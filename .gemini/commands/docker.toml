@@ -1,0 +1,2 @@
+description = "Comprehensive Docker administration and troubleshooting for the Goji system."
+prompt = "Use the docker skill to perform Docker administration, troubleshooting, and environment management. {{args}}"

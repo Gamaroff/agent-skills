@@ -1,5 +1,5 @@
 ---
-skill: docker
+name: docker
 description: Comprehensive Docker administration and troubleshooting for the Goji system. Manages development, test, and production environments with PostgreSQL, Redis, and monitoring stack.
 type: project
 ---
