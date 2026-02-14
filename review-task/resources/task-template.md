@@ -1,0 +1,1 @@
+../../create-task/resources/task-template.md

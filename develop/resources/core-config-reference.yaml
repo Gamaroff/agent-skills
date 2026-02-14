@@ -1,0 +1,42 @@
+# <!-- Powered by BMAD™ Core -->
+# Core Configuration Reference
+# Actual config location: .bmad-core/core-config.yaml
+
+# This is a reference showing the structure and purpose of each configuration key.
+# Always read the actual core-config.yaml file at runtime to get current values.
+
+markdownExploder: true # Markdown processing flag
+
+qa:
+  qaLocation: docs/qa # QA artifacts root directory (gates/, assessments/)
+
+prd:
+  prdFile: docs/prd.md # Monolithic PRD file path
+  prdVersion: v4 # PRD schema version
+  prdSharded: true # PRD uses sharded structure
+  prdShardedLocation: docs/prd # Directory containing epic files
+  epicFilePattern: '*/epic-{n}*.md' # Pattern for finding epics
+
+architecture:
+  architectureFile: docs/architecture.md # Monolithic architecture file
+  architectureVersion: v4 # Architecture schema version
+  architectureSharded: true # Architecture is sharded
+  architectureShardedLocation: docs/architecture # Directory containing architecture docs
+
+customTechnicalDocuments: null # Custom doc references (optional)
+
+devLoadAlwaysFiles: # Files to load on dev agent activation
+  - docs/architecture/concepts/coding-standards.md
+  - docs/architecture/concepts/tech-stack.md
+  - docs/architecture/concepts/source-tree.md
+
+devDebugLog: .ai/debug-log.md # Dev debug log location
+devStoryLocation: docs/stories # Story file directory
+slashPrefix: BMad # Command prefix for CLI integration
+
+
+# Usage Examples:
+# - Story files: {devStoryLocation}/{epic}.{story}.*.md
+# - QA gate files: {qa.qaLocation}/gates/{epic}.{story}-*.yml
+# - QA assessments: {qa.qaLocation}/assessments/{epic}.{story}-*.md
+# - Epic files: {prd.prdShardedLocation}/{category}/epic-{n}.*.md

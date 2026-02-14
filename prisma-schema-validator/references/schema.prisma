@@ -1,0 +1,2079 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                          String                       @id @default(uuid())
+  email                       String                       @unique
+  handle                      String?                      @unique
+  firstName                   String?
+  lastName                    String?
+  displayName                 String?
+  bio                         String?
+  status                      String?
+  dateOfBirth                 DateTime?
+  profileImageUrl             String?
+  country                     String?
+  region                      String?
+  timezone                    String?
+  passwordHash                String?
+  authMethod                  AuthMethodEnum               @default(PASSWORD)
+  isEmailVerified             Boolean                      @default(false)
+  isPhoneVerified             Boolean                      @default(false)
+  phoneNumber                 String?                      @unique
+  lastLoginAt                 DateTime?
+  twoFactorEnabled            Boolean                      @default(false)
+  twoFactorSecret             String?
+  biometricEnabled            Boolean                      @default(false)
+  faceIdEnabled               Boolean                      @default(false)
+  fingerprintEnabled          Boolean                      @default(false)
+  securityQuestions           Json?
+  socialProviderId            String?
+  socialProvider              String?
+  socialProviderEmail         String?
+  socialAccessToken           String?
+  socialRefreshToken          String?
+  socialTokenExpiresAt        DateTime?
+  socialProfileData           Json?
+  socialVerifiedEmail         Boolean                      @default(false)
+  socialAccountCreatedAt      DateTime?
+  kycTier                     KycTierEnum                  @default(TIER_0)
+  kycStatus                   KycStatusEnum                @default(PENDING)
+  kycDocumentStatus           Json?
+  creditScore                 Decimal?
+  riskScore                   Decimal?
+  amlFlags                    String[]                     @default([])
+  sanctionsScreened           Boolean                      @default(false)
+  profileVisibility           ProfileVisibilityEnum        @default(PUBLIC)
+  onlineStatus                UserStatusEnum               @default(OFFLINE)
+  lastSeenAt                  DateTime?
+  allowContactRequests        Boolean                      @default(true)
+  chatPreferences             Json?
+  language                    String                       @default("en")
+  currency                    String                       @default("USD")
+  theme                       String                       @default("light")
+  dataConsentVersion          String?
+  gdprConsent                 Boolean                      @default(false)
+  accountStatus               AccountStatusEnum            @default(ACTIVE)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  alertAuditLogs              AlertAuditLog[]
+  contentViolations           ChatContentFilterViolation[] @relation("UserContentViolations")
+  deviceFingerprints          ChatDeviceFingerprint[]      @relation("UserDeviceFingerprints")
+  deviceSessions              ChatDeviceSession[]          @relation("UserDeviceSessions")
+  syncEvents                  ChatDeviceSyncEvent[]        @relation("UserSyncEvents")
+  createdGroupKeys            ChatGroupKey[]               @relation("CreatedGroupKeys")
+  keyAuditEvents              ChatKeyAuditEvent[]          @relation("UserKeyAuditEvents")
+  sentKeyExchangeRequests     ChatKeyExchangeRequest[]     @relation("SentKeyExchangeRequests")
+  receivedKeyExchangeRequests ChatKeyExchangeRequest[]     @relation("ReceivedKeyExchangeRequests")
+  offlineMessages             ChatOfflineMessage[]         @relation("UserOfflineMessages")
+  readReceipts                ChatReadReceipt[]            @relation("UserReadReceipts")
+  securityEvents              ChatSecurityEvent[]          @relation("UserSecurityEvents")
+  encryptionKeys              ChatUserKey[]                @relation("UserEncryptionKeys")
+  contacts                    Contact[]
+  ownedExternalContacts       ExternalContact[]            @relation("OwnedExternalContacts")
+  financialAuditEntries       FinancialAuditEntry[]
+  groupMemberships            GroupMember[]
+  identityDocuments           IdentityDocument[]
+  kycVerification             KycVerification?
+  notificationPreferences     NotificationPreference[]
+  notifications               Notification[]
+  receivedRequests            PaymentRequest[]             @relation("RequestToUser")
+  sentRequests                PaymentRequest[]             @relation("RequestFromUser")
+  productReviews              ProductReview[]
+  productShares               ProductShare[]
+  rewards                     Reward[]
+  shoppingPurchases           ShoppingPurchase[]
+  shoppingRecommendations     ShoppingRecommendation[]
+  shoppingProfile             ShoppingUserProfile?
+  socialAccounts              SocialAccount[]
+  receivedTransactions        Transaction[]                @relation("TransactionToUser")
+  transactions                Transaction[]                @relation("UserTransactions")
+  contactOf                   UserContact[]                @relation("ContactOf")
+  ownedContacts               UserContact[]                @relation("OwnedContacts")
+  suspensions                 UserSuspension[]
+  wallets                     Wallet[]
+  usedAddresses               UsedAddress[]
+  otps                        Otp[]                        @relation()
+
+  @@map("users")
+}
+
+model SocialAccount {
+  id               String    @id @default(uuid())
+  userId           String
+  provider         String
+  providerId       String
+  providerEmail    String?
+  accessToken      String?
+  refreshToken     String?
+  tokenExpiresAt   DateTime?
+  scope            String?
+  profileData      Json?
+  emailVerified    Boolean   @default(false)
+  phoneVerified    Boolean   @default(false)
+  profileImageUrl  String?
+  accountCreatedAt DateTime?
+  lastSyncAt       DateTime?
+  isActive         Boolean   @default(true)
+  linkedAt         DateTime  @default(now())
+  lastUsedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@unique([userId, provider])
+  @@index([userId, isActive])
+  @@index([provider, providerId])
+  @@map("social_accounts")
+}
+
+model Wallet {
+  id                    String                @id @default(uuid())
+  userId                String
+  type                  String
+  changePublicKey       String
+  receivePublicKey      String
+  address               String?
+  balance               Decimal               @default(0)
+  status                String?               @default("ACTIVE")
+  lastSyncAt            DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  financialAuditEntries FinancialAuditEntry[]
+  shoppingPurchases     ShoppingPurchase[]
+  transactions          Transaction[]
+  usedAddresses         UsedAddress[]
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("wallets")
+}
+
+model UsedAddress {
+  id            String       @id @default(uuid())
+  userId        String       @map("user_id")
+  walletId      String       @map("wallet_id")
+  protocolId    String       @map("protocol_id") @db.VarChar(100)
+  keyId         String       @map("key_id") @db.VarChar(500)
+  counterparty  String       @db.VarChar(100)
+  address       String       @db.VarChar(100)
+  publicKey     String       @map("public_key") @db.Text
+  currency      String       @db.VarChar(10)
+  context       String       @db.VarChar(50)
+  contextId     String?      @map("context_id") @db.VarChar(500)
+  isUsed        Boolean      @default(false) @map("is_used")
+  usedAt        DateTime?    @map("used_at")
+  transactionId String?      @map("transaction_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet        Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@unique([walletId, keyId], name: "unique_wallet_keyid")
+  @@index([userId, walletId], name: "idx_user_wallet")
+  @@index([keyId], name: "idx_key_id")
+  @@index([address], name: "idx_address")
+  @@index([currency, context, contextId], name: "idx_context")
+  @@map("used_addresses")
+}
+
+model Transaction {
+  id                      String                 @id @default(uuid())
+  userId                  String
+  walletId                String?
+  type                    TransactionTypeEnum
+  status                  TransactionStatusEnum  @default(PENDING)
+  amount                  Decimal
+  fee                     Decimal                @default(0)
+  currency                String
+  toUserId                String?
+  chatId                  String?
+  description             String?
+  memo                    String?
+  blockchainTransactionId String?
+  blockchainOutputIndex   Int?
+  deletedAt               DateTime?
+  deletedBy               String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  financialAuditEntries   FinancialAuditEntry[]
+  blockchainData          BlockchainTransaction? @relation("BlockchainToGojiTransactions", fields: [blockchainTransactionId], references: [id])
+  toUser                  User?                  @relation("TransactionToUser", fields: [toUserId], references: [id])
+  user                    User                   @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  wallet                  Wallet?                @relation(fields: [walletId], references: [id])
+  chat                    Group?                 @relation(fields: [chatId], references: [id])
+  paymentRequest          PaymentRequest?        @relation("TransactionPaymentRequest")
+  paymentMessage          GroupMessage?
+  usedAddresses           UsedAddress[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([toUserId, createdAt(sort: Desc)])
+  @@index([blockchainTransactionId])
+  @@index([blockchainTransactionId, blockchainOutputIndex])
+  @@index([chatId, deletedAt])
+  @@index([chatId, createdAt(sort: Desc)])
+  @@index([deletedAt, status])
+  @@map("transactions")
+}
+
+model Contact {
+  id                 String        @id @default(uuid())
+  userId             String
+  name               String
+  type               String
+  paymentDetails     Json
+  avatarUrl          String?
+  isFavorite         Boolean       @default(false)
+  trustLevel         String        @default("new")
+  lastInteractionAt  DateTime?
+  interactionCount   Int           @default(0)
+  totalPaymentVolume Decimal       @default(0)
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupMemberships   GroupMember[]
+
+  @@unique([userId, type, paymentDetails])
+  @@index([userId, type])
+  @@index([userId, isFavorite])
+  @@map("contacts")
+}
+
+model UserContact {
+  id                 String          @id @default(uuid())
+  ownerId            String
+  contactUserId      String
+  nickname           String?
+  notes              String?
+  isFavorite         Boolean         @default(false)
+  trustLevel         String          @default("new")
+  status             String          @default("ACTIVE")
+  lastInteractionAt  DateTime?
+  interactionCount   Int             @default(0)
+  totalPaymentVolume Decimal         @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  paymentMethods     PaymentMethod[]
+  contactUser        User            @relation("ContactOf", fields: [contactUserId], references: [id], onDelete: Cascade)
+  owner              User            @relation("OwnedContacts", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, contactUserId])
+  @@index([ownerId, status])
+  @@index([ownerId, isFavorite])
+  @@index([contactUserId])
+  @@map("user_contacts")
+}
+
+model ExternalContact {
+  id                 String          @id @default(uuid())
+  ownerId            String
+  name               String
+  type               String
+  country            String?
+  isFavorite         Boolean         @default(false)
+  trustLevel         String          @default("new")
+  isActive           Boolean         @default(true)
+  lastInteractionAt  DateTime?
+  interactionCount   Int             @default(0)
+  totalPaymentVolume Decimal         @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  owner              User            @relation("OwnedExternalContacts", fields: [ownerId], references: [id], onDelete: Cascade)
+  paymentMethods     PaymentMethod[]
+
+  @@index([ownerId, type])
+  @@index([ownerId, isFavorite])
+  @@map("external_contacts")
+}
+
+model PaymentMethod {
+  id                String           @id @default(uuid())
+  userContactId     String?
+  externalContactId String?
+  type              String
+  label             String
+  paymentDetails    Json
+  isDefault         Boolean          @default(false)
+  isVerified        Boolean          @default(false)
+  verifiedAt        DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  externalContact   ExternalContact? @relation(fields: [externalContactId], references: [id], onDelete: Cascade)
+  userContact       UserContact?     @relation(fields: [userContactId], references: [id], onDelete: Cascade)
+
+  @@index([userContactId, isDefault])
+  @@index([externalContactId, isDefault])
+  @@index([type])
+  @@map("payment_methods")
+}
+
+model Group {
+  id                  String              @id @default(uuid())
+  name                String
+  description         String?
+  avatarUrl           String?
+  type                String
+  joinMode            String              @default("invite_only")
+  capabilities        String[]            @default([])
+  savingsEnabled      Boolean             @default(false)
+  savingsGoal         Decimal?
+  savingsDeadline     DateTime?
+  savingsRules        Json?
+  bettingEnabled      Boolean             @default(false)
+  bettingRules        Json?
+  bettingDeadline     DateTime?
+  monetizationEnabled Boolean             @default(false)
+  defaultContentPrice Decimal?
+  monetizationRules   Json?
+  pokerEnabled        Boolean             @default(false)
+  pokerConfig         Json?
+  pokerDeadline       DateTime?
+  isReadOnly          Boolean             @default(false)
+  autoArchiveAfter    Int?
+  memberLimit         Int                 @default(1000)
+  deletedAt           DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  lastActivityAt      DateTime            @default(now())
+  visibility          GroupVisibility     @default(PRIVATE)
+  bettingPools        BettingPool[]
+  encryptionKeys      ChatGroupKey[]      @relation("GroupEncryptionKeys")
+  keyAuditEvents      ChatKeyAuditEvent[] @relation("GroupKeyAuditEvents")
+  members             GroupMember[]
+  messages            GroupMessage[]
+  ProductShare        ProductShare[]
+  transactions        Transaction[]
+
+  @@index([type, visibility])
+  @@index([capabilities])
+  @@index([lastActivityAt])
+  @@index([deletedAt, lastActivityAt])
+  @@map("groups")
+}
+
+model GroupMember {
+  id                  String         @id @default(uuid())
+  groupId             String
+  userId              String?
+  contactId           String?
+  role                String
+  permissions         String[]       @default(["chat"])
+  status              String         @default("active")
+  joinedAt            DateTime       @default(now())
+  lastReadAt          DateTime?
+  lastActiveAt        DateTime       @default(now())
+  invitedBy           String?
+  approvedAt          DateTime?
+  approvedBy          String?
+  savingsContribution Decimal        @default(0)
+  bettingBalance      Decimal        @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  contact             Contact?       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  group               Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user                User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  GroupMessage        GroupMessage[]
+
+  @@unique([groupId, userId])
+  @@unique([groupId, contactId])
+  @@index([userId, status])
+  @@index([groupId, role])
+  @@index([status, lastActiveAt])
+  @@map("group_members")
+}
+
+model GroupMessage {
+  id                  String                @id @default(uuid())
+  groupId             String
+  senderId            String
+  senderMemberId      String
+  content             String
+  text                String?
+  contentType         String                @default("text")
+  mediaDuration       Int?
+  mediaSize           BigInt?
+  thumbnailUrl        String?
+  isPayment           Boolean               @default(false)
+  paymentAmount       Decimal?
+  paymentCurrency     String?
+  paymentRecipients   String[]              @default([])
+  paymentStatus       String?
+  transactionId       String?               @unique
+  isMonetized         Boolean               @default(false)
+  accessPrice         Decimal?
+  accessCurrency      String?
+  accessCount         Int                   @default(0)
+  monetizationGoal    Json?
+  unlockDeadline      DateTime?
+  savingsData         Json?
+  bettingPoolId       String?
+  billSplitData       Json?
+  productShareData    Json?
+  giftCodeData        Json?
+  reactions           Json?
+  mentions            String[]              @default([])
+  linkPreviews        Json?
+  replyToMessageId    String?
+  threadMessageIds    String[]              @default([])
+  editedAt            DateTime?
+  deletedAt           DateTime?
+  pinnedAt            DateTime?
+  pinnedBy            String?
+  isEdited            Boolean               @default(false)
+  isDeleted           Boolean               @default(false)
+  deliveredTo         String[]              @default([])
+  readBy              String[]              @default([])
+  status              MessageStatusEnum     @default(MESSAGE_SENT)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  syncEvents          ChatDeviceSyncEvent[] @relation("MessageSyncEvents")
+  offlineMessageQueue ChatOfflineMessage[]  @relation("MessageOfflineQueue")
+  readReceipts        ChatReadReceipt[]     @relation("MessageReadReceipts")
+  contentAccess       ContentAccess[]
+  ContentGoal         ContentGoal?
+  bettingPool         BettingPool?          @relation(fields: [bettingPoolId], references: [id])
+  group               Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  replyTo             GroupMessage?         @relation("MessageReplies", fields: [replyToMessageId], references: [id])
+  replies             GroupMessage[]        @relation("MessageReplies")
+  member              GroupMember           @relation(fields: [senderMemberId], references: [id], onDelete: Cascade)
+  transaction         Transaction?          @relation(fields: [transactionId], references: [id])
+  mediaAttachments    MediaAttachment[]
+
+  @@index([groupId, createdAt])
+  @@index([senderId, createdAt])
+  @@index([contentType, createdAt])
+  @@index([isMonetized, accessPrice])
+  @@index([bettingPoolId])
+  @@index([replyToMessageId])
+  @@index([status, createdAt])
+  @@map("group_messages")
+}
+
+model MediaAttachment {
+  id               String       @id @default(uuid())
+  messageId        String
+  fileName         String
+  originalFileName String
+  fileSize         BigInt
+  mimeType         String
+  mediaType        String
+  url              String
+  thumbnailUrl     String?
+  previewUrl       String?
+  dimensions       Json?
+  duration         Int?
+  bitrate          Int?
+  resolution       String?
+  processingStatus String       @default("pending")
+  processedAt      DateTime?
+  isEncrypted      Boolean      @default(false)
+  encryptionKey    String?
+  accessLevel      String       @default("group")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  message          GroupMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([mediaType, processingStatus])
+  @@index([createdAt])
+  @@map("media_attachments")
+}
+
+model BettingPool {
+  id                 String           @id @default(uuid())
+  groupId            String
+  creatorId          String
+  title              String
+  description        String
+  category           String
+  minBet             Decimal
+  maxBet             Decimal
+  maxPoolSize        Int?
+  currency           String
+  entryDeadline      DateTime
+  resultDeadline     DateTime
+  status             String           @default("open")
+  totalPool          Decimal          @default(0)
+  participantCount   Int              @default(0)
+  winningOutcome     String?
+  evidenceLinks      String[]         @default([])
+  moderatorId        String?
+  resolvedAt         DateTime?
+  payoutCompleted    Boolean          @default(false)
+  requiresModeration Boolean          @default(true)
+  ageRestricted      Boolean          @default(false)
+  regionRestricted   String[]         @default([])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  outcomes           BettingOutcome[]
+  bets               BettingPoolBet[]
+  group              Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  messages           GroupMessage[]
+
+  @@index([groupId, status])
+  @@index([status, entryDeadline])
+  @@index([category, status])
+  @@map("betting_pools")
+}
+
+model BettingOutcome {
+  id          String           @id @default(uuid())
+  poolId      String
+  label       String
+  description String?
+  odds        Decimal?
+  isWinner    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  pool        BettingPool      @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  bets        BettingPoolBet[]
+
+  @@index([poolId])
+  @@map("betting_outcomes")
+}
+
+model BettingPoolBet {
+  id                  String         @id @default(uuid())
+  poolId              String
+  outcomeId           String
+  userId              String
+  amount              Decimal
+  currency            String
+  transactionId       String?
+  status              String         @default("placed")
+  payout              Decimal?
+  payoutTransactionId String?
+  createdAt           DateTime       @default(now())
+  outcome             BettingOutcome @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+  pool                BettingPool    @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+  @@unique([poolId, outcomeId, userId])
+  @@index([userId, status])
+  @@index([poolId, status])
+  @@map("betting_pool_bets")
+}
+
+model ContentAccess {
+  id               String          @id @default(uuid())
+  messageId        String
+  userId           String
+  accessType       String
+  paymentAmount    Decimal?
+  paymentCurrency  String?
+  transactionId    String?
+  goalContribution Boolean         @default(false)
+  goalId           String?
+  accessGrantedAt  DateTime        @default(now())
+  accessExpiresAt  DateTime?
+  createdAt        DateTime        @default(now())
+  goal             ContentGoal?    @relation(fields: [goalId], references: [id])
+  message          GroupMessage    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  refunds          ContentRefund[]
+
+  @@unique([messageId, userId, accessType])
+  @@index([userId, accessGrantedAt])
+  @@index([messageId, accessType])
+  @@map("content_access")
+}
+
+model ContentGoal {
+  id                 String          @id @default(uuid())
+  messageId          String          @unique
+  targetAmount       Decimal?
+  targetBackers      Int?
+  deadline           DateTime
+  description        String?
+  totalRaised        Decimal         @default(0)
+  backersCount       Int             @default(0)
+  status             String          @default("active")
+  fallbackPolicy     String          @default("refund_all")
+  gracePeriodHours   Int             @default(72)
+  minRevealThreshold Decimal?
+  goalReachedAt      DateTime?
+  goalExpiredAt      DateTime?
+  refundsProcessed   Boolean         @default(false)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  contributions      ContentAccess[]
+  message            GroupMessage    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  refunds            ContentRefund[]
+
+  @@index([status, deadline])
+  @@index([messageId])
+  @@map("content_goals")
+}
+
+model ContentRefund {
+  id              String        @id @default(uuid())
+  contentAccessId String
+  goalId          String?
+  userId          String
+  refundAmount    Decimal
+  refundCurrency  String
+  refundReason    String
+  processed       Boolean       @default(false)
+  processedAt     DateTime?
+  transactionId   String?
+  createdAt       DateTime      @default(now())
+  contentAccess   ContentAccess @relation(fields: [contentAccessId], references: [id], onDelete: Cascade)
+  goal            ContentGoal?  @relation(fields: [goalId], references: [id])
+
+  @@index([processed, createdAt])
+  @@index([userId, processed])
+  @@map("content_refunds")
+}
+
+model Reward {
+  id        String   @id @default(uuid())
+  userId    String
+  points    Int      @default(0)
+  tier      String   @default("BRONZE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("rewards")
+}
+
+model KycVerification {
+  id                 String            @id @default(uuid())
+  userId             String            @unique
+  status             String
+  level              String
+  documentType       String?
+  documentNumber     String?
+  expiryDate         DateTime?
+  documentFrontImage String?
+  documentBackImage  String?
+  selfieImage        String?
+  addressProofImage  String?
+  documentExpiry     DateTime?
+  documentCountry    String?
+  addressLine1       String?
+  addressLine2       String?
+  city               String?
+  state              String?
+  postalCode         String?
+  country            String?
+  rejectionReason    String?
+  verifiedAt         DateTime?
+  reviewedBy         String?
+  reviewNotes        String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  documentLinks      KycDocumentLink[]
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_verifications")
+}
+
+model Notification {
+  id          String                    @id @default(uuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationTypeEnum
+  priority    NotificationPriorityEnum  @default(MEDIUM)
+  channels    NotificationChannelEnum[]
+  status      NotificationStatusEnum    @default(pending)
+  metadata    Json?
+  templateId  String?
+  scheduledAt DateTime?
+  expiresAt   DateTime?
+  readAt      DateTime?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  deliveries  NotificationDelivery[]
+  template    NotificationTemplate?     @relation(fields: [templateId], references: [id])
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([type, priority])
+  @@index([status, scheduledAt])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id             String                  @id @default(uuid())
+  notificationId String
+  channel        NotificationChannelEnum
+  provider       String?
+  externalId     String?
+  status         DeliveryStatusEnum      @default(pending)
+  deliveredAt    DateTime?
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  failedAt       DateTime?
+  failureReason  String?
+  metadata       Json?
+  createdAt      DateTime                @default(now())
+  notification   Notification            @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId, channel])
+  @@index([status, createdAt])
+  @@index([channel, status])
+  @@map("notification_deliveries")
+}
+
+model NotificationPreference {
+  id             String                    @id @default(uuid())
+  userId         String
+  type           NotificationTypeEnum
+  channels       NotificationChannelEnum[]
+  enabled        Boolean                   @default(true)
+  quietHours     Json?
+  frequencyLimit Int?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId, enabled])
+  @@map("notification_preferences")
+}
+
+model NotificationTemplate {
+  id              String                  @id @default(uuid())
+  name            String
+  type            NotificationTypeEnum
+  language        String                  @default("en")
+  channel         NotificationChannelEnum
+  titleTemplate   String
+  messageTemplate String
+  metadataSchema  Json?
+  isActive        Boolean                 @default(true)
+  version         Int                     @default(1)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  notifications   Notification[]
+
+  @@unique([name, version])
+  @@index([type, channel, language])
+  @@index([isActive, type])
+  @@map("notification_templates")
+}
+
+model PaymentRequest {
+  id              String       @id @default(uuid())
+  requesterId     String
+  recipientId     String
+  amount          Decimal
+  currency        String
+  message         String?
+  note            String?
+  status          String
+  dueDate         DateTime?
+  expiresAt       DateTime?
+  expiresInHours  Int?
+  metadata        String?
+  transactionId   String?      @unique
+  rejectionReason String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  recipient       User         @relation("RequestToUser", fields: [recipientId], references: [id], onDelete: Cascade)
+  requester       User         @relation("RequestFromUser", fields: [requesterId], references: [id], onDelete: Cascade)
+  transaction     Transaction? @relation("TransactionPaymentRequest", fields: [transactionId], references: [id])
+
+  @@map("payment_requests")
+}
+
+model KycLimit {
+  id           String   @id @default(uuid())
+  country      String
+  kycTier      String
+  currency     String
+  dailyLimit   Decimal
+  monthlyLimit Decimal
+  yearlyLimit  Decimal?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([country, kycTier, currency])
+  @@index([country, kycTier])
+  @@index([currency])
+  @@map("kyc_limits")
+}
+
+model UserSuspension {
+  id            String    @id @default(uuid())
+  userId        String
+  reason        String
+  suspendedAt   DateTime  @default(now())
+  unsuspendedAt DateTime?
+  suspendedBy   String?
+  unsuspendedBy String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, suspendedAt])
+  @@index([suspendedAt])
+  @@map("user_suspensions")
+}
+
+model IdentityDocument {
+  id                      String                      @id @default(uuid())
+  userId                  String
+  documentType            String
+  documentNumber          String?
+  documentCountry         String
+  documentRegion          String?
+  documentIssuedDate      DateTime?
+  documentExpiryDate      DateTime?
+  submissionBatch         String
+  submissionMethod        String                      @default("MOBILE_SCAN")
+  submissionSource        String?
+  documentFrontImageUrl   String?
+  documentBackImageUrl    String?
+  selfieImageUrl          String?
+  frontImageHash          String?
+  backImageHash           String?
+  selfieImageHash         String?
+  encryptionKeyId         String?
+  processingStatus        String                      @default("SUBMITTED")
+  processingProvider      String?
+  processingStartedAt     DateTime?
+  processingCompletedAt   DateTime?
+  processingFailureReason String?
+  imageQualityScore       Decimal?
+  documentReadability     Decimal?
+  faceMatchScore          Decimal?
+  authenticityScore       Decimal?
+  overallConfidenceScore  Decimal?
+  verificationStatus      String                      @default("PENDING")
+  verificationDecision    String?
+  rejectionReasons        String[]                    @default([])
+  complianceFlags         String[]                    @default([])
+  requiresManualReview    Boolean                     @default(false)
+  reviewedAt              DateTime?
+  reviewedBy              String?
+  reviewNotes             String?
+  approvedAt              DateTime?
+  approvedBy              String?
+  retentionExpiresAt      DateTime?
+  dataClassification      String                      @default("SENSITIVE")
+  accessLog               Json?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+  processingEvents        DocumentProcessingEvent[]
+  verificationResult      DocumentVerificationResult?
+  user                    User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kycVerifications        KycDocumentLink[]
+
+  @@index([userId, createdAt])
+  @@index([userId, verificationStatus])
+  @@index([submissionBatch])
+  @@index([processingStatus, processingProvider])
+  @@index([verificationStatus, requiresManualReview])
+  @@index([documentType, documentCountry])
+  @@map("identity_documents")
+}
+
+model DocumentProcessingEvent {
+  id                    String           @id @default(uuid())
+  identityDocumentId    String
+  attemptNumber         Int              @default(1)
+  processingProvider    String
+  providerTransactionId String?
+  requestPayload        Json?
+  requestTimestamp      DateTime         @default(now())
+  responsePayload       Json?
+  responseTimestamp     DateTime?
+  responseCode          String?
+  responseMessage       String?
+  processingDuration    Int?
+  apiCallCount          Int              @default(1)
+  dataTransferSize      Int?
+  processingStatus      String
+  success               Boolean          @default(false)
+  errorCode             String?
+  errorMessage          String?
+  retryable             Boolean          @default(false)
+  webhookReceived       Boolean          @default(false)
+  webhookReceivedAt     DateTime?
+  callbackUrl           String?
+  userAgent             String?
+  ipAddress             String?
+  sessionId             String?
+  debugInfo             Json?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  identityDocument      IdentityDocument @relation(fields: [identityDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([identityDocumentId, attemptNumber])
+  @@index([processingProvider, processingStatus])
+  @@index([providerTransactionId])
+  @@index([processingStatus, createdAt])
+  @@map("document_processing_events")
+}
+
+model DocumentVerificationResult {
+  id                        String           @id @default(uuid())
+  identityDocumentId        String           @unique
+  extractedFirstName        String?
+  extractedLastName         String?
+  extractedFullName         String?
+  extractedDateOfBirth      DateTime?
+  extractedGender           String?
+  extractedNationality      String?
+  extractedDocumentNumber   String?
+  extractedDocumentType     String?
+  extractedIssuingAuthority String?
+  extractedIssuedDate       DateTime?
+  extractedExpiryDate       DateTime?
+  extractedMRZData          Json?
+  extractedAddress          Json?
+  extractedCity             String?
+  extractedRegion           String?
+  extractedPostalCode       String?
+  extractedCountry          String?
+  biometricData             Json?
+  securityFeatures          Json?
+  documentSecurity          Json?
+  nameConfidence            Decimal?
+  dobConfidence             Decimal?
+  documentConfidence        Decimal?
+  addressConfidence         Decimal?
+  biometricConfidence       Decimal?
+  faceMatchResult           String?
+  faceMatchScore            Decimal?
+  livenessCheck             String?
+  livenessScore             Decimal?
+  documentAuthentic         Boolean?
+  forgeryDetected           Boolean          @default(false)
+  tamperingDetected         Boolean          @default(false)
+  documentCondition         String?
+  validationFlags           String[]         @default([])
+  warningFlags              String[]         @default([])
+  fraudRiskScore            Decimal?
+  riskFactors               String[]         @default([])
+  watchlistHits             Json?
+  processingVersion         String?
+  modelVersion              String?
+  processingRegion          String?
+  dataRetentionPolicy       String?
+  imageResolution           Json?
+  imageFormat               Json?
+  documentOrientation       String?
+  lightingCondition         String?
+  extractedAt               DateTime?
+  verifiedAt                DateTime?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+  identityDocument          IdentityDocument @relation(fields: [identityDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([identityDocumentId])
+  @@index([faceMatchResult, faceMatchScore])
+  @@index([documentAuthentic, fraudRiskScore])
+  @@index([verifiedAt])
+  @@map("document_verification_results")
+}
+
+model KycDocumentLink {
+  id                 String           @id @default(uuid())
+  kycVerificationId  String
+  identityDocumentId String
+  documentPurpose    String
+  documentWeight     Decimal          @default(1.0)
+  isRequired         Boolean          @default(true)
+  linkStatus         String           @default("PENDING")
+  acceptedAt         DateTime?
+  rejectedAt         DateTime?
+  rejectionReason    String?
+  linkedAt           DateTime         @default(now())
+  linkedBy           String?
+  reviewedBy         String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  identityDocument   IdentityDocument @relation(fields: [identityDocumentId], references: [id], onDelete: Cascade)
+  kycVerification    KycVerification  @relation(fields: [kycVerificationId], references: [id], onDelete: Cascade)
+
+  @@unique([kycVerificationId, identityDocumentId])
+  @@index([kycVerificationId, linkStatus])
+  @@index([identityDocumentId, documentPurpose])
+  @@index([linkStatus, isRequired])
+  @@map("kyc_document_links")
+}
+
+model ShoppingProvider {
+  id                    String              @id @default(uuid())
+  name                  String
+  type                  String
+  apiEndpoint           String?
+  commissionRate        Decimal             @default(0.05)
+  supportedCountries    String[]            @default([])
+  status                String              @default("ACTIVE")
+  authMethod            String?
+  apiKeyEncrypted       String?
+  webhookUrl            String?
+  averageDeliveryTime   Int                 @default(300)
+  successRate           Decimal             @default(0.95)
+  dailyTransactionLimit Decimal?
+  minimumOrderValue     Decimal             @default(1)
+  maximumOrderValue     Decimal?
+  lastSyncAt            DateTime?
+  nextSyncAt            DateTime?
+  isHealthy             Boolean             @default(true)
+  lastHealthCheck       DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  syncEvents            ProviderSyncEvent[]
+  products              ShoppingProduct[]
+  purchases             ShoppingPurchase[]
+
+  @@index([type, status])
+  @@index([supportedCountries])
+  @@index([status, lastHealthCheck])
+  @@map("shopping_providers")
+}
+
+model ShoppingProduct {
+  id                   String                   @id @default(uuid())
+  sku                  String                   @unique
+  name                 String
+  description          String
+  shortDescription     String?
+  category             String
+  subcategory          String?
+  brand                String
+  merchant             String
+  faceValue            Decimal
+  costPrice            Decimal?
+  currency             String
+  countries            String[]                 @default([])
+  regions              String[]                 @default([])
+  deliveryType         String
+  deliveryInstructions String?
+  redemptionUrl        String?
+  termsAndConditions   String?
+  expiryDuration       Int?
+  providerId           String
+  providerSku          String
+  providerProductId    String?
+  status               String                   @default("ACTIVE")
+  availableQuantity    Int                      @default(0)
+  reservedQuantity     Int                      @default(0)
+  lowStockThreshold    Int                      @default(10)
+  isLowStock           Boolean                  @default(false)
+  imageUrl             String?
+  thumbnailUrl         String?
+  tags                 String[]                 @default([])
+  isFeatured           Boolean                  @default(false)
+  isTrending           Boolean                  @default(false)
+  isRecommended        Boolean                  @default(false)
+  popularity           Int                      @default(0)
+  rating               Decimal?
+  reviewCount          Int                      @default(0)
+  ageRestricted        Boolean                  @default(false)
+  minimumAge           Int                      @default(18)
+  kycRequired          String                   @default("TIER_0")
+  complianceFlags      String[]                 @default([])
+  dynamicPricing       Boolean                  @default(false)
+  basePrice            Decimal?
+  priceModifiers       Json?
+  launchedAt           DateTime?
+  discontinuedAt       DateTime?
+  lastInventoryUpdate  DateTime?
+  lastPriceUpdate      DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  inventoryEvents      ProductInventoryEvent[]
+  reviews              ProductReview[]
+  shares               ProductShare[]
+  provider             ShoppingProvider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  purchases            ShoppingPurchase[]
+  recommendations      ShoppingRecommendation[]
+
+  @@index([providerId, status])
+  @@index([category, status])
+  @@index([countries])
+  @@index([status, isFeatured])
+  @@index([category, subcategory])
+  @@index([brand, status])
+  @@index([popularity, rating])
+  @@index([tags])
+  @@map("shopping_products")
+}
+
+model ShoppingPurchase {
+  id                  String                @id @default(uuid())
+  userId              String
+  productId           String
+  walletId            String?
+  quantity            Int                   @default(1)
+  unitPrice           Decimal
+  totalAmount         Decimal
+  currency            String
+  exchangeRate        Decimal?
+  providerId          String
+  providerOrderId     String?
+  providerStatus      String?
+  providerResponse    Json?
+  status              String                @default("PENDING")
+  paymentStatus       String                @default("PENDING")
+  deliveryStatus      String                @default("PENDING")
+  deliveryMethod      String
+  redemptionCodes     Json?
+  deliveryAttempts    Int                   @default(0)
+  deliveredAt         DateTime?
+  isGift              Boolean               @default(false)
+  recipientEmail      String?
+  recipientUserId     String?
+  giftMessage         String?
+  giftDeliveredAt     DateTime?
+  sharedWithContacts  String[]              @default([])
+  shareType           String?
+  shareMessageId      String?
+  transactionId       String?
+  refundTransactionId String?
+  userAgent           String?
+  ipAddress           String?
+  deviceFingerprint   String?
+  geoLocation         Json?
+  complianceFlags     String[]              @default([])
+  fraudScore          Decimal?
+  riskFactors         String[]              @default([])
+  processedAt         DateTime?
+  completedAt         DateTime?
+  failedAt            DateTime?
+  cancelledAt         DateTime?
+  refundedAt          DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  ProductReview       ProductReview[]
+  purchaseEvents      PurchaseStatusEvent[]
+  product             ShoppingProduct       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  provider            ShoppingProvider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet              Wallet?               @relation(fields: [walletId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([productId, status])
+  @@index([providerId, providerOrderId])
+  @@index([status, createdAt])
+  @@index([deliveryStatus, deliveredAt])
+  @@index([isGift, recipientEmail])
+  @@index([transactionId])
+  @@map("shopping_purchases")
+}
+
+model PurchaseStatusEvent {
+  id                String           @id @default(uuid())
+  purchaseId        String
+  fromStatus        String?
+  toStatus          String
+  statusReason      String?
+  eventType         String
+  eventSource       String
+  triggeredBy       String?
+  providerEventId   String?
+  providerTimestamp DateTime?
+  providerData      Json?
+  errorCode         String?
+  errorMessage      String?
+  retryable         Boolean          @default(false)
+  retryCount        Int              @default(0)
+  ipAddress         String?
+  userAgent         String?
+  sessionId         String?
+  createdAt         DateTime         @default(now())
+  purchase          ShoppingPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([toStatus, createdAt])
+  @@index([providerEventId])
+  @@map("purchase_status_events")
+}
+
+model ShoppingUserProfile {
+  id                        String                   @id @default(uuid())
+  userId                    String                   @unique
+  purchaseCategories        Json                     @default("{}")
+  spendingPatterns          Json                     @default("{}")
+  priceSensitivity          Decimal                  @default(0.5)
+  recommendationPreferences Json                     @default("{}")
+  preferredCategories       String[]                 @default([])
+  excludedCategories        String[]                 @default([])
+  totalLifetimeSpent        Decimal                  @default(0)
+  totalPurchases            Int                      @default(0)
+  averageOrderValue         Decimal                  @default(0)
+  favoriteCategory          String?
+  favoriteMerchant          String?
+  purchaseFrequency         Decimal?
+  seasonalPatterns          Json?
+  dayOfWeekPatterns         Json?
+  timeOfDayPatterns         Json?
+  shareFrequency            Int                      @default(0)
+  giftPurchaseRatio         Decimal                  @default(0)
+  socialInfluenceScore      Decimal                  @default(0)
+  lastAnalysisUpdate        DateTime                 @default(now())
+  modelVersion              String?
+  confidenceScore           Decimal?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  recommendations           ShoppingRecommendation[]
+  user                      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastAnalysisUpdate])
+  @@index([favoriteCategory, favoriteMerchant])
+  @@map("shopping_user_profiles")
+}
+
+model ShoppingRecommendation {
+  id                   String               @id @default(uuid())
+  userId               String
+  productId            String
+  userProfileId        String?
+  recommendationType   String
+  confidenceScore      Decimal
+  personalizedPrice    Decimal?
+  hasPromotion         Boolean              @default(false)
+  discountPercentage   Decimal?
+  promotionValidUntil  DateTime?
+  promotionDescription String?
+  reason               String?
+  contextData          Json?
+  shownToUser          Boolean              @default(false)
+  shownAt              DateTime?
+  userInteraction      String?
+  interactedAt         DateTime?
+  conversionScore      Decimal?
+  clickThroughRate     Decimal?
+  isActive             Boolean              @default(true)
+  expiresAt            DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  product              ShoppingProduct      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userProfile          ShoppingUserProfile? @relation(fields: [userProfileId], references: [id])
+
+  @@index([userId, isActive])
+  @@index([productId, recommendationType])
+  @@index([recommendationType, confidenceScore])
+  @@index([shownToUser, userInteraction])
+  @@index([expiresAt, isActive])
+  @@map("shopping_recommendations")
+}
+
+model ProductShare {
+  id                  String          @id @default(uuid())
+  userId              String
+  productId           String
+  sharedWithContactId String?
+  sharedInGroupId     String?
+  shareType           String
+  shareMethod         String
+  messageContext      String?
+  shareMessageId      String?
+  shareUrl            String?
+  shareCode           String?
+  viewedByRecipient   Boolean         @default(false)
+  viewedAt            DateTime?
+  clickedByRecipient  Boolean         @default(false)
+  clickedAt           DateTime?
+  resultedInPurchase  Boolean         @default(false)
+  purchaseId          String?
+  shareImpression     Int             @default(0)
+  shareReach          Int             @default(0)
+  conversionRate      Decimal?
+  viralCoefficient    Decimal?
+  secondaryShares     Int             @default(0)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  product             ShoppingProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  group               Group?          @relation(fields: [sharedInGroupId], references: [id])
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, shareType])
+  @@index([productId, resultedInPurchase])
+  @@index([sharedInGroupId, createdAt])
+  @@index([shareType, viewedByRecipient])
+  @@index([resultedInPurchase, conversionRate])
+  @@map("product_shares")
+}
+
+model ProductReview {
+  id                 String            @id @default(uuid())
+  userId             String
+  productId          String
+  purchaseId         String?
+  rating             Int
+  title              String?
+  content            String?
+  isVerifiedPurchase Boolean           @default(false)
+  isRecommended      Boolean           @default(false)
+  helpfulVotes       Int               @default(0)
+  totalVotes         Int               @default(0)
+  helpfulnessRatio   Decimal           @default(0)
+  isModerated        Boolean           @default(false)
+  moderatedAt        DateTime?
+  moderatedBy        String?
+  moderationReason   String?
+  status             String            @default("PUBLISHED")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  product            ShoppingProduct   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchase           ShoppingPurchase? @relation(fields: [purchaseId], references: [id])
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, purchaseId])
+  @@index([productId, status])
+  @@index([userId, createdAt])
+  @@index([rating, helpfulnessRatio])
+  @@index([isVerifiedPurchase, status])
+  @@map("product_reviews")
+}
+
+model ProductInventoryEvent {
+  id                String          @id @default(uuid())
+  productId         String
+  eventType         String
+  quantityBefore    Int
+  quantityAfter     Int
+  quantityChanged   Int
+  triggeredBy       String?
+  reason            String?
+  batchId           String?
+  providerSyncId    String?
+  providerReference String?
+  createdAt         DateTime        @default(now())
+  product           ShoppingProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([providerSyncId])
+  @@map("product_inventory_events")
+}
+
+model ProviderSyncEvent {
+  id                String           @id @default(uuid())
+  providerId        String
+  syncType          String
+  status            String
+  productsTotal     Int              @default(0)
+  productsAdded     Int              @default(0)
+  productsUpdated   Int              @default(0)
+  productsRemoved   Int              @default(0)
+  pricesUpdated     Int              @default(0)
+  inventoryUpdated  Int              @default(0)
+  syncDurationMs    Int?
+  apiCallsCount     Int              @default(0)
+  dataTransferredMB Decimal?
+  errorCount        Int              @default(0)
+  errors            Json?
+  partialSyncData   Json?
+  retryAttempt      Int              @default(0)
+  maxRetries        Int              @default(3)
+  triggeredBy       String
+  scheduledAt       DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  provider          ShoppingProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, status])
+  @@index([syncType, status])
+  @@index([scheduledAt, status])
+  @@index([completedAt])
+  @@map("provider_sync_events")
+}
+
+model ShoppingCategory {
+  id               String             @id @default(uuid())
+  name             String             @unique
+  displayName      String
+  description      String?
+  parentCategoryId String?
+  level            Int                @default(0)
+  sortOrder        Int                @default(0)
+  iconUrl          String?
+  coverImageUrl    String?
+  colorScheme      String?
+  commissionRate   Decimal?
+  isRestricted     Boolean            @default(false)
+  minimumAge       Int?
+  requiredKycTier  String?
+  isActive         Boolean            @default(true)
+  isFeatured       Boolean            @default(false)
+  isPopular        Boolean            @default(false)
+  productCount     Int                @default(0)
+  totalSales       Decimal            @default(0)
+  averageRating    Decimal?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  parentCategory   ShoppingCategory?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  subcategories    ShoppingCategory[] @relation("CategoryHierarchy")
+
+  @@index([parentCategoryId, sortOrder])
+  @@index([isActive, isFeatured])
+  @@index([level, sortOrder])
+  @@index([name])
+  @@map("shopping_categories")
+}
+
+model AlertAuditLog {
+  id          String   @id @default(uuid())
+  alertId     String
+  eventType   String
+  severity    String
+  category    String
+  userId      String?
+  userHandle  String?
+  metricName  String?
+  threshold   String?
+  actualValue String?
+  metadata    Json
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([alertId, eventType])
+  @@index([category, severity, createdAt])
+  @@index([userId, createdAt])
+  @@index([metricName, createdAt])
+  @@index([createdAt])
+  @@map("alert_audit_logs")
+}
+
+model PerformanceMetric {
+  id         String   @id @default(uuid())
+  metricName String
+  value      Decimal
+  unit       String?
+  category   String
+  labels     Json     @default("{}")
+  timestamp  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([metricName, timestamp])
+  @@index([category, timestamp])
+  @@index([timestamp])
+  @@map("performance_metrics")
+}
+
+model ChatDeviceSession {
+  id                String                 @id @default(uuid())
+  deviceId          String                 @unique
+  userId            String
+  deviceType        String
+  deviceName        String
+  platform          String
+  appVersion        String?
+  pushToken         String?
+  socketId          String?                @unique
+  ipAddress         String?
+  isActive          Boolean                @default(true)
+  lastSeenAt        DateTime               @default(now())
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  deviceFingerprint ChatDeviceFingerprint? @relation("DeviceFingerprint")
+  user              User                   @relation("UserDeviceSessions", fields: [userId], references: [id], onDelete: Cascade)
+  offlineMessages   ChatOfflineMessage[]   @relation("DeviceOfflineMessages")
+  readReceipts      ChatReadReceipt[]      @relation("DeviceReadReceipts")
+  securityEvents    ChatSecurityEvent[]    @relation("DeviceSecurityEvents")
+  encryptionKeys    ChatUserKey?           @relation("DeviceEncryptionKeys")
+
+  @@unique([userId, deviceId])
+  @@index([userId, isActive, lastSeenAt])
+  @@index([socketId])
+  @@index([pushToken])
+  @@map("chat_device_sessions")
+}
+
+model ChatOfflineMessage {
+  id              String            @id @default(uuid())
+  deviceId        String
+  userId          String
+  messageId       String
+  messageData     Json
+  priority        String            @default("normal")
+  retryCount      Int               @default(0)
+  maxRetries      Int               @default(3)
+  expiresAt       DateTime          @default(dbgenerated("(now() + '7 days'::interval)"))
+  delivered       Boolean           @default(false)
+  deliveredAt     DateTime?
+  createdAt       DateTime          @default(now())
+  device          ChatDeviceSession @relation("DeviceOfflineMessages", fields: [deviceId, userId], references: [deviceId, userId], onDelete: Cascade)
+  originalMessage GroupMessage      @relation("MessageOfflineQueue", fields: [messageId], references: [id], onDelete: Cascade)
+  user            User              @relation("UserOfflineMessages", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, messageId])
+  @@index([deviceId, delivered, priority, createdAt])
+  @@index([expiresAt, delivered])
+  @@map("chat_offline_messages")
+}
+
+model ChatReadReceipt {
+  id              String            @id @default(uuid())
+  messageId       String
+  userId          String
+  deviceId        String
+  deviceType      String
+  deviceName      String
+  readAt          DateTime          @default(now())
+  syncedToDevices String[]          @default([])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  device          ChatDeviceSession @relation("DeviceReadReceipts", fields: [deviceId, userId], references: [deviceId, userId], onDelete: Cascade)
+  message         GroupMessage      @relation("MessageReadReceipts", fields: [messageId], references: [id], onDelete: Cascade)
+  user            User              @relation("UserReadReceipts", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, deviceId])
+  @@index([messageId, userId, readAt])
+  @@index([userId, deviceId, readAt])
+  @@index([userId, readAt])
+  @@map("chat_read_receipts")
+}
+
+model ChatPushNotification {
+  id               String   @id @default(uuid())
+  recipientUserIds String[]
+  notificationType String
+  title            String
+  body             String
+  data             Json     @default("{}")
+  platformResults  Json     @default("{}")
+  totalSent        Int      @default(0)
+  totalDelivered   Int      @default(0)
+  totalFailed      Int      @default(0)
+  sentAt           DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  @@index([recipientUserIds])
+  @@index([notificationType, sentAt])
+  @@map("chat_push_notifications")
+}
+
+model ChatDeviceSyncEvent {
+  id               String        @id @default(uuid())
+  userId           String
+  sourceDeviceId   String
+  targetDeviceIds  String[]      @default([])
+  eventType        String
+  messageId        String?
+  syncData         Json          @default("{}")
+  success          Boolean       @default(true)
+  errorMessage     String?
+  processingTimeMs Int?
+  createdAt        DateTime      @default(now())
+  message          GroupMessage? @relation("MessageSyncEvents", fields: [messageId], references: [id])
+  user             User          @relation("UserSyncEvents", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([sourceDeviceId, eventType, createdAt])
+  @@index([eventType, success, processingTimeMs, createdAt])
+  @@map("chat_device_sync_events")
+}
+
+model ChatUserKey {
+  id              String                   @id @default(uuid())
+  userId          String
+  deviceId        String
+  keyId           String                   @unique
+  publicKey       String
+  privateKeyHash  String
+  keyStatus       String                   @default("active")
+  expiresAt       DateTime
+  lastUsedAt      DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  auditEvents     ChatKeyAuditEvent[]      @relation("KeyAuditEvents")
+  keyExchangeFrom ChatKeyExchangeRequest[] @relation("KeyExchangeFromUser")
+  keyExchangeTo   ChatKeyExchangeRequest[] @relation("KeyExchangeToUser")
+  device          ChatDeviceSession        @relation("DeviceEncryptionKeys", fields: [userId, deviceId], references: [userId, deviceId], onDelete: Cascade)
+  user            User                     @relation("UserEncryptionKeys", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([userId, keyStatus, expiresAt])
+  @@index([deviceId, keyStatus])
+  @@index([expiresAt])
+  @@map("chat_user_keys")
+}
+
+model ChatGroupKey {
+  id              String              @id @default(uuid())
+  groupId         String
+  keyId           String              @unique
+  encryptedKey    String
+  keyVersion      Int                 @default(1)
+  createdBy       String
+  isActive        Boolean             @default(true)
+  authorizedUsers Json                @default("[]")
+  createdAt       DateTime            @default(now())
+  creator         User                @relation("CreatedGroupKeys", fields: [createdBy], references: [id], onDelete: Cascade)
+  group           Group               @relation("GroupEncryptionKeys", fields: [groupId], references: [id], onDelete: Cascade)
+  auditEvents     ChatKeyAuditEvent[] @relation("GroupKeyAuditEvents")
+
+  @@unique([groupId, keyVersion])
+  @@index([groupId, isActive])
+  @@index([createdBy, createdAt])
+  @@map("chat_group_keys")
+}
+
+model ChatKeyExchangeRequest {
+  id           String      @id @default(uuid())
+  requestId    String      @unique
+  fromUserId   String
+  toUserId     String
+  fromDeviceId String
+  toDeviceId   String
+  publicKey    String
+  status       String      @default("pending")
+  expiresAt    DateTime
+  createdAt    DateTime    @default(now())
+  fromUser     User        @relation("SentKeyExchangeRequests", fields: [fromUserId], references: [id], onDelete: Cascade)
+  fromKey      ChatUserKey @relation("KeyExchangeFromUser", fields: [fromUserId, fromDeviceId], references: [userId, deviceId], onDelete: Cascade)
+  toUser       User        @relation("ReceivedKeyExchangeRequests", fields: [toUserId], references: [id], onDelete: Cascade)
+  toKey        ChatUserKey @relation("KeyExchangeToUser", fields: [toUserId, toDeviceId], references: [userId, deviceId], onDelete: Cascade)
+
+  @@index([toUserId, status, expiresAt])
+  @@index([fromUserId, createdAt])
+  @@index([expiresAt])
+  @@map("chat_key_exchange_requests")
+}
+
+model ChatKeyAuditEvent {
+  id         String        @id @default(uuid())
+  eventId    String        @unique
+  eventType  String
+  keyType    String
+  userId     String
+  deviceId   String?
+  userKeyId  String?
+  groupKeyId String?
+  groupId    String?
+  metadata   Json          @default("{}")
+  timestamp  DateTime      @default(now())
+  ipAddress  String?
+  userAgent  String?
+  group      Group?        @relation("GroupKeyAuditEvents", fields: [groupId], references: [id])
+  groupKey   ChatGroupKey? @relation("GroupKeyAuditEvents", fields: [groupKeyId], references: [keyId], onDelete: Cascade)
+  user       User          @relation("UserKeyAuditEvents", fields: [userId], references: [id], onDelete: Cascade)
+  userKey    ChatUserKey?  @relation("KeyAuditEvents", fields: [userKeyId], references: [keyId], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+  @@index([eventType, timestamp])
+  @@index([userKeyId, timestamp])
+  @@index([groupKeyId, timestamp])
+  @@index([keyType, timestamp])
+  @@map("chat_key_audit_events")
+}
+
+model ChatSecurityEvent {
+  id        String             @id @default(uuid())
+  eventType String
+  userId    String?
+  sessionId String?
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime           @default(now())
+  metadata  Json               @default("{}")
+  riskScore Decimal            @default(0.0)
+  blocked   Boolean            @default(false)
+  device    ChatDeviceSession? @relation("DeviceSecurityEvents", fields: [sessionId], references: [socketId])
+  user      User?              @relation("UserSecurityEvents", fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+  @@index([eventType, timestamp])
+  @@index([ipAddress, timestamp])
+  @@index([riskScore, timestamp])
+  @@map("chat_security_events")
+}
+
+model ChatDeviceFingerprint {
+  id             String            @id @default(uuid())
+  deviceId       String            @unique
+  userId         String
+  fingerprint    String
+  userAgent      String?
+  acceptLanguage String?
+  acceptEncoding String?
+  riskScore      Decimal           @default(0.0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  device         ChatDeviceSession @relation("DeviceFingerprint", fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  user           User              @relation("UserDeviceFingerprints", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([riskScore, updatedAt])
+  @@map("chat_device_fingerprints")
+}
+
+model ChatRateLimitEntry {
+  id             String    @id @default(uuid())
+  identifier     String    @unique
+  windowStart    DateTime
+  requestCount   Int       @default(0)
+  violations     Int       @default(0)
+  blockedUntil   DateTime?
+  firstViolation DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([identifier, windowStart])
+  @@index([blockedUntil])
+  @@index([violations, updatedAt])
+  @@map("chat_rate_limit_entries")
+}
+
+model ChatContentFilterViolation {
+  id               String   @id @default(uuid())
+  userId           String
+  contentHash      String
+  violationType    String
+  filterName       String
+  severity         String
+  actionTaken      String
+  originalContent  String?
+  sanitizedContent String?
+  threatTypes      String[] @default([])
+  confidenceScore  Decimal?
+  createdAt        DateTime @default(now())
+  user             User     @relation("UserContentViolations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([violationType, severity, createdAt])
+  @@index([contentHash])
+  @@map("chat_content_filter_violations")
+}
+
+model ChatBlockedIdentifier {
+  id             String    @id @default(uuid())
+  identifier     String    @unique
+  blockedBy      String    @default("system")
+  reason         String?
+  blockedAt      DateTime  @default(now())
+  expiresAt      DateTime?
+  isPermanent    Boolean   @default(false)
+  violationCount Int       @default(1)
+  lastViolation  DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@index([isPermanent, blockedAt])
+  @@map("chat_blocked_identifiers")
+}
+
+model FinancialAuditEntry {
+  id                String       @id @default(uuid())
+  userId            String
+  walletId          String?
+  transactionId     String?
+  operationType     String
+  operationSubtype  String?
+  amount            String?
+  currency          String?
+  balanceBefore     String?
+  balanceAfter      String?
+  description       String
+  metadata          Json?
+  complianceFlags   String[]
+  riskScore         Int?
+  deviceFingerprint String?
+  ipAddress         String?
+  userAgent         String?
+  correlationId     String
+  parentAuditId     String?
+  timestamp         DateTime     @default(now())
+  checksum          String?
+  transaction       Transaction? @relation(fields: [transactionId], references: [id])
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet            Wallet?      @relation(fields: [walletId], references: [id])
+
+  @@index([userId, timestamp])
+  @@index([walletId, timestamp])
+  @@index([transactionId, timestamp])
+  @@index([operationType, timestamp])
+  @@index([correlationId])
+  @@index([timestamp])
+  @@index([riskScore])
+  @@index([complianceFlags])
+  @@map("financial_audit_entries")
+}
+
+model BlockchainTransaction {
+  id                  String                   @id @default(uuid())
+  network             BlockchainNetwork
+  blockchainTxId      String                   @unique
+  blockHeight         Int?
+  confirmations       Int                      @default(0)
+  isFullyConfirmed    Boolean                  @default(false)
+  rawTransactionHex   String?
+  transactionSize     Int?
+  virtualSize         Int?
+  inputs              Json                     @default("[]")
+  outputs             Json                     @default("[]")
+  signatures          Json                     @default("[]")
+  witnessData         Json?
+  networkResponse     Json?
+  broadcastStatus     String?
+  broadcastError      String?
+  networkFee          Decimal
+  feeRate             Decimal?
+  broadcastAt         DateTime?
+  confirmedAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  gojiTransactions Transaction[]            @relation("BlockchainToGojiTransactions")
+  confirmationHistory BlockchainConfirmation[]
+
+  @@index([blockchainTxId])
+  @@index([network, blockHeight])
+  @@index([isFullyConfirmed, confirmations])
+  @@map("blockchain_transactions")
+}
+
+model Otp {
+  id            String         @id @default(uuid())
+  userId        String? // Optional - for logged-in users
+  email         String? // Either email or phoneNumber must be provided
+  phoneNumber   String?
+  otp           String // The actual OTP code
+  type          OtpTypeEnum // EMAIL or PHONE
+  purpose       OtpPurposeEnum // REGISTRATION, LOGIN, EMAIL_VERIFICATION, PHONE_VERIFICATION, PASSWORD_RESET, 2FA
+  attempts      Int            @default(0) // Number of verification attempts
+  maxAttempts   Int            @default(3) // Maximum allowed attempts
+  isVerified    Boolean        @default(false)
+  isInvalidated Boolean        @default(false) // True when a new OTP is requested
+  expiresAt     DateTime // OTP expiration timestamp
+  verifiedAt    DateTime? // When the OTP was successfully verified
+  invalidatedAt DateTime? // When the OTP was invalidated
+  ipAddress     String? // IP address of the request
+  userAgent     String? // User agent string
+  metadata      Json? // Additional metadata
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Optional relation to User
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes for performance
+  @@index([userId])
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([type, purpose])
+  @@index([expiresAt])
+  @@index([isInvalidated, isVerified])
+  @@map("otps")
+}
+
+model OtpAutoRegeneration {
+  id          String   @id @default(uuid())
+  otpId       String // Original expired OTP ID
+  userId      String? // Optional - may be null for pre-registration
+  email       String?
+  phoneNumber String?
+  ipAddress   String?
+  userAgent   String?
+  reason      String   @default("expired_submission") // Reason for auto-regeneration
+  createdAt   DateTime @default(now())
+
+  // Indexes for rate limiting queries
+  @@index([email, createdAt])
+  @@index([phoneNumber, createdAt])
+  @@index([userId, createdAt])
+  @@map("otp_auto_regenerations")
+}
+
+model SentEmail {
+  id           String   @id @default(uuid())
+  toEmail      String // Recipient email address
+  subject      String // Email subject line
+  template     String // Template identifier (email-otp, password-reset, etc.)
+  templateData Json // Template data (otp, expirationMinutes, etc.)
+  status       String // sent, failed
+  provider     String // mock, resend, sendgrid
+  messageId    String? // External provider message ID (for tracking)
+  error        String? // Error message if failed
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime? // When the email should expire (for mock provider cleanup)
+
+  // Indexes for querying
+  @@index([toEmail])
+  @@index([provider])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("sent_emails")
+}
+
+model BlockchainConfirmation {
+  id                      String                @id @default(uuid())
+  blockchainTransactionId String
+  confirmationCount       Int
+  blockHeight             Int?
+  blockHash               String?
+  detectedBy              String                @default("system")
+  detectionMethod         String?
+  detectedAt              DateTime              @default(now())
+  blockchainTransaction   BlockchainTransaction @relation(fields: [blockchainTransactionId], references: [id], onDelete: Cascade)
+
+  @@index([blockchainTransactionId, confirmationCount])
+  @@index([blockHeight])
+  @@map("blockchain_confirmations")
+}
+
+enum GroupVisibility {
+  PRIVATE
+  PUBLIC
+  UNLISTED
+}
+
+enum AuthMethodEnum {
+  PASSWORD
+  SOCIAL
+  HYBRID
+}
+
+enum KycStatusEnum {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum KycTierEnum {
+  TIER_0
+  TIER_1
+  TIER_2
+  TIER_3
+}
+
+enum AccountStatusEnum {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum MessageStatusEnum {
+  MESSAGE_SENDING
+  MESSAGE_SENT
+  MESSAGE_DELIVERED
+  MESSAGE_READ
+  MESSAGE_FAILED
+}
+
+enum TransactionTypeEnum {
+  SEND
+  RECEIVE
+  TOPUP
+  BANK_TRANSFER
+  MOBILE_MONEY_TRANSFER
+  FEE
+  REFUND
+  REWARD
+  SHOPPING
+  REQUEST_FULFILLMENT
+  DEPOSIT
+}
+
+enum TransactionStatusEnum {
+  PENDING
+  PROCESSING
+  BROADCASTING
+  COMPLETED
+  CONFIRMED
+  FAILED
+  CANCELLED
+  REVERSED
+  ON_HOLD
+  EXPIRED
+}
+
+enum UserStatusEnum {
+  ONLINE
+  OFFLINE
+  AWAY
+  BUSY
+}
+
+enum ProfileVisibilityEnum {
+  PUBLIC
+  PRIVATE
+  CONTACTS_ONLY
+}
+
+enum NotificationTypeEnum {
+  transaction
+  security
+  kyc
+  payment_request
+  shopping
+  system
+  promotion
+  PAYMENT
+  CHAT_MESSAGE
+  GROUP_INVITE
+  FRIEND_REQUEST
+}
+
+enum NotificationStatusEnum {
+  pending
+  queued
+  sent
+  delivered
+  read
+  failed
+  expired
+  EXPIRED
+}
+
+enum NotificationChannelEnum {
+  push
+  sms
+  email
+  in_app
+  websocket
+}
+
+enum NotificationPriorityEnum {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  EMERGENCY
+}
+
+enum DeliveryStatusEnum {
+  pending
+  sent
+  delivered
+  opened
+  clicked
+  failed
+}
+
+enum BlockchainNetwork {
+  BSV_MAINNET
+  BSV_TESTNET
+  MNEE_MAINNET
+  MNEE_TESTNET
+  REGTEST
+}
+
+enum OtpTypeEnum {
+  EMAIL
+  PHONE
+}
+
+enum OtpPurposeEnum {
+  REGISTRATION
+  LOGIN
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+  TWO_FACTOR_AUTH
+  ACCOUNT_RECOVERY
+  CONTACT_VERIFICATION
+}

@@ -1,0 +1,1 @@
+../../shared/resources/code-vs-test-validation.md
