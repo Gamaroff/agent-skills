@@ -1,0 +1,2 @@
+description = "Analyze sessions to update and improve agent skills based on preferences."
+prompt = "Use the autoskill skill to Analyze sessions to update and improve agent skills based on preferences. {{args}}"

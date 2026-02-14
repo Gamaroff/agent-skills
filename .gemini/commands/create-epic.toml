@@ -1,0 +1,2 @@
+description = "Create single epic for medium-sized brownfield enhancements (1-3 stories)."
+prompt = "Use the create-epic skill to Create single epic for medium-sized brownfield enhancements (1-3 stories). {{args}}"

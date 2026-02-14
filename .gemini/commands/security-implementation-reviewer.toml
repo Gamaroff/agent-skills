@@ -1,0 +1,2 @@
+description = "Review security-critical code against production-grade standards."
+prompt = "Use the security-implementation-reviewer skill to Review security-critical code against production-grade standards. {{args}}"

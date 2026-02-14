@@ -1,0 +1,2 @@
+description = "Enforce correct \"handle\" terminology for payments and social features."
+prompt = "Use the handle-payment-validator skill to Enforce correct \"handle\" terminology for payments and social features. {{args}}"

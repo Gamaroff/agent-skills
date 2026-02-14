@@ -1,0 +1,2 @@
+description = "Create GitHub issues and corresponding local work item documents."
+prompt = "Use the create-issue skill to Create GitHub issues and corresponding local work item documents. {{args}}"

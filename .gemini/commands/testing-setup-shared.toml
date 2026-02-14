@@ -1,0 +1,2 @@
+description = "Common testing infrastructure setup for the monorepo."
+prompt = "Use the testing-setup-shared skill to Common testing infrastructure setup for the monorepo. {{args}}"

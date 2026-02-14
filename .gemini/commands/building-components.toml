@@ -1,0 +1,2 @@
+description = "Guide for building modern, accessible, and composable UI components."
+prompt = "Use the building-components skill to Guide for building modern, accessible, and composable UI components. {{args}}"

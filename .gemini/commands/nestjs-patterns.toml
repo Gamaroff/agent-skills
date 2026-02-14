@@ -1,0 +1,2 @@
+description = "proven NestJS implementation patterns and DI troubleshooting."
+prompt = "Use the nestjs-patterns skill to proven NestJS implementation patterns and DI troubleshooting. {{args}}"

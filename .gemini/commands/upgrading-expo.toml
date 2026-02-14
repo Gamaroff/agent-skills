@@ -1,0 +1,2 @@
+description = "Guidelines for upgrading Expo SDK versions and fixing dependencies."
+prompt = "Use the upgrading-expo skill to Guidelines for upgrading Expo SDK versions and fixing dependencies. {{args}}"

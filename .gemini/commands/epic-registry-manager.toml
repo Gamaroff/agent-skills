@@ -1,0 +1,2 @@
+description = "Manage global epic numbering and registry updates."
+prompt = "Use the epic-registry-manager skill to Manage global epic numbering and registry updates. {{args}}"

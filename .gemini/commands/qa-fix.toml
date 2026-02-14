@@ -1,0 +1,2 @@
+description = "Implement fixes based on QA feedback and update story status."
+prompt = "Use the qa-fix skill to Implement fixes based on QA feedback and update story status. {{args}}"

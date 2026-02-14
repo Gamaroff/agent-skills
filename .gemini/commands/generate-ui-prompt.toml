@@ -1,0 +1,2 @@
+description = "Generate comprehensive prompts for AI-driven frontend tools (v0, Lovable)."
+prompt = "Use the generate-ui-prompt skill to Generate comprehensive prompts for AI-driven frontend tools (v0, Lovable). {{args}}"

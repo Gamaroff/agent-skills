@@ -1,0 +1,2 @@
+description = "Market research, competitive analysis, and brainstorming for strategic insights."
+prompt = "Use the analyst skill to Market research, competitive analysis, and brainstorming for strategic insights. {{args}}"

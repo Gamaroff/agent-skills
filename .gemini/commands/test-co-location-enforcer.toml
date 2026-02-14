@@ -1,0 +1,2 @@
+description = "Ensure all tests are co-located with source files using `.spec.ts`."
+prompt = "Use the test-co-location-enforcer skill to Ensure all tests are co-located with source files using `.spec.ts`. {{args}}"

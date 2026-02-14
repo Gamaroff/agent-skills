@@ -1,0 +1,2 @@
+description = "Primary workflow for implementing features and technical tasks."
+prompt = "Use the develop skill to Primary workflow for implementing features and technical tasks. {{args}}"

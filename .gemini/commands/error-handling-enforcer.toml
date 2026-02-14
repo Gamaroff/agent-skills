@@ -1,0 +1,2 @@
+description = "Ensure consistent error handling across client and server."
+prompt = "Use the error-handling-enforcer skill to Ensure consistent error handling across client and server. {{args}}"

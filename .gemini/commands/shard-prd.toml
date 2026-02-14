@@ -1,0 +1,2 @@
+description = "Split large PRDs into smaller, manageable markdown files by section."
+prompt = "Use the shard-prd skill to Split large PRDs into smaller, manageable markdown files by section. {{args}}"

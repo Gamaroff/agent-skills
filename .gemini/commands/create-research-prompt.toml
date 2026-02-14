@@ -1,0 +1,2 @@
+description = "Generate comprehensive research prompts for deep analysis."
+prompt = "Use the create-research-prompt skill to Generate comprehensive research prompts for deep analysis. {{args}}"

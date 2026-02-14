@@ -1,0 +1,2 @@
+description = "Enforce standardized API response wrapping patterns."
+prompt = "Use the response-envelope-enforcer skill to Enforce standardized API response wrapping patterns. {{args}}"

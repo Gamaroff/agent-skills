@@ -1,0 +1,2 @@
+description = "Validate client/server separation and prevent dependency leaks."
+prompt = "Use the platform-separation-validator skill to Validate client/server separation and prevent dependency leaks. {{args}}"

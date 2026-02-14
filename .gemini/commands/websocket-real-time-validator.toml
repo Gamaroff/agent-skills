@@ -1,0 +1,2 @@
+description = "Validate Socket.IO patterns for chat and live updates."
+prompt = "Use the websocket-real-time-validator skill to Validate Socket.IO patterns for chat and live updates. {{args}}"

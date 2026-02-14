@@ -1,0 +1,2 @@
+description = "Edit epic documents with validation and cascade analysis for child stories."
+prompt = "Use the edit-epic skill to Edit epic documents with validation and cascade analysis for child stories. {{args}}"

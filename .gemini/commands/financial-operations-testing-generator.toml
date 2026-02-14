@@ -1,0 +1,2 @@
+description = "Generate test suites for financial operations with 95%+ coverage."
+prompt = "Use the financial-operations-testing-generator skill to Generate test suites for financial operations with 95%+ coverage. {{args}}"

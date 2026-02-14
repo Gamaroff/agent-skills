@@ -1,0 +1,2 @@
+description = "Facilitate interactive brainstorming sessions with proven techniques."
+prompt = "Use the brainstorming skill to Facilitate interactive brainstorming sessions with proven techniques. {{args}}"

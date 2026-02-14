@@ -1,0 +1,2 @@
+description = "Create PRDs for enhancements to existing projects (4+ stories)."
+prompt = "Use the create-prd skill to Create PRDs for enhancements to existing projects (4+ stories). {{args}}"

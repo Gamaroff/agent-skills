@@ -1,0 +1,2 @@
+description = "Interactive task document review to identify gaps and implementability issues."
+prompt = "Use the review-task skill to Interactive task document review to identify gaps and implementability issues. {{args}}"

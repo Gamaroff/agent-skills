@@ -1,0 +1,2 @@
+description = "Guidance for implementing offline-first architecture and sync patterns."
+prompt = "Use the offline-first-enforcer skill to Guidance for implementing offline-first architecture and sync patterns. {{args}}"

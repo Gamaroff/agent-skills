@@ -1,0 +1,2 @@
+description = "Enforce naming conventions and structural standards for docs."
+prompt = "Use the documentation-standards-validator skill to Enforce naming conventions and structural standards for docs. {{args}}"

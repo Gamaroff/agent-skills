@@ -1,0 +1,2 @@
+description = "Quick automated pre-implementation validation gate."
+prompt = "Use the validate-story skill to Quick automated pre-implementation validation gate. {{args}}"

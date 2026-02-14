@@ -1,0 +1,2 @@
+description = "Systematic validation engine for documentation, code, or processes."
+prompt = "Use the execute-checklist skill to Systematic validation engine for documentation, code, or processes. {{args}}"

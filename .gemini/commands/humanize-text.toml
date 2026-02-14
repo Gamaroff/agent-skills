@@ -1,0 +1,2 @@
+description = "Rewrite AI-generated text to sound completely human and conversational."
+prompt = "Use the humanize-text skill to Rewrite AI-generated text to sound completely human and conversational. {{args}}"

@@ -1,0 +1,2 @@
+description = "PRD template structure for existing project enhancements."
+prompt = "Use the brownfield-prd-template skill to PRD template structure for existing project enhancements. {{args}}"

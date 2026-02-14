@@ -1,0 +1,2 @@
+description = "Validate NestJS API endpoints and RESTful design patterns."
+prompt = "Use the api-endpoint-validator skill to Validate NestJS API endpoints and RESTful design patterns. {{args}}"

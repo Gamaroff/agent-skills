@@ -1,0 +1,2 @@
+description = "Create distinctive, production-grade frontend interfaces."
+prompt = "Use the frontend-design skill to Create distinctive, production-grade frontend interfaces. {{args}}"
