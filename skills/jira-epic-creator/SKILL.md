@@ -26,7 +26,7 @@ Activate when user needs to:
 **Required Files:**
 
 - Epic markdown file following the standard epic format (YAML frontmatter with title, priority, etc.)
-- The script `scripts/jira-create-epic.js` within this skill directory
+- The script `.scripts/jira-create-epic.js` in the project root
 
 **Required Environment Variables:**
 
@@ -45,7 +45,7 @@ The following Jira environment variables must be available (will prompt if missi
 2. **Execute the script** with the epic file path:
 
 ```bash
-node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file docs/prds/[domain]/[feature]/epics/epic.[N].[name].md
+node .scripts/jira-create-epic.js --file docs/prds/[domain]/[feature]/epics/epic.[N].[name].md
 ```
 
 ### Environment Variable Check
@@ -97,6 +97,15 @@ The script extracts:
 - **Priority** from `priority` frontmatter (automatically capitalized for Jira: "high" → "High")
 - **Stories table** from Stories Breakdown section
 
+**After successful creation, the script automatically updates the epic file with:**
+
+```yaml
+jira_key: "RB-9"
+jira_url: "https://yourcompany.atlassian.net/browse/RB-9"
+```
+
+These are added to the YAML frontmatter to maintain the link between local documentation and Jira.
+
 ### Command Options
 
 The script supports these flags:
@@ -113,7 +122,7 @@ The script supports these flags:
 To preview before creating:
 
 ```bash
-node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file docs/prds/.../epic.N.name.md --dry-run
+node .scripts/jira-create-epic.js --file docs/prds/.../epic.N.name.md --dry-run
 ```
 
 ## Workflow
@@ -121,8 +130,9 @@ node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file docs/pr
 1. **Parse epic file** - Extract frontmatter and description sections
 2. **Check environment** - Verify JIRA\_\* variables, prompt if missing
 3. **Validate file exists** - Confirm epic file path is correct
-4. **Run script** - Execute `.agents/skills/jira-epic-creator/scripts/jira-create-epic.js` with file path
+4. **Run script** - Execute `.scripts/jira-create-epic.js` with file path
 5. **Report result** - Display created epic key and URL
+6. **Update epic file** - Add `jira_key` and `jira_url` to frontmatter
 
 ## Success Indicators
 
@@ -130,6 +140,7 @@ node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file docs/pr
 - Epic key displayed (e.g., `PROJ-123`)
 - Jira URL provided for direct access
 - Stories breakdown included in description
+- Epic file updated with `jira_key` and `jira_url` frontmatter entries
 
 ## Error Handling
 
