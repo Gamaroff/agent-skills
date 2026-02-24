@@ -1,2 +1,0 @@
-description = "Edit story documents with comprehensive validation and diff preview."
-prompt = "Use the edit-story skill to Edit story documents with comprehensive validation and diff preview. {{args}}"

@@ -1,2 +1,0 @@
-description = "Enforce consistent Expo Router navigation patterns."
-prompt = "Use the navigation-pattern-validator skill to Enforce consistent Expo Router navigation patterns. {{args}}"

@@ -1,2 +1,0 @@
-description = "Validate Prisma schema patterns, naming, and relationships."
-prompt = "Use the prisma-schema-validator skill to Validate Prisma schema patterns, naming, and relationships. {{args}}"

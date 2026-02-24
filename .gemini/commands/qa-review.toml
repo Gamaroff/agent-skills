@@ -1,2 +1,0 @@
-description = "Comprehensive quality review including NFR and requirements traceability."
-prompt = "Use the qa-review skill to Comprehensive quality review including NFR and requirements traceability. {{args}}"

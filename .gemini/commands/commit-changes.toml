@@ -1,2 +1,0 @@
-description = "Create high-quality git commits with clear messages and review."
-prompt = "Use the commit-changes skill to Create high-quality git commits with clear messages and review. {{args}}"

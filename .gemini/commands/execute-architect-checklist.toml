@@ -1,2 +1,0 @@
-description = "Validate technical design using the Architect Solution Validation Checklist."
-prompt = "Use the execute-architect-checklist skill to Validate technical design using the Architect Solution Validation Checklist. {{args}}"

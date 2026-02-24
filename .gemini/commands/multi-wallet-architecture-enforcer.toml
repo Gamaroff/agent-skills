@@ -1,2 +1,0 @@
-description = "Enforce single-currency wallet constraints and multi-wallet patterns."
-prompt = "Use the multi-wallet-architecture-enforcer skill to Enforce single-currency wallet constraints and multi-wallet patterns. {{args}}"

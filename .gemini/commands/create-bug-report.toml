@@ -1,2 +1,0 @@
-description = "Create structured bug report files for issues found during testing."
-prompt = "Use the create-bug-report skill to Create structured bug report files for issues found during testing. {{args}}"

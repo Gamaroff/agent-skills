@@ -1,2 +1,0 @@
-description = "Review code for performance issues and apply optimization patterns."
-prompt = "Use the performance-optimizer skill to Review code for performance issues and apply optimization patterns. {{args}}"

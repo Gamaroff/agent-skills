@@ -1,2 +1,0 @@
-description = "Guide for React Native component and hook testing patterns."
-prompt = "Use the testing-setup-react-native skill to Guide for React Native component and hook testing patterns. {{args}}"

@@ -1,3 +1,8 @@
+---
+name: react-native-debug
+description: Iterative debugging for React Native apps. Handles Jest test failures and Metro bundler errors with an interactive approach to determine whether implementation or test is incorrect.
+---
+
 # React Native Debugging Skill
 
 ## Overview

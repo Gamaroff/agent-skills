@@ -60,15 +60,36 @@ Epic 1: User Authentication
 
 #### 0.1 Load Configuration
 
-1. Load `.bmad-core/core-config.yaml` from project root
-2. If file does not exist, **HALT** and inform user:
+**Configuration File**: `skills-config.yaml` (in project root)
 
-   > "core-config.yaml not found. This file is required for story creation."
+1. Attempt to load `skills-config.yaml` from project root
+2. If file does not exist, **notify user**:
 
-3. Extract configurations:
-   - `devStoryLocation` - Where to save story files
-   - `prd.*` - PRD structure and locations
-   - `architecture.*` - Architecture document settings
+   > "`skills-config.yaml` not found. Create this file to customize story locations, or continue with default settings."
+
+3. Extract configurations (with defaults if file missing):
+   - `devStoryLocation` - Story storage mode: `nested` (default) means stories are stored within epic directories
+   - `prd.*` - PRD structure and locations (default: `prdSharded: true`, `prdShardedLocation: docs/prd`)
+   - `architecture.*` - Architecture document settings (default: `architectureSharded: true`, `architectureShardedLocation: docs/architecture`)
+
+**Default Configuration Values** (used if `skills-config.yaml` not found):
+
+```yaml
+markdownExploder: true
+qa:
+  qaLocation: docs/qa
+prd:
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: '*/epics/epic.{n}.*.md'
+architecture:
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
+# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
+devStoryLocation: nested
+devDebugLog: .ai/debug-log.md
+slashPrefix: BMad
+```
 
 #### 0.2 Read PRD and Architecture
 
@@ -288,9 +309,9 @@ git worktree remove ../worktrees/story-1-1
 
 For each story (parallel and sequential):
 
-1. Create story file: `{devStoryLocation}/{epicNum}.{storyId}.story.md`
-   - Example: `docs/stories/1.1-1.login-ui.md`
-   - Example: `docs/stories/1.2.integration-testing.md`
+1. Create story file in epic's stories subdirectory: `{epicPath}/stories/{epicNum}.{storyId}.{descriptive-name}.md`
+   - Example: `docs/prd/user-experience/notifications/epics/epic.305/stories/305.1-1.swipe-actions.md`
+   - Example: `docs/prd/core-platform/auth/epics/epic.301/stories/301.2.integration-testing.md`
 
 2. Fill basic information:
    - **Status**: `Draft`
@@ -438,7 +459,7 @@ git branch -d feature/story-1-1-1
 
 **Purpose**: Provide overview and coordination for parallel development team
 
-Create overview file: `{devStoryLocation}/epic-{epicNum}-coordination.md`
+Create overview file: `{epicPath}/epic-{epicNum}-coordination.md`
 
 #### 5.1 Matrix Structure
 
@@ -607,7 +628,7 @@ Generate comprehensive summary:
 
 ### Coordination Matrix
 
-**Location**: {devStoryLocation}/epic-{epicNum}-coordination.md
+**Location**: `{epicPath}/epic-{epicNum}-coordination.md` (in epic directory)
 
 **Contents**:
 

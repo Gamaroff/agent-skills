@@ -19,6 +19,7 @@ Use this skill when:
 ## When to Use vs /review-story
 
 **Use `/validate-story` (this skill) when**:
+
 - ✅ You need **automated validation** without user interaction
 - ✅ Story appears complete and you want GO/NO-GO decision
 - ✅ You're doing **batch validation** of multiple stories
@@ -26,6 +27,7 @@ Use this skill when:
 - ✅ You need a readiness score for project tracking
 
 **Use `/review-story` instead when**:
+
 - 🔄 Story has **ambiguous requirements** that need clarification
 - 🔄 You need to **resolve conflicts or gaps interactively**
 - 🔄 You want **user input on technical decisions**
@@ -57,12 +59,12 @@ Produces actionable validation report with:
 ```yaml
 required:
   - story_file: Path to story draft or user-provided
-  - core_config: resources/core-config.yaml
+  - core_config: skills-config.yaml (optional, uses defaults if missing)
 
 derived_from_config:
-  - devStoryLocation: Where to find stories
-  - prd.*: PRD configuration (sharded/monolithic)
-  - architecture.*: Architecture configuration
+  - devStoryLocation: Story storage mode - `nested` means stories are stored within epic directories (default: nested)
+  - prd.*: PRD configuration (sharded/monolithic) (defaults: prdSharded: true, prdShardedLocation: docs/prd)
+  - architecture.*: Architecture configuration (defaults: architectureSharded: true, architectureShardedLocation: docs/architecture)
 ```
 
 **Files to Load**:
@@ -76,14 +78,41 @@ derived_from_config:
 
 ### Step 0: Load Core Configuration and Inputs
 
-1. Load `resources/core-config.yaml`
-   - If missing → HALT: "core-config.yaml not found. This file is required for story validation."
-2. Extract: `devStoryLocation`, `prd.*`, `architecture.*`
-3. Identify and load:
-   - Story file to validate
+**Configuration File**: `skills-config.yaml` (in project root)
+
+1. Attempt to load `skills-config.yaml` from project root
+2. If file does not exist, **notify user**:
+
+   > "`skills-config.yaml` not found. Create this file to customize paths, or continue with default settings."
+
+3. Extract configurations (with defaults if file missing):
+   - `devStoryLocation` (default: `nested` - stories stored within epic directories)
+   - `prd.*` (defaults: `prdSharded: true`, `prdShardedLocation: docs/prd`, `epicFilePattern: '*/epics/epic.{n}.*.md'`)
+   - `architecture.*` (defaults: `architectureSharded: true`, `architectureShardedLocation: docs/architecture`)
+4. Identify and load:
+   - Story file to validate (located at `{epicPath}/stories/{epic}.{story}.*.md`)
    - Parent epic from PRD
    - Architecture documents
    - Story template (`resources/story-tmpl.yaml`) for section verification
+
+**Default Configuration Values** (used if `skills-config.yaml` not found):
+
+```yaml
+markdownExploder: true
+qa:
+  qaLocation: docs/qa
+prd:
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: '*/epics/epic.{n}.*.md'
+architecture:
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
+# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
+devStoryLocation: nested
+devDebugLog: .ai/debug-log.md
+slashPrefix: BMad
+```
 
 ### Step 1: Template Completeness Validation
 
@@ -316,7 +345,6 @@ Provide structured report with following sections:
 
 **HALT if**:
 
-- `resources/core-config.yaml` not found
 - Story file not accessible
 - Parent epic not found
 - Story template (`resources/story-tmpl.yaml`) missing
@@ -400,11 +428,11 @@ Validation complete when:
 
    ```yaml
    question: "Validation result is GO with readiness score [X]/10. Update story status to 'Ready for Development'?"
-   header: "Update Status"
+   header: 'Update Status'
    options:
-     - label: "Yes, ready to implement"
+     - label: 'Yes, ready to implement'
        description: "Update status to 'Ready for Development'. Story can be handed off to /develop."
-     - label: "Keep current status"
+     - label: 'Keep current status'
        description: "Leave status as '[current status]'. I'll update manually when ready."
    ```
 
@@ -430,8 +458,8 @@ Validation complete when:
 
    ```yaml
    file_path: [story-file-path]
-   old_string: "**Status:** Draft"
-   new_string: "**Status:** Ready for Development"
+   old_string: '**Status:** Draft'
+   new_string: '**Status:** Ready for Development'
    ```
 
 **Status Transition Rules**:
@@ -472,4 +500,4 @@ User Can Now: Run `/develop` to begin implementation
 This skill uses these resource files:
 
 - `resources/story-tmpl.yaml` - Story template for structure validation
-- `resources/core-config.yaml` - Project configuration (dev story location, PRD/architecture paths)
+- `skills-config.yaml` - Project configuration (dev story location, PRD/architecture paths) - optional, uses defaults if missing

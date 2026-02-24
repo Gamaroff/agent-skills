@@ -1,2 +1,0 @@
-description = "Generate brownfield architecture documentation for existing codebases."
-prompt = "Use the document-existing-project skill to Generate brownfield architecture documentation for existing codebases. {{args}}"

@@ -1,2 +1,0 @@
-description = "Guide for NestJS-specific testing patterns and E2E setup."
-prompt = "Use the testing-setup-nestjs skill to Guide for NestJS-specific testing patterns and E2E setup. {{args}}"

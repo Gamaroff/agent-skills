@@ -1,2 +1,0 @@
-description = "Ensure transaction code follows normalized schema and Decimal.js usage."
-prompt = "Use the transaction-schema-validator skill to Ensure transaction code follows normalized schema and Decimal.js usage. {{args}}"

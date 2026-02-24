@@ -1,2 +1,0 @@
-description = "Verify story completion against DOD and generate Sprint Review artifacts."
-prompt = "Use the finalise skill to Verify story completion against DOD and generate Sprint Review artifacts. {{args}}"

@@ -1,2 +1,0 @@
-description = "Specialized guidance for BSV blockchain wallet implementation."
-prompt = "Use the bsv-wallet-implementer skill to Specialized guidance for BSV blockchain wallet implementation. {{args}}"

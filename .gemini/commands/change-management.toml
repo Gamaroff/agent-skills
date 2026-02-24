@@ -1,2 +1,0 @@
-description = "Orchestrate structured responses to significant project changes."
-prompt = "Use the change-management skill to Orchestrate structured responses to significant project changes. {{args}}"

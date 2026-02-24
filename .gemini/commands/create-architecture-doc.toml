@@ -1,2 +1,0 @@
-description = "Interactive creation of backend, frontend, or full-stack architecture docs."
-prompt = "Use the create-architecture-doc skill to Interactive creation of backend, frontend, or full-stack architecture docs. {{args}}"

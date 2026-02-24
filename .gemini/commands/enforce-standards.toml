@@ -1,2 +1,0 @@
-description = "Enforce naming conventions and file structure on a target directory."
-prompt = "Use the enforce-standards skill to Enforce naming conventions and file structure on a target directory. {{args}}"

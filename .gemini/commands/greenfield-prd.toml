@@ -1,2 +1,0 @@
-description = "Create Product Requirements Documents for new products from scratch."
-prompt = "Use the greenfield-prd skill to Create Product Requirements Documents for new products from scratch. {{args}}"

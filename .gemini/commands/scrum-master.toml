@@ -1,2 +1,0 @@
-description = "Story creation, validation, and agile process guidance."
-prompt = "Use the scrum-master skill to Story creation, validation, and agile process guidance. {{args}}"

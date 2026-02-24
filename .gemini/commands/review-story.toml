@@ -1,2 +1,0 @@
-description = "Deep interactive story review to resolve ambiguities and conflicts."
-prompt = "Use the review-story skill to Deep interactive story review to resolve ambiguities and conflicts. {{args}}"

@@ -1,2 +1,0 @@
-description = "Create single user story for tiny brownfield changes."
-prompt = "Use the brownfield-story skill to Create single user story for tiny brownfield changes. {{args}}"

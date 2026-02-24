@@ -1,2 +1,0 @@
-description = "UI/UX design, wireframes, and frontend specification optimization."
-prompt = "Use the ux-expert skill to UI/UX design, wireframes, and frontend specification optimization. {{args}}"

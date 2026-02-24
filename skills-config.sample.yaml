@@ -1,0 +1,40 @@
+# Skills Configuration
+# Place this file at: {project-root}/skills-config.yaml
+#
+# If this file is missing, skills will use default values based on the
+# standard project document organization.
+#
+# Document Structure:
+# - PRD documents: docs/prd/{category}/{component}/
+# - Epics: docs/prd/{category}/{component}/epics/{epic}/
+# - Stories: docs/prd/{category}/{component}/epics/{epic}/stories/
+
+markdownExploder: true
+
+qa:
+  qaLocation: docs/qa
+
+prd:
+  prdFile: docs/prd.md
+  prdVersion: v4
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: "*/epics/epic.{n}.*.md"
+
+architecture:
+  architectureFile: docs/architecture.md
+  architectureVersion: v4
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
+
+customTechnicalDocuments: null
+
+devLoadAlwaysFiles:
+  - docs/architecture/concepts/coding-standards.md
+  - docs/architecture/concepts/tech-stack.md
+  - docs/architecture/concepts/source-tree.md
+
+devDebugLog: .ai/debug-log.md
+# Stories are stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
+devStoryLocation: nested
+slashPrefix: BMad

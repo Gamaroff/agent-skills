@@ -1,2 +1,0 @@
-description = "Prepare and submit pull requests following project conventions."
-prompt = "Use the create-pr skill to Prepare and submit pull requests following project conventions. {{args}}"

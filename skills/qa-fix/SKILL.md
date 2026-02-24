@@ -32,8 +32,8 @@ Systematically consume QA outputs and apply code/test changes:
 ```yaml
 required:
   - story_id: '{epic}.{story}' # e.g., "2.2"
-  - qa_root: from core-config.yaml key qa.qaLocation
-  - story_root: from core-config.yaml key devStoryLocation
+  - qa_root: from skills-config.yaml key qa.qaLocation (default: docs/qa)
+  - story_location: nested (stories stored within epic directories)
 
 optional:
   - story_title: derived from story H1 if missing
@@ -233,10 +233,28 @@ Before starting fixes:
 
 ### Step 0: Load Config & Locate Story
 
-1. Read `.bmad-core/core-config.yaml`
-2. Resolve `qa_root` and `story_root` paths
-3. Locate story file: `{story_root}/{epic}.{story}.*.md`
-4. HALT if story not found → ask for correct story id/path
+**Configuration File**: `skills-config.yaml` (in project root)
+
+1. Attempt to load `skills-config.yaml` from project root
+2. If file does not exist, **notify user**:
+
+   > "`skills-config.yaml` not found. Create this file to customize paths, or continue with default settings."
+
+3. Resolve paths (with defaults if file missing):
+   - `qa_root`: `qa.qaLocation` (default: `docs/qa`)
+   - Story location: `nested` means stories are stored within epic directories at `{epicPath}/stories/`
+4. Locate story file: `{epicPath}/stories/{epic}.{story}.*.md`
+5. HALT if story not found → ask for correct story id/path
+
+**Default Configuration Values** (used if `skills-config.yaml` not found):
+
+```yaml
+qa:
+  qaLocation: docs/qa
+
+# Stories stored within epic directories
+devStoryLocation: nested
+```
 
 ### Step 1: Collect QA Findings
 
@@ -342,6 +360,7 @@ nfr_validation:
 **Ambiguity Found**: QA suggests three options for performance improvement (caching, query optimization, CDN). Which approach should I prioritize?
 
 Options:
+
 - Option A: Implement Redis caching (faster, adds dependency)
 - Option B: Optimize database queries (minimal changes, moderate improvement)
 - Option C: Use CDN for static assets (infrastructure change required)
@@ -349,6 +368,7 @@ Options:
 **Ambiguity Found**: QA states "improve input validation" without specifics. What level of validation is required?
 
 Options:
+
 - Option A: Add basic type checking and required field validation
 - Option B: Implement comprehensive schema validation with custom rules
 - Option C: Add validation + sanitization + rate limiting
@@ -356,6 +376,7 @@ Options:
 **Ambiguity Found**: Test design recommends P0 coverage gaps, but NFR assessment suggests maintainability concerns with test complexity. How should I balance coverage vs maintainability?
 
 Options:
+
 - Option A: Add comprehensive test coverage as recommended (increases test complexity)
 - Option B: Add targeted tests for critical paths only (maintains simplicity)
 - Option C: Add coverage with test helpers/fixtures to manage complexity
@@ -461,8 +482,7 @@ Iterate until:
 
 **HALT and ask user if**:
 
-- Missing `.bmad-core/core-config.yaml`
-- Story file not found for provided `story_id`
+- Missing story file for provided `story_id`
 - No QA artifacts found (neither gate nor assessments)
   - Request QA to generate at least a gate file OR
   - Proceed only with clear developer-provided fix list

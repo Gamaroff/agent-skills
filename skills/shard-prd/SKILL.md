@@ -1,6 +1,6 @@
 ---
 name: shard-prd
-description: Split large PRDs into smaller, manageable markdown files by level 2 sections. Use when PRD becomes large (>5 epics, >30 stories) to improve navigation and epic creation workflow.
+description: Split large PRDs into smaller, manageable markdown files by level 2 sections. Use when PRD becomes large (more than 5 epics, more than 30 stories) to improve navigation and epic creation workflow.
 ---
 
 # Document Sharding
@@ -42,10 +42,17 @@ Split large markdown documents into multiple smaller files:
 
 **Check for markdown-tree-parser:**
 
-1. Check if `markdownExploder: true` in `.bmad-core/core-config.yaml`
-2. If true, attempt command: `md-tree explode {input file} {output path}`
-3. If succeeds → DONE (inform user, stop)
-4. If fails (command not found):
+**Configuration File**: `skills-config.yaml` (in project root)
+
+1. Attempt to load `skills-config.yaml` from project root
+2. If file does not exist, **notify user**:
+
+   > "`skills-config.yaml` not found. Create this file to customize settings, or continue with default settings."
+
+3. Check `markdownExploder` setting (default: `true` if config missing)
+4. If `true`, attempt command: `md-tree explode {input file} {output path}`
+5. If succeeds → DONE (inform user, stop)
+6. If fails (command not found):
 
    ```
    "The markdownExploder setting is enabled but md-tree command
@@ -53,11 +60,17 @@ Split large markdown documents into multiple smaller files:
 
    1. Install @kayvan/markdown-tree-parser globally:
       npm install -g @kayvan/markdown-tree-parser
-   2. Or set markdownExploder to false in .bmad-core/core-config.yaml
+   2. Or set markdownExploder to false in skills-config.yaml
 
    STOP HERE - do not proceed with manual sharding until one of
    the above actions is taken."
    ```
+
+**Default Configuration Values** (used if `skills-config.yaml` not found):
+
+```yaml
+markdownExploder: true
+```
 
 **Installation:**
 
@@ -93,7 +106,7 @@ md-tree explode [source-document] [destination-folder]
 "The markdownExploder setting is currently false. For better
 performance and reliability, you should:
 
-1. Set markdownExploder to true in .bmad-core/core-config.yaml
+1. Set markdownExploder to true in skills-config.yaml
 2. Install @kayvan/markdown-tree-parser globally
 
 I will now proceed with the manual sharding process."
@@ -245,7 +258,7 @@ Successful sharding produces:
 User: "Split docs/prd.md into smaller files"
 
 → shard-prd activates
-→ Checks markdownExploder setting (true)
+→ Checks skills-config.yaml for markdownExploder setting (default: true)
 → Runs: md-tree explode docs/prd.md docs/prd
 → Success - 8 files created
 → Reports results
@@ -257,7 +270,7 @@ User: "Split docs/prd.md into smaller files"
 User: "Shard my PRD"
 
 → shard-prd activates
-→ Checks markdownExploder setting (false)
+→ Checks skills-config.yaml for markdownExploder setting (false, uses default)
 → Warns about automatic method benefits
 → Proceeds with manual parsing
 → Extracts all level 2 sections

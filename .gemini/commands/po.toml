@@ -1,2 +1,0 @@
-description = "Product Owner persona for backlog management and story refinement."
-prompt = "Use the po skill to Product Owner persona for backlog management and story refinement. {{args}}"

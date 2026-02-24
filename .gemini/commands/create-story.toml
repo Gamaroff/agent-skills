@@ -1,2 +1,0 @@
-description = "10-step process to identify, extract, and document story requirements."
-prompt = "Use the create-story skill to 10-step process to identify, extract, and document story requirements. {{args}}"

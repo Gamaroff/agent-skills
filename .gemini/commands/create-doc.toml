@@ -1,2 +1,0 @@
-description = "YAML-driven engine for creating PRDs, epics, or any structured document."
-prompt = "Use the create-doc skill to YAML-driven engine for creating PRDs, epics, or any structured document. {{args}}"

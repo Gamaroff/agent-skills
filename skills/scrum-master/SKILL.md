@@ -109,19 +109,20 @@ Systematic response to project pivots, blockers, or requirement changes:
 
 ## Configuration Requirements
 
-This skill expects a configuration file at `.bmad-core/core-config.yaml` that defines:
+This skill expects a configuration file at `skills-config.yaml` (in project root) that defines:
 
 ```yaml
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic.{n}.*.md' # Note: Epic numbers are globally unique (see /docs/development/epic-registry.md)
+  epicFilePattern: '*/epics/epic.{n}.*.md' # Note: Epic numbers are globally unique (see /docs/development/epic-registry.md)
 
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
 
-devStoryLocation: docs/stories
+# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
+devStoryLocation: nested
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
@@ -131,9 +132,28 @@ devLoadAlwaysFiles:
 
 If this file doesn't exist, the skill will use sensible defaults:
 
-- Stories: `docs/stories/`
-- Epics: `docs/prd/`
+- Stories: Stored within epic directories at `{epicPath}/stories/`
+- Epics: `docs/prd/{category}/{component}/epics/`
 - Architecture: `docs/architecture/`
+
+**Default Configuration Values** (used if `skills-config.yaml` not found):
+
+```yaml
+markdownExploder: true
+qa:
+  qaLocation: docs/qa
+prd:
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: '*/epics/epic.{n}.*.md'
+architecture:
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
+# Stories stored within epic directories
+devStoryLocation: nested
+devDebugLog: .ai/debug-log.md
+slashPrefix: BMad
+```
 
 ## Anti-Hallucination Protocol
 
@@ -224,7 +244,7 @@ Assistant: [Activates scrum-master skill, which calls create-story skill]
 - Gathers architecture context from relevant docs
 - Populates story template with traceable information
 - Validates completeness
-- Outputs: docs/stories/2.3.story-name.md
+- Outputs: `{epicPath}/stories/{epic}.{story}.{descriptive-name}.md`
 ```
 
 **Validating Story**:

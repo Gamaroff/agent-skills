@@ -1,2 +1,0 @@
-description = "Guidance on creating and organizing custom slash commands."
-prompt = "Use the command-development skill to Guidance on creating and organizing custom slash commands. {{args}}"

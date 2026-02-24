@@ -1,2 +1,0 @@
-description = "Comprehensive PRD validation across 9 categories and 60+ checks."
-prompt = "Use the pm-checklist skill to Comprehensive PRD validation across 9 categories and 60+ checks. {{args}}"

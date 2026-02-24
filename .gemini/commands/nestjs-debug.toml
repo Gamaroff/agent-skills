@@ -1,2 +1,0 @@
-description = "Autonomous NestJS debugging for module, DI, and configuration errors."
-prompt = "Use the nestjs-debug skill to Autonomous NestJS debugging for module, DI, and configuration errors. {{args}}"

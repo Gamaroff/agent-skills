@@ -1,2 +1,0 @@
-description = "Handle project pivots, blockers, and requirement changes."
-prompt = "Use the correct-course skill to Handle project pivots, blockers, and requirement changes. {{args}}"

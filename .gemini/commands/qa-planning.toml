@@ -1,2 +1,0 @@
-description = "Upfront test planning and risk assessment before development."
-prompt = "Use the qa-planning skill to Upfront test planning and risk assessment before development. {{args}}"

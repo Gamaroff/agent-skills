@@ -1,2 +1,0 @@
-description = "Create git branches following Gitflow conventions."
-prompt = "Use the create-branch skill to Create git branches following Gitflow conventions. {{args}}"

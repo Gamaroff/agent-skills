@@ -1,2 +1,0 @@
-description = "Generate stories organized for parallel development using worktrees."
-prompt = "Use the parallel-stories skill to Generate stories organized for parallel development using worktrees. {{args}}"

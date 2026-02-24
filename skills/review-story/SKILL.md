@@ -29,6 +29,7 @@ Natural language triggers:
 ## When to Use vs /validate-story
 
 **Use `/review-story` (this skill) when**:
+
 - 🔄 Story has **ambiguous requirements** that need clarification
 - 🔄 You need to **resolve conflicts or gaps interactively**
 - 🔄 You want **user input on technical decisions**
@@ -37,6 +38,7 @@ Natural language triggers:
 - 🔄 You want to collaboratively refine the story with user input
 
 **Use `/validate-story` instead when**:
+
 - ✅ You need **automated validation** without user interaction
 - ✅ Story appears complete and you want GO/NO-GO decision
 - ✅ You're doing **batch validation** of multiple stories
@@ -145,15 +147,15 @@ Use `AskUserQuestion` tool with:
 **Question Format**:
 
 ```yaml
-question: "[Specific question about the issue]"
-header: "[Short label, max 12 chars]"
+question: '[Specific question about the issue]'
+header: '[Short label, max 12 chars]'
 options:
-  - label: "[Option 1]"
-    description: "[What this means and implications]"
-  - label: "[Option 2]"
-    description: "[What this means and implications]"
-  - label: "[Option 3 if applicable]"
-    description: "[What this means and implications]"
+  - label: '[Option 1]'
+    description: '[What this means and implications]'
+  - label: '[Option 2]'
+    description: '[What this means and implications]'
+  - label: '[Option 3 if applicable]'
+    description: '[What this means and implications]'
 ```
 
 **Question Quality Guidelines**:
@@ -170,77 +172,77 @@ options:
 
 ```yaml
 question: "Story AC #2 says 'provide fast response times' but doesn't specify a measurable threshold. What is the acceptable response time?"
-header: "Response Time"
+header: 'Response Time'
 options:
-  - label: "< 100ms (p95)"
-    description: "Very fast, requires caching and optimization. Standard for real-time features."
-  - label: "< 500ms (p95)"
-    description: "Fast enough for most user interactions. Easier to achieve."
-  - label: "< 2 seconds (p95)"
-    description: "Acceptable for non-critical operations. Minimal optimization needed."
-  - label: "Not performance-critical"
-    description: "Remove specific timing requirement, rely on general performance standards."
+  - label: '< 100ms (p95)'
+    description: 'Very fast, requires caching and optimization. Standard for real-time features.'
+  - label: '< 500ms (p95)'
+    description: 'Fast enough for most user interactions. Easier to achieve.'
+  - label: '< 2 seconds (p95)'
+    description: 'Acceptable for non-critical operations. Minimal optimization needed.'
+  - label: 'Not performance-critical'
+    description: 'Remove specific timing requirement, rely on general performance standards.'
 ```
 
 #### Example 2: Technical Conflict
 
 ```yaml
 question: "Story Dev Notes mention using 'WebSocket' but architecture docs specify Socket.IO for real-time communication. Which should be used?"
-header: "Real-time Tech"
+header: 'Real-time Tech'
 options:
-  - label: "Socket.IO (Recommended)"
-    description: "Matches architecture standard. Auto-fallback, rooms, namespaces. Already in use for chat."
-  - label: "Native WebSocket"
-    description: "Lower-level, more control. Requires custom reconnection logic. Deviates from standard."
-  - label: "Update architecture docs"
-    description: "Keep WebSocket in story, update architecture to allow native WebSocket for specific use cases."
+  - label: 'Socket.IO (Recommended)'
+    description: 'Matches architecture standard. Auto-fallback, rooms, namespaces. Already in use for chat.'
+  - label: 'Native WebSocket'
+    description: 'Lower-level, more control. Requires custom reconnection logic. Deviates from standard.'
+  - label: 'Update architecture docs'
+    description: 'Keep WebSocket in story, update architecture to allow native WebSocket for specific use cases.'
 ```
 
 #### Example 3: Missing Information
 
 ```yaml
 question: "Task 3 mentions 'implement error handling' but doesn't specify what errors to handle. What error scenarios should be covered?"
-header: "Error Cases"
+header: 'Error Cases'
 multiSelect: true
 options:
-  - label: "Network errors"
-    description: "Connection failures, timeouts, DNS errors"
-  - label: "Authentication errors"
-    description: "Invalid tokens, expired sessions, unauthorized access"
-  - label: "Validation errors"
-    description: "Invalid input, malformed data, constraint violations"
-  - label: "Server errors"
-    description: "500 errors, database failures, external service failures"
+  - label: 'Network errors'
+    description: 'Connection failures, timeouts, DNS errors'
+  - label: 'Authentication errors'
+    description: 'Invalid tokens, expired sessions, unauthorized access'
+  - label: 'Validation errors'
+    description: 'Invalid input, malformed data, constraint violations'
+  - label: 'Server errors'
+    description: '500 errors, database failures, external service failures'
 ```
 
 #### Example 4: Scope Clarification
 
 ```yaml
 question: "Story includes tasks for 'comprehensive testing' but epic only requires unit tests. Should integration/e2e tests be included?"
-header: "Test Scope"
+header: 'Test Scope'
 options:
-  - label: "Unit tests only"
-    description: "Match epic requirement. Faster, simpler. Align with original scope."
-  - label: "Unit + Integration"
-    description: "More thorough. Tests API interactions. Adds time but better quality."
-  - label: "Full test suite"
-    description: "Unit + Integration + E2E. Maximum coverage. Significant time investment."
-  - label: "Update epic"
-    description: "Comprehensive testing is the right approach. Update epic to match story scope."
+  - label: 'Unit tests only'
+    description: 'Match epic requirement. Faster, simpler. Align with original scope.'
+  - label: 'Unit + Integration'
+    description: 'More thorough. Tests API interactions. Adds time but better quality.'
+  - label: 'Full test suite'
+    description: 'Unit + Integration + E2E. Maximum coverage. Significant time investment.'
+  - label: 'Update epic'
+    description: 'Comprehensive testing is the right approach. Update epic to match story scope.'
 ```
 
 #### Example 5: Hallucination Resolution
 
 ```yaml
 question: "Story mentions using 'react-query-plus' library which is not in tech-stack.md or package.json. How should data fetching be handled?"
-header: "Data Fetching"
+header: 'Data Fetching'
 options:
-  - label: "Use documented library"
-    description: "Replace with existing solution from architecture docs (specify which one)"
-  - label: "Add new library"
-    description: "react-query-plus is correct choice. Update tech stack docs and install it."
-  - label: "Clarify intent"
-    description: "Story author meant something else. What was the intended approach?"
+  - label: 'Use documented library'
+    description: 'Replace with existing solution from architecture docs (specify which one)'
+  - label: 'Add new library'
+    description: 'react-query-plus is correct choice. Update tech stack docs and install it.'
+  - label: 'Clarify intent'
+    description: 'Story author meant something else. What was the intended approach?'
 ```
 
 ### Batching Questions
@@ -248,15 +250,17 @@ options:
 **IMPORTANT**: When multiple issues found in same category, batch related questions:
 
 **Good** (batched):
+
 ```yaml
 questions:
-  - question: "Three ACs have ambiguous criteria. Should all be made measurable?"
+  - question: 'Three ACs have ambiguous criteria. Should all be made measurable?'
     # ... options
-  - question: "Two tasks mention undefined file paths. Use standard locations?"
+  - question: 'Two tasks mention undefined file paths. Use standard locations?'
     # ... options
 ```
 
 **Bad** (one at a time):
+
 - Asking 10 separate questions sequentially
 - Making user answer questions one-by-one
 - Interrupting review flow repeatedly
@@ -292,13 +296,13 @@ questions:
 1. Use `AskUserQuestion` to ask about desired output format:
 
 ```yaml
-question: "Would you like a comprehensive review report saved to a file, or just an actionable plan for immediate fixes?"
-header: "Output Format"
+question: 'Would you like a comprehensive review report saved to a file, or just an actionable plan for immediate fixes?'
+header: 'Output Format'
 options:
-  - label: "Comprehensive report"
-    description: "Generate detailed review report saved to [story-name].review.[date].md with all findings, user decisions, and recommendations documented."
-  - label: "Action plan only"
-    description: "Provide prioritized list of issues and fixes to action immediately without saving a report file."
+  - label: 'Comprehensive report'
+    description: 'Generate detailed review report saved to [story-name].review.[date].md with all findings, user decisions, and recommendations documented.'
+  - label: 'Action plan only'
+    description: 'Provide prioritized list of issues and fixes to action immediately without saving a report file.'
 ```
 
 2. Store user's choice for use in Step 9 (final output generation)
@@ -313,11 +317,31 @@ options:
 
 **Actions**:
 
-1. Load `.bmad-core/core-config.yaml` from project root
-   - If missing, use fallback defaults and warn user
-   - Extract: `devStoryLocation`, `prd.*`, `architecture.*`
+1. Load `skills-config.yaml` from project root
+   - If missing, use fallback defaults and notify user
+   - Extract: `devStoryLocation` (default: `nested`), `prd.*`, `architecture.*`
+
+**Default Configuration Values** (used if `skills-config.yaml` not found):
+
+```yaml
+markdownExploder: true
+qa:
+  qaLocation: docs/qa
+prd:
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: '*/epics/epic.{n}.*.md'
+architecture:
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
+# Stories stored within epic directories
+devStoryLocation: nested
+devDebugLog: .ai/debug-log.md
+slashPrefix: BMad
+```
 
 2. Load story document to review
+   - Locate at `{epicPath}/stories/{epic}.{story}.*.md`
    - Extract epic number and story number from filename or frontmatter
    - Parse all sections and content
 
@@ -325,7 +349,7 @@ options:
    - For structure compliance validation
 
 4. Identify and load parent epic
-   - Based on `prdSharded` setting
+   - Based on `prdSharded` setting and epic file pattern `*/epics/epic.{n}.*.md`
    - Extract original requirements and acceptance criteria
 
 5. Load relevant architecture documents
@@ -459,24 +483,24 @@ options:
 
 ```yaml
 questions:
-  - question: "Story filename uses underscores (story_2_3.md) instead of required dots (story.2.3.md). Rename the file?"
-    header: "File Naming"
+  - question: 'Story filename uses underscores (story_2_3.md) instead of required dots (story.2.3.md). Rename the file?'
+    header: 'File Naming'
     options:
-      - label: "Yes, rename"
-        description: "Follow documentation standards with dots for structural separators"
-      - label: "Keep current"
-        description: "Underscore format is intentional for this project"
+      - label: 'Yes, rename'
+        description: 'Follow documentation standards with dots for structural separators'
+      - label: 'Keep current'
+        description: 'Underscore format is intentional for this project'
 
-  - question: "Story has 5 ACs but epic only specifies 3. Are the extra 2 ACs intentional additions?"
-    header: "AC Count"
+  - question: 'Story has 5 ACs but epic only specifies 3. Are the extra 2 ACs intentional additions?'
+    header: 'AC Count'
     multiSelect: true
     options:
-      - label: "AC 4 is needed"
-        description: "Necessary addition not in epic. Update epic to include it."
-      - label: "AC 5 is needed"
-        description: "Necessary addition not in epic. Update epic to include it."
-      - label: "Remove extras"
-        description: "Story should match epic exactly. Remove AC 4 and 5."
+      - label: 'AC 4 is needed'
+        description: 'Necessary addition not in epic. Update epic to include it.'
+      - label: 'AC 5 is needed'
+        description: 'Necessary addition not in epic. Update epic to include it.'
+      - label: 'Remove extras'
+        description: 'Story should match epic exactly. Remove AC 4 and 5.'
 ```
 
 **After Questions**: Continue review with user's decisions incorporated.
@@ -649,35 +673,35 @@ questions:
 ```yaml
 questions:
   - question: "Story mentions 'react-native-super-cache' library not in tech stack. What caching solution should be used?"
-    header: "Caching Lib"
+    header: 'Caching Lib'
     options:
-      - label: "Use documented lib"
-        description: "Replace with existing caching solution from architecture docs"
-      - label: "Add new library"
-        description: "Install react-native-super-cache and update tech stack docs"
-      - label: "Clarify approach"
-        description: "Describe the intended caching approach without assuming library"
+      - label: 'Use documented lib'
+        description: 'Replace with existing caching solution from architecture docs'
+      - label: 'Add new library'
+        description: 'Install react-native-super-cache and update tech stack docs'
+      - label: 'Clarify approach'
+        description: 'Describe the intended caching approach without assuming library'
 
-  - question: "Dev Notes missing database schema details. Should this story include schema changes?"
-    header: "Schema Work"
+  - question: 'Dev Notes missing database schema details. Should this story include schema changes?'
+    header: 'Schema Work'
     options:
-      - label: "Yes, add schema"
-        description: "Story needs schema updates. Specify which models/fields."
-      - label: "No schema work"
-        description: "Story only works with existing schema. No changes needed."
-      - label: "Separate story"
-        description: "Schema changes should be separate story (dependency)."
+      - label: 'Yes, add schema'
+        description: 'Story needs schema updates. Specify which models/fields.'
+      - label: 'No schema work'
+        description: 'Story only works with existing schema. No changes needed.'
+      - label: 'Separate story'
+        description: 'Schema changes should be separate story (dependency).'
 
   - question: "Testing section says 'comprehensive tests' but doesn't specify type. Which tests are needed?"
-    header: "Test Types"
+    header: 'Test Types'
     multiSelect: true
     options:
-      - label: "Unit tests"
-        description: "Test individual functions and components in isolation"
-      - label: "Integration tests"
-        description: "Test API interactions and service integration"
-      - label: "E2E tests"
-        description: "Test complete user flows end-to-end"
+      - label: 'Unit tests'
+        description: 'Test individual functions and components in isolation'
+      - label: 'Integration tests'
+        description: 'Test API interactions and service integration'
+      - label: 'E2E tests'
+        description: 'Test complete user flows end-to-end'
 ```
 
 **After Questions**: Continue review with technical decisions clarified.
@@ -900,44 +924,44 @@ questions:
 ```yaml
 questions:
   - question: "AC #3 says 'fast response time' which is unmeasurable. What specific performance threshold is required?"
-    header: "Performance"
+    header: 'Performance'
     options:
-      - label: "< 100ms (p95)"
-        description: "Very fast, requires caching/optimization"
-      - label: "< 500ms (p95)"
-        description: "Fast enough for most interactions"
-      - label: "< 2s (p95)"
-        description: "Acceptable for non-critical operations"
-      - label: "Remove threshold"
-        description: "No specific requirement, general standards apply"
+      - label: '< 100ms (p95)'
+        description: 'Very fast, requires caching/optimization'
+      - label: '< 500ms (p95)'
+        description: 'Fast enough for most interactions'
+      - label: '< 2s (p95)'
+        description: 'Acceptable for non-critical operations'
+      - label: 'Remove threshold'
+        description: 'No specific requirement, general standards apply'
 
   - question: "Tasks reference both '/api/v1/users' and '/api/users' endpoints. Which version is correct?"
-    header: "API Version"
+    header: 'API Version'
     options:
-      - label: "Use v1 (/api/v1/users)"
-        description: "Versioned endpoints as per architecture standard"
-      - label: "Use unversioned (/api/users)"
-        description: "Unversioned for this specific case"
-      - label: "Consistency error"
-        description: "Should all be same. Correct tasks to use consistent version."
+      - label: 'Use v1 (/api/v1/users)'
+        description: 'Versioned endpoints as per architecture standard'
+      - label: 'Use unversioned (/api/users)'
+        description: 'Unversioned for this specific case'
+      - label: 'Consistency error'
+        description: 'Should all be same. Correct tasks to use consistent version.'
 
-  - question: "Story uses different error handling pattern than previous story 2.2. Is this intentional?"
-    header: "Error Pattern"
+  - question: 'Story uses different error handling pattern than previous story 2.2. Is this intentional?'
+    header: 'Error Pattern'
     options:
-      - label: "Follow 2.2 pattern"
-        description: "Maintain consistency with established approach"
-      - label: "New pattern correct"
-        description: "This story requires different approach (explain why in Dev Notes)"
+      - label: 'Follow 2.2 pattern'
+        description: 'Maintain consistency with established approach'
+      - label: 'New pattern correct'
+        description: 'This story requires different approach (explain why in Dev Notes)'
 
-  - question: "Story has 15 tasks across 3 distinct feature areas (database, API, frontend). This appears too large for one story. Should it be split into sub-stories?"
-    header: "Split Story"
+  - question: 'Story has 15 tasks across 3 distinct feature areas (database, API, frontend). This appears too large for one story. Should it be split into sub-stories?'
+    header: 'Split Story'
     options:
-      - label: "Keep as one story"
-        description: "All tasks are tightly coupled and must ship together. Scope is acceptable."
-      - label: "Split into sub-stories"
-        description: "Create sub-stories for parallel development. Provide suggested split structure in recommendations."
-      - label: "Reduce scope"
-        description: "Some tasks should be moved to future stories. Identify which tasks to defer."
+      - label: 'Keep as one story'
+        description: 'All tasks are tightly coupled and must ship together. Scope is acceptable.'
+      - label: 'Split into sub-stories'
+        description: 'Create sub-stories for parallel development. Provide suggested split structure in recommendations.'
+      - label: 'Reduce scope'
+        description: 'Some tasks should be moved to future stories. Identify which tasks to defer.'
 ```
 
 **After Questions**: Generate final report incorporating all user decisions and clarifications.
@@ -949,6 +973,7 @@ questions:
 **Purpose**: Provide actionable recommendations for story improvement in user's preferred format
 
 **CRITICAL**: Use the output format preference captured in Step 0 to determine whether to generate:
+
 - **Comprehensive Report**: Full review report saved to file
 - **Action Plan Only**: Prioritized list of fixes for immediate action
 
@@ -995,26 +1020,31 @@ questions:
 ### Question Point 1: Epic & Structure
 
 **Q1: [Question asked]**
+
 - **User Decision**: [Answer selected]
 - **Impact**: [How this affects recommendations]
 
 **Q2: [Question asked]**
+
 - **User Decision**: [Answer selected]
 - **Impact**: [How this affects recommendations]
 
 ### Question Point 2: Technical & Completeness
 
 **Q3: [Question asked]**
+
 - **User Decision**: [Answer selected]
 - **Impact**: [How this affects recommendations]
 
 **Q4: [Question asked]**
+
 - **User Decision**: [Answer selected]
 - **Impact**: [How this affects recommendations]
 
 ### Question Point 3: Quality & Clarity
 
 **Q5: [Question asked]**
+
 - **User Decision**: [Answer selected]
 - **Impact**: [How this affects recommendations]
 
@@ -1378,17 +1408,20 @@ questions:
 ## Immediate Next Steps
 
 **If READY TO IMPLEMENT:**
+
 1. [Action 1]
 2. [Action 2]
 3. Begin implementation with `/develop` skill
 
 **If NEEDS REVISION:**
+
 1. [Priority 1 fix]
 2. [Priority 2 fix]
 3. [Priority 3 fix]
 4. Run `/validate-story` after fixes
 
 **If REQUIRES REWORK:**
+
 1. [Major rework item 1]
 2. [Major rework item 2]
 3. Consider using `/review-story` again or `/create-story` to regenerate
@@ -1430,14 +1463,14 @@ questions:
    Use `AskUserQuestion` to determine if fixes have been completed:
 
    ```yaml
-   question: "Have you completed the recommended fixes from the review?"
-   header: "Fixes Done"
+   question: 'Have you completed the recommended fixes from the review?'
+   header: 'Fixes Done'
    options:
-     - label: "Yes, fixes complete"
+     - label: 'Yes, fixes complete'
        description: "I've addressed all critical/important issues. Story is now ready for development."
-     - label: "Partially complete"
+     - label: 'Partially complete'
        description: "I've addressed some issues but more work is needed before development."
-     - label: "Not yet"
+     - label: 'Not yet'
        description: "I haven't made changes yet. I'll update the document later."
    ```
 
@@ -1461,8 +1494,8 @@ questions:
 
    ```yaml
    file_path: [story-file-path]
-   old_string: "Status:** Draft"
-   new_string: "Status:** Ready for Development"
+   old_string: 'Status:** Draft'
+   new_string: 'Status:** Ready for Development'
    ```
 
 **Status Transition Rules**:
@@ -1664,28 +1697,24 @@ For each technical claim in story:
 
 ## Configuration Reference
 
-Expected configuration in `.bmad-core/core-config.yaml`:
+Expected configuration in `skills-config.yaml`:
 
 ```yaml
 # Project structure
-devStoryLocation: docs/stories
-devDebugLog: .ai/debug-log.md
-
-# PRD configuration
 prd:
-  prdFile: docs/prd.md
-  prdVersion: v4
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic-{n}*.md'
+  epicFilePattern: '*/epics/epic.{n}.*.md'
 
-# Architecture configuration
 architecture:
-  architectureFile: docs/architecture.md
-  architectureVersion: v4
   architectureSharded: true
   architectureShardedLocation: docs/architecture
+
+# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
+devStoryLocation: nested
 ```
+
+**Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on the Goji project organization.
 
 ---
 
@@ -1694,7 +1723,7 @@ architecture:
 This skill uses:
 
 - `resources/story-template.yaml` - Story template for structure validation
-- `.bmad-core/core-config.yaml` - Project configuration (optional, uses fallbacks)
+- `skills-config.yaml` - Project configuration (optional, uses fallbacks)
 
 ---
 
@@ -1705,3 +1734,7 @@ This skill uses:
 - Can be used at any stage: draft, in progress, completed
 - Complements `/validate-story` but provides deeper analysis and recommendations
 - Designed to find problems, not just validate compliance
+
+```
+
+```

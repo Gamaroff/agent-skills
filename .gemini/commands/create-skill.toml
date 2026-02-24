@@ -1,2 +1,0 @@
-description = "Guide for creating or updating Gemini CLI agent skills."
-prompt = "Use the create-skill skill to Guide for creating or updating Gemini CLI agent skills. {{args}}"

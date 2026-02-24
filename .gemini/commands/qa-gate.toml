@@ -1,2 +1,0 @@
-description = "Create or update quality gate decision files (PASS/CONCERNS/FAIL)."
-prompt = "Use the qa-gate skill to Create or update quality gate decision files (PASS/CONCERNS/FAIL). {{args}}"

@@ -1,3 +1,8 @@
+---
+name: qa-technical-task
+description: Comprehensive quality assurance review for technical tasks. Focuses on success criteria validation, implementation phase verification, and non-functional requirements assessment for infrastructure and refactoring work.
+---
+
 # QA Technical Task Review Skill
 
 **Version**: 1.0
