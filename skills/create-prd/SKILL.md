@@ -81,6 +81,8 @@ Before starting, ensure you have:
 
 ```
 1. Pre-Flight Check & Analysis
+   ├─ Continuation detection (resume incomplete PRD if found)
+   ├─ Active input document discovery (briefs, research, context)
    ├─ Check for document-project output
    ├─ Assess scope complexity
    ├─ Analyze existing project structure
@@ -97,6 +99,7 @@ Before starting, ensure you have:
 
 3. Quality Validation
    ├─ Run pm-checklist
+   ├─ Run 4 targeted checks (measurability, leakage, traceability, SMART)
    ├─ Validate integration approach
    └─ Ensure backward compatibility
 
@@ -109,7 +112,54 @@ Before starting, ensure you have:
 
 ### Step 1: Pre-Flight Check & Analysis
 
-**1a. Check for document-project Output:**
+**1a. Continuation Detection (check FIRST):**
+
+Before anything else, scan for an existing in-progress PRD for this feature:
+
+- Check `docs/prd/` and subdirectories for any PRD file related to the enhancement being discussed
+- If found, read it and check its `stepsCompleted` frontmatter field (or infer completion from section headings)
+- If an incomplete PRD is found, report to the user:
+
+```
+"I found an existing PRD at [path] that appears to cover [topic].
+It looks like [sections X, Y were completed / it was started but not finished].
+
+Options:
+[R] Resume — Continue from where it left off
+[S] Start fresh — Create a new PRD (existing file will be overwritten)
+[V] View — Show me the existing PRD first
+
+What would you like to do?"
+```
+
+Wait for user selection before proceeding.
+
+**1b. Active Input Document Discovery:**
+
+Scan the project for existing reference documents before asking the user for anything:
+
+- `*brief*.md` — Product or feature briefs
+- `*research*.md` — Research or analysis documents
+- `docs/prd/**` — Prior PRD artefacts
+- `**/project-context.md` — Project context files
+- `docs/architecture/**` — Architecture documentation
+
+Report findings:
+
+```
+"I found the following reference documents:
+- Product briefs: [list or 'none found']
+- Research docs: [list or 'none found']
+- Project context: [list or 'none found']
+- Architecture docs: [list or 'none found']
+
+I'll use these to inform the PRD. Are there any other documents
+you'd like me to include before we begin?"
+```
+
+Load all confirmed documents before proceeding.
+
+**1c. Check for document-project Output:**
 
 ```
 "Have you run document-project on this codebase? It provides:
@@ -123,7 +173,7 @@ If not available, I STRONGLY recommend running it first for better
 enhancement planning."
 ```
 
-**1b. Analyze Existing Project:**
+**1e. Analyze Existing Project:**
 
 **If document-project available:**
 
@@ -236,6 +286,12 @@ Use create-doc skill with:
 4. **STOP - Present 1-9 elicitation options**
 5. Wait for user response
 6. Iterate based on feedback
+
+**❌ Do NOT proceed if:**
+- Any FR uses vague language without measurable criteria (e.g., "fast", "easy", "intuitive") — replace with specific, testable statements
+- Any FR prescribes implementation technology (e.g., "use React component X") instead of capability
+- NFRs lack specific metrics (e.g., "< 200ms response time" not "fast response")
+- Compatibility Requirements (CR) section is absent or incomplete
 
 #### Section 3: UI Enhancement Goals (conditional, no mandatory elicitation)
 
@@ -358,6 +414,12 @@ So that [benefit].
 4. Wait for user response
 5. Refine based on feedback
 
+**❌ Do NOT proceed if:**
+- Any story lacks Integration Verification (IV) criteria
+- Story sequence has a step that modifies existing behaviour before verifying current behaviour still works
+- Acceptance criteria are not independently testable (no shared pass/fail conditions across stories)
+- No rollback consideration is documented for any story that modifies shared infrastructure (DB schema, APIs, auth)
+
 ### Step 3: Quality Validation
 
 **Same as greenfield:**
@@ -373,6 +435,24 @@ So that [benefit].
 - Ensure integration approach sound
 - Validate risk assessment includes technical debt
 - Confirm story sequencing minimizes existing system risk
+
+**Targeted requirement quality checks (run after pm-checklist):**
+
+Run each check sequentially and report findings before proceeding:
+
+**Check 1 — Measurability:**
+Scan every FR for vague adjectives: "easy", "fast", "simple", "intuitive", "user-friendly", "seamless", "quick", "efficient" (without accompanying metrics). Flag each occurrence. Scan every NFR for missing numeric criteria (must have a specific metric, e.g. "< 2s" not "fast"). Report: `[PASS] All requirements measurable` or `[FAIL] Found N vague requirements: [list]`
+
+**Check 2 — Implementation Leakage:**
+Scan FRs and NFRs for technology names that prescribe implementation rather than capability: framework names (React, Redux, Prisma), library names, data structure names (JSON, array), cloud provider names (AWS, S3). Exception: names that ARE the capability (e.g. "BSV blockchain", "WebSocket"). Report: `[PASS] No implementation leakage` or `[FAIL] Found leakage in: [list]`
+
+**Check 3 — Traceability:**
+For each FR, verify it can be traced to at least one stated Goal in Section 1d. An FR with no goal justification is a scope risk. Report: `[PASS] All FRs traceable to goals` or `[WARN] N FRs lack clear goal traceability: [list]`
+
+**Check 4 — NFR SMART Criteria:**
+Each NFR must be: Specific (named metric), Measurable (number or threshold), Achievable (grounded in existing system context), Relevant (explains who it affects), Time-bound or Condition-bound (when it applies). Flag NFRs missing two or more of these. Report: `[PASS] NFRs are SMART` or `[FAIL] N NFRs are not SMART: [list]`
+
+Report total: `Quality checks: X/4 passed`. Address any FAILs before proceeding to next steps.
 
 ### Step 4: Next Steps
 
@@ -463,6 +543,7 @@ A successful brownfield PRD produces:
 
 5. **Quality Validated**
    - Passed pm-checklist
+   - Passed 4 targeted checks (measurability, leakage, traceability, SMART NFRs)
    - Compatibility requirements validated
    - Integration approach sound
 
@@ -497,12 +578,18 @@ User: "Add biometric authentication to our existing mobile banking app"
 ❌ **Skipping compatibility requirements** - Backward compatibility critical
 ❌ **Not validating understanding** - Confirm assumptions before proceeding
 ❌ **Recommending full PRD for small changes** - Use create-epic or brownfield-story for simpler enhancements
+❌ **Starting fresh without checking for existing PRD** - Always check for incomplete in-progress work first
+❌ **Ignoring existing reference documents** - Scan for briefs, research, context docs before asking the user
+❌ **Vague requirements** - "Fast", "easy", "intuitive" are not requirements; replace with measurable criteria
+❌ **Implementation leakage** - FRs describe capability, not implementation; no technology names in requirements
 
+✅ **Check for existing PRD before starting**
+✅ **Scan and load all discoverable reference documents first**
 ✅ **Analyze existing project thoroughly**
 ✅ **Confirm understanding at every step**
 ✅ **Emphasize compatibility and integration**
 ✅ **Sequence stories for risk minimization**
-✅ **Validate quality with pm-checklist**
+✅ **Validate quality with pm-checklist AND the 4 targeted checks**
 
 ## Notes
 

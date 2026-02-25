@@ -130,6 +130,25 @@ From this, auto-generate:
 - **Directory Path**: `docs/development/tasks/task.[ID].[kebab-case-name]/`
 - **File Path**: `task.[ID].[kebab-case-name].md`
 
+### 1.5 Analyse Git History for Technical Context
+
+Before building the document, run a git history scan to ground the technical content:
+
+1. Run `git log --oneline -15` to get recent commits
+2. Identify commits that touch the same files, modules, or layers as this task
+3. For 2-3 most relevant commits, inspect the diff to extract:
+   - Patterns already established in this area (naming, structure, abstractions)
+   - Libraries or approaches recently adopted that this task should align with
+   - Similar refactors or changes that succeeded or were reverted (and why)
+   - Existing utilities, services, or helpers that could be reused
+4. Use these insights to pre-populate or validate:
+   - **Technical Background** — current architecture is accurate, not outdated
+   - **Implementation Plan** — phases don't duplicate or conflict with recent changes
+   - **Files Summary** — file paths exist and haven't been moved/deleted
+   - **Risk Assessment** — recent reverts or fixes flag real-world risk areas
+
+**Anti-Hallucination Rule**: Only use what is confirmed in the commit history. Do NOT infer patterns not present in the diffs.
+
 ### 2. Process Each Section
 
 For each of 11 mandatory sections:
@@ -231,6 +250,32 @@ For each risk:
 - Prompt user to complete them
 - Offer guided completion flow
 
+### 3.5 Adversarial Quality Review
+
+**MANDATORY**: Before generating the document, perform an adversarial re-analysis of all collected content as if reviewing someone else's work. Goal: make implementation mistakes **impossible**.
+
+#### 🚨 Critical (auto-fix before document generation)
+
+- **Wheel reinvention**: Does the implementation plan direct the developer toward existing code, services, or utilities they should extend rather than re-implement? Search the codebase for related functionality.
+- **Wrong libraries or versions**: Are all library/framework references consistent with `package.json`? No fabricated or outdated dependencies.
+- **Incorrect file paths**: Do all files in the Files Summary actually exist (for modifications) or land in the correct directories (for new files)? Validate against the project's directory structure.
+- **Incomplete migration paths**: Every breaking change must have a concrete migration path — not just "update callers". Flag vague migrations.
+- **Inadequate rollback plan**: Are rollback triggers specific enough to act on? Are steps actionable in under 1 hour if needed?
+- **Risk underestimation**: Does the Risk Assessment account for side effects surfaced by git history (recent reverts, related fixes)?
+
+#### ⚡ Should Add (present to user for confirmation)
+
+- **Missing performance baselines**: If the task claims performance improvements, does it document current baselines to measure against?
+- **Uncovered test scenarios**: Does the Testing Strategy cover regression risks, not just happy paths?
+- **Scope creep risk**: Are any implementation steps implicitly larger than stated?
+
+#### ✨ Nice to Have (present to user for confirmation)
+
+- **Clarity**: Are phase descriptions specific enough that a developer not involved in planning can execute them?
+- **Checklist completeness**: Do all checkboxes in the Implementation Plan cover the full scope?
+
+Fix all Critical items in the collected content before proceeding. Present Should Add and Nice to Have to the user.
+
 ### 4. Document Generation
 
 Once validated:
@@ -265,9 +310,14 @@ Once validated:
 Inform user:
 
 1. Task document created at `docs/development/tasks/task.[ID].[name]/task.[ID].[name].md`
-2. Next steps: Implementation
-3. When complete: Hand off to QA with `qa-review` skill
-4. QA will create:
+2. If `docs/prd/sprint-status.yaml` exists, update it:
+   - Load the full file, preserving all comments and structure
+   - Find the entry matching this task's ID/key
+   - Update its status to `ready-for-dev`
+   - Save the file
+3. Next steps: Implementation
+4. When complete: Hand off to QA with `qa-review` skill
+5. QA will create:
    - QA report at `task.[ID].qa.[number].[name].md`
    - Bug reports (if issues found) at `task.[ID].bug.[N].[name].md`
    - Quality gate at `docs/qa/gates/tasks/task.[ID].gate.[number].[name].yml`

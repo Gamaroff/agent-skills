@@ -80,15 +80,15 @@ Activate when user needs:
 
 ```markdown
 ---
-title: 'Epic [N]: [Enhancement Name]'
-prd_source: '[source-document].md or brownfield-enhancement'
-epic_type: 'feature_enhancement'
-priority: 'critical | high | medium | low'
+title: "Epic [N]: [Enhancement Name]"
+prd_source: "[source-document].md or brownfield-enhancement"
+epic_type: "feature_enhancement"
+priority: "critical | high | medium | low"
 estimated_sprints: 1-2
 dependencies: []
-status: 'NOT_STARTED | IN_PROGRESS | PARTIALLY_COMPLETE | COMPLETE'
+status: "NOT_STARTED | IN_PROGRESS | PARTIALLY_COMPLETE | COMPLETE"
 completion_percentage: 0
-team: ['developer-1']
+team: ["developer-1"]
 ---
 
 # Epic [N]: {{Enhancement Name}} - Brownfield Enhancement
@@ -113,11 +113,34 @@ team: ['developer-1']
 
 ## Stories Breakdown
 
+**Epic Story Guidelines:**
+
+- **User-Value First:** Organize by user value, not technical layers.
+- **No Forward Dependencies:** Stories must NOT depend on future stories within the epic. Each must be independently completable.
+- **Incremental Technical Setup:** Create database entities or infrastructure ONLY in the story that first needs them.
+
+### Stories Overview
+
 | Story | Status         | Priority | Description                     |
 | ----- | -------------- | -------- | ------------------------------- |
 | [N].1 | ❌ Not Started | High     | {{Title and brief description}} |
 | [N].2 | ❌ Not Started | Medium   | {{Title and brief description}} |
 | [N].3 | ❌ Not Started | Low      | {{Title and brief description}} |
+
+### Story [N].1: {{story_title}}
+
+As a {{user_type}},
+I want {{capability}},
+So that {{value_benefit}}.
+
+**Acceptance Criteria:**
+
+**Given** {{precondition}}
+**When** {{action}}
+**Then** {{expected_outcome}}
+**And** {{additional_criteria}}
+
+_(Repeat structure for Stories [N].2 and [N].3)_
 
 **Status Indicators**:
 
@@ -169,10 +192,13 @@ team: ['developer-1']
 ## Key Principles
 
 1. **Scope constraint** - Maximum 3 stories
-2. **Pattern adherence** - Follows existing architecture
-3. **Risk minimization** - Low risk to existing system
-4. **Integration awareness** - Clear integration approach
-5. **Rollback feasibility** - Changes can be reversed
+2. **User-Value First** - Stories must enable users to accomplish something meaningful, not just technical milestones
+3. **No Forward Dependencies** - Stories must NOT depend on future stories; they must be independently completable in sequence
+4. **Incremental Technical Setup** - Database creations or structural changes should only happen within the story that actually needs them
+5. **Pattern adherence** - Follows existing architecture
+6. **Risk minimization** - Low risk to existing system
+7. **Integration awareness** - Clear integration approach
+8. **Rollback feasibility** - Changes can be reversed
 
 ## Success Criteria
 

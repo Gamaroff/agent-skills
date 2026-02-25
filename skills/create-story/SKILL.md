@@ -141,6 +141,23 @@ If a previous story exists (e.g., creating 2.3, so 2.2 exists):
 
 **Anti-Hallucination Rule**: Only extract insights that are explicitly documented. Do NOT assume or infer information not written in the previous story.
 
+### 2.3 Analyse Git History
+
+1. Run `git log --oneline -15` to get recent commits
+2. Identify commits relevant to the current epic/story area:
+   - Files created or modified in adjacent or related work
+   - Library dependencies recently added or changed
+   - Code patterns and conventions established
+   - Reverts or fixes that signal known pitfalls
+3. For 2-3 most relevant commits, inspect the diff to extract:
+   - File locations and naming patterns established
+   - Libraries already in use that satisfy this story's needs (avoids reinvention)
+   - Testing approaches used in recent stories
+   - Any patterns introduced that this story must follow for consistency
+4. Document actionable insights in the Dev Notes section under **Git History Insights**
+
+**Anti-Hallucination Rule**: Only extract insights from actual commit history. Do NOT infer beyond what the commits and diffs show.
+
 ---
 
 ## Step 3: Gather Architecture Context
@@ -409,18 +426,38 @@ Review all sections for:
    | 2025-10-30 | 1.0 | Initial draft created by Scrum Master | SM Agent |
    ```
 3. Save the story file to `{devStoryLocation}/{epicNum}.{storyNum}.{story-title}.md`
+4. If `docs/prd/sprint-status.yaml` exists, update it:
+   - Load the full file, preserving all comments and structure
+   - Find the entry matching this story's key
+   - Update its status from `backlog` → `ready-for-dev`
+   - Save the file
 
-### 6.3 Execute Validation Checklist
+### 6.3 Execute Adversarial Quality Review
 
-**MANDATORY**: Run the `execute-checklist` skill with `story-draft-checklist.md`
+**MANDATORY**: Perform a full adversarial re-analysis of the completed story, treating it as if reviewing someone else's work. The goal is to make developer mistakes **impossible**.
 
-This validates:
+**Disaster Prevention Checklist** — for each category, identify gaps and fix them before presenting the story:
 
-- Goal & Context Clarity
-- Technical Implementation Guidance
-- Reference Effectiveness
-- Self-Containment Assessment
-- Testing Guidance
+#### 🚨 Critical (Must Fix)
+- **Wheel reinvention**: Does the story direct the developer toward existing code they should extend, rather than re-implement? Check the codebase for related components, services, hooks, or utilities.
+- **Wrong libraries**: Are all library references version-specific and consistent with what the project actually uses (check `package.json`)? No guessed or fabricated dependencies.
+- **Wrong file locations**: Do all file paths in Dev Notes match the project's actual directory structure as confirmed in Step 4?
+- **Regression risk**: Does the story identify existing functionality that could break? Are tests for adjacent features called out?
+- **UX violations**: If this story touches UI, are UX requirements from the epic explicitly referenced with file citations?
+- **Vague implementations**: Can every task be executed without ambiguity? Flag any task that requires guessing.
+
+#### ⚡ Should Add
+- **Previous story continuity**: Are patterns, file locations, and decisions from the previous story carried forward correctly?
+- **Missing acceptance criteria coverage**: Does every AC map to at least one task?
+- **Security or performance requirements**: If relevant, are they stated explicitly (not implied)?
+
+#### ✨ Nice to Have
+- **Token efficiency**: Is the story concise? Remove verbose explanations that don't add implementation value.
+- **Scannable structure**: Are critical constraints visible at a glance, not buried in prose?
+
+After completing the review, list all findings grouped by category. Fix all Critical items directly in the story file. Present Should Add and Nice to Have items to the user for confirmation before applying.
+
+If the BMAD adversarial checklist is available at `_bmad/bmm/workflows/4-implementation/create-story/checklist.md`, use it in addition to the above.
 
 ### 6.4 Provide Summary to User
 
