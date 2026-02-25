@@ -99,12 +99,12 @@ When you provide a story directory path, these skills automatically discover rel
 
 **Supported Skills:**
 
-| Skill             | Accepts Directory | Accepts Story File | Accepts QA/Gate/Bug Files                               |
-| ----------------- | ----------------- | ------------------ | ------------------------------------------------------- |
-| **develop** | ✅                | ✅                 | ❌                                                      |
-| **qa-review**     | ✅                | ✅                 | ❌                                                      |
-| **fix-qa**        | ✅                | ✅                 | ✅ (QA, Gate, Bug)                                      |
-| **Naming Note**   |                   |                    | QA/Gate files are numbered (e.g., `.qa.1.`, `.gate.1.`) |
+| Skill           | Accepts Directory | Accepts Story File | Accepts QA/Gate/Bug Files                               |
+| --------------- | ----------------- | ------------------ | ------------------------------------------------------- |
+| **develop**     | ✅                | ✅                 | ❌                                                      |
+| **qa-review**   | ✅                | ✅                 | ❌                                                      |
+| **fix-qa**      | ✅                | ✅                 | ✅ (QA, Gate, Bug)                                      |
+| **Naming Note** |                   |                    | QA/Gate files are numbered (e.g., `.qa.1.`, `.gate.1.`) |
 
 ---
 
@@ -158,7 +158,7 @@ When you provide a story directory path, these skills automatically discover rel
 | **edit-epic**             | Edit epic documents               | Modifying epic goals, status, requirements |
 | **edit-story**            | Edit story documents              | Modifying story AC, tasks, status          |
 | **validate-story**        | Validate story completeness       | Before implementation starts               |
-| **create-task** | Create technical task             | Infrastructure, refactoring, tech debt     |
+| **create-task**           | Create technical task             | Infrastructure, refactoring, tech debt     |
 | **parallel-stories**      | Manage parallel story development | Multiple stories in progress               |
 | **epic-registry-manager** | Manage global epic numbering      | Ensuring unique epic numbers               |
 
@@ -178,7 +178,7 @@ When you provide a story directory path, these skills automatically discover rel
 
 | Skill                      | Description               | When to Use                     |
 | -------------------------- | ------------------------- | ------------------------------- |
-| **develop**          | Implement features        | Story implementation            |
+| **develop**                | Implement features        | Story implementation            |
 | **nestjs-patterns**        | NestJS best practices     | Backend development with NestJS |
 | **nestjs-debug**           | Debug NestJS issues       | Troubleshooting NestJS apps     |
 | **react-native-debug**     | Debug React Native issues | Mobile app troubleshooting      |
@@ -202,13 +202,13 @@ When you provide a story directory path, these skills automatically discover rel
 
 ### 🧪 Testing & Quality Assurance
 
-| Skill                 | Description                   | When to Use                    |
-| --------------------- | ----------------------------- | ------------------------------ |
-| **qa-planning**       | Upfront test planning         | Before implementation starts   |
-| **qa-review**         | Comprehensive quality review  | During/after implementation    |
-| **qa-gate**           | Create quality gate decisions | Deployment readiness           |
+| Skill              | Description                   | When to Use                    |
+| ------------------ | ----------------------------- | ------------------------------ |
+| **qa-planning**    | Upfront test planning         | Before implementation starts   |
+| **qa-review**      | Comprehensive quality review  | During/after implementation    |
+| **qa-gate**        | Create quality gate decisions | Deployment readiness           |
 | **qa-create-task** | QA for technical tasks        | Testing infrastructure changes |
-| **fix-qa**            | Apply QA-recommended fixes    | Addressing QA findings         |
+| **fix-qa**         | Apply QA-recommended fixes    | Addressing QA findings         |
 
 **QA Review Usage:**
 
@@ -433,7 +433,9 @@ When you provide a story directory path, these skills automatically discover rel
 
 **Process:**
 
-- Loads `.bmad-core/core-config.yaml`
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+- Loads inline configuration or explicit file references
 - Identifies next story number
 - Extracts epic requirements
 - Reviews previous story insights
@@ -752,8 +754,10 @@ skill-name/
 
 ### Skills That Use Resources
 
-- **execute-checklist** → `.bmad-core/checklists/`
-- **create-story** → `.bmad-core/core-config.yaml`
+> **Note**: .bmad-core directory was intentionally removed. Resources are now loaded from the skills' resources/ directory.
+
+- **execute-checklist** → `resources/` (moved from the removed .bmad-core/checklists/)
+- **create-story** → Inline configuration or explicit file references
 - **architect** → `resources/technical-preferences.md`
 
 ---
@@ -808,7 +812,9 @@ Example: task.44.database-migration.md
 
 ### Core Configuration
 
-**Location:** `.bmad-core/core-config.yaml`
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+**Location**: Inline configuration or explicit file references
 
 **Key Settings:**
 
@@ -819,7 +825,7 @@ devDebugLog: .ai/debug-log.md
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic-{n}*.md'
+  epicFilePattern: "*/epic-{n}*.md"
 
 architecture:
   architectureSharded: true

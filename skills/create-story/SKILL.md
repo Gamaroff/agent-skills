@@ -38,13 +38,15 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 
 **Actions**:
 
-1. Load `.bmad-core/core-config.yaml` from project root
-2. If file does not exist, **HALT** and inform user:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+1. Load configuration from skill resources or explicit file references
+2. If configuration does not exist, **HALT** and inform user:
 
    > "core-config.yaml not found. This file is required for story creation. You can either:
    >
-   > 1. Copy it from GITHUB bmad-core/core-config.yaml and configure it for your project
-   > 2. Run the BMad installer against your project to upgrade and add the file automatically.
+   > 1. Copy it from project templates and configure it for your project
+   > 2. Create the configuration manually based on the reference structure
    >    Please add and configure core-config.yaml before proceeding."
 
 3. Extract key configurations:
@@ -60,7 +62,7 @@ devStoryLocation: docs/stories
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic-{n}*.md'
+  epicFilePattern: "*/epic-{n}*.md"
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
@@ -516,7 +518,9 @@ This skill implements rigorous safeguards against AI hallucination:
 
 ## Configuration Reference
 
-Expected configuration in `.bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+Expected configuration structure:
 
 ```yaml
 # Project structure
@@ -529,7 +533,7 @@ prd:
   prdVersion: v4
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic-{n}*.md'
+  epicFilePattern: "*/epic-{n}*.md"
 
 # Architecture configuration
 architecture:

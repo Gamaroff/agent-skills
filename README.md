@@ -162,7 +162,9 @@ fix-qa → Code/test changes → Ready for Review
 Done or Repeat Fix Cycle
 ```
 
-**Configuration**: All skills use `.bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+**Configuration**: All skills use inline configuration or explicit file references:
 
 ```yaml
 devStoryLocation: docs/stories
@@ -507,7 +509,9 @@ Merge in any order (no conflicts with proper file boundaries)
 Sequential stories after parallel work merges
 ```
 
-**Configuration**: Uses `.bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+**Configuration**: Uses inline configuration or explicit file references:
 
 ```yaml
 devStoryLocation: docs/stories
@@ -690,12 +694,14 @@ docs/
 
 ## Configuration
 
-QA skills expect configuration in `bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+QA skills expect configuration in skill resources or explicit file references:
 
 ```yaml
 qa:
-  qaLocation: 'docs/qa' # Base directory for QA files
-devStoryLocation: 'docs/prd' # Story files location
+  qaLocation: "docs/qa" # Base directory for QA files
+devStoryLocation: "docs/prd" # Story files location
 ```
 
 ---
@@ -935,7 +941,9 @@ The PM skills provide comprehensive product management workflows with natural la
 
 **Purpose**: Generic checklist validation engine
 
-**When to use**: Validate document against any checklist from `.bmad-core/checklists/`
+**When to use**: Validate document against any checklist from the skills' resources/ directory
+
+> **Note**: .bmad-core directory was intentionally removed. Checklists are now loaded from the skills' resources/ directory.
 
 **Activation**: "Run architecture checklist on docs/architecture.md"
 

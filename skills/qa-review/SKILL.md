@@ -157,6 +157,7 @@ Before starting the review:
 After finding the story file and validating PR exists:
 
 1. **Check for existing QA artifacts:**
+
    ```bash
    # Find existing gate files in story directory
    STORY_DIR=$(dirname "$STORY_FILE")
@@ -164,6 +165,7 @@ After finding the story file and validating PR exists:
    ```
 
 2. **If gate file exists, read and analyze:**
+
    ```bash
    if [ -n "$LATEST_GATE" ]; then
      GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $2}')
@@ -189,6 +191,7 @@ After finding the story file and validating PR exists:
    - Message: "🔄 Performing QA re-review (previous gate: $GATE_STATUS with $HAS_ISSUES issues)"
 
 4. **For re-reviews, determine next QA artifact number:**
+
    ```bash
    # Find highest existing QA number
    LATEST_QA_NUM=$(ls "$STORY_DIR"/story.*.qa.*.md 2>/dev/null | \
@@ -235,6 +238,7 @@ When performing a re-review (QA #2, #3, etc.), include this section at the top o
 ### Re-Review Scope
 
 This review focuses on:
+
 - Verifying all previous concerns were addressed
 - Checking for regression or new issues introduced by fixes
 - Re-assessing NFR compliance after changes
@@ -244,33 +248,39 @@ This review focuses on:
 ### Example Re-Review Scenarios
 
 **Scenario 1: Clean PASS → Skip**
+
 ```yaml
 # Previous gate file
 gate: PASS
-top_issues: []  # Empty
+top_issues: [] # Empty
 ```
+
 Action: Display message and skip re-review.
 
 **Scenario 2: PASS with concerns → Re-review**
+
 ```yaml
 # Previous gate file
 gate: PASS
 top_issues:
-  - issue: 'Task 2 checkboxes not marked'
+  - issue: "Task 2 checkboxes not marked"
     severity: medium
 ```
+
 Action: Perform re-review to check if checkboxes are now marked.
 
 **Scenario 3: CONCERNS/FAIL → Re-review**
+
 ```yaml
 # Previous gate file
 gate: CONCERNS
 top_issues:
-  - issue: 'Integration tests missing'
+  - issue: "Integration tests missing"
     severity: medium
-  - issue: 'No retry logic'
+  - issue: "No retry logic"
     severity: medium
 ```
+
 Action: Perform re-review to verify if issues were addressed.
 
 ---
@@ -418,29 +428,29 @@ Use the Task tool to spawn multiple agents in parallel. Send a SINGLE message wi
 Task({
   subagent_type: "general-purpose",
   description: "Analyze test coverage",
-  prompt: "[Full coverage analysis task description]"
-})
+  prompt: "[Full coverage analysis task description]",
+});
 
 // Task Call 2: TypeScript Strict Mode
 Task({
   subagent_type: "general-purpose",
   description: "Check TypeScript compliance",
-  prompt: "[Full TypeScript compliance task description]"
-})
+  prompt: "[Full TypeScript compliance task description]",
+});
 
 // Task Call 3: Accessibility Requirements
 Task({
   subagent_type: "general-purpose",
   description: "Audit accessibility",
-  prompt: "[Full accessibility audit task description]"
-})
+  prompt: "[Full accessibility audit task description]",
+});
 
 // Task Call 4: Definition of Done
 Task({
   subagent_type: "general-purpose",
   description: "Verify Definition of Done",
-  prompt: "[Full DoD verification task description]"
-})
+  prompt: "[Full DoD verification task description]",
+});
 
 // All 4 agents run concurrently
 // Wait for completion, then aggregate results
@@ -521,16 +531,19 @@ Each parallel check contributes to the overall quality assessment:
 **Category**: Code Quality + Test Architecture
 
 **Findings**:
+
 - **Test Coverage Agent**: `auth-service.ts` has 0% coverage (0/45 lines tested, no test file found)
 - **TypeScript Agent**: `auth-service.ts` contains 3 `any` types and 2 `@ts-ignore` comments in authentication methods
 
 **Impact**:
+
 - Critical authentication logic is completely untested
 - Type safety violations mask potential runtime errors
 - Combined risk: HIGH probability of production security failures
 - Violates security testing requirements in Definition of Done
 
 **Recommendation**:
+
 1. Create `auth-service.spec.ts` with comprehensive unit tests (target: 90% coverage for security code)
 2. Replace `any` types with proper `UserCredentials` and `AuthToken` interfaces
 3. Remove `@ts-ignore` comments and fix underlying type issues (likely bcrypt type issues)
@@ -586,6 +599,7 @@ When reviewing test files discovered by the Test Coverage Agent, check:
 **Blocking Conditions:**
 
 If any parallel agent fails to complete or reports critical errors:
+
 - Document the agent failure in QA report with error details
 - Continue with manual review for that specific category
 - Mark corresponding quality assessment as CONCERNS with note: "Automated check failed"
@@ -626,18 +640,21 @@ If any parallel agent fails to complete or reports critical errors:
 Perform comprehensive test quality evaluation:
 
 **Test Coverage Analysis**:
+
 - **Quantitative Coverage**: Lines, functions, branches, statements (from Test Coverage Agent)
 - **Qualitative Coverage**: Are critical paths tested? Edge cases covered?
 - **Coverage Gaps**: Which files/functions lack tests? Why?
 - **Integration Test Coverage Agent findings (Phase 1.5)** into coverage assessment
 
 **Test Level Appropriateness**:
+
 - **Unit Tests**: Business logic, utilities, pure functions tested in isolation?
 - **Integration Tests**: Component interactions, API endpoints, database operations?
 - **E2E Tests**: Critical user journeys covered?
 - **Test Pyramid Balance**: Appropriate ratio of unit:integration:e2e tests?
 
 **Test Quality Metrics**:
+
 - **Assertion Quality**: Do tests make meaningful assertions? Or just smoke tests?
 - **Test Independence**: Can tests run in isolation without dependencies?
 - **Test Clarity**: Are test names descriptive? Is intent clear?
@@ -645,30 +662,35 @@ Perform comprehensive test quality evaluation:
 - **Test Reliability**: Do tests pass consistently? Or flaky?
 
 **Test Data Strategy**:
+
 - **Test Data Management**: How is test data created/cleaned up?
 - **Fixtures**: Are fixtures well-organized and reusable?
 - **Data Factories**: Are data builders/factories used for complex objects?
 - **Test Isolation**: Does each test create/clean its own data?
 
 **Mock/Stub Strategy**:
+
 - **Mock Appropriateness**: Are mocks used for external dependencies only?
 - **Mock Quality**: Do mocks accurately represent real behavior?
 - **Over-mocking**: Are integration tests mocking too much?
 - **Under-mocking**: Are unit tests hitting real databases/APIs?
 
 **Edge Case and Error Coverage**:
+
 - **Happy Path**: Basic functionality tested?
 - **Edge Cases**: Boundary conditions (empty arrays, null values, max limits)?
 - **Error Scenarios**: Invalid input, network failures, timeouts?
 - **Security Edge Cases**: SQL injection attempts, XSS payloads, auth bypasses?
 
 **Test Execution Characteristics**:
+
 - **Execution Time**: Are tests fast enough? (Unit: <1s, Integration: <10s)
 - **Test Reliability**: Pass rate? Any flaky tests?
 - **Parallelization**: Can tests run in parallel?
 - **CI/CD Integration**: Do tests run in continuous integration?
 
 **Cross-Reference with Other Agents**:
+
 - **Integrate Test Coverage Agent findings (Phase 1.5)** for quantitative metrics
 - **Cross-reference with Definition of Done Agent (Phase 1.5)** for testing completeness
 - **Validate against TypeScript Compliance Agent (Phase 1.5)** for test code quality
@@ -676,6 +698,7 @@ Perform comprehensive test quality evaluation:
 **D. Non-Functional Requirements (NFRs)**
 
 See NFR Assessment section below for detailed process.
+
 - **Incorporate TypeScript Compliance findings** into maintainability NFR
 - **Incorporate Accessibility findings** into usability/accessibility NFR
 - **Incorporate Test Coverage findings** into reliability/maintainability NFRs
@@ -1065,59 +1088,61 @@ After review:
    **For Stories - Update these sections:**
 
    a. **QA Testing Results** section:
-      ```markdown
-      ## QA Testing Results
 
-      **QA Status**: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL
-      **QA Engineer**: QA Engineer
-      **Testing Date**: [Date]
-      **Quality Score**: [score]/100
-      **Gate Decision**: [PASS/CONCERNS/FAIL/WAIVED]
+   ```markdown
+   ## QA Testing Results
 
-      ### QA Report
+   **QA Status**: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL
+   **QA Engineer**: QA Engineer
+   **Testing Date**: [Date]
+   **Quality Score**: [score]/100
+   **Gate Decision**: [PASS/CONCERNS/FAIL/WAIVED]
 
-      - **Full Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](./story.[epic].[story].qa.[number].[descriptive-name].md)
-      - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](./story.[epic].[story].gate.[number].[descriptive-name].yml)
+   ### QA Report
 
-      ### Test Coverage Summary
+   - **Full Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](./story.[epic].[story].qa.[number].[descriptive-name].md)
+   - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](./story.[epic].[story].gate.[number].[descriptive-name].yml)
 
-      - **Acceptance Criteria Tested**: [X/Y]
-      - **Tests Executed**: [Count]
-      - **Critical Issues**: [Count]
-      - **NFR Status**: Security: [STATUS], Performance: [STATUS], Reliability: [STATUS], Maintainability: [STATUS]
+   ### Test Coverage Summary
 
-      ### Key Findings
+   - **Acceptance Criteria Tested**: [X/Y]
+   - **Tests Executed**: [Count]
+   - **Critical Issues**: [Count]
+   - **NFR Status**: Security: [STATUS], Performance: [STATUS], Reliability: [STATUS], Maintainability: [STATUS]
 
-      [Brief summary of critical issues or concerns, or "No critical issues identified"]
-      ```
+   ### Key Findings
+
+   [Brief summary of critical issues or concerns, or "No critical issues identified"]
+   ```
 
    b. **QA Completion Summary** section (if testing is complete):
-      ```markdown
-      ## QA Completion Summary
 
-      **Final QA Status**: ✅ Passed / ⚠️ Passed with Concerns / ❌ Failed
-      **QA Engineer**: QA Engineer
-      **Final Testing Date**: [Date]
+   ```markdown
+   ## QA Completion Summary
 
-      ### Test Results Summary
+   **Final QA Status**: ✅ Passed / ⚠️ Passed with Concerns / ❌ Failed
+   **QA Engineer**: QA Engineer
+   **Final Testing Date**: [Date]
 
-      - **All Acceptance Criteria Met**: Yes / No
-      - **Bug Reports Created**: [Number]
-      - **Bug Reports Closed**: [Number]
-      - **Regression Tests**: Passed / Failed
-      - **Performance**: Acceptable / Issues Found
-      - **Ready for Deployment**: Yes / No / Conditional
+   ### Test Results Summary
 
-      ### Final Notes
+   - **All Acceptance Criteria Met**: Yes / No
+   - **Bug Reports Created**: [Number]
+   - **Bug Reports Closed**: [Number]
+   - **Regression Tests**: Passed / Failed
+   - **Performance**: Acceptable / Issues Found
+   - **Ready for Deployment**: Yes / No / Conditional
 
-      [Summary of recommendations, deployment conditions, or follow-up items]
-      ```
+   ### Final Notes
+
+   [Summary of recommendations, deployment conditions, or follow-up items]
+   ```
 
    c. **Update Story Status** based on gate decision:
-      - PASS → Status: "Ready for Done"
-      - CONCERNS → Status: "Ready for Done" (with notes about concerns)
-      - FAIL → Status: "Reopened" (requires fixes)
-      - WAIVED → Status: "Ready for Done" (with waiver notes)
+   - PASS → Status: "Ready for Done"
+   - CONCERNS → Status: "Ready for Done" (with notes about concerns)
+   - FAIL → Status: "Reopened" (requires fixes)
+   - WAIVED → Status: "Ready for Done" (with waiver notes)
 
    **For Tasks - Update similar sections** in task file with QA assessment results
 
@@ -1464,9 +1489,9 @@ Include bug count in gate file:
 
 ```yaml
 top_issues:
-  - issue: 'Cache cleanup memory leak'
+  - issue: "Cache cleanup memory leak"
     severity: high
-    bug_ref: 'story.8.5.3.bug.1.cache-cleanup-memory-leak.md'
+    bug_ref: "story.8.5.3.bug.1.cache-cleanup-memory-leak.md"
     suggested_owner: dev
 ```
 
@@ -1642,16 +1667,16 @@ nfr_validation:
   _assessed: [security, performance, reliability, maintainability]
   security:
     status: CONCERNS
-    notes: 'No rate limiting on auth endpoints'
+    notes: "No rate limiting on auth endpoints"
   performance:
     status: PASS
-    notes: 'Response times < 200ms verified'
+    notes: "Response times < 200ms verified"
   reliability:
     status: PASS
-    notes: 'Error handling and retries implemented'
+    notes: "Error handling and retries implemented"
   maintainability:
     status: CONCERNS
-    notes: 'Test coverage at 65%, target is 80%'
+    notes: "Test coverage at 65%, target is 80%"
 ```
 
 #### Deterministic Status Rules
@@ -1784,21 +1809,21 @@ Identify all testable requirements from:
 For each requirement, document which tests validate it. Use Given-When-Then to describe what the test validates (not how it's written):
 
 ```yaml
-requirement: 'AC1: User can login with valid credentials'
+requirement: "AC1: User can login with valid credentials"
 test_mappings:
-  - test_file: 'auth/login.test.ts'
-    test_case: 'should successfully login with valid email and password'
+  - test_file: "auth/login.test.ts"
+    test_case: "should successfully login with valid email and password"
     # Given-When-Then describes WHAT the test validates, not HOW it's coded
-    given: 'A registered user with valid credentials'
-    when: 'They submit the login form'
-    then: 'They are redirected to dashboard and session is created'
+    given: "A registered user with valid credentials"
+    when: "They submit the login form"
+    then: "They are redirected to dashboard and session is created"
     coverage: full
 
-  - test_file: 'e2e/auth-flow.test.ts'
-    test_case: 'complete login flow'
-    given: 'User on login page'
-    when: 'Entering valid credentials and submitting'
-    then: 'Dashboard loads with user data'
+  - test_file: "e2e/auth-flow.test.ts"
+    test_case: "complete login flow"
+    given: "User on login page"
+    when: "Entering valid credentials and submitting"
+    then: "Dashboard loads with user data"
     coverage: integration
 ```
 
@@ -1820,19 +1845,19 @@ Document any gaps found:
 
 ```yaml
 coverage_gaps:
-  - requirement: 'AC3: Password reset email sent within 60 seconds'
-    gap: 'No test for email delivery timing'
+  - requirement: "AC3: Password reset email sent within 60 seconds"
+    gap: "No test for email delivery timing"
     severity: medium
     suggested_test:
       type: integration
-      description: 'Test email service SLA compliance'
+      description: "Test email service SLA compliance"
 
-  - requirement: 'AC5: Support 1000 concurrent users'
-    gap: 'No load testing implemented'
+  - requirement: "AC5: Support 1000 concurrent users"
+    gap: "No load testing implemented"
     severity: high
     suggested_test:
       type: performance
-      description: 'Load test with 1000 concurrent connections'
+      description: "Load test with 1000 concurrent connections"
 ```
 
 ### Traceability Outputs
@@ -1848,11 +1873,11 @@ trace:
     full: 3
     partial: 1
     none: 1
-  planning_ref: '{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md'
+  planning_ref: "{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md"
   uncovered:
-    - ac: 'AC3'
-      reason: 'No test found for password reset timing'
-  notes: 'See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md'
+    - ac: "AC3"
+      reason: "No test found for password reset timing"
+  notes: "See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md"
 ```
 
 #### Output 2: Traceability Report
@@ -2044,12 +2069,14 @@ This traceability feeds into quality gates:
 
 ### Expected Configuration
 
-All file locations should be defined in `bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+All file locations should be defined in skill resources or explicit file references:
 
 ```yaml
 qa:
-  qaLocation: 'docs/qa' # Base directory for QA files
-devStoryLocation: 'docs/prd' # Story files location
+  qaLocation: "docs/qa" # Base directory for QA files
+devStoryLocation: "docs/prd" # Story files location
 ```
 
 ### File Naming Conventions (Updated 2025-12-09)

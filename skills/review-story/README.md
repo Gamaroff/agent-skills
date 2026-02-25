@@ -235,13 +235,13 @@ The review skill rigorously detects:
 
 ### Differences from validate-story
 
-| Feature | review-story | validate-story |
-|---------|-------------|----------------|
-| **Purpose** | Find problems & recommend fixes | Validate readiness |
-| **Timing** | Any stage | Pre-implementation |
-| **Depth** | Deeper analysis | Standard checks |
-| **Output** | Comprehensive review report | GO/NO-GO decision |
-| **Focus** | Improvement recommendations | Compliance verification |
+| Feature     | review-story                    | validate-story          |
+| ----------- | ------------------------------- | ----------------------- |
+| **Purpose** | Find problems & recommend fixes | Validate readiness      |
+| **Timing**  | Any stage                       | Pre-implementation      |
+| **Depth**   | Deeper analysis                 | Standard checks         |
+| **Output**  | Comprehensive review report     | GO/NO-GO decision       |
+| **Focus**   | Improvement recommendations     | Compliance verification |
 
 ## Tips for Best Results
 
@@ -265,8 +265,10 @@ A story is ready when review shows:
 
 ## Resources
 
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
 - Story template: `resources/story-template.yaml`
-- Configuration: `.bmad-core/core-config.yaml` (optional)
+- Configuration: Inline configuration or explicit file references
 
 ## See Also
 

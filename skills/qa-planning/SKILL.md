@@ -46,14 +46,14 @@ For each category, identify specific risks:
 
 ```yaml
 risk:
-  id: 'SEC-001' # Use category prefixes
+  id: "SEC-001" # Use category prefixes
   category: security
-  title: 'Insufficient input validation on user forms'
-  description: 'Form inputs not properly sanitized could lead to XSS attacks'
+  title: "Insufficient input validation on user forms"
+  description: "Form inputs not properly sanitized could lead to XSS attacks"
   affected_components:
-    - 'UserRegistrationForm'
-    - 'ProfileUpdateForm'
-  detection_method: 'Code review revealed missing validation'
+    - "UserRegistrationForm"
+    - "ProfileUpdateForm"
+  detection_method: "Code review revealed missing validation"
 ```
 
 **Interactive Elicitation** (when user context is unclear):
@@ -109,20 +109,20 @@ For each identified risk, provide mitigation:
 
 ```yaml
 mitigation:
-  risk_id: 'SEC-001'
-  strategy: 'preventive' # preventive|detective|corrective
+  risk_id: "SEC-001"
+  strategy: "preventive" # preventive|detective|corrective
   actions:
-    - 'Implement input validation library (e.g., validator.js)'
-    - 'Add CSP headers to prevent XSS execution'
-    - 'Sanitize all user inputs before storage'
-    - 'Escape all outputs in templates'
+    - "Implement input validation library (e.g., validator.js)"
+    - "Add CSP headers to prevent XSS execution"
+    - "Sanitize all user inputs before storage"
+    - "Escape all outputs in templates"
   testing_requirements:
-    - 'Security testing with OWASP ZAP'
-    - 'Manual penetration testing of forms'
-    - 'Unit tests for validation functions'
-  residual_risk: 'Low - Some zero-day vulnerabilities may remain'
-  owner: 'dev'
-  timeline: 'Before deployment'
+    - "Security testing with OWASP ZAP"
+    - "Manual penetration testing of forms"
+    - "Unit tests for validation functions"
+  residual_risk: "Low - Some zero-day vulnerabilities may remain"
+  owner: "dev"
+  timeline: "Before deployment"
 ```
 
 ### Risk Profiling Outputs
@@ -148,12 +148,12 @@ risk_summary:
   highest:
     id: SEC-001
     score: 9
-    title: 'XSS on profile form'
+    title: "XSS on profile form"
   recommendations:
     must_fix:
-      - 'Add input sanitization & CSP'
+      - "Add input sanitization & CSP"
     monitor:
-      - 'Add security alerts for auth endpoints'
+      - "Add security alerts for auth endpoints"
 ```
 
 #### Output 2: Markdown Risk Report
@@ -431,13 +431,13 @@ For each identified test need, create:
 
 ```yaml
 test_scenario:
-  id: '{epic}.{story}-{LEVEL}-{SEQ}'
-  requirement: 'AC1: User can login with valid credentials'
+  id: "{epic}.{story}-{LEVEL}-{SEQ}"
+  requirement: "AC1: User can login with valid credentials"
   priority: P0
   level: integration
-  description: 'Verify authentication service validates credentials and creates session'
-  justification: 'Multi-component flow (controller → service → database → session store)'
-  mitigates_risks: ['SEC-001', 'DATA-002'] # Reference risk profile if exists
+  description: "Verify authentication service validates credentials and creates session"
+  justification: "Multi-component flow (controller → service → database → session store)"
+  mitigates_risks: ["SEC-001", "DATA-002"] # Reference risk profile if exists
   test_data:
     - Valid user credentials
     - Invalid credentials
@@ -622,11 +622,13 @@ Before finalizing, verify:
 
 ### Expected Configuration
 
-All file locations should be defined in `bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+All file locations should be defined in skill resources or explicit file references:
 
 ```yaml
 qa:
-  qaLocation: 'docs/qa' # Base directory for QA files
+  qaLocation: "docs/qa" # Base directory for QA files
 ```
 
 ### File Naming Conventions

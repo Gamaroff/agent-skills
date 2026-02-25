@@ -46,7 +46,9 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 
 ### Location Configuration
 
-**ALWAYS** check `bmad-core/core-config.yaml` for the `qa.qaLocation/gates` setting.
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+**ALWAYS** check skill resources or explicit file references for the `qa.qaLocation/gates` setting.
 
 ### Naming Convention
 
@@ -80,11 +82,11 @@ docs/qa/gates/
 
 ```yaml
 schema: 1
-story: '1.3'
+story: "1.3"
 gate: PASS # PASS|CONCERNS|FAIL|WAIVED
-status_reason: '1-2 sentence explanation of gate decision'
-reviewer: 'QA Engineer'
-updated: '2025-01-12T10:15:00Z' # ISO-8601 timestamp
+status_reason: "1-2 sentence explanation of gate decision"
+reviewer: "QA Engineer"
+updated: "2025-01-12T10:15:00Z" # ISO-8601 timestamp
 top_issues: [] # Empty array if no issues
 waiver: { active: false } # Only set active: true if WAIVED
 ```
@@ -95,22 +97,22 @@ waiver: { active: false } # Only set active: true if WAIVED
 
 ```yaml
 schema: 1
-story: '1.3'
+story: "1.3"
 gate: CONCERNS
-status_reason: 'Missing rate limiting on auth endpoints poses security risk.'
-reviewer: 'QA Engineer'
-updated: '2025-01-12T10:15:00Z'
+status_reason: "Missing rate limiting on auth endpoints poses security risk."
+reviewer: "QA Engineer"
+updated: "2025-01-12T10:15:00Z"
 top_issues:
-  - id: 'SEC-001'
+  - id: "SEC-001"
     severity: high # ONLY: low|medium|high (no other values)
-    finding: 'No rate limiting on login endpoint'
-    suggested_action: 'Add rate limiting middleware before production'
-    suggested_owner: 'dev' # dev|sm|po
-  - id: 'TEST-001'
+    finding: "No rate limiting on login endpoint"
+    suggested_action: "Add rate limiting middleware before production"
+    suggested_owner: "dev" # dev|sm|po
+  - id: "TEST-001"
     severity: medium
-    finding: 'No integration tests for auth flow'
-    suggested_action: 'Add integration test coverage'
-    suggested_owner: 'dev'
+    finding: "No integration tests for auth flow"
+    suggested_action: "Add integration test coverage"
+    suggested_owner: "dev"
 waiver: { active: false }
 ```
 
@@ -120,20 +122,20 @@ waiver: { active: false }
 
 ```yaml
 schema: 1
-story: '1.3'
+story: "1.3"
 gate: WAIVED
-status_reason: 'Known issues accepted for MVP release.'
-reviewer: 'QA Engineer'
-updated: '2025-01-12T10:15:00Z'
+status_reason: "Known issues accepted for MVP release."
+reviewer: "QA Engineer"
+updated: "2025-01-12T10:15:00Z"
 top_issues:
-  - id: 'PERF-001'
+  - id: "PERF-001"
     severity: low
-    finding: 'Dashboard loads slowly with 1000+ items'
-    suggested_action: 'Implement pagination in next sprint'
+    finding: "Dashboard loads slowly with 1000+ items"
+    suggested_action: "Implement pagination in next sprint"
 waiver:
   active: true
-  reason: 'MVP release - performance optimization deferred'
-  approved_by: 'Product Owner'
+  reason: "MVP release - performance optimization deferred"
+  approved_by: "Product Owner"
 ```
 
 ### Extended Schema (Optional but Recommended)
@@ -142,25 +144,25 @@ waiver:
 
 ```yaml
 schema: 1
-story: '1.3'
-story_title: 'Implement user authentication'
+story: "1.3"
+story_title: "Implement user authentication"
 gate: CONCERNS
-status_reason: 'Security gaps identified - rate limiting and enhanced testing needed.'
-reviewer: 'QA Engineer'
-updated: '2025-01-12T10:15:00Z'
+status_reason: "Security gaps identified - rate limiting and enhanced testing needed."
+reviewer: "QA Engineer"
+updated: "2025-01-12T10:15:00Z"
 
 top_issues:
-  - id: 'SEC-001'
+  - id: "SEC-001"
     severity: high
-    finding: 'No rate limiting on login endpoint'
-    suggested_action: 'Add rate limiting middleware'
-    suggested_owner: 'dev'
+    finding: "No rate limiting on login endpoint"
+    suggested_action: "Add rate limiting middleware"
+    suggested_owner: "dev"
 
 waiver: { active: false }
 
 # Optional extended fields
 quality_score: 80 # 100 - (20*FAILs) - (10*CONCERNS)
-expires: '2025-01-26T00:00:00Z' # Typically 2 weeks from review
+expires: "2025-01-26T00:00:00Z" # Typically 2 weeks from review
 
 evidence:
   tests_reviewed: 15
@@ -172,16 +174,16 @@ evidence:
 nfr_validation:
   security:
     status: CONCERNS
-    notes: 'Rate limiting missing on auth endpoints'
+    notes: "Rate limiting missing on auth endpoints"
   performance:
     status: PASS
-    notes: 'Response times < 200ms verified'
+    notes: "Response times < 200ms verified"
   reliability:
     status: PASS
-    notes: 'Error handling and retries implemented'
+    notes: "Error handling and retries implemented"
   maintainability:
     status: PASS
-    notes: 'Test coverage at 82%'
+    notes: "Test coverage at 82%"
 
 risk_summary:
   totals:
@@ -192,29 +194,29 @@ risk_summary:
   highest:
     id: SEC-001
     score: 6
-    title: 'Rate limiting missing'
+    title: "Rate limiting missing"
   recommendations:
     must_fix:
-      - 'Add rate limiting to auth endpoints'
+      - "Add rate limiting to auth endpoints"
     monitor:
-      - 'Monitor authentication failure rates'
+      - "Monitor authentication failure rates"
 
 recommendations:
   immediate: # Must fix before production
-    - action: 'Add rate limiting'
-      refs: ['api/auth/login.ts']
+    - action: "Add rate limiting"
+      refs: ["api/auth/login.ts"]
   future: # Can be addressed later
-    - action: 'Consider caching'
-      refs: ['services/data.ts']
+    - action: "Consider caching"
+      refs: ["services/data.ts"]
 
 # Optional: Audit trail
 history:
-  - at: '2025-01-12T10:00:00Z'
+  - at: "2025-01-12T10:00:00Z"
     gate: FAIL
-    note: 'Initial review - missing tests'
-  - at: '2025-01-12T15:00:00Z'
+    note: "Initial review - missing tests"
+  - at: "2025-01-12T15:00:00Z"
     gate: CONCERNS
-    note: 'Tests added but rate limiting still missing'
+    note: "Tests added but rate limiting still missing"
 ```
 
 ---
@@ -439,11 +441,13 @@ When gate decision is unclear, use AskUserQuestion to clarify:
 
 ### Expected Configuration
 
-All file locations should be defined in `bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+All file locations should be defined in skill resources or explicit file references:
 
 ```yaml
 qa:
-  qaLocation: 'docs/qa' # Base directory for QA files
+  qaLocation: "docs/qa" # Base directory for QA files
 ```
 
 ### Directory Structure
@@ -467,11 +471,11 @@ docs/qa/
 
 ```yaml
 schema: 1
-story: '{epic}.{story}'
+story: "{epic}.{story}"
 gate: PASS|CONCERNS|FAIL|WAIVED
-status_reason: '{1-2 sentence explanation}'
-reviewer: 'QA Engineer'
-updated: '{ISO-8601 timestamp}'
+status_reason: "{1-2 sentence explanation}"
+reviewer: "QA Engineer"
+updated: "{ISO-8601 timestamp}"
 top_issues: []
 waiver: { active: false }
 ```
@@ -480,25 +484,25 @@ waiver: { active: false }
 
 ```yaml
 schema: 1
-story: '{epic}.{story}'
-story_title: '{story title}'
+story: "{epic}.{story}"
+story_title: "{story title}"
 gate: PASS|CONCERNS|FAIL|WAIVED
-status_reason: '{1-2 sentence explanation}'
-reviewer: 'QA Engineer'
-updated: '{ISO-8601 timestamp}'
+status_reason: "{1-2 sentence explanation}"
+reviewer: "QA Engineer"
+updated: "{ISO-8601 timestamp}"
 
 top_issues:
-  - id: '{PREFIX-###}'
+  - id: "{PREFIX-###}"
     severity: low|medium|high
-    finding: '{description}'
-    suggested_action: '{fix}'
+    finding: "{description}"
+    suggested_action: "{fix}"
     suggested_owner: dev|sm|po
 
 waiver:
   active: false # or true with reason/approved_by
 
 quality_score: 0-100
-expires: '{ISO-8601 timestamp}'
+expires: "{ISO-8601 timestamp}"
 
 evidence:
   tests_reviewed: { count }
@@ -508,30 +512,30 @@ evidence:
     ac_gaps: [{ list }]
 
 nfr_validation:
-  security: { status: PASS|CONCERNS|FAIL, notes: '' }
-  performance: { status: PASS|CONCERNS|FAIL, notes: '' }
-  reliability: { status: PASS|CONCERNS|FAIL, notes: '' }
-  maintainability: { status: PASS|CONCERNS|FAIL, notes: '' }
+  security: { status: PASS|CONCERNS|FAIL, notes: "" }
+  performance: { status: PASS|CONCERNS|FAIL, notes: "" }
+  reliability: { status: PASS|CONCERNS|FAIL, notes: "" }
+  maintainability: { status: PASS|CONCERNS|FAIL, notes: "" }
 
 risk_summary:
   totals: { critical: 0, high: 0, medium: 0, low: 0 }
-  highest: { id: '', score: 0, title: '' } # Only if risks exist
+  highest: { id: "", score: 0, title: "" } # Only if risks exist
   recommendations:
     must_fix: []
     monitor: []
 
 recommendations:
   immediate:
-    - action: ''
+    - action: ""
       refs: []
   future:
-    - action: ''
+    - action: ""
       refs: []
 
 history:
-  - at: '{ISO-8601 timestamp}'
+  - at: "{ISO-8601 timestamp}"
     gate: PASS|CONCERNS|FAIL|WAIVED
-    note: '{change description}'
+    note: "{change description}"
 ```
 
 ---

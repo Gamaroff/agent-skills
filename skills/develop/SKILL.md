@@ -76,6 +76,7 @@ When an epic file is provided as input:
 1. **Detect Epic File** - Match pattern: `epic.{number}.{name}.md`
 
 2. **Warn User** - Display clear message:
+
    ```
    ⚠️  EPIC FILE DETECTED
 
@@ -151,6 +152,7 @@ System Action: Invokes /create-story skill
 **When Status is "Draft" or "Not Started"**:
 
 1. **Display Warning**:
+
    ```
    ⚠️  DRAFT DOCUMENT DETECTED
 
@@ -300,6 +302,7 @@ System Action: Invokes /review-story skill
 
    **If "Let me decide manually"**:
    - HALT and display alignment analysis:
+
      ```
      Implementation alignment analysis paused.
 
@@ -311,6 +314,7 @@ System Action: Invokes /review-story skill
      - Which aspects of document should update
      - Any hybrid approaches to consider
      ```
+
    - Exit skill
 
 ### Example Flow
@@ -356,6 +360,7 @@ System Action:
 ### Alignment for Greenfield Implementation
 
 **When Status is "No Implementation"** (greenfield):
+
 - No alignment check needed
 - Proceed directly to "Core Development Principles" section
 - Begin implementation following story/task specifications
@@ -367,8 +372,10 @@ System Action:
 **Key Rule**: Stories contain ALL information needed for implementation. Load only:
 
 - The assigned story file
-- Always-loaded files (coding standards, tech stack, source tree from `.bmad-core/core-config.yaml`)
+- Always-loaded files (coding standards, tech stack, source tree)
 - Never load PRD/architecture/other docs unless explicitly directed in story notes
+
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 **Authorized Story Updates** (CRITICAL):
 You may ONLY update these story file sections:
@@ -457,17 +464,20 @@ After status validation passes:
 **Testing Checkpoints** (Execute at these milestones):
 
 After implementing each task:
+
 - **Unit Tests**: Run affected unit tests to verify the specific functionality works
 - **Integration Tests**: If the task touches multiple components, run integration tests
 - **Check Command**: `npx nx test <project> --testPathPattern=<test-file-pattern>`
 - **Expected Outcome**: All tests pass before marking task complete
 
 After completing 2-3 related tasks:
+
 - **Regression Check**: Run the full test suite for the affected project
 - **Check Command**: `npx nx test <project>`
 - **Expected Outcome**: No regressions introduced
 
 Before marking story as "Ready for Review":
+
 - **Full Validation Suite**: Run all tests across all affected projects
 - **Check Command**: `npx nx test <project> --coverage`
 - **Expected Outcome**: All tests pass with coverage targets met (80%+ overall, 95%+ for financial operations)
@@ -598,6 +608,7 @@ After status validation passes:
 **QA Handoff**:
 
 When task is complete, inform user that QA can review using `qa-review` skill for:
+
 - Technical task assessment
 - Risk validation
 - Breaking changes verification
@@ -628,7 +639,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 
 ## Project Configuration
 
-Configuration is in `.bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 **Key Paths**:
 

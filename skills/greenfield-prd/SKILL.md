@@ -171,7 +171,7 @@ Use create-doc skill with:
   - Testing Requirements (Unit|Integration|Full Pyramid)
   - Additional Technical Assumptions
 - **Process:**
-  1. Check `.bmad-core/data/technical-preferences.yaml` to pre-populate
+  1. Note: .bmad-core directory was intentionally removed. Check for an attached technical-preferences file to pre-populate
   2. Ask about languages, frameworks, libraries, deployment
   3. Present with rationale
   4. **STOP - Present 1-9 elicitation options**

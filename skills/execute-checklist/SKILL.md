@@ -28,7 +28,9 @@ This skill provides systematic validation of documentation against structured ch
 
 ## Available Checklists
 
-This skill uses checklist files from `.bmad-core/checklists/` or `resources/` directory:
+> **Note**: .bmad-core directory was intentionally removed. Checklists are now loaded from the skills' resources/ directory.
+
+This skill uses checklist files from `resources/` directory:
 
 **Core Checklists**:
 
@@ -61,7 +63,7 @@ This skill uses **interactive mode** for thorough, collaborative validation:
    - Example: "architecture checklist" → "architect-checklist.md"
    - Example: "story draft" → "story-draft-checklist.md"
 2. If multiple matches found, ask user to clarify
-3. Load the appropriate checklist from `.bmad-core/checklists/` or `resources/`
+3. Load the appropriate checklist from `resources/`
 
 **If no checklist specified**:
 
@@ -299,7 +301,7 @@ Generate comprehensive summary with:
 
 **Uses resources from**:
 
-- `.bmad-core/checklists/` - Checklist definitions
+- `resources/` - Checklist definitions (moved from the removed .bmad-core/checklists/)
 - `.claude/skills/execute-checklist/resources/` - Local checklist copies
 
 **Outputs used by**:

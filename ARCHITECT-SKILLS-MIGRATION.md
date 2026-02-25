@@ -13,6 +13,7 @@ The BMAD architect agent has been successfully converted into a modular Claude S
 The main architect skill provides the persona and interface for all architecture work. Think of it as "Winston the Architect" - your pragmatic, holistic technical leader.
 
 **Resources**:
+
 - `architect-checklist.md` - Comprehensive validation framework
 - `technical-preferences.md` - Your technical preferences
 
@@ -25,10 +26,12 @@ The main architect skill provides the persona and interface for all architecture
 Interactive YAML-driven architecture document creation with mandatory user elicitation.
 
 **Resources**:
+
 - 4 architecture templates (backend, brownfield, frontend, full-stack)
 - Elicitation methods guide
 
 **Use Cases**:
+
 - Creating new backend/service architecture
 - Documenting existing (brownfield) systems
 - Designing frontend-specific architectures
@@ -41,6 +44,7 @@ Interactive YAML-driven architecture document creation with mandatory user elici
 Comprehensive brownfield documentation for existing codebases.
 
 **Use Cases**:
+
 - Documenting legacy systems
 - Onboarding to existing projects
 - Capturing technical debt and constraints
@@ -53,9 +57,11 @@ Comprehensive brownfield documentation for existing codebases.
 Systematic architecture validation against 200+ quality criteria.
 
 **Resources**:
+
 - Complete architect checklist with 10 major sections
 
 **Use Cases**:
+
 - Validating architecture before development
 - Architecture quality reviews
 - Identifying gaps and risks
@@ -67,6 +73,7 @@ Systematic architecture validation against 200+ quality criteria.
 Generate structured research prompts for technical analysis.
 
 **Use Cases**:
+
 - Technology selection research
 - Product validation
 - Competitive analysis
@@ -76,19 +83,19 @@ Generate structured research prompts for technical analysis.
 
 ### BMAD Agent Commands → Claude Skills
 
-| BMAD Command | Claude Skills Approach |
-|-------------|------------------------|
-| `/bmad architect` | Invoke `architect` skill |
-| `*help` | Automatic when architect skill loaded |
-| `*create-backend-architecture` | "Create backend architecture" or invoke `create-architecture-doc` skill |
-| `*create-brownfield-architecture` | "Document existing project" or invoke `document-existing-project` skill |
-| `*create-front-end-architecture` | "Create frontend architecture" or invoke `create-architecture-doc` skill |
+| BMAD Command                      | Claude Skills Approach                                                     |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| `/bmad architect`                 | Invoke `architect` skill                                                   |
+| `*help`                           | Automatic when architect skill loaded                                      |
+| `*create-backend-architecture`    | "Create backend architecture" or invoke `create-architecture-doc` skill    |
+| `*create-brownfield-architecture` | "Document existing project" or invoke `document-existing-project` skill    |
+| `*create-front-end-architecture`  | "Create frontend architecture" or invoke `create-architecture-doc` skill   |
 | `*create-full-stack-architecture` | "Create full-stack architecture" or invoke `create-architecture-doc` skill |
-| `*document-project` | Invoke `document-existing-project` skill |
-| `*execute-checklist` | Invoke `execute-architect-checklist` skill |
-| `*research {topic}` | "Research {topic}" or invoke `create-research-prompt` skill |
-| `*doc-out` | Request complete document output |
-| `*exit` | Close skill or conversation |
+| `*document-project`               | Invoke `document-existing-project` skill                                   |
+| `*execute-checklist`              | Invoke `execute-architect-checklist` skill                                 |
+| `*research {topic}`               | "Research {topic}" or invoke `create-research-prompt` skill                |
+| `*doc-out`                        | Request complete document output                                           |
+| `*exit`                           | Close skill or conversation                                                |
 
 ## How to Use the New Skills
 
@@ -132,26 +139,31 @@ Claude: [Invokes create-architecture-doc skill with backend template]
 ## Key Benefits
 
 ### 1. Modularity
+
 - Each skill is independent and reusable
 - Can use individual skills without loading entire agent
 - Clear separation of concerns
 
 ### 2. Claude-Native Integration
+
 - Follows Claude Skills documentation patterns
 - Automatic progressive loading (only loads what's needed)
 - Better performance and context management
 
 ### 3. Maintainability
+
 - Easier to update individual skills
 - Clear responsibility boundaries
 - Resource management through skills framework
 
 ### 4. Scalability
+
 - Easy to add new architecture templates
 - Simple to extend with new validation criteria
 - Can create specialized architecture skills
 
 ### 5. Resource Efficiency
+
 - Progressive loading (metadata → instructions → resources)
 - Only loads templates when needed
 - Minimal context usage until skill is invoked
@@ -258,8 +270,10 @@ Claude:
 
 ### During Transition
 
-- Original BMAD files remain in `.bmad-core/`
-- You can continue using BMAD agents if needed
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+- Original BMAD files have been removed (the .bmad-core directory was intentionally removed)
+- You can continue using BMAD agents if needed through alternative configuration
 - Claude Skills system runs independently
 - No breaking changes to existing workflows
 
@@ -309,11 +323,13 @@ Claude:
 ### Quick Start
 
 1. **Try the main architect skill**:
+
    ```
    User: "Use the architect skill"
    ```
 
 2. **Create a simple architecture**:
+
    ```
    User: "Create backend architecture for a todo list API"
    ```
@@ -343,6 +359,7 @@ If you encounter issues or have questions:
 ## Summary
 
 The BMAD architect agent has been successfully converted to Claude Skills with:
+
 - ✅ 5 modular, reusable skills
 - ✅ Same comprehensive content and quality
 - ✅ Better organization and maintainability

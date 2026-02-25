@@ -293,7 +293,9 @@ options:
 
 **Actions**:
 
-1. Load `.bmad-core/core-config.yaml` from project root
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+1. Load configuration from skill resources or explicit file references
    - If missing, use fallback defaults and warn user
    - Extract: `devStoryLocation`, `prd.*`, `architecture.*`
 
@@ -1411,7 +1413,9 @@ For each technical claim in story:
 
 ## Configuration Reference
 
-Expected configuration in `.bmad-core/core-config.yaml`:
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
+Expected configuration structure:
 
 ```yaml
 # Project structure
@@ -1440,8 +1444,10 @@ architecture:
 
 This skill uses:
 
+> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
+
 - `resources/story-template.yaml` - Story template for structure validation
-- `.bmad-core/core-config.yaml` - Project configuration (optional, uses fallbacks)
+- Inline configuration or explicit file references
 
 ---
 
