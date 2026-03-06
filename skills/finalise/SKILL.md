@@ -9,7 +9,7 @@ description: Verify story/task completion against comprehensive Definition of Do
 
 Mark a story or task as complete by verifying it against a comprehensive Definition of Done (DoD) checklist. This skill automates the verification of acceptance criteria, unit tests, code reviews, documentation updates, security reviews, and compliance checks.
 
-**CRITICAL - Incremental Verification Approach:** This skill writes verification results incrementally as each DoD item is checked. A co-located running summary file (`{story-name}.dod-verification.md`) is created at the start and updated after EACH verification step. This ensures:
+**CRITICAL - Incremental Verification Approach:** This skill writes verification results incrementally as each DoD item is checked. A co-located running summary file (`story.{epic}.{story}.dod.{num}.{story-name}.md`) is created at the start and updated after EACH verification step. This ensures:
 - Real-time visibility into verification progress
 - Complete audit trail of what was checked and when
 - No loss of work if verification is interrupted
@@ -39,9 +39,36 @@ This skill should be used when:
 
 Follow this systematic workflow to verify and mark a story/task as complete. **CRITICAL**: After checking EACH Definition of Done item, immediately write the result to the running summary file. Do NOT wait until all checks are complete.
 
-### Step 0: Create Running Summary File
+### Step 0: Initialize Task List and Create Running Summary File
 
-Before starting any verification, create a co-located running summary file to track results incrementally.
+Before starting any verification, create a task list to track every sub-step to completion, then create the running summary file.
+
+**CRITICAL — Task List Initialization:**
+
+Use `TaskCreate` to register every sub-step you will execute. This prevents skipping steps. Create one task per action item below, then mark each `in_progress` before starting it and `completed` immediately after finishing it.
+
+**Tasks to create at the start (use TaskCreate for each):**
+
+| Task Subject | Description |
+|---|---|
+| Read story document | Locate and parse the story/task markdown file |
+| Review QA reports | Find and read QA report and gate files in story directory |
+| Verify acceptance criteria | Check all AC checkboxes and PR approval status |
+| Security review | Run story-type-specific security checklist |
+| Compliance review | Run applicable compliance checklist (GDPR, WCAG, etc.) |
+| Make acceptance decision | Evaluate all checks and decide ACCEPT or GAPS |
+| Update story document | Add DoD section (accepted or gap report) to story file |
+| Update frontmatter | Change status, updated, completed_date fields (accepted path only) |
+| Generate Sprint Review summary | Create sprint-review-summary.md from template (accepted path only) |
+| Post PR comment | Post acceptance or gap comment to GitHub PR |
+| Update running summary | Finalize story.{epic}.{story}.dod.{num}.{name}.md with outcome |
+| Communicate to user | Output final result block to user |
+
+Create all tasks upfront, then work through them in order. Do NOT skip any task.
+
+---
+
+Before starting any verification, also create a co-located running summary file to track results incrementally.
 
 **Actions:**
 
@@ -50,8 +77,9 @@ Before starting any verification, create a co-located running summary file to tr
    - Example: `docs/prd/.../story.311.1.transaction-confirmation-system/`
 
 2. **Create running summary file:**
-   - File name format: `{story-name}.dod-verification.md` or `{task-name}.dod-verification.md`
-   - Full path: `{story-directory}/{story-name}.dod-verification.md`
+   - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` starts at 1, increment if re-running finalise
+   - File name format (tasks): `task.{id}.dod.{num}.{task-name}.md`
+   - Full path: `{story-directory}/story.{epic}.{story}.dod.{num}.{story-name}.md`
    - Initialize with header and timestamp
 
 3. **Write initial content:**
@@ -78,7 +106,7 @@ Before starting any verification, create a co-located running summary file to tr
 
 If verifying `docs/prd/.../story.311.1.transaction-confirmation-system/story.311.1.transaction-confirmation-system.md`, create:
 
-`docs/prd/.../story.311.1.transaction-confirmation-system/story.311.1.transaction-confirmation-system.dod-verification.md`
+`docs/prd/.../story.311.1.transaction-confirmation-system/story.311.1.dod.1.transaction-confirmation-system.md`
 
 ### Step 1: Locate and Read the Story/Task Document
 
@@ -731,7 +759,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
 4. **Reference Running Summary in DoD Section:**
    - Add a reference to the detailed running summary file
-   - Example: "**Detailed Verification Log:** See `story.311.1.transaction-confirmation-system.dod-verification.md` for complete verification evidence and timestamps."
+   - Example: "**Detailed Verification Log:** See `story.311.1.dod.1.transaction-confirmation-system.md` for complete verification evidence and timestamps."
 
 5. **Generate Sprint Review Summary:**
    - Use the template from `assets/sprint-review-summary-template.md`
@@ -769,6 +797,16 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Show path to updated story document
    - Show path to Sprint Review summary
    - Confirm PR comment was posted
+
+**Step 7 Completion Checklist — tick off each before moving on:**
+
+- [ ] Running summary file finalized (status = COMPLETED - ACCEPTED)
+- [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
+- [ ] DoD PASSED section added to story document body
+- [ ] Running summary referenced in DoD section
+- [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
+- [ ] GitHub PR comment posted via `gh pr comment <number>`
+- [ ] User notified with success message, artifact paths, and PR comment link
 
 ### Step 8: Report Gaps (In Progress)
 
@@ -877,7 +915,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Reviewed by:** Claude Code (finalise skill)
    **QA Gate Reference**: See `story.311.2.gate.1.initial-review.yml` for full details
 
-   **Detailed Verification Log:** See `story.311.2.dod-verification.md` for complete verification evidence and timestamps.
+   **Detailed Verification Log:** See `story.311.2.dod.1.transaction-event-history.md` for complete verification evidence and timestamps.
    ```
 
 4. **Add GitHub PR Comment (if PR exists):**
@@ -918,6 +956,14 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - List all gaps in a readable format
    - Suggest next steps to close the gaps
    - Estimate effort required
+
+**Step 8 Completion Checklist — tick off each before moving on:**
+
+- [ ] Running summary file finalized (status = COMPLETED - GAPS IDENTIFIED)
+- [ ] Story status NOT changed (kept at current status, not set to accepted)
+- [ ] Gap report section added to story document body
+- [ ] GitHub PR comment posted via `gh pr comment <number>` (skip only if no PR exists)
+- [ ] User notified with clear NOT ACCEPTED message, gap list, and next steps
 
 ## Usage Examples
 

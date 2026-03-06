@@ -158,7 +158,10 @@ risk_summary:
 
 #### Output 2: Markdown Risk Report
 
-**Save to:** `{qa.qaLocation}/assessments/{epic}.{story}-risk-{YYYYMMDD}.md`
+**Save to:** `{storyDirectory}/story.{epic}.{story}.risk.1.{story-name}.md`
+
+- If re-running planning (rare): increment to `.risk.2.`, `.risk.3.` etc.
+- For tasks: `{taskDirectory}/task.{id}.risk.1.{task-name}.md`
 
 ```markdown
 # Risk Profile: Story {epic}.{story}
@@ -267,7 +270,7 @@ Review and update risk profile when:
 **Print this line for qa-review skill to reference:**
 
 ```text
-Risk profile: {qa.qaLocation}/assessments/{epic}.{story}-risk-{YYYYMMDD}.md
+Risk profile: {storyDirectory}/story.{epic}.{story}.risk.1.{story-name}.md
 ```
 
 ### Risk Scoring Algorithm
@@ -462,7 +465,10 @@ Ensure:
 
 #### Output 1: Test Design Document
 
-**Save to:** `{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md`
+**Save to:** `{storyDirectory}/story.{epic}.{story}.test-design.1.{story-name}.md`
+
+- If re-running planning (rare): increment to `.test-design.2.`, `.test-design.3.` etc.
+- For tasks: `{taskDirectory}/task.{id}.test-design.1.{task-name}.md`
 
 ```markdown
 # Test Design: Story {epic}.{story}
@@ -552,7 +558,7 @@ test_design:
 Print for use by qa-review skill (trace-requirements workflow):
 
 ```text
-Test design matrix: {qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md
+Test design matrix: {storyDirectory}/story.{epic}.{story}.test-design.1.{story-name}.md
 P0 tests identified: 5
 ```
 
@@ -633,20 +639,26 @@ qa:
 
 ### File Naming Conventions
 
-**Risk Reports**: `{qa.qaLocation}/assessments/{epic}.{story}-risk-{YYYYMMDD}.md`
-**Test Design**: `{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md`
+All qa-planning outputs are co-located in the story (or task) directory following the canonical naming convention:
+
+**Risk Reports** (stories): `story.{epic}.{story}.risk.{num}.{story-name}.md`
+**Test Design** (stories): `story.{epic}.{story}.test-design.{num}.{story-name}.md`
+
+**Risk Reports** (tasks): `task.{id}.risk.{num}.{task-name}.md`
+**Test Design** (tasks): `task.{id}.test-design.{num}.{task-name}.md`
+
+`{num}` starts at 1 and increments if qa-planning is re-run for the same story.
 
 ### Directory Structure
 
 ```
-docs/qa/
-├── assessments/
-│   ├── 1.1-risk-20250130.md
-│   ├── 1.1-test-design-20250130.md
-│   ├── 1.2-risk-20250131.md
-│   └── 1.2-test-design-20250131.md
-└── gates/
-    └── [mirrored PRD structure]
+story.312.1.bsv-transaction-signing/
+├── story.312.1.bsv-transaction-signing.md
+├── story.312.1.risk.1.bsv-transaction-signing.md       ← qa-planning (pre-dev)
+├── story.312.1.test-design.1.bsv-transaction-signing.md ← qa-planning (pre-dev)
+├── story.312.1.qa.1.bsv-transaction-signing.md         ← qa-review
+├── story.312.1.gate.1.bsv-transaction-signing.yml      ← qa-review
+└── story.312.1.dod.1.bsv-transaction-signing.md        ← finalise
 ```
 
 ---

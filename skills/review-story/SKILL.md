@@ -345,7 +345,7 @@ slashPrefix: BMad
    - Extract epic number and story number from filename or frontmatter
    - Parse all sections and content
 
-3. Load story template from `resources/story-template.yaml`
+3. Load story template from `resources/story-tmpl.yaml`
    - For structure compliance validation
 
 4. Identify and load parent epic
@@ -384,6 +384,7 @@ slashPrefix: BMad
    - Tasks / Subtasks
    - Dev Notes
    - Testing (subsection of Dev Notes)
+   - Manual Testing Steps (subsection of Dev Notes) — required for UI/navigation stories
    - Change Log
    - Dev Agent Record
    - QA Handoff Notes
@@ -615,6 +616,15 @@ questions:
      - Key test scenarios
      - Coverage requirements
    - Should not just say "write tests"
+
+4a. **Manual Testing Steps** (UI/navigation stories only):
+   - Must be present when story touches screens, modals, navigation, or user-visible interactions
+   - Must include: Prerequisites, Navigation Path, Verification Steps (one per AC), Edge Cases
+   - Navigation Path must name actual screens/buttons (not vague descriptions)
+   - Every AC must map to at least one verification step
+   - Acceptable placeholder: "To be confirmed during implementation" — but only for unknown screen names, not for the entire section
+   - Flag as **Important** if section is absent on a UI story
+   - Flag as **Optional** if present but navigation path uses vague language
 
 5. **File Location Specification**:
    - New files should have specific paths
@@ -1418,13 +1428,13 @@ questions:
 1. [Priority 1 fix]
 2. [Priority 2 fix]
 3. [Priority 3 fix]
-4. Run `/validate-story` after fixes
+4. Run `/review-story` again after fixes
 
 **If REQUIRES REWORK:**
 
 1. [Major rework item 1]
 2. [Major rework item 2]
-3. Consider using `/review-story` again or `/create-story` to regenerate
+3. Consider using `/create-story` to regenerate with proper context
 
 ---
 
@@ -1439,56 +1449,97 @@ questions:
 
 ---
 
+### Step 9.5: Offer to Implement Fixes
+
+**Purpose**: Give the user the option to have the agent apply the recommended fixes to the story document immediately.
+
+**When to Execute**: Always — after generating the report or action plan (Step 9), before the status update (Step 10).
+
+**Actions**:
+
+1. Use `AskUserQuestion` to ask:
+
+```yaml
+question: 'Would you like me to implement the recommended fixes to the story document now?'
+header: 'Apply Fixes'
+options:
+  - label: 'Yes, apply all critical + important fixes'
+    description: 'I will edit the story document to address all critical and important issues identified in the review.'
+  - label: 'Yes, critical fixes only'
+    description: 'I will apply only the must-fix (critical) changes to unblock implementation.'
+  - label: 'No, I will fix manually'
+    description: 'Skip automatic fixes. I will update the story document myself.'
+```
+
+2. **If "Yes, apply all critical + important fixes"** or **"Yes, critical fixes only"**:
+   - Work through each issue in priority order (critical first, then important if selected)
+   - For each fix: use the Edit tool to apply the change to the story document
+   - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
+   - If a fix requires information the agent doesn't have (e.g., user must decide the value), skip it and note: `⏭ Skipped: [issue title] — requires your input`
+   - After all fixes applied, summarise:
+     ```
+     Fixes applied: [N]
+     Skipped (needs your input): [M]
+     ```
+
+3. **If "No, I will fix manually"**:
+   - Acknowledge and proceed to Step 10
+   - Remind user: "The full issue list is in the report above. Run `/review-story` again after making changes."
+
+**Output**: Story document with fixes applied (if user chose to apply), or unchanged (if user declined).
+
+---
+
 ### Step 10: Update Document Status (if applicable)
 
-**Purpose**: Update the story document status after review and fixes are complete
+**Purpose**: Update the story document status based on the review outcome
 
-**CRITICAL**: This step ensures that once a story has been reviewed and improved, its status reflects readiness for development.
+**CRITICAL**: This step ensures the story status reflects its readiness for development immediately after review.
 
 **When to Execute This Step**:
 
 - After generating comprehensive report OR action plan
-- When user has had opportunity to address recommendations
 - Only if current status indicates document is not yet ready (e.g., "Draft", "Not Started")
 
 **Actions**:
 
-1. **Check Current Document Status**:
-   - Read the `Status:` field from story document
-   - If status is already "Ready for Development" or "In Progress", skip this step
-   - If status is "Draft", "Not Started", or similar, proceed
+1. **Check Review Outcome**:
+   - If recommendation is **READY TO IMPLEMENT** (score >= 8, no critical issues) → Offer immediate status update
+   - If recommendation is **NEEDS REVISION** or **REQUIRES REWORK** → Skip status update, inform user to fix and re-review
 
-2. **Ask User About Fixes**:
+2. **If READY TO IMPLEMENT — Ask User About Status Update**:
 
-   Use `AskUserQuestion` to determine if fixes have been completed:
+   Use `AskUserQuestion` to confirm:
 
    ```yaml
-   question: 'Have you completed the recommended fixes from the review?'
-   header: 'Fixes Done'
+   question: "Review result is READY TO IMPLEMENT with readiness score [X]/10. Update story status to 'Ready for Development'?"
+   header: 'Update Status'
    options:
-     - label: 'Yes, fixes complete'
-       description: "I've addressed all critical/important issues. Story is now ready for development."
-     - label: 'Partially complete'
-       description: "I've addressed some issues but more work is needed before development."
-     - label: 'Not yet'
-       description: "I haven't made changes yet. I'll update the document later."
+     - label: 'Yes, update status'
+       description: "Update status to 'Ready for Development'. Story can be handed off to /develop."
+     - label: 'Keep current status'
+       description: "Leave status as '[current status]'. I'll update manually when ready."
    ```
 
-3. **Update Status Based on User Response**:
+3. **If NEEDS REVISION or REQUIRES REWORK**:
+   - Do NOT offer status update
+   - Inform user: "Story status remains '[current status]'. Address the critical/important issues above, then run `/review-story` again."
 
-   **If "Yes, fixes complete"**:
+4. **Update Status Based on User Response** (READY TO IMPLEMENT path only):
+
+   **If "Yes, update status"**:
    - Update story document `Status:` field to "Ready for Development"
-   - Confirm update to user: "Story status updated to 'Ready for Development'. You can now run `/develop` to begin implementation."
+   - Add entry to Change Log table:
+     ```markdown
+     | [date] | [version] | Review passed - ready for development | Review-Story |
+     ```
+   - Confirm update to user: "✅ Story status updated to 'Ready for Development'. You can now run `/develop` to begin implementation."
 
-   **If "Partially complete"**:
-   - Keep status as "Draft" or current value
-   - Inform user: "Story status remains '[current status]'. Run `/review-story` again when ready."
-
-   **If "Not yet"**:
+   **If "Keep current status"**:
    - Keep status unchanged
-   - Inform user: "Story status unchanged. Update the document and run `/review-story` again when fixes are complete."
+   - Inform user: "Story status unchanged at '[current status]'. Run `/develop` when ready."
 
-4. **Status Update Implementation**:
+5. **Status Update Implementation**:
 
    When updating status, use Edit tool:
 
@@ -1500,27 +1551,23 @@ questions:
 
 **Status Transition Rules**:
 
-- `Draft` → `Ready for Development` (after successful review and fixes)
-- `Not Started` → `Ready for Development` (after successful review and fixes)
-- `Draft` → `Draft` (if fixes incomplete)
-- Any other status → No change (respect existing workflow state)
+- `Draft` → `Ready for Development` (only when READY TO IMPLEMENT and user confirms)
+- `Not Started` → `Ready for Development` (only when READY TO IMPLEMENT and user confirms)
+- Any status → No change if NEEDS REVISION, REQUIRES REWORK, or user declines
 
 **Output**: Story document with updated status field (if applicable)
 
 **Example Flow**:
 
 ```
-Initial Review: Story status is "Draft"
+Review Complete: Score 9/10, no critical issues → READY TO IMPLEMENT
 ↓
-Review Completed: Issues identified, recommendations provided
+Step 10: "Update story status to 'Ready for Development'?"
 ↓
-User Makes Fixes: Addresses critical and important issues
-↓
-Step 10 Executes: Asks "Have you completed fixes?"
-↓
-User Selects: "Yes, fixes complete"
+User Selects: "Yes, update status"
 ↓
 Status Updated: "Draft" → "Ready for Development"
+Change Log Updated: Review entry added
 ↓
 User Can Now: Run `/develop` to begin implementation
 ```
@@ -1722,17 +1769,17 @@ devStoryLocation: nested
 
 This skill uses:
 
-- `resources/story-template.yaml` - Story template for structure validation
+- `resources/story-tmpl.yaml` - Story template for structure validation
 - `skills-config.yaml` - Project configuration (optional, uses fallbacks)
 
 ---
 
 ## Notes
 
-- This skill is READ-ONLY - it does not modify the story document
 - Review reports are saved separately as `[story-name].review.[date].md`
+- Story status is updated in-place only when review outcome is READY TO IMPLEMENT and user confirms
 - Can be used at any stage: draft, in progress, completed
-- Complements `/validate-story` but provides deeper analysis and recommendations
+- Supersedes `/validate-story` — provides everything validate-story does plus interactive clarification, epic alignment, consistency checks, and story split recommendations
 - Designed to find problems, not just validate compliance
 
 ```

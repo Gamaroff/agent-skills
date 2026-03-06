@@ -70,6 +70,27 @@ Creates: story.178.8.gate.1.initial-review.yml
 
 ## Prerequisites
 
+### Task List Initialization
+
+**CRITICAL**: Before starting the review, use `TaskCreate` to register every phase as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
+
+| Task Subject                    | Description                                                      |
+| ------------------------------- | ---------------------------------------------------------------- |
+| PR existence check              | Validate PR exists for current branch; store PR metadata         |
+| Check for existing QA artifacts | Detect re-review vs fresh review; read prior gate/report         |
+| Locate and read story/task      | Read story/task file, extract ACs, identify implementation files |
+| Run test architecture review    | Assess test coverage, co-location, co-coverage                   |
+| Run NFR validation              | Evaluate security, performance, reliability, maintainability     |
+| Run requirements traceability   | Map ACs to test evidence; identify gaps                          |
+| Write QA report                 | Create co-located `.qa.N.*.md` report file                       |
+| Write gate YAML                 | Create co-located `.gate.N.*.yml` file                           |
+| Update story/task file          | Add QA Results section, update status, link artifacts            |
+| Create bug reports              | Create `.bug.N.*.md` files for HIGH/MEDIUM issues (if any)       |
+| Post PR comment                 | Post QA summary to PR via `gh pr comment`                        |
+| Communicate to user             | Output final summary with gate decision and next steps           |
+
+---
+
 ### PR Existence Check
 
 **CRITICAL**: The qa-review skill requires an active pull request for the current branch.
@@ -263,7 +284,7 @@ Action: Display message and skip re-review.
 # Previous gate file
 gate: PASS
 top_issues:
-  - issue: "Task 2 checkboxes not marked"
+  - issue: 'Task 2 checkboxes not marked'
     severity: medium
 ```
 
@@ -275,9 +296,9 @@ Action: Perform re-review to check if checkboxes are now marked.
 # Previous gate file
 gate: CONCERNS
 top_issues:
-  - issue: "Integration tests missing"
+  - issue: 'Integration tests missing'
     severity: medium
-  - issue: "No retry logic"
+  - issue: 'No retry logic'
     severity: medium
 ```
 
@@ -293,9 +314,11 @@ Perform a comprehensive test architecture review with quality assessment. This a
 
 ### Story Status Prerequisites
 
-- Story status is "Review" or "Ready for QA"
+- Story status is "Draft", "Review", or "Ready for QA"
 - Developer has completed all tasks and updated the File List
 - All automated tests are passing
+
+**IMPORTANT — Draft Status Transition**: If the story status is "Draft" at the time the review is invoked, update it to "In Review" in the frontmatter **before** proceeding with any other review phases. Log: "📝 Story status updated: Draft → In Review"
 
 ### Review Workflow
 
@@ -334,6 +357,24 @@ Perform a comprehensive test architecture review with quality assessment. This a
    - Include "Re-Review Context" section in new QA report
 
 **See "QA Re-Review Logic" section above for detailed implementation.**
+
+#### Phase 0.5: Check for QA Planning Artifacts
+
+Before running independent NFR and risk analysis, check the story directory for pre-existing qa-planning files:
+
+1. **Glob for risk assessments**: `story.{epic}.{story}.risk.*.md` in the story directory
+   - If found: load as baseline risk profile
+   - Validate whether implementation mitigated the pre-identified risks rather than re-deriving them from scratch
+   - Log: "Found qa-planning risk assessment — using as baseline"
+
+2. **Glob for test design documents**: `story.{epic}.{story}.test-design.*.md` in the story directory
+   - If found: use the pre-defined test scenarios as the traceability baseline
+   - Flag which P0/P1 scenarios are covered vs missing in the implementation
+   - Log: "Found qa-planning test design — using as traceability baseline"
+
+3. **Reference throughout review**: When planning artifacts are found, reference them explicitly in the NFR and traceability sections of the QA report rather than performing fully independent analysis.
+
+4. **Not found**: If no planning artifacts exist, proceed with independent analysis as normal (no behaviour change).
 
 #### Phase 1: Risk Assessment (Determines Review Depth)
 
@@ -426,30 +467,30 @@ Use the Task tool to spawn multiple agents in parallel. Send a SINGLE message wi
 
 // Task Call 1: Test Coverage Analysis
 Task({
-  subagent_type: "general-purpose",
-  description: "Analyze test coverage",
-  prompt: "[Full coverage analysis task description]",
+  subagent_type: 'general-purpose',
+  description: 'Analyze test coverage',
+  prompt: '[Full coverage analysis task description]'
 });
 
 // Task Call 2: TypeScript Strict Mode
 Task({
-  subagent_type: "general-purpose",
-  description: "Check TypeScript compliance",
-  prompt: "[Full TypeScript compliance task description]",
+  subagent_type: 'general-purpose',
+  description: 'Check TypeScript compliance',
+  prompt: '[Full TypeScript compliance task description]'
 });
 
 // Task Call 3: Accessibility Requirements
 Task({
-  subagent_type: "general-purpose",
-  description: "Audit accessibility",
-  prompt: "[Full accessibility audit task description]",
+  subagent_type: 'general-purpose',
+  description: 'Audit accessibility',
+  prompt: '[Full accessibility audit task description]'
 });
 
 // Task Call 4: Definition of Done
 Task({
-  subagent_type: "general-purpose",
-  description: "Verify Definition of Done",
-  prompt: "[Full DoD verification task description]",
+  subagent_type: 'general-purpose',
+  description: 'Verify Definition of Done',
+  prompt: '[Full DoD verification task description]'
 });
 
 // All 4 agents run concurrently
@@ -722,7 +763,8 @@ See NFR Assessment section below for detailed process.
 - Run tests to ensure changes don't break functionality
 - Document all changes in QA report with clear WHY and HOW
 - Do NOT alter story content beyond QA Report section
-- Do NOT change story Status or File List; recommend next status only
+- Do NOT alter the story File List section
+- Story status IS updated at review start (Draft → In Review) and at review completion per gate decision (see "Update Story Status" in Review Completion section)
 
 #### Phase 4: Standards Compliance Check
 
@@ -1202,6 +1244,17 @@ After review:
 
 7. Always provide constructive feedback and actionable recommendations
 
+**Review Completion Checklist — tick off each before marking the review done:**
+
+- [ ] QA report file created and saved (co-located with story/task)
+- [ ] Gate YAML file created and saved (co-located with story/task)
+- [ ] Story/task `## QA Testing Results` section updated with gate status, quality score, and links to artifacts
+- [ ] Story/task status updated (`Ready for Done` / `Reopened` / etc.) per gate decision
+- [ ] Bug report files created for all HIGH and MEDIUM severity issues (if any)
+- [ ] Story Bug Reports section updated with current bug statuses (if any)
+- [ ] PR comment posted via `gh pr comment "$PR_URL"` with QA summary
+- [ ] Next steps communicated clearly to user
+
 **File Creation Locations (Updated 2025-12-09):**
 
 - **QA Report**: Same directory as story/task file (co-located)
@@ -1489,9 +1542,9 @@ Include bug count in gate file:
 
 ```yaml
 top_issues:
-  - issue: "Cache cleanup memory leak"
+  - issue: 'Cache cleanup memory leak'
     severity: high
-    bug_ref: "story.8.5.3.bug.1.cache-cleanup-memory-leak.md"
+    bug_ref: 'story.8.5.3.bug.1.cache-cleanup-memory-leak.md'
     suggested_owner: dev
 ```
 
@@ -1667,16 +1720,16 @@ nfr_validation:
   _assessed: [security, performance, reliability, maintainability]
   security:
     status: CONCERNS
-    notes: "No rate limiting on auth endpoints"
+    notes: 'No rate limiting on auth endpoints'
   performance:
     status: PASS
-    notes: "Response times < 200ms verified"
+    notes: 'Response times < 200ms verified'
   reliability:
     status: PASS
-    notes: "Error handling and retries implemented"
+    notes: 'Error handling and retries implemented'
   maintainability:
     status: CONCERNS
-    notes: "Test coverage at 65%, target is 80%"
+    notes: 'Test coverage at 65%, target is 80%'
 ```
 
 #### Deterministic Status Rules
@@ -1809,21 +1862,21 @@ Identify all testable requirements from:
 For each requirement, document which tests validate it. Use Given-When-Then to describe what the test validates (not how it's written):
 
 ```yaml
-requirement: "AC1: User can login with valid credentials"
+requirement: 'AC1: User can login with valid credentials'
 test_mappings:
-  - test_file: "auth/login.test.ts"
-    test_case: "should successfully login with valid email and password"
+  - test_file: 'auth/login.test.ts'
+    test_case: 'should successfully login with valid email and password'
     # Given-When-Then describes WHAT the test validates, not HOW it's coded
-    given: "A registered user with valid credentials"
-    when: "They submit the login form"
-    then: "They are redirected to dashboard and session is created"
+    given: 'A registered user with valid credentials'
+    when: 'They submit the login form'
+    then: 'They are redirected to dashboard and session is created'
     coverage: full
 
-  - test_file: "e2e/auth-flow.test.ts"
-    test_case: "complete login flow"
-    given: "User on login page"
-    when: "Entering valid credentials and submitting"
-    then: "Dashboard loads with user data"
+  - test_file: 'e2e/auth-flow.test.ts'
+    test_case: 'complete login flow'
+    given: 'User on login page'
+    when: 'Entering valid credentials and submitting'
+    then: 'Dashboard loads with user data'
     coverage: integration
 ```
 
@@ -1845,19 +1898,19 @@ Document any gaps found:
 
 ```yaml
 coverage_gaps:
-  - requirement: "AC3: Password reset email sent within 60 seconds"
-    gap: "No test for email delivery timing"
+  - requirement: 'AC3: Password reset email sent within 60 seconds'
+    gap: 'No test for email delivery timing'
     severity: medium
     suggested_test:
       type: integration
-      description: "Test email service SLA compliance"
+      description: 'Test email service SLA compliance'
 
-  - requirement: "AC5: Support 1000 concurrent users"
-    gap: "No load testing implemented"
+  - requirement: 'AC5: Support 1000 concurrent users'
+    gap: 'No load testing implemented'
     severity: high
     suggested_test:
       type: performance
-      description: "Load test with 1000 concurrent connections"
+      description: 'Load test with 1000 concurrent connections'
 ```
 
 ### Traceability Outputs
@@ -1873,11 +1926,11 @@ trace:
     full: 3
     partial: 1
     none: 1
-  planning_ref: "{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md"
+  planning_ref: '{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md'
   uncovered:
-    - ac: "AC3"
-      reason: "No test found for password reset timing"
-  notes: "See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md"
+    - ac: 'AC3'
+      reason: 'No test found for password reset timing'
+  notes: 'See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md'
 ```
 
 #### Output 2: Traceability Report
@@ -2075,8 +2128,8 @@ All file locations should be defined in skill resources or explicit file referen
 
 ```yaml
 qa:
-  qaLocation: "docs/qa" # Base directory for QA files
-devStoryLocation: "docs/prd" # Story files location
+  qaLocation: 'docs/qa' # Base directory for QA files
+devStoryLocation: 'docs/prd' # Story files location
 ```
 
 ### File Naming Conventions (Updated 2025-12-09)

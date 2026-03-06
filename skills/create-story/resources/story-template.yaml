@@ -94,6 +94,42 @@ sections:
         owner: scrum-master
         editors: [scrum-master]
 
+      - id: manual-testing-steps
+        title: Manual Testing Steps
+        instruction: |
+          Provide a step-by-step walkthrough for manually verifying this story in the running app.
+          Populated by the SM at story creation from routing docs, UX flows, and acceptance criteria.
+          The developer should refine this after implementation in QA Handoff Notes.
+
+          Structure:
+          1. Prerequisites — what must be true before testing (logged in, data seeded, feature flag, etc.)
+          2. Navigation Path — exact steps to reach the feature from the app home screen
+          3. Verification Steps — one step per acceptance criterion: what to tap/do and what to expect
+          4. Edge Cases — specific interactions to check that are known risks (e.g. previously broken flows)
+
+          Rules:
+          - Be specific: name actual screens, buttons, and labels as they appear in the UI
+          - Map each verification step to an AC number (e.g. "AC1:", "AC2:")
+          - If navigation path is not yet known, state "To be confirmed during implementation"
+          - Do NOT invent screen names — extract from routing docs or core-workflows.md
+        template: |
+          **Prerequisites**:
+          - App running (`npm run goji-wallet:start:device`)
+          - [Any auth/data prerequisites]
+
+          **Navigation Path**:
+          1. [Starting screen] → [tap X] → [destination screen]
+
+          **Verification Steps**:
+          - **AC1**: [Action] → expect [result]
+          - **AC2**: [Action] → expect [result]
+
+          **Edge Cases / Key Risks**:
+          - [Known tricky interaction or previously broken flow to verify]
+        elicit: true
+        owner: scrum-master
+        editors: [scrum-master, dev-agent]
+
   - id: change-log
     title: Change Log
     type: table

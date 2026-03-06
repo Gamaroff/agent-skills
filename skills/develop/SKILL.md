@@ -223,9 +223,81 @@ System Action: Invokes /review-story skill
 → User can now run /develop to begin implementation
 ```
 
+## Risk Level Check
+
+**CRITICAL**: After document status validation passes and before implementation analysis, check the story frontmatter for a `risk_level` field.
+
+### Risk Level Check Procedure
+
+1. **Read `risk_level` from story frontmatter**:
+   - `risk_level: high` → Gate applies (see below)
+   - `risk_level: medium` / `risk_level: low` / field absent → silently continue to Implementation Alignment Analysis
+
+2. **When `risk_level: high`**:
+
+   Display warning:
+   ```
+   ⚠️  HIGH RISK STORY DETECTED
+
+   This story is flagged as high risk (auth, payments, BSV signing, encryption, or external APIs).
+   Running /qa-planning before development is strongly recommended to catch architecture or
+   security issues before code is written — when they are cheapest to fix.
+
+   Story: [story file name]
+   Risk Level: high
+   ```
+
+   Ask user how to proceed using AskUserQuestion:
+
+   **Question**: "This is a high-risk story. Would you like to run `/qa-planning` first?"
+
+   **Options**:
+   - **Run `/qa-planning` now** — "Recommended. Identify risks and design test strategy before writing code."
+     - Description: "Generates risk matrix and test design document. Returns here when done."
+   - **Skip, I've already planned** — "I've already assessed risks or this is a re-run."
+     - Description: "Acknowledge the risk and proceed directly to implementation."
+   - **Skip, low actual risk** — "The `risk_level: high` tag is overstated for this change."
+     - Description: "Proceed without planning. Consider updating the story's risk_level."
+
+3. **Execute User Choice**:
+
+   **If "Run `/qa-planning` now"**:
+   - Invoke `/qa-planning` skill with the current story context
+   - After `/qa-planning` completes, return to this skill and continue to Implementation Alignment Analysis
+
+   **If "Skip, I've already planned"** or **"Skip, low actual risk"**:
+   - Log acknowledgement in Dev Agent Record under a "Risk Acknowledgement" note
+   - Continue to Implementation Alignment Analysis
+
+### Example Flow
+
+```
+User Input: /develop story.312.1.bsv-transaction-signing.md
+
+System Detection: Story file detected
+System Status Check: Status shows "Ready for Development"
+System Risk Check: risk_level = high
+
+System Warning:
+⚠️  HIGH RISK STORY DETECTED
+Story: story.312.1.bsv-transaction-signing.md
+Risk Level: high
+
+System Prompt: [Displays AskUserQuestion with 3 options]
+
+User Selection: "Run /qa-planning now"
+
+System Action: Invokes /qa-planning skill
+→ Risk matrix generated, test design document created
+→ Returns to /develop
+→ Continues to Implementation Alignment Analysis
+```
+
+---
+
 ## Implementation Alignment Analysis
 
-**CRITICAL**: After document status validation passes, you MUST check if an implementation already exists and analyze alignment with the story/task document.
+**CRITICAL**: After document status validation and risk level check pass, you MUST check if an implementation already exists and analyze alignment with the story/task document.
 
 ### Alignment Check Procedure
 
@@ -445,20 +517,21 @@ After status validation passes:
 
 ```
 1. Complete Document Status Validation (see Document Status Validation section above)
-2. Complete Implementation Alignment Analysis (see Implementation Alignment Analysis section above)
-3. Set story status to 'In Progress' (if currently 'Not Started' or 'Ready for Development')
-4. Read first or next task
-5. Implement task and its subtasks
-6. Write tests (co-located .spec.ts files)
-7. Execute validations (linting + tests)
-8. Only if ALL tests pass → update task checkbox with [x]
-9. Document work in Dev Agent Record → Implementation Approach:
+2. Complete Risk Level Check (see Risk Level Check section above) — gates on risk_level: high
+3. Complete Implementation Alignment Analysis (see Implementation Alignment Analysis section above)
+4. Set story status to 'In Progress' (if currently 'Not Started' or 'Ready for Development')
+5. Read first or next task
+6. Implement task and its subtasks
+7. Write tests (co-located .spec.ts files)
+8. Execute validations (linting + tests)
+9. Only if ALL tests pass → update task checkbox with [x]
+10. Document work in Dev Agent Record → Implementation Approach:
    - What you built (architecture decisions, patterns used)
    - Key technical details (algorithms, data flows)
    - Integration points and dependencies
-10. Update story File List section (all new/modified/deleted files)
-11. Update Change Log with date and summary of changes
-12. Repeat until all tasks complete
+11. Update story File List section (all new/modified/deleted files)
+12. Update Change Log with date and summary of changes
+13. Repeat until all tasks complete
 ```
 
 **Testing Checkpoints** (Execute at these milestones):
@@ -530,6 +603,16 @@ When tests fail during implementation:
 7. Set story status to 'Ready for Review'
 8. HALT
 ```
+
+**Story Completion Checklist — tick off each before halting:**
+
+- [ ] All task checkboxes marked `[x]` (none left unchecked)
+- [ ] Full test suite run: zero failures, coverage target met (80%+ overall, 95%+ financial)
+- [ ] Lint run: zero errors
+- [ ] Dev Agent Record complete: Implementation Summary, Approach, Testing Results, Completion Date, Deferred Work
+- [ ] File List complete and accurate (all created/modified/deleted files)
+- [ ] Change Log has dated entries for all significant changes
+- [ ] Story status set to `Ready for Review`
 
 ### 2. Develop Task Workflow
 
@@ -604,6 +687,18 @@ After status validation passes:
 8. Set task status to 'Ready for Review'
 9. HALT
 ```
+
+**Task Completion Checklist — tick off each before halting:**
+
+- [ ] All implementation plan phase checkboxes marked `[x]` (none left unchecked)
+- [ ] Full test suite run: zero failures, coverage targets met
+- [ ] Lint run: zero errors
+- [ ] All Success Criteria validated (Functional, Performance, Quality, Migration)
+- [ ] Task documentation complete: Implementation Summary, Approach, Testing Results, Completion Date, Deferred Work
+- [ ] Files Summary complete and accurate (all created/modified/deleted files)
+- [ ] Change Log has dated entries for all significant changes
+- [ ] CHANGELOG.md updated (if applicable)
+- [ ] Task status set to `Ready for Review`
 
 **QA Handoff**:
 

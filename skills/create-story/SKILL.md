@@ -58,16 +58,24 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 **Fallback Defaults** (if config file doesn't exist but user approves proceeding):
 
 ```yaml
-devStoryLocation: docs/stories
+devStoryLocation: co-located  # Stories are saved inside the epic's own stories/ subdirectory
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epic-{n}*.md"
+  epicFilePattern: '*/epic-{n}*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
   architectureVersion: v4
 ```
+
+> **CRITICAL — Story File Location**: Stories are **always** saved inside the `stories/` subdirectory of the epic directory that was provided as input (or identified in Step 1). The path is:
+> `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title-short}/story.{epicNum}.{storyNum}.{story-title-short}.md`
+>
+> Example: If the epic is at `docs/prd/core-platform/my-feature/epics/epic.336.my-epic/epic.336.my-epic.md`, stories go to:
+> `docs/prd/core-platform/my-feature/epics/epic.336.my-epic/stories/story.336.1.my-story/story.336.1.my-story.md`
+>
+> Do **NOT** use a global `docs/stories/` directory.
 
 ---
 
@@ -81,7 +89,7 @@ architecture:
    - **Sharded**: Use `prdShardedLocation` + `epicFilePattern`
    - **Monolithic**: Parse sections from main PRD file
 
-2. If `devStoryLocation` has story files, load the highest `{epicNum}.{storyNum}.story.md` file
+2. Look for existing story files inside the epic's `stories/` subdirectory (i.e. `{epic-directory}/stories/`). Load the highest-numbered `story.{epicNum}.{storyNum}.*` file found there.
 
 3. **If highest story exists**:
    - Verify status is `Done`
@@ -273,11 +281,15 @@ Recommend following Project Structure Guide for consistency.
 
 **Purpose**: Create comprehensive, self-contained story document
 
-### 5.1 Create Story File
+### 5.1 Create Story File and Directory
 
-1. Create new file: `{devStoryLocation}/{epicNum}.{storyNum}.story.md`
-2. Use Story Template from `resources/story-template.yaml` as structure
-3. Initial filename format: `{epicNum}.{storyNum}.{story-title-short}.md`
+1. Determine story path name: `story.{epicNum}.{storyNum}.{story-title-short}`
+2. Derive the output root from the epic file path provided (or identified in Step 1): `{epic-directory}/stories/`
+3. Create directory: `{epic-directory}/stories/{story-path-name}/`
+4. Create file inside directory: `{epic-directory}/stories/{story-path-name}/{story-path-name}.md`
+5. Use Story Template from `resources/story-template.yaml` as structure
+
+> **CRITICAL**: Never write to a global `docs/stories/` directory. Stories always live inside their own epic's `stories/` subdirectory.
 
 ### 5.2 Fill Basic Story Information
 
@@ -342,6 +354,40 @@ Organize Dev Notes by these categories:
 - Coverage requirements
 - Test file locations
 - **MANDATORY**: Include source references
+
+#### Manual Testing Steps
+
+Generate a concrete, step-by-step walkthrough for verifying this story in the running app. This is distinct from automated test design — it is a human-readable smoke test guide.
+
+**Sources to consult** (in priority order):
+1. `docs/architecture/routing-and-file-structure.md` — for navigation paths and screen names
+2. `docs/architecture/concepts/core-workflows.md` — for user flows
+3. The story's own acceptance criteria — one verification step per AC
+4. Integration notes in the story (what parent component or screen triggers this feature)
+
+**Structure to generate**:
+```markdown
+**Prerequisites**:
+- App running (`npm run goji-wallet:start:device`)
+- [Auth state, seeded data, or feature flags required]
+
+**Navigation Path**:
+1. [Home/starting screen] → [tap X] → [intermediate screen] → [target screen]
+
+**Verification Steps**:
+- **AC1**: [Exact action] → expect [exact result]
+- **AC2**: [Exact action] → expect [exact result]
+- ...
+
+**Edge Cases / Key Risks**:
+- [Known tricky interaction, previously broken flow, or non-obvious behaviour to verify]
+```
+
+**Rules**:
+- Use actual screen/button names from routing docs; if unknown, write "To be confirmed during implementation"
+- Map every AC to at least one verification step
+- The `dev-agent` may refine this section after implementation; the SM skeleton is sufficient to guide development
+- Do NOT invent navigation paths — only extract from source documents
 
 #### Technical Constraints
 
@@ -425,7 +471,7 @@ Review all sections for:
    ```markdown
    | 2025-10-30 | 1.0 | Initial draft created by Scrum Master | SM Agent |
    ```
-3. Save the story file to `{devStoryLocation}/{epicNum}.{storyNum}.{story-title}.md`
+3. Save the story file to the self-named subdirectory inside the epic's `stories/` folder: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
 4. If `docs/prd/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this story's key
@@ -439,19 +485,23 @@ Review all sections for:
 **Disaster Prevention Checklist** — for each category, identify gaps and fix them before presenting the story:
 
 #### 🚨 Critical (Must Fix)
+
 - **Wheel reinvention**: Does the story direct the developer toward existing code they should extend, rather than re-implement? Check the codebase for related components, services, hooks, or utilities.
 - **Wrong libraries**: Are all library references version-specific and consistent with what the project actually uses (check `package.json`)? No guessed or fabricated dependencies.
 - **Wrong file locations**: Do all file paths in Dev Notes match the project's actual directory structure as confirmed in Step 4?
 - **Regression risk**: Does the story identify existing functionality that could break? Are tests for adjacent features called out?
 - **UX violations**: If this story touches UI, are UX requirements from the epic explicitly referenced with file citations?
+- **Missing manual testing steps**: If this story touches UI or navigation, does the Manual Testing Steps section have a concrete walkthrough? Vague or empty steps must be filled or explicitly marked "To be confirmed during implementation".
 - **Vague implementations**: Can every task be executed without ambiguity? Flag any task that requires guessing.
 
 #### ⚡ Should Add
+
 - **Previous story continuity**: Are patterns, file locations, and decisions from the previous story carried forward correctly?
 - **Missing acceptance criteria coverage**: Does every AC map to at least one task?
 - **Security or performance requirements**: If relevant, are they stated explicitly (not implied)?
 
 #### ✨ Nice to Have
+
 - **Token efficiency**: Is the story concise? Remove verbose explanations that don't add implementation value.
 - **Scannable structure**: Are critical constraints visible at a glance, not buried in prose?
 
@@ -466,7 +516,7 @@ Generate a comprehensive summary including:
 ```markdown
 ## Story Creation Complete
 
-**Story Created**: `{devStoryLocation}/{epicNum}.{storyNum}.{story-title}.md`
+**Story Created**: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
 **Status**: Draft
 **Epic**: {epicNum} - {Epic Title}
 **Story Number**: {storyNum}
@@ -561,7 +611,9 @@ Expected configuration structure:
 
 ```yaml
 # Project structure
-devStoryLocation: docs/stories
+# Stories are saved inside each epic's own stories/ subdirectory — NOT in a global docs/stories/ folder.
+# Path pattern: {epic-directory}/stories/story.{N}.{M}.{title}/story.{N}.{M}.{title}.md
+devStoryLocation: co-located-in-epic
 devDebugLog: .ai/debug-log.md
 
 # PRD configuration
@@ -570,7 +622,7 @@ prd:
   prdVersion: v4
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epic-{n}*.md"
+  epicFilePattern: '*/epic-{n}*.md'
 
 # Architecture configuration
 architecture:

@@ -86,7 +86,19 @@ Skills use a three-level loading system to manage context efficiently:
 
 ## Skill Creation Process
 
-To create a skill, follow the "Skill Creation Process" in order, skipping steps only if there is a clear reason why they are not applicable.
+Copy this checklist and track your progress when creating a skill:
+
+```text
+Skill Creation Progress:
+- [ ] Step 1: Understanding the skill with concrete examples
+- [ ] Step 2: Planning the reusable skill contents
+- [ ] Step 3: Initializing the skill
+- [ ] Step 4: Edit the skill
+- [ ] Step 5: Packaging a skill
+- [ ] Step 6: Iterate
+```
+
+To create a skill, execute these steps sequentially, skipping steps only if there is a clear reason why they are not applicable.
 
 ### Step 1: Understanding the Skill with Concrete Examples
 
@@ -164,7 +176,10 @@ Also, delete any example files and directories not needed for the skill. The ini
 
 #### Update SKILL.md
 
-**Writing Style:** Write the entire skill using **imperative/infinitive form** (verb-first instructions), not second person. Use objective, instructional language (e.g., "To accomplish X, do Y" rather than "You should do X" or "If you need to do X"). This maintains consistency and clarity for AI consumption.
+**Writing Style:** Write the skill using **imperative/infinitive form** (verb-first instructions). Keep default assumptions that Claude is already smart—don't add context Claude doesn't need. Keep descriptions third-person focused on "what it does and when to use it".
+**Paths:** Always use forward slashes in file paths (e.g., `scripts/helper.py`), even on Windows.
+**Options:** Provide a clear default option instead of offering too many alternatives.
+**Output Structuring Patterns:** Use the **Template pattern** to establish strict Markdown structures (e.g., `ALWAYS use this exact template structure:`) for reports, specs, and API payloads. Use the **Examples pattern** (providing strict `Input:` and `Output:` pairs) to train Claude on nuanced stylistic tasks like drafting commits or PR reviews.
 
 To complete SKILL.md, answer the following questions:
 

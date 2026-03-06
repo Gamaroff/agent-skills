@@ -150,12 +150,13 @@ Rejects: epic.323.pin-advanced-security.md (if provided)
 
 **Validate the following before allowing edits:**
 
-**A. File Naming Convention**
+**A. File Naming Convention & Location**
 
 - Filename follows pattern: `story.[epic].[story].[name].md`
+- File must be placed inside a subdirectory with the exact same name: `story.[epic].[story].[name]/story.[epic].[story].[name].md`
 - Uses DOTS for number separators (not underscores)
 - Uses hyphens for word separation in descriptive name (not underscores)
-- Example valid: `story.163.1.seed-phrase-validator.md`
+- Example valid: `story.163.1.seed-phrase-validator/story.163.1.seed-phrase-validator.md`
 - Example invalid: `story_163_1_seed_phrase_validator.md`
 
 **B. YAML Frontmatter (if present)**
@@ -305,22 +306,22 @@ If validation fails, present findings to user:
 
 **Valid Patterns:**
 
-- `story.163.1.seed-phrase-validator.md` ✓
-- `story.323.2.emergency-recovery-unlock.md` ✓
-- `story.178.8.swipe-actions-friend-requests.md` ✓
+- `story.163.1.seed-phrase-validator/story.163.1.seed-phrase-validator.md` ✓
+- `story.323.2.emergency-recovery-unlock/story.323.2.emergency-recovery-unlock.md` ✓
+- `story.178.8.swipe-actions-friend-requests/story.178.8.swipe-actions-friend-requests.md` ✓
 
 **Invalid Patterns:**
 
 - `story_163_1_seed_phrase_validator.md` ✗ (underscores instead of dots)
 - `story.163_1.seed-phrase-validator.md` ✗ (mixed separators)
 - `story-163.1.seed-phrase-validator.md` ✗ (hyphen for number separator)
+- `story.163.1.seed-phrase-validator.md` ✗ (must be inside a self-named subdirectory)
 
 **Rule from Documentation:**
 
 > Use DOTS for numbers: `story.163.1.name.md` not `story_163_1_name.md`
 > Use hyphens for word separation in descriptive names: `seed-phrase-validator` not `seed_phrase_validator`
->
-> Source: `.claude/documentation.md` lines 99-100
+> Each story MUST be placed in its own self-named subdirectory within the epic's `stories` folder.
 
 ### Status Value Validation
 

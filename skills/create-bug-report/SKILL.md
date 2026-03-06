@@ -26,10 +26,11 @@ Use this skill when:
 
 ### Story Bug Reports
 
-- **Pattern**: `bug.{epic}.{story}.{number}.{name}.md`
+- **Pattern**: `story.{epic}.{story}.bug.{number}.{name}.md`
 - **Location**: Co-located with story file in story directory
 - **Used For**: Bugs found during user-facing feature testing
-- **Example**: `bug.8.5.3.1.cache-cleanup-memory-leak.md`
+- **Example**: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
+- **Reference**: Follows `docs/development/naming-conventions.md`
 
 ### Technical Task Bug Reports
 
@@ -99,11 +100,11 @@ optional:
 **Sequential Numbering Logic**:
 
 1. Search for existing bug reports in story directory
-   - Pattern: `bug.{epic}.{story}.*.md`
-   - Example: `bug.8.5.3.1.*.md`, `bug.8.5.3.2.*.md`
+   - Pattern: `story.{epic}.{story}.bug.*.md`
+   - Example: `story.8.5.3.bug.1.*.md`, `story.8.5.3.bug.2.*.md`
 
 2. Find highest bug number
-   - If `bug.8.5.3.2.*.md` exists → next number is 3
+   - If `story.8.5.3.bug.2.*.md` exists → next number is 3
    - If no bugs exist → next number is 1
 
 3. Assign bug number to new report
@@ -119,7 +120,9 @@ optional:
 
 ### Step 3: Generate Bug Report Filename
 
-**Format**: `bug.{epic}.{story}.{bug-number}.{descriptive-name}.md`
+**Format**: `story.{epic}.{story}.bug.{bug-number}.{descriptive-name}.md`
+
+**Reference**: Follow the naming convention as specified in `docs/development/naming-conventions.md`
 
 **Descriptive Name**:
 
@@ -129,9 +132,9 @@ optional:
 
 **Examples**:
 
-- `bug.8.5.3.1.cache-cleanup-memory-leak.md`
-- `bug.8.5.3.2.offline-mode-regression.md`
-- `bug.2.1.1.validation-error-handling.md`
+- `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
+- `story.8.5.3.bug.2.offline-mode-regression.md`
+- `story.2.1.1.bug.1.validation-error-handling.md`
 
 ---
 
@@ -144,7 +147,7 @@ optional:
 **Initial Bug Report Content**:
 
 ```markdown
-**Bug ID**: bug.{epic}.{story}.{bug-number}.{description}
+**Bug ID**: story.{epic}.{story}.bug.{bug-number}.{description}
 **Related Story**: [Story {Epic}-{N}: {Story Title}](./story.{epic}.{story}.{name}.md)
 **Status**: 🆕 New
 **Priority**: {Critical | High | Medium | Low}
@@ -276,7 +279,7 @@ If `## Bug Reports` section doesn't exist in story file, add it after the "QA Re
 
 ### Open Bugs
 
-- [Bug {epic}.{story}.{n}: {Description}](bug.{epic}.{story}.{n}.{name}.md) - 🆕 New - Priority: {Priority}
+- [Bug {epic}.{story}.{n}: {Description}](story.{epic}.{story}.bug.{n}.{name}.md) - 🆕 New - Priority: {Priority}
 
 ### In QA Verification
 
@@ -304,7 +307,7 @@ If QA report exists (`story.{epic}.{story}.qa.*.md`), reference the bug report:
 
 #### Issue 1: {Bug Description}
 
-**Bug Report**: [Bug {epic}.{story}.{n}](bug.{epic}.{story}.{n}.{name}.md)
+**Bug Report**: [Bug {epic}.{story}.{n}](story.{epic}.{story}.bug.{n}.{name}.md)
 
 {Issue details from QA report}
 ```
@@ -768,14 +771,14 @@ reproduction_steps:
 
 1. **Locate Story**: `story.8.5.3.cache-first-cleanup-testing.md`
 2. **Determine Bug Number**: No existing bugs → assign number 1
-3. **Generate Filename**: `bug.8.5.3.1.cache-cleanup-memory-leak.md`
+3. **Generate Filename**: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
 4. **Create Bug Report**: Use template, populate all fields
 5. **Update Story**: Add to Bug Reports section:
 
    ```markdown
    ### Open Bugs
 
-   - [Bug 8.5.3.1: Cache cleanup memory leak](bug.8.5.3.1.cache-cleanup-memory-leak.md) - 🆕 New - Priority: High
+   - [Bug 8.5.3.1: Cache cleanup memory leak](story.8.5.3.bug.1.cache-cleanup-memory-leak.md) - 🆕 New - Priority: High
    ```
 
 6. **Update Story Status**: "Ready for QA" → "Reopened"

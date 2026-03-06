@@ -110,16 +110,14 @@ stories/
 - Bug reports include sequential number: `.bug.1.`, `.bug.2.`, etc.
 - Descriptive name comes last before file extension
 
-**Gate File** (most recent by modified time):
+**Assessment Files** (co-located in story subdirectory, canonical naming):
 
-- `{qa_root}/gates/{epic}.{story}-*.yml`
+- Risk Assessment: `story.{epic}.{story}.risk.*.{name}.md`
+- Test Design: `story.{epic}.{story}.test-design.*.{name}.md`
 
-**Assessment Files**:
-
-- Test Design: `{qa_root}/assessments/{epic}.{story}-test-design-*.md`
-- Traceability: `{qa_root}/assessments/{epic}.{story}-trace-*.md`
-- Risk Profile: `{qa_root}/assessments/{epic}.{story}-risk-*.md`
-- NFR Assessment: `{qa_root}/assessments/{epic}.{story}-nfr-*.md`
+For tasks:
+- Risk Assessment: `task.{id}.risk.*.{name}.md` (in task subdirectory)
+- Test Design: `task.{id}.test-design.*.{name}.md` (in task subdirectory)
 
 **Bug Report Files** (co-located in story subdirectory):
 
@@ -231,7 +229,23 @@ Before starting fixes:
 
 ## Workflow (6 Steps)
 
-### Step 0: Load Config & Locate Story
+### Step 0: Initialize Task List, Load Config & Locate Story
+
+**CRITICAL**: Before doing anything else, use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing.
+
+| Task Subject | Description |
+|---|---|
+| PR existence check | Validate PR exists; store PR_URL, PR_NUMBER, PR_STATE, PR_TITLE |
+| Load config & locate story | Read skills-config.yaml; find story file, QA report, gate, bug reports |
+| Collect QA findings | Parse gate YAML, assessment markdowns, and bug reports |
+| Build fix plan | Prioritize issues; resolve ambiguities with user before proceeding |
+| Apply changes | Implement code fixes and add missing tests |
+| Validate | Run lint + tests; iterate until zero errors and all tests pass |
+| Update story file & bug reports | Update authorized sections only; set correct status per Status Rule |
+| Post fix summary to PR | Post fix summary comment via `gh pr comment "$PR_URL"` |
+| Communicate to user | Output completion summary with next steps |
+
+---
 
 **Configuration File**: `skills-config.yaml` (in project root)
 
@@ -274,6 +288,13 @@ Read assessment markdowns and extract:
 - Explicit gaps and recommendations
 - Uncovered requirements
 - Missing test scenarios
+
+**Load qa-planning artifacts** (if present in story directory):
+
+- Glob for `story.{epic}.{story}.risk.*.md` — load all risk assessments found
+- Glob for `story.{epic}.{story}.test-design.*.md` — load all test design documents found
+- Use these to understand pre-identified risks and intended test coverage when building the fix plan
+- For tasks: glob `task.{id}.risk.*.md` and `task.{id}.test-design.*.md` in task subdirectory
 
 **Parse Bug Reports** (if any exist):
 

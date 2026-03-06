@@ -41,25 +41,41 @@ Common Gitflow patterns:
 ## Workflow
 
 **IMPORTANT**: This skill performs a complete workflow from uncommitted changes to PR creation:
-1. Commits any uncommitted changes (if present)
-2. Asks user for target branch
+1. **Asks user for target branch** — ALWAYS the very first action, no exceptions
+2. Commits any uncommitted changes (if present)
 3. Pushes branch to remote
 4. Generates PR title and description
 5. Creates the actual PR using `gh pr create`
 6. Returns the PR URL to the user
 
-**Do not stop after Step 1** - all steps must be completed to finish the PR creation process.
+**Do not skip Step 1** — the base branch question must be answered before any other work begins.
 
-### Step 1: Verify Prerequisites and Commit Changes
+### Step 1: Ask User for Target Branch
+
+**MANDATORY — do this before anything else, even before checking git status.**
+
+Use AskUserQuestion to ask which branch this PR should merge into. Never assume or auto-detect — always wait for an explicit answer.
+
+```
+Question: Which branch should this PR merge into?
+
+Current branch: <git branch --show-current>
+
+Options:
+- develop (Default for features and bug fixes)
+- main (Hotfixes and releases only)
+- other (specify)
+```
+
+Store the answer as `BASE_BRANCH`. Every subsequent step that references a target branch must use this value.
+
+### Step 2: Verify Prerequisites and Commit Changes
 
 Check that the environment is ready:
 
 ```bash
 # Verify gh CLI is available and authenticated
 gh auth status
-
-# Check current branch
-git branch --show-current
 
 # Check for uncommitted changes
 git status --porcelain
@@ -68,39 +84,9 @@ git status --porcelain
 If there are uncommitted changes:
 
 1. **Automatically invoke the `/commit-changes` skill** to commit all changes
-2. **After commits are complete, IMMEDIATELY CONTINUE with Step 2** - Do not stop after committing
+2. **After commits are complete, IMMEDIATELY CONTINUE with Step 3** - Do not stop after committing
 
-**CRITICAL**: The commit step is just preparation. After `/commit-changes` completes successfully, you MUST continue with Steps 2-7 to actually create the PR. Do not stop after committing - that's only the first part of this skill's job.
-
-### Step 2: Ask User for Target Branch
-
-**REQUIRED**: Use AskUserQuestion to confirm the target branch.
-
-```
-Question: Which branch should this PR target?
-
-Options:
-1. develop (Recommended) - For features, fixes, and regular development
-2. main - For hotfixes and releases only
-```
-
-**Recommended default**: `develop` for most PRs
-
-Parse the current branch name to provide context:
-
-```bash
-CURRENT_BRANCH=$(git branch --show-current)
-
-# Suggest target based on branch prefix
-case "$CURRENT_BRANCH" in
-  hotfix/*|release/*)
-    echo "Note: This appears to be a $CURRENT_BRANCH branch, which typically targets 'main'"
-    ;;
-  feature/*|fix/*)
-    echo "Note: This appears to be a $CURRENT_BRANCH branch, which typically targets 'develop'"
-    ;;
-esac
-```
+**CRITICAL**: The commit step is just preparation. After `/commit-changes` completes successfully, you MUST continue with Steps 3-7 to actually create the PR. Do not stop after committing - that's only the first part of this skill's job.
 
 ### Step 3: Push Branch to Remote
 
@@ -162,7 +148,7 @@ Closes #123
 
 ```bash
 # Get commit messages for the PR body
-git log origin/develop..HEAD --pretty=format:"- %s"
+git log origin/$BASE_BRANCH..HEAD --pretty=format:"- %s"
 ```
 
 ### Step 6: Create the Pull Request
@@ -171,7 +157,7 @@ Use the GitHub CLI to create the PR:
 
 ```bash
 gh pr create \
-  --base develop \
+  --base $BASE_BRANCH \
   --title "feat(story.180.3): quick re-search functionality" \
   --body "## Summary
 
