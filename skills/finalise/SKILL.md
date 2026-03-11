@@ -15,6 +15,12 @@ Mark a story or task as complete by verifying it against a comprehensive Definit
 - No loss of work if verification is interrupted
 - Transparency for stakeholders who can monitor the running summary file
 
+**Relationship to implementation report**: The DoD running summary (`story.{epic}.{story}.dod.{num}.{story-name}.md`) is a QA/verification artifact — it records the DoD check results. The implementation report (`story.{epic}.{story}.implementation.{N}.md`), created by the `develop-story` orchestrator, records the full pipeline audit trail. They are complementary, not redundant:
+- Implementation report: pipeline-level log (branch, PR, QA iterations, decisions)
+- DoD running summary: verification-level log (acceptance criteria pass/fail, security check, compliance check)
+
+Both are co-located in the story directory. When invoked from `develop-story`, the DoD summary is the canonical record of finalise results; the implementation report references it.
+
 Based on the verification results, it either marks the story/task as "Accepted" with generated artifacts, or lists specific gaps that need to be addressed.
 
 ## When to Use This Skill

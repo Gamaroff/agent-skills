@@ -533,6 +533,51 @@ If yes:
 
 ---
 
+### Step 11 — Apply Findings to Epic
+
+**Purpose**: Offer to apply the findings from the report/plan directly to the epic file.
+
+Use `AskUserQuestion`:
+
+```yaml
+question: 'Would you like the findings from the review to be applied to the epic file now?'
+header: 'Apply Fixes'
+options:
+  - label: 'Yes — apply all fixes'
+    description: 'Apply every Critical and Major fix from the report/plan directly to the epic file now.'
+  - label: 'Yes — apply critical only'
+    description: 'Apply only Critical fixes now. Leave Major and Minor for a later pass.'
+  - label: 'No — I will apply them manually'
+    description: 'Leave the epic file unchanged. Use the report/plan as a reference to apply fixes yourself.'
+```
+
+**If "Yes — apply all fixes" or "Yes — apply critical only"**:
+
+1. Work through each applicable recommendation from Step 8 in order of severity (Critical first, then Major)
+2. For each fix, use the Edit tool to apply the change directly to the epic file
+3. Do NOT rewrite sections that were not flagged — only touch what the recommendation covers
+4. After all edits, read back the changed sections to verify correctness
+5. Report which fixes were applied and which (if any) were skipped with reason
+6. **Mark recommendations as implemented** — update both documents:
+
+   **In the review report** (`epic.[N].[name]-review-report.md`):
+   - Add the following line immediately after the Story Writing Readiness line in the Executive Summary:
+     `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD`
+     (or: `> **Implementation Status**: ✅ Critical/Major recommendations implemented — YYYY-MM-DD` if partial)
+   - In the Recommended Actions list, prefix each applied recommendation with `✅ ` and each skipped one with `⏭️ skipped —` followed by the reason
+
+   **In the epic file** (`epic.[N].[name].md`):
+   - Add the following line immediately after the `**Last Updated**` status line:
+     `**Review**: ✅ All review recommendations from \`epic.[N].[name]-review-report.md\` implemented YYYY-MM-DD`
+     (or: `**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
+   - Update the `last_reviewed` YAML frontmatter field to today's date if not already done in Step 10
+
+**If "No — I will apply them manually"**:
+
+- Confirm the report/plan file path for reference and close the skill
+
+---
+
 ## Key Anti-Hallucination Rules
 
 1. **Every conflict citation** must reference an actual file path and section header

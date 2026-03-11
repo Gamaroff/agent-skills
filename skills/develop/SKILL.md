@@ -34,7 +34,7 @@ You can invoke this skill with:
    - If detected: Invoke epic handling workflow (see Epic File Handling section)
 
 2. **Story File Detection** - Matches pattern: `story.{epic}.{story}.{name}.md`
-   - Location: `docs/stories/` or subdirectories
+   - Location: co-located within epic directories (`docs/prd/<domain>/epics/epic.{N}.*/stories/`) or as provided by the caller
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 3. **Task File Detection** - Matches pattern: `task.{id}.{name}.md`
@@ -145,11 +145,12 @@ System Action: Invokes /create-story skill
    - ✅ **In Progress** - Resume implementation
    - ✅ **Ready for Review** - Skip to review process
    - ⚠️ **Draft** - HALT and validate readiness (see Draft Status Handling below)
-   - ⚠️ **Not Started** - HALT and validate readiness (see Draft Status Handling below)
 
 ### Draft Status Handling
 
-**When Status is "Draft" or "Not Started"**:
+**Pipeline bypass**: When `/develop` is invoked by the `develop-story` orchestrator, the `/review-story` skill has already run in Step 2 of the pipeline and validated the story. If called from develop-story, treat any Draft status as already validated — automatically select "Yes, ready to implement" and proceed without prompting the user. The develop-story skill will handle this autonomously.
+
+**When Status is "Draft"**:
 
 1. **Display Warning**:
 
@@ -301,10 +302,14 @@ System Action: Invokes /qa-planning skill
 
 ### Alignment Check Procedure
 
-1. **Identify Target Files**:
-   - Read the story/task document to identify which files should be affected
-   - Check if these files already exist in the codebase
-   - Use Glob/Grep to discover related implementations
+1. **Identify Target Files (using Explore subagent):**
+   - Use the Agent tool with subagent_type="Explore" to discover files relevant to this story/task. Ask it to:
+     - Find all files referenced in the story's Acceptance Criteria, Dev Notes, and Tasks sections
+     - Find existing implementations in the same module/layer that may overlap
+     - Return: file path + 1-line description per file (max 25 files)
+   - Use the returned summary to decide what to read — do NOT load all discovered files into the main context
+   - Only Read() the 3-5 files that most directly affect alignment assessment
+   - After completing alignment assessment, write a 3-line summary of findings and release the discovered file list from active context before proceeding to implementation
 
 2. **Analyze Existing Implementation** (if files exist):
    - Read the existing implementation code
@@ -520,18 +525,19 @@ After status validation passes:
 2. Complete Risk Level Check (see Risk Level Check section above) — gates on risk_level: high
 3. Complete Implementation Alignment Analysis (see Implementation Alignment Analysis section above)
 4. Set story status to 'In Progress' (if currently 'Not Started' or 'Ready for Development')
-5. Read first or next task
-6. Implement task and its subtasks
-7. Write tests (co-located .spec.ts files)
-8. Execute validations (linting + tests)
-9. Only if ALL tests pass → update task checkbox with [x]
-10. Document work in Dev Agent Record → Implementation Approach:
+5. Before reading task: use Agent tool with subagent_type="Explore" to find files this task will touch (check task description + acceptance criteria). Get compact summary. Then Read() only the directly relevant files.
+6. Read first or next task
+7. Implement task and its subtasks
+8. Write tests (co-located .spec.ts files)
+9. Execute validations (linting + tests)
+10. Only if ALL tests pass → update task checkbox with [x]
+11. Document work in Dev Agent Record → Implementation Approach:
    - What you built (architecture decisions, patterns used)
    - Key technical details (algorithms, data flows)
    - Integration points and dependencies
-11. Update story File List section (all new/modified/deleted files)
-12. Update Change Log with date and summary of changes
-13. Repeat until all tasks complete
+12. Update story File List section (all new/modified/deleted files)
+13. Update Change Log with date and summary of changes
+14. Repeat until all tasks complete
 ```
 
 **Testing Checkpoints** (Execute at these milestones):
@@ -599,7 +605,7 @@ When tests fail during implementation:
    - Deferred Work (if any items were not completed)
 4. Ensure File List is complete (all created/modified/deleted files)
 5. Ensure Change Log has all dated entries
-6. Run execute-checklist skill for story-dod-checklist (Definition of Done)
+6. Verify Definition of Done using the `/finalise` skill — it performs the full DoD checklist and marks the story as Accepted if all criteria pass
 7. Set story status to 'Ready for Review'
 8. HALT
 ```
@@ -738,7 +744,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 
 **Key Paths**:
 
-- Stories: `docs/stories/`
+- Stories: `docs/prd/<domain>/epics/epic.{N}.*/stories/` (co-located within epics)
 - Tasks: `docs/development/tasks/`
 - QA Artifacts: `docs/qa/`
 - PRD: `docs/prd/` (sharded)
@@ -756,7 +762,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 Each story has its own subdirectory containing all related files:
 
 ```
-stories/
+docs/prd/<domain>/epics/epic.{N}.<name>/stories/
 └── story.{epic}.{story}.{story-name}/
     ├── story.{epic}.{story}.{story-name}.md           # Story file (source of truth)
     ├── story.{epic}.{story}.qa.{number}.{descriptive-name}.md  # QA report (created by QA)
@@ -930,7 +936,7 @@ Reference: See CLAUDE.md "Creating Libraries" for complete setup.
 **Typical Flow** (adapt as needed):
 
 1. **Plan** - Use TodoWrite for multi-step tasks
-2. **Read** - Understand affected files and dependencies
+2. **Map then Read** - Use Agent tool with subagent_type="Explore" to identify affected files and dependencies. Get the compact summary (file paths + 1-line descriptions), then only Read() the 2-4 files most critical to the current task. Do not load the entire dependency graph into the main context.
 3. **Implement** - Follow dependency order (utilities → services → components → screens)
 4. **Test** - Write and verify co-located test files
 5. **Verify** - Run coverage checks

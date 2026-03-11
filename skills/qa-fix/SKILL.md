@@ -257,7 +257,7 @@ Before starting fixes:
 3. Resolve paths (with defaults if file missing):
    - `qa_root`: `qa.qaLocation` (default: `docs/qa`)
    - Story location: `nested` means stories are stored within epic directories at `{epicPath}/stories/`
-4. Locate story file: `{epicPath}/stories/{epic}.{story}.*.md`
+4. Locate story file using the nested pattern: glob `{devStoryNestedPattern}/**/story.{epic}.{story}.*.md` — this searches the full nested epic structure. If `devStoryNestedPattern` is not set in config, default to `docs/prd/**/epics/*/stories`. HALT if story not found → ask user for path.
 5. HALT if story not found → ask for correct story id/path
 
 **Default Configuration Values** (used if `skills-config.yaml` not found):
@@ -266,8 +266,9 @@ Before starting fixes:
 qa:
   qaLocation: docs/qa
 
-# Stories stored within epic directories
+# Stories stored within epic directories (nested within epics)
 devStoryLocation: nested
+devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 ```
 
 ### Step 1: Collect QA Findings
@@ -315,6 +316,23 @@ For each bug report, extract:
 - Only process bugs with status: **New** or **Reopened**
 - Skip bugs with status: Closed, Ready for QA (QA is testing)
 - Bug fixes take precedence in fix plan based on severity
+
+### Step 1.5: Consolidate Findings and Release Raw Artifacts
+
+After parsing all QA artifacts (gate YAML, QA reports, bug reports), consolidate before building the fix plan:
+
+1. Write a **Findings Summary** (bullet list):
+   - Gate status + quality score
+   - Each issue: ID, severity, file/location, 1-line description
+   - Each open bug: ID, severity, 1-line description
+   - NFR failures (list only FAIL items)
+   - Coverage gaps (list only P0/P1 gaps)
+
+2. **Release from active context**: the full gate YAML content, full QA report markdown, full bug report markdowns — these have been consumed. The Findings Summary is the authoritative source from here on.
+
+3. Proceed to Step 2 using ONLY the Findings Summary — do not re-read gate/QA files unless a specific detail is needed later.
+
+This prevents the large QA artifact content from polluting the fix implementation context.
 
 ### Step 2: Build Deterministic Fix Plan
 
@@ -418,12 +436,22 @@ Options:
 
 ### Step 3: Apply Changes
 
+**Pre-fix codebase mapping (do this before any code changes):**
+
+Use the Agent tool with subagent_type="Explore" to map the codebase around the files being fixed:
+- For each file in the fix plan, find: the file itself, its spec file, any service/module it imports from, any similar implementations in the same module
+- Identify the existing patterns and conventions used in the affected module (naming, error handling style, dependency injection patterns)
+- Return a compact summary: file path + pattern observation (max 2 lines per file)
+
+Use this summary to ensure fixes follow existing patterns rather than introducing inconsistencies. Do NOT read all discovered files — use Read() only for the 2-3 files whose patterns are most directly relevant to each fix.
+
 - Implement code fixes per plan
 - Add missing tests (unit first; integration where required by AC)
 - Follow project patterns:
   - Goji: Keep imports centralized (platform separation, NX monorepo)
   - Follow DI boundaries and existing patterns
 - Maintain test co-location (.spec.ts files next to source)
+- **Pattern before change**: Before modifying each file, spend one Read() to confirm the existing pattern in that file — do not assume from memory. After implementing each fix, summarize what changed in 2-3 lines and move on; do not retain the full file content.
 
 ### Step 4: Validate
 

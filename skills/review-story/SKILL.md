@@ -94,11 +94,13 @@ optional:
 
 **Files to Load During Review**:
 
-1. Story document (the file being reviewed)
-2. Parent epic (contains original requirements)
-3. Architecture documents (for accuracy verification)
-4. Story template (for structure compliance)
-5. Previous stories (for context and patterns)
+1. Story document — always load in full (primary artifact, stays in context throughout)
+2. Parent epic — load selectively: targeted section reads only (ACs and story list), not the full file
+3. Architecture documents — discovered via Explore subagent; load at most 2-3 most relevant files
+4. Story template — load for structure compliance check only; release after Step 2
+5. Previous stories — load only if story explicitly references continuity; a 1-line summary is usually sufficient
+
+**CRITICAL**: Use the Explore subagent to discover documents before loading them. Never load all architecture docs blindly — always select based on story domain.
 
 ---
 
@@ -307,6 +309,8 @@ options:
 
 2. Store user's choice for use in Step 9 (final output generation)
 
+**Pipeline note**: When invoked by the `develop-story` orchestrator, this question will be answered autonomously ("Comprehensive report" is always selected). If running inside the develop-story pipeline, skip the AskUserQuestion and proceed directly with "Comprehensive report" as the format selection. Only ask interactively when invoked standalone.
+
 **Output**: User's output format preference captured
 
 ---
@@ -336,30 +340,32 @@ architecture:
   architectureShardedLocation: docs/architecture
 # Stories stored within epic directories
 devStoryLocation: nested
+devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 devDebugLog: .ai/debug-log.md
 slashPrefix: BMad
 ```
 
-2. Load story document to review
+2. Load the story document directly using the Read tool — this is the primary artifact and must be in main context.
    - Locate at `{epicPath}/stories/{epic}.{story}.*.md`
-   - Extract epic number and story number from filename or frontmatter
-   - Parse all sections and content
+   - Parse all sections: frontmatter, ACs, Tasks, Dev Notes, Dev Agent Record
 
-3. Load story template from `resources/story-tmpl.yaml`
-   - For structure compliance validation
+3. **Discover supporting documents using Explore subagent:**
 
-4. Identify and load parent epic
-   - Based on `prdSharded` setting and epic file pattern `*/epics/epic.{n}.*.md`
-   - Extract original requirements and acceptance criteria
+   Use the Agent tool with subagent_type="Explore" to find:
+   - The parent epic file (pattern: `epic.{N}.*.md` in the epic directory)
+   - Architecture documents relevant to this story's type (backend/frontend/full-stack/auth/payments)
+   - The previous story in sequence (pattern: `story.{epic}.{story-1}.*.md`)
+   - The story template (`resources/story-tmpl.yaml`)
 
-5. Load relevant architecture documents
-   - Based on story type (backend, frontend, full-stack)
-   - For accuracy verification
+   Ask the Explore subagent to return: **file paths + 1-line description only** (no file contents).
 
-6. Load previous story in sequence (if exists)
-   - For context and pattern consistency
+4. **Selectively load from the Explore results:**
+   - Load the parent epic: read ONLY the "Stories" / "Acceptance Criteria" section (not the full file) — use offset/limit to target the relevant section
+   - Load architecture docs: read at most **2-3 most relevant files** based on story type. For a backend story, prefer `coding-standards.md` and the relevant service architecture doc. Do NOT load all architecture docs.
+   - Load story template: read for structure compliance reference
+   - Previous story: only load if the story explicitly references continuity with it
 
-**Output**: Context package with all necessary documents loaded
+**Output**: Compact context package — story in full, supporting docs selectively loaded
 
 ---
 
@@ -505,6 +511,16 @@ questions:
 ```
 
 **After Questions**: Continue review with user's decisions incorporated.
+
+### Context Hygiene After Phase 1
+
+After receiving user answers to QUESTION POINT 1, consolidate findings before proceeding to technical review:
+
+1. Write a **Phase 1 Summary** (5-10 bullet points) covering: template compliance result, epic alignment result, user decisions from Q1
+2. Release the parent epic and architecture documents from active consideration — they are no longer needed for Steps 4–6
+3. Retain in context: the story document, Phase 1 Summary, and user decisions only
+
+This prevents the first-phase document load from polluting the technical review phases.
 
 ---
 
@@ -715,6 +731,15 @@ questions:
 ```
 
 **After Questions**: Continue review with technical decisions clarified.
+
+### Context Hygiene After Phase 2
+
+After receiving user answers to QUESTION POINT 2, consolidate:
+1. Write a **Phase 2 Summary**: technical accuracy issues found, user decisions, resolved hallucinations
+2. Release any additional architecture docs loaded during Steps 4–6 from active consideration
+3. Retain: story document, Phase 1 Summary, Phase 2 Summary, user decisions
+
+Proceed to Phase 3 (recommendations and output) with a clean context containing only summaries + story.
 
 ---
 
@@ -1481,12 +1506,24 @@ options:
      Fixes applied: [N]
      Skipped (needs your input): [M]
      ```
+   - **Mark recommendations as implemented** — update both documents:
+
+     **In the review report** (if a co-located report file was generated in Step 9):
+     - Add the following line immediately after the readiness/score line in the report's opening summary block:
+       `> **Implementation Status**: ✅ All recommendations implemented — YYYY-MM-DD`
+       (or: `> **Implementation Status**: ✅ Critical/Important recommendations implemented — YYYY-MM-DD` if partial)
+     - In the Recommended Actions / Issues list, prefix each applied item with `✅ ` and each skipped item with `⏭️ skipped — [reason]`
+
+     **In the story file**:
+     - Add the following line immediately after the `**Status**:` line at the top of the story:
+       `**Review**: ✅ All review recommendations from \`[report-filename]\` implemented YYYY-MM-DD`
+       (or: `**Review**: ✅ Critical/Important recommendations implemented YYYY-MM-DD — see review report for details` if partial)
 
 3. **If "No, I will fix manually"**:
    - Acknowledge and proceed to Step 10
    - Remind user: "The full issue list is in the report above. Run `/review-story` again after making changes."
 
-**Output**: Story document with fixes applied (if user chose to apply), or unchanged (if user declined).
+**Output**: Story document with fixes applied and implementation status noted on both report and story file (if user chose to apply), or unchanged (if user declined).
 
 ---
 
@@ -1759,6 +1796,7 @@ architecture:
 
 # Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
 devStoryLocation: nested
+devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 ```
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on the Goji project organization.

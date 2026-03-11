@@ -49,6 +49,8 @@ When given a directory path:
 4. If multiple story files found, use the one matching the directory name
 5. If no story file found, HALT and ask user for the correct path
 
+When given only a story ID (e.g., `story.336.1`) with no path, locate the story directory using the nested pattern: `docs/prd/**/epics/*/stories/story.{epic}.{story}.*`
+
 **QA Artifacts Creation:**
 
 When creating QA reports and gate files, they will be placed in the same directory as the story file with the appropriate naming:
@@ -356,6 +358,16 @@ Perform a comprehensive test architecture review with quality assessment. This a
    - List each previous issue and verify if it was fixed
    - Include "Re-Review Context" section in new QA report
 
+5. **For re-reviews: scope the review using diff exploration**
+
+   Use the Agent tool with subagent_type="Explore" to identify what changed SINCE the previous gate:
+   - Get the date of the previous gate file from its `updated:` field
+   - Run: `git log --since="{gate_date}" --name-only --format="" | sort -u`
+   - Return: list of files changed since the last QA review
+
+   This scopes the re-review to only what changed — avoid re-checking unchanged files that already passed.
+   Log: "Re-review scope: {N} files changed since gate.{prev_num}"
+
 **See "QA Re-Review Logic" section above for detailed implementation.**
 
 #### Phase 0.5: Check for QA Planning Artifacts
@@ -378,6 +390,20 @@ Before running independent NFR and risk analysis, check the story directory for 
 
 #### Phase 1: Risk Assessment (Determines Review Depth)
 
+**Step 1a: Map changed files using Explore subagent (CRITICAL — do this first)**
+
+Before reading any implementation files, use the Agent tool with subagent_type="Explore" to:
+- Find all files changed in this PR: run `git diff --name-only origin/develop...HEAD` (or target branch)
+- For each changed file, return: file path + module it belongs to + whether a co-located `.spec.ts` exists
+- Return as a compact table (max 30 rows): `file | module | has_test`
+
+Use this table to:
+1. Determine review depth (see auto-escalate rules below)
+2. Inform the adaptive strategy decision (Phase 1.5)
+3. Pass as context to parallel agents — they do NOT need to re-discover changed files
+
+Do NOT read the changed files themselves in the main context — that is the agents' job.
+
 **Auto-escalate to deep review when:**
 
 - Auth/payment/security files touched
@@ -394,6 +420,13 @@ Use AskUserQuestion to clarify:
 - Are there specific security/performance concerns?
 - What's the expected test coverage level?
 - Are there any known technical debt areas?
+
+#### Phase 1 Context Hygiene
+
+After completing risk assessment and before launching agents:
+1. Summarize Phase 1 findings: changed file count, modules affected, escalation decision, risk flags
+2. Store the Explore file table as a variable to pass to agents — do not re-read changed files in main context
+3. Release any implementation files read during risk assessment from active consideration
 
 #### Phase 1.5: Adaptive Quality Checks
 
@@ -439,25 +472,29 @@ When using direct tools approach:
 
 Use the Task tool to spawn multiple agents in parallel. Send a SINGLE message with MULTIPLE Task tool calls to execute these checks concurrently:
 
+**Before launching agents — interpolate the file map:**
+
+Take the Explore output from Phase 1 Step 1a (the `file | module | has_test` table) and format it as a plain markdown table string. Store it as `EXPLORE_FILE_TABLE`. When constructing each agent's Task prompt, replace the literal `{EXPLORE_FILE_TABLE}` with the actual table content inline. If the Explore step was skipped (direct-tools path), set `EXPLORE_FILE_TABLE` to "N/A — direct tools review, file map not generated."
+
 1. **Test Coverage Analysis Agent**
    - Agent Type: `general-purpose`
-   - Task: "Analyze test coverage for all files modified in the current PR. For each changed file, determine if corresponding test files exist (.spec.ts, .test.ts). Run coverage reports using `npx nx test <project> --coverage` for affected projects. Identify uncovered lines, functions, and branches. Generate a detailed report with coverage percentages per file and missing test cases."
-   - Output: Test coverage report with file-by-file analysis
+   - Task: "Analyze test coverage for the Goji system PR. Changed files (from Explore map): {EXPLORE_FILE_TABLE}. For each changed file: (a) check if a co-located .spec.ts file exists in the same directory, (b) run `npx nx test <project> --coverage --testPathPattern=<file>` for affected NX projects, (c) verify coverage meets targets: 80%+ overall, 95%+ for any file in payments/transactions/BSV/wallet paths. Flag any changed file with 0% coverage as FAIL. Check test co-location (tests MUST be next to source, never in __tests__/ directories). Generate a report with: per-file coverage %, missing test files, co-location violations, financial operation coverage shortfalls."
+   - Output: Test coverage report with Goji-specific coverage targets
 
 2. **TypeScript Strict Mode Compliance Agent**
    - Agent Type: `general-purpose`
-   - Task: "Check TypeScript strict mode compliance for all files in the current PR. First verify tsconfig.json has strict: true. Then scan all modified .ts/.tsx files for violations: `any` types, `@ts-ignore` comments, non-null assertions (!), unsafe type assertions (as), missing return types on functions, and implicit any parameters. Generate a compliance report with violations categorized by severity (CRITICAL/HIGH/MEDIUM/LOW)."
-   - Output: TypeScript strict mode compliance report
+   - Task: "Check TypeScript strict mode compliance for the Goji NX monorepo PR. Changed files: {EXPLORE_FILE_TABLE}. Verify tsconfig.json has strict: true. Scan changed .ts/.tsx files for: `any` types (FAIL if in auth/payments/BSV/wallet code), `@ts-ignore` comments, non-null assertions (!), unsafe `as` casts, missing return types. Also check: (a) no Node.js imports in files under apps/goji-wallet (client/server separation violation), (b) no bcrypt/winston/jsonwebtoken imports in client-side files, (c) all financial amounts use proper types (not `number` — should be typed amounts). Generate compliance report with violations by severity."
+   - Output: TypeScript compliance report with Goji platform-separation checks
 
-3. **Accessibility Requirements Agent**
+3. **Accessibility & Code Quality Agent**
    - Agent Type: `general-purpose`
-   - Task: "Review all React/React Native components modified in the current PR for accessibility compliance. Check for: missing alt text on images/icons, missing ARIA labels on interactive elements, missing accessibility labels/hints (React Native), keyboard navigation support, color contrast issues, semantic HTML/component usage, focus management, and screen reader compatibility. Reference WCAG 2.1 AA standards. Generate an accessibility audit report with violations categorized by WCAG level (A/AA/AAA)."
-   - Output: Accessibility audit report
+   - Task: "Review React Native components changed in the Goji PR. Changed files: {EXPLORE_FILE_TABLE}. Check: (a) accessibility labels/hints on interactive elements (Pressable, TouchableOpacity, TextInput), (b) no native WebSocket usage (must use socket.io-client), (c) no console.log/console.error (must use @goji-system/logging-lib), (d) no 'username' terminology (must use 'handle'), (e) no SegWit/Bech32/Cashaddr in BSV-related code (BSV uses P2PKH only), (f) correct Expo Router navigation patterns (no manual navigation stacks). Generate audit report with violations categorized by severity."
+   - Output: Code quality and Goji-convention compliance report
 
 4. **Definition of Done Criteria Agent**
    - Agent Type: `general-purpose`
-   - Task: "Verify Definition of Done criteria for the current story/task. Check: all acceptance criteria implemented (reference story file), unit tests written and passing, integration tests passing, documentation updated (README, inline comments), code follows project standards, no console.log/debug statements, performance benchmarks met, security review completed (no hardcoded secrets, proper auth), and deployment checklist items complete. Generate a DoD compliance report with pass/fail for each criterion."
-   - Output: Definition of Done compliance report
+   - Task: "Verify Definition of Done for this Goji story. Read the story file and check: (a) all AC checkboxes marked as implemented in Dev Agent Record, (b) File List in story is complete (all created/modified/deleted files listed), (c) Change Log has dated entries, (d) Dev Agent Record has Implementation Summary + Approach + Testing Results + Completion Date, (e) story status is 'Ready for Review', (f) no hardcoded secrets or API keys in changed files, (g) NX monorepo rules respected (no local node_modules in apps/, no direct cd + npm install). Generate DoD compliance report with PASS/FAIL per criterion."
+   - Output: Goji-specific DoD compliance report
 
 **Implementation Pattern:**
 
@@ -505,7 +542,8 @@ After all parallel agents complete:
    - Read each agent's completion message or output
    - Extract key findings from each report
    - Identify severity levels (CRITICAL/HIGH/MEDIUM/LOW)
-   - Document any agent failures or incomplete checks
+   - **Detect agent failures**: For each agent, verify its output contains at minimum a severity classification (CRITICAL/HIGH/MEDIUM/LOW) and at least one finding or an explicit "no issues found" statement. If an agent's output is empty, contains only an error message, or lacks these markers, flag it as FAILED.
+   - **Handle failed agents**: Log the failure in the QA report under a "Review Gaps" section: "Agent {name} failed or returned no output — {area} checks are incomplete." Downgrade the gate to CONCERNS if any agent failed (cannot issue PASS with incomplete checks). Do not re-run the failed agent — note the gap and proceed.
 
 2. **Synthesize Unified Report:**
    - Merge all findings into the main QA report
@@ -2130,6 +2168,7 @@ All file locations should be defined in skill resources or explicit file referen
 qa:
   qaLocation: 'docs/qa' # Base directory for QA files
 devStoryLocation: 'docs/prd' # Story files location
+devStoryNestedPattern: "docs/prd/**/epics/*/stories" # Nested story glob pattern
 ```
 
 ### File Naming Conventions (Updated 2025-12-09)

@@ -48,11 +48,25 @@ Common Gitflow patterns:
 5. Creates the actual PR using `gh pr create`
 6. Returns the PR URL to the user
 
-**Do not skip Step 1** — the base branch question must be answered before any other work begins.
+**Do not skip Step 1 unless `--base` was pre-supplied via Step 0** — if no pre-supplied branch, the base branch question must be answered before any other work begins.
+
+### Step 0: Check for Pre-Supplied Base Branch
+
+Before asking the user, check whether a base branch was supplied as a parameter:
+- The caller may pass `--base <branch>` (e.g., `/create-pr --base develop`)
+- When invoked by the `develop-story` orchestrator, the base branch is passed programmatically
+
+If `--base <branch>` was provided:
+- Store it as `BASE_BRANCH`
+- Skip Step 1 entirely — do NOT ask the user again
+- Log: "Base branch pre-supplied: {branch} — skipping interactive prompt"
+- Proceed directly to Step 2
+
+If no `--base` parameter was provided: proceed to Step 1 as normal.
 
 ### Step 1: Ask User for Target Branch
 
-**MANDATORY — do this before anything else, even before checking git status.**
+**MANDATORY (unless skipped by Step 0)** — if `--base` was not pre-supplied, do this before anything else, even before checking git status.
 
 Use AskUserQuestion to ask which branch this PR should merge into. Never assume or auto-detect — always wait for an explicit answer.
 
@@ -376,6 +390,7 @@ Options:
 
 | Flag         | Description        | Example                             |
 | ------------ | ------------------ | ----------------------------------- |
+| `--base`     | Pre-supply target branch (skip prompt) | `/create-pr --base develop`         |
 | `--draft`    | Create as draft PR | `/create-pr --draft`                |
 | `--title`    | Override PR title  | `/create-pr --title "custom title"` |
 | `--body`     | Override PR body   | `/create-pr --body "custom body"`   |

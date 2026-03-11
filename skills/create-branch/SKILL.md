@@ -179,6 +179,8 @@ If there are uncommitted changes:
 2. Suggest using `/commit-changes` skill first
 3. Or offer to stash changes: `git stash push -m "WIP before creating branch"`
 
+**Exception — Orchestrator-managed files**: When invoked by the `develop-story` orchestrator, a single uncommitted implementation report file (`*.implementation.*.md`) may be present — this is expected pipeline state. If the **only** uncommitted file(s) match the pattern `*.implementation.*.md`, proceed without halting. The orchestrator stashes and restores this file around branch creation automatically.
+
 ### Step 5: Fetch Latest and Checkout Base
 
 ```bash
@@ -198,7 +200,7 @@ git pull origin <selected-base-branch>
 git checkout -b feature/story.178.8.swipe-actions-friend-requests
 ```
 
-### Step 5: Push Branch (Optional)
+### Step 6: Push Branch (Optional)
 
 Optionally push the branch to set up tracking:
 

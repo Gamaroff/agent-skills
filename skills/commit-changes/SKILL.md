@@ -35,6 +35,14 @@ Make commits that are easy to review and safe to ship:
 3. Stage only what belongs in the next commit
    - Prefer patch staging for mixed changes: `git add -p`
    - To unstage a hunk/file: `git restore --staged -p` or `git restore --staged <path>`
+3a. **Check for files that must NOT be committed yet**
+
+Before finalising staging, check for any files that should be excluded from this commit:
+- **Implementation reports** (`*.implementation.*.md`) — if the pipeline has not reached its final Step 8 commit, unstage these: `git restore --staged path/to/story.*.implementation.*.md`
+- **DoD running summaries** (`*.dod.*.md`) — only commit these when finalise has completed
+- **Partial QA artifacts** — gate files and QA reports are owned by QA; dev should not commit them unless explicitly part of the current work
+
+If unsure whether a generated file should be included, err on the side of exclusion and note it in the commit message as "not yet included".
 4. Review what will actually be committed
    - `git diff --cached`
    - Sanity checks:
