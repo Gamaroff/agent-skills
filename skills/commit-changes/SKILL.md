@@ -99,3 +99,25 @@ Provide:
 - the final commit message(s) with detailed bullet-point bodies
 - a short summary per commit (what/why)
 - the commands used to stage/review (at minimum: `git diff --cached`, plus any tests run)
+
+## Commit Report (always required)
+
+After all commits are made, display a summary table in this exact format:
+
+```
+  ┌─────┬─────────┬──────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  #  │ Commit  │                                               What                                               │
+  ├─────┼─────────┼──────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 1   │ <hash>  │ <type(scope)> — <short description>                                                              │
+  ├─────┼─────────┼──────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 2   │ <hash>  │ <type(scope)> — <short description>                                                              │
+  └─────┴─────────┴──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Rules for the table:
+- Show one row per commit made in this session (oldest → newest)
+- `#` is sequential starting at 1
+- `Commit` is the 7-character short hash (from `git rev-parse --short HEAD` or `git log`)
+- `What` is the commit subject line: `type(scope) — concise description` (dash `—` em-dash separator, no colon after scope)
+- If only one commit was made, show a single-row table
+- Always display this table — never skip it
