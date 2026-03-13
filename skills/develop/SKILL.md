@@ -618,6 +618,8 @@ When tests fail during implementation:
 - [ ] Dev Agent Record complete: Implementation Summary, Approach, Testing Results, Completion Date, Deferred Work
 - [ ] File List complete and accurate (all created/modified/deleted files)
 - [ ] Change Log has dated entries for all significant changes
+- [ ] **Prisma schema check**: If `apps/goji-web-api/prisma/schema.prisma` was modified, a migration file exists in `prisma/migrations/` (run `cd apps/goji-web-api && npx prisma migrate dev --name <name>` if not)
+- [ ] **New npm packages check**: Any new runtime package added to root `package.json` is also added to `apps/goji-web-api/package.json` (see CLAUDE.md "goji-web-api: Runtime Dependencies")
 - [ ] Story status set to `Ready for Review`
 
 ### 2. Develop Task Workflow
