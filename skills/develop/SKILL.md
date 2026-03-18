@@ -605,7 +605,9 @@ When tests fail during implementation:
    - Deferred Work (if any items were not completed)
 4. Ensure File List is complete (all created/modified/deleted files)
 5. Ensure Change Log has all dated entries
-6. Verify Definition of Done using the `/finalise` skill — it performs the full DoD checklist and marks the story as Accepted if all criteria pass
+6. **Pipeline bypass check** — Before invoking `/finalise`, determine the caller:
+   - **Invoked by `develop-story` orchestrator**: **SKIP `/finalise`** — the pipeline's Step 7 runs `/finalise` after QA review and after PR creation, when all artifacts are available. Calling it here (before a PR exists) would produce premature DoD files and a failed or misplaced PR comment. Go directly to step 7.
+   - **Invoked directly by user (not from `develop-story`)**: **CRITICAL / BLOCKING** — Invoke the `/finalise` skill. It performs the full DoD checklist, generates the Sprint Review summary, and posts a PR comment. If `/finalise` finds gaps, address them before proceeding.
 7. Set story status to 'Ready for Review'
 8. HALT
 ```
@@ -621,6 +623,7 @@ When tests fail during implementation:
 - [ ] **Prisma schema check**: If `apps/goji-web-api/prisma/schema.prisma` was modified, a migration file exists in `prisma/migrations/` (run `cd apps/goji-web-api && npx prisma migrate dev --name <name>` if not)
 - [ ] **New npm packages check**: Any new runtime package added to root `package.json` is also added to `apps/goji-web-api/package.json` (see CLAUDE.md "goji-web-api: Runtime Dependencies")
 - [ ] Story status set to `Ready for Review`
+- [ ] **Pipeline bypass applied**: If invoked by `develop-story`, `/finalise` was NOT called here — pipeline Step 7 handles it
 
 ### 2. Develop Task Workflow
 
@@ -691,9 +694,12 @@ After status validation passes:
 4. Validate all Success Criteria (Functional, Performance, Quality, Migration)
 5. Ensure Files Summary is complete (all created/modified/deleted files)
 6. Ensure change log has all dated entries
-7. Update CHANGELOG.md if applicable
-8. Set task status to 'Ready for Review'
-9. HALT
+7. Update CHANGELOG.md if the task changes public-facing behaviour, modifies an API contract, or adds/removes a feature. Skip only for internal refactors with no observable external change.
+8. **Pipeline bypass check** — Before invoking `/finalise`, determine the caller:
+   - **Invoked by `develop-task` orchestrator**: **SKIP `/finalise`** — the pipeline's Step 7 runs `/finalise` after QA review and after PR creation, when all artifacts are available. Go directly to step 9.
+   - **Invoked directly by user (not from `develop-task`)**: **CRITICAL / BLOCKING** — Invoke the `/finalise` skill. It performs the full DoD checklist and generates review artifacts. If `/finalise` finds gaps, address them before proceeding.
+9. Set task status to 'Ready for Review'
+10. HALT
 ```
 
 **Task Completion Checklist — tick off each before halting:**
@@ -705,7 +711,8 @@ After status validation passes:
 - [ ] Task documentation complete: Implementation Summary, Approach, Testing Results, Completion Date, Deferred Work
 - [ ] Files Summary complete and accurate (all created/modified/deleted files)
 - [ ] Change Log has dated entries for all significant changes
-- [ ] CHANGELOG.md updated (if applicable)
+- [ ] CHANGELOG.md updated (if public behaviour/API/feature changed; skip for internal refactors only)
+- [ ] **Pipeline bypass applied**: If invoked by `develop-task`, `/finalise` was NOT called here — pipeline Step 7 handles it
 - [ ] Task status set to `Ready for Review`
 
 **QA Handoff**:

@@ -52,7 +52,21 @@ Use the `AskUserQuestion` tool with:
   - "Resume from last completed step" (Recommended) — continue from where the previous run left off
   - "Start fresh" — create a new implementation report (N+1) and restart from Step 1
 
-If resuming: read the existing implementation report, identify the last ✅ step, and jump to the next step. Skip upfront questions that are already recorded in the Decisions Log of the existing report.
+If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions that are already recorded in the Decisions Log of the existing report.
+
+**Resume artifact verification (CRITICAL — run before skipping any step)**:
+
+For each step marked ✅ in the implementation report, verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
+
+| Step | Artifact to verify |
+|------|-------------------|
+| 1. create-branch | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
+| 3. develop | `git log --oneline {branch}` shows more than the initial commit (code was actually committed) |
+| 4. create-pr | `gh pr view {PR-number} --json state` returns open or merged |
+| 5–6. qa loop | Latest gate file exists: `ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null` |
+| 7. finalise | Story file `Status:` field reads `Accepted` |
+
+Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
 
 **QA cycle count reconstruction (if resuming at Step 5–6)**:
 If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
@@ -85,7 +99,7 @@ Before asking questions, read the story file and note:
 |--------|--------|
 | `Ready for Development` | Proceed normally |
 | `In Progress` | Proceed normally |
-| `Draft` | Note it in the implementation report. Proceed — Step 2 (`/review-story`) will validate and upgrade the status autonomously. Do NOT ask the user. |
+| `Draft` | Note it in the implementation report. Proceed — Step 2 will run `/review-story` to validate and upgrade the status autonomously. Do NOT ask the user. |
 | `Ready for Review`, `Accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path. |
 | Any other status | HALT — status is unexpected. Report to user before proceeding. |
 
@@ -284,6 +298,20 @@ Press Ctrl+C now to abort before any changes are made.
 
 ## Phase 1: Pipeline Execution
 
+### Context Compression Recovery (CRITICAL — read this first)
+
+If context was compressed while this pipeline was running (i.e., the conversation was summarized and you are now resuming), the pipeline state **must** be recovered from the implementation report before taking any other action:
+
+```bash
+ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null | sort | tail -1
+```
+
+1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
+2. Output immediately: "⚠️ Context recovery — last completed step: Step {N}. Resuming from Step {N+1}."
+3. Continue from Step {N+1} — do NOT re-run completed steps, do NOT skip any pending steps.
+
+**This recovery is mandatory even if the user did not explicitly re-invoke `/develop-story`.** If you are in a conversation where `develop-story` was previously running and context was then compressed, you are still the develop-story orchestrator and must complete all remaining steps. A context summary saying "next step: create-pr" does NOT mean the pipeline ends after create-pr — it means Step 4 is next, and Steps 5–8 still follow.
+
 ### Context Management Rule (CRITICAL)
 
 After EVERY step completes, before moving to the next step:
@@ -292,6 +320,14 @@ After EVERY step completes, before moving to the next step:
 3. Summarize the step result in ≤5 bullet points in the implementation report, then treat step as closed
 
 This prevents context accumulation across the 8-step pipeline.
+
+**Never stop between steps.** This pipeline runs hands-free from Step 1 to Step 8. Never output a "done" or "complete" message and stop unless a step explicitly results in HALT or the pipeline has reached Step 8. Completing Step 4 (create-pr) is NOT a terminal state — Step 5 must follow immediately.
+
+**Step banners (required).** Before starting each step, output a visible banner:
+```
+═══ DEVELOP-STORY PIPELINE: STEP {N}/8 — {STEP-NAME} ═══
+```
+This creates persistent checkpoints that survive context compression and make the pipeline position unambiguous.
 
 After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention) and log any decisions or issues before moving on.
 
@@ -319,11 +355,34 @@ If that also fails, run `git stash list` to find the stash index and `git stash 
 
 After the branch is created:
 - Record the branch name in the Decisions Log and in the **Branch** field of the Completion section
+- Run `git log --oneline -1` to capture the initial commit hash; record it in the Pipeline Progress Notes: e.g. `Branch created at \`{hash}\``
 - Update Pipeline Progress: ✅ create-branch
 
 **On failure**: Update Pipeline Progress ❌, log in Issues Log. **Do not commit the report** — no feature branch exists yet and committing on the base branch would pollute it. Save the report file to disk and tell the user its path so they can recover manually. Then HALT with the error details.
 
 ### Step 2: Review Story
+
+**Gate check**: Re-read the story file's `Status:` field (captured in Phase 0). Then check for an existing review report:
+```bash
+ls {story-directory}/story.{epic}.{story}.review.*.md 2>/dev/null | sort | tail -1
+```
+
+Apply these rules:
+
+| Pre-review status | Review report exists? | Action |
+|-------------------|-----------------------|--------|
+| `Draft` | Either | Run `/review-story` — story needs validation and promotion |
+| `Ready for Development` | Yes | **Skip** — story reviewed and report exists; log and proceed |
+| `Ready for Development` | No | Run `/review-story` — status set without completing a review |
+| `In Progress` | Yes | **Skip** — review already completed; log and proceed |
+| `In Progress` | No | Run `/review-story` — story may have been marked In Progress without a proper review |
+
+**If skipping (status non-Draft AND review report confirmed)**:
+- Log in Decisions Log: "review-story skipped — story status is `{status}` and review report exists at `{path}`"
+- Update Pipeline Progress: ✅ review-story (skipped — already reviewed)
+- Proceed to Step 3
+
+**If status IS `Draft` (run path)**:
 
 Invoke the `/review-story` skill with the story file path.
 
@@ -339,16 +398,14 @@ Record the path in the Decisions Log: "Review report: {path}". If no review repo
 
 | Post-review status | Action |
 |--------------------|--------|
-| `Ready for Development` | Proceed — clean pass or draft promoted |
+| `Ready for Development` | Proceed — draft promoted |
 | `In Progress` | Proceed — acceptable intermediate state |
 | `Draft` (unchanged) | review-story left it Draft — log as issue, HALT and report to user |
 | Downgraded / unclear | HALT — report to user |
 
 **Handling findings**:
-- **Draft → Ready for Development** (story was Draft, review upgraded it): Log "Draft promoted to Ready for Development by review-story" in Decisions Log. Proceed autonomously — no user prompt needed.
-- **Non-blocking suggestions** (minor wording, optional improvements made by review-story): Log as "Proceeding despite minor review suggestions: {list}" and continue
-- **Clean pass** (story was already ready, no changes needed): Log "Story review passed" and continue
-- **Blocking issues** (contradictory specs, missing acceptance criteria, or status still `Draft` after review): Log each specifically in Issues Log, invoke `/commit-changes` to save the report (message: `docs(story.{epic}.{story}): implementation report — review-story blocking halt`), then HALT with: "review-story could not resolve blocking issues — human input required before development can proceed"
+- **Draft → Ready for Development**: Log "Draft promoted to Ready for Development by review-story" in Decisions Log. Proceed autonomously.
+- **Blocking issues** (contradictory specs, missing ACs, status still `Draft`): Log in Issues Log, invoke `/commit-changes` (message: `docs(story.{epic}.{story}): implementation report — review-story blocking halt`), then HALT.
 
 Update Pipeline Progress: ✅ review-story
 
@@ -376,9 +433,12 @@ Log the Explore summary in the Decisions Log: "Pre-develop surface map: {N} file
 
 **Detecting completion**: After `/develop` returns, read the story file and check the `Status:` field:
 - `Ready for Review` → success, continue
+- `Accepted` → success, continue — `/develop` calls `/finalise` internally, which sets `Accepted`; the pipeline's own Step 7 (`/finalise`) will run after QA regardless
 - Any other status → treat as a halt; log the actual status in Issues Log
 
 Update Pipeline Progress: ✅ develop
+
+**PIPELINE CONTINUES IMMEDIATELY.** Do not pause, do not summarise to the user, do not wait. Proceed directly to Step 4.
 
 **On halt**: Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(story.{epic}.{story}): implementation report — develop halt`), then HALT with the report path.
 
@@ -395,9 +455,18 @@ The report will continue to be updated through Steps 5–8, and its final state 
 
 After the PR is created:
 - Record the PR URL in the Decisions Log and in the **PR** field of the Completion section
+- Update Pipeline Progress Notes: `PR #{N}: {url}` — e.g. `PR #42: https://github.com/org/repo/pull/42`
 - Update Pipeline Progress: ✅ create-pr
 
 **On failure**: Log in Issues Log. Invoke the `/commit-changes` skill to commit the report (suggested message: `docs(story.{epic}.{story}): implementation report — create-pr failure`), push, then HALT.
+
+**PIPELINE DOES NOT END HERE. Steps 5–8 are mandatory.** Output immediately:
+```
+═══ DEVELOP-STORY PIPELINE: STEP 4/8 COMPLETE ═══
+PR created: {PR URL}
+Proceeding to Step 5: QA Review — do not stop
+```
+Then continue directly to Step 5–6 without waiting for user input.
 
 ### Step 5–6: QA Review / Fix Loop
 
@@ -439,15 +508,17 @@ After fixes are applied:
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 1. Invoke the `/commit-changes` skill to stage and commit the fix changes. The commit message should follow Conventional Commits: `fix(story.{epic}.{story}): qa-fix cycle {N} — {brief summary of fixes}`. The implementation report does NOT need to be included in this commit — it will be finalised in Step 8.
-2. Push to the remote branch so the PR reflects the latest changes:
+2. Run `git log --oneline -1` to capture the fix commit hash.
+3. Push to the remote branch so the PR reflects the latest changes:
    ```bash
    git push origin HEAD
    ```
-3. Log what was fixed in the QA Cycle entry:
+4. Log what was fixed in the QA Cycle entry:
    ```
    **Fixes Applied**: {brief description of what qa-fix changed}
+   **Commit**: `{hash}`
    ```
-4. Increment the cycle counter and return to 5a.
+5. Increment the cycle counter and return to 5a.
 
 #### Loop limit escalation (after 5 cycles without PASS)
 
@@ -549,6 +620,8 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 
 Then invoke the `/commit-changes` skill. The implementation report must be staged and included in this commit alongside any remaining uncommitted changes.
 
+After `/commit-changes` completes, run `git log --oneline -1` to capture the final commit hash. Update the Pipeline Progress Notes for Step 8: `Committed in \`{hash}\`` (and note the PR reference if applicable, e.g. `Committed in \`{hash}\`, merged via PR #{N}`).
+
 Update Pipeline Progress: ✅ commit-changes.
 
 ---
@@ -593,9 +666,11 @@ Every default applied must be recorded in the Decisions Log.
 | Feature branch base | User-selected in Upfront Setup (Q1) |
 | PR target branch | User-selected in Upfront Setup (Q2) |
 | High-risk story gate | User-selected in Upfront Setup (Q3) |
-| Story status is `Draft` | Proceed into Step 2 — `/review-story` will validate and promote autonomously |
+| Story status is `Draft` | Step 2 runs `/review-story` to validate and promote autonomously |
+| Story status is `Ready for Development` or `In Progress` AND review report exists | Step 2 skips `/review-story` — story already reviewed |
+| Story status is `Ready for Development` or `In Progress` AND no review report | Step 2 runs `/review-story` — status set without completing a review |
 | review-story output format | Always select "Comprehensive report" — pipeline requires co-located review report file |
-| Draft status gate (develop) | Proceed — review-story already validated the story |
+| Draft status gate (develop) | Proceed — review-story already validated the story (or status was never Draft) |
 | Alignment mismatch (develop) | Align code to document — document is source of truth |
 | Commit style | Conventional Commits |
 | Commit granularity | Multiple logical commits |

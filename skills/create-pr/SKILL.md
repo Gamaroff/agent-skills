@@ -110,6 +110,8 @@ Ensure the branch is pushed with tracking:
 git push -u origin $(git branch --show-current)
 ```
 
+**CRITICAL / BLOCKING**: Verify `git push` exited with code 0. If it fails (e.g. remote rejected, no upstream), report the error to the user and halt. Do NOT proceed to Step 4 with an unpushed branch — `gh pr create` will fail or create a PR against the wrong commit.
+
 ### Step 4: Generate PR Title
 
 Extract a meaningful title from the branch name or commits:
@@ -195,6 +197,8 @@ None
 
 Part of Epic 180"
 ```
+
+**CRITICAL / BLOCKING**: Verify `gh pr create` exited with code 0 and returned a PR URL before proceeding to Step 7. If it fails, report the error and halt — do NOT print a success message for a PR that doesn't exist.
 
 ### Step 7: Output Result
 

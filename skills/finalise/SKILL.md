@@ -772,18 +772,14 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Fill in all sections with information from the story/task document and PR
    - Save summary as: `{story-directory}/sprint-review-summary.md`
 
-6. **Add GitHub PR Comment:**
-   - Use `gh pr comment <pr-number>` to add a summary comment
-   - Include acceptance confirmation and link to Sprint Review summary
+6. **Add GitHub PR Comment** — **CRITICAL / BLOCKING**: This step is mandatory. Step 7 is NOT complete until the PR comment is confirmed posted. Do not skip or defer.
 
-   **Example PR Comment:**
+   ```bash
+   gh pr comment <pr-number> --body "## ✅ Story Accepted — Ready for Sprint Review
 
-   ```markdown
-   ## ✅ Story Accepted - Ready for Sprint Review
-
-   **Story:** story.311.1.transaction-confirmation-system
+   **Story:** story.{epic}.{story}.{name}
    **Status:** ACCEPTED
-   **Acceptance Date:** 2025-02-01
+   **Acceptance Date:** {date}
 
    All Definition of Done criteria have been verified:
 
@@ -793,16 +789,18 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - ✅ Security review passed
    - ✅ Compliance review passed
 
-   **Sprint Review Summary:** See `sprint-review-summary.md` in story directory
+   **Sprint Review Summary:** See \`sprint-review-summary.md\` in story directory
 
-   **Reviewed by:** Claude Code (finalise skill)
+   **Reviewed by:** Claude Code (finalise skill)"
    ```
 
-7. **Communicate to User:**
-   - Display a success message with summary of completion
-   - Show path to updated story document
-   - Show path to Sprint Review summary
-   - Confirm PR comment was posted
+   **Verify the comment was posted**: Confirm `gh pr comment` exited with code 0. If it fails, report the error to the user and retry or provide the comment body for manual posting. Do NOT proceed to sub-item 7 until confirmed.
+
+7. **Communicate to User** — **CRITICAL / BLOCKING**: Always output a completion summary. Do not end the skill silently. Required output:
+   - Acceptance confirmation with story ID
+   - Path to updated story document
+   - Path to Sprint Review summary
+   - Confirmation that PR comment was posted (with PR URL)
 
 **Step 7 Completion Checklist — tick off each before moving on:**
 
@@ -811,8 +809,8 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
-- [ ] GitHub PR comment posted via `gh pr comment <number>`
-- [ ] User notified with success message, artifact paths, and PR comment link
+- [ ] GitHub PR comment posted (sub-item 6 — BLOCKING): confirm exit code 0
+- [ ] User notified with completion summary (sub-item 7 — BLOCKING): story ID + artifact paths + PR comment confirmation
 
 ### Step 8: Report Gaps (In Progress)
 
