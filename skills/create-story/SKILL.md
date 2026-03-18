@@ -480,7 +480,7 @@ Review all sections for:
 
 ### 6.3 Execute Adversarial Quality Review
 
-**MANDATORY**: Perform a full adversarial re-analysis of the completed story, treating it as if reviewing someone else's work. The goal is to make developer mistakes **impossible**.
+**CRITICAL / BLOCKING**: This step is mandatory and must not be skipped. Do not proceed to 6.4 or present the story to the user until this review is complete. Perform a full adversarial re-analysis of the completed story, treating it as if reviewing someone else's work. The goal is to make developer mistakes **impossible**.
 
 **Disaster Prevention Checklist** — for each category, identify gaps and fix them before presenting the story:
 

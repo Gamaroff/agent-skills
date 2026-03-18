@@ -252,7 +252,7 @@ For each risk:
 
 ### 3.5 Adversarial Quality Review
 
-**MANDATORY**: Before generating the document, perform an adversarial re-analysis of all collected content as if reviewing someone else's work. Goal: make implementation mistakes **impossible**.
+**CRITICAL / BLOCKING**: This step is mandatory and must not be skipped. Do not proceed to Section 4 (Document Generation) until this review is complete. Perform an adversarial re-analysis of all collected content as if reviewing someone else's work. Goal: make implementation mistakes **impossible**.
 
 #### 🚨 Critical (auto-fix before document generation)
 

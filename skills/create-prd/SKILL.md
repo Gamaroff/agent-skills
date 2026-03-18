@@ -454,7 +454,9 @@ Each NFR must be: Specific (named metric), Measurable (number or threshold), Ach
 
 Report total: `Quality checks: X/4 passed`. Address any FAILs before proceeding to next steps.
 
-### Step 4: Next Steps
+### Step 4: Next Steps — CRITICAL / BLOCKING
+
+**Always execute this step.** Do not end the skill after Step 3 validation. The handoff prompts are a required output — the PRD is not complete until they are generated.
 
 **Generate handoff prompts:**
 

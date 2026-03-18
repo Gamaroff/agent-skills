@@ -250,7 +250,22 @@ options:
 
 2. Store user's choice for use in Step 8 (final output generation)
 
-**Output**: User's output format preference captured
+3. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
+
+| Task Subject | Description |
+|---|---|
+| Determine output format | Capture user's report vs action-plan preference |
+| Load config & context | Locate task document, template, architecture docs |
+| Template compliance | Verify task structure against template |
+| Technical accuracy | Anti-hallucination review of implementation details |
+| Implementation plan completeness | Check tasks, subtasks, effort estimates |
+| Consistency & completeness | Detect contradictions and missing sections |
+| Risk assessment & rollback | Verify risk mitigation and rollback plan |
+| Generate output | Produce report file or action plan |
+| Offer to implement fixes | Ask user if fixes should be applied now (Step 8.5 — always execute) |
+| Update document status | Offer status update based on review outcome |
+
+**Output**: User's output format preference captured; task list initialized
 
 ---
 
@@ -994,6 +1009,46 @@ questions:
 
 ---
 
+### Step 8.5: Offer to Implement Fixes
+
+**Purpose**: Give the user the option to have the agent apply the recommended fixes to the task document immediately.
+
+**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 8, before Step 9. Do not skip or end the skill without presenting this offer.
+
+**Actions**:
+
+1. Use `AskUserQuestion` to ask:
+
+```yaml
+question: 'Would you like me to implement the recommended fixes to the task document now?'
+header: 'Apply Fixes'
+options:
+  - label: 'Yes, apply all critical + important fixes'
+    description: 'I will edit the task document to address all critical and important issues identified in the review.'
+  - label: 'Yes, critical fixes only'
+    description: 'I will apply only the must-fix (critical) changes to unblock implementation.'
+  - label: 'No, I will fix manually'
+    description: 'Skip automatic fixes. I will update the task document myself.'
+```
+
+2. **If "Yes, apply all critical + important fixes"** or **"Yes, critical fixes only"**:
+   - Work through each issue in priority order (critical first, then important if selected)
+   - For each fix: use the Edit tool to apply the change to the task document
+   - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
+   - If a fix requires information the agent doesn't have, skip it and note: `⏭ Skipped: [issue title] — requires your input`
+   - After all fixes applied, summarise: `Fixes applied: [N] / Skipped (needs your input): [M]`
+   - **Mark recommendations as implemented** — if a co-located report file was generated in Step 8:
+     - Add `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD` to the report's opening summary
+     - In the task file, add `**Review**: ✅ All review recommendations from \`[report-filename]\` implemented YYYY-MM-DD` immediately after the `**Status**:` line
+
+3. **If "No, I will fix manually"**:
+   - Acknowledge and proceed to Step 9
+   - Remind user: "The full issue list is in the report above. Run `/review-task` again after making changes."
+
+**Output**: Task document with fixes applied (if user chose to apply), or unchanged (if user declined).
+
+---
+
 ### Step 9: Update Document Status (if applicable)
 
 **Purpose**: Update the task document status after review and fixes are complete
@@ -1002,8 +1057,7 @@ questions:
 
 **When to Execute This Step**:
 
-- After generating comprehensive report OR action plan
-- When user has had opportunity to address recommendations
+- After Step 8.5 (offer to implement fixes) is complete
 - Only if current status indicates document is not yet ready (e.g., "Draft", "Planned", "Not Started")
 
 **Actions**:

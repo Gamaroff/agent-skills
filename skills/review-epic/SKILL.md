@@ -82,6 +82,23 @@ options:
 
 Store choice as `output_mode` for Step 9.
 
+**Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
+
+| Task Subject | Description |
+|---|---|
+| Determine output mode | Capture report vs inline action-plan preference |
+| Load epic & reference docs | Locate epic file, template, registry, architecture docs |
+| Template compliance | Verify epic structure against template |
+| Registry conflict detection | Check for epic number/scope collisions |
+| Architecture conflicts | Verify epic aligns with codebase patterns |
+| Existing story drift | Check stories haven't diverged from epic intent |
+| Consistency check | Detect internal contradictions |
+| Quality & clarity | Score epic readability and precision |
+| Conflict recommendations | Produce actionable fix list |
+| Generate output | Produce report file or inline action plan |
+| Post-review status update | Offer to update epic frontmatter with review metadata |
+| Apply findings to epic | Offer to apply recommended fixes directly to epic file |
+
 ---
 
 ### Step 1 — Load Epic & Reference Documents

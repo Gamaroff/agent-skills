@@ -137,6 +137,26 @@ Rejects: story.178.1.search-by-handle.md (if provided)
 
 ---
 
+#### Step 2b: Change Impact Classification
+
+**Purpose:** Classify the proposed changes before running validation and cascade analysis, so downstream steps can skip unnecessary work.
+
+After the user describes their desired changes, classify each change into one of these categories:
+
+| Category | Fields / Sections | Cascade Analysis | Diff Approval Gate |
+|---|---|---|---|
+| **Metadata-only** | `title`, `epic_type`, `estimated_sprints`, `prd_source`, `legacy_epic_number`, goal/description/background text | **Skip entirely** | Auto-apply (inline confirmation) |
+| **Status change** | `status` field | Lightweight: check child story completion only (if → `completed`) | Auto-apply (inline confirmation) |
+| **Priority change** | `priority` field | Lightweight: check story priority alignment only | Auto-apply (inline confirmation) |
+| **Dependency change** | `dependencies` array | Targeted: check if stories reference old deps | Full blocking gate |
+| **Structural change** | Stories Breakdown section, story numbers, success criteria | **Full cascade analysis** | Full blocking gate |
+
+**Rule:** If a single edit spans multiple categories, use the **highest-risk category** in the table.
+
+Store the classification result — it governs Step 4 and Step 5 behaviour.
+
+---
+
 #### Step 3: Pre-Edit Validation
 
 **Validate the following before allowing edits:**
@@ -172,41 +192,48 @@ If validation fails, present findings to user:
 
 ---
 
-#### Step 4: Cascade Analysis for Child Stories (CRITICAL)
+#### Step 4: Cascade Analysis for Child Stories
 
 **Purpose:** Detect if epic changes will conflict with existing story implementations.
 
+**Scope is determined by the classification from Step 2b:**
+
+- **Metadata-only** → **SKIP this step entirely.** Log: `Cascade analysis skipped: metadata-only change.`
+- **Status change** → Run **lightweight check** (sub-step A only — child story completion)
+- **Priority change** → Run **lightweight check** (sub-step B only — story priority alignment)
+- **Dependency change** → Run **targeted check** (sub-step C only — story dep references)
+- **Structural change** → Run **full analysis** (all sub-steps)
+
 **Actions:**
 
-1. **Discover child stories**:
+1. **Discover child stories** (all analysis modes except skip):
    - Check if `stories/` subdirectory exists in epic directory
-   - If exists, list all `story.[epic].[story].[name].md` files
-   - Load each story file
+   - List all `story.[epic].[story].[name].md` files
+   - Load only the story files needed for the active analysis mode
 
-2. **Analyze proposed changes against child stories**:
+2. **Analysis sub-steps (run only the sub-steps required by classification):**
 
-   **A. Dependency Changes**:
-   - If epic dependencies are being modified, check:
-     - Do any stories reference the current dependencies?
-     - Will dependency changes invalidate story acceptance criteria?
+   **A. Completion check** (status change → `completed`):
+   - Check if all child stories are marked `completed`
+   - If not → CONFLICT
 
-   **B. Story Breakdown Changes**:
+   **B. Priority alignment** (priority change):
+   - Check story priorities for misalignment with new epic priority
+   - Flag stories with conflicting priority values
+
+   **C. Dependency references** (dependency change):
+   - Scan story files for references to old dependency IDs
+   - Will dependency changes invalidate story acceptance criteria?
+
+   **D. Story Breakdown** (structural change only):
    - If adding/removing stories from epic:
      - Check if story files exist for stories being removed
      - If removing story that has file → CONFLICT
      - If renumbering stories → check for existing files with old numbers
 
-   **C. Priority/Status Changes**:
-   - If changing epic priority:
-     - Check story priorities for misalignment
-   - If changing epic status to "completed":
-     - Check if all child stories are marked "completed"
-     - If not → CONFLICT
-
-   **D. Success Criteria Changes**:
-   - If modifying success criteria:
-     - Check story acceptance criteria for dependencies on epic criteria
-     - Flag potential misalignment
+   **E. Success Criteria alignment** (structural change only):
+   - Check story acceptance criteria for dependencies on epic criteria
+   - Flag potential misalignment
 
 3. **Generate Cascade Conflict Report**:
 
@@ -254,6 +281,13 @@ If validation fails, present findings to user:
 
 #### Step 5: Generate and Present Diff Preview
 
+**Behaviour is determined by the classification from Step 2b and cascade results:**
+
+| Condition | Behaviour |
+|---|---|
+| **Metadata-only or status/priority** AND **no cascade conflicts** | Show inline diff, apply immediately — no blocking gate |
+| **Dependency or structural change** OR **cascade conflicts flagged** | Full blocking approval gate (existing behaviour) |
+
 **Actions:**
 
 1. **Apply proposed changes to in-memory copy** (do NOT modify actual file yet)
@@ -263,7 +297,23 @@ If validation fails, present findings to user:
    - Lines being added (prefixed with `+`)
    - Context lines around changes
 
-3. **Present diff to user**:
+3a. **Low-risk path** (metadata-only / status / priority, no cascade conflicts):
+
+   Present inline:
+   ```
+   CHANGE PREVIEW
+   ==============
+   File: {filepath}
+
+   {unified diff output}
+
+   Change classification: {metadata-only | status | priority} — applying directly.
+   ```
+   Proceed to Step 6 without waiting for user approval.
+
+3b. **Standard path** (dependency/structural change, or cascade conflicts):
+
+   Present diff to user:
    ```
    DIFF PREVIEW
    ============
@@ -281,7 +331,7 @@ If validation fails, present findings to user:
    - Sections modified: {list}
    ```
 
-4. **Request user approval**:
+   Request user approval:
    > "Please review the diff above.
    >
    > Would you like to:
@@ -289,7 +339,7 @@ If validation fails, present findings to user:
    > 2. Revise the changes
    > 3. Cancel edit operation"
 
-**CRITICAL:** Do NOT proceed to Step 6 without explicit user approval.
+   **Do NOT proceed to Step 6 without explicit user approval on the standard path.**
 
 ---
 
@@ -340,25 +390,28 @@ If validation fails, present findings to user:
 - Validates epic filename pattern before proceeding
 - Prevents accidental edits to wrong file types
 
-### 2. Cascade Analysis
-- **Unique to edit-epic skill**
-- Analyzes impact on child stories before applying changes
-- Detects conflicts with:
-  - Story dependencies
-  - Story acceptance criteria
-  - Story status/priority alignment
-  - Story numbering changes
-- Provides actionable recommendations
+### 2. Change Impact Classification
+- **Classifies every edit before running cascade analysis or diff approval**
+- Five categories: metadata-only, status, priority, dependency, structural
+- Determines which cascade sub-steps to run and whether approval gate is required
+- Eliminates unnecessary file loading and blocking prompts for low-risk changes
 
-### 3. Comprehensive Validation
+### 3. Cascade Analysis (Conditional)
+- **Unique to edit-epic skill**
+- Scope driven by change classification — skipped entirely for metadata-only edits
+- Targeted sub-steps for status/priority/dependency changes (no full story load)
+- Full analysis reserved for structural changes only
+- Provides actionable recommendations when conflicts are found
+
+### 4. Comprehensive Validation
 - **Pre-edit validation**: YAML frontmatter, required sections, naming conventions, status values
 - **Post-edit validation**: File integrity, markdown syntax, frontmatter validity
 
-### 4. Diff Preview Requirement
-- **All changes shown before applying**
-- Unified diff format for clarity
-- Explicit user approval required
-- Prevents accidental destructive edits
+### 5. Risk-Proportional Diff Preview
+- **All changes shown before (or alongside) applying**
+- Low-risk changes (metadata/status/priority, no cascade conflicts): inline preview, auto-apply
+- Higher-risk changes (dependency/structural, or cascade conflicts): blocking approval gate
+- Prevents accidental destructive edits without adding friction to routine updates
 
 ### 5. Multi-Operation Support
 - Add/remove sections
@@ -475,31 +528,47 @@ If validation fails, present findings to user:
 
 ---
 
-## Workflow Example
+## Workflow Examples
 
+**Low-risk path (metadata/priority change — no blocking gate):**
 ```
-User: /edit-epic docs/prd/core-platform/contact-system/add-contact-via-handle/epics/epic.178.user-discovery-ui/
+User: /edit-epic epic.178.user-discovery-ui/ "Update priority to high"
 
 Agent:
-1. Discovers: epic.178.user-discovery-ui.md
-2. Validates: File type confirmed as epic ✓
-3. Loads epic and parses structure
-4. Validates: Pre-edit checks pass ✓
-5. Discovers 9 child stories in stories/ subdirectory
-6. User describes changes: "Update priority to high and add security dependency"
-7. Generates in-memory modified version
-8. Analyzes cascade: No conflicts with child stories ✓
-9. Presents diff preview:
-   --- priority: "medium"
-   +++ priority: "high"
-   --- dependencies: ["epic-177"]
-   +++ dependencies: ["epic-177", "epic-163"]
-10. User approves
-11. Applies changes using Edit tool
-12. Validates: Post-edit checks pass ✓
-13. Confirms success + reminds user to consider story alignment
+1. Discovers: epic.178.user-discovery-ui.md ✓
+2. Loads epic and parses structure
+2b. Classifies change: priority → LOW RISK
+3. Validates: Pre-edit checks pass ✓
+4. Cascade analysis: Lightweight priority alignment check only
+   → No misalignment found. Cascade skipped for non-structural fields.
+5. Inline change preview:
+   - priority: "medium"
+   + priority: "high"
+   [Applying directly — priority change, no cascade conflicts]
+6. Applies change using Edit tool
+7. Validates: Post-edit checks pass ✓
+8. "Epic updated. priority: medium → high"
+```
 
-Result: Epic successfully updated with validation and safety checks
+**High-risk path (structural change — full gate):**
+```
+User: /edit-epic epic.178.user-discovery-ui/ "Remove story 3 and add dependency on epic-163"
+
+Agent:
+1. Discovers: epic.178.user-discovery-ui.md ✓
+2. Loads epic and parses structure
+2b. Classifies change: Stories Breakdown + dependency → STRUCTURAL (highest risk)
+3. Validates: Pre-edit checks pass ✓
+4. Full cascade analysis:
+   - Loads 9 child story files
+   - Checks story 3 file exists → CONFLICT: story.178.3.*.md exists, cannot safely remove
+   - Checks dep references → story.178.5 references epic-177 context
+5. Presents CASCADE ANALYSIS REPORT with conflicts
+6. User chooses: proceed / revise / cancel
+7. [On proceed] Presents full DIFF PREVIEW with blocking approval gate
+8. User approves → Applies changes
+9. Validates: Post-edit checks pass ✓
+10. Confirms success + lists affected stories to update manually
 ```
 
 ---

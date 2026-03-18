@@ -311,7 +311,24 @@ options:
 
 **Pipeline note**: When invoked by the `develop-story` orchestrator, this question will be answered autonomously ("Comprehensive report" is always selected). If running inside the develop-story pipeline, skip the AskUserQuestion and proceed directly with "Comprehensive report" as the format selection. Only ask interactively when invoked standalone.
 
-**Output**: User's output format preference captured
+3. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
+
+| Task Subject | Description |
+|---|---|
+| Determine output format | Capture user's report vs action-plan preference |
+| Load config & context | Load skills-config.yaml, locate story + architecture docs |
+| Template compliance | Verify story structure against template |
+| Epic alignment | Check story fits within its parent epic |
+| Technical accuracy | Anti-hallucination review of implementation details |
+| Completeness & gap analysis | Identify missing ACs, tasks, NFRs |
+| Consistency & conflicts | Detect internal contradictions |
+| Quality & clarity | Score story readability and precision |
+| Previous story context | Review predecessor story if applicable |
+| Generate output | Produce report file or action plan |
+| Offer to implement fixes | Ask user if fixes should be applied now (Step 9.5 — always execute) |
+| Update document status | Offer status update based on review outcome |
+
+**Output**: User's output format preference captured; task list initialized
 
 ---
 
@@ -1478,7 +1495,7 @@ questions:
 
 **Purpose**: Give the user the option to have the agent apply the recommended fixes to the story document immediately.
 
-**When to Execute**: Always — after generating the report or action plan (Step 9), before the status update (Step 10).
+**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10. Do not skip or end the skill without presenting this offer.
 
 **Actions**:
 

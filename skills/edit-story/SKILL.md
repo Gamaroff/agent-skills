@@ -115,12 +115,14 @@ Rejects: epic.323.pin-advanced-security.md (if provided)
    - If epic file detected → HALT with error message
    - If story pattern matches → proceed
 
-3. **Confirm with user**:
-   > "Found story file: {filepath}
-   > Epic: {epic}
-   > Story: {story}
-   > Name: {name}
-   > Ready to proceed with editing?"
+3. **Confirm with user** *(only when ambiguous)*:
+   - **Skip confirmation** if the user provided an exact file path — proceed directly to Step 2.
+   - **Ask for confirmation** only when the file was auto-discovered from a directory and there was ambiguity (e.g. multiple candidates found, or the match was uncertain):
+     > "Found story file: {filepath}
+     > Epic: {epic}
+     > Story: {story}
+     > Name: {name}
+     > Ready to proceed with editing?"
 
 ---
 
@@ -189,7 +191,20 @@ If validation fails, present findings to user:
 
 #### Step 4: Generate and Present Diff Preview
 
-**Actions:**
+**Classify edit risk before deciding whether to require approval:**
+
+| Edit type | Risk | Action |
+|---|---|---|
+| Checkbox/task toggle (`[ ]` → `[x]`) | Low | Apply directly → show post-apply summary |
+| Single-field update (status, priority, assignee) | Low | Apply directly → show post-apply summary |
+| Appending content to an existing section | Low | Apply directly → show post-apply summary |
+| Adding a new AC, section, or block of content | Medium | Show diff → require approval |
+| Removing existing content | High | Show diff → require approval |
+| Multi-section rewrite or structural change | High | Show diff → require approval |
+
+**For low-risk edits** — skip to Step 5 directly (no diff, no approval gate). After applying, show a concise confirmation summary.
+
+**For medium/high-risk edits:**
 
 1. **Apply proposed changes to in-memory copy** (do NOT modify actual file yet)
 
@@ -226,7 +241,7 @@ If validation fails, present findings to user:
    > 2. Revise the changes
    > 3. Cancel edit operation"
 
-**CRITICAL:** Do NOT proceed to Step 5 without explicit user approval.
+**CRITICAL:** For medium/high-risk edits, do NOT proceed to Step 5 without explicit user approval.
 
 ---
 
@@ -282,12 +297,11 @@ If validation fails, present findings to user:
 - **Pre-edit validation**: Filename conventions, YAML frontmatter (if present), required sections
 - **Post-edit validation**: File integrity, markdown syntax, frontmatter validity
 
-### 3. Diff Preview Requirement
+### 3. Risk-Gated Diff Preview
 
-- **All changes shown before applying**
-- Unified diff format for clarity
-- Explicit user approval required
-- Prevents accidental destructive edits
+- **Low-risk edits** (checkbox toggle, single-field update, section append) are applied directly — no diff gate
+- **Medium/high-risk edits** (new sections, removals, multi-section rewrites) show diff and require explicit approval
+- Prevents accidental destructive edits without adding unnecessary roundtrips for routine changes
 
 ### 4. Multi-Operation Support
 
@@ -450,10 +464,9 @@ Agent:
 1. Loads story.178.8.swipe-actions-friend-requests.md
 2. Validates file type
 3. Locates status field (frontmatter or markdown)
-4. Shows diff:
-   - **Status**: ❌ Not Started
-   * **Status**: ✅ Ready for QA
-5. Applies after approval
+4. Risk classification: single-field update → LOW RISK → apply directly
+5. Applies change immediately, shows confirmation:
+   "Updated: **Status**: ✅ Ready for QA"
 ```
 
 ### Modifying Tasks
@@ -466,10 +479,9 @@ Agent:
 1. Loads story.163.1.seed-phrase-validator.md
 2. Validates file type
 3. Locates task 2.3 in Tasks section
-4. Shows diff:
-   - - [ ] Implement constant-time comparison
-   * - [x] Implement constant-time comparison
-5. Applies after approval
+4. Risk classification: checkbox toggle → LOW RISK → apply directly
+5. Applies change immediately, shows confirmation:
+   "Updated: - [x] Implement constant-time comparison"
 ```
 
 ---
