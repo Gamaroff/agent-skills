@@ -5,8 +5,8 @@ description: Comprehensive quality assurance review for technical tasks. Focuses
 
 # QA Task Review Skill
 
-**Version**: 1.1
-**Last Updated**: 2026-03-15
+**Version**: 2.0
+**Last Updated**: 2026-03-20
 **Skill Type**: Quality Assurance
 
 ## Description
@@ -31,7 +31,7 @@ Activate this skill when:
 
 ### Workflow Stages
 
-1. **Prerequisites Verification** - Ensure task is ready for QA
+1. **Prerequisites Verification** - Ensure task is ready for QA; check for existing artifacts (re-review logic)
 2. **Implementation Review** - Verify all phases completed correctly
 3. **Testing Validation** - Run and validate test suite
 4. **Success Criteria Assessment** - Check functional, performance, code quality criteria
@@ -52,11 +52,145 @@ Activate this skill when:
 
 ---
 
-## Prerequisites Verification
+## Prerequisites
 
-### Before Starting QA Review
+### Task List Initialization
 
-**Check the following**:
+**CRITICAL**: Before starting the review, use `TaskCreate` to register every phase as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
+
+| Task Subject                    | Description                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| PR existence check              | Validate PR exists for current branch; store PR metadata                     |
+| Check for existing QA artifacts | Detect re-review vs fresh review; read prior gate/report                     |
+| Read task document              | Read task file, extract success criteria, phases, breaking changes           |
+| Run test suite                  | Execute tests, lint, build; capture coverage output                          |
+| Verify implementation phases    | Check each phase checkbox; confirm changes match plan via git diff           |
+| Verify success criteria         | Check functional, performance, code quality criteria against actual results  |
+| Validate breaking changes       | Verify migration paths documented and consumer code updated                  |
+| Run NFR assessment              | Evaluate performance, reliability, security, maintainability                 |
+| Run regression testing          | Test dependent areas for regressions                                         |
+| Document issues                 | Create bug report files for all HIGH/MEDIUM severity issues found            |
+| Write QA report                 | Create co-located `task.{id}.qa.N.*.md` report file                         |
+| Write gate YAML                 | Create co-located `task.{id}.gate.N.*.yml` file                             |
+| Update task file                | Add QA Results section, update status, link artifacts                        |
+| Post PR comment                 | Post QA summary to PR via `gh pr comment` — CRITICAL / BLOCKING             |
+| Communicate to user             | Output final summary with gate decision and next steps                       |
+
+---
+
+### PR Existence Check
+
+**CRITICAL**: The qa-task skill requires an active pull request for the current branch. Store PR metadata now — it is needed for the PR comment in Step 14.
+
+```bash
+# Get current branch
+CURRENT_BRANCH=$(git branch --show-current)
+
+# Find PR for current branch
+PR_JSON=$(gh pr view --json url,state,title,number 2>&1)
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "No pull request found for branch: $CURRENT_BRANCH"
+  echo "QA Review requires a pull request to post results."
+  echo "Create a PR first, then re-run /qa-task"
+  exit 1
+fi
+
+PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
+PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+```
+
+**Handle PR state:**
+- **OPEN**: Proceed with review
+- **MERGED**: Warn user but continue — comment will be posted to merged PR
+- **CLOSED**: Warn user but continue
+- **No PR**: HALT and provide guidance
+
+**Store PR_URL, PR_STATE, PR_NUMBER, PR_TITLE** for use in the PR comment step.
+
+---
+
+### Phase 0: Re-Review Logic
+
+**CRITICAL**: Before starting a new review, check if QA artifacts already exist for this task.
+
+1. **Search for existing gate files in the task directory:**
+
+   ```bash
+   TASK_DIR=$(dirname "$TASK_FILE")
+   LATEST_GATE=$(ls -t "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | head -1)
+   ```
+
+2. **If gate file exists, read and analyze:**
+
+   ```bash
+   if [ -n "$LATEST_GATE" ]; then
+     GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $2}')
+     HAS_ISSUES=$(grep -c '^  - issue:' "$LATEST_GATE" 2>/dev/null || echo 0)
+     echo "Found existing QA review: $LATEST_GATE"
+     echo "Gate Status: $GATE_STATUS — Issues: $HAS_ISSUES"
+   fi
+   ```
+
+3. **Decide whether to re-review:**
+
+   **Skip re-review (exit with success message) when:**
+   - Gate status is `PASS`
+   - AND `top_issues` list is empty
+   - Message: "Task already has clean PASS gate with no concerns. Re-review not needed."
+
+   **Perform re-review when ANY of:**
+   - Gate status is `CONCERNS`, `FAIL`, or `WAIVED`
+   - OR `top_issues` has items (even if gate is PASS)
+   - OR no gate file exists (first review)
+   - Message: "Performing QA re-review (previous gate: {status} with {count} issues)"
+
+4. **For re-reviews, determine next QA artifact number:**
+
+   ```bash
+   LATEST_QA_NUM=$(ls "$TASK_DIR"/task.*.qa.*.md 2>/dev/null | \
+                   sed -E 's/.*\.qa\.([0-9]+)\..*/\1/' | \
+                   sort -n | tail -1)
+   NEXT_QA_NUM=$((${LATEST_QA_NUM:-0} + 1))
+   ```
+
+5. **For re-reviews: scope to what changed since last gate.**
+
+   Get the date of the previous gate's `updated:` field and run:
+
+   ```bash
+   git log --since="{gate_date}" --name-only --format="" | sort -u
+   ```
+
+   Focus re-review on files changed since the last gate. Include a **Re-Review Context** section at the top of the new QA report listing each previous issue and its current status (FIXED / PARTIAL / NOT FIXED).
+
+---
+
+### Adaptive Review Strategy
+
+Before running checks, evaluate the task to choose the review approach:
+
+| Condition | Approach |
+|---|---|
+| Lite mode (set by `develop-task` orchestrator) | Direct tools only — skip parallel agents |
+| Small task (<3 phases, single module, Low risk) | Direct tools — fast, sufficient coverage |
+| Re-review (fixing previous issues) | Direct tools — focused scope on specific concerns |
+| Large task (>5 phases, multiple modules) | Parallel agents — comprehensive |
+| High-risk task (auth, payments, security touched) | Parallel agents — focused on risk areas |
+| Default | Direct tools first; spawn agents if gaps found |
+
+Log the chosen approach in the QA report's "Review Methodology" section.
+
+---
+
+## QA Review Process
+
+### Step 1: Prerequisites Check
+
+Verify all prerequisites met:
 
 - [ ] Task document exists at `docs/development/tasks/task.[id].[name]/task.[id].[name].md`
 - [ ] Status is "Completed" or "Ready for QA"
@@ -64,49 +198,261 @@ Activate this skill when:
 - [ ] Developer has marked success criteria as complete
 - [ ] Tests are passing according to task document
 - [ ] Breaking changes are documented (if applicable)
-- [ ] Code is merged to appropriate branch
+- [ ] Code is on the feature branch with an open PR
 
-**If Prerequisites NOT Met**:
+**If prerequisites NOT met**: Return task to developer with specific items needed. Do not proceed.
 
-- Do not proceed with QA review
-- Return task to developer with specific prerequisites needed
-- Update task status to "In Progress" or "Blocked"
+### Step 2: Read Task Document
 
----
+Thoroughly read the task document to understand:
+- Motivation and benefits
+- Technical background (current state → target state)
+- Breaking changes
+- Implementation phases
+- Success criteria (functional, performance, code quality)
+- Testing strategy
+- Risk assessment
 
-## QA Report Template for Technical Tasks
+### Step 3: Verify Implementation Phases
 
-### File Naming Convention
+For each phase in the implementation plan:
+1. Verify checkboxes are marked complete
+2. Review files changed (`git diff origin/develop...HEAD -- {files}`)
+3. Confirm changes match the plan
+4. Look for potential issues
 
-**QA Report**: `task.[id].qa.[number].[descriptive-name].md` (co-located in task subdirectory)
-**Quality Gate**: `docs/qa/gates/tasks/task.[id].gate.[number].[descriptive-name].yml` (separate gates directory)
-**Bug Reports**: `task.[id].bug.[number].[descriptive-name].md` (co-located in task subdirectory)
+**Create Phase Completion Table:**
 
-**Example**:
+| Phase           | Status      | Test Result | Notes          |
+| --------------- | ----------- | ----------- | -------------- |
+| Phase 1: {Name} | PASS        | Verified    | {Notes}        |
+| Phase 2: {Name} | PASS        | Verified    | {Notes}        |
+| Phase 3: {Name} | CONCERNS    | Partial     | {Issues found} |
+
+**Overall Phase Completion**: {X/Y phases passed}
+
+### Step 4: Run Tests
+
+Execute all tests mentioned in the testing strategy:
+
+```bash
+# Run tests with coverage
+npm exec nx test {project} -- --coverage
+
+# Run build
+npm exec nx build {project}
+
+# Run linting
+npm exec nx lint {project}
+
+# Run integration tests if applicable
+npm exec nx test {project} -- --testPathPattern=integration
+```
+
+**Document results:**
+- Test pass rate (X/Y tests)
+- Coverage percentages (Statements / Branches / Functions / Lines)
+- Any test failures
+- Build success/failure
+- Lint errors
+
+### Step 5: Verify Success Criteria
+
+For each success criterion, compare target vs actual:
+
+**Functional Criteria:**
+
+| Criterion                   | Target | Actual | Status   | Notes |
+| --------------------------- | ------ | ------ | -------- | ----- |
+| All tests passing           | 100%   | 100%   | PASS     |       |
+| No regressions              | 0      | 0      | PASS     |       |
+| Breaking changes documented | Yes    | Yes    | PASS     |       |
+
+**Performance Criteria:**
+
+| Criterion         | Target        | Actual | Status | Notes |
+| ----------------- | ------------- | ------ | ------ | ----- |
+| Write performance | +20-30%       | +25%   | PASS   |       |
+| Memory usage      | No leaks      | Clean  | PASS   |       |
+
+**Code Quality Criteria:**
+
+| Criterion              | Target   | Actual   | Status | Notes |
+| ---------------------- | -------- | -------- | ------ | ----- |
+| Test coverage          | 80%+     | 82%      | PASS   |       |
+| Linting                | 0 errors | 0 errors | PASS   |       |
+| TypeScript compilation | 0 errors | 0 errors | PASS   |       |
+| Documentation          | Updated  | Complete | PASS   |       |
+
+### Step 6: Validate Breaking Changes
+
+For each breaking change documented in the task:
+
+1. Verify it's documented with a migration path
+2. Confirm migration path is complete and actionable
+3. Verify consumer code is updated (if applicable)
+4. Test migration if possible
+
+**If migration path is missing or incomplete**: Create HIGH severity bug report and mark validation as FAIL.
+
+**Breaking Change Assessment Template:**
 
 ```
-# Task Subdirectory Structure
-docs/development/tasks/task.1.cache-lib-simplification/
-├── task.1.cache-lib-simplification.md          # Main task document
-├── task.1.qa.1.cache-lib-simplification.md     # QA report (co-located)
-├── task.1.bug.1.memory-leak.md                 # Bug report (co-located)
-└── task.1.bug.2.test-failure.md                # Additional bugs (co-located)
-
-# Quality Gate (separate directory)
-docs/qa/gates/tasks/task.1.gate.1.cache-lib-simplification.yml
+### Breaking Change: {Title}
+Documented: Yes / No
+Migration Path Provided: Yes / No
+Migration Tested: Yes / No
+Consumer Code Updated: Yes / No / N/A
+Notes: {Validation notes}
 ```
 
-### QA Report Structure
+**Overall Breaking Changes Assessment:** PASS / CONCERNS / FAIL
+
+### Step 7: Assess Non-Functional Requirements
+
+Evaluate each NFR (see NFR Evaluation Criteria section for thresholds):
+
+- **Performance**: Run performance tests; compare with baseline; check for regressions; validate resource usage
+- **Reliability**: Test error handling; validate rollback plan; check recovery mechanisms
+- **Security**: Review for security issues; check dependencies; validate auth/authorization preserved
+- **Maintainability**: Review code clarity; check documentation; assess technical debt impact
+
+### Step 8: Regression Testing
+
+Identify and test areas affected by changes:
+- Components that depend on changed code
+- APIs that were modified
+- Related functionality
+
+Run existing tests and check for unexpected behaviour in adjacent areas.
+
+### Step 9: Document Issues
+
+For each HIGH or MEDIUM severity issue found:
+1. Create bug report: `task.{id}.bug.{number}.{descriptive-name}.md` (co-located in task directory)
+2. Assign severity (HIGH/MEDIUM/LOW)
+3. Link bug report in QA report
+
+**LOW severity issues**: Document in QA report only — no separate bug file needed.
+
+**Bug Report Structure:**
 
 ```markdown
-# QA Report: Technical Task {TASK-ID} - {Title}
+# Bug Report: Task {ID} - {Bug Title}
+
+**Task**: [Link](./task.{id}.{name}.md)
+**Bug ID**: TASK-{id}-BUG-{number}
+**Severity**: HIGH/MEDIUM/LOW
+**Priority**: P0/P1/P2/P3
+**Status**: New
+**Found By**: QA Engineer
+**Date Found**: {Date}
+
+## Description
+{Clear description of the issue}
+
+## Steps to Reproduce
+{If applicable}
+
+## Expected Behavior
+{What should happen}
+
+## Actual Behavior
+{What actually happens}
+
+## Impact
+{Impact on system/deployment}
+
+## Recommendation
+{How to fix}
+```
+
+### Step 10: Create Quality Gate File
+
+Create gate file co-located with the task document:
+
+**Location**: `{task-directory}/task.{id}.gate.{number}.{descriptive-name}.yml`
+
+**Gate YAML Schema:**
+
+```yaml
+schema: 1
+task: 'task.{id}.{name}'
+task_title: '{task title}'
+gate: PASS|CONCERNS|FAIL|WAIVED
+status_reason: '1-2 sentence explanation of gate decision'
+reviewer: 'QA Engineer'
+updated: '{ISO-8601 timestamp}'
+
+top_issues: [] # Empty if no issues; list issues for CONCERNS/FAIL
+
+waiver:
+  active: false # Set true only for WAIVED, with reason and approver
+
+quality_score: 95 # 100 - (20 × FAILs) - (10 × CONCERNS), bounded 0–100
+
+evidence:
+  tests_reviewed: { count }
+  phases_verified: { X/Y }
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS|CONCERNS|FAIL
+    notes: 'Specific findings'
+  performance:
+    status: PASS|CONCERNS|FAIL
+    notes: 'Specific findings'
+  reliability:
+    status: PASS|CONCERNS|FAIL
+    notes: 'Specific findings'
+  maintainability:
+    status: PASS|CONCERNS|FAIL
+    notes: 'Specific findings'
+
+recommendations:
+  immediate: # Blocking issues — must fix before merge
+    - action: '{Description}'
+      refs: ['{file.ts}']
+  future: # Non-blocking — address later
+    - action: '{Description}'
+      refs: ['{file.ts}']
+
+deployment_readiness:
+  staging: APPROVED|CONDITIONAL|BLOCKED
+  production: APPROVED|CONDITIONAL|BLOCKED
+  conditions: [] # List conditions if CONDITIONAL
+```
+
+**Deterministic gate decision rules (apply in order):**
+
+1. If any `top_issues.severity == high` → Gate = FAIL (unless waived)
+2. Else if any `severity == medium` → Gate = CONCERNS
+3. If any NFR status is FAIL → Gate = FAIL
+4. Else if any NFR status is CONCERNS → Gate = CONCERNS
+5. Else → Gate = PASS
+
+**WAIVED** only when `waiver.active: true` with documented reason and approver.
+
+### Step 11: Write QA Report
+
+Create QA report co-located with the task document:
+
+**Location**: `{task-directory}/task.{id}.qa.{number}.{descriptive-name}.md`
+
+**QA Report Structure:**
+
+```markdown
+# QA Report: Task {ID} - {Title}
 
 **Task**: [Link to task document](./task.{id}.{name}.md)
-**Gate File**: ../../../../qa/gates/tasks/task.{id}.gate.{number}.{descriptive-name}.yml
+**Gate File**: [task.{id}.gate.{number}.{name}.yml](./task.{id}.gate.{number}.{name}.yml)
 **QA Engineer**: QA Engineer
 **Review Date**: {Date}
 **Testing Completed**: {Date}
-**Gate Status**: ✅/⚠️/❌ **PASS/CONCERNS/FAIL**
+**Gate Status**: PASS/CONCERNS/FAIL
 
 ---
 
@@ -121,13 +467,13 @@ docs/qa/gates/tasks/task.1.gate.1.cache-lib-simplification.yml
 
 ## Testing Scope
 
-### Prerequisites Verified ✅
+### Prerequisites Verified
 
 - [x] Task document exists and complete
 - [x] All implementation phases completed
-- [x] Tests passing according to task document
+- [x] Tests passing
 - [x] Breaking changes documented (if applicable)
-- [x] Code merged to appropriate branch
+- [x] Code on feature branch with open PR
 
 ### Testing Approach
 
@@ -140,73 +486,25 @@ docs/qa/gates/tasks/task.1.gate.1.cache-lib-simplification.yml
 
 ### Review Methodology
 
-{Describe how the review was conducted}
+{Direct tools / parallel agents / hybrid — rationale}
 
 ---
 
 ## Implementation Verification
 
-### Phase Completion Status
-
-| Phase           | Status      | Test Result | Notes          |
-| --------------- | ----------- | ----------- | -------------- |
-| Phase 1: {Name} | ✅ PASS     | Verified    | {Notes}        |
-| Phase 2: {Name} | ✅ PASS     | Verified    | {Notes}        |
-| Phase 3: {Name} | ⚠️ CONCERNS | Partial     | {Issues found} |
-
-**Overall Phase Completion**: {X/Y phases passed}
+{Phase Completion Table — see Step 3}
 
 ---
 
 ## Success Criteria Verification
 
-### Functional Criteria
-
-| Criterion                   | Target | Actual | Status      | Notes                    |
-| --------------------------- | ------ | ------ | ----------- | ------------------------ |
-| All tests passing           | 100%   | 98%    | ⚠️ CONCERNS | 2 tests failing          |
-| No regressions              | 0      | 0      | ✅ PASS     | No regressions detected  |
-| Breaking changes documented | Yes    | Yes    | ✅ PASS     | Complete migration guide |
-
-**Functional Assessment**: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL
-
-### Performance Criteria
-
-| Criterion         | Target        | Actual | Status  | Notes             |
-| ----------------- | ------------- | ------ | ------- | ----------------- |
-| Write performance | +20-30%       | +25%   | ✅ PASS | Target met        |
-| Read performance  | No regression | +5%    | ✅ PASS | Improved          |
-| Memory usage      | No leaks      | Clean  | ✅ PASS | No leaks detected |
-
-**Performance Assessment**: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL
-
-### Code Quality Criteria
-
-| Criterion              | Target   | Actual   | Status  | Notes               |
-| ---------------------- | -------- | -------- | ------- | ------------------- |
-| Test coverage          | 80%+     | 82%      | ✅ PASS | Coverage maintained |
-| Linting                | 0 errors | 0 errors | ✅ PASS | Clean               |
-| TypeScript compilation | 0 errors | 0 errors | ✅ PASS | Builds successfully |
-| Documentation          | Updated  | Complete | ✅ PASS | CHANGELOG added     |
-
-**Code Quality Assessment**: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL
+{Functional / Performance / Code Quality tables — see Step 5}
 
 ---
 
 ## Breaking Changes Validation
 
-{For each breaking change documented in task}
-
-### Breaking Change 1: {Title}
-
-**Documented**: ✅ Yes / ❌ No
-**Migration Path Provided**: ✅ Yes / ❌ No
-**Migration Tested**: ✅ Yes / ❌ No
-**Consumer Code Updated**: ✅ Yes / ❌ No / N/A
-
-**Notes**: {Validation notes}
-
-**Overall Breaking Changes Assessment**: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL
+{Per-change validation — see Step 6}
 
 ---
 
@@ -214,627 +512,253 @@ docs/qa/gates/tasks/task.1.gate.1.cache-lib-simplification.yml
 
 ### HIGH Severity Issues ({X})
 
-**Issue 1: {Title}**
-
+**Issue: {Title}**
 - **Severity**: HIGH
-- **Category**: {Functional/Performance/Security/Quality}
-- **Bug Report**: [task.{id}.bug.{number}.{description}.md](./task.{id}.bug.{number}.{description}.md)
+- **Category**: Functional/Performance/Security/Quality
+- **Bug Report**: [task.{id}.bug.{N}.{name}.md](./task.{id}.bug.{N}.{name}.md)
 - **Observation**: {What was observed}
-- **Impact**: {Impact on system/users}
+- **Impact**: {Impact on system/deployment}
 - **Recommendation**: {How to fix}
 - **Priority**: P0/P1
 
 ### MEDIUM Severity Issues ({X})
-
 {Same structure as HIGH}
 
 ### LOW Severity Issues ({X})
+{Description only — no separate bug file}
 
-{Same structure as HIGH}
-
-**Total Issues**: {HIGH: X, MEDIUM: Y, LOW: Z}
+**Total Issues**: HIGH: X, MEDIUM: Y, LOW: Z
 
 ---
 
 ## NFR Assessment
 
-### Performance ✅/⚠️/❌
+### Performance — PASS/CONCERNS/FAIL
+{Criteria evaluated, findings, recommendations}
 
-**Status**: PASS / CONCERNS / FAIL
+### Reliability — PASS/CONCERNS/FAIL
+{Criteria evaluated, findings, recommendations}
 
-**Criteria Evaluated**:
+### Security — PASS/CONCERNS/FAIL
+{Criteria evaluated, findings, recommendations}
 
-- [ ] Response time targets met
-- [ ] Throughput requirements met
-- [ ] Resource utilization acceptable
-- [ ] No performance regressions
-- [ ] Load/stress testing completed (if applicable)
-
-**Findings**:
-{Detailed performance findings}
-
-**Recommendations**:
-{Performance improvement recommendations if needed}
-
----
-
-### Reliability ✅/⚠️/❌
-
-**Status**: PASS / CONCERNS / FAIL
-
-**Criteria Evaluated**:
-
-- [ ] Error handling comprehensive
-- [ ] Failure modes tested
-- [ ] Recovery mechanisms validated
-- [ ] Graceful degradation verified
-- [ ] Rollback plan validated
-
-**Findings**:
-{Detailed reliability findings}
-
-**Recommendations**:
-{Reliability improvement recommendations if needed}
-
----
-
-### Security ✅/⚠️/❌
-
-**Status**: PASS / CONCERNS / FAIL
-
-**Criteria Evaluated**:
-
-- [ ] No new security vulnerabilities introduced
-- [ ] Dependency vulnerabilities addressed
-- [ ] Sensitive data handling appropriate
-- [ ] Authentication/authorization preserved
-- [ ] Security best practices followed
-
-**Findings**:
-{Detailed security findings}
-
-**Recommendations**:
-{Security improvement recommendations if needed}
-
----
-
-### Maintainability ✅/⚠️/❌
-
-**Status**: PASS / CONCERNS / FAIL
-
-**Criteria Evaluated**:
-
-- [ ] Code clarity and readability
-- [ ] Documentation completeness
-- [ ] Test coverage adequate
-- [ ] Complexity manageable
-- [ ] Technical debt reduced (not increased)
-
-**Findings**:
-{Detailed maintainability findings}
-
-**Recommendations**:
-{Maintainability improvement recommendations if needed}
+### Maintainability — PASS/CONCERNS/FAIL
+{Criteria evaluated, findings, recommendations}
 
 ---
 
 ## Regression Testing
 
-### Regression Test Results
-
-**Scope**: {Areas tested for regressions}
-
-| Test Area | Status      | Notes          |
-| --------- | ----------- | -------------- |
-| {Area 1}  | ✅ PASS     | No regressions |
-| {Area 2}  | ⚠️ CONCERNS | {Issues found} |
-
-**Overall Regression Assessment**: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL
+{Test areas checked; PASS/CONCERNS/FAIL per area}
 
 ---
 
 ## Test Artifacts
 
 ### Files Reviewed
-```
-
-{List of key files reviewed during QA}
-
-````
+{List of key files reviewed}
 
 ### Test Commands Executed
-
 ```bash
-{Commands used for testing}
-npx nx test cache-lib --coverage
-npx nx build cache-lib
-npx nx lint cache-lib
-````
+{Commands used}
+```
 
 ### Coverage Report
-
-**Coverage Summary**:
-
-```
-Statements: X%
-Branches: Y%
-Functions: Z%
-Lines: W%
-```
-
-**Coverage Assessment**: ✅ Meets target / ⚠️ Below target
+Statements: X% | Branches: Y% | Functions: Z% | Lines: W%
 
 ---
 
 ## Recommendations
 
-### Immediate Actions (Blocking Issues)
-
-{List of critical issues that must be fixed before deployment}
-
-1. **Fix {Issue}**: {Description and priority}
-2. **Address {Issue}**: {Description and priority}
+### Immediate Actions (Blocking)
+1. {Issue and priority}
 
 ### Short-term Actions (Non-Blocking)
-
-{List of improvements that should be addressed soon but don't block deployment}
-
-1. **Improve {Area}**: {Description}
-2. **Enhance {Feature}**: {Description}
-
-### Long-term Improvements
-
-{Nice-to-have improvements for future work}
-
-1. **Consider {Improvement}**: {Description}
+1. {Improvement}
 
 ---
 
 ## Final Assessment
 
-### Gate Status: ✅ PASS / ⚠️ CONCERNS / ❌ FAIL / 🚫 WAIVED
+**Gate Status**: PASS / CONCERNS / FAIL / WAIVED
+**Rationale**: {Explanation}
+**Quality Score**: {score}/100
 
-**Rationale**: {Detailed explanation of gate decision}
-
-**Blocking Issues**: {List of issues that must be resolved}
-
-- {Issue 1}
-- {Issue 2}
-
-**Non-Blocking Issues**: {List of issues that should be addressed but don't block deployment}
-
-- {Issue 1}
-- {Issue 2}
+**Deployment Recommendation**: APPROVED / CONDITIONAL / BLOCKED
+**Conditions** (if conditional): {List}
 
 ---
 
-### Deployment Recommendation: ✅ APPROVED / ❌ BLOCKED / ⚠️ CONDITIONAL
-
-**Conditions** (if conditional):
-
-- {Condition 1}
-- {Condition 2}
-
-**Deployment Readiness**: {Assessment of deployment readiness}
-
----
-
-### Dev Agent Record
-
-{If bugs were found and fixed using fix-qa skill}
-
-**Bugs Fixed**:
-
-- [task.{id}.bug.{number}.{description}.md](./task.{id}.bug.{number}.{description}.md) - {Status}
-
-**Agent Transcript**: {Link to agent transcript if applicable}
-
----
-
-**QA Report Reference**: `docs/development/tasks/task.{id}.{descriptive-name}/task.{id}.qa.{number}.{descriptive-name}.md`
-**Gate File**: `docs/qa/gates/tasks/task.{id}.gate.{number}.{descriptive-name}.yml`
-**Next Steps**: {What happens next - fixes, deployment, follow-up}
-
-````
-
----
-
-## QA Review Process
-
-### Step 1: Prerequisites Check
-
-**Action**: Verify all prerequisites met (see Prerequisites Verification section)
-
-**If NOT Ready**:
-1. Return to developer with specific missing items
-2. Do not proceed with QA
-3. Update task status
-
-### Step 2: Read Task Document
-
-**Action**: Thoroughly read the task document to understand:
-- Motivation and benefits
-- Technical background (current state → target state)
-- Breaking changes
-- Implementation phases
-- Success criteria
-- Testing strategy
-- Risk assessment
-
-**Questions to Ask**:
-- Is the scope clear?
-- Are breaking changes well-documented?
-- Are success criteria measurable?
-- Is the testing strategy comprehensive?
-
-### Step 3: Verify Implementation Phases
-
-**Action**: Go through each phase in the implementation plan
-
-**For Each Phase**:
-1. Verify checkboxes are marked complete
-2. Review files changed (use git diff if needed)
-3. Confirm changes match plan
-4. Look for potential issues
-
-**Create Phase Completion Table**:
-- List each phase
-- Mark status (PASS/CONCERNS/FAIL)
-- Add notes for any concerns
-
-### Step 4: Run Tests
-
-**Action**: Execute all tests mentioned in testing strategy
-
-**Commands**:
-```bash
-# Run tests
-npx nx test {library} --coverage
-
-# Run build
-npx nx build {library}
-
-# Run linting
-npx nx lint {library}
-
-# Run integration tests if applicable
-npx nx test {app} --testPathPattern=integration
-````
-
-**Document Results**:
-
-- Test pass rate
-- Coverage percentages
-- Any test failures
-- Build success/failure
-- Lint errors
-
-### Step 5: Verify Success Criteria
-
-**Action**: Check each success criterion against actual results
-
-**For Each Criterion**:
-
-1. Compare target vs actual
-2. Mark as PASS/CONCERNS/FAIL
-3. Add notes explaining status
-
-**Create Success Criteria Tables**:
-
-- Functional criteria
-- Performance criteria
-- Code quality criteria
-
-### Step 6: Validate Breaking Changes
-
-**Action**: For each breaking change:
-
-1. Verify it's documented in task document
-2. Check migration path is provided
-3. Confirm migration path is complete
-4. Verify consumer code updated (if applicable)
-5. Test migration if possible
-
-**If Migration Path Missing or Incomplete**:
-
-- Create HIGH severity bug report
-- Mark breaking change validation as FAIL
-
-### Step 7: Assess Non-Functional Requirements
-
-**Action**: Evaluate each NFR:
-
-**Performance**:
-
-- Run performance tests
-- Compare with baseline
-- Check for regressions
-- Validate resource usage
-
-**Reliability**:
-
-- Test error handling
-- Validate rollback plan
-- Check recovery mechanisms
-
-**Security**:
-
-- Review for security issues
-- Check dependencies for vulnerabilities
-- Validate authentication/authorization
-
-**Maintainability**:
-
-- Review code clarity
-- Check documentation
-- Assess technical debt impact
-
-**For Each NFR**:
-
-- Mark status (PASS/CONCERNS/FAIL)
-- Document findings
-- Provide recommendations
-
-### Step 8: Regression Testing
-
-**Action**: Test areas that might be affected by changes
-
-**Identify Regression Areas**:
-
-- Components that depend on changed code
-- APIs that were modified
-- Related functionality
-
-**Test for Regressions**:
-
-- Run existing tests
-- Manual testing of affected areas
-- Check for unexpected behavior
-
-### Step 9: Document Issues
-
-**Action**: For each issue found:
-
-1. Create bug report using create-bug-report skill
-2. Name: `task.{id}.bug.{number}.{descriptive-name}.md`
-3. Assign severity (HIGH/MEDIUM/LOW)
-4. Link bug report in QA report
-
-**Bug Report Structure**:
-
-```markdown
-# Bug Report: Technical Task {TASK-ID} - {Bug Title}
-
-**Task**: [Link](./task.{id}.{name}.md)
-**Bug ID**: TASK-{id}-BUG-{number}
-**Severity**: HIGH/MEDIUM/LOW
-**Priority**: P0/P1/P2/P3
-**Status**: New
-**Found By**: QA Engineer
-**Date Found**: {Date}
-
-## Description
-
-{Clear description of the issue}
-
-## Steps to Reproduce
-
-{If applicable}
-
-## Expected Behavior
-
-{What should happen}
-
-## Actual Behavior
-
-{What actually happens}
-
-## Impact
-
-{Impact on system/deployment}
-
-## Recommendation
-
-{How to fix}
+**QA Report**: co-located at `task.{id}.qa.{number}.{name}.md`
+**Gate File**: co-located at `task.{id}.gate.{number}.{name}.yml`
+**Next Steps**: {fixes / deployment / follow-up}
 ```
 
-### Step 10: Create Quality Gate File
+### Step 12: Update Task File
 
-**Action**: Use qa-gate skill to create gate decision file
+Add a QA Results section to the task document:
 
-**Location**: `docs/qa/gates/tasks/task.{id}.gate.{number}.{descriptive-name}.yml`
+```markdown
+## QA Testing Results
 
-**Gate Decision Options**:
+**QA Status**: PASS / CONCERNS / FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: {Date}
+**Quality Score**: {score}/100
+**Gate Decision**: PASS/CONCERNS/FAIL/WAIVED
 
-- **PASS**: All criteria met, approved for deployment
-- **CONCERNS**: Minor issues found, deployment approved with conditions
-- **FAIL**: Critical issues found, deployment blocked
-- **WAIVED**: Issues acknowledged but deployment approved (requires justification)
+### QA Report
+- **Full Report**: [task.{id}.qa.{N}.{name}.md](./task.{id}.qa.{N}.{name}.md)
+- **Gate File**: [task.{id}.gate.{N}.{name}.yml](./task.{id}.gate.{N}.{name}.yml)
 
-### Step 11: Write QA Report
+### Test Coverage Summary
+- **Tests Executed**: {count}
+- **Phases Verified**: {X/Y}
+- **Critical Issues**: {count}
+- **NFR Status**: Security: {STATUS}, Performance: {STATUS}, Reliability: {STATUS}, Maintainability: {STATUS}
 
-**Action**: Create comprehensive QA report using template above
+### Key Findings
+{Brief summary, or "No critical issues identified"}
+```
 
-**Key Sections**:
+**Update task status based on gate decision:**
+- PASS or CONCERNS → Status: "Completed" (with notes about concerns if applicable)
+- FAIL → Status: "In Progress" (requires fixes before re-review)
+- WAIVED → Status: "Completed" (with waiver notes)
 
-1. Executive Summary
-2. Testing Scope
-3. Implementation Verification
-4. Success Criteria Verification
-5. Breaking Changes Validation
-6. Issues Found
-7. NFR Assessment
-8. Recommendations
-9. Final Assessment
+### Step 13: Post PR Comment — CRITICAL / BLOCKING
 
-**Report Location**: `docs/development/tasks/task.{id}.{descriptive-name}/task.{id}.qa.[number].{descriptive-name}.md`
+**This step is mandatory. The review is NOT complete until the PR comment is confirmed posted. Do not skip, defer, or treat as optional.**
 
-### Step 12: Communicate Results
+Use the PR metadata stored in the Prerequisites step. Run:
 
-**Action**: Inform stakeholders of QA results
+```bash
+gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
 
-**If PASS**:
+**Gate Decision**: {PASS/CONCERNS/FAIL}
+**Quality Score**: {score}/100
+**Reviewer**: QA Engineer
+**Date**: {date}
+**PR**: #{PR_NUMBER} - {PR_TITLE}
 
-- Notify team task is approved
-- Provide deployment recommendation
-- Share any non-blocking improvements
+---
 
-**If CONCERNS**:
+### QA Artifacts
 
-- List conditions for deployment
-- Communicate non-blocking issues
-- Provide timeline for fixes
+- **QA Report**: task.{id}.qa.{N}.{name}.md
+- **Gate File**: task.{id}.gate.{N}.{name}.yml
 
-**If FAIL**:
+### Summary
 
-- List blocking issues clearly
-- Communicate deployment is blocked
-- Work with developer on fix plan
+- **Tests Executed**: {count}
+- **Phases Verified**: {X/Y}
+- **NFR Status**: Security: {STATUS}, Performance: {STATUS}, Reliability: {STATUS}, Maintainability: {STATUS}
+- **Issues Found**: HIGH: {X}, MEDIUM: {Y}, LOW: {Z}
 
-### Step 13: Re-running QA After Bug Fixes (Optional)
+### Critical Issues
 
-**When to Re-run QA**:
+{List critical issues, or 'None identified'}
 
+### Deployment Recommendation
+
+**Status**: {APPROVED/CONDITIONAL/BLOCKED}
+**Conditions**: {Any conditions, or 'None'}
+
+### Next Steps
+
+1. {Step 1}
+2. {Step 2}
+
+---
+Generated by qa-task skill"
+```
+
+**Verify the comment was posted**: Confirm `gh pr comment` exited with code 0. If it fails, report the error to the user and retry or provide the comment body for manual posting. **Do NOT proceed to Step 14 until the comment is confirmed posted.**
+
+### Step 14: Communicate to User — CRITICAL / BLOCKING
+
+**Always output a completion summary. Do not end the skill silently.** Required output:
+- Gate decision and quality score
+- Top issues summary (or "No issues found")
+- Explicit next steps for the developer
+- Paths to QA report and gate file
+
+---
+
+## Review Completion Checklist
+
+**Tick off each item before marking the review done:**
+
+- [ ] All prerequisite checks passed (PR exists, task ready for QA)
+- [ ] Re-review logic executed (Phase 0 — skip or re-review decided)
+- [ ] Task document read; success criteria extracted
+- [ ] Tests executed and results documented
+- [ ] All implementation phases verified
+- [ ] Success criteria checked (functional, performance, code quality)
+- [ ] Breaking changes validated (or marked N/A)
+- [ ] NFRs assessed (Performance, Reliability, Security, Maintainability)
+- [ ] Regression testing completed
+- [ ] Bug report files created for all HIGH/MEDIUM issues (if any)
+- [ ] QA report file created and saved (co-located with task)
+- [ ] Gate YAML file created and saved (co-located with task)
+- [ ] Task file `## QA Testing Results` section updated with gate status and artifact links
+- [ ] Task status updated per gate decision
+- [ ] PR comment posted via `gh pr comment "$PR_URL"` (Step 13 — BLOCKING): confirm exit code 0
+- [ ] User notified with gate decision, issues summary, and next steps (Step 14 — BLOCKING)
+
+---
+
+## Re-Review After Bug Fixes
+
+When bug fixes are applied after a CONCERNS or FAIL gate, determine the appropriate review scope:
+
+**Full re-review when:**
 - Complex fixes with new functionality added
-- Multiple iteration cycles (>2 attempts to fix)
-- Performance testing additions (Bug requires new benchmarks)
-- Stakeholder audit requirement (needs fresh independent review)
+- Multiple iteration cycles (>2 fix attempts)
+- Performance testing additions
+- Stakeholder audit requirement
 
-**When Quick Verification is Sufficient**:
-
-- Trivial fixes (<30 minutes, like 1-line deletions or find/replace)
+**Quick verification when:**
+- Trivial fixes (<30 minutes, e.g. 1-line deletion, assertion update)
 - Lint corrections (no logic changes)
 - Simple test updates (updating assertions only)
-- Automated tests verify correctness
 
-**Quick Verification Process** (for trivial fixes):
+**What gets updated after fixes:**
 
-```bash
-# 1. Bugs get fixed (via fix-qa skill or manual)
-# 2. Tests run automatically during fix
-# 3. Bug reports updated automatically with fix details
-# 4. After all bugs fixed, update QA artifacts:
-# You: "Update QA report and gate with bug resolutions"
-```
-
-**Full QA Re-run Process** (for complex fixes):
-
-```bash
-# After complex fixes applied
-# You: "Re-run QA on task.{id} after bug fixes"
-#
-# What happens:
-# - Full 12-step QA process executes
-# - UPDATES original task.{id}.qa.*.md (adds Bug Resolution Summary)
-# - UPDATES original task.{id}.gate.*.yml (updates gate status, adds bug_resolution)
-# - Bug reports retain iteration history
-```
-
-**IMPORTANT**:
-
-- QA may choose to create a new versioned file (e.g. `qa.2`) if significant changes or re-testing occurred.
-- If updating in place, ensure the latest file (highest number) is the one updated.
-
-**What Gets Updated**:
-
-1. **Bug Reports** (automatic during fix):
-   - Add "Developer Fix Cycle" section with fix details
-   - Update status: New → In Progress → Ready for QA → Closed
-   - Track multiple iterations if bug reopened
-
-2. **QA Report** (after all bugs fixed):
-   - Add "Bug Resolution Summary" section at end
-   - List each bug fixed with verification results
+1. **Bug Reports** (updated during fix by developer): status New → In Progress → Ready for QA → Closed
+2. **QA Report** (append a "Bug Resolution Summary" section after all bugs fixed):
+   - List each bug fixed with verification result
    - Update gate status and deployment recommendation
-   - Add new timestamp
-
-3. **Quality Gate File** (after all bugs fixed):
-   - Update `gate` field (CONCERNS → PASS)
-   - Update `status_reason` with fix summary
+3. **Gate YAML** (update in place — do not create a new file unless significant re-testing occurred):
+   - Update `gate` field (e.g. CONCERNS → PASS)
+   - Update `status_reason`
    - Update `updated` timestamp
-   - Add `status: closed` and `fixed_date` to each issue in `top_issues`
-   - Update `quality_score` based on remaining issues
-   - Add `bug_resolution` section with fix metadata
+   - Add `status: closed` and `fixed_date` to each resolved issue in `top_issues`
+   - Update `quality_score`
+   - Add `bug_resolution` section
+4. **Task Document**: Update success criteria checkboxes if now met
 
-4. **Task Document** (optional):
-   - Update success criteria checkboxes if now met
-   - Mark status as complete if all criteria met
-
-**Example QA Report Update** (appended to original):
-
-```markdown
----
-
-## Bug Resolution Summary
-
-**Date**: 2025-10-31
-
-### Bugs Fixed
-
-**Bug #1: Test expects L3 tier**
-
-- Status: ✅ Closed
-- Fix: Removed line 257 from cache-manager.spec.ts
-- Verification: All 136 tests passing (was 134/136)
-
-**Bug #2: Lint @ts-ignore violations**
-
-- Status: ✅ Closed
-- Fix: Replaced 44 @ts-ignore with @ts-expect-error
-- Verification: 0 lint errors (was 44 errors)
-
-### Updated Assessment
-
-**Previous Gate Status**: ⚠️ CONCERNS
-**Updated Gate Status**: ✅ PASS
-
-**Success Criteria - Updated**:
-Functional:
-
-- [x] All cache-lib tests pass ✅ (Fixed Bug #1)
-
-Code Quality:
-
-- [x] All linting passes ✅ (Fixed Bug #2)
-
-**Remaining Issues**:
-
-- Bug #3 (Performance testing) - Non-blocking, recommended for production
-
-### Final Deployment Recommendation: ✅ APPROVED
-
-**Conditions Met**:
-
-- [x] Bug #1 Fixed (test failure resolved)
-- [x] Bug #2 Fixed (lint errors resolved)
-- [ ] Bug #3 Pending (non-blocking)
-
-**Updated Risk Level**: LOW
-**Deployment**: APPROVED for merge to develop branch
-```
-
-**Example Quality Gate Update**:
+**Example gate update after fixes:**
 
 ```yaml
-# Update in place (do not create v2 file)
-gate: PASS # Was: CONCERNS
-status_reason: 'Bugs #1 and #2 fixed. Tests passing, lint clean. Approved for deployment.'
-updated: '2025-10-31T14:30:00Z' # New timestamp
+gate: PASS  # Was: CONCERNS
+status_reason: 'Bugs #1 and #2 fixed. Tests passing, lint clean.'
+updated: '2026-03-20T14:30:00Z'
 
 top_issues:
-  - issue: 'Test expects removed L3 tier'
-    severity: high
-    bug_ref: 'task.1.bug.1.test-expects-l3-tier.md'
-    status: closed # Added field
-    fixed_date: '2025-10-31' # Added field
+  - issue: 'Test expects removed tier'
+    severity: medium
+    bug_ref: 'task.1.bug.1.test-failure.md'
+    status: closed
+    fixed_date: '2026-03-20'
     suggested_owner: dev
 
-quality_score: 80 # Was: 60 (100 - 10*1 medium + 10*1 remaining)
+quality_score: 90  # Was: 70
 
-bug_resolution: # New section
+bug_resolution:
   bugs_fixed: 2
-  bugs_remaining: 1
-  fix_date: '2025-10-31'
+  bugs_remaining: 0
+  fix_date: '2026-03-20'
   total_iterations: 1
   verification_method: 'Automated tests + lint'
 ```
@@ -845,26 +769,14 @@ bug_resolution: # New section
 
 ### HIGH Severity
 
-**Criteria**:
-
-- Blocks deployment
-- Causes system instability
+- Blocks deployment or causes system instability
 - Breaking changes without migration path
 - Critical tests failing
 - Security vulnerabilities
 - Data loss risk
 - Performance regressions > 20%
 
-**Examples**:
-
-- Missing migration path for breaking change
-- Core functionality broken
-- Test coverage dropped below 70%
-- Memory leaks detected
-
 ### MEDIUM Severity
-
-**Criteria**:
 
 - Should be fixed before deployment but not blocking
 - Impacts developer experience
@@ -872,28 +784,12 @@ bug_resolution: # New section
 - Performance concerns
 - Code quality issues
 
-**Examples**:
-
-- Some tests skipped
-- Documentation incomplete
-- Minor performance regression
-- Code complexity concerns
-
 ### LOW Severity
-
-**Criteria**:
 
 - Nice to fix but not urgent
 - Cosmetic issues
 - Minor documentation gaps
 - Code style inconsistencies
-
-**Examples**:
-
-- Typos in comments
-- Missing inline documentation
-- Console warnings
-- Minor lint issues
 
 ---
 
@@ -901,87 +797,51 @@ bug_resolution: # New section
 
 ### Performance
 
-**Good Performance**:
-
-- ✅ Meets or exceeds performance targets
-- ✅ No regressions in critical paths
-- ✅ Resource usage acceptable
-- ✅ Load tested if applicable
-
-**Concerns**:
-
-- ⚠️ Minor performance regressions (< 10%)
-- ⚠️ Resource usage higher than expected
-- ⚠️ Performance not tested thoroughly
-
-**Fails**:
-
-- ❌ Significant performance degradation (> 20%)
-- ❌ Memory leaks
-- ❌ Unacceptable resource consumption
+| Assessment | Conditions |
+|---|---|
+| PASS | Meets or exceeds targets; no regressions in critical paths; resource usage acceptable |
+| CONCERNS | Minor regressions (<10%); resource usage higher than expected; performance not fully tested |
+| FAIL | Significant degradation (>20%); memory leaks; unacceptable resource consumption |
 
 ### Reliability
 
-**Good Reliability**:
-
-- ✅ Comprehensive error handling
-- ✅ Graceful degradation
-- ✅ Rollback plan validated
-- ✅ Recovery mechanisms tested
-
-**Concerns**:
-
-- ⚠️ Some error cases not handled
-- ⚠️ Rollback plan not fully tested
-- ⚠️ Limited failure mode testing
-
-**Fails**:
-
-- ❌ Poor error handling
-- ❌ No rollback plan
-- ❌ System instability
+| Assessment | Conditions |
+|---|---|
+| PASS | Comprehensive error handling; graceful degradation; rollback plan validated |
+| CONCERNS | Some error cases unhandled; rollback plan not fully tested |
+| FAIL | Poor error handling; no rollback plan; system instability |
 
 ### Security
 
-**Good Security**:
-
-- ✅ No new vulnerabilities
-- ✅ Security best practices followed
-- ✅ Sensitive data handled properly
-- ✅ Dependencies up to date
-
-**Concerns**:
-
-- ⚠️ Minor security concerns
-- ⚠️ Some dependencies with vulnerabilities
-- ⚠️ Security not fully tested
-
-**Fails**:
-
-- ❌ Critical security vulnerabilities
-- ❌ Sensitive data exposed
-- ❌ Authentication/authorization broken
+| Assessment | Conditions |
+|---|---|
+| PASS | No new vulnerabilities; security best practices followed; dependencies up to date |
+| CONCERNS | Minor security concerns; some dependency vulnerabilities; security not fully tested |
+| FAIL | Critical vulnerabilities; sensitive data exposed; authentication/authorization broken |
 
 ### Maintainability
 
-**Good Maintainability**:
+| Assessment | Conditions |
+|---|---|
+| PASS | Code is clear and well-documented; tests comprehensive; technical debt reduced |
+| CONCERNS | Some documentation gaps; test coverage below target; increased complexity |
+| FAIL | Code unclear or unmaintainable; no tests; significant technical debt added |
 
-- ✅ Code is clear and well-documented
-- ✅ Tests are comprehensive
-- ✅ Technical debt reduced
-- ✅ Complexity manageable
+---
 
-**Concerns**:
+## File Naming and Location
 
-- ⚠️ Some documentation gaps
-- ⚠️ Test coverage below target
-- ⚠️ Increased complexity
+```
+# Task Subdirectory — all QA artifacts co-located with task file
+docs/development/tasks/task.1.cache-lib-simplification/
+├── task.1.cache-lib-simplification.md          # Main task document
+├── task.1.qa.1.cache-lib-simplification.md     # QA report (co-located)
+├── task.1.gate.1.cache-lib-simplification.yml  # Gate file (co-located)
+├── task.1.bug.1.memory-leak.md                 # Bug report 1 (co-located)
+└── task.1.bug.2.test-failure.md                # Bug report 2 (co-located)
+```
 
-**Fails**:
-
-- ❌ Code is unclear or unmaintainable
-- ❌ No tests
-- ❌ Significant technical debt added
+**Note**: The legacy pattern of storing gate files in `docs/qa/gates/tasks/` is deprecated. All gate files must be co-located with the task file.
 
 ---
 
@@ -989,27 +849,19 @@ bug_resolution: # New section
 
 ### Pattern 1: All Tests Passing, No Issues
 
-**Gate Decision**: PASS
-**Deployment**: APPROVED
-**Report Focus**: Verify all criteria met, document successful completion
+**Gate Decision**: PASS — document successful completion; post PR comment with APPROVED recommendation.
 
 ### Pattern 2: Minor Issues Found
 
-**Gate Decision**: CONCERNS
-**Deployment**: CONDITIONAL
-**Report Focus**: Document issues, set conditions for deployment, track fixes
+**Gate Decision**: CONCERNS — list conditions; set deployment as CONDITIONAL; communicate non-blocking issues.
 
 ### Pattern 3: Critical Issues Found
 
-**Gate Decision**: FAIL
-**Deployment**: BLOCKED
-**Report Focus**: Clearly list blocking issues, work with dev on fix plan
+**Gate Decision**: FAIL — list blocking issues clearly; set deployment as BLOCKED; work with developer on fix plan.
 
 ### Pattern 4: Issues Acknowledged by Team
 
-**Gate Decision**: WAIVED
-**Deployment**: APPROVED
-**Report Focus**: Document rationale for waiver, track issues for future work
+**Gate Decision**: WAIVED — document rationale, reason, and approver; set `waiver.active: true` in gate YAML.
 
 ---
 
@@ -1017,71 +869,29 @@ bug_resolution: # New section
 
 ### Developer → QA Handoff
 
-**Developer Actions**:
+**Developer Actions:**
+1. Complete all implementation phases and mark checkboxes
+2. Ensure tests passing
+3. Update task status to "Ready for QA"
+4. Ensure PR exists
 
-1. Complete all implementation phases
-2. Mark all checkboxes in task document
-3. Ensure tests passing
-4. Update task status to "Ready for QA"
-5. Notify QA team
+**QA Actions:**
+1. Run this skill
+2. Post results to PR (Step 13)
+3. Return to developer if FAIL; proceed to finalise if PASS/CONCERNS
 
-**QA Actions**:
+### QA → Developer Handoff (Issues Found)
 
-1. Verify prerequisites
-2. Begin QA review process
-3. Create QA report
-4. Create quality gate
-5. Communicate results
-
-### QA → Developer Handoff (If Issues Found)
-
-**QA Actions**:
-
-1. Create bug reports for all issues
+**QA Actions:**
+1. Create bug reports for all HIGH/MEDIUM issues
 2. Link bugs in QA report
 3. Mark gate as FAIL or CONCERNS
-4. Return task to developer
+4. Post PR comment (Step 13)
 
-**Developer Actions**:
-
+**Developer Actions:**
 1. Review bug reports
 2. Fix issues
-3. Update task document
-4. Re-test
-5. Return to QA for re-review
-
----
-
-## Quick Reference
-
-### QA Review Checklist
-
-- [ ] Prerequisites verified
-- [ ] Task document read thoroughly
-- [ ] All phases reviewed
-- [ ] Tests executed and results documented
-- [ ] Success criteria checked
-- [ ] Breaking changes validated
-- [ ] NFRs assessed (Performance, Reliability, Security, Maintainability)
-- [ ] Regression testing completed
-- [ ] Issues documented with bug reports
-- [ ] QA report written
-- [ ] Quality gate created
-- [ ] Results communicated to team
-
-### File Naming Quick Reference
-
-```
-# Task Subdirectory Structure
-docs/development/tasks/task.1.cache-lib-simplification/
-├── task.1.cache-lib-simplification.md          # Main task document
-├── task.1.qa.1.cache-lib-simplification.md     # QA report (co-located)
-├── task.1.bug.1.memory-leak.md                 # Bug report 1 (co-located)
-└── task.1.bug.2.test-failure.md                # Bug report 2 (co-located)
-
-# Quality Gate (separate directory)
-docs/qa/gates/tasks/task.1.gate.1.cache-lib-simplification.yml
-```
+3. Re-run qa-task (Phase 0 auto-detects re-review need)
 
 ---
 
@@ -1095,6 +905,6 @@ docs/qa/gates/tasks/task.1.gate.1.cache-lib-simplification.yml
 
 ---
 
-**Last Updated**: 2026-03-15
-**Version**: 1.1
+**Last Updated**: 2026-03-20
+**Version**: 2.0
 **Maintainer**: Goji QA Team
