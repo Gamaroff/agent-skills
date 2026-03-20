@@ -876,7 +876,7 @@ Error: ECONNREFUSED 127.0.0.1:5432
 
 - `create-task` - For documenting complex fixes requiring wider refactoring
 - `develop` - When implementation encounters errors during development
-- `qa-review` - When QA testing identifies errors needing investigation
+- `qa-story` - When QA testing identifies errors needing investigation
 
 **Skills that use this:**
 

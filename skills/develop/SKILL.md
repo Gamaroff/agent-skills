@@ -717,7 +717,7 @@ After status validation passes:
 
 **QA Handoff**:
 
-When task is complete, inform user that QA can review using `qa-review` skill for:
+When task is complete, inform user that QA can review using `qa-story` skill for:
 
 - Technical task assessment
 - Risk validation

@@ -9,7 +9,7 @@ Create or update quality gate decision files that provide clear pass/fail decisi
 
 ## When to Use This Skill
 
-- **After Story Review**: When qa-review skill has completed comprehensive assessment
+- **After Story Review**: When qa-story skill has completed comprehensive assessment
 - **Creating Gate Files**: Formalizing quality decisions in standardized YAML format
 - **Updating Gates**: Revising gate status after bug fixes or improvements
 - **Gate Decisions**: Determining PASS/CONCERNS/FAIL/WAIVED status based on findings
@@ -17,7 +17,7 @@ Create or update quality gate decision files that provide clear pass/fail decisi
 **Related Skills**:
 
 - Use `qa-planning` skill for upfront risk and test planning (inputs to gate)
-- Use `qa-review` skill for comprehensive review (primary input to gate)
+- Use `qa-story` skill for comprehensive review (primary input to gate)
 
 ---
 
@@ -36,7 +36,7 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 
 ## Prerequisites
 
-- Story has been reviewed (manually or via qa-review skill)
+- Story has been reviewed (manually or via qa-story skill)
 - Review findings are available
 - Understanding of story requirements and implementation
 
@@ -232,7 +232,7 @@ Apply these rules in sequence to determine gate status:
 - If any risk score ≥ 9 → Gate = **FAIL** (unless waived)
 - Else if any risk score ≥ 6 → Gate = **CONCERNS**
 
-**2. Test Coverage Gaps (if trace available from qa-review)**:
+**2. Test Coverage Gaps (if trace available from qa-story)**:
 
 - If any P0 test from test-design is missing → Gate = **CONCERNS**
 - If security/data-loss P0 test missing → Gate = **FAIL**
@@ -412,7 +412,7 @@ When gate decision is unclear, use AskUserQuestion to clarify:
    - Risk profiling → Feeds `risk_summary` section
    - Test design → Feeds `evidence.tests_reviewed` and `trace` sections
 
-2. **Review** (qa-review skill)
+2. **Review** (qa-story skill)
    - Story review → Generates `top_issues`
    - NFR assessment → Feeds `nfr_validation` section
    - Requirements traceability → Feeds `trace` section
@@ -429,11 +429,11 @@ When gate decision is unclear, use AskUserQuestion to clarify:
 - "Reference risk_summary from qa-planning skill's risk profile output"
 - "Use test design data from qa-planning skill for evidence section"
 
-**From this skill to qa-review**:
+**From this skill to qa-story**:
 
-- "Pull top_issues from qa-review skill's QA report"
-- "Use nfr_validation data from qa-review skill's NFR assessment"
-- "Reference trace data from qa-review skill's traceability matrix"
+- "Pull top_issues from qa-story skill's QA report"
+- "Use nfr_validation data from qa-story skill's NFR assessment"
+- "Reference trace data from qa-story skill's traceability matrix"
 
 ---
 

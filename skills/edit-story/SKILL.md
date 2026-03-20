@@ -41,7 +41,7 @@ Natural language triggers:
 - `create-story` - Create new story documents
 - `edit-epic` - Edit epic documents (use this for epic files)
 - `develop` - Implement stories
-- `qa-review` - Review story implementations
+- `qa-story` - Review story implementations
 - `validate-story` - Pre-implementation validation
 
 ---
@@ -415,7 +415,7 @@ If validation fails, present findings to user:
 - Implements stories created/edited by this skill
 - May update story files during development (authorized sections only)
 
-**qa-review**:
+**qa-story**:
 
 - Reviews story implementations
 - Creates QA reports co-located with story files

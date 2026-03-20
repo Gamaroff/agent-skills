@@ -794,7 +794,7 @@ reproduction_steps:
 
 ## Related Skills
 
-- **qa-review**: Comprehensive story review that creates bug reports
+- **qa-story**: Comprehensive story review that creates bug reports
 - **fix-qa**: Developer workflow for fixing bugs
 - **develop**: Main development workflow
 

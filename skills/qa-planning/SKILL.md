@@ -16,7 +16,7 @@ Proactive quality assurance through risk assessment and test strategy design. Us
 
 **Related Skills**:
 
-- After planning, use `qa-review` skill for story review and NFR assessment
+- After planning, use `qa-story` skill for story review and NFR assessment
 - Use `qa-gate` skill to create quality gate decisions based on assessments
 
 ---
@@ -267,7 +267,7 @@ Review and update risk profile when:
 
 #### Output 3: Story Hook Line
 
-**Print this line for qa-review skill to reference:**
+**Print this line for qa-story skill to reference:**
 
 ```text
 Risk profile: {storyDirectory}/story.{epic}.{story}.risk.1.{story-name}.md
@@ -555,7 +555,7 @@ test_design:
 
 #### Output 3: Trace References
 
-Print for use by qa-review skill (trace-requirements workflow):
+Print for use by qa-story skill (trace-requirements workflow):
 
 ```text
 Test design matrix: {storyDirectory}/story.{epic}.{story}.test-design.1.{story-name}.md
@@ -600,7 +600,7 @@ Before finalizing, verify:
    - Assign appropriate test levels
    - Output: Test design document + Gate YAML block
 
-3. **Story Review** (qa-review skill)
+3. **Story Review** (qa-story skill)
    - Review implementation against test design
    - Validate risk mitigations
    - Trace requirements to tests
@@ -611,11 +611,11 @@ Before finalizing, verify:
 
 ### Cross-Skill References
 
-**From this skill to qa-review**:
+**From this skill to qa-story**:
 
-- "See qa-review skill for comprehensive story review process"
-- "Use qa-review skill to validate risk mitigations are implemented"
-- "Reference qa-review skill for NFR assessment and requirements traceability"
+- "See qa-story skill for comprehensive story review process"
+- "Use qa-story skill to validate risk mitigations are implemented"
+- "Reference qa-story skill for NFR assessment and requirements traceability"
 
 **From this skill to qa-gate**:
 
@@ -656,8 +656,8 @@ story.312.1.bsv-transaction-signing/
 ├── story.312.1.bsv-transaction-signing.md
 ├── story.312.1.risk.1.bsv-transaction-signing.md       ← qa-planning (pre-dev)
 ├── story.312.1.test-design.1.bsv-transaction-signing.md ← qa-planning (pre-dev)
-├── story.312.1.qa.1.bsv-transaction-signing.md         ← qa-review
-├── story.312.1.gate.1.bsv-transaction-signing.yml      ← qa-review
+├── story.312.1.qa.1.bsv-transaction-signing.md         ← qa-story
+├── story.312.1.gate.1.bsv-transaction-signing.yml      ← qa-story
 └── story.312.1.dod.1.bsv-transaction-signing.md        ← finalise
 ```
 
@@ -670,5 +670,5 @@ story.312.1.bsv-transaction-signing/
 3. **Efficient Test Coverage**: Right level, right priority, no duplication
 4. **Systematic Assessment**: Use frameworks (probability × impact, test levels, priorities)
 5. **Actionable Outputs**: Generate concrete artifacts (YAML blocks, reports, test scenarios)
-6. **Integrated Workflow**: Outputs feed into qa-review and qa-gate workflows
+6. **Integrated Workflow**: Outputs feed into qa-story and qa-gate workflows
 7. **Interactive When Needed**: Use AskUserQuestion for unclear requirements or priorities

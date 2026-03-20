@@ -1,6 +1,6 @@
 ---
 name: develop-story
-description: Automates the full end-to-end story development lifecycle: create-branch → review-story → develop → create-pr → qa-review → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume from any step; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story <story-file-path>` or "develop and QA this story end to end".
+description: Automates the full end-to-end story development lifecycle: create-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume from any step; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story <story-file-path>` or "develop and QA this story end to end".
 ---
 
 # Develop Story — Automated Lifecycle Orchestrator
@@ -109,7 +109,7 @@ Before asking questions, read the story file and note:
 - Story touches a single module (single app or lib)
 
 If all three conditions are met, set `PIPELINE_MODE=lite` and log it in the implementation report Pipeline Configuration table. In lite mode:
-- Step 5 (qa-review) uses **Direct Tools only** (skips parallel agents regardless of the adaptive strategy decision)
+- Step 5 (qa-story) uses **Direct Tools only** (skips parallel agents regardless of the adaptive strategy decision)
 - Step 5b (qa-fix) still runs if issues are found
 - All other steps run unchanged
 
@@ -240,7 +240,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | 2. review-story | ⏳ Pending | |
 | 3. develop | ⏳ Pending | |
 | 4. create-pr | ⏳ Pending | |
-| 5–6. qa-review / qa-fix loop | ⏳ Pending | |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | |
 | 7. finalise | ⏳ Pending | |
 | 8. commit-changes | ⏳ Pending | |
 
@@ -470,11 +470,11 @@ Then continue directly to Step 5–6 without waiting for user input.
 
 ### Step 5–6: QA Review / Fix Loop
 
-This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles** (each cycle = one qa-review + one qa-fix). A clean PASS on any qa-review exits the loop immediately.
+This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles** (each cycle = one qa-story + one qa-fix). A clean PASS on any qa-story exits the loop immediately.
 
 #### Finding the latest gate file
 
-After each qa-review, locate the most recent gate file:
+After each qa-story, locate the most recent gate file:
 ```bash
 ls {story-directory}/story.{epic}.{story}.gate.*.yml | sort -t. -k5 -n | tail -1
 ```
@@ -484,7 +484,7 @@ The gate file pattern is `story.{epic}.{story}.gate.{N}.{name}.yml` — field 5 
 
 **5a. Run QA Review**
 
-Invoke the `/qa-review` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
+Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
 
 After completion, find and read the latest gate file. Determine outcome:
 - `PASS` with no `top_issues` → exit loop, proceed to Step 7
@@ -527,7 +527,7 @@ Before halting, write a thorough escalation entry in the Issues Log:
 ```
 ### QA Loop Limit Reached — {YYYY-MM-DD}
 
-The pipeline completed 5 qa-review/qa-fix cycles without a clean PASS.
+The pipeline completed 5 qa-story/qa-fix cycles without a clean PASS.
 
 **Final gate status**: {status}
 **Remaining issues** (from final gate file):
@@ -565,7 +565,7 @@ Implementation Report: {report file path}
 
 The implementation report contains a full breakdown of every issue and fix attempted.
 Options:
-1. Fix remaining issues manually, then re-run /qa-review
+1. Fix remaining issues manually, then re-run /qa-story
 2. Accept the current gate status and proceed manually with /finalise
 3. Update the story requirements if issues reflect unintended scope
 ```
@@ -679,7 +679,7 @@ Every default applied must be recorded in the Decisions Log.
 | qa-fix with no file changes | HALT — do not increment cycle; log as unfixable and surface to user |
 | Resume state validation | Cross-check branch + PR existence before jumping to next step |
 | Pipeline mode for simple stories | `lite` if risk_level low/absent + <3 Tasks + single module; otherwise `standard` |
-| qa-review invocation in lite mode | Prepend "Use direct tools only — skip parallel agents" to the invocation context |
+| qa-story invocation in lite mode | Prepend "Use direct tools only — skip parallel agents" to the invocation context |
 | Register not found at startup | Ask once via AskUserQuestion; defer creation to post-pipeline if Yes |
 | Register found, story already ✅ | HALT, AskUserQuestion to confirm re-run |
 | Register found, story ❌ or ⚡ | Update to ⚡ at start; update to ✅ after Step 7 |
@@ -717,7 +717,7 @@ If a situation arises that is not in this table and the stakes are non-trivial, 
 - `/review-story` — Step 2
 - `/develop` — Step 3
 - `/create-pr` — Step 4
-- `/qa-review` — Step 5
+- `/qa-story` — Step 5
 - `/qa-fix` — Step 6
 - `/finalise` — Step 7
 - `/commit-changes` — Step 8

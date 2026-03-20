@@ -297,7 +297,7 @@ Generate comprehensive summary with:
 - `create-story` - Validates story completeness after creation
 - `correct-course` - Uses change-checklist for impact assessment
 - `develop` - Developers run DoD checklist before completion
-- `qa-review` - QA validation of completed work
+- `qa-story` - QA validation of completed work
 
 **Uses resources from**:
 

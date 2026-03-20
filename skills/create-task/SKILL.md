@@ -45,7 +45,7 @@ Activate this skill when:
 **Related Skills**:
 
 - `scrum-master` - For orchestrating technical task creation in project planning
-- `qa-review` - For QA assessment after task implementation
+- `qa-story` - For QA assessment after task implementation
 - `qa-gate` - For formal quality gate decision on technical tasks
 
 ### When NOT to Use
@@ -316,7 +316,7 @@ Inform user:
    - Update its status to `ready-for-dev`
    - Save the file
 3. Next steps: Implementation
-4. When complete: Hand off to QA with `qa-review` skill
+4. When complete: Hand off to QA with `qa-story` skill
 5. QA will create:
    - QA report at `task.[ID].qa.[number].[name].md`
    - Bug reports (if issues found) at `task.[ID].bug.[N].[name].md`
@@ -549,7 +549,7 @@ If QA finds issues:
 **Related QA Skills**:
 
 - **qa-planning**: Risk assessment and test design (use during planning phase)
-- **qa-review**: Comprehensive review for technical tasks (use when ready for QA)
+- **qa-story**: Comprehensive review for technical tasks (use when ready for QA)
 - **qa-gate**: Create quality gate decision files (use after review)
 - **create-bug-report**: Document issues found during QA
 - **qa-fix**: Apply fixes for issues found

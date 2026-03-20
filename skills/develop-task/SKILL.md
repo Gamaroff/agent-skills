@@ -63,7 +63,7 @@ For each step marked ✅ in the implementation report, verify the expected artif
 | 1. create-branch | `git branch --list "feature/task.{id}.*"` returns the branch |
 | 3. develop | `git log --oneline {branch}` shows more than the initial commit (code was actually committed) |
 | 4. create-pr | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | Latest gate file exists: `ls docs/qa/gates/tasks/task.{id}.gate.*.yml 2>/dev/null` |
+| 5–6. qa loop | Latest gate file exists: `ls {task-directory}/task.{id}.gate.*.yml 2>/dev/null` |
 | 7. finalise | Task file `Status:` field reads `Completed` |
 
 Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
@@ -472,11 +472,13 @@ This is the iterative heart of the pipeline. Maintain a **QA cycle counter** sta
 
 #### Finding the latest gate file
 
-After each qa-task review, locate the most recent gate file:
+After each qa-task review, locate the most recent gate file. Gate files are co-located with the task document in the task directory:
 ```bash
-ls docs/qa/gates/tasks/task.{id}.gate.*.yml | sort -t. -k4 -n | tail -1
+ls {task-directory}/task.{id}.gate.*.yml 2>/dev/null | sort -t. -k4 -n | tail -1
 ```
-The gate file pattern is `task.{id}.gate.{N}.{name}.yml` — field 4 (dot-delimited, with the full path prefix as field 1) is the numeric gate index. Read this file to determine the gate result.
+The gate file pattern is `task.{id}.gate.{N}.{name}.yml` — field 4 (dot-delimited) is the numeric gate index. Read this file to determine the gate result.
+
+**Note**: The legacy path `docs/qa/gates/tasks/` is deprecated. qa-task v2.0 co-locates gate files in the task directory alongside the task document.
 
 #### Each cycle:
 
