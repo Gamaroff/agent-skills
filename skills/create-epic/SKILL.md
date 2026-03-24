@@ -189,6 +189,15 @@ _(Repeat structure for Stories [N].2 and [N].3)_
 **Update Progress**: Calculate as (completed stories / total stories) × 100
 ```
 
+## Post-Creation Validation
+
+After generating the epic file, invoke `documentation-standards-validator` to confirm:
+
+- Filename uses dots as separators (`epic.NUMBER.descriptive-name.md`)
+- All required YAML frontmatter fields are present (epic_number, title, domain, status, priority, estimated_stories, created, target_completion)
+- Status indicator uses the standard icon (✅ 🔄 ⚠️ ❌ 📋)
+- File placed in correct location (`docs/prd/[domain]/[feature]/epics/`)
+
 ## Key Principles
 
 1. **Scope constraint** - Maximum 3 stories
@@ -215,3 +224,9 @@ _(Repeat structure for Stories [N].2 and [N].3)_
 - If scope grows beyond 3 stories → use create-prd
 - Always prioritize existing system integrity
 - When in doubt about complexity → escalate to create-prd
+
+## Related Skills
+
+- `documentation-standards-validator` - Validates epic file naming, YAML frontmatter fields, and status indicator usage after creation
+- `epic-registry-manager` - Manages global epic numbering and registry updates
+- `create-story` - Creates individual stories within the epic

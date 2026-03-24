@@ -116,21 +116,28 @@ If all three conditions are met, set `PIPELINE_MODE=lite` and log it in the impl
 
 If any condition is not met, `PIPELINE_MODE=standard` (default, no change to behaviour).
 
-### 0c-reg. Check Task Register (Optional)
+### 0c-reg. Check Global Register
 
 Locate the task register:
 ```bash
-ls docs/development/task-register.md 2>/dev/null
+ls docs/development/todo-list.md 2>/dev/null
 ```
 
-**If NOT found**: Log in Decisions Log: "No task register found at `docs/development/task-register.md` — skipping register integration." Continue to 0d.
+**If NOT found:**
+Use `AskUserQuestion`:
+- "No task register found at `docs/development/todo-list.md`. Should one be created? It tracks global progress and enables automatic status updates."
+- Options: "Yes, create after pipeline completes" | "No, skip register integration"
 
-**If found**:
+If Yes: log "Register creation deferred to post-pipeline" in Decisions Log. After Phase 2 Completion, scaffold the register from the task files in `docs/development/tasks/`. Then STOP — do not block the pipeline now.
+
+**If found:**
 Read it. Find the row for this task by matching the task ID.
 
 - `✅ Completed` → HALT with AskUserQuestion: "Task {ID} is already ✅ in the register. Re-run anyway?" If confirmed, proceed and log.
 - `⚡ In Progress` → Proceed, log "Task already In Progress in register".
 - `❌ Not Started` → Proceed normally.
+
+Check if the task's Dependencies column lists any tasks still marked ❌. If so, log a **non-blocking** warning in Decisions Log: "Out-of-sequence: {N} listed dependency/ies not yet complete. Proceeding — user may have intentional reason."
 
 Update the row: change status to `⚡ In Progress`. Stage this change alongside the Step 1 stash/unstash cycle (restore it after `git stash pop` in Step 1).
 
@@ -591,8 +598,8 @@ Review the implementation report at {path} and address the gaps before re-runnin
 
 On success: log "Task completed" in Decisions Log.
 
-**Register Update (if task register exists):**
-If `docs/development/task-register.md` was found in Step 0c-reg:
+**Register Update:**
+If `docs/development/todo-list.md` exists:
 1. Find the row matching this task's ID
 2. Set Status column → `✅ Completed`
 3. Set PR column → `#N` (PR number from Completion section)
@@ -687,9 +694,10 @@ Every default applied must be recorded in the Decisions Log.
 | Pipeline mode for simple tasks | `lite` if risk Low/absent + <3 phases + single module; otherwise `standard` |
 | qa-task invocation in lite mode | Prepend "Use direct tools only — skip parallel agents" to the invocation context |
 | Completion status | `Completed` (tasks use Completed, not Accepted) |
-| Task register not found | Skip silently — log in Decisions Log; no prompt needed |
-| Task register found, task already ✅ | HALT, AskUserQuestion to confirm re-run |
-| Task register found, task ❌ or ⚡ | Update to ⚡ at start; update to ✅ after Step 7; stage with Step 8 commit |
+| Register not found at startup | Ask once via AskUserQuestion; defer creation to post-pipeline if Yes |
+| Register found, task already ✅ | HALT, AskUserQuestion to confirm re-run |
+| Register found, task ❌ or ⚡ | Update to ⚡ at start; update to ✅ after Step 7 |
+| Register update on completion | Stage with implementation report; include in Step 8 commit |
 | Final commit push (Step 8) | Always push after Step 8 commit so PR reflects completed report |
 
 If a situation arises that is not in this table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.

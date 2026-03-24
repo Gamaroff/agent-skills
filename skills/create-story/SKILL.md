@@ -478,6 +478,13 @@ Review all sections for:
    - Update its status from `backlog` → `ready-for-dev`
    - Save the file
 
+5. **Run Documentation Standards Validation**
+   - Invoke `documentation-standards-validator` on the created story file and directory
+   - Confirm: story is in a self-named subdirectory (`story.E.S.name/story.E.S.name.md`)
+   - Confirm: dots used as structural separators, hyphens within descriptive name, all lowercase
+   - Confirm: all required YAML frontmatter fields present and ISO-formatted dates
+   - Fix any violations before proceeding to adversarial review (6.3)
+
 ### 6.3 Execute Adversarial Quality Review
 
 **CRITICAL / BLOCKING**: This step is mandatory and must not be skipped. Do not proceed to 6.4 or present the story to the user until this review is complete. Perform a full adversarial re-analysis of the completed story, treating it as if reviewing someone else's work. The goal is to make developer mistakes **impossible**.
@@ -567,6 +574,7 @@ For Simple Stories:
 **Calls**:
 
 - `execute-checklist` - For story validation
+- `documentation-standards-validator` - Validates story file naming, directory structure, and YAML frontmatter after creation
 
 **Outputs used by**:
 

@@ -47,6 +47,7 @@ Activate this skill when:
 - `scrum-master` - For orchestrating technical task creation in project planning
 - `qa-story` - For QA assessment after task implementation
 - `qa-gate` - For formal quality gate decision on technical tasks
+- `documentation-standards-validator` - Validates file naming conventions, YAML frontmatter, and structural standards after document creation
 
 ### When NOT to Use
 
@@ -243,6 +244,7 @@ For each risk:
 - ✅ All file paths use correct naming convention
 - ✅ No duplicate task IDs
 - ✅ Directory structure valid
+- ✅ File naming validated against documentation standards (dots not underscores, kebab-case descriptive names)
 
 **If validation fails**:
 
@@ -304,6 +306,11 @@ Once validated:
    - Show task ID assigned
    - Provide command to view file
    - Link to related QA skills
+
+5. **Run Documentation Standards Validation**
+   - Invoke `documentation-standards-validator` on the created file
+   - Confirm: dots used as structural separators, hyphens within names, lowercase, `.md` extension
+   - Fix any naming violations before presenting the file to the user
 
 ### 5. Post-Generation Steps
 
