@@ -774,25 +774,56 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
 6. **Add GitHub PR Comment** — **CRITICAL / BLOCKING**: This step is mandatory. Step 7 is NOT complete until the PR comment is confirmed posted. Do not skip or defer.
 
+   Populate the following template from the gate file and story document, then post it:
+
    ```bash
-   gh pr comment <pr-number> --body "## ✅ Story Accepted — Ready for Sprint Review
+   gh pr comment <pr-number> --body "## ✅ Story {epic}.{story} — Definition of Done: ACCEPTED
 
-   **Story:** story.{epic}.{story}.{name}
-   **Status:** ACCEPTED
-   **Acceptance Date:** {date}
+   **QA Gate**: {gate_status} ({quality_score}/100)
+   **Completed**: {date}
 
-   All Definition of Done criteria have been verified:
+   ### Acceptance Criteria ({ac_count}/{ac_total} satisfied)
 
-   - ✅ All acceptance criteria met
-   - ✅ Tests written and PR approved
-   - ✅ Documentation updated
-   - ✅ Security review passed
-   - ✅ Compliance review passed
+   | # | Criterion | Status |
+   |---|-----------|--------|
+   {ac_table_rows}
 
-   **Sprint Review Summary:** See \`sprint-review-summary.md\` in story directory
+   ### Quality
 
-   **Reviewed by:** Claude Code (finalise skill)"
+   - **Tests**: {tests_passing}/{tests_total} passing
+   - **Coverage**: {coverage_summary}
+   - **Security**: {security_status}
+   - **Performance**: {performance_status}
+   - **Reliability**: {reliability_status}
+
+   ### Artifacts
+
+   - QA Report: \`{qa_report_filename}\`
+   - Gate File: \`{gate_filename}\` ({gate_status})
+   - DoD Report: \`{dod_filename}\`
+   - Sprint Review: \`sprint-review-summary.md\`
+
+   **Story is ready to merge.** 🚀"
    ```
+
+   **Variable sources:**
+
+   | Placeholder | Source |
+   |---|---|
+   | `{epic}.{story}` | Story filename (e.g. `18.8`) |
+   | `{gate_status}` | Gate file `gate:` field |
+   | `{quality_score}` | Gate file `quality_score:` field |
+   | `{date}` | Today's date (YYYY-MM-DD) |
+   | `{ac_count}/{ac_total}` | Length of gate `evidence.trace.ac_covered` array / total ACs |
+   | `{ac_table_rows}` | One row per AC: `\| AC{n} \| {short description} \| ✅ \|` — descriptions from story's Acceptance Criteria section |
+   | `{tests_passing}/{tests_total}` | Gate file `evidence.tests_passing` / `evidence.tests_reviewed` |
+   | `{coverage_summary}` | Gate file `evidence.coverage` — format: `{stmt}% statements / {lines}% lines / {fn}% functions, {branch}% branches` |
+   | `{security_status}` | Gate file `nfr_validation.security.status` + brief `notes` |
+   | `{performance_status}` | Gate file `nfr_validation.performance.status` + brief `notes` |
+   | `{reliability_status}` | Gate file `nfr_validation.reliability.status` + brief `notes` |
+   | `{qa_report_filename}` | Filename of the `.qa.N.*.md` artifact created this run |
+   | `{gate_filename}` | Filename of the `.gate.N.*.yml` artifact created this run |
+   | `{dod_filename}` | Filename of the `.dod.N.*.md` artifact created this run |
 
    **Verify the comment was posted**: Confirm `gh pr comment` exited with code 0. If it fails, report the error to the user and retry or provide the comment body for manual posting. Do NOT proceed to sub-item 7 until confirmed.
 
