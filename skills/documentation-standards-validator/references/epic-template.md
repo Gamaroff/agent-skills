@@ -13,18 +13,15 @@
 -->
 
 ---
-title: 'Epic [N]: [Epic Name]'
-prd_source: '[source-document].md'
-epic_type: 'system_implementation | feature_enhancement | infrastructure | integration'
-priority: 'critical | high | medium | low'
-estimated_sprints: N
-dependencies: ['epic-X', 'epic-Y']
-status: 'NOT_STARTED | IN_PROGRESS | PARTIALLY_COMPLETE | COMPLETE'
-completion_percentage: 0-100
-blocked_by: ['epic-X'] # Optional, only if blocked
-team: ['developer-1', 'developer-2', 'designer', 'qa']
-start_date: 'YYYY-MM-DD' # Optional
-target_date: 'YYYY-MM-DD' # Optional
+epic_number: N
+title: "[Epic Name]"
+domain: "[Domain]"
+status: "📋 Planned"
+priority: "Critical | High | Medium | Low"
+estimated_stories: N
+created: YYYY-MM-DD
+target_completion: YYYY-MM-DD
+prd_source: "[source-document].md"
 ---
 
 # Epic [N]: [Epic Name]

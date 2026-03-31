@@ -80,15 +80,15 @@ Activate when user needs:
 
 ```markdown
 ---
-title: "Epic [N]: [Enhancement Name]"
+epic_number: N
+title: "[Enhancement Name]"
+domain: "[Domain]"
+status: "📋 Planned"
+priority: "Critical | High | Medium | Low"
+estimated_stories: N
+created: YYYY-MM-DD
+target_completion: YYYY-MM-DD
 prd_source: "[source-document].md or brownfield-enhancement"
-epic_type: "feature_enhancement"
-priority: "critical | high | medium | low"
-estimated_sprints: 1-2
-dependencies: []
-status: "NOT_STARTED | IN_PROGRESS | PARTIALLY_COMPLETE | COMPLETE"
-completion_percentage: 0
-team: ["developer-1"]
 ---
 
 # Epic [N]: {{Enhancement Name}} - Brownfield Enhancement
