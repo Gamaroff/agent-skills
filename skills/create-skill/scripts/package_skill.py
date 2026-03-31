@@ -79,10 +79,15 @@ def package_skill(skill_path, output_dir=None):
 
     # Create the zip file
     try:
+        EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
+        EXCLUDE_SUFFIXES = {'.pyc', '.pyo', '.map'}
+
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
             # Walk through the skill directory
             for file_path in skill_path.rglob('*'):
-                if file_path.is_file():
+                if any(part in EXCLUDE_DIRS for part in file_path.parts):
+                    continue
+                if file_path.is_file() and file_path.suffix not in EXCLUDE_SUFFIXES:
                     # Calculate the relative path within the zip
                     arcname = file_path.relative_to(skill_path.parent)
                     zipf.write(file_path, arcname)
