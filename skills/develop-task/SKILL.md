@@ -92,6 +92,14 @@ Before asking questions, read the task file and note:
 - Task title (for implementation report naming)
 - `Status:` field — see autonomous handling rules below
 - Risk Assessment section — overall risk level (High / Medium / Low / absent)
+- `github_issue:` field — extract the issue number if present:
+
+```bash
+GITHUB_ISSUE=$(grep '^github_issue:' {task-file} | awk '{print $2}')
+```
+
+- If `GITHUB_ISSUE` is a number: store as pipeline variable for downstream skills
+- If `GITHUB_ISSUE` is `null` or absent: log "No GitHub Issue linked — issue references will be skipped"
 
 **Autonomous status handling:**
 
@@ -116,30 +124,49 @@ If all three conditions are met, set `PIPELINE_MODE=lite` and log it in the impl
 
 If any condition is not met, `PIPELINE_MODE=standard` (default, no change to behaviour).
 
-### 0c-reg. Check Global Register
+### 0c-reg. Signal Work Started
 
-Locate the task register:
+If `GITHUB_ISSUE` is set (extracted in Phase 0c), comment on the issue and move it to "In Progress" on the Projects board:
+
 ```bash
-ls docs/development/todo-list.md 2>/dev/null
+# 1. Post pipeline-start comment
+gh issue comment {GITHUB_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
+
+# 2. Move issue to "In Progress" on the Projects board (graceful — warn and continue on any failure)
+(
+  # Discover project number (use project #1, the primary board)
+  PROJECT_NUM=1
+  OWNER=$(gh repo view --json owner -q '.owner.login')
+
+  # Get the item ID for this issue within the project
+  ITEM_ID=$(gh project item-list "$PROJECT_NUM" --owner "$OWNER" --format json \
+    | jq -r --argjson n {GITHUB_ISSUE} '.items[] | select(.content.number == $n) | .id // empty')
+
+  # Get the Status field ID and "In Progress" option ID
+  FIELD_JSON=$(gh project field-list "$PROJECT_NUM" --owner "$OWNER" --format json \
+    | jq '.fields[] | select(.name == "Status")')
+  STATUS_FIELD_ID=$(echo "$FIELD_JSON" | jq -r '.id // empty')
+  OPTION_ID=$(echo "$FIELD_JSON" | jq -r '.options[] | select(.name == "In Progress") | .id // empty')
+
+  if [ -z "$ITEM_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$OPTION_ID" ]; then
+    echo "⚠️  Could not resolve project item or Status field — skipping board update"
+  else
+    gh project item-edit \
+      --project-id "$PROJECT_NUM" \
+      --id "$ITEM_ID" \
+      --field-id "$STATUS_FIELD_ID" \
+      --single-select-option-id "$OPTION_ID" \
+      && echo "✅ Issue #{GITHUB_ISSUE} moved to In Progress on Projects board" \
+      || echo "⚠️  Board status update failed — issue comment was posted successfully"
+  fi
+) || echo "⚠️  Projects board update skipped (gh project unavailable or auth scope missing)"
 ```
 
-**If NOT found:**
-Use `AskUserQuestion`:
-- "No task register found at `docs/development/todo-list.md`. Should one be created? It tracks global progress and enables automatic status updates."
-- Options: "Yes, create after pipeline completes" | "No, skip register integration"
+If `GITHUB_ISSUE` is not set, skip both steps — do NOT update the deprecated register (`docs/development/todo-list.md`).
 
-If Yes: log "Register creation deferred to post-pipeline" in Decisions Log. After Phase 2 Completion, scaffold the register from the task files in `docs/development/tasks/`. Then STOP — do not block the pipeline now.
+Add to the implementation report Pipeline Configuration table:
 
-**If found:**
-Read it. Find the row for this task by matching the task ID.
-
-- `✅ Completed` → HALT with AskUserQuestion: "Task {ID} is already ✅ in the register. Re-run anyway?" If confirmed, proceed and log.
-- `⚡ In Progress` → Proceed, log "Task already In Progress in register".
-- `❌ Not Started` → Proceed normally.
-
-Check if the task's Dependencies column lists any tasks still marked ❌. If so, log a **non-blocking** warning in Decisions Log: "Out-of-sequence: {N} listed dependency/ies not yet complete. Proceeding — user may have intentional reason."
-
-Update the row: change status to `⚡ In Progress`. Stage this change alongside the Step 1 stash/unstash cycle (restore it after `git stash pop` in Step 1).
+| GitHub Issue | #{N} or not linked |
 
 ### 0d. Upfront Setup — gather all decisions before execution
 
@@ -430,6 +457,16 @@ Log the Explore summary in the Decisions Log: "Pre-develop surface map: {N} file
 
 **Pass this summary to `/develop`**: When invoking `/develop`, present the Explore summary as initial context so `/develop` does NOT need to run its own independent file discovery. This prevents duplicate exploration. State explicitly: "Codebase surface map already completed — {summary}. Proceed directly to alignment analysis using this map."
 
+**Plan file discovery (CRITICAL — check before invoking /develop)**:
+
+After the Explore subagent returns, look for a co-located plan file in the task directory:
+```bash
+ls {task-directory}/task.{id}.plan.*.md 2>/dev/null
+```
+If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the task's Implementation Plan section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
+
+If no plan file exists, proceed without it — plan files are optional (only present for tasks created after the co-located plan feature was added).
+
 **Handling the develop skill's internal gates**:
 
 - **Draft/Planned status gate**: If develop asks "is this ready?", answer **Yes** and automatically select "Yes, ready to implement". Rationale: `/review-task` already validated the task in Step 2. Log in Decisions Log: "Planned/Draft gate auto-answered: Yes — review-task validation in Step 2 is sufficient."
@@ -449,7 +486,7 @@ Update Pipeline Progress: ✅ develop
 
 ### Step 4: Create PR
 
-Invoke the `/create-pr` skill passing `--base {Q2_answer}` (e.g., `/create-pr --base develop`). This pre-supplies the target branch via create-pr's Step 0, skipping the interactive prompt entirely. Do not wait for create-pr to ask — Q2 is already resolved.
+Invoke the `/create-pr` skill passing `--base {Q2_answer}` (e.g., `/create-pr --base develop`). If `GITHUB_ISSUE` is set, also pass `--issue {GITHUB_ISSUE}` (e.g., `/create-pr --base develop --issue 42`). This pre-supplies the target branch and issue number via create-pr's Step 0, skipping the interactive prompt entirely. Do not wait for create-pr to ask — Q2 is already resolved.
 
 **Important**: `create-pr` will automatically commit any uncommitted code changes before opening the PR. At this point the implementation report is partially complete (Steps 1–3 documented). **CRITICAL**: The implementation report file must NOT be included in create-pr's auto-commit. Before invoking create-pr, proactively unstage the report if it was staged:
 ```bash
@@ -598,15 +635,8 @@ Review the implementation report at {path} and address the gaps before re-runnin
 
 On success: log "Task completed" in Decisions Log.
 
-**Register Update:**
-If `docs/development/todo-list.md` exists:
-1. Find the row matching this task's ID
-2. Set Status column → `✅ Completed`
-3. Set PR column → `#N` (PR number from Completion section)
-4. Write the file
-5. Stage for inclusion in Step 8 commit (do NOT commit separately)
-
-Log in Decisions Log: "Register updated: task.{id} → ✅ Completed (PR #{N})"
+**GitHub Issue Update:**
+If `GITHUB_ISSUE` is set, the issue is automatically closed via `Closes #{N}` in the PR body on merge — no manual action needed. Log in Decisions Log: "GitHub Issue #{N} will auto-close on PR merge via `Closes #N` in PR body."
 
 Update Pipeline Progress: ✅ finalise.
 
