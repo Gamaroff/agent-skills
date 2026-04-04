@@ -413,7 +413,19 @@ gh issue create \
 *Auto-created by /create-task*" \
   --label "task" \
   --label "priority:{priority}" \
-  --milestone "Technical Tasks (standalone)"
+  --milestone "{milestone_title}"
+```
+
+**Milestone selection** — determine `{milestone_title}` in this order:
+
+1. If the task document has a `milestone:` frontmatter field, use that value verbatim
+2. If the task has an `epic:` frontmatter field (e.g. `epic: 23`), look up the milestone title from the epic registry (`docs/development/epic-registry.md`) — format: `"Epic {N} — {Epic Title}"`
+3. Otherwise default to `"Technical Tasks (standalone)"`
+
+If the chosen milestone doesn't exist yet, auto-create it first:
+
+```bash
+gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="open"
 ```
 
 **Body authoring rules:**

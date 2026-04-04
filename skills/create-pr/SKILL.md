@@ -5,7 +5,7 @@ description: Create pull requests following project conventions. This skill shou
 
 # Create Pull Request
 
-This skill creates pull requests following the conventions defined in `docs/development/git-strategy.md`.
+This skill creates pull requests following standard Gitflow conventions.
 
 ## When to Use This Skill
 
@@ -50,19 +50,21 @@ Common Gitflow patterns:
 
 **Do not skip Step 1 unless `--base` was pre-supplied via Step 0** — if no pre-supplied branch, the base branch question must be answered before any other work begins.
 
-### Step 0: Check for Pre-Supplied Base Branch
+### Step 0: Check for Pre-Supplied Parameters
 
-Before asking the user, check whether a base branch was supplied as a parameter:
+Before asking the user, check whether parameters were supplied:
+
+**`--base <branch>`**:
 - The caller may pass `--base <branch>` (e.g., `/create-pr --base develop`)
-- When invoked by the `develop-story` orchestrator, the base branch is passed programmatically
+- When invoked by the `develop-story` or `develop-task` orchestrator, the base branch is passed programmatically
+- If provided: store as `BASE_BRANCH`, skip Step 1, log: "Base branch pre-supplied: {branch} — skipping interactive prompt", proceed to Step 2
+- If not provided: proceed to Step 1 as normal
 
-If `--base <branch>` was provided:
-- Store it as `BASE_BRANCH`
-- Skip Step 1 entirely — do NOT ask the user again
-- Log: "Base branch pre-supplied: {branch} — skipping interactive prompt"
-- Proceed directly to Step 2
-
-If no `--base` parameter was provided: proceed to Step 1 as normal.
+**`--issue <N>`**:
+- The caller may pass `--issue <N>` (e.g., `/create-pr --issue 42`)
+- When invoked by the `develop-story` or `develop-task` orchestrator, the issue number is passed if `GITHUB_ISSUE` is set
+- If provided: store as `GITHUB_ISSUE`, use in Step 5 PR description
+- If not provided: attempt auto-detection in Step 5 (see GitHub Issue Detection below)
 
 ### Step 1: Ask User for Target Branch
 
@@ -166,6 +168,28 @@ Closes #123
 # Get commit messages for the PR body
 git log origin/$BASE_BRANCH..HEAD --pretty=format:"- %s"
 ```
+
+### GitHub Issue Detection
+
+Determine the issue number using this priority:
+
+1. **`--issue` flag**: If provided via Step 0, use `GITHUB_ISSUE` directly
+2. **Auto-detection**: If no flag, attempt to find the issue from the source document:
+   a. Parse the current branch name for a story/task identifier (e.g. `feature/story.37.1.*` or `feature/task.40.*`)
+   b. Find the corresponding story/task document in the working directory
+   c. Read `github_issue` from its YAML frontmatter
+   d. If found, store as `GITHUB_ISSUE`
+3. **No issue**: If neither method yields a number, omit the Related Issues section entirely
+
+If `GITHUB_ISSUE` is set, add to the PR body:
+
+```markdown
+## Related Issues
+
+Closes #{GITHUB_ISSUE}
+```
+
+If no issue number is available, do NOT add the Related Issues section.
 
 ### Step 6: Create the Pull Request
 
@@ -395,6 +419,7 @@ Options:
 | Flag         | Description        | Example                             |
 | ------------ | ------------------ | ----------------------------------- |
 | `--base`     | Pre-supply target branch (skip prompt) | `/create-pr --base develop`         |
+| `--issue`    | Pre-supply GitHub issue number (skip auto-detection) | `/create-pr --issue 42`  |
 | `--draft`    | Create as draft PR | `/create-pr --draft`                |
 | `--title`    | Override PR title  | `/create-pr --title "custom title"` |
 | `--body`     | Override PR body   | `/create-pr --body "custom body"`   |
@@ -459,5 +484,4 @@ Output:
 
 ## References
 
-- [Git Strategy](file:///docs/development/git-strategy.md) - PR requirements and templates
 - [GitHub CLI Documentation](https://cli.github.com/manual/gh_pr_create) - `gh pr create` options
