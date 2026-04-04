@@ -92,6 +92,7 @@ When this skill is activated:
 ```
 docs/development/tasks/task.[ID].[descriptive-name]/
 ├── task.[ID].[descriptive-name].md                    # Main task
+├── task.[ID].plan.[descriptive-name].md               # Implementation plan (created alongside task)
 ├── task.[ID].qa.[number].[descriptive-name].md        # QA report (created by QA)
 ├── task.[ID].bug.[N].[bug-name].md                    # Bug reports (created during QA)
 └── [No quality gate file - created separately at docs/qa/gates/tasks/]
@@ -230,6 +231,66 @@ For each risk:
 - Rollback plan if needed
 ```
 
+### 2.5 Generate Plan File
+
+After collecting all section content (especially the Implementation Plan in Section 6), generate a co-located implementation plan file.
+
+**File**: `task.[ID].plan.[descriptive-name].md` — same directory as the task document.
+
+**Purpose**: The plan file contains implementation-level detail that the task document deliberately omits: code snippets, exact file changes, function signatures, and line-by-line guidance. The task doc describes *what* to build; the plan describes *how*.
+
+**Content structure**:
+
+```markdown
+---
+id: task.[ID].plan
+title: "Implementation Plan: [task title]"
+type: plan
+task-ref: task.[ID].[descriptive-name].md
+---
+
+# Implementation Plan: [task title]
+
+> Requirements and success criteria: [task.[ID].[descriptive-name].md](task.[ID].[descriptive-name].md)
+
+## Overview
+
+[1-2 sentence summary of the implementation approach]
+
+## Phase-by-Phase Implementation Guide
+
+### Phase 1: [Phase Name]
+
+**Files to modify:**
+- `path/to/file.ts` — [what to change and why]
+
+**Exact changes:**
+[Code snippets, function signatures, line references, before/after examples]
+
+### Phase 2: [Phase Name]
+[Same structure repeated for each phase]
+
+## Key Patterns and References
+
+[Existing code patterns to follow, utilities to reuse, architectural constraints]
+
+## Testing Approach
+
+[Specific test scenarios, test file locations, mocking strategies]
+```
+
+**Content sourcing rules**:
+- Extract implementation-level detail from the interactive workflow (code examples, function signatures, file paths discussed during section collection)
+- Reference specific lines/functions in existing files discovered during git history analysis (Step 1.5)
+- Include before/after code snippets for each phase where applicable
+- Do NOT duplicate the task doc's Implementation Plan section verbatim — the plan adds *how*, not restates *what*
+
+**Cross-reference in task doc**: After generating the plan file, add a cross-reference line at the top of the task doc's Implementation Plan section (Section 6):
+
+```markdown
+> Detailed implementation guide: [task.[ID].plan.[descriptive-name].md](task.[ID].plan.[descriptive-name].md)
+```
+
 ### 3. Validation Before File Creation
 
 **Checklist before generating document**:
@@ -312,12 +373,67 @@ Once validated:
    - Confirm: dots used as structural separators, hyphens within names, lowercase, `.md` extension
    - Fix any naming violations before presenting the file to the user
 
+### 4.5 Create GitHub Issue
+
+After the task document is fully written, create a corresponding GitHub Issue. Build a rich body that gives someone landing on the issue enough context without opening the document:
+
+```bash
+# Build clickable document link
+REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+DOC_URL="https://github.com/$REPO/blob/develop/{task-file-relative-path}"
+
+gh issue create \
+  --title "Task {id}: {title}" \
+  --body "## Overview
+
+{First paragraph of the task's Overview section — 2-4 sentences describing what the task does and why}
+
+## Key Deliverables
+
+{Bulleted list from the task's Key Deliverables or Scope section}
+
+## Success Criteria (summary)
+
+{2-5 most important success criteria, as a checkbox list}
+
+## Metadata
+
+| Field | Value |
+|-------|-------|
+| Priority | {priority} |
+| Effort | {effort_estimate} |
+| Category | {category} |
+| Depends on | {depends_on or —} |
+
+## Document
+
+📄 [Task Document]($DOC_URL)
+
+---
+*Auto-created by /create-task*" \
+  --label "task" \
+  --label "priority:{priority}" \
+  --milestone "Technical Tasks (standalone)"
+```
+
+**Body authoring rules:**
+- **Overview**: Copy the opening paragraph(s) verbatim from section 1 — don't summarise, use the actual text
+- **Key Deliverables**: Pull from the "Key Deliverables" or "Scope" section of the task document
+- **Success Criteria**: Select the 2-5 most outcome-focused criteria (skip internal implementation details)
+- **Document link**: Always use the full `https://github.com/...` URL — local paths are not clickable in GitHub issues
+- If `depends_on` is empty or `[]`, write `—`
+
+**On success**: Add `github_issue: {N}` to the task's YAML frontmatter.
+
+**On failure**: Set `github_issue: null`, log warning, continue. Never halt.
+
 ### 5. Post-Generation Steps
 
 Inform user:
 
 1. Task document created at `docs/development/tasks/task.[ID].[name]/task.[ID].[name].md`
-2. If `docs/prd/sprint-status.yaml` exists, update it:
+2. Plan file created at `docs/development/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
+3. If `docs/prd/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this task's ID/key
    - Update its status to `ready-for-dev`

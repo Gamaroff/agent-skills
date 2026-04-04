@@ -311,6 +311,69 @@ Populate these sections:
 2. Second acceptance criterion
 3. etc.
 
+### 5.2a Create GitHub Issue
+
+After populating basic story information, create a corresponding GitHub Issue with a rich, descriptive body:
+
+```bash
+# Build a clickable document link (repo-agnostic)
+REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+DOC_URL="https://github.com/$REPO/blob/develop/{story-file-relative-path}"
+
+gh issue create \
+  --title "Story {epic}.{story}: {title}" \
+  --body "## Overview
+
+{First 2-4 sentences from the story's purpose/description — the 'why' of this story, not just the title}
+
+## Acceptance Criteria
+
+{Acceptance criteria from Step 2.1, formatted as a checkbox list — each criterion on its own line}
+
+## Dependencies
+
+{Comma-separated list of story/task IDs this depends on, or '—' if none}
+
+## Metadata
+
+| Field | Value |
+|-------|-------|
+| Epic | {epic} — {epic_title} |
+| Priority | {priority} |
+| Story Type | {type: UI/API/Full-stack/Infrastructure} |
+
+## Document
+
+📄 [Story Document]($DOC_URL)
+
+---
+*Auto-created by /create-story*" \
+  --label "story" \
+  --label "priority:{priority}" \
+  --milestone "Epic {epic} — {epic_title}"
+```
+
+**Body authoring rules:**
+- **Overview**: Pull from the story statement rationale (the "so that" clause expanded) or the epic's description of this story's purpose — aim for 2-4 sentences that explain *why* the story matters
+- **Acceptance criteria**: Format each criterion as `- [ ] {text}` — use the verbatim text from Step 2.1, not paraphrases
+- **Document link**: Always use the full GitHub URL (`https://github.com/...`), never a local file path — the `REPO` variable makes this repo-agnostic
+
+If the milestone doesn't exist yet, auto-create it first:
+
+```bash
+gh api repos/{owner}/{repo}/milestones -f title="Epic {epic} — {epic_title}" -f state="open"
+```
+
+**On success**:
+1. Parse the issue number from the `gh` output (e.g. `https://github.com/org/repo/issues/42` → `42`)
+2. Add `github_issue: {N}` to the story's YAML frontmatter
+3. Add a row to the Story Information table: `| GitHub Issue | [#{N}](url) |`
+
+**On failure** (`gh` exits non-zero):
+1. Log warning: "⚠️ GitHub Issue creation failed — proceeding without issue linkage"
+2. Set `github_issue: null` in YAML frontmatter
+3. Continue to Step 5.3 — do NOT halt
+
 ### 5.3 Populate Dev Notes Section (CRITICAL)
 
 **CRITICAL ANTI-HALLUCINATION REQUIREMENT**: This section MUST contain ONLY information extracted from architecture documents. NEVER invent or assume technical details.
@@ -389,6 +452,17 @@ Generate a concrete, step-by-step walkthrough for verifying this story in the ru
 - The `dev-agent` may refine this section after implementation; the SM skeleton is sufficient to guide development
 - Do NOT invent navigation paths — only extract from source documents
 
+#### Rollback Plan
+
+Document how to undo this story's changes if they cause a production incident:
+
+- **What to revert**: Specific files, migrations, or feature flags that must be reversed
+- **Revert steps**: Ordered list of actions (e.g., run down migration, redeploy previous build, toggle flag off)
+- **Impact of rollback**: What functionality is lost or degraded after rollback
+- **Rollback complexity**: Simple (revert PR) / Moderate (migration rollback needed) / Complex (data already mutated)
+
+If a database migration is included, explicitly note whether it is reversible and provide the rollback SQL or Prisma command.
+
 #### Technical Constraints
 
 - Version requirements
@@ -440,6 +514,66 @@ Create detailed, sequential list of technical tasks based on:
   - [ ] Write integration tests for registration flow
 ```
 
+### 5.45 Generate Plan File
+
+After collecting tasks/subtasks and dev notes, generate a co-located implementation plan file.
+
+**File**: `story.[N].[M].plan.[descriptive-name].md` — same directory as the story document.
+
+**Purpose**: The plan file contains implementation-level detail that the story document deliberately omits: code snippets, exact file changes, function signatures, and line-by-line guidance. The story doc describes *what* to build; the plan describes *how*.
+
+**Content structure**:
+
+```markdown
+---
+id: story.[N].[M].plan
+title: "Implementation Plan: [story title]"
+type: plan
+story-ref: story.[N].[M].[descriptive-name].md
+---
+
+# Implementation Plan: [story title]
+
+> Requirements and acceptance criteria: [story.[N].[M].[descriptive-name].md](story.[N].[M].[descriptive-name].md)
+
+## Overview
+
+[1-2 sentence summary of the implementation approach]
+
+## Task-by-Task Implementation Guide
+
+### Task 1: [Task Name]
+
+**Files to modify:**
+- `path/to/file.ts` — [what to change and why]
+
+**Exact changes:**
+[Code snippets, function signatures, line references, before/after examples]
+
+### Task 2: [Task Name]
+[Same structure repeated for each task]
+
+## Key Patterns and References
+
+[Existing code patterns to follow, utilities to reuse, architectural constraints]
+
+## Testing Approach
+
+[Specific test scenarios, test file locations, mocking strategies]
+```
+
+**Content sourcing rules**:
+- Extract implementation-level detail from the interactive workflow (code examples, function signatures, file paths discussed during section collection)
+- Reference specific lines/functions in existing files discovered during git history analysis (Step 2.3)
+- Include before/after code snippets for each task where applicable
+- Do NOT duplicate the story's Tasks/Subtasks section verbatim — the plan adds *how*, not restates *what*
+
+**Cross-reference in story doc**: After generating the plan file, add a cross-reference line at the top of the Tasks / Subtasks section:
+
+```markdown
+> Detailed implementation guide: [story.[N].[M].plan.[descriptive-name].md](story.[N].[M].plan.[descriptive-name].md)
+```
+
 ### 5.5 Add Testing Guidance
 
 In the **Testing** subsection of Dev Notes:
@@ -448,6 +582,63 @@ In the **Testing** subsection of Dev Notes:
 2. Specify test file locations
 3. Note testing frameworks and patterns to use
 4. Include any specific testing requirements for this story
+
+### 5.6 Scaffold QA Handoff Section
+
+Append the following block to the story file as empty stubs. The developer fills these in when marking the story Ready for QA — scaffolding them now gives a natural, consistent place for that context without requiring the developer to remember the structure.
+
+```markdown
+## QA Handoff
+
+**Completed**: [Date]
+**Developer**: [Name]
+**Branch**: [branch-name]
+**PR**: [PR link]
+
+### Summary of Changes
+
+[Developer: describe what was built and any implementation decisions that affect testing]
+
+### Testing Instructions for QA
+
+[Developer: step-by-step instructions to verify the acceptance criteria manually]
+
+### Areas Requiring Special Attention
+
+[Developer: edge cases, integration points, or regressions most likely to surface]
+
+### Known Limitations
+
+[Developer: constraints, workarounds, or descoped items the QA tester should know]
+
+### QA Prerequisites Checklist
+
+- [ ] All acceptance criteria implemented
+- [ ] Unit tests written and passing
+- [ ] Integration tests passing (if applicable)
+- [ ] Code review completed and approved
+- [ ] PR merged to develop branch
+- [ ] No console.log statements or debugging code left in
+- [ ] CI/CD pipeline passing
+
+## QA Report
+
+[Link to QA report will be added here when QA testing is complete]
+
+## Bug Reports
+
+### Open Bugs
+
+[No open bugs]
+
+### In QA Verification
+
+[No bugs in verification]
+
+### Closed Bugs
+
+[No closed bugs]
+```
 
 ---
 
@@ -500,6 +691,12 @@ Review all sections for:
 - **UX violations**: If this story touches UI, are UX requirements from the epic explicitly referenced with file citations?
 - **Missing manual testing steps**: If this story touches UI or navigation, does the Manual Testing Steps section have a concrete walkthrough? Vague or empty steps must be filled or explicitly marked "To be confirmed during implementation".
 - **Vague implementations**: Can every task be executed without ambiguity? Flag any task that requires guessing.
+- **Compatibility risks**: Verify each of the following is explicitly addressed in the story:
+  - [ ] No breaking changes to existing API contracts
+  - [ ] Database changes (if any) are additive only, or a migration rollback is documented
+  - [ ] UI changes follow existing design patterns (no new component libraries introduced)
+  - [ ] Performance impact of the change is negligible or justified
+- **Missing rollback plan**: Does the Rollback Plan section describe how to undo the change? If a migration is involved, is the rollback SQL/command included?
 
 #### ⚡ Should Add
 
