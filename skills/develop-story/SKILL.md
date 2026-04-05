@@ -24,8 +24,28 @@ Accept any of:
 - **Story file**: `docs/stories/story.8.2.configure-validation-pipe/story.8.2.configure-validation-pipe.md`
 - **Story directory**: `docs/stories/story.8.2.configure-validation-pipe/`
 - **Bare filename**: `story.8.2.configure-validation-pipe.md`
+- **GitHub issue URL** (direct or project board): `https://github.com/.../issues/297` or URL containing `issue=`
+- **Issue hash notation**: `#297`
+- **Bare issue number**: `297`
 
-**Resolution using Explore subagent:**
+**GitHub URL / issue number — resolve inline first (before Explore subagent):**
+
+If the input matches a GitHub URL, `#NNN`, or an all-digit number:
+
+1. Extract the issue number.
+2. Fetch the issue body and parse the Document link:
+
+```bash
+ISSUE_BODY=$(gh issue view {N} --json body -q '.body')
+DOC_URL=$(echo "$ISSUE_BODY" | grep -o 'https://github\.com/[^)]*\.md' | head -1)
+LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*/||')
+```
+
+3. If `LOCAL_PATH` is non-empty and the file exists: use it as the resolved story file path — **skip the Explore subagent**.
+4. If no Document link found: fall back to `grep -rl "github_issue: {N}" docs/` and pass the matched directory to the Explore subagent.
+5. If still not found: HALT — inform user "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
+
+**Resolution using Explore subagent** (for file/directory/bare-filename inputs):
 
 Use the Agent tool with subagent_type="Explore" to locate the story file. Provide the input path and ask it to:
 
@@ -143,28 +163,62 @@ gh issue comment {GITHUB_ISSUE} --body "Pipeline started — branch: \`{branch-n
 
 # 2. Move issue to "In Progress" on the Projects board (graceful — warn and continue on any failure)
 (
-  # Discover project number (use project #1, the primary board)
-  PROJECT_NUM=1
   OWNER=$(gh repo view --json owner -q '.owner.login')
+  REPO_NAME=$(gh repo view --json name -q '.name')
+  REPO_URL=$(gh repo view --json url -q '.url')
 
-  # Get the item ID for this issue within the project
-  ITEM_ID=$(gh project item-list "$PROJECT_NUM" --owner "$OWNER" --format json \
-    | jq -r --argjson n {GITHUB_ISSUE} '.items[] | select(.content.number == $n) | .id // empty')
+  # Ensure issue is on the board (idempotent — returns existing item if already present)
+  gh project item-add 1 --owner "$OWNER" --url "$REPO_URL/issues/{GITHUB_ISSUE}" 2>/dev/null || true
 
-  # Get the Status field ID and "In Progress" option ID
-  FIELD_JSON=$(gh project field-list "$PROJECT_NUM" --owner "$OWNER" --format json \
-    | jq '.fields[] | select(.name == "Status")')
-  STATUS_FIELD_ID=$(echo "$FIELD_JSON" | jq -r '.id // empty')
-  OPTION_ID=$(echo "$FIELD_JSON" | jq -r '.options[] | select(.name == "In Progress") | .id // empty')
+  # Query the issue directly for its project items — avoids item-list pagination limits
+  RESPONSE=$(gh api graphql -f query='
+  {
+    repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
+      issue(number: {GITHUB_ISSUE}) {
+        projectItems(first: 10) {
+          nodes {
+            id
+            project {
+              id
+              title
+              fields(first: 20) {
+                nodes {
+                  ... on ProjectV2SingleSelectField {
+                    id
+                    name
+                    options { id name }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }')
 
-  if [ -z "$ITEM_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$OPTION_ID" ]; then
+  # Extract IDs from the first project item
+  ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
+  STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
+  OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "In Progress") | .id // empty')
+
+  if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$OPTION_ID" ]; then
     echo "⚠️  Could not resolve project item or Status field — skipping board update"
   else
-    gh project item-edit \
-      --project-id "$PROJECT_NUM" \
-      --id "$ITEM_ID" \
-      --field-id "$STATUS_FIELD_ID" \
-      --single-select-option-id "$OPTION_ID" \
+    gh api graphql -f query='
+    mutation {
+      updateProjectV2ItemFieldValue(
+        input: {
+          projectId: "'"$PROJECT_ID"'"
+          itemId: "'"$ITEM_ID"'"
+          fieldId: "'"$STATUS_FIELD_ID"'"
+          value: { singleSelectOptionId: "'"$OPTION_ID"'" }
+        }
+      ) {
+        projectV2Item { id }
+      }
+    }' \
       && echo "✅ Issue #{GITHUB_ISSUE} moved to In Progress on Projects board" \
       || echo "⚠️  Board status update failed — issue comment was posted successfully"
   fi

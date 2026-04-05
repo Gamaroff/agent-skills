@@ -85,12 +85,52 @@ The review produces **user-validated recommendations** through:
 
 ```yaml
 required:
-  - story_file: Path to story document to review
+  - story_file: |
+      Path to story document, OR any of:
+      - GitHub issue URL (direct):       https://github.com/{owner}/{repo}/issues/297
+      - GitHub project board URL:        https://github.com/orgs/.../projects/...?...issue=...
+      - Issue hash notation:             #297
+      - Bare issue number:               297
 
 optional:
   - focus_areas: Specific areas to focus on (e.g., "testing", "API specs")
   - review_depth: "quick" | "standard" | "thorough" (default: "standard")
 ```
+
+## Input Resolution
+
+Before loading the story document, resolve the input to a local file path:
+
+**Step 1 — Detect input type.** If the argument looks like a file path, skip to Step 4.
+
+| Pattern | Matches |
+|---------|---------|
+| Contains `github.com` or `orgs/` | GitHub URL |
+| Starts with `#` followed by digits | Hash notation |
+| All digits | Bare issue number |
+
+**Step 2 — Extract the issue number** from whichever pattern matched.
+
+**Step 3 — Resolve to local file path:**
+
+```bash
+# Fetch issue body
+ISSUE_BODY=$(gh issue view {N} --json body -q '.body')
+
+# Extract the GitHub blob URL from the Document section
+DOC_URL=$(echo "$ISSUE_BODY" | grep -o 'https://github\.com/[^)]*\.md' | head -1)
+
+# Strip the URL prefix to get the repo-relative path
+LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*/||')
+```
+
+- If `LOCAL_PATH` is non-empty and the file exists: use it as `story_file`, skip to Step 4.
+- If no Document link found (older issue without Document section): fall back to `grep -rl "github_issue: {N}" docs/` and find `story.{epic}.{story}.*.md` in the result (excluding `.qa.`, `.gate.`, `.bug.`, `.implementation.` files).
+- If still not found: HALT — inform user: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
+
+**Step 4 — Continue with the resolved `story_file`.**
+
+---
 
 **Files to Load During Review**:
 
@@ -433,10 +473,47 @@ slashPrefix: BMad
    - Tasks must use checkbox format with subtasks
    - Change Log must be table format
 
+5. **GitHub Issue Linkage**:
+   - Frontmatter MUST contain `github_issue:` field
+   - If `github_issue:` is missing or `null`:
+     - Flag as **Important** gap
+     - Ask: "This story has no linked GitHub issue. Should I create one now?"
+     - If user confirms, create the issue using the same pattern as `/create-story`:
+       ```bash
+       REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+       DOC_URL="https://github.com/$REPO/blob/develop/{story-file-relative-path}"
+
+       gh issue create \
+         --title "Story {epic}.{story}: {title}" \
+         --project "Goji Website Development Board" \
+         --body "## Overview
+
+       {First 2-4 sentences from the story's purpose/description}
+
+       ## Acceptance Criteria
+
+       {Acceptance criteria formatted as checkbox list}
+
+       ## Document
+
+       📄 [Story Document]($DOC_URL)
+       📁 \`{story-file-relative-path}\`
+
+       ---
+       *Auto-created by /review-story*" \
+         --label "story" \
+         --label "priority:{priority}" \
+         --milestone "Epic {epic} — {epic_title}"
+       ```
+     - Write `github_issue: {N}` into frontmatter
+     - Add row to Story Information table: `| GitHub Issue | [#{N}](url) |`
+   - If `github_issue:` has a numeric value, verify the issue exists: `gh issue view {N} --json state -q '.state'`
+     - If the issue doesn't exist (command errors), flag as **Critical**
+
 **Issues to Flag**:
 
 - **Critical**: Missing required sections (Story, ACs, Tasks, Dev Notes)
-- **Important**: Unfilled placeholders in core sections
+- **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage
 - **Optional**: Missing optional sections or subsections
 
 **Output**: Section compliance report with specific issues listed
