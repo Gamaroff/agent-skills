@@ -30,9 +30,20 @@ Accept any of:
 
 **GitHub URL / issue number — resolve inline first (before Explore subagent):**
 
-If the input matches a GitHub URL, `#NNN`, or an all-digit number:
+If the input matches a GitHub URL (contains `github.com`), `#NNN`, or an all-digit number:
 
-1. Extract the issue number.
+1. Extract the issue number:
+
+```bash
+# Direct issue URL:   https://github.com/owner/repo/issues/297
+ISSUE_NUM=$(echo "$INPUT" | grep -oE '(?<=/issues/)[0-9]+')
+
+# Project board URL:  ...issue=owner%7Crepo%7C297
+# Hash notation:      #297  /  Bare number: 297
+# Generic fallback — last group of digits:
+[ -z "$ISSUE_NUM" ] && ISSUE_NUM=$(echo "$INPUT" | grep -oE '[0-9]+' | tail -1)
+```
+
 2. Fetch the issue body and parse the Document link:
 
 ```bash

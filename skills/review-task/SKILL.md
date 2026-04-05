@@ -82,11 +82,22 @@ Before loading the task document, resolve the input to a local file path:
 
 | Pattern | Matches |
 |---------|---------|
-| Contains `github.com` or `orgs/` | GitHub URL |
+| Contains `github.com` | GitHub URL (direct issue or project board) |
 | Starts with `#` followed by digits | Hash notation |
 | All digits | Bare issue number |
 
-**Step 2 — Extract the issue number** from whichever pattern matched.
+**Step 2 — Extract the issue number** from whichever pattern matched:
+
+```bash
+# Direct issue URL:   https://github.com/owner/repo/issues/297
+ISSUE_NUM=$(echo "$INPUT" | grep -oE '(?<=/issues/)[0-9]+')
+
+# Project board URL:  ...issue=owner%7Crepo%7C297  (last digits after %7C or |)
+# Hash notation:      #297
+# Bare number:        297
+# Generic fallback — last group of digits in the input:
+[ -z "$ISSUE_NUM" ] && ISSUE_NUM=$(echo "$INPUT" | grep -oE '[0-9]+' | tail -1)
+```
 
 **Step 3 — Resolve to local file path:**
 
