@@ -116,11 +116,11 @@ For each step marked ✅ in the implementation report, verify the expected artif
 | 3. develop | Code committed on branch | `git log --oneline {branch}` shows more than the initial commit |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
 | 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` — gate alone is insufficient |
-| 7. finalise | **Both** `task.{id}.dod.{N}.*.md` exists **and** task `Status:` field reads `Completed` | `ls {task-directory}/task.{id}.dod.*.md` AND `grep "^status:" {task-file}` |
+| 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `Status:` reads `Completed` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep "^status:" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
 
 Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
 
-**CRITICAL — Do not conflate gate file with qa completion**: A `gate.yml` written manually (without running `/qa-task`) does NOT satisfy Step 5–6. The required artifacts are the `qa.N.md` report file (created by `/qa-task`) AND the `gate.N.yml`. Similarly, updating DoD checkboxes in the task doc does NOT satisfy Step 7 — `/finalise` must write a separate `dod.N.md` file.
+**CRITICAL — Do not conflate gate file with qa completion**: A `gate.yml` written manually (without running `/qa-task`) does NOT satisfy Step 5–6. The required artifacts are the `qa.N.md` report file (created by `/qa-task`) AND the `gate.N.yml`. Similarly, updating DoD checkboxes in the task doc does NOT satisfy Step 7 — `/finalise` must write a separate `dod.N.md` file AND post an acceptance comment to the PR.
 
 **QA cycle count reconstruction (if resuming at Step 5–6)**:
 If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
