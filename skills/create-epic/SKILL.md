@@ -27,6 +27,27 @@ Activate when user needs:
 - **4+ stories, architectural changes** → Use `create-prd`
 - **Single session, isolated** → Use `brownfield-story`
 
+## ⚠️ Documentation-Only Scope — Do NOT Implement
+
+This skill produces **the epic document and registry update only**. It MUST NOT begin implementing the stories the epic describes, nor scaffold any source code.
+
+**Forbidden during this skill** (regardless of how compelling it seems):
+
+- ❌ Editing, creating, or deleting any source file outside the epic's directory (and the registry/sprint-status side effects below)
+- ❌ Creating story files (that is `create-story`'s job, invoked separately)
+- ❌ Running migrations, codegen, build, lint-fix, or refactor commands
+- ❌ Creating branches, committing, or pushing code changes
+- ❌ Installing/removing dependencies or modifying `package.json`
+- ❌ Auto-invoking `create-story`, `develop-story`, or any implementation skill on completion
+
+**Allowed writes** (the only filesystem changes this skill may make):
+
+- ✅ The epic file `docs/prd/[domain]/[feature]/epics/epic.[N].[name].md`
+- ✅ `/docs/development/epic-registry.md` (number reservation per the global numbering rule)
+- ✅ Tracker issue creation if the workflow includes it (GitHub/Jira issue for the epic itself)
+
+**If the user asks to "create the epic and start the first story"**: create the epic doc, then STOP and explicitly hand off — tell user to invoke `/create-story` as a separate step. Do not chain.
+
 ## Prerequisites
 
 **Project context required:**
@@ -189,6 +210,19 @@ _(Repeat structure for Stories [N].2 and [N].3)_
 **Update Progress**: Calculate as (completed stories / total stories) × 100
 ```
 
+## Visual Diagram (conditional, via `mermaid-architect`)
+
+After drafting the Stories Breakdown, decide whether a Mermaid Value Stream diagram would clarify the epic. **Mandatory only if it enhances understanding** — do not pad the epic with a diagram that just restates the table.
+
+**Justified when:** the epic has 3 stories with non-trivial sequencing constraints, cross-story dependencies, or risk-isolated parallel tracks.
+
+**Process:**
+
+1. Invoke `mermaid-architect` with: epic file path, the list of stories (with IDs and titles), and any sequencing constraints surfaced in Stories Breakdown.
+2. The skill returns a `flowchart` (Value Stream type) showing story order, dependencies, and any parallel branches — plus a 2-sentence "Architectural assumptions" summary.
+3. Paste the Mermaid block (with YAML metadata header) into a new "Story Flow" subsection placed between "Stories Breakdown" and "Compatibility Requirements".
+4. Accept `no diagram justified — {reason}` without pushing back; not every epic needs one.
+
 ## Post-Creation Validation
 
 After generating the epic file, invoke `documentation-standards-validator` to confirm:
@@ -230,3 +264,4 @@ After generating the epic file, invoke `documentation-standards-validator` to co
 - `documentation-standards-validator` - Validates epic file naming, YAML frontmatter fields, and status indicator usage after creation
 - `epic-registry-manager` - Manages global epic numbering and registry updates
 - `create-story` - Creates individual stories within the epic
+- `mermaid-architect` - Generates Value Stream flowchart of the epic's stories when sequencing or parallelism warrants a diagram

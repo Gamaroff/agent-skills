@@ -305,6 +305,22 @@ options:
 
 ---
 
+### Step 5.5 — Mermaid Diagram Validation (via `mermaid-architect`)
+
+**Purpose**: Validate any embedded Mermaid Value Stream diagram against syntax, metadata, and consistency rules. Recommend a diagram if the epic lacks one and a story-flow view would materially clarify sequencing.
+
+**Actions**:
+
+1. **Detect diagrams**: scan the epic for fenced ```` ```mermaid ```` blocks. Capture each block's section anchor and whether a YAML metadata header (`<!-- mermaid-architect: ... -->`) precedes it.
+2. **Invoke `mermaid-architect` in review mode** for each block. Pass: epic file path, the section anchor, and the Stories Breakdown table so the skill can verify each story node in the diagram maps to a real story (and vice versa) and detect drift between the diagram and the table.
+3. **Collect verdicts**: `pass`, `pass with notes`, `fail`. `fail` → Major Issue; `pass with notes` → Minor.
+4. **If absent and the epic has 3+ stories with non-trivial sequencing, parallel tracks, or cross-story dependencies**: add a Recommendation to invoke `create-epic`'s diagram step (or the user can ask `mermaid-architect` directly). Do not flag absence as an issue when the table already conveys the order clearly.
+5. **If a diagram restates the table verbatim with no added information**: recommend removing it.
+
+**Output**: append to Critical/Major/Minor buckets. Defer any user decisions to QUESTION POINT 2 or 3 as appropriate.
+
+---
+
 ### Step 6 — Consistency & Internal Conflict Check
 
 **Purpose**: Cross-reference within the epic for internal contradictions.

@@ -15,12 +15,6 @@ Mark a story or task as complete by verifying it against a comprehensive Definit
 - No loss of work if verification is interrupted
 - Transparency for stakeholders who can monitor the running summary file
 
-**Relationship to implementation report**: The DoD running summary (`story.{epic}.{story}.dod.{num}.{story-name}.md`) is a QA/verification artifact — it records the DoD check results. The implementation report (`story.{epic}.{story}.implementation.{N}.md`), created by the `develop-story` orchestrator, records the full pipeline audit trail. They are complementary, not redundant:
-- Implementation report: pipeline-level log (branch, PR, QA iterations, decisions)
-- DoD running summary: verification-level log (acceptance criteria pass/fail, security check, compliance check)
-
-Both are co-located in the story directory. When invoked from `develop-story`, the DoD summary is the canonical record of finalise results; the implementation report references it.
-
 Based on the verification results, it either marks the story/task as "Accepted" with generated artifacts, or lists specific gaps that need to be addressed.
 
 ## When to Use This Skill
@@ -313,11 +307,23 @@ Reference the **Definition of Done checklist** (`references/definition-of-done-c
    - If any checkbox is unchecked, note it as a gap
 
 2. **Verify Unit Tests and Code Review:**
-   - Extract PR number from frontmatter (`pr_number: 123`) or body (`PR #123`, `https://github.com/org/repo/pull/123`)
-   - Use `gh pr view <number>` to check:
-     - PR exists and is accessible
-     - PR has been approved by at least one reviewer
-     - Tests are mentioned in PR description or story document
+   - Extract PR number from frontmatter (`pr_number: 123`) or body (`PR #123`, `https://github.com/org/repo/pull/123`, `https://bitbucket.org/.../pull-requests/123`)
+   - Detect platform (run once if not already done):
+     ```bash
+     REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+     if echo "$REMOTE_URL" | grep -qi "github\.com"; then PLATFORM="github"
+     elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
+       PLATFORM="bitbucket"
+       BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+       BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+       BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+       BB_API="https://api.bitbucket.org/2.0"
+     fi
+     ```
+   - Check PR status by platform:
+     - *GitHub*: `gh pr view <number>` — check `state`, `reviewDecision`, and description
+     - *Bitbucket*: `curl -s -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/<number>"` — check `state` (`OPEN`/`MERGED`) and `participants[].approved`
+   - Verify: PR exists and is accessible, approved by at least one reviewer, tests mentioned
    - If PR is not found, not approved, or tests are missing, note as a gap
 
 3. **Check Documentation Updates:**
@@ -680,6 +686,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - ✅ Story document updated with DoD verification section
    - ✅ Sprint Review summary created
    - ✅ PR comment posted (if applicable)
+   - ✅ GitHub project board item moved to Done (if applicable)
 
    **Next Steps:**
    - Story is ready for Sprint Review
@@ -740,8 +747,6 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Production: ⚠️ CONDITIONAL (pending staging validation)
 
    **Story marked as ACCEPTED on:** 2025-02-01
-   **Reviewed by:** Claude Code (finalise skill)
-   **QA Engineer:** QA Engineer (Claude Sonnet 4.5)
    ```
 
    **Example (without QA report):**
@@ -760,7 +765,6 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    ✅ **Compliance Review:** GDPR consent flow implemented, WCAG AA accessibility met
 
    **Story marked as ACCEPTED on:** 2025-02-01
-   **Reviewed by:** Claude Code (finalise skill)
    ```
 
 4. **Reference Running Summary in DoD Section:**
@@ -772,66 +776,159 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Fill in all sections with information from the story/task document and PR
    - Save summary as: `{story-directory}/sprint-review-summary.md`
 
-6. **Add GitHub PR Comment** — **CRITICAL / BLOCKING**: This step is mandatory. Step 7 is NOT complete until the PR comment is confirmed posted. Do not skip or defer.
+6. **Add PR Comment:**
+   - Add a summary comment to the PR (platform-branched):
+     - *GitHub*: `gh pr comment <pr-number> --body "..."`
+     - *Bitbucket*: `curl -s -X POST "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/<pr-number>/comments" -H "Content-Type: application/json" -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" -d '{"content": {"raw": "..."}}'`
+   - Include acceptance confirmation and link to Sprint Review summary
 
-   Populate the following template from the gate file and story document, then post it:
+   **Example PR Comment:**
 
-   ```bash
-   gh pr comment <pr-number> --body "## ✅ Story {epic}.{story} — Definition of Done: ACCEPTED
+   ```markdown
+   ## ✅ Story Accepted - Ready for Sprint Review
 
-   **QA Gate**: {gate_status} ({quality_score}/100)
-   **Completed**: {date}
+   **Story:** story.311.1.transaction-confirmation-system
+   **Status:** ACCEPTED
+   **Acceptance Date:** 2025-02-01
 
-   ### Acceptance Criteria ({ac_count}/{ac_total} satisfied)
+   All Definition of Done criteria have been verified:
 
-   | # | Criterion | Status |
-   |---|-----------|--------|
-   {ac_table_rows}
+   - ✅ All acceptance criteria met
+   - ✅ Tests written and PR approved
+   - ✅ Documentation updated
+   - ✅ Security review passed
+   - ✅ Compliance review passed
 
-   ### Quality
-
-   - **Tests**: {tests_passing}/{tests_total} passing
-   - **Coverage**: {coverage_summary}
-   - **Security**: {security_status}
-   - **Performance**: {performance_status}
-   - **Reliability**: {reliability_status}
-
-   ### Artifacts
-
-   - QA Report: \`{qa_report_filename}\`
-   - Gate File: \`{gate_filename}\` ({gate_status})
-   - DoD Report: \`{dod_filename}\`
-   - Sprint Review: \`sprint-review-summary.md\`
-
-   **Story is ready to merge.** 🚀"
+   **Sprint Review Summary:** See `sprint-review-summary.md` in story directory
    ```
 
-   **Variable sources:**
+7. **Move Tracker Issue to Done:**
 
-   | Placeholder | Source |
-   |---|---|
-   | `{epic}.{story}` | Story filename (e.g. `18.8`) |
-   | `{gate_status}` | Gate file `gate:` field |
-   | `{quality_score}` | Gate file `quality_score:` field |
-   | `{date}` | Today's date (YYYY-MM-DD) |
-   | `{ac_count}/{ac_total}` | Length of gate `evidence.trace.ac_covered` array / total ACs |
-   | `{ac_table_rows}` | One row per AC: `\| AC{n} \| {short description} \| ✅ \|` — descriptions from story's Acceptance Criteria section |
-   | `{tests_passing}/{tests_total}` | Gate file `evidence.tests_passing` / `evidence.tests_reviewed` |
-   | `{coverage_summary}` | Gate file `evidence.coverage` — format: `{stmt}% statements / {lines}% lines / {fn}% functions, {branch}% branches` |
-   | `{security_status}` | Gate file `nfr_validation.security.status` + brief `notes` |
-   | `{performance_status}` | Gate file `nfr_validation.performance.status` + brief `notes` |
-   | `{reliability_status}` | Gate file `nfr_validation.reliability.status` + brief `notes` |
-   | `{qa_report_filename}` | Filename of the `.qa.N.*.md` artifact created this run |
-   | `{gate_filename}` | Filename of the `.gate.N.*.yml` artifact created this run |
-   | `{dod_filename}` | Filename of the `.dod.N.*.md` artifact created this run |
+   **Detect tracker platform** (same pattern used throughout this skill):
+   - If `JIRA_URL` is set → **Jira path**
+   - Otherwise → **GitHub path**
 
-   **Verify the comment was posted**: Confirm `gh pr comment` exited with code 0. If it fails, report the error to the user and retry or provide the comment body for manual posting. Do NOT proceed to sub-item 7 until confirmed.
+   **Jira path** (when `JIRA_URL` is set):
 
-7. **Communicate to User** — **CRITICAL / BLOCKING**: Always output a completion summary. Do not end the skill silently. Required output:
-   - Acceptance confirmation with story ID
-   - Path to updated story document
-   - Path to Sprint Review summary
-   - Confirmation that PR comment was posted (with PR URL)
+   Extract `jira_key` from story/task frontmatter. If absent or null, skip this step silently.
+
+   Use the Atlassian MCP tools. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `mediastreamag.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
+
+   1. **Transition to Done** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
+      - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {jira_key}`
+      - Find transition matching "Done" (case-insensitive); fallbacks: "Closed", "Resolved"
+      - If found: call `transitionJiraIssue` with `cloudId`, `issueIdOrKey: {jira_key}`, and `transition: {id: "<matched-id>"}`
+      - **Retry once** if the first call fails
+      - If both calls fail: post a PR comment (Bitbucket REST API) warning that the Jira issue was not moved to Done, and log in running summary
+      - If no matching transition: log "⚠️ No done-state transition found for {jira_key}" in running summary (non-blocking)
+
+   2. **Post completion comment** — call `addCommentToJiraIssue`:
+      - `cloudId`: {derived hostname}
+      - `issueIdOrKey`: `{jira_key}`
+      - `commentBody`: `"Story accepted — PR: {PR_URL}. All DoD criteria verified."`
+      - `contentFormat`: `"markdown"`
+      - On failure: log warning and continue (non-blocking)
+
+   Log outcome in running summary: "Jira issue {jira_key} transitioned to Done ✅" or the warning detail.
+
+   **GitHub path** (when `JIRA_URL` is NOT set):
+
+   - Extract `github_issue` number from story/task frontmatter
+   - Get the repository owner (org) via: `gh repo view --json owner --jq '.owner.login'`
+   - Get the repository name via: `gh repo view --json name --jq '.name'`
+   - Query the issue's project board items using GraphQL to discover item ID, project ID, Status field ID, and "Done" option ID — all in one call:
+
+   ```bash
+   gh api graphql -f query='
+   {
+     repository(owner: "<owner>", name: "<repo>") {
+       issue(number: <github_issue>) {
+         projectItems(first: 10) {
+           nodes {
+             id
+             project {
+               id
+               title
+               fields(first: 20) {
+                 nodes {
+                   ... on ProjectV2SingleSelectField {
+                     id
+                     name
+                     options {
+                       id
+                       name
+                     }
+                   }
+                 }
+               }
+             }
+           }
+         }
+       }
+     }
+   }'
+   ```
+
+   - From the response, find the item where `project.title` matches the active project board (typically the first result if there is only one)
+   - Extract:
+     - `item.id` → the project item ID
+     - `item.project.id` → the project ID
+     - The field where `name == "Status"` → its `id` is the fieldId
+     - The option in that field where `name == "Done"` → its `id` is the singleSelectOptionId
+
+   **If no project items are found (issue not on any board):**
+   - Do NOT silently skip. Post a PR comment (GitHub: `gh pr comment <pr-number>`, Bitbucket: REST API as in Step 6) warning that the board was not updated:
+     ```
+     ⚠️ Project Board Not Updated
+
+     This story/task was accepted but GitHub issue #<github_issue> was not found on any project board — the board status was **not** moved to Done automatically.
+
+     **Action required:** manually move the card to Done on the project board, or add the issue to the board first.
+
+     ```
+   - Record this as a warning (not a blocker) in the running summary.
+
+   - Apply the update with the mutation:
+
+   ```bash
+   gh api graphql -f query='
+   mutation {
+     updateProjectV2ItemFieldValue(
+       input: {
+         projectId: "<project.id>"
+         itemId: "<item.id>"
+         fieldId: "<status-field.id>"
+         value: { singleSelectOptionId: "<done-option.id>" }
+       }
+     ) {
+       projectV2Item {
+         id
+       }
+     }
+   }'
+   ```
+
+   - Inspect the response:
+     - **Success**: response contains `data.updateProjectV2ItemFieldValue.projectV2Item.id` with no `errors` key → board update confirmed.
+     - **Failure**: response contains an `errors` key, or `projectV2Item` is null → **retry once** by re-running the exact same mutation. If the retry also fails, post a PR comment via `gh pr comment <pr-number>`:
+       ```
+       ⚠️ Project Board Update Failed
+
+       This story/task was accepted but the attempt to move GitHub issue #<github_issue> to **Done** on the project board failed (GraphQL error).
+
+       **Error details:** `<paste the errors array from the response>`
+
+       **Action required:** manually move the card to Done on the project board.
+
+       ```
+     - Record the failure (and the error detail) in the running summary regardless of retry outcome.
+
+8. **Communicate to User:**
+   - Display a success message with summary of completion
+   - Show path to updated story document
+   - Show path to Sprint Review summary
+   - Confirm PR comment was posted
+   - Confirm project board item was moved to Done (or note if not found on any board)
 
 **Step 7 Completion Checklist — tick off each before moving on:**
 
@@ -840,8 +937,10 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
-- [ ] GitHub PR comment posted (sub-item 6 — BLOCKING): confirm exit code 0
-- [ ] User notified with completion summary (sub-item 7 — BLOCKING): story ID + artifact paths + PR comment confirmation
+- [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API)
+- [ ] Tracker issue moved to Done: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub project board item moved via GraphQL mutation **OR** warning comment posted (if transition/mutation failed after retry)
+- [ ] Running summary records board update outcome (success, not-found, or error with detail)
+- [ ] User notified with success message, artifact paths, PR comment link, and board update status
 
 ### Step 8: Report Gaps (In Progress)
 
@@ -947,7 +1046,6 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Estimated Effort:** Large (6-8 hours) - includes 3 blocking security issues
 
    **Gap Report Generated:** 2025-02-01
-   **Reviewed by:** Claude Code (finalise skill)
    **QA Gate Reference**: See `story.311.2.gate.1.initial-review.yml` for full details
 
    **Detailed Verification Log:** See `story.311.2.dod.1.transaction-event-history.md` for complete verification evidence and timestamps.

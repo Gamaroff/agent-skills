@@ -24,6 +24,29 @@ Natural language triggers:
 
 To identify the next logical story based on project progress and epic definitions, and then to prepare a comprehensive, self-contained, and actionable story file. This skill ensures the story is enriched with all necessary technical context, requirements, and acceptance criteria, making it ready for efficient implementation by a Developer Agent with minimal need for additional research.
 
+## ⚠️ Documentation-Only Scope — Do NOT Implement
+
+This skill produces **the story document and its co-located plan file only**. It MUST NOT begin implementing the story and MUST NOT create tracker issues. Implementation is `develop-story`'s job; Jira sync is `/sync-jira-story`'s job — both invoked separately.
+
+**Forbidden during this skill** (regardless of how compelling it seems):
+
+- ❌ Editing, creating, or deleting any source file outside the story's directory
+- ❌ Running migrations, codegen, build, lint-fix, or refactor commands
+- ❌ Creating branches, committing, or pushing code changes
+- ❌ Installing/removing dependencies or modifying `package.json`
+- ❌ Starting Task 1 of the story's Tasks/Subtasks "to get a head start"
+- ❌ Auto-invoking `develop-story`, `develop`, or any implementation skill on completion
+- ❌ Creating Jira issues, GitHub issues, or any remote tracker issues — use `/sync-jira-story` explicitly
+
+**Allowed writes** (the only filesystem changes this skill may make):
+
+- ✅ The story directory `{epic-directory}/stories/story.{E}.{S}.{name}/`
+- ✅ `story.{E}.{S}.{name}.md` (story doc)
+- ✅ `story.{E}.{S}.plan.{name}.md` (plan doc)
+- ✅ `docs/prd/sprint-status.yaml` status field update (Step 6.2)
+
+**If the user asks to "create the story and start implementing"**: complete the story doc + plan, then STOP and explicitly hand off — tell user to invoke `/develop-story` as a separate step. Do not chain.
+
 ## CRITICAL: Sequential Execution Required
 
 **MANDATORY**: This workflow has 7 sequential steps that MUST be followed in order. Do NOT skip steps or proceed until the current step is complete.
@@ -311,68 +334,15 @@ Populate these sections:
 2. Second acceptance criterion
 3. etc.
 
-### 5.2a Create GitHub Issue
+### 5.2a Create Tracker Issue
 
-After populating basic story information, create a corresponding GitHub Issue with a rich, descriptive body:
-
-```bash
-# Build a clickable document link (repo-agnostic)
-REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-DOC_URL="https://github.com/$REPO/blob/develop/{story-file-relative-path}"
-
-gh issue create \
-  --title "Story {epic}.{story}: {title}" \
-  --body "## Overview
-
-{First 2-4 sentences from the story's purpose/description — the 'why' of this story, not just the title}
-
-## Acceptance Criteria
-
-{Acceptance criteria from Step 2.1, formatted as a checkbox list — each criterion on its own line}
-
-## Dependencies
-
-{Comma-separated list of story/task IDs this depends on, or '—' if none}
-
-## Metadata
-
-| Field | Value |
-|-------|-------|
-| Epic | {epic} — {epic_title} |
-| Priority | {priority} |
-| Story Type | {type: UI/API/Full-stack/Infrastructure} |
-
-## Document
-
-📄 [Story Document]($DOC_URL)
-
----
-*Auto-created by /create-story*" \
-  --label "story" \
-  --label "priority:{priority}" \
-  --milestone "Epic {epic} — {epic_title}"
-```
-
-**Body authoring rules:**
-- **Overview**: Pull from the story statement rationale (the "so that" clause expanded) or the epic's description of this story's purpose — aim for 2-4 sentences that explain *why* the story matters
-- **Acceptance criteria**: Format each criterion as `- [ ] {text}` — use the verbatim text from Step 2.1, not paraphrases
-- **Document link**: Always use the full GitHub URL (`https://github.com/...`), never a local file path — the `REPO` variable makes this repo-agnostic
-
-If the milestone doesn't exist yet, auto-create it first:
-
-```bash
-gh api repos/{owner}/{repo}/milestones -f title="Epic {epic} — {epic_title}" -f state="open"
-```
-
-**On success**:
-1. Parse the issue number from the `gh` output (e.g. `https://github.com/org/repo/issues/42` → `42`)
-2. Add `github_issue: {N}` to the story's YAML frontmatter
-3. Add a row to the Story Information table: `| GitHub Issue | [#{N}](url) |`
-
-**On failure** (`gh` exits non-zero):
-1. Log warning: "⚠️ GitHub Issue creation failed — proceeding without issue linkage"
-2. Set `github_issue: null` in YAML frontmatter
-3. Continue to Step 5.3 — do NOT halt
+> ⛔ **SKIP THIS STEP ENTIRELY.**
+>
+> Do NOT create Jira issues, GitHub issues, or any remote tracker issues during story creation.
+> Tracker sync is a separate, explicitly-triggered operation. The user must run `/sync-jira-story`
+> after the story is created and reviewed.
+>
+> Set `jira_key: null` and `jira_url: null` in the story YAML frontmatter. Leave them null.
 
 ### 5.3 Populate Dev Notes Section (CRITICAL)
 
@@ -574,6 +544,23 @@ story-ref: story.[N].[M].[descriptive-name].md
 > Detailed implementation guide: [story.[N].[M].plan.[descriptive-name].md](story.[N].[M].plan.[descriptive-name].md)
 ```
 
+### 5.4.5 Visual Diagram (conditional, via `mermaid-architect`)
+
+After Dev Notes are populated and the implementation plan exists, decide whether a Mermaid diagram materially clarifies the story. **Mandatory only if it enhances understanding** — do not add a diagram that just restates the Tasks list.
+
+**Diagram type by story shape:**
+
+- Story describes a request/response or multi-service interaction → `sequenceDiagram` (preferred)
+- Story describes a stateful UI/component lifecycle (e.g., onboarding wizard, transaction status) → `stateDiagram-v2`
+- Story describes a non-trivial decision/branching flow → `flowchart` with decision nodes
+
+**Process:**
+
+1. Invoke `mermaid-architect` with: story file path, the section anchor (Dev Notes or a new "Flow" subsection inside Dev Notes), API spec reference if applicable, and any explicit actors named in the story.
+2. The skill will halt with clarifying questions if error states, actors, or transition triggers are missing — answer them before continuing. These answers may also surface gaps in the story itself; if so, update the relevant section.
+3. Paste the returned Mermaid block (with YAML metadata header) into Dev Notes under a "## Flow" or "## Sequence" subheading. Append the 2-sentence "Architectural assumptions" summary directly below the block.
+4. Accept `no diagram justified — {reason}` without pushing back.
+
 ### 5.5 Add Testing Guidance
 
 In the **Testing** subsection of Dev Notes:
@@ -772,6 +759,7 @@ For Simple Stories:
 
 - `execute-checklist` - For story validation
 - `documentation-standards-validator` - Validates story file naming, directory structure, and YAML frontmatter after creation
+- `mermaid-architect` - Generates a sequence diagram (API interaction) or state diagram (stateful UI) for the story when a diagram materially clarifies the spec
 
 **Outputs used by**:
 

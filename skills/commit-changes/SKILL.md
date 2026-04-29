@@ -61,6 +61,19 @@ If unsure whether a generated file should be included, err on the side of exclus
        - Features added/updated
        - Related changes (tests, docs, config, migrations)
    - Prefer an editor for multi-line messages: `git commit -v`
+
+   ### Tracker Issue Reference
+
+   If a `GITHUB_ISSUE` number is available (passed from the pipeline orchestrator — works for both GitHub and Bitbucket issue numbers):
+   - Append ` (#{N})` to the commit subject line
+   - Example: `feat(story.37.1): wallet recovery transparency (#42)`
+
+   If no issue number is available (standalone invocation or document lacks `github_issue`):
+   - Commit message format is unchanged
+   - Do NOT prompt the user for an issue number
+
+   The issue reference is purely additive — it must never change the commit type, scope, or description.
+
 7. Run the smallest relevant verification
    - Run the repo's fastest meaningful check (unit tests, lint, or build) before moving on.
 8. Repeat for the next commit until the working tree is clean

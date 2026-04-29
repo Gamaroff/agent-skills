@@ -300,15 +300,66 @@ function parseArgs() {
   return options;
 }
 
+function updateFileWithJiraLink(filePath, issueKey, issueUrl) {
+  const content = fs.readFileSync(filePath, "utf-8");
+
+  // --- 1. Update YAML frontmatter ---
+  let updated;
+  if (content.startsWith("---")) {
+    const parts = content.split(/^---$/m);
+    // parts[0] = '' (before first ---), parts[1] = frontmatter, parts[2+] = body
+    if (parts.length >= 3) {
+      let fm = parts[1];
+      // Remove any existing jira_key / jira_url lines before re-adding
+      fm = fm.replace(/^jira_key:.*\n?/m, "").replace(/^jira_url:.*\n?/m, "");
+      // Append before the closing blank line (or at end)
+      fm = fm.trimEnd() + `\njira_key: "${issueKey}"\njira_url: "${issueUrl}"\n`;
+      parts[1] = fm;
+      updated = parts[0] + "---" + parts.slice(1, -1).join("---") + "---" + parts[parts.length - 1];
+    } else {
+      updated = content;
+    }
+  } else {
+    updated = content;
+  }
+
+  // --- 2. Add / update cross-reference link in body ---
+  const linkLine = `**Jira Epic**: [${issueKey}](${issueUrl})`;
+  const linkPattern = /^\*\*Jira Epic\*\*:.*$/m;
+
+  if (linkPattern.test(updated)) {
+    // Replace existing link line
+    updated = updated.replace(linkPattern, linkLine);
+  } else {
+    // Find a good insertion point:
+    // Prefer inserting after the first top-level heading (# ...) line
+    const headingMatch = updated.match(/^(# .+)$/m);
+    if (headingMatch) {
+      const idx = updated.indexOf(headingMatch[0]) + headingMatch[0].length;
+      updated = updated.slice(0, idx) + "\n\n" + linkLine + updated.slice(idx);
+    } else {
+      // Fallback: append at end
+      updated = updated.trimEnd() + "\n\n" + linkLine + "\n";
+    }
+  }
+
+  fs.writeFileSync(filePath, updated, "utf-8");
+  console.log(`\n📝 Updated source file with Jira cross-reference:`);
+  console.log(`   ${filePath}`);
+  console.log(`   Added: jira_key, jira_url to frontmatter`);
+  console.log(`   Added: ${linkLine}`);
+}
+
 async function main() {
   const args = parseArgs();
   const { baseUrl, token, email, project } = getAuth();
 
   let summary, description, priority, labels;
+  let filePath = null;
 
   // Parse from file if provided
   if (args.file) {
-    const filePath = path.resolve(args.file);
+    filePath = path.resolve(args.file);
     if (!fs.existsSync(filePath)) {
       console.error(`Error: File not found: ${filePath}`);
       process.exit(1);
@@ -357,7 +408,7 @@ async function main() {
   }
 
   // Create the epic
-  await createEpic({
+  const issueKey = await createEpic({
     baseUrl,
     email,
     token,
@@ -368,6 +419,12 @@ async function main() {
     labels,
     dryRun: args.dryRun,
   });
+
+  // Write back cross-reference link to source file
+  if (issueKey && filePath && !args.dryRun) {
+    const issueUrl = `${baseUrl}/browse/${issueKey}`;
+    updateFileWithJiraLink(filePath, issueKey, issueUrl);
+  }
 }
 
 main().catch((err) => {

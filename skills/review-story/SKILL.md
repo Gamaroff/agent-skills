@@ -484,18 +484,48 @@ slashPrefix: BMad
    - Tasks must use checkbox format with subtasks
    - Change Log must be table format
 
-5. **GitHub Issue Linkage**:
+5. **Tracker Issue Linkage**:
+
+   Detect tracker platform first:
+   - If `JIRA_URL` is set → **Jira path** (check for `jira_key:` in frontmatter)
+   - Otherwise → **GitHub path** (check for `github_issue:` in frontmatter)
+
+   **Jira path:**
+   - Frontmatter MUST contain `jira_key:` field
+   - If `jira_key:` is missing or `null`:
+     - Flag as **Important** gap
+     - Ask: "This story has no linked Jira issue. Should I create one now?"
+     - If user confirms, create the Jira Story using the same pattern as `/create-story` Step 5.2a (Jira path), including reading `jira_key` from the epic's frontmatter for epic linkage
+     - Write `jira_key`, `jira_epic_key`, `jira_url` into frontmatter and Story Information table
+   - If `jira_key:` has a value, verify the issue exists using the `getJiraIssue` Atlassian MCP tool with `issueIdOrKey: {jira_key}` and `fields: ["status", "summary"]`.
+     - If the tool returns a valid issue object → issue exists, continue.
+     - If the tool returns an error or null/empty result → flag as **Critical**: "Jira issue `{jira_key}` not found — it may have been deleted". Do NOT halt — record the finding and continue the review.
+   - **URL consistency check** (when `jira_key` is present and valid):
+     - If `jira_url:` is also in frontmatter: verify it equals `{JIRA_URL}/browse/{jira_key}`. Any mismatch → flag as **Important**: "`jira_url` does not match `jira_key`"
+     - Look for a `**Jira Epic**: [KEY](url)` or `**Jira Issue**: [KEY](url)` line in the story body. If found: verify the KEY matches `jira_key` and the URL ends with `/browse/{jira_key}`. Any mismatch → flag as **Important**: "Body cross-reference link does not match `jira_key`"
+     - If no body link is found: flag as **Important** — add one (e.g., `**Jira Issue**: [{jira_key}]({jira_url})`)
+
+   **GitHub path** (when `JIRA_URL` is NOT set):
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
      - Ask: "This story has no linked GitHub issue. Should I create one now?"
-     - If user confirms, create the issue using the same pattern as `/create-story`:
+     - If user confirms:
+       1. Derive the epic file path using the grandparent directory rule:
+          ```bash
+          STORY_DIR=$(dirname "{resolved story file path}")
+          EPIC_DIR=$(dirname "$(dirname "$STORY_DIR")")
+          EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
+          ```
+          If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_ISSUE_NUM=""`.
+       2. If the file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set or empty.
+       3. Create the story issue:
        ```bash
        REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
        DOC_URL="https://github.com/$REPO/blob/develop/{story-file-relative-path}"
 
        gh issue create \
-         --title "Story {epic}.{story}: {title}" \
+         --title "[Story {epic}.{story}] {title}" \
          --project "Goji Website Development Board" \
          --body "## Overview
 
@@ -508,18 +538,35 @@ slashPrefix: BMad
        ## Document
 
        📄 [Story Document]($DOC_URL)
-       📁 \`{story-file-relative-path}\`
-
-       ---
-       *Auto-created by /review-story*" \
+       📁 \`{story-file-relative-path}\`" \
          --label "story" \
          --label "priority:{priority}" \
          --milestone "Epic {epic} — {epic_title}"
        ```
      - Write `github_issue: {N}` into frontmatter
      - Add row to Story Information table: `| GitHub Issue | [#{N}](url) |`
-   - If `github_issue:` has a numeric value, verify the issue exists: `gh issue view {N} --json state -q '.state'`
-     - If the issue doesn't exist (command errors), flag as **Critical**
+       4. After writing `github_issue: {N}` to frontmatter, link the story as a sub-issue of the epic:
+          If `EPIC_ISSUE_NUM` is non-empty:
+          ```bash
+          OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
+          REPO_NAME=$(gh repo view --json name -q '.name')
+          STORY_NUM={N from the newly created issue}
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${OWNER}/${REPO_NAME}/issues/${EPIC_ISSUE_NUM}/sub_issues \
+            -f sub_issue_id=${STORY_NUM}
+          ```
+          On success: log `✅ Story #${STORY_NUM} linked as sub-issue of Epic #${EPIC_ISSUE_NUM}.`
+          On failure: log `⚠️ Sub-issue linking failed — story issue created but not hierarchically linked.` Do NOT halt.
+   - If `github_issue:` has a numeric value:
+     - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
+       - If the issue doesn't exist (command errors), flag as **Critical**
+     - **URL consistency check** — verify the cross-reference link in the story body is correct:
+       - Look for any markdown link of the form `[#N](url)` or `[#N](https://github.com/...)` in the story body
+       - If found: confirm the issue number in the link matches `github_issue:` in frontmatter; and confirm the URL path ends with `/issues/{N}`. Any mismatch → flag as **Important**: "Body link `[#X](url)` does not match frontmatter `github_issue: {N}`"
+       - If no body link found: flag as **Important** — add one (e.g., `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`)
 
 **Issues to Flag**:
 
@@ -910,6 +957,27 @@ Proceed to Phase 3 (recommendations and output) with a clean context containing 
 - **Optional**: Minor terminology variations, could be more consistent
 
 **Output**: Consistency report with conflicts identified
+
+---
+
+### Step 6.5: Mermaid Diagram Validation (via `mermaid-architect`)
+
+**Purpose**: Validate any embedded Mermaid diagrams (sequence, state, flowchart) in Dev Notes against syntax, metadata, and architectural-consistency rules. Recommend a diagram if the story lacks one and a visual would materially clarify the spec.
+
+**Actions**:
+
+1. **Detect diagrams**: scan the story (and its co-located plan file if present) for fenced ```` ```mermaid ```` blocks. For each, capture: section anchor, diagram type, presence of YAML metadata header (`<!-- mermaid-architect: ... -->`).
+2. **Invoke `mermaid-architect` in review mode** for each block. Pass: story file path, the section anchor, the API spec ref (if applicable), and the actor/component names already in the story so the skill can verify naming consistency, time-order correctness for sequences, and that no architectural violations are encoded (e.g., a Client talking directly to a Database).
+3. **Collect verdicts**: `pass`, `pass with notes`, `fail`. Map `fail` → Important (or Critical if it encodes an architectural violation); `pass with notes` → Optional.
+4. **If absent**: assess whether one would materially clarify the story:
+   - Story describes a request/response or multi-service interaction → suggest `sequenceDiagram`
+   - Story describes a stateful UI/component lifecycle → suggest `stateDiagram-v2`
+   - Story has non-trivial branching or decision logic → suggest `flowchart`
+   Do NOT flag absence as an issue if Dev Notes prose already conveys the flow clearly.
+5. **If a diagram is present but adds no value over the prose**: recommend removing it.
+6. **If diagram type is wrong** (e.g., a time-ordered API protocol drawn as a generic flowchart): recommend the correct type.
+
+**Output**: append findings to Critical/Important/Optional buckets used by Steps 6–7.
 
 ---
 
@@ -1716,6 +1784,121 @@ User Can Now: Run `/develop` to begin implementation
 
 ---
 
+### Step 11: Post Tracker Comment (graceful — non-blocking)
+
+**Purpose**: Notify the linked tracker issue (Jira or GitHub) that a review has been completed, with the outcome, key findings, and a summary of any changes made to the story document.
+
+**When to Execute**: Always — after Step 10 completes (regardless of review outcome or status update decision).
+
+**Actions**:
+
+1. **Detect tracker platform**: if `JIRA_URL` is set → Jira path; else → GitHub path.
+
+3. **Collect context from previous steps**:
+
+   - `SCORE` — readiness score from Step 9
+   - `RECOMMENDATION` — READY TO IMPLEMENT | NEEDS REVISION | REQUIRES REWORK
+   - `CRITICAL`, `IMPORTANT`, `OPTIONAL` — issue counts from Step 9
+   - `REVIEW_FILE` — path to `.review.md` if saved, or `"Action plan only — no file saved"`
+   - `FIXES_APPLIED` — list of fix titles applied in Step 9.5, or empty string if user declined
+   - `FIXES_SKIPPED` — list of skipped fix titles from Step 9.5, or empty string
+   - `STATUS_CHANGE` — transition string if Step 10 updated status (e.g. `"Draft → Ready for Development"`), or empty string
+
+4. **Build the CHANGES_SECTION** (shared between both paths):
+
+   ```bash
+   CHANGES_SECTION=""
+   if [ -n "$FIXES_APPLIED" ] || [ -n "$FIXES_SKIPPED" ] || [ -n "$STATUS_CHANGE" ]; then
+     CHANGES_SECTION="
+
+   ### Changes Made to Story Document
+   "
+     [ -n "$FIXES_APPLIED" ] && CHANGES_SECTION+="
+   **Fixes applied:**
+   ${FIXES_APPLIED}"
+     [ -n "$FIXES_SKIPPED" ] && CHANGES_SECTION+="
+
+   **Skipped (needs manual input):**
+   ${FIXES_SKIPPED}"
+     [ -n "$STATUS_CHANGE" ] && CHANGES_SECTION+="
+
+   **Status updated**: ${STATUS_CHANGE}"
+   fi
+   ```
+
+5. **Post comment — branch on TRACKER:**
+
+   ---
+
+   **Jira path** (when `JIRA_URL` is set):
+
+   Read `jira_key` from story frontmatter. If absent, skip this step silently.
+
+   Use the `addCommentToJiraIssue` Atlassian MCP tool with:
+   - `issueIdOrKey`: `{jira_key from frontmatter}`
+   - `contentFormat`: `"markdown"`
+   - `comment`:
+     ```
+     ## Story Review Complete
+
+     **Recommendation**: {RECOMMENDATION}
+     **Readiness Score**: {SCORE}/10
+
+     | Severity | Count |
+     |---|---|
+     | Critical 🚨 | {CRITICAL} |
+     | Important ⚠️ | {IMPORTANT} |
+     | Optional 💡 | {OPTIONAL} |
+
+     **Review artifact**: `{REVIEW_FILE}`
+     {CHANGES_SECTION}
+     ```
+
+   On success → confirm: "✅ Review summary posted to Jira issue {jira_key}."
+   On failure → log warning "⚠️ Jira comment failed — continuing", do NOT halt.
+
+   ---
+
+   **GitHub path** (when `JIRA_URL` is NOT set):
+
+   Read `github_issue` from story frontmatter. If absent, skip this step silently.
+
+   Ensure issue is on the project board (idempotent, graceful):
+
+   ```bash
+   BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+   OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
+   REPO=$(gh repo view --json name -q '.name')
+   gh project item-add "$BOARD_NUM" --owner "$OWNER" \
+     --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
+   ```
+
+   Post the comment:
+
+   ```bash
+   gh issue comment "$GITHUB_ISSUE" --body "## Story Review Complete
+
+   **Recommendation**: ${RECOMMENDATION}
+   **Readiness Score**: ${SCORE}/10
+
+   | Severity | Count |
+   |----------|-------|
+   | Critical 🚨 | ${CRITICAL} |
+   | Important ⚠️ | ${IMPORTANT} |
+   | Optional 💡 | ${OPTIONAL} |
+
+   **Review artifact**: \`${REVIEW_FILE}\`
+   ${CHANGES_SECTION}" \
+     || echo "⚠️ GitHub issue comment failed — continuing"
+   ```
+
+   On success → confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}."
+   On failure → report error, do NOT halt.
+
+**Output**: Tracker issue updated with review outcome comment (Jira or GitHub, whichever is active).
+
+---
+
 ## Review Depth Modes
 
 ### Quick Review (15-30 minutes)
@@ -1753,7 +1936,7 @@ User Can Now: Run `/develop` to begin implementation
 
 Review is successfully completed when:
 
-✅ All steps (0-10) systematically executed according to review depth
+✅ All steps (0-11) systematically executed according to review depth
 ✅ Issues categorized by severity (critical/important/optional)
 ✅ Hallucinations identified and documented
 ✅ Gaps and inconsistencies flagged with specific locations
@@ -1762,6 +1945,7 @@ Review is successfully completed when:
 ✅ Clear GO/NO-GO recommendation made
 ✅ Comprehensive review report generated and saved (if applicable)
 ✅ Document status updated to reflect readiness (if fixes completed)
+✅ GitHub issue comment posted with review outcome (Step 11 — graceful: skipped if `github_issue` absent from frontmatter)
 
 ---
 
@@ -1775,7 +1959,7 @@ Review is successfully completed when:
 
 **Calls**:
 
-- None (standalone review skill)
+- `mermaid-architect` - Validates any embedded Mermaid diagrams (Step 6.5) and recommends a diagram if absent and a visual would materially clarify the spec
 
 **Outputs used by**:
 

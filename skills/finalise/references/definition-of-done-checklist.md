@@ -324,5 +324,4 @@ All Definition of Done criteria have been verified:
 ✅ **Compliance Review:** GDPR consent flow implemented, accessibility WCAG AA met
 
 **Story marked as ACCEPTED on:** [Date]
-**Reviewed by:** Claude Code (mark-story-complete skill)
 ```

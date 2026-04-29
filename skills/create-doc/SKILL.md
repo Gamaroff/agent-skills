@@ -142,6 +142,14 @@ Select 1-9 or just type your question/feedback:
 - Ask user if they want to add another instance
 - Repeat section processing as needed
 
+**h. Visual Diagrams (conditional, via `mermaid-architect`)**
+
+- If a section's drafted content describes a multi-actor flow, system topology, state lifecycle, sequence of API calls, or data shape — and a diagram would materially clarify it — invoke `mermaid-architect`.
+- A Mermaid diagram is **mandatory only if it enhances understanding** of the section. Do not pad documents with diagrams.
+- Pass the document path, the section anchor, and any actors/systems already named in the prose.
+- If the section template marks `diagram: optional|recommended|required`, honour that hint. Otherwise let `mermaid-architect` decide and accept its `no diagram justified — {reason}` response without pushing back.
+- Paste the returned Mermaid block (with YAML metadata header) and the 2-sentence "Architectural assumptions" summary into the section before continuing.
+
 ### 5. Continue Until Complete
 
 - Process all sections in order
@@ -267,6 +275,7 @@ This skill is typically called by:
 This skill calls:
 
 - **`pm-checklist`** - Often runs at end of PRD creation
+- **`mermaid-architect`** - Generates Mermaid diagrams for any section where a visual materially clarifies the prose
 - **Template skills** - References template structures from `prd-template` or `brownfield-prd-template`
 
 ## Key Principles

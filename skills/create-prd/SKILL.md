@@ -57,6 +57,27 @@ Activate this skill when the user needs to:
 [create-prd/create-epic/brownfield-story] because [rationale]."
 ```
 
+## ⚠️ Documentation-Only Scope — Do NOT Implement
+
+This skill produces **the PRD document and its associated planning artifacts only** (epic files via subsequent skills, tracker issues, handoff prompts). It MUST NOT begin implementing any feature the PRD describes, nor scaffold any source code.
+
+**Forbidden during this skill** (regardless of how compelling it seems):
+
+- ❌ Editing, creating, or deleting any source file outside `docs/prd/` (and the tracker-issue side effect)
+- ❌ Running migrations, codegen, build, lint-fix, or refactor commands
+- ❌ Creating branches, committing, or pushing code changes
+- ❌ Installing/removing dependencies or modifying `package.json`
+- ❌ Auto-invoking `create-epic`, `create-story`, `develop-story`, or any implementation skill on completion
+- ❌ Starting "phase 1" of any epic or story to "get a head start"
+
+**Allowed writes** (the only filesystem changes this skill may make):
+
+- ✅ The PRD file `docs/prd/[domain]/[feature]/prd.[name].md` (and its directory)
+- ✅ Tracker issue creation if the workflow includes it (GitHub/Jira issue for the PRD/initiative)
+- ✅ Handoff prompt files (Architect/UX Expert) emitted as part of Step 4
+
+**If the user asks to "create the PRD and start the first epic"**: complete the PRD (including Step 4 handoff prompts), then STOP and explicitly hand off — tell user to invoke `/create-epic` or `/create-epics-from-shards` as a separate step. Do not chain.
+
 ## Prerequisites
 
 Before starting, ensure you have:
@@ -95,7 +116,7 @@ Before starting, ensure you have:
    │  ├─ Compatibility requirements
    │  ├─ Risk assessment (technical debt, integration risks)
    │  └─ Incremental, low-risk story sequencing
-   └─ Save to docs/prd.md
+   └─ Save to docs/prds/prd.[kebab-name]/prd.[kebab-name].md
 
 3. Quality Validation
    ├─ Run pm-checklist
@@ -118,8 +139,9 @@ Before anything else, scan for an existing in-progress PRD for this feature:
 
 - Check `docs/prd/` and subdirectories for any PRD file related to the enhancement being discussed
 - If found, read it and check its `stepsCompleted` frontmatter field (or infer completion from section headings)
-- If an incomplete PRD is found, report to the user:
+- If a PRD is found, determine whether it is incomplete or complete, then report to the user:
 
+**If incomplete:**
 ```
 "I found an existing PRD at [path] that appears to cover [topic].
 It looks like [sections X, Y were completed / it was started but not finished].
@@ -127,6 +149,19 @@ It looks like [sections X, Y were completed / it was started but not finished].
 Options:
 [R] Resume — Continue from where it left off
 [S] Start fresh — Create a new PRD (existing file will be overwritten)
+[V] View — Show me the existing PRD first
+
+What would you like to do?"
+```
+
+**If complete (all sections present):**
+```
+"I found a completed PRD at [path] covering [topic].
+
+Options:
+[E] Extend — Add a new epic area to this PRD
+[R] Revise — Edit or update an existing section
+[S] Start fresh — Create a new PRD
 [V] View — Show me the existing PRD first
 
 What would you like to do?"
@@ -214,7 +249,7 @@ Is this correct?"
 ```
 Use create-doc skill with:
 - Template: brownfield-prd-template (resources/brownfield-prd-tmpl.yaml)
-- Output: docs/prd.md
+- Output: docs/prds/prd.[kebab-name]/prd.[kebab-name].md
 - Mode: Interactive (mandatory for brownfield)
 ```
 
@@ -349,20 +384,61 @@ Use create-doc skill with:
 
 #### Section 5: Epic and Story Structure (MANDATORY ELICITATION)
 
-**Brownfield Principle:** Favor single comprehensive epic unless multiple unrelated enhancements
+**Principle:** PRDs are living documents. Assess complexity honestly — multiple epics improve parallelism, reduce coupling, and make delivery more manageable. Do not default to a single epic.
 
-**Process:**
+**Step 1 — Complexity Assessment:**
 
-1. Assess epic structure need
-2. Present rationale: "Based on my analysis of your existing project, I believe this enhancement should be structured as [single epic/multiple epics] because [rationale based on actual project analysis]. Does this align with your understanding of the work required?"
-3. **STOP - Present 1-9 elicitation options**
-4. Wait for user response
+Score the PRD against these 6 signals. Each signal present = 1 point:
+
+| Signal | Description |
+|--------|-------------|
+| **Domain breadth** | PRD spans 2+ distinct functional areas (e.g. auth + notifications + data sync) |
+| **Parallelism opportunity** | Areas can be worked simultaneously by independent streams |
+| **Story volume** | Likely 8+ stories total (target 3–6 stories per epic) |
+| **Dependency isolation** | Areas have minimal cross-dependencies and can ship independently |
+| **Risk isolation** | One area is high-risk and should be isolated to contain impact |
+| **Timeline variance** | Different areas have different urgency or delivery milestones |
+
+**Scoring:**
+- **0–2 signals** → Single epic is appropriate; document rationale
+- **3+ signals** → Propose multiple epics, one per functional area
+
+**Step 2 — For multiple epics:**
+
+1. Propose a named epic breakdown mapping each epic to a PRD functional area
+2. Show which stories belong to each epic
+3. Identify cross-epic dependencies (if any) and sequencing constraints
+4. Present as: *"I recommend [N] epics because [signal list]. Here is the proposed breakdown: [epic list with rationale]."*
+
+**Step 3 — For single epic (must justify):**
+
+If 0–2 signals, document explicitly: *"This PRD scores [N]/6 on the complexity rubric. A single epic is appropriate because [reason]."*
+
+**Step 4 — Elicitation:**
+
+5. **STOP — Present 1-9 elicitation options**
+6. Wait for user response before proceeding
 
 **Epic Approach Documentation:**
 
-- Single epic (typical for brownfield)
-- Multiple epics (only if clearly multiple unrelated enhancements)
-- Rationale based on project analysis
+- Epic breakdown with named epics and their scope
+- Complexity signal score and rationale
+- Cross-epic dependency map (if multiple epics)
+
+**PRD Extensibility:**
+
+PRDs grow over time — it is expected and normal to add new epics as scope evolves. When working with an existing PRD:
+
+- Check if the user's intent is to **extend** an existing PRD (add a new epic area) rather than create from scratch
+- If extending: append the new epic to the existing PRD's Epic and Story Structure section; do not re-create the whole PRD
+- The continuation detection step (1a) must offer an **Extend** option for completed PRDs:
+
+```
+"This PRD appears complete. Would you like to:
+[R] Resume — Continue an incomplete section
+[E] Extend — Add a new epic area to this PRD
+[S] Start fresh — Create a new PRD"
+```
 
 **IMPORTANT - Epic Numbering:**
 When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/development/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
@@ -419,6 +495,21 @@ So that [benefit].
 - Story sequence has a step that modifies existing behaviour before verifying current behaviour still works
 - Acceptance criteria are not independently testable (no shared pass/fail conditions across stories)
 - No rollback consideration is documented for any story that modifies shared infrastructure (DB schema, APIs, auth)
+
+### Step 2.5: Visual Architecture Diagram (conditional, via `mermaid-architect`)
+
+**When to invoke:** if the PRD describes a new system topology, multi-actor flow, or non-trivial integration that would be clearer as a picture than as prose.
+
+**Rule:** a Mermaid diagram is **mandatory only if it enhances understanding** of the spec. Do not pad the PRD with diagrams. If the prose already conveys the structure clearly, skip this step and note "no diagram justified" in the rationale.
+
+**Process:**
+
+1. Invoke `mermaid-architect` with: PRD path, the section being diagrammed (typically "Technical Constraints and Integration Requirements" or a new System Topology subsection), and a list of known integrations / external systems.
+2. The skill will run its Discovery & Inquiry Protocol and may halt to ask clarifying questions about error states, actor ambiguity, or missing triggers — answer these inside this step before continuing.
+3. The skill returns a Mermaid block (with YAML metadata header) plus a 2-sentence "Architectural assumptions" summary. Paste both into the PRD section.
+4. For PRDs, the diagram type is normally **C4 Context / System Topology** (`flowchart` with subgraphs by C4 layer). Do not silently substitute another type.
+
+**Diagram is justified when** any of these are true: 4+ external systems are involved, the PRD introduces a new service boundary, the integration approach has >2 alternatives worth contrasting, or a sibling PRD already uses a topology diagram and consistency matters.
 
 ### Step 3: Quality Validation
 
@@ -503,6 +594,7 @@ Report total: `Quality checks: X/4 passed`. Address any FAILs before proceeding 
 - `create-doc` - Document creation engine
 - `brownfield-prd-template` - Brownfield PRD structure
 - `pm-checklist` - Quality validation
+- `mermaid-architect` - System Topology / C4 Context diagram when the PRD benefits from a visual
 
 **This skill may recommend:**
 
@@ -537,19 +629,26 @@ A successful brownfield PRD produces:
    - Mitigation strategies defined
    - Rollback procedures planned
 
-4. **Incremental Story Sequencing**
+4. **Appropriate Epic Structure**
+   - 6-signal complexity assessment completed and documented
+   - Multiple epics proposed when 3+ signals present
+   - Each epic maps to a distinct functional area
+   - PRDs with 3+ domain areas or 8+ stories justify single-epic choice explicitly
+   - PRD extensibility acknowledged — future epics can be added without full rewrite
+
+5. **Incremental Story Sequencing**
    - Stories minimize risk to existing system
    - Integration verification explicit
    - Gradual rollout approach
    - Existing functionality protected
 
-5. **Quality Validated**
+7. **Quality Validated**
    - Passed pm-checklist
    - Passed 4 targeted checks (measurability, leakage, traceability, SMART NFRs)
    - Compatibility requirements validated
    - Integration approach sound
 
-6. **Clear Handoffs**
+8. **Clear Handoffs**
    - Architect prompt (integration-focused)
    - UX Expert prompt (if applicable)
    - Integration testing guidance
@@ -584,11 +683,15 @@ User: "Add biometric authentication to our existing mobile banking app"
 ❌ **Ignoring existing reference documents** - Scan for briefs, research, context docs before asking the user
 ❌ **Vague requirements** - "Fast", "easy", "intuitive" are not requirements; replace with measurable criteria
 ❌ **Implementation leakage** - FRs describe capability, not implementation; no technology names in requirements
+❌ **Defaulting to a single epic** - Always run the complexity assessment; complex PRDs warrant multiple epics for parallelism and delivery manageability
+❌ **Forcing all epics upfront** - PRDs are living documents; epics can be added as scope evolves — don't block progress waiting for a complete epic list
 
-✅ **Check for existing PRD before starting**
+✅ **Check for existing PRD before starting (offer Extend for completed PRDs)**
 ✅ **Scan and load all discoverable reference documents first**
 ✅ **Analyze existing project thoroughly**
 ✅ **Confirm understanding at every step**
+✅ **Run the 6-signal complexity assessment before proposing epic structure**
+✅ **Propose multiple epics when 3+ complexity signals are present**
 ✅ **Emphasize compatibility and integration**
 ✅ **Sequence stories for risk minimization**
 ✅ **Validate quality with pm-checklist AND the 4 targeted checks**

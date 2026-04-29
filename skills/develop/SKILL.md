@@ -459,7 +459,6 @@ You may ONLY update these story file sections:
 
 - Tasks / Subtasks Checkboxes
 - Dev Agent Record (all subsections)
-- Agent Model Used
 - Debug Log References
 - Completion Notes List
 - File List (all added/modified/deleted files)
@@ -475,8 +474,7 @@ As you implement each task, continuously update these Dev Agent Record sections:
 1. **Implementation Summary** - High-level overview of what was accomplished
 2. **Start Date** - Date work began (YYYY-MM-DD format)
 3. **Completion Date** - Date work finished (populated at completion)
-4. **Agent Model Used** - Which Claude model performed the work
-5. **Implementation Approach** - Detailed breakdown:
+4. **Implementation Approach** - Detailed breakdown:
    - Architecture decisions and patterns used
    - Technical details (algorithms, data structures, workflows)
    - Integration points and dependencies
@@ -515,7 +513,6 @@ After status validation passes:
 1. Update story status to 'In Progress' if currently 'Not Started' or 'Ready for Development'
 2. Update Dev Agent Record with:
    - Start Date: [YYYY-MM-DD]
-   - Agent Model Used: [e.g., Claude Sonnet 4.5]
 3. Proceed to task implementation
 
 **Order of Execution**:
@@ -639,7 +636,6 @@ After status validation passes:
 1. Update task status to 'In Progress' if currently 'Planned' or 'Ready for Development'
 2. Update task metadata with:
    - Start Date: [YYYY-MM-DD]
-   - Agent Model Used: [e.g., Claude Sonnet 4.5]
 3. Proceed to phase implementation
 
 **Order of Execution**:

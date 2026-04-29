@@ -48,6 +48,7 @@ Activate this skill when:
 - `qa-story` - For QA assessment after task implementation
 - `qa-gate` - For formal quality gate decision on technical tasks
 - `documentation-standards-validator` - Validates file naming conventions, YAML frontmatter, and structural standards after document creation
+- `mermaid-architect` - Generates a decision flowchart, ER, or class diagram for the task when the data shape or branching logic warrants a visual
 
 ### When NOT to Use
 
@@ -62,6 +63,29 @@ Activate this skill when:
 
 ## ⚠️ CRITICAL EXECUTION RULES ⚠️
 
+### Documentation-Only Scope — Do NOT Implement
+
+This skill produces **task documentation and the co-located plan file only**. It MUST NOT perform, begin, or scaffold the implementation work that the task describes.
+
+**Forbidden during this skill** (regardless of how compelling it seems):
+
+- ❌ Editing, creating, or deleting any source file outside `docs/development/tasks/task.[ID].[name]/` (and the tracker-issue side effect in step 4.5)
+- ❌ Running migrations, codegen, build, lint-fix, or refactor commands
+- ❌ Creating branches, committing, or pushing code changes
+- ❌ Installing/removing dependencies or modifying `package.json`
+- ❌ Starting Phase 1 of the Implementation Plan "to get a head start"
+- ❌ Auto-invoking `develop-task`, `develop-story`, or any implementation skill on completion
+
+**Allowed writes** (the only filesystem changes this skill may make):
+
+- ✅ The task directory `docs/development/tasks/task.[ID].[name]/`
+- ✅ `task.[ID].[name].md` (task doc)
+- ✅ `task.[ID].plan.[name].md` (plan doc)
+- ✅ `docs/prd/sprint-status.yaml` status field update (step 5)
+- ✅ Tracker issue creation via `gh` / Jira API (step 4.5)
+
+**If the user asks to "create the task and start implementing"**: create the task documentation, then STOP and explicitly hand off — tell user to invoke `/develop-task` (or similar) as a separate step. Do not chain.
+
 ### This is an Interactive Document Creation Workflow
 
 When this skill is activated:
@@ -70,6 +94,7 @@ When this skill is activated:
 2. **STEP-BY-STEP SECTION BUILDING** - Process each of 11 sections sequentially
 3. **VALIDATION REQUIRED** - Verify completeness before generating final document
 4. **FILE CREATION** - Create proper directory structure with correct naming
+5. **NO IMPLEMENTATION** - Stop after document + tracker issue created (see "Documentation-Only Scope" above)
 
 ### Mandatory Sections (11)
 
@@ -291,6 +316,23 @@ task-ref: task.[ID].[descriptive-name].md
 > Detailed implementation guide: [task.[ID].plan.[descriptive-name].md](task.[ID].plan.[descriptive-name].md)
 ```
 
+### 2.5 Visual Diagram (conditional, via `mermaid-architect`)
+
+After the Implementation Plan and Technical Background are populated, decide whether a Mermaid diagram materially clarifies the task. **Mandatory only if it enhances understanding** — do not pad the task doc with a diagram that just restates Section 3.
+
+**Diagram type by task shape:**
+
+- Task introduces or migrates a data shape → `erDiagram` (entities + relationships) or `classDiagram`
+- Task contains non-trivial decision/branching logic → `flowchart` with decision nodes
+- Task migrates an architecture from "current" to "target" → side-by-side `flowchart` subgraphs
+
+**Process:**
+
+1. Invoke `mermaid-architect` with: task file path, the section anchor (typically Technical Background or Implementation Plan), and the entity/decision keywords already named in the prose.
+2. The skill returns a Mermaid block (with YAML metadata header) and a 2-sentence "Architectural assumptions" summary.
+3. Paste the block into Section 3 (Technical Background) under a "Current vs Target Architecture" subheading, OR into Section 6 (Implementation Plan) under a "Decision Flow" subheading — whichever is more relevant.
+4. Accept `no diagram justified — {reason}` without pushing back.
+
 ### 3. Validation Before File Creation
 
 **Checklist before generating document**:
@@ -373,9 +415,102 @@ Once validated:
    - Confirm: dots used as structural separators, hyphens within names, lowercase, `.md` extension
    - Fix any naming violations before presenting the file to the user
 
-### 4.5 Create GitHub Issue
+### 4.5 Create Tracker Issue
 
-After the task document is fully written, create a corresponding GitHub Issue. Build a rich body that gives someone landing on the issue enough context without opening the document:
+After the task document is fully written, create a corresponding issue in the remote tracker. Detect platform first:
+
+```bash
+if [ -n "$JIRA_URL" ]; then
+  TRACKER="jira"
+else
+  TRACKER="github"
+fi
+```
+
+---
+
+#### Jira Path (when `JIRA_URL` is set)
+
+> **Note**: Tasks are NOT linked to epics — no `customfield_10014` is set.
+
+Map priority to Jira values:
+
+| Task priority | Jira priority |
+|---------------|---------------|
+| Critical / High | High |
+| Medium | Medium |
+| Low | Low |
+
+```bash
+JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
+
+body_file=$(mktemp)
+cat > "$body_file" <<'BODY'
+## Overview
+
+{First paragraph of the task's Overview section — 2-4 sentences}
+
+## Key Deliverables
+
+{Bulleted list from the task's Key Deliverables or Scope section}
+
+## Success Criteria (summary)
+
+- [ ] {Most important criterion 1}
+- [ ] {Most important criterion 2}
+
+## Metadata
+
+| Field | Value |
+|-------|-------|
+| Priority | {priority} |
+| Effort | {effort_estimate} |
+| Category | {category} |
+| Depends on | {depends_on or —} |
+
+## Document
+
+📁 `{task-file-relative-path}`
+BODY
+
+JIRA_RESPONSE=$(curl -s -X POST \
+  "${JIRA_URL}/rest/api/2/issue" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic ${JIRA_AUTH}" \
+  -d "$(jq -n \
+    --arg summary "[Task {id}] {title}" \
+    --arg description "$(cat "$body_file")" \
+    --arg project "$JIRA_PROJECT_KEY" \
+    --arg priority "{High|Medium|Low}" \
+    '{
+      "fields": {
+        "project": {"key": $project},
+        "summary": $summary,
+        "description": $description,
+        "issuetype": {"name": "Task"},
+        "priority": {"name": $priority}
+      }
+    }'
+  )")
+rm -f "$body_file"
+
+task_key=$(echo "$JIRA_RESPONSE" | jq -r '.key // empty')
+task_url="${JIRA_URL}/browse/${task_key}"
+```
+
+**On success**: Add to task YAML frontmatter:
+```yaml
+jira_key: RB-15
+jira_url: https://mediastreamag.atlassian.net/browse/RB-15
+```
+
+**On failure**: Set `jira_key: null`, log warning, continue. Never halt.
+
+---
+
+#### GitHub Path (when `JIRA_URL` is NOT set)
+
+Read `project.yml` (repo root) to get `github.project_board_name` for the `--project` flag:
 
 ```bash
 # Build clickable document link
@@ -383,7 +518,8 @@ REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 DOC_URL="https://github.com/$REPO/blob/develop/{task-file-relative-path}"
 
 gh issue create \
-  --title "Task {id}: {title}" \
+  --title "[Task {id}] {title}" \
+  --project "{project_board_name}" \
   --body "## Overview
 
 {First paragraph of the task's Overview section — 2-4 sentences describing what the task does and why}
@@ -408,9 +544,7 @@ gh issue create \
 ## Document
 
 📄 [Task Document]($DOC_URL)
-
----
-*Auto-created by /create-task*" \
+📁 \`{task-file-relative-path}\`" \
   --label "task" \
   --label "priority:{priority}" \
   --milestone "{milestone_title}"
@@ -428,20 +562,21 @@ If the chosen milestone doesn't exist yet, auto-create it first:
 gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="open"
 ```
 
-**Body authoring rules:**
-- **Overview**: Copy the opening paragraph(s) verbatim from section 1 — don't summarise, use the actual text
-- **Key Deliverables**: Pull from the "Key Deliverables" or "Scope" section of the task document
-- **Success Criteria**: Select the 2-5 most outcome-focused criteria (skip internal implementation details)
-- **Document link**: Always use the full `https://github.com/...` URL — local paths are not clickable in GitHub issues
-- If `depends_on` is empty or `[]`, write `—`
-
-**On success**: Add `github_issue: {N}` to the task's YAML frontmatter.
+**On success**:
+1. Parse the issue URL from the `gh` output (e.g. `https://github.com/org/repo/issues/42`)
+2. Add the issue to the GitHub Project board:
+   ```bash
+   gh project item-add {project_board_number} --owner {owner} --url {issue_url}
+   ```
+3. Add `github_issue: {N}` to the task's YAML frontmatter.
 
 **On failure**: Set `github_issue: null`, log warning, continue. Never halt.
 
-### 5. Post-Generation Steps
+### 5. Post-Generation Steps — STOP HERE
 
-Inform user:
+This is the terminal step of the skill. After completing it, **end the session and return control to the user**. Do not begin implementation, do not auto-invoke `develop-task`, do not start Phase 1 work.
+
+Actions:
 
 1. Task document created at `docs/development/tasks/task.[ID].[name]/task.[ID].[name].md`
 2. Plan file created at `docs/development/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
@@ -450,12 +585,16 @@ Inform user:
    - Find the entry matching this task's ID/key
    - Update its status to `ready-for-dev`
    - Save the file
-3. Next steps: Implementation
-4. When complete: Hand off to QA with `qa-story` skill
-5. QA will create:
-   - QA report at `task.[ID].qa.[number].[name].md`
-   - Bug reports (if issues found) at `task.[ID].bug.[N].[name].md`
-   - Quality gate at `docs/qa/gates/tasks/task.[ID].gate.[number].[name].yml`
+
+Inform user (and stop):
+
+- Document and plan paths
+- Tracker issue URL (from step 4.5) if created
+- **Next step is the user's call**: invoke `/develop-task` to implement, or hand off to another developer. This skill does not implement.
+- When implementation is complete, QA artifacts will land at:
+  - QA report: `task.[ID].qa.[number].[name].md`
+  - Bug reports (if issues found): `task.[ID].bug.[N].[name].md`
+  - Quality gate: `docs/qa/gates/tasks/task.[ID].gate.[number].[name].yml`
 
 ---
 

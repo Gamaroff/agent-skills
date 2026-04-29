@@ -1,13 +1,13 @@
 ---
 name: create-issue
-description: Create GitHub issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development. Creates a GitHub issue via the gh CLI and a co-located issue document following the project naming conventions.
+description: Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development. Creates an issue via the GitHub CLI (GitHub), Bitbucket REST API (Bitbucket), or Jira REST API (Jira). Platform is auto-detected: Jira takes priority when JIRA_URL is set, otherwise detected from the git remote URL.
 ---
 
 # Create Issue
 
 This skill creates tracked work items by:
 
-1. Creating a **GitHub Issue** for visibility and tracking
+1. Creating an **issue in the remote tracker** (Jira, GitHub, or Bitbucket) for visibility and tracking
 2. Creating a **local issue document** co-located with the source story/task
 3. Linking them bidirectionally for traceability
 
@@ -130,14 +130,60 @@ ls task.{id}.issue.*.md
 - Never reuse numbers even if issues are closed
 - Issue numbers are independent of bug numbers
 
-### Step 3: Create GitHub Issue
+### Step 2.5: Detect Platform
 
-Use the GitHub CLI to create the issue:
+Before creating an issue in the remote tracker, detect the issue tracking platform. **Jira takes priority** — if `JIRA_URL` is set, always use Jira regardless of the git remote.
 
 ```bash
-gh issue create \
-  --title "[Story 180.3] Debounce timing needs adjustment" \
-  --body "## Context
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+
+# Jira takes priority — checked before git remote detection
+if [ -n "$JIRA_URL" ]; then
+  PLATFORM="jira"
+  # Use JIRA_PROJECT_KEY from env, or fall back to CLAUDE.md-declared value
+  JIRA_PROJECT="${JIRA_PROJECT_KEY:-}"
+  if [ -z "$JIRA_PROJECT" ]; then
+    echo "Error: JIRA_PROJECT_KEY must be set" && exit 1
+  fi
+  if [ -z "$JIRA_USER_EMAIL" ] || [ -z "$JIRA_API_TOKEN" ]; then
+    echo "Error: JIRA_USER_EMAIL and JIRA_API_TOKEN must be set" && exit 1
+  fi
+
+elif echo "$REMOTE_URL" | grep -qi "github\.com"; then
+  PLATFORM="github"
+  REPO_SLUG=$(echo "$REMOTE_URL" \
+    | sed -E 's|.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+
+elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
+  PLATFORM="bitbucket"
+  BB_PATH=$(echo "$REMOTE_URL" \
+    | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+
+  # Verify credentials
+  if [ -z "$BITBUCKET_USERNAME" ] || [ -z "$BITBUCKET_APP_PASSWORD" ]; then
+    echo "Error: BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD must be set" && exit 1
+  fi
+else
+  PLATFORM="unknown"
+fi
+```
+
+> [!NOTE]
+> **Bitbucket Issues** must be enabled on the repository (Settings → Features → Issues). For projects that use Jira as the issue tracker (even with Bitbucket as the code host), set `JIRA_URL` and Jira will be used automatically.
+
+### Step 3: Create Issue in Remote Tracker
+
+**ALWAYS use a tempfile for the body** — never inline it. This avoids heredoc wrapping issues with long URLs.
+
+1. Render the body to a tempfile:
+
+```bash
+body_file=$(mktemp)
+cat > "$body_file" <<'EOF'
+## Context
 
 Related to: story.180.3.quick-re-search
 
@@ -149,27 +195,163 @@ Related to: story.180.3.quick-re-search
 
 - **From PR**: #{pr_number} (if applicable)
 - **Story/Task**: story.180.3.quick-re-search
-- **Local Doc**: story.180.3.issue.1.debounce-timing.md
+- **Local Doc**: `docs/development/stories/story.180.3.quick-re-search/story.180.3.issue.1.debounce-timing.md`
 
 ## Acceptance Criteria
 
 - [ ] {Derived from description}
-" \
-  --label "enhancement" \
-  --label "story.180"
+EOF
 ```
 
-**Capture the issue number** from the output (e.g., `#45`).
+2. **Pre-flight validation — MANDATORY.** Abort if any template token survived substitution:
+
+```bash
+if grep -Eq '(_PLACEHOLDER|\{[a-z_]+\})' "$body_file"; then
+  echo "ERROR: unsubstituted tokens in issue body:" >&2
+  grep -nE '(_PLACEHOLDER|\{[a-z_]+\})' "$body_file" >&2
+  exit 1
+fi
+```
+
+3. Create the issue — branch on `PLATFORM`:
+
+**Jira:**
+
+Map type and priority to Jira values:
+
+| Input type  | Jira `issuetype` |
+| ----------- | ---------------- |
+| bug         | Bug              |
+| enhancement | Story            |
+| task        | Task             |
+
+| Input priority | Jira `priority` |
+| -------------- | --------------- |
+| high           | High            |
+| medium         | Medium          |
+| low            | Low             |
+
+```bash
+JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
+
+JIRA_RESPONSE=$(curl -s -X POST \
+  "${JIRA_URL}/rest/api/2/issue" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic ${JIRA_AUTH}" \
+  -d "$(jq -n \
+    --arg summary "$TITLE" \
+    --arg description "$(cat "$body_file")" \
+    --arg project "$JIRA_PROJECT" \
+    --arg issuetype "$JIRA_ISSUETYPE" \
+    --arg priority "$JIRA_PRIORITY" \
+    '{
+      "fields": {
+        "project": {"key": $project},
+        "summary": $summary,
+        "description": $description,
+        "issuetype": {"name": $issuetype},
+        "priority": {"name": $priority}
+      }
+    }'
+  )")
+
+issue_key=$(echo "$JIRA_RESPONSE" | jq -r '.key // empty')
+issue_url="${JIRA_URL}/browse/${issue_key}"
+
+if [ -z "$issue_key" ]; then
+  echo "ERROR: Jira issue creation failed:" >&2
+  echo "$JIRA_RESPONSE" | jq '.errors // .' >&2
+  exit 1
+fi
+```
+
+---
+
+**GitHub:**
+```bash
+issue_url=$(gh issue create \
+  --title "[Story 180.3] Debounce timing needs adjustment" \
+  --body-file "$body_file" \
+  --label "enhancement" \
+  --label "story.180")
+issue_number="${issue_url##*/}"
+issue_url="$issue_url"
+```
+
+Post-create verification:
+```bash
+created_body=$(gh issue view "$issue_number" --json body --jq '.body')
+if echo "$created_body" | grep -Eq '(_PLACEHOLDER|\{[a-z_]+\})'; then
+  echo "ERROR: created issue #$issue_number has unsubstituted tokens:" >&2
+  echo "$created_body" | grep -nE '(_PLACEHOLDER|\{[a-z_]+\})' >&2
+  echo "Fix with: gh issue edit $issue_number --body-file <corrected-file>" >&2
+  exit 1
+fi
+```
+
+---
+
+**Bitbucket:**
+
+Map type and priority to Bitbucket values:
+
+| Input type  | Bitbucket `kind` |
+| ----------- | ---------------- |
+| bug         | bug              |
+| enhancement | enhancement      |
+| task        | task             |
+
+| Input priority | Bitbucket `priority` |
+| -------------- | -------------------- |
+| high           | major                |
+| medium         | minor                |
+| low            | trivial              |
+
+```bash
+ISSUE_RESPONSE=$(curl -s -X POST \
+  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/issues" \
+  -H "Content-Type: application/json" \
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+  -d "$(jq -n \
+    --arg title "[Story 180.3] Debounce timing needs adjustment" \
+    --arg content "$(cat "$body_file")" \
+    --arg kind "enhancement" \
+    --arg priority "minor" \
+    '{
+      "title": $title,
+      "content": {"raw": $content},
+      "kind": $kind,
+      "priority": $priority
+    }'
+  )")
+
+issue_number=$(echo "$ISSUE_RESPONSE" | jq -r '.id // empty')
+issue_url=$(echo "$ISSUE_RESPONSE"   | jq -r '.links.html.href // empty')
+
+if [ -z "$issue_number" ]; then
+  echo "ERROR: Bitbucket issue creation failed:" >&2
+  echo "$ISSUE_RESPONSE" | jq '.error // .' >&2
+  exit 1
+fi
+```
+
+---
+
+```bash
+rm -f "$body_file"
+```
+
+**Capture `issue_number` and `issue_url`** — used in Steps 4–6.
 
 ### Step 4: Create Local Issue Document
 
-Create the issue file in the source directory:
+Create the issue file in the source directory. Use the appropriate tracker reference based on `PLATFORM`:
 
 ```markdown
 # Issue: {Title}
 
 **Issue ID**: story.{epic}.{story}.issue.{n}
-**GitHub Issue**: #{github_issue_number} (https://github.com/org/repo/issues/{n})
+**Tracker Issue**: {RB-123 (https://mediastreamag.atlassian.net/browse/RB-123) | #45 (https://github.com/...) | #45 (https://bitbucket.org/...)}
 **Related Story**: [Story {epic}.{story}: {title}](./story.{epic}.{story}.{name}.md)
 **Status**: 🆕 Open
 **Type**: {bug | enhancement | task}
@@ -236,9 +418,9 @@ Add a link to the issue in the source story/task's issues section.
 ```markdown
 ## Issues
 
-| ID      | Title                                                       | Status  | Priority | GitHub             |
-| ------- | ----------------------------------------------------------- | ------- | -------- | ------------------ |
-| issue.1 | [Debounce timing](./story.180.3.issue.1.debounce-timing.md) | 🆕 Open | Medium   | [#45](https://...) |
+| ID      | Title                                                       | Status  | Priority | Tracker                   |
+| ------- | ----------------------------------------------------------- | ------- | -------- | ------------------------- |
+| issue.1 | [Debounce timing](./story.180.3.issue.1.debounce-timing.md) | 🆕 Open | Medium   | [RB-45](https://...) |
 ```
 
 **For Tasks** - Add or update `### Issues` section:
@@ -251,11 +433,12 @@ Add a link to the issue in the source story/task's issues section.
 
 ### Step 6: Output Summary
 
+For **Jira**:
 ```
 ✅ Issue Created!
 
-   GitHub Issue: #45
-   URL: https://github.com/goji-wallet/goji-system/issues/45
+   Jira Issue: RB-45
+   URL: https://mediastreamag.atlassian.net/browse/RB-45
 
    Local Document: story.180.3.issue.1.debounce-timing.md
    Location: docs/prd/.../stories/story.180.3.quick-re-search/
@@ -264,7 +447,16 @@ Next Steps:
    1. Start work: /create-branch story.180.3.issue.1.debounce-timing.md
    2. Implement the fix
    3. Commit: /commit-changes
-   4. Create PR: /create-pr (will auto-close #45)
+   4. Create PR: /create-pr
+```
+
+For **GitHub**:
+```
+✅ Issue Created!
+
+   GitHub Issue: #45
+   URL: https://github.com/org/repo/issues/45
+   ...
 ```
 
 ## Issue vs Bug: When to Use Which
@@ -330,8 +522,25 @@ Please provide a valid story or task file/directory:
   - Task: docs/development/tasks/task.X.name/
 ```
 
-### gh CLI Not Authenticated
+### Not Authenticated
 
+**Jira:**
+```
+Error: Jira credentials not set or invalid.
+
+Set the following environment variables:
+  export JIRA_URL=https://yourcompany.atlassian.net
+  export JIRA_PROJECT_KEY=RB
+  export JIRA_USER_EMAIL=your-email@example.com
+  export JIRA_API_TOKEN=your-api-token
+
+API tokens can be created at:
+  https://id.atlassian.com/manage-profile/security/api-tokens
+
+Then retry /create-issue
+```
+
+**GitHub:**
 ```
 Error: GitHub CLI is not authenticated.
 
@@ -339,6 +548,31 @@ To authenticate, run:
   gh auth login
 
 Then retry /create-issue
+```
+
+**Bitbucket:**
+```
+Error: Bitbucket credentials not set or invalid.
+
+Set the following environment variables:
+  export BITBUCKET_USERNAME=your-username
+  export BITBUCKET_APP_PASSWORD=your-app-password
+
+App passwords can be created at:
+  https://bitbucket.org/account/settings/app-passwords/
+
+Then retry /create-issue
+```
+
+### Bitbucket Issues Disabled
+
+```
+Error: Issues are disabled on this Bitbucket repository.
+
+Enable Issues at: Repository Settings → Features → Issues
+
+Alternatively, use an external tracker (Jira, Linear) and
+record the issue URL manually in the local issue document.
 ```
 
 ### Issue Already Exists
@@ -403,3 +637,5 @@ Output:
 
 - [Git Strategy](file:///docs/development/git-strategy.md) - Gitflow branching model
 - [GitHub CLI Documentation](https://cli.github.com/manual/gh_issue_create) - `gh issue create` options
+- [Bitbucket REST API — Issues](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-issue-tracker/) - Bitbucket issue creation
+- [Bitbucket App Passwords](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/) - Authentication for Bitbucket API

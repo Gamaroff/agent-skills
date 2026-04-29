@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Create pull requests following project conventions. This skill should be used when ready to submit code for review. Automatically commits any uncommitted changes using /commit-changes before creating the PR. Prompts for target branch (typically develop), pushes the current branch, generates a PR description using the project template, and opens a PR using the GitHub CLI.
+description: Create pull requests following project conventions. This skill should be used when ready to submit code for review. Automatically commits any uncommitted changes using /commit-changes before creating the PR. Prompts for target branch (typically develop), pushes the current branch, generates a PR description, and opens a PR using the GitHub CLI (GitHub) or Bitbucket REST API (Bitbucket). Platform is auto-detected from the git remote URL.
 ---
 
 # Create Pull Request
@@ -18,7 +18,14 @@ Use this skill when:
 
 ## Prerequisites
 
-- **GitHub CLI (`gh`)** must be installed and authenticated
+**GitHub:**
+- **GitHub CLI (`gh`)** must be installed and authenticated (`gh auth status`)
+
+**Bitbucket:**
+- `BITBUCKET_USERNAME` and `BITBUCKET_APP_PASSWORD` environment variables must be set
+- `curl` and `jq` must be available
+
+**Both:**
 - Current branch must have commits to push (or uncommitted changes that can be committed)
 
 ## Target Branch Selection
@@ -66,6 +73,33 @@ Before asking the user, check whether parameters were supplied:
 - If provided: store as `GITHUB_ISSUE`, use in Step 5 PR description
 - If not provided: attempt auto-detection in Step 5 (see GitHub Issue Detection below)
 
+### Step 0.5: Detect Platform
+
+Before interacting with any remote hosting service, detect the platform from the git remote URL:
+
+```bash
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+
+if echo "$REMOTE_URL" | grep -qi "github\.com"; then
+  PLATFORM="github"
+  REPO_SLUG=$(echo "$REMOTE_URL" \
+    | sed -E 's|.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+
+elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
+  PLATFORM="bitbucket"
+  BB_PATH=$(echo "$REMOTE_URL" \
+    | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+
+else
+  PLATFORM="unknown"
+fi
+```
+
+Store `PLATFORM` — every platform-specific step below branches on this value.
+
 ### Step 1: Ask User for Target Branch
 
 **MANDATORY (unless skipped by Step 0)** — if `--base` was not pre-supplied, do this before anything else, even before checking git status.
@@ -90,11 +124,28 @@ Store the answer as `BASE_BRANCH`. Every subsequent step that references a targe
 Check that the environment is ready:
 
 ```bash
-# Verify gh CLI is available and authenticated
-gh auth status
-
 # Check for uncommitted changes
 git status --porcelain
+```
+
+**Platform-specific auth verification:**
+
+*GitHub:*
+```bash
+gh auth status
+```
+
+*Bitbucket:*
+```bash
+if [ -z "$BITBUCKET_USERNAME" ] || [ -z "$BITBUCKET_APP_PASSWORD" ]; then
+  echo "Error: BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD must be set"
+  exit 1
+fi
+# Verify credentials are valid
+AUTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+  "${BB_API}/user")
+[ "$AUTH_CHECK" != "200" ] && echo "Error: Bitbucket auth failed (HTTP $AUTH_CHECK)" && exit 1
 ```
 
 If there are uncommitted changes:
@@ -193,36 +244,92 @@ If no issue number is available, do NOT add the Related Issues section.
 
 ### Step 6: Create the Pull Request
 
-Use the GitHub CLI to create the PR:
+Branch on `PLATFORM`:
+
+**GitHub:**
 
 ```bash
-gh pr create \
-  --base $BASE_BRANCH \
-  --title "feat(story.180.3): quick re-search functionality" \
-  --body "## Summary
-
-Implements quick re-search functionality for recent searches.
-
-## Changes
-
-$(git log origin/develop..HEAD --pretty=format:'- %s')
-
-## Testing
-
-- [ ] Unit tests added/updated
-- [ ] Integration tests pass
-- [ ] Manual testing completed
-
-## Breaking Changes
-
-None
-
-## Related Issues
-
-Part of Epic 180"
+PR_URL=$(gh pr create \
+  --base "$BASE_BRANCH" \
+  --title "$PR_TITLE" \
+  --body "$PR_BODY")
+PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 ```
 
-**CRITICAL / BLOCKING**: Verify `gh pr create` exited with code 0 and returned a PR URL before proceeding to Step 7. If it fails, report the error and halt — do NOT print a success message for a PR that doesn't exist.
+**CRITICAL / BLOCKING**: Verify `gh pr create` exited with code 0 and returned a PR URL before proceeding to Step 6b.
+
+---
+
+**Bitbucket:**
+
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+PR_BODY_FILE=$(mktemp)
+cat > "$PR_BODY_FILE" << 'ENDBODY'
+{PR_BODY content}
+ENDBODY
+
+PR_RESPONSE=$(curl -s -X POST \
+  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests" \
+  -H "Content-Type: application/json" \
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+  -d "$(jq -n \
+    --arg title "$PR_TITLE" \
+    --arg desc "$(cat "$PR_BODY_FILE")" \
+    --arg src "$CURRENT_BRANCH" \
+    --arg dst "$BASE_BRANCH" \
+    '{
+      "title": $title,
+      "description": $desc,
+      "source": {"branch": {"name": $src}},
+      "destination": {"branch": {"name": $dst}},
+      "close_source_branch": false
+    }'
+  )")
+rm -f "$PR_BODY_FILE"
+
+PR_URL=$(echo "$PR_RESPONSE" | jq -r '.links.html.href // empty')
+PR_ID=$(echo "$PR_RESPONSE"  | jq -r '.id // empty')
+```
+
+**CRITICAL / BLOCKING**: If `PR_URL` is empty, inspect `PR_RESPONSE` for an error message, report it to the user, and halt.
+
+---
+
+### Step 6b: Comment on Linked Issue (graceful — non-blocking)
+
+Branch on `PLATFORM` and tracker detection:
+
+**GitHub path** (when `PLATFORM=github`):
+
+If `GITHUB_ISSUE` is set (from Step 0), post a comment linking the PR:
+```bash
+if [ -n "$GITHUB_ISSUE" ]; then
+  gh issue comment "$GITHUB_ISSUE" --body "PR opened — #${PR_NUMBER}: ${PR_URL}" \
+    || echo "⚠️  Issue comment failed — continuing"
+fi
+```
+If `GITHUB_ISSUE` is not set, skip silently.
+
+---
+
+**Bitbucket + Jira path** (when `PLATFORM=bitbucket` and `JIRA_URL` is set):
+
+Bitbucket Issues are disabled for this project — do NOT use the Bitbucket Issues API. Instead, post the PR link as a comment on the linked Jira issue:
+
+1. Determine the Jira issue key from the source document:
+   - Parse the current branch name for a story/task identifier (e.g. `feature/story.37.1.*` or `feature/task.40.*`)
+   - Find the corresponding story/task document in the working directory
+   - Read `jira_key` from its YAML frontmatter (e.g. `RB-12`)
+2. If `jira_key` is found, use the `addCommentToJiraIssue` Atlassian MCP tool with:
+   - `issueIdOrKey`: `{jira_key}`
+   - `contentFormat`: `"markdown"`
+   - `comment`: `"PR opened — [PR #{PR_ID}]({PR_URL})"`
+3. If `jira_key` is not found or the comment fails, log warning and continue — do NOT halt.
+
+---
+
+Failure to post any tracker comment does NOT halt the skill.
 
 ### Step 7: Output Result
 
@@ -234,6 +341,7 @@ Provide the user with the PR URL and summary:
    Title: feat(story.180.3): quick re-search functionality
    URL: https://github.com/org/repo/pull/123
    Base: develop ← feature/story.180.3.quick-re-search-functionality
+   Issue: #42 commented (or "not linked" if GITHUB_ISSUE unset)
 
 Next steps:
 - Review the PR description on GitHub
@@ -375,13 +483,28 @@ List any breaking changes.
 
 ## Error Handling
 
-### gh CLI Not Authenticated
+### Not Authenticated
 
+**GitHub:**
 ```
 Error: gh CLI is not authenticated.
 
 To authenticate, run:
   gh auth login
+
+Then retry /create-pr
+```
+
+**Bitbucket:**
+```
+Error: Bitbucket credentials not set or invalid.
+
+Set the following environment variables:
+  export BITBUCKET_USERNAME=your-username
+  export BITBUCKET_APP_PASSWORD=your-app-password
+
+App passwords can be created at:
+  https://bitbucket.org/account/settings/app-passwords/
 
 Then retry /create-pr
 ```
@@ -403,6 +526,7 @@ If push fails:
 
 ### PR Already Exists
 
+**GitHub:**
 ```
 A pull request already exists for this branch.
 
@@ -413,6 +537,17 @@ Options:
 - Update PR description
 - Close existing and create new
 ```
+
+**Bitbucket:**
+
+Check for an existing PR before creating:
+```bash
+EXISTING=$(curl -s \
+  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${CURRENT_BRANCH}%22%20AND%20state%3D%22OPEN%22" \
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+  | jq -r '.values[0].links.html.href // empty')
+```
+If non-empty, report to the user and offer the same options.
 
 ## Options
 
@@ -485,3 +620,5 @@ Output:
 ## References
 
 - [GitHub CLI Documentation](https://cli.github.com/manual/gh_pr_create) - `gh pr create` options
+- [Bitbucket REST API — Pull Requests](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/) - Bitbucket PR creation
+- [Bitbucket App Passwords](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/) - Authentication for Bitbucket API

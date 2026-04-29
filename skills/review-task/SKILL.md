@@ -82,13 +82,28 @@ Before loading the task document, resolve the input to a local file path:
 
 | Pattern | Matches |
 |---------|---------|
+| Matches `[A-Z]+-[0-9]+` (e.g. `RB-45`) | Jira issue key |
 | Contains `github.com` | GitHub URL (direct issue or project board) |
 | Starts with `#` followed by digits | Hash notation |
 | All digits | Bare issue number |
 
-**Step 2 — Extract the issue number** from whichever pattern matched:
+**Step 2 — Extract the issue number / key** from whichever pattern matched:
 
 ```bash
+# Jira key (e.g. RB-45): resolve to local file via frontmatter lookup
+if echo "$INPUT" | grep -qE '^[A-Z]+-[0-9]+$'; then
+  JIRA_KEY="$INPUT"
+  LOCAL_PATH=$(grep -rl "jira_key: ${JIRA_KEY}" docs/ 2>/dev/null \
+    | grep -E 'task\.[0-9]+\.' \
+    | grep -v -E '\.(qa|gate|bug|implementation)\.' \
+    | head -1)
+  if [ -z "$LOCAL_PATH" ]; then
+    echo "No local document found for Jira key ${JIRA_KEY}. Run /create-task first, or provide the file path directly."
+    exit 1
+  fi
+  # Jump directly to Step 4 with LOCAL_PATH resolved
+fi
+
 # Direct issue URL:   https://github.com/owner/repo/issues/297
 ISSUE_NUM=$(echo "$INPUT" | grep -oE '(?<=/issues/)[0-9]+')
 
@@ -113,7 +128,7 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 ```
 
 - If `LOCAL_PATH` is non-empty and the file exists: use it as `task_file`, skip to Step 4.
-- If no Document link found (older issue without Document section): fall back to `grep -rl "github_issue: {N}" docs/` and find `task.{N}.*.md` in the result (excluding `.qa.`, `.gate.`, `.bug.`, `.implementation.` files).
+- If no Document link found (older issue without Document section): fall back to `grep -rl "github_issue: {N}" docs/` **or** `grep -rl "jira_key: {KEY}" docs/` and find `task.{N}.*.md` in the result (excluding `.qa.`, `.gate.`, `.bug.`, `.implementation.` files).
 - If still not found: HALT — inform user: "No local document found for issue #{N}. Run `/create-task` first, or provide the file path directly."
 
 **Step 4 — Continue with the resolved `task_file`.**
@@ -392,7 +407,56 @@ options:
    - Search for: `[TBD]`, `[TODO]`, `[PLACEHOLDER]`, `???`, `[Description]`
    - Each unfilled placeholder is a gap
 
-5. **GitHub Issue Linkage**:
+5. **Tracker Issue Linkage**:
+
+   **Detection**: if `JIRA_URL` is set → Jira path; else → GitHub path (existing behaviour unchanged).
+
+   **Jira path:**
+   - Check frontmatter for `jira_key:` field
+   - If `jira_key:` is missing or `null`:
+     - Flag as **Important** gap
+     - Ask: "This task has no linked Jira issue. Should I create one now?"
+     - If user confirms, create via Jira REST API v2:
+       ```bash
+       JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
+       JIRA_RESPONSE=$(curl -s -X POST \
+         "${JIRA_URL}/rest/api/2/issue" \
+         -H "Content-Type: application/json" \
+         -H "Authorization: Basic ${JIRA_AUTH}" \
+         -d "$(jq -n \
+           --arg summary "[Task {id}] {title}" \
+           --arg description "## Overview\n\n{overview}\n\n## Document\n📁 \`{task-file-relative-path}\`" \
+           --arg project "$JIRA_PROJECT_KEY" \
+           --arg priority "{High|Medium|Low}" \
+           '{
+             "fields": {
+               "project": {"key": $project},
+               "summary": $summary,
+               "description": $description,
+               "issuetype": {"name": "Task"},
+               "priority": {"name": $priority}
+             }
+           }'
+         )")
+       task_key=$(echo "$JIRA_RESPONSE" | jq -r '.key // empty')
+       task_url="${JIRA_URL}/browse/${task_key}"
+       ```
+     - On success: write `jira_key: {task_key}` and `jira_url: {task_url}` into frontmatter
+     - On failure: flag as **Important**, continue
+   - If `jira_key:` has a value → verify the issue exists:
+     ```bash
+     JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
+     HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+       "${JIRA_URL}/rest/api/2/issue/${jira_key}" \
+       -H "Authorization: Basic ${JIRA_AUTH}")
+     # 200 = exists; 404 = flag as Critical
+     ```
+   - **URL consistency check** (when `jira_key` is present and valid):
+     - If `jira_url:` is also in frontmatter: verify it equals `{JIRA_URL}/browse/{jira_key}`. Any mismatch → flag as **Important**: "`jira_url` does not match `jira_key`"
+     - Look for a `**Jira Epic**: [KEY](url)` or `**Jira Issue**: [KEY](url)` line in the document body. If found: verify the KEY matches `jira_key` and the URL ends with `/browse/{jira_key}`. Any mismatch → flag as **Important**: "Body cross-reference link does not match `jira_key`"
+     - If no body link is found: flag as **Important** — add one (e.g., `**Jira Issue**: [{jira_key}]({jira_url})`)
+
+   **GitHub path** (when `JIRA_URL` not set):
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
@@ -403,7 +467,7 @@ options:
        DOC_URL="https://github.com/$REPO/blob/develop/{task-file-relative-path}"
 
        gh issue create \
-         --title "Task {id}: {title}" \
+         --title "[Task {id}] {title}" \
          --project "Goji Website Development Board" \
          --body "## Overview
 
@@ -416,18 +480,20 @@ options:
        ## Document
 
        📄 [Task Document]($DOC_URL)
-       📁 \`{task-file-relative-path}\`
-
-       ---
-       *Auto-created by /review-task*" \
+       📁 \`{task-file-relative-path}\`" \
          --label "task" \
          --label "priority:{priority}" \
          --milestone "{milestone_title}"
        ```
      - Determine `{milestone_title}` using the same priority as `/create-task`: `milestone:` frontmatter → epic registry lookup → `"Technical Tasks (standalone)"`
      - Write `github_issue: {N}` into frontmatter
-   - If `github_issue:` has a numeric value, verify the issue exists: `gh issue view {N} --json state -q '.state'`
-     - If the issue doesn't exist (command errors), flag as **Critical**
+   - If `github_issue:` has a numeric value:
+     - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
+       - If the issue doesn't exist (command errors), flag as **Critical**
+     - **URL consistency check** — verify the cross-reference link in the document body is correct:
+       - Look for any markdown link of the form `[#N](url)` or `[#N](https://github.com/...)` in the task body
+       - If found: confirm the issue number in the link matches `github_issue:` in frontmatter; and confirm the URL path ends with `/issues/{N}`. Any mismatch → flag as **Important**: "Body link `[#X](url)` does not match frontmatter `github_issue: {N}`"
+       - If no body link found: flag as **Important** — add one (e.g., `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`)
 
 **Issues to Flag**:
 
@@ -653,6 +719,26 @@ options:
 - When rollback incomplete: How to handle failure in Phase X?
 - When criteria vague: How to measure success for this?
 - When task too large: Should task be split into sub-task documents?
+
+---
+
+### Step 6.5: Mermaid Diagram Validation (via `mermaid-architect`)
+
+**Purpose**: Validate any embedded Mermaid diagrams (decision flowchart, ER, class, current-vs-target architecture) against syntax, metadata, and architectural-consistency rules. Recommend a diagram if the task lacks one and a visual would materially clarify the data shape or branching logic.
+
+**Actions**:
+
+1. **Detect diagrams**: scan the task doc and its co-located plan file for fenced ```` ```mermaid ```` blocks. Capture each block's section anchor (Technical Background, Implementation Plan, etc.) and YAML metadata header presence.
+2. **Invoke `mermaid-architect` in review mode** for each block. Pass: task file path, the section anchor, and the entity / decision keywords already in the prose so the skill can verify the diagram type matches the content (e.g., `erDiagram` for data shapes, `flowchart` for decision logic) and that no architectural violations are encoded.
+3. **Collect verdicts**: `pass`, `pass with notes`, `fail`. `fail` → Critical (data-shape error) or Important (cosmetic); `pass with notes` → Optional.
+4. **If absent**:
+   - Task introduces or migrates a data shape → recommend `erDiagram` or `classDiagram`
+   - Task contains non-trivial branching logic → recommend `flowchart` with decision nodes
+   - Task migrates "current → target" architecture → recommend side-by-side `flowchart` subgraphs
+   Do not flag absence if the prose already conveys the structure clearly.
+5. **If a diagram restates the Implementation Plan verbatim**: recommend removing it.
+
+**Output**: append to Critical/Important/Optional buckets used by Steps 6, 7.
 
 ---
 
@@ -1226,6 +1312,131 @@ User Can Now: Run `/develop` to begin implementation
 
 ---
 
+### Step 10: Post Tracker Comment (graceful — non-blocking)
+
+**Purpose**: Notify the linked tracker issue (Jira or GitHub) that a review has been completed, with the outcome, key findings, and a summary of any changes made to the task document.
+
+**When to Execute**: Always — after Step 9 completes (regardless of review outcome or status update decision).
+
+**Detection**: if `JIRA_URL` is set → Jira path; else → GitHub path.
+
+**Collect context from previous steps** (both paths):
+
+- `SCORE` — readiness score from Step 8
+- `RECOMMENDATION` — READY TO IMPLEMENT | NEEDS REVISION | REQUIRES REWORK
+- `CRITICAL`, `IMPORTANT`, `OPTIONAL` — issue counts from Step 8
+- `REVIEW_FILE` — path to `.review.md` if saved, or `"Action plan only — no file saved"`
+- `FIXES_APPLIED` — list of fix titles applied in Step 8.5, or empty string if user declined
+- `FIXES_SKIPPED` — list of skipped fix titles from Step 8.5, or empty string
+- `STATUS_CHANGE` — transition string (e.g. `"Planned → Ready for Development"`), or empty string
+
+**Build `CHANGES_SECTION`** (shared by both paths):
+
+```bash
+CHANGES_SECTION=""
+
+if [ -n "$FIXES_APPLIED" ] || [ -n "$FIXES_SKIPPED" ] || [ -n "$STATUS_CHANGE" ]; then
+  CHANGES_SECTION="
+
+### Changes Made to Task Document
+"
+  [ -n "$FIXES_APPLIED" ]  && CHANGES_SECTION+="
+**Fixes applied:**
+${FIXES_APPLIED}"
+  [ -n "$FIXES_SKIPPED" ]  && CHANGES_SECTION+="
+
+**Skipped (needs manual input):**
+${FIXES_SKIPPED}"
+  [ -n "$STATUS_CHANGE" ]  && CHANGES_SECTION+="
+
+**Status updated**: ${STATUS_CHANGE}"
+fi
+```
+
+---
+
+**Jira path** (when `JIRA_URL` is set):
+
+1. Read `jira_key` from task frontmatter (already loaded in Step 1). If absent or `null`, skip this step silently.
+
+2. Post comment via Jira REST API:
+
+   ```bash
+   JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
+   TASK_KEY="{jira_key from frontmatter}"
+
+   curl -s -X POST \
+     "${JIRA_URL}/rest/api/2/issue/${TASK_KEY}/comment" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Basic ${JIRA_AUTH}" \
+     -d "$(jq -n \
+       --arg body "## Task Review Complete
+
+   **Recommendation**: ${RECOMMENDATION}
+   **Readiness Score**: ${SCORE}/10
+
+   | Severity | Count |
+   |---|---|
+   | Critical 🚨 | ${CRITICAL} |
+   | Important ⚠️ | ${IMPORTANT} |
+   | Optional 💡 | ${OPTIONAL} |
+
+   **Review artifact**: \`${REVIEW_FILE}\`
+   ${CHANGES_SECTION}" \
+       '{"body": $body}'
+     )" || echo "⚠️ Jira comment failed — continuing"
+   ```
+
+3. On success → confirm: "✅ Review summary posted to Jira issue ${TASK_KEY}."
+4. On failure → report error but do NOT halt.
+
+**Output** (Jira path): Jira issue updated with review outcome comment (if `jira_key` present in frontmatter).
+
+---
+
+**GitHub path** (when `JIRA_URL` is not set):
+
+1. **Retrieve `github_issue`** from the task document YAML frontmatter. If absent, skip this step silently.
+
+2. **Ensure issue is on the project board (idempotent, graceful)**:
+
+   ```bash
+   BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+   OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
+   REPO=$(gh repo view --json name -q '.name')
+   gh project item-add "$BOARD_NUM" --owner "$OWNER" \
+     --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
+   ```
+
+   Failure does not halt Step 10 — the `|| true` ensures the comment step always runs.
+
+3. **Build and post the comment**:
+
+   ```bash
+   GITHUB_ISSUE={github_issue from frontmatter}
+
+   gh issue comment "$GITHUB_ISSUE" --body "## Task Review Complete
+
+   **Recommendation**: ${RECOMMENDATION}
+   **Readiness Score**: ${SCORE}/10
+
+   | Severity | Count |
+   |----------|-------|
+   | Critical 🚨 | ${CRITICAL} |
+   | Important ⚠️ | ${IMPORTANT} |
+   | Optional 💡 | ${OPTIONAL} |
+
+   **Review artifact**: \`${REVIEW_FILE}\`
+   ${CHANGES_SECTION}" \
+     || echo "⚠️  GitHub issue comment failed — continuing"
+   ```
+
+4. **Verify**: If `gh issue comment` exits 0, confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}." If it fails, report the error but do NOT halt the skill.
+
+**Output** (GitHub path): GitHub issue updated with review outcome comment and added to the project board (if `github_issue` present in frontmatter).
+
+---
+
 ## Review Depth Modes
 
 ### Quick Review (10-20 minutes)
@@ -1261,7 +1472,7 @@ User Can Now: Run `/develop` to begin implementation
 
 Review is successfully completed when:
 
-✅ All steps (0-9) systematically executed according to review depth
+✅ All steps (0-10) systematically executed according to review depth
 ✅ Issues categorized by severity (critical/important/optional)
 ✅ Hallucinations identified and documented
 ✅ Gaps and inconsistencies flagged with specific locations
@@ -1270,6 +1481,7 @@ Review is successfully completed when:
 ✅ Clear GO/NO-GO recommendation made
 ✅ Comprehensive review report generated and saved (if applicable)
 ✅ Document status updated to reflect readiness (if fixes completed)
+✅ Tracker comment posted with review outcome (Step 10 — graceful: skipped if tracker key absent from frontmatter)
 
 ---
 
