@@ -27,9 +27,30 @@ Accept any of:
 - **Issue hash notation**: `#297`
 - **Bare issue number**: `297`
 
+**Jira URL / issue key — resolve inline first (when JIRA_URL is set):**
+
+If `JIRA_URL` is set and the input matches a Jira browse URL (contains `atlassian.net/browse/`) or a Jira key pattern (`[A-Z]+-[0-9]+`, e.g. `RB-12`):
+
+1. Extract the Jira key:
+
+```bash
+JIRA_KEY=$(echo "$INPUT" | grep -oE '[A-Z]+-[0-9]+' | tail -1)
+```
+
+2. Search for a local task file referencing this Jira key:
+
+```bash
+LOCAL_PATH=$(grep -rl "jira_key: ${JIRA_KEY}" docs/ 2>/dev/null \
+  | grep -v '\.implementation\.' | grep -v '\.review\.' | grep -v '\.gate\.' \
+  | head -1)
+```
+
+3. If `LOCAL_PATH` is non-empty and the file exists: use it as the resolved task file path — **skip the Explore subagent**.
+4. If not found: HALT — inform user "No local document found for Jira issue ${JIRA_KEY}. Run `/create-task` first to link it, or provide the file path directly."
+
 **GitHub URL / issue number — resolve inline first (before Explore subagent):**
 
-If the input matches a GitHub URL (contains `github.com`), `#NNN`, or an all-digit number:
+If `JIRA_URL` is NOT set and the input matches a GitHub URL (contains `github.com`), `#NNN`, or an all-digit number:
 
 1. Extract the issue number:
 
@@ -89,15 +110,17 @@ If resuming: read the existing implementation report, identify the last ✅ step
 
 For each step marked ✅ in the implementation report, verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
 
-| Step | Artifact to verify |
-|------|-------------------|
-| 1. create-branch | `git branch --list "feature/task.{id}.*"` returns the branch |
-| 3. develop | `git log --oneline {branch}` shows more than the initial commit (code was actually committed) |
-| 4. create-pr | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | Latest gate file exists: `ls {task-directory}/task.{id}.gate.*.yml 2>/dev/null` |
-| 7. finalise | Task file `Status:` field reads `Completed` |
+| Step | Artifact to verify | Verification command |
+|------|-------------------|---------------------|
+| 1. create-branch | Branch exists in git | `git branch --list "feature/task.{id}.*"` returns the branch |
+| 3. develop | Code committed on branch | `git log --oneline {branch}` shows more than the initial commit |
+| 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
+| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` — gate alone is insufficient |
+| 7. finalise | **Both** `task.{id}.dod.{N}.*.md` exists **and** task `Status:` field reads `Completed` | `ls {task-directory}/task.{id}.dod.*.md` AND `grep "^status:" {task-file}` |
 
 Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
+
+**CRITICAL — Do not conflate gate file with qa completion**: A `gate.yml` written manually (without running `/qa-task`) does NOT satisfy Step 5–6. The required artifacts are the `qa.N.md` report file (created by `/qa-task`) AND the `gate.N.yml`. Similarly, updating DoD checkboxes in the task doc does NOT satisfy Step 7 — `/finalise` must write a separate `dod.N.md` file.
 
 **QA cycle count reconstruction (if resuming at Step 5–6)**:
 If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
@@ -123,14 +146,30 @@ Before asking questions, read the task file and note:
 - Task title (for implementation report naming)
 - `Status:` field — see autonomous handling rules below
 - Risk Assessment section — overall risk level (High / Medium / Low / absent)
-- `github_issue:` field — extract the issue number if present:
+- Tracker issue — detect platform first, then read the appropriate frontmatter field:
 
 ```bash
-GITHUB_ISSUE=$(grep '^github_issue:' {task-file} | awk '{print $2}')
+if [ -n "$JIRA_URL" ]; then
+  TRACKER="jira"
+  TRACKER_ISSUE=$(grep '^jira_key:' {task-file} | awk '{print $2}')
+  if [ -z "$TRACKER_ISSUE" ] || [ "$TRACKER_ISSUE" = "null" ]; then
+    echo "⚠️ No Jira issue linked (jira_key absent or null) — tracker references will be skipped"
+    TRACKER_ISSUE=""
+  fi
+else
+  TRACKER="github"
+  TRACKER_ISSUE=$(grep '^github_issue:' {task-file} | awk '{print $2}')
+  GITHUB_ISSUE="$TRACKER_ISSUE"   # kept for backward compatibility with sub-skills
+  if [ -z "$TRACKER_ISSUE" ] || [ "$TRACKER_ISSUE" = "null" ]; then
+    echo "No GitHub Issue linked — issue references will be skipped"
+    TRACKER_ISSUE=""
+    GITHUB_ISSUE=""
+  fi
+fi
 ```
 
-- If `GITHUB_ISSUE` is a number: store as pipeline variable for downstream skills
-- If `GITHUB_ISSUE` is `null` or absent: log "No GitHub Issue linked — issue references will be skipped"
+- `TRACKER` (`jira` or `github`) and `TRACKER_ISSUE` (Jira key or GitHub issue number) are pipeline-wide variables — every subsequent branch uses them
+- For tasks: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations
 
 **Autonomous status handling:**
 
@@ -157,26 +196,59 @@ If any condition is not met, `PIPELINE_MODE=standard` (default, no change to beh
 
 ### 0c-reg. Signal Work Started
 
-If `GITHUB_ISSUE` is set (extracted in Phase 0c), comment on the issue and move it to "In Progress" on the Projects board:
+If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started on the linked tracker issue. Branch on `TRACKER`:
+
+#### Jira path (when `TRACKER=jira`):
+
+Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `mediastreamag.atlassian.net` from `https://mediastreamag.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` field from the matching entry.
+
+1. **Post pipeline-start comment** — call `addCommentToJiraIssue`:
+   - `cloudId`: {derived hostname}
+   - `issueIdOrKey`: `{TRACKER_ISSUE}`
+   - `commentBody`: `"Pipeline started — branch: \`{branch-name}\`"`
+   - `contentFormat`: `"markdown"`
+   - On failure: log warning and continue (non-blocking)
+
+2. **Transition to "In Progress"** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
+   - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {TRACKER_ISSUE}`
+   - Find the transition whose `name` matches "In Progress" (case-insensitive)
+   - If found: call `transitionJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, and `transition: {id: "<matched-id>"}`
+   - If no matching transition: log "⚠️ No 'In Progress' transition available for {TRACKER_ISSUE}" and skip
+   - On failure: log warning and continue (non-blocking)
+
+3. **Post-condition verification** — call `getJiraIssue` to confirm the transition worked:
+   - Call `getJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, `fields: ["status"]`
+   - Check `fields.status.name`: if "In Progress" → log "✅ Jira issue {TRACKER_ISSUE} confirmed In Progress"
+   - If NOT "In Progress": retry step 2 once; if still not moved, log "⚠️ Jira status not updated — proceeding" in Issues Log
+
+All steps are **non-blocking** — failures are logged but do not halt the pipeline.
+
+Add to the implementation report Pipeline Configuration table:
+
+| Tracker Issue | {TRACKER_ISSUE} (Jira) or not linked |
+| Tracker status | In Progress ✅ / ⚠️ transition failed |
+
+#### GitHub path (when `TRACKER=github`):
 
 ```bash
 # 1. Post pipeline-start comment
-gh issue comment {GITHUB_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
+gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
 
 # 2. Move issue to "In Progress" on the Projects board (graceful — warn and continue on any failure)
 (
   OWNER=$(gh repo view --json owner -q '.owner.login')
   REPO_NAME=$(gh repo view --json name -q '.name')
   REPO_URL=$(gh repo view --json url -q '.url')
+  BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
 
   # Ensure issue is on the board (idempotent — returns existing item if already present)
-  gh project item-add 1 --owner "$OWNER" --url "$REPO_URL/issues/{GITHUB_ISSUE}" 2>/dev/null || true
+  gh project item-add "$BOARD_NUM" --owner "$OWNER" --url "$REPO_URL/issues/{TRACKER_ISSUE}" 2>/dev/null || true
 
   # Query the issue directly for its project items — avoids item-list pagination limits
   RESPONSE=$(gh api graphql -f query='
   {
     repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
-      issue(number: {GITHUB_ISSUE}) {
+      issue(number: {TRACKER_ISSUE}) {
         projectItems(first: 10) {
           nodes {
             id
@@ -221,17 +293,33 @@ gh issue comment {GITHUB_ISSUE} --body "Pipeline started — branch: \`{branch-n
         projectV2Item { id }
       }
     }' \
-      && echo "✅ Issue #{GITHUB_ISSUE} moved to In Progress on Projects board" \
+      && echo "✅ Issue #{TRACKER_ISSUE} moved to In Progress on Projects board" \
       || echo "⚠️  Board status update failed — issue comment was posted successfully"
   fi
 ) || echo "⚠️  Projects board update skipped (gh project unavailable or auth scope missing)"
 ```
 
-If `GITHUB_ISSUE` is not set, skip both steps — do NOT update the deprecated register (`docs/development/todo-list.md`).
+**Post-condition check** — immediately after the block above, verify the board actually moved:
+
+```bash
+BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+BOARD_STATUS=$(gh project item-list "$BOARD_NUM" --owner "$(gh repo view --json owner -q '.owner.login')" --format json 2>/dev/null \
+  | jq -r '.items[] | select(.content.number == {TRACKER_ISSUE}) | .status // "unknown"')
+if [ "$BOARD_STATUS" = "Todo" ] || [ "$BOARD_STATUS" = "unknown" ]; then
+  echo "⚠️  POST-CONDITION FAILED: Issue #{TRACKER_ISSUE} is still '$BOARD_STATUS' on the board — board update did not take effect"
+else
+  echo "✅ Post-condition verified: board status is '$BOARD_STATUS'"
+fi
+```
+
+If the post-condition warns, retry the board update once. If it still fails, log the warning in the implementation report Issues Log and continue — do not block the pipeline.
 
 Add to the implementation report Pipeline Configuration table:
 
-| GitHub Issue | #{N} or not linked |
+| Tracker Issue | #{TRACKER_ISSUE} (GitHub) or not linked |
+| Board status | In Progress ✅ / ⚠️ update failed |
+
+If `TRACKER_ISSUE` is not set, skip this entire section — do NOT update the deprecated register (`docs/development/todo-list.md`).
 
 ### 0d. Upfront Setup — gather all decisions before execution
 
@@ -322,20 +410,21 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 | High-risk gate | {Q3 answer or N/A} |
 | Task risk level | {risk level from Risk Assessment or not set} |
 | Pipeline mode | {lite / standard} |
+| Board status | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)} |
 
 ---
 
 ## Pipeline Progress
 
-| Step | Status | Notes |
-|------|--------|-------|
-| 1. create-branch | ⏳ Pending | |
-| 2. review-task | ⏳ Pending | |
-| 3. develop | ⏳ Pending | |
-| 4. create-pr | ⏳ Pending | |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | |
-| 7. finalise | ⏳ Pending | |
-| 8. commit-changes | ⏳ Pending | |
+| Step | Status | Required Artifacts | Notes |
+|------|--------|--------------------|-------|
+| 1. create-branch | ⏳ Pending | Branch `feature/task.{id}.*` exists in git | |
+| 2. review-task | ⏳ Pending | `task.{id}.review.{date}.md` exists (or skip logged) | |
+| 3. develop | ⏳ Pending | ≥1 code commit beyond initial branch commit | |
+| 4. create-pr | ⏳ Pending | PR URL; issue comment posted | |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted | |
+| 7. finalise | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `Status: Completed` | |
+| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
 
 ---
 
@@ -393,15 +482,26 @@ Press Ctrl+C now to abort before any changes are made.
 
 ### Context Compression Recovery (CRITICAL — read this first)
 
-If context was compressed while this pipeline was running (i.e., the conversation was summarized and you are now resuming), the pipeline state **must** be recovered from the implementation report before taking any other action:
+If context was compressed while this pipeline was running (i.e., the conversation was summarized and you are now resuming), follow this sequence exactly — do not improvise:
 
+**Step 0 — Re-read the full skill file before anything else:**
+```bash
+# The skill instructions in the system reminder are TRUNCATED after compression.
+# Improvising steps from memory produces wrong artifacts and misses required invocations.
+# Always read the full skill first:
+cat .agents/skills/develop-task/SKILL.md
+```
+Output: "⚠️ Context recovery — re-reading full skill file before resuming."
+
+**Step 1 — Recover pipeline state from the implementation report:**
 ```bash
 ls {task-directory}/task.{id}.implementation.*.md 2>/dev/null | sort | tail -1
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
-2. Output immediately: "⚠️ Context recovery — last completed step: Step {N}. Resuming from Step {N+1}."
-3. Continue from Step {N+1} — do NOT re-run completed steps, do NOT skip any pending steps.
+2. **Verify each ✅ step's artifact exists** (see Resume artifact verification table below) — do not trust the report alone.
+3. Output: "⚠️ Context recovery — last verified step: Step {N}. Resuming from Step {N+1}."
+4. Continue from Step {N+1} — do NOT re-run completed steps, do NOT skip any pending steps.
 
 **This recovery is mandatory even if the user did not explicitly re-invoke `/develop-task`.** If you are in a conversation where `develop-task` was previously running and context was then compressed, you are still the develop-task orchestrator and must complete all remaining steps. A context summary saying "next step: create-pr" does NOT mean the pipeline ends after create-pr — it means Step 4 is next, and Steps 5–8 still follow.
 
@@ -425,6 +525,27 @@ This creates persistent checkpoints that survive context compression and make th
 After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention) and log any decisions or issues before moving on.
 
 ### Step 1: Create Branch
+
+**Pre-flight board check (mandatory gate before create-branch — GitHub only):**
+
+If `TRACKER=github` and `TRACKER_ISSUE` is set, verify the board status before proceeding. This catches cases where Phase 0c-reg was skipped or silently failed:
+
+```bash
+BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+BOARD_STATUS=$(gh project item-list "$BOARD_NUM" --owner "$(gh repo view --json owner -q '.owner.login')" --format json 2>/dev/null \
+  | jq -r '.items[] | select(.content.number == {TRACKER_ISSUE}) | .status // "unknown"')
+echo "Board status for #{TRACKER_ISSUE}: $BOARD_STATUS"
+```
+
+- If `$BOARD_STATUS` is `In Progress`: proceed — 0c-reg succeeded.
+- If `$BOARD_STATUS` is `Todo` or `unknown`: re-run the full 0c-reg GitHub board update (GraphQL mutation from Phase 0c-reg above), then re-check. Log the outcome in the implementation report Pipeline Configuration table (`Board status` row).
+- If the retry also fails: log `⚠️ Board status update failed — proceeding without board update` in the Issues Log and continue.
+
+If `TRACKER=jira` and `TRACKER_ISSUE` is set, call `getJiraIssue` MCP tool to verify the issue is "In Progress" before proceeding:
+- `cloudId`: {hostname from `JIRA_URL`}, `issueIdOrKey`: `{TRACKER_ISSUE}`, `fields: ["status"]`
+- If `fields.status.name` is "In Progress": proceed — 0c-reg succeeded
+- If not "In Progress": re-apply transition using `getTransitionsForJiraIssue` + `transitionJiraIssue` (same pattern as 0c-reg step 2); log outcome in Pipeline Configuration table (`Tracker status` row)
+- If retry fails: log `⚠️ Jira status update failed — proceeding` in Issues Log and continue
 
 Before invoking `/create-branch`, stash the implementation report to ensure a clean working directory:
 ```bash
@@ -551,7 +672,12 @@ Update Pipeline Progress: ✅ develop
 
 ### Step 4: Create PR
 
-Invoke the `/create-pr` skill passing `--base {Q2_answer}` (e.g., `/create-pr --base develop`). If `GITHUB_ISSUE` is set, also pass `--issue {GITHUB_ISSUE}` (e.g., `/create-pr --base develop --issue 42`). This pre-supplies the target branch and issue number via create-pr's Step 0, skipping the interactive prompt entirely. Do not wait for create-pr to ask — Q2 is already resolved.
+Invoke the `/create-pr` skill passing `--base {Q2_answer}` (e.g., `/create-pr --base develop`). Branch on tracker platform for the `--issue` flag:
+
+- **GitHub** (`TRACKER=github`): also pass `--issue {TRACKER_ISSUE}` (e.g., `/create-pr --base develop --issue 42`) — `create-pr` will add `Closes #N` to the PR body and comment on the GitHub issue.
+- **Jira** (`TRACKER=jira`): omit `--issue` — `create-pr` handles Bitbucket PR creation natively; Bitbucket Issues are not enabled for this project, so passing `--issue` would cause a failed comment attempt. The PR body will reference the task file which contains `jira_key`.
+
+This pre-supplies the target branch via create-pr's Step 0, skipping the interactive prompt entirely. Do not wait for create-pr to ask — Q2 is already resolved.
 
 **Important**: `create-pr` will automatically commit any uncommitted code changes before opening the PR. At this point the implementation report is partially complete (Steps 1–3 documented). **CRITICAL**: The implementation report file must NOT be included in create-pr's auto-commit. Before invoking create-pr, proactively unstage the report if it was staged:
 ```bash
@@ -562,8 +688,27 @@ The report will continue to be updated through Steps 5–8, and its final state 
 
 After the PR is created:
 - Record the PR URL in the Decisions Log and in the **PR** field of the Completion section
-- Update Pipeline Progress Notes: `PR #{N}: {url}` — e.g. `PR #108: https://github.com/org/repo/pull/108`
+- Update Pipeline Progress Notes: `PR #{N}: {url}` — e.g. `PR #108: https://bitbucket.org/org/repo/pull-requests/108`
 - Update Pipeline Progress: ✅ create-pr
+
+**Jira tracker update (when `TRACKER=jira` and `TRACKER_ISSUE` is set):**
+
+After extracting the PR URL from `create-pr`'s output, use the Atlassian MCP tools:
+
+1. **Post PR-opened comment** — call `addCommentToJiraIssue`:
+   - `cloudId`: {hostname from `JIRA_URL`}
+   - `issueIdOrKey`: `{TRACKER_ISSUE}`
+   - `commentBody`: `"PR opened — {PR_URL}"`
+   - `contentFormat`: `"markdown"`
+   - On failure: log warning and continue (non-blocking)
+
+2. **Transition to "In Review"** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
+   - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {TRACKER_ISSUE}`
+   - Find a transition matching "In Review", "Code Review", or "Ready for Review" (case-insensitive, try in that order)
+   - If found: call `transitionJiraIssue`; log "✅ Jira issue {TRACKER_ISSUE} moved to {transition name}"
+   - If not found: log "⚠️ No review-phase transition available — issue remains In Progress" (non-blocking)
+
+Log in Decisions Log: "Jira {TRACKER_ISSUE} — PR comment posted; status: {transition name or 'In Progress (no review transition)'}."
 
 **On failure**: Log in Issues Log. Invoke the `/commit-changes` skill to commit the report (suggested message: `docs(task.{id}): implementation report — create-pr failure`), push, then HALT.
 
@@ -700,8 +845,51 @@ Review the implementation report at {path} and address the gaps before re-runnin
 
 On success: log "Task completed" in Decisions Log.
 
-**GitHub Issue Update:**
-If `GITHUB_ISSUE` is set, the issue is automatically closed via `Closes #{N}` in the PR body on merge — no manual action needed. Log in Decisions Log: "GitHub Issue #{N} will auto-close on PR merge via `Closes #N` in PR body."
+**Tracker Issue Update:**
+
+Branch on `TRACKER`:
+
+- **GitHub** (`TRACKER=github`): If `TRACKER_ISSUE` is set, explicitly close the issue and move the project board to Done:
+
+   ```bash
+   # 1. Post completion comment
+   gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: Completed. All DoD criteria verified."
+
+   # 2. Close the issue
+   gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted and PR merged. Implementation report: {report-path}"
+   ```
+
+   After closing, verify the issue is actually closed:
+   ```bash
+   ISSUE_STATE=$(gh issue view {TRACKER_ISSUE} --json state -q '.state')
+   if [ "$ISSUE_STATE" = "CLOSED" ]; then
+     echo "✅ GitHub Issue #{TRACKER_ISSUE} confirmed closed"
+   else
+     echo "⚠️ GitHub Issue #{TRACKER_ISSUE} still open — state: $ISSUE_STATE"
+   fi
+   ```
+
+   Then move the project board item to Done using the same GraphQL pattern from Phase 0c-reg, but with "Done" as the target option (not "In Progress"). If the board move fails, post a comment on the issue warning that the board was not updated.
+
+   On any `gh issue close` failure: retry once. If still failing, log the error in the Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
+
+   Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} closed (state: {state}). Board: {Done ✅ / ⚠️ update failed}."
+
+- **Jira** (`TRACKER=jira`): If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comment and transition to Done (`cloudId` derived from `JIRA_URL` hostname):
+
+   1. **Post completion comment** — call `addCommentToJiraIssue`:
+      - `issueIdOrKey`: `{TRACKER_ISSUE}`
+      - `commentBody`: `"Task development complete — PR: {PR_URL}. Task status: Completed."`
+      - `contentFormat`: `"markdown"`
+      - On failure: log warning and continue (non-blocking)
+
+   2. **Transition to Done** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
+      - Find transition matching "Done" (case-insensitive); fallbacks: "Closed", "Resolved"
+      - If found: call `transitionJiraIssue`; log "✅ Jira issue {TRACKER_ISSUE} transitioned to Done"
+      - If not found: log "⚠️ No done-state transition available for {TRACKER_ISSUE}" (non-blocking)
+      - On failure: log warning and continue
+
+   Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — completion comment posted; transitioned to Done."
 
 Update Pipeline Progress: ✅ finalise.
 
