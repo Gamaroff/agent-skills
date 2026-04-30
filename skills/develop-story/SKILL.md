@@ -7,6 +7,29 @@ description: Automates the full end-to-end story development lifecycle: create-b
 
 This skill orchestrates the complete story development lifecycle, calling each skill in sequence and maintaining an implementation report that records every significant decision and issue encountered along the way.
 
+## Setup — Graceful Pause Hook (one-time, per project)
+
+Long pipelines can hit Claude's context window before reaching Step 8. To make compaction-induced pauses graceful (commit the report, comment the PR, signal the user how to resume), register the bundled `PreCompact` hook in the project's `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/skills/develop-story/scripts/on-precompact.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook noops when no pipeline is active (lock file absent), so it has zero overhead outside `/develop-story` and `/develop-task` runs. See `docs/development/develop-pipeline-pause.md` for the full pause/resume contract. Setup is optional — without the hook, pipelines still resume correctly via the existing post-compaction recovery, just without the PR comment and pause-state report entry.
+
 ## When to Use This Skill
 
 - User says `/develop-story <path>` or passes a story file path
@@ -112,6 +135,8 @@ If resuming: read the existing implementation report, identify the last ✅ step
 **Resume artifact verification (CRITICAL — run before skipping any step)**:
 
 For each step marked ✅ in the implementation report, verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
+
+A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is treated identically to `⏳ Pending`: re-run from the start of that step. Earlier `✅` steps still skip per their artifact verification. Log: "Resuming after graceful pause — re-running Step {N}."
 
 | Step             | Artifact to verify | Verification command |
 | ---------------- | ------------------ | -------------------- |
@@ -515,6 +540,28 @@ ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null | sort
 
 **This recovery is mandatory even if the user did not explicitly re-invoke `/develop-story`.** If you are in a conversation where `develop-story` was previously running and context was then compressed, you are still the develop-story orchestrator and must complete all remaining steps. A context summary saying "next step: create-pr" does NOT mean the pipeline ends after create-pr — it means Step 4 is next, and Steps 5–8 still follow.
 
+### Graceful Pause on Imminent Compaction (CRITICAL — read this second)
+
+This complements the post-compaction recovery above. **Pre**-compaction graceful pause requires the `PreCompact` hook to be installed (see Setup section at the top of this file). When the hook fires:
+
+1. The hook itself appends a "Pipeline Paused" entry to the implementation report, commits, pushes, and posts a PR/issue comment — all best-effort, all done before compaction proceeds.
+2. The hook emits `🛑 PIPELINE-PAUSE-SIGNAL` as `additionalContext` to you, which appears as a `<system-reminder>` in your next turn.
+3. The hook removes the lock file.
+
+**When you observe `🛑 PIPELINE-PAUSE-SIGNAL` in a system reminder:**
+
+1. **Stop everything.** Do not invoke any sub-skill. Do not edit the implementation report (the hook already did). Do not run any tools beyond what's needed for the user-facing summary.
+2. **Output the pause banner**:
+   ```
+   ═══ DEVELOP-STORY PIPELINE: PAUSED — CONTEXT COMPACTION IMMINENT ═══
+   ```
+3. **Output the user-facing summary** using the template provided in the signal's `additionalContext`. If the signal indicates `tracker=jira`, add a single-line note that the Jira issue was *not* commented on (Jira pause is silent by design).
+4. **HALT.** Do not proceed to any further step. The lock file has been removed by the hook; on next user invocation of `/develop-story <path>`, Phase 0b will detect the existing run, read the report, and resume cleanly.
+
+**No additional report edits, no additional commits, no additional comments** — the hook already did all of that, and you have very little budget left before compaction proceeds. Spending it on duplicate work risks losing the user-facing summary entirely.
+
+For the full lock-file format, hook contract, and half-done step recovery semantics, see `docs/development/develop-pipeline-pause.md`.
+
 ### Context Management Rule (CRITICAL)
 
 After EVERY step completes, before moving to the next step:
@@ -535,7 +582,14 @@ This prevents context accumulation across the 8-step pipeline.
 
 This creates persistent checkpoints that survive context compression and make the pipeline position unambiguous.
 
-After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention) and log any decisions or issues before moving on.
+**Lock file `current_step` update (required, Steps 2–8).** Immediately after the banner, update the pipeline lock file so the PreCompact hook knows where the pipeline is:
+```bash
+jq --argjson n {N} '.current_step = $n' .claude/state/develop-pipeline.lock \
+  > .claude/state/develop-pipeline.lock.tmp && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock
+```
+Skip this for Step 1 (the lock is created at the *end* of Step 1, after the feature branch exists — see Step 1 below).
+
+After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention / ⏸️ Paused — see Graceful Pause section) and log any decisions or issues before moving on.
 
 ### Step 1: Create Branch
 
@@ -591,7 +645,27 @@ After the branch is created:
 - Run `git log --oneline -1` to capture the initial commit hash; record it in the Pipeline Progress Notes: e.g. `Branch created at \`{hash}\``
 - Update Pipeline Progress: ✅ create-branch
 
-**On failure**: Update Pipeline Progress ❌, log in Issues Log. **Do not commit the report** — no feature branch exists yet and committing on the base branch would pollute it. Save the report file to disk and tell the user its path so they can recover manually. Then HALT with the error details.
+**Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward):
+```bash
+mkdir -p .claude/state
+cat > .claude/state/develop-pipeline.lock <<EOF
+{
+  "skill": "develop-story",
+  "report_path": "{implementation-report-path}",
+  "task_or_story_id": "{epic}.{story}",
+  "task_or_story_directory": "{story-directory}",
+  "branch": "{branch-name}",
+  "pr_url": "",
+  "tracker": "{TRACKER}",
+  "tracker_issue": "{TRACKER_ISSUE}",
+  "current_step": 1,
+  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+```
+The lock file is read by `.claude/skills/develop-story/scripts/on-precompact.sh` if compaction fires. From Step 2 onward, the per-step banner directive updates `current_step`. Step 4 also writes `pr_url` after the PR is created.
+
+**On failure**: Update Pipeline Progress ❌, log in Issues Log. **Do not commit the report** — no feature branch exists yet and committing on the base branch would pollute it. Save the report file to disk and tell the user its path so they can recover manually. Do **not** write the lock file (no branch = hook can't safely commit). Then HALT with the error details.
 
 ### Step 2: Review Story
 
@@ -715,6 +789,11 @@ After the PR is created:
 - Record the PR URL in the Decisions Log and in the **PR** field of the Completion section
 - Update Pipeline Progress Notes: `PR #{N}: {url}` — e.g. `PR #42: https://github.com/org/repo/pull/42`
 - Update Pipeline Progress: ✅ create-pr
+- **Update the lock file with the PR URL** so the PreCompact hook can post pause comments:
+  ```bash
+  jq --arg url "{PR_URL}" '.pr_url = $url' .claude/state/develop-pipeline.lock \
+    > .claude/state/develop-pipeline.lock.tmp && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock
+  ```
 
 **Jira tracker update (when `TRACKER=jira` and `TRACKER_ISSUE` is set):**
 
@@ -951,6 +1030,11 @@ After `/commit-changes` completes, run `git log --oneline -1` to capture the fin
 
 Update Pipeline Progress: ✅ commit-changes.
 
+**Remove the pipeline lock file** (pipeline finished cleanly, no further pause possible):
+```bash
+rm -f .claude/state/develop-pipeline.lock
+```
+
 ---
 
 ## Phase 2: Completion
@@ -1024,6 +1108,7 @@ If a situation arises that is not in this table and the stakes are non-trivial, 
 - **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete.
 - **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
+- **Remove the lock file before every terminal HALT.** After committing the report (per the rule above), run `rm -f .claude/state/develop-pipeline.lock` so a future PreCompact firing in this same session won't try to commit again. The lock is recreated automatically when the user re-invokes `/develop-story` and the resume flow re-enters Step 1 (or the resume verification confirms it should remain past Step 1). The graceful-pause hook also removes the lock itself if it runs — this rule covers the non-hook halt paths.
 - If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.agents/skills/`.
 
 ---
