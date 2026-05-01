@@ -127,15 +127,15 @@ function resolveEpicPath(epicSource, repoRoot) {
 // ---------------------------------------------------------------------------
 // Field collection
 // ---------------------------------------------------------------------------
-function collectIssueFields({ args, frontmatter, descAdf, includeDescription = true, storyTypeId, projectKey, livePriorities, output, syncLabel, epicKey, useEpicLink }) {
-  const summary = args.summary || frontmatter.summary || frontmatter.title;
+function collectIssueFields({ args, frontmatter, summary, descAdf, includeDescription = true, storyTypeId, projectKey, livePriorities, output, syncLabel, epicKey, useEpicLink }) {
+  const finalSummary = summary || args.summary || frontmatter.summary || frontmatter.title;
   const priority = lib.normalisePriority(args.priority || frontmatter.priority, livePriorities, output);
   const labelInput = args.labels || frontmatter.labels;
   const cleanLabels = lib.sanitiseLabels(labelInput) || [];
   if (!cleanLabels.includes(syncLabel)) cleanLabels.push(syncLabel);
 
   const fields = {
-    summary,
+    summary: finalSummary,
     labels: cleanLabels,
   };
   if (includeDescription) fields.description = descAdf;
@@ -437,7 +437,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       const includeDescription = changedFields.includes("description") || changedFields.includes("metadata");
       // Do not change parent linkage on update — Jira rejects parent edits on team-managed tracking issues.
       const fields = collectIssueFields({
-        args, frontmatter, descAdf, includeDescription,
+        args, frontmatter, summary, descAdf, includeDescription,
         storyTypeId: null, projectKey: null,
         livePriorities, output, syncLabel, epicKey: null, useEpicLink: false,
       });
@@ -488,7 +488,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       ]);
       const useEpicLink = style === "classic";
       const fields = collectIssueFields({
-        args, frontmatter, descAdf, includeDescription: true,
+        args, frontmatter, summary, descAdf, includeDescription: true,
         storyTypeId, projectKey: auth.project,
         livePriorities, output, syncLabel, epicKey, useEpicLink,
       });
