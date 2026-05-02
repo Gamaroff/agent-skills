@@ -1,5 +1,5 @@
 ---
-name: book_typesetter_pro
+name: book-typesetter-pro
 description: "Formats Markdown into a novel-style book with highlighted AI-synthesized transitions for editorial review."
 version: "1.2.0"
 ---
