@@ -1,0 +1,25 @@
+{
+  "name": "agent-skills",
+  "version": "1.0.0",
+  "description": "Repository of Agent skills",
+  "homepage": "https://github.com/Gamaroff/agent-skills#readme",
+  "bugs": {
+    "url": "https://github.com/Gamaroff/agent-skills/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gamaroff/agent-skills.git"
+  },
+  "license": "ISC",
+  "author": "Lorien Gamaroff",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "package": "cd skills/create-skill/scripts && for d in ../../*/; do [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
+    "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py"
+  }
+}
