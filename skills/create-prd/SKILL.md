@@ -176,7 +176,7 @@ Scan the project for existing reference documents before asking the user for any
 - `*brief*.md` — Product or feature briefs
 - `*research*.md` — Research or analysis documents
 - `docs/prd/**` — Prior PRD artefacts
-- `**/project-context.md` — Project context files
+- `docs/project-context.md` — Project context (loaded automatically)
 - `docs/architecture/**` — Architecture documentation
 
 Report findings:

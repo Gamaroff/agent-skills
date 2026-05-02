@@ -698,8 +698,6 @@ Review all sections for:
 
 After completing the review, list all findings grouped by category. Fix all Critical items directly in the story file. Present Should Add and Nice to Have items to the user for confirmation before applying.
 
-If the BMAD adversarial checklist is available at `_bmad/bmm/workflows/4-implementation/create-story/checklist.md`, use it in addition to the above.
-
 ### 6.4 Provide Summary to User
 
 Generate a comprehensive summary including:
