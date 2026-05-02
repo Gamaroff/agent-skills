@@ -22,6 +22,21 @@ import os
 import re
 from pathlib import Path
 
+def find_repo_root(skill_path):
+    """Walk up from skill_path to find the repo root (contains shared/resources/)."""
+    path = Path(skill_path).resolve()
+    while path != path.parent:
+        if (path / 'shared' / 'resources').exists():
+            return path
+        path = path.parent
+    return None
+
+
+def collect_shared_refs(content):
+    """Return list of filenames referenced via shared/resources/<filename>."""
+    return re.findall(r'shared/resources/([^\s`\'")\]*]+)', content)
+
+
 def validate_skill(skill_path):
     """Basic validation of a skill"""
     skill_path = Path(skill_path)
@@ -63,9 +78,27 @@ def validate_skill(skill_path):
     desc_match = re.search(r'description:\s*(.+)', frontmatter)
     if desc_match:
         description = desc_match.group(1).strip()
+        # YAML block scalar — extract actual multi-line content
+        if description in ('>', '|', '>-', '|-', '>+', '|+'):
+            block_match = re.search(r'description:\s*[>|][+\-]?\n((?:[ \t]+.+\n?)+)', frontmatter)
+            if block_match:
+                description = ' '.join(line.strip() for line in block_match.group(1).splitlines())
         # Check for angle brackets
         if '<' in description or '>' in description:
             return False, "Description cannot contain angle brackets (< or >)"
+
+    # Check shared/resources/ references exist at repo level
+    repo_root = find_repo_root(skill_path)
+    all_md = list(skill_path.rglob('*.md'))
+    for md_file in all_md:
+        if not md_file.is_file():
+            continue
+        for filename in collect_shared_refs(md_file.read_text()):
+            if repo_root is None:
+                return False, f"shared/resources/{filename} referenced but repo root not found"
+            src = repo_root / 'shared' / 'resources' / filename
+            if not src.exists():
+                return False, f"shared/resources/{filename} referenced but file does not exist"
 
     return True, "Skill is valid!"
 

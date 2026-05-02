@@ -102,7 +102,7 @@ devDebugLog: .ai/debug-log.md
 
 ## Shared Resources
 
-`shared/resources/` contains cross-skill shared documentation (e.g., `code-vs-test-validation.md`).
+`shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. At package time, `package_skill.py` auto-bundles referenced files under `references/` inside the zip and rewrites paths accordingly — installed skills are fully self-contained. Never use symlinks or relative paths to reference shared resources.
 
 ## BMAD Development Pipeline
 

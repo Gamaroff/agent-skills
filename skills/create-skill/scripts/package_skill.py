@@ -24,10 +24,11 @@ Example:
     python utils/package_skill.py skills/public/my-skill ./dist
 """
 
+import re
 import sys
 import zipfile
 from pathlib import Path
-from quick_validate import validate_skill
+from quick_validate import validate_skill, find_repo_root, collect_shared_refs
 
 
 def package_skill(skill_path, output_dir=None):
@@ -77,21 +78,58 @@ def package_skill(skill_path, output_dir=None):
 
     zip_filename = output_path / f"{skill_name}.zip"
 
+    # Locate repo root for shared resource resolution
+    repo_root = find_repo_root(skill_path)
+
+    # Collect all shared/resources refs across all skill .md and .js files
+    shared_to_bundle = {}  # filename -> source Path
+    for src_file in list(skill_path.rglob('*.md')) + list(skill_path.rglob('*.js')):
+        refs = collect_shared_refs(src_file.read_text())
+        for filename in refs:
+            if filename in shared_to_bundle:
+                continue
+            if repo_root:
+                src = repo_root / 'shared' / 'resources' / filename
+                if src.exists():
+                    shared_to_bundle[filename] = src
+                else:
+                    print(f"⚠️  Warning: shared/resources/{filename} referenced but not found — skipping bundle")
+            else:
+                print(f"⚠️  Warning: cannot resolve repo root to bundle shared/resources/{filename}")
+
     # Create the zip file
     try:
         EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
         EXCLUDE_SUFFIXES = {'.pyc', '.pyo', '.map'}
+        SHARED_REF_RE = re.compile(r'shared/resources/([^\s`\'")\]*]+)')
+        # Matches require("...path.../shared/resources/file") and rewrites to require("../references/file")
+        JS_SHARED_RE = re.compile(r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)')
 
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Walk through the skill directory
+            # Walk through the skill directory; rewrite shared/resources/ paths in .md and .js files
             for file_path in skill_path.rglob('*'):
                 if any(part in EXCLUDE_DIRS for part in file_path.parts):
                     continue
-                if file_path.is_file() and file_path.suffix not in EXCLUDE_SUFFIXES:
-                    # Calculate the relative path within the zip
-                    arcname = file_path.relative_to(skill_path.parent)
+                if not file_path.is_file() or file_path.suffix in EXCLUDE_SUFFIXES:
+                    continue
+                arcname = file_path.relative_to(skill_path.parent)
+                if file_path.suffix == '.md' and shared_to_bundle:
+                    content = file_path.read_text()
+                    rewritten = SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
+                    zipf.writestr(str(arcname), rewritten)
+                elif file_path.suffix == '.js' and shared_to_bundle:
+                    content = file_path.read_text()
+                    rewritten = JS_SHARED_RE.sub(lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})', content)
+                    zipf.writestr(str(arcname), rewritten)
+                else:
                     zipf.write(file_path, arcname)
-                    print(f"  Added: {arcname}")
+                print(f"  Added: {arcname}")
+
+            # Bundle shared resources under references/
+            for filename, src_path in shared_to_bundle.items():
+                arcname = Path(skill_path.name) / 'references' / filename
+                zipf.write(src_path, arcname)
+                print(f"  Bundled shared: {arcname}")
 
         print(f"\n✅ Successfully packaged skill to: {zip_filename}")
         return zip_filename
