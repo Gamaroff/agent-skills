@@ -410,7 +410,6 @@ architecture:
 devStoryLocation: nested
 devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 devDebugLog: .ai/debug-log.md
-slashPrefix: BMad
 ```
 
 2. Load the story document directly using the Read tool — this is the primary artifact and must be in main context.

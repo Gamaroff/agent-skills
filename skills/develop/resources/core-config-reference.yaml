@@ -31,7 +31,6 @@ devLoadAlwaysFiles: # Files to load on dev agent activation
 
 devDebugLog: .ai/debug-log.md # Dev debug log location
 devStoryLocation: docs/stories # Story file directory
-slashPrefix: BMad # Command prefix for CLI integration
 
 
 # Usage Examples:

@@ -88,7 +88,6 @@ architecture:
 # Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
 devStoryLocation: nested
 devDebugLog: .ai/debug-log.md
-slashPrefix: BMad
 ```
 
 #### 0.2 Read PRD and Architecture

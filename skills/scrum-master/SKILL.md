@@ -152,7 +152,6 @@ architecture:
 # Stories stored within epic directories
 devStoryLocation: nested
 devDebugLog: .ai/debug-log.md
-slashPrefix: BMad
 ```
 
 ## Anti-Hallucination Protocol

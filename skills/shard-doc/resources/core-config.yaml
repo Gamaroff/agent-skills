@@ -20,4 +20,3 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/source-tree.md
 devDebugLog: .ai/debug-log.md
 devStoryLocation: docs/stories
-slashPrefix: BMad
