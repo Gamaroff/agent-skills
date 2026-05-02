@@ -1,6 +1,6 @@
 # React Native-Specific Test Patterns
 
-This document supplements the shared `code-vs-test-validation.md` with patterns specific to React Native testing.
+This document supplements `shared/resources/code-vs-test-validation.md` with patterns specific to React Native testing.
 
 **Reference the shared framework for core methodology.** This document adds React Native-specific context.
 
@@ -638,4 +638,4 @@ React Native tests fail for platform-specific reasons:
 6. **Platform module not mocked** - Test infrastructure issue
 7. **Metro cache stale** - Development environment issue
 
-**Use the shared `code-vs-test-validation.md` framework to decide code vs test,** then use this supplement to understand React Native-specific patterns.
+**Use the `shared/resources/code-vs-test-validation.md` framework to decide code vs test,** then use this supplement to understand React Native-specific patterns.

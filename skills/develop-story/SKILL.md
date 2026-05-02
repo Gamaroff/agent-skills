@@ -1,6 +1,6 @@
 ---
 name: develop-story
-description: Automates the full end-to-end story development lifecycle: create-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume from any step; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story <story-file-path>` or "develop and QA this story end to end".
+description: Automates the full end-to-end story development lifecycle: create-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume from any step; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".
 ---
 
 # Develop Story — Automated Lifecycle Orchestrator
@@ -28,7 +28,7 @@ Long pipelines can hit Claude's context window before reaching Step 8. To make c
 }
 ```
 
-The hook noops when no pipeline is active (lock file absent), so it has zero overhead outside `/develop-story` and `/develop-task` runs. See `docs/development/develop-pipeline-pause.md` for the full pause/resume contract. Setup is optional — without the hook, pipelines still resume correctly via the existing post-compaction recovery, just without the PR comment and pause-state report entry.
+The hook noops when no pipeline is active (lock file absent), so it has zero overhead outside `/develop-story` and `/develop-task` runs. See `shared/resources/develop-pipeline-pause.md` for the full pause/resume contract. Setup is optional — without the hook, pipelines still resume correctly via the existing post-compaction recovery, just without the PR comment and pause-state report entry.
 
 ## When to Use This Skill
 
@@ -560,7 +560,7 @@ This complements the post-compaction recovery above. **Pre**-compaction graceful
 
 **No additional report edits, no additional commits, no additional comments** — the hook already did all of that, and you have very little budget left before compaction proceeds. Spending it on duplicate work risks losing the user-facing summary entirely.
 
-For the full lock-file format, hook contract, and half-done step recovery semantics, see `docs/development/develop-pipeline-pause.md`.
+For the full lock-file format, hook contract, and half-done step recovery semantics, see `shared/resources/develop-pipeline-pause.md`.
 
 ### Context Management Rule (CRITICAL)
 

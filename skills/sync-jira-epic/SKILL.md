@@ -306,7 +306,7 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
 
 ## Architecture
 
-The script is a thin wrapper over `.claude/skills/_lib/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs, project-style detection). Shared with `sync-jira-task` and `sync-jira-story`.
+The script is a thin wrapper over `shared/resources/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs, project-style detection). Shared with `sync-jira-task` and `sync-jira-story`.
 
 **Migration note:** older versions of this script used Jira REST API v2 with a plain-text description. Existing epics synced via that older version are upgraded to v3+ADF on the next sync — the body of the Jira description will look different (real tables, real bullet lists, real headings) but `jira_key` and the epic key itself are unchanged.
 

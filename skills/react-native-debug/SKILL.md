@@ -531,7 +531,7 @@ Both skills share:
 
 See accompanying documentation files:
 
-1. **code-vs-test-validation.md** - Shared framework for determining if code or test is wrong
+1. **shared/resources/code-vs-test-validation.md** - Shared framework for determining if code or test is wrong
 2. **react-native-test-patterns.md** - React Native-specific test failure patterns
 3. **error-patterns.md** - Comprehensive error message reference
 4. **debugging-workflows.md** - Step-by-step guides for each workflow

@@ -315,7 +315,7 @@ On error: `{ "error": "<message>" }` and a non-zero exit code.
 
 ## Architecture
 
-The script is a thin wrapper over `.claude/skills/_lib/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs). `sync-jira-epic` and `sync-jira-story` can adopt this lib in a follow-up.
+The script is a thin wrapper over `shared/resources/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs). `sync-jira-epic` and `sync-jira-story` can adopt this lib in a follow-up.
 
 ## Tests
 

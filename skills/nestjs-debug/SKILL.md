@@ -321,7 +321,7 @@ When you encounter an error, **first select the primary Skill** that categorizes
 - ✅ **Test Wrong** (30%): Test expectations outdated or test setup flawed
 - ✅ **Both Wrong** (5%): Both code and test have issues
 
-**Decision Matrix:** See `resources/code-vs-test-validation.md` for detailed framework
+**Decision Matrix:** See `shared/resources/code-vs-test-validation.md` for detailed framework
 **NestJS-Specific Patterns:** See `resources/nestjs-test-patterns.md` for platform-specific guidance
 
 ---

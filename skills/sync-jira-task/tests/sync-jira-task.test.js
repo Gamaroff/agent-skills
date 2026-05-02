@@ -400,7 +400,7 @@ After rule.
 // New tests — recommendations #2-#20
 // ---------------------------------------------------------------------------
 
-const lib_inner = require("../../_lib/jira-sync.js");
+const lib_inner = require("../../../shared/resources/jira-sync.js");
 
 // #9 — strict isEntryRow regex
 test("isEntryRow — accepts only `| YYYY-MM-DD HH:MM |` rows", () => {
