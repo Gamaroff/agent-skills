@@ -19,7 +19,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "package": "cd skills/create-skill/scripts && for d in ../../*/; do [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
+    "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && [ -f \"${d}${name}.zip\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
     "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py"
   }
 }
