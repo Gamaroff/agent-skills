@@ -568,6 +568,63 @@ gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="op
    ```bash
    gh project item-add {project_board_number} --owner {owner} --url {issue_url}
    ```
+
+2b. Set Priority field on the board item (mirrors the label already applied):
+   ```bash
+   # 2b. Set Priority field on the board item (mirrors the label already applied)
+   case "{priority}" in
+     Critical) P_PREFIX="P0" ;;
+     High)     P_PREFIX="P1" ;;
+     Medium)   P_PREFIX="P2" ;;
+     Low)      P_PREFIX="P3" ;;
+     *)        P_PREFIX="P2" ;;
+   esac
+
+   OWNER=$(gh repo view --json owner -q '.owner.login')
+   REPO_NAME=$(gh repo view --json name -q '.name')
+   PROJ_RESPONSE=$(gh api graphql -f query='
+   {
+     repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
+       issue(number: {github_issue_number}) {
+         projectItems(first: 10) {
+           nodes {
+             id
+             project {
+               id
+               fields(first: 20) {
+                 nodes {
+                   ... on ProjectV2SingleSelectField {
+                     id name options { id name }
+                   }
+                 }
+               }
+             }
+           }
+         }
+       }
+     }
+   }')
+
+   NEW_ITEM_ID=$(echo "$PROJ_RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+   PROJECT_ID=$(echo "$PROJ_RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
+   PRIORITY_FIELD_ID=$(echo "$PROJ_RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
+   PRIORITY_OPTION_ID=$(echo "$PROJ_RESPONSE" | jq -r --arg p "$P_PREFIX" '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith($p)) | .id // empty')
+
+   if [ -n "$NEW_ITEM_ID" ] && [ -n "$PRIORITY_FIELD_ID" ] && [ -n "$PRIORITY_OPTION_ID" ]; then
+     gh api graphql -f query='
+     mutation {
+       updateProjectV2ItemFieldValue(input: {
+         projectId: "'"$PROJECT_ID"'"
+         itemId: "'"$NEW_ITEM_ID"'"
+         fieldId: "'"$PRIORITY_FIELD_ID"'"
+         value: { singleSelectOptionId: "'"$PRIORITY_OPTION_ID"'" }
+       }) { projectV2Item { id } }
+     }' >/dev/null 2>&1 \
+       && echo "✅ Priority set to ${P_PREFIX} on project board" \
+       || echo "⚠️  Priority field set failed — label priority:{priority} still applied"
+   fi
+   ```
+
 3. Add `github_issue: {N}` to the task's YAML frontmatter.
 
 **On failure**: Set `github_issue: null`, log warning, continue. Never halt.

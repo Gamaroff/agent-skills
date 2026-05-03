@@ -277,6 +277,9 @@ gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-
         projectItems(first: 10) {
           nodes {
             id
+            fieldValueByName(name: "Priority") {
+              ... on ProjectV2ItemFieldSingleSelectValue { name }
+            }
             project {
               id
               title
@@ -302,6 +305,11 @@ gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-
   STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
   OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "In Progress") | .id // empty')
 
+  # Extract Priority field details (for auto-set when unset)
+  PRIORITY_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
+  CURRENT_PRIORITY=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
+  P2_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
+
   if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$OPTION_ID" ]; then
     echo "⚠️  Could not resolve project item or Status field — skipping board update"
   else
@@ -320,6 +328,21 @@ gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-
     }' \
       && echo "✅ Issue #{TRACKER_ISSUE} moved to In Progress on Projects board" \
       || echo "⚠️  Board status update failed — issue comment was posted successfully"
+
+    # Set Priority to P2 – Medium if the field exists and is currently unset
+    if [ -n "$PRIORITY_FIELD_ID" ] && [ -n "$P2_OPTION_ID" ] && [ -z "$CURRENT_PRIORITY" ]; then
+      gh api graphql -f query='
+      mutation {
+        updateProjectV2ItemFieldValue(input: {
+          projectId: "'"$PROJECT_ID"'"
+          itemId: "'"$ITEM_ID"'"
+          fieldId: "'"$PRIORITY_FIELD_ID"'"
+          value: { singleSelectOptionId: "'"$P2_OPTION_ID"'" }
+        }) { projectV2Item { id } }
+      }' >/dev/null 2>&1 \
+        && echo "✅ Priority set to P2 – Medium (was unset)" \
+        || echo "⚠️  Priority field update failed — continuing"
+    fi
   fi
 ) || echo "⚠️  Projects board update skipped (gh project unavailable or auth scope missing)"
 ```
