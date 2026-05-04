@@ -175,7 +175,7 @@ fi
 | `Ready for Development`        | Proceed normally                                                                                                                                      |
 | `In Progress`                  | Proceed normally                                                                                                                                      |
 | `Draft`                        | Note it in the implementation report. Proceed — Step 2 will run `/review-story` to validate and upgrade the status autonomously. Do NOT ask the user. |
-| `Ready for Review`, `accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path.                                          |
+| `Ready for Review` / `accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path. |
 | Any other status               | HALT — status is unexpected. Report to user before proceeding.                                                                                        |
 
 **Lite mode detection**: See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, PIPELINE_MODE=lite behaviour, and the directive format passed to `/qa-story`.
@@ -569,6 +569,21 @@ After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠
 
 ### Step 1: Create Branch
 
+**Pipeline lock collision check (mandatory — refuse to start if another pipeline active):**
+
+Only one `/develop-story` or `/develop-task` pipeline may run per repo at a time (single-path lock). Run this *before* any branch-creation work — collision after `/create-branch` would orphan a branch.
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
+  cat .claude/state/develop-pipeline.lock
+  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
+  exit 1
+fi
+```
+
+If the lock exists but its `branch` field does not match any existing local branch (`git branch --list`), it is stale — log a warning and remove it: `rm -f .claude/state/develop-pipeline.lock`. Then proceed.
+
 **Pre-flight board check (mandatory gate before create-branch — GitHub only):**
 
 If `TRACKER=github` and `TRACKER_ISSUE` is set, verify the board status before proceeding. This catches cases where Phase 0c-reg was skipped or silently failed:
@@ -621,16 +636,10 @@ After the branch is created:
 - Run `git log --oneline -1` to capture the initial commit hash; record it in the Pipeline Progress Notes: e.g. `Branch created at \`{hash}\``
 - Update Pipeline Progress: ✅ create-branch
 
-**Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward):
+**Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward). Collision was already checked at the top of Step 1; the lock should not exist here.
+
 ```bash
 mkdir -p .claude/state
-# Collision check — only one pipeline may run per repo at a time (single-path lock).
-if [ -f .claude/state/develop-pipeline.lock ]; then
-  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
-  cat .claude/state/develop-pipeline.lock
-  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
-  exit 1
-fi
 cat > .claude/state/develop-pipeline.lock <<EOF
 {
   "skill": "develop-story",
@@ -1098,9 +1107,7 @@ Every default applied must be recorded in the Decisions Log.
 
 See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shared autonomous-mode default-behavior table (covers all rows common to both `develop-story` and `develop-task`).
 
-### Skill-specific defaults (develop-story only)
-
-_(No story-specific autonomous defaults beyond the shared table. The legacy story-register integration was removed; there is no story-implementation-sequence handling in this orchestrator.)_
+No story-specific autonomous defaults beyond the shared table.
 
 If a situation arises that is not in the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 

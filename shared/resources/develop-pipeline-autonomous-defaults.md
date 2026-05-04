@@ -25,8 +25,8 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 | Implementation report in create-pr commit | EXCLUDE — unstage before create-pr commits; Step 8 commits it |
 | Pre-develop codebase mapping | Always run Explore subagent; pass summary to `/develop`, do not re-read files |
 | qa-fix with no file changes | HALT — do not increment cycle; log as unfixable and surface to user |
-| Resume state validation (story) | Cross-check branch + PR existence before jumping to next step |
-| Resume state validation (task) | Per-step artifact verification before skipping any ✅ step |
+| Resume state validation | Per-step artifact verification (per `develop-pipeline-resume-contract.md`) AND branch + PR cross-check before skipping any ✅ step |
+| Completion status (story or task) | `accepted` (lowercase, matches finalise canonical YAML schema) |
 | Pipeline mode for simple stories | `lite` if `risk_level` low/absent + <3 Tasks + single module; otherwise `standard` |
 | Pipeline mode for simple tasks | `lite` if `risk_level` low/absent + <3 phases + single module; otherwise `standard` |
 | qa-story / qa-task invocation in lite mode | Prepend "Use direct tools only — skip parallel agents" to the invocation context |

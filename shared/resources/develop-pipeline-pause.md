@@ -195,7 +195,7 @@ The hook fires regardless of pipeline position. The lock's `current_step` record
 
 - **State**: `/finalise` may have written part of `dod.N.md` or partially updated task/story `Status:`.
 - **Hook**: same as above — report committed, signal sent.
-- **Resume**: artifact verification requires `dod.N.md` to exist *and* status to read `Completed`/`Accepted` *and* PR acceptance comment posted — all three. Anything less → Step 7 re-runs. `/finalise` overwrites cleanly.
+- **Resume**: artifact verification requires `dod.N.md` to exist *and* status to read `accepted` (canonical lowercase per finalise schema) *and* PR acceptance comment posted — all three. Anything less → Step 7 re-runs. `/finalise` overwrites cleanly.
 
 ### Summary
 

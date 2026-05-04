@@ -562,6 +562,21 @@ After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠
 
 ### Step 1: Create Branch
 
+**Pipeline lock collision check (mandatory — refuse to start if another pipeline active):**
+
+Only one `/develop-story` or `/develop-task` pipeline may run per repo at a time (single-path lock). Run this *before* any branch-creation work — collision after `/create-branch` would orphan a branch.
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
+  cat .claude/state/develop-pipeline.lock
+  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
+  exit 1
+fi
+```
+
+If the lock exists but its `branch` field does not match any existing local branch (`git branch --list`), it is stale — log a warning and remove it: `rm -f .claude/state/develop-pipeline.lock`. Then proceed.
+
 **Pre-flight board check (mandatory gate before create-branch — GitHub only):**
 
 If `TRACKER=github` and `TRACKER_ISSUE` is set, verify the board status before proceeding. This catches cases where Phase 0c-reg was skipped or silently failed:
@@ -608,16 +623,10 @@ After the branch is created:
 - Run `git log --oneline -1` to capture the initial commit hash; record it in the Pipeline Progress Notes: e.g. `Branch created at \`{hash}\``
 - Update Pipeline Progress: ✅ create-branch
 
-**Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward):
+**Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward). Collision was already checked at the top of Step 1; the lock should not exist here.
+
 ```bash
 mkdir -p .claude/state
-# Collision check — only one pipeline may run per repo at a time (single-path lock).
-if [ -f .claude/state/develop-pipeline.lock ]; then
-  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
-  cat .claude/state/develop-pipeline.lock
-  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
-  exit 1
-fi
 cat > .claude/state/develop-pipeline.lock <<EOF
 {
   "skill": "develop-task",
@@ -1073,7 +1082,6 @@ See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shar
 | Situation | Default |
 |-----------|---------|
 | review-task Step 9 (fixes complete?) | Auto-answer "Yes, fixes complete" — pipeline proceeds autonomously |
-| Completion status | `accepted` (matches finalise schema for both stories and tasks) |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
