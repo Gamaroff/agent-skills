@@ -9,17 +9,18 @@ This skill orchestrates the complete task development lifecycle, calling each sk
 
 ## Setup — Graceful Pause Hook (one-time, per project)
 
-Long pipelines can hit Claude's context window before reaching Step 8. To make compaction-induced pauses graceful (commit the report, comment the PR, signal the user how to resume), register the bundled `PreCompact` hook in the project's `.claude/settings.json`:
+Register the bundled `PreCompact` hook in the project's `.claude/settings.json` to enable graceful pause on context compaction. See `shared/resources/develop-pipeline-pause.md` for the full setup instructions, lock-file contract, and pause/resume semantics.
 
 ```json
 {
   "hooks": {
     "PreCompact": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/skills/develop-task/scripts/on-precompact.sh"
+            "command": "bash .claude/skills/develop-task/scripts/on-precompact.sh"
           }
         ]
       }
@@ -28,7 +29,7 @@ Long pipelines can hit Claude's context window before reaching Step 8. To make c
 }
 ```
 
-The hook noops when no pipeline is active (lock file absent), so it has zero overhead outside `/develop-task` and `/develop-story` runs. See `shared/resources/develop-pipeline-pause.md` for the full pause/resume contract. Setup is optional — without the hook, pipelines still resume correctly via the existing post-compaction recovery, just without the PR comment and pause-state report entry.
+Setup is optional — without the hook, pipelines still resume correctly via post-compaction recovery, just without the PR comment and pause-state report entry.
 
 ## When to Use This Skill
 

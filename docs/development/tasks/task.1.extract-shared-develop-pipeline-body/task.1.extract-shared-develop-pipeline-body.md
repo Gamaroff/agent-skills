@@ -239,12 +239,12 @@ If a downstream user has manually unpacked a skill and is referencing internal f
 - `skills/develop-task/SKILL.md`
 
 **Changes**:
-- [ ] Re-read `shared/resources/develop-pipeline-pause.md` end-to-end — does it already cover the PreCompact hook setup contract that's currently duplicated in both SKILLs (lines 31 of each)?
-- [ ] If yes: just update both SKILLs' hook block to reference pause doc; skip new file creation.
-- [ ] If no: create `develop-pipeline-hook-contract.md` with the hook setup steps, pre-compact behavior, and `.claude/hooks` registration format
-- [ ] Replace blocks in both SKILL.mds
-- [ ] Validate + package five affected skills
-- [ ] Commit: `refactor(develop-pipeline): consolidate hook contract` (one of two messages depending on outcome)
+- [x] Re-read `shared/resources/develop-pipeline-pause.md` end-to-end — does it already cover the PreCompact hook setup contract that's currently duplicated in both SKILLs (lines 31 of each)?
+- [x] If yes: just update both SKILLs' hook block to reference pause doc; skip new file creation.
+- [x] If no: create `develop-pipeline-hook-contract.md` with the hook setup steps, pre-compact behavior, and `.claude/hooks` registration format
+- [x] Replace blocks in both SKILL.mds
+- [x] Validate + package five affected skills
+- [x] Commit: `refactor(develop-pipeline): consolidate hook contract` (one of two messages depending on outcome)
 
 **Dependencies**: Phase 4 commit landed.
 
