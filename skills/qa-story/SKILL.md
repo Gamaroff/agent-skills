@@ -11,6 +11,22 @@ Comprehensive quality assurance review combining adaptive automated checks, test
 
 **Re-Review Capability**: Automatically detects existing QA artifacts and performs re-review when previous gate has CONCERNS/FAIL or lists top_issues. Only skips re-review if gate is clean PASS with no issues.
 
+## Lite Mode (Pipeline Contract)
+
+When invoked from the `/develop-story` orchestrator, the call may be prefixed with the directive:
+
+> "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
+
+**When the orchestrator sets it**: `PIPELINE_MODE=lite` is set when the story has `risk_level: low` or absent, fewer than 3 Tasks, and touches a single module. See the Lite mode detection block in `skills/develop-story/SKILL.md`.
+
+**Effect on this skill**:
+
+- Skip parallel agents in the Adaptive Review Strategy decision — go straight to **Direct Tools only**.
+- All other phases (NFR, traceability, gate decision) run unchanged.
+- Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
+
+If invoked outside the pipeline (no lite directive), the normal Adaptive Review Strategy applies.
+
 ## When to Use This Skill
 
 - **Story Review**: When developer marks story as "Review" or "Ready for QA"

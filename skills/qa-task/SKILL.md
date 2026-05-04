@@ -13,6 +13,22 @@ description: Comprehensive quality assurance review for technical tasks. Focuses
 
 This skill guides QA engineers through comprehensive quality assurance reviews for technical tasks (refactoring, infrastructure improvements, technical debt reduction, architectural changes). It adapts the story QA workflow for technical work, focusing on success criteria, implementation phases, and non-functional requirements.
 
+## Lite Mode (Pipeline Contract)
+
+When invoked from the `/develop-task` orchestrator, the call may be prefixed with the directive:
+
+> "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
+
+**When the orchestrator sets it**: `PIPELINE_MODE=lite` is set when the task has `risk_level: low` or absent, fewer than 3 implementation phases, and touches a single module. See the Lite mode detection block in `skills/develop-task/SKILL.md`.
+
+**Effect on this skill**:
+
+- Skip parallel agents in the Adaptive Review Strategy table — use the **Lite mode** row (direct tools only) regardless of phase count or risk.
+- All other phases (success criteria, breaking changes, NFR, gate decision) run unchanged.
+- Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
+
+If invoked outside the pipeline (no lite directive), the normal Adaptive Review Strategy applies.
+
 ## When to Use This Skill
 
 Activate this skill when:
