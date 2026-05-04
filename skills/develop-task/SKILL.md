@@ -129,47 +129,7 @@ Use the `AskUserQuestion` tool with:
 
 If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions that are already recorded in the Decisions Log of the existing report.
 
-**Resume artifact verification (CRITICAL — run before skipping any step)**:
-
-For each step marked ✅ in the implementation report, verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
-
-A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is treated identically to `⏳ Pending`: re-run from the start of that step. Earlier `✅` steps still skip per their artifact verification. Log: "Resuming after graceful pause — re-running Step {N}."
-
-| Step | Artifact to verify | Verification command |
-|------|-------------------|---------------------|
-| 1. create-branch | Branch exists in git | `git branch --list "feature/task.{id}.*"` returns the branch |
-| 3. develop | All phases complete | Task file `Status:` field reads `Ready for Review` |
-| 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` — gate alone is insufficient |
-| 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
-
-Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
-
-**Plan freshness (Step 3 prerequisite)**: If the Decisions Log records a plan file from a prior session and Step 3 is being resumed, verify the plan file is at least as fresh as the task file:
-
-```bash
-[ "$(stat -f %m {task-directory}/task.{id}.plan.*.md)" -ge "$(stat -f %m {task-file})" ]
-```
-
-(macOS `stat`. On Linux use `stat -c %Y`.) If the plan is stale (older than the task), do **not** reuse it — drop the cached "Pre-develop surface map:" entry from the in-memory resume context, re-run the Explore subagent, and re-discover the plan file. Log: "Plan file stale on resume (mtime < task mtime) — re-running pre-develop discovery." Cap re-discovery at **1 retry per resume** to prevent loops; if the plan is still stale after the retry, proceed with the latest plan and log a warning. If no plan file exists in the directory, the freshness check is a no-op.
-
-**CRITICAL — Do not conflate gate file with qa completion**: A `gate.yml` written manually (without running `/qa-task`) does NOT satisfy Step 5–6. The required artifacts are the `qa.N.md` report file (created by `/qa-task`) AND the `gate.N.yml`. Similarly, updating DoD checkboxes in the task doc does NOT satisfy Step 7 — `/finalise` must write a separate `dod.N.md` file AND post an acceptance comment to the PR.
-
-**QA cycle count reconstruction (if resuming at Step 5–6)**:
-If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
-```bash
-grep -c "^### QA Cycle" {implementation-report-path}
-```
-Set the cycle counter to this value before re-entering the loop. This ensures the 5-cycle limit is respected across resumes.
-
-Also cross-check the recorded state against current reality:
-```bash
-# Verify branch still exists
-git branch --list "$(grep 'Branch:' {implementation-report} | awk '{print $2}')"
-# Verify PR still exists
-gh pr view "$(grep 'PR:' {implementation-report} | awk '{print $2}')" --json state 2>/dev/null
-```
-If the branch or PR no longer matches, warn the user before proceeding: "Pipeline state has diverged — recorded branch/PR may differ from current state. Proceeding anyway."
+**Resume artifact verification**: For the full resume contract — per-step verification table (task file patterns), plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, MAX_ITER=5 stall semantics, and Step 8 push — see `shared/resources/develop-pipeline-resume-contract.md`.
 
 If starting fresh: continue to 0c.
 
@@ -758,26 +718,21 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 
 **Develop loop — run until all phases complete (bounded):**
 
-Before iteration 1: count **any** `[x]` checkbox in the task file regardless of indent (top-level phases AND nested sub-steps both count as progress signal). Record `INITIAL_COMPLETED`. Count total checkboxes (`[ ]` + `[x]`, any indent) as `M`. Capture `LAST_COMMIT_HASH=$(git rev-parse HEAD)`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
+Before iteration 1: count **any** `[x]` checkbox in the task file regardless of indent. Record `INITIAL_COMPLETED`, total checkboxes as `M`. Capture `LAST_COMMIT_HASH=$(git rev-parse HEAD)`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`. For the full stall semantics, progress conditions, and MAX_ITER halt rules see `shared/resources/develop-pipeline-resume-contract.md`.
 
 ```bash
-# Count any checked box (top-level or nested):
-grep -cE '\[x\]' {task-file}
-# Count total checkboxes:
-grep -cE '\[[ x]\]' {task-file}
+grep -cE '\[x\]' {task-file}    # checked boxes
+grep -cE '\[[ x]\]' {task-file} # total boxes
 ```
 
 LOOP:
 
-1. Invoke `/develop` with the task file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only the message: "Resuming from partial completion — see task checkboxes for completed phases."
-2. After `/develop` returns, **re-read the task file from disk** (do not use cached content). Read the `Status:` field plus current `[x]` count (any indent) as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
+1. Invoke `/develop` with the task file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
+2. After `/develop` returns, re-read the task file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
 3. Branch on status:
    - `Ready for Review` → EXIT loop — all phases done, proceed to Step 4
-   - `Accepted` → EXIT loop — unexpected in pipeline mode (the "Pipeline bypass check" in `develop/SKILL.md` should prevent `/develop` from calling `/finalise`); treat as success; pipeline Step 7 re-runs `/finalise` after QA regardless. Log the unexpected status in Issues Log.
-   - `In Progress` → check progress safeguards. **Progress is made if EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR `CURRENT_COMMIT_HASH != LAST_COMMIT_HASH`** (a new commit on the branch counts as progress even if no checkbox ticked, e.g. when only sub-step work or test fixes were committed):
-     - If **no progress** (both equal): HALT. Log in Issues Log: "Step 3 stall: /develop returned `In Progress` without ticking a checkbox or producing a new commit (iteration {ITER}, {CURRENT_COMPLETED}/{M})". Set report status to `Escalated` and HALT per the On-halt rule below.
-     - If `ITER >= MAX_ITER`: **iteration cap reached** — HALT. Log: "Step 3 hit MAX_ITER={MAX_ITER} without reaching `Ready for Review` ({CURRENT_COMPLETED}/{M} ticks). Manual intervention required." HALT per the On-halt rule below.
-     - Otherwise: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} ticks complete (commit-progress: {yes/no}). Re-invoking /develop." Append to the Notes column of the Step 3 row in the Pipeline Progress table: `(iter {ITER}: {CURRENT_COMPLETED}/{M} ticks)`. Set `LAST_COMPLETED=CURRENT_COMPLETED`, `LAST_COMMIT_HASH=CURRENT_COMMIT_HASH`, increment `ITER`. **Output the Remaining Work Status banner (see below) before re-invoking.**
+   - `Accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
+   - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
    - Any other status → HALT; log the actual status in Issues Log.
 
 Update Pipeline Progress: ✅ develop

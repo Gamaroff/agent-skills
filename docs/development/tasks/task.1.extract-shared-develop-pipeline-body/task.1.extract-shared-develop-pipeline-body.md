@@ -220,12 +220,12 @@ If a downstream user has manually unpacked a skill and is referencing internal f
 - `skills/develop-task/SKILL.md`
 
 **Changes**:
-- [ ] Extract: (a) resume verification table with all step rows, (b) plan-freshness `stat -f %m` check, (c) MAX_ITER=5 + loosened stall logic (any-indent `[x]` count OR new HEAD commit), (d) Step 7 status grep
-- [ ] Verify the extracted block uses placeholders (`{story-file}`, `{story-directory}`) consistently with how each SKILL substitutes them
-- [ ] Replace blocks in both SKILL.mds with reference lines
-- [ ] Validate + package
-- [ ] Mental dry-run: walk the resume contract from a paused state for both story and task — does the extracted file have everything an agent needs to resume correctly?
-- [ ] Commit: `refactor(develop-pipeline): extract resume + stall contract to shared resource`
+- [x] Extract: (a) resume verification table with all step rows, (b) plan-freshness `stat -f %m` check, (c) MAX_ITER=5 + loosened stall logic (any-indent `[x]` count OR new HEAD commit), (d) Step 7 status grep
+- [x] Verify the extracted block uses placeholders (`{story-file}`, `{story-directory}`) consistently with how each SKILL substitutes them
+- [x] Replace blocks in both SKILL.mds with reference lines
+- [x] Validate + package
+- [x] Mental dry-run: walk the resume contract from a paused state for both story and task — does the extracted file have everything an agent needs to resume correctly?
+- [x] Commit: `refactor(develop-pipeline): extract resume + stall contract to shared resource`
 
 **Dependencies**: Phase 3 commit landed.
 
