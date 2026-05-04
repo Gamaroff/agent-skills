@@ -179,12 +179,12 @@ If a downstream user has manually unpacked a skill and is referencing internal f
 - `skills/develop-task/SKILL.md`
 
 **Changes**:
-- [ ] Create `shared/resources/develop-pipeline-autonomous-defaults.md` with the autonomous-defaults table content from develop-story (canonical version)
-- [ ] Replace the table block in `skills/develop-story/SKILL.md` with: `See \`shared/resources/develop-pipeline-autonomous-defaults.md\` for the autonomous-mode default behaviors.`
-- [ ] Replace the table block in `skills/develop-task/SKILL.md` with the same reference line
-- [ ] Run `python3 skills/create-skill/scripts/quick_validate.py skills/develop-story` and `… skills/develop-task`
-- [ ] Run `python3 skills/create-skill/scripts/package_skill.py skills/develop-story skills/develop-story` and confirm `references/develop-pipeline-autonomous-defaults.md` appears in the zip via `unzip -l`
-- [ ] Commit: `refactor(develop-pipeline): extract autonomous defaults table to shared resource`
+- [x] Create `shared/resources/develop-pipeline-autonomous-defaults.md` with the autonomous-defaults table content from develop-story (canonical version)
+- [x] Replace the table block in `skills/develop-story/SKILL.md` with: `See \`shared/resources/develop-pipeline-autonomous-defaults.md\` for the autonomous-mode default behaviors.`
+- [x] Replace the table block in `skills/develop-task/SKILL.md` with the same reference line
+- [x] Run `python3 skills/create-skill/scripts/quick_validate.py skills/develop-story` and `… skills/develop-task`
+- [x] Run `python3 skills/create-skill/scripts/package_skill.py skills/develop-story skills/develop-story` and confirm `references/develop-pipeline-autonomous-defaults.md` appears in the zip via `unzip -l`
+- [x] Commit: `refactor(develop-pipeline): extract autonomous defaults table to shared resource`
 
 **Dependencies**: Phase 1 audit complete (confirms autonomous-defaults table is identical across both skills).
 

@@ -1113,30 +1113,16 @@ The implementation report has a full account of what was completed and what need
 
 Every default applied must be recorded in the Decisions Log.
 
+See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shared autonomous-mode default-behavior table (covers all rows common to both `develop-story` and `develop-task`).
+
+### Skill-specific defaults (develop-task only)
+
 | Situation | Default |
 |-----------|---------|
-| Feature branch base | User-selected in Upfront Setup (Q1) |
-| PR target branch | User-selected in Upfront Setup (Q2) |
-| High-risk task gate | User-selected in Upfront Setup (Q3) |
-| Task status is `Planned` | Proceed into Step 2 — `/review-task` will validate and promote autonomously |
-| Task status `Ready for Development` or `In Progress` AND review report exists | Step 2 skips `/review-task` — task already reviewed |
-| Task status `Ready for Development` or `In Progress` AND no review report | Step 2 runs `/review-task` — status set without completing a review |
-| review-task output format | Always select "Comprehensive report" — pipeline requires co-located review report file |
 | review-task Step 9 (fixes complete?) | Auto-answer "Yes, fixes complete" — pipeline proceeds autonomously |
-| Draft/Planned status gate (develop) | Proceed — review-task already validated the task |
-| Alignment mismatch (develop) | Align code to document — document is source of truth |
-| Commit style | Conventional Commits |
-| Commit granularity | Multiple logical commits |
-| Implementation report in create-pr commit | EXCLUDE — unstage before create-pr commits; Step 8 commits it |
-| Pre-develop codebase mapping | Always run Explore subagent; pass summary to /develop, do not re-read files |
-| qa-fix with no file changes | HALT — do not increment cycle; log as unfixable and surface to user |
-| Resume state validation | Per-step artifact verification before skipping any ✅ step |
-| Pipeline mode for simple tasks | `lite` if risk Low/absent + <3 phases + single module; otherwise `standard` |
-| qa-task invocation in lite mode | Prepend "Use direct tools only — skip parallel agents" to the invocation context |
 | Completion status | `accepted` (matches finalise schema for both stories and tasks) |
-| Final commit push (Step 8) | Always push after Step 8 commit so PR reflects completed report |
 
-If a situation arises that is not in this table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
+If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
 ---
 

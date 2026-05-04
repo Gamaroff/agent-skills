@@ -1149,33 +1149,19 @@ The implementation report has a full account of what was completed and what need
 
 Every default applied must be recorded in the Decisions Log.
 
-| Situation                                                                         | Default                                                                                |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Feature branch base                                                               | User-selected in Upfront Setup (Q1)                                                    |
-| PR target branch                                                                  | User-selected in Upfront Setup (Q2)                                                    |
-| High-risk story gate                                                              | User-selected in Upfront Setup (Q3)                                                    |
-| Story status is `Draft`                                                           | Step 2 runs `/review-story` to validate and promote autonomously                       |
-| Story status is `Ready for Development` or `In Progress` AND review report exists | Step 2 skips `/review-story` — story already reviewed                                  |
-| Story status is `Ready for Development` or `In Progress` AND no review report     | Step 2 runs `/review-story` — status set without completing a review                   |
-| review-story output format                                                        | Always select "Comprehensive report" — pipeline requires co-located review report file |
-| Draft status gate (develop)                                                       | Proceed — review-story already validated the story (or status was never Draft)         |
-| Alignment mismatch (develop)                                                      | Align code to document — document is source of truth                                   |
-| Commit style                                                                      | Conventional Commits                                                                   |
-| Commit granularity                                                                | Multiple logical commits                                                               |
-| Implementation report in create-pr commit                                         | EXCLUDE — unstage before create-pr commits; Step 8 commits it                          |
-| Pre-develop codebase mapping                                                      | Always run Explore subagent; pass summary to /develop, do not re-read files            |
-| qa-fix with no file changes                                                       | HALT — do not increment cycle; log as unfixable and surface to user                    |
-| Resume state validation                                                           | Cross-check branch + PR existence before jumping to next step                          |
-| Pipeline mode for simple stories                                                  | `lite` if risk_level low/absent + <3 Tasks + single module; otherwise `standard`       |
-| qa-story invocation in lite mode                                                  | Prepend "Use direct tools only — skip parallel agents" to the invocation context       |
-| Register not found at startup                                                     | Ask once via AskUserQuestion; defer creation to post-pipeline if Yes                   |
-| Register found, story already ✅                                                  | HALT, AskUserQuestion to confirm re-run                                                |
-| Register found, story ❌ or ⚡                                                    | Update to ⚡ at start; update to ✅ after Step 7                                       |
-| Register update on completion                                                     | Stage with implementation report; include in Step 8 commit                             |
-| Register references sequence doc (for creation)                                   | Use story-implementation-sequence.md if present; otherwise scan story files            |
-| Final commit push (Step 8)                                                        | Always push after Step 8 commit so PR reflects completed report                        |
+See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shared autonomous-mode default-behavior table (covers all rows common to both `develop-story` and `develop-task`).
 
-If a situation arises that is not in this table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
+### Skill-specific defaults (develop-story only)
+
+| Situation | Default |
+|-----------|---------|
+| Register not found at startup | Ask once via AskUserQuestion; defer creation to post-pipeline if Yes |
+| Register found, story already ✅ | HALT, AskUserQuestion to confirm re-run |
+| Register found, story ❌ or ⚡ | Update to ⚡ at start; update to ✅ after Step 7 |
+| Register update on completion | Stage with implementation report; include in Step 8 commit |
+| Register references sequence doc (for creation) | Use story-implementation-sequence.md if present; otherwise scan story files |
+
+If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
 ---
 
