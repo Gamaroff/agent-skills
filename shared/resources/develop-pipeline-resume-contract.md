@@ -20,8 +20,8 @@ Steps 2 and 8 do not require artifact verification beyond reading the implementa
 | 1. create-branch | Branch exists in git | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
 | 3. develop | All tasks complete | Story file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` — gate alone is insufficient |
-| 7. finalise | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
+| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient |
+| 7. finalise | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ### develop-task artifact table
 
@@ -30,22 +30,21 @@ Steps 2 and 8 do not require artifact verification beyond reading the implementa
 | 1. create-branch | Branch exists in git | `git branch --list "feature/task.{id}.*"` returns the branch |
 | 3. develop | All phases complete | Task file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` — gate alone is insufficient |
-| 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
+| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient |
+| 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ## Plan Freshness (Step 3 Prerequisite)
 
 If the Decisions Log records a plan file from a prior session and Step 3 is being resumed, verify the plan file is at least as fresh as the story/task file:
 
 ```bash
-# develop-story:
-[ "$(stat -f %m {story-directory}/story.{epic}.{story}.plan.*.md)" -ge "$(stat -f %m {story-file})" ]
+# develop-story (macOS/Linux portable):
+_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"; }
+[ "$(_mtime {story-directory}/story.{epic}.{story}.plan.*.md)" -ge "$(_mtime {story-file})" ]
 
-# develop-task:
-[ "$(stat -f %m {task-directory}/task.{id}.plan.*.md)" -ge "$(stat -f %m {task-file})" ]
-```
-
-(macOS `stat -f %m`. On Linux use `stat -c %Y`.) If the plan is stale (older than the story/task file), do **not** reuse it — drop the cached "Pre-develop surface map:" entry from the in-memory resume context, re-run the Explore subagent, and re-discover the plan file. Log: "Plan file stale on resume (mtime < story/task mtime) — re-running pre-develop discovery." Cap re-discovery at **1 retry per resume** to prevent loops; if the plan is still stale after the retry, proceed with the latest plan and log a warning. If no plan file exists in the directory, the freshness check is a no-op.
+# develop-task (macOS/Linux portable):
+[ "$(_mtime {task-directory}/task.{id}.plan.*.md)" -ge "$(_mtime {task-file})" ]
+``` If the plan is stale (older than the story/task file), do **not** reuse it — drop the cached "Pre-develop surface map:" entry from the in-memory resume context, re-run the Explore subagent, and re-discover the plan file. Log: "Plan file stale on resume (mtime < story/task mtime) — re-running pre-develop discovery." Cap re-discovery at **1 retry per resume** to prevent loops; if the plan is still stale after the retry, proceed with the latest plan and log a warning. If no plan file exists in the directory, the freshness check is a no-op.
 
 ## Gate File Conflation Warning (CRITICAL)
 

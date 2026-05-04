@@ -571,9 +571,10 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
   echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
   cat .claude/state/develop-pipeline.lock
   echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
-  exit 1
 fi
 ```
+
+If the lock file exists: **HALT immediately** — show the lock contents to the user and instruct them to resolve by completing or aborting the other pipeline run, then removing `.claude/state/develop-pipeline.lock`. Do NOT proceed to branch creation.
 
 If the lock exists but its `branch` field does not match any existing local branch (`git branch --list`), it is stale — log a warning and remove it: `rm -f .claude/state/develop-pipeline.lock`. Then proceed.
 
@@ -967,7 +968,7 @@ Branch on `TRACKER`:
 
    ```bash
    # 1. Post completion comment
-   gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: Accepted. All DoD criteria verified."
+   gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: accepted. All DoD criteria verified."
 
    # 2. Close the issue
    gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted and PR merged. Implementation report: {report-path}"
@@ -993,7 +994,7 @@ Branch on `TRACKER`:
 
    1. **Post completion comment** — call `addCommentToJiraIssue`:
       - `issueIdOrKey`: `{TRACKER_ISSUE}`
-      - `commentBody`: `"Task development complete — PR: {PR_URL}. Task status: Accepted."`
+      - `commentBody`: `"Task development complete — PR: {PR_URL}. Task status: accepted."`
       - `contentFormat`: `"markdown"`
       - On failure: log warning and continue (non-blocking)
 

@@ -20,7 +20,7 @@ Register the bundled `PreCompact` hook in the project's `.claude/settings.json` 
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/skills/develop-task/scripts/on-precompact.sh"
+            "command": "bash .claude/skills/develop-story/scripts/on-precompact.sh"
           }
         ]
       }
@@ -578,9 +578,10 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
   echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
   cat .claude/state/develop-pipeline.lock
   echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
-  exit 1
 fi
 ```
+
+If the lock file exists: **HALT immediately** — show the lock contents to the user and instruct them to resolve by completing or aborting the other pipeline run, then removing `.claude/state/develop-pipeline.lock`. Do NOT proceed to branch creation.
 
 If the lock exists but its `branch` field does not match any existing local branch (`git branch --list`), it is stale — log a warning and remove it: `rm -f .claude/state/develop-pipeline.lock`. Then proceed.
 
@@ -787,7 +788,7 @@ Remaining story tasks ({X} of {M} tasks complete):
 Pipeline steps still ahead:
   - Step {next-step}: {name}
   - ...
-  - Step 9: commit-changes + push
+  - Step 8: commit-changes + push
 ```
 
 Omit the "Remaining story tasks" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
@@ -994,7 +995,7 @@ Branch on `TRACKER`:
 
    ```bash
    # 1. Post completion comment
-   gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: Accepted. All DoD criteria verified."
+   gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: accepted. All DoD criteria verified."
 
    # 2. Close the issue
    gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted and PR merged. Implementation report: {report-path}"
@@ -1020,7 +1021,7 @@ Branch on `TRACKER`:
 
    1. **Post completion comment** — call `addCommentToJiraIssue`:
       - `issueIdOrKey`: `{TRACKER_ISSUE}`
-      - `commentBody`: `"Story development complete — PR: {PR_URL}. Story status: Accepted."`
+      - `commentBody`: `"Story development complete — PR: {PR_URL}. Story status: accepted."`
       - `contentFormat`: `"markdown"`
       - On failure: log warning and continue (non-blocking)
 
