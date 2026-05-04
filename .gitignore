@@ -4,3 +4,6 @@ node_modules/
 __pycache__/
 *.pyc
 *.pyo
+
+# Skill packages — build artifacts, regenerate via package_skill.py
+skills/*/*.zip
