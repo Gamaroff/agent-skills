@@ -808,12 +808,33 @@ LOOP:
    - `In Progress` → check progress safeguards. **Progress is made if EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR `CURRENT_COMMIT_HASH != LAST_COMMIT_HASH`** (a new commit on the branch counts as progress even if no checkbox ticked, e.g. when only subtask work or test fixes were committed):
      - If **no progress** (both equal): HALT. Log in Issues Log: "Step 3 stall: /develop returned `In Progress` without ticking a checkbox or producing a new commit (iteration {ITER}, {CURRENT_COMPLETED}/{M})". Set report status to `Escalated` and HALT per the On-halt rule below.
      - If `ITER >= MAX_ITER`: **iteration cap reached** — HALT. Log: "Step 3 hit MAX_ITER={MAX_ITER} without reaching `Ready for Review` ({CURRENT_COMPLETED}/{M} ticks). Manual intervention required." HALT per the On-halt rule below.
-     - Otherwise: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} ticks complete (commit-progress: {yes/no}). Re-invoking /develop." Append to the Notes column of the Step 3 row in the Pipeline Progress table: `(iter {ITER}: {CURRENT_COMPLETED}/{M} ticks)`. Set `LAST_COMPLETED=CURRENT_COMPLETED`, `LAST_COMMIT_HASH=CURRENT_COMMIT_HASH`, increment `ITER`, continue loop.
+     - Otherwise: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} ticks complete (commit-progress: {yes/no}). Re-invoking /develop." Append to the Notes column of the Step 3 row in the Pipeline Progress table: `(iter {ITER}: {CURRENT_COMPLETED}/{M} ticks)`. Set `LAST_COMPLETED=CURRENT_COMPLETED`, `LAST_COMMIT_HASH=CURRENT_COMMIT_HASH`, increment `ITER`. **Output the Remaining Work Status banner (see below) before re-invoking.**
    - Any other status → HALT; log the actual status in Issues Log.
 
 Update Pipeline Progress: ✅ develop
 
 **Do not pause, do not summarise to the user, do not wait.** Proceed directly to Step 4.
+
+**Remaining Work Status banner (required — output after each develop-loop iteration that continues, and after Steps 1, 2, 4, 5–6, and 7 complete)**:
+
+Read the story file to get unchecked `[ ]` task names from the Tasks section. Output:
+
+```
+═══ REMAINING WORK STATUS ═══
+Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
+
+Remaining story tasks ({X} of {M} tasks complete):
+  ✅ Task {n}: {name}      ← already ticked
+  ⬜ Task {n+1}: {name}   ← still to do
+  ...
+
+Pipeline steps still ahead:
+  - Step {next-step}: {name}
+  - ...
+  - Step 9: commit-changes + push
+```
+
+Omit the "Remaining story tasks" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
 
 **On halt**: Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(story.{epic}.{story}): implementation report — develop halt`), then HALT with the report path.
 
