@@ -3,7 +3,7 @@
 **Task**: `task.1.extract-shared-develop-pipeline-body.md`
 **Run Number**: 1
 **Started**: 2026-05-04 00:00
-**Status**: In Progress — Step 4 (create-pr)
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Extract ~95% duplicated pipeline contract content from develop-story and develop
 | 2. review-task | ✅ Done | `task.1.review.*.md` exists (or skip logged) | Skipped — status Ready for Development, review report exists |
 | 3. develop | ✅ Done | Task status `Ready for Review` | 6 phases, 6 commits (8f83159→e6635ec) |
 | 4. create-pr | ✅ Done | PR #2 open; issue comment posted | https://github.com/Gamaroff/agent-skills/pull/2 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.1.qa.{N}.*.md`; `task.1.gate.{N}.*.yml`; PR comment posted | |
-| 7. finalise | ⏳ Pending | `task.1.dod.{N}.*.md`; task `status: accepted` | |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.1.qa.1.*.md`; `task.1.gate.1.*.yml`; PR comment posted | PASS gate, 90/100, 0 HIGH/MEDIUM issues |
+| 7. finalise | ✅ Done | `task.1.dod.1.*.md`; task `status: accepted`; PR acceptance comment | Accepted 2026-05-04; merge CONDITIONAL on real pipeline run |
 | 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
 
 ---
@@ -84,21 +84,27 @@ Extract ~95% duplicated pipeline contract content from develop-story and develop
 
 ## Issues Log
 
-*Problems encountered and how they were resolved or escalated.*
+- **Step 3**: Plan file stale on resume (mtime 1777885030 < task mtime 1777888118). Re-ran Explore (1 retry); still stale (task updated with Phase 1 audit findings; plan content valid). Proceeded per contract rules, warning logged.
+- **Step 3**: `grep -c` exit code 1 on 0 matches breaks `&&` chains. Fixed by running as separate command with `|| true`.
 
 ---
 
 ## QA Iteration History
 
-*Track each QA review/fix cycle.*
+### QA Cycle 1 — 2026-05-04
+- **Gate**: PASS (90/100)
+- **Issues**: HIGH: 0, MEDIUM: 0, LOW: 1 (task doc section 7 bypass-contract ✅ without "not needed" note)
+- **Artifacts**: `task.1.qa.1.extract-shared-develop-pipeline-body.md`, `task.1.gate.1.extract-shared-develop-pipeline-body.yml`
+- **PR comment**: https://github.com/Gamaroff/agent-skills/pull/2#issuecomment-4370270318
+- **No qa-fix needed**: 0 HIGH/MEDIUM issues
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-05-04
+**Final Status**: Completed
 **Branch**: feature/task.1.extract-shared-develop-pipeline-body
 **PR**: https://github.com/Gamaroff/agent-skills/pull/2
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 1 (PASS, no qa-fix needed)
+**DoD Summary**: ACCEPTED 2026-05-04 — all functional/quality criteria met; performance criteria deferred to follow-on task; merge CONDITIONAL on real pipeline run
