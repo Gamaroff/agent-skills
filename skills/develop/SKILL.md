@@ -515,6 +515,8 @@ After status validation passes:
    - Start Date: [YYYY-MM-DD]
 3. Proceed to task implementation
 
+**Partial resumption (when invoked by pipeline with pre-checked tasks):** Before reading the first task, count `[x]` vs `[ ]` task checkboxes. If any are already checked, log: "Resuming from partial completion: N/M tasks complete. Starting from task N+1." Skip directly to the first unchecked task.
+
 **Order of Execution**:
 
 ```
@@ -637,6 +639,8 @@ After status validation passes:
 2. Update task metadata with:
    - Start Date: [YYYY-MM-DD]
 3. Proceed to phase implementation
+
+**Partial resumption (when invoked by pipeline with pre-checked phases):** Before reading the first phase, count `[x]` vs `[ ]` phase checkboxes in the Implementation Plan. If any are already checked, log: "Resuming from partial completion: N/M phases complete. Starting from phase N+1." Skip directly to the first unchecked phase.
 
 **Order of Execution**:
 

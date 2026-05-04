@@ -138,10 +138,10 @@ A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is 
 | Step | Artifact to verify | Verification command |
 |------|-------------------|---------------------|
 | 1. create-branch | Branch exists in git | `git branch --list "feature/task.{id}.*"` returns the branch |
-| 3. develop | Code committed on branch | `git log --oneline {branch}` shows more than the initial commit |
+| 3. develop | All phases complete | Task file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
 | 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` — gate alone is insufficient |
-| 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `Status:` reads `Completed` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep "^status:" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
+| 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
 
 Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
 
@@ -203,7 +203,7 @@ fi
 | `Planned` | Note it in the implementation report. Proceed — Step 2 (`/review-task`) will validate and update the status autonomously. Do NOT ask the user. |
 | `Ready for Development` | Proceed normally |
 | `In Progress` | Proceed normally |
-| `Ready for Review` / `Completed` | HALT — task is already past development. Ask the user if they want to re-run or check the wrong task path. |
+| `Ready for Review` / `Accepted` | HALT — task is already past development. Ask the user if they want to re-run or check the wrong task path. |
 | `Cancelled` | HALT — task is cancelled. Report to user before proceeding. |
 | Any other status | HALT — status is unexpected. Report to user before proceeding. |
 
@@ -468,10 +468,10 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 |------|--------|--------------------|-------|
 | 1. create-branch | ⏳ Pending | Branch `feature/task.{id}.*` exists in git | |
 | 2. review-task | ⏳ Pending | `task.{id}.review.{date}.md` exists (or skip logged) | |
-| 3. develop | ⏳ Pending | ≥1 code commit beyond initial branch commit | |
+| 3. develop | ⏳ Pending | Task status == `Ready for Review` | |
 | 4. create-pr | ⏳ Pending | PR URL; issue comment posted | |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted | |
-| 7. finalise | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `Status: Completed` | |
+| 7. finalise | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted` | |
 | 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
 
 ---
@@ -730,6 +730,8 @@ Invoke the `/develop` skill with the task file path.
 
 **Pre-develop codebase mapping (CRITICAL for context efficiency):**
 
+**Resume optimization:** If the Decisions Log already contains a "Pre-develop surface map:" entry (from a prior session), skip both the Explore subagent invocation AND the plan file discovery below — reuse the recorded surface map and plan-file decision. Log: "Resume — pre-develop surface map and plan-file decision reused from Decisions Log." Then proceed to the develop loop.
+
 Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface for this task:
 - Ask it to find: all files likely affected by the success criteria and implementation phases, existing patterns in the same module/layer, test file conventions for the affected areas, any files explicitly named in the task's implementation plan
 - Return a compact summary: file path + 1-line description per file (max 20 files)
@@ -756,14 +758,26 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 - **High-risk gate** (Risk Assessment = HIGH): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond interactively.
 - **Alignment mismatch gate**: If develop finds existing code that differs from the task, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
 
-**Detecting completion**: After `/develop` returns, read the task file and check the `Status:` field:
-- `In Progress` or `Ready for QA` or `Ready for Review` → success, continue
-- `Completed` → success, continue — `/develop` calls `/finalise` internally when run directly; the pipeline's own Step 7 will re-run `/finalise` after QA regardless
-- Any other status → treat as a halt; log the actual status in Issues Log
+**Develop loop — run until all phases complete (bounded):**
 
-**PIPELINE CONTINUES IMMEDIATELY.** Do not pause after `/develop` completes. Proceed directly to Step 4.
+Before iteration 1: count `[x]` checkboxes in the task's Implementation Plan, record `INITIAL_COMPLETED`, count total phase checkboxes as `M`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
+
+LOOP:
+
+1. Invoke `/develop` with the task file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only the message: "Resuming from partial completion — see task checkboxes for completed phases."
+2. After `/develop` returns, **re-read the task file from disk** (do not use cached content) and read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`.
+3. Branch on status:
+   - `Ready for Review` → EXIT loop — all phases done, proceed to Step 4
+   - `Accepted` → EXIT loop — unexpected in pipeline mode (the "Pipeline bypass check" in `develop/SKILL.md` should prevent `/develop` from calling `/finalise`); treat as success; pipeline Step 7 re-runs `/finalise` after QA regardless. Log the unexpected status in Issues Log.
+   - `In Progress` → check progress safeguards:
+     - If `CURRENT_COMPLETED == LAST_COMPLETED`: **no progress made** — HALT. Log in Issues Log: "Step 3 stall: /develop returned `In Progress` without completing any new phase (iteration {ITER}, {CURRENT_COMPLETED}/{M})". Set report status to `Escalated` and HALT per the On-halt rule below.
+     - If `ITER >= MAX_ITER`: **iteration cap reached** — HALT. Log: "Step 3 hit MAX_ITER={MAX_ITER} without reaching `Ready for Review` ({CURRENT_COMPLETED}/{M} phases). Manual intervention required." HALT per the On-halt rule below.
+     - Otherwise: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} phases complete. Re-invoking /develop." Append to the Notes column of the Step 3 row in the Pipeline Progress table: `(iter {ITER}: {CURRENT_COMPLETED}/{M} phases complete)`. Set `LAST_COMPLETED=CURRENT_COMPLETED`, increment `ITER`, continue loop.
+   - Any other status → HALT; log the actual status in Issues Log.
 
 Update Pipeline Progress: ✅ develop
+
+**Do not pause, do not summarise to the user, do not wait.** Proceed directly to Step 4.
 
 **On halt**: Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(task.{id}): implementation report — develop halt`), then HALT with the report path.
 
@@ -930,8 +944,8 @@ Options:
 
 Invoke the `/finalise` skill with the task file path.
 
-**Detecting completion**: After finalise returns, read the task file and check the `Status:` field:
-- `Completed` → success, continue
+**Detecting completion**: After finalise returns, read the task file and check the `status:` frontmatter field:
+- `accepted` → success, continue
 - Any other status, or if finalise listed DoD gaps → halt
 
 **If DoD gaps are found**: Log each gap with specific detail in Issues Log. Invoke the `/commit-changes` skill to commit the implementation report before halting so the audit trail is in git. Suggested commit message: `docs(task.{id}): implementation report — finalise gaps identified`. Then push:
@@ -955,7 +969,7 @@ Branch on `TRACKER`:
 
    ```bash
    # 1. Post completion comment
-   gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: Completed. All DoD criteria verified."
+   gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: Accepted. All DoD criteria verified."
 
    # 2. Close the issue
    gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted and PR merged. Implementation report: {report-path}"
@@ -981,7 +995,7 @@ Branch on `TRACKER`:
 
    1. **Post completion comment** — call `addCommentToJiraIssue`:
       - `issueIdOrKey`: `{TRACKER_ISSUE}`
-      - `commentBody`: `"Task development complete — PR: {PR_URL}. Task status: Completed."`
+      - `commentBody`: `"Task development complete — PR: {PR_URL}. Task status: Accepted."`
       - `contentFormat`: `"markdown"`
       - On failure: log warning and continue (non-blocking)
 
@@ -1083,11 +1097,7 @@ Every default applied must be recorded in the Decisions Log.
 | Resume state validation | Per-step artifact verification before skipping any ✅ step |
 | Pipeline mode for simple tasks | `lite` if risk Low/absent + <3 phases + single module; otherwise `standard` |
 | qa-task invocation in lite mode | Prepend "Use direct tools only — skip parallel agents" to the invocation context |
-| Completion status | `Completed` (tasks use Completed, not Accepted) |
-| Register not found at startup | Ask once via AskUserQuestion; defer creation to post-pipeline if Yes |
-| Register found, task already ✅ | HALT, AskUserQuestion to confirm re-run |
-| Register found, task ❌ or ⚡ | Update to ⚡ at start; update to ✅ after Step 7 |
-| Register update on completion | Stage with implementation report; include in Step 8 commit |
+| Completion status | `accepted` (matches finalise schema for both stories and tasks) |
 | Final commit push (Step 8) | Always push after Step 8 commit so PR reflects completed report |
 
 If a situation arises that is not in this table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
@@ -1112,7 +1122,7 @@ If a situation arises that is not in this table and the stakes are non-trivial, 
 - Task file: `task.{id}.{name}.md`
 - Implementation report: `task.{id}.implementation.{N}.{descriptive-name}.md`
 - Review report: `task.{id}.review.{YYYY-MM-DD}.md` (generated by Step 2 `/review-task`)
-- QA gate: `docs/qa/gates/tasks/task.{id}.gate.{N}.{name}.yml`
+- QA gate: `task.{id}.gate.{N}.{name}.yml` (co-located in task directory; `docs/qa/gates/tasks/` path is legacy and removed)
 - QA report: `task.{id}.qa.{N}.{name}.md` (co-located in task directory)
 - DoD summary: `task.{id}.dod.{N}.{name}.md`
 

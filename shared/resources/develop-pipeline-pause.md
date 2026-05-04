@@ -179,10 +179,10 @@ The hook fires regardless of pipeline position. The lock's `current_step` record
 
 ### Window C — Step 3 (`/develop`) mid-run, partial code
 
-- **State**: `/develop` is mid-execution. Some commits may already exist on the branch; some changes may sit uncommitted in the working tree.
+- **State**: `/develop` is mid-execution. Some commits may already exist on the branch; some changes may sit uncommitted in the working tree. Task/story `[x]` checkboxes reflect already-completed phases/tasks.
 - **Hook**: commits *the report only* — does not touch code changes (those belong to `/develop`).
-- **Resume**: `/develop` is re-invoked. It reads task/story `Status:`, sees what's already done (existing commits + dirty tree), and continues. `/develop` is expected to be re-run-safe (existing pipeline assumption — it's already used iteratively).
-- **Worst case**: `/develop` re-does some work. No worse than the user manually re-running it after a crash. Acceptable.
+- **Resume**: the orchestrator's bounded Step 3 loop re-runs. It re-reads task/story `Status:` from disk, sees `In Progress`, and re-invokes `/develop`. The Decisions Log preserves the "Pre-develop surface map:" entry, so Explore + plan-file discovery are skipped on resume. `/develop` itself reads task/story checkboxes and continues from the next unchecked phase/task. The loop is bounded by `MAX_ITER=5` and a no-progress stall check (halts if `[x]` count is unchanged between iterations), so a stuck `/develop` halts cleanly rather than spinning.
+- **Worst case**: `/develop` re-does the in-flight phase whose work was uncommitted at compaction time. No worse than the user manually re-running it after a crash. Acceptable.
 
 ### Window D — Step 5–6 (QA loop), partial `qa.N.md` / `gate.N.yml` / fix commits
 

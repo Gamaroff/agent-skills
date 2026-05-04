@@ -141,10 +141,10 @@ A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is 
 | Step             | Artifact to verify | Verification command |
 | ---------------- | ------------------ | -------------------- |
 | 1. create-branch | Branch exists in git | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
-| 3. develop       | Code committed on branch | `git log --oneline {branch}` shows more than the initial commit |
+| 3. develop       | All tasks complete | Story file `Status:` field reads `Ready for Review` |
 | 4. create-pr     | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
 | 5–6. qa loop     | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` — gate alone is insufficient |
-| 7. finalise      | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `Status:` reads `Accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep "^Status:" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
+| 7. finalise      | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
 
 Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
 
@@ -477,7 +477,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | ---- | ------ | ------------------ | ----- |
 | 1. create-branch            | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | |
 | 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{date}.md` exists (or skip logged) | |
-| 3. develop                  | ⏳ Pending | ≥1 code commit beyond initial branch commit | |
+| 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | |
 | 4. create-pr                | ⏳ Pending | PR URL; issue/tracker comment posted | |
 | 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | |
 | 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `Status: Accepted` | |
@@ -750,6 +750,8 @@ Invoke the `/develop` skill with the story file path.
 
 **Pre-develop codebase mapping (CRITICAL for context efficiency):**
 
+**Resume optimization:** If the Decisions Log already contains a "Pre-develop surface map:" entry (from a prior session), skip both the Explore subagent invocation AND the plan file discovery below — reuse the recorded surface map and plan-file decision. Log: "Resume — pre-develop surface map and plan-file decision reused from Decisions Log." Then proceed to the develop loop.
+
 Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface for this story:
 
 - Ask it to find: all files likely affected by the acceptance criteria, existing patterns in the same module/layer, test file conventions for the affected areas, any files explicitly named in the story's Dev Notes or Tasks
@@ -777,15 +779,26 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 - **High-risk gate** (`risk_level: high`): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond to the develop prompt interactively. Note: develop also offers a third option "Skip, low actual risk" — if develop presents this option in the context where Q3 = "Skip qa-planning", treat it as equivalent to "Skip, I've already planned" and select it; do not surface the distinction to the user.
 - **Alignment mismatch gate**: If develop finds existing code that differs from the story, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
 
-**Detecting completion**: After `/develop` returns, read the story file and check the `Status:` field:
+**Develop loop — run until all tasks complete (bounded):**
 
-- `Ready for Review` → success, continue
-- `Accepted` → success, continue — `/develop` calls `/finalise` internally, which sets `Accepted`; the pipeline's own Step 7 (`/finalise`) will run after QA regardless
-- Any other status → treat as a halt; log the actual status in Issues Log
+Before iteration 1: count `[x]` task checkboxes in the story, record `INITIAL_COMPLETED`, count total task checkboxes as `M`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
+
+LOOP:
+
+1. Invoke `/develop` with the story file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only the message: "Resuming from partial completion — see story checkboxes for completed tasks."
+2. After `/develop` returns, **re-read the story file from disk** (do not use cached content) and read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`.
+3. Branch on status:
+   - `Ready for Review` → EXIT loop — all tasks done, proceed to Step 4
+   - `Accepted` → EXIT loop — unexpected in pipeline mode (the "Pipeline bypass check" in `develop/SKILL.md` should prevent `/develop` from calling `/finalise`); treat as success; pipeline Step 7 re-runs `/finalise` after QA regardless. Log the unexpected status in Issues Log.
+   - `In Progress` → check progress safeguards:
+     - If `CURRENT_COMPLETED == LAST_COMPLETED`: **no progress made** — HALT. Log in Issues Log: "Step 3 stall: /develop returned `In Progress` without completing any new task (iteration {ITER}, {CURRENT_COMPLETED}/{M})". Set report status to `Escalated` and HALT per the On-halt rule below.
+     - If `ITER >= MAX_ITER`: **iteration cap reached** — HALT. Log: "Step 3 hit MAX_ITER={MAX_ITER} without reaching `Ready for Review` ({CURRENT_COMPLETED}/{M} tasks). Manual intervention required." HALT per the On-halt rule below.
+     - Otherwise: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} tasks complete. Re-invoking /develop." Append to the Notes column of the Step 3 row in the Pipeline Progress table: `(iter {ITER}: {CURRENT_COMPLETED}/{M} tasks complete)`. Set `LAST_COMPLETED=CURRENT_COMPLETED`, increment `ITER`, continue loop.
+   - Any other status → HALT; log the actual status in Issues Log.
 
 Update Pipeline Progress: ✅ develop
 
-**PIPELINE CONTINUES IMMEDIATELY.** Do not pause, do not summarise to the user, do not wait. Proceed directly to Step 4.
+**Do not pause, do not summarise to the user, do not wait.** Proceed directly to Step 4.
 
 **On halt**: Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(story.{epic}.{story}): implementation report — develop halt`), then HALT with the report path.
 
@@ -1051,6 +1064,11 @@ Then invoke the `/commit-changes` skill. The implementation report must be stage
 
 After `/commit-changes` completes, run `git log --oneline -1` to capture the final commit hash. Update the Pipeline Progress Notes for Step 8: `Committed in \`{hash}\``(and note the PR reference if applicable, e.g.`Committed in \`{hash}\`, merged via PR #{N}`).
 
+Push the final commit so the PR reflects the completed implementation report and DoD summary:
+```bash
+git push origin HEAD
+```
+
 Update Pipeline Progress: ✅ commit-changes.
 
 **Remove the pipeline lock file** (pipeline finished cleanly, no further pause possible):
@@ -1119,6 +1137,7 @@ Every default applied must be recorded in the Decisions Log.
 | Register found, story ❌ or ⚡                                                    | Update to ⚡ at start; update to ✅ after Step 7                                       |
 | Register update on completion                                                     | Stage with implementation report; include in Step 8 commit                             |
 | Register references sequence doc (for creation)                                   | Use story-implementation-sequence.md if present; otherwise scan story files            |
+| Final commit push (Step 8)                                                        | Always push after Step 8 commit so PR reflects completed report                        |
 
 If a situation arises that is not in this table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
