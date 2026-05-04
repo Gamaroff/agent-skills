@@ -789,19 +789,26 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 
 **Develop loop — run until all tasks complete (bounded):**
 
-Before iteration 1: count `[x]` task checkboxes in the story, record `INITIAL_COMPLETED`, count total task checkboxes as `M`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
+Before iteration 1: count **any** `[x]` checkbox in the story regardless of indent (top-level Tasks AND nested subtasks both count as progress signal). Record `INITIAL_COMPLETED`. Count total checkboxes (`[ ]` + `[x]`, any indent) as `M`. Capture `LAST_COMMIT_HASH=$(git rev-parse HEAD)`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
+
+```bash
+# Count any checked box (top-level or nested):
+grep -cE '\[x\]' {story-file}
+# Count total checkboxes:
+grep -cE '\[[ x]\]' {story-file}
+```
 
 LOOP:
 
 1. Invoke `/develop` with the story file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only the message: "Resuming from partial completion — see story checkboxes for completed tasks."
-2. After `/develop` returns, **re-read the story file from disk** (do not use cached content) and read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`.
+2. After `/develop` returns, **re-read the story file from disk** (do not use cached content). Read the `Status:` field plus current `[x]` count (any indent) as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
 3. Branch on status:
    - `Ready for Review` → EXIT loop — all tasks done, proceed to Step 4
    - `Accepted` → EXIT loop — unexpected in pipeline mode (the "Pipeline bypass check" in `develop/SKILL.md` should prevent `/develop` from calling `/finalise`); treat as success; pipeline Step 7 re-runs `/finalise` after QA regardless. Log the unexpected status in Issues Log.
-   - `In Progress` → check progress safeguards:
-     - If `CURRENT_COMPLETED == LAST_COMPLETED`: **no progress made** — HALT. Log in Issues Log: "Step 3 stall: /develop returned `In Progress` without completing any new task (iteration {ITER}, {CURRENT_COMPLETED}/{M})". Set report status to `Escalated` and HALT per the On-halt rule below.
-     - If `ITER >= MAX_ITER`: **iteration cap reached** — HALT. Log: "Step 3 hit MAX_ITER={MAX_ITER} without reaching `Ready for Review` ({CURRENT_COMPLETED}/{M} tasks). Manual intervention required." HALT per the On-halt rule below.
-     - Otherwise: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} tasks complete. Re-invoking /develop." Append to the Notes column of the Step 3 row in the Pipeline Progress table: `(iter {ITER}: {CURRENT_COMPLETED}/{M} tasks complete)`. Set `LAST_COMPLETED=CURRENT_COMPLETED`, increment `ITER`, continue loop.
+   - `In Progress` → check progress safeguards. **Progress is made if EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR `CURRENT_COMMIT_HASH != LAST_COMMIT_HASH`** (a new commit on the branch counts as progress even if no checkbox ticked, e.g. when only subtask work or test fixes were committed):
+     - If **no progress** (both equal): HALT. Log in Issues Log: "Step 3 stall: /develop returned `In Progress` without ticking a checkbox or producing a new commit (iteration {ITER}, {CURRENT_COMPLETED}/{M})". Set report status to `Escalated` and HALT per the On-halt rule below.
+     - If `ITER >= MAX_ITER`: **iteration cap reached** — HALT. Log: "Step 3 hit MAX_ITER={MAX_ITER} without reaching `Ready for Review` ({CURRENT_COMPLETED}/{M} ticks). Manual intervention required." HALT per the On-halt rule below.
+     - Otherwise: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} ticks complete (commit-progress: {yes/no}). Re-invoking /develop." Append to the Notes column of the Step 3 row in the Pipeline Progress table: `(iter {ITER}: {CURRENT_COMPLETED}/{M} ticks)`. Set `LAST_COMPLETED=CURRENT_COMPLETED`, `LAST_COMMIT_HASH=CURRENT_COMMIT_HASH`, increment `ITER`, continue loop.
    - Any other status → HALT; log the actual status in Issues Log.
 
 Update Pipeline Progress: ✅ develop
