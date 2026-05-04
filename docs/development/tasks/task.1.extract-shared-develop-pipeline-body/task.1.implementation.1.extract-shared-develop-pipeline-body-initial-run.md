@@ -38,7 +38,7 @@ Extract ~95% duplicated pipeline contract content from develop-story and develop
 | 4. create-pr | ✅ Done | PR #2 open; issue comment posted | https://github.com/Gamaroff/agent-skills/pull/2 |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.1.qa.1.*.md`; `task.1.gate.1.*.yml`; PR comment posted | PASS gate, 90/100, 0 HIGH/MEDIUM issues |
 | 7. finalise | ✅ Done | `task.1.dod.1.*.md`; task `status: accepted`; PR acceptance comment | Accepted 2026-05-04; merge CONDITIONAL on real pipeline run |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
+| 8. commit-changes | ✅ Done | All artifacts committed; pushed to remote | commit 11f477e |
 
 ---
 
