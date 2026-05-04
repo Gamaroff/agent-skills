@@ -5,7 +5,7 @@ type: task
 category: refactoring
 priority: Medium
 effort: 4-8 hours
-status: 🔄 In Progress
+status: Ready for Review
 created: 2026-05-04
 assignee: gamaroff
 branch: chore/develop-skill-extract
@@ -256,13 +256,13 @@ If a downstream user has manually unpacked a skill and is referencing internal f
 - All five affected skill zips
 
 **Changes**:
-- [ ] Run `python3 skills/create-skill/scripts/quick_validate.py` on all five skills
-- [ ] Run `package_skill.py` on all five with explicit output dir
-- [ ] `unzip -l skills/develop-story/develop-story.zip | grep references/` to confirm all extracted shared docs are bundled
-- [ ] Repeat for develop-task, develop, qa-story, qa-task
-- [ ] Confirm zipped SKILL.md path rewrites: `grep "references/develop-pipeline-" skills/develop-story/develop-story.zip` (extracted via `unzip -p`) — every `shared/resources/X` ref must have become `references/X`
-- [ ] Compare line counts before/after: target develop-story and develop-task each at ~400-500 lines (down from ~1190)
-- [ ] Commit: `chore(skills): repackage develop-pipeline family after shared extraction`
+- [x] Run `python3 skills/create-skill/scripts/quick_validate.py` on all five skills
+- [x] Run `package_skill.py` on all five with explicit output dir
+- [x] `unzip -l skills/develop-story/develop-story.zip | grep references/` to confirm all extracted shared docs are bundled
+- [x] Repeat for develop-task, develop, qa-story, qa-task
+- [x] Confirm zipped SKILL.md path rewrites: `grep "references/develop-pipeline-" skills/develop-story/develop-story.zip` (extracted via `unzip -p`) — every `shared/resources/X` ref must have become `references/X`
+- [x] Compare line counts before/after: develop-story 1192→1139, develop-task 1153→1106. **Note: ≤500 line target not met** — Phase 1 audit identified only 5 blocks for extraction; pipeline step bodies (Steps 0-9) contain token-swap variants throughout and require a follow-on task to extract
+- [x] Commit: `chore(skills): repackage develop-pipeline family after shared extraction`
 - [ ] **DO NOT MERGE** until at least one full pipeline run completes against the new docs (per original deferral note)
 
 **Dependencies**: Phases 2-5 all committed.
@@ -309,26 +309,26 @@ This is a documentation refactor. There are no runtime tests. Validation is stru
 
 - **Scope**: each modified skill passes the skill validator
 - **Actions**:
-  - [ ] `python3 skills/create-skill/scripts/quick_validate.py skills/<skill>` returns success for each affected skill
-  - [ ] `package_skill.py` produces a valid zip with all referenced shared docs bundled under `references/`
-  - [ ] `unzip -l <skill>.zip` shows expected `references/develop-pipeline-*.md` entries
-  - [ ] `unzip -p <skill>.zip <skill>/SKILL.md | grep "shared/resources/"` returns nothing (all refs rewritten to `references/`)
+  - [x] `python3 skills/create-skill/scripts/quick_validate.py skills/<skill>` returns success for each affected skill
+  - [x] `package_skill.py` produces a valid zip with all referenced shared docs bundled under `references/`
+  - [x] `unzip -l <skill>.zip` shows expected `references/develop-pipeline-*.md` entries
+  - [x] `unzip -p <skill>.zip <skill>/SKILL.md | grep "shared/resources/"` returns nothing (all refs rewritten to `references/`)
 - **Target**: 100% pass on validator, 100% of shared refs rewritten in zips
 
 ### Content Validation (per phase)
 
 - **Scope**: extracted shared file is self-sufficient; reference line in SKILL.md is unambiguous
 - **Actions**:
-  - [ ] Read each new shared file end-to-end. Could a fresh agent execute the contract without reading the original SKILL.md? If no, fix.
-  - [ ] Read each replaced reference block in SKILL.md. Is the surrounding context still coherent without the removed body? If no, leave a one-line summary above the reference.
+  - [x] Read each new shared file end-to-end. Could a fresh agent execute the contract without reading the original SKILL.md? If no, fix.
+  - [x] Read each replaced reference block in SKILL.md. Is the surrounding context still coherent without the removed body? If no, leave a one-line summary above the reference.
 - **Target**: zero ambiguity per reviewer judgment
 
 ### Regression Validation (end-to-end, gates merge)
 
 - **Scope**: pipeline behavior unchanged after extraction
 - **Actions**:
-  - [ ] Mental dry-run: walk through Step 1-9 of develop-story using only the slimmed SKILL.md + bundled shared files. Does the agent have everything it needs at each step? Validate against current production behavior.
-  - [ ] Repeat for develop-task
+  - [x] Mental dry-run: walk through Step 1-9 of develop-story using only the slimmed SKILL.md + bundled shared files. Does the agent have everything it needs at each step? Validate against current production behavior.
+  - [x] Repeat for develop-task
   - [ ] At least one full real pipeline run (`/develop-story` or `/develop-task` against a small story/task) completes successfully against the new docs **before merge**. This is the original deferral gate.
 - **Target**: pipeline executes identically; no agent confusion at any step
 
@@ -336,37 +336,37 @@ This is a documentation refactor. There are no runtime tests. Validation is stru
 
 - **Scope**: confirm that future fixes only need to be made once
 - **Actions**:
-  - [ ] After extraction, simulate a fix: edit a single line in `develop-pipeline-resume-contract.md`. Repackage. Confirm the change appears in **both** develop-story.zip and develop-task.zip without any further edits.
+  - [x] After extraction, simulate a fix: edit a single line in `develop-pipeline-resume-contract.md`. Repackage. Confirm the change appears in **both** develop-story.zip and develop-task.zip without any further edits.
 - **Target**: one shared-doc edit propagates to both skills via packager
 
 ## 9. Success Criteria
 
 ### Functional
 
-- [ ] All five affected skills pass `quick_validate.py`
-- [ ] All five repackaged zips contain expected `references/develop-pipeline-*.md` files
-- [ ] No `shared/resources/` paths remain unrewritten in any zipped SKILL.md
-- [ ] `develop-story` and `develop-task` slash commands work identically (mental dry-run passes; one real run gates merge)
+- [x] All five affected skills pass `quick_validate.py`
+- [x] All five repackaged zips contain expected `references/develop-pipeline-*.md` files
+- [x] No `shared/resources/` paths remain unrewritten in any zipped SKILL.md
+- [x] `develop-story` and `develop-task` slash commands work identically (mental dry-run passes; one real run gates merge)
 - [ ] No regression in any of the cleanup-brief items 1-13 fixes that landed in the prior batch
 
 ### Performance
 
-- [ ] `develop-story/SKILL.md` reduced from 1192 lines to ≤500 lines
-- [ ] `develop-task/SKILL.md` reduced from 1153 lines to ≤500 lines
-- [ ] Combined unique-content lines (sum of SKILL.mds + new shared docs) reduced by ≥30% vs current duplication
+- [ ] `develop-story/SKILL.md` reduced from 1192 lines to ≤500 lines — **partial**: 1192→1139 (5-block extraction complete; pipeline step bodies not in scope per Phase 1 audit; follow-on task needed for full reduction)
+- [ ] `develop-task/SKILL.md` reduced from 1153 lines to ≤500 lines — **partial**: 1153→1106 (same)
+- [ ] Combined unique-content lines (sum of SKILL.mds + new shared docs) reduced by ≥30% vs current duplication — **partial**: extracted 5 blocks; follow-on required for step body extraction
 
 ### Code Quality
 
-- [ ] Every new shared file has a clear single responsibility (one of: defaults table, lite-mode, bypass, resume, hook)
-- [ ] Every reference line in SKILL.md is grammatically self-contained (reads naturally even if the linked file weren't bundled)
-- [ ] No dead links or broken `shared/resources/` references
-- [ ] Each phase has its own commit (6 commits total on `chore/develop-skill-extract`); commits are independently revertable
+- [x] Every new shared file has a clear single responsibility (one of: defaults table, lite-mode, bypass, resume, hook)
+- [x] Every reference line in SKILL.md is grammatically self-contained (reads naturally even if the linked file weren't bundled)
+- [x] No dead links or broken `shared/resources/` references
+- [x] Each phase has its own commit (6 commits total on `chore/develop-skill-extract`); commits are independently revertable
 
 ### Migration
 
-- [ ] No external migration needed (internal refactor only)
-- [ ] Phase 1 audit findings documented in this doc's section 12 before Phase 2 begins
-- [ ] Drift Resistance Validation (section 8) passes — proves single-edit propagation works
+- [x] No external migration needed (internal refactor only)
+- [x] Phase 1 audit findings documented in this doc's section 12 before Phase 2 begins
+- [x] Drift Resistance Validation (section 8) passes — proves single-edit propagation works
 
 ## 10. Risk Assessment
 
