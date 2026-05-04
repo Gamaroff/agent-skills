@@ -1,6 +1,6 @@
 ---
 name: develop-task
-description: Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/development/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; optional task-register integration; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".
+description: Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/development/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".
 ---
 
 # Develop Task — Automated Lifecycle Orchestrator
@@ -170,7 +170,7 @@ If starting fresh: continue to 0c.
 Before asking questions, read the task file and note:
 - Task title (for implementation report naming)
 - `Status:` field — see autonomous handling rules below
-- Risk Assessment section — overall risk level (High / Medium / Low / absent)
+- `risk_level:` field (high / medium / low / absent) — read from task frontmatter, matching the convention `/develop` and develop-story use
 - Tracker issue — detect platform first, then read the appropriate frontmatter field:
 
 ```bash
@@ -208,7 +208,7 @@ fi
 | Any other status | HALT — status is unexpected. Report to user before proceeding. |
 
 **Lite mode detection**: After reading the task, evaluate whether all three conditions are met:
-- Overall risk in Risk Assessment is "Low" or absent, AND
+- `risk_level: low` or absent, AND
 - Fewer than 3 implementation phases defined, AND
 - Task touches a single module (single app or lib)
 
@@ -409,9 +409,9 @@ Use the `AskUserQuestion` tool to ask all applicable questions in a single call 
   - "feature/{parent-branch}" — if this is a sub-task
   - "Other" — specify a custom branch name
 
-**Q3 — High-risk task gate (only include this question if Risk Assessment = HIGH overall risk):**
+**Q3 — High-risk task gate (only include this question if `risk_level: high` detected):**
 
-- Question: "This task is flagged with HIGH overall risk. The `/develop` skill will offer to run `/qa-planning` first. Should this pipeline skip that gate?"
+- Question: "This task is flagged `risk_level: high`. The `/develop` skill will offer to run `/qa-planning` first. Should this pipeline skip that gate?"
 - Options:
   - "Skip qa-planning" (Recommended) — proceed autonomously
   - "Pause at that gate" — let me decide when we get there
@@ -456,7 +456,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 | Feature branch base | {Q1 answer} |
 | PR target | {Q2 answer} |
 | High-risk gate | {Q3 answer or N/A} |
-| Task risk level | {risk level from Risk Assessment or not set} |
+| Task risk level | {risk_level value or not set} |
 | Pipeline mode | {lite / standard} |
 | Board status | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)} |
 
@@ -755,7 +755,7 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 **Handling the develop skill's internal gates**:
 
 - **Draft/Planned status gate**: If develop asks "is this ready?", answer **Yes** and automatically select "Yes, ready to implement". Rationale: `/review-task` already validated the task in Step 2. Log in Decisions Log: "Planned/Draft gate auto-answered: Yes — review-task validation in Step 2 is sufficient."
-- **High-risk gate** (Risk Assessment = HIGH): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond interactively.
+- **High-risk gate** (`risk_level: high`): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond interactively.
 - **Alignment mismatch gate**: If develop finds existing code that differs from the task, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
 
 **Develop loop — run until all phases complete (bounded):**

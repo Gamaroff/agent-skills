@@ -148,7 +148,7 @@ System Action: Invokes /create-story skill
 
 ### Draft Status Handling
 
-**Pipeline bypass**: When `/develop` is invoked by the `develop-story` orchestrator, the `/review-story` skill has already run in Step 2 of the pipeline and validated the story. If called from develop-story, treat any Draft status as already validated — automatically select "Yes, ready to implement" and proceed without prompting the user. The develop-story skill will handle this autonomously.
+**Pipeline bypass**: When `/develop` is invoked by the `develop-story` or `develop-task` orchestrator, the `/review-story` or `/review-task` skill has already run in Step 2 of the pipeline and validated the document. If called from either orchestrator, treat any Draft (story) or Planned (task) status as already validated — automatically select "Yes, ready to implement" and proceed without prompting the user. The orchestrator handles this autonomously.
 
 **When Status is "Draft"**:
 
