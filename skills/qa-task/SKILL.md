@@ -15,11 +15,7 @@ This skill guides QA engineers through comprehensive quality assurance reviews f
 
 ## Lite Mode (Pipeline Contract)
 
-When invoked from the `/develop-task` orchestrator, the call may be prefixed with the directive:
-
-> "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
-
-**When the orchestrator sets it**: `PIPELINE_MODE=lite` is set when the task has `risk_level: low` or absent, fewer than 3 implementation phases, and touches a single module. See the Lite mode detection block in `skills/develop-task/SKILL.md`.
+When invoked from the `/develop-task` orchestrator, the call may be prefixed with the lite-mode directive. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, pipeline behaviour, and directive format.
 
 **Effect on this skill**:
 

@@ -215,17 +215,7 @@ fi
 | `Cancelled` | HALT — task is cancelled. Report to user before proceeding. |
 | Any other status | HALT — status is unexpected. Report to user before proceeding. |
 
-**Lite mode detection**: After reading the task, evaluate whether all three conditions are met:
-- `risk_level: low` or absent, AND
-- Fewer than 3 implementation phases defined, AND
-- Task touches a single module (single app or lib)
-
-If all three conditions are met, set `PIPELINE_MODE=lite` and log it in the implementation report Pipeline Configuration table. In lite mode:
-- Step 5 (qa-task) uses **Direct Tools only** (skips parallel agents regardless of the adaptive strategy decision)
-- Step 5b (qa-fix) still runs if issues are found
-- All other steps run unchanged
-
-If any condition is not met, `PIPELINE_MODE=standard` (default, no change to behaviour).
+**Lite mode detection**: See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, PIPELINE_MODE=lite behaviour, and the directive format passed to `/qa-task`.
 
 ### 0c-reg. Signal Work Started
 

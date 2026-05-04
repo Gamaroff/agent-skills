@@ -201,12 +201,12 @@ If a downstream user has manually unpacked a skill and is referencing internal f
 - `skills/qa-task/SKILL.md` (same)
 
 **Changes**:
-- [ ] Decide: one combined file (`develop-pipeline-lite-mode.md` covers bypass too) or two separate files. Default: one combined unless content exceeds ~300 lines.
-- [ ] Extract the orchestrator directive format, PIPELINE_MODE=lite trigger conditions, override on Adaptive Review Strategy, and expected log line into the new file
-- [ ] Replace blocks in develop-story, develop-task with reference lines
-- [ ] Update qa-story and qa-task lite-mode subsections (added in commit `4dcedeb`) to reference the same new file rather than duplicating
-- [ ] Validate + package all four affected skills
-- [ ] Commit: `refactor(develop-pipeline): extract lite-mode and bypass contract to shared resource`
+- [x] Decide: one combined file (`develop-pipeline-lite-mode.md` covers bypass too) or two separate files. Default: one combined unless content exceeds ~300 lines.
+- [x] Extract the orchestrator directive format, PIPELINE_MODE=lite trigger conditions, override on Adaptive Review Strategy, and expected log line into the new file
+- [x] Replace blocks in develop-story, develop-task with reference lines
+- [x] Update qa-story and qa-task lite-mode subsections (added in commit `4dcedeb`) to reference the same new file rather than duplicating
+- [x] Validate + package all four affected skills
+- [x] Commit: `refactor(develop-pipeline): extract lite-mode and bypass contract to shared resource`
 
 **Dependencies**: Phase 2 commit landed (avoids merge conflicts on the same SKILL files).
 
