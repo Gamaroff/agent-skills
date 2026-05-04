@@ -148,6 +148,14 @@ A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is 
 
 Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
 
+**Plan freshness (Step 3 prerequisite)**: If the Decisions Log records a plan file from a prior session and Step 3 is being resumed, verify the plan file is at least as fresh as the story file:
+
+```bash
+[ "$(stat -f %m {story-directory}/story.{epic}.{story}.plan.*.md)" -ge "$(stat -f %m {story-file})" ]
+```
+
+(macOS `stat`. On Linux use `stat -c %Y`.) If the plan is stale (older than the story), do **not** reuse it — drop the cached "Pre-develop surface map:" entry from the in-memory resume context, re-run the Explore subagent, and re-discover the plan file. Log: "Plan file stale on resume (mtime < story mtime) — re-running pre-develop discovery." Cap re-discovery at **1 retry per resume** to prevent loops; if the plan is still stale after the retry, proceed with the latest plan and log a warning. If no plan file exists in the directory, the freshness check is a no-op.
+
 **CRITICAL — Do not conflate gate file with QA completion**: A `gate.yml` written manually (without running `/qa-review`) does NOT satisfy Step 5–6. The required artifacts are the `qa.N.md` report file (created by `/qa-review`) AND the `gate.N.yml`. Similarly, updating DoD checkboxes in the story doc does NOT satisfy Step 7 — `/finalise` must write a separate `dod.N.md` file AND post an acceptance comment to the PR.
 
 **QA cycle count reconstruction (if resuming at Step 5–6)**:
