@@ -133,7 +133,7 @@ Use the `AskUserQuestion` tool with:
 
 If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions that are already recorded in the Decisions Log of the existing report.
 
-**Resume artifact verification**: For the full resume contract — per-step verification table (story file patterns), plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, MAX_ITER=5 stall semantics, and Step 8 push — see `shared/resources/develop-pipeline-resume-contract.md`.
+**Resume artifact verification**: For the full resume contract — per-step verification table (story file patterns), plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, and MAX_ITER=5 stall semantics — see `shared/resources/develop-pipeline-resume-contract.md`.
 
 If starting fresh: continue to 0c.
 
@@ -175,7 +175,7 @@ fi
 | `Ready for Development`        | Proceed normally                                                                                                                                      |
 | `In Progress`                  | Proceed normally                                                                                                                                      |
 | `Draft`                        | Note it in the implementation report. Proceed — Step 2 will run `/review-story` to validate and upgrade the status autonomously. Do NOT ask the user. |
-| `Ready for Review`, `Accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path.                                          |
+| `Ready for Review`, `accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path.                                          |
 | Any other status               | HALT — status is unexpected. Report to user before proceeding.                                                                                        |
 
 **Lite mode detection**: See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, PIPELINE_MODE=lite behaviour, and the directive format passed to `/qa-story`.
@@ -433,7 +433,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | |
 | 4. create-pr                | ⏳ Pending | PR URL; issue/tracker comment posted | |
 | 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | |
-| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `Status: Accepted` | |
+| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted` | |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | |
 
 ---
@@ -624,6 +624,13 @@ After the branch is created:
 **Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward):
 ```bash
 mkdir -p .claude/state
+# Collision check — only one pipeline may run per repo at a time (single-path lock).
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
+  cat .claude/state/develop-pipeline.lock
+  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
+  exit 1
+fi
 cat > .claude/state/develop-pipeline.lock <<EOF
 {
   "skill": "develop-story",
@@ -747,7 +754,7 @@ LOOP:
 2. After `/develop` returns, re-read the story file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
 3. Branch on status:
    - `Ready for Review` → EXIT loop — all tasks done, proceed to Step 4
-   - `Accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
+   - `accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
    - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
    - Any other status → HALT; log the actual status in Issues Log.
 
@@ -950,9 +957,9 @@ Options:
 
 Invoke the `/finalise` skill with the story file path.
 
-**Detecting completion**: After finalise returns, read the story file and check the `Status:` field:
+**Detecting completion**: After finalise returns, read the story file and check the `status:` frontmatter field:
 
-- `Accepted` → success, continue
+- `accepted` → success, continue
 - Any other status, or if finalise listed DoD gaps → halt
 
 **If DoD gaps are found**: Log each gap with specific detail in Issues Log. Invoke the `/commit-changes` skill to commit the implementation report before halting so the audit trail is in git. Suggested commit message: `docs(story.{epic}.{story}): implementation report — finalise gaps identified`. Then push:
@@ -1093,15 +1100,9 @@ See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shar
 
 ### Skill-specific defaults (develop-story only)
 
-| Situation | Default |
-|-----------|---------|
-| Register not found at startup | Ask once via AskUserQuestion; defer creation to post-pipeline if Yes |
-| Register found, story already ✅ | HALT, AskUserQuestion to confirm re-run |
-| Register found, story ❌ or ⚡ | Update to ⚡ at start; update to ✅ after Step 7 |
-| Register update on completion | Stage with implementation report; include in Step 8 commit |
-| Register references sequence doc (for creation) | Use story-implementation-sequence.md if present; otherwise scan story files |
+_(No story-specific autonomous defaults beyond the shared table. The legacy story-register integration was removed; there is no story-implementation-sequence handling in this orchestrator.)_
 
-If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
+If a situation arises that is not in the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
 ---
 

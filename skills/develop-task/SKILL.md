@@ -130,7 +130,7 @@ Use the `AskUserQuestion` tool with:
 
 If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions that are already recorded in the Decisions Log of the existing report.
 
-**Resume artifact verification**: For the full resume contract — per-step verification table (task file patterns), plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, MAX_ITER=5 stall semantics, and Step 8 push — see `shared/resources/develop-pipeline-resume-contract.md`.
+**Resume artifact verification**: For the full resume contract — per-step verification table (task file patterns), plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, and MAX_ITER=5 stall semantics — see `shared/resources/develop-pipeline-resume-contract.md`.
 
 If starting fresh: continue to 0c.
 
@@ -172,7 +172,7 @@ fi
 | `Planned` | Note it in the implementation report. Proceed — Step 2 (`/review-task`) will validate and update the status autonomously. Do NOT ask the user. |
 | `Ready for Development` | Proceed normally |
 | `In Progress` | Proceed normally |
-| `Ready for Review` / `Accepted` | HALT — task is already past development. Ask the user if they want to re-run or check the wrong task path. |
+| `Ready for Review` / `accepted` | HALT — task is already past development. Ask the user if they want to re-run or check the wrong task path. |
 | `Cancelled` | HALT — task is cancelled. Report to user before proceeding. |
 | Any other status | HALT — status is unexpected. Report to user before proceeding. |
 
@@ -611,6 +611,13 @@ After the branch is created:
 **Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward):
 ```bash
 mkdir -p .claude/state
+# Collision check — only one pipeline may run per repo at a time (single-path lock).
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
+  cat .claude/state/develop-pipeline.lock
+  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
+  exit 1
+fi
 cat > .claude/state/develop-pipeline.lock <<EOF
 {
   "skill": "develop-task",
@@ -732,7 +739,7 @@ LOOP:
 2. After `/develop` returns, re-read the task file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
 3. Branch on status:
    - `Ready for Review` → EXIT loop — all phases done, proceed to Step 4
-   - `Accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
+   - `accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
    - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
    - Any other status → HALT; log the actual status in Issues Log.
 

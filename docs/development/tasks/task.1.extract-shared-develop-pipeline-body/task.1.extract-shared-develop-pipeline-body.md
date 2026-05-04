@@ -274,7 +274,7 @@ If a downstream user has manually unpacked a skill and is referencing internal f
 
 1. ✅ `shared/resources/develop-pipeline-autonomous-defaults.md` — autonomous-mode default-behavior table
 2. ✅ `shared/resources/develop-pipeline-lite-mode.md` — lite-mode contract (orchestrator directive, override rules)
-3. ✅ `shared/resources/develop-pipeline-bypass-contract.md` — pipeline bypass conditions (may merge into lite-mode)
+3. ⏭️ `shared/resources/develop-pipeline-bypass-contract.md` — **not created** (Phase 1 audit determined the bypass contract lives only in `develop/SKILL.md`, not in either orchestrator; nothing to extract from develop-story / develop-task)
 4. ✅ `shared/resources/develop-pipeline-resume-contract.md` — resume verification table, plan freshness, stall semantics
 5. ✅ `shared/resources/develop-pipeline-hook-contract.md` — PreCompact hook setup (only if not redundant with pause doc)
 

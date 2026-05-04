@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-resume-contract
-description: Resume verification contract shared by develop-story and develop-task. Covers per-step artifact verification, plan freshness check, MAX_ITER=5 stall semantics, QA cycle count reconstruction, and branch/PR cross-check. File naming patterns differ between story and task — both are listed.
+description: Resume verification contract shared by develop-story and develop-task. Covers per-step artifact verification, plan freshness check, MAX_ITER=5 stall semantics, QA cycle count reconstruction, and branch/PR cross-check. File naming patterns differ between story and task — both listed. (Step 8 push command lives inline in each SKILL.md — it is a normal-flow concern, not a resume concern.)
 ---
 
 # Develop Pipeline — Resume Verification Contract
@@ -90,11 +90,3 @@ grep -cE '\[[ x]\]' {story-or-task-file}
 - **No progress** (both equal): HALT. Log: "Step 3 stall: /develop returned `In Progress` without ticking a checkbox or producing a new commit (iteration {ITER}, {CURRENT_COMPLETED}/{M})". Set report status to `Escalated` and HALT.
 - **`ITER >= MAX_ITER`**: iteration cap reached — HALT. Log: "Step 3 hit MAX_ITER={MAX_ITER} without reaching `Ready for Review` ({CURRENT_COMPLETED}/{M} ticks). Manual intervention required."
 - **Otherwise**: log "Step 3 iteration {ITER}: {CURRENT_COMPLETED}/{M} ticks complete (commit-progress: {yes/no}). Re-invoking /develop." Set `LAST_COMPLETED=CURRENT_COMPLETED`, `LAST_COMMIT_HASH=CURRENT_COMMIT_HASH`, increment `ITER`.
-
-## Final Commit Push (Step 8)
-
-Always push after the Step 8 commit so the PR reflects the completed implementation report:
-
-```bash
-git push origin HEAD
-```
