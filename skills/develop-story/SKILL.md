@@ -1108,7 +1108,13 @@ Every default applied must be recorded in the Decisions Log.
 
 See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shared autonomous-mode default-behavior table (covers all rows common to both `develop-story` and `develop-task`).
 
-No story-specific autonomous defaults beyond the shared table.
+### Skill-specific defaults (develop-story only)
+
+| Situation | Default |
+|-----------|---------|
+| review-story Step 9.5 (implement fixes?) | Auto-answer "Yes, apply all critical + important fixes" — pipeline needs the story fully corrected before Step 3 runs `/develop` |
+| review-story Step 10 (update status?) when READY TO IMPLEMENT | Auto-answer "Yes, update status" — pipeline needs `Ready for Development` before Step 3 |
+| review-story Step 10 when NEEDS REVISION or REQUIRES REWORK | HALT — story is not ready; surface review findings to user before proceeding |
 
 If a situation arises that is not in the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
