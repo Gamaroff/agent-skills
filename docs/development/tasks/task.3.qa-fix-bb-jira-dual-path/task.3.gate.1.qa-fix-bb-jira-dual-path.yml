@@ -1,0 +1,48 @@
+schema: 1
+task: 'task.3.qa-fix-bb-jira-dual-path'
+task_title: 'qa-fix: add Bitbucket REST + Jira MCP dual-path'
+gate: PASS
+status_reason: 'All 5 implementation phases verified. GitHub path unchanged. Bitbucket REST + Jira MCP paths follow create-pr/finalise patterns. quick_validate.py passes. No stray gh calls outside platform branch. Two LOW observations noted — neither blocks deployment.'
+reviewer: 'QA Agent'
+updated: '2026-05-05T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Credentials passed via env var references. MCP tool handles auth internally.'
+  performance:
+    status: PASS
+    notes: 'One extra git remote get-url call. GitHub path unchanged — no regression.'
+  reliability:
+    status: PASS
+    notes: 'BB path has empty-values guard. Jira path non-blocking. PR comment failure prints body for manual posting.'
+  maintainability:
+    status: PASS
+    notes: 'Pattern mirrors create-pr/finalise. Cross-references documented. LOW: Step 0 lacks explicit $STORY_FILE export; LOW: BB PR display missing DECLINED/SUPERSEDED state.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Update Step 0 to explicitly document STORY_FILE export so Phase 4 Jira block has a clear variable contract'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'Add DECLINED/SUPERSEDED state handling to PR display block for Bitbucket parity'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
