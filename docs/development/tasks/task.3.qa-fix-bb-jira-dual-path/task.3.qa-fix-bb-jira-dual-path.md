@@ -16,7 +16,7 @@ github_issue: 5
 # Task 3 — qa-fix: add Bitbucket REST + Jira MCP dual-path
 
 **GitHub Issue**: [#5](https://github.com/Gamaroff/agent-skills/issues/5)
-**Status**: Ready for Development
+**Status**: Accepted (PR #6 merged 2026-05-05)
 **Review**: ✅ All review recommendations from `task.3.qa-fix-bb-jira-dual-path.review.2026-05-05.md` implemented 2026-05-05
 
 ## 1. Overview
@@ -298,7 +298,7 @@ All Definition of Done criteria have been verified:
 
 ✅ **Success Criteria:** All 11 criteria met (functional, performance, code quality, migration)
 ✅ **Implementation:** All 5 phases complete and verified
-✅ **PR:** PR #6 open — https://github.com/Gamaroff/agent-skills/pull/6
+✅ **PR:** PR #6 merged 2026-05-05 — https://github.com/Gamaroff/agent-skills/pull/6
 ✅ **Static Validation:** `quick_validate.py` PASS; grep audit PASS
 ✅ **Security Review:** PASS — credentials via env vars, no hardcoded secrets, no PII
 ✅ **Compliance Review:** N/A (developer tooling, no user-facing changes)

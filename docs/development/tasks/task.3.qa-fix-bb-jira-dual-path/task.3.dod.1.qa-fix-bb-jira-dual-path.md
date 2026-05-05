@@ -2,7 +2,7 @@
 
 **Task:** task.3.qa-fix-bb-jira-dual-path
 **Verification Started:** 2026-05-05
-**Status:** IN PROGRESS
+**Status:** ACCEPTED
 
 ---
 
@@ -50,7 +50,7 @@ All task success criteria are checked in the task document. Verified against imp
 - ✅ SKILL.md env vars documented
 - ✅ Cross-references to create-pr and finalise added
 
-**PR Status:** PR #6 OPEN — https://github.com/Gamaroff/agent-skills/pull/6
+**PR Status:** PR #6 MERGED 2026-05-05 — https://github.com/Gamaroff/agent-skills/pull/6
 **Review Decision:** No formal reviewer (solo repo — acceptable)
 
 ---
