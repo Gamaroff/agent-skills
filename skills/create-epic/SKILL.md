@@ -225,6 +225,97 @@ After drafting the Stories Breakdown, decide whether a Mermaid Value Stream diag
 3. Paste the Mermaid block (with YAML metadata header) into a new "Story Flow" subsection placed between "Stories Breakdown" and "Compatibility Requirements".
 4. Accept `no diagram justified — {reason}` without pushing back; not every epic needs one.
 
+## Create Tracker Issue
+
+After the epic file is fully written and the registry updated, create a corresponding issue in the remote tracker. Skip this step if `SKIP_TRACKER=1` is set **or** if the epic frontmatter already contains a `github_issue` or `jira_key` (idempotent — no duplicate creation on re-runs).
+
+### Opt-out: docs-only epic
+
+Set env var `SKIP_TRACKER=1` to skip tracker issue creation entirely. The epic file and registry update are still created. Useful for one-off planning epics, migrations, or offline workflows.
+
+### Detect platform and opt-out
+
+```bash
+if [ "$SKIP_TRACKER" = "1" ]; then
+  echo "ℹ️  SKIP_TRACKER=1 — skipping tracker issue creation"
+else
+  if [ -n "$JIRA_URL" ]; then
+    TRACKER="jira"
+  else
+    TRACKER="github"
+  fi
+  # proceed to platform branch below
+fi
+```
+
+### Jira path (when `JIRA_URL` is set)
+
+Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), handles ADF rendering, writes `jira_key` and `jira_url` back to the epic frontmatter, and guards against concurrent edits. No inline Jira REST in this skill.
+
+```bash
+/sync-jira-epic "$EPIC_FILE"
+```
+
+**On failure**: log warning and continue. Never halt. The epic file already exists; the Jira issue can be synced manually later via `/sync-jira-epic`.
+
+### GitHub path (when `JIRA_URL` is NOT set)
+
+Idempotency check: if `github_issue` is already set in the epic frontmatter, skip creation and log `"ℹ️  github_issue already set — skipping tracker creation"`.
+
+Read `project.yml` (repo root) to get `github.project_board_name` for the `--project` flag.
+
+```bash
+REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+DOC_URL="https://github.com/$REPO/blob/main/{epic-file-relative-path}"
+
+EPIC_ISSUE_URL=$(gh issue create \
+  --title "[Epic {N}] {epic_title}" \
+  --project "{project_board_name}" \
+  --body "## Goal
+
+{epic_goal — 1-2 sentences from the Epic Goal section}
+
+## Description
+
+{Summary from Epic Description — what's being added/changed and how it integrates}
+
+## Stories
+
+| Story | Description |
+|-------|-------------|
+{rows from Stories Overview table, one per story}
+
+## Document
+
+📄 [Epic Document]($DOC_URL)
+📁 \`{epic-file-relative-path}\`" \
+  --label "epic" \
+  --label "priority:{priority}" \
+  --milestone "{milestone_title}")
+```
+
+**Milestone selection** — in this order:
+
+1. If the epic frontmatter has a `milestone:` field, use that value verbatim.
+2. Otherwise default to `"Epic {N} — {epic_title}"`.
+
+Auto-create milestone if it doesn't exist yet:
+
+```bash
+gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="open"
+```
+
+**On success**:
+
+1. Parse the issue URL from the `gh` output.
+2. Add to GitHub Project board:
+   ```bash
+   gh project item-add {project_board_number} --owner {owner} --url "$EPIC_ISSUE_URL"
+   ```
+3. Add `github_issue: {N}` to the epic's YAML frontmatter.
+
+**On failure**: Set `github_issue: null`, log warning, continue. Never halt.
+
 ## Post-Creation Validation
 
 After generating the epic file, invoke `documentation-standards-validator` to confirm:
