@@ -1,28 +1,54 @@
 ---
 id: 2
-title: Extract develop-pipeline Step 0–9 bodies into shared resources
-status: Planned
+title: Extract develop-pipeline Step 0–8 bodies into shared resources
+type: task
+category: refactoring
+status: Ready for Review
+priority: Medium
+effort: 1-2 days
 risk_level: medium
 created: 2026-05-04
+assignee: gamaroff
 parent_task: 1
+depends_on: [1]
+github_issue: 3
+github_issue_url: https://github.com/Gamaroff/agent-skills/issues/3
+related-skills:
+  - develop-story
+  - develop-task
+  - develop
+  - qa-story
+  - qa-task
 ---
 
-# Task 2 — Extract develop-pipeline step bodies into shared resources
+# Task 2 — Extract develop-pipeline Step 0–8 bodies into shared resources
 
-## 1. Motivation
+**GitHub Issue**: [#3](https://github.com/Gamaroff/agent-skills/issues/3)
+**Parent Task**: [Task 1](../task.1.extract-shared-develop-pipeline-body/task.1.extract-shared-develop-pipeline-body.md)
+**Review**: ✅ All review recommendations from `task.2.review.2026-05-05.md` implemented 2026-05-05
 
-Task 1 extracted the 5 token-swap-only contract blocks (autonomous defaults, lite-mode, resume contract, pause/hook setup) from `develop-story/SKILL.md` and `develop-task/SKILL.md` into `shared/resources/develop-pipeline-*.md`. Line counts dropped:
+## 1. Overview
 
-- `develop-story/SKILL.md`: 1192 → 1139 (−53)
-- `develop-task/SKILL.md`: 1153 → 1106 (−47)
+Continue the develop-pipeline dedup refactor started in Task 1 by extracting the Step 0–8 bodies (`resolve-and-prepare` through `commit + lock removal`) into per-step shared docs under `shared/resources/`. Task 1 shipped 4 token-swap-only shared files (`develop-pipeline-autonomous-defaults.md`, `develop-pipeline-lite-mode.md`, `develop-pipeline-pause.md`, `develop-pipeline-resume-contract.md`) but the ≤500-line orchestrator target was deferred because Steps 0–8 contain woven token-swap variants requiring structural rewriting.
 
-The original target was ≤500 lines per orchestrator (≥30% body reduction). That target was deferred because the Phase 1 variance audit determined that **Steps 0–9** (resolve-and-prepare, branch creation, review, develop loop, create-PR, QA loop, finalise, commit) contain token-swap variants throughout — they are the bulk of remaining duplication but cannot be extracted with the same trivial pattern Task 1 used.
+**Scope**: Extract Step 0a–0f, 1, 2, 3, 4, 5–6, 7, 8 bodies from `develop-story/SKILL.md` and `develop-task/SKILL.md` into 8 shared per-step docs using Strategy B (per-step shared docs with side-by-side story/task variant tables — pattern already validated by Task 1's `develop-pipeline-resume-contract.md`).
 
-This task picks up where Task 1 stopped: extract the Step 0–9 bodies, accepting some structural rewriting to handle the woven token-swap variants.
+## 2. Motivation
 
-## 2. Scope
+Task 1 reduced both orchestrators by extracting the 4 trivially-token-swap blocks. Post-Task-1 review passes 2–4 then re-grew both files as new contract refinements were added. Current state (2026-05-05):
 
-In scope:
+| File | Pre-Task-1 | Task 1 end | Today |
+|---|---|---|---|
+| `develop-story/SKILL.md` | 1192 | 1139 | 1153 |
+| `develop-task/SKILL.md` | 1153 | 1106 | 1119 |
+
+Original target: ≤500 lines per orchestrator (≥30% unique-content reduction). That target was deferred because the Phase 1 variance audit determined that Steps 0–8 (resolve-and-prepare, branch creation, review, develop loop, create-PR, QA loop, finalise, commit) contain token-swap variants throughout — they are the bulk of remaining duplication but cannot be extracted with the trivial pattern Task 1 used.
+
+This task picks up where Task 1 stopped.
+
+## 3. Scope
+
+**In scope:**
 - Extract pipeline Step 0a/0b/0c/0c-reg/0d/0e/0f resolve-and-prepare bodies
 - Extract Step 1 create-branch (board pre-flight, stash, lock-write)
 - Extract Step 2 review-* gate logic
@@ -32,72 +58,293 @@ In scope:
 - Extract Step 7 finalise + tracker close body
 - Extract Step 8 commit-changes + lock-removal body
 
-Out of scope:
+**Out of scope:**
 - Changes to step semantics (this is a pure extraction)
 - Cross-orchestrator behavior changes (any divergence stays per-orchestrator)
-- New shared docs beyond what's needed for the Step 0–9 bodies
+- New shared docs beyond what's needed for the Step 0–8 bodies
+- Changing the packager (`create-skill/scripts/package_skill.py`)
+- Touching skills outside the affected five
 
-## 3. Approach
+## 4. Approach — Strategy B (locked)
 
-Two viable strategies:
+**Per-step shared docs with explicit story/task tables.** One file per step (`develop-pipeline-step-1-create-branch.md` etc.), each containing both story and task variants in side-by-side tables — the same pattern Task 1 used for `develop-pipeline-resume-contract.md`.
 
-**Strategy A — single shared body with token substitution.** One `shared/resources/develop-pipeline-steps.md` containing all step bodies with `{{ARTIFACT}} = story|task`, `{{REVIEW_SKILL}} = review-story|review-task`, etc. Each orchestrator's SKILL.md contains a token map and a single reference line per step.
+Rationale: no substitution layer required; pattern already validated; maximally robust under context pressure. Strategy A (single file with token substitution) was considered and rejected — it relies on a substitution mechanism the agent must honor at read time and risks misinterpretation.
 
-  - Pro: maximum dedup, single source of truth
-  - Con: requires a substitution mechanism the agent honors at read time; risks misinterpretation under context pressure
+Target shared files:
 
-**Strategy B — per-step shared docs with explicit story/task tables.** One file per step (`develop-pipeline-step-1-create-branch.md` etc.), each containing both story and task variants in side-by-side tables (same pattern Task 1 used for `develop-pipeline-resume-contract.md`).
+| Step | Target file |
+|---|---|
+| 0 | `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` |
+| 1 | `shared/resources/develop-pipeline-step-1-create-branch.md` |
+| 2 | `shared/resources/develop-pipeline-step-2-review.md` |
+| 3 | `shared/resources/develop-pipeline-step-3-develop-loop.md` |
+| 4 | `shared/resources/develop-pipeline-step-4-create-pr.md` |
+| 5–6 | `shared/resources/develop-pipeline-step-5-6-qa-loop.md` |
+| 7 | `shared/resources/develop-pipeline-step-7-finalise.md` |
+| 8 | `shared/resources/develop-pipeline-step-8-commit.md` |
 
-  - Pro: no substitution layer; pattern already validated by Task 1
-  - Con: 8 new shared files; some content stays duplicated within the shared doc
+## 5. Phases
 
-Recommended: **Strategy B** unless we discover a robust substitution mechanism. Pre-task spike on Strategy A may be worthwhile for the team to evaluate before committing.
+### Phase 1: Extract Step 0 resolve-and-prepare
 
-## 4. Phases
+**Risk Level**: Low (largely token-swap-only)
 
-Pre-Phase: Strategy decision spike (A vs B). Evaluate by extracting one step (Step 1, lowest variance) under each strategy and comparing the result.
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`
+- Modify: `skills/develop-story/SKILL.md`, `skills/develop-task/SKILL.md`
 
-Phase 1: Extract Step 0 resolve-and-prepare (already largely token-swap-only, low risk)
-Phase 2: Extract Step 1 create-branch
-Phase 3: Extract Step 2 review-*
-Phase 4: Extract Step 3 develop loop (highest content density — dedicated phase)
-Phase 5: Extract Step 4 create-PR
-Phase 6: Extract Step 5–6 QA loop
-Phase 7: Extract Step 7 finalise + tracker close
-Phase 8: Extract Step 8 commit + lock removal
-Phase 9: Final validation, repackage, mental dry-run, drift canary
+**Changes**:
+- [x] Lift Step 0a–0f bodies into the new shared file with story/task tables for variants
+- [x] Prioritise Step 0c-reg tracker block (Jira transition + GitHub board update, ~90 lines, byte-identical between orchestrators) — highest-confidence extraction target
+- [x] Replace inline content in both SKILL.mds with reference line
+- [x] `quick_validate.py` clean on develop-story, develop-task, develop, qa-story, qa-task
+- [x] Repackage all 5 zips; verify shared file bundled
 
-## 5. Success Criteria
+**Dependencies**: None
 
-- `develop-story/SKILL.md` ≤ 500 lines
-- `develop-task/SKILL.md` ≤ 500 lines
-- ≥30% unique-content reduction (measured by lines of *non-reference* content)
-- All 5 affected skills pass `quick_validate.py`
-- All zips contain expected `references/develop-pipeline-step-*.md` entries
-- Drift canary: editing one shared step file propagates to both orchestrator zips
-- Mental dry-run for both orchestrators with full pipeline (Steps 0–8)
-- One full real `/develop-story` run AND one full real `/develop-task` run complete successfully against new docs before merge
+---
 
-## 6. Risks
+### Phase 2: Extract Step 1 create-branch
 
-- **High**: token-swap variants may be more woven than Phase 1 of Task 1 suggested. Mitigation: pre-Phase strategy spike + per-step variance audit before each extraction phase.
-- **Medium**: extracting Step 3 (develop loop) risks breaking the bounded loop semantics that were hardened in Task 1 cleanup-brief items 11/13. Mitigation: dedicated phase, mental dry-run before extraction, regression-check against current resume-contract.md.
-- **Low**: GitHub project board GraphQL block (~85 lines, currently duplicated in Step 0c-reg AND Step 1 board pre-flight) is the largest single token-swap candidate. Likely the highest LOC return per extraction.
-- **Low**: Phase 0c-reg tracker operation code (Jira transition + GitHub board update, ~90 lines each) and Step 7 tracker close code (Jira Done transition + GitHub issue close) are byte-identical between develop-story and develop-task — pure duplication with no token-swap variants. These are the highest-confidence extraction candidates in the entire pipeline and should be prioritised within their respective phases (Phase 1 for 0c-reg, Phase 7 for tracker close).
+**Risk Level**: Low
 
-## 7. References
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-1-create-branch.md`
+- Modify: both SKILL.mds
+
+**Changes**:
+- [x] Extract board pre-flight, stash, lock-write logic (note: GitHub project board GraphQL block ~85 lines is duplicated across Step 0c-reg AND Step 1 — deduplicate within shared docs)
+- [x] Side-by-side variant table for story/task differences
+- [x] Validate + repackage
+
+**Dependencies**: Phase 1 (variant table pattern stabilises)
+
+---
+
+### Phase 3: Extract Step 2 review
+
+**Risk Level**: Low
+
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-2-review.md`
+- Modify: both SKILL.mds
+
+**Changes**:
+- [x] Extract review-* gate logic (review-story vs review-task variant)
+- [x] Capture pause/hook setup interaction with review step
+- [x] Validate + repackage
+
+**Dependencies**: Phase 1
+
+---
+
+### Phase 4: Extract Step 3 develop loop (highest content density)
+
+**Risk Level**: High
+
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-3-develop-loop.md`
+- Modify: both SKILL.mds
+
+**Changes**:
+- [x] Extract Explore subagent invocation, plan-file discovery, internal-gate handling, loop iteration shell
+- [x] Preserve bounded-loop semantics hardened in Task 1 cleanup-brief items 11/13
+- [x] Mental dry-run before extraction; regression-check against current `develop-pipeline-resume-contract.md` and `develop-pipeline-pause.md`
+- [x] Variant table for story/task differences in plan file discovery
+- [x] Validate + repackage
+
+**Dependencies**: Phases 1–3
+
+---
+
+### Phase 5: Extract Step 4 create-PR
+
+**Risk Level**: Medium
+
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-4-create-pr.md`
+- Modify: both SKILL.mds
+
+**Changes**:
+- [x] Extract GitHub vs Jira branching logic
+- [x] Extract lock pr_url update
+- [x] Validate + repackage
+
+**Dependencies**: Phase 4
+
+---
+
+### Phase 6: Extract Step 5–6 QA loop
+
+**Risk Level**: Medium
+
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
+- Modify: both SKILL.mds
+
+**Changes**:
+- [x] Extract QA review + qa-fix loop body (qa-story vs qa-task variant)
+- [x] Validate + repackage
+
+**Dependencies**: Phase 4
+
+---
+
+### Phase 7: Extract Step 7 finalise + tracker close
+
+**Risk Level**: Low
+
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-7-finalise.md`
+- Modify: both SKILL.mds
+
+**Changes**:
+- [x] Prioritise tracker close block (Jira Done transition + GitHub issue close, byte-identical between orchestrators) — highest-confidence extraction target
+- [x] Extract finalise skill invocation
+- [x] Validate + repackage
+
+**Dependencies**: None (parallel with Phases 5–6)
+
+---
+
+### Phase 8: Extract Step 8 commit + lock removal
+
+**Risk Level**: Low
+
+**Files**:
+- Add: `shared/resources/develop-pipeline-step-8-commit.md`
+- Modify: both SKILL.mds
+
+**Changes**:
+- [x] Extract commit-changes invocation and lock-removal logic
+- [x] Validate + repackage
+
+**Dependencies**: Phase 7
+
+---
+
+### Phase 9: Final validation
+
+**Risk Level**: Low
+
+**Changes**:
+- [x] Verify both orchestrators ≤500 lines
+- [x] Run `quick_validate.py` on all 5 affected skills
+- [x] Run drift canary: edit one shared file, repackage, confirm propagation to both orchestrator zips
+- [x] Mental dry-run of full pipeline (Steps 0–8) for both orchestrators
+- [ ] One real `/develop-story` run + one real `/develop-task` run end-to-end against new docs
+
+**Dependencies**: Phases 1–8
+
+## 6. Files Summary
+
+**Files to add** (8):
+- `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`
+- `shared/resources/develop-pipeline-step-1-create-branch.md`
+- `shared/resources/develop-pipeline-step-2-review.md`
+- `shared/resources/develop-pipeline-step-3-develop-loop.md`
+- `shared/resources/develop-pipeline-step-4-create-pr.md`
+- `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
+- `shared/resources/develop-pipeline-step-7-finalise.md`
+- `shared/resources/develop-pipeline-step-8-commit.md`
+
+**Files to modify** (5 SKILL.mds):
+- `skills/develop-story/SKILL.md`
+- `skills/develop-task/SKILL.md`
+- `skills/develop/SKILL.md` (re-bundle only)
+- `skills/qa-story/SKILL.md` (re-bundle only)
+- `skills/qa-task/SKILL.md` (re-bundle only)
+
+**Files to delete**: None.
+
+## 7. Testing Strategy
+
+**Per-phase validation:**
+- `python skills/create-skill/scripts/quick_validate.py skills/<skill-name>` clean on all 5 affected skills
+- `python skills/create-skill/scripts/package_skill.py skills/<skill-name>` regenerates zips with shared docs bundled
+- Spot-check zip contents: `unzip -l skills/<skill>/<skill>.zip | grep references/develop-pipeline-step-` — expected entries present
+
+**Drift canary** (run after Phase 9):
+```bash
+echo "<!-- canary -->" >> shared/resources/develop-pipeline-step-1-create-branch.md
+python skills/create-skill/scripts/package_skill.py skills/develop-story
+python skills/create-skill/scripts/package_skill.py skills/develop-task
+unzip -p skills/develop-story/develop-story.zip references/develop-pipeline-step-1-create-branch.md | tail -1
+unzip -p skills/develop-task/develop-task.zip  references/develop-pipeline-step-1-create-branch.md | tail -1
+# Both must show the canary line. Revert after.
+git checkout shared/resources/develop-pipeline-step-1-create-branch.md
+```
+
+**Mental dry-run** (per orchestrator, before merge):
+- Walk Steps 0→8 reading the slimmed SKILL.md + each referenced shared doc
+- Confirm: agent has the exact same instruction set as pre-extraction
+- Confirm: variant tables disambiguate story vs task at each branch point
+
+**Real pipeline runs** (before merge):
+- One full `/develop-story` run on a low-risk story
+- One full `/develop-task` run on a low-risk task
+
+## 8. Risks
+
+- **High — Step 3 develop loop extraction risks breaking bounded-loop semantics** hardened in Task 1 cleanup-brief items 11/13.
+  - *Probability*: Medium · *Impact*: Critical
+  - *Mitigation*: dedicated Phase 4; mental dry-run before extraction; regression-check against current resume-contract.md and pause.md before lifting content
+  - *Rollback*: revert Phase 4 commits; restore inline Step 3 body in both SKILL.mds from git history
+
+- **Medium — token-swap variants more woven than Phase 1 of Task 1 suggested.**
+  - *Probability*: Medium · *Impact*: Major
+  - *Mitigation*: per-step variance audit before each extraction phase; abandon a phase and add a sub-task if a step is structurally divergent
+  - *Rollback*: drop the affected phase, document divergence, leave that step inline
+
+- **Low — drift canary regresses (shared file edits don't propagate).**
+  - *Probability*: Low · *Impact*: Major (silent dedup failure)
+  - *Mitigation*: drift canary is a hard merge gate (Phase 9)
+  - *Rollback*: investigate packager; do not merge until canary passes
+
+## 9. Opportunities (high-yield extractions)
+
+These are not risks — they are extraction targets where the LOC return is highest because the content is byte-identical between orchestrators (pure duplication, no token-swap variants):
+
+- **Step 0c-reg tracker block** (~90 lines: Jira transition + GitHub board update). Prioritise within Phase 1.
+- **Step 7 tracker close block** (Jira Done transition + GitHub issue close). Prioritise within Phase 7.
+- **GitHub project board GraphQL block** (~85 lines, duplicated within Step 0c-reg AND Step 1 board pre-flight). Deduplicate within shared docs during Phase 2.
+
+## 10. Rollback Plan
+
+**Triggers (immediate rollback):**
+- `quick_validate.py` fails on any of the 5 affected skills after a phase merge
+- Drift canary fails (Phase 9)
+- Real pipeline run halts on a step body that was just extracted
+
+**Per-phase rollback:**
+1. `git revert` the phase's commits
+2. Confirm SKILL.mds restored to pre-phase state
+3. Re-run `quick_validate.py` and `package_skill.py` on all 5 skills
+4. Document the phase failure in this task doc under §11
+
+**Forward-fix triggers (do NOT rollback):**
+- Cosmetic line-count overshoot (orchestrator >500 but <600 lines)
+- Variant table needs a column added (edit shared file in place)
+
+## 11. Definition of Done
+
+- [x] All 8 step bodies extracted to `shared/resources/develop-pipeline-step-*.md`
+- [x] `develop-story/SKILL.md` ≤ 500 lines (239 lines)
+- [x] `develop-task/SKILL.md` ≤ 500 lines (236 lines)
+- [x] ≥30% unique-content reduction (measured by lines of *non-reference* content) — 79% reduction achieved
+- [x] All 5 affected skills pass `quick_validate.py`
+- [x] All 5 zips contain expected `references/develop-pipeline-step-*.md` entries
+- [x] No `shared/resources/` paths remain in zipped SKILL.mds
+- [x] Drift canary passes
+- [x] Mental dry-run for both orchestrators (Steps 0–8)
+- [ ] One full real `/develop-story` run + one full real `/develop-task` run complete successfully
+- [ ] PR opened, reviewed, merged
+
+## 12. References
 
 - Parent task: `docs/development/tasks/task.1.extract-shared-develop-pipeline-body/task.1.extract-shared-develop-pipeline-body.md`
-- Task 1 QA report: `docs/development/tasks/task.1.extract-shared-develop-pipeline-body/task.1.qa.1.extract-shared-develop-pipeline-body.md` (notes ≤500-line target deferred)
+- Task 1 QA report: `docs/development/tasks/task.1.extract-shared-develop-pipeline-body/task.1.qa.1.extract-shared-develop-pipeline-body.md`
 - Task 1 PR: https://github.com/Gamaroff/agent-skills/pull/2
-
-## 8. Definition of Done
-
-- [ ] Strategy decision documented (A or B)
-- [ ] All 8 step bodies extracted to `shared/resources/`
-- [ ] develop-story and develop-task SKILL.md ≤500 lines
-- [ ] All 5 skills validate clean
-- [ ] All bundling verified (no `shared/resources/` paths in zipped SKILL.mds)
-- [ ] Drift canary passes
-- [ ] One full real `/develop-story` run + one full `/develop-task` run complete against new docs
-- [ ] PR opened, reviewed, merged
+- This task review: `task.2.review.2026-05-05.md`
+- GitHub issue: https://github.com/Gamaroff/agent-skills/issues/3
