@@ -4,7 +4,10 @@ title: "finalise: route warning-path PR comments through PLATFORM branch"
 type: task
 category: refactoring
 priority: Medium
-status: ✅ Ready for Review
+status: accepted
+updated: 2026-05-05
+completed_date: 2026-05-05
+pr_number: 8
 created: 2026-05-05
 assignee: TBD
 effort: 0.5 day
@@ -15,7 +18,7 @@ github_issue: 7
 # Task 4 — finalise: route warning-path PR comments through PLATFORM branch
 
 **Tracker**: [#7](https://github.com/Gamaroff/agent-skills/issues/7)
-**Status**: ✅ Ready for Review
+**Status**: ✅ Accepted
 **Review**: ✅ All review recommendations from `task.4.review.2026-05-05.md` implemented 2026-05-05
 
 ## Dev Agent Record
@@ -176,6 +179,53 @@ None. Output text unchanged. Behavior on GitHub unchanged.
    - Probability: Low (Step 6 of skill runs early)
    - Impact: Medium (warning silently fails)
    - Mitigation: Phase 1 explicitly verifies scope; if any site is upstream of detection, hoist the detection block earlier
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-05
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.4.qa.1.finalise-platform-route-warning-paths.md](./task.4.qa.1.finalise-platform-route-warning-paths.md)
+- **Gate File**: [task.4.gate.1.finalise-platform-route-warning-paths.yml](./task.4.gate.1.finalise-platform-route-warning-paths.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: Static grep + quick_validate.py + git diff review
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. All 4 call sites correctly patched; grep clean; validator passes.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.4.qa.1.finalise-platform-route-warning-paths.md`
+**Gate File**: `task.4.gate.1.finalise-platform-route-warning-paths.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 97/100
+
+All Definition of Done criteria verified:
+
+✅ **Implementation Phases**: 3/3 complete — all phase checkboxes marked
+✅ **Static Tests**: grep clean (0 bare `gh pr comment`), `quick_validate.py` passes
+✅ **PR**: #8 open — https://github.com/Gamaroff/agent-skills/pull/8
+✅ **Security**: N/A — prose-only markdown change, no code/credentials/dependencies
+✅ **Compliance**: N/A — internal tool file
+✅ **No regressions** — existing GitHub-path behavior unchanged
+
+**Deployment Readiness**: Staging ✅ APPROVED / Production ✅ APPROVED
+
+**Detailed Verification Log:** See `task.4.dod.1.finalise-platform-route-warning-paths.md` for complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-05-05
 
 ## 11. Rollback Plan
 

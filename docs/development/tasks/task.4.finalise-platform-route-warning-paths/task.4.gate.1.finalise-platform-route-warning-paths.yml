@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.4.finalise-platform-route-warning-paths'
+task_title: 'finalise: route warning-path PR comments through PLATFORM branch'
+gate: PASS
+status_reason: 'All four call sites correctly patched to reference $PLATFORM branch. Static grep clean, quick_validate.py passes, no regressions.'
+reviewer: 'QA Engineer'
+updated: '2026-05-05T14:45:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No auth/credential/permission changes. No new dependencies.'
+  performance:
+    status: PASS
+    notes: 'Prose-only change. No performance impact.'
+  reliability:
+    status: PASS
+    notes: 'Additive change — existing guidance preserved, new platform routing added.'
+  maintainability:
+    status: PASS
+    notes: 'Four sites now consistent with primary dual-path pattern at line 783. grep-discoverable via $PLATFORM.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Run manual dual-env smoke test on Bitbucket scratch repo before first production Bitbucket usage of finalise skill.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
