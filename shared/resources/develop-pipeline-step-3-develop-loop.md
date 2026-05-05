@@ -1,0 +1,167 @@
+---
+name: develop-pipeline-step-3-develop-loop
+description: Step 3 (develop loop) shared by develop-story and develop-task. Covers pre-develop codebase mapping (Explore subagent), plan file discovery, internal gate handling (draft/planned, high-risk, alignment), bounded develop loop (LOOP → MAX_ITER semantics from resume-contract), Remaining Work Status banner format, and halt protocol. Story vs task variants called out where they differ. Bounded-loop semantics from Task 1 cleanup items 11/13 are preserved exactly.
+---
+
+# Develop Pipeline — Step 3: Develop
+
+## When This Document Applies
+
+Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variants are called out in labeled sub-sections where they differ. The bounded develop loop semantics are identical for both orchestrators — see `shared/resources/develop-pipeline-resume-contract.md` for the full MAX_ITER and stall-detection contract.
+
+---
+
+## Pre-develop Codebase Mapping (CRITICAL for context efficiency)
+
+> This step invokes `/develop`, but the Explore subagent and plan file discovery below must run first. Do not invoke `/develop` until those are complete.
+
+**Resume optimization:** If the Decisions Log already contains a "Pre-develop surface map:" entry (from a prior session), skip both the Explore subagent invocation AND the plan file discovery below — reuse the recorded surface map and plan-file decision. Log: "Resume — pre-develop surface map and plan-file decision reused from Decisions Log." Then proceed to the develop loop.
+
+Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface:
+
+#### develop-story
+Ask it to find: all files likely affected by the acceptance criteria, existing patterns in the same module/layer, test file conventions for the affected areas, any files explicitly named in the story's Dev Notes or Tasks.
+
+#### develop-task
+Ask it to find: all files likely affected by the success criteria and implementation phases, existing patterns in the same module/layer, test file conventions for the affected areas, any files explicitly named in the task's implementation plan.
+
+### Shared (both orchestrators)
+
+- Return a compact summary: file path + 1-line description per file (max 20 files)
+- Do NOT read these files again in the main context — the summary is sufficient for `/develop` to make informed decisions
+- Log the Explore summary in the Decisions Log: "Pre-develop surface map: {N} files identified in {affected modules}"
+- When invoking `/develop`, present the Explore summary as initial context so `/develop` does NOT need to run its own independent file discovery. State explicitly: "Codebase surface map already completed — {summary}. Proceed directly to alignment analysis using this map."
+
+---
+
+## Plan File Discovery (CRITICAL — check before invoking /develop)
+
+After the Explore subagent returns, look for a co-located plan file:
+
+#### develop-story
+```bash
+ls {story-directory}/story.{epic}.{story}.plan.*.md 2>/dev/null
+```
+If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the story's Tasks section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
+
+If no plan file exists, proceed without it — plan files are optional (only present for stories created after the co-located plan feature was added).
+
+#### develop-task
+```bash
+ls {task-directory}/task.{id}.plan.*.md 2>/dev/null
+```
+If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the task's Implementation Plan section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
+
+If no plan file exists, proceed without it — plan files are optional (only present for tasks created after the co-located plan feature was added).
+
+### Plan Freshness on Resume (both orchestrators)
+
+If a prior plan file is being reused from a previous session, verify its freshness per `shared/resources/develop-pipeline-resume-contract.md` (Plan Freshness Check section). Log outcome: "Plan file freshness: verified" or "Plan file stale — re-running Explore subagent".
+
+---
+
+## Handling the Develop Skill's Internal Gates
+
+#### develop-story internal gates
+
+- **Draft status gate**: If develop asks "is this draft ready?", answer **Yes** and automatically select "Yes, ready to implement". Rationale: `/review-story` already validated and promoted the story in Step 2 — the draft gate in `/develop` is redundant when called from this pipeline. Log in Decisions Log: "Draft gate auto-answered: Yes — review-story validation in Step 2 is sufficient."
+- **High-risk gate** (`risk_level: high`): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond to the develop prompt interactively. Note: develop also offers a third option "Skip, low actual risk" — if develop presents this option in the context where Q3 = "Skip qa-planning", treat it as equivalent to "Skip, I've already planned" and select it; do not surface the distinction to the user.
+- **Alignment mismatch gate**: If develop finds existing code that differs from the story, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
+
+#### develop-task internal gates
+
+- **Draft/Planned status gate**: If develop asks "is this ready?", answer **Yes** and automatically select "Yes, ready to implement". Rationale: `/review-task` already validated the task in Step 2. Log in Decisions Log: "Planned/Draft gate auto-answered: Yes — review-task validation in Step 2 is sufficient."
+- **High-risk gate** (`risk_level: high`): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond interactively.
+- **Alignment mismatch gate**: If develop finds existing code that differs from the task, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
+
+---
+
+## Develop Loop — Run Until Complete (Bounded)
+
+For the full develop loop setup (initial checkpoint variables, stall detection, progress conditions, and MAX_ITER halt rules), see `shared/resources/develop-pipeline-resume-contract.md`.
+
+### LOOP (both orchestrators — execute identically)
+
+#### develop-story loop body
+
+1. Invoke `/develop` with the story file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
+2. After `/develop` returns, re-read the story file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
+3. Branch on status:
+   - `Ready for Review` → EXIT loop — all tasks done, proceed to Step 4
+   - `accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
+   - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
+   - Any other status → HALT; log the actual status in Issues Log.
+
+#### develop-task loop body
+
+1. Invoke `/develop` with the task file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
+2. After `/develop` returns, re-read the task file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
+3. Branch on status:
+   - `Ready for Review` → EXIT loop — all phases done, proceed to Step 4
+   - `accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
+   - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
+   - Any other status → HALT; log the actual status in Issues Log.
+
+### After loop exits (both orchestrators)
+
+Update Pipeline Progress: ✅ develop
+
+**Do not pause, do not summarise to the user, do not wait.** Proceed directly to Step 4.
+
+---
+
+## Remaining Work Status Banner
+
+Required: output after each develop-loop iteration that continues, and after Steps 1, 2, 4, 5–6, and 7 complete.
+
+#### develop-story banner
+
+Read the story file to get unchecked `[ ]` task names from the Tasks section. Output:
+
+```
+═══ REMAINING WORK STATUS ═══
+Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
+
+Remaining story tasks ({X} of {M} tasks complete):
+  ✅ Task {n}: {name}      ← already ticked
+  ⬜ Task {n+1}: {name}   ← still to do
+  ...
+
+Pipeline steps still ahead:
+  - Step {next-step}: {name}
+  - ...
+  - Step 8: commit-changes + push
+```
+
+Omit the "Remaining story tasks" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
+
+#### develop-task banner
+
+Read the task file to get unchecked `[ ]` phase names from the Implementation Plan. Output:
+
+```
+═══ REMAINING WORK STATUS ═══
+Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
+
+Remaining task phases ({X} of {M} phases complete):
+  ✅ Phase {n}: {name}      ← already ticked
+  ⬜ Phase {n+1}: {name}   ← still to do
+  ...
+
+Pipeline steps still ahead:
+  - Step {next-step}: {name}
+  - ...
+  - Step 8: commit-changes + push
+```
+
+Omit the "Remaining task phases" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
+
+---
+
+## On Halt
+
+#### develop-story
+Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(story.{epic}.{story}): implementation report — develop halt`), then HALT with the report path.
+
+#### develop-task
+Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(task.{id}): implementation report — develop halt`), then HALT with the report path.

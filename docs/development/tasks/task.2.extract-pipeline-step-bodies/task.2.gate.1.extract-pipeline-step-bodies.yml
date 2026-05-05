@@ -1,0 +1,53 @@
+schema: 1
+task: 'task.2.extract-pipeline-step-bodies'
+task_title: 'Extract develop-pipeline Step 0–8 bodies into shared resources'
+gate: CONCERNS
+status_reason: 'All mechanical DoD criteria pass (validation, zip integrity, line counts, drift canary, mental dry-run). One medium gap: real end-to-end pipeline runs not fully completed prior to review. Current /develop-task run provides partial evidence; /develop-story run still needed before merge.'
+reviewer: 'QA Engineer'
+updated: '2026-05-05T00:00:00Z'
+
+top_issues:
+  - issue: 'Real pipeline runs not completed before QA review'
+    severity: medium
+    description: 'Task DoD item — real /develop-story + /develop-task runs — not yet done. Current /develop-task pipeline run is the first real run on new shared docs. /develop-story run not yet executed.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 88
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '8/9'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    phases_with_issues: [9]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Documentation-only task. No credentials, code execution, or external services.'
+  performance:
+    status: PASS
+    notes: 'Orchestrator context load reduced 79% (239/236 lines vs 1153/1119). No runtime concerns.'
+  reliability:
+    status: PASS
+    notes: 'Pure extraction, no semantic changes. Drift canary confirmed propagation. Variant tables present in all high-risk steps.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Goal achieved — single edit point for all 8 steps. Real e2e run not yet complete. develop-pipeline-step-0-resolve-and-prepare.md at 552 lines (future split candidate).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Complete a real /develop-story run on a low-risk story before merging PR #4'
+      refs: ['skills/develop-story/SKILL.md']
+    - action: 'Consider splitting develop-pipeline-step-0-resolve-and-prepare.md (552 lines) into sub-docs if it grows further'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Complete a successful real /develop-story run (or get explicit stakeholder waiver) before merging PR #4 to main'

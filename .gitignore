@@ -7,3 +7,4 @@ __pycache__/
 
 # Skill packages — build artifacts, regenerate via package_skill.py
 skills/*/*.zip
+*.zip
