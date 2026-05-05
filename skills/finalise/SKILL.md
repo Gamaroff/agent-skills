@@ -879,7 +879,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
      - The option in that field where `name == "Done"` → its `id` is the singleSelectOptionId
 
    **If no project items are found (issue not on any board):**
-   - Do NOT silently skip. Post a PR comment (GitHub: `gh pr comment <pr-number>`, Bitbucket: REST API as in Step 6) warning that the board was not updated:
+   - Do NOT silently skip. Post a PR comment warning that the board was not updated, using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
      ```
      ⚠️ Project Board Not Updated
 
@@ -912,7 +912,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    - Inspect the response:
      - **Success**: response contains `data.updateProjectV2ItemFieldValue.projectV2Item.id` with no `errors` key → board update confirmed.
-     - **Failure**: response contains an `errors` key, or `projectV2Item` is null → **retry once** by re-running the exact same mutation. If the retry also fails, post a PR comment via `gh pr comment <pr-number>`:
+     - **Failure**: response contains an `errors` key, or `projectV2Item` is null → **retry once** by re-running the exact same mutation. If the retry also fails, post a PR comment using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
        ```
        ⚠️ Project Board Update Failed
 
@@ -1053,8 +1053,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Detailed Verification Log:** See `story.311.2.dod.1.transaction-event-history.md` for complete verification evidence and timestamps.
    ```
 
-4. **Add GitHub PR Comment (if PR exists):**
-   - Use `gh pr comment <pr-number>` to notify about gaps
+4. **Add PR Comment (if PR exists):**
+   - Use the active `$PLATFORM` branch to notify about gaps (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6)
    - Request changes to address gaps
 
    **Example PR Comment:**
@@ -1097,7 +1097,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 - [ ] Running summary file finalized (status = COMPLETED - GAPS IDENTIFIED)
 - [ ] Story status NOT changed (kept at current status, not set to accepted)
 - [ ] Gap report section added to story document body
-- [ ] GitHub PR comment posted via `gh pr comment <number>` (skip only if no PR exists)
+- [ ] PR comment posted on the active platform (GitHub: `gh pr comment` / Bitbucket: REST POST) (skip only if no PR exists)
 - [ ] User notified with clear NOT ACCEPTED message, gap list, and next steps
 
 ## Usage Examples
