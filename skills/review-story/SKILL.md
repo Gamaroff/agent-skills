@@ -496,8 +496,17 @@ devDebugLog: .ai/debug-log.md
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
      - Ask: "This story has no linked Jira issue. Should I create one now?"
-     - If user confirms, create the Jira Story using the same pattern as `/create-story` Step 5.2a (Jira path), including reading `jira_key` from the epic's frontmatter for epic linkage
-     - Write `jira_key`, `jira_epic_key`, `jira_url` into frontmatter and Story Information table
+     - If user confirms:
+       1. Derive the epic file path using the grandparent directory rule:
+          ```bash
+          STORY_DIR=$(dirname "{resolved story file path}")
+          EPIC_DIR=$(dirname "$(dirname "$STORY_DIR")")
+          EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
+          ```
+          If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_JIRA_KEY=""`.
+       2. If the file exists, invoke the `ensure-epic-jira-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_JIRA_KEY` is set or empty. Set `EPIC_TRACKER_KIND="jira"`.
+       3. Create the Jira Story using the same pattern as `/create-story` Step 5.2a (Jira path), using `EPIC_JIRA_KEY` for `jira_epic_key` linkage
+       4. Write `jira_key`, `jira_epic_key`, `jira_url` into frontmatter and Story Information table
    - If `jira_key:` has a value, verify the issue exists using the `getJiraIssue` Atlassian MCP tool with `issueIdOrKey: {jira_key}` and `fields: ["status", "summary"]`.
      - If the tool returns a valid issue object → issue exists, continue.
      - If the tool returns an error or null/empty result → flag as **Critical**: "Jira issue `{jira_key}` not found — it may have been deleted". Do NOT halt — record the finding and continue the review.
@@ -519,7 +528,7 @@ devDebugLog: .ai/debug-log.md
           EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
           ```
           If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_ISSUE_NUM=""`.
-       2. If the file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set or empty.
+       2. If the file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set or empty. Set `EPIC_TRACKER_KIND="github"`.
        3. Create the story issue:
        ```bash
        REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
@@ -546,8 +555,8 @@ devDebugLog: .ai/debug-log.md
        ```
      - Write `github_issue: {N}` into frontmatter
      - Add row to Story Information table: `| GitHub Issue | [#{N}](url) |`
-       4. After writing `github_issue: {N}` to frontmatter, link the story as a sub-issue of the epic:
-          If `EPIC_ISSUE_NUM` is non-empty:
+       4. After writing `github_issue: {N}` to frontmatter, link the story as a sub-issue of the epic (GitHub-only — Jira parent linkage is `sync-jira-story`'s job):
+          If `EPIC_TRACKER_KIND=github` and `EPIC_ISSUE_NUM` is non-empty:
           ```bash
           OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
           REPO_NAME=$(gh repo view --json name -q '.name')
