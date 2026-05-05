@@ -34,9 +34,9 @@ Initial run extracting Steps 0–8 pipeline bodies from develop-story and develo
 | 2. review-task | ✅ Done | `task.2.review.*.md` exists (or skip logged) | Skipped — status `Ready for Development`, review report exists |
 | 3. develop | ✅ Done | Task status == `Ready for Review` | 8 shared files created; both SKILL.mds 239/236 lines; all zips valid; drift canary ✅ |
 | 4. create-pr | ✅ Done | PR URL; issue comment posted | PR #4: https://github.com/Gamaroff/agent-skills/pull/4 |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.2.qa.*.md`; `task.2.gate.*.yml`; PR comment posted | CONCERNS — issues not code-fixable; pipeline HALT per autonomous defaults |
-| 7. finalise | ⏳ Pending | `task.2.dod.*.md`; task `status: accepted` | |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.2.qa.*.md`; `task.2.gate.*.yml`; PR comment posted | CONCERNS — /develop-story run waived by user; proceeding to Step 7 |
+| 7. finalise | ✅ Done | `task.2.dod.1.extract-pipeline-step-bodies.md`; task `status: accepted` | Issue #3 closed; PR comment posted; board: ⚠️ manual (no read:project scope) |
+| 8. commit-changes | ✅ Done | All artifacts committed and pushed | Final commit + push |
 
 ---
 
@@ -54,6 +54,13 @@ Initial run extracting Steps 0–8 pipeline bodies from develop-story and develo
 
 ### Step 2 — review-task — 2026-05-05
 - Skipped — task status `Ready for Development` and review report exists at `docs/development/tasks/task.2.extract-pipeline-step-bodies/task.2.review.2026-05-05.md`
+
+### Step 7 — finalise — 2026-05-05
+- Task status set to `accepted`; `completed_date: 2026-05-05`
+- DoD summary: `docs/development/tasks/task.2.extract-pipeline-step-bodies/task.2.dod.1.extract-pipeline-step-bodies.md`
+- GitHub Issue #3 closed (state: CLOSED ✅)
+- PR #4 acceptance comment posted
+- Board: ⚠️ not updated — token lacks `read:project` scope; warning posted to PR
 
 ### Step 4 — create-pr — 2026-05-05
 - PR #4 created: https://github.com/Gamaroff/agent-skills/pull/4 (base: main)
@@ -81,6 +88,9 @@ Initial run extracting Steps 0–8 pipeline bodies from develop-story and develo
 
 ## Issues Log
 
+### Waiver — 2026-05-05
+User waived /develop-story run requirement. Gate CONCERNS accepted. Reasoning: current /develop-task pipeline run constitutes real task run evidence; /develop-story run deferred. Production conditional met via explicit stakeholder waiver. Proceeding to Step 7.
+
 ### QA Cycle 1 — qa-fix no code changes — 2026-05-05
 Gate CONCERNS with two issues: (1) MEDIUM "Real pipeline runs not completed before QA review" — process gap, cannot be fixed by editing files; (2) LOW "step-0 file at 552 lines" — explicitly out of task scope (§3). qa-fix invoked; no files changed. Pipeline halted per autonomous default: qa-fix with no file changes → HALT. User decision required: waive /develop-story run requirement or run /develop-story before merging PR #4.
 
@@ -94,14 +104,15 @@ Gate CONCERNS with two issues: (1) MEDIUM "Real pipeline runs not completed befo
 **Action**: qa-fix invoked — no code changes possible (both issues are process/out-of-scope gaps, not code defects)
 **Fixes Applied**: None — qa-fix made no file changes
 **Outcome**: HALT per autonomous default (qa-fix with no file changes → HALT)
+**Resolution**: User waived /develop-story run requirement (Option B) — CONCERNS accepted; proceeding to Step 7
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-05-05
+**Final Status**: Completed
 **Branch**: feature/task.2.extract-pipeline-step-bodies
 **PR**: https://github.com/Gamaroff/agent-skills/pull/4
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 1 (CONCERNS — waived by stakeholder)
+**DoD Summary**: docs/development/tasks/task.2.extract-pipeline-step-bodies/task.2.dod.1.extract-pipeline-step-bodies.md

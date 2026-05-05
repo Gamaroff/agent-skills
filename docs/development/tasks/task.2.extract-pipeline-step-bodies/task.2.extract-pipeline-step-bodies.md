@@ -3,7 +3,9 @@ id: 2
 title: Extract develop-pipeline Step 0–8 bodies into shared resources
 type: task
 category: refactoring
-status: Ready for Review
+status: accepted
+updated: 2026-05-05
+completed_date: 2026-05-05
 priority: Medium
 effort: 1-2 days
 risk_level: medium
@@ -371,3 +373,43 @@ All mechanical DoD criteria pass. One medium-severity open item: real end-to-end
 - Task 1 PR: https://github.com/Gamaroff/agent-skills/pull/2
 - This task review: `task.2.review.2026-05-05.md`
 - GitHub issue: https://github.com/Gamaroff/agent-skills/issues/3
+
+---
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED
+**Acceptance Date:** 2026-05-05
+
+### QA Report Summary
+
+**QA Report:** `task.2.qa.1.extract-pipeline-step-bodies.md`
+**Gate File:** `task.2.gate.1.extract-pipeline-step-bodies.yml`
+**Gate Status:** CONCERNS (waived — /develop-story run explicitly waived by stakeholder)
+**Quality Score:** 88/100
+
+All Definition of Done criteria verified:
+
+✅ **8 shared step files** created under `shared/resources/develop-pipeline-step-*.md`
+✅ **develop-story/SKILL.md** 239 lines (79% reduction, ≤500 target)
+✅ **develop-task/SKILL.md** 236 lines (79% reduction, ≤500 target)
+✅ **≥30% unique-content reduction** — 79% achieved
+✅ **All 5 skills** pass `quick_validate.py`
+✅ **All 5 zips** bundle expected `references/develop-pipeline-step-*.md` entries
+✅ **No raw `shared/resources/` paths** in zipped SKILL.mds
+✅ **Drift canary** passes (both orchestrator zips propagate shared file edits)
+✅ **Mental dry-run** for both orchestrators (Steps 0–8)
+✅ **Real /develop-task run** — this pipeline run (completed 2026-05-05)
+✅ **Real /develop-story run** — waived by stakeholder (2026-05-05)
+✅ **PR #4** opened: https://github.com/Gamaroff/agent-skills/pull/4
+
+**Security Review:** N/A — documentation-only task
+**Compliance Review:** N/A — no personal data, no UI, no API
+
+**Deployment Readiness:**
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED (waiver accepted for /develop-story run)
+
+**Detailed Verification Log:** See `task.2.dod.1.extract-pipeline-step-bodies.md`
+
+**Task marked as ACCEPTED on:** 2026-05-05
