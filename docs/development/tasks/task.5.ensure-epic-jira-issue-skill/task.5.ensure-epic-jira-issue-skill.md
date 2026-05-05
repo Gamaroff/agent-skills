@@ -4,7 +4,9 @@ title: "Add ensure-epic-jira-issue skill and dual-path the call sites"
 type: task
 category: infrastructure
 priority: High
-status: Ready for Development
+status: accepted
+completed_date: 2026-05-05
+pr_number: 10
 created: 2026-05-05
 assignee: TBD
 effort: 1-2 days
@@ -12,7 +14,7 @@ depends_on: —
 github_issue: 9
 ---
 
-**Status**: Ready for Development
+**Status**: accepted
 **Review**: ✅ All review recommendations from `task.5.ensure-epic-jira-issue-skill.review.2026-05-05.md` implemented 2026-05-05
 
 # Task 5 — Add ensure-epic-jira-issue skill and dual-path the call sites
@@ -99,27 +101,27 @@ None. New skill is additive. Call site in review-story branches on `JIRA_URL` �
 
 - Files: `skills/ensure-epic-jira-issue/SKILL.md` (new), `skills/ensure-epic-jira-issue/scripts/` (optional)
 - Changes:
-  - [ ] Run `python skills/create-skill/scripts/init_skill.py ensure-epic-jira-issue --path skills/`
-  - [ ] Author SKILL.md mirroring the GitHub sibling's `type: internal` sub-routine structure (input `EPIC_FILE_PATH`, output `EPIC_JIRA_KEY` set in caller scope, no slash-command invocation)
+  - [x] Run `python skills/create-skill/scripts/init_skill.py ensure-epic-jira-issue --path skills/`
+  - [x] Author SKILL.md mirroring the GitHub sibling's `type: internal` sub-routine structure (input `EPIC_FILE_PATH`, output `EPIC_JIRA_KEY` set in caller scope, no slash-command invocation)
 
 **Phase 2 — Implement the skill body (Medium risk)**
 
 - Files: `skills/ensure-epic-jira-issue/SKILL.md`
 - Changes:
-  - [ ] Read epic file at `EPIC_FILE_PATH`, parse frontmatter, extract `jira_key`
-  - [ ] If `jira_key` present and non-null: verify via `getJiraIssue` MCP; on success set `EPIC_JIRA_KEY=$jira_key` and return early
-  - [ ] If missing: delegate to `sync-jira-epic` (passing `EPIC_FILE_PATH`) — it creates the Jira epic and writes `jira_key` + `jira_url` back to frontmatter
-  - [ ] Re-read epic frontmatter to capture the freshly-written `jira_key`
-  - [ ] Verify `jira_url` shape is `${JIRA_URL}/browse/${jira_key}` — write it if missing
-  - [ ] Set `EPIC_JIRA_KEY=$jira_key` (or empty string on any failure)
-  - [ ] Document failure modes — reconcile with §11 below: 404 on existing key → log critical, return empty; network/transient error → log warning, return current `jira_key` (don't lose link); auth missing or `sync-jira-epic` non-zero exit → log warning, return empty
+  - [x] Read epic file at `EPIC_FILE_PATH`, parse frontmatter, extract `jira_key`
+  - [x] If `jira_key` present and non-null: verify via `getJiraIssue` MCP; on success set `EPIC_JIRA_KEY=$jira_key` and return early
+  - [x] If missing: delegate to `sync-jira-epic` (passing `EPIC_FILE_PATH`) — it creates the Jira epic and writes `jira_key` + `jira_url` back to frontmatter
+  - [x] Re-read epic frontmatter to capture the freshly-written `jira_key`
+  - [x] Verify `jira_url` shape is `${JIRA_URL}/browse/${jira_key}` — write it if missing
+  - [x] Set `EPIC_JIRA_KEY=$jira_key` (or empty string on any failure)
+  - [x] Document failure modes — reconcile with §11 below: 404 on existing key → log critical, return empty; network/transient error → log warning, return current `jira_key` (don't lose link); auth missing or `sync-jira-epic` non-zero exit → log warning, return empty
 
 **Phase 3 — Update review-story call site (Low risk)**
 
 - Files: `skills/review-story/SKILL.md` (around line 522)
 - Changes:
-  - [ ] Locate the `ensure-epic-github-issue` sub-routine invocation
-  - [ ] Wrap it in a `JIRA_URL`-conditional that sets `EPIC_TRACKER_KIND` and the appropriate output variable:
+  - [x] Locate the `ensure-epic-github-issue` sub-routine invocation
+  - [x] Wrap it in a `JIRA_URL`-conditional that sets `EPIC_TRACKER_KIND` and the appropriate output variable:
     ```
     if [ -n "$JIRA_URL" ]; then
       # invokes ensure-epic-jira-issue sub-routine; sets EPIC_JIRA_KEY in scope
@@ -129,19 +131,19 @@ None. New skill is additive. Call site in review-story branches on `JIRA_URL` �
       EPIC_TRACKER_KIND="github"
     fi
     ```
-  - [ ] Gate the existing GitHub-only sub-issue linking block (lines 549-563, the `gh api .../sub_issues` call) on `EPIC_TRACKER_KIND=github` — Jira parent linkage is `sync-jira-story`'s job, not this skill's
+  - [x] Gate the existing GitHub-only sub-issue linking block (lines 549-563, the `gh api .../sub_issues` call) on `EPIC_TRACKER_KIND=github` — Jira parent linkage is `sync-jira-story`'s job, not this skill's
 
 **Phase 4 — Clarify GitHub sibling description (Low risk)**
 
 - Files: `skills/ensure-epic-github-issue/SKILL.md`
 - Changes:
-  - [ ] Update `description:` frontmatter: replace "GitHub path only — Jira path not affected." with "GitHub-only sibling of `ensure-epic-jira-issue`. Callers branch on `JIRA_URL` to pick the right one."
+  - [x] Update `description:` frontmatter: replace "GitHub path only — Jira path not affected." with "GitHub-only sibling of `ensure-epic-jira-issue`. Callers branch on `JIRA_URL` to pick the right one."
 
 **Phase 5 — Repackage affected skills (Low risk)**
 
 - Files: build artifacts
 - Changes:
-  - [ ] Run `quick_validate.py` then `package_skill.py` for: `ensure-epic-jira-issue` (new), `ensure-epic-github-issue`, `review-story`
+  - [x] Run `quick_validate.py` then `package_skill.py` for: `ensure-epic-jira-issue` (new), `ensure-epic-github-issue`, `review-story`
 
 ## 7. Files Summary
 
@@ -244,3 +246,50 @@ None. New skill is additive. Call site in review-story branches on `JIRA_URL` �
 **Forward fix**: most edge cases (stale keys, transient Jira errors) tightened in the new skill body without affecting callers
 
 **Triggers**: any GH-path regression; or Jira mass-creation of duplicate epics
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer (Claude)
+**Testing Date**: 2026-05-05
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.5.qa.1.ensure-epic-jira-issue.md](./task.5.qa.1.ensure-epic-jira-issue.md)
+- **Gate File**: [task.5.gate.1.ensure-epic-jira-issue.yml](./task.5.gate.1.ensure-epic-jira-issue.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: N/A (declarative skill markdown — no compiled code)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. All validators pass. GitHub path unaffected. Live Jira smoke test deferred to post-merge (requires live instance).
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED
+**Accepted:** 2026-05-05
+**PR:** [#10](https://github.com/Gamaroff/agent-skills/pull/10)
+
+### QA Report Summary
+
+**QA Report:** `task.5.qa.1.ensure-epic-jira-issue.md`
+**Gate File:** `task.5.gate.1.ensure-epic-jira-issue.yml`
+**Gate Status:** ✅ PASS
+**Quality Score:** 97/100
+
+All Definition of Done criteria verified:
+
+✅ **Implementation Phases:** All 5 phases complete — new skill created, review-story patched, GitHub sibling clarified, all validators pass
+✅ **Success Criteria:** All functional, performance, and code quality criteria met
+✅ **PR:** #10 open, code pushed, reviewed
+✅ **Security:** ✅ PASS — no new attack surface; Atlassian MCP handles auth
+✅ **Reliability:** ✅ PASS — all failure modes documented and non-blocking
+✅ **Maintainability:** ✅ PASS — thin wrapper, zero Jira REST duplication
+✅ **Breaking Changes:** None — GitHub path byte-identical when `JIRA_URL` unset
+✅ **Compliance:** N/A — skill library infrastructure task
+
+**Detailed Verification Log:** See `task.5.dod.1.ensure-epic-jira-issue.md`
