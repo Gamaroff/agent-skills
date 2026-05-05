@@ -2,7 +2,7 @@
 
 A library of Claude Code skills — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 76+ skills covering development, story management, QA, PM, architecture, validation, and more.
 
-Skills are loaded into Claude Code via `.claude/skills/` in target projects and activate automatically based on context, or can be invoked explicitly.
+Skills are loaded into Claude Code via `.agents/skills/` in target projects and activate automatically based on context, or can be invoked explicitly.
 
 ## Quick Start
 

@@ -5,6 +5,10 @@ description: Canonical autonomous decision defaults shared by develop-story and 
 
 # Develop Pipeline — Autonomous Decision Defaults
 
+## When This Table Applies
+
+This table is consulted during any `develop-story` or `develop-task` pipeline run whenever the orchestrator must take an action without prompting the user. Load it at the start of Phase 0 setup and refer back to it at each decision point. Skill-specific rows that apply to only one orchestrator are in each SKILL.md's **Skill-specific defaults** section beneath the reference line — check both sources before deciding.
+
 Every default applied must be recorded in the Decisions Log.
 
 The rows below apply to both `develop-story` and `develop-task`. Where the two skills differ in terminology only (story ↔ task, `Draft` ↔ `Planned`, `review-story` ↔ `review-task`), both forms are shown. Skill-specific rows that apply to only one orchestrator are listed in each SKILL.md's own **Skill-specific defaults** section beneath the reference line.
@@ -25,11 +29,10 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 | Implementation report in create-pr commit | EXCLUDE — unstage before create-pr commits; Step 8 commits it |
 | Pre-develop codebase mapping | Always run Explore subagent; pass summary to `/develop`, do not re-read files |
 | qa-fix with no file changes | HALT — do not increment cycle; log as unfixable and surface to user |
-| Resume state validation | Per-step artifact verification (per `develop-pipeline-resume-contract.md`) AND branch + PR cross-check before skipping any ✅ step |
-| Completion status (story or task) | `accepted` (lowercase, matches finalise canonical YAML schema) |
-| Pipeline mode for simple stories | `lite` if `risk_level` low/absent + <3 Tasks + single module; otherwise `standard` |
-| Pipeline mode for simple tasks | `lite` if `risk_level` low/absent + <3 phases + single module; otherwise `standard` |
-| qa-story / qa-task invocation in lite mode | Prepend "Use direct tools only — skip parallel agents" to the invocation context |
+| Resume state validation | Per-step artifact verification AND branch + PR cross-check before skipping any ✅ step — full contract in `references/develop-pipeline-resume-contract.md` |
+| Completion status (story or task) | `accepted` (lowercase, matches finalise canonical YAML schema). Note: document `Status:` fields use Title Case (`Draft`, `Planned`, `In Progress`, `Ready for Review`) — `accepted` is the YAML frontmatter value only. |
+| Pipeline mode (lite vs standard) | See `references/develop-pipeline-lite-mode.md` for trigger conditions and behaviour. Default to `standard` if any condition fails. |
+| qa-story / qa-task invocation in lite mode | Prepend the lite-mode directive (see lite-mode contract) to the invocation context |
 | Final commit push (Step 8) | Always push after Step 8 commit so PR reflects completed report |
 
 If a situation arises that is not covered by this table or the skill-specific table, and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.

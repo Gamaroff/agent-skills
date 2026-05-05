@@ -127,7 +127,7 @@ Run `/sync-jira-epic` on the parent epic if not already done.
 ### 3. Optional — Dry Run
 
 ```bash
-node .claude/skills/sync-jira-story/scripts/sync-jira-story.js \
+node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
   --file <story-file-path> \
   --dry-run
 ```
@@ -137,7 +137,7 @@ In dry-run, missing env vars are reported as warnings (not fatal), so you can pr
 ### 4. Sync the Story
 
 ```bash
-node .claude/skills/sync-jira-story/scripts/sync-jira-story.js \
+node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
   --file <story-file-path>
 ```
 
@@ -323,7 +323,7 @@ The script is a thin wrapper over `shared/resources/jira-sync.js`, which holds t
 ## Tests
 
 ```bash
-node --test .claude/skills/sync-jira-story/tests/*.test.js
+node --test .agents/skills/sync-jira-story/tests/*.test.js
 ```
 
 Covers frontmatter parsing (incl. `---` in body, YAML block arrays), changelog upsert / hand-written-heading rescue, diff + hash, priority normalisation, label sanitisation, concurrent-edit guard, ADF builder, and Jira error parser.

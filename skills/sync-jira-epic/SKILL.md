@@ -116,7 +116,7 @@ grep -L 'jira_key:' $(find docs/prds -path '*/epics/*/epic.*.md' -not -path '*/s
 ### 2. Optional — Dry Run
 
 ```bash
-node .claude/skills/sync-jira-epic/scripts/sync-jira-epic.js \
+node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
   --file <epic-file-path> \
   --dry-run
 ```
@@ -126,7 +126,7 @@ In dry-run, missing env vars are reported as warnings (not fatal), so you can pr
 ### 3. Sync the Epic
 
 ```bash
-node .claude/skills/sync-jira-epic/scripts/sync-jira-epic.js \
+node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
   --file <epic-file-path>
 ```
 
@@ -313,7 +313,7 @@ The script is a thin wrapper over `shared/resources/jira-sync.js`, which holds t
 ## Tests
 
 ```bash
-node --test .claude/skills/sync-jira-epic/tests/*.test.js
+node --test .agents/skills/sync-jira-epic/tests/*.test.js
 ```
 
 Covers frontmatter parsing (incl. `---` in body), changelog upsert / hand-written-heading rescue, body/meta hash split, ADF builder + Stories Breakdown table (incl. inline links + escaped pipes), Change Log description cap, PRD path resolution, full status map (incl. Backlog / In Review / Ready / Won't Do), `syncLabelFor` derivation, in-place frontmatter update, Jira error parser, `findExistingByLabel` POST `/search/jql` shape, `fetchUpdatedTimestamp` non-throwing variant, `guardConcurrentEdit` (incl. `--force` override path), `collectCreateFields` vs `collectUpdateFields` field shape, and `--verbose` / `--version` flag parsing.

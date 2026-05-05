@@ -780,5 +780,5 @@ A parallel story set is successfully created when:
 ## Resources
 
 **Git Worktree Documentation**: https://git-scm.com/docs/git-worktree
-**Story Template**: `.claude/skills/create-story/resources/story-template.yaml`
-**Story Draft Checklist**: `.claude/skills/execute-checklist/resources/story-draft-checklist.md`
+**Story Template**: `.agents/skills/create-story/resources/story-template.yaml`
+**Story Draft Checklist**: `.agents/skills/execute-checklist/resources/story-draft-checklist.md`

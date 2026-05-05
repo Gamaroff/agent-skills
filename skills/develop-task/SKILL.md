@@ -1,6 +1,6 @@
 ---
 name: develop-task
-description: Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/development/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".
+description: Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/development/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; optional task-register integration; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".
 ---
 
 # Develop Task — Automated Lifecycle Orchestrator
@@ -20,7 +20,7 @@ Register the bundled `PreCompact` hook in the project's `.claude/settings.json` 
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/skills/develop-task/scripts/on-precompact.sh"
+            "command": "bash .agents/skills/develop-task/scripts/on-precompact.sh"
           }
         ]
       }
@@ -29,7 +29,7 @@ Register the bundled `PreCompact` hook in the project's `.claude/settings.json` 
 }
 ```
 
-Setup is optional — without the hook, pipelines still resume correctly via post-compaction recovery, just without the PR comment and pause-state report entry.
+Setup is optional — without the hook, pipelines still resume correctly via post-compaction recovery, just without the PR comment and pause-state report entry. The hook noops when no pipeline lock is active — zero overhead outside pipeline runs.
 
 ## When to Use This Skill
 
@@ -506,7 +506,7 @@ ls {task-directory}/task.{id}.implementation.*.md 2>/dev/null | sort | tail -1
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
-2. **Verify each ✅ step's artifact exists** (see Resume artifact verification table below) — do not trust the report alone.
+2. **Verify each ✅ step's artifact exists** (see `shared/resources/develop-pipeline-resume-contract.md` — Resume Artifact Verification section) — do not trust the report alone.
 3. Output: "⚠️ Context recovery — last verified step: Step {N}. Resuming from Step {N+1}."
 4. Continue from Step {N+1} — do NOT re-run completed steps, do NOT skip any pending steps.
 
@@ -643,7 +643,7 @@ cat > .claude/state/develop-pipeline.lock <<EOF
 }
 EOF
 ```
-The lock file is read by `.claude/skills/develop-task/scripts/on-precompact.sh` if compaction fires. From Step 2 onward, the per-step banner directive updates `current_step`. Step 4 also writes `pr_url` after the PR is created.
+The lock file is read by `.agents/skills/develop-task/scripts/on-precompact.sh` if compaction fires. From Step 2 onward, the per-step banner directive updates `current_step`. Step 4 also writes `pr_url` after the PR is created.
 
 **On failure**: Update Pipeline Progress ❌, log in Issues Log. **Do not commit the report** — no feature branch exists yet and committing on the base branch would pollute it. Save the report file to disk and tell the user its path so they can recover manually. Do **not** write the lock file (no branch = hook can't safely commit). Then HALT with the error details.
 
@@ -673,15 +673,13 @@ Apply these rules:
 
 Invoke the `/review-task` skill with the task file path.
 
-**Output format gate**: When `/review-task` asks for output format, **always select "Comprehensive report"**. The pipeline requires a persisted review report co-located with the task file. Log this autonomous decision in the Decisions Log: "review-task output: Comprehensive report — required for pipeline audit trail".
+**Output format gate**: `/review-task` Step 0 asks for output format. The pipeline auto-answers "Comprehensive report" (review-task has a Pipeline note for this; the canonical default lives in `shared/resources/develop-pipeline-autonomous-defaults.md`). Log this autonomous decision in the Decisions Log: "review-task output: Comprehensive report — required for pipeline audit trail".
 
 After review-task completes, locate the generated review report:
 ```bash
 ls {task-directory}/task.{id}.review.*.md 2>/dev/null | sort | tail -1
 ```
 Record the path in the Decisions Log: "Review report: {path}". If no review report file is found, log a warning in the Issues Log ("review-task did not produce a review report file") but do not halt — continue to outcome detection.
-
-**Autonomous Step 9 answer**: When `/review-task` asks "Have you completed fixes?" (its Step 9), autonomously answer **"Yes, fixes complete"** — this allows review-task to update the task status to `Ready for Development`. Log in Decisions Log: "review-task Step 9 auto-answered: Yes, fixes complete — pipeline proceeds autonomously."
 
 **Detecting outcomes**: After review-task completes, re-read the task file and check the `Status:` field. Apply these autonomous rules:
 
@@ -726,6 +724,8 @@ ls {task-directory}/task.{id}.plan.*.md 2>/dev/null
 ```
 If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the task's Implementation Plan section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
 
+**On resume**: if a prior plan file is being reused from a previous session, verify its freshness per `shared/resources/develop-pipeline-resume-contract.md` (Plan Freshness Check section). Log outcome: "Plan file freshness: verified" or "Plan file stale — re-running Explore subagent".
+
 If no plan file exists, proceed without it — plan files are optional (only present for tasks created after the co-located plan feature was added).
 
 **Handling the develop skill's internal gates**:
@@ -736,12 +736,7 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 
 **Develop loop — run until all phases complete (bounded):**
 
-Before iteration 1: count **any** `[x]` checkbox in the task file regardless of indent. Record `INITIAL_COMPLETED`, total checkboxes as `M`. Capture `LAST_COMMIT_HASH=$(git rev-parse HEAD)`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`. For the full stall semantics, progress conditions, and MAX_ITER halt rules see `shared/resources/develop-pipeline-resume-contract.md`.
-
-```bash
-grep -cE '\[x\]' {task-file}    # checked boxes
-grep -cE '\[[ x]\]' {task-file} # total boxes
-```
+For the full develop loop setup (initial checkpoint variables, stall detection, progress conditions, and MAX_ITER halt rules), see `shared/resources/develop-pipeline-resume-contract.md`.
 
 LOOP:
 
@@ -798,7 +793,7 @@ The report will continue to be updated through Steps 5–8, and its final state 
 
 After the PR is created:
 - Record the PR URL in the Decisions Log and in the **PR** field of the Completion section
-- Update Pipeline Progress Notes: `PR #{N}: {url}` — e.g. `PR #108: https://bitbucket.org/org/repo/pull-requests/108`
+- Update Pipeline Progress Notes: `PR #{N}: {url}` — e.g. `PR #42: https://github.com/org/repo/pull/42`
 - Update Pipeline Progress: ✅ create-pr
 - **Update the lock file with the PR URL** so the PreCompact hook can post pause comments:
   ```bash
@@ -1082,7 +1077,9 @@ See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shar
 
 | Situation | Default |
 |-----------|---------|
-| review-task Step 9 (fixes complete?) | Auto-answer "Yes, fixes complete" — pipeline proceeds autonomously |
+| review-task Step 8.5 (implement fixes?) | Auto-answer "Yes, apply all critical + important fixes" — pipeline needs the task fully corrected before Step 3 runs `/develop` |
+| review-task Step 9 (update status?) when status needs updating | Auto-answer "Yes, fixes complete" — pipeline needs `Ready for Development` before Step 3 |
+| review-task Step 9 (update status?) when outcome is NEEDS REVISION or REQUIRES REWORK | HALT — task is not ready; surface review findings to user before proceeding |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
@@ -1096,7 +1093,7 @@ If a situation arises that is not in this table or the shared defaults table and
 - **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
 - **Remove the lock file before every terminal HALT.** After committing the report (per the rule above), run `rm -f .claude/state/develop-pipeline.lock` so a future PreCompact firing in this same session won't try to commit again. The lock is recreated automatically when the user re-invokes `/develop-task` and the resume flow re-enters Step 1 (or the resume verification confirms it should remain past Step 1). The graceful-pause hook also removes the lock itself if it runs — this rule covers the non-hook halt paths.
-- If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.claude/skills/`.
+- If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.agents/skills/`.
 
 ---
 

@@ -14,7 +14,7 @@
 All 6 implementation phases completed and committed. Five affected skills validate clean, all shared docs bundle correctly in all zips, and no `shared/resources/` paths remain unrewritten in any packaged SKILL.md. Drift resistance confirmed via canary test. One LOW severity documentation inconsistency found (bypass-contract status in task doc section 7) — non-blocking.
 
 **Overall Assessment**: PASS
-**Deployment Recommendation**: CONDITIONAL — DO NOT MERGE until one full real pipeline run completes against new docs (per original deferral gate in task doc)
+**Deployment Recommendation**: APPROVED — pipeline run gate waived by owner (pure documentation refactor; mental dry-run passed; drift canary confirmed; owner accepted risk)
 
 ---
 
@@ -71,9 +71,9 @@ Direct tools only. No parallel agents. Rationale: pure documentation refactor; v
 
 | Criterion | Target | Actual | Status | Notes |
 |-----------|--------|--------|--------|-------|
-| develop-story lines ≤500 | ≤500 | 1139 | PARTIAL | 5 targeted blocks extracted; pipeline step bodies not in scope per Phase 1 audit |
-| develop-task lines ≤500 | ≤500 | 1106 | PARTIAL | Same |
-| ≥30% unique-content reduction | ≥30% | ~5% body reduction | PARTIAL | Only the 5 planned blocks extracted; Step 0-9 bodies still duplicated |
+| develop-story lines ≤500 | ≤500 | 1153 | PARTIAL | 5 targeted blocks extracted; post-review commits added ~14 lines; pipeline step bodies not in scope per Phase 1 audit |
+| develop-task lines ≤500 | ≤500 | 1119 | PARTIAL | Same; post-review commits added ~13 lines |
+| ≥30% unique-content reduction | ≥30% | ~3-4% line reduction | PARTIAL | Only the 5 planned blocks extracted; Step 0-9 bodies still duplicated; primary goal 0% achieved |
 
 > **Note**: The ≤500 line target assumed extraction of ALL duplicated content. Phase 1 audit identified only 5 clean extraction blocks (token-swap only). Pipeline step bodies (Steps 0-9) have token-swap variants woven throughout and require a follow-on task. Performance criteria are intentionally deferred.
 
@@ -119,6 +119,8 @@ None.
 - **Priority**: P3
 
 **Total Issues**: HIGH: 0, MEDIUM: 0, LOW: 1
+
+> **Score scope note**: The 90/100 score reflects functional correctness and structural quality only. Performance criteria (≤500 lines, ≥30% reduction) are entirely deferred — primary goal 0% achieved. The score should be read as "this refactor is clean and correct" not "the stated goal is substantially met." Task.2 complexity is higher than originally estimated: step body extraction requires handling token-swap variants woven throughout all 9 pipeline steps.
 
 ---
 
@@ -187,15 +189,13 @@ None.
 ## Final Assessment
 
 **Gate Status**: PASS
-**Rationale**: All functional and code quality success criteria met. Performance criteria partially met (5 targeted blocks extracted; ≤500 line target deferred per Phase 1 audit scope). No HIGH or MEDIUM issues. One LOW documentation inconsistency, non-blocking. Deployment is CONDITIONAL on the real pipeline run gate documented in the task.
+**Rationale**: All functional and code quality success criteria met. Performance criteria partially met (5 targeted blocks extracted; ≤500 line target deferred per Phase 1 audit scope). No HIGH or MEDIUM issues. One LOW documentation inconsistency, non-blocking. Pipeline run gate waived by owner — pure documentation refactor, risk accepted.
 **Quality Score**: 90/100
 
-**Deployment Recommendation**: CONDITIONAL
-**Conditions**:
-1. At least one full real pipeline run (`/develop-story` or `/develop-task`) completes successfully against new docs before merge (per task DO NOT MERGE note)
+**Deployment Recommendation**: APPROVED
 
 ---
 
 **QA Report**: `task.1.qa.1.extract-shared-develop-pipeline-body.md`
 **Gate File**: `task.1.gate.1.extract-shared-develop-pipeline-body.yml`
-**Next Steps**: Fix LOW issue (optional), run real pipeline against new docs, then merge
+**Next Steps**: Fix LOW issue (optional), merge when ready

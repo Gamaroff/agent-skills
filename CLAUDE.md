@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Purpose
 
-This is a library of Claude Code skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into Claude Code via `.claude/skills/` in target projects.
+This is a library of Claude Code skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into Claude Code via `.agents/skills/` in target projects.
 
 ## Skill Structure
 

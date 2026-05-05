@@ -83,6 +83,7 @@ Phase 9: Final validation, repackage, mental dry-run, drift canary
 - **High**: token-swap variants may be more woven than Phase 1 of Task 1 suggested. Mitigation: pre-Phase strategy spike + per-step variance audit before each extraction phase.
 - **Medium**: extracting Step 3 (develop loop) risks breaking the bounded loop semantics that were hardened in Task 1 cleanup-brief items 11/13. Mitigation: dedicated phase, mental dry-run before extraction, regression-check against current resume-contract.md.
 - **Low**: GitHub project board GraphQL block (~85 lines, currently duplicated in Step 0c-reg AND Step 1 board pre-flight) is the largest single token-swap candidate. Likely the highest LOC return per extraction.
+- **Low**: Phase 0c-reg tracker operation code (Jira transition + GitHub board update, ~90 lines each) and Step 7 tracker close code (Jira Done transition + GitHub issue close) are byte-identical between develop-story and develop-task — pure duplication with no token-swap variants. These are the highest-confidence extraction candidates in the entire pipeline and should be prioritised within their respective phases (Phase 1 for 0c-reg, Phase 7 for tracker close).
 
 ## 7. References
 

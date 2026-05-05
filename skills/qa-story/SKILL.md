@@ -17,7 +17,7 @@ When invoked from the `/develop-story` orchestrator, the call may be prefixed wi
 
 **Effect on this skill**:
 
-- Skip parallel agents in the Adaptive Review Strategy decision — go straight to **Direct Tools only**.
+- Skip parallel agents in the Adaptive Review Strategy decision — use the **Lite mode** rule (rule 0 in the decision tree, direct tools only) regardless of story size or risk.
 - All other phases (NFR, traceability, gate decision) run unchanged.
 - Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
 
@@ -451,7 +451,10 @@ Evaluate story characteristics and select appropriate review method:
 ```
 DECISION LOGIC:
 
-1. IF story has documented test coverage (>500 tests documented):
+0. IF lite mode directive received from `develop-story` orchestrator:
+   → Use DIRECT TOOLS — skip parallel agents regardless of story size or risk
+
+1. ELSE IF story has documented test coverage (>500 tests documented):
    → Use DIRECT TOOLS (fast, leverages existing documentation)
 
 2. ELSE IF story is small (<5 files created/modified):

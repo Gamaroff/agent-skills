@@ -1,3 +1,8 @@
+---
+name: develop-pipeline-pause
+description: Graceful pause contract shared by develop-story and develop-task orchestrators. Covers the pipeline lock-file format, the PreCompact hook contract, the pause-signal handshake, and half-done step recovery guarantees on resume.
+---
+
 # Develop Pipeline — Graceful Pause on Imminent Context Compaction
 
 Reference doc for the `/develop-task` and `/develop-story` orchestrator skills. Describes the lock-file format, the `PreCompact` hook contract, and the half-done step recovery guarantees.
@@ -32,7 +37,7 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
                   ▼  context approaches limit
 ┌──────────────────────────────────────────────────────────────────┐
 │ Claude Code triggers PreCompact hook                             │
-│   └─ runs `.claude/skills/<skill>/scripts/on-precompact.sh`      │
+│   └─ runs `.agents/skills/<skill>/scripts/on-precompact.sh`      │
 └──────────────────────────────────────────────────────────────────┘
                   │
                   ▼
@@ -104,7 +109,7 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 
 ## Hook contract
 
-**Path**: `.claude/skills/develop-task/scripts/on-precompact.sh` (and the duplicate at `.claude/skills/develop-story/scripts/on-precompact.sh`). Both copies are byte-identical — the lock file's `skill` field tells the hook which orchestrator is paused.
+**Path**: `.agents/skills/develop-task/scripts/on-precompact.sh` (and the duplicate at `.agents/skills/develop-story/scripts/on-precompact.sh`). Both copies are byte-identical — the lock file's `skill` field tells the hook which orchestrator is paused.
 
 **Shell**: `bash`, `set -uo pipefail` (deliberately *not* `-e` — the hook is best-effort throughout).
 
@@ -134,8 +139,9 @@ If no lock file exists, `additionalContext` is `""` (empty). If a lock exists, `
 
 ## Setup (per project)
 
-Each project that uses `/develop-task` or `/develop-story` registers the hook in its `.claude/settings.json`:
+Each project that uses `/develop-task` or `/develop-story` registers the hook in its `.claude/settings.json`. Use the path for whichever skill(s) you have installed:
 
+**If using `/develop-story`:**
 ```json
 {
   "hooks": {
@@ -145,7 +151,26 @@ Each project that uses `/develop-task` or `/develop-story` registers the hook in
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/skills/develop-task/scripts/on-precompact.sh"
+            "command": "bash .agents/skills/develop-story/scripts/on-precompact.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**If using `/develop-task` (or both skills):**
+```json
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .agents/skills/develop-task/scripts/on-precompact.sh"
           }
         ]
       }
@@ -155,7 +180,8 @@ Each project that uses `/develop-task` or `/develop-story` registers the hook in
 ```
 
 Notes:
-- Either skill's copy of the script works — they're identical and both consult the lock file's `skill` field. Pointing at the `develop-task` copy covers both pipelines.
+- Both scripts are byte-identical and both consult the lock file's `skill` field to determine which orchestrator is paused. Either path covers both pipelines — use the one for the skill you have installed.
+- If both skills are installed, a single entry is sufficient; use either path.
 - The hook is project-scoped on purpose. Different projects may register different report locations or tracker integrations; per-project settings keep them isolated.
 - The hook is keyed off the lock file. With no active pipeline, it's a noop — safe to leave registered permanently.
 

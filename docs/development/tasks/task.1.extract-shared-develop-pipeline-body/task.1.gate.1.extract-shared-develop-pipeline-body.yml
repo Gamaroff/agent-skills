@@ -2,14 +2,15 @@ schema: 1
 task: 'task.1.extract-shared-develop-pipeline-body'
 task_title: 'Extract shared develop-pipeline body into shared/resources (Option C)'
 gate: PASS
-status_reason: 'All functional and code quality criteria met. 5 extraction blocks complete, all validators green, packager bundling verified, drift resistance confirmed. One LOW documentation inconsistency (bypass-contract status in section 7) — non-blocking. Real pipeline run required before merge per task deferral gate.'
+status_reason: 'All functional and code quality criteria met. 5 extraction blocks complete, all validators green, packager bundling verified, drift resistance confirmed. One LOW documentation inconsistency (bypass-contract status in section 7) — non-blocking. Real pipeline run required before merge per task deferral gate. NOTE: score of 90/100 reflects functional/structural correctness only — performance criteria (≤500 lines, ≥30% reduction) are 0% met and fully deferred to task.2; task.2 complexity is higher than originally estimated due to token-swap variants throughout all pipeline steps.'
 reviewer: 'QA Engineer'
 updated: '2026-05-04T00:00:00Z'
 
 top_issues: []
 
 waiver:
-  active: false
+  active: true
+  reason: 'Pipeline run gate waived by owner (2026-05-04). This is a pure documentation refactor — no runtime code changed, no behavior altered, no state machines touched. Mental dry-run passed for both develop-story and develop-task. Drift canary confirmed. Risk of regression is structural (packager path rewriting) not behavioral, and that was verified mechanically. Owner accepted risk of skipping live run.'
 
 quality_score: 90
 
@@ -44,6 +45,4 @@ recommendations:
 
 deployment_readiness:
   staging: APPROVED
-  production: CONDITIONAL
-  conditions:
-    - 'At least one full real pipeline run (/develop-story or /develop-task) completes successfully against new docs before merge'
+  production: APPROVED

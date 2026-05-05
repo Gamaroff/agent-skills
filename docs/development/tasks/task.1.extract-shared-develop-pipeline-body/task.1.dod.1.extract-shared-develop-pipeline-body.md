@@ -26,7 +26,7 @@
 
 **Issues Found:** HIGH: 0, MEDIUM: 0, LOW: 1 (task doc section 7 bypass-contract ✅ note — non-blocking)
 
-**Deployment Readiness:** CONDITIONAL — real pipeline run required before merge
+**Deployment Readiness:** APPROVED — pipeline run gate waived by owner (2026-05-04)
 
 ---
 
@@ -34,14 +34,15 @@
 
 ### Functional Criteria
 - ✅ All 5 skills pass `quick_validate.py` (develop-story, develop-task, develop, qa-story, qa-task)
-- ✅ All 5 repackaged zips contain expected `references/develop-pipeline-*.md` entries
-- ✅ No `shared/resources/` paths remain unrewritten in any zipped SKILL.md (0 refs in all 5)
+- ✅ All 5 repackaged zips confirmed to contain expected `references/develop-pipeline-*.md` entries (verified locally before gitignore cleanup)
+- ⚠️ All 5 zips subsequently deleted from git in same PR per `skills/*/*.zip` gitignore policy — zips are not tracked; regenerate with `package_skill.py` before installing
+- ✅ No `shared/resources/` paths remain unrewritten in any zipped SKILL.md (0 refs in all 5, verified before deletion)
 - ✅ Mental dry-run passes for both develop-story and develop-task
 - ✅ No breaking changes — external contracts unchanged
 
 ### Performance Criteria
-- ⚠️ develop-story: 1192→1139 lines (target ≤500 — deferred; pipeline step bodies require follow-on task)
-- ⚠️ develop-task: 1153→1106 lines (same)
+- ⚠️ develop-story: 1192→1153 lines (target ≤500 — deferred; pipeline step bodies require follow-on task)
+- ⚠️ develop-task: 1153→1119 lines (same)
 - ⚠️ ≥30% combined reduction — deferred; same rationale
 
 ### Code Quality Criteria
@@ -72,7 +73,7 @@
 
 **Rationale:** All in-scope extraction work is complete. Performance criteria (≤500 line target) were aspirational pre-audit targets that require pipeline step body extraction, deferred to a follow-on task per Phase 1 audit findings. All extracted blocks are structurally sound, validators green, and drift resistance confirmed.
 
-**Condition**: Task has existing DO NOT MERGE gate — merge to main deferred until one full real pipeline run completes.
+**Condition**: Pipeline run gate waived by owner — pure documentation refactor, mental dry-run passed, drift canary confirmed, risk accepted.
 
 ---
 
@@ -88,6 +89,5 @@
 - ✅ This running summary file
 
 **Next Steps:**
-- Run one full pipeline (/develop-story or /develop-task) against new docs
-- Merge when pipeline run confirms no regression
+- Merge PR #2
 

@@ -130,15 +130,15 @@ System Action: Invokes /create-story skill
 → Story ready for development via /develop
 ```
 
-## Caller Detection (PIPELINE_MODE)
+## Caller Detection
 
 Before any other workflow action, detect whether `/develop` is running standalone or orchestrated by `/develop-story` / `/develop-task`. The signal is the pipeline lock file written by the orchestrator at the end of its Step 1:
 
 ```bash
 if [ -f .claude/state/develop-pipeline.lock ]; then
-  PIPELINE_MODE=orchestrated   # called from develop-story or develop-task
+  CALLER_MODE=orchestrated   # called from develop-story or develop-task
 else
-  PIPELINE_MODE=standalone
+  CALLER_MODE=standalone
 fi
 ```
 
@@ -156,7 +156,7 @@ fi
 
 - `/develop` must never write, update, or delete `.claude/state/develop-pipeline.lock`. The lock's lifecycle is owned by the orchestrator (created in its Step 1, mutated as it advances steps, removed before terminal HALT).
 - Read-only check; no race risk.
-- If the lock exists but its `branch` field does not match the current git branch, log a warning ("Stale pipeline lock detected — branch mismatch; treating as standalone") and fall back to `PIPELINE_MODE=standalone`. This protects against an abandoned lock from a previous run.
+- If the lock exists but its `branch` field does not match the current git branch, log a warning ("Stale pipeline lock detected — branch mismatch; treating as standalone") and fall back to `CALLER_MODE=standalone`. This protects against an abandoned lock from a previous run.
 - Lock schema: see `shared/resources/develop-pipeline-pause.md`.
 
 ## Document Status Validation

@@ -1,9 +1,13 @@
 ---
 name: develop-pipeline-resume-contract
-description: Resume verification contract shared by develop-story and develop-task. Covers per-step artifact verification, plan freshness check, MAX_ITER=5 stall semantics, QA cycle count reconstruction, and branch/PR cross-check. File naming patterns differ between story and task — both listed. (Step 8 push command lives inline in each SKILL.md — it is a normal-flow concern, not a resume concern.)
+description: Resume verification contract shared by develop-story and develop-task. Covers per-step artifact verification, plan freshness check, MAX_ITER=5 stall semantics, QA cycle count reconstruction, and branch/PR cross-check. File naming patterns differ between story and task — both listed. Step 8 push command is a normal-flow concern (not a resume concern); it lives inline in each SKILL.md under the `### Step 8: Commit Changes` section.
 ---
 
 # Develop Pipeline — Resume Verification Contract
+
+## When This Contract Applies
+
+This contract is invoked during Phase 0b of `/develop-story` or `/develop-task` when resuming a previous pipeline run. The orchestrator follows these steps to determine which steps are safe to skip (verified ✅) versus which must be re-run (missing artifact or ⏸️ Paused).
 
 ## Resume Artifact Verification (CRITICAL)
 
@@ -40,11 +44,15 @@ If the Decisions Log records a plan file from a prior session and Step 3 is bein
 ```bash
 # develop-story (macOS/Linux portable):
 _mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"; }
-[ "$(_mtime {story-directory}/story.{epic}.{story}.plan.*.md)" -ge "$(_mtime {story-file})" ]
+plan=$(ls {story-directory}/story.{epic}.{story}.plan.*.md 2>/dev/null | head -1)
+[ -n "$plan" ] && [ "$(_mtime "$plan")" -ge "$(_mtime {story-file})" ]
 
 # develop-task (macOS/Linux portable):
-[ "$(_mtime {task-directory}/task.{id}.plan.*.md)" -ge "$(_mtime {task-file})" ]
-``` If the plan is stale (older than the story/task file), do **not** reuse it — drop the cached "Pre-develop surface map:" entry from the in-memory resume context, re-run the Explore subagent, and re-discover the plan file. Log: "Plan file stale on resume (mtime < story/task mtime) — re-running pre-develop discovery." Cap re-discovery at **1 retry per resume** to prevent loops; if the plan is still stale after the retry, proceed with the latest plan and log a warning. If no plan file exists in the directory, the freshness check is a no-op.
+plan=$(ls {task-directory}/task.{id}.plan.*.md 2>/dev/null | head -1)
+[ -n "$plan" ] && [ "$(_mtime "$plan")" -ge "$(_mtime {task-file})" ]
+```
+
+If the plan is stale (older than the story/task file), do **not** reuse it — drop the cached "Pre-develop surface map:" entry from the in-memory resume context, re-run the Explore subagent, and re-discover the plan file. Log: "Plan file stale on resume (mtime < story/task mtime) — re-running pre-develop discovery." Cap re-discovery at **1 retry per resume** to prevent loops; if the plan is still stale after the retry, proceed with the latest plan and log a warning. If no plan file exists in the directory, the freshness check is a no-op.
 
 ## Gate File Conflation Warning (CRITICAL)
 
