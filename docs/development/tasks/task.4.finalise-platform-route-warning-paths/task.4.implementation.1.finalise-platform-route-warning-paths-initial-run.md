@@ -36,7 +36,7 @@ Route four hard-coded `gh pr comment` warning paths in `skills/finalise/SKILL.md
 | 4. create-pr | ✅ Done | PR URL; issue comment posted | https://github.com/Gamaroff/agent-skills/pull/8 |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.4.qa.N.*.md`; `task.4.gate.N.*.yml`; PR comment posted | PASS 97/100 — 0 HIGH, 0 MEDIUM, 1 LOW (non-blocking) |
 | 7. finalise | ✅ Done | `task.4.dod.N.*.md`; task `status: accepted` | DoD PASSED; sprint-review-summary.md created; issue #7 closed |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
+| 8. commit-changes | ✅ Done | All artifacts committed and pushed | 196101d pushed to origin |
 
 ---
 
