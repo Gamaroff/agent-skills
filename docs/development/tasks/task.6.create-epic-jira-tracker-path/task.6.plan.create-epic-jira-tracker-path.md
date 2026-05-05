@@ -11,7 +11,7 @@ task-ref: task.6.create-epic-jira-tracker-path.md
 
 ## Overview
 
-Audit `skills/create-epic/SKILL.md` for tracker-creation behavior. If absent or partial, add a dual-path block mirroring `skills/create-task/SKILL.md` lines 425-509, delegating Jira creation to `/sync-jira-epic` (which is idempotent and already battle-tested).
+Audit `skills/create-epic/SKILL.md` for tracker-creation behavior. If absent or partial, add a dual-path block mirroring `skills/create-task/SKILL.md` §4.5 Create Tracker Issue, delegating Jira creation to `/sync-jira-epic` (idempotent and battle-tested).
 
 ## Phase-by-Phase Implementation Guide
 
@@ -35,7 +35,7 @@ Record findings in `task.6.implementation.1.create-epic-jira-tracker-path-audit.
 
 ### Phase 2: Add dual-path block (Path A)
 
-Insertion point: after epic doc generation step, before final hand-off. Mirror `create-task` lines 425-509 verbatim where applicable, but adapt for epic semantics:
+Insertion point: after epic doc generation step, before final hand-off. Mirror `create-task` §4.5 Create Tracker Issue verbatim where applicable, but adapt for epic semantics:
 
 ```bash
 if [ -n "$JIRA_URL" ]; then
@@ -112,9 +112,9 @@ python skills/create-skill/scripts/package_skill.py skills/create-epic
 
 ## Key Patterns and References
 
-- **Pattern source**: `skills/create-task/SKILL.md` lines 425-509 (platform detection + Jira REST), 515-630 (GitHub `gh issue create` + project board + milestone)
+- **Pattern source**: `skills/create-task/SKILL.md` §4.5 Create Tracker Issue — platform detection (`if [ -n "$JIRA_URL" ]`), Jira Path (REST POST), GitHub Path (`gh issue create` + project board + milestone)
 - **Jira delegate**: `skills/sync-jira-epic/SKILL.md` — idempotent create-or-update, ADF rendering, Bitbucket URL embedding
-- **Alternative**: `skills/jira-epic-creator/SKILL.md` — single-purpose creator (use only if `sync-jira-epic` is too heavyweight; default to `sync-jira-epic`)
+- **Not used**: `skills/jira-epic-creator/SKILL.md` — single-purpose creator; kept as alternative reference only
 - **Frontmatter shape** (epic): `jira_key`, `jira_url`, or `github_issue` written by the respective branch
 
 ## Testing Approach
