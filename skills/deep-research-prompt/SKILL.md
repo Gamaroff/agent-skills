@@ -1,6 +1,8 @@
 ---
 name: deep-research-prompt
 description: Generate comprehensive research prompts for various analysis types (product validation, market opportunity, competitive intelligence, etc.). Use when market validation or deep investigation needed before PRD creation.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Deep Research Prompt Generation

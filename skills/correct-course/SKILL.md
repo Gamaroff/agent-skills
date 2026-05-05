@@ -1,6 +1,8 @@
 ---
 name: correct-course
 description: Change management and navigation skill for handling project pivots, blockers, and requirement changes. Uses change-checklist to analyze impacts, evaluate options, and generate Sprint Change Proposals with specific artifact edits.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Correct Course (Change Navigation)

@@ -1,6 +1,8 @@
 ---
 name: testing-setup-shared
 description: Guide developers through common testing infrastructure setup for the goji-system monorepo including dual testing strategy, test co-location, mocking strategies for subpath exports, platform separation validation, and troubleshooting common test failures
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Testing Setup - Shared Infrastructure

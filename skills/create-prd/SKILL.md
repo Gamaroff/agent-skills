@@ -1,6 +1,8 @@
 ---
 name: create-prd
 description: Create PRDs for enhancements to existing projects. Use when adding significant features to existing codebases that require comprehensive planning (4+ stories, architectural changes).
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Brownfield PRD Creation

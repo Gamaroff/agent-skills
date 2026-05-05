@@ -14,6 +14,8 @@ description: >
   diagram", "state diagram", "C4", "ER diagram", or pastes Mermaid code for
   review.
 allowed-tools: Read, Write, Edit, Bash(mmdc:*), Bash(npx:*), Bash(node:*), Bash(grep:*), Bash(rg:*), Bash(find:*), Bash(ls:*), Bash(cat:*)
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Mermaid Architect

@@ -1,6 +1,8 @@
 ---
 name: sync-jira-epic
 description: Sync a local epic markdown file to Jira — creates the epic if it has no jira_key, updates it if jira_key is already set. Top-level work item (no parent). Embeds Bitbucket links to the parent PRD and epic file in the Jira description (rendered via ADF). Renders the Stories Breakdown markdown table as a real ADF table in Jira. Maintains a Change Log in both the local epic and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this epic in Jira", "update this epic in Jira", "sync epic to Jira", "push epic changes to Jira", or "publish epic to Jira".
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # sync-jira-epic

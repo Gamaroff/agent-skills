@@ -1,6 +1,8 @@
 ---
 name: develop
 description: Provides guidance for implementing features and technical tasks in the Goji system. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns. Covers task planning, platform separation, testing, and documentation standards. Includes BMAD story-driven development workflow with quality gates and comprehensive validation.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Develop

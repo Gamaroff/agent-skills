@@ -1,6 +1,8 @@
 ---
 name: qa-planning
 description: Use for upfront test planning and risk assessment before/during development. Provides risk profiling (probability × impact) and comprehensive test design (test levels, priorities, scenarios) to guide quality-focused implementation.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # QA Planning

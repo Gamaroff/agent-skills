@@ -1,6 +1,8 @@
 ---
 name: execute-architect-checklist
 description: Comprehensive architecture validation using the Architect Solution Validation Checklist. Validates technical design for robustness, scalability, security, and requirements alignment. Use before finalizing architecture documents or during architecture reviews.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Execute Architect Checklist

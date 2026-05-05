@@ -1,6 +1,8 @@
 ---
 name: bsv-wallet-implementer
 description: Use this agent when implementing BSV blockchain wallet functionality, including transaction creation, key management, address generation, UTXO handling, or wallet-toolbox integration. Examples - User is implementing BSV wallet features and needs help with transaction signing. user 'I need to implement transaction signing for my BSV wallet' assistant 'I'll use the bsv-wallet-implementer agent to help with proper BSV transaction signing implementation' The user needs BSV-specific wallet implementation help, so use the bsv-wallet-implementer agent. - User is working on UTXO management for their BSV application. user 'How do I properly handle UTXO selection and change outputs in BSV?' assistant 'Let me use the bsv-wallet-implementer agent to provide guidance on BSV UTXO management best practices' This requires BSV blockchain expertise for wallet functionality.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # BSV Blockchain Wallet Implementer

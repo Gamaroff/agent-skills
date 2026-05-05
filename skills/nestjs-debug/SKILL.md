@@ -1,6 +1,8 @@
 ---
 name: nestjs-debug
 description: Autonomous NestJS debugging for any NestJS application in the monorepo. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works with current (goji-api) and future NestJS applications.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # NestJS Autonomous Debugging Skill

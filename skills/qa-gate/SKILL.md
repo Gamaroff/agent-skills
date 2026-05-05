@@ -1,6 +1,8 @@
 ---
 name: qa-gate
 description: Use for creating or updating quality gate decision files for stories. Provides clear PASS/CONCERNS/FAIL/WAIVED decisions with actionable feedback based on review findings. Advisory checkpoint for teams to understand quality status.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # QA Gate

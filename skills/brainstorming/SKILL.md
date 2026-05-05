@@ -1,6 +1,8 @@
 ---
 name: brainstorming
 description: Facilitate interactive brainstorming sessions using proven ideation techniques to generate and refine ideas collaboratively
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Brainstorming Facilitation

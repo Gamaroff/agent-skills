@@ -1,6 +1,8 @@
 ---
 name: performance-optimizer
 description: Review code for performance issues and apply optimization patterns. Use when performing performance review, optimizing slow features, reducing bundle size, improving database queries, optimizing React Native rendering, or implementing caching strategies.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Performance Optimizer

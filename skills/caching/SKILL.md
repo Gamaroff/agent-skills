@@ -1,6 +1,8 @@
 ---
 name: caching
 description: Caching implementation guide using @goji-system/cache-lib. Covers cache strategy selection, TTL configuration, invalidation patterns, and monitoring for production-ready caching.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Caching Implementation Skill

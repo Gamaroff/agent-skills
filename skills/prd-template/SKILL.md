@@ -1,6 +1,8 @@
 ---
 name: prd-template
 description: Greenfield PRD template structure and guidance. Defines the complete structure for Product Requirements Documents for new products from scratch.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Greenfield PRD Template

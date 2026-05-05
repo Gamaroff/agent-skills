@@ -1,6 +1,8 @@
 ---
 name: epic-registry-manager
 description: Manage global epic numbering and registry updates. Use when creating new epics to assign next available epic number, validate epic.NUMBER.name.md filename format, update epic-registry.md with new entries, and ensure YAML frontmatter compliance. Prevents epic number conflicts and maintains central epic tracking.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Epic Registry Manager

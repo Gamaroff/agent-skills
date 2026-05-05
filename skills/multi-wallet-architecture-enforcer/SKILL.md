@@ -1,6 +1,8 @@
 ---
 name: multi-wallet-architecture-enforcer
 description: Enforce single-currency wallet constraint and multi-wallet architecture patterns. Use when implementing wallet creation, validating wallet operations, reviewing wallet-related code, or ensuring each wallet holds ONE currency only (BSV or MNEE_USD). Prevents mixed-currency wallets and validates multi-wallet user patterns.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Multi-Wallet Architecture Enforcer

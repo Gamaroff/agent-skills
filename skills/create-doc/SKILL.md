@@ -1,6 +1,8 @@
 ---
 name: create-doc
 description: YAML-driven document creation engine with mandatory user interaction. Use when creating PRDs, epics, or any document from a YAML template that requires section-by-section collaboration.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Create Document from Template (YAML-Driven)

@@ -1,6 +1,8 @@
 ---
 name: review-story
 description: Deep interactive story review that asks clarifying questions to resolve ambiguities, conflicts, and missing information. Use when story has unclear requirements or you need user input to guide recommendations.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Review Story

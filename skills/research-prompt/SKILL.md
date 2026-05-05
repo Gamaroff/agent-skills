@@ -1,6 +1,8 @@
 ---
 name: research-prompt
 description: Create comprehensive research prompts for deep analysis across product, market, user, competitive, and technical domains
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Deep Research Prompt Creation

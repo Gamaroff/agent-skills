@@ -1,6 +1,8 @@
 ---
 name: create-epics-from-shards
 description: Convert PRD shards into implementation epic files. Use after shard-prd to generate focused epic documents in epics/ subdirectory following standard epic structure.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Create Epics from PRD Shards

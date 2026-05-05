@@ -1,6 +1,8 @@
 ---
 name: scrum-master
 description: Use for story creation, story validation, epic management, and agile process guidance. Provides systematic workflows for preparing detailed, actionable stories that developers can implement without confusion.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Scrum Master (Story Preparation Specialist)

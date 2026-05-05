@@ -1,6 +1,8 @@
 ---
 name: analyst
 description: Market research, competitive analysis, project briefs, and brainstorming for strategic business insights
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Business Analysis & Strategic Research

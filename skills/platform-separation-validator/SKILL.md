@@ -1,6 +1,8 @@
 ---
 name: platform-separation-validator
 description: This skill should be used when reviewing code for platform separation violations, validating library imports (client vs server paths), ensuring crypto operations remain server-side, checking React Native code uses /client imports only, preventing Node.js dependencies in client bundles, or enforcing security boundaries. Use this when implementing new features that span client and server, reviewing pull requests for separation compliance, debugging "Cannot find module" errors related to imports, refactoring shared libraries, or auditing codebase for platform separation adherence.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Platform Separation Validator

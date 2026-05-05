@@ -1,6 +1,8 @@
 ---
 name: sync-jira-story
 description: Sync a local story markdown file to Jira — creates the story if it has no jira_key, updates it if jira_key is already set. Links the Jira story to its parent Jira epic (team-managed `parent` or classic Epic Link customfield, auto-detected with retry). Adds the story to the project backlog (Scrum boards only). Embeds Bitbucket links rendered via ADF (default-branch refs). Maintains a Change Log in both the local story and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this story in Jira", "update this story in Jira", "sync story to Jira", "push story changes to Jira", or "publish story to Jira".
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # sync-jira-story

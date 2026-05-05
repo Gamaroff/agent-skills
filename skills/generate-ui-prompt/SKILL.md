@@ -1,6 +1,8 @@
 ---
 name: generate-ui-prompt
 description: Generate masterful, comprehensive prompts for AI-driven frontend development tools (v0, Lovable, etc.). Use when creating UI generation prompts that need to be optimized for code scaffolding and component generation.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Generate AI Frontend Prompt

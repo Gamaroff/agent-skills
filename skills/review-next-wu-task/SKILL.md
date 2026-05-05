@@ -1,6 +1,8 @@
 ---
 name: review-next-wu-task
 description: Finds the next actionable task in the WU task-sequence and dispatches the appropriate skill. Scans task-sequence.md top-to-bottom and picks the first row that is either unreviewed (❌ Review → /review-task) or reviewed but incomplete (✅ Review + non-Done status → /develop-task). First match in document order wins.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Review Next WU Task

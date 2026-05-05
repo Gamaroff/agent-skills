@@ -1,6 +1,8 @@
 ---
 name: transaction-schema-validator
 description: Ensure transaction code follows documented patterns with uppercase enum values, schema normalization, and Decimal.js for amounts. Use when creating transaction types, validating transaction states, implementing transaction processing, or reviewing transaction-related code. Enforces PENDING not pending, valid TransactionStatus values, and proper transaction schemas.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Transaction Schema Validator

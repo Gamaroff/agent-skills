@@ -1,6 +1,8 @@
 ---
 name: qa-fix
 description: Implement fixes based on QA feedback. Use when QA has provided a gate file or assessments and you need to systematically address issues, close coverage gaps, and update the story file. Follows deterministic prioritization for risk-first fix implementation.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # QA Fix

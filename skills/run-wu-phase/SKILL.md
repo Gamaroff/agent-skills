@@ -1,6 +1,8 @@
 ---
 name: run-wu-phase
 description: Runs an entire WU migration phase end-to-end with minimal intervention. Creates one Git branch per phase (feature/wu-phase-N), loops through every task sequentially (review → develop → nx-affected → qa-task/qa-story → qa-fix → commit), and manages a single draft PR that is finalised at phase completion. Skips tasks already marked Done. Pauses only for user-flagged high-risk tasks, QA failures that cannot self-heal, ambiguous task requirements, or genuine blockers. Use /run-wu-phase [N] to target a specific phase or omit N to auto-detect the next incomplete phase.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Run WU Phase — Automated Phase Executor

@@ -2,6 +2,8 @@
 name: deploy-remote
 description: Deploy and manage Goji Docker stacks on the LAN server (default goji-server / 192.168.1.247) via SSH-backed Docker context and a local registry. Use for any remote container build, push, deploy, restart, log, migrate, or teardown operation.
 type: project
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Deploy Remote Skill

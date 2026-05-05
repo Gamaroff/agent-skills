@@ -1,6 +1,8 @@
 ---
 name: execute-checklist
 description: Generic checklist validation engine for systematically validating documentation, code, or processes against predefined quality criteria. Supports interactive and batch modes with comprehensive reporting.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Execute Checklist Validation

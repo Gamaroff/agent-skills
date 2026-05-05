@@ -1,6 +1,8 @@
 ---
 name: wu-index
 description: Regenerate docs/development/tasks/migration/website-unification/task-index.md by deriving status from each stub's task-doc target (not from stub frontmatter, which may be stale or vestigial since the 2026-04-26 stub-slimming pass). Use this when a task's status field flips, a gate yml lands, a review file is added, or a new follow-up is created. No arguments.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # wu-index

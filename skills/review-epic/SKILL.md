@@ -5,6 +5,8 @@ description: "Deep interactive epic review that checks template compliance, dete
   the codebase for already-implemented features. Produces a co-located review report
   or inline action plan. Use before writing stories to catch structural, duplication,
   and conflict problems early."
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Review Epic

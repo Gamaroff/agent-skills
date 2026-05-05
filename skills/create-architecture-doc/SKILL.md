@@ -1,6 +1,8 @@
 ---
 name: create-architecture-doc
 description: Interactive YAML-driven architecture document creation with mandatory user elicitation. Creates backend, brownfield, frontend, or full-stack architecture documents through structured workflows. Use when creating new architecture documentation from templates.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Create Architecture Document

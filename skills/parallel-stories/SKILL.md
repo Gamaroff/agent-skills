@@ -1,6 +1,8 @@
 ---
 name: parallel-stories
 description: Generate stories organized for parallel development using Git worktrees. Implements hybrid numbering (1-1, 1-2 for parallel, 2, 3 for sequential) with dependency mapping, conflict prevention, and coordination strategies.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Parallel Worktree Stories

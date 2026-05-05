@@ -1,6 +1,8 @@
 ---
 name: pm-checklist
 description: Comprehensive PRD validation with 9 categories and 60+ checks. Use to validate PRD quality, completeness, and readiness for architecture phase before architect handoff.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Product Manager (PM) Requirements Checklist

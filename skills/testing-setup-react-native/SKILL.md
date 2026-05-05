@@ -1,6 +1,8 @@
 ---
 name: testing-setup-react-native
 description: Guide developers through React Native specific testing patterns for goji-wallet including component testing, screen testing, hooks, native module mocking, and user interaction patterns with React Native Testing Library
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Testing Setup - React Native

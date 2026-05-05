@@ -1,6 +1,8 @@
 ---
 name: greenfield-prd
 description: Create Product Requirements Documents for new products from scratch. Use when starting a new product or major feature without existing codebase constraints. Orchestrates create-doc, prd-template, and pm-checklist.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Greenfield PRD Creation

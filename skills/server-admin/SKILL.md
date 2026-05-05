@@ -2,6 +2,8 @@
 name: server-admin
 description: Sysadmin operations on the Goji LAN server (default goji-server / 192.168.1.247). Covers apt updates, ufw firewall rules, systemd service management, user/group management, disk and memory diagnostics, log inspection, and routine maintenance. Use for any non-Docker server-side task.
 type: project
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Server Admin Skill

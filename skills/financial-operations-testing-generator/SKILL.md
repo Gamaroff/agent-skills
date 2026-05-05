@@ -1,6 +1,8 @@
 ---
 name: financial-operations-testing-generator
 description: This skill should be used when generating test suites for financial operations (wallet operations, transactions, balance calculations, currency conversions), ensuring Decimal.js usage for monetary calculations, creating co-located test files, validating 95%+ coverage for financial code, or implementing the proven 32-phase testing methodology that achieved 99%+ coverage. Use when writing tests for new financial features, improving test coverage for existing financial code, or applying world-class testing standards to critical financial operations.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Financial Operations Testing Generator

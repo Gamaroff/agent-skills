@@ -1,6 +1,8 @@
 ---
 name: websocket-real-time-validator
 description: Validate Socket.IO patterns for chat, notifications, live updates. Use when implementing real-time features, reviewing Socket.IO code, implementing event handlers, validating connection management, ensuring proper room/namespace patterns, or enforcing Socket.IO event naming conventions.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Socket.IO Real-Time Validator

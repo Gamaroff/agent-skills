@@ -1,6 +1,8 @@
 ---
 name: handle-payment-validator
 description: Ensure correct terminology using "handle" not "username" for @handle payments and social features. Use when implementing payment flows, user identity features, reviewing variable names, validating UI labels, or auditing API endpoints. Enforces @handle for payments/social, "username" ONLY for database credentials.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Handle Payment Validator

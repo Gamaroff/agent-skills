@@ -1,6 +1,8 @@
 ---
 name: flesh-wu-stub
 description: Flesh out a website-unification (WU) stub task IN-PLACE — fills the four template sections (Acceptance criteria, Test plan, Implementation steps, Definition of done) using the parent phase doc and any code/files referenced in the stub's frontmatter, then sets doc-status to "fleshed". After fleshing, automatically generates a create-task-format task document, creates a GitHub issue, and links both back into the WU stub frontmatter. Does not touch impl-status or flip doc-status to "reviewed" — that happens when the user runs /review-task on the generated task document.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # flesh-wu-stub

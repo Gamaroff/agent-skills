@@ -1,6 +1,8 @@
 ---
 name: document-project
 description: Generate comprehensive brownfield architecture documentation for existing projects optimized for AI development agents
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Brownfield Project Documentation

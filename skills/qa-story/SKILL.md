@@ -1,6 +1,8 @@
 ---
 name: qa-story
 description: Use for comprehensive quality review during/after implementation. Performs adaptive test architecture review with conditional parallel agents based on story complexity. Uses direct tools for well-documented stories, spawns agents for complex/high-risk scenarios. Includes NFR validation (security, performance, reliability, maintainability) and requirements traceability mapping. Automatically performs re-review when previous gate has concerns or issues.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # QA Review

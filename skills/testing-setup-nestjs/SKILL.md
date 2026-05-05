@@ -1,6 +1,8 @@
 ---
 name: testing-setup-nestjs
 description: Guide developers through NestJS specific testing patterns for goji-api including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and financial operations testing with 95% coverage requirements
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Testing Setup - NestJS

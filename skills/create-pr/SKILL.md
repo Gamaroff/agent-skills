@@ -1,6 +1,8 @@
 ---
 name: create-pr
 description: Create pull requests following project conventions. This skill should be used when ready to submit code for review. Automatically commits any uncommitted changes using /commit-changes before creating the PR. Prompts for target branch (typically develop), pushes the current branch, generates a PR description, and opens a PR using the GitHub CLI (GitHub) or Bitbucket REST API (Bitbucket). Platform is auto-detected from the git remote URL.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Create Pull Request

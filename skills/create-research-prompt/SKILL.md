@@ -1,6 +1,8 @@
 ---
 name: create-research-prompt
 description: Create comprehensive research prompts for technical deep-dive analysis including product validation, market research, technology assessment, competitive intelligence, and strategic options. Use when needing structured research for architecture decisions or technology selection.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Create Deep Research Prompt

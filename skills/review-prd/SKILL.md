@@ -5,6 +5,8 @@ description: "Deep interactive PRD review that verifies claims against the actua
   and asks clarifying questions. Produces a co-located review report or inline action
   plan. Use to catch inaccuracies, gaps, and inconsistencies before epic/story work
   begins."
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Review PRD

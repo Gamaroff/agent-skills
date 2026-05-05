@@ -1,6 +1,8 @@
 ---
 name: remember-insight
 description: Saves an insight to the project's persistent memory system. Reads all existing memory files, determines whether the insight can be merged into an existing file or needs a new one, then writes the memory and updates MEMORY.md. Use this skill when the user shares an insight (e.g. from an agent run, a retrospective, or a discovery) and wants it preserved across future conversations.
+copyright: "Copyright (c) 2025 Lorien Gamaroff"
+license: MIT
 ---
 
 # Remember Insight
