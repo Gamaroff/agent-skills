@@ -1,0 +1,50 @@
+schema: 1
+task: 'task.6.create-epic-jira-tracker-path'
+task_title: 'create-epic: verify and add Jira tracker path'
+gate: PASS
+status_reason: 'All 4 phases complete; quick_validate.py passes; dual-path tracker block correct; no HIGH/MEDIUM issues. Three LOW cosmetic findings, all non-blocking.'
+reviewer: 'QA Engineer'
+updated: '2026-05-05T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 93
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No credentials in skill body; auth via env vars consistent with library pattern.'
+  performance:
+    status: PASS
+    notes: 'Skill doc change only; tracker call non-blocking on failure.'
+  reliability:
+    status: PASS
+    notes: 'Both branches: non-blocking on failure. Jira delegates to idempotent sync-jira-epic. GitHub has explicit null-fallback.'
+  maintainability:
+    status: PASS
+    notes: 'No inline Jira REST; GitHub pattern mirrors create-task §4.5; quick_validate.py passes.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Clarify idempotency prose — "enforced per path" rather than single upfront guard'
+      refs: ['skills/create-epic/SKILL.md']
+    - action: 'Replace ambiguous "proceed to platform branch below" comment in detect block'
+      refs: ['skills/create-epic/SKILL.md']
+    - action: 'Consider dynamic default-branch detection if standardised across skill library'
+      refs: ['skills/create-epic/SKILL.md', 'skills/create-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
