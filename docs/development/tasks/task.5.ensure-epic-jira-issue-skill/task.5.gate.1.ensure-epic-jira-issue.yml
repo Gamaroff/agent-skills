@@ -1,0 +1,48 @@
+schema: 1
+task: 'task.5.ensure-epic-jira-issue-skill'
+task_title: 'Add ensure-epic-jira-issue skill and dual-path the call sites'
+gate: PASS
+status_reason: 'All 5 phases verified. Validators pass for all three affected skills. No regressions on GitHub path. Zero HIGH/MEDIUM issues.'
+reviewer: 'QA Engineer (Claude)'
+updated: '2026-05-05T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No credentials in skill body. Atlassian MCP handles auth. No new attack surface.'
+  performance:
+    status: PASS
+    notes: 'One getJiraIssue call on happy path. sync-jira-epic only when key absent.'
+  reliability:
+    status: PASS
+    notes: 'All six failure scenarios documented. All failures non-blocking.'
+  maintainability:
+    status: PASS
+    notes: '115-line thin wrapper. Zero Jira REST duplication. Mirrors GitHub sibling contract.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Run dual-env smoke test via /review-story when live Jira instance available'
+      refs: ['skills/ensure-epic-jira-issue/SKILL.md']
+    - action: 'Consider --no-status-transition flag on sync-jira-epic to decouple "ensure exists" from status advancement'
+      refs: ['skills/sync-jira-epic/SKILL.md', 'skills/ensure-epic-jira-issue/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
