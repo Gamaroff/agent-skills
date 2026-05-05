@@ -1,6 +1,6 @@
 ---
 name: develop-story
-description: Automates the full end-to-end story development lifecycle: create-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume from any step; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".
+description: Automates the full end-to-end story development lifecycle: create-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume with per-step artifact verification; bounded develop loop (MAX_ITER=5); `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".
 ---
 
 # Develop Story — Automated Lifecycle Orchestrator
@@ -9,17 +9,18 @@ This skill orchestrates the complete story development lifecycle, calling each s
 
 ## Setup — Graceful Pause Hook (one-time, per project)
 
-Long pipelines can hit Claude's context window before reaching Step 8. To make compaction-induced pauses graceful (commit the report, comment the PR, signal the user how to resume), register the bundled `PreCompact` hook in the project's `.claude/settings.json`:
+Register the bundled `PreCompact` hook in the project's `.claude/settings.json` to enable graceful pause on context compaction. See `shared/resources/develop-pipeline-pause.md` for the full setup instructions, lock-file contract, and pause/resume semantics.
 
 ```json
 {
   "hooks": {
     "PreCompact": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/skills/develop-story/scripts/on-precompact.sh"
+            "command": "bash .agents/skills/develop-story/scripts/on-precompact.sh"
           }
         ]
       }
@@ -28,7 +29,7 @@ Long pipelines can hit Claude's context window before reaching Step 8. To make c
 }
 ```
 
-The hook noops when no pipeline is active (lock file absent), so it has zero overhead outside `/develop-story` and `/develop-task` runs. See `shared/resources/develop-pipeline-pause.md` for the full pause/resume contract. Setup is optional — without the hook, pipelines still resume correctly via the existing post-compaction recovery, just without the PR comment and pause-state report entry.
+Setup is optional — without the hook, pipelines still resume correctly via post-compaction recovery, just without the PR comment and pause-state report entry. The hook noops when no pipeline lock is active — zero overhead outside pipeline runs.
 
 ## When to Use This Skill
 
@@ -132,43 +133,7 @@ Use the `AskUserQuestion` tool with:
 
 If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions that are already recorded in the Decisions Log of the existing report.
 
-**Resume artifact verification (CRITICAL — run before skipping any step)**:
-
-For each step marked ✅ in the implementation report, verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
-
-A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is treated identically to `⏳ Pending`: re-run from the start of that step. Earlier `✅` steps still skip per their artifact verification. Log: "Resuming after graceful pause — re-running Step {N}."
-
-| Step             | Artifact to verify | Verification command |
-| ---------------- | ------------------ | -------------------- |
-| 1. create-branch | Branch exists in git | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
-| 3. develop       | Code committed on branch | `git log --oneline {branch}` shows more than the initial commit |
-| 4. create-pr     | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop     | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` — gate alone is insufficient |
-| 7. finalise      | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `Status:` reads `Accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep "^Status:" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "Accepted"` |
-
-Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
-
-**CRITICAL — Do not conflate gate file with QA completion**: A `gate.yml` written manually (without running `/qa-review`) does NOT satisfy Step 5–6. The required artifacts are the `qa.N.md` report file (created by `/qa-review`) AND the `gate.N.yml`. Similarly, updating DoD checkboxes in the story doc does NOT satisfy Step 7 — `/finalise` must write a separate `dod.N.md` file AND post an acceptance comment to the PR.
-
-**QA cycle count reconstruction (if resuming at Step 5–6)**:
-If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
-
-```bash
-grep -c "^### QA Cycle" {implementation-report-path}
-```
-
-Set the cycle counter to this value before re-entering the loop. This ensures the 5-cycle limit is respected across resumes.
-
-Also cross-check the recorded state against current reality:
-
-```bash
-# Verify branch still exists
-git branch --list "$(grep 'Branch:' {implementation-report} | awk '{print $2}')"
-# Verify PR still exists
-gh pr view "$(grep 'PR:' {implementation-report} | awk '{print $2}')" --json state 2>/dev/null
-```
-
-If the branch or PR no longer matches, warn the user before proceeding: "Pipeline state has diverged — recorded branch/PR may differ from current state. Proceeding anyway."
+**Resume artifact verification**: For the full resume contract — per-step verification table (story file patterns), plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, and MAX_ITER=5 stall semantics — see `shared/resources/develop-pipeline-resume-contract.md`.
 
 If starting fresh: continue to 0c.
 
@@ -210,22 +175,10 @@ fi
 | `Ready for Development`        | Proceed normally                                                                                                                                      |
 | `In Progress`                  | Proceed normally                                                                                                                                      |
 | `Draft`                        | Note it in the implementation report. Proceed — Step 2 will run `/review-story` to validate and upgrade the status autonomously. Do NOT ask the user. |
-| `Ready for Review`, `Accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path.                                          |
+| `Ready for Review` / `accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path. |
 | Any other status               | HALT — status is unexpected. Report to user before proceeding.                                                                                        |
 
-**Lite mode detection**: After reading the story, evaluate whether all three conditions are met:
-
-- `risk_level: low` or absent, AND
-- Fewer than 3 Tasks defined in the story, AND
-- Story touches a single module (single app or lib)
-
-If all three conditions are met, set `PIPELINE_MODE=lite` and log it in the implementation report Pipeline Configuration table. In lite mode:
-
-- Step 5 (qa-story) uses **Direct Tools only** (skips parallel agents regardless of the adaptive strategy decision)
-- Step 5b (qa-fix) still runs if issues are found
-- All other steps run unchanged
-
-If any condition is not met, `PIPELINE_MODE=standard` (default, no change to behaviour).
+**Lite mode detection**: See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, PIPELINE_MODE=lite behaviour, and the directive format passed to `/qa-story`.
 
 ### 0c-reg. Signal Work Started
 
@@ -477,10 +430,10 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | ---- | ------ | ------------------ | ----- |
 | 1. create-branch            | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | |
 | 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{date}.md` exists (or skip logged) | |
-| 3. develop                  | ⏳ Pending | ≥1 code commit beyond initial branch commit | |
+| 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | |
 | 4. create-pr                | ⏳ Pending | PR URL; issue/tracker comment posted | |
 | 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | |
-| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `Status: Accepted` | |
+| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted` | |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | |
 
 ---
@@ -557,7 +510,7 @@ ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null | sort
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
-2. **Verify each ✅ step's artifact exists** (see Resume artifact verification table above) — do not trust the report alone.
+2. **Verify each ✅ step's artifact exists** (see `shared/resources/develop-pipeline-resume-contract.md` — Resume Artifact Verification section) — do not trust the report alone.
 3. Output: "⚠️ Context recovery — last verified step: Step {N}. Resuming from Step {N+1}."
 4. Continue from Step {N+1} — do NOT re-run completed steps, do NOT skip any pending steps.
 
@@ -616,6 +569,22 @@ After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠
 
 ### Step 1: Create Branch
 
+**Pipeline lock collision check (mandatory — refuse to start if another pipeline active):**
+
+Only one `/develop-story` or `/develop-task` pipeline may run per repo at a time (single-path lock). Run this *before* any branch-creation work — collision after `/create-branch` would orphan a branch.
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
+  cat .claude/state/develop-pipeline.lock
+  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
+fi
+```
+
+If the lock file exists: **HALT immediately** — show the lock contents to the user and instruct them to resolve by completing or aborting the other pipeline run, then removing `.claude/state/develop-pipeline.lock`. Do NOT proceed to branch creation.
+
+If the lock exists but its `branch` field does not match any existing local branch (`git branch --list`), it is stale — log a warning and remove it: `rm -f .claude/state/develop-pipeline.lock`. Then proceed.
+
 **Pre-flight board check (mandatory gate before create-branch — GitHub only):**
 
 If `TRACKER=github` and `TRACKER_ISSUE` is set, verify the board status before proceeding. This catches cases where Phase 0c-reg was skipped or silently failed:
@@ -668,7 +637,8 @@ After the branch is created:
 - Run `git log --oneline -1` to capture the initial commit hash; record it in the Pipeline Progress Notes: e.g. `Branch created at \`{hash}\``
 - Update Pipeline Progress: ✅ create-branch
 
-**Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward):
+**Write the pipeline lock file** (enables the PreCompact graceful-pause hook from this point onward). Collision was already checked at the top of Step 1; the lock should not exist here.
+
 ```bash
 mkdir -p .claude/state
 cat > .claude/state/develop-pipeline.lock <<EOF
@@ -686,7 +656,7 @@ cat > .claude/state/develop-pipeline.lock <<EOF
 }
 EOF
 ```
-The lock file is read by `.claude/skills/develop-story/scripts/on-precompact.sh` if compaction fires. From Step 2 onward, the per-step banner directive updates `current_step`. Step 4 also writes `pr_url` after the PR is created.
+The lock file is read by `.agents/skills/develop-story/scripts/on-precompact.sh` if compaction fires. From Step 2 onward, the per-step banner directive updates `current_step`. Step 4 also writes `pr_url` after the PR is created.
 
 **On failure**: Update Pipeline Progress ❌, log in Issues Log. **Do not commit the report** — no feature branch exists yet and committing on the base branch would pollute it. Save the report file to disk and tell the user its path so they can recover manually. Do **not** write the lock file (no branch = hook can't safely commit). Then HALT with the error details.
 
@@ -714,11 +684,11 @@ Apply these rules:
 - Update Pipeline Progress: ✅ review-story (skipped — already reviewed)
 - Proceed to Step 3
 
-**If status IS `Draft` (run path)**:
+**If running review-story**:
 
 Invoke the `/review-story` skill with the story file path.
 
-**Output format gate**: When `/review-story` asks "Would you like a comprehensive review report saved to a file, or just an actionable plan?" (Step 0 of that skill), **always select "Comprehensive report"**. The pipeline requires a persisted review report co-located with the story file. Do not select "Action plan only" — log this autonomous decision in the Decisions Log: "review-story output: Comprehensive report — required for pipeline audit trail".
+**Output format gate**: `/review-story` Step 0 asks for output format. The pipeline auto-answers "Comprehensive report" (review-story has a Pipeline note for this; the canonical default lives in `shared/resources/develop-pipeline-autonomous-defaults.md`). Log this autonomous decision in the Decisions Log: "review-story output: Comprehensive report — required for pipeline audit trail".
 
 After review-story completes, locate the generated review report:
 
@@ -739,8 +709,10 @@ Record the path in the Decisions Log: "Review report: {path}". If no review repo
 
 **Handling findings**:
 
-- **Draft → Ready for Development**: Log "Draft promoted to Ready for Development by review-story" in Decisions Log. Proceed autonomously.
-- **Blocking issues** (contradictory specs, missing ACs, status still `Draft`): Log in Issues Log, invoke `/commit-changes` (message: `docs(story.{epic}.{story}): implementation report — review-story blocking halt`), then HALT.
+- **Draft → Ready for Development** (story was Draft, review promoted it): Log "Draft promoted to Ready for Development by review-story" in Decisions Log. Proceed autonomously — no user prompt needed.
+- **Non-blocking suggestions** (minor wording, optional improvements made by review-story): Log as "Proceeding despite minor review suggestions: {list}" and continue.
+- **Clean pass** (story was already ready, no changes needed): Log "Story review passed" and continue.
+- **Blocking issues** (contradictory specs, missing ACs, status still `Draft`): Log each specifically in Issues Log, invoke `/commit-changes` (message: `docs(story.{epic}.{story}): implementation report — review-story blocking halt`), then HALT with: "review-story could not resolve blocking issues — human input required before development can proceed".
 
 Update Pipeline Progress: ✅ review-story
 
@@ -749,6 +721,8 @@ Update Pipeline Progress: ✅ review-story
 Invoke the `/develop` skill with the story file path.
 
 **Pre-develop codebase mapping (CRITICAL for context efficiency):**
+
+**Resume optimization:** If the Decisions Log already contains a "Pre-develop surface map:" entry (from a prior session), skip both the Explore subagent invocation AND the plan file discovery below — reuse the recorded surface map and plan-file decision. Log: "Resume — pre-develop surface map and plan-file decision reused from Decisions Log." Then proceed to the develop loop.
 
 Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface for this story:
 
@@ -769,6 +743,8 @@ ls {story-directory}/story.{epic}.{story}.plan.*.md 2>/dev/null
 ```
 If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the story's Tasks section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
 
+**On resume**: if a prior plan file is being reused from a previous session, verify its freshness per `shared/resources/develop-pipeline-resume-contract.md` (Plan Freshness Check section). Log outcome: "Plan file freshness: verified" or "Plan file stale — re-running Explore subagent".
+
 If no plan file exists, proceed without it — plan files are optional (only present for stories created after the co-located plan feature was added).
 
 **Handling the develop skill's internal gates**:
@@ -777,15 +753,44 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 - **High-risk gate** (`risk_level: high`): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond to the develop prompt interactively. Note: develop also offers a third option "Skip, low actual risk" — if develop presents this option in the context where Q3 = "Skip qa-planning", treat it as equivalent to "Skip, I've already planned" and select it; do not surface the distinction to the user.
 - **Alignment mismatch gate**: If develop finds existing code that differs from the story, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
 
-**Detecting completion**: After `/develop` returns, read the story file and check the `Status:` field:
+**Develop loop — run until all tasks complete (bounded):**
 
-- `Ready for Review` → success, continue
-- `Accepted` → success, continue — `/develop` calls `/finalise` internally, which sets `Accepted`; the pipeline's own Step 7 (`/finalise`) will run after QA regardless
-- Any other status → treat as a halt; log the actual status in Issues Log
+For the full develop loop setup (initial checkpoint variables, stall detection, progress conditions, and MAX_ITER halt rules), see `shared/resources/develop-pipeline-resume-contract.md`.
+
+LOOP:
+
+1. Invoke `/develop` with the story file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
+2. After `/develop` returns, re-read the story file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
+3. Branch on status:
+   - `Ready for Review` → EXIT loop — all tasks done, proceed to Step 4
+   - `accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
+   - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
+   - Any other status → HALT; log the actual status in Issues Log.
 
 Update Pipeline Progress: ✅ develop
 
-**PIPELINE CONTINUES IMMEDIATELY.** Do not pause, do not summarise to the user, do not wait. Proceed directly to Step 4.
+**Do not pause, do not summarise to the user, do not wait.** Proceed directly to Step 4.
+
+**Remaining Work Status banner (required — output after each develop-loop iteration that continues, and after Steps 1, 2, 4, 5–6, and 7 complete)**:
+
+Read the story file to get unchecked `[ ]` task names from the Tasks section. Output:
+
+```
+═══ REMAINING WORK STATUS ═══
+Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
+
+Remaining story tasks ({X} of {M} tasks complete):
+  ✅ Task {n}: {name}      ← already ticked
+  ⬜ Task {n+1}: {name}   ← still to do
+  ...
+
+Pipeline steps still ahead:
+  - Step {next-step}: {name}
+  - ...
+  - Step 8: commit-changes + push
+```
+
+Omit the "Remaining story tasks" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
 
 **On halt**: Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(story.{epic}.{story}): implementation report — develop halt`), then HALT with the report path.
 
@@ -961,9 +966,9 @@ Options:
 
 Invoke the `/finalise` skill with the story file path.
 
-**Detecting completion**: After finalise returns, read the story file and check the `Status:` field:
+**Detecting completion**: After finalise returns, read the story file and check the `status:` frontmatter field:
 
-- `Accepted` → success, continue
+- `accepted` → success, continue
 - Any other status, or if finalise listed DoD gaps → halt
 
 **If DoD gaps are found**: Log each gap with specific detail in Issues Log. Invoke the `/commit-changes` skill to commit the implementation report before halting so the audit trail is in git. Suggested commit message: `docs(story.{epic}.{story}): implementation report — finalise gaps identified`. Then push:
@@ -989,7 +994,7 @@ Branch on `TRACKER`:
 
    ```bash
    # 1. Post completion comment
-   gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: Accepted. All DoD criteria verified."
+   gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: accepted. All DoD criteria verified."
 
    # 2. Close the issue
    gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted and PR merged. Implementation report: {report-path}"
@@ -1015,7 +1020,7 @@ Branch on `TRACKER`:
 
    1. **Post completion comment** — call `addCommentToJiraIssue`:
       - `issueIdOrKey`: `{TRACKER_ISSUE}`
-      - `commentBody`: `"Story development complete — PR: {PR_URL}. Story status: Accepted."`
+      - `commentBody`: `"Story development complete — PR: {PR_URL}. Story status: accepted."`
       - `contentFormat`: `"markdown"`
       - On failure: log warning and continue (non-blocking)
 
@@ -1050,6 +1055,11 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 Then invoke the `/commit-changes` skill. The implementation report must be staged and included in this commit alongside any remaining uncommitted changes.
 
 After `/commit-changes` completes, run `git log --oneline -1` to capture the final commit hash. Update the Pipeline Progress Notes for Step 8: `Committed in \`{hash}\``(and note the PR reference if applicable, e.g.`Committed in \`{hash}\`, merged via PR #{N}`).
+
+Push the final commit so the PR reflects the completed implementation report and DoD summary:
+```bash
+git push origin HEAD
+```
 
 Update Pipeline Progress: ✅ commit-changes.
 
@@ -1095,32 +1105,17 @@ The implementation report has a full account of what was completed and what need
 
 Every default applied must be recorded in the Decisions Log.
 
-| Situation                                                                         | Default                                                                                |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Feature branch base                                                               | User-selected in Upfront Setup (Q1)                                                    |
-| PR target branch                                                                  | User-selected in Upfront Setup (Q2)                                                    |
-| High-risk story gate                                                              | User-selected in Upfront Setup (Q3)                                                    |
-| Story status is `Draft`                                                           | Step 2 runs `/review-story` to validate and promote autonomously                       |
-| Story status is `Ready for Development` or `In Progress` AND review report exists | Step 2 skips `/review-story` — story already reviewed                                  |
-| Story status is `Ready for Development` or `In Progress` AND no review report     | Step 2 runs `/review-story` — status set without completing a review                   |
-| review-story output format                                                        | Always select "Comprehensive report" — pipeline requires co-located review report file |
-| Draft status gate (develop)                                                       | Proceed — review-story already validated the story (or status was never Draft)         |
-| Alignment mismatch (develop)                                                      | Align code to document — document is source of truth                                   |
-| Commit style                                                                      | Conventional Commits                                                                   |
-| Commit granularity                                                                | Multiple logical commits                                                               |
-| Implementation report in create-pr commit                                         | EXCLUDE — unstage before create-pr commits; Step 8 commits it                          |
-| Pre-develop codebase mapping                                                      | Always run Explore subagent; pass summary to /develop, do not re-read files            |
-| qa-fix with no file changes                                                       | HALT — do not increment cycle; log as unfixable and surface to user                    |
-| Resume state validation                                                           | Cross-check branch + PR existence before jumping to next step                          |
-| Pipeline mode for simple stories                                                  | `lite` if risk_level low/absent + <3 Tasks + single module; otherwise `standard`       |
-| qa-story invocation in lite mode                                                  | Prepend "Use direct tools only — skip parallel agents" to the invocation context       |
-| Register not found at startup                                                     | Ask once via AskUserQuestion; defer creation to post-pipeline if Yes                   |
-| Register found, story already ✅                                                  | HALT, AskUserQuestion to confirm re-run                                                |
-| Register found, story ❌ or ⚡                                                    | Update to ⚡ at start; update to ✅ after Step 7                                       |
-| Register update on completion                                                     | Stage with implementation report; include in Step 8 commit                             |
-| Register references sequence doc (for creation)                                   | Use story-implementation-sequence.md if present; otherwise scan story files            |
+See `shared/resources/develop-pipeline-autonomous-defaults.md` for the full shared autonomous-mode default-behavior table (covers all rows common to both `develop-story` and `develop-task`).
 
-If a situation arises that is not in this table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
+### Skill-specific defaults (develop-story only)
+
+| Situation | Default |
+|-----------|---------|
+| review-story Step 9.5 (implement fixes?) | Auto-answer "Yes, apply all critical + important fixes" — pipeline needs the story fully corrected before Step 3 runs `/develop` |
+| review-story Step 10 (update status?) when READY TO IMPLEMENT | Auto-answer "Yes, update status" — pipeline needs `Ready for Development` before Step 3 |
+| review-story Step 10 when NEEDS REVISION or REQUIRES REWORK | HALT — story is not ready; surface review findings to user before proceeding |
+
+If a situation arises that is not in the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
 ---
 

@@ -133,7 +133,7 @@ grep -E 'JIRA_URL|JIRA_PROJECT_KEY|JIRA_USER_EMAIL|JIRA_API_TOKEN|JIRA_BOARD_ID'
 ### 3. Optional — Dry Run
 
 ```bash
-node .claude/skills/sync-jira-task/scripts/sync-jira-task.js \
+node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
   --file <task-file-path> \
   --dry-run
 ```
@@ -143,7 +143,7 @@ In dry-run, missing env vars are reported as warnings (not fatal), so you can pr
 ### 4. Sync the Task
 
 ```bash
-node .claude/skills/sync-jira-task/scripts/sync-jira-task.js \
+node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
   --file <task-file-path>
 ```
 
@@ -320,7 +320,7 @@ The script is a thin wrapper over `shared/resources/jira-sync.js`, which holds t
 ## Tests
 
 ```bash
-node --test .claude/skills/sync-jira-task/tests/*.test.js
+node --test .agents/skills/sync-jira-task/tests/*.test.js
 ```
 
 55 tests covering frontmatter parsing, in-place frontmatter update, changelog upsert / strict entry-row regex / hand-written-heading rescue, body-vs-meta hash split, priority synonyms + live resolution, label sanitisation, concurrent-edit guard, ADF builders + bullet/ordered list detection, Jira error parser, HTTP retry on 5xx, status transitions, board-type detection, atomic PUT response parsing, fail-loud timestamp fetch, idempotent create via label search, and issue-type cache.

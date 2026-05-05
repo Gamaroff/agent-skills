@@ -130,6 +130,35 @@ System Action: Invokes /create-story skill
 → Story ready for development via /develop
 ```
 
+## Caller Detection
+
+Before any other workflow action, detect whether `/develop` is running standalone or orchestrated by `/develop-story` / `/develop-task`. The signal is the pipeline lock file written by the orchestrator at the end of its Step 1:
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  CALLER_MODE=orchestrated   # called from develop-story or develop-task
+else
+  CALLER_MODE=standalone
+fi
+```
+
+**Behavioural branches:**
+
+| Concern | `standalone` (default) | `orchestrated` |
+|---|---|---|
+| Resume prompts to user | shown | **skipped** — orchestrator owns resume |
+| Own implementation report | written/updated | **not written** — orchestrator's report is canonical |
+| Lock file lifecycle | not touched | **read-only** — never write/update/remove the lock; orchestrator owns it |
+| Status validation, Risk Level Check, alignment analysis | run as documented | run as documented |
+| Calling `/finalise` | per existing flow | **never** — pipeline Step 7 handles it (see Pipeline bypass check) |
+
+**Rules:**
+
+- `/develop` must never write, update, or delete `.claude/state/develop-pipeline.lock`. The lock's lifecycle is owned by the orchestrator (created in its Step 1, mutated as it advances steps, removed before terminal HALT).
+- Read-only check; no race risk.
+- If the lock exists but its `branch` field does not match the current git branch, log a warning ("Stale pipeline lock detected — branch mismatch; treating as standalone") and fall back to `CALLER_MODE=standalone`. This protects against an abandoned lock from a previous run.
+- Lock schema: see `shared/resources/develop-pipeline-pause.md`.
+
 ## Document Status Validation
 
 **CRITICAL**: After detecting a valid story or task file, you MUST check the document status before beginning development.
@@ -148,7 +177,7 @@ System Action: Invokes /create-story skill
 
 ### Draft Status Handling
 
-**Pipeline bypass**: When `/develop` is invoked by the `develop-story` orchestrator, the `/review-story` skill has already run in Step 2 of the pipeline and validated the story. If called from develop-story, treat any Draft status as already validated — automatically select "Yes, ready to implement" and proceed without prompting the user. The develop-story skill will handle this autonomously.
+**Pipeline bypass**: When `/develop` is invoked by the `develop-story` or `develop-task` orchestrator, the `/review-story` or `/review-task` skill has already run in Step 2 of the pipeline and validated the document. If called from either orchestrator, treat any Draft (story) or Planned (task) status as already validated — automatically select "Yes, ready to implement" and proceed without prompting the user. The orchestrator handles this autonomously.
 
 **When Status is "Draft"**:
 
@@ -515,6 +544,8 @@ After status validation passes:
    - Start Date: [YYYY-MM-DD]
 3. Proceed to task implementation
 
+**Partial resumption (when invoked by pipeline with pre-checked tasks):** Before reading the first task, count `[x]` vs `[ ]` task checkboxes. If any are already checked, log: "Resuming from partial completion: N/M tasks complete. Starting from task N+1." Skip directly to the first unchecked task.
+
 **Order of Execution**:
 
 ```
@@ -637,6 +668,8 @@ After status validation passes:
 2. Update task metadata with:
    - Start Date: [YYYY-MM-DD]
 3. Proceed to phase implementation
+
+**Partial resumption (when invoked by pipeline with pre-checked phases):** Before reading the first phase, count `[x]` vs `[ ]` phase checkboxes in the Implementation Plan. If any are already checked, log: "Resuming from partial completion: N/M phases complete. Starting from phase N+1." Skip directly to the first unchecked phase.
 
 **Order of Execution**:
 

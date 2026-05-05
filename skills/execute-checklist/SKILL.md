@@ -302,7 +302,7 @@ Generate comprehensive summary with:
 **Uses resources from**:
 
 - `resources/` - Checklist definitions (moved from the removed .bmad-core/checklists/)
-- `.claude/skills/execute-checklist/resources/` - Local checklist copies
+- `.agents/skills/execute-checklist/resources/` - Local checklist copies
 
 **Outputs used by**:
 

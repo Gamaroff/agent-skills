@@ -1104,10 +1104,10 @@ docs/qa/gates/tasks/task.1.cache-lib-simplification.gate.yml
 
 ## Additional Resources
 
-- **Technical Task Skill**: `.claude/skills/create-task/SKILL.md`
-- **QA Planning Skill**: `.claude/skills/qa-planning/SKILL.md`
-- **QA Gate Skill**: `.claude/skills/qa-gate/SKILL.md`
-- **Create Bug Report Skill**: `.claude/skills/create-bug-report/SKILL.md`
+- **Technical Task Skill**: `.agents/skills/create-task/SKILL.md`
+- **QA Planning Skill**: `.agents/skills/qa-planning/SKILL.md`
+- **QA Gate Skill**: `.agents/skills/qa-gate/SKILL.md`
+- **Create Bug Report Skill**: `.agents/skills/create-bug-report/SKILL.md`
 - **Fix QA Skill**: `.agents/skills/fix-qa/SKILL.md`
 
 ---

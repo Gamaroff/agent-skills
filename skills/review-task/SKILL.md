@@ -316,6 +316,8 @@ options:
 
 2. Store user's choice for use in Step 8 (final output generation)
 
+**Pipeline note**: When invoked by the `develop-task` orchestrator, this question will be answered autonomously ("Comprehensive report" is always selected). If running inside the develop-task pipeline, skip the AskUserQuestion and proceed directly with "Comprehensive report" as the format selection. Only ask interactively when invoked standalone.
+
 3. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
 
 | Task Subject | Description |
@@ -660,6 +662,8 @@ options:
 ---
 
 ### Step 6: Consistency and Completeness Review
+
+> Note: Step 5 is intentionally omitted. In `review-story`, Step 5 is "Completeness and Gap Analysis" — that concept is folded into this step (Step 6) for tasks. Numbering aligns with `review-story` for cross-skill comparability.
 
 **Purpose**: Find contradictions and gaps across the task document
 
@@ -1189,6 +1193,8 @@ questions:
 
 **When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 8, before Step 9. Do not skip or end the skill without presenting this offer.
 
+**Pipeline note**: When invoked by the `develop-task` orchestrator, skip the `AskUserQuestion` and auto-answer **"Yes, apply all critical + important fixes"** — the pipeline proceeds autonomously and needs the task fully corrected before `/develop` runs in Step 3. Log in Decisions Log: "review-task Step 8.5 auto-answered: Yes, apply all critical + important fixes — pipeline proceeds autonomously."
+
 **Actions**:
 
 1. Use `AskUserQuestion` to ask:
@@ -1228,6 +1234,8 @@ options:
 **Purpose**: Update the task document status after review and fixes are complete
 
 **CRITICAL**: This step ensures that once a task has been reviewed and improved, its status reflects readiness for development.
+
+**Pipeline note**: When invoked by the `develop-task` orchestrator and the current status needs updating, skip the `AskUserQuestion` and auto-answer **"Yes, fixes complete"** — the pipeline needs the task promoted to `Ready for Development` before `/develop` runs in Step 3. Log in Decisions Log: "review-task Step 9 auto-answered: Yes, fixes complete — pipeline proceeds autonomously." If the review outcome is NEEDS REVISION or REQUIRES REWORK and fixes applied in Step 8.5 were insufficient, do NOT skip — HALT the pipeline and surface the review findings to the user; the task is not ready for development.
 
 **When to Execute This Step**:
 
@@ -1556,8 +1564,8 @@ This skill uses:
 
 ## Notes
 
-- This skill is READ-ONLY - it does not modify the task document
-- Review reports are saved separately as `[task-name].review.[date].md`
+- The review report (`[task-name].review.[date].md`) is the primary output and is always saved separately
+- Steps 8.5 and 9 may modify the task document (apply fixes; update `Status:` field) — both are gated on user consent (or pipeline auto-answer)
 - Can be used at any stage: planned, in progress, completed
 - Designed to find problems through collaborative user input
 - Questions are batched for efficient clarification

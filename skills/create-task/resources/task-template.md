@@ -370,7 +370,7 @@
 
 ## References
 
-- **Related Skill**: `.claude/skills/[skill-name]/`
+- **Related Skill**: `.agents/skills/[skill-name]/`
 - **Related Documentation**: `docs/development/[path]/`
 - **Related Epic** (if applicable): Epic [N] - [Name]
 

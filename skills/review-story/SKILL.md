@@ -1652,6 +1652,8 @@ questions:
 
 **When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10. Do not skip or end the skill without presenting this offer.
 
+**Pipeline note**: When invoked by the `develop-story` orchestrator, skip the `AskUserQuestion` and auto-answer **"Yes, apply all critical + important fixes"** — the pipeline proceeds autonomously and needs the story fully corrected before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 9.5 auto-answered: Yes, apply all critical + important fixes — pipeline proceeds autonomously."
+
 **Actions**:
 
 1. Use `AskUserQuestion` to ask:
@@ -1704,6 +1706,8 @@ options:
 **Purpose**: Update the story document status based on the review outcome
 
 **CRITICAL**: This step ensures the story status reflects its readiness for development immediately after review.
+
+**Pipeline note**: When invoked by the `develop-story` orchestrator and the review outcome is READY TO IMPLEMENT, skip the `AskUserQuestion` and auto-answer **"Yes, update status"** — the pipeline needs the story promoted to `Ready for Development` before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 10 auto-answered: Yes, update status — pipeline proceeds autonomously." If the outcome is NEEDS REVISION or REQUIRES REWORK, do NOT skip the step — HALT the pipeline and surface the review findings to the user; the story is not ready for development.
 
 **When to Execute This Step**:
 

@@ -13,6 +13,18 @@ description: Comprehensive quality assurance review for technical tasks. Focuses
 
 This skill guides QA engineers through comprehensive quality assurance reviews for technical tasks (refactoring, infrastructure improvements, technical debt reduction, architectural changes). It adapts the story QA workflow for technical work, focusing on success criteria, implementation phases, and non-functional requirements.
 
+## Lite Mode (Pipeline Contract)
+
+When invoked from the `/develop-task` orchestrator, the call may be prefixed with the lite-mode directive. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, pipeline behaviour, and directive format.
+
+**Effect on this skill**:
+
+- Skip parallel agents in the Adaptive Review Strategy decision — use the **Lite mode** rule (direct tools only) regardless of phase count or risk.
+- All other phases (success criteria, breaking changes, NFR, gate decision) run unchanged.
+- Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
+
+If invoked outside the pipeline (no lite directive), the normal Adaptive Review Strategy applies.
+
 ## When to Use This Skill
 
 Activate this skill when:
@@ -310,12 +322,14 @@ Notes: {Validation notes}
 
 ### Step 7: Assess Non-Functional Requirements
 
-Evaluate each NFR (see NFR Evaluation Criteria section for thresholds):
+Evaluate each NFR and assign PASS / CONCERNS / FAIL using the thresholds in the **NFR Evaluation Criteria** section below.
 
 - **Performance**: Run performance tests; compare with baseline; check for regressions; validate resource usage
 - **Reliability**: Test error handling; validate rollback plan; check recovery mechanisms
 - **Security**: Review for security issues; check dependencies; validate auth/authorization preserved
 - **Maintainability**: Review code clarity; check documentation; assess technical debt impact
+
+For each NFR, document findings and assign a status in the **NFR Assessment** section of the QA report. Gate impact: any NFR FAIL → Gate = FAIL; any NFR CONCERNS → Gate = CONCERNS (minimum).
 
 ### Step 8: Regression Testing
 
@@ -856,7 +870,9 @@ docs/development/tasks/task.1.cache-lib-simplification/
 └── task.1.bug.2.test-failure.md                # Bug report 2 (co-located)
 ```
 
-**Note**: The legacy pattern of storing gate files in `docs/qa/gates/tasks/` is deprecated. All gate files must be co-located with the task file.
+**CRITICAL: Gate files MUST be co-located with the task file in the same directory.** Do not store them in a separate `docs/qa/gates/` path.
+
+**Legacy Note**: Old pattern of storing gates in `docs/qa/gates/tasks/` is deprecated. All new gate files must be co-located.
 
 ---
 
@@ -912,11 +928,11 @@ docs/development/tasks/task.1.cache-lib-simplification/
 
 ## Additional Resources
 
-- **Technical Task Skill**: `.claude/skills/create-task/SKILL.md`
-- **QA Planning Skill**: `.claude/skills/qa-planning/SKILL.md`
-- **QA Gate Skill**: `.claude/skills/qa-gate/SKILL.md`
-- **Create Bug Report Skill**: `.claude/skills/create-bug-report/SKILL.md`
-- **Fix QA Skill**: `.claude/skills/qa-fix/SKILL.md`
+- **Technical Task Skill**: `.agents/skills/create-task/SKILL.md`
+- **QA Planning Skill**: `.agents/skills/qa-planning/SKILL.md`
+- **QA Gate Skill**: `.agents/skills/qa-gate/SKILL.md`
+- **Create Bug Report Skill**: `.agents/skills/create-bug-report/SKILL.md`
+- **Fix QA Skill**: `.agents/skills/qa-fix/SKILL.md`
 
 ---
 

@@ -216,7 +216,7 @@ AsyncStorage is being removed **only from cache-lib** as a cache tier.
 - `apps/goji-api/` - Update consumer code
 
 ✅ **Documentation**:
-- Update skill: `.claude/skills/caching/SKILL.md`
+- Update skill: `.agents/skills/caching/SKILL.md`
 - Update README (if exists)
 - Add CHANGELOG entry
 

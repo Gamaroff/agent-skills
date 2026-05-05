@@ -13,7 +13,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const lib = require("../../_lib/jira-sync.js");
+const lib = require("../../../shared/resources/jira-sync.js");
 
 // ---------------------------------------------------------------------------
 // Constants

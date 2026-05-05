@@ -105,17 +105,17 @@ Everything below is for humans installing, using, or contributing to this skill.
 Personal install (available across all your projects):
 
 ```bash
-mkdir -p ~/.claude/skills/tech-debt-audit
+mkdir -p ~/.agents/skills/tech-debt-audit
 ```
 
 ```bash
-curl -o ~/.claude/skills/tech-debt-audit/SKILL.md https://raw.githubusercontent.com/ksimback/tech-debt-skill/main/SKILL.md
+curl -o ~/.agents/skills/tech-debt-audit/SKILL.md https://raw.githubusercontent.com/ksimback/tech-debt-skill/main/SKILL.md
 ```
 
 Or for a project-only install (just this repo):
 
 ```bash
-mkdir -p .claude/skills/tech-debt-audit && cp /path/to/SKILL.md .claude/skills/tech-debt-audit/SKILL.md
+mkdir -p .agents/skills/tech-debt-audit && cp /path/to/SKILL.md .agents/skills/tech-debt-audit/SKILL.md
 ```
 
 Verify it loaded:
@@ -186,7 +186,7 @@ The system is a [...]
 
 ## Adaptation notes
 
-**Project-level overrides.** A `.claude/skills/tech-debt-audit/SKILL.md` in a specific repo overrides the global one. Useful when a project needs custom dimensions — e.g., an agent codebase might add "prompt injection surface area" or "tool-call cost per turn" as audit categories.
+**Project-level overrides.** A `.agents/skills/tech-debt-audit/SKILL.md` in a specific repo overrides the global one. Useful when a project needs custom dimensions — e.g., an agent codebase might add "prompt injection surface area" or "tool-call cost per turn" as audit categories.
 
 **Mid-audit course correction.** After Phase 1 completes, you can interrupt with: *"Before Phase 2, tell me what surprised you in Phase 1 and what you want to investigate that isn't in the dimensions list."* The best findings often come from things the prompt didn't anticipate. Worth doing on first run for any new codebase.
 

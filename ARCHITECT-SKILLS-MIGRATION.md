@@ -8,7 +8,7 @@ The BMAD architect agent has been successfully converted into a modular Claude S
 
 ### Main Architect Skill
 
-**Location**: `.claude/skills/architect/`
+**Location**: `.agents/skills/architect/`
 
 The main architect skill provides the persona and interface for all architecture work. Think of it as "Winston the Architect" - your pragmatic, holistic technical leader.
 
@@ -21,7 +21,7 @@ The main architect skill provides the persona and interface for all architecture
 
 #### 1. Create Architecture Document (`create-architecture-doc`)
 
-**Location**: `.claude/skills/create-architecture-doc/`
+**Location**: `.agents/skills/create-architecture-doc/`
 
 Interactive YAML-driven architecture document creation with mandatory user elicitation.
 
@@ -39,7 +39,7 @@ Interactive YAML-driven architecture document creation with mandatory user elici
 
 #### 2. Document Existing Project (`document-existing-project`)
 
-**Location**: `.claude/skills/document-existing-project/`
+**Location**: `.agents/skills/document-existing-project/`
 
 Comprehensive brownfield documentation for existing codebases.
 
@@ -52,7 +52,7 @@ Comprehensive brownfield documentation for existing codebases.
 
 #### 3. Execute Architect Checklist (`execute-architect-checklist`)
 
-**Location**: `.claude/skills/execute-architect-checklist/`
+**Location**: `.agents/skills/execute-architect-checklist/`
 
 Systematic architecture validation against 200+ quality criteria.
 
@@ -68,7 +68,7 @@ Systematic architecture validation against 200+ quality criteria.
 
 #### 4. Create Research Prompt (`create-research-prompt`)
 
-**Location**: `.claude/skills/create-research-prompt/`
+**Location**: `.agents/skills/create-research-prompt/`
 
 Generate structured research prompts for technical analysis.
 
@@ -237,7 +237,7 @@ Claude:
 ## File Structure
 
 ```
-.claude/skills/
+.agents/skills/
 ├── architect/
 │   ├── SKILL.md                                    # Main persona skill
 │   └── resources/

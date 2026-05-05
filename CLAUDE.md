@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Purpose
 
-This is a library of Claude Code skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into Claude Code via `.claude/skills/` in target projects.
+This is a library of Claude Code skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into Claude Code via `.agents/skills/` in target projects.
 
 ## Skill Structure
 
@@ -13,7 +13,7 @@ Each skill lives in `skills/{skill-name}/` with this layout:
 ```
 skills/skill-name/
 ├── SKILL.md          # Required: YAML frontmatter + instructions
-├── skill-name.zip    # Packaged distributable (auto-generated)
+├── skill-name.zip    # Packaged distributable (gitignored — built on demand)
 ├── scripts/          # Executable scripts for deterministic tasks
 ├── references/       # Documentation loaded into context on demand
 └── assets/           # Templates and boilerplate used in output
@@ -53,7 +53,7 @@ python skills/create-skill/scripts/package_skill.py skills/<skill-name>
 python skills/create-skill/scripts/quick_validate.py skills/<skill-name>
 ```
 
-Packaged `.zip` files sit alongside the skill directory and are the distributable format.
+Packaged `.zip` files sit alongside the skill directory and are the distributable format. **Zips are build artifacts and gitignored** (`skills/*/*.zip`) — regenerate with `package_skill.py` whenever you need to install or distribute. Do not commit them.
 
 ## Configuration
 
