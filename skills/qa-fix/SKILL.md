@@ -151,60 +151,103 @@ For tasks:
 
 ## Prerequisites
 
+### Environment Variables
+
+| Variable | Required when | Purpose |
+|----------|--------------|---------|
+| `BITBUCKET_USERNAME` | `PLATFORM=bitbucket` | Bitbucket REST API auth (username) |
+| `BITBUCKET_APP_PASSWORD` | `PLATFORM=bitbucket` | Bitbucket REST API auth (app password) |
+| `JIRA_URL` | Jira comment desired | Enables Jira MCP comment when set (e.g. `https://myorg.atlassian.net`) |
+
+Cross-reference: `create-pr` and `finalise` use the same variables — set them once in your shell profile.
+
+### Platform Detection
+
+Run once before the PR existence check. All downstream branches use `$PLATFORM`.
+
+```bash
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+if echo "$REMOTE_URL" | grep -qi "github\.com"; then
+  PLATFORM="github"
+elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
+  PLATFORM="bitbucket"
+  BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+else
+  echo "❌ Unknown remote: $REMOTE_URL" >&2
+  exit 1
+fi
+```
+
 ### PR Existence Check
 
 **CRITICAL**: The qa-fix skill requires an active pull request for the current branch.
 
 **How PR Selection Works:**
 
-- The skill uses `gh pr view` to find the PR associated with your **current Git branch**
-- GitHub CLI matches the PR where `headRefName` equals your current branch name
-- If multiple PRs exist from the same branch, the most recent one is selected
-- This ensures you're applying fixes to the PR for the branch you're currently working on
+- On GitHub: `gh pr view` matches the PR where `headRefName` equals your current branch
+- On Bitbucket: Bitbucket REST `/pullrequests` filtered by `source.branch.name` + `state=OPEN`
+- If multiple PRs exist from the same branch, the most recent one is used
 
 Before starting fixes:
 
-1. **Check for PR existence:**
+1. **Check for PR existence (dual-path):**
 
    ```bash
-   # Get current branch
-   CURRENT_BRANCH=$(git branch --show-current)
+   BRANCH=$(git branch --show-current)
 
-   # Find PR for current branch
-   PR_JSON=$(gh pr view --json url,state,title,number 2>&1)
-   EXIT_CODE=$?
+   if [ "$PLATFORM" = "github" ]; then
+     PR_JSON=$(gh pr view --json url,state,title,number 2>&1)
+     if [ $? -ne 0 ]; then
+       echo "⚠️ No pull request found for branch: $BRANCH"
+       echo ""
+       echo "Fix QA requires a pull request to post results."
+       echo ""
+       echo "Options:"
+       echo "1. Create a PR: gh pr create"
+       echo "2. Use /create-pr skill"
+       echo "3. Push changes: git push -u origin $BRANCH"
+       echo ""
+       echo "Once PR is created, re-run /qa-fix"
+       exit 1
+     fi
+     PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+     PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
+     PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+     PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
 
-   if [ $EXIT_CODE -ne 0 ]; then
-     echo "⚠️ No pull request found for branch: $CURRENT_BRANCH"
-     echo ""
-     echo "Fix QA requires a pull request to post results."
-     echo ""
-     echo "Options:"
-     echo "1. Create a PR: gh pr create"
-     echo "2. Use /create-pr skill"
-     echo "3. Push changes: git push -u origin $CURRENT_BRANCH"
-     echo ""
-     echo "Once PR is created, re-run /qa-fix"
-     exit 1
+   elif [ "$PLATFORM" = "bitbucket" ]; then
+     ENCODED_BRANCH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$BRANCH" 2>/dev/null || echo "$BRANCH")
+     BB_PR_JSON=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+       "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${ENCODED_BRANCH}%22+AND+state%3D%22OPEN%22")
+     if [ $? -ne 0 ] || [ "$(echo "$BB_PR_JSON" | jq '.values | length')" -eq 0 ]; then
+       echo "⚠️ No open Bitbucket PR found for branch ${BRANCH}"
+       echo ""
+       echo "Fix QA requires a pull request to post results."
+       echo ""
+       echo "Options:"
+       echo "1. Create a PR: /create-pr"
+       echo "2. Push changes: git push -u origin $BRANCH"
+       echo ""
+       echo "Once PR is created, re-run /qa-fix"
+       exit 1
+     fi
+     PR_NUMBER=$(echo "$BB_PR_JSON" | jq -r '.values[0].id')
+     PR_URL=$(echo "$BB_PR_JSON" | jq -r '.values[0].links.html.href')
+     PR_STATE=$(echo "$BB_PR_JSON" | jq -r '.values[0].state')
+     PR_TITLE=$(echo "$BB_PR_JSON" | jq -r '.values[0].title')
    fi
    ```
 
-2. **Parse and validate PR information:**
-
-   ```bash
-   PR_URL=$(echo "$PR_JSON" | jq -r '.url')
-   PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
-   PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
-   PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
-   ```
-
-3. **Handle PR state:**
+2. **Handle PR state:**
    - **OPEN**: ✅ Proceed with fixes
    - **MERGED**: ⚠️ Warn user but continue (comment will be posted to merged PR)
    - **CLOSED**: ⚠️ Warn user but continue (comment will be posted to closed PR)
    - **No PR**: ❌ Halt and provide guidance
 
-4. **Display PR status:**
+3. **Display PR status:**
 
    ```bash
    if [ "$PR_STATE" = "MERGED" ]; then
@@ -224,7 +267,7 @@ Before starting fixes:
    fi
    ```
 
-5. **Store PR metadata:**
+4. **Store PR metadata:**
    Store PR_URL, PR_STATE, PR_NUMBER, PR_TITLE for use in completion checklist
 
 ---
@@ -244,7 +287,7 @@ Before starting fixes:
 | Apply changes | Implement code fixes and add missing tests |
 | Validate | Run lint + tests; iterate until zero errors and all tests pass |
 | Update story file & bug reports | Update authorized sections only; set correct status per Status Rule |
-| Post fix summary to PR | Post fix summary comment via `gh pr comment "$PR_URL"` |
+| Post fix summary to PR | Post fix summary comment via platform-appropriate path (GitHub `gh pr comment` / Bitbucket REST); optionally post to Jira via MCP when `JIRA_URL` set |
 | Communicate to user | Output completion summary with next steps |
 
 ---
@@ -533,10 +576,10 @@ Iterate until:
 
 **CRITICAL / BLOCKING**: This step is mandatory. The workflow is NOT complete until the PR comment is posted. Do not skip, defer, or treat as optional.
 
-Use the PR metadata stored in Step 0 (Prerequisites). Run the following command:
+Use the PR metadata stored in Step 0 (Prerequisites). Compose the comment body then post it via the active platform.
 
 ```bash
-gh pr comment "$PR_URL" --body "## 🛠️ QA Fixes Applied
+COMMENT_BODY="## 🛠️ QA Fixes Applied
 
 **Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 **Date**: [date]
@@ -603,7 +646,55 @@ gh pr comment "$PR_URL" --body "## 🛠️ QA Fixes Applied
 "
 ```
 
-**Verify the comment was posted**: Confirm `gh pr comment` exited with code 0. If it fails (network error, auth issue), report the error to the user and retry or provide the comment body for manual posting. Do NOT mark the workflow complete until the comment is confirmed posted.
+**Post the comment (dual-path):**
+
+```bash
+if [ "$PLATFORM" = "github" ]; then
+  gh pr comment "$PR_URL" --body "$COMMENT_BODY"
+  COMMENT_RC=$?
+elif [ "$PLATFORM" = "bitbucket" ]; then
+  BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$COMMENT_BODY" '{content: {raw: $raw}}')
+  curl -sf -X POST \
+    -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+    -H "Content-Type: application/json" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+    -d "$BB_COMMENT_PAYLOAD" >/dev/null
+  COMMENT_RC=$?
+fi
+
+if [ $COMMENT_RC -ne 0 ]; then
+  echo "❌ Failed to post fix-summary comment ($PLATFORM). Comment body printed below for manual posting:"
+  echo "$COMMENT_BODY"
+  exit 1
+fi
+```
+
+**Verify the comment was posted**: Confirm the platform-appropriate call exited with code 0 (`COMMENT_RC=0`). If it fails (network error, auth issue), report the error to the user and retry or provide the comment body for manual posting. Do NOT mark the workflow complete until the comment is confirmed posted.
+
+**Jira tracker comment (optional — after PR comment confirmed):**
+
+When `JIRA_URL` is set, also post the fix summary to the linked Jira issue. This is **non-blocking** — a failure here does NOT stop qa-fix from completing.
+
+First, read `$STORY_FILE` (the resolved story or task document — set during Step 0 locate-story) and extract `jira_key`:
+
+```bash
+JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+```
+
+If `JIRA_URL` is set and `JIRA_KEY` is non-empty (and not `null`):
+
+1. Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
+
+2. Call `addCommentToJiraIssue` MCP tool:
+   - `cloudId`: {derived hostname}
+   - `issueIdOrKey`: `{JIRA_KEY}`
+   - `commentBody`: the same `$COMMENT_BODY` string used for the PR comment
+   - `contentFormat`: `"markdown"`
+
+3. On success: log `📨 Fix summary posted to Jira issue ${JIRA_KEY}`.
+4. On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-fix).
+
+Cross-reference: `finalise` uses the same MCP call shape at lines 827-832 (`contentFormat: "markdown"`). ADF format is permitted but not the default.
 
 ## Blocking Conditions
 
@@ -639,7 +730,8 @@ Before marking complete:
 - ✅ File List complete and accurate
 - ✅ Change Log entry added
 - ✅ Status set correctly per Status Rule
-- ✅ **Post Fix Summary to PR** (Step 7 — BLOCKING): Confirm `gh pr comment` completed successfully. Workflow is not done until this is verified.
+- ✅ **Post Fix Summary to PR** (Step 7 — BLOCKING): Confirm platform-appropriate comment call (`gh pr comment` on GitHub / Bitbucket REST on Bitbucket) exited with code 0. Workflow is not done until this is verified.
+- ✅ **Jira comment** (non-blocking): If `JIRA_URL` set and `jira_key` present in story/task frontmatter, `addCommentToJiraIssue` MCP was attempted; failure is logged but does not block completion.
 
 ---
 
