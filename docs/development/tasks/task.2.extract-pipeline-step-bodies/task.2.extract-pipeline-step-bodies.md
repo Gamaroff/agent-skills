@@ -341,6 +341,29 @@ These are not risks — they are extraction targets where the LOC return is high
 - [ ] One full real `/develop-story` run + one full real `/develop-task` run complete successfully
 - [ ] PR opened, reviewed, merged
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-05
+**Quality Score**: 88/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.2.qa.1.extract-pipeline-step-bodies.md](./task.2.qa.1.extract-pipeline-step-bodies.md)
+- **Gate File**: [task.2.gate.1.extract-pipeline-step-bodies.yml](./task.2.gate.1.extract-pipeline-step-bodies.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: N/A (documentation-only task)
+- **Phases Verified**: 8/9
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+All mechanical DoD criteria pass. One medium-severity open item: real end-to-end pipeline runs not fully completed before QA review. Current `/develop-task` pipeline run constitutes the required real task run; a `/develop-story` run is still needed before merge.
+
+---
+
 ## 12. References
 
 - Parent task: `docs/development/tasks/task.1.extract-shared-develop-pipeline-body/task.1.extract-shared-develop-pipeline-body.md`
