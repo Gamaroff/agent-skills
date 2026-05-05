@@ -27,7 +27,7 @@ Each cycle = one `/qa-task` + one `/qa-fix`. A clean PASS on any qa-task review 
 
 #### develop-story
 ```bash
-ls {story-directory}/story.{epic}.{story}.gate.*.yml | sort -t. -k5 -n | tail -1
+ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null | sort -t. -k5 -n | tail -1
 ```
 The gate file pattern is `story.{epic}.{story}.gate.{N}.{name}.yml` — field 5 (dot-delimited) is the numeric gate index.
 

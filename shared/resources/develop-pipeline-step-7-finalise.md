@@ -82,7 +82,7 @@ If `TRACKER_ISSUE` is set, explicitly close the issue and move the project board
 gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: accepted. All DoD criteria verified."
 
 # 2. Close the issue
-gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted and PR merged. Implementation report: {report-path}"
+gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
 ```
 
 #### develop-task
@@ -91,7 +91,7 @@ gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted and PR merg
 gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: accepted. All DoD criteria verified."
 
 # 2. Close the issue
-gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted and PR merged. Implementation report: {report-path}"
+gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
 ```
 
 #### Shared (both orchestrators)

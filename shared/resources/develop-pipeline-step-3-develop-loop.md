@@ -11,17 +11,9 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 ---
 
-## Invoke /develop (first line)
-
-#### develop-story
-Invoke the `/develop` skill with the story file path.
-
-#### develop-task
-Invoke the `/develop` skill with the task file path.
-
----
-
 ## Pre-develop Codebase Mapping (CRITICAL for context efficiency)
+
+> This step invokes `/develop`, but the Explore subagent and plan file discovery below must run first. Do not invoke `/develop` until those are complete.
 
 **Resume optimization:** If the Decisions Log already contains a "Pre-develop surface map:" entry (from a prior session), skip both the Explore subagent invocation AND the plan file discovery below — reuse the recorded surface map and plan-file decision. Log: "Resume — pre-develop surface map and plan-file decision reused from Decisions Log." Then proceed to the develop loop.
 

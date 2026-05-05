@@ -45,8 +45,6 @@ See `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` for the fu
 
 ---
 
----
-
 ## Phase 1: Pipeline Execution
 
 ### Context Compression Recovery (CRITICAL — read this first)
