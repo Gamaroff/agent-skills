@@ -9,6 +9,7 @@ created: 2026-05-06
 assignee: TBD
 effort: 0.25 day
 depends_on: —
+github_issue: 20
 source_plan: ~/.claude/plans/review-the-develop-task-and-reactive-boot.md (Finding #7)
 ---
 
