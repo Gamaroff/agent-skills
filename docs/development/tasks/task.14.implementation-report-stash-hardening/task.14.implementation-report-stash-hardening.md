@@ -4,18 +4,21 @@ title: "Harden implementation-report stash dance in develop pipeline"
 type: task
 category: refactoring
 priority: Low
-status: ready-for-review
+status: accepted
 created: 2026-05-06
+updated: 2026-05-06
+completed_date: 2026-05-06
 assignee: TBD
 effort: 0.5 day
 depends_on: —
 github_issue: 21
+pr_number: 28
 source_plan: ~/.claude/plans/review-the-develop-task-and-reactive-boot.md (Finding #8)
 ---
 
 # Task 14 — Harden implementation-report stash dance in develop pipeline
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#21](https://github.com/Gamaroff/agent-skills/issues/21)
 **Review**: ⚠️ Recommendations from `task.14.implementation-report-stash-hardening.review.2026-05-06.md` applied 2026-05-06.
 
@@ -183,3 +186,52 @@ Changes:
 **Immediate (< 30 min)**: revert the Step 4 reference to the old `git restore --staged` dance; ignore the new `--exclude` flag (additive, unused). `/commit-changes` and `/create-pr` changes are backward-compatible.
 
 **Triggers**: PR commits start including unintended files; pipeline halts on commit-changes argument errors.
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer (Claude Code)
+**Testing Date**: 2026-05-06
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.14.qa.1.implementation-report-stash-hardening.md](./task.14.qa.1.implementation-report-stash-hardening.md)
+- **Gate File**: [task.14.gate.1.implementation-report-stash-hardening.yml](./task.14.gate.1.implementation-report-stash-hardening.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 4 static checks + live exclusion proof
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+All 3 phases implemented correctly. `git restore --staged` dance removed. `--exclude` pathspec exclusion verified live during this pipeline run — implementation report absent from PR commit `8d12621`. One LOW cosmetic concern (forward-reference in step-4 invocation section, non-blocking).
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.14.qa.1.implementation-report-stash-hardening.md`
+**Gate File**: `task.14.gate.1.implementation-report-stash-hardening.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 97/100
+
+All Definition of Done criteria verified:
+
+✅ **Implementation Phases:** 3/3 complete — all checkboxes ticked
+✅ **Success Criteria:** All 5 criteria met including live exclusion proof
+✅ **PR:** #28 open — `refactor(task.14): harden implementation-report exclusion in develop pipeline`
+✅ **Documentation:** 3 skill/reference files updated; no executable code changes
+✅ **Security Review:** PASS — docs-only, no security surface
+✅ **Performance:** PASS — `:(exclude)` pathspec O(1) overhead
+✅ **Reliability:** PASS — deterministic flag replaces timing-dependent dance
+✅ **Maintainability:** PASS — cross-references and smoke test improve long-term clarity
+
+**Deployment Readiness:** Staging ✅ APPROVED, Production ✅ APPROVED
+
+**Task marked as ACCEPTED on:** 2026-05-06
+
+**Detailed Verification Log:** See `task.14.dod.1.implementation-report-stash-hardening.md`

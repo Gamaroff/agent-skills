@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.14.implementation-report-stash-hardening'
+task_title: 'Harden implementation-report stash dance in develop pipeline'
+gate: PASS
+status_reason: 'All 3 phases implemented correctly. Static checks pass. Live exclusion proof confirmed. No HIGH or MEDIUM issues.'
+reviewer: 'QA Engineer (Claude Code)'
+updated: '2026-05-06T12:55:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Docs-only changes. No security surface touched.'
+  performance:
+    status: PASS
+    notes: 'No runtime impact. :(exclude) pathspec is O(1) at commit time.'
+  reliability:
+    status: PASS
+    notes: 'Well-documented git mechanism. Live proof during pipeline run. Advisory fallback preserved.'
+  maintainability:
+    status: PASS
+    notes: 'Timing-dependent behavior replaced with deterministic flag. Cross-references and smoke test improve long-term clarity.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consider inlining a short invocation example directly in the "Invoke /create-pr" section of develop-pipeline-step-4-create-pr.md to avoid the forward-reference to the Implementation Report Exclusion section.'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
