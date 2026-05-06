@@ -26,7 +26,7 @@ These two tools serve distinct roles. `AskUserQuestion` is for clarifying requir
 
 The memory system (`MEMORY.md` + per-topic files) is for things that can't be derived from the code: preferences, workflow patterns, feedback on Claude's approach, and cross-session context. Don't save architecture decisions, code patterns, or file paths — those are in the codebase.
 
-**Example:** Save "user prefers single bundled PRs over many small ones" — not "auth is in apps/goji-web-api/src/auth/".
+**Example:** Save "user prefers single bundled PRs over many small ones" — not "auth is in apps/my-web-api/src/auth/".
 **Why it matters:** Saving derivable facts bloats memory and makes it harder to find genuinely useful context.
 
 ---

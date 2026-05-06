@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document defines the comprehensive **Client-Server Security Boundaries** implemented in the Goji platform as part of the Platform-Specific Entry Points Architecture. The security model ensures that all cryptographic operations, authentication processes, and sensitive data handling occur exclusively on the server while providing optimal user experience on client applications.
+This document defines the comprehensive **Client-Server Security Boundaries** implemented in your platform as part of the Platform-Specific Entry Points Architecture. The security model ensures that all cryptographic operations, authentication processes, and sensitive data handling occur exclusively on the server while providing optimal user experience on client applications.
 
 ### Core Security Principles
 
@@ -59,7 +59,7 @@ import {
 
   // Shared utilities (server implementation)
   extractBearerToken // Authorization header parsing
-} from '@goji-system/auth-lib'; // Full server functionality
+} from '@my-system/auth-lib'; // Full server functionality
 
 import {
   // Cryptographic operations (server-only)
@@ -74,7 +74,7 @@ import {
   getCurrentEnvironment, // Runtime environment detection
   getBooleanEnvVar, // Boolean environment variables
   getNumericEnvVar // Numeric environment variables
-} from '@goji-system/shared-utils/server'; // Server-only utilities
+} from '@my-system/shared-utils/server'; // Server-only utilities
 ```
 
 #### Client-Side Security Operations (React Native)
@@ -97,7 +97,7 @@ import {
   createMockUser, // Mock data for development
   generateMockTokens, // Mock tokens for testing
   getMockUserByEmail // Development user lookup
-} from '@goji-system/auth-lib/src/client'; // Mobile-safe entry point
+} from '@my-system/auth-lib/src/client'; // Mobile-safe entry point
 
 import {
   // Client-safe utilities with fallbacks
@@ -111,7 +111,7 @@ import {
   isOnline, // Network connectivity detection
   isDarkMode, // System dark mode detection
   isDevelopment // Development mode detection
-} from '@goji-system/shared-utils/client'; // Client-only utilities
+} from '@my-system/shared-utils/client'; // Client-only utilities
 ```
 
 ## Security Implementation Patterns
@@ -283,7 +283,7 @@ class AuthService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': `GojiWallet/${getAppVersion()} ${getCurrentPlatform()}`
+          'User-Agent': `MyWallet/${getAppVersion()} ${getCurrentPlatform()}`
         },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
@@ -720,7 +720,7 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          'User-Agent': `GojiWallet/${getAppVersion()} ${getCurrentPlatform()}`,
+          'User-Agent': `MyWallet/${getAppVersion()} ${getCurrentPlatform()}`,
           'X-Request-ID': generateRequestId(), // Non-cryptographic ID
           ...options.headers
         }
@@ -1235,7 +1235,7 @@ describe('ClientAuthService', () => {
 
 ## Conclusion
 
-The Client-Server Security Boundaries implemented in the Goji platform establish a comprehensive **Zero Trust Client Model** that ensures maximum security while providing optimal performance and user experience. This security architecture provides:
+The Client-Server Security Boundaries implemented in your platform establish a comprehensive **Zero Trust Client Model** that ensures maximum security while providing optimal performance and user experience. This security architecture provides:
 
 ### Security Excellence
 
@@ -1262,4 +1262,4 @@ This security boundary architecture serves as the foundation for secure financia
 
 ---
 
-_This document provides definitive security boundaries for the Goji platform. All development must adhere to these security patterns to maintain the integrity of the financial services platform._
+_This document provides definitive security boundaries for your platform. All development must adhere to these security patterns to maintain the integrity of the financial services platform._

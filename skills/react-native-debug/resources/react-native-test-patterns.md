@@ -25,7 +25,7 @@ These can cause test failures that require platform-specific investigation techn
 
 ```
 Test Failure:
-Cannot find module '@goji-system/auth-lib'
+Cannot find module '@my-system/auth-lib'
 OR
 Module resolution failed for library export
 ```
@@ -46,7 +46,7 @@ Module resolution failed for library export
 
 ```bash
 # Check if library is built
-ls dist/libs/@goji-system/[library-name]/
+ls dist/libs/@my-system/[library-name]/
 
 # Check library exports
 cat libs/[library-name]/src/index.ts
@@ -55,7 +55,7 @@ cat libs/[library-name]/src/index.ts
 cat libs/[library-name]/package.json | grep -A 5 '"main"'
 
 # Check test import
-grep "from '@goji-system" test-file.spec.tsx
+grep "from '@my-system" test-file.spec.tsx
 ```
 
 ### Decision Tree
@@ -71,7 +71,7 @@ Does library dist/ directory exist?
         ├─ NO → Test wrong (wrong import)
         │   └─ Fix: Update import in test
         └─ YES → Is Metro cache stale?
-            └─ Fix: npx nx start goji-wallet --reset-cache
+            └─ Fix: npx nx start my-wallet --reset-cache
 ```
 
 ### Example: Library Not Exported
@@ -89,7 +89,7 @@ export * from './lib/token-decoder';
 export * from './lib/types';
 
 // Test now works
-import { decodeToken } from '@goji-system/auth-lib/client';
+import { decodeToken } from '@my-system/auth-lib/client';
 ```
 
 ---
@@ -121,14 +121,14 @@ OR
 ### Evidence to Gather
 
 ```bash
-# Check all @goji-system imports in test
-grep "from '@goji-system" test-file.spec.tsx
+# Check all @my-system imports in test
+grep "from '@my-system" test-file.spec.tsx
 
 # Look for server-only packages
 grep "bcryptjs\|jsonwebtoken\|winston" test-file.spec.tsx
 
 # Check if /client suffix is used
-grep "from '@goji-system.*lib'" test-file.spec.tsx | grep -v "/client"
+grep "from '@my-system.*lib'" test-file.spec.tsx | grep -v "/client"
 
 # Determine if integration or client test
 ls -la test-file.spec.tsx  # .spec.tsx = client, .integration.spec.ts = integration
@@ -155,8 +155,8 @@ Is this a client test (.spec.tsx)?
 ```typescript
 // ❌ WRONG - Client test without /client imports
 // This is a client test (.spec.tsx)
-import { decodeToken, hashPassword } from '@goji-system/auth-lib';
-import { logger } from '@goji-system/logging-lib';
+import { decodeToken, hashPassword } from '@my-system/auth-lib';
+import { logger } from '@my-system/logging-lib';
 
 it('should decode token', () => {
   // FAILS: hashPassword not available in client
@@ -164,8 +164,8 @@ it('should decode token', () => {
 });
 
 // ✅ CORRECT - Client test with /client imports
-import { decodeToken } from '@goji-system/auth-lib/client';
-import { logger } from '@goji-system/logging-lib/client';
+import { decodeToken } from '@my-system/auth-lib/client';
+import { logger } from '@my-system/logging-lib/client';
 
 it('should decode token', () => {
   const decoded = decodeToken('jwt-token');
@@ -457,16 +457,16 @@ Do tests pass after clearing Metro cache?
 
 ```bash
 # Check if library built
-ls dist/libs/@goji-system/[lib]/
+ls dist/libs/@my-system/[lib]/
 
 # Check Metro cache status
-npx nx start goji-wallet --dry-run
+npx nx start my-wallet --dry-run
 
 # Look for old Metro cache
 rm -rf node_modules/.cache
 
 # Clear and rebuild
-npx nx start goji-wallet --reset-cache --clear
+npx nx start my-wallet --reset-cache --clear
 npm run build:libraries
 ```
 
@@ -550,61 +550,61 @@ render(
 
 ```bash
 # Check library build
-ls -la dist/libs/@goji-system/[lib]/
+ls -la dist/libs/@my-system/[lib]/
 
 # Check test configuration
-cat apps/goji-wallet/jest.config.ts
+cat apps/my-wallet/jest.config.ts
 
 # Check test setup file
-cat apps/goji-wallet/src/test-setup.ts
+cat apps/my-wallet/src/test-setup.ts
 
 # Find all mocks
-grep -r "jest.mock" apps/goji-wallet/**/*.spec.tsx
+grep -r "jest.mock" apps/my-wallet/**/*.spec.tsx
 
 # Find Metro cache
 du -sh node_modules/.cache 2>/dev/null
 
 # Check metro config
-cat apps/goji-wallet/metro.config.js | grep -A 5 "projectRoot\|nodeModulesPaths"
+cat apps/my-wallet/metro.config.js | grep -A 5 "projectRoot\|nodeModulesPaths"
 
 # Find async operations in tests
-grep -r "await\|waitFor" apps/goji-wallet/**/*.spec.tsx
+grep -r "await\|waitFor" apps/my-wallet/**/*.spec.tsx
 
 # Find component mocks
-grep -A 5 "jest.mock.*components" apps/goji-wallet/**/*.spec.tsx
+grep -A 5 "jest.mock.*components" apps/my-wallet/**/*.spec.tsx
 ```
 
 ---
 
-## Real-World React Native Example: goji-wallet
+## Real-World React Native Example: my-wallet
 
 ### Scenario: AuthContext Test Fails with "Cannot find module"
 
 ```
-Error: Cannot find module '@goji-system/auth-lib/client'
+Error: Cannot find module '@my-system/auth-lib/client'
 ```
 
 ### Investigation Process
 
 1. **Check import in test:**
    ```bash
-   grep "from '@goji-system/auth-lib" auth-context.spec.tsx
-   # Found: import from '@goji-system/auth-lib' (missing /client!)
+   grep "from '@my-system/auth-lib" auth-context.spec.tsx
+   # Found: import from '@my-system/auth-lib' (missing /client!)
    ```
 
 2. **Check if /client is required:**
    ```bash
-   grep "client\|server" apps/goji-wallet/contexts/auth-context.tsx
+   grep "client\|server" apps/my-wallet/contexts/auth-context.tsx
    # Found: Used in client component - needs /client import
    ```
 
 3. **Verdict:** Test wrong
    - Missing /client suffix on auth-lib import
-   - Fix: Change to `@goji-system/auth-lib/client`
+   - Fix: Change to `@my-system/auth-lib/client`
 
 4. **Update test imports:**
    ```typescript
-   import { decodeToken } from '@goji-system/auth-lib/client';  // Added /client
+   import { decodeToken } from '@my-system/auth-lib/client';  // Added /client
    ```
 
 ---
@@ -614,7 +614,7 @@ Error: Cannot find module '@goji-system/auth-lib/client'
 Before submitting a React Native test:
 
 - [ ] jest.mock() calls come BEFORE imports
-- [ ] All @goji-system imports have /client suffix (for client tests)
+- [ ] All @my-system imports have /client suffix (for client tests)
 - [ ] No server-only packages (bcryptjs, jsonwebtoken, winston)
 - [ ] Component mocks accept and use props
 - [ ] Component mocks render children if needed

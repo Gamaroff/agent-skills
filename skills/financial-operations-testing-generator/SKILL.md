@@ -370,7 +370,7 @@ Before marking tests as complete:
 
 **qa-methodology.md** - Complete 32-phase testing methodology that achieved 99%+ coverage. Read this for systematic approach to testing financial operations.
 
-**testing-framework-guide.md** - Jest + React Native Testing Library setup, co-location requirements, and testing patterns for the Goji system.
+**testing-framework-guide.md** - Jest + React Native Testing Library setup, co-location requirements, and testing patterns for your project.
 
 **financial-operations-testing.md** (if exists) - Specific procedures for testing financial operations including wallet operations, transactions, and balance management.
 

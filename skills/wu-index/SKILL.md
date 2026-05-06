@@ -115,7 +115,7 @@ All {N} atomic tasks across 7 phases, plus post-merge follow-ups. Each row links
 
 Each task has **two independent lifecycle axes** — see the [README status legend](./README.md#status-legend) for definitions and gating rules. The `Blocked By` column lists each task's `depends-on`; a task is unblockable while any blocker is not yet `done`.
 
-**Project board:** [Goji System Migration](https://github.com/orgs/goji-wallet/projects/2)
+**Project board:** Link your project board here
 **Migration docs:** [README](./README.md)
 
 > **Stub paths note:** All `WU-P*.md` stubs were moved into `archive/` on 2026-04-17 (commit `e36ce81fd`) and slimmed to forwarding pointers on 2026-04-26. The stubs retain their frontmatter for tooling but no longer contain spec content — see the linked `task.{N}.*/` doc for the live spec, plan, DoD, gate, and review.

@@ -1,6 +1,6 @@
 ---
 name: docker
-description: Comprehensive Docker administration and troubleshooting for the Goji system. Manages development, test, and production environments with PostgreSQL, Redis, and monitoring stack.
+description: Comprehensive Docker administration and troubleshooting for multi-service projects. Manages development, test, and production environments with PostgreSQL, Redis, and monitoring stack.
 type: project
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
@@ -8,7 +8,7 @@ license: MIT
 
 # Docker Administration Skill
 
-Expert Docker administration for the Goji system's multi-environment infrastructure (development, test, production).
+Expert Docker administration for multi-environment infrastructure (development, test, production).
 
 ## Quick Reference
 
@@ -19,44 +19,44 @@ Expert Docker administration for the Goji system's multi-environment infrastruct
 npm run docker:setup
 
 # Development Environment (daily use)
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
-docker compose -f docker/docker-compose.dev.yml -p goji-system logs -f
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system logs -f
 
 # Testing (automated)
 npm run test:local                    # All tests with isolated database
 npm run test:local:coverage           # With coverage reports
 
 # Troubleshooting
-docker logs goji-postgres          # Check database logs
-docker logs goji-api               # Check API logs
+docker logs my-postgres          # Check database logs
+docker logs my-api               # Check API logs
 docker stats                          # Resource usage
-docker compose -f docker/docker-compose.dev.yml -p goji-system down -v  # Clean slate
+docker compose -f docker/docker-compose.dev.yml -p my-system down -v  # Clean slate
 ```
 
-**CRITICAL**: Always use `-p goji-system` with docker-compose commands for consistent naming.
+**CRITICAL**: Always use `-p my-system` with docker-compose commands for consistent naming.
 
 ## Architecture Overview
 
 ### Service Stack
 
 **Development** (ports 3000, 5432, 6379, 5050, 8082):
-- goji-api (Node.js 24, hot-reload)
-- goji-postgres (PostgreSQL 16)
-- goji-redis (Redis 8)
-- goji-pgadmin (database UI)
-- goji-redis-commander (Redis UI)
+- my-api (Node.js 24, hot-reload)
+- my-postgres (PostgreSQL 16)
+- my-redis (Redis 8)
+- my-app-pgadmin (database UI)
+- my-redis-commander (Redis UI)
 
 **Test** (ports 5433, 6380 - non-conflicting):
-- goji-postgres-test (isolated test database)
-- goji-redis-test (isolated test cache)
+- my-postgres-test (isolated test database)
+- my-redis-test (isolated test cache)
 
 **Production** (with monitoring):
-- goji-api (3 replicas, load balanced)
-- goji-postgres (production-tuned)
-- goji-redis (with auth)
-- goji-nginx (reverse proxy, SSL)
-- goji-prometheus (metrics)
-- goji-grafana (dashboards)
+- my-api (3 replicas, load balanced)
+- my-postgres (production-tuned)
+- my-redis (with auth)
+- my-app-nginx (reverse proxy, SSL)
+- my-app-prometheus (metrics)
+- my-app-grafana (dashboards)
 - ELK stack (logging)
 - backup service (automated daily backups)
 
@@ -82,28 +82,28 @@ npm run docker:setup
 #### Manual Start
 ```bash
 # Start all services
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 
 # View logs (all services)
-docker compose -f docker/docker-compose.dev.yml -p goji-system logs -f
+docker compose -f docker/docker-compose.dev.yml -p my-system logs -f
 
 # View specific service logs
-docker compose -f docker/docker-compose.dev.yml -p goji-system logs -f goji-api
-docker compose -f docker/docker-compose.dev.yml -p goji-system logs -f goji-postgres
+docker compose -f docker/docker-compose.dev.yml -p my-system logs -f my-api
+docker compose -f docker/docker-compose.dev.yml -p my-system logs -f my-postgres
 
 # Stop services (preserve data)
-docker compose -f docker/docker-compose.dev.yml -p goji-system down
+docker compose -f docker/docker-compose.dev.yml -p my-system down
 
 # Stop and remove volumes (clean slate)
-docker compose -f docker/docker-compose.dev.yml -p goji-system down -v
+docker compose -f docker/docker-compose.dev.yml -p my-system down -v
 ```
 
 #### Service Access
 ```
 API:              http://localhost:3000
-PostgreSQL:       localhost:5432 (goji/goji/goji)
+PostgreSQL:       localhost:5432 (my-app/my-app/my-app)
 Redis:            localhost:6379
-PgAdmin:          http://localhost:5050 (admin@goji.dev/admin)
+PgAdmin:          http://localhost:5050 (admin@my-app.dev/admin)
 Redis Commander:  http://localhost:8082
 ```
 
@@ -135,7 +135,7 @@ npm run test:local:coverage
 docker compose -f docker/docker-compose.test.yml up -d
 
 # Check test database
-docker exec goji-postgres-test pg_isready -U testuser -d goji_test
+docker exec my-postgres-test pg_isready -U testuser -d my_test
 
 # Stop test services and cleanup
 docker compose -f docker/docker-compose.test.yml down -v
@@ -143,7 +143,7 @@ docker compose -f docker/docker-compose.test.yml down -v
 
 #### Test Service Ports
 ```
-PostgreSQL Test:  localhost:5433 (testuser/testpass/goji_test)
+PostgreSQL Test:  localhost:5433 (testuser/testpass/my_test)
 Redis Test:       localhost:6380
 ```
 
@@ -181,19 +181,19 @@ Kibana:             http://localhost:5601
 #### Health Checks
 ```bash
 # Check all containers
-docker compose -f docker/docker-compose.dev.yml -p goji-system ps
+docker compose -f docker/docker-compose.dev.yml -p my-system ps
 
 # PostgreSQL ready check
-docker exec goji-postgres pg_isready -U goji -d goji
+docker exec my-postgres pg_isready -U my-app -d my-app
 
 # Redis ping check
-docker exec goji-redis redis-cli ping
+docker exec my-redis redis-cli ping
 
 # API health endpoint
 curl http://localhost:3000/health
 
 # View container health status with details
-docker inspect goji-postgres | grep -A 10 Health
+docker inspect my-postgres | grep -A 10 Health
 ```
 
 #### Resource Monitoring
@@ -202,7 +202,7 @@ docker inspect goji-postgres | grep -A 10 Health
 docker stats
 
 # Specific container stats
-docker stats goji-api goji-postgres goji-redis
+docker stats my-api my-postgres my-redis
 
 # System resource usage
 docker system df
@@ -214,15 +214,15 @@ docker system df -v
 #### Container Inspection
 ```bash
 # View container configuration
-docker inspect goji-postgres
+docker inspect my-postgres
 
 # View container logs
-docker logs goji-postgres
-docker logs --tail 100 goji-api
-docker logs --since 30m goji-redis
+docker logs my-postgres
+docker logs --tail 100 my-api
+docker logs --since 30m my-redis
 
 # Follow logs in real-time
-docker logs -f goji-api
+docker logs -f my-api
 ```
 
 ### Rebuilding Containers
@@ -236,22 +236,22 @@ docker logs -f goji-api
 #### When Dependencies Change
 ```bash
 # Rebuild and restart
-docker compose -f docker/docker-compose.dev.yml -p goji-system down
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d --build
+docker compose -f docker/docker-compose.dev.yml -p my-system down
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d --build
 
 # Force rebuild without cache
-docker compose -f docker/docker-compose.dev.yml -p goji-system build --no-cache
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system build --no-cache
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 ```
 
 #### Production Builds
 ```bash
 # Build production image
-docker build -f apps/goji-api/Dockerfile -t goji-api:latest .
+docker build -f apps/my-api/Dockerfile -t my-api:latest .
 
 # Push to registry
-docker tag goji-api:latest your-registry/goji-api:v1.0.0
-docker push your-registry/goji-api:v1.0.0
+docker tag my-api:latest your-registry/my-api:v1.0.0
+docker push your-registry/my-api:v1.0.0
 ```
 
 ## Database Operations
@@ -261,7 +261,7 @@ docker push your-registry/goji-api:v1.0.0
 #### Direct Database Access
 ```bash
 # Access PostgreSQL CLI (development)
-docker exec -it goji-postgres psql -U goji -d goji
+docker exec -it my-postgres psql -U my-app -d my-app
 
 # Common psql commands
 \dt              # List tables
@@ -270,13 +270,13 @@ docker exec -it goji-postgres psql -U goji -d goji
 \q               # Quit
 
 # Execute SQL from command line
-docker exec goji-postgres psql -U goji -d goji -c "SELECT * FROM users LIMIT 10;"
+docker exec my-postgres psql -U my-app -d my-app -c "SELECT * FROM users LIMIT 10;"
 ```
 
 #### Prisma Migrations
 ```bash
 # Generate Prisma client
-cd apps/goji-api
+cd apps/my-api
 npx prisma generate
 
 # Push schema changes (development)
@@ -295,23 +295,23 @@ npx prisma migrate reset
 #### Database Backups
 ```bash
 # Create backup with timestamp
-docker exec goji-postgres pg_dump -U goji goji > \
+docker exec my-postgres pg_dump -U my-app my-app > \
   "backup_$(date +%Y%m%d_%H%M%S).sql"
 
 # Compressed backup
-docker exec goji-postgres pg_dump -U goji goji | \
+docker exec my-postgres pg_dump -U my-app my-app | \
   gzip > "backup_$(date +%Y%m%d_%H%M%S).sql.gz"
 
 # Backup specific tables
-docker exec goji-postgres pg_dump -U goji -t users -t wallets goji > \
+docker exec my-postgres pg_dump -U my-app -t users -t wallets my-app > \
   "partial_backup_$(date +%Y%m%d_%H%M%S).sql"
 
 # Restore from backup
-docker exec -i goji-postgres psql -U goji goji < backup.sql
+docker exec -i my-postgres psql -U my-app my-app < backup.sql
 
 # Restore from compressed
 gunzip -c backup.sql.gz | \
-  docker exec -i goji-postgres psql -U goji goji
+  docker exec -i my-postgres psql -U my-app my-app
 ```
 
 #### Production Automated Backups
@@ -325,7 +325,7 @@ Production environment includes automated daily backups at 2 AM:
 #### Direct Redis Access
 ```bash
 # Access Redis CLI (development)
-docker exec -it goji-redis redis-cli
+docker exec -it my-redis redis-cli
 
 # Common Redis commands
 PING                    # Test connection
@@ -337,39 +337,39 @@ FLUSHDB                 # Clear current database (WARNING)
 INFO                    # Server information
 
 # Execute command from shell
-docker exec goji-redis redis-cli PING
-docker exec goji-redis redis-cli INFO memory
+docker exec my-redis redis-cli PING
+docker exec my-redis redis-cli INFO memory
 ```
 
 #### Redis Monitoring
 ```bash
 # Monitor commands in real-time
-docker exec goji-redis redis-cli MONITOR
+docker exec my-redis redis-cli MONITOR
 
 # Check memory usage
-docker exec goji-redis redis-cli INFO memory
+docker exec my-redis redis-cli INFO memory
 
 # View connected clients
-docker exec goji-redis redis-cli CLIENT LIST
+docker exec my-redis redis-cli CLIENT LIST
 
 # Check keyspace statistics
-docker exec goji-redis redis-cli INFO keyspace
+docker exec my-redis redis-cli INFO keyspace
 ```
 
 #### Redis Backups
 ```bash
 # Trigger manual save
-docker exec goji-redis redis-cli BGSAVE
+docker exec my-redis redis-cli BGSAVE
 
 # Check last save time
-docker exec goji-redis redis-cli LASTSAVE
+docker exec my-redis redis-cli LASTSAVE
 
 # Copy RDB file
-docker cp goji-redis:/data/dump.rdb ./redis_backup_$(date +%Y%m%d).rdb
+docker cp my-redis:/data/dump.rdb ./redis_backup_$(date +%Y%m%d).rdb
 
 # Restore RDB file
-docker cp ./redis_backup.rdb goji-redis:/data/dump.rdb
-docker restart goji-redis
+docker cp ./redis_backup.rdb my-redis:/data/dump.rdb
+docker restart my-redis
 ```
 
 ## Troubleshooting Guide
@@ -384,11 +384,11 @@ docker restart goji-redis
 **Diagnosis**:
 ```bash
 # Check container status
-docker compose -f docker/docker-compose.dev.yml -p goji-system ps
+docker compose -f docker/docker-compose.dev.yml -p my-system ps
 
 # View container logs
-docker logs goji-postgres
-docker logs goji-redis
+docker logs my-postgres
+docker logs my-redis
 
 # Check Docker daemon status
 docker info
@@ -397,12 +397,12 @@ docker info
 **Solutions**:
 ```bash
 # Solution 1: Clean restart
-docker compose -f docker/docker-compose.dev.yml -p goji-system down
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system down
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 
 # Solution 2: Remove volumes (if data corruption suspected)
-docker compose -f docker/docker-compose.dev.yml -p goji-system down -v
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system down -v
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 
 # Solution 3: Restart Docker Desktop
 # Quit and restart Docker Desktop application
@@ -410,7 +410,7 @@ docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
 
 # Solution 4: Clean Docker state
 docker system prune -f
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 ```
 
 ### Issue 2: Port Conflicts
@@ -459,10 +459,10 @@ docker compose -f docker/docker-compose.test.yml up -d
 docker ps | grep postgres
 
 # Check PostgreSQL logs
-docker logs goji-postgres
+docker logs my-postgres
 
 # Test connection
-docker exec goji-postgres pg_isready -U goji -d goji
+docker exec my-postgres pg_isready -U my-app -d my-app
 
 # Verify DATABASE_URL
 cat .env | grep DATABASE_URL
@@ -471,21 +471,21 @@ cat .env | grep DATABASE_URL
 **Solutions**:
 ```bash
 # Solution 1: Verify DATABASE_URL format
-# Development: postgresql://goji:goji@localhost:5432/goji?schema=public
-# Test: postgresql://testuser:testpass@localhost:5433/goji_test
+# Development: postgresql://my-app:my-app@localhost:5432/my-app?schema=public
+# Test: postgresql://testuser:testpass@localhost:5433/my_test
 
 # Solution 2: Wait for container to be ready
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 sleep 10  # Wait for PostgreSQL to initialize
-docker exec goji-postgres pg_isready -U goji -d goji
+docker exec my-postgres pg_isready -U my-app -d my-app
 
 # Solution 3: Recreate container
-docker compose -f docker/docker-compose.dev.yml -p goji-system down
-docker volume rm goji-system_postgres_data  # WARNING: destroys data
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system down
+docker volume rm my-system_postgres_data  # WARNING: destroys data
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 
 # Solution 4: Check network connectivity
-docker exec goji-api ping goji-postgres
+docker exec my-api ping my-postgres
 ```
 
 ### Issue 4: Image Caching Issues
@@ -498,10 +498,10 @@ docker exec goji-api ping goji-postgres
 **Diagnosis**:
 ```bash
 # Check if using bind mounts (development)
-docker inspect goji-api | grep -A 20 Mounts
+docker inspect my-api | grep -A 20 Mounts
 
 # Check image build date
-docker images | grep goji-api
+docker images | grep my-api
 ```
 
 **Solutions**:
@@ -511,17 +511,17 @@ docker images | grep goji-api
 # TypeScript changes are automatically detected
 
 # For dependency changes (package.json modified)
-docker compose -f docker/docker-compose.dev.yml -p goji-system down
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d --build
+docker compose -f docker/docker-compose.dev.yml -p my-system down
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d --build
 
 # For persistent caching issues
-docker compose -f docker/docker-compose.dev.yml -p goji-system build --no-cache
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d
+docker compose -f docker/docker-compose.dev.yml -p my-system build --no-cache
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 
 # Nuclear option (complete rebuild)
-docker compose -f docker/docker-compose.dev.yml -p goji-system down -v
+docker compose -f docker/docker-compose.dev.yml -p my-system down -v
 docker system prune -a -f
-docker compose -f docker/docker-compose.dev.yml -p goji-system up -d --build
+docker compose -f docker/docker-compose.dev.yml -p my-system up -d --build
 ```
 
 ### Issue 5: Out of Disk Space
@@ -612,11 +612,11 @@ docker volume prune -f
 docker stats
 
 # Check container logs for errors
-docker logs goji-api | grep -i error
-docker logs goji-postgres | grep -i error
+docker logs my-api | grep -i error
+docker logs my-postgres | grep -i error
 
 # Check database performance
-docker exec goji-postgres psql -U goji -d goji -c "
+docker exec my-postgres psql -U my-app -d my-app -c "
   SELECT pid, state, query_start, query
   FROM pg_stat_activity
   WHERE state != 'idle'
@@ -630,13 +630,13 @@ docker exec goji-postgres psql -U goji -d goji -c "
 # Increase CPUs (recommend 4+) and Memory (recommend 8GB+)
 
 # Solution 2: Optimize PostgreSQL
-docker exec goji-postgres psql -U goji -d goji -c "VACUUM ANALYZE;"
+docker exec my-postgres psql -U my-app -d my-app -c "VACUUM ANALYZE;"
 
 # Solution 3: Clear Redis cache
-docker exec goji-redis redis-cli FLUSHDB
+docker exec my-redis redis-cli FLUSHDB
 
 # Solution 4: Restart containers
-docker compose -f docker/docker-compose.dev.yml -p goji-system restart
+docker compose -f docker/docker-compose.dev.yml -p my-system restart
 
 # Solution 5: Check for resource limits in compose file
 # Review docker/docker-compose.dev.yml for resource constraints
@@ -693,7 +693,7 @@ USER nestjs
 #### Security Scanning
 ```bash
 # Scan images for vulnerabilities
-docker scan goji-api:latest
+docker scan my-api:latest
 
 # Check for outdated base images
 docker images | grep node
@@ -710,7 +710,7 @@ docker compose -f docker/docker-compose.dev.yml build
 # Production: Services communicate on private network
 # Only nginx exposed externally on 80/443
 networks:
-  goji-network:
+  my-app-network:
     driver: bridge
     internal: false  # Only nginx connects externally
 ```
@@ -721,13 +721,13 @@ networks:
 # Redis: Password protection in production
 
 # Verify PostgreSQL auth
-docker exec goji-postgres cat /var/lib/postgresql/data/pg_hba.conf
+docker exec my-postgres cat /var/lib/postgresql/data/pg_hba.conf
 ```
 
 ## Best Practices
 
 ### DO
-- ✅ Always use `-p goji-system` with docker-compose commands
+- ✅ Always use `-p my-system` with docker-compose commands
 - ✅ Run `npm run docker:setup` for first-time setup (handles secrets, migrations)
 - ✅ Use automated scripts (`npm run test:local`) instead of manual Docker commands
 - ✅ Let scripts handle cleanup (test-local.sh has trap handlers)
@@ -743,7 +743,7 @@ docker exec goji-postgres cat /var/lib/postgresql/data/pg_hba.conf
 - ❌ Don't modify test database manually (let Prisma migrations handle schema)
 - ❌ Don't run tests against dev database (use isolated test environment)
 - ❌ Don't commit .env files with real secrets
-- ❌ Don't install packages in apps/goji-api or apps/goji-wallet (NX monorepo - install at root)
+- ❌ Don't install packages in NX app subdirs (NX monorepo - install at root)
 - ❌ Don't use `docker-compose` (deprecated) - use `docker compose` (v2)
 - ❌ Don't run production containers without resource limits
 - ❌ Don't expose PostgreSQL/Redis ports externally in production

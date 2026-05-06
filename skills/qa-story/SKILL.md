@@ -497,23 +497,23 @@ Take the Explore output from Phase 1 Step 1a (the `file | module | has_test` tab
 
 1. **Test Coverage Analysis Agent**
    - Agent Type: `general-purpose`
-   - Task: "Analyze test coverage for the Goji system PR. Changed files (from Explore map): {EXPLORE_FILE_TABLE}. For each changed file: (a) check if a co-located .spec.ts file exists in the same directory, (b) run `npx nx test <project> --coverage --testPathPattern=<file>` for affected NX projects, (c) verify coverage meets targets: 80%+ overall, 95%+ for any file in payments/transactions/BSV/wallet paths. Flag any changed file with 0% coverage as FAIL. Check test co-location (tests MUST be next to source, never in __tests__/ directories). Generate a report with: per-file coverage %, missing test files, co-location violations, financial operation coverage shortfalls."
-   - Output: Test coverage report with Goji-specific coverage targets
+   - Task: "Analyze test coverage for your project PR. Changed files (from Explore map): {EXPLORE_FILE_TABLE}. For each changed file: (a) check if a co-located .spec.ts file exists in the same directory, (b) run `npx nx test <project> --coverage --testPathPattern=<file>` for affected NX projects, (c) verify coverage meets targets: 80%+ overall, 95%+ for any file in payments/transactions/BSV/wallet paths. Flag any changed file with 0% coverage as FAIL. Check test co-location (tests MUST be next to source, never in __tests__/ directories). Generate a report with: per-file coverage %, missing test files, co-location violations, financial operation coverage shortfalls."
+   - Output: Test coverage report with project-specific coverage targets
 
 2. **TypeScript Strict Mode Compliance Agent**
    - Agent Type: `general-purpose`
-   - Task: "Check TypeScript strict mode compliance for the Goji NX monorepo PR. Changed files: {EXPLORE_FILE_TABLE}. Verify tsconfig.json has strict: true. Scan changed .ts/.tsx files for: `any` types (FAIL if in auth/payments/BSV/wallet code), `@ts-ignore` comments, non-null assertions (!), unsafe `as` casts, missing return types. Also check: (a) no Node.js imports in files under apps/goji-wallet (client/server separation violation), (b) no bcrypt/winston/jsonwebtoken imports in client-side files, (c) all financial amounts use proper types (not `number` — should be typed amounts). Generate compliance report with violations by severity."
-   - Output: TypeScript compliance report with Goji platform-separation checks
+   - Task: "Check TypeScript strict mode compliance for your app NX monorepo PR. Changed files: {EXPLORE_FILE_TABLE}. Verify tsconfig.json has strict: true. Scan changed .ts/.tsx files for: `any` types (FAIL if in auth/payments/BSV/wallet code), `@ts-ignore` comments, non-null assertions (!), unsafe `as` casts, missing return types. Also check: (a) no Node.js imports in files under apps/my-wallet (client/server separation violation), (b) no bcrypt/winston/jsonwebtoken imports in client-side files, (c) all financial amounts use proper types (not `number` — should be typed amounts). Generate compliance report with violations by severity."
+   - Output: TypeScript compliance report with your platform-separation checks
 
 3. **Accessibility & Code Quality Agent**
    - Agent Type: `general-purpose`
-   - Task: "Review React Native components changed in the Goji PR. Changed files: {EXPLORE_FILE_TABLE}. Check: (a) accessibility labels/hints on interactive elements (Pressable, TouchableOpacity, TextInput), (b) no native WebSocket usage (must use socket.io-client), (c) no console.log/console.error (must use @goji-system/logging-lib), (d) no 'username' terminology (must use 'handle'), (e) no SegWit/Bech32/Cashaddr in BSV-related code (BSV uses P2PKH only), (f) correct Expo Router navigation patterns (no manual navigation stacks). Generate audit report with violations categorized by severity."
-   - Output: Code quality and Goji-convention compliance report
+   - Task: "Review React Native components changed in your app PR. Changed files: {EXPLORE_FILE_TABLE}. Check: (a) accessibility labels/hints on interactive elements (Pressable, TouchableOpacity, TextInput), (b) no native WebSocket usage (must use socket.io-client), (c) no console.log/console.error (must use @my-system/logging-lib), (d) no 'username' terminology (must use 'handle'), (e) no SegWit/Bech32/Cashaddr in BSV-related code (BSV uses P2PKH only), (f) correct Expo Router navigation patterns (no manual navigation stacks). Generate audit report with violations categorized by severity."
+   - Output: Code quality and your app-convention compliance report
 
 4. **Definition of Done Criteria Agent**
    - Agent Type: `general-purpose`
-   - Task: "Verify Definition of Done for this Goji story. Read the story file and check: (a) all AC checkboxes marked as implemented in Dev Agent Record, (b) File List in story is complete (all created/modified/deleted files listed), (c) Change Log has dated entries, (d) Dev Agent Record has Implementation Summary + Approach + Testing Results + Completion Date, (e) story status is 'Ready for Review', (f) no hardcoded secrets or API keys in changed files, (g) NX monorepo rules respected (no local node_modules in apps/, no direct cd + npm install). Generate DoD compliance report with PASS/FAIL per criterion."
-   - Output: Goji-specific DoD compliance report
+   - Task: "Verify Definition of Done for this your app story. Read the story file and check: (a) all AC checkboxes marked as implemented in Dev Agent Record, (b) File List in story is complete (all created/modified/deleted files listed), (c) Change Log has dated entries, (d) Dev Agent Record has Implementation Summary + Approach + Testing Results + Completion Date, (e) story status is 'Ready for Review', (f) no hardcoded secrets or API keys in changed files, (g) NX monorepo rules respected (no local node_modules in apps/, no direct cd + npm install). Generate DoD compliance report with PASS/FAIL per criterion."
+   - Output: project-specific DoD compliance report
 
 **Implementation Pattern:**
 

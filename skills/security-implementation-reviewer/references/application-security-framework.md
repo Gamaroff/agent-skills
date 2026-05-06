@@ -1,15 +1,15 @@
 # Application Security Framework
-## Goji Mobile Wallet Platform
+## your mobile wallet app Platform
 
 ### Executive Summary
 
-This document defines the comprehensive application security framework for the Goji Mobile Wallet platform, covering security requirements for React Native mobile applications, NestJS backend services, and integrated blockchain components. The framework ensures defense-in-depth security across all application layers while maintaining regulatory compliance for financial services operations.
+This document defines the comprehensive application security framework for the your mobile wallet app platform, covering security requirements for React Native mobile applications, NestJS backend services, and integrated blockchain components. The framework ensures defense-in-depth security across all application layers while maintaining regulatory compliance for financial services operations.
 
 ### Framework Scope
 
 **Applications Covered:**
-- Goji Mobile Wallet (React Native + Expo 54.0.20)
-- Goji API (NestJS 11.1.5 modular monolith)
+- your mobile wallet app (React Native + Expo 54.0.20)
+- your API (NestJS 11.1.5 modular monolith)
 - Shared libraries and utilities (NX workspace libraries)
 - Third-party integrations (payment processors, blockchain networks)
 
@@ -196,7 +196,7 @@ class SecureStorageService {
     authenticationPrompt: 'Authenticate to access secure data',
     ...(Platform.OS === 'android' && {
       encrypt: true,
-      accessGroup: 'com.gojiwallet.app.secure',
+      accessGroup: 'com.my-appwallet.app.secure',
     }),
   };
 
@@ -1142,7 +1142,7 @@ interface OAuthSecurityEvent {
 
 ## Conclusion
 
-This comprehensive application security framework provides the foundation for secure development and operation of the Goji Mobile Wallet platform. The framework addresses:
+This comprehensive application security framework provides the foundation for secure development and operation of the your mobile wallet app platform. The framework addresses:
 
 - **Secure Development Practices**: From code review to deployment security
 - **Runtime Protection**: Authentication, authorization, and input validation

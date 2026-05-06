@@ -587,7 +587,7 @@ Output:
   ✅ Pull Request Created!
 
      Title: feat(story.180.3): quick re-search functionality
-     URL: https://github.com/goji-wallet/goji-system/pull/456
+     URL: https://github.com/your-org/your-repo/pull/456
      Base: develop ← feature/story.180.3.quick-re-search-functionality
 ```
 
@@ -600,7 +600,7 @@ Output:
   ✅ Draft Pull Request Created!
 
      Title: fix(payment): resolve timeout in transaction processing
-     URL: https://github.com/goji-wallet/goji-system/pull/457
+     URL: https://github.com/your-org/your-repo/pull/457
      Base: main ← hotfix/v1.2.1
      Status: Draft (not ready for review)
 ```
@@ -614,7 +614,7 @@ Output:
   ✅ Pull Request Created!
 
      Title: feat(auth): implement OAuth2 integration
-     URL: https://github.com/goji-wallet/goji-system/pull/458
+     URL: https://github.com/your-org/your-repo/pull/458
      Reviewers: @alice, @bob
 ```
 

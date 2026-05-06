@@ -7,7 +7,7 @@ license: MIT
 
 # Epic Registry Manager
 
-Manage globally unique epic numbers and maintain the central epic registry for consistent epic tracking across the Goji project.
+Manage globally unique epic numbers and maintain the central epic registry for consistent epic tracking across your project.
 
 ## When to Use This Skill
 

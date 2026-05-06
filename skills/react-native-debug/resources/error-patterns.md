@@ -1,6 +1,6 @@
 # Error Patterns Reference
 
-A comprehensive guide to identifying and debugging common React Native errors in the Goji system.
+A comprehensive guide to identifying and debugging common React Native errors in your project.
 
 ## Metro Bundler Errors
 
@@ -8,9 +8,9 @@ A comprehensive guide to identifying and debugging common React Native errors in
 
 **Error Messages**:
 ```
-Unable to resolve module @goji-system/auth-lib from /path/to/app
-Metro bundler failed: Cannot find module '@goji-system/auth-lib'
-Module not found: Can't resolve '@goji-system/auth-lib'
+Unable to resolve module @my-system/auth-lib from /path/to/app
+Metro bundler failed: Cannot find module '@my-system/auth-lib'
+Module not found: Can't resolve '@my-system/auth-lib'
 ```
 
 **Root Causes**:
@@ -23,13 +23,13 @@ Module not found: Can't resolve '@goji-system/auth-lib'
 **Quick Diagnosis**:
 ```bash
 # Check if library built
-ls dist/libs/@goji-system/[library-name]/
+ls dist/libs/@my-system/[library-name]/
 
 # Check metro config
 grep projectRoot metro.config.js
 
 # Check tsconfig paths
-grep "@goji-system" tsconfig.json
+grep "@my-system" tsconfig.json
 ```
 
 **Solution Priority**:
@@ -89,13 +89,13 @@ Transform failed for module
 **Quick Diagnosis**:
 ```bash
 # Check test-setup.ts exists
-ls apps/goji-wallet/src/test-setup.ts
+ls apps/my-wallet/src/test-setup.ts
 
 # Check jest.config.ts setupFilesAfterEnv
-grep setupFilesAfterEnv apps/goji-wallet/jest.config.ts
+grep setupFilesAfterEnv apps/my-wallet/jest.config.ts
 
 # Check jest preset
-grep preset apps/goji-wallet/jest.config.ts
+grep preset apps/my-wallet/jest.config.ts
 ```
 
 **Solution Priority**:
@@ -125,13 +125,13 @@ Could not find babel config
 **Quick Diagnosis**:
 ```bash
 # Check babel config exists
-ls -la apps/goji-wallet/.babelrc.js
+ls -la apps/my-wallet/.babelrc.js
 
 # Check presets installed
 npm list @babel/preset-react @babel/preset-typescript
 
 # Check config syntax
-node -c apps/goji-wallet/.babelrc.js
+node -c apps/my-wallet/.babelrc.js
 ```
 
 **Solution**:
@@ -197,11 +197,11 @@ Unexpected mock call
 **Quick Diagnosis**:
 ```bash
 # Find all mocks for this module
-grep -r "jest.mock.*module-name" apps/goji-wallet/
+grep -r "jest.mock.*module-name" apps/my-wallet/
 # Check if declared in multiple places
 
 # Check test-setup.ts
-grep "jest.mock" apps/goji-wallet/src/test-setup.ts
+grep "jest.mock" apps/my-wallet/src/test-setup.ts
 ```
 
 **Solution**:
@@ -254,7 +254,7 @@ expect(mockFn()).toEqual(expectedType); // Type assertion
 Cannot find module 'bcryptjs'
 Cannot find module 'jsonwebtoken'
 Cannot find module 'winston'
-Cannot find module '@goji-system/auth-lib' (should use /client)
+Cannot find module '@my-system/auth-lib' (should use /client)
 ```
 
 **Root Cause**:
@@ -266,7 +266,7 @@ Cannot find module '@goji-system/auth-lib' (should use /client)
 **Quick Diagnosis**:
 ```bash
 # Find problematic imports
-grep -n "from '@goji-system/" test-file.spec.tsx
+grep -n "from '@my-system/" test-file.spec.tsx
 # Should see /client suffix for client imports
 
 grep -n "hashPassword\|verifyAccessToken\|encryptData\|bcryptjs\|jsonwebtoken\|winston" test-file.spec.tsx
@@ -276,17 +276,17 @@ grep -n "hashPassword\|verifyAccessToken\|encryptData\|bcryptjs\|jsonwebtoken\|w
 **Correct Import Mapping**:
 ```typescript
 // ❌ WRONG (client test)
-import { hashPassword, verifyAccessToken } from '@goji-system/auth-lib';
-import { logger } from '@goji-system/logging-lib';
+import { hashPassword, verifyAccessToken } from '@my-system/auth-lib';
+import { logger } from '@my-system/logging-lib';
 
 // ✅ CORRECT (client test)
-import { decodeToken } from '@goji-system/auth-lib/client';
-import { logger } from '@goji-system/logging-lib/client';
-import { isTokenExpired } from '@goji-system/auth-lib/client';
+import { decodeToken } from '@my-system/auth-lib/client';
+import { logger } from '@my-system/logging-lib/client';
+import { isTokenExpired } from '@my-system/auth-lib/client';
 
 // ✅ OK (integration test)
-import { hashPassword, verifyAccessToken } from '@goji-system/auth-lib';
-import { logger } from '@goji-system/logging-lib';
+import { hashPassword, verifyAccessToken } from '@my-system/auth-lib';
+import { logger } from '@my-system/logging-lib';
 ```
 
 **Solution**:
@@ -482,13 +482,13 @@ Test passes when run alone, fails in suite
 **Quick Diagnosis**:
 ```bash
 # Run test multiple times
-for i in {1..5}; do npx nx test goji-wallet --testNamePattern="flaky-test"; done
+for i in {1..5}; do npx nx test my-wallet --testNamePattern="flaky-test"; done
 # If sometimes pass, it's flaky
 
 # Run in isolation
-npx nx test goji-wallet --testNamePattern="flaky-test"
+npx nx test my-wallet --testNamePattern="flaky-test"
 # vs with other tests
-npx nx test goji-wallet
+npx nx test my-wallet
 ```
 
 **Solution**:

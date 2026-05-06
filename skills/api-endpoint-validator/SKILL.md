@@ -1,6 +1,6 @@
 ---
 name: api-endpoint-validator
-description: This skill should be used when creating NestJS API endpoints, reviewing RESTful API design, validating controller patterns, ensuring DTO validation, implementing pagination/filtering, or enforcing API conventions. Use when designing new endpoints, reviewing controller code, refactoring APIs, or ensuring consistent API patterns across the Goji backend.
+description: This skill should be used when creating NestJS API endpoints, reviewing RESTful API design, validating controller patterns, ensuring DTO validation, implementing pagination/filtering, or enforcing API conventions. Use when designing new endpoints, reviewing controller code, refactoring APIs, or ensuring consistent API patterns across the NestJS backend.
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -9,7 +9,7 @@ license: MIT
 
 ## Overview
 
-This skill validates NestJS API endpoints against RESTful conventions and Goji-specific patterns. Ensures controllers follow proper HTTP methods, DTO validation, error handling, pagination, filtering, and response formatting standards.
+This skill validates NestJS API endpoints against RESTful conventions and NestJS best practices. Ensures controllers follow proper HTTP methods, DTO validation, error handling, pagination, filtering, and response formatting standards.
 
 ## When to Use This Skill
 
@@ -414,7 +414,7 @@ async findAll(@Query() sort: SortDto) {
 
 ### references/
 
-**api-design.md** - API design standards and RESTful conventions for the Goji system
+**api-design.md** - API design standards and RESTful conventions for NestJS backends
 
 **validation-patterns.md** - DTO validation patterns and class-validator usage examples
 

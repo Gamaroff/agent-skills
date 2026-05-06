@@ -1,6 +1,6 @@
 # Story/Task Status Schema
 
-This document defines the valid status values and frontmatter structure for story and task documents in the Goji system.
+This document defines the valid status values and frontmatter structure for story and task documents in your project.
 
 ## Valid Status Values
 

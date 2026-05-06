@@ -16,13 +16,13 @@ license: MIT
 
 ```bash
 # Enforce standards on entire components directory
-/enforce-standards apps/goji-wallet/components
+/enforce-standards apps/my-wallet/components
 
 # Enforce standards but exclude specific subdirectories
-/enforce-standards apps/goji-wallet/components --exclude contacts offline ui
+/enforce-standards apps/my-wallet/components --exclude contacts offline ui
 
 # Exclude a single directory
-/enforce-standards apps/goji-wallet/app --exclude (auth)
+/enforce-standards apps/my-wallet/app --exclude (auth)
 ```
 
 **Exclude Parameter Behavior**:
@@ -35,7 +35,7 @@ license: MIT
 ### 1.0 Parse Command Arguments
 
 1.  **Extract TargetDirectory**: First argument after the skill name
-    - Example: `/enforce-standards apps/goji-wallet/components` → `apps/goji-wallet/components`
+    - Example: `/enforce-standards apps/my-wallet/components` → `apps/my-wallet/components`
 2.  **Extract Excluded Directories** (if `--exclude` flag present):
     - Parse all arguments after `--exclude` until end of command
     - Example: `--exclude contacts offline ui` → `['contacts', 'offline', 'ui']`
@@ -222,13 +222,13 @@ Create a uniquely named migration plan file in the `.plans` directory:
 
 **File Location**: `.plans/migration-[timestamp]-[sanitized-directory-name].md`
 - **timestamp**: Current timestamp in format `YYYYMMDD-HHMMSS` (e.g., `20260127-143022`)
-- **sanitized-directory-name**: Target directory with slashes replaced by dashes (e.g., `apps-goji-wallet-components-offline`)
+- **sanitized-directory-name**: Target directory with slashes replaced by dashes (e.g., `apps-my-wallet-components-offline`)
 - **Example**: `.plans/migration-20260127-143022-components-offline.md`
 
 **Steps**:
 1. Create `.plans` directory if it doesn't exist: `mkdir -p .plans`
 2. Generate timestamp: `date +%Y%m%d-%H%M%S`
-3. Sanitize directory name: Replace `/` with `-`, remove `apps/goji-wallet/` prefix if present
+3. Sanitize directory name: Replace `/` with `-`, remove `apps/my-wallet/` prefix if present
 4. Create the migration plan file with the template below
 
 ```markdown
@@ -468,7 +468,7 @@ Run these checks after each batch:
     npx nx run <app>:typecheck
     ```
     - Ensures no type errors or unresolved imports
-    - Example: `npx nx run goji-wallet:typecheck`
+    - Example: `npx nx run my-wallet:typecheck`
 
 2.  **Lint Check**:
     ```bash
@@ -476,7 +476,7 @@ Run these checks after each batch:
     ```
     - Catches "Unable to resolve path" errors
     - Validates import ordering and unused imports
-    - Example: `npx nx lint goji-wallet`
+    - Example: `npx nx lint my-wallet`
 
 3.  **Test Check** (optional but recommended):
     ```bash
@@ -552,7 +552,7 @@ If verification fails:
 
 **Command**:
 ```bash
-/enforce-standards apps/goji-wallet/components --exclude contacts offline ui
+/enforce-standards apps/my-wallet/components --exclude contacts offline ui
 ```
 
 **Result**:
@@ -575,7 +575,7 @@ components/
 **Migration Plan Output**:
 ```markdown
 ## Summary
-- Target directory: apps/goji-wallet/components
+- Target directory: apps/my-wallet/components
 - Excluded directories: contacts, offline, ui
 - Total files scanned: 45 (127 files excluded)
 - Total files to rename: 12
@@ -586,7 +586,7 @@ components/
 
 **Command**:
 ```bash
-/enforce-standards apps/goji-wallet/app/(drawer) --exclude settings
+/enforce-standards apps/my-wallet/app/(drawer) --exclude settings
 ```
 
 **Result**:
@@ -597,7 +597,7 @@ components/
 
 **Command**:
 ```bash
-/enforce-standards apps/goji-wallet/components
+/enforce-standards apps/my-wallet/components
 ```
 
 **Result**:

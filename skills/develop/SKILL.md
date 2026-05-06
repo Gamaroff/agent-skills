@@ -1,6 +1,6 @@
 ---
 name: develop
-description: Provides guidance for implementing features and technical tasks in the Goji system. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns. Covers task planning, platform separation, testing, and documentation standards. Includes BMAD story-driven development workflow with quality gates and comprehensive validation.
+description: Provides guidance for implementing features and technical tasks. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns. Covers task planning, platform separation, testing, and documentation standards. Includes BMAD story-driven development workflow with quality gates and comprehensive validation.
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -534,7 +534,7 @@ As you implement each task, continuously update these Dev Agent Record sections:
 
 **Why This Matters**: The Dev Agent Record serves as implementation documentation for QA, future developers, and audit purposes. It should tell the complete story of what was built and how.
 
-### Goji System Architecture
+### System Architecture
 
 The system uses:
 
@@ -666,8 +666,8 @@ When tests fail during implementation:
 - [ ] Dev Agent Record complete: Implementation Summary, Approach, Testing Results, Completion Date, Deferred Work
 - [ ] File List complete and accurate (all created/modified/deleted files)
 - [ ] Change Log has dated entries for all significant changes
-- [ ] **Prisma schema check**: If `apps/goji-web-api/prisma/schema.prisma` was modified, a migration file exists in `prisma/migrations/` (run `cd apps/goji-web-api && npx prisma migrate dev --name <name>` if not)
-- [ ] **New npm packages check**: Any new runtime package added to root `package.json` is also added to `apps/goji-web-api/package.json` (see CLAUDE.md "goji-web-api: Runtime Dependencies")
+- [ ] **Prisma schema check**: If `apps/my-web-api/prisma/schema.prisma` was modified, a migration file exists in `prisma/migrations/` (run `cd apps/my-web-api && npx prisma migrate dev --name <name>` if not)
+- [ ] **New npm packages check**: Any new runtime package added to root `package.json` is also added to `apps/my-web-api/package.json` (see CLAUDE.md "my-web-api: Runtime Dependencies")
 - [ ] Story status set to `Ready for Review`
 - [ ] **Pipeline bypass applied**: If invoked by `develop-story`, `/finalise` was NOT called here — pipeline Step 7 handles it
 
@@ -982,7 +982,7 @@ npx nx generate @nx/react-native:library my-lib \
 **Post-Creation**:
 
 - Configure client/server exports if needed
-- Add to namespace: `@goji-system/my-lib`
+- Add to namespace: `@my-system/my-lib`
 - Create corresponding test files
 
 Reference: See CLAUDE.md "Creating Libraries" for complete setup.
@@ -1012,7 +1012,7 @@ Reference: See CLAUDE.md "Creating Libraries" for complete setup.
 
 **Logging**:
 
-- Always use `@goji-system/logging-lib` (not console)
+- Always use `@my-system/logging-lib` (not console)
 - Client: lightweight console logger
 - Server: Winston-based structured logging
 
@@ -1068,7 +1068,7 @@ npx nx test my-lib --coverage
 - Never hash passwords or sign JWTs client-side
 - Never use `any` type for financial data
 - Never install packages in app directories (use workspace root)
-- Never create local `node_modules` in apps/goji-wallet/
+- Never create local `node_modules` in NX app subdirectories
 
 ## References
 
@@ -1077,14 +1077,14 @@ npx nx test my-lib --coverage
 - Development patterns: `CLAUDE.md`
 - Story templates: `docs/templates/README.md`
 - Logging guide: `docs/development/logging-infrastructure-guide.md`
-- E2E testing: `apps/goji-api/test/integration/groups/README.md`
+- E2E testing: `apps/my-api/test/integration/groups/README.md`
 
 **Key Commands**:
 
-- Start Metro: `npx nx start goji-wallet --reset-cache --clear`
-- Start API: `npx nx run goji-api:serve`
+- Start Metro: `npx nx start <app-name> --reset-cache --clear`
+- Start API: `npx nx run my-api:serve`
 - Run tests: `npx nx test <project> --coverage`
-- Build library: `npx nx build @goji-system/library-name`
+- Build library: `npx nx build @my-system/library-name`
 
 ---
 

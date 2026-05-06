@@ -8,7 +8,7 @@ Tips for making sound architectural decisions in full-stack TypeScript/NestJS/Re
 
 In Nx monorepos with NestJS on Railway, every runtime import must appear in TWO places: the root `package.json` (for local dev and build) and the app-level `package.json` (used by `generatePackageJson: true` to produce the pruned production bundle). Missing the app-level entry causes `Cannot find module` in production even though the build succeeds.
 
-**Example:** Adding `@aws-sdk/client-s3` → add to root `dependencies` AND `apps/goji-web-api/package.json` dependencies.
+**Example:** Adding `@aws-sdk/client-s3` → add to root `dependencies` AND `apps/my-web-api/package.json` dependencies.
 **Why it matters:** The build passes locally and in CI, but the production container crashes on first use.
 
 ---
@@ -17,7 +17,7 @@ In Nx monorepos with NestJS on Railway, every runtime import must appear in TWO 
 
 Every change to `schema.prisma` — new field, new model, renamed field, removed index — requires a migration file created in the same PR. The migration is what actually updates the production database; the schema alone does nothing at deploy time.
 
-**Example:** `cd apps/goji-web-api && npx prisma migrate dev --name add_user_verified_at`
+**Example:** `cd apps/my-web-api && npx prisma migrate dev --name add_user_verified_at`
 **Why it matters:** Production DB schema diverges from the Prisma client silently — runtime queries fail with cryptic column-not-found errors.
 
 ---
@@ -26,7 +26,7 @@ Every change to `schema.prisma` — new field, new model, renamed field, removed
 
 When a shared library needs to work in both browser/React Native and Node.js, expose two entry points: `/client` (no Node deps, no secrets) and default/`/server` (full Node capabilities). Never import Node-only modules from the client path.
 
-**Example:** `import { logger } from '@rebirth-system/logging-lib/client'` in React; `import { logger } from '@rebirth-system/logging-lib'` in NestJS.
+**Example:** `import { utils } from '@scope/shared-lib/client'` in React; `import { utils } from '@scope/shared-lib'` in NestJS.
 **Why it matters:** Bundlers will try to include Node.js modules in browser bundles, causing build failures or security leaks.
 
 ---
@@ -35,7 +35,7 @@ When a shared library needs to work in both browser/React Native and Node.js, ex
 
 In a multi-project developer environment, port conflicts are silent and confusing. Assign ports per project and document them — then enforce them in Docker Compose, Dockerfiles, environment files, and proxy configs. Keep all four in sync.
 
-**Example:** `goji-web-api` owns port 3002 everywhere: `compose.yml`, `Dockerfile`, `.env`, `vite.config.mts` proxy.
+**Example:** `my-web-api` owns port 3002 everywhere: `compose.yml`, `Dockerfile`, `.env`, `vite.config.mts` proxy.
 **Why it matters:** Changing one without the others causes the proxy to silently forward to the wrong service.
 
 ---

@@ -1,6 +1,6 @@
 # Mock Patterns Reference
 
-Correct and incorrect mock patterns for React Native testing in the Goji system.
+Correct and incorrect mock patterns for React Native testing in your project.
 
 ## Core Principles
 
@@ -537,8 +537,8 @@ Using functions from shared libraries (auth-lib, shared-utils, etc.).
 
 ```typescript
 // components/LoginForm.tsx
-import { decodeToken } from '@goji-system/auth-lib/client';
-import { validateEmail } from '@goji-system/shared-utils';
+import { decodeToken } from '@my-system/auth-lib/client';
+import { validateEmail } from '@my-system/shared-utils';
 
 export function LoginForm() {
   // Uses decodeToken and validateEmail
@@ -548,7 +548,7 @@ export function LoginForm() {
 ### ❌ WRONG Pattern: Wrong Library Path
 
 ```typescript
-jest.mock('@goji-system/auth-lib', () => ({ // ❌ Wrong! Should use /client
+jest.mock('@my-system/auth-lib', () => ({ // ❌ Wrong! Should use /client
   decodeToken: jest.fn()
 }));
 ```
@@ -556,7 +556,7 @@ jest.mock('@goji-system/auth-lib', () => ({ // ❌ Wrong! Should use /client
 ### ✅ CORRECT Pattern: Use /client Path
 
 ```typescript
-jest.mock('@goji-system/auth-lib/client', () => ({
+jest.mock('@my-system/auth-lib/client', () => ({
   decodeToken: jest.fn((token: string) => ({
     userId: '123',
     handle: '@testuser',
@@ -564,7 +564,7 @@ jest.mock('@goji-system/auth-lib/client', () => ({
   }))
 }));
 
-jest.mock('@goji-system/shared-utils', () => ({
+jest.mock('@my-system/shared-utils', () => ({
   validateEmail: jest.fn((email: string) => ({
     valid: email.includes('@'),
     errors: []
@@ -573,8 +573,8 @@ jest.mock('@goji-system/shared-utils', () => ({
 
 import { render, fireEvent } from '@testing-library/react-native';
 import { LoginForm } from '../components/LoginForm';
-import { decodeToken } from '@goji-system/auth-lib/client';
-import { validateEmail } from '@goji-system/shared-utils';
+import { decodeToken } from '@my-system/auth-lib/client';
+import { validateEmail } from '@my-system/shared-utils';
 
 describe('LoginForm', () => {
   it('should validate email using shared util', () => {
@@ -599,16 +599,16 @@ describe('LoginForm', () => {
 **Library Import Rules**:
 ```typescript
 // Client code (.spec.tsx, .spec.ts for client tests)
-✅ @goji-system/auth-lib/client
-✅ @goji-system/logging-lib/client
-✅ @goji-system/shared-utils/client (for device/ui)
-❌ @goji-system/auth-lib (missing /client)
-❌ @goji-system/shared-utils/server (server-only)
+✅ @my-system/auth-lib/client
+✅ @my-system/logging-lib/client
+✅ @my-system/shared-utils/client (for device/ui)
+❌ @my-system/auth-lib (missing /client)
+❌ @my-system/shared-utils/server (server-only)
 
 // Integration code (.integration.spec.ts)
-✅ @goji-system/auth-lib (default = server)
-✅ @goji-system/logging-lib (default = server)
-✅ @goji-system/shared-utils/server
+✅ @my-system/auth-lib (default = server)
+✅ @my-system/logging-lib (default = server)
+✅ @my-system/shared-utils/server
 ```
 
 ---
@@ -619,7 +619,7 @@ describe('LoginForm', () => {
 Mocks that are needed by MANY tests (platform modules, global utilities).
 
 ```typescript
-// apps/goji-wallet/src/test-setup.ts
+// apps/my-wallet/src/test-setup.ts
 import '@testing-library/jest-native/extend-expect';
 
 // Global mocks for platform modules
@@ -769,13 +769,13 @@ Before submitting a test with mocks, verify:
 
 ```bash
 # Test just your file to verify mocks work
-npx nx test goji-wallet --testPathPattern="my-test.spec.tsx" --no-coverage
+npx nx test my-wallet --testPathPattern="my-test.spec.tsx" --no-coverage
 
 # Test with verbose output to see mock calls
-npx nx test goji-wallet --testPathPattern="my-test.spec.tsx" --verbose --no-coverage
+npx nx test my-wallet --testPathPattern="my-test.spec.tsx" --verbose --no-coverage
 
 # Run multiple times to catch flakiness
-for i in {1..5}; do npx nx test goji-wallet --testPathPattern="my-test.spec.tsx" --no-coverage; done
+for i in {1..5}; do npx nx test my-wallet --testPathPattern="my-test.spec.tsx" --no-coverage; done
 
 # Clear and rebuild mocks
 jest.clearAllMocks() // In beforeEach

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document contains actual navigation violations found in the Goji codebase during analysis (December 2025), along with debugging techniques and testing strategies to catch these issues early.
+This document contains actual navigation violations found in your codebase during analysis (December 2025), along with debugging techniques and testing strategies to catch these issues early.
 
 ## Real-World Violations
 
@@ -10,11 +10,11 @@ This document contains actual navigation violations found in the Goji codebase d
 
 **Date Discovered**: December 31, 2025
 **Severity**: High (user-facing bug causing blank screen)
-**Files Affected**: `apps/goji-wallet/components/wallets/wallets-header.tsx`
+**Files Affected**: `apps/my-wallet/components/wallets/wallets-header.tsx`
 
 **Violation**:
 ```typescript
-// apps/goji-wallet/components/wallets/wallets-header.tsx
+// apps/my-wallet/components/wallets/wallets-header.tsx
 import { useNavigation } from '@react-navigation/native';
 
 export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
@@ -31,7 +31,7 @@ export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
   );
 };
 
-// apps/goji-wallet/app/(drawer)/home/index.tsx
+// apps/my-wallet/app/(drawer)/home/index.tsx
 const handleButtonPress = (buttonId: string) => {
   switch (buttonId) {
     case 'wallets':
@@ -58,7 +58,7 @@ const handleButtonPress = (buttonId: string) => {
 
 **Fix**:
 ```typescript
-// apps/goji-wallet/components/wallets/wallets-header.tsx
+// apps/my-wallet/components/wallets/wallets-header.tsx
 import { useRouter } from 'expo-router';  // ✅ Changed from useNavigation
 
 export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
@@ -89,12 +89,12 @@ export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
 **Date Discovered**: December 31, 2025
 **Severity**: Medium (code quality issue, potential confusion)
 **Files Affected**:
-- `apps/goji-wallet/app/(drawer)/contacts/contacts-header.tsx`
-- `apps/goji-wallet/app/(drawer)/transactions/transactions-header.tsx`
-- `apps/goji-wallet/app/(drawer)/shopping/shopping-header.tsx`
-- `apps/goji-wallet/app/(drawer)/profile/profile-header.tsx`
-- `apps/goji-wallet/app/(drawer)/request/request-header.tsx`
-- `apps/goji-wallet/app/(drawer)/topup/topup-header.tsx`
+- `apps/my-wallet/app/(drawer)/contacts/contacts-header.tsx`
+- `apps/my-wallet/app/(drawer)/transactions/transactions-header.tsx`
+- `apps/my-wallet/app/(drawer)/shopping/shopping-header.tsx`
+- `apps/my-wallet/app/(drawer)/profile/profile-header.tsx`
+- `apps/my-wallet/app/(drawer)/request/request-header.tsx`
+- `apps/my-wallet/app/(drawer)/topup/topup-header.tsx`
 
 **Violation Pattern** (example from contacts-header.tsx):
 ```typescript
@@ -252,7 +252,7 @@ return (
 
 **Date Discovered**: December 31, 2025
 **Severity**: Medium (inconsistent with codebase patterns)
-**File Affected**: `apps/goji-wallet/app/(drawer)/help/help-header.tsx`
+**File Affected**: `apps/my-wallet/app/(drawer)/help/help-header.tsx`
 
 **Violation**:
 ```typescript

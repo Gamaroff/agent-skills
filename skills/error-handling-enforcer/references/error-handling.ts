@@ -1,32 +1,44 @@
-/*
- * PROPRIETARY SOURCE CODE - NOT OPEN SOURCE
- * Copyright (c) 2025 Lorien Gamaroff. All Rights Reserved.
- *
- * 1. OWNERSHIP
- * This software is the confidential and proprietary information of Lorien Gamaroff.
- * It is NOT "Open Source" and it is NOT "Work for Hire."
- *
- * 2. RESTRICTIONS
- * Possession of this source code does not imply a license to use it.
- * Any usage by a third party (including corporate employers) requires a
- * written license agreement.
- */
-
 /* eslint-disable @typescript-eslint/no-explicit-any,@typescript-eslint/no-non-null-assertion,@typescript-eslint/no-unused-vars */
-// Comprehensive error handling with retry mechanisms for contact operations
 
-import { ContactError, ContactValidationError, ContactNotFoundError, ContactDuplicateError } from './types';
-// Platform-compatible logger import
-let logger: any;
-try {
-  logger = require('@goji-system/logging-lib/client').logger;
-} catch {
-  logger = {
-    info: (message: string, context?: any) => console.log('[LIB]', message, context),
-    error: (message: string, context?: any) => console.error('[LIB]', message, context),
-    warn: (message: string, context?: any) => console.warn('[LIB]', message, context),
-    debug: (message: string, context?: any) => console.debug('[LIB]', message, context),
-  };
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+  ) {
+    super(message);
+    this.name = "AppError";
+    Object.setPrototypeOf(this, AppError.prototype);
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(
+    message: string,
+    public readonly resourceId?: string,
+  ) {
+    super(message, "VALIDATION_ERROR");
+    this.name = "ValidationError";
+    Object.setPrototypeOf(this, ValidationError.prototype);
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(public readonly resourceId: string) {
+    super(`Resource not found: ${resourceId}`, "RESOURCE_NOT_FOUND");
+    this.name = "NotFoundError";
+    Object.setPrototypeOf(this, NotFoundError.prototype);
+  }
+}
+
+export class DuplicateError extends AppError {
+  constructor(
+    message: string,
+    public readonly resourceId: string,
+  ) {
+    super(message, "DUPLICATE_RESOURCE");
+    this.name = "DuplicateError";
+    Object.setPrototypeOf(this, DuplicateError.prototype);
+  }
 }
 
 export interface RetryOptions {
@@ -41,55 +53,52 @@ export interface RetryOptions {
 export interface ErrorRecoveryContext {
   operation: string;
   userId?: string;
-  contactId?: string;
+  resourceId?: string;
   metadata?: Record<string, unknown>;
 }
 
 export interface ErrorHandlingResult<T> {
   success: boolean;
   data?: T;
-  error?: ContactError;
+  error?: AppError;
   attempts: number;
   recoveryAction?: string;
 }
 
-export class ContactErrorHandler {
+export class ErrorHandler {
   private static readonly DEFAULT_RETRY_OPTIONS: RetryOptions = {
     maxAttempts: 3,
     baseDelayMs: 1000,
     maxDelayMs: 10000,
     exponentialBackoff: true,
-    retryCondition: (error: unknown) => ContactErrorHandler.isRetryableError(error),
+    retryCondition: (error: unknown) => ErrorHandler.isRetryableError(error),
   };
 
-  private static readonly OPERATION_SPECIFIC_RETRY_OPTIONS: Record<string, Partial<RetryOptions>> = {
-    'external_validation': {
+  private static readonly OPERATION_SPECIFIC_RETRY_OPTIONS: Record<
+    string,
+    Partial<RetryOptions>
+  > = {
+    external_validation: {
       maxAttempts: 5,
       baseDelayMs: 2000,
       maxDelayMs: 30000,
-      retryCondition: (error: unknown) => 
-        ContactErrorHandler.isNetworkError(error) || ContactErrorHandler.isTemporaryServiceError(error),
+      retryCondition: (error: unknown) =>
+        ErrorHandler.isNetworkError(error) ||
+        ErrorHandler.isTemporaryServiceError(error),
     },
-    'database_operation': {
+    database_operation: {
       maxAttempts: 3,
       baseDelayMs: 500,
       maxDelayMs: 5000,
-      retryCondition: (error: unknown) => 
-        ContactErrorHandler.isTemporaryDatabaseError(error),
+      retryCondition: (error: unknown) =>
+        ErrorHandler.isTemporaryDatabaseError(error),
     },
-    'api_call': {
+    api_call: {
       maxAttempts: 4,
       baseDelayMs: 1500,
       maxDelayMs: 20000,
-      retryCondition: (error: unknown) => 
-        ContactErrorHandler.isRetryableApiError(error),
-    },
-    'blockchain_operation': {
-      maxAttempts: 5,
-      baseDelayMs: 3000,
-      maxDelayMs: 60000,
-      retryCondition: (error: unknown) => 
-        ContactErrorHandler.isBlockchainRetryableError(error),
+      retryCondition: (error: unknown) =>
+        ErrorHandler.isRetryableApiError(error),
     },
   };
 
@@ -99,8 +108,8 @@ export class ContactErrorHandler {
     customOptions?: Partial<RetryOptions>,
   ): Promise<ErrorHandlingResult<T>> {
     const options = {
-      ...ContactErrorHandler.DEFAULT_RETRY_OPTIONS,
-      ...ContactErrorHandler.OPERATION_SPECIFIC_RETRY_OPTIONS[context.operation],
+      ...ErrorHandler.DEFAULT_RETRY_OPTIONS,
+      ...ErrorHandler.OPERATION_SPECIFIC_RETRY_OPTIONS[context.operation],
       ...customOptions,
     };
 
@@ -109,42 +118,42 @@ export class ContactErrorHandler {
 
     while (attempts < options.maxAttempts) {
       attempts++;
-      
+
       try {
         const result = await operation();
         return {
           success: true,
           data: result,
           attempts,
-          recoveryAction: attempts > 1 ? `Succeeded after ${attempts} attempts` : undefined,
+          recoveryAction:
+            attempts > 1 ? `Succeeded after ${attempts} attempts` : undefined,
         };
       } catch (error) {
         lastError = error;
-        
-        // Call retry callback if provided
+
         if (options.onRetry) {
           options.onRetry(attempts, error);
         }
 
-        // Check if we should retry
-        if (attempts >= options.maxAttempts || !options.retryCondition!(error)) {
+        if (
+          attempts >= options.maxAttempts ||
+          !options.retryCondition!(error)
+        ) {
           break;
         }
 
-        // Calculate delay with exponential backoff
-        const delay = ContactErrorHandler.calculateDelay(attempts, options);
-        await ContactErrorHandler.sleep(delay);
+        const delay = ErrorHandler.calculateDelay(attempts, options);
+        await ErrorHandler.sleep(delay);
       }
     }
 
-    // Convert error to ContactError if needed
-    const contactError = ContactErrorHandler.normalizeError(lastError, context);
-    
+    const appError = ErrorHandler.normalizeError(lastError, context);
+
     return {
       success: false,
-      error: contactError,
+      error: appError,
       attempts,
-      recoveryAction: ContactErrorHandler.suggestRecoveryAction(contactError, context),
+      recoveryAction: ErrorHandler.suggestRecoveryAction(appError, context),
     };
   }
 
@@ -159,67 +168,71 @@ export class ContactErrorHandler {
   ): Promise<ErrorHandlingResult<T>> {
     const options = {
       failureThreshold: 5,
-      recoveryTimeoutMs: 60000, // 1 minute
-      monitoringPeriodMs: 300000, // 5 minutes
+      recoveryTimeoutMs: 60000,
+      monitoringPeriodMs: 300000,
       ...circuitBreakerOptions,
     };
 
-    const circuitKey = `${context.operation}_${context.userId || 'global'}`;
-    
-    if (ContactErrorHandler.isCircuitOpen(circuitKey, options)) {
+    const circuitKey = `${context.operation}_${context.userId || "global"}`;
+
+    if (ErrorHandler.isCircuitOpen(circuitKey, options)) {
       return {
         success: false,
-        error: new ContactError(
-          'Service temporarily unavailable due to repeated failures', 
-          'CIRCUIT_BREAKER_OPEN',
+        error: new AppError(
+          "Service temporarily unavailable due to repeated failures",
+          "CIRCUIT_BREAKER_OPEN",
         ),
         attempts: 0,
-        recoveryAction: 'Wait for circuit breaker recovery or contact support',
+        recoveryAction: "Wait for circuit breaker recovery or contact support",
       };
     }
 
-    const result = await ContactErrorHandler.executeWithRetry(operation, context);
-    
-    // Update circuit breaker state
+    const result = await ErrorHandler.executeWithRetry(operation, context);
+
     if (result.success) {
-      ContactErrorHandler.recordSuccess(circuitKey);
+      ErrorHandler.recordSuccess(circuitKey);
     } else {
-      ContactErrorHandler.recordFailure(circuitKey, options);
+      ErrorHandler.recordFailure(circuitKey, options);
     }
 
     return result;
   }
 
-  private static calculateDelay(attempt: number, options: RetryOptions): number {
+  private static calculateDelay(
+    attempt: number,
+    options: RetryOptions,
+  ): number {
     if (!options.exponentialBackoff) {
       return Math.min(options.baseDelayMs, options.maxDelayMs);
     }
 
-    // Exponential backoff with jitter
     const exponentialDelay = options.baseDelayMs * Math.pow(2, attempt - 1);
-    const jitter = Math.random() * 0.1 * exponentialDelay; // 10% jitter
-    const totalDelay = exponentialDelay + jitter;
-
-    return Math.min(totalDelay, options.maxDelayMs);
+    const jitter = Math.random() * 0.1 * exponentialDelay;
+    return Math.min(exponentialDelay + jitter, options.maxDelayMs);
   }
 
   private static async sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private static isRetryableError(error: unknown): boolean {
     return (
-      ContactErrorHandler.isNetworkError(error) ||
-      ContactErrorHandler.isTemporaryServiceError(error) ||
-      ContactErrorHandler.isTemporaryDatabaseError(error) ||
-      ContactErrorHandler.isRateLimitError(error)
+      ErrorHandler.isNetworkError(error) ||
+      ErrorHandler.isTemporaryServiceError(error) ||
+      ErrorHandler.isTemporaryDatabaseError(error) ||
+      ErrorHandler.isRateLimitError(error)
     );
   }
 
   private static isNetworkError(error: unknown): boolean {
     if (error instanceof Error) {
-      const networkErrorCodes = ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'];
-      return networkErrorCodes.some(code => error.message.includes(code));
+      const networkErrorCodes = [
+        "ECONNRESET",
+        "ECONNREFUSED",
+        "ETIMEDOUT",
+        "ENOTFOUND",
+      ];
+      return networkErrorCodes.some((code) => error.message.includes(code));
     }
     return false;
   }
@@ -227,15 +240,15 @@ export class ContactErrorHandler {
   private static isTemporaryServiceError(error: unknown): boolean {
     if (error instanceof Error) {
       const temporaryMessages = [
-        'service unavailable',
-        'temporary failure',
-        'server busy',
-        'maintenance mode',
-        '503',
-        '502',
-        '504',
+        "service unavailable",
+        "temporary failure",
+        "server busy",
+        "maintenance mode",
+        "503",
+        "502",
+        "504",
       ];
-      return temporaryMessages.some(msg => 
+      return temporaryMessages.some((msg) =>
         error.message.toLowerCase().includes(msg),
       );
     }
@@ -245,14 +258,14 @@ export class ContactErrorHandler {
   private static isTemporaryDatabaseError(error: unknown): boolean {
     if (error instanceof Error) {
       const dbErrorMessages = [
-        'connection timeout',
-        'connection reset',
-        'deadlock',
-        'lock timeout',
-        'connection pool',
-        'database busy',
+        "connection timeout",
+        "connection reset",
+        "deadlock",
+        "lock timeout",
+        "connection pool",
+        "database busy",
       ];
-      return dbErrorMessages.some(msg => 
+      return dbErrorMessages.some((msg) =>
         error.message.toLowerCase().includes(msg),
       );
     }
@@ -260,138 +273,127 @@ export class ContactErrorHandler {
   }
 
   private static isRateLimitError(error: unknown): boolean {
-    if (error instanceof ContactError) {
-      return error.code === 'RATE_LIMITED';
+    if (error instanceof AppError) {
+      return error.code === "RATE_LIMITED";
     }
     if (error instanceof Error) {
-      return error.message.toLowerCase().includes('rate limit') ||
-             error.message.includes('429') ||
-             error.message.toLowerCase().includes('too many requests');
+      return (
+        error.message.toLowerCase().includes("rate limit") ||
+        error.message.includes("429") ||
+        error.message.toLowerCase().includes("too many requests")
+      );
     }
     return false;
   }
 
   private static isRetryableApiError(error: unknown): boolean {
     if (error instanceof Error) {
-      const statusCodes = ['429', '500', '502', '503', '504'];
-      return statusCodes.some(code => error.message.includes(code));
+      const statusCodes = ["429", "500", "502", "503", "504"];
+      return statusCodes.some((code) => error.message.includes(code));
     }
     return false;
   }
 
-  private static isBlockchainRetryableError(error: unknown): boolean {
-    if (error instanceof Error) {
-      const blockchainErrors = [
-        'mempool full',
-        'fee too low',
-        'network congestion',
-        'node unavailable',
-        'consensus failure',
-        'temporary fork',
-      ];
-      return blockchainErrors.some(msg => 
-        error.message.toLowerCase().includes(msg),
-      );
-    }
-    return false;
-  }
-
-  private static normalizeError(error: unknown, context: ErrorRecoveryContext): ContactError {
-    if (error instanceof ContactError) {
+  private static normalizeError(
+    error: unknown,
+    context: ErrorRecoveryContext,
+  ): AppError {
+    if (error instanceof AppError) {
       return error;
     }
 
     if (error instanceof Error) {
-      // Map common error types to ContactError
-      if (error.message.includes('not found')) {
-        return new ContactNotFoundError(context.contactId || 'unknown');
-      }
-      
-      if (error.message.includes('duplicate') || error.message.includes('already exists')) {
-        return new ContactDuplicateError(error.message, context.contactId || 'unknown');
-      }
-      
-      if (error.message.includes('validation') || error.message.includes('invalid')) {
-        return new ContactValidationError(error.message, context.contactId);
+      if (error.message.includes("not found")) {
+        return new NotFoundError(context.resourceId || "unknown");
       }
 
-      return new ContactError(
+      if (
+        error.message.includes("duplicate") ||
+        error.message.includes("already exists")
+      ) {
+        return new DuplicateError(error.message, context.resourceId || "unknown");
+      }
+
+      if (
+        error.message.includes("validation") ||
+        error.message.includes("invalid")
+      ) {
+        return new ValidationError(error.message, context.resourceId);
+      }
+
+      return new AppError(
         `${context.operation} failed: ${error.message}`,
-        'OPERATION_FAILED',
+        "OPERATION_FAILED",
       );
     }
 
-    return new ContactError(
+    return new AppError(
       `${context.operation} failed with unknown error`,
-      'UNKNOWN_ERROR',
+      "UNKNOWN_ERROR",
     );
   }
 
-  private static suggestRecoveryAction(error: ContactError, context: ErrorRecoveryContext): string {
+  private static suggestRecoveryAction(
+    error: AppError,
+    _context: ErrorRecoveryContext,
+  ): string {
     switch (error.code) {
-      case 'NETWORK_ERROR':
-        return 'Check network connectivity and try again';
-      
-      case 'RATE_LIMITED':
-        return 'Wait a few minutes before attempting this operation again';
-      
-      case 'VALIDATION_ERROR':
-        return 'Please review and correct the input data';
-      
-      case 'ACCESS_DENIED':
-        return 'Verify user permissions and authentication status';
-      
-      case 'DUPLICATE_CONTACT':
-        return 'A contact with these details already exists - consider updating the existing contact';
-      
-      case 'CONTACT_NOT_FOUND':
-        return 'The contact may have been deleted or access permissions changed';
-      
-      case 'CIRCUIT_BREAKER_OPEN':
-        return 'Service is temporarily unavailable - please try again later';
-      
-      case 'DATABASE_ERROR':
-        return 'Database operation failed - please try again or contact support';
-      
-      case 'EXTERNAL_SERVICE_ERROR':
-        return 'External service is temporarily unavailable - please try again';
-      
+      case "NETWORK_ERROR":
+        return "Check network connectivity and try again";
+      case "RATE_LIMITED":
+        return "Wait a few minutes before attempting this operation again";
+      case "VALIDATION_ERROR":
+        return "Please review and correct the input data";
+      case "ACCESS_DENIED":
+        return "Verify user permissions and authentication status";
+      case "DUPLICATE_RESOURCE":
+        return "A resource with these details already exists - consider updating the existing record";
+      case "RESOURCE_NOT_FOUND":
+        return "The resource may have been deleted or access permissions changed";
+      case "CIRCUIT_BREAKER_OPEN":
+        return "Service is temporarily unavailable - please try again later";
+      case "DATABASE_ERROR":
+        return "Database operation failed - please try again or contact support";
+      case "EXTERNAL_SERVICE_ERROR":
+        return "External service is temporarily unavailable - please try again";
       default:
-        return 'Please try again or contact support if the problem persists';
+        return "Please try again or contact support if the problem persists";
     }
   }
 
-  // Circuit breaker implementation
-  private static circuitState: Map<string, {
-    failures: number;
-    lastFailureTime: number;
-    isOpen: boolean;
-    successCount: number;
-  }> = new Map();
-
-  private static isCircuitOpen(circuitKey: string, options: {
-    failureThreshold: number;
-    recoveryTimeoutMs: number;
-    monitoringPeriodMs: number;
-  }): boolean {
-    const state = ContactErrorHandler.circuitState.get(circuitKey);
-    
-    if (!state) {
-      return false; // Circuit is closed by default
+  private static circuitState: Map<
+    string,
+    {
+      failures: number;
+      lastFailureTime: number;
+      isOpen: boolean;
+      successCount: number;
     }
+  > = new Map();
 
-    const now = Date.now();
-    
-    // Check if circuit should be reset due to monitoring period expiry
-    if (now - state.lastFailureTime > options.monitoringPeriodMs) {
-      ContactErrorHandler.circuitState.delete(circuitKey);
+  private static isCircuitOpen(
+    circuitKey: string,
+    options: {
+      failureThreshold: number;
+      recoveryTimeoutMs: number;
+      monitoringPeriodMs: number;
+    },
+  ): boolean {
+    const state = ErrorHandler.circuitState.get(circuitKey);
+
+    if (!state) {
       return false;
     }
 
-    // Check if circuit is open and if recovery timeout has passed
+    const now = Date.now();
+
+    if (now - state.lastFailureTime > options.monitoringPeriodMs) {
+      ErrorHandler.circuitState.delete(circuitKey);
+      return false;
+    }
+
     if (state.isOpen) {
       if (now - state.lastFailureTime > options.recoveryTimeoutMs) {
-        // Move to half-open state
         state.isOpen = false;
         state.failures = 0;
         state.successCount = 0;
@@ -403,12 +405,15 @@ export class ContactErrorHandler {
     return false;
   }
 
-  private static recordFailure(circuitKey: string, options: {
-    failureThreshold: number;
-    recoveryTimeoutMs: number;
-    monitoringPeriodMs: number;
-  }): void {
-    const state = ContactErrorHandler.circuitState.get(circuitKey) || {
+  private static recordFailure(
+    circuitKey: string,
+    options: {
+      failureThreshold: number;
+      recoveryTimeoutMs: number;
+      monitoringPeriodMs: number;
+    },
+  ): void {
+    const state = ErrorHandler.circuitState.get(circuitKey) || {
       failures: 0,
       lastFailureTime: 0,
       isOpen: false,
@@ -422,96 +427,97 @@ export class ContactErrorHandler {
       state.isOpen = true;
     }
 
-    ContactErrorHandler.circuitState.set(circuitKey, state);
+    ErrorHandler.circuitState.set(circuitKey, state);
   }
 
   private static recordSuccess(circuitKey: string): void {
-    const state = ContactErrorHandler.circuitState.get(circuitKey);
-    
+    const state = ErrorHandler.circuitState.get(circuitKey);
+
     if (state) {
       state.successCount++;
-      
-      // Reset circuit if we have enough consecutive successes
+
       if (state.successCount >= 3) {
-        ContactErrorHandler.circuitState.delete(circuitKey);
+        ErrorHandler.circuitState.delete(circuitKey);
       } else {
-        ContactErrorHandler.circuitState.set(circuitKey, state);
+        ErrorHandler.circuitState.set(circuitKey, state);
       }
     }
   }
 
-  // Error classification helpers
   public static classifyError(error: unknown): {
-    type: 'network' | 'validation' | 'authorization' | 'business_logic' | 'external_service' | 'database' | 'unknown';
-    severity: 'low' | 'medium' | 'high' | 'critical';
+    type:
+      | "network"
+      | "validation"
+      | "authorization"
+      | "business_logic"
+      | "external_service"
+      | "database"
+      | "unknown";
+    severity: "low" | "medium" | "high" | "critical";
     isRetryable: boolean;
     requiresUserAction: boolean;
   } {
-    if (error instanceof ContactValidationError) {
+    if (error instanceof ValidationError) {
       return {
-        type: 'validation',
-        severity: 'medium',
+        type: "validation",
+        severity: "medium",
         isRetryable: false,
         requiresUserAction: true,
       };
     }
 
-    if (error instanceof ContactNotFoundError) {
+    if (error instanceof NotFoundError) {
       return {
-        type: 'business_logic',
-        severity: 'medium',
+        type: "business_logic",
+        severity: "medium",
         isRetryable: false,
         requiresUserAction: true,
       };
     }
 
-    if (error instanceof ContactDuplicateError) {
+    if (error instanceof DuplicateError) {
       return {
-        type: 'business_logic',
-        severity: 'low',
+        type: "business_logic",
+        severity: "low",
         isRetryable: false,
         requiresUserAction: true,
       };
     }
 
-    if (error instanceof ContactError) {
+    if (error instanceof AppError) {
       switch (error.code) {
-        case 'ACCESS_DENIED':
+        case "ACCESS_DENIED":
           return {
-            type: 'authorization',
-            severity: 'high',
+            type: "authorization",
+            severity: "high",
             isRetryable: false,
             requiresUserAction: true,
           };
-        
-        case 'RATE_LIMITED':
+        case "RATE_LIMITED":
           return {
-            type: 'external_service',
-            severity: 'medium',
+            type: "external_service",
+            severity: "medium",
             isRetryable: true,
             requiresUserAction: false,
           };
-        
-        case 'NETWORK_ERROR':
+        case "NETWORK_ERROR":
           return {
-            type: 'network',
-            severity: 'medium',
+            type: "network",
+            severity: "medium",
             isRetryable: true,
             requiresUserAction: false,
           };
-        
-        case 'DATABASE_ERROR':
+        case "DATABASE_ERROR":
           return {
-            type: 'database',
-            severity: 'high',
+            type: "database",
+            severity: "high",
             isRetryable: true,
             requiresUserAction: false,
           };
-        
         default:
           return {
-            type: 'unknown',
-            severity: 'medium',
+            type: "unknown",
+            severity: "medium",
             isRetryable: true,
             requiresUserAction: false,
           };
@@ -519,19 +525,19 @@ export class ContactErrorHandler {
     }
 
     if (error instanceof Error) {
-      if (ContactErrorHandler.isNetworkError(error)) {
+      if (ErrorHandler.isNetworkError(error)) {
         return {
-          type: 'network',
-          severity: 'medium',
+          type: "network",
+          severity: "medium",
           isRetryable: true,
           requiresUserAction: false,
         };
       }
 
-      if (ContactErrorHandler.isTemporaryDatabaseError(error)) {
+      if (ErrorHandler.isTemporaryDatabaseError(error)) {
         return {
-          type: 'database',
-          severity: 'high',
+          type: "database",
+          severity: "high",
           isRetryable: true,
           requiresUserAction: false,
         };
@@ -539,105 +545,167 @@ export class ContactErrorHandler {
     }
 
     return {
-      type: 'unknown',
-      severity: 'high',
+      type: "unknown",
+      severity: "high",
       isRetryable: false,
       requiresUserAction: true,
     };
   }
 
-  // Enhanced error logging with structured metadata
   public static logError(
-    error: unknown, 
-    context: ErrorRecoveryContext, 
-    classification?: ReturnType<typeof ContactErrorHandler.classifyError>,
+    error: unknown,
+    context: ErrorRecoveryContext,
+    classification?: ReturnType<typeof ErrorHandler.classifyError>,
   ): void {
-    const errorClassification = classification || ContactErrorHandler.classifyError(error);
-    
+    const errorClassification =
+      classification || ErrorHandler.classifyError(error);
+
     const logEntry = {
       timestamp: new Date().toISOString(),
       operation: context.operation,
       userId: context.userId,
-      contactId: context.contactId,
+      resourceId: context.resourceId,
       errorType: errorClassification.type,
       severity: errorClassification.severity,
       isRetryable: errorClassification.isRetryable,
       requiresUserAction: errorClassification.requiresUserAction,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      errorCode: error instanceof ContactError ? error.code : undefined,
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+      errorCode: error instanceof AppError ? error.code : undefined,
       metadata: context.metadata,
       stackTrace: error instanceof Error ? error.stack : undefined,
     };
 
-    // In production, this would send to logging service
-    logger.error('[ContactErrorHandler] Operation failed:', logEntry);
-    
-    // For critical errors, could trigger alerts
-    if (errorClassification.severity === 'critical') {
-      ContactErrorHandler.triggerCriticalErrorAlert(logEntry);
+    console.error("[ErrorHandler] Operation failed:", logEntry);
+
+    if (errorClassification.severity === "critical") {
+      ErrorHandler.triggerCriticalErrorAlert(logEntry);
     }
   }
 
-  private static triggerCriticalErrorAlert(logEntry: Record<string, unknown>): void {
-    // In production, this would send alerts to monitoring system
-    logger.error('[CRITICAL] Contact system critical error:', {
-      operation: logEntry['operation'] as string | undefined,
-      userId: logEntry['userId'] as string | undefined,
-      timestamp: logEntry['timestamp'] as string | undefined,
-      errorMessage: logEntry['errorMessage'],
+  private static triggerCriticalErrorAlert(
+    logEntry: Record<string, unknown>,
+  ): void {
+    console.error("[CRITICAL] System critical error:", {
+      operation: logEntry["operation"] as string | undefined,
+      userId: logEntry["userId"] as string | undefined,
+      timestamp: logEntry["timestamp"] as string | undefined,
+      errorMessage: logEntry["errorMessage"],
     });
   }
 
-  // Error recovery suggestions based on context
   public static getErrorRecoveryPlan(
-    error: ContactError,
-    context: ErrorRecoveryContext,
+    error: AppError,
+    _context: ErrorRecoveryContext,
   ): {
     immediate: string[];
     shortTerm: string[];
     longTerm: string[];
     preventive: string[];
   } {
-    const classification = ContactErrorHandler.classifyError(error);
-    
+    const classification = ErrorHandler.classifyError(error);
+
     const basePlan = {
-      immediate: ['Log error details', 'Notify user of failure'],
-      shortTerm: ['Review error patterns', 'Check system status'],
-      longTerm: ['Analyze root cause', 'Implement preventive measures'],
-      preventive: ['Monitor error rates', 'Regular system health checks'],
+      immediate: ["Log error details", "Notify user of failure"],
+      shortTerm: ["Review error patterns", "Check system status"],
+      longTerm: ["Analyze root cause", "Implement preventive measures"],
+      preventive: ["Monitor error rates", "Regular system health checks"],
     };
 
     switch (classification.type) {
-      case 'network':
+      case "network":
         return {
-          immediate: [...basePlan.immediate, 'Check network connectivity', 'Retry with exponential backoff'],
-          shortTerm: [...basePlan.shortTerm, 'Monitor network stability', 'Consider caching strategy'],
-          longTerm: [...basePlan.longTerm, 'Implement offline mode', 'Optimize network usage'],
-          preventive: [...basePlan.preventive, 'Network monitoring alerts', 'Connection pooling'],
+          immediate: [
+            ...basePlan.immediate,
+            "Check network connectivity",
+            "Retry with exponential backoff",
+          ],
+          shortTerm: [
+            ...basePlan.shortTerm,
+            "Monitor network stability",
+            "Consider caching strategy",
+          ],
+          longTerm: [
+            ...basePlan.longTerm,
+            "Implement offline mode",
+            "Optimize network usage",
+          ],
+          preventive: [
+            ...basePlan.preventive,
+            "Network monitoring alerts",
+            "Connection pooling",
+          ],
         };
 
-      case 'validation':
+      case "validation":
         return {
-          immediate: [...basePlan.immediate, 'Return detailed validation errors', 'Suggest corrections'],
-          shortTerm: [...basePlan.shortTerm, 'Review validation rules', 'Update user guidance'],
-          longTerm: [...basePlan.longTerm, 'Enhance input validation', 'Improve UX feedback'],
-          preventive: [...basePlan.preventive, 'Input sanitization', 'Real-time validation'],
+          immediate: [
+            ...basePlan.immediate,
+            "Return detailed validation errors",
+            "Suggest corrections",
+          ],
+          shortTerm: [
+            ...basePlan.shortTerm,
+            "Review validation rules",
+            "Update user guidance",
+          ],
+          longTerm: [
+            ...basePlan.longTerm,
+            "Enhance input validation",
+            "Improve UX feedback",
+          ],
+          preventive: [
+            ...basePlan.preventive,
+            "Input sanitization",
+            "Real-time validation",
+          ],
         };
 
-      case 'authorization':
+      case "authorization":
         return {
-          immediate: [...basePlan.immediate, 'Verify user session', 'Check permissions'],
-          shortTerm: [...basePlan.shortTerm, 'Review access control rules', 'Audit user roles'],
-          longTerm: [...basePlan.longTerm, 'Enhance security policies', 'Implement fine-grained permissions'],
-          preventive: [...basePlan.preventive, 'Regular permission audits', 'Session monitoring'],
+          immediate: [
+            ...basePlan.immediate,
+            "Verify user session",
+            "Check permissions",
+          ],
+          shortTerm: [
+            ...basePlan.shortTerm,
+            "Review access control rules",
+            "Audit user roles",
+          ],
+          longTerm: [
+            ...basePlan.longTerm,
+            "Enhance security policies",
+            "Implement fine-grained permissions",
+          ],
+          preventive: [
+            ...basePlan.preventive,
+            "Regular permission audits",
+            "Session monitoring",
+          ],
         };
 
-      case 'external_service':
+      case "external_service":
         return {
-          immediate: [...basePlan.immediate, 'Check service status', 'Use fallback if available'],
-          shortTerm: [...basePlan.shortTerm, 'Monitor service health', 'Review SLA compliance'],
-          longTerm: [...basePlan.longTerm, 'Implement service redundancy', 'Negotiate better SLAs'],
-          preventive: [...basePlan.preventive, 'Service health monitoring', 'Fallback mechanisms'],
+          immediate: [
+            ...basePlan.immediate,
+            "Check service status",
+            "Use fallback if available",
+          ],
+          shortTerm: [
+            ...basePlan.shortTerm,
+            "Monitor service health",
+            "Review SLA compliance",
+          ],
+          longTerm: [
+            ...basePlan.longTerm,
+            "Implement service redundancy",
+            "Negotiate better SLAs",
+          ],
+          preventive: [
+            ...basePlan.preventive,
+            "Service health monitoring",
+            "Fallback mechanisms",
+          ],
         };
 
       default:
@@ -645,7 +713,6 @@ export class ContactErrorHandler {
     }
   }
 
-  // Batch operation error handling
   public static async handleBatchOperationErrors<T>(
     operations: Array<() => Promise<T>>,
     context: ErrorRecoveryContext,
@@ -656,7 +723,7 @@ export class ContactErrorHandler {
     },
   ): Promise<{
     successes: T[];
-    failures: Array<{ index: number; error: ContactError; attempts: number }>;
+    failures: Array<{ index: number; error: AppError; attempts: number }>;
     summary: {
       total: number;
       successful: number;
@@ -672,9 +739,12 @@ export class ContactErrorHandler {
     };
 
     const successes: T[] = [];
-    const failures: Array<{ index: number; error: ContactError; attempts: number }> = [];
-    
-    // Process operations in batches to control concurrency
+    const failures: Array<{
+      index: number;
+      error: AppError;
+      attempts: number;
+    }> = [];
+
     for (let i = 0; i < operations.length; i += opts.maxConcurrent) {
       const batch = operations.slice(i, i + opts.maxConcurrent);
       const batchPromises = batch.map(async (operation, batchIndex) => {
@@ -684,15 +754,15 @@ export class ContactErrorHandler {
           metadata: { ...context.metadata, operationIndex },
         };
 
-        return ContactErrorHandler.executeWithRetry(operation, operationContext);
+        return ErrorHandler.executeWithRetry(operation, operationContext);
       });
 
       const batchResults = await Promise.all(batchPromises);
-      
+
       for (let j = 0; j < batchResults.length; j++) {
         const result = batchResults[j];
         const operationIndex = i + j;
-        
+
         if (result.success && result.data !== undefined) {
           successes.push(result.data);
         } else if (result.error) {
@@ -701,25 +771,28 @@ export class ContactErrorHandler {
             error: result.error,
             attempts: result.attempts,
           });
-          
+
           if (opts.failFast) {
-            // Stop processing remaining operations
-            return ContactErrorHandler.buildBatchResult(successes, failures, operations.length);
+            return ErrorHandler.buildBatchResult(
+              successes,
+              failures,
+              operations.length,
+            );
           }
         }
       }
     }
 
-    return ContactErrorHandler.buildBatchResult(successes, failures, operations.length);
+    return ErrorHandler.buildBatchResult(successes, failures, operations.length);
   }
 
   private static buildBatchResult<T>(
     successes: T[],
-    failures: Array<{ index: number; error: ContactError; attempts: number }>,
+    failures: Array<{ index: number; error: AppError; attempts: number }>,
     total: number,
   ) {
-    const retryableCount = failures.filter(f => 
-      ContactErrorHandler.classifyError(f.error).isRetryable,
+    const retryableCount = failures.filter(
+      (f) => ErrorHandler.classifyError(f.error).isRetryable,
     ).length;
 
     return {
@@ -735,7 +808,6 @@ export class ContactErrorHandler {
   }
 }
 
-// Decorator for automatic error handling
 export function withErrorHandling(
   context: ErrorRecoveryContext,
   retryOptions?: Partial<RetryOptions>,
@@ -746,33 +818,33 @@ export function withErrorHandling(
     descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
-    
+
     descriptor.value = async function (...args: any[]): Promise<T> {
       const fullContext = {
         ...context,
-        metadata: { 
-          ...context.metadata, 
+        metadata: {
+          ...context.metadata,
           methodName: propertyKey,
-          className: target.constructor.name, 
+          className: target.constructor.name,
         },
       };
 
-      const result = await ContactErrorHandler.executeWithRetry(
+      const result = await ErrorHandler.executeWithRetry(
         () => originalMethod.apply(this, args),
         fullContext,
         retryOptions,
       );
 
-      // Log errors
       if (!result.success && result.error) {
-        ContactErrorHandler.logError(result.error, fullContext);
+        ErrorHandler.logError(result.error, fullContext);
       }
 
-      // Return result or throw error based on method expectation
       if (result.success && result.data !== undefined) {
         return result.data as T;
       } else {
-        throw result.error || new ContactError('Operation failed', 'OPERATION_FAILED');
+        throw (
+          result.error || new AppError("Operation failed", "OPERATION_FAILED")
+        );
       }
     };
 
@@ -780,59 +852,58 @@ export function withErrorHandling(
   };
 }
 
-// Utility for graceful degradation
 export class GracefulDegradationHandler {
   public static async executeWithFallback<T>(
     primaryOperation: () => Promise<T>,
     fallbackOperation: () => Promise<T>,
     context: ErrorRecoveryContext,
     options?: {
-      fallbackThreshold?: number; // Number of failures before using fallback
+      fallbackThreshold?: number;
       fallbackCacheDurationMs?: number;
     },
   ): Promise<T> {
     const opts = {
       fallbackThreshold: 3,
-      fallbackCacheDurationMs: 300000, // 5 minutes
+      fallbackCacheDurationMs: 300000,
       ...options,
     };
 
     const fallbackKey = `${context.operation}_fallback`;
-    
-    // Check if we should use fallback based on recent failures
-    if (GracefulDegradationHandler.shouldUseFallback(fallbackKey, opts.fallbackThreshold)) {
+
+    if (
+      GracefulDegradationHandler.shouldUseFallback(
+        fallbackKey,
+        opts.fallbackThreshold,
+      )
+    ) {
       try {
         const result = await fallbackOperation();
         GracefulDegradationHandler.recordFallbackSuccess(fallbackKey);
         return result;
       } catch (fallbackError) {
-        // If fallback also fails, try primary operation
-        ContactErrorHandler.logError(fallbackError, {
+        ErrorHandler.logError(fallbackError, {
           ...context,
           operation: `${context.operation}_fallback`,
         });
       }
     }
 
-    // Try primary operation
     try {
       const result = await primaryOperation();
       GracefulDegradationHandler.recordPrimarySuccess(fallbackKey);
       return result;
     } catch (primaryError) {
       GracefulDegradationHandler.recordPrimaryFailure(fallbackKey);
-      
-      // Use fallback as last resort
+
       try {
         const result = await fallbackOperation();
-        ContactErrorHandler.logError(primaryError, {
+        ErrorHandler.logError(primaryError, {
           ...context,
           metadata: { ...context.metadata, usedFallback: true },
         });
         return result;
       } catch (fallbackError) {
-        // Both failed - throw the primary error
-        ContactErrorHandler.logError(fallbackError, {
+        ErrorHandler.logError(fallbackError, {
           ...context,
           operation: `${context.operation}_fallback_final`,
         });
@@ -841,13 +912,19 @@ export class GracefulDegradationHandler {
     }
   }
 
-  private static fallbackState: Map<string, {
-    primaryFailures: number;
-    lastPrimaryFailure: number;
-    useFallback: boolean;
-  }> = new Map();
+  private static fallbackState: Map<
+    string,
+    {
+      primaryFailures: number;
+      lastPrimaryFailure: number;
+      useFallback: boolean;
+    }
+  > = new Map();
 
-  private static shouldUseFallback(fallbackKey: string, threshold: number): boolean {
+  private static shouldUseFallback(
+    fallbackKey: string,
+    _threshold: number,
+  ): boolean {
     const state = GracefulDegradationHandler.fallbackState.get(fallbackKey);
     return state ? state.useFallback : false;
   }
@@ -861,7 +938,7 @@ export class GracefulDegradationHandler {
 
     state.primaryFailures++;
     state.lastPrimaryFailure = Date.now();
-    
+
     if (state.primaryFailures >= 3) {
       state.useFallback = true;
     }
@@ -873,17 +950,15 @@ export class GracefulDegradationHandler {
     const state = GracefulDegradationHandler.fallbackState.get(fallbackKey);
     if (state) {
       state.primaryFailures = Math.max(0, state.primaryFailures - 1);
-      
+
       if (state.primaryFailures === 0) {
         state.useFallback = false;
       }
-      
+
       GracefulDegradationHandler.fallbackState.set(fallbackKey, state);
     }
   }
 
-  private static recordFallbackSuccess(fallbackKey: string): void {
-    // Don't reset primary failure count on fallback success
-    // This prevents rapid switching between primary and fallback
-  }
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  private static recordFallbackSuccess(_fallbackKey: string): void {}
 }

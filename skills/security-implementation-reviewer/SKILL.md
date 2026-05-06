@@ -8,7 +8,7 @@ license: Complete terms in LICENSE.txt
 
 ## Purpose
 
-To systematically review security implementations in the Goji wallet, focusing on:
+To systematically review security implementations in mobile wallet and financial apps, focusing on:
 - Defense-in-depth encryption architecture (3 layers: application, OS, access control)
 - Cryptographic best practices (AES-256-GCM authenticated encryption, PBKDF2 key derivation)
 - Biometric and PIN authentication patterns
@@ -186,8 +186,8 @@ See `references/` for detailed architecture:
 ## Implementation Locations
 
 Review these files for security patterns:
-- `/apps/goji-wallet/services/security/mnemonic-encryption.service.ts` - Encryption layer
-- `/apps/goji-wallet/services/security/mnemonic-storage.service.ts` - Storage layer
-- `/apps/goji-wallet/services/security/biometric-auth.service.ts` - Access control layer
+- `/apps/<your-app>/services/security/mnemonic-encryption.service.ts` - Encryption layer
+- `/apps/<your-app>/services/security/mnemonic-storage.service.ts` - Storage layer
+- `/apps/<your-app>/services/security/biometric-auth.service.ts` - Access control layer
 
-Run security test coverage: `npx nx test goji-wallet --coverage` (target: >95%)
+Run security test coverage: `npx nx test <your-app> --coverage` (target: >95%)

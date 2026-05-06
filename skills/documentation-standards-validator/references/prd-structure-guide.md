@@ -265,7 +265,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 **Format**: `epic.[number].[descriptive-name].md`
 
 **CRITICAL - Global Epic Numbering**:
-- Epic numbers are **globally unique** across the entire Goji system
+- Epic numbers are **globally unique** across the entire your project
 - Numbers are assigned system-wide, NOT per-feature
 - Check `/docs/development/epic-registry.md` for next available number
 - Update registry when creating new epics

@@ -1,6 +1,6 @@
 ---
 name: testing-setup-react-native
-description: Guide developers through React Native specific testing patterns for goji-wallet including component testing, screen testing, hooks, native module mocking, and user interaction patterns with React Native Testing Library
+description: Guide developers through React Native specific testing patterns including component testing, screen testing, hooks, native module mocking, and user interaction patterns with React Native Testing Library
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -23,7 +23,7 @@ Invoke this skill when you need to test:
 
 ## Overview
 
-React Native testing in goji-wallet uses:
+React Native testing in my-wallet uses:
 - **Framework**: React Native Testing Library 13.3.3
 - **Test Runner**: Jest 30.2.0
 - **Preset**: `jest-expo` (Expo SDK 54)
@@ -267,7 +267,7 @@ describe('AuthContext', () => {
 
 **Impact**: Can improve pass rate by 20-30% when isolation issues exist.
 
-**Example from goji-wallet**: auth-context tests went from 67% to 90% pass rate by adding comprehensive beforeEach mock resets for 85+ methods across 15 services.
+**Example from my-wallet**: auth-context tests went from 67% to 90% pass rate by adding comprehensive beforeEach mock resets for 85+ methods across 15 services.
 
 ---
 
@@ -396,7 +396,7 @@ jest.mock('expo-router', () => ({
 }));
 
 // Mock logger
-import * as loggingLib from '@goji-system/logging-lib/client';
+import * as loggingLib from '@my-system/logging-lib/client';
 jest.spyOn(loggingLib, 'logger', 'get').mockReturnValue({
   info: jest.fn(),
   error: jest.fn(),
@@ -440,7 +440,7 @@ describe('DashboardScreen', () => {
 
 ```typescript
 import { render, screen } from '@testing-library/react-native';
-import { generateMockUser, generateMockTransaction } from '@goji-system/mock-data-lib/client';
+import { generateMockUser, generateMockTransaction } from '@my-system/mock-data-lib/client';
 import TransactionListScreen from './transaction-list';
 
 describe('TransactionListScreen', () => {
@@ -468,7 +468,7 @@ describe('TransactionListScreen', () => {
 
 ### 4.1 AsyncStorage Mock
 
-**Setup** (already configured in `apps/goji-wallet/test-setup.ts`):
+**Setup** (already configured in `apps/my-wallet/test-setup.ts`):
 
 ```typescript
 // Test usage
@@ -520,7 +520,7 @@ describe('Screen with Navigation', () => {
 
 ### 4.3 Reanimated Mock
 
-**Setup** (already configured in `apps/goji-wallet/jest-pre-setup.js`):
+**Setup** (already configured in `apps/my-wallet/jest-pre-setup.js`):
 
 ```typescript
 // Mock is global, no additional setup needed in tests
@@ -777,7 +777,7 @@ it('should wait for slow operation', async () => {
 ### 9.1 Testing with Mock Data Library
 
 ```typescript
-import { generateMockUser, generateMockWallet } from '@goji-system/mock-data-lib/client';
+import { generateMockUser, generateMockWallet } from '@my-system/mock-data-lib/client';
 
 describe('Wallet Screen', () => {
   it('should display wallet balance', () => {
@@ -794,7 +794,7 @@ describe('Wallet Screen', () => {
 ### 9.2 Testing with Logger Mock
 
 ```typescript
-import * as loggingLib from '@goji-system/logging-lib/client';
+import * as loggingLib from '@my-system/logging-lib/client';
 
 describe('Component with Logging', () => {
   let loggerSpy: jest.SpyInstance;
@@ -870,17 +870,17 @@ describe('Multi-Screen Flow', () => {
 ### 10.1 Run React Native Tests
 
 ```bash
-# Run all client tests for goji-wallet
-npx nx test goji-wallet --no-cache
+# Run all client tests for my-wallet
+npx nx test my-wallet --no-cache
 
 # Run with coverage
-npx nx test goji-wallet --coverage
+npx nx test my-wallet --coverage
 
 # Run specific test file
-npx nx test goji-wallet --testFile=components/button.spec.ts
+npx nx test my-wallet --testFile=components/button.spec.ts
 
 # Watch mode
-npx nx test goji-wallet --watch
+npx nx test my-wallet --watch
 ```
 
 ### 10.2 Coverage Requirements
@@ -899,7 +899,7 @@ npx nx test goji-wallet --watch
 
 **Check Coverage Report**:
 ```bash
-open test-output/jest/coverage/apps/goji-wallet/index.html
+open test-output/jest/coverage/apps/my-wallet/index.html
 ```
 
 ---
@@ -910,7 +910,7 @@ open test-output/jest/coverage/apps/goji-wallet/index.html
 
 **Cause**: Missing mock for native module
 
-**Solution**: Add mock in `apps/goji-wallet/test-setup.ts`:
+**Solution**: Add mock in `apps/my-wallet/test-setup.ts`:
 ```typescript
 jest.mock('react-native-module-name', () => ({
   // Mock implementation
@@ -969,5 +969,5 @@ Before completing, verify:
 
 - `docs/development/testing-framework-guide.md` - Comprehensive testing guide
 - `docs/development/testing.md` - General testing strategy
-- `apps/goji-wallet/test-setup.ts` - Global React Native test configuration
+- `apps/my-wallet/test-setup.ts` - Global React Native test configuration
 - React Native Testing Library: https://callstack.github.io/react-native-testing-library/

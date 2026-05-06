@@ -1116,4 +1116,4 @@ docs/development/tasks/task.1.cache-lib-simplification/task.1.gate.1.cache-lib-s
 
 **Last Updated**: 2025-10-31
 **Version**: 1.0
-**Maintainer**: Goji QA Team
+**Maintainer**: QA Team

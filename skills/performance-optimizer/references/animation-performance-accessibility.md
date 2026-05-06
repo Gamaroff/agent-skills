@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document establishes performance standards and accessibility requirements for animations in the Goji Mobile Wallet, with specific focus on the bottom action bar morphing animation. These guidelines ensure consistent, smooth, and inclusive user experiences across all supported devices and user configurations.
+This document establishes performance standards and accessibility requirements for animations in the your mobile wallet app, with specific focus on the bottom action bar morphing animation. These guidelines ensure consistent, smooth, and inclusive user experiences across all supported devices and user configurations.
 
 ## Performance Standards
 
@@ -724,4 +724,4 @@ const ALERT_THRESHOLDS = {
 - [ ] Focus management during animations correct
 - [ ] Timing requirements met (no auto-advancing content >5 seconds)
 
-This comprehensive guide ensures that all animations in the Goji Mobile Wallet meet high standards for performance, accessibility, and user experience across all supported devices and user configurations.
+This comprehensive guide ensures that all animations in the your mobile wallet app meet high standards for performance, accessibility, and user experience across all supported devices and user configurations.

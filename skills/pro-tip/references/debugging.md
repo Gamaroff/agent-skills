@@ -53,7 +53,7 @@ In a proxied setup (Vite dev proxy → API, Nginx → API, Railway routing), a f
 
 When a Docker container fails, check `docker logs <container>` before rebuilding the image. Most failures are runtime issues (missing env vars, port conflicts, failed migrations) that rebuilding won't fix. Only rebuild when you've changed a Dockerfile or dependency.
 
-**Example:** `docker logs goji-web-api-1` shows `Cannot find module 'nodemailer'` → missing from app-level `package.json`, not a Docker issue.
+**Example:** `docker logs my-web-api-1` shows `Cannot find module 'nodemailer'` → missing from app-level `package.json`, not a Docker issue.
 **Why it matters:** Docker rebuilds are slow (minutes); log inspection is fast (seconds). Rebuild-first debugging wastes significant time.
 
 ---

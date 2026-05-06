@@ -1,6 +1,6 @@
 # Database Index & Performance Guide
 
-Comprehensive guide to database optimization, indexing strategies, and query patterns for optimal performance in the Goji platform.
+Comprehensive guide to database optimization, indexing strategies, and query patterns for optimal performance in your platform.
 
 > **For schema details**, see [Schema Catalog](./schema-catalog.md)  
 > **For relationships**, see [Relationship Mapping](./relationship-mapping.md)  
@@ -383,7 +383,7 @@ REINDEX TABLE transactions;
 **PgBouncer Settings (Production)**
 ```ini
 [databases]
-goji = host=localhost port=5432 dbname=goji
+my-app = host=localhost port=5432 dbname=my-app
 
 [pgbouncer] 
 pool_mode = transaction

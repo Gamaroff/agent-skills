@@ -171,7 +171,7 @@ All technical details MUST be:
 
 ## Epic Numbering System
 
-**IMPORTANT**: Epic numbers are **globally unique** across the entire Goji system.
+**IMPORTANT**: Epic numbers are **globally unique** across the entire your project.
 
 **Key Points**:
 

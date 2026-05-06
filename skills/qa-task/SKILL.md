@@ -948,4 +948,4 @@ docs/development/tasks/task.1.cache-lib-simplification/
 
 **Last Updated**: 2026-03-20
 **Version**: 2.0
-**Maintainer**: Goji QA Team
+**Maintainer**: QA Team

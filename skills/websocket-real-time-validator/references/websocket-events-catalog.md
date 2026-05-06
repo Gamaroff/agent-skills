@@ -45,7 +45,7 @@ Clients update local state
 import io from 'socket.io-client';
 
 // Connect to groups namespace
-const socket = io('ws://api.goji.com/groups', {
+const socket = io('ws://api.example.com/groups', {
   auth: {
     token: userJwtToken // JWT token for authentication
   },
@@ -234,14 +234,14 @@ interface GroupUpdatedEvent {
     {
       "field": "avatarUrl",
       "oldValue": null,
-      "newValue": "https://cdn.goji.com/avatars/abc123.jpg"
+      "newValue": "https://cdn.example.com/avatars/abc123.jpg"
     }
   ],
   "group": {
     "id": "grp_abc123",
     "type": "private",
     "name": "Family Chat",
-    "avatarUrl": "https://cdn.goji.com/avatars/abc123.jpg",
+    "avatarUrl": "https://cdn.example.com/avatars/abc123.jpg",
     "visibility": "private",
     "capabilities": ["chat", "payments"],
     "memberCount": 2
@@ -1959,7 +1959,7 @@ localStorage.setItem('debug', 'socket.io-client:*');
 
 // Or in code
 import io from 'socket.io-client';
-const socket = io('ws://api.goji.com/groups', {
+const socket = io('ws://api.example.com/groups', {
   auth: { token: userToken }
 });
 
@@ -1992,13 +1992,13 @@ setInterval(() => {
 ### Technical References
 
 - [Socket.IO Documentation](https://socket.io/docs/v4/) - Official Socket.IO docs
-- [ChatService](../../../../../apps/goji-api/src/chat/chat.service.ts) - Existing WebSocket implementation
-- [GroupsService](../../../../../apps/goji-api/src/groups/groups.service.ts) - Group business logic
+- [ChatService](../../../../../apps/my-api/src/chat/chat.service.ts) - Existing WebSocket implementation
+- [GroupsService](../../../../../apps/my-api/src/groups/groups.service.ts) - Group business logic
 
 ### Code Examples
 
-- Example WebSocket client: `apps/goji-wallet/services/websocket-client.ts` (to be created)
-- Example event handlers: `apps/goji-wallet/hooks/useGroupEvents.ts` (to be created)
+- Example WebSocket client: `apps/my-wallet/services/websocket-client.ts` (to be created)
+- Example event handlers: `apps/my-wallet/hooks/useGroupEvents.ts` (to be created)
 
 ---
 

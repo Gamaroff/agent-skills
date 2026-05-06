@@ -201,16 +201,16 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 1. **API endpoint validation** — for each new endpoint the epic plans:
    - Check against `.claude/backend-patterns.md` versioning rules
-   - Grep codebase for existing route: `apps/goji-api/src/**/*.controller.ts`
+   - Grep codebase for existing route: `apps/my-api/src/**/*.controller.ts`
    - Validate naming: `@Controller({ path: '...', version: '...' })` pattern
 
 2. **Service/module duplication check** — for each service/module planned:
-   - Glob: `apps/goji-api/src/**/*[service-name]*.ts`
+   - Glob: `apps/my-api/src/**/*[service-name]*.ts`
    - Grep: `export class [ServiceName]Service`
    - If found: note file path and what it already implements
 
 3. **Frontend component duplication check** — for each UI component planned:
-   - Glob: `apps/goji-wallet/**/*[component-name]*`
+   - Glob: `apps/my-wallet/**/*[component-name]*`
    - If found: note file path
 
 4. **BSV constraint check** — if epic touches wallet/payments:

@@ -9,7 +9,7 @@ license: MIT
 
 ## Overview
 
-This skill validates and enforces consistent `StandardSuccessResponse` wrapping patterns across the Goji NestJS API, ensuring frontend-backend contract alignment and preventing response structure inconsistencies that cause data extraction failures.
+This skill validates and enforces consistent `StandardSuccessResponse` wrapping patterns across your app NestJS API, ensuring frontend-backend contract alignment and preventing response structure inconsistencies that cause data extraction failures.
 
 **Core Principle**: All HTTP API endpoints must return responses wrapped in `StandardSuccessResponse` format `{ success: true, data: T, metadata?: ResponseMetadata }`. Different response types require different handling approaches.
 
@@ -42,7 +42,7 @@ Invoke this skill when:
 
 **What**: All REST API HTTP endpoints in controller files
 
-**Location**: `apps/goji-api/src/**/*.controller.ts`
+**Location**: `apps/my-api/src/**/*.controller.ts`
 
 **Must Return**:
 - `StandardSuccessResponse<T>` - Success responses with data
@@ -115,7 +115,7 @@ async findOne(@Param('id') id: string) {
 
 **What**: Data Transfer Objects that represent the `data` field content inside StandardSuccessResponse
 
-**Location**: `apps/goji-api/src/**/dto/*-response.dto.ts`
+**Location**: `apps/my-api/src/**/dto/*-response.dto.ts`
 
 **Purpose**: DTOs are the PAYLOAD, not the wrapper
 
@@ -176,7 +176,7 @@ export class NotificationResponseDto {
 
 **What**: Internal interfaces used for communication between services, NOT returned from controllers
 
-**Location**: `apps/goji-api/src/**/*.service.ts`
+**Location**: `apps/my-api/src/**/*.service.ts`
 
 **Purpose**: Internal data structures for service-to-service communication
 
@@ -226,7 +226,7 @@ async searchMessages(query: string): Promise<StandardSuccessResponse<MessageSear
 
 **What**: WebSocket events have their own structure, separate from HTTP responses
 
-**Location**: `apps/goji-api/src/**/*.gateway.ts`
+**Location**: `apps/my-api/src/**/*.gateway.ts`
 
 **Purpose**: Real-time event notifications over WebSocket connections
 
@@ -367,44 +367,44 @@ Check for file downloads, images, etc. → Verify raw response marker (Category 
 
 ```bash
 # Find explicit wrapping (GOOD)
-grep -n "new StandardSuccessResponse" apps/goji-api/src/**/*.controller.ts
-grep -n "new StandardPaginatedResponse" apps/goji-api/src/**/*.controller.ts
-grep -n "createRawResponse" apps/goji-api/src/**/*.controller.ts
+grep -n "new StandardSuccessResponse" apps/my-api/src/**/*.controller.ts
+grep -n "new StandardPaginatedResponse" apps/my-api/src/**/*.controller.ts
+grep -n "createRawResponse" apps/my-api/src/**/*.controller.ts
 
 # Find potential interceptor reliance (CHECK DOCUMENTATION)
-grep -n "return.*await.*Service" apps/goji-api/src/**/*.controller.ts
+grep -n "return.*await.*Service" apps/my-api/src/**/*.controller.ts
 
 # Find violations (BAD)
-grep -n "return.*{ success:" apps/goji-api/src/**/*.controller.ts
+grep -n "return.*{ success:" apps/my-api/src/**/*.controller.ts
 ```
 
 **For DTOs (Payload structures)**:
 
 ```bash
 # Check for inappropriate wrapper fields (VIOLATION)
-grep -n "success:" apps/goji-api/src/**/dto/*-response.dto.ts
-grep -n "data:" apps/goji-api/src/**/dto/*-response.dto.ts
+grep -n "success:" apps/my-api/src/**/dto/*-response.dto.ts
+grep -n "data:" apps/my-api/src/**/dto/*-response.dto.ts
 ```
 
 **For Services (Internal interfaces)**:
 
 ```bash
 # Ensure service methods return typed data
-grep -n "Promise<" apps/goji-api/src/**/*.service.ts
+grep -n "Promise<" apps/my-api/src/**/*.service.ts
 
 # Check for inappropriate StandardSuccessResponse in services (VIOLATION)
-grep -n "StandardSuccessResponse" apps/goji-api/src/**/*.service.ts
+grep -n "StandardSuccessResponse" apps/my-api/src/**/*.service.ts
 ```
 
 **For Gateways (WebSocket)**:
 
 ```bash
 # Check WebSocket event structure
-grep -n "@SubscribeMessage" apps/goji-api/src/**/*.gateway.ts
-grep -n "this.server.emit" apps/goji-api/src/**/*.gateway.ts
+grep -n "@SubscribeMessage" apps/my-api/src/**/*.gateway.ts
+grep -n "this.server.emit" apps/my-api/src/**/*.gateway.ts
 
 # Check for inappropriate HTTP wrapping (VIOLATION)
-grep -n "StandardSuccessResponse" apps/goji-api/src/**/*.gateway.ts
+grep -n "StandardSuccessResponse" apps/my-api/src/**/*.gateway.ts
 ```
 
 ### Step 3: Validate Pattern Consistency
@@ -532,23 +532,23 @@ Use this checklist to verify compliance:
 ## Critical Files Reference
 
 **Core Infrastructure**:
-- `apps/goji-api/src/common/dto/standard-response.dto.ts` - Response wrapper definitions
-- `apps/goji-api/src/common/interceptors/response-transform.interceptor.ts` - Auto-wrapping logic
-- `apps/goji-api/src/common/filters/global-exception.filter.ts` - Error response wrapping
-- `apps/goji-api/src/main.ts` - Global interceptor registration
+- `apps/my-api/src/common/dto/standard-response.dto.ts` - Response wrapper definitions
+- `apps/my-api/src/common/interceptors/response-transform.interceptor.ts` - Auto-wrapping logic
+- `apps/my-api/src/common/filters/global-exception.filter.ts` - Error response wrapping
+- `apps/my-api/src/main.ts` - Global interceptor registration
 
 **Reference Controllers**:
-- `apps/goji-api/src/wallets/wallets.controller.ts` - Explicit wrapping pattern (all 14 endpoints)
-- `apps/goji-api/src/auth/auth.controller.ts` - Interceptor reliance pattern
-- `apps/goji-api/src/help/help.controller.ts` - Standard CRUD pattern
+- `apps/my-api/src/wallets/wallets.controller.ts` - Explicit wrapping pattern (all 14 endpoints)
+- `apps/my-api/src/auth/auth.controller.ts` - Interceptor reliance pattern
+- `apps/my-api/src/help/help.controller.ts` - Standard CRUD pattern
 
 **Response DTOs**:
-- `apps/goji-api/src/help/dto/conversation-response.dto.ts` - Payload DTO example
-- `apps/goji-api/src/notifications/dto/notification-response.dto.ts` - Payload DTO example
+- `apps/my-api/src/help/dto/conversation-response.dto.ts` - Payload DTO example
+- `apps/my-api/src/notifications/dto/notification-response.dto.ts` - Payload DTO example
 
 **WebSocket**:
-- `apps/goji-api/src/common/websocket/websocket-events.ts` - Event structure definitions
-- `apps/goji-api/src/chat/chat.gateway.ts` - Gateway implementation example
+- `apps/my-api/src/common/websocket/websocket-events.ts` - Event structure definitions
+- `apps/my-api/src/chat/chat.gateway.ts` - Gateway implementation example
 
 **Frontend**:
-- `apps/goji-wallet/services/api/base-api.ts` - Response extraction logic (line 483-488)
+- `apps/my-wallet/services/api/base-api.ts` - Response extraction logic (line 483-488)

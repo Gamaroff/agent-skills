@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides practical development workflows and best practices for implementing and maintaining the platform-specific architecture in the Goji mobile wallet project. It covers daily development tasks, debugging, testing, and deployment considerations when working with client/server separation patterns.
+This guide provides practical development workflows and best practices for implementing and maintaining the platform-specific architecture in the your mobile wallet app project. It covers daily development tasks, debugging, testing, and deployment considerations when working with client/server separation patterns.
 
 ## Quick Reference
 
@@ -17,7 +17,7 @@ import {
   comparePassword,
   generateTokenPair,
   verifyAccessToken
-} from '@goji-system/auth-lib';
+} from '@my-system/auth-lib';
 
 // Server-only utilities (includes AES encryption, HMAC signing)
 import {
@@ -25,10 +25,10 @@ import {
   decryptData,
   generateHMAC,
   verifyHMAC
-} from '@goji-system/shared-utils/server';
+} from '@my-system/shared-utils/server';
 
 // Common utilities (validation, formatting)
-import { validateEmail, formatCurrency } from '@goji-system/shared-utils';
+import { validateEmail, formatCurrency } from '@my-system/shared-utils';
 ```
 
 #### Client-Side Imports (React Native Mobile)
@@ -39,17 +39,17 @@ import {
   decodeToken,
   isTokenExpired,
   validateLoginCredentials
-} from '@goji-system/auth-lib/src/client';
+} from '@my-system/auth-lib/src/client';
 
 // Client-only utilities (device detection, local storage)
 import {
   getDeviceInfo,
   detectPlatform,
   generateClientId
-} from '@goji-system/shared-utils/client';
+} from '@my-system/shared-utils/client';
 
 // Common utilities (validation, formatting)
-import { validateEmail, formatCurrency } from '@goji-system/shared-utils';
+import { validateEmail, formatCurrency } from '@my-system/shared-utils';
 ```
 
 ## Development Workflows
@@ -58,7 +58,7 @@ import { validateEmail, formatCurrency } from '@goji-system/shared-utils';
 
 #### Server-Side Authentication Implementation
 
-**File**: `apps/goji-api/src/modules/auth/auth.service.ts`
+**File**: `apps/my-api/src/modules/auth/auth.service.ts`
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -67,7 +67,7 @@ import {
   comparePassword,
   generateTokenPair,
   verifyAccessToken
-} from '@goji-system/auth-lib';
+} from '@my-system/auth-lib';
 import { RegisterDto, LoginDto } from './dto';
 
 @Injectable()
@@ -131,15 +131,15 @@ export class AuthService {
 
 #### Client-Side Authentication Implementation
 
-**File**: `apps/goji-wallet/services/api/auth-service.ts`
+**File**: `apps/my-wallet/services/api/auth-service.ts`
 
 ```typescript
 import {
   decodeToken,
   isTokenExpired,
   validateLoginCredentials
-} from '@goji-system/auth-lib/src/client';
-import { LoginRequest, RegisterRequest } from '@goji-system/shared-types';
+} from '@my-system/auth-lib/src/client';
+import { LoginRequest, RegisterRequest } from '@my-system/shared-types';
 import { ApiService } from './base-api-service';
 
 export class AuthService extends ApiService {
@@ -215,7 +215,7 @@ export async function encryptData(
 
   // Encrypt using AES-256-GCM
   const cipher = crypto.createCipher('aes-256-gcm', key);
-  cipher.setAAD(Buffer.from('goji-wallet', 'utf8'));
+  cipher.setAAD(Buffer.from('my-wallet', 'utf8'));
 
   let encrypted = cipher.update(data, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -285,15 +285,15 @@ export function generateClientId(): string {
 
 #### Server-Side Testing
 
-**File**: `apps/goji-api/src/modules/auth/__tests__/auth.service.spec.ts`
+**File**: `apps/my-api/src/modules/auth/__tests__/auth.service.spec.ts`
 
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../auth.service';
-import * as authLib from '@goji-system/auth-lib';
+import * as authLib from '@my-system/auth-lib';
 
 // Mock the entire auth library for server testing
-jest.mock('@goji-system/auth-lib');
+jest.mock('@my-system/auth-lib');
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -329,14 +329,14 @@ describe('AuthService', () => {
 
 #### Client-Side Testing
 
-**File**: `apps/goji-wallet/services/api/__tests__/auth-service.spec.ts`
+**File**: `apps/my-wallet/services/api/__tests__/auth-service.spec.ts`
 
 ```typescript
 import { AuthService } from '../auth-service';
-import * as authMobile from '@goji-system/auth-lib/src/client';
+import * as authMobile from '@my-system/auth-lib/src/client';
 
 // Mock only the mobile-specific auth imports
-jest.mock('@goji-system/auth-lib/src/client');
+jest.mock('@my-system/auth-lib/src/client');
 
 describe('AuthService (Client)', () => {
   let service: AuthService;
@@ -398,24 +398,24 @@ describe('AuthService (Client)', () => {
 npx expo export --dump-assetmap
 
 # Check for server-only imports in mobile bundle
-grep -r "from '@goji-system/auth-lib'" apps/goji-wallet/
-grep -r "from '@goji-system/shared-utils/server'" apps/goji-wallet/
+grep -r "from '@my-system/auth-lib'" apps/my-wallet/
+grep -r "from '@my-system/shared-utils/server'" apps/my-wallet/
 ```
 
 #### Expected vs Problematic Patterns
 
 ```typescript
 // ✅ Good: Mobile should only use mobile-specific imports
-import { decodeToken } from '@goji-system/auth-lib/src/client';
+import { decodeToken } from '@my-system/auth-lib/src/client';
 
 // ❌ Bad: Mobile importing server crypto functions
-import { hashPassword } from '@goji-system/auth-lib'; // Includes bcrypt!
+import { hashPassword } from '@my-system/auth-lib'; // Includes bcrypt!
 
 // ✅ Good: Common utilities can be imported directly
-import { validateEmail } from '@goji-system/shared-utils';
+import { validateEmail } from '@my-system/shared-utils';
 
 // ❌ Bad: Mobile importing server-only crypto
-import { encryptData } from '@goji-system/shared-utils/server';
+import { encryptData } from '@my-system/shared-utils/server';
 ```
 
 ### 2. Runtime Error Debugging
@@ -426,20 +426,20 @@ import { encryptData } from '@goji-system/shared-utils/server';
 
 ```typescript
 // Problem: Mobile code importing server auth functions
-import { hashPassword } from '@goji-system/auth-lib';
+import { hashPassword } from '@my-system/auth-lib';
 
 // Solution: Use mobile-specific imports
-import { validateLoginCredentials } from '@goji-system/auth-lib/src/client';
+import { validateLoginCredentials } from '@my-system/auth-lib/src/client';
 ```
 
 **Error**: `crypto.randomBytes is not a function`
 
 ```typescript
 // Problem: Client trying to use Node.js crypto
-import { encryptData } from '@goji-system/shared-utils/server';
+import { encryptData } from '@my-system/shared-utils/server';
 
 // Solution: Use client-safe alternatives
-import { generateClientId } from '@goji-system/shared-utils/client';
+import { generateClientId } from '@my-system/shared-utils/client';
 ```
 
 ### 3. Authentication Flow Debugging
@@ -499,9 +499,9 @@ npx expo export --dump-assetmap
 
 ```typescript
 // Check what gets bundled from each library
-import { validateEmail } from '@goji-system/shared-utils'; // ✅ Small impact
-import { decodeToken } from '@goji-system/auth-lib/src/client'; // ✅ Small impact
-import { hashPassword } from '@goji-system/auth-lib'; // ❌ Bundles bcrypt
+import { validateEmail } from '@my-system/shared-utils'; // ✅ Small impact
+import { decodeToken } from '@my-system/auth-lib/src/client'; // ✅ Small impact
+import { hashPassword } from '@my-system/auth-lib'; // ❌ Bundles bcrypt
 ```
 
 ### 2. Startup Performance
@@ -576,7 +576,7 @@ npm ls bcrypt jsonwebtoken
 
 ```bash
 # Check for server imports in mobile code
-grep -r "from '@goji-system/auth-lib'" apps/goji-wallet/ | grep -v "mobile"
+grep -r "from '@my-system/auth-lib'" apps/my-wallet/ | grep -v "mobile"
 ```
 
 **Solution**: Replace server imports with mobile-specific imports
@@ -626,8 +626,8 @@ npx expo export --dump-assetmap | grep -E "(bcrypt|jsonwebtoken)"
 
 ### Code Review Security
 
-- [ ] No `@goji-system/auth-lib` imports in mobile code (use `/src/client`)
-- [ ] No `@goji-system/shared-utils/server` imports in mobile code
+- [ ] No `@my-system/auth-lib` imports in mobile code (use `/src/client`)
+- [ ] No `@my-system/shared-utils/server` imports in mobile code
 - [ ] No plaintext passwords logged on server
 - [ ] No JWT secrets in client-accessible configuration
 - [ ] All financial operations have 95%+ test coverage

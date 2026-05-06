@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the secure mnemonic storage implementation for the Goji mobile wallet, which follows industry best practices for cryptocurrency wallet security.
+This document describes the secure mnemonic storage implementation for the your mobile wallet app, which follows industry best practices for cryptocurrency wallet security.
 
 **Implementation Date**: 2025-12-31
 **Status**: ✅ Complete
@@ -42,7 +42,7 @@ This document describes the secure mnemonic storage implementation for the Goji 
 
 ### ✅ 1. Mnemonic Encryption Service
 
-**File**: `/apps/goji-wallet/services/security/mnemonic-encryption.service.ts`
+**File**: `/apps/my-wallet/services/security/mnemonic-encryption.service.ts`
 
 **Features**:
 - AES-256-CBC encryption with HMAC-SHA256 authentication
@@ -74,7 +74,7 @@ const mnemonic = await MnemonicEncryptionService.decrypt(encrypted, pin);
 
 ### ✅ 2. Mnemonic Storage Service
 
-**File**: `/apps/goji-wallet/services/security/mnemonic-storage.service.ts`
+**File**: `/apps/my-wallet/services/security/mnemonic-storage.service.ts`
 
 **Features**:
 - Encrypted mnemonic storage in SecureStore
@@ -112,7 +112,7 @@ const isValid = await MnemonicStorageService.verifyPin(pin);
 
 ### ✅ 3. Biometric Authentication Service
 
-**File**: `/apps/goji-wallet/services/security/biometric-auth.service.ts`
+**File**: `/apps/my-wallet/services/security/biometric-auth.service.ts`
 
 **Features**:
 - Hardware capability detection
@@ -155,7 +155,7 @@ const result = await BiometricAuthService.authenticateForTransaction(
 
 ### ✅ 4. Security Events Service
 
-**File**: `/apps/goji-wallet/services/security/security-events.service.ts`
+**File**: `/apps/my-wallet/services/security/security-events.service.ts`
 
 **Features**:
 - Structured security event logging
@@ -206,7 +206,7 @@ SecurityEventsService.logEvent(
 
 ### ✅ 5. View Seed Phrase Screen
 
-**File**: `/apps/goji-wallet/app/(drawer)/settings/security/view-seed-phrase.tsx`
+**File**: `/apps/my-wallet/app/(drawer)/settings/security/view-seed-phrase.tsx`
 
 **Features**:
 - ✅ Biometric + PIN authentication required
@@ -418,7 +418,7 @@ User views seed phrase ✓
 
 ### Test Coverage
 
-**File**: `/apps/goji-wallet/services/security/mnemonic-encryption.service.spec.ts`
+**File**: `/apps/my-wallet/services/security/mnemonic-encryption.service.spec.ts`
 
 **Test Categories**:
 1. Encryption tests (valid/invalid inputs)
@@ -451,7 +451,7 @@ npm test -- mnemonic-encryption.service.spec.ts --watch
 ### Example 1: Wallet Creation with Encrypted Mnemonic
 
 ```typescript
-import { MnemonicGenerator } from '@goji-system/blockchain-lib/client';
+import { MnemonicGenerator } from '@my-system/blockchain-lib/client';
 import { MnemonicStorageService } from '@/services/security';
 
 async function createWalletWithEncryption(pin: string, userId: string) {
@@ -477,7 +477,7 @@ async function createWalletWithEncryption(pin: string, userId: string) {
 ```typescript
 import { MnemonicStorageService } from '@/services/security';
 import { BiometricAuthService } from '@/services/security';
-import { BRC42KeyDeriver, GOJI_PROTOCOLS } from '@goji-system/blockchain-lib/client';
+import { BRC42KeyDeriver, MY_APP_PROTOCOLS } from '@my-system/blockchain-lib/client';
 
 async function signTransaction(tx: Transaction, pin: string, userId: string) {
   // Authenticate with biometric
@@ -496,7 +496,7 @@ async function signTransaction(tx: Transaction, pin: string, userId: string) {
   // Derive key for signing
   const deriver = BRC42KeyDeriver.fromMnemonic({ mnemonic });
   const key = deriver.deriveKey(
-    GOJI_PROTOCOLS.WALLET_APP.id,
+    MY_APP_PROTOCOLS.WALLET_APP.id,
     tx.keyID,
     'self'
   );
@@ -531,7 +531,7 @@ async function changeUserPin(oldPin: string, newPin: string, userId: string) {
 ## File Structure
 
 ```
-apps/goji-wallet/
+apps/my-wallet/
 ├── services/
 │   └── security/
 │       ├── index.ts                              # Barrel exports
@@ -646,7 +646,7 @@ async function migrateToEncryptedStorage(userId: string) {
 
 ## Summary
 
-This implementation provides **production-grade security** for mnemonic storage in the Goji mobile wallet:
+This implementation provides **production-grade security** for mnemonic storage in the your mobile wallet app:
 
 - ✅ **3-layer defense-in-depth** (App encryption, OS encryption, Access control)
 - ✅ **Industry-standard cryptography** (AES-256, PBKDF2, HMAC)
@@ -662,9 +662,9 @@ This implementation provides **production-grade security** for mnemonic storage 
 ## Support
 
 For questions or issues related to this implementation, contact:
-- **Security Team**: security@gojiwallet.com
+- **Security Team**: security@example.com
 - **Documentation**: `/docs/development/BRC42-PROTOCOL-ID-GUIDE.md`
-- **GitHub Issues**: https://github.com/goji/goji-system/issues
+- **GitHub Issues**: https://github.com/my-app/my-system/issues
 
 ---
 

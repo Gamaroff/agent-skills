@@ -27,9 +27,9 @@
 ### Applied Fix
 
 **Files Modified**:
-1. `apps/goji-api/src/auth/auth.module.ts` - Simplified to single factory
-2. `apps/goji-api/src/auth/strategies/local.strategy.ts` - Standard injection
-3. `apps/goji-api/src/auth/strategies/google.strategy.ts` - Standard injection
+1. `apps/my-api/src/auth/auth.module.ts` - Simplified to single factory
+2. `apps/my-api/src/auth/strategies/local.strategy.ts` - Standard injection
+3. `apps/my-api/src/auth/strategies/google.strategy.ts` - Standard injection
 
 ### Before (Broken - Dual Factory)
 
@@ -355,4 +355,4 @@ Use this reference when:
 **Task ID**: task.38.authservice-di-failure
 **Resolution Date**: 2025-12-05
 **Status**: ✅ RESOLVED - Login functionality restored
-**Documentation Maintained By**: Goji Development Team
+**Documentation Maintained By**: Development Team

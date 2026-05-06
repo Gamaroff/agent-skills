@@ -1,6 +1,6 @@
 ---
 name: caching
-description: Caching implementation guide using @goji-system/cache-lib. Covers cache strategy selection, TTL configuration, invalidation patterns, and monitoring for production-ready caching.
+description: Caching implementation guide using @my-system/cache-lib. Covers cache strategy selection, TTL configuration, invalidation patterns, and monitoring for production-ready caching.
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -13,7 +13,7 @@ license: MIT
 
 ## Description
 
-This skill guides developers through implementing production-ready caching functionality using `@goji-system/cache-lib`. It covers cache strategy selection, TTL configuration, cache key naming conventions, invalidation patterns, cache warming, and monitoring.
+This skill guides developers through implementing production-ready caching functionality using `@my-system/cache-lib`. It covers cache strategy selection, TTL configuration, cache key naming conventions, invalidation patterns, cache warming, and monitoring.
 
 ## When to Use This Skill
 
@@ -201,7 +201,7 @@ enum DataPriority {
 
 **Import Pattern**:
 ```typescript
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/client';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/client';
 ```
 
 #### Pattern 1: CACHE_FIRST for Static Data
@@ -209,7 +209,7 @@ import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-li
 **Use Case**: User profiles, settings, configuration data
 
 ```typescript
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/client';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/client';
 
 // User profile (changes infrequently)
 export async function getCachedUserProfile(userId: string) {
@@ -237,7 +237,7 @@ export async function getCachedUserProfile(userId: string) {
 **Use Case**: Wallet balances, recent transactions, activity feeds
 
 ```typescript
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/client';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/client';
 
 // Wallet balance (changes frequently)
 export async function getCachedWalletBalance(walletId: string) {
@@ -261,7 +261,7 @@ export async function getCachedWalletBalance(walletId: string) {
 **Use Case**: Chat messages, notifications, live updates
 
 ```typescript
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/client';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/client';
 
 // Chat messages (real-time)
 export async function getCachedChatMessages(chatId: string, limit: number = 100) {
@@ -285,7 +285,7 @@ export async function getCachedChatMessages(chatId: string, limit: number = 100)
 **Use Case**: Offline mode, cached transaction history, downloaded data
 
 ```typescript
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/client';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/client';
 
 // Offline transaction history
 export async function getOfflineTransactions(userId: string) {
@@ -306,7 +306,7 @@ export async function getOfflineTransactions(userId: string) {
 **Use Case**: Quick cache-only checks without strategy configuration
 
 ```typescript
-import { CacheManager } from '@goji-system/cache-lib/client';
+import { CacheManager } from '@my-system/cache-lib/client';
 
 // Simple cache-only lookup
 const cachedData = await CacheManager.get<MyType>('simple:key');
@@ -320,7 +320,7 @@ if (cachedData) {
 **Use Case**: Pre-populate cache with data to avoid initial fetch
 
 ```typescript
-import { CacheManager } from '@goji-system/cache-lib/client';
+import { CacheManager } from '@my-system/cache-lib/client';
 
 // Pre-warm user profile on login
 export async function prewarmUserData(userId: string, userData: any) {
@@ -335,7 +335,7 @@ export async function prewarmUserData(userId: string, userData: any) {
 
 **Import Pattern**:
 ```typescript
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/server';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/server';
 ```
 
 #### Pattern 1: CACHE_FIRST with Prisma Query
@@ -345,7 +345,7 @@ import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-li
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/server';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/server';
 
 @Injectable()
 export class ContactService {
@@ -382,7 +382,7 @@ export class ContactService {
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheManager, CacheStrategy, DataPriority } from '@goji-system/cache-lib/server';
+import { CacheManager, CacheStrategy, DataPriority } from '@my-system/cache-lib/server';
 
 @Injectable()
 export class TransactionService {
@@ -450,7 +450,7 @@ export class ProductService {
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 @Injectable()
 export class UserService {
@@ -633,7 +633,7 @@ export class UserService {
 #### Method 1: String Key Invalidation
 
 ```typescript
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 // Invalidate single key
 await CacheManager.invalidate('user:123:profile');
@@ -642,7 +642,7 @@ await CacheManager.invalidate('user:123:profile');
 #### Method 2: Array-Based Batch Invalidation
 
 ```typescript
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 // Invalidate multiple related keys
 await CacheManager.invalidate([
@@ -655,7 +655,7 @@ await CacheManager.invalidate([
 #### Method 3: RegExp Pattern-Based Invalidation
 
 ```typescript
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 // Invalidate all user-related caches
 await CacheManager.invalidate(new RegExp(`^user:${userId}:`));
@@ -807,7 +807,7 @@ async transferFunds(fromWalletId: string, toWalletId: string, amount: number) {
 
 ```typescript
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -851,8 +851,8 @@ export class CacheWarmingService implements OnModuleInit {
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { CacheManager } from '@goji-system/cache-lib/server';
-import { cacheWarmer } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
+import { cacheWarmer } from '@my-system/cache-lib/server';
 
 @Injectable()
 export class ScheduledCacheService {
@@ -898,7 +898,7 @@ export class ScheduledCacheService {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 @Injectable()
 export class BatchCacheService {
@@ -941,7 +941,7 @@ export class BatchCacheService {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 @Injectable()
 export class AuthService {
@@ -982,7 +982,7 @@ export class AuthService {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { CacheMonitor } from '@goji-system/cache-lib/server';
+import { CacheMonitor } from '@my-system/cache-lib/server';
 
 @Injectable()
 export class CacheHealthService {
@@ -1068,7 +1068,7 @@ interface CacheMetrics {
 ### Unit Testing Cached Operations
 
 ```typescript
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 describe('ContactService', () => {
   let service: ContactService;
@@ -1165,7 +1165,7 @@ describe('Cache Integration Tests', () => {
 
 ```typescript
 // Mock CacheManager for unit tests
-jest.mock('@goji-system/cache-lib/server', () => ({
+jest.mock('@my-system/cache-lib/server', () => ({
   CacheManager: {
     get: jest.fn(),
     set: jest.fn(),
@@ -1201,7 +1201,7 @@ it('should use cache when available', async () => {
 
 ### Two Different Storage Concerns
 
-The Goji system uses **two separate storage mechanisms** for different purposes:
+The your project uses **two separate storage mechanisms** for different purposes:
 
 #### **cache-lib** (L1 + L2): API Response Caching
 
@@ -1220,7 +1220,7 @@ The Goji system uses **two separate storage mechanisms** for different purposes:
 **Access Pattern**: Through CacheManager with strategies
 
 ```typescript
-import { CacheManager } from '@goji-system/cache-lib/client';
+import { CacheManager } from '@my-system/cache-lib/client';
 
 const profile = await CacheManager.get({
   key: 'user:123:profile',
@@ -1347,7 +1347,7 @@ export function useTheme() {
 
 ```typescript
 // ❌ BAD: Don't use cache-lib for app settings
-import { CacheManager } from '@goji-system/cache-lib/client';
+import { CacheManager } from '@my-system/cache-lib/client';
 
 // This is wrong - settings are not cached API responses!
 await CacheManager.set('user:123:theme', 'dark');
@@ -1512,13 +1512,13 @@ await CacheManager.invalidate('user:123:settings');
 
 ```typescript
 // ✅ GOOD: Client-side (React Native)
-import { CacheManager } from '@goji-system/cache-lib/client';
+import { CacheManager } from '@my-system/cache-lib/client';
 
 // ✅ GOOD: Server-side (NestJS)
-import { CacheManager } from '@goji-system/cache-lib/server';
+import { CacheManager } from '@my-system/cache-lib/server';
 
 // ❌ BAD: Wrong import on client
-import { CacheManager } from '@goji-system/cache-lib'; // Includes server deps!
+import { CacheManager } from '@my-system/cache-lib'; // Includes server deps!
 ```
 
 ---
@@ -1527,7 +1527,7 @@ import { CacheManager } from '@goji-system/cache-lib'; // Includes server deps!
 
 ### Client-Side (React Native)
 
-**Import**: `@goji-system/cache-lib/client`
+**Import**: `@my-system/cache-lib/client`
 
 **Cache Technologies** (L1 + L2):
 - L1: Memory Cache (Map) - Fastest tier
@@ -1550,7 +1550,7 @@ import { CacheManager } from '@goji-system/cache-lib'; // Includes server deps!
 
 ### Server-Side (NestJS)
 
-**Import**: `@goji-system/cache-lib/server` or `@goji-system/cache-lib`
+**Import**: `@my-system/cache-lib/server` or `@my-system/cache-lib`
 
 **Cache Technologies** (L1 + L2):
 - L1: Memory Cache (Map) - Fastest tier
@@ -1593,14 +1593,14 @@ import {
   CacheManager,
   CacheStrategy,
   DataPriority
-} from '@goji-system/cache-lib/client';
+} from '@my-system/cache-lib/client';
 
 // Server (NestJS) - cache-lib
 import {
   CacheManager,
   CacheStrategy,
   DataPriority
-} from '@goji-system/cache-lib/server';
+} from '@my-system/cache-lib/server';
 
 // App settings (NOT cache-lib)
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1644,16 +1644,16 @@ await CacheManager.invalidate(new RegExp(`^user:${userId}:`));
 ## Additional Resources
 
 - **Cache-lib Source**: `/libs/cache-lib/`
-- **API Caching Service**: `/apps/goji-api/src/common/services/api-caching.service.ts`
-- **Redis Service**: `/apps/goji-api/src/common/redis/redis.service.ts`
+- **API Caching Service**: `/apps/my-api/src/common/services/api-caching.service.ts`
+- **Redis Service**: `/apps/my-api/src/common/redis/redis.service.ts`
 - **PRD Reference**: Epic 8 - Cache-Based Data Architecture
-- **Integration Tests**: `/apps/goji-api/test/integration/groups/` (example patterns)
+- **Integration Tests**: `/apps/my-api/test/integration/groups/` (example patterns)
 
 ---
 
 **Last Updated**: 2025-10-31
 **Version**: 2.0
-**Maintainer**: Goji Development Team
+**Maintainer**: Development Team
 
 **Change Log**:
 - v2.0: Simplified architecture - Removed AsyncStorage from cache-lib, renumbered WatermelonDB L3→L2

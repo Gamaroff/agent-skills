@@ -1,6 +1,6 @@
 ---
 name: nestjs-patterns
-description: NestJS implementation patterns and anti-patterns guide for the Goji system. Use when creating or modifying NestJS modules, providers, or services; setting up PassportStrategy with dependency injection; using useFactory, forwardRef, or complex DI patterns; debugging "Cannot resolve dependencies" or "undefined service" errors; implementing authentication, authorization, or security modules; working with circular dependencies or module imports. Prevents common mistakes from Task 38 (dual-factory pattern, DI timing issues). Provides proven working patterns and implementation checklists.
+description: NestJS implementation patterns and anti-patterns guide. Use when creating or modifying NestJS modules, providers, or services; setting up PassportStrategy with dependency injection; using useFactory, forwardRef, or complex DI patterns; debugging "Cannot resolve dependencies" or "undefined service" errors; implementing authentication, authorization, or security modules; working with circular dependencies or module imports. Prevents common DI mistakes (dual-factory pattern, DI timing issues). Provides proven working patterns and implementation checklists.
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -372,7 +372,7 @@ For comprehensive investigation details, root cause analysis, and research findi
 
 ## Future NestJS Patterns
 
-This section is a placeholder for future patterns as they're discovered during Goji development.
+This section is a placeholder for future patterns discovered during development.
 
 ### Template for Adding New Patterns
 
@@ -400,7 +400,7 @@ This section is a placeholder for future patterns as they're discovered during G
 
 ### Potential Future Topics
 
-As NestJS patterns emerge in the Goji codebase, add sections for:
+As NestJS patterns emerge in your codebase, add sections for:
 
 - **Testing Patterns**
   - TestingModule setup
@@ -477,4 +477,4 @@ constructor(private readonly authService: AuthService) {
 **Skill Version**: 1.0.0
 **Last Updated**: 2025-12-31
 **Primary Source**: Task 38 - AuthService Dependency Injection Failure
-**Maintained By**: Goji Development Team
+**Maintained By**: Your Development Team

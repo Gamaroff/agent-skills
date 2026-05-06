@@ -9,7 +9,7 @@ license: MIT
 
 ## Overview
 
-The React Native Debugging skill helps you iteratively debug and fix React Native apps in the Goji system, specifically for `@apps/goji-wallet/`. This skill handles both Jest test failures and Metro bundler runtime errors, with special focus on the code vs test validation problem - tests may become outdated while code is correct, or vice versa.
+The React Native Debugging skill helps you iteratively debug and fix React Native apps in your project, specifically for `@apps/my-wallet/`. This skill handles both Jest test failures and Metro bundler runtime errors, with special focus on the code vs test validation problem - tests may become outdated while code is correct, or vice versa.
 
 ## Critical Design Principles
 
@@ -29,7 +29,7 @@ This skill has two primary entry points:
 
 ### 2. Metro Runtime Error Debugging
 **When**: Metro bundler fails, app crashes on device, module resolution errors
-**Example**: "Metro error: Unable to resolve module @goji-system/auth-lib from..."
+**Example**: "Metro error: Unable to resolve module @my-system/auth-lib from..."
 
 ## Phase 1: Error Detection & Classification
 
@@ -96,7 +96,7 @@ When you provide an error, the skill will:
 - ESLint error "Don't import from server-only libraries in client code"
 
 **Root Causes**:
-- Importing from `@goji-system/auth-lib` instead of `/client`
+- Importing from `@my-system/auth-lib` instead of `/client`
 - Using server functions (hashPassword, verifyAccessToken, encryptData)
 - Test file importing server utilities
 
@@ -146,14 +146,14 @@ Before interactive debugging begins, run these automated checks:
 
 ### Check 1: Metro Cache Staleness
 ```
-Run: npx nx start goji-wallet --dry-run (check if it succeeds)
+Run: npx nx start my-wallet --dry-run (check if it succeeds)
 If fails: Metro cache likely stale
 Action: Auto-clear cache without asking
 ```
 
 ### Check 2: Library Build Artifacts
 ```
-Run: ls dist/libs/@goji-system/*/
+Run: ls dist/libs/@my-system/*/
 For each missing library:
   - Notify user
   - Offer auto-rebuild
@@ -162,16 +162,16 @@ For each missing library:
 ### Check 3: Platform Separation
 ```
 Scan: Test file for imports from:
-  - @goji-system/auth-lib (should be /client)
-  - @goji-system/logging-lib (should be /client)
-  - @goji-system/shared-utils/server
+  - @my-system/auth-lib (should be /client)
+  - @my-system/logging-lib (should be /client)
+  - @my-system/shared-utils/server
   - bcryptjs, jsonwebtoken, winston
 If found: Flag as platform separation violation
 ```
 
 ### Check 4: Test Setup Validation
 ```
-Verify: apps/goji-wallet/src/test-setup.ts exists
+Verify: apps/my-wallet/src/test-setup.ts exists
 If missing: Flag critical issue
 If exists: Verify it contains:
   - @testing-library/jest-native/extend-expect
@@ -205,7 +205,7 @@ Each debugging path below presents findings and offers 2-4 options. User selects
 **When**: "Unable to resolve module" or "Cannot find module"
 
 **Automated Checks**:
-1. Is library built? Check `dist/libs/@goji-system/[library]/`
+1. Is library built? Check `dist/libs/@my-system/[library]/`
 2. Is Metro cache fresh? Try clear if not
 3. Is workspace root configured? Check `metro.config.js`
 
@@ -224,7 +224,7 @@ Each debugging path below presents findings and offers 2-4 options. User selects
 **Verification**:
 ```bash
 # After fix
-npx nx start goji-wallet --reset-cache --clear
+npx nx start my-wallet --reset-cache --clear
 # Check: Does Metro bundler start without errors?
 ```
 
@@ -256,7 +256,7 @@ npx nx start goji-wallet --reset-cache --clear
 **Verification**:
 ```bash
 # After fix
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Workflow C: Mock Configuration Debugging
@@ -288,7 +288,7 @@ npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
 **Verification**:
 ```bash
 # After fix - check just the mock
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Workflow D: Platform Separation Validation
@@ -296,7 +296,7 @@ npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
 **When**: "Not available in mobile environment" or server import in client
 
 **Automated Checks**:
-1. Scan test file for all @goji-system imports
+1. Scan test file for all @my-system imports
 2. Flag any imports WITHOUT `/client` suffix
 3. Check for Node.js-only packages (bcryptjs, jsonwebtoken, winston)
 
@@ -310,9 +310,9 @@ npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
 - Show list of violations
 - Offer auto-fix mapping:
   ```
-  @goji-system/auth-lib → @goji-system/auth-lib/client
-  @goji-system/logging-lib → @goji-system/logging-lib/client
-  @goji-system/shared-utils/server → Remove or use /client
+  @my-system/auth-lib → @my-system/auth-lib/client
+  @my-system/logging-lib → @my-system/logging-lib/client
+  @my-system/shared-utils/server → Remove or use /client
   ```
 
 **Fix Options**:
@@ -323,7 +323,7 @@ npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
 **Verification**:
 ```bash
 # After fix - check imports resolve
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Workflow E: Component Rendering Debugging
@@ -355,7 +355,7 @@ npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
 **Verification**:
 ```bash
 # After fix
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 # Or with debug output
 console.log(debug()); // Print component tree
 ```
@@ -389,8 +389,8 @@ console.log(debug()); // Print component tree
 **Verification**:
 ```bash
 # After fix - run multiple times
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 # Should not be flaky
 ```
 
@@ -473,7 +473,7 @@ After applying a fix:
 
 1. **Re-run the test/Metro**
    ```bash
-   npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+   npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
    ```
 
 2. **Confirm success**
@@ -484,7 +484,7 @@ After applying a fix:
 3. **Check for side effects**
    ```bash
    # Run related tests
-   npx nx test goji-wallet --testNamePattern="[related tests]" --no-coverage
+   npx nx test my-wallet --testNamePattern="[related tests]" --no-coverage
    ```
 
 ### Suggested Next Steps

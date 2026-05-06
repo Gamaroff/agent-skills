@@ -70,7 +70,7 @@ For each entry in the stub's `files:` list:
 
 - If it's a glob (e.g. `prisma/migrations/**`), use Glob to expand and read 2-3 representative files.
 - If it's a single path, read the file. If the file does not exist yet (the task creates it), note this in the spec rather than failing.
-- If it's a path under `goji-website/` and the file is referenced as something to migrate, read the source for context but plan the destination under `goji-system/`.
+- If it's a path under `my-app-website/` and the file is referenced as something to migrate, read the source for context but plan the destination under `my-system/`.
 
 ### 3. Draft the four sections
 
@@ -121,9 +121,9 @@ Extract all numeric {N} values, find the global maximum, and use `max + 1` as th
 
 Derive the kebab-case task name from the stub's **title**, not the WU ID. Distil the title down to 2-4 meaningful words in kebab-case that describe the actual work:
 
-- "Upgrade goji-system Prisma 6.18 → 7.4; replay all migrations" → `upgrade-prisma`
-- "Run `npx nx migrate 22.5.4` on goji-system; verify build green" → `nx-version-upgrade`
-- "Add `platform:web` token to goji-system eslint depConstraints" → `add-platform-web-tag`
+- "Upgrade my-system Prisma 6.18 → 7.4; replay all migrations" → `upgrade-prisma`
+- "Run `npx nx migrate 22.5.4` on my-system; verify build green" → `nx-version-upgrade`
+- "Add `platform:web` token to my-system eslint depConstraints" → `add-platform-web-tag`
 - "Audit overlap between scripts/ dirs; produce collision matrix" → `scripts-collision-audit`
 
 Also derive the **Title-Cased Descriptive Name** used for the GitHub issue title — this is simply the kebab-case name converted to Title Case:
@@ -347,7 +347,7 @@ All {N} atomic tasks across 7 phases. Each row links to the local stub file.
 
 Each task has **two independent lifecycle axes** — see the [README status legend](./README.md#status-legend) for definitions and gating rules. The `Blocked By` column lists each task's `depends-on`; a task is unblockable while any blocker is not yet `done`.
 
-**Project board:** [Goji System Migration](https://github.com/orgs/goji-wallet/projects/2)
+**Project board:** Link your project board here
 **Migration docs:** [README](./README.md)
 
 ## Phase progress

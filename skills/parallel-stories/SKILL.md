@@ -185,8 +185,8 @@ For stories identified as parallel-safe:
 
    ```
    Modifies:
-   - apps/goji-wallet/app/(drawer)/auth/login.tsx
-   - apps/goji-wallet/components/LoginForm.tsx
+   - apps/my-wallet/app/(drawer)/auth/login.tsx
+   - apps/my-wallet/components/LoginForm.tsx
 
    Does NOT modify:
    - Backend files
@@ -236,7 +236,7 @@ git worktree add ../worktrees/story-1-3 -b feature/story-1-1-3
 **Worktree Structure**:
 
 ```
-goji-system/               # Main repository
+my-system/               # Main repository
 ├─ .git/
 ├─ apps/
 └─ libs/
@@ -266,7 +266,7 @@ cd ../worktrees/story-1-1
 npm install
 
 # Run development servers
-npx nx serve goji-wallet
+npx nx serve my-wallet
 ```
 
 **Development**:
@@ -290,13 +290,13 @@ git push -u origin feature/story-1-1-1
 
 ```bash
 # Run tests
-npx nx test goji-wallet
+npx nx test my-wallet
 
 # Create pull request
 gh pr create --title "Story 1-1: Login UI"
 
 # After PR merged, clean up worktree
-cd ../../goji-system
+cd ../../my-system
 git worktree remove ../worktrees/story-1-1
 ```
 
@@ -346,7 +346,7 @@ npm install
 **Cleanup Command** (after merge):
 
 ```bash
-cd ../../goji-system
+cd ../../my-system
 git worktree remove ../worktrees/story-1-1
 ```
 
@@ -374,10 +374,10 @@ git worktree remove ../worktrees/story-1-1
 
 **File Boundaries** (MUST RESPECT):
 
-- ✅ apps/goji-wallet/app/(drawer)/auth/login.tsx
-- ✅ apps/goji-wallet/components/LoginForm.tsx
-- ✅ apps/goji-wallet/components/auth/\*
-- ❌ apps/goji-api/\*\* (modified by Story 1-2)
+- ✅ apps/my-wallet/app/(drawer)/auth/login.tsx
+- ✅ apps/my-wallet/components/LoginForm.tsx
+- ✅ apps/my-wallet/components/auth/\*
+- ❌ apps/my-api/\*\* (modified by Story 1-2)
 - ❌ libs/auth-lib/\*\* (modified by Story 1-3)
 
 **Conflict Prevention**:
@@ -433,7 +433,7 @@ git commit -m "Implement login form validation"
 
 ```bash
 # Run tests for affected modules only
-npx nx test goji-wallet --testPathPattern=auth
+npx nx test my-wallet --testPathPattern=auth
 ```
 
 **4. Pull Request**:
@@ -447,7 +447,7 @@ gh pr create --title "Story 1-1: Login UI" \
 **5. Cleanup** (after PR merged):
 
 ```bash
-cd ../../goji-system
+cd ../../my-system
 git worktree remove ../worktrees/story-1-1
 git branch -d feature/story-1-1-1
 ```
@@ -527,8 +527,8 @@ These stories must be developed in order after parallel stories complete.
 ### Preventing Conflicts
 
 **File Boundaries** (strictly enforced):
-- Story 1-1: `apps/goji-wallet/app/(drawer)/auth/**`
-- Story 1-2: `apps/goji-api/src/modules/auth/**`
+- Story 1-1: `apps/my-wallet/app/(drawer)/auth/**`
+- Story 1-2: `apps/my-api/src/modules/auth/**`
 - Story 1-3: `libs/auth-lib/src/**`
 
 **Interface Contracts** (agreed upfront):

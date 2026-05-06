@@ -586,7 +586,7 @@ devDebugLog: .ai/debug-log.md
 
        gh issue create \
          --title "[Story {epic}.{story}] {title}" \
-         --project "Goji Website Development Board" \
+         --project "Your GitHub Project Board" \
          --body "## Overview
 
        {First 2-4 sentences from the story's purpose/description}
@@ -1428,7 +1428,7 @@ questions:
 #### Important
 
 - **[Vague file location]**: Tasks mention "services folder" without specific path
-  - **Recommendation:** Specify exact path: `apps/goji-api/src/modules/[module]/services/[file].ts`
+  - **Recommendation:** Specify exact path: `apps/my-api/src/modules/[module]/services/[file].ts`
 
 - **[Missing testing detail]**: Testing section just says "write tests"
   - **Recommendation:** Specify test file locations, frameworks, key scenarios
@@ -2152,7 +2152,7 @@ devStoryLocation: nested
 devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 ```
 
-**Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on the Goji project organization.
+**Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.
 
 ---
 

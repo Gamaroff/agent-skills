@@ -114,7 +114,7 @@ sections:
           - Do NOT invent screen names — extract from routing docs or core-workflows.md
         template: |
           **Prerequisites**:
-          - App running (`npm run goji-wallet:start:device`)
+          - App running (`npm run my-wallet:start:device`)
           - [Any auth/data prerequisites]
 
           **Navigation Path**:

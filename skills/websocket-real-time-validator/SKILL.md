@@ -9,7 +9,7 @@ license: MIT
 
 ## Overview
 
-This skill validates Socket.IO implementations against Goji real-time communication patterns. **CRITICAL**: Goji uses Socket.IO 4.8+ for all real-time communication, NOT native WebSocket. This skill ensures proper Socket.IO connection management, event naming conventions, namespace/room patterns, state synchronization, error recovery, offline queuing, and rate limiting.
+This skill validates Socket.IO implementations for real-time communication patterns. **CRITICAL**: This skill assumes Socket.IO 4.8+ for all real-time communication, NOT native WebSocket. This skill ensures proper Socket.IO connection management, event naming conventions, namespace/room patterns, state synchronization, error recovery, offline queuing, and rate limiting.
 
 ## When to Use This Skill
 
@@ -28,7 +28,7 @@ Use this skill when:
 
 ## Socket.IO Protocol Standard
 
-**CRITICAL**: Goji uses Socket.IO 4.8+ for all real-time communication.
+**CRITICAL**: This skill assumes Socket.IO 4.8+ for all real-time communication.
 
 **DO NOT USE**: Native WebSocket API (`new WebSocket()`)
 **USE**: `socket.io-client` library (client-side) and `@nestjs/platform-socket.io` (server-side)
@@ -41,7 +41,7 @@ Proper Socket.IO connection lifecycle management:
 
 ```typescript
 import io, { Socket } from 'socket.io-client';
-import { logger } from '@goji-system/logging-lib/client';
+import { logger } from '@my-system/logging-lib/client';
 
 class SocketIOService {
   private socket: Socket | null = null;
@@ -811,7 +811,7 @@ async handleSendMessage(
 
 ### references/
 
-**websocket-patterns.md** - WebSocket architecture patterns, connection management, and real-time communication best practices for the Goji system
+**websocket-patterns.md** - WebSocket architecture patterns, connection management, and real-time communication best practices for your project
 
 **socket-io-guide.md** - Socket.IO specific patterns, room management, and event handling for NestJS gateways
 

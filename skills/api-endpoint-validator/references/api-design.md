@@ -2,12 +2,12 @@
 
 ## Document Information
 
-**Project**: Goji Mobile Wallet  
-**Purpose**: Define comprehensive API standards, endpoints, and data models for the Goji mobile wallet backend services
+**Project**: NestJS API Backend  
+**Purpose**: Define comprehensive API standards, endpoints, and data models for NestJS backend services
 **Priority**: High
 **Version**: 1.0  
 **Date**: July 2025  
-**Owner**: Lorien Gamaroff
+**Owner**: Project maintainer
 
 ## Related Documentation
 
@@ -20,7 +20,7 @@
 
 ### Purpose
 
-The Goji API serves as the unified backend for both the mobile wallet application and the system admin portal, providing secure, scalable endpoints for financial transactions, user management, compliance operations, and real-time communications.
+The API serves as the unified backend for client applications and admin portals, providing secure, scalable endpoints for business operations, user management, and real-time communications.
 
 **Key Capabilities:**
 
@@ -35,8 +35,8 @@ The Goji API serves as the unified backend for both the mobile wallet applicatio
 ### Base URL Structure
 
 -   **Development**: `http://localhost:3000/api/v1`
--   **Staging**: `https://staging-api.goji.app/api/v1`
--   **Production**: `https://api.goji.app/api/v1`
+-   **Staging**: `https://staging-api.yourdomain.com/api/v1`
+-   **Production**: `https://api.yourdomain.com/api/v1`
 
 ### API Architecture
 

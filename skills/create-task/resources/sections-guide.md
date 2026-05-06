@@ -22,12 +22,12 @@ This guide provides detailed instructions for completing each of the 11 mandator
 ```markdown
 ## Overview
 
-Refactor `@goji-system/cache-lib` to simplify the client-side caching
+Refactor `@my-system/cache-lib` to simplify the client-side caching
 architecture from 3 tiers (L1/L2/L3) to 2 tiers (L1/L2) by removing
 AsyncStorage redundancy and promoting WatermelonDB from L3 to L2.
 
-**Scope**: Affects `libs/cache-lib/` and `apps/goji-api/` only.
-**Excludes** `apps/goji-wallet/`.
+**Scope**: Affects `libs/cache-lib/` and `apps/my-api/` only.
+**Excludes** `apps/my-wallet/`.
 ```
 
 ### Key Points
@@ -213,7 +213,7 @@ AsyncStorage is being removed **only from cache-lib** as a cache tier.
 - `libs/cache-lib/` - Complete refactoring
 
 ✅ **Applications**:
-- `apps/goji-api/` - Update consumer code
+- `apps/my-api/` - Update consumer code
 
 ✅ **Documentation**:
 - Update skill: `.agents/skills/caching/SKILL.md`
@@ -222,7 +222,7 @@ AsyncStorage is being removed **only from cache-lib** as a cache tier.
 
 ### Out of Scope
 
-❌ `apps/goji-wallet/` - Excluded per requirements
+❌ `apps/my-wallet/` - Excluded per requirements
 ❌ Production deployment - Implementation only
 ❌ Performance benchmarking - Basic testing only
 ```
@@ -292,8 +292,8 @@ interface CacheStats {
 ### 2. Export Changes
 
 **Removed Exports**:
-- `AsyncStorageCache` from `@goji-system/cache-lib/client`
-- `AsyncStorageCache` from `@goji-system/cache-lib`
+- `AsyncStorageCache` from `@my-system/cache-lib/client`
+- `AsyncStorageCache` from `@my-system/cache-lib`
 
 **Impact**: Direct imports of AsyncStorageCache will fail
 
@@ -592,15 +592,15 @@ For each test level:
 
 ### Consumer Tests
 
-**Scope**: Goji API
+**Scope**: your API
 
 **Actions**:
-- [ ] Run all goji-api tests
+- [ ] Run all my-api tests
 - [ ] Verify cache monitoring endpoints work
 - [ ] Verify shopping cache works
 - [ ] Verify chat cache works
 
-**Command**: `npx nx test goji-api`
+**Command**: `npx nx test my-api`
 ```
 
 ### Key Points
@@ -640,7 +640,7 @@ For each test level:
 ### Functional
 
 - [x] All cache-lib tests pass (build successful)
-- [x] All goji-api tests pass (no consumer code changes needed)
+- [x] All my-api tests pass (no consumer code changes needed)
 - [x] Client cache uses L1 (Memory) + L2 (WatermelonDB) only
 - [x] Server cache uses L1 (Memory) + L2 (Redis/fallback) unchanged
 - [x] CacheStats returns only `l1` and `l2` in tierStats
@@ -652,7 +652,7 @@ For each test level:
 - [x] Cache write performance improved 20-30% (baseline vs refactored) **VALIDATED**
 - [x] Cache read performance maintained or improved **VALIDATED**
 - [x] No memory leaks detected **VALIDATED**
-- [x] No performance regression in goji-api **VALIDATED**
+- [x] No performance regression in my-api **VALIDATED**
 
 ### Code Quality
 
@@ -665,7 +665,7 @@ For each test level:
 
 - [x] CHANGELOG.md updated with breaking changes
 - [x] Migration guide provided (in CHANGELOG.md)
-- [x] All consumer code updated (no updates needed in goji-api)
+- [x] All consumer code updated (no updates needed in my-api)
 ```
 
 ### Key Points
@@ -731,7 +731,7 @@ For each risk:
 - **Impact**: Development delay only
 
 **2. Consumer Code Issues**
-- **Risk**: goji-api references l3
+- **Risk**: my-api references l3
 - **Mitigation**: Grep search and update before testing
 - **Impact**: Compilation errors (easy to fix)
 
@@ -905,7 +905,7 @@ For each risk:
 ### Important Reminders
 
 1. **AsyncStorage Still Exists**: It's only being removed from cache-lib,
-   not from the project. It's still used in goji-wallet for app settings.
+   not from the project. It's still used in my-wallet for app settings.
 
 2. **Server Unchanged**: Server architecture is already 2-tier and requires
    minimal changes (only stats).

@@ -9,7 +9,7 @@ license: MIT
 
 ## Overview
 
-This skill identifies and resolves performance issues across the Goji system. Covers React Native optimization (memoization, virtualization), database optimization (N+1 detection, indexes), bundle size reduction, image optimization, caching strategies, and memory leak prevention.
+This skill identifies and resolves performance issues across your project. Covers React Native optimization (memoization, virtualization), database optimization (N+1 detection, indexes), bundle size reduction, image optimization, caching strategies, and memory leak prevention.
 
 ## When to Use This Skill
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Goji wallet uses a hybrid navigation architecture combining **Expo Router** (file-based routing with built-in stack management) and **React Navigation** (for drawer functionality). This guide explains how both systems work together, when to use each, and how to maintain navigation pattern consistency.
+The your wallet app uses a hybrid navigation architecture combining **Expo Router** (file-based routing with built-in stack management) and **React Navigation** (for drawer functionality). This guide explains how both systems work together, when to use each, and how to maintain navigation pattern consistency.
 
 ### Navigation Stack Layers
 
@@ -128,8 +128,8 @@ router.push('/contacts/123');              // contacts/:id
 router.push('/transactions?status=pending'); // Query params
 
 // Deep links work
-goji://wallets                          → opens Wallets screen
-goji://contacts/456                     → opens Contact detail
+my-app://wallets                          → opens Wallets screen
+my-app://contacts/456                     → opens Contact detail
 ```
 
 ## Drawer Navigation (React Navigation)

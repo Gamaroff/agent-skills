@@ -1,8 +1,8 @@
-# Offline Capabilities System PRD - Goji Mobile Wallet
+# Offline Capabilities System PRD - your mobile wallet app
 
 ## Document Information
 
-- **Project**: Goji Mobile Wallet Offline Capabilities System
+- **Project**: your mobile wallet app Offline Capabilities System
 - **Version**: 1.0
 - **Date**: September 2025
 - **Owner**: Product Team
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-The Goji Offline Capabilities System represents a **revolutionary transformation** of mobile financial services for emerging markets, positioning Goji as the first truly offline-first mobile wallet platform. This system targets the critical connectivity challenges faced by 250M+ smartphone users in Sub-Saharan Africa, rural areas, and developing nations, where network reliability remains a barrier to financial inclusion.
+The your app Offline Capabilities System represents a **revolutionary transformation** of mobile financial services for emerging markets, positioning your app as the first truly offline-first mobile wallet platform. This system targets the critical connectivity challenges faced by 250M+ smartphone users in Sub-Saharan Africa, rural areas, and developing nations, where network reliability remains a barrier to financial inclusion.
 
 ### Strategic Market Disruption
 
@@ -24,7 +24,7 @@ Based on analysis of emerging market connectivity patterns and competitive posit
 
 ### Revolutionary Offline-First Advantage
 
-Goji enables users to maintain complete wallet functionality during network outages, fundamentally changing the relationship between connectivity and financial access. By implementing sophisticated multi-tier caching, intelligent sync mechanisms, and conflict resolution, users can:
+your app enables users to maintain complete wallet functionality during network outages, fundamentally changing the relationship between connectivity and financial access. By implementing sophisticated multi-tier caching, intelligent sync mechanisms, and conflict resolution, users can:
 
 - **Complete Transactions Offline**: View balances, transaction history, contact management for up to 72 hours without connectivity
 - **Queue Operations Seamlessly**: Send money, make payments, create requests that execute automatically when online
@@ -84,16 +84,16 @@ Mobile financial services in emerging markets face a fundamental architecture fl
 
 ### Offline-First Architecture Revolution
 
-The Goji Offline Capabilities System implements a sophisticated **Multi-Tier Caching Architecture** that enables complete wallet functionality independent of network connectivity while maintaining security, compliance, and data integrity standards.
+The your app Offline Capabilities System implements a sophisticated **Multi-Tier Caching Architecture** that enables complete wallet functionality independent of network connectivity while maintaining security, compliance, and data integrity standards.
 
 #### Core Architectural Components
 
 **1. Multi-Tier Storage & Caching System**
 
 - **L0 SecureStore**: Hardware-backed secure storage (Expo SecureStore) for cryptographic secrets, authentication tokens, and biometric credentials. Operates independently of cache-lib.
-- **L1 Cache**: In-memory cache managed by `@goji-system/cache-lib` for active session data (volatile, <10ms access)
-- **L2 Cache**: AsyncStorage-based cache managed by `@goji-system/cache-lib` for non-sensitive persisted data (preferences, recent lists)
-- **L3 Cache**: SQLite via `@goji-system/cache-lib` for structured offline-first datasets with sync capabilities
+- **L1 Cache**: In-memory cache managed by `@my-system/cache-lib` for active session data (volatile, <10ms access)
+- **L2 Cache**: AsyncStorage-based cache managed by `@my-system/cache-lib` for non-sensitive persisted data (preferences, recent lists)
+- **L3 Cache**: SQLite via `@my-system/cache-lib` for structured offline-first datasets with sync capabilities
 
 **Key Benefits of SQLite (L3):**
 
@@ -119,7 +119,7 @@ The Goji Offline Capabilities System implements a sophisticated **Multi-Tier Cac
 
 ### Technical Architecture Alignment
 
-The system builds upon Goji's sophisticated existing architecture while maintaining established patterns:
+The system builds upon your app's sophisticated existing architecture while maintaining established patterns:
 
 #### Platform-Specific Architecture Compliance
 
@@ -130,14 +130,14 @@ The system builds upon Goji's sophisticated existing architecture while maintain
 
 #### Library Integration Strategy
 
-- **@goji-system/offline-lib**: Core offline capabilities following existing patterns
-- **@goji-system/cache-lib**: Multi-tier caching system integrated with current API layer
-- **@goji-system/sync-lib**: Background synchronization building on existing services
+- **@my-system/offline-lib**: Core offline capabilities following existing patterns
+- **@my-system/cache-lib**: Multi-tier caching system integrated with current API layer
+- **@my-system/sync-lib**: Background synchronization building on existing services
 - **Enhanced Existing Libraries**: Extend auth-lib, contact-lib, chat-lib with offline capabilities
 
 ### Cache Population Strategy
 
-The Goji offline system uses a **simplified cache population approach** that eliminates complex runtime guest user detection throughout the codebase. Instead, caches are populated at the entry point based on the user's authentication state.
+The your app offline system uses a **simplified cache population approach** that eliminates complex runtime guest user detection throughout the codebase. Instead, caches are populated at the entry point based on the user's authentication state.
 
 #### Guest Mode: Mock Data Cache Population
 
@@ -145,8 +145,8 @@ The Goji offline system uses a **simplified cache population approach** that eli
 
 When a new user taps the "Try without Account" button on the Welcome screen to enter Guest Mode:
 
-1. **Guest Mode Flag Set**: AsyncStorage flag `goji_guest_mode` is set to `true`
-2. **Mock Data Population**: All local caches (L1-L4) are immediately populated with mock data from `@goji-system/mock-data-lib`
+1. **Guest Mode Flag Set**: AsyncStorage flag `my_guest_mode` is set to `true`
+2. **Mock Data Population**: All local caches (L1-L4) are immediately populated with mock data from `@my-system/mock-data-lib`
 3. **Cache Contents Include**:
    - Mock wallet with sample balance and currencies
    - Mock transaction history (100+ sample transactions)
@@ -168,7 +168,7 @@ When a new user taps the "Try without Account" button on the Welcome screen to e
 // On Guest Mode activation (Welcome screen)
 async function activateGuestMode(): Promise<void> {
   // Set guest mode flag
-  await AsyncStorage.setItem('goji_guest_mode', 'true');
+  await AsyncStorage.setItem('my_guest_mode', 'true');
 
   // Populate all cache tiers with mock data
   await cacheManager.populateWithMockData({
@@ -208,7 +208,7 @@ async function onAuthenticationSuccess(authToken: string): Promise<void> {
 
   // Set authenticated user state
   await AsyncStorage.setItem('auth_token', authToken);
-  await AsyncStorage.removeItem('goji_guest_mode');
+  await AsyncStorage.removeItem('my_guest_mode');
 
   // Fetch and cache critical data immediately
   const profile = await api.getUserProfile();
@@ -278,7 +278,7 @@ async function resetWallet(): Promise<void> {
   await AsyncStorage.multiRemove([
     'auth_token',
     'refresh_token',
-    'goji_guest_mode'
+    'my_guest_mode'
   ]);
 
   // Clear all cache tiers
@@ -344,7 +344,7 @@ The cache manager internally knows whether to serve mock data (guest mode) or ca
 
 | User Action                          | Cache Population           | Data Source                                    | Cache Clearing          |
 | ------------------------------------ | -------------------------- | ---------------------------------------------- | ----------------------- |
-| **Tap "Try without Account"**        | Immediate full population  | Mock data from `@goji-system/mock-data-lib` | Previous cache cleared  |
+| **Tap "Try without Account"**        | Immediate full population  | Mock data from `@my-system/mock-data-lib` | Previous cache cleared  |
 | **Login/Signup**                     | Progressive population     | Live API data                                  | Previous cache cleared  |
 | **Normal App Usage (Authenticated)** | Automatic on API responses | Live API data                                  | TTL-based eviction      |
 | **Reset Wallet**                     | N/A                        | N/A                                            | Complete cache clearing |
@@ -392,7 +392,7 @@ This approach ensures:
 **Acceptance Criteria:**
 
 - [ ] Complete contact list available offline with search functionality
-- [ ] Contact details include all payment methods (Goji, bank, mobile money)
+- [ ] Contact details include all payment methods (your app, bank, mobile money)
 - [ ] Contact interaction history accessible offline
 - [ ] Favorite and frequently used contacts prioritized in offline cache
 - [ ] New contacts can be created offline and synced when online
@@ -697,7 +697,7 @@ interface ConflictResolution {
 
 ### New Library Structure
 
-#### @goji-system/offline-lib
+#### @my-system/offline-lib
 
 **Core Offline Management**
 
@@ -745,7 +745,7 @@ export class CacheManager {
 }
 ```
 
-#### @goji-system/cache-lib
+#### @my-system/cache-lib
 
 **Multi-Tier Cache Implementation**
 
@@ -787,7 +787,7 @@ interface CachePolicyConfig {
 }
 ```
 
-#### @goji-system/sync-lib
+#### @my-system/sync-lib
 
 **Background Synchronization**
 
@@ -1075,7 +1075,7 @@ interface StorageOptimization {
 
 **Deliverables:**
 
-- Create `@goji-system/offline-lib` library following existing patterns
+- Create `@my-system/offline-lib` library following existing patterns
 - Implement `ConnectivityMonitor` with NetInfo integration
 - Setup basic `CacheManager` with AsyncStorage integration
 - Create offline-aware extensions to existing contexts
@@ -1297,7 +1297,7 @@ interface StorageOptimization {
 - Sync algorithm optimization for different network conditions
 - UI/UX improvements based on user feedback
 - Security enhancements and compliance updates
-- Integration with new Goji features and modules
+- Integration with new your app features and modules
 
 ## Integration Strategy
 
@@ -1360,7 +1360,7 @@ const OfflineContactContext = createContext<OfflineContactContextType>({
 
 ```typescript
 // Extend existing libraries without breaking changes
-// @goji-system/contact-lib enhancement
+// @my-system/contact-lib enhancement
 export class OfflineContactManager extends ContactManager {
   private offlineCache: OfflineCache;
   private syncEngine: SyncEngine;
@@ -1393,7 +1393,7 @@ export class OfflineContactManager extends ContactManager {
 
 ```sql
 -- Add offline support tables to existing schema
--- apps/goji-api/prisma/schema.prisma additions
+-- apps/my-api/prisma/schema.prisma additions
 
 -- Offline operation queue
 model OfflineOperation {
@@ -1524,7 +1524,7 @@ class OfflineEncryption {
     const derived = await crypto.subtle.deriveBits(
       {
         name: 'PBKDF2',
-        salt: encoder.encode('goji-offline-salt'),
+        salt: encoder.encode('my-app-offline-salt'),
         iterations: 100000,
         hash: 'SHA-256'
       },
@@ -1823,11 +1823,11 @@ export class OfflineManager {
 #### Help Documentation Updates
 
 ```markdown
-# Using Goji Offline
+# Using your app Offline
 
 ## What is Offline Mode?
 
-Goji's offline mode allows you to use most wallet features even when you don't have an internet connection. This is especially useful in areas with poor network coverage or during network outages.
+your app's offline mode allows you to use most wallet features even when you don't have an internet connection. This is especially useful in areas with poor network coverage or during network outages.
 
 ## What Works Offline?
 
@@ -1846,7 +1846,7 @@ Goji's offline mode allows you to use most wallet features even when you don't h
 
 ## Managing Your Offline Data
 
-You can control how much data Goji stores offline:
+You can control how much data your app stores offline:
 
 1. Go to **Settings** > **Offline & Sync**
 2. Choose your offline data preferences
@@ -1872,15 +1872,15 @@ You can control how much data Goji stores offline:
 
 ## Conclusion
 
-The Goji Offline Capabilities System represents a transformative advancement in mobile financial services, specifically designed to address the connectivity challenges faced by users in emerging markets. By implementing a sophisticated multi-tier caching architecture, intelligent synchronization mechanisms, and robust conflict resolution, this system positions Goji as the leading offline-first mobile wallet platform.
+The your app Offline Capabilities System represents a transformative advancement in mobile financial services, specifically designed to address the connectivity challenges faced by users in emerging markets. By implementing a sophisticated multi-tier caching architecture, intelligent synchronization mechanisms, and robust conflict resolution, this system positions your app as the leading offline-first mobile wallet platform.
 
 ### Strategic Value Proposition
 
-**Market Leadership**: Goji becomes the first comprehensive offline-capable mobile wallet, providing significant competitive advantage over traditional mobile money operators who remain entirely connectivity-dependent.
+**Market Leadership**: your app becomes the first comprehensive offline-capable mobile wallet, providing significant competitive advantage over traditional mobile money operators who remain entirely connectivity-dependent.
 
 **User Empowerment**: Users gain financial autonomy regardless of network conditions, enabling financial inclusion even in areas with poor connectivity infrastructure.
 
-**Technical Excellence**: The implementation leverages and enhances Goji's existing architectural strengths while maintaining security, performance, and compliance standards.
+**Technical Excellence**: The implementation leverages and enhances your app's existing architectural strengths while maintaining security, performance, and compliance standards.
 
 ### Implementation Confidence
 
@@ -1888,7 +1888,7 @@ The Goji Offline Capabilities System represents a transformative advancement in 
 
 **Risk Mitigation**: Comprehensive risk assessment and mitigation strategies ensure reliable implementation with minimal disruption to existing functionality.
 
-**Quality Assurance**: Robust testing framework and quality gates ensure the offline functionality meets Goji's high standards for financial software.
+**Quality Assurance**: Robust testing framework and quality gates ensure the offline functionality meets your app's high standards for financial software.
 
 ### Expected Impact
 
@@ -1896,10 +1896,10 @@ The Goji Offline Capabilities System represents a transformative advancement in 
 
 **Business Growth**: 15% increase in overall transaction volume and 20% reduction in revenue loss during network outages.
 
-**Market Expansion**: Opens new markets previously underserved due to connectivity limitations, supporting Goji's mission of financial inclusion.
+**Market Expansion**: Opens new markets previously underserved due to connectivity limitations, supporting your app's mission of financial inclusion.
 
-This PRD provides the comprehensive foundation for implementing offline capabilities that will revolutionize mobile financial services in emerging markets while maintaining Goji's commitment to security, performance, and user experience excellence.
+This PRD provides the comprehensive foundation for implementing offline capabilities that will revolutionize mobile financial services in emerging markets while maintaining your app's commitment to security, performance, and user experience excellence.
 
 ---
 
-_This document serves as the definitive specification for offline capabilities implementation, integrating seamlessly with Goji's existing architecture while establishing new standards for offline-first financial services._
+_This document serves as the definitive specification for offline capabilities implementation, integrating seamlessly with your app's existing architecture while establishing new standards for offline-first financial services._

@@ -62,7 +62,7 @@ Task is conceptually sound and well-motivated, but rests on one factual error: i
 
 ### Optional
 - `status: 📋 Planned` uses an emoji prefix; template uses plain `Planned`. Cosmetic.
-- `assignee: TBD` — set to `gamaroff` or self-assign in GH issue when picked up.
+- `assignee: TBD` — set to yourself or self-assign in GH issue when picked up.
 
 ---
 

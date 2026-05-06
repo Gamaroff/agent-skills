@@ -9,7 +9,7 @@ license: MIT
 
 ## Overview
 
-This skill enforces consistent Expo Router navigation patterns across the Goji wallet application, preventing navigation stack mismatches that cause blank screens, broken back buttons, and confusing user experiences. The skill validates import usage, navigation method calls, and stack consistency to ensure all header components follow the established "Expo Router First" pattern.
+This skill enforces consistent Expo Router navigation patterns across the your wallet app application, preventing navigation stack mismatches that cause blank screens, broken back buttons, and confusing user experiences. The skill validates import usage, navigation method calls, and stack consistency to ensure all header components follow the established "Expo Router First" pattern.
 
 **Core Principle**: Expo Router provides file-based routing with built-in stack management. Mixing Expo Router and React Navigation in the same component creates navigation stack mismatches where forward navigation uses one system but back navigation uses another, resulting in undefined behavior.
 
@@ -32,7 +32,7 @@ Use this skill when:
 
 Determine the component's navigation context:
 
-**Standard Drawer Headers**: Files in `apps/goji-wallet/app/(drawer)/*/`
+**Standard Drawer Headers**: Files in `apps/my-wallet/app/(drawer)/*/`
 - Should use Expo Router exclusively
 - Example: WalletsHeader, ShoppingHeader, ContactsHeader
 
@@ -367,12 +367,12 @@ const handleBackPress = () => {
 **Description**: Component imports both `useRouter` and `useNavigation` but only uses one of them.
 
 **Files Affected** (from codebase analysis):
-- `apps/goji-wallet/app/(drawer)/contacts/contacts-header.tsx`
-- `apps/goji-wallet/app/(drawer)/transactions/transactions-header.tsx`
-- `apps/goji-wallet/app/(drawer)/shopping/shopping-header.tsx`
-- `apps/goji-wallet/app/(drawer)/profile/profile-header.tsx`
-- `apps/goji-wallet/app/(drawer)/request/request-header.tsx`
-- `apps/goji-wallet/app/(drawer)/topup/topup-header.tsx`
+- `apps/my-wallet/app/(drawer)/contacts/contacts-header.tsx`
+- `apps/my-wallet/app/(drawer)/transactions/transactions-header.tsx`
+- `apps/my-wallet/app/(drawer)/shopping/shopping-header.tsx`
+- `apps/my-wallet/app/(drawer)/profile/profile-header.tsx`
+- `apps/my-wallet/app/(drawer)/request/request-header.tsx`
+- `apps/my-wallet/app/(drawer)/topup/topup-header.tsx`
 
 **Detection Pattern**:
 1. Both `import { useRouter } from 'expo-router'` and `import { useNavigation } from '@react-navigation/native'` present
@@ -412,7 +412,7 @@ export const ContactsHeader = () => {
 **Description**: Component uses `navigation.goBack()` without importing or using `useRouter`, creating fragile navigation that depends on React Navigation stack state.
 
 **Files Affected**:
-- `apps/goji-wallet/app/(drawer)/help/help-header.tsx`
+- `apps/my-wallet/app/(drawer)/help/help-header.tsx`
 
 **Detection Pattern**:
 1. `import { useNavigation } from '@react-navigation/native'` present
@@ -561,9 +561,9 @@ Before marking navigation code as compliant, verify all items:
 
 ### Reference Documentation
 
-**navigation-architecture-guide.md** - Comprehensive guide to Expo Router + React Navigation architecture in Goji, including file-based routing conventions, drawer navigation patterns, when to use each navigation method, migration guide from React Navigation to Expo Router, and edge case handling.
+**navigation-architecture-guide.md** - Comprehensive guide to Expo Router + React Navigation architecture in your app, including file-based routing conventions, drawer navigation patterns, when to use each navigation method, migration guide from React Navigation to Expo Router, and edge case handling.
 
-**violation-examples.md** - Real-world navigation violations from the Goji codebase with context, stack mismatch debugging techniques, and testing strategies for navigation flows.
+**violation-examples.md** - Real-world navigation violations from your codebase with context, stack mismatch debugging techniques, and testing strategies for navigation flows.
 
 ## Success Criteria
 

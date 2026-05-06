@@ -252,9 +252,9 @@ options:
 question: "Phase 1 lists 'auth-service.ts' but doesn't specify if this is client or server. Which path is correct?"
 header: "File Location"
 options:
-  - label: "Server: apps/goji-api/src/modules/auth/auth-service.ts"
+  - label: "Server: apps/my-api/src/modules/auth/auth-service.ts"
     description: "Backend authentication service (NestJS)"
-  - label: "Client: apps/goji-wallet/src/services/auth-service.ts"
+  - label: "Client: apps/my-wallet/src/services/auth-service.ts"
     description: "Frontend authentication service (React Native)"
   - label: "Both needed"
     description: "Changes required in both client and server auth services"
@@ -520,7 +520,7 @@ options:
 
        gh issue create \
          --title "[Task {id}] {title}" \
-         --project "Goji Website Development Board" \
+         --project "your app Website Development Board" \
          --body "## Overview
 
        {First paragraph of the task's Overview section}
@@ -665,7 +665,7 @@ options:
 
 2. **File Change Specificity**:
    - Not: "Update auth service"
-   - ✅ Yes: "Update `apps/goji-api/src/modules/auth/auth.service.ts` - Add `verifyExpiredOtp()` method"
+   - ✅ Yes: "Update `apps/my-api/src/modules/auth/auth.service.ts` - Add `verifyExpiredOtp()` method"
 
 3. **Change Description Quality**:
    - Changes should specify WHAT and WHY

@@ -10,7 +10,7 @@ priority: Medium
 effort: 1-2 days
 risk_level: medium
 created: 2026-05-04
-assignee: gamaroff
+assignee: maintainer
 parent_task: 1
 depends_on: [1]
 github_issue: 3

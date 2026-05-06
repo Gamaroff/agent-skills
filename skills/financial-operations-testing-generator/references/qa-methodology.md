@@ -1,6 +1,6 @@
 # Quality Assurance System
 
-**Project:** Goji Mobile Wallet  
+**Project:** your mobile wallet app  
 **Purpose:** World-class QA system with proven comprehensive testing achievements  
 **Owner:** QA Team  
 **Last Updated:** September 2025  
@@ -14,9 +14,9 @@
 
 ### **🌟 Current Excellence Status**
 
-- **@goji-system/wallet-lib**: 99.65% function coverage (**WORLD-CLASS**)
-- **@goji-system/auth-lib**: 99.18% function coverage (**EXCELLENT**)
-- **@goji-system/rewards-lib**: 99.09% function coverage (**OUTSTANDING**)
+- **@my-system/wallet-lib**: 99.65% function coverage (**WORLD-CLASS**)
+- **@my-system/auth-lib**: 99.18% function coverage (**EXCELLENT**)
+- **@my-system/rewards-lib**: 99.09% function coverage (**OUTSTANDING**)
 - **Total Test Files**: 283 comprehensive test suites
 - **Proven Method**: 32-phase iterative methodology with documented success
 
@@ -24,7 +24,7 @@
 
 ```bash
 # Verify you're in repository root
-pwd # Should end with /goji
+pwd # Should end with /my-app
 
 # Run our new comprehensive coverage monitor
 ./scripts/coverage-monitor.sh --quick
@@ -67,9 +67,9 @@ The full 32-phase approach achieved **world-class results** (wallet-lib: 99.65%,
 
 ```bash
 # Verify current world-class achievements
-npx nx test @goji-system/wallet-lib --coverage  # 99.65% coverage achieved!
-npx nx test @goji-system/auth-lib --coverage    # 99.18% coverage achieved!
-npx nx test @goji-system/rewards-lib --coverage # 99.09% coverage achieved!
+npx nx test @my-system/wallet-lib --coverage  # 99.65% coverage achieved!
+npx nx test @my-system/auth-lib --coverage    # 99.18% coverage achieved!
+npx nx test @my-system/rewards-lib --coverage # 99.09% coverage achieved!
 
 # Monitor ongoing excellence
 ./scripts/coverage-monitor.sh --quick
@@ -85,19 +85,19 @@ npx nx test @goji-system/rewards-lib --coverage # 99.09% coverage achieved!
 
 **🎯 CURRENT ACHIEVEMENTS EXCEED ALL TARGETS:**
 
-- **@goji-system/wallet-lib**: **99.65%** (Target was 80%+ ✅ **EXCEEDED by 19.65 points**)
-- **@goji-system/auth-lib**: **99.18%** (Target was 95%+ ✅ **EXCEEDED by 4.18 points**)
-- **@goji-system/rewards-lib**: **99.09%** (Target was 85%+ ✅ **EXCEEDED by 14.09 points**)
+- **@my-system/wallet-lib**: **99.65%** (Target was 80%+ ✅ **EXCEEDED by 19.65 points**)
+- **@my-system/auth-lib**: **99.18%** (Target was 95%+ ✅ **EXCEEDED by 4.18 points**)
+- **@my-system/rewards-lib**: **99.09%** (Target was 85%+ ✅ **EXCEEDED by 14.09 points**)
 - **Security validation**: **100%** platform separation compliance ✅ **PERFECT**
 
 #### **Step 2: Integration & E2E Testing**
 
 ```bash
 # Run complete payment flow integration tests
-npx nx test goji-api --testPathPattern="payment-flow-e2e"
+npx nx test my-api --testPathPattern="payment-flow-e2e"
 
 # Validate cross-platform data consistency
-npx nx test goji-api --testPathPattern="integration"
+npx nx test my-api --testPathPattern="integration"
 ```
 
 **What This Validates:**
@@ -113,13 +113,13 @@ npx nx test goji-api --testPathPattern="integration"
 
 ```bash
 # High-priority libraries ready for systematic improvement
-npx nx test @goji-system/contact-lib --coverage      # Current: 0% → Target: 95%
-npx nx test @goji-system/transactions-lib --coverage # Analyze current status
-npx nx test @goji-system/compliance-lib --coverage   # Analyze current status
+npx nx test @my-system/contact-lib --coverage      # Current: 0% → Target: 95%
+npx nx test @my-system/transactions-lib --coverage # Analyze current status
+npx nx test @my-system/compliance-lib --coverage   # Analyze current status
 
 # Libraries with good foundations to optimize
-npx nx test @goji-system/user-lib --coverage         # Current: 67.96% → Target: 85%
-npx nx test @goji-system/chat-lib --coverage         # Current: 61.75% → Target: 80%
+npx nx test @my-system/user-lib --coverage         # Current: 67.96% → Target: 85%
+npx nx test @my-system/chat-lib --coverage         # Current: 61.75% → Target: 80%
 ```
 
 **🚀 Ready Quality Infrastructure:**
@@ -134,10 +134,10 @@ npx nx test @goji-system/chat-lib --coverage         # Current: 61.75% → Targe
 ```bash
 # Set up daily coverage monitoring
 crontab -e
-# Add: 0 9 * * * /path/to/goji/docs/qa/automation/coverage-improvement-script.sh --quick
+# Add: 0 9 * * * /path/to/my-app/docs/qa/automation/coverage-improvement-script.sh --quick
 
 # Weekly comprehensive analysis
-# Add: 0 9 * * 1 /path/to/goji/docs/qa/automation/coverage-improvement-script.sh
+# Add: 0 9 * * 1 /path/to/my-app/docs/qa/automation/coverage-improvement-script.sh
 ```
 
 ### **Phase 3: Comprehensive Coverage (Ongoing)**
@@ -182,7 +182,7 @@ git commit -m "qa: Weekly coverage analysis and progress update"
 - **Financial Libraries**: 95%+ (auth-lib, wallet-lib, compliance-lib, transactions-lib)
 - **Core Libraries**: 85%+ (contact-lib, chat-lib, notifications-lib, user-lib, shopping-lib, requests-lib, rewards-lib, help-lib, localization-lib)
 - **Foundation Libraries**: 80%+ (shared-types, shared-utils, mock-data-lib)
-- **Applications**: 75%+ (goji-wallet, goji-api)
+- **Applications**: 75%+ (my-wallet, my-api)
 
 ### **Security Requirements (Critical)**
 
@@ -209,7 +209,7 @@ git commit -m "qa: Weekly coverage analysis and progress update"
 
 ```bash
 # Run immediately
-npx nx test @goji-system/wallet-lib --testPathPattern="multi-wallet-architecture"
+npx nx test @my-system/wallet-lib --testPathPattern="multi-wallet-architecture"
 ```
 
 **Coverage**: 20+ tests for single-currency validation, cross-wallet operations, decimal precision
@@ -220,18 +220,18 @@ npx nx test @goji-system/wallet-lib --testPathPattern="multi-wallet-architecture
 
 ```bash
 # Run immediately
-npx nx test @goji-system/auth-lib --testPathPattern="platform-separation-security"
+npx nx test @my-system/auth-lib --testPathPattern="platform-separation-security"
 ```
 
 **Coverage**: 30+ critical security tests for mobile/server environment validation
 
 #### **3. End-to-End Payment Flow Testing**
 
-**File**: `apps/goji-api/src/__tests__/integration/payment-flow-e2e.spec.ts`
+**File**: `apps/my-api/src/__tests__/integration/payment-flow-e2e.spec.ts`
 
 ```bash
 # Run immediately (requires test database)
-npx nx test goji-api --testPathPattern="payment-flow-e2e"
+npx nx test my-api --testPathPattern="payment-flow-e2e"
 ```
 
 **Coverage**: Complete payment flows with real-time updates and error scenarios
@@ -361,30 +361,30 @@ echo "Next month QA priorities:" > qa-priorities-$(date +%Y-%m).md
 ```bash
 # Check current coverage across entire codebase
 echo "Financial Libraries Coverage (95% Target):"
-echo "- auth-lib: $(npx nx test @goji-system/auth-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- wallet-lib: $(npx nx test @goji-system/wallet-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- compliance-lib: $(npx nx test @goji-system/compliance-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- transactions-lib: $(npx nx test @goji-system/transactions-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- auth-lib: $(npx nx test @my-system/auth-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- wallet-lib: $(npx nx test @my-system/wallet-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- compliance-lib: $(npx nx test @my-system/compliance-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- transactions-lib: $(npx nx test @my-system/transactions-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
 
 echo "Core Libraries Coverage (85% Target):"
-echo "- contact-lib: $(npx nx test @goji-system/contact-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- chat-lib: $(npx nx test @goji-system/chat-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- notifications-lib: $(npx nx test @goji-system/notifications-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- user-lib: $(npx nx test @goji-system/user-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- shopping-lib: $(npx nx test @goji-system/shopping-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- requests-lib: $(npx nx test @goji-system/requests-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- rewards-lib: $(npx nx test @goji-system/rewards-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- help-lib: $(npx nx test @goji-system/help-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- localization-lib: $(npx nx test @goji-system/localization-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- contact-lib: $(npx nx test @my-system/contact-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- chat-lib: $(npx nx test @my-system/chat-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- notifications-lib: $(npx nx test @my-system/notifications-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- user-lib: $(npx nx test @my-system/user-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- shopping-lib: $(npx nx test @my-system/shopping-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- requests-lib: $(npx nx test @my-system/requests-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- rewards-lib: $(npx nx test @my-system/rewards-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- help-lib: $(npx nx test @my-system/help-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- localization-lib: $(npx nx test @my-system/localization-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
 
 echo "Foundation Libraries Coverage (80% Target):"
-echo "- shared-types: $(npx nx test @goji-system/shared-types --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- shared-utils: $(npx nx test @goji-system/shared-utils --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- mock-data-lib: $(npx nx test @goji-system/mock-data-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- shared-types: $(npx nx test @my-system/shared-types --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- shared-utils: $(npx nx test @my-system/shared-utils --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- mock-data-lib: $(npx nx test @my-system/mock-data-lib --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
 
 echo "Applications Coverage (75% Target):"
-echo "- goji-wallet: $(npx nx test goji-wallet --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
-echo "- goji-api: $(npx nx test goji-api --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- my-wallet: $(npx nx test my-wallet --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
+echo "- my-api: $(npx nx test my-api --coverage --silent | grep -o '[0-9.]\+%' | tail -1)"
 ```
 
 ### **Quality Gate Performance**
@@ -402,8 +402,8 @@ echo "- FAIL: $(find docs/qa/gates -name "*.yml" -exec grep -l "gate: FAIL" {} \
 ```bash
 # Validate platform separation compliance
 echo "Security Validation:"
-echo "- Platform separation tests: $(npx nx test @goji-system/auth-lib --testPathPattern="platform-separation" --silent && echo "PASS" || echo "FAIL")"
-echo "- Financial security tests: $(npx nx test @goji-system/wallet-lib --testPathPattern="security" --silent && echo "PASS" || echo "FAIL")"
+echo "- Platform separation tests: $(npx nx test @my-system/auth-lib --testPathPattern="platform-separation" --silent && echo "PASS" || echo "FAIL")"
+echo "- Financial security tests: $(npx nx test @my-system/wallet-lib --testPathPattern="security" --silent && echo "PASS" || echo "FAIL")"
 ```
 
 ---
@@ -452,7 +452,7 @@ npm install # Ensure dependencies
 
 ```bash
 # If tests fail to run
-npx nx test @goji-system/shared-types  # Start with simple library
+npx nx test @my-system/shared-types  # Start with simple library
 npx nx affected --target=test      # Run only affected tests
 ```
 

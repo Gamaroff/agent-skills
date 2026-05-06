@@ -10,24 +10,24 @@ Step-by-step guides for each debugging workflow in the React Native Debug skill.
 
 ```bash
 # Check if the library exists in dist/
-ls -la dist/libs/@goji-system/[library-name]/
+ls -la dist/libs/@my-system/[library-name]/
 
 # If not found:
 echo "❌ Library not built"
 
 # If found:
 echo "✅ Library exists, check if up to date"
-ls -lt dist/libs/@goji-system/[library-name]/ | head -5
+ls -lt dist/libs/@my-system/[library-name]/ | head -5
 ```
 
 ### Step 2: Run Automated Checks
 
 ```bash
 # Check Metro cache freshness
-npx nx start goji-wallet --dry-run
+npx nx start my-wallet --dry-run
 
 # Check tsconfig paths
-grep -A 20 '"paths"' tsconfig.json | grep "@goji-system"
+grep -A 20 '"paths"' tsconfig.json | grep "@my-system"
 
 # Check metro.config.js setup
 grep -A 5 "projectRoot\|cacheVersion" metro.config.js
@@ -42,14 +42,14 @@ grep -A 5 "projectRoot\|cacheVersion" metro.config.js
   ```bash
   npm run build:libraries
   # Or rebuild specific library
-  npx nx build @goji-system/[library-name]
+  npx nx build @my-system/[library-name]
   ```
 
 ### Step 4: Clear Metro Cache
 
 **Auto-run this**:
 ```bash
-npx nx start goji-wallet --reset-cache --clear
+npx nx start my-wallet --reset-cache --clear
 ```
 
 Metro cache is often stale after rebuilds. This is safe to run automatically.
@@ -58,7 +58,7 @@ Metro cache is often stale after rebuilds. This is safe to run automatically.
 
 ```bash
 # Try starting Metro again
-npx nx start goji-wallet --reset-cache --clear
+npx nx start my-wallet --reset-cache --clear
 
 # If still failing, check exact error path
 # Metro terminal shows: "from /path/to/file"
@@ -70,7 +70,7 @@ npx nx start goji-wallet --reset-cache --clear
 **Issue A**: "Module name mapped to different path"
 ```bash
 # Check if library export path matches tsconfig
-cat dist/libs/@goji-system/[lib]/package.json
+cat dist/libs/@my-system/[lib]/package.json
 # Check "main" field matches
 
 cat tsconfig.json
@@ -113,10 +113,10 @@ Common errors:
 
 ```bash
 # Check jest.config.ts exists
-ls apps/goji-wallet/jest.config.ts
+ls apps/my-wallet/jest.config.ts
 
 # Check required fields
-grep -E "preset|setupFilesAfterEnv|transform|moduleNameMapper" apps/goji-wallet/jest.config.ts
+grep -E "preset|setupFilesAfterEnv|transform|moduleNameMapper" apps/my-wallet/jest.config.ts
 ```
 
 **Required jest.config.ts fields**:
@@ -137,10 +137,10 @@ grep -E "preset|setupFilesAfterEnv|transform|moduleNameMapper" apps/goji-wallet/
 
 ```bash
 # Check if test-setup.ts exists
-ls apps/goji-wallet/src/test-setup.ts
+ls apps/my-wallet/src/test-setup.ts
 
 # Check if referenced in jest.config.ts
-grep "test-setup.ts" apps/goji-wallet/jest.config.ts
+grep "test-setup.ts" apps/my-wallet/jest.config.ts
 ```
 
 **test-setup.ts should contain**:
@@ -156,10 +156,10 @@ jest.mock('@react-native-async-storage/async-storage');
 
 ```bash
 # Check .babelrc.js exists
-ls apps/goji-wallet/.babelrc.js
+ls apps/my-wallet/.babelrc.js
 
 # Check required presets
-grep -E "@babel/preset-react|@babel/preset-typescript" apps/goji-wallet/.babelrc.js
+grep -E "@babel/preset-react|@babel/preset-typescript" apps/my-wallet/.babelrc.js
 ```
 
 **Required .babelrc.js presets**:
@@ -182,7 +182,7 @@ module.exports = {
 **Issue A**: test-setup.ts missing
 ```bash
 # Create minimal test-setup.ts
-cat > apps/goji-wallet/src/test-setup.ts << 'EOF'
+cat > apps/my-wallet/src/test-setup.ts << 'EOF'
 import '@testing-library/jest-native/extend-expect';
 EOF
 ```
@@ -204,14 +204,14 @@ npm install --save-dev @babel/preset-react @babel/preset-typescript
 ### Step 6: Re-run Test
 
 ```bash
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Step 7: If Still Failing
 
 Ask user: **"Can you run this and show me the error?"**
 ```bash
-npx nx test goji-wallet --no-coverage --verbose
+npx nx test my-wallet --no-coverage --verbose
 ```
 
 Check for:
@@ -289,7 +289,7 @@ jest.mock('api', () => ({
 
 ```bash
 # Find all mocks for the same module
-grep -r "jest.mock.*api" apps/goji-wallet/
+grep -r "jest.mock.*api" apps/my-wallet/
 
 # If found in multiple places, consolidate into one
 ```
@@ -389,8 +389,8 @@ Ask user: **"Is this a client test or integration test?"**
 ### Step 2: Scan for Problematic Imports
 
 ```bash
-# Find all @goji-system imports
-grep -n "@goji-system" test-file.spec.tsx
+# Find all @my-system imports
+grep -n "@my-system" test-file.spec.tsx
 
 # Check each one for /client suffix or server-only packages
 ```
@@ -398,17 +398,17 @@ grep -n "@goji-system" test-file.spec.tsx
 **Correct Client Imports**:
 ```typescript
 // ✅ Client tests must use /client imports
-import { decodeToken, isTokenExpired } from '@goji-system/auth-lib/client';
-import { logger } from '@goji-system/logging-lib/client';
-import { validateEmail } from '@goji-system/shared-utils/client';
-import { getDeviceInfo } from '@goji-system/shared-utils/client';
+import { decodeToken, isTokenExpired } from '@my-system/auth-lib/client';
+import { logger } from '@my-system/logging-lib/client';
+import { validateEmail } from '@my-system/shared-utils/client';
+import { getDeviceInfo } from '@my-system/shared-utils/client';
 ```
 
 **Wrong Client Imports**:
 ```typescript
 // ❌ Client tests CANNOT use these
-import { hashPassword, generateTokenPair } from '@goji-system/auth-lib'; // Missing /client
-import { logger } from '@goji-system/logging-lib'; // Missing /client
+import { hashPassword, generateTokenPair } from '@my-system/auth-lib'; // Missing /client
+import { logger } from '@my-system/logging-lib'; // Missing /client
 import bcryptjs from 'bcryptjs'; // ❌ Node.js only
 import jwt from 'jsonwebtoken'; // ❌ Node.js only
 ```
@@ -433,9 +433,9 @@ Build a table of fixes needed:
 ```
 Current Import                 → Correct Import
 ────────────────────────────────────────────────────
-@goji-system/auth-lib       → @goji-system/auth-lib/client
-@goji-system/logging-lib    → @goji-system/logging-lib/client
-@goji-system/shared-utils   → @goji-system/shared-utils/client (if device/ui functions)
+@my-system/auth-lib       → @my-system/auth-lib/client
+@my-system/logging-lib    → @my-system/logging-lib/client
+@my-system/shared-utils   → @my-system/shared-utils/client (if device/ui functions)
 bcryptjs                       → Remove (server-only)
 jsonwebtoken                   → Remove (server-only)
 ```
@@ -445,8 +445,8 @@ jsonwebtoken                   → Remove (server-only)
 **For automated fixing** (ask confirmation):
 ```typescript
 // Find and replace in test file
-// OLD: import { func } from '@goji-system/auth-lib'
-// NEW: import { decodeToken } from '@goji-system/auth-lib/client'
+// OLD: import { func } from '@my-system/auth-lib'
+// NEW: import { decodeToken } from '@my-system/auth-lib/client'
 ```
 
 **For manual review** (if uncertain):
@@ -461,7 +461,7 @@ Ask user: "Should function X be removed (server-only) or changed to /client impo
 npx tsc --noEmit
 
 # Run test to verify imports resolve
-npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Step 7: Check ESLint Enforcement
@@ -469,7 +469,7 @@ npx nx test goji-wallet --testNamePattern="[test name]" --no-coverage
 If this happens repeatedly, ESLint should catch it:
 ```bash
 # Run ESLint on test file
-npx nx lint goji-wallet --files="test-file.spec.tsx"
+npx nx lint my-wallet --files="test-file.spec.tsx"
 
 # Should show error like:
 # "Don't import from server-only library in client code"
@@ -719,7 +719,7 @@ If test is flaky (sometimes passes, sometimes fails):
 ```bash
 # Run test multiple times
 for i in {1..5}; do
-  npx nx test goji-wallet --testNamePattern="flaky-test" --no-coverage
+  npx nx test my-wallet --testNamePattern="flaky-test" --no-coverage
 done
 
 # If sometimes fails, it's a timing issue
@@ -748,7 +748,7 @@ it('should handle async operation', async () => {
   console.log('4. After waitFor');
 });
 
-// Run with: npx nx test goji-wallet --testNamePattern="..." --no-coverage
+// Run with: npx nx test my-wallet --testNamePattern="..." --no-coverage
 ```
 
 Check console output to see where delay occurs.

@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This guide provides comprehensive patterns for implementing authentication across the Goji platform using the **Platform-Specific Entry Points Architecture**. The authentication system demonstrates a **Zero Trust Client Model** where all security-critical operations remain server-side while providing optimal user experience on mobile clients.
+This guide provides comprehensive patterns for implementing authentication across your platform using the **Platform-Specific Entry Points Architecture**. The authentication system demonstrates a **Zero Trust Client Model** where all security-critical operations remain server-side while providing optimal user experience on mobile clients.
 
 ### Key Authentication Principles
 
@@ -76,14 +76,14 @@ sequenceDiagram
 #### bcrypt Password Hashing (Server-Only)
 
 ```typescript
-// Server-side password hashing with @goji-system/auth-lib
+// Server-side password hashing with @my-system/auth-lib
 import {
   hashPassword,
   comparePassword,
   validatePassword,
   needsRehash,
   type AuthConfig
-} from '@goji-system/auth-lib';
+} from '@my-system/auth-lib';
 
 @Injectable()
 export class AuthService {
@@ -192,7 +192,7 @@ export class AuthService {
 #### JWT Token Management (Server-Only)
 
 ```typescript
-// Server-side JWT operations with @goji-system/auth-lib
+// Server-side JWT operations with @my-system/auth-lib
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -201,7 +201,7 @@ import {
   verifyRefreshToken,
   type JwtPayload,
   type AuthTokens
-} from '@goji-system/auth-lib';
+} from '@my-system/auth-lib';
 
 @Injectable()
 export class TokenService {
@@ -281,7 +281,7 @@ export class TokenService {
 import {
   verifyAccessToken,
   extractBearerToken
-} from '@goji-system/auth-lib';
+} from '@my-system/auth-lib';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -338,7 +338,7 @@ export class ProtectedController {
 #### React Native Authentication Service
 
 ```typescript
-// Client-side authentication with @goji-system/auth-lib/src/client
+// Client-side authentication with @my-system/auth-lib/src/client
 import {
   extractBearerToken,
   decodeToken,
@@ -351,7 +351,7 @@ import {
   type SafeUser,
   type AuthTokens,
   type JwtPayload
-} from '@goji-system/auth-lib/src/client';
+} from '@my-system/auth-lib/src/client';
 
 import * as SecureStore from 'expo-secure-store';
 
@@ -613,7 +613,7 @@ import React, {
   ReactNode
 } from 'react';
 import { authService } from '../services/auth-service';
-import type { SafeUser } from '@goji-system/auth-lib/src/client';
+import type { SafeUser } from '@my-system/auth-lib/src/client';
 
 interface AuthContextValue {
   user: SafeUser | null;
@@ -745,7 +745,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/auth-context';
-import { validateEmail } from '@goji-system/auth-lib/src/client';
+import { validateEmail } from '@my-system/auth-lib/src/client';
 
 export const LoginScreen: React.FC = () => {
   const { login, isLoading } = useAuth();
@@ -903,7 +903,7 @@ export class PasswordSecurityService {
 
 ```typescript
 // Client-side password validation for user experience
-import { validatePassword } from '@goji-system/auth-lib/src/client';
+import { validatePassword } from '@my-system/auth-lib/src/client';
 
 export const usePasswordValidation = () => {
   const [passwordStrength, setPasswordStrength] = useState<{
@@ -977,7 +977,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 
 export class TokenStorageService {
-  private readonly KEYCHAIN_SERVICE = 'goji-wallet';
+  private readonly KEYCHAIN_SERVICE = 'my-wallet';
 
   async storeTokenSecurely(key: string, token: string): Promise<void> {
     try {
@@ -1356,7 +1356,7 @@ const JWT_SECRET = process.env.JWT_SECRET; // ❌ Exposed in client bundle
 
 ```typescript
 // Server-side password handling
-import { hashPassword } from '@goji-system/auth-lib';
+import { hashPassword } from '@my-system/auth-lib';
 
 @Post('register')
 async register(@Body() { email, password }: RegisterDto) {
@@ -1373,7 +1373,7 @@ async register(@Body() { email, password }: RegisterDto) {
 import {
   decodeToken,
   isTokenExpired
-} from '@goji-system/auth-lib/src/client';
+} from '@my-system/auth-lib/src/client';
 
 const getTokenInfo = (token: string) => {
   // Parse for UX, don't verify signature
@@ -1386,7 +1386,7 @@ const getTokenInfo = (token: string) => {
 
 ## Conclusion
 
-The Authentication Platform Patterns implemented in the Goji platform demonstrate a comprehensive **Zero Trust Client Model** that ensures maximum security while providing optimal user experience. Key achievements include:
+The Authentication Platform Patterns implemented in your platform demonstrate a comprehensive **Zero Trust Client Model** that ensures maximum security while providing optimal user experience. Key achievements include:
 
 ### Security Excellence
 
@@ -1412,4 +1412,4 @@ This authentication architecture serves as the foundation for secure financial s
 
 ---
 
-_This guide provides the definitive patterns for authentication implementation across the Goji platform. For specific implementation details, refer to the @goji-system/auth-lib documentation and platform-specific architecture guides._
+_This guide provides the definitive patterns for authentication implementation across your platform. For specific implementation details, refer to the @my-system/auth-lib documentation and platform-specific architecture guides._

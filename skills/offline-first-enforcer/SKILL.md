@@ -1,16 +1,16 @@
 ---
 name: offline-first-enforcer
-description: This skill should be used when implementing offline-first architecture for the Goji mobile wallet, validating sync queue implementations, reviewing conflict resolution strategies, ensuring optimistic UI updates, or designing local-first features. Use when working with offline capabilities, cache strategies, or sync patterns.
+description: This skill should be used when implementing offline-first architecture for mobile or web apps, validating sync queue implementations, reviewing conflict resolution strategies, ensuring optimistic UI updates, or designing local-first features. Use when working with offline capabilities, cache strategies, or sync patterns.
 license: Complete terms in LICENSE.txt
 ---
 
 # Offline First Enforcer
 
-Validate and enforce offline-first architecture patterns for the Goji mobile wallet, ensuring reliable operation during network interruptions while maintaining data consistency and security.
+Validate and enforce offline-first architecture patterns for mobile and web apps, ensuring reliable operation during network interruptions while maintaining data consistency and security.
 
 ## Purpose
 
-Ensure the Goji mobile wallet operates seamlessly offline by validating local storage patterns, sync queue implementations, conflict resolution strategies, and optimistic UI updates. This skill prevents common offline architecture mistakes and enforces best practices for network-independent operation.
+Ensure your app operates seamlessly offline by validating local storage patterns, sync queue implementations, conflict resolution strategies, and optimistic UI updates. This skill prevents common offline architecture mistakes and enforces best practices for network-independent operation.
 
 ## When to Use This Skill
 
@@ -25,7 +25,7 @@ Use this skill when:
 - Ensuring offline data security
 - Optimizing for intermittent connectivity
 
-## Goji Offline Architecture
+## Offline Architecture
 
 ### Multi-Tier Caching System
 
@@ -37,19 +37,19 @@ Use this skill when:
 
 **L1 Cache** (In-Memory):
 - Purpose: Active session data, hot data
-- Technology: `@goji-system/cache-lib` in-memory cache
+- Technology: `@my-system/cache-lib` in-memory cache
 - Characteristics: Volatile, <10ms access, cleared on app restart
 - Use for: Current wallet balance, active transactions, recent contacts
 
 **L2 Cache** (AsyncStorage):
 - Purpose: Non-sensitive persisted data
-- Technology: `@goji-system/cache-lib` AsyncStorage layer
+- Technology: `@my-system/cache-lib` AsyncStorage layer
 - Characteristics: Persistent, ~50ms access, key-value storage
 - Use for: User preferences, UI state, recent search history
 
 **L3 Cache** (SQLite):
 - Purpose: Structured offline-first datasets
-- Technology: `@goji-system/cache-lib` SQLite with sync capabilities
+- Technology: `@my-system/cache-lib` SQLite with sync capabilities
 - Characteristics: Persistent, relational, observable queries, ~100ms access
 - Use for: Transaction history, contact lists, wallet metadata, offline queue
 

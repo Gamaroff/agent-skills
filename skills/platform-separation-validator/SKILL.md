@@ -30,8 +30,8 @@ Use this skill when:
 
 Determine where the code will execute:
 
-**React Native (Client)**: Files in `apps/goji-wallet/`, components, screens, hooks
-**NestJS (Server)**: Files in `apps/goji-api/`, controllers, services, guards
+**React Native (Client)**: Files in `apps/my-wallet/`, components, screens, hooks
+**NestJS (Server)**: Files in `apps/my-api/`, controllers, services, guards
 **Shared**: Type definitions, interfaces, validation schemas
 
 ### Step 2: Validate Imports
@@ -39,20 +39,20 @@ Determine where the code will execute:
 **For React Native files** - Check imports use `/client` paths:
 ```typescript
 // ✅ CORRECT
-import { logger } from '@goji-system/logging-lib/client';
-import { validateEmail } from '@goji-system/shared-utils/client';
-import { decodeToken } from '@goji-system/auth-lib/client';
+import { logger } from '@my-system/logging-lib/client';
+import { validateEmail } from '@my-system/shared-utils/client';
+import { decodeToken } from '@my-system/auth-lib/client';
 
 // ❌ VIOLATION
-import { logger } from '@goji-system/logging-lib'; // Includes Node.js code
-import { hashPassword } from '@goji-system/auth-lib'; // Server-only
+import { logger } from '@my-system/logging-lib'; // Includes Node.js code
+import { hashPassword } from '@my-system/auth-lib'; // Server-only
 ```
 
 **For NestJS files** - Can use default or server imports:
 ```typescript
 // ✅ CORRECT
-import { hashPassword } from '@goji-system/auth-lib';
-import { logger } from '@goji-system/logging-lib';
+import { hashPassword } from '@my-system/auth-lib';
+import { logger } from '@my-system/logging-lib';
 import * as bcrypt from 'bcrypt';
 ```
 
@@ -88,10 +88,10 @@ const response = await api.post('/wallet/generate-key');
 import * as crypto from 'crypto';
 
 // ❌ Server imports in React Native
-import { logger } from '@goji-system/logging-lib';
+import { logger } from '@my-system/logging-lib';
 
 // ✅ Correct - Client import
-import { logger } from '@goji-system/logging-lib/client';
+import { logger } from '@my-system/logging-lib/client';
 ```
 
 ## Common Violations & Fixes
@@ -110,7 +110,7 @@ const hashedPassword = await bcrypt.hash(password, 10); // ❌
 await api.post('/auth/register', { email, password });
 
 // Server hashes password
-// apps/goji-api/src/modules/auth/auth.service.ts
+// apps/my-api/src/modules/auth/auth.service.ts
 const hashedPassword = await bcrypt.hash(password, 10); // ✅
 ```
 
@@ -125,11 +125,11 @@ const payload = jwt.verify(token, process.env.JWT_SECRET); // ❌
 **Fix**:
 ```typescript
 // Client parses (doesn't validate) token
-import { decodeToken } from '@goji-system/auth-lib/client';
+import { decodeToken } from '@my-system/auth-lib/client';
 const payload = decodeToken(token); // ✅ Parse only
 
 // Server validates JWT
-// apps/goji-api/src/modules/auth/jwt.strategy.ts
+// apps/my-api/src/modules/auth/jwt.strategy.ts
 jwt.verify(token, process.env.JWT_SECRET); // ✅
 ```
 

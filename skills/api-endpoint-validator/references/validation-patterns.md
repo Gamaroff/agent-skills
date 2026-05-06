@@ -1,10 +1,10 @@
 # Validation Patterns
 
-This document outlines common validation patterns, rules, and error handling strategies used throughout the Goji platform's DTOs and types.
+This document outlines common validation patterns, rules, and error handling strategies used throughout NestJS application DTOs and types.
 
 ## Validation Framework
 
-The Goji platform uses a **4-layer validation approach**:
+This platform uses a **4-layer validation approach**:
 
 1. **Type-level validation** (compile time) - TypeScript strict mode
 2. **Decorator validation** (runtime) - class-validator 
@@ -65,7 +65,7 @@ percentage!: number;
 ```typescript
 // Single enum validation
 @IsEnum(ContactType, { 
-  message: 'Contact type must be one of: goji, bank, mobile_money, paymail, mnee_usd, chat_group' 
+  message: 'Contact type must be one of: app_user, bank, mobile_money, paymail, external_wallet, chat_group' 
 })
 type!: ContactType;
 
@@ -163,7 +163,7 @@ bankCode!: string;
 
 ### Identity Validation
 ```typescript
-// Handle validation (Goji identity - WITHOUT @ prefix)
+// Handle/username validation (WITHOUT @ prefix)
 // Note: Handles are stored without @ prefix. UI adds @ for display purposes only.
 @IsString()
 @MinLength(3)
@@ -329,7 +329,7 @@ export class CreateContactDto {
   @Type((options) => {
     const type = (options?.object as any)?.type;
     switch (type) {
-      case ContactType.GOJI: return GojiContactDetailsDto;
+      case ContactType.APP_USER: return AppUserContactDetailsDto;
       case ContactType.BANK: return BankContactDetailsDto;
       case ContactType.MOBILE_MONEY: return MobileMoneyContactDetailsDto;
       case ContactType.PAYMAIL: return PaymailContactDetailsDto;
@@ -731,10 +731,10 @@ describe('HandleFormatValidator', () => {
 ### Integration Tests for DTOs
 ```typescript
 describe('CreateContactDto Validation', () => {
-  it('should validate Goji contact creation', async () => {
+  it('should validate app user contact creation', async () => {
     const dto = plainToClass(CreateContactDto, {
       name: 'John Doe',
-      type: ContactType.GOJI,
+      type: ContactType.APP_USER,
       details: { handle: '@john.doe', publicKey: 'pub_123' }
     });
 
@@ -745,7 +745,7 @@ describe('CreateContactDto Validation', () => {
   it('should reject handles with @ prefix', async () => {
     const dto = plainToClass(CreateContactDto, {
       name: 'John Doe',
-      type: ContactType.GOJI,
+      type: ContactType.MY_APP,
       details: { handle: '@john.doe', publicKey: 'pub_123' } // Invalid: should not have @
     });
 

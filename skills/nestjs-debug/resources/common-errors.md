@@ -103,7 +103,7 @@ export class ModuleB {}
 
 ## 2. Module & Import Errors
 
-### Error: "Cannot find module '@goji-system/auth-lib'"
+### Error: "Cannot find module '@my-system/auth-lib'"
 
 **Quick Diagnosis Checklist:**
 - [ ] Does the library exist in `libs/` directory?
@@ -125,7 +125,7 @@ export class ModuleB {}
 {
   "compilerOptions": {
     "paths": {
-      "@goji-system/*": ["libs/*/src/index.ts"]
+      "@my-system/*": ["libs/*/src/index.ts"]
     }
   }
 }
@@ -136,7 +136,7 @@ export * from './lib/auth.module';
 export * from './types';
 
 // In app - Import from path alias
-import { AuthService } from '@goji-system/auth-lib';
+import { AuthService } from '@my-system/auth-lib';
 ```
 
 **Skill to Use:** ModuleResolutionDebugging
@@ -519,7 +519,7 @@ npm run build:libraries
 npx nx build {app_name}
 
 # Check build output
-ls dist/libs/@goji-system/auth-lib/
+ls dist/libs/@my-system/auth-lib/
 ```
 
 **Skill to Use:** ModuleResolutionDebugging

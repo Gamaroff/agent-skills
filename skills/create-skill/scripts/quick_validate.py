@@ -1,18 +1,6 @@
 #!/usr/bin/env python3
 
-#
-# PROPRIETARY SOURCE CODE - NOT OPEN SOURCE
-# Copyright (c) 2025 Lorien Gamaroff. All Rights Reserved.
-#
-# 1. OWNERSHIP
-# This software is the confidential and proprietary information of Lorien Gamaroff.
-# It is NOT "Open Source" and it is NOT "Work for Hire."
-#
-# 2. RESTRICTIONS
-# Possession of this source code does not imply a license to use it.
-# Any usage by a third party (including corporate employers) requires a
-# written license agreement.
-#
+
 """
 Quick validation script for skills - minimal version
 """

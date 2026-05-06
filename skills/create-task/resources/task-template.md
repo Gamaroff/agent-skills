@@ -239,9 +239,9 @@
 **Scope**: Test dependent code still works
 
 **Files to Test**:
-- `apps/goji-api/src/[consumer-code]`
+- `apps/my-api/src/[consumer-code]`
 
-**Command**: `npx nx test goji-api`
+**Command**: `npx nx test my-api`
 
 ---
 

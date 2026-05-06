@@ -1,6 +1,6 @@
 # Integration Tips
 
-Tips for working with the specific tools and platforms used in the Goji project stack.
+Tips for working with the specific tools and platforms used in your project stack.
 
 ---
 
@@ -26,7 +26,7 @@ Resend contact properties are key/value metadata on contacts. They must be creat
 
 When `NxAppWebpackPlugin` generates a pruned `package.json` for the production bundle, it reads only from the app-level `package.json` — not the root. Any package imported at runtime that isn't listed there will be absent from the Docker image's `node_modules` even though the build succeeds.
 
-**Example:** Add `nodemailer` to both root `dependencies` and `apps/goji-web-api/package.json` dependencies, not just one.
+**Example:** Add `nodemailer` to both root `dependencies` and `apps/my-web-api/package.json` dependencies, not just one.
 **Why it matters:** Build passes in CI, container crashes on first request. Extremely hard to debug without knowing this pattern.
 
 ---
@@ -80,7 +80,7 @@ Only environment variables prefixed with `VITE_` are exposed to the browser bund
 
 Run Nx commands as `npm exec nx <command>` or `npx nx <command>` — never as bare `nx`. This ensures the workspace's locally installed Nx version is used, not a global one that may differ. Mismatched versions cause subtle build and plugin resolution failures.
 
-**Example:** `npm exec nx test goji-web-app` — not `nx test goji-web-app`
+**Example:** `npm exec nx test my-app-web-app` — not `nx test my-app-web-app`
 **Why it matters:** Global `nx` versions are often out of date with the workspace's `nx` package version, causing cryptic plugin errors.
 
 ---

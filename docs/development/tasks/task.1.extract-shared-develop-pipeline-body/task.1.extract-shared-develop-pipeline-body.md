@@ -8,7 +8,7 @@ effort: 4-8 hours
 status: accepted
 completed_date: 2026-05-04
 created: 2026-05-04
-assignee: gamaroff
+assignee: maintainer
 branch: chore/develop-skill-extract
 github_issue: 1
 github_issue_url: https://github.com/Gamaroff/agent-skills/issues/1

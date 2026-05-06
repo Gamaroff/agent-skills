@@ -247,4 +247,4 @@ For comprehensive lists and detailed guidance:
 
 **Skill Version**: 1.0.0
 **Last Updated**: 2026-02-11
-**Maintainer**: Goji System Skills
+**Maintainer**: your app System Skills

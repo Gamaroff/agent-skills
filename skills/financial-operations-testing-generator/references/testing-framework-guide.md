@@ -6,7 +6,7 @@
 
 ## Overview
 
-This guide covers the standardized testing framework implemented for the Goji Mobile Wallet platform, specifically designed to meet the 95% coverage requirements for financial operations while ensuring reliable React Native testing.
+This guide covers the standardized testing framework implemented for the your mobile wallet app platform, specifically designed to meet the 95% coverage requirements for financial operations while ensuring reliable React Native testing.
 
 **New in v5.0**: Dual testing strategy with separate Node.js integration tests and React Native client tests, enabling full server-side crypto operations (password hashing, JWT signing, AES encryption) in test environments.
 
@@ -14,7 +14,7 @@ This guide covers the standardized testing framework implemented for the Goji Mo
 
 ### Dual Testing Strategy
 
-The Goji system uses a **dual testing strategy** to maintain platform separation and security boundaries:
+The your project uses a **dual testing strategy** to maintain platform separation and security boundaries:
 
 #### 1. Integration Tests (Node.js Environment)
 
@@ -75,7 +75,7 @@ import {
   hashPassword,
   comparePassword,
   generateTokenPair
-} from '@goji-system/auth-lib';
+} from '@my-system/auth-lib';
 
 describe('Authentication Service Integration Tests', () => {
   it('should hash and verify passwords', async () => {
@@ -122,7 +122,7 @@ describe('Authentication Service Integration Tests', () => {
 ```typescript
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { LoginForm } from './login-form';
-import { decodeToken } from '@goji-system/auth-lib/client'; // Client-only import
+import { decodeToken } from '@my-system/auth-lib/client'; // Client-only import
 
 describe('LoginForm Component', () => {
   it('should render and handle login', async () => {
@@ -177,11 +177,11 @@ describe('Custom Financial Tests', () => {
 import {
   createTestUserProfile,
   createCompleteTestUserProfile
-} from '@goji-system/shared-types/test-utils';
+} from '@my-system/shared-types/test-utils';
 
 // Minimal valid profile
 const user = createTestUserProfile({
-  email: 'test@goji.com',
+  email: 'test@example.com',
   kycTier: 'TIER_1'
 });
 
@@ -226,7 +226,7 @@ describe('PaymentForm', () => {
 import {
   measurePerformance,
   measureAsyncPerformance
-} from '@goji-system/shared-types/test-utils';
+} from '@my-system/shared-types/test-utils';
 
 describe('Performance Tests', () => {
   it('should process transactions within time limits', () => {
@@ -253,7 +253,7 @@ describe('Performance Tests', () => {
 import {
   expectValidationError,
   expectAsyncValidationError
-} from '@goji-system/shared-types/test-utils';
+} from '@my-system/shared-types/test-utils';
 
 describe('Error Handling', () => {
   it('should validate inputs correctly', () => {
@@ -364,7 +364,7 @@ Every library in `/libs/` includes these configuration files:
 
    ```typescript
    module.exports = {
-     displayName: '@goji-system/auth-lib (Integration)',
+     displayName: '@my-system/auth-lib (Integration)',
      preset: '../../jest.preset.js',
      testEnvironment: 'node',
      setupFiles: ['<rootDir>/src/integration-test-setup.ts'],
@@ -384,7 +384,7 @@ Every library in `/libs/` includes these configuration files:
 
    ```typescript
    module.exports = {
-     displayName: '@goji-system/auth-lib',
+     displayName: '@my-system/auth-lib',
      preset: 'react-native',
      testPathIgnorePatterns: [
        '/node_modules/',
@@ -506,7 +506,7 @@ coverageThreshold: {
     lines: 95,
     statements: 95
   },
-  'apps/goji-wallet/services/api/*-service.ts': {
+  'apps/my-wallet/services/api/*-service.ts': {
     branches: 95,
     functions: 95,
     lines: 95,
@@ -572,7 +572,7 @@ afterEach(() => {
 **Pattern:**
 ```typescript
 // ✅ CORRECT: Hoisted mock for standalone function
-jest.mock('@goji-system/shared-utils', () => ({
+jest.mock('@my-system/shared-utils', () => ({
   formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`),
   calculateFee: jest.fn((amount) => amount * 0.01),
   validateHandle: jest.fn((handle) => true)
@@ -580,7 +580,7 @@ jest.mock('@goji-system/shared-utils', () => ({
 
 describe('Payment Component', () => {
   it('should format currency correctly', () => {
-    const { formatCurrency } = require('@goji-system/shared-utils');
+    const { formatCurrency } = require('@my-system/shared-utils');
     const result = formatCurrency(100, 'USD');
     expect(result).toBe('USD 100');
     expect(formatCurrency).toHaveBeenCalledWith(100, 'USD');
@@ -610,7 +610,7 @@ describe('Payment Component', () => {
 **Pattern:**
 ```typescript
 // ✅ CORRECT: Runtime spy for object method
-import * as loggingLib from '@goji-system/logging-lib/client';
+import * as loggingLib from '@my-system/logging-lib/client';
 
 describe('User Service', () => {
   let loggerSpy: jest.SpyInstance;
@@ -680,7 +680,7 @@ describe('User Service', () => {
 **❌ WRONG: Trying to spy on standalone function**
 ```typescript
 // This will NOT work - Jest limitation
-import * as utils from '@goji-system/shared-utils';
+import * as utils from '@my-system/shared-utils';
 
 const spy = jest.spyOn(utils, 'formatCurrency'); // ❌ Error: Cannot spy on function
 ```
@@ -689,7 +689,7 @@ const spy = jest.spyOn(utils, 'formatCurrency'); // ❌ Error: Cannot spy on fun
 
 **✅ Solution:** Use hoisted mock
 ```typescript
-jest.mock('@goji-system/shared-utils', () => ({
+jest.mock('@my-system/shared-utils', () => ({
   formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`)
 }));
 ```
@@ -699,7 +699,7 @@ jest.mock('@goji-system/shared-utils', () => ({
 **❌ WRONG: Hoisted mock for subpath export**
 ```typescript
 // This will fail due to module resolution timing
-jest.mock('@goji-system/logging-lib/client', () => ({
+jest.mock('@my-system/logging-lib/client', () => ({
   logger: { info: jest.fn(), error: jest.fn() }
 }));
 ```
@@ -708,7 +708,7 @@ jest.mock('@goji-system/logging-lib/client', () => ({
 
 **✅ Solution:** Use runtime mocking (see `jest-subpath-export-resolution-guide.md` for details)
 ```typescript
-import * as loggingLib from '@goji-system/logging-lib/client';
+import * as loggingLib from '@my-system/logging-lib/client';
 
 beforeAll(() => {
   jest.spyOn(loggingLib, 'logger', 'get').mockReturnValue({
@@ -879,11 +879,11 @@ Determine if your existing tests should be integration tests or client tests:
 
 ```typescript
 // These need integration tests (server-side crypto):
-import { hashPassword } from '@goji-system/auth-lib'; // ❌ Won't work in React Native
+import { hashPassword } from '@my-system/auth-lib'; // ❌ Won't work in React Native
 await hashPassword('password'); // Needs Node.js environment
 
 // These can use client tests:
-import { decodeToken } from '@goji-system/auth-lib/client'; // ✅ Works in React Native
+import { decodeToken } from '@my-system/auth-lib/client'; // ✅ Works in React Native
 decodeToken(token); // Parsing only, no crypto
 ```
 
@@ -901,7 +901,7 @@ mv src/lib/auth-service.spec.ts src/lib/auth-service.integration.spec.ts
 
 ```typescript
 // Before (caused "Password hashing not available" errors)
-import { hashPassword } from '@goji-system/auth-lib';
+import { hashPassword } from '@my-system/auth-lib';
 
 describe('Auth Tests', () => {
   it('should hash password', async () => {
@@ -914,7 +914,7 @@ describe('Auth Tests', () => {
  * Server-side integration tests
  * Environment setup is handled by integration-test-setup.ts
  */
-import { hashPassword } from '@goji-system/auth-lib';
+import { hashPassword } from '@my-system/auth-lib';
 
 describe('Auth Integration Tests', () => {
   it('should hash password', async () => {
@@ -928,10 +928,10 @@ describe('Auth Integration Tests', () => {
 
 ```typescript
 // Before (tried to use server-side functions)
-import { hashPassword } from '@goji-system/auth-lib'; // ❌ Wrong import
+import { hashPassword } from '@my-system/auth-lib'; // ❌ Wrong import
 
 // After (use client-side functions only)
-import { decodeToken, validateEmail } from '@goji-system/auth-lib/client'; // ✅ Correct
+import { decodeToken, validateEmail } from '@my-system/auth-lib/client'; // ✅ Correct
 
 describe('Login Form Tests', () => {
   it('should validate email', () => {
@@ -991,11 +991,11 @@ describe('Password Integration Tests', () => {
 
 ```typescript
 // ❌ Old way (server-side verification in wrong environment)
-import { verifyAccessToken } from '@goji-system/auth-lib';
+import { verifyAccessToken } from '@my-system/auth-lib';
 
 // ✅ Integration test (server-side verification)
 // File: token.integration.spec.ts
-import { generateTokenPair, verifyAccessToken } from '@goji-system/auth-lib';
+import { generateTokenPair, verifyAccessToken } from '@my-system/auth-lib';
 
 describe('Token Integration Tests', () => {
   it('should generate and verify tokens', () => {
@@ -1007,7 +1007,7 @@ describe('Token Integration Tests', () => {
 
 // ✅ Client test (token parsing only)
 // File: token-display.spec.tsx
-import { decodeToken, isTokenExpired } from '@goji-system/auth-lib/client';
+import { decodeToken, isTokenExpired } from '@my-system/auth-lib/client';
 
 describe('Token Display Tests', () => {
   it('should decode token for display', () => {
@@ -1059,7 +1059,7 @@ describe('Auth Validation Tests', () => {
    import { mockUser } from '../__mocks__/user';
 
    // New
-   import { TestFixtures } from '@goji-system/shared-types/test-utils';
+   import { TestFixtures } from '@my-system/shared-types/test-utils';
    const user = TestFixtures.user.minimal();
    ```
 
@@ -1194,7 +1194,7 @@ import { server } from './src/mocks/server';  // ← Sees your mocked Response!
 **Solution**: Move Response mock to `setupFiles` which runs before ANY imports:
 
 ```javascript
-// apps/goji-wallet/jest-pre-setup.js
+// apps/my-wallet/jest-pre-setup.js
 global.Response = class Response {
   constructor(body, init) {
     this.body = body;

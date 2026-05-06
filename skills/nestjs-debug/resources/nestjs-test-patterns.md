@@ -133,12 +133,12 @@ describe('MyController', () => {
 
 1. **Check Module Providers:**
    ```bash
-   grep -A 30 "@Module({" apps/goji-api/src/auth/auth.module.ts | grep providers
+   grep -A 30 "@Module({" apps/my-api/src/auth/auth.module.ts | grep providers
    ```
 
 2. **Verify Service Exists:**
    ```bash
-   grep "class.*Service" apps/goji-api/src/auth/auth.service.ts
+   grep "class.*Service" apps/my-api/src/auth/auth.service.ts
    ```
 
 3. **Check Test Module Setup:**
@@ -466,20 +466,20 @@ const module = await Test.createTestingModule({
 
 ```bash
 # Find module providers
-grep -A 20 "@Module({" apps/goji-api/src/auth/auth.module.ts
+grep -A 20 "@Module({" apps/my-api/src/auth/auth.module.ts
 
 # Check exports
-grep -A 5 "exports:" apps/goji-api/src/auth/auth.module.ts
+grep -A 5 "exports:" apps/my-api/src/auth/auth.module.ts
 
 # Find service decorators
-grep -B 2 "class.*Service" apps/goji-api/src/auth/auth.service.ts
+grep -B 2 "class.*Service" apps/my-api/src/auth/auth.service.ts
 
 # Check test module setup
 grep -A 20 "Test.createTestingModule" src/**/*.spec.ts
 
 # Check for circular dependencies
-grep "import.*auth" apps/goji-api/src/config/*.ts
-grep "import.*config" apps/goji-api/src/auth/*.ts
+grep "import.*auth" apps/my-api/src/config/*.ts
+grep "import.*config" apps/my-api/src/auth/*.ts
 
 # Find mock declarations
 grep -n "jest.mock" src/**/*.spec.ts
@@ -490,7 +490,7 @@ grep -n "beforeEach()" src/**/*.spec.ts | head -20
 
 ---
 
-## Real-World NestJS Example: goji-api
+## Real-World NestJS Example: my-api
 
 ### Scenario: Auth Service Test Fails
 
@@ -502,13 +502,13 @@ Error: Nest can't resolve dependencies of AuthService
 
 1. **Check module structure:**
    ```bash
-   grep -A 10 "@Module" apps/goji-api/src/auth/auth.module.ts
+   grep -A 10 "@Module" apps/my-api/src/auth/auth.module.ts
    # Find: AuthService in providers, but not in test module
    ```
 
 2. **Check exports:**
    ```bash
-   grep "exports:" apps/goji-api/src/auth/auth.module.ts
+   grep "exports:" apps/my-api/src/auth/auth.module.ts
    # Find: AuthService not exported!
    ```
 

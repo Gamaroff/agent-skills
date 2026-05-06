@@ -1,6 +1,6 @@
 ---
 name: server-admin
-description: Sysadmin operations on the Goji LAN server (default goji-server / 192.168.1.247). Covers apt updates, ufw firewall rules, systemd service management, user/group management, disk and memory diagnostics, log inspection, and routine maintenance. Use for any non-Docker server-side task.
+description: Sysadmin operations on a LAN server via SSH. Covers apt updates, ufw firewall rules, systemd service management, user/group management, disk and memory diagnostics, log inspection, and routine maintenance. Use for any non-Docker server-side task.
 type: project
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
@@ -8,7 +8,7 @@ license: MIT
 
 # Server Admin Skill
 
-System administration for the Goji LAN deploy server. Use for OS-level work — package management, firewall, services, users, logs, hardware checks. For Docker/container ops use the `deploy-remote` skill.
+System administration for a LAN deploy server. Use for OS-level work — package management, firewall, services, users, logs, hardware checks. For Docker/container ops use the `deploy-remote` skill.
 
 ## When to Use This Skill
 
@@ -33,9 +33,9 @@ System administration for the Goji LAN deploy server. Use for OS-level work — 
 Standard alias from `setup-ssh.sh`:
 
 ```bash
-ssh goji-server                 # interactive
-ssh goji-server '<command>'     # one-shot
-ssh -t goji-server 'sudo ...'   # sudo (TTY for password prompt)
+ssh <your-server>                 # interactive
+ssh <your-server> '<command>'     # one-shot
+ssh -t <your-server> 'sudo ...'   # sudo (TTY for password prompt)
 ```
 
 User has `sudo` (member of `su` / `sudo` group). Most ops below require sudo.
@@ -45,45 +45,45 @@ User has `sudo` (member of `su` / `sudo` group). Most ops below require sudo.
 ### System info
 
 ```bash
-ssh goji-server 'uname -a; lsb_release -a; uptime; free -h; df -h'
+ssh <your-server> 'uname -a; lsb_release -a; uptime; free -h; df -h'
 ```
 
 ### Package management
 
 ```bash
 # Update package index
-ssh -t goji-server 'sudo apt update'
+ssh -t <your-server> 'sudo apt update'
 
 # Upgrade installed packages (security + bugfix)
-ssh -t goji-server 'sudo apt upgrade -y'
+ssh -t <your-server> 'sudo apt upgrade -y'
 
 # Full distribution upgrade (kernel, libc — reboot may be needed)
-ssh -t goji-server 'sudo apt full-upgrade -y'
+ssh -t <your-server> 'sudo apt full-upgrade -y'
 
 # Install / remove a package
-ssh -t goji-server 'sudo apt install -y htop tmux jq'
-ssh -t goji-server 'sudo apt remove --purge -y <pkg>'
+ssh -t <your-server> 'sudo apt install -y htop tmux jq'
+ssh -t <your-server> 'sudo apt remove --purge -y <pkg>'
 
 # Reboot if required (check /var/run/reboot-required)
-ssh goji-server 'test -f /var/run/reboot-required && echo "REBOOT NEEDED" || echo "no reboot needed"'
-ssh -t goji-server 'sudo reboot'
+ssh <your-server> 'test -f /var/run/reboot-required && echo "REBOOT NEEDED" || echo "no reboot needed"'
+ssh -t <your-server> 'sudo reboot'
 ```
 
 ### Firewall (ufw)
 
 ```bash
 # View rules
-ssh goji-server 'sudo ufw status numbered'
+ssh <your-server> 'sudo ufw status numbered'
 
 # Allow a port from LAN only
-ssh -t goji-server 'sudo ufw allow from 192.168.1.0/24 to any port 8080 proto tcp comment "my-service"'
+ssh -t <your-server> 'sudo ufw allow from 192.168.1.0/24 to any port 8080 proto tcp comment "my-service"'
 
 # Delete rule by number
-ssh -t goji-server 'sudo ufw delete 5'
+ssh -t <your-server> 'sudo ufw delete 5'
 
 # Disable / enable
-ssh -t goji-server 'sudo ufw disable'
-ssh -t goji-server 'sudo ufw --force enable'
+ssh -t <your-server> 'sudo ufw disable'
+ssh -t <your-server> 'sudo ufw --force enable'
 ```
 
 **Default policy** (set by `bootstrap-remote.sh`):
@@ -95,114 +95,114 @@ ssh -t goji-server 'sudo ufw --force enable'
 
 ```bash
 # Status
-ssh goji-server 'systemctl status docker'
-ssh goji-server 'systemctl status ufw'
+ssh <your-server> 'systemctl status docker'
+ssh <your-server> 'systemctl status ufw'
 
 # Start / stop / restart / reload
-ssh -t goji-server 'sudo systemctl restart docker'
+ssh -t <your-server> 'sudo systemctl restart docker'
 
 # Enable / disable on boot
-ssh -t goji-server 'sudo systemctl enable docker'
+ssh -t <your-server> 'sudo systemctl enable docker'
 
 # List failed units
-ssh goji-server 'systemctl --failed'
+ssh <your-server> 'systemctl --failed'
 
 # Recent logs for a service
-ssh goji-server 'journalctl -u docker -n 100 --no-pager'
+ssh <your-server> 'journalctl -u docker -n 100 --no-pager'
 
 # Follow live
-ssh goji-server 'sudo journalctl -u docker -f'
+ssh <your-server> 'sudo journalctl -u docker -f'
 ```
 
 ### User & SSH key management
 
 ```bash
 # List users with shells
-ssh goji-server 'getent passwd | grep -v nologin'
+ssh <your-server> 'getent passwd | grep -v nologin'
 
 # Add a user with sudo
-ssh -t goji-server 'sudo adduser --gecos "" newdev && sudo usermod -aG sudo,docker newdev'
+ssh -t <your-server> 'sudo adduser --gecos "" newdev && sudo usermod -aG sudo,docker newdev'
 
 # Authorize an SSH key for an existing user
 PUBKEY=$(cat ~/.ssh/some_user_key.pub)
-ssh -t goji-server "sudo -u newdev mkdir -p /home/newdev/.ssh && echo '$PUBKEY' | sudo tee -a /home/newdev/.ssh/authorized_keys && sudo chown -R newdev:newdev /home/newdev/.ssh && sudo chmod 700 /home/newdev/.ssh && sudo chmod 600 /home/newdev/.ssh/authorized_keys"
+ssh -t <your-server> "sudo -u newdev mkdir -p /home/newdev/.ssh && echo '$PUBKEY' | sudo tee -a /home/newdev/.ssh/authorized_keys && sudo chown -R newdev:newdev /home/newdev/.ssh && sudo chmod 700 /home/newdev/.ssh && sudo chmod 600 /home/newdev/.ssh/authorized_keys"
 
 # Remove a user (keep home for archival)
-ssh -t goji-server 'sudo deluser newdev'
+ssh -t <your-server> 'sudo deluser newdev'
 ```
 
 ### Disk & memory
 
 ```bash
 # Disk usage by mount
-ssh goji-server 'df -h'
+ssh <your-server> 'df -h'
 
 # Top 10 largest dirs under /var (typical culprits)
-ssh -t goji-server 'sudo du -hx /var --max-depth=1 2>/dev/null | sort -rh | head -10'
+ssh -t <your-server> 'sudo du -hx /var --max-depth=1 2>/dev/null | sort -rh | head -10'
 
 # Largest Docker images / volumes
-ssh goji-server 'docker system df -v'
+ssh <your-server> 'docker system df -v'
 
 # Memory pressure
-ssh goji-server 'free -h; cat /proc/pressure/memory 2>/dev/null'
+ssh <your-server> 'free -h; cat /proc/pressure/memory 2>/dev/null'
 
 # Top processes by RSS
-ssh goji-server 'ps aux --sort=-%mem | head -10'
+ssh <your-server> 'ps aux --sort=-%mem | head -10'
 ```
 
 ### Logs
 
 ```bash
 # Kernel
-ssh goji-server 'sudo dmesg -T | tail -50'
+ssh <your-server> 'sudo dmesg -T | tail -50'
 
 # All journalctl since today, errors only
-ssh goji-server 'sudo journalctl --since today -p err --no-pager'
+ssh <your-server> 'sudo journalctl --since today -p err --no-pager'
 
 # auth.log (failed sshd, sudo)
-ssh goji-server 'sudo tail -50 /var/log/auth.log'
+ssh <your-server> 'sudo tail -50 /var/log/auth.log'
 
 # Docker daemon
-ssh goji-server 'sudo journalctl -u docker --since "1 hour ago" --no-pager'
+ssh <your-server> 'sudo journalctl -u docker --since "1 hour ago" --no-pager'
 ```
 
 ### Cron / scheduled jobs
 
 ```bash
 # View user crontab
-ssh goji-server 'crontab -l'
+ssh <your-server> 'crontab -l'
 
 # View system crontab
-ssh goji-server 'sudo cat /etc/crontab; ls /etc/cron.d/'
+ssh <your-server> 'sudo cat /etc/crontab; ls /etc/cron.d/'
 
 # Edit user crontab (interactive)
-ssh -t goji-server 'crontab -e'
+ssh -t <your-server> 'crontab -e'
 ```
 
 ### Swap & sysctl
 
 ```bash
 # Swap status
-ssh goji-server 'swapon --show; free -h'
+ssh <your-server> 'swapon --show; free -h'
 
 # Sysctl current value
-ssh goji-server 'sysctl vm.swappiness'
+ssh <your-server> 'sysctl vm.swappiness'
 
 # Persistent sysctl override (idempotent)
-ssh -t goji-server 'echo "net.core.somaxconn=4096" | sudo tee /etc/sysctl.d/99-goji-net.conf && sudo sysctl -p /etc/sysctl.d/99-goji-net.conf'
+ssh -t <your-server> 'echo "net.core.somaxconn=4096" | sudo tee /etc/sysctl.d/99-my-app-net.conf && sudo sysctl -p /etc/sysctl.d/99-my-app-net.conf'
 ```
 
 ### File transfer
 
 ```bash
 # Send a file
-scp ./local.sql goji-server:/tmp/
+scp ./local.sql <your-server>:/tmp/
 
 # Pull a file
-scp goji-server:/var/log/syslog ./
+scp <your-server>:/var/log/syslog ./
 
 # Sync a directory (mirror, delete extras)
-rsync -avz --delete ./build/ goji-server:/srv/goji/build/
+rsync -avz --delete ./build/ <your-server>:/srv/my-app/build/
 ```
 
 ## Common Workflows
@@ -210,20 +210,20 @@ rsync -avz --delete ./build/ goji-server:/srv/goji/build/
 ### Routine weekly maintenance
 
 ```bash
-ssh -t goji-server '
+ssh -t <your-server> '
   sudo apt update &&
   sudo apt upgrade -y &&
   sudo apt autoremove -y &&
   docker system prune -af --filter "until=168h"
 '
-ssh goji-server 'test -f /var/run/reboot-required && echo "REBOOT NEEDED"'
+ssh <your-server> 'test -f /var/run/reboot-required && echo "REBOOT NEEDED"'
 ```
 
 ### Diagnose "server is slow"
 
 ```bash
 bash scripts/server/remote-status.sh
-ssh goji-server '
+ssh <your-server> '
   echo "=== load ==="; uptime
   echo "=== top cpu ==="; ps aux --sort=-%cpu | head -10
   echo "=== top mem ==="; ps aux --sort=-%mem | head -10
@@ -236,24 +236,24 @@ ssh goji-server '
 
 1. Get their public key (e.g. `id_ed25519.pub`)
 2. Add a user with sudo + docker group (see User & SSH key section)
-3. Have them clone repo locally, run `setup-ssh.sh` with `GOJI_SERVER_USER=<their_username>`
+3. Have them clone repo locally, run `setup-ssh.sh` with `MY_APP_SERVER_USER=<their_username>`
 4. Confirm with `bash scripts/server/remote-status.sh`
 
 ### Recover from "out of disk"
 
 ```bash
 # 1. Find biggest offenders
-ssh -t goji-server 'sudo du -hx / --max-depth=2 2>/dev/null | sort -rh | head -20'
+ssh -t <your-server> 'sudo du -hx / --max-depth=2 2>/dev/null | sort -rh | head -20'
 
 # 2. Most common culprit: docker
-ssh goji-server 'docker system df'
-ssh goji-server 'docker system prune -af --volumes'
+ssh <your-server> 'docker system df'
+ssh <your-server> 'docker system prune -af --volumes'
 
 # 3. Old journal logs
-ssh -t goji-server 'sudo journalctl --vacuum-time=7d'
+ssh -t <your-server> 'sudo journalctl --vacuum-time=7d'
 
 # 4. Old apt cache
-ssh -t goji-server 'sudo apt clean'
+ssh -t <your-server> 'sudo apt clean'
 ```
 
 ## Constraints

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the standardized approach for transaction status values across the Goji platform. **All transaction status values MUST use UPPERCASE format** to ensure type safety and consistency across the codebase.
+This document defines the standardized approach for transaction status values across your platform. **All transaction status values MUST use UPPERCASE format** to ensure type safety and consistency across the codebase.
 
 ## Standard Status Values
 
@@ -197,7 +197,7 @@ Consider adding custom ESLint rules to enforce uppercase status values:
 ```javascript
 // Custom ESLint rule (example)
 "rules": {
-  "goji/uppercase-transaction-status": "error"
+  "my-app/uppercase-transaction-status": "error"
 }
 ```
 
@@ -288,6 +288,6 @@ if (transaction.status === appStatus) {
 
 ## Conclusion
 
-The UPPERCASE transaction status standard ensures type safety, code consistency, and better developer experience across the Goji platform. All new code MUST follow this standard, and existing code should be migrated during regular maintenance cycles.
+The UPPERCASE transaction status standard ensures type safety, code consistency, and better developer experience across your platform. All new code MUST follow this standard, and existing code should be migrated during regular maintenance cycles.
 
 **Remember: When in doubt, always use UPPERCASE for transaction status and type values.**
