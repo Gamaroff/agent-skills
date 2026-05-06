@@ -12,3 +12,6 @@ skills/*/*.zip
 
 # Unpacked skill output — never check in (shadow dirs created by unzip inside skill source dir)
 skills/*/*/SKILL.md
+
+# Claude Code session state — pipeline locks and other runtime artifacts
+.claude/state/
