@@ -4,7 +4,7 @@ title: "Migrate leaf skills to skills-config.yaml platform-detection resolver"
 type: task
 category: refactoring
 priority: High
-status: Ready for Review
+status: accepted
 review: ✅ All review recommendations from `task.9.platform-detection-resolver-migration.review.2026-05-06.md` implemented 2026-05-06
 created: 2026-05-06
 assignee: TBD
@@ -233,6 +233,54 @@ Changes:
 **Immediate (< 30 min)**: revert the per-skill commits; helper file can stay (unused). Each skill commit is independent.
 
 **Triggers**: skill calls the wrong tracker / VCS in a real project; bug reports referencing platform misrouting.
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+- **QA Report**: [task.9.qa.1.platform-detection-resolver-migration.md](./task.9.qa.1.platform-detection-resolver-migration.md)
+- **Gate File**: [task.9.gate.1.platform-detection-resolver-migration.yml](./task.9.gate.1.platform-detection-resolver-migration.yml)
+- **Gate Status**: ✅ PASS (98/100)
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** All 5 functional + 3 code quality criteria met
+✅ **Tests:** 6/6 resolver scenarios pass (resolve-platform.test.sh)
+✅ **PR:** #23 open — solo-maintainer project; QA gate PASS serves as quality validation
+✅ **Documentation:** platform-detection.md and CLAUDE.md updated
+✅ **Security Review:** PASS — no credentials, no injection risk, graceful degrade
+✅ **Compliance Review:** N/A — no personal data, no UI, no financial transactions
+✅ **NFR:** Security PASS, Performance PASS, Reliability PASS, Maintainability PASS
+
+**Detailed Verification Log:** See [task.9.dod.1.platform-detection-resolver-migration.md](./task.9.dod.1.platform-detection-resolver-migration.md)
+
+**Task marked as ACCEPTED on:** 2026-05-06
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-06
+**Quality Score**: 98/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.9.qa.1.platform-detection-resolver-migration.md](./task.9.qa.1.platform-detection-resolver-migration.md)
+- **Gate File**: [task.9.gate.1.platform-detection-resolver-migration.yml](./task.9.gate.1.platform-detection-resolver-migration.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6 (resolve-platform.test.sh scenarios)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. All 8 skills successfully migrated to canonical resolver. Resolver test suite covers all platform combination scenarios including graceful degrade paths.
+
+---
 
 ## 12. Dev Agent Record
 
