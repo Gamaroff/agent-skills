@@ -59,7 +59,7 @@ import {
 
   // Shared utilities (server implementation)
   extractBearerToken // Authorization header parsing
-} from '@my-system/auth-lib'; // Full server functionality
+} from '@{org}/auth-lib'; // Full server functionality
 
 import {
   // Cryptographic operations (server-only)
@@ -74,7 +74,7 @@ import {
   getCurrentEnvironment, // Runtime environment detection
   getBooleanEnvVar, // Boolean environment variables
   getNumericEnvVar // Numeric environment variables
-} from '@my-system/shared-utils/server'; // Server-only utilities
+} from '@{org}/shared-utils/server'; // Server-only utilities
 ```
 
 #### Client-Side Security Operations (React Native)
@@ -97,7 +97,7 @@ import {
   createMockUser, // Mock data for development
   generateMockTokens, // Mock tokens for testing
   getMockUserByEmail // Development user lookup
-} from '@my-system/auth-lib/src/client'; // Mobile-safe entry point
+} from '@{org}/auth-lib/src/client'; // Mobile-safe entry point
 
 import {
   // Client-safe utilities with fallbacks
@@ -111,7 +111,7 @@ import {
   isOnline, // Network connectivity detection
   isDarkMode, // System dark mode detection
   isDevelopment // Development mode detection
-} from '@my-system/shared-utils/client'; // Client-only utilities
+} from '@{org}/shared-utils/client'; // Client-only utilities
 ```
 
 ## Security Implementation Patterns

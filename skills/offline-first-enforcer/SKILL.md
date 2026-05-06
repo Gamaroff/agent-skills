@@ -37,50 +37,50 @@ Use this skill when:
 
 **L1 Cache** (In-Memory):
 - Purpose: Active session data, hot data
-- Technology: `@my-system/cache-lib` in-memory cache
+- Technology: `@{org}/cache-lib` in-memory cache
 - Characteristics: Volatile, <10ms access, cleared on app restart
-- Use for: Current wallet balance, active transactions, recent contacts
+- Use for: Active session data, hot entities (e.g. current balance, active items)
 
 **L2 Cache** (AsyncStorage):
 - Purpose: Non-sensitive persisted data
-- Technology: `@my-system/cache-lib` AsyncStorage layer
+- Technology: `@{org}/cache-lib` AsyncStorage layer
 - Characteristics: Persistent, ~50ms access, key-value storage
 - Use for: User preferences, UI state, recent search history
 
 **L3 Cache** (SQLite):
 - Purpose: Structured offline-first datasets
-- Technology: `@my-system/cache-lib` SQLite with sync capabilities
+- Technology: `@{org}/cache-lib` SQLite with sync capabilities
 - Characteristics: Persistent, relational, observable queries, ~100ms access
-- Use for: Transaction history, contact lists, wallet metadata, offline queue
+- Use for: Historical records, contact lists, entity metadata, offline queue
 
 ### Offline-First Patterns
 
 **Local-First Data Access**:
 ```typescript
 // ✅ CORRECT: Always read from cache first
-async function getWalletBalance(walletId: string): Promise<Balance> {
+async function getItem(entityType: string, id: string): Promise<Entity> {
   // 1. Check L1 cache (in-memory)
-  const cachedBalance = cacheLib.get(`balance:${walletId}`);
-  if (cachedBalance) return cachedBalance;
+  const cached = cacheLib.get(`${entityType}:${id}`);
+  if (cached) return cached;
 
   // 2. Check L3 cache (SQLite)
-  const localBalance = await cacheLib.query('wallets', { id: walletId });
-  if (localBalance) {
+  const local = await cacheLib.query(entityType, { id });
+  if (local) {
     // Populate L1 for next access
-    cacheLib.set(`balance:${walletId}`, localBalance);
-    return localBalance;
+    cacheLib.set(`${entityType}:${id}`, local);
+    return local;
   }
 
   // 3. Fetch from network (online only)
   if (isOnline()) {
-    const networkBalance = await api.getBalance(walletId);
+    const remote = await api.get(entityType, id);
     // Populate all caches
-    await cacheLib.set(`balance:${walletId}`, networkBalance); // L1
-    await cacheLib.upsert('wallets', networkBalance); // L3
-    return networkBalance;
+    await cacheLib.set(`${entityType}:${id}`, remote); // L1
+    await cacheLib.upsert(entityType, remote); // L3
+    return remote;
   }
 
-  throw new Error('Wallet balance unavailable offline');
+  throw new Error(`${entityType} unavailable offline`);
 }
 ```
 
@@ -220,7 +220,7 @@ async function resolveConflict(
       // Field-level merge
       const merged = { ...server, ...local };
       // Handle specific field conflicts
-      merged.balance = server.balance; // Server is source of truth for financial data
+      merged.balance = server.balance; // Server is source of truth for computed fields
       merged.displayName = local.displayName; // Client wins for user preferences
       return merged;
   }
@@ -275,37 +275,37 @@ async function resolveConflict(
 **Network-First Architecture**:
 ```typescript
 // ❌ WRONG: Fetches from network before checking cache
-async function getBalance() {
-  const balance = await api.getBalance(); // Fails offline
-  return balance;
+async function getData(id: string) {
+  const data = await api.get(id); // Fails offline
+  return data;
 }
 
 // ✅ CORRECT: Cache-first with network fallback
-async function getBalance() {
-  const cached = await cacheLib.get('balance');
+async function getData(id: string) {
+  const cached = await cacheLib.get(id);
   if (cached) return cached;
   
   if (isOnline()) {
-    const balance = await api.getBalance();
-    await cacheLib.set('balance', balance);
-    return balance;
+    const data = await api.get(id);
+    await cacheLib.set(id, data);
+    return data;
   }
   
-  throw new OfflineError('Balance unavailable offline');
+  throw new OfflineError('Data unavailable offline');
 }
 ```
 
 **Synchronous Network Calls**:
 ```typescript
 // ❌ WRONG: Blocks UI thread
-function sendMoney() {
-  const result = await api.sendMoney(); // Blocks until network response
+function submitOperation() {
+  const result = await api.submit(data); // Blocks until network response
   updateUI(result);
 }
 
 // ✅ CORRECT: Optimistic update with background sync
-async function sendMoney() {
-  const optimistic = createOptimisticTx();
+async function submitOperation() {
+  const optimistic = createOptimisticRecord(data);
   updateUI(optimistic); // Instant UI update
   await syncQueue.enqueue(optimistic); // Background sync
 }

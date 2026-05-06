@@ -76,14 +76,14 @@ sequenceDiagram
 #### bcrypt Password Hashing (Server-Only)
 
 ```typescript
-// Server-side password hashing with @my-system/auth-lib
+// Server-side password hashing with @{org}/auth-lib
 import {
   hashPassword,
   comparePassword,
   validatePassword,
   needsRehash,
   type AuthConfig
-} from '@my-system/auth-lib';
+} from '@{org}/auth-lib';
 
 @Injectable()
 export class AuthService {
@@ -192,7 +192,7 @@ export class AuthService {
 #### JWT Token Management (Server-Only)
 
 ```typescript
-// Server-side JWT operations with @my-system/auth-lib
+// Server-side JWT operations with @{org}/auth-lib
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -201,7 +201,7 @@ import {
   verifyRefreshToken,
   type JwtPayload,
   type AuthTokens
-} from '@my-system/auth-lib';
+} from '@{org}/auth-lib';
 
 @Injectable()
 export class TokenService {
@@ -281,7 +281,7 @@ export class TokenService {
 import {
   verifyAccessToken,
   extractBearerToken
-} from '@my-system/auth-lib';
+} from '@{org}/auth-lib';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -338,7 +338,7 @@ export class ProtectedController {
 #### React Native Authentication Service
 
 ```typescript
-// Client-side authentication with @my-system/auth-lib/src/client
+// Client-side authentication with @{org}/auth-lib/src/client
 import {
   extractBearerToken,
   decodeToken,
@@ -351,7 +351,7 @@ import {
   type SafeUser,
   type AuthTokens,
   type JwtPayload
-} from '@my-system/auth-lib/src/client';
+} from '@{org}/auth-lib/src/client';
 
 import * as SecureStore from 'expo-secure-store';
 
@@ -613,7 +613,7 @@ import React, {
   ReactNode
 } from 'react';
 import { authService } from '../services/auth-service';
-import type { SafeUser } from '@my-system/auth-lib/src/client';
+import type { SafeUser } from '@{org}/auth-lib/src/client';
 
 interface AuthContextValue {
   user: SafeUser | null;
@@ -745,7 +745,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/auth-context';
-import { validateEmail } from '@my-system/auth-lib/src/client';
+import { validateEmail } from '@{org}/auth-lib/src/client';
 
 export const LoginScreen: React.FC = () => {
   const { login, isLoading } = useAuth();
@@ -903,7 +903,7 @@ export class PasswordSecurityService {
 
 ```typescript
 // Client-side password validation for user experience
-import { validatePassword } from '@my-system/auth-lib/src/client';
+import { validatePassword } from '@{org}/auth-lib/src/client';
 
 export const usePasswordValidation = () => {
   const [passwordStrength, setPasswordStrength] = useState<{
@@ -977,7 +977,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 
 export class TokenStorageService {
-  private readonly KEYCHAIN_SERVICE = 'my-wallet';
+  private readonly KEYCHAIN_SERVICE = 'my-app';
 
   async storeTokenSecurely(key: string, token: string): Promise<void> {
     try {
@@ -1356,7 +1356,7 @@ const JWT_SECRET = process.env.JWT_SECRET; // ❌ Exposed in client bundle
 
 ```typescript
 // Server-side password handling
-import { hashPassword } from '@my-system/auth-lib';
+import { hashPassword } from '@{org}/auth-lib';
 
 @Post('register')
 async register(@Body() { email, password }: RegisterDto) {
@@ -1373,7 +1373,7 @@ async register(@Body() { email, password }: RegisterDto) {
 import {
   decodeToken,
   isTokenExpired
-} from '@my-system/auth-lib/src/client';
+} from '@{org}/auth-lib/src/client';
 
 const getTokenInfo = (token: string) => {
   // Parse for UX, don't verify signature
@@ -1412,4 +1412,4 @@ This authentication architecture serves as the foundation for secure financial s
 
 ---
 
-_This guide provides the definitive patterns for authentication implementation across your platform. For specific implementation details, refer to the @my-system/auth-lib documentation and platform-specific architecture guides._
+_This guide provides the definitive patterns for authentication implementation across your platform. For specific implementation details, refer to the @{org}/auth-lib documentation and platform-specific architecture guides._

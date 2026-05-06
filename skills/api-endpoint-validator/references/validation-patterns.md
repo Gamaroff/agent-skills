@@ -126,7 +126,7 @@ metadata?: MetadataDto = {};
 // Currency code validation (ISO 4217)
 @IsString()
 @Length(3, 3)
-@Matches(/^[A-Z]{3}$/, { message: 'Currency must be ISO 4217 format (e.g., USD, EUR, BSV)' })
+@Matches(/^[A-Z]{3}$/, { message: 'Currency must be ISO 4217 format (e.g., USD, EUR, GBP)' })
 @Transform(({ value }) => typeof value === 'string' ? value.toUpperCase().trim() : value)
 currency!: string;
 
@@ -300,13 +300,13 @@ role!: string;
 })
 emoji!: string;
 
-// Paymail validation (BSV payments)
+// Handle / email-like identifier validation
 @IsString()
 @Matches(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, {
-  message: 'Invalid paymail format'
+  message: 'Invalid handle format'
 })
 @Transform(({ value }) => typeof value === 'string' ? value.toLowerCase().trim() : value)
-paymail!: string;
+handle!: string;
 
 // Group title validation
 @IsString()
@@ -333,7 +333,7 @@ export class CreateContactDto {
       case ContactType.BANK: return BankContactDetailsDto;
       case ContactType.MOBILE_MONEY: return MobileMoneyContactDetailsDto;
       case ContactType.PAYMAIL: return PaymailContactDetailsDto;
-      case ContactType.MNEE_USD: return MNEEUSDContactDetailsDto;
+      case ContactType.EXTERNAL: return ExternalContactDetailsDto;
       case ContactType.CHAT_GROUP: return ChatGroupContactDetailsDto;
       default: return BaseContactDetailsDto;
     }
@@ -535,8 +535,8 @@ feePercentage!: number;
 ### Currency Validation
 ```typescript
 // Supported currencies validation
-@IsEnum(['USD', 'BSV', 'MNEE_USD'], {
-  message: 'Currency must be one of: USD, BSV, MNEE_USD'
+@IsEnum(['USD', 'EUR', 'GBP'], {
+  message: 'Currency must be one of: USD, EUR, GBP'
 })
 currency!: string;
 

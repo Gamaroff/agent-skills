@@ -305,28 +305,28 @@ async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
 
 **Multiple filter criteria**:
 ```typescript
-export class FilterWalletsDto {
+export class FilterProductsDto {
   @IsOptional()
-  @IsEnum(['BSV', 'MNEE_USD'])
-  currency?: 'BSV' | 'MNEE_USD';
+  @IsEnum(['ACTIVE', 'INACTIVE', 'ARCHIVED'])
+  status?: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
 
   @IsOptional()
-  @IsEnum(['ACTIVE', 'INACTIVE'])
-  status?: 'ACTIVE' | 'INACTIVE';
+  @IsEnum(['category-a', 'category-b'])
+  category?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  minBalance?: number;
+  minPrice?: number;
 }
 
-@Get('wallets')
-async findWallets(@Query() filters: FilterWalletsDto) {
-  return this.walletService.findAll({
+@Get('products')
+async findProducts(@Query() filters: FilterProductsDto) {
+  return this.productService.findAll({
     where: {
-      currency: filters.currency,
       status: filters.status,
-      balance: filters.minBalance ? { gte: filters.minBalance } : undefined
+      category: filters.category,
+      price: filters.minPrice ? { gte: filters.minPrice } : undefined
     }
   });
 }

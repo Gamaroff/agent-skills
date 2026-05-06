@@ -2,19 +2,18 @@
 
 ## Overview
 
-This document contains actual navigation violations found in your codebase during analysis (December 2025), along with debugging techniques and testing strategies to catch these issues early.
+This document contains common navigation violations with example patterns, debugging techniques and testing strategies to catch these issues early.
 
-## Real-World Violations
+## Common Violations
 
 ### Case Study 1: WalletsHeader Blank Screen Bug
 
-**Date Discovered**: December 31, 2025
 **Severity**: High (user-facing bug causing blank screen)
-**Files Affected**: `apps/my-wallet/components/wallets/wallets-header.tsx`
+**Files Affected**: `src/components/wallets/wallets-header.tsx`
 
 **Violation**:
 ```typescript
-// apps/my-wallet/components/wallets/wallets-header.tsx
+// src/components/wallets/wallets-header.tsx
 import { useNavigation } from '@react-navigation/native';
 
 export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
@@ -31,7 +30,7 @@ export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
   );
 };
 
-// apps/my-wallet/app/(drawer)/home/index.tsx
+// src/screens/home/index.tsx
 const handleButtonPress = (buttonId: string) => {
   switch (buttonId) {
     case 'wallets':
@@ -58,7 +57,7 @@ const handleButtonPress = (buttonId: string) => {
 
 **Fix**:
 ```typescript
-// apps/my-wallet/components/wallets/wallets-header.tsx
+// src/components/wallets/wallets-header.tsx
 import { useRouter } from 'expo-router';  // ✅ Changed from useNavigation
 
 export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
@@ -84,17 +83,10 @@ export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
 
 ---
 
-### Case Study 2: Redundant Navigation Imports (6 Headers)
+### Case Study 2: Redundant Navigation Imports
 
-**Date Discovered**: December 31, 2025
 **Severity**: Medium (code quality issue, potential confusion)
-**Files Affected**:
-- `apps/my-wallet/app/(drawer)/contacts/contacts-header.tsx`
-- `apps/my-wallet/app/(drawer)/transactions/transactions-header.tsx`
-- `apps/my-wallet/app/(drawer)/shopping/shopping-header.tsx`
-- `apps/my-wallet/app/(drawer)/profile/profile-header.tsx`
-- `apps/my-wallet/app/(drawer)/request/request-header.tsx`
-- `apps/my-wallet/app/(drawer)/topup/topup-header.tsx`
+**Common files affected**: Screen header components importing both `useRouter` and `useNavigation` but only calling router methods
 
 **Violation Pattern** (example from contacts-header.tsx):
 ```typescript
@@ -248,11 +240,10 @@ return (
 
 ---
 
-### Case Study 4: HelpHeader Using Only React Navigation
+### Case Study 4: Header Using Only React Navigation
 
-**Date Discovered**: December 31, 2025
 **Severity**: Medium (inconsistent with codebase patterns)
-**File Affected**: `apps/my-wallet/app/(drawer)/help/help-header.tsx`
+**File Affected**: Any screen header using only `useNavigation` / `navigation.goBack()` without `useRouter`
 
 **Violation**:
 ```typescript

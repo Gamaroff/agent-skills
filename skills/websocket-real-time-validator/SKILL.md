@@ -41,7 +41,7 @@ Proper Socket.IO connection lifecycle management:
 
 ```typescript
 import io, { Socket } from 'socket.io-client';
-import { logger } from '@my-system/logging-lib/client';
+import { logger } from '@{org}/logging-lib/client';
 
 class SocketIOService {
   private socket: Socket | null = null;
@@ -811,7 +811,7 @@ async handleSendMessage(
 
 ### references/
 
-**websocket-patterns.md** - WebSocket architecture patterns, connection management, and real-time communication best practices for your project
+**websocket-patterns.md** - WebSocket architecture patterns, connection management, and real-time communication best practices
 
 **socket-io-guide.md** - Socket.IO specific patterns, room management, and event handling for NestJS gateways
 

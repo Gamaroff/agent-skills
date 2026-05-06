@@ -24,12 +24,10 @@ The API serves as the unified backend for client applications and admin portals,
 
 **Key Capabilities:**
 
--   Bitcoin SV and MNEE USD wallet operations
--   Chat-integrated payments and fund requests
--   Fiat onramping (fiat-to-crypto conversion)
--   Digital shopping and gift card purchases
--   Multi-tier KYC/AML compliance
--   Real-time transaction monitoring
+-   User and account management
+-   Resource CRUD operations with pagination and filtering
+-   Real-time data via WebSocket connections
+-   Role-based access control and authentication
 -   Administrative oversight and management
 
 ### Base URL Structure
@@ -142,7 +140,7 @@ X-Admin-Session: <session_id>         // Admin only
         "details": {
             "required": "100.50",
             "available": "75.25",
-            "currency": "MNEE_USD"
+            "currency": "EUR"
         },
         "field": "amount"
     },
@@ -242,7 +240,7 @@ SYS_004: 'MAINTENANCE_MODE'
         "wallets": [
             {
                 "id": "wallet_uuid",
-                "type": "BITCOIN_SV",
+                "type": "PRIMARY",
                 "balance": "0.00000000",
                 "address": "1ABC..."
             }
@@ -303,19 +301,19 @@ SYS_004: 'MAINTENANCE_MODE'
 {
     "success": true,
     "data": {
-        "wallets": [
+        "accounts": [
             {
-                "id": "wallet_bsv_uuid",
-                "type": "BITCOIN_SV",
-                "balance": "0.12345678",
-                "address": "1ABC...",
+                "id": "account_primary_uuid",
+                "type": "PRIMARY",
+                "balance": "150.50",
+                "currency": "USD",
                 "isActive": true
             },
             {
-                "id": "wallet_usd_uuid",
-                "type": "MNEE_USD",
-                "balance": "150.50",
-                "address": "0x123...",
+                "id": "account_secondary_uuid",
+                "type": "SECONDARY",
+                "balance": "75.00",
+                "currency": "EUR",
                 "isActive": true
             }
         ],
@@ -346,7 +344,7 @@ SYS_004: 'MAINTENANCE_MODE'
                 "id": "tx_uuid",
                 "type": "SEND",
                 "amount": "25.00",
-                "currency": "MNEE_USD",
+                "currency": "EUR",
                 "status": "CONFIRMED",
                 "toAddress": "0x456...",
                 "toHandle": "mary_kampala",
@@ -380,7 +378,7 @@ SYS_004: 'MAINTENANCE_MODE'
 {
     "recipientHandle": "mary_kampala",
     "amount": "25.00",
-    "currency": "MNEE_USD",
+    "currency": "EUR",
     "message": "Coffee money 😄",
     "walletId": "wallet_usd_uuid"
 }
@@ -414,7 +412,7 @@ SYS_004: 'MAINTENANCE_MODE'
 {
     "recipientHandle": "mary_kampala",
     "amount": "25.00",
-    "currency": "MNEE_USD",
+    "currency": "EUR",
     "message": "Lunch split",
     "dueDate": "2025-08-07T23:59:59Z"
 }

@@ -4,7 +4,7 @@
 **Last Updated**: 2025-10-11
 **Status**: ✅ Ready for Implementation
 **Purpose**: Define all WebSocket events for group system real-time synchronization
-**Priority**: 🔥 **HIGH** - Required for Epic 1 Story 1.2
+**Priority**: 🔥 **HIGH**
 
 ---
 
@@ -1992,13 +1992,13 @@ setInterval(() => {
 ### Technical References
 
 - [Socket.IO Documentation](https://socket.io/docs/v4/) - Official Socket.IO docs
-- [ChatService](../../../../../apps/my-api/src/chat/chat.service.ts) - Existing WebSocket implementation
-- [GroupsService](../../../../../apps/my-api/src/groups/groups.service.ts) - Group business logic
+- [ChatService](../../../../../apps/{api-service}/src/chat/chat.service.ts) - Existing WebSocket implementation
+- [GroupsService](../../../../../apps/{api-service}/src/groups/groups.service.ts) - Group business logic
 
 ### Code Examples
 
-- Example WebSocket client: `apps/my-wallet/services/websocket-client.ts` (to be created)
-- Example event handlers: `apps/my-wallet/hooks/useGroupEvents.ts` (to be created)
+- Example WebSocket client: `src/services/websocket-client.ts`
+- Example event handlers: `src/hooks/useGroupEvents.ts`
 
 ---
 
@@ -2032,6 +2032,6 @@ setInterval(() => {
 **Last Updated**: 2025-10-11
 **Version**: 1.0
 **Owner**: Backend Team + Frontend Team
-**Next Review**: After Epic 1 Story 1.2 implementation
+**Next Review**: After implementation
 
 **Questions?** Contact Backend Lead or post in #group-system Slack channel
