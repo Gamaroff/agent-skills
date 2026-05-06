@@ -47,10 +47,11 @@ pick the platform:
    `github.com` → vcs is GitHub.
 4. **Default**: GitHub for both.
 
-Skills that currently honor the resolver:
-- `create-pr`, `create-task`, `finalise`, `review-story` — full dual-path
-- `qa-fix`, `ensure-epic-jira-issue`, `create-epic` — see tasks 3, 5, 6
-  (in progress)
+Current skill behavior (aspirational — config-key honoring is a follow-up):
+- `create-pr`, `create-task`, `finalise`, `review-story`,
+  `qa-fix`, `ensure-epic-jira-issue`, `create-epic` — currently use
+  **implicit detection only** (env var + git remote); reading
+  `tracker:`/`vcs:` from `skills-config.yaml` is a follow-up migration.
 
 Skills that are platform-agnostic (no resolver needed):
 - `create-branch`, `commit-changes`, `create-story` (docs-only),
@@ -73,14 +74,27 @@ the path so installed skills are self-contained.
 ## Resolver
 
 ```bash
+# Helper: read a top-level key from skills-config.yaml using python (project standard;
+# matches Phase 4 testing approach). Returns "auto" if file or key missing.
+read_config_key() {
+  python -c "
+import yaml, sys
+try:
+    with open('skills-config.yaml') as f:
+        print(yaml.safe_load(f).get('$1', 'auto'))
+except Exception:
+    print('auto')
+" 2>/dev/null
+}
+
 # Tracker
-TRACKER=$(yq '.tracker // "auto"' skills-config.yaml 2>/dev/null || echo "auto")
+TRACKER=$(read_config_key tracker)
 if [ "$TRACKER" = "auto" ]; then
   if [ -n "$JIRA_URL" ]; then TRACKER="jira"; else TRACKER="github"; fi
 fi
 
 # VCS
-VCS=$(yq '.vcs // "auto"' skills-config.yaml 2>/dev/null || echo "auto")
+VCS=$(read_config_key vcs)
 if [ "$VCS" = "auto" ]; then
   REMOTE_URL=$(git remote get-url origin)
   if echo "$REMOTE_URL" | grep -qi "github\.com"; then VCS="github"

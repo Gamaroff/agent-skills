@@ -75,6 +75,23 @@ devStoryLocation: nested   # stories nested inside epic directories
 devDebugLog: .ai/debug-log.md
 ```
 
+### Platform Detection
+
+Skills that interact with remote trackers or PRs use this resolver order to pick the platform:
+
+1. **`skills-config.yaml`**: explicit `tracker:` and `vcs:` keys (values: `jira | github`, `bitbucket | github`).
+2. **Env vars**: `JIRA_URL` set → tracker is Jira; otherwise GitHub.
+3. **Git remote**: `bitbucket.org` in `origin` → vcs is Bitbucket; `github.com` → vcs is GitHub.
+4. **Default**: GitHub for both.
+
+Current skill behavior (aspirational — config-key honoring is a follow-up):
+- `create-pr`, `create-task`, `finalise`, `review-story`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic` — currently use **implicit detection only** (env var + git remote); reading `tracker:`/`vcs:` from `skills-config.yaml` is a follow-up migration.
+
+Skills that are platform-agnostic (no resolver needed):
+- `create-branch`, `commit-changes`, `create-story` (docs-only), `qa-review`, `qa-gate`
+
+The canonical resolver spec lives in `shared/resources/platform-detection.md`.
+
 ## File Naming Conventions (used in target projects)
 
 | Artifact | Pattern | Example |

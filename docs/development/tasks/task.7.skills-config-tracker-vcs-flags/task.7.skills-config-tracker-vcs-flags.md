@@ -4,14 +4,20 @@ title: "skills-config: document explicit tracker and vcs flags"
 type: task
 category: documentation
 priority: Low
-status: 📋 Planned
+status: Accepted
+completed_date: 2026-05-06
+pr_number: 13
 created: 2026-05-05
 assignee: TBD
 effort: 0.5 day
 depends_on: —
+github_issue: 12
 ---
 
 # Task 7 — skills-config: document explicit tracker and vcs flags
+
+**Tracker**: [#12](https://github.com/Gamaroff/agent-skills/issues/12)
+**Review**: ✅ All review recommendations from `task.7.skills-config-tracker-vcs-flags.review.2026-05-06.md` implemented 2026-05-06
 
 ## 1. Overview
 
@@ -100,29 +106,29 @@ None. New keys are additive. Default `auto` preserves all current behavior. Skil
 
 - Files: `skills-config.sample.yaml`
 - Changes:
-  - [ ] Add `tracker:` and `vcs:` keys with comments explaining values and resolver order
+  - [x] Add `tracker:` and `vcs:` keys with comments explaining values and resolver order
 
 **Phase 2 — Document in CLAUDE.md (Low risk)**
 
 - Files: `CLAUDE.md`
 - Changes:
-  - [ ] Add a "Platform Detection" subsection under "Configuration"
-  - [ ] Spell out resolver order (config > env > git remote > default)
-  - [ ] List which skills currently honor the convention
+  - [x] Add a "Platform Detection" subsection under "Configuration"
+  - [x] Spell out resolver order (config > env > git remote > default)
+  - [x] List which skills currently honor the convention
 
 **Phase 3 — Author shared canonical spec (Low risk, optional)**
 
 - Files: `shared/resources/platform-detection.md` (new)
 - Changes:
-  - [ ] Document detection logic, code snippet, env vars, and edge cases
-  - [ ] Skills (qa-fix, finalise, create-pr, create-task, create-epic, ensure-epic-*) can reference this file via the explicit `shared/resources/platform-detection.md` path — `package_skill.py` will auto-bundle on package
+  - [x] Document detection logic, code snippet, env vars, and edge cases
+  - [x] Skills (qa-fix, finalise, create-pr, create-task, create-epic, ensure-epic-*) can reference this file via the explicit `shared/resources/platform-detection.md` path — `package_skill.py` will auto-bundle on package
 
 **Phase 4 — Validate (Low risk)**
 
 - Files: build artifact verification
 - Changes:
-  - [ ] Spot-check that adding the shared resource (if Phase 3) doesn't break package_skill.py path rewrites
-  - [ ] Lint sample.yaml for valid YAML
+  - [x] Spot-check that adding the shared resource (if Phase 3) doesn't break package_skill.py path rewrites
+  - [x] Lint sample.yaml for valid YAML
 
 ## 7. Files Summary
 
@@ -133,7 +139,7 @@ None. New keys are additive. Default `auto` preserves all current behavior. Skil
 
 **New (optional)**:
 
-3. ⚠️ `shared/resources/platform-detection.md` — canonical spec
+3. ✅ `shared/resources/platform-detection.md` — canonical spec
 
 **No build artifacts** — config and docs only
 
@@ -147,19 +153,19 @@ None. New keys are additive. Default `auto` preserves all current behavior. Skil
 
 **Functional**:
 
-- [ ] `skills-config.sample.yaml` documents both keys with `auto` default
-- [ ] CLAUDE.md describes the resolver order
-- [ ] (Optional) `shared/resources/platform-detection.md` exists and is referenced by at least one skill
+- [x] `skills-config.sample.yaml` documents both keys with `auto` default
+- [x] CLAUDE.md describes the resolver order
+- [x] (Optional) `shared/resources/platform-detection.md` exists and is referenced by at least one skill
 
 **Code quality**:
 
-- [ ] Sample YAML parses
-- [ ] No invalid markdown
+- [x] Sample YAML parses
+- [x] No invalid markdown
 
 **Migration**:
 
-- [ ] No code changes required for skills to keep working — they continue using current implicit detection
-- [ ] Future skills can opt into reading the keys
+- [x] No code changes required for skills to keep working — they continue using current implicit detection
+- [x] Future skills can opt into reading the keys
 
 ## 10. Risk Assessment
 
@@ -175,3 +181,50 @@ None. New keys are additive. Default `auto` preserves all current behavior. Skil
 **Immediate rollback**: revert sample.yaml and CLAUDE.md edits. No runtime impact.
 
 **Triggers**: none expected — pure documentation change.
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-06
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.7.qa.1.skills-config-tracker-vcs-flags.md](./task.7.qa.1.skills-config-tracker-vcs-flags.md)
+- **Gate File**: [task.7.gate.1.skills-config-tracker-vcs-flags.yml](./task.7.gate.1.skills-config-tracker-vcs-flags.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 4 (YAML lint + content verification checks)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. All success criteria met. Pure additive docs/config — zero regression risk.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: [task.7.qa.1.skills-config-tracker-vcs-flags.md](./task.7.qa.1.skills-config-tracker-vcs-flags.md)
+**Gate File**: [task.7.gate.1.skills-config-tracker-vcs-flags.yml](./task.7.gate.1.skills-config-tracker-vcs-flags.yml)
+**Gate Status**: ✅ PASS
+**Quality Score**: 97/100
+
+All Definition of Done criteria verified:
+
+✅ **Implementation Phases:** All 4/4 complete — sample yaml, CLAUDE.md, platform-detection.md, validation
+✅ **Tests/Validation:** YAML lint passes; no test suite needed (docs-only)
+✅ **Success Criteria:** All 7 criteria met
+✅ **PR:** #13 OPEN — feat(skills-config): document explicit tracker and vcs platform flags
+✅ **Documentation:** CLAUDE.md Platform Detection section + canonical spec in shared/resources/
+✅ **Security Review:** PASS — no auth/data/permission changes
+✅ **Compliance Review:** N/A — no PII, no UI, no financial data
+✅ **NFR:** Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+**Task marked as ACCEPTED on:** 2026-05-06
+
+**Detailed Verification Log:** See [task.7.dod.1.skills-config-tracker-vcs-flags.md](./task.7.dod.1.skills-config-tracker-vcs-flags.md)
