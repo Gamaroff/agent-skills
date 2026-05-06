@@ -4,7 +4,7 @@ title: "Consolidate PR-comment fan-out under finalise"
 type: task
 category: refactoring
 priority: Medium
-status: 🔍 Ready for Review
+status: ✅ Completed
 created: 2026-05-06
 assignee: TBD
 effort: 0.5 day
@@ -200,6 +200,29 @@ Changes:
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-06
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.10.qa.1.pr-comment-consolidation.md](./task.10.qa.1.pr-comment-consolidation.md)
+- **Gate File**: [task.10.gate.1.pr-comment-consolidation.yml](./task.10.gate.1.pr-comment-consolidation.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: N/A (instruction-document changes)
+- **Phases Verified**: 3/3 (1 CONCERNS)
+- **Critical Issues**: 0 HIGH, 2 MEDIUM
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+2 MEDIUM issues in finalise idempotency: (1) `grep '^decision:'` should be `grep '^gate:'` — gate field mismatch causes FINAL_GATE to always be "N/A"; (2) `.databaseId` not available in `gh pr view --json comments` — must extract numeric ID from `.url` instead. Both are 1-line fixes.
+
+---
+
 ## Dev Agent Record
 
 **Implementation Summary**: Demoted qa-task and qa-fix PR comments to non-blocking, designated finalise as canonical PR-comment author with marker-based idempotency, and embedded authorship contract tables in all three skills.
@@ -224,3 +247,4 @@ Changes:
 
 **Change Log**:
 - 2026-05-06: All three phases implemented. Task marked Ready for Review.
+- 2026-05-06: qa-fix cycle 1 — fixed 2 MEDIUM issues in skills/finalise/SKILL.md: (1) grep '^decision:' → grep '^gate:'; (2) .databaseId → URL-extracted numeric ID via grep -oE '[0-9]+$'.

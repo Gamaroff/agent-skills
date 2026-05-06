@@ -809,7 +809,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    MARKER="<!-- finalise-canonical-summary -->"
    DOD_PATH=$(ls {document-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
    FINAL_GATE=$(ls {document-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
-     | xargs -I{} grep '^decision:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
+     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
 
    BODY="$MARKER
    ## ✅ Accepted — Canonical Pipeline Summary
@@ -827,10 +827,11 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    *GitHub:*
    ```bash
-   # Search for existing canonical comment by marker
+   # Search for existing canonical comment by marker; extract numeric ID from URL
+   # (.databaseId is not available — gh pr view returns .url like ...#issuecomment-12345)
    EXISTING_COMMENT_ID=$(gh pr view "$PR_URL" --json comments \
-     -q '.comments[] | select(.body | startswith("<!-- finalise-canonical-summary -->")) | .databaseId' \
-     2>/dev/null | head -1)
+     -q '.comments[] | select(.body | startswith("<!-- finalise-canonical-summary -->")) | .url' \
+     2>/dev/null | head -1 | grep -oE '[0-9]+$')
 
    if [ -n "$EXISTING_COMMENT_ID" ]; then
      # Edit existing comment by ID — do NOT use --edit-last (ordering unreliable)
