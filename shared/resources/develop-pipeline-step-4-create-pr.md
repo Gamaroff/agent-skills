@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-4-create-pr
-description: Step 4 (create-PR) shared by develop-story and develop-task. Covers /create-pr invocation with --base and tracker-conditional --issue flag, implementation report exclusion from auto-commit, post-PR steps (Decisions Log, lock pr_url update), Jira tracker update (PR-opened comment + In Review transition), pipeline continuation banner, and failure handling. Story vs task variants called out where they differ.
+description: Step 4 (create-PR) shared by develop-story and develop-task. Covers /create-pr invocation with --base, --exclude (report path), and tracker-conditional --issue flag, implementation report exclusion via pathspec magic, leak verification, post-PR steps (Decisions Log, lock pr_url update), Jira tracker update (PR-opened comment + In Review transition), pipeline continuation banner, and failure handling. Story vs task variants called out where they differ.
 ---
 
 # Develop Pipeline — Step 4: Create PR
@@ -13,9 +13,9 @@ Loaded by `/develop-story` and `/develop-task` during Step 4. Story/task variant
 
 ## Invoke /create-pr
 
-Invoke the `/create-pr` skill passing `--base {Q2_answer}` (e.g., `/create-pr --base develop`). Branch on tracker platform for the `--issue` flag:
+Invoke the `/create-pr` skill passing `--base {Q2_answer}`, `--exclude {implementation-report-path}`, and conditionally `--issue`. The exact invocation commands are in the Implementation Report Exclusion section below. Branch on tracker platform for the `--issue` flag:
 
-- **GitHub** (`TRACKER=github`): also pass `--issue {TRACKER_ISSUE}` (e.g., `/create-pr --base develop --issue 42`) — `create-pr` will add `Closes #N` to the PR body and comment on the GitHub issue.
+- **GitHub** (`TRACKER=github`): also pass `--issue {TRACKER_ISSUE}` — `create-pr` will add `Closes #N` to the PR body and comment on the GitHub issue.
 - **Jira** (`TRACKER=jira`): omit `--issue` — `create-pr` handles Bitbucket PR creation natively; Bitbucket Issues are not enabled for this project, so passing `--issue` would cause a failed comment attempt.
 
 #### develop-story (Jira note)
@@ -30,13 +30,31 @@ This pre-supplies the target branch via create-pr's Step 0, skipping the interac
 
 ## Implementation Report Exclusion
 
-`create-pr` will automatically commit any uncommitted code changes before opening the PR. At this point the implementation report is partially complete (Steps 1–3 documented). **CRITICAL**: The implementation report file must NOT be included in create-pr's auto-commit. Before invoking create-pr, proactively unstage the report if it was staged:
+`create-pr` will automatically commit any uncommitted code changes before opening the PR. At this point the implementation report is partially complete (Steps 1–3 documented). **CRITICAL**: The implementation report file must NOT be included in create-pr's auto-commit.
 
-```bash
-git restore --staged {implementation-report-path} 2>/dev/null || true
+Pass `--exclude {implementation-report-path}` to `/create-pr` so it forwards the flag to `/commit-changes`, which switches to full-tree staging with explicit pathspec exclusion (`git add -A -- '.' ':(exclude){report-path}'`). This is deterministic exclusion — not timing-dependent unstaging.
+
+#### develop-story invocation
+
+```
+/create-pr --base {Q2_answer} --issue {TRACKER_ISSUE} --exclude {implementation-report-path}
 ```
 
-After create-pr completes, verify the report was not committed by checking `git log -1 --name-only`. If it was included, note this in the Issues Log (it does not warrant a halt — the report will simply be updated again in Step 8 with a superseding commit).
+#### develop-task invocation
+
+```
+/create-pr --base {Q2_answer} --issue {TRACKER_ISSUE} --exclude {implementation-report-path}
+```
+
+(Omit `--issue` when `TRACKER=jira` per the rule above.)
+
+After create-pr completes, verify the report was not committed using an exact-path match (avoids false positives from other `.implementation.*.md` files):
+
+```bash
+git log -1 --name-only HEAD | grep -Fxq "{implementation-report-path}" && echo "LEAK DETECTED" || echo "OK"
+```
+
+If the verification prints `LEAK DETECTED`, note this in the Issues Log (does not warrant a halt — the report will be updated again in Step 8 with a superseding commit). A leak here means the `--exclude` pathspec did not take effect; investigate before the next pipeline run.
 
 The report will continue to be updated through Steps 5–8, and its final state will be captured in the dedicated Step 8 commit.
 

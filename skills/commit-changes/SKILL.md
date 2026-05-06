@@ -21,6 +21,27 @@ Make commits that are easy to review and safe to ship:
 - Commit style: Conventional Commits are required.
 - Any rules: max subject length, required scopes.
 
+## Flags
+
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--exclude <path>` | Exclude a file from staging (repeatable). Switches from patch staging to full-tree staging with explicit pathspec exclusion. | `--exclude docs/task.14.impl.md` |
+
+When one or more `--exclude <path>` flags are passed, collect all values into an array and use full-tree staging in step 3 instead of patch staging:
+
+```bash
+git add -A -- '.' ':(exclude)path/one' ':(exclude)path/two'
+```
+
+The `:(exclude)` magic is the documented pathspec form (gitglossary(7)). The bare `:!path` short-form is avoided because it requires an accompanying positive pathspec to behave correctly. Multiple `--exclude` flags each expand to one `':(exclude)<p>'` argument.
+
+This is the **enforced form** of the advisory rule in step 3a — the flag converts documentation into a flag-driven guarantee. The advisory rule remains for standalone invocations without the flag.
+
+**Smoke test** (verify the excluded file is absent from staged set):
+```bash
+git add -A -- '.' ':(exclude)path/to/file.md' && git diff --cached --name-only | grep -c 'file.md' | grep -q '^0$' && echo "OK" || echo "LEAK"
+```
+
 ## Workflow (checklist)
 
 0. Analyze recent commits to match repository style
@@ -40,7 +61,7 @@ Make commits that are easy to review and safe to ship:
 3a. **Check for files that must NOT be committed yet**
 
 Before finalising staging, check for any files that should be excluded from this commit:
-- **Implementation reports** (`*.implementation.*.md`) — if the pipeline has not reached its final Step 8 commit, unstage these: `git restore --staged path/to/story.*.implementation.*.md`
+- **Implementation reports** (`*.implementation.*.md`) — if the pipeline has not reached its final Step 8 commit, unstage these: `git restore --staged path/to/story.*.implementation.*.md`. When called by the pipeline orchestrator with `--exclude <path>`, the flag enforces this exclusion automatically via pathspec magic (see Flags section above) — no manual unstage needed.
 - **DoD running summaries** (`*.dod.*.md`) — only commit these when finalise has completed
 - **Partial QA artifacts** — gate files and QA reports are owned by QA; dev should not commit them unless explicitly part of the current work
 

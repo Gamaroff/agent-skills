@@ -75,6 +75,13 @@ Before asking the user, check whether parameters were supplied:
 - If provided: store as `GITHUB_ISSUE`, use in Step 5 PR description
 - If not provided: attempt auto-detection in Step 5 (see GitHub Issue Detection below)
 
+**`--exclude <path>`** (repeatable):
+- The caller may pass one or more `--exclude <path>` flags (e.g., `/create-pr --exclude path/to/report.md`)
+- When invoked by the `develop-story` or `develop-task` orchestrator, the implementation report path is passed so it is never staged in the auto-commit
+- Collect all values into an `EXCLUDE_PATHS` array
+- When invoking `/commit-changes` in Step 2 (uncommitted changes present): forward all values as repeated flags — `/commit-changes --exclude path1 --exclude path2 ...`
+- When there are NO uncommitted changes (commit-changes is not invoked): silently ignore all `--exclude` values and log `"--exclude received but no commit needed — ignored"`
+
 ### Step 0.5: Detect Platform
 
 Before interacting with any remote hosting service, detect the platform using the canonical resolver. See `shared/resources/platform-detection.md` for the full resolver spec.
@@ -554,6 +561,7 @@ If non-empty, report to the user and offer the same options.
 | ------------ | ------------------ | ----------------------------------- |
 | `--base`     | Pre-supply target branch (skip prompt) | `/create-pr --base develop`         |
 | `--issue`    | Pre-supply GitHub issue number (skip auto-detection) | `/create-pr --issue 42`  |
+| `--exclude`  | Exclude path from auto-commit staging (repeatable; forwarded to `/commit-changes`) | `/create-pr --exclude path/to/report.md` |
 | `--draft`    | Create as draft PR | `/create-pr --draft`                |
 | `--title`    | Override PR title  | `/create-pr --title "custom title"` |
 | `--body`     | Override PR body   | `/create-pr --body "custom body"`   |
