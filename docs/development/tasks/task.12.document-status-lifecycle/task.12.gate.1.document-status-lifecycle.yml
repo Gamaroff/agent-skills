@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.12.document-status-lifecycle'
+task_title: 'Document the canonical document-status lifecycle and frontmatter/body sync rule'
+gate: PASS
+status_reason: 'All 4 phases complete, all success criteria met, 0 HIGH/MEDIUM issues. One LOW observation (allow-list test grep too broad) deferred to follow-up.'
+reviewer: 'QA Engineer'
+updated: '2026-05-06T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Docs-only change. No new attack surface.'
+  performance:
+    status: PASS
+    notes: 'No runtime code modified. Zero performance impact.'
+  reliability:
+    status: PASS
+    notes: 'Rollback is delete new file + cross-ref lines. Fully reversible.'
+  maintainability:
+    status: PASS
+    notes: 'Establishes single source of truth for status values; reduces cross-skill drift; Mermaid diagram and worked examples lower onboarding cost.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Narrow allow-list test grep in document-status-lifecycle.md to the 9 lifecycle skills only, or add exclusion for non-lifecycle status domains, to eliminate false positives when test is run'
+      refs: ['shared/resources/document-status-lifecycle.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -5,6 +5,8 @@ copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
 
+> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+
 # Develop Story — Automated Lifecycle Orchestrator
 
 This skill orchestrates the complete story development lifecycle, calling each skill in sequence and maintaining an implementation report that records every significant decision and issue encountered along the way.

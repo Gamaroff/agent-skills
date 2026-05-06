@@ -5,6 +5,8 @@ copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
 
+> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+
 # QA Review
 
 Comprehensive quality assurance review combining adaptive automated checks, test architecture assessment, non-functional requirements validation, and requirements traceability. Use this skill when reviewing implemented stories to ensure quality standards are met.
