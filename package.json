@@ -10,7 +10,7 @@
     "type": "git",
     "url": "git+https://github.com/Gamaroff/agent-skills.git"
   },
-  "license": "ISC",
+  "license": "MIT",
   "author": "Lorien Gamaroff",
   "type": "commonjs",
   "main": "index.js",

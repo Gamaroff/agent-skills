@@ -1,8 +1,32 @@
 # Claude Skills
 
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Validate Skills](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml)
+
 A library of Claude Code skills — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 76+ skills covering development, story management, QA, PM, architecture, validation, and more.
 
 Skills are loaded into Claude Code via `.agents/skills/` in target projects and activate automatically based on context, or can be invoked explicitly.
+
+## Installing Skills
+
+**Single skill:**
+```bash
+mkdir -p .agents/skills
+cp -r path/to/agent-skills/skills/<skill-name> .agents/skills/
+```
+
+**All skills (clone and symlink):**
+```bash
+git clone https://github.com/Gamaroff/agent-skills.git
+ln -s "$(pwd)/agent-skills/skills" .agents/skills
+```
+
+**From a packaged zip:**
+```bash
+unzip <skill-name>.zip -d .agents/skills/
+```
+
+Skills activate automatically when Claude Code starts — no further configuration needed.
 
 ## Quick Start
 
@@ -57,6 +81,14 @@ Operations:
 ## Project Guidelines
 
 See [`CLAUDE.md`](./CLAUDE.md) for repository-specific rules used by Claude Code.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for how to add or improve skills.
+
+## License
+
+[MIT](./LICENSE)
 
 ## External Resources
 
