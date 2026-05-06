@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.7.skills-config-tracker-vcs-flags'
+task_title: 'skills-config: document explicit tracker and vcs flags'
+gate: PASS
+status_reason: 'All 4 phases complete, YAML valid, all success criteria met. Pure additive docs/config — zero regression risk, no issues found.'
+reviewer: 'QA Engineer'
+updated: '2026-05-06T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No auth, permissions, or sensitive data changes. No new dependencies.'
+  performance:
+    status: PASS
+    notes: 'No runtime changes. Zero performance impact.'
+  reliability:
+    status: PASS
+    notes: 'Additive only. auto default fully backward-compatible. All existing skills unaffected.'
+  maintainability:
+    status: PASS
+    notes: 'Centralizes platform-detection convention into canonical spec. Reduces future drift.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'When a skill adopts tracker:/vcs: config keys, add reference to shared/resources/platform-detection.md in SKILL.md for auto-bundling'
+      refs: ['shared/resources/platform-detection.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
