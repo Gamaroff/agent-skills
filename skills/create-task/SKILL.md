@@ -5,6 +5,8 @@ copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
 
+> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+
 # Create Task
 
 ## When to Use This Skill

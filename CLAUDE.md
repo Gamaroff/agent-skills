@@ -103,6 +103,10 @@ The canonical resolver spec lives in `shared/resources/platform-detection.md`. T
 | Bug Report | `bug.{epic}.{story}.{n}.{name}.md` | `bug.178.8.1.crash.md` |
 | Task | `task.{n}.{name}.md` | `task.44.db-migration.md` |
 
+### Status Lifecycle
+
+Document status follows a canonical lifecycle defined in `shared/resources/document-status-lifecycle.md`: `Draft → Planned → Ready for Development → In Progress → Ready for Review → Accepted`, with `Cancelled` reachable from any non-terminal state. Frontmatter `status:` uses lowercase kebab-case; body `Status:` uses Title Case. Both must be updated together.
+
 ## Key Skill Categories
 
 **Development workflow (BMAD):** `develop`, `develop-story`, `qa-review`, `qa-fix`, `qa-gate`, `finalise`
