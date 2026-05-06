@@ -64,7 +64,7 @@ See [Story Management](./skills/story-management.md) for detail.
 | `nestjs-patterns` | NestJS best practices | Backend development with NestJS |
 | `nestjs-debug` | Debug NestJS issues | Troubleshooting NestJS apps |
 | `react-native-debug` | Debug React Native issues | Mobile app troubleshooting |
-| `bsv-wallet-implementer` | BSV wallet implementation | Bitcoin SV wallet features |
+
 
 Develop usage:
 ```bash
@@ -121,7 +121,6 @@ See [Quality Assurance Skills](./skills/quality-assurance.md) for detail.
 | `execute-architect-checklist` | Architecture validation | Validating architecture docs |
 | `documentation-standards-validator` | Documentation compliance | Ensuring doc standards |
 | `api-endpoint-validator` | API endpoint validation | REST API compliance |
-| `prisma-schema-validator` | Prisma schema validation | Database schema checks |
 | `error-handling-enforcer` | Error handling patterns | Consistent error handling |
 | `offline-first-enforcer` | Offline-first compliance | Offline capability validation |
 | `platform-separation-validator` | Platform separation rules | Multi-platform architecture |
