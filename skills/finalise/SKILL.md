@@ -778,31 +778,106 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Fill in all sections with information from the story/task document and PR
    - Save summary as: `{story-directory}/sprint-review-summary.md`
 
-6. **Add PR Comment:**
-   - Add a summary comment to the PR (platform-branched):
-     - *GitHub*: `gh pr comment <pr-number> --body "..."`
-     - *Bitbucket*: `curl -s -X POST "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/<pr-number>/comments" -H "Content-Type: application/json" -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" -d '{"content": {"raw": "..."}}'`
-   - Include acceptance confirmation and link to Sprint Review summary
+6. **Add Canonical PR Comment (idempotent via marker):**
 
-   **Example PR Comment:**
+   **PR-comment authorship contract**:
 
-   ```markdown
-   ## ✅ Story Accepted - Ready for Sprint Review
+   | Skill | Owns |
+   |---|---|
+   | `qa-task` | Per-cycle gate decision (best-effort, non-blocking) |
+   | `qa-fix` | Per-cycle fix summary (best-effort, non-blocking) |
+   | `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
 
-   **Story:** story.311.1.transaction-confirmation-system
-   **Status:** ACCEPTED
-   **Acceptance Date:** 2025-02-01
+   `finalise` is the designated author of the canonical PR summary. It edits in place on re-run.
 
-   All Definition of Done criteria have been verified:
+   **Step 6a — Resolve QA cycle count:**
 
-   - ✅ All acceptance criteria met
-   - ✅ Tests written and PR approved
-   - ✅ Documentation updated
-   - ✅ Security review passed
-   - ✅ Compliance review passed
-
-   **Sprint Review Summary:** See `sprint-review-summary.md` in story directory
+   ```bash
+   # Locate the implementation report (passed by develop-task/develop-story as IMPLEMENTATION_REPORT env var,
+   # or search the document directory for task.{id}.implementation.*.md / story.{epic}.{story}.implementation.*.md)
+   if [ -n "$IMPLEMENTATION_REPORT" ] && [ -f "$IMPLEMENTATION_REPORT" ]; then
+     CYCLES=$(grep -c '^### QA Cycle' "$IMPLEMENTATION_REPORT" 2>/dev/null || echo 0)
+   else
+     CYCLES=0
+   fi
+   # If grep returns 0 (no headings found), CYCLES=0 → omit the cycle-count line from the body
    ```
+
+   **Step 6b — Build comment body:**
+
+   ```bash
+   MARKER="<!-- finalise-canonical-summary -->"
+   DOD_PATH=$(ls {document-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
+   FINAL_GATE=$(ls {document-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
+     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
+
+   BODY="$MARKER
+   ## ✅ Accepted — Canonical Pipeline Summary
+
+   **PR**: ${PR_URL}
+   **Final Gate**: ${FINAL_GATE}
+   **Accepted**: $(date +%Y-%m-%d)
+   **DoD Summary**: \`${DOD_PATH}\`
+   $([ "$CYCLES" -gt 0 ] && echo "**QA Cycles**: ${CYCLES}" || true)
+
+   All Definition of Done criteria verified. Story/task accepted."
+   ```
+
+   **Step 6c — Idempotent post (search-then-edit):**
+
+   *GitHub:*
+   ```bash
+   # Search for existing canonical comment by marker; extract numeric ID from URL
+   # (.databaseId is not available — gh pr view returns .url like ...#issuecomment-12345)
+   EXISTING_COMMENT_ID=$(gh pr view "$PR_URL" --json comments \
+     -q '.comments[] | select(.body | startswith("<!-- finalise-canonical-summary -->")) | .url' \
+     2>/dev/null | head -1 | grep -oE '[0-9]+$')
+
+   if [ -n "$EXISTING_COMMENT_ID" ]; then
+     # Edit existing comment by ID — do NOT use --edit-last (ordering unreliable)
+     OWNER=$(gh repo view --json owner -q '.owner.login')
+     REPO_NAME=$(gh repo view --json name -q '.name')
+     gh api -X PATCH "/repos/${OWNER}/${REPO_NAME}/issues/comments/${EXISTING_COMMENT_ID}" \
+       -f body="$BODY" >/dev/null \
+       && echo "✅ Canonical summary comment updated (ID: $EXISTING_COMMENT_ID)" \
+       || echo "⚠️ PR comment edit failed — attempting new comment"
+   else
+     gh pr comment "$PR_URL" --body "$BODY" \
+       && echo "✅ Canonical summary comment posted" \
+       || echo "⚠️ PR comment failed — non-blocking"
+   fi
+   ```
+
+   *Bitbucket:*
+   ```bash
+   # Search for existing canonical comment by marker
+   EXISTING_COMMENT_ID=$(curl -sf \
+     -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+     "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+     | jq -r '.values[] | select(.content.raw | startswith("<!-- finalise-canonical-summary -->")) | .id' \
+     | head -1)
+
+   BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$BODY" '{content: {raw: $raw}}')
+   if [ -n "$EXISTING_COMMENT_ID" ]; then
+     curl -sf -X PUT \
+       -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+       -H "Content-Type: application/json" \
+       "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments/${EXISTING_COMMENT_ID}" \
+       -d "$BB_COMMENT_PAYLOAD" >/dev/null \
+       && echo "✅ Canonical summary comment updated" \
+       || echo "⚠️ PR comment edit failed — attempting new comment"
+   else
+     curl -sf -X POST \
+       -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+       -H "Content-Type: application/json" \
+       "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+       -d "$BB_COMMENT_PAYLOAD" >/dev/null \
+       && echo "✅ Canonical summary comment posted" \
+       || echo "⚠️ PR comment failed — non-blocking"
+   fi
+   ```
+
+   **Failure handling**: All `⚠️` paths are non-blocking. The implementation report in git is the durable audit trail.
 
 7. **Move Tracker Issue to Done:**
 
