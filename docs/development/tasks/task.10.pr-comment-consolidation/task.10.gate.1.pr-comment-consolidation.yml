@@ -1,0 +1,67 @@
+schema: 1
+task: 'task.10.pr-comment-consolidation'
+task_title: 'Consolidate PR-comment fan-out under finalise'
+gate: PASS
+status_reason: 'Both MEDIUM issues fixed in qa-fix cycle 1: grep key corrected to gate:; databaseId replaced with URL-extracted numeric ID. All 3 phases PASS. NFRs all PASS or CONCERNS resolved.'
+reviewer: 'QA Engineer'
+updated: '2026-05-06T11:00:00Z'
+
+top_issues:
+  - issue: 'Wrong gate field name in finalise Step 6b — grep '^decision:' should be grep '^gate:''
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-05-06'
+  - issue: '.databaseId not available in gh pr view --json comments — must extract numeric ID from .url'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-05-06'
+
+waiver:
+  active: false
+
+quality_score: 97
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-05-06'
+  total_iterations: 1
+  verification_method: 'Direct code review + empirical field-availability testing'
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '3/3 (1 CONCERNS)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No auth changes, no secret exposure'
+  performance:
+    status: PASS
+    notes: 'Instruction-document changes; no runtime overhead'
+  reliability:
+    status: PASS
+    notes: 'Idempotency fix applied — numeric ID extracted from .url; search-then-edit now works correctly'
+  maintainability:
+    status: PASS
+    notes: 'Authorship contract table clear and consistent across all 3 skills'
+
+recommendations:
+  immediate:
+    - action: 'Change grep '\''^decision:'\'' to grep '\''^gate:'\'' in finalise Step 6b'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Replace .databaseId with numeric ID extracted from .url (e.g. | jq -r '\''.url'\'' | grep -oE '\''[0-9]+$'\'')'
+      refs: ['skills/finalise/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

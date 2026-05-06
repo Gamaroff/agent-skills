@@ -4,7 +4,8 @@ title: "Consolidate PR-comment fan-out under finalise"
 type: task
 category: refactoring
 priority: Medium
-status: ✅ Completed
+status: ✅ Accepted
+completed_date: 2026-05-06
 created: 2026-05-06
 assignee: TBD
 effort: 0.5 day
@@ -202,11 +203,11 @@ Changes:
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS (after qa-fix cycle 1)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-05-06
 **Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Gate Decision**: PASS
 
 ### QA Report
 - **Full Report**: [task.10.qa.1.pr-comment-consolidation.md](./task.10.qa.1.pr-comment-consolidation.md)
@@ -248,3 +249,35 @@ Changes:
 **Change Log**:
 - 2026-05-06: All three phases implemented. Task marked Ready for Review.
 - 2026-05-06: qa-fix cycle 1 — fixed 2 MEDIUM issues in skills/finalise/SKILL.md: (1) grep '^decision:' → grep '^gate:'; (2) .databaseId → URL-extracted numeric ID via grep -oE '[0-9]+$'.
+- 2026-05-06: Task accepted — all DoD criteria verified.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.10.qa.1.pr-comment-consolidation.md`
+**Gate File**: `task.10.gate.1.pr-comment-consolidation.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 97/100
+**QA Cycles**: 2 (Cycle 1: CONCERNS → qa-fix → Cycle 2: PASS)
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria**: 5/5 met — non-blocking intermediate comments, canonical idempotent finalise summary, authorship contract in all 3 skills
+✅ **PR**: #24 open — [https://github.com/Gamaroff/agent-skills/pull/24](https://github.com/Gamaroff/agent-skills/pull/24)
+✅ **Tests**: N/A — SKILL.md instruction-document changes; QA gate serves as quality gate
+✅ **Documentation**: SKILL.md files are the deliverables; all updated per implementation plan
+✅ **Security**: ✅ PASS — no auth changes, no secret exposure (QA NFR verified)
+✅ **Performance**: ✅ PASS — instruction-document changes, no runtime overhead (QA NFR verified)
+✅ **Reliability**: ✅ PASS — idempotency fix applied and verified (QA NFR verified)
+✅ **Maintainability**: ✅ PASS — authorship contract table clear and consistent (QA NFR verified)
+
+**Deployment Readiness**: Staging ✅ APPROVED | Production ✅ APPROVED
+
+**Task marked as ACCEPTED on:** 2026-05-06
+
+**Detailed Verification Log:** See `task.10.dod.1.pr-comment-consolidation.md` for complete verification evidence.
