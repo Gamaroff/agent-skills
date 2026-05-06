@@ -1,0 +1,44 @@
+schema: 1
+task: 'task.13.develop-caller-context-contract'
+task_title: 'Document caller-supplied context contract in /develop'
+gate: PASS
+status_reason: 'Both deliverables present and accurate. Section correctly placed in develop/SKILL.md; cross-reference added to step-3 shared resource. 0 issues. Documentation-only change.'
+reviewer: 'QA Engineer (Claude)'
+updated: '2026-05-06T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '2/2'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No security surface affected — documentation only'
+  performance:
+    status: PASS
+    notes: 'No runtime changes'
+  reliability:
+    status: PASS
+    notes: 'Explicit contract reduces silent regression risk for future /develop refactors'
+  maintainability:
+    status: PASS
+    notes: 'Well-placed, concise, table-formatted; cross-referenced from both directions'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

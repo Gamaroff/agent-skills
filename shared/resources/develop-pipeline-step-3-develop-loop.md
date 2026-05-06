@@ -31,6 +31,7 @@ Ask it to find: all files likely affected by the success criteria and implementa
 - Do NOT read these files again in the main context — the summary is sufficient for `/develop` to make informed decisions
 - Log the Explore summary in the Decisions Log: "Pre-develop surface map: {N} files identified in {affected modules}"
 - When invoking `/develop`, present the Explore summary as initial context so `/develop` does NOT need to run its own independent file discovery. State explicitly: "Codebase surface map already completed — {summary}. Proceed directly to alignment analysis using this map."
+- See `/develop` SKILL.md **Caller-Supplied Context** section for the full contract on how orchestrators may prepend context (surface map, plan file path, iteration hint) and how `/develop` must honour it.
 
 ---
 
