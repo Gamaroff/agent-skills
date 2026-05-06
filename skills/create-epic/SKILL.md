@@ -239,16 +239,14 @@ Set env var `SKIP_TRACKER=1` to skip tracker issue creation entirely. The epic f
 if [ "$SKIP_TRACKER" = "1" ]; then
   echo "ℹ️  SKIP_TRACKER=1 — skipping tracker issue creation"
 else
-  if [ -n "$JIRA_URL" ]; then
-    TRACKER="jira"
-  else
-    TRACKER="github"
-  fi
+  # Platform detection — see shared/resources/platform-detection.md
+  source shared/resources/resolve-platform.sh
+  # TRACKER = jira | github; VCS = github | bitbucket
   # proceed to platform branch below
 fi
 ```
 
-### Jira path (when `JIRA_URL` is set)
+### Jira path (when `TRACKER=jira`)
 
 Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), handles ADF rendering, writes `jira_key` and `jira_url` back to the epic frontmatter, and guards against concurrent edits. No inline Jira REST in this skill.
 
@@ -258,7 +256,7 @@ Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), 
 
 **On failure**: log warning and continue. Never halt. The epic file already exists; the Jira issue can be synced manually later via `/sync-jira-epic`.
 
-### GitHub path (when `JIRA_URL` is NOT set)
+### GitHub path (when `TRACKER=github`)
 
 Idempotency check: if `github_issue` is already set in the epic frontmatter, skip creation and log `"ℹ️  github_issue already set — skipping tracker creation"`.
 

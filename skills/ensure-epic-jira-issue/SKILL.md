@@ -1,6 +1,6 @@
 ---
 name: ensure-epic-jira-issue
-description: Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-epic, and writes jira_key + jira_url to the epic frontmatter. Sets EPIC_JIRA_KEY (e.g. "RB-42") in caller scope, or empty string on failure. Jira-only sibling of ensure-epic-github-issue. Callers branch on JIRA_URL to pick the right one.
+description: Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-epic, and writes jira_key + jira_url to the epic frontmatter. Sets EPIC_JIRA_KEY (e.g. "RB-42") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Callers branch on TRACKER (set by shared/resources/resolve-platform.sh) to pick the right sub-routine.
 type: internal
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
@@ -15,15 +15,24 @@ This is an **internal sub-routine** called by `review-story`. Do not invoke dire
 ## Inputs (set by the calling skill before invoking)
 
 - `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `docs/prd/infra/epics/epic.12.payments/epic.12.payments.md`)
+- `TRACKER` — set by `shared/resources/resolve-platform.sh` in the calling skill (must be `jira` for this sub-routine to act)
 - Env: `JIRA_URL`, plus Atlassian MCP credentials (cloudId derived from `JIRA_URL` hostname)
 
 ## Output (set by this sub-routine, available to the calling skill)
 
-- `EPIC_JIRA_KEY` — Jira issue key (e.g. `RB-42`), or empty string on failure
+- `EPIC_JIRA_KEY` — Jira issue key (e.g. `RB-42`), or empty string on failure or skip
 
 ---
 
 ## Workflow
+
+### Step EJ0: Guard — Jira-only check
+
+If `TRACKER` is not set to `jira`:
+```
+ℹ️  Skipped: tracker is not jira (TRACKER=${TRACKER:-unset}) — ensure-epic-jira-issue is a no-op for non-Jira projects.
+```
+Set `EPIC_JIRA_KEY=""` and return. Do not proceed to EJ1.
 
 ### Step EJ1: Read Epic Frontmatter
 

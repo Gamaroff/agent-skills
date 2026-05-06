@@ -487,9 +487,13 @@ devDebugLog: .ai/debug-log.md
 
 5. **Tracker Issue Linkage**:
 
-   Detect tracker platform first:
-   - If `JIRA_URL` is set → **Jira path** (check for `jira_key:` in frontmatter)
-   - Otherwise → **GitHub path** (check for `github_issue:` in frontmatter)
+   Detect tracker platform using the canonical resolver — see `shared/resources/platform-detection.md`. Source the helper once per skill invocation:
+   ```bash
+   source shared/resources/resolve-platform.sh
+   # TRACKER = jira | github
+   ```
+   - When `TRACKER=jira` → **Jira path** (check for `jira_key:` in frontmatter)
+   - When `TRACKER=github` → **GitHub path** (check for `github_issue:` in frontmatter)
 
    **Jira path:**
    - Frontmatter MUST contain `jira_key:` field
@@ -515,7 +519,7 @@ devDebugLog: .ai/debug-log.md
      - Look for a `**Jira Epic**: [KEY](url)` or `**Jira Issue**: [KEY](url)` line in the story body. If found: verify the KEY matches `jira_key` and the URL ends with `/browse/{jira_key}`. Any mismatch → flag as **Important**: "Body cross-reference link does not match `jira_key`"
      - If no body link is found: flag as **Important** — add one (e.g., `**Jira Issue**: [{jira_key}]({jira_url})`)
 
-   **GitHub path** (when `JIRA_URL` is NOT set):
+   **GitHub path** (when `TRACKER=github`):
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
@@ -1806,7 +1810,7 @@ User Can Now: Run `/develop` to begin implementation
 
 **Actions**:
 
-1. **Detect tracker platform**: if `JIRA_URL` is set → Jira path; else → GitHub path.
+1. **Detect tracker platform**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `shared/resources/platform-detection.md`.
 
 3. **Collect context from previous steps**:
 
@@ -1844,7 +1848,7 @@ User Can Now: Run `/develop` to begin implementation
 
    ---
 
-   **Jira path** (when `JIRA_URL` is set):
+   **Jira path** (when `TRACKER=jira`):
 
    Read `jira_key` from story frontmatter. If absent, skip this step silently.
 
@@ -1873,7 +1877,7 @@ User Can Now: Run `/develop` to begin implementation
 
    ---
 
-   **GitHub path** (when `JIRA_URL` is NOT set):
+   **GitHub path** (when `TRACKER=github`):
 
    Read `github_issue` from story frontmatter. If absent, skip this step silently.
 

@@ -171,20 +171,23 @@ Cross-reference: `create-pr` and `finalise` use the same variables — set them 
 
 ### Platform Detection
 
-Run once before the PR existence check. All downstream branches use `$PLATFORM`.
+Run once before the PR existence check. All downstream branches use `$PLATFORM` and `$TRACKER`. See `shared/resources/platform-detection.md` for the full resolver spec.
 
 ```bash
+source shared/resources/resolve-platform.sh
+# TRACKER = jira | github; VCS = github | bitbucket
+PLATFORM="$VCS"
+
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
-if echo "$REMOTE_URL" | grep -qi "github\.com"; then
-  PLATFORM="github"
-elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
-  PLATFORM="bitbucket"
+if [ "$PLATFORM" = "bitbucket" ]; then
   BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
+elif [ "$PLATFORM" = "github" ]; then
+  : # gh CLI handles GitHub; no extra vars needed
 else
-  echo "❌ Unknown remote: $REMOTE_URL" >&2
+  echo "❌ Unrecognised platform: $PLATFORM" >&2
   exit 1
 fi
 ```
@@ -295,7 +298,7 @@ Before starting fixes:
 | Apply changes | Implement code fixes and add missing tests |
 | Validate | Run lint + tests; iterate until zero errors and all tests pass |
 | Update story file & bug reports | Update authorized sections only; set correct status per Status Rule |
-| Post fix summary to PR | Post fix summary comment via platform-appropriate path (GitHub `gh pr comment` / Bitbucket REST); optionally post to Jira via MCP when `JIRA_URL` set |
+| Post fix summary to PR | Post fix summary comment via platform-appropriate path (GitHub `gh pr comment` / Bitbucket REST); optionally post to Jira via MCP when `TRACKER=jira` |
 | Communicate to user | Output completion summary with next steps |
 
 ---
@@ -681,7 +684,7 @@ fi
 
 **Jira tracker comment (optional — after PR comment confirmed):**
 
-When `JIRA_URL` is set, also post the fix summary to the linked Jira issue. This is **non-blocking** — a failure here does NOT stop qa-fix from completing.
+When `TRACKER=jira` (set by resolver in the Platform Detection section above), also post the fix summary to the linked Jira issue. This is **non-blocking** — a failure here does NOT stop qa-fix from completing.
 
 First, read `$STORY_FILE` (the resolved story or task document — set during Step 0 locate-story) and extract `jira_key`:
 
@@ -689,7 +692,7 @@ First, read `$STORY_FILE` (the resolved story or task document — set during St
 JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
 ```
 
-If `JIRA_URL` is set and `JIRA_KEY` is non-empty (and not `null`):
+If `TRACKER=jira` and `JIRA_KEY` is non-empty (and not `null`):
 
 1. Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
 
@@ -739,7 +742,7 @@ Before marking complete:
 - ✅ Change Log entry added
 - ✅ Status set correctly per Status Rule
 - ✅ **Post Fix Summary to PR** (Step 7 — BLOCKING): Confirm platform-appropriate comment call (`gh pr comment` on GitHub / Bitbucket REST on Bitbucket) exited with code 0. Workflow is not done until this is verified.
-- ✅ **Jira comment** (non-blocking): If `JIRA_URL` set and `jira_key` present in story/task frontmatter, `addCommentToJiraIssue` MCP was attempted; failure is logged but does not block completion.
+- ✅ **Jira comment** (non-blocking): If `TRACKER=jira` and `jira_key` present in story/task frontmatter, `addCommentToJiraIssue` MCP was attempted; failure is logged but does not block completion.
 
 ---
 

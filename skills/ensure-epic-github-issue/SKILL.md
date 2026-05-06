@@ -1,6 +1,6 @@
 ---
 name: ensure-epic-github-issue
-description: Internal sub-routine called from create-story and review-story. Given an epic markdown file path, ensures the epic has a corresponding GitHub issue. Creates the issue if missing, adds it to the project board, and writes github_issue to the epic frontmatter. Returns EPIC_ISSUE_NUM (integer or empty on failure). GitHub-only sibling of ensure-epic-jira-issue. Callers branch on JIRA_URL to pick the right one.
+description: Internal sub-routine called from create-story and review-story. Given an epic markdown file path, ensures the epic has a corresponding GitHub issue. Creates the issue if missing, adds it to the project board, and writes github_issue to the epic frontmatter. Returns EPIC_ISSUE_NUM (integer or empty on failure). GitHub-only sibling of ensure-epic-jira-issue. Callers branch on TRACKER (set by shared/resources/resolve-platform.sh) to pick the right sub-routine.
 type: internal
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT

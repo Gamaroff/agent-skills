@@ -310,12 +310,12 @@ Reference the **Definition of Done checklist** (`references/definition-of-done-c
 
 2. **Verify Unit Tests and Code Review:**
    - Extract PR number from frontmatter (`pr_number: 123`) or body (`PR #123`, `https://github.com/org/repo/pull/123`, `https://bitbucket.org/.../pull-requests/123`)
-   - Detect platform (run once if not already done):
+   - Detect platform (run once if not already done) using the canonical resolver — see `shared/resources/platform-detection.md`:
      ```bash
+     source shared/resources/resolve-platform.sh
+     PLATFORM="$VCS"   # github | bitbucket
      REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
-     if echo "$REMOTE_URL" | grep -qi "github\.com"; then PLATFORM="github"
-     elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
-       PLATFORM="bitbucket"
+     if [ "$PLATFORM" = "bitbucket" ]; then
        BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
        BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
        BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
@@ -806,11 +806,11 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
 7. **Move Tracker Issue to Done:**
 
-   **Detect tracker platform** (same pattern used throughout this skill):
-   - If `JIRA_URL` is set → **Jira path**
-   - Otherwise → **GitHub path**
+   **Detect tracker platform** — resolver already sourced above (`TRACKER` is set):
+   - When `TRACKER=jira` → **Jira path**
+   - When `TRACKER=github` → **GitHub path**
 
-   **Jira path** (when `JIRA_URL` is set):
+   **Jira path** (when `TRACKER=jira`):
 
    Extract `jira_key` from story/task frontmatter. If absent or null, skip this step silently.
 
@@ -833,7 +833,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    Log outcome in running summary: "Jira issue {jira_key} transitioned to Done ✅" or the warning detail.
 
-   **GitHub path** (when `JIRA_URL` is NOT set):
+   **GitHub path** (when `TRACKER=github`):
 
    - Extract `github_issue` number from story/task frontmatter
    - Get the repository owner (org) via: `gh repo view --json owner --jq '.owner.login'`

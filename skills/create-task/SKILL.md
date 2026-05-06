@@ -419,19 +419,16 @@ Once validated:
 
 ### 4.5 Create Tracker Issue
 
-After the task document is fully written, create a corresponding issue in the remote tracker. Detect platform first:
+After the task document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `shared/resources/platform-detection.md`):
 
 ```bash
-if [ -n "$JIRA_URL" ]; then
-  TRACKER="jira"
-else
-  TRACKER="github"
-fi
+source shared/resources/resolve-platform.sh
+# TRACKER = jira | github; VCS = github | bitbucket
 ```
 
 ---
 
-#### Jira Path (when `JIRA_URL` is set)
+#### Jira Path (when `TRACKER=jira`)
 
 > **Note**: Tasks are NOT linked to epics — no `customfield_10014` is set.
 
@@ -510,7 +507,7 @@ jira_url: https://mediastreamag.atlassian.net/browse/RB-15
 
 ---
 
-#### GitHub Path (when `JIRA_URL` is NOT set)
+#### GitHub Path (when `TRACKER=github`)
 
 Read `project.yml` (repo root) to get `github.project_board_name` for the `--project` flag:
 
