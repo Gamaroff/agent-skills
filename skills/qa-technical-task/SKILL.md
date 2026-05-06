@@ -81,7 +81,7 @@ Activate this skill when:
 ### File Naming Convention
 
 **QA Report**: `task.[id].qa.[number].[descriptive-name].md` (co-located in task subdirectory)
-**Quality Gate**: `docs/qa/gates/tasks/task.[id].gate.[number].[descriptive-name].yml` (separate gates directory)
+**Quality Gate**: `task.[id].gate.[number].[descriptive-name].yml` (co-located in task subdirectory)
 **Bug Reports**: `task.[id].bug.[number].[descriptive-name].md` (co-located in task subdirectory)
 
 **Example**:
@@ -94,8 +94,8 @@ docs/development/tasks/task.1.cache-lib-simplification/
 ├── task.1.bug.1.memory-leak.md                 # Bug report (co-located)
 └── task.1.bug.2.test-failure.md                # Additional bugs (co-located)
 
-# Quality Gate (separate directory)
-docs/qa/gates/tasks/task.1.gate.1.cache-lib-simplification.yml
+# Quality Gate (co-located)
+docs/development/tasks/task.1.cache-lib-simplification/task.1.gate.1.cache-lib-simplification.yml
 ```
 
 ### QA Report Structure
@@ -434,7 +434,7 @@ Lines: W%
 ---
 
 **QA Report Reference**: `docs/development/tasks/task.{id}.{descriptive-name}/task.{id}.qa.{number}.{descriptive-name}.md`
-**Gate File**: `docs/qa/gates/tasks/task.{id}.gate.{number}.{descriptive-name}.yml`
+**Gate File**: `task.{id}.gate.{number}.{descriptive-name}.yml` (co-located in task subdirectory)
 **Next Steps**: {What happens next - fixes, deployment, follow-up}
 
 ````
@@ -644,7 +644,7 @@ npx nx test {app} --testPathPattern=integration
 
 **Action**: Use qa-gate skill to create gate decision file
 
-**Location**: `docs/qa/gates/tasks/task.{id}.gate.{number}.{descriptive-name}.yml`
+**Location**: `docs/development/tasks/task.{id}.{name}/task.{id}.gate.{number}.{descriptive-name}.yml` (co-located in task subdirectory)
 
 **Gate Decision Options**:
 
@@ -1098,8 +1098,8 @@ docs/development/tasks/task.1.cache-lib-simplification/
 ├── task.1.bug.1.memory-leak.md                 # Bug report 1 (co-located)
 └── task.1.bug.2.test-failure.md                # Bug report 2 (co-located)
 
-# Quality Gate (separate directory)
-docs/qa/gates/tasks/task.1.cache-lib-simplification.gate.yml
+# Quality Gate (co-located)
+docs/development/tasks/task.1.cache-lib-simplification/task.1.gate.1.cache-lib-simplification.yml
 ```
 
 ---

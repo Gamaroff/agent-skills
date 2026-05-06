@@ -849,7 +849,7 @@ tasks/
 - File type is indicated by the segment after the task ID:
   - `.qa.{number}.` = QA report
   - `.bug.{number}.` = Bug report (sequential numbering)
-- Quality gate files are stored separately in `docs/qa/gates/tasks/`
+- Quality gate files are co-located in the task directory: `task.{id}.gate.{number}.{name}.yml`
 - Descriptive name comes last before the file extension
 - Example: `task.1.cache-lib-simplification.md`
 

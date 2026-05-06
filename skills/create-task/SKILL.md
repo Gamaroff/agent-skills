@@ -122,7 +122,7 @@ docs/development/tasks/task.[ID].[descriptive-name]/
 ├── task.[ID].plan.[descriptive-name].md               # Implementation plan (created alongside task)
 ├── task.[ID].qa.[number].[descriptive-name].md        # QA report (created by QA)
 ├── task.[ID].bug.[N].[bug-name].md                    # Bug reports (created during QA)
-└── [No quality gate file - created separately at docs/qa/gates/tasks/]
+└── task.[ID].gate.[number].[descriptive-name].yml     # Quality gate (co-located, created by QA)
 ```
 
 **Naming Rules**:
@@ -403,7 +403,7 @@ Once validated:
 3. **Create Placeholder Notes**
    - Document where QA report will be created
    - Document where bug reports will be created
-   - Note quality gate will be in `docs/qa/gates/tasks/`
+   - Note quality gate will be co-located in the task directory
    - Provide next steps
 
 4. **Display Success Message**
@@ -653,7 +653,7 @@ Inform user (and stop):
 - When implementation is complete, QA artifacts will land at:
   - QA report: `task.[ID].qa.[number].[name].md`
   - Bug reports (if issues found): `task.[ID].bug.[N].[name].md`
-  - Quality gate: `docs/qa/gates/tasks/task.[ID].gate.[number].[name].yml`
+  - Quality gate: `task.[ID].gate.[number].[name].yml` (co-located in task directory)
 
 ---
 
@@ -867,7 +867,7 @@ ROLLBACK TRIGGERS:
 2. **Create QA report** at `task.[ID].qa.[number].[name].md`
 3. **Test** all success criteria
 4. **Create bug reports** if issues found: `task.[ID].bug.[N].[name].md`
-5. **Create quality gate** at `docs/qa/gates/tasks/task.[ID].gate.[number].[name].yml`
+5. **Create quality gate** at `task.[ID].gate.[number].[name].yml` (co-located in task directory)
 6. **Make gate decision**: PASS | CONCERNS | FAIL | WAIVED
 
 ### Bug Fix Cycle

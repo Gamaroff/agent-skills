@@ -405,4 +405,4 @@
 4. QA will create:
    - QA Report: `task.[ID].qa.[name].md`
    - Bug Reports (if needed): `task.[ID].bug.[N].[name].md`
-   - Quality Gate: `docs/qa/gates/tasks/task.[ID].gate.[name].yml`
+   - Quality Gate: `task.[ID].gate.[number].[name].yml` (co-located in task directory)

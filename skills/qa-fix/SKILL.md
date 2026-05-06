@@ -75,6 +75,13 @@ When given a directory path, discover all relevant QA artifacts:
    - Load all bug reports found
    - Filter by status: only process "New" or "Reopened"
 
+**For technical tasks**, the same discovery rules apply with `task.{id}` in place of `story.{epic}.{story}`:
+
+- Task file: `task.{id}.{name}.md` (exclude `.qa.`, `.gate.`, `.bug.`)
+- QA Report: `task.{id}.qa.{number}.*.md` (highest number wins)
+- Gate File: `task.{id}.gate.{number}.*.yml` co-located in the task subdirectory (highest number wins)
+- Bug Reports: `task.{id}.bug.*.md`
+
 **Example:**
 
 ```
@@ -138,9 +145,10 @@ For tasks:
 
 - Pattern: `docs/development/tasks/task.{id}.{name}/task.{id}.qa.{number}.{name}.md`
 
-**Quality Gate** (separate gates directory):
+**Quality Gate** (co-located in task subdirectory):
 
-- Pattern: `docs/qa/gates/tasks/task.{id}.{name}.gate.{number}.yml`
+- Pattern: `docs/development/tasks/task.{id}.{name}/task.{id}.gate.{number}.{name}.yml`
+- Discovery glob: `task.{id}.gate.*.yml` in the task subdirectory; sort by gate number and take the latest
 
 **Bug Report Files** (co-located in task subdirectory):
 
@@ -1031,7 +1039,7 @@ You: "Update QA report and gate with bug resolutions for {task_id}"
    - Updates gate status and deployment recommendation
    - Adds new timestamp
 
-2. **Latest Quality Gate** (`docs/qa/gates/tasks/task.{id}.{name}.gate.{number}.yml`):
+2. **Latest Quality Gate** (`docs/development/tasks/task.{id}.{name}/task.{id}.gate.{number}.{name}.yml`):
    - Updates `gate` field (CONCERNS → PASS)
    - Updates `status_reason` with fix summary
    - Updates `updated` timestamp

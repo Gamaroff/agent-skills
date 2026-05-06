@@ -1214,7 +1214,7 @@ Use this when creating a technical task:
 4. QA will create:
    - QA report: `task.[ID].qa.[name].md`
    - Bug reports (if needed): `task.[ID].bug.[N].[name].md`
-   - Quality gate: `docs/qa/gates/tasks/task.[ID].gate.[name].yml`
+   - Quality gate: `task.[ID].gate.[number].[name].yml` (co-located in task directory)
 ```
 
 This comprehensive guide provides everything needed to create professional technical task documents that are implementation-ready and QA-compatible.

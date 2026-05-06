@@ -841,4 +841,4 @@ reproduction_steps:
 - Pattern: `task.{id}.bug.{number}.{name}.md`
 - Location: Co-located in task subdirectory (`docs/development/tasks/task.{id}.{name}/`)
 - Numbering resets for each task (task 1 has task.1.bug.1, task.1.bug.2, etc.)
-- Quality gates stored separately in `docs/qa/gates/tasks/` directory
+- Quality gates are co-located in the task subdirectory (`task.{id}.gate.{number}.{name}.yml`)
