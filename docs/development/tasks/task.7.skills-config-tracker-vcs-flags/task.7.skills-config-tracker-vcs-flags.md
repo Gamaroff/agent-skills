@@ -4,14 +4,18 @@ title: "skills-config: document explicit tracker and vcs flags"
 type: task
 category: documentation
 priority: Low
-status: 📋 Planned
+status: Ready for Review
 created: 2026-05-05
 assignee: TBD
 effort: 0.5 day
 depends_on: —
+github_issue: 12
 ---
 
 # Task 7 — skills-config: document explicit tracker and vcs flags
+
+**Tracker**: [#12](https://github.com/Gamaroff/agent-skills/issues/12)
+**Review**: ✅ All review recommendations from `task.7.skills-config-tracker-vcs-flags.review.2026-05-06.md` implemented 2026-05-06
 
 ## 1. Overview
 
@@ -100,29 +104,29 @@ None. New keys are additive. Default `auto` preserves all current behavior. Skil
 
 - Files: `skills-config.sample.yaml`
 - Changes:
-  - [ ] Add `tracker:` and `vcs:` keys with comments explaining values and resolver order
+  - [x] Add `tracker:` and `vcs:` keys with comments explaining values and resolver order
 
 **Phase 2 — Document in CLAUDE.md (Low risk)**
 
 - Files: `CLAUDE.md`
 - Changes:
-  - [ ] Add a "Platform Detection" subsection under "Configuration"
-  - [ ] Spell out resolver order (config > env > git remote > default)
-  - [ ] List which skills currently honor the convention
+  - [x] Add a "Platform Detection" subsection under "Configuration"
+  - [x] Spell out resolver order (config > env > git remote > default)
+  - [x] List which skills currently honor the convention
 
 **Phase 3 — Author shared canonical spec (Low risk, optional)**
 
 - Files: `shared/resources/platform-detection.md` (new)
 - Changes:
-  - [ ] Document detection logic, code snippet, env vars, and edge cases
-  - [ ] Skills (qa-fix, finalise, create-pr, create-task, create-epic, ensure-epic-*) can reference this file via the explicit `shared/resources/platform-detection.md` path — `package_skill.py` will auto-bundle on package
+  - [x] Document detection logic, code snippet, env vars, and edge cases
+  - [x] Skills (qa-fix, finalise, create-pr, create-task, create-epic, ensure-epic-*) can reference this file via the explicit `shared/resources/platform-detection.md` path — `package_skill.py` will auto-bundle on package
 
 **Phase 4 — Validate (Low risk)**
 
 - Files: build artifact verification
 - Changes:
-  - [ ] Spot-check that adding the shared resource (if Phase 3) doesn't break package_skill.py path rewrites
-  - [ ] Lint sample.yaml for valid YAML
+  - [x] Spot-check that adding the shared resource (if Phase 3) doesn't break package_skill.py path rewrites
+  - [x] Lint sample.yaml for valid YAML
 
 ## 7. Files Summary
 
@@ -133,7 +137,7 @@ None. New keys are additive. Default `auto` preserves all current behavior. Skil
 
 **New (optional)**:
 
-3. ⚠️ `shared/resources/platform-detection.md` — canonical spec
+3. ✅ `shared/resources/platform-detection.md` — canonical spec
 
 **No build artifacts** — config and docs only
 
@@ -147,19 +151,19 @@ None. New keys are additive. Default `auto` preserves all current behavior. Skil
 
 **Functional**:
 
-- [ ] `skills-config.sample.yaml` documents both keys with `auto` default
-- [ ] CLAUDE.md describes the resolver order
-- [ ] (Optional) `shared/resources/platform-detection.md` exists and is referenced by at least one skill
+- [x] `skills-config.sample.yaml` documents both keys with `auto` default
+- [x] CLAUDE.md describes the resolver order
+- [x] (Optional) `shared/resources/platform-detection.md` exists and is referenced by at least one skill
 
 **Code quality**:
 
-- [ ] Sample YAML parses
-- [ ] No invalid markdown
+- [x] Sample YAML parses
+- [x] No invalid markdown
 
 **Migration**:
 
-- [ ] No code changes required for skills to keep working — they continue using current implicit detection
-- [ ] Future skills can opt into reading the keys
+- [x] No code changes required for skills to keep working — they continue using current implicit detection
+- [x] Future skills can opt into reading the keys
 
 ## 10. Risk Assessment
 
