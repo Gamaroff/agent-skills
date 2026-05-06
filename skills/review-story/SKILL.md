@@ -495,12 +495,39 @@ devDebugLog: .ai/debug-log.md
    - When `TRACKER=jira` → **Jira path** (check for `jira_key:` in frontmatter)
    - When `TRACKER=github` → **GitHub path** (check for `github_issue:` in frontmatter)
 
+   **Tracker dedup** (applies to both paths, runs only when `jira_key` / `github_issue` is absent):
+
+   Before creating a new tracker issue, search the tracker for an existing one matching the story title. This prevents duplicate issues when frontmatter was hand-edited or the story was authored outside the standard creation flow.
+
+   Lookup order:
+   1. **Frontmatter present** (`jira_key` / `github_issue` has a value) → use it; skip create entirely.
+   2. **Frontmatter absent** → run title-based search (see per-path details below):
+      - Exactly one match (any status) → write frontmatter + body link, log `"Linked existing tracker issue"`, skip create (including `ensure-epic-jira-issue` / `ensure-epic-github-issue` — existing issue assumed already linked to its parent epic).
+      - Closed match → additionally log closed-issue warning.
+      - Zero or multiple matches → fall through to create (existing behaviour); multi-match logs all match IDs.
+      - Search failure → log warning and fall through to create (existing behaviour preserved).
+   3. **Frontmatter write-back**: on link-existing, write `jira_key` + `jira_url` (or `github_issue`) before the closing `---` of the frontmatter block (same sed-based pattern as `create-task`). Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
+
    **Jira path:**
    - Frontmatter MUST contain `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
      - Ask: "This story has no linked Jira issue. Should I create one now?"
      - If user confirms:
+       0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
+          - Use Atlassian MCP `searchJiraIssuesUsingJql`:
+            - `jql`: `summary ~ "[Story {epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
+            - Verify story title pattern against what `/create-story` Step 5.2a / `sync-jira-story` actually emits; align if the format differs
+            - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
+          - **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-jira-issue`):
+            - Extract `jira_key` and build `jira_url = ${JIRA_URL}/browse/${jira_key}`
+            - Write `jira_key: {jira_key}` and `jira_url: {jira_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
+            - Insert or repair body cross-reference link: `**Jira Issue**: [{jira_key}]({jira_url})`
+            - Existing issue is assumed to already have its parent epic linkage — do NOT re-invoke `ensure-epic-jira-issue`
+            - If matched issue status is `Closed` or `Done`: log `"⚠️  Linked existing CLOSED tracker issue {jira_key} — verify intent before continuing."`
+            - Log `"Linked existing tracker issue {jira_key} (skipped create)"` and **skip steps 1–4 below**
+          - **Zero matches** → fall through to steps 1–4 below
+          - **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Story {epic}.{story}]\": {key1}, {key2}, … — proceeding to create"` and fall through to steps 1–4 below
        1. Derive the epic file path using the grandparent directory rule:
           ```bash
           STORY_DIR=$(dirname "{resolved story file path}")
@@ -525,6 +552,23 @@ devDebugLog: .ai/debug-log.md
      - Flag as **Important** gap
      - Ask: "This story has no linked GitHub issue. Should I create one now?"
      - If user confirms:
+       0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
+          1. Search for an existing issue:
+             ```bash
+             gh issue list --search "in:title \"[Story {epic}.{story}]\"" --state all \
+               --json number,url,state,title
+             ```
+             Verify story title pattern against what `/create-story` Step 5.2a actually emits; align if the format differs.
+             On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to steps 1–4 below
+          2. **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-github-issue`):
+             - Extract `N` (issue number) and `url` from the result
+             - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
+             - Insert or repair body cross-reference link: `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`
+             - Existing issue is assumed to already have its parent epic linkage — do NOT re-invoke `ensure-epic-github-issue`
+             - If matched issue `state` is `CLOSED`: log `"⚠️  Linked existing CLOSED tracker issue #{N} — verify intent before continuing."`
+             - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip steps 1–4 below**
+          3. **Zero matches** → fall through to steps 1–4 below
+          4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Story {epic}.{story}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to steps 1–4 below
        1. Derive the epic file path using the grandparent directory rule:
           ```bash
           STORY_DIR=$(dirname "{resolved story file path}")
