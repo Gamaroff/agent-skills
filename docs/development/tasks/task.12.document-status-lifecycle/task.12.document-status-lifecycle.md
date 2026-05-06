@@ -4,7 +4,8 @@ title: "Document the canonical document-status lifecycle and frontmatter/body sy
 type: task
 category: documentation
 priority: Medium
-status: 📋 Planned
+status: ready-for-review
+review: ✅ All review recommendations from `task.12.review.2026-05-06.md` implemented 2026-05-06
 created: 2026-05-06
 assignee: TBD
 effort: 0.5 day
@@ -53,19 +54,21 @@ Skills mix `Planned` / `Ready for Development` / `In Progress` / `Ready for Revi
 | `Planned` | Title | create-task |
 | `Ready for Development` | Title | review-task → develop |
 | `In Progress` | Title | develop |
-| `Ready for Review` | Title | develop → qa-task |
-| `Ready for QA` | Title | qa-task (synonym of above?) |
+| `Ready for Review` | Title | develop → qa-task (canonical post-develop, pre-QA state) |
+| `Ready for QA` | Title | qa-task (**deprecated synonym** of `Ready for Review` — to be retired in follow-up) |
 | `accepted` | lowercase | finalise (frontmatter) |
 | `Completed` | Title | qa-task body |
-| `📋 Planned` | emoji+Title | create-task body |
+| `📋 Planned` | emoji+Title | create-task body (legacy — to be normalised) |
 
-**Target lifecycle** (proposed — refine during implementation):
+**Canonical lifecycle** (committed):
 
 ```
-Draft → Planned → Ready for Development → In Progress → Ready for Review →
-  Accepted (frontmatter: accepted)
-         ↘ Cancelled
+Draft → Planned → Ready for Development → In Progress → Ready for Review → Accepted
 ```
+
+`Cancelled` is reachable as an exit transition from any non-terminal state (`Draft`, `Planned`, `Ready for Development`, `In Progress`, `Ready for Review`). Terminal states: `Accepted`, `Cancelled`.
+
+`Ready for QA` is a deprecated synonym of `Ready for Review`; the canonical doc names `Ready for Review` and skills using `Ready for QA` are filed as a follow-up rename (out of scope here).
 
 **Sync rule**: frontmatter `status:` is always lowercase, no emoji; body `Status:` is Title Case and may include the emoji prefix. Both must be updated together. `finalise` enforces this.
 
@@ -74,14 +77,16 @@ Draft → Planned → Ready for Development → In Progress → Ready for Review
 **In Scope**:
 
 - ✅ New `shared/resources/document-status-lifecycle.md`
-- ✅ Cross-reference lines in 6+ skills (create-task, review-task, develop, qa-task, finalise, plus story equivalents)
+- ✅ Cross-reference lines in 9 skills (create-task, review-task, develop, develop-story, qa-task, qa-story, finalise, create-story, review-story)
 - ✅ Mermaid stateDiagram of transitions
+- ✅ Self-migration: fix this task's own frontmatter to canonical lowercase form (Phase 4)
 
 **Out of Scope**:
 
 - ❌ Implementing a runtime validator (separate task if desired)
-- ❌ Migrating existing task documents that use legacy values
-- ❌ Renaming `accepted` → `Accepted` etc. (preserve current frontmatter casing)
+- ❌ Bulk migration of legacy task/story documents that use non-canonical values (only task.12's own frontmatter is fixed, as a documentation example)
+- ❌ Renaming `accepted` → `Accepted` etc. in skills (preserve current frontmatter casing convention)
+- ❌ Renaming `Ready for QA` → `Ready for Review` in skills that use it (file as follow-up)
 
 ## 5. Breaking Changes
 
@@ -97,10 +102,10 @@ Files:
 
 Changes:
 
-- [ ] Define each status value with: meaning, who sets it, who reads it, allowed predecessors/successors
-- [ ] State the frontmatter-vs-body sync rule explicitly with examples
-- [ ] Mermaid stateDiagram showing the full state machine
-- [ ] List terminal states (`Accepted`, `Cancelled`)
+- [x] Define each status value with: meaning, who sets it, who reads it, allowed predecessors/successors
+- [x] State the frontmatter-vs-body sync rule explicitly with examples
+- [x] Mermaid stateDiagram showing the full state machine
+- [x] List terminal states (`Accepted`, `Cancelled`)
 
 ### Phase 2 — Cross-reference (Risk: Low)
 
@@ -109,16 +114,17 @@ Files:
 - `skills/create-task/SKILL.md`
 - `skills/review-task/SKILL.md`
 - `skills/develop/SKILL.md`
+- `skills/develop-story/SKILL.md`
 - `skills/qa-task/SKILL.md`
+- `skills/qa-story/SKILL.md`
 - `skills/finalise/SKILL.md`
 - `skills/create-story/SKILL.md`
 - `skills/review-story/SKILL.md`
-- `skills/qa-story/SKILL.md`
 
 Changes:
 
-- [ ] Add a one-line "Status lifecycle: see `shared/resources/document-status-lifecycle.md`" to the relevant section of each
-- [ ] Reconcile any contradictions found (e.g. `Ready for QA` vs `Ready for Review`) in the doc, not in the skills
+- [x] In each SKILL.md, immediately after the YAML frontmatter (before the first H1), insert a single line: `> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)` (path adjusted per skill location).
+- [x] Resolve `Ready for QA` vs `Ready for Review` in the canonical doc (declare `Ready for Review` canonical; `Ready for QA` deprecated). Skill renames are out of scope.
 
 ### Phase 3 — CLAUDE.md (Risk: Low)
 
@@ -128,7 +134,17 @@ Files:
 
 Changes:
 
-- [ ] Add a Status Lifecycle subsection under "File Naming Conventions" pointing at the canonical doc
+- [x] Add a `### Status Lifecycle` subsection under the existing `## File Naming Conventions` H2, pointing at `shared/resources/document-status-lifecycle.md` and summarising the canonical states in one sentence.
+
+### Phase 4 — Self-migration (Risk: Low)
+
+Files:
+
+- `docs/development/tasks/task.12.document-status-lifecycle/task.12.document-status-lifecycle.md`
+
+Changes:
+
+- [x] Confirm frontmatter `status: planned` (lowercase, no emoji) — applied during review fixes; verify no regression after Phase 1 lands. Current: `status: in-progress` (correct canonical form at this pipeline step).
 
 ## 7. Files Summary
 
@@ -139,25 +155,28 @@ Changes:
 **Modified**:
 
 - `CLAUDE.md`
-- 8 skill SKILL.md files (cross-reference lines only)
+- 9 skill SKILL.md files (cross-reference lines only)
+- `docs/development/tasks/task.12.document-status-lifecycle/task.12.document-status-lifecycle.md` (self-migration of frontmatter)
 
 ## 8. Testing Strategy
 
-- **Static**: `grep -rnE "^[Ss]tatus:" skills/` should not surface a value missing from the canonical doc.
+- **Static (allow-list)**: extract every status value referenced in `skills/` (`grep -rnhE "(^|[\` ])[Ss]tatus[:\` ]+[A-Za-z][^\"\\\`]*" skills/` filtered to status writes/reads), normalise, and assert each value appears in the canonical doc's allow-list. Implement as a shell snippet under Testing Strategy that exits non-zero on any unknown value.
 - **Review**: walk through `/develop-task` end-to-end and verify each step's pre/post status matches the doc.
 
 ## 9. Success Criteria
 
 **Functional**:
 
-- [ ] Doc enumerates every status value in active use
-- [ ] Doc states the frontmatter-vs-body sync rule with examples
-- [ ] Mermaid stateDiagram present and accurate
+- [x] Doc enumerates every status value in active use
+- [x] Doc states the frontmatter-vs-body sync rule and includes ≥2 worked examples showing simultaneous frontmatter+body update (e.g., develop step transition and finalise step transition)
+- [x] Mermaid stateDiagram present and accurate, matching the canonical lifecycle in §3
+- [x] Allow-list test passes: every `status:` value used in `skills/` is present in the canonical doc
 
 **Migration**:
 
-- [ ] All 8 skills link to the doc
-- [ ] CLAUDE.md mentions the doc
+- [x] All 9 skills link to the doc (top of SKILL.md, after frontmatter)
+- [x] CLAUDE.md mentions the doc under "File Naming Conventions"
+- [x] task.12 frontmatter is `status: ready-for-review` (canonical lowercase, correct for this pipeline step)
 
 ## 10. Risk Assessment
 
