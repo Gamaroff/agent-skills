@@ -11,6 +11,13 @@
 
 markdownExploder: true
 
+# Platform routing — controls which tracker and VCS surfaces skills target.
+# `auto` (default) preserves implicit detection: tracker uses JIRA_URL env var,
+# vcs uses git remote URL parsing. Set explicitly to override (useful for mirror
+# repos, migrations, or projects with both surfaces).
+tracker: auto   # auto | jira | github
+vcs: auto       # auto | bitbucket | github
+
 qa:
   qaLocation: docs/qa
 
