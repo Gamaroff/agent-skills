@@ -420,12 +420,38 @@ options:
    ```
    When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path.
 
+   **Tracker dedup** (applies to both paths, runs only when `jira_key` / `github_issue` is absent):
+
+   Before creating a new tracker issue, search the tracker for an existing one matching the task title. This prevents duplicate issues when frontmatter was hand-edited or the task was authored outside `/create-task`.
+
+   Lookup order:
+   1. **Frontmatter present** (`jira_key` / `github_issue` has a value) → use it; skip create entirely.
+   2. **Frontmatter absent** → run title-based search (see per-path details below):
+      - Exactly one match (any status) → write frontmatter + body link, log `"Linked existing tracker issue"`, skip create.
+      - Closed match → additionally log closed-issue warning.
+      - Zero or multiple matches → fall through to create (existing behaviour); multi-match logs all match IDs.
+      - Search failure → log warning and fall through to create (existing behaviour preserved).
+   3. **Frontmatter write-back**: on link-existing, write `jira_key` + `jira_url` (or `github_issue`) before the closing `---` of the frontmatter block (same sed-based pattern as `create-task`). Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
+
    **Jira path:**
    - Check frontmatter for `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
      - Ask: "This task has no linked Jira issue. Should I create one now?"
      - If user confirms, create via Jira REST API v2:
+       - **Pre-create dedup search (Tracker dedup)** — run immediately before the create block:
+         1. Search for an existing issue via Atlassian MCP `searchJiraIssuesUsingJql`:
+            - `jql`: `summary ~ "[Task {id}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — search across all states)
+            - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to create below (preserves current behaviour)
+         2. **Exactly one match** → link existing, skip create:
+            - Extract `task_key` (issue key) and build `task_url = ${JIRA_URL}/browse/${task_key}`
+            - Write `jira_key: {task_key}` and `jira_url: {task_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
+            - Insert or repair body cross-reference link: `**Jira Issue**: [{task_key}]({task_url})`
+            - If matched issue status is `Closed` or `Done`: log `"⚠️  Linked existing CLOSED tracker issue {task_key} — verify intent before continuing."`
+            - Log `"Linked existing tracker issue {task_key} (skipped create)"` and **skip the curl block below**
+         3. **Zero matches** → fall through to create block below
+         4. **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Task {id}]\": {key1}, {key2}, … — proceeding to create"` and fall through to create block below
+         - **Note on search/create asymmetry**: this search uses Atlassian MCP (`searchJiraIssuesUsingJql`); the create block below uses curl REST. This split is intentional — switching create to MCP is out of scope and tracked separately.
        ```bash
        JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
        JIRA_RESPONSE=$(curl -s -X POST \
@@ -471,6 +497,21 @@ options:
      - Flag as **Important** gap
      - Ask: "This task has no linked GitHub issue. Should I create one now?"
      - If user confirms, create the issue using the same pattern as `/create-task`:
+       - **Pre-create dedup search (Tracker dedup)** — run immediately before the create block:
+         1. Search for an existing issue:
+            ```bash
+            gh issue list --search "in:title \"[Task {id}]\"" --state all \
+              --json number,url,state,title
+            ```
+            On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to create below
+         2. **Exactly one match** → link existing, skip create:
+            - Extract `N` (issue number) and `url` from the result
+            - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
+            - Insert or repair body cross-reference link: `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`
+            - If matched issue `state` is `CLOSED`: log `"⚠️  Linked existing CLOSED tracker issue #{N} — verify intent before continuing."`
+            - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip the `gh issue create` block below**
+         3. **Zero matches** → fall through to create block below
+         4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Task {id}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to create block below
        ```bash
        REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
        DOC_URL="https://github.com/$REPO/blob/develop/{task-file-relative-path}"
