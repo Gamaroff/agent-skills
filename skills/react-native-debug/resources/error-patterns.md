@@ -8,9 +8,9 @@ A comprehensive guide to identifying and debugging common React Native errors in
 
 **Error Messages**:
 ```
-Unable to resolve module @my-system/auth-lib from /path/to/app
-Metro bundler failed: Cannot find module '@my-system/auth-lib'
-Module not found: Can't resolve '@my-system/auth-lib'
+Unable to resolve module @{org}/auth-lib from /path/to/app
+Metro bundler failed: Cannot find module '@{org}/auth-lib'
+Module not found: Can't resolve '@{org}/auth-lib'
 ```
 
 **Root Causes**:
@@ -23,13 +23,13 @@ Module not found: Can't resolve '@my-system/auth-lib'
 **Quick Diagnosis**:
 ```bash
 # Check if library built
-ls dist/libs/@my-system/[library-name]/
+ls dist/libs/@{org}/[library-name]/
 
 # Check metro config
 grep projectRoot metro.config.js
 
 # Check tsconfig paths
-grep "@my-system" tsconfig.json
+grep "@{project}" tsconfig.json
 ```
 
 **Solution Priority**:
@@ -254,7 +254,7 @@ expect(mockFn()).toEqual(expectedType); // Type assertion
 Cannot find module 'bcryptjs'
 Cannot find module 'jsonwebtoken'
 Cannot find module 'winston'
-Cannot find module '@my-system/auth-lib' (should use /client)
+Cannot find module '@{org}/auth-lib' (should use /client)
 ```
 
 **Root Cause**:
@@ -266,7 +266,7 @@ Cannot find module '@my-system/auth-lib' (should use /client)
 **Quick Diagnosis**:
 ```bash
 # Find problematic imports
-grep -n "from '@my-system/" test-file.spec.tsx
+grep -n "from '@{org}/" test-file.spec.tsx
 # Should see /client suffix for client imports
 
 grep -n "hashPassword\|verifyAccessToken\|encryptData\|bcryptjs\|jsonwebtoken\|winston" test-file.spec.tsx
@@ -276,17 +276,17 @@ grep -n "hashPassword\|verifyAccessToken\|encryptData\|bcryptjs\|jsonwebtoken\|w
 **Correct Import Mapping**:
 ```typescript
 // ❌ WRONG (client test)
-import { hashPassword, verifyAccessToken } from '@my-system/auth-lib';
-import { logger } from '@my-system/logging-lib';
+import { hashPassword, verifyAccessToken } from '@{org}/auth-lib';
+import { logger } from '@{org}/logging-lib';
 
 // ✅ CORRECT (client test)
-import { decodeToken } from '@my-system/auth-lib/client';
-import { logger } from '@my-system/logging-lib/client';
-import { isTokenExpired } from '@my-system/auth-lib/client';
+import { decodeToken } from '@{org}/auth-lib/client';
+import { logger } from '@{org}/logging-lib/client';
+import { isTokenExpired } from '@{org}/auth-lib/client';
 
 // ✅ OK (integration test)
-import { hashPassword, verifyAccessToken } from '@my-system/auth-lib';
-import { logger } from '@my-system/logging-lib';
+import { hashPassword, verifyAccessToken } from '@{org}/auth-lib';
+import { logger } from '@{org}/logging-lib';
 ```
 
 **Solution**:
@@ -316,7 +316,7 @@ Element type is invalid: expected a string (for built-in components) or a class/
 **Quick Diagnosis**:
 ```typescript
 // Check mock return value
-jest.mock('./my-component', () => ({
+jest.mock('./{component-name}', () => ({
   MyComponent: /* what does this return? Should be React component */
 }));
 

@@ -383,7 +383,7 @@ REINDEX TABLE transactions;
 **PgBouncer Settings (Production)**
 ```ini
 [databases]
-my-app = host=localhost port=5432 dbname=my-app
+{app-name} = host=localhost port=5432 dbname={app-name}
 
 [pgbouncer] 
 pool_mode = transaction

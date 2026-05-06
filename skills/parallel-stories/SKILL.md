@@ -236,7 +236,7 @@ git worktree add ../worktrees/story-1-3 -b feature/story-1-1-3
 **Worktree Structure**:
 
 ```
-my-system/               # Main repository
+{project}/               # Main repository
 ├─ .git/
 ├─ apps/
 └─ libs/
@@ -296,7 +296,7 @@ npx nx test my-wallet
 gh pr create --title "Story 1-1: Login UI"
 
 # After PR merged, clean up worktree
-cd ../../my-system
+cd ../../{project}
 git worktree remove ../worktrees/story-1-1
 ```
 
@@ -346,7 +346,7 @@ npm install
 **Cleanup Command** (after merge):
 
 ```bash
-cd ../../my-system
+cd ../../{project}
 git worktree remove ../worktrees/story-1-1
 ```
 
@@ -377,7 +377,7 @@ git worktree remove ../worktrees/story-1-1
 - ✅ apps/my-wallet/app/(drawer)/auth/login.tsx
 - ✅ apps/my-wallet/components/LoginForm.tsx
 - ✅ apps/my-wallet/components/auth/\*
-- ❌ apps/my-api/\*\* (modified by Story 1-2)
+- ❌ apps/{api-service}/\*\* (modified by Story 1-2)
 - ❌ libs/auth-lib/\*\* (modified by Story 1-3)
 
 **Conflict Prevention**:
@@ -447,7 +447,7 @@ gh pr create --title "Story 1-1: Login UI" \
 **5. Cleanup** (after PR merged):
 
 ```bash
-cd ../../my-system
+cd ../../{project}
 git worktree remove ../worktrees/story-1-1
 git branch -d feature/story-1-1-1
 ```
@@ -528,7 +528,7 @@ These stories must be developed in order after parallel stories complete.
 
 **File Boundaries** (strictly enforced):
 - Story 1-1: `apps/my-wallet/app/(drawer)/auth/**`
-- Story 1-2: `apps/my-api/src/modules/auth/**`
+- Story 1-2: `apps/{api-service}/src/modules/auth/**`
 - Story 1-3: `libs/auth-lib/src/**`
 
 **Interface Contracts** (agreed upfront):

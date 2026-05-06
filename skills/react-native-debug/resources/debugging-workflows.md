@@ -10,14 +10,14 @@ Step-by-step guides for each debugging workflow in the React Native Debug skill.
 
 ```bash
 # Check if the library exists in dist/
-ls -la dist/libs/@my-system/[library-name]/
+ls -la dist/libs/@{org}/[library-name]/
 
 # If not found:
 echo "❌ Library not built"
 
 # If found:
 echo "✅ Library exists, check if up to date"
-ls -lt dist/libs/@my-system/[library-name]/ | head -5
+ls -lt dist/libs/@{org}/[library-name]/ | head -5
 ```
 
 ### Step 2: Run Automated Checks
@@ -27,7 +27,7 @@ ls -lt dist/libs/@my-system/[library-name]/ | head -5
 npx nx start my-wallet --dry-run
 
 # Check tsconfig paths
-grep -A 20 '"paths"' tsconfig.json | grep "@my-system"
+grep -A 20 '"paths"' tsconfig.json | grep "@{project}"
 
 # Check metro.config.js setup
 grep -A 5 "projectRoot\|cacheVersion" metro.config.js
@@ -42,7 +42,7 @@ grep -A 5 "projectRoot\|cacheVersion" metro.config.js
   ```bash
   npm run build:libraries
   # Or rebuild specific library
-  npx nx build @my-system/[library-name]
+  npx nx build @{org}/[library-name]
   ```
 
 ### Step 4: Clear Metro Cache
@@ -70,7 +70,7 @@ npx nx start my-wallet --reset-cache --clear
 **Issue A**: "Module name mapped to different path"
 ```bash
 # Check if library export path matches tsconfig
-cat dist/libs/@my-system/[lib]/package.json
+cat dist/libs/@{org}/[lib]/package.json
 # Check "main" field matches
 
 cat tsconfig.json
@@ -249,15 +249,15 @@ grep -n "jest.mock\|import.*from" test-file.spec.tsx | head -10
 **Example WRONG order**:
 ```typescript
 // ❌ WRONG
-import { myFunction } from './my-module';
-jest.mock('./my-module', () => ({ myFunction: jest.fn() }));
+import { myFunction } from './{module-name}';
+jest.mock('./{module-name}', () => ({ myFunction: jest.fn() }));
 ```
 
 **Example CORRECT order**:
 ```typescript
 // ✅ CORRECT
-jest.mock('./my-module', () => ({ myFunction: jest.fn() }));
-import { myFunction } from './my-module';
+jest.mock('./{module-name}', () => ({ myFunction: jest.fn() }));
+import { myFunction } from './{module-name}';
 ```
 
 ### Step 3: Verify Mock Completeness
@@ -336,15 +336,15 @@ jest.mock('components/Button', () =>
 // The test file shouldn't import from the mocked module's internals
 
 // Common issue:
-jest.mock('./my-service', () => {
-  const { SomeClass } = require('./my-service'); // ❌ Creates circular dependency!
+jest.mock('./{service-name}', () => {
+  const { SomeClass } = require('./{service-name}'); // ❌ Creates circular dependency!
   return { myFunction: jest.fn() };
 });
 ```
 
 **Fix**:
 ```typescript
-jest.mock('./my-service', () => ({
+jest.mock('./{service-name}', () => ({
   myFunction: jest.fn(() => 'mocked'), // ✅ No circular dependency
   SomeClass: class MockClass {}
 }));
@@ -389,8 +389,8 @@ Ask user: **"Is this a client test or integration test?"**
 ### Step 2: Scan for Problematic Imports
 
 ```bash
-# Find all @my-system imports
-grep -n "@my-system" test-file.spec.tsx
+# Find all @{project} imports
+grep -n "@{project}" test-file.spec.tsx
 
 # Check each one for /client suffix or server-only packages
 ```
@@ -398,17 +398,17 @@ grep -n "@my-system" test-file.spec.tsx
 **Correct Client Imports**:
 ```typescript
 // ✅ Client tests must use /client imports
-import { decodeToken, isTokenExpired } from '@my-system/auth-lib/client';
-import { logger } from '@my-system/logging-lib/client';
-import { validateEmail } from '@my-system/shared-utils/client';
-import { getDeviceInfo } from '@my-system/shared-utils/client';
+import { decodeToken, isTokenExpired } from '@{org}/auth-lib/client';
+import { logger } from '@{org}/logging-lib/client';
+import { validateEmail } from '@{org}/shared-utils/client';
+import { getDeviceInfo } from '@{org}/shared-utils/client';
 ```
 
 **Wrong Client Imports**:
 ```typescript
 // ❌ Client tests CANNOT use these
-import { hashPassword, generateTokenPair } from '@my-system/auth-lib'; // Missing /client
-import { logger } from '@my-system/logging-lib'; // Missing /client
+import { hashPassword, generateTokenPair } from '@{org}/auth-lib'; // Missing /client
+import { logger } from '@{org}/logging-lib'; // Missing /client
 import bcryptjs from 'bcryptjs'; // ❌ Node.js only
 import jwt from 'jsonwebtoken'; // ❌ Node.js only
 ```
@@ -433,9 +433,9 @@ Build a table of fixes needed:
 ```
 Current Import                 → Correct Import
 ────────────────────────────────────────────────────
-@my-system/auth-lib       → @my-system/auth-lib/client
-@my-system/logging-lib    → @my-system/logging-lib/client
-@my-system/shared-utils   → @my-system/shared-utils/client (if device/ui functions)
+@{org}/auth-lib       → @{org}/auth-lib/client
+@{org}/logging-lib    → @{org}/logging-lib/client
+@{org}/shared-utils   → @{org}/shared-utils/client (if device/ui functions)
 bcryptjs                       → Remove (server-only)
 jsonwebtoken                   → Remove (server-only)
 ```
@@ -445,8 +445,8 @@ jsonwebtoken                   → Remove (server-only)
 **For automated fixing** (ask confirmation):
 ```typescript
 // Find and replace in test file
-// OLD: import { func } from '@my-system/auth-lib'
-// NEW: import { decodeToken } from '@my-system/auth-lib/client'
+// OLD: import { func } from '@{org}/auth-lib'
+// NEW: import { decodeToken } from '@{org}/auth-lib/client'
 ```
 
 **For manual review** (if uncertain):
@@ -494,23 +494,23 @@ Get:
 
 ```typescript
 // Check import path is correct
-import { MyComponent } from './my-component';
+import { MyComponent } from './{component-name}';
 
 // Verify file exists
-ls [path-to-component]/my-component.tsx
+ls [path-to-component]/{component-name}.tsx
 
 // Verify component is exported
-grep "export.*MyComponent" [path-to-component]/my-component.tsx
+grep "export.*MyComponent" [path-to-component]/{component-name}.tsx
 ```
 
 ### Step 3: Check for Component Mock
 
 ```bash
 # Search for mock in test file
-grep -n "jest.mock.*my-component" test-file.spec.tsx
+grep -n "jest.mock.*{component-name}" test-file.spec.tsx
 
 # If found, verify mock returns valid React element:
-jest.mock('./my-component', () => ({
+jest.mock('./{component-name}', () => ({
   MyComponent: jest.fn(({ children }) => <div>{children}</div>) // ✅ Valid
 }));
 ```
@@ -583,12 +583,12 @@ If component is mocked, verify mock factory:
 
 ```typescript
 // ❌ WRONG - Mock doesn't return component
-jest.mock('./my-component', () => ({
+jest.mock('./{component-name}', () => ({
   MyComponent: { /* plain object, not component */ }
 }));
 
 // ✅ CORRECT - Mock returns React component (function)
-jest.mock('./my-component', () => ({
+jest.mock('./{component-name}', () => ({
   MyComponent: jest.fn(({ children, ...props }) => (
     <div data-testid="mock-component" {...props}>{children}</div>
   ))

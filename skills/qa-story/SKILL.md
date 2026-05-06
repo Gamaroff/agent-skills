@@ -507,7 +507,7 @@ Take the Explore output from Phase 1 Step 1a (the `file | module | has_test` tab
 
 3. **Accessibility & Code Quality Agent**
    - Agent Type: `general-purpose`
-   - Task: "Review React Native components changed in your app PR. Changed files: {EXPLORE_FILE_TABLE}. Check: (a) accessibility labels/hints on interactive elements (Pressable, TouchableOpacity, TextInput), (b) no native WebSocket usage (must use socket.io-client), (c) no console.log/console.error (must use @my-system/logging-lib), (d) no 'username' terminology (must use 'handle'), (e) no SegWit/Bech32/Cashaddr in BSV-related code (BSV uses P2PKH only), (f) correct Expo Router navigation patterns (no manual navigation stacks). Generate audit report with violations categorized by severity."
+   - Task: "Review React Native components changed in your app PR. Changed files: {EXPLORE_FILE_TABLE}. Check: (a) accessibility labels/hints on interactive elements (Pressable, TouchableOpacity, TextInput), (b) no native WebSocket usage (must use socket.io-client), (c) no console.log/console.error (must use @{org}/logging-lib), (d) no 'username' terminology (must use 'handle'), (e) no SegWit/Bech32/Cashaddr in BSV-related code (BSV uses P2PKH only), (f) correct Expo Router navigation patterns (no manual navigation stacks). Generate audit report with violations categorized by severity."
    - Output: Code quality and your app-convention compliance report
 
 4. **Definition of Done Criteria Agent**

@@ -29,7 +29,7 @@ This skill has two primary entry points:
 
 ### 2. Metro Runtime Error Debugging
 **When**: Metro bundler fails, app crashes on device, module resolution errors
-**Example**: "Metro error: Unable to resolve module @my-system/auth-lib from..."
+**Example**: "Metro error: Unable to resolve module @{org}/auth-lib from..."
 
 ## Phase 1: Error Detection & Classification
 
@@ -96,7 +96,7 @@ When you provide an error, the skill will:
 - ESLint error "Don't import from server-only libraries in client code"
 
 **Root Causes**:
-- Importing from `@my-system/auth-lib` instead of `/client`
+- Importing from `@{org}/auth-lib` instead of `/client`
 - Using server functions (hashPassword, verifyAccessToken, encryptData)
 - Test file importing server utilities
 
@@ -153,7 +153,7 @@ Action: Auto-clear cache without asking
 
 ### Check 2: Library Build Artifacts
 ```
-Run: ls dist/libs/@my-system/*/
+Run: ls dist/libs/@{org}/*/
 For each missing library:
   - Notify user
   - Offer auto-rebuild
@@ -162,9 +162,9 @@ For each missing library:
 ### Check 3: Platform Separation
 ```
 Scan: Test file for imports from:
-  - @my-system/auth-lib (should be /client)
-  - @my-system/logging-lib (should be /client)
-  - @my-system/shared-utils/server
+  - @{org}/auth-lib (should be /client)
+  - @{org}/logging-lib (should be /client)
+  - @{org}/shared-utils/server
   - bcryptjs, jsonwebtoken, winston
 If found: Flag as platform separation violation
 ```
@@ -205,7 +205,7 @@ Each debugging path below presents findings and offers 2-4 options. User selects
 **When**: "Unable to resolve module" or "Cannot find module"
 
 **Automated Checks**:
-1. Is library built? Check `dist/libs/@my-system/[library]/`
+1. Is library built? Check `dist/libs/@{org}/[library]/`
 2. Is Metro cache fresh? Try clear if not
 3. Is workspace root configured? Check `metro.config.js`
 
@@ -296,7 +296,7 @@ npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 **When**: "Not available in mobile environment" or server import in client
 
 **Automated Checks**:
-1. Scan test file for all @my-system imports
+1. Scan test file for all @{project} imports
 2. Flag any imports WITHOUT `/client` suffix
 3. Check for Node.js-only packages (bcryptjs, jsonwebtoken, winston)
 
@@ -310,9 +310,9 @@ npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 - Show list of violations
 - Offer auto-fix mapping:
   ```
-  @my-system/auth-lib → @my-system/auth-lib/client
-  @my-system/logging-lib → @my-system/logging-lib/client
-  @my-system/shared-utils/server → Remove or use /client
+  @{org}/auth-lib → @{org}/auth-lib/client
+  @{org}/logging-lib → @{org}/logging-lib/client
+  @{org}/shared-utils/server → Remove or use /client
   ```
 
 **Fix Options**:

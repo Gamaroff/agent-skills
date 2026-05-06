@@ -25,7 +25,7 @@ These can cause test failures that require platform-specific investigation techn
 
 ```
 Test Failure:
-Cannot find module '@my-system/auth-lib'
+Cannot find module '@{org}/auth-lib'
 OR
 Module resolution failed for library export
 ```
@@ -46,7 +46,7 @@ Module resolution failed for library export
 
 ```bash
 # Check if library is built
-ls dist/libs/@my-system/[library-name]/
+ls dist/libs/@{org}/[library-name]/
 
 # Check library exports
 cat libs/[library-name]/src/index.ts
@@ -55,7 +55,7 @@ cat libs/[library-name]/src/index.ts
 cat libs/[library-name]/package.json | grep -A 5 '"main"'
 
 # Check test import
-grep "from '@my-system" test-file.spec.tsx
+grep "from '@{project}" test-file.spec.tsx
 ```
 
 ### Decision Tree
@@ -89,7 +89,7 @@ export * from './lib/token-decoder';
 export * from './lib/types';
 
 // Test now works
-import { decodeToken } from '@my-system/auth-lib/client';
+import { decodeToken } from '@{org}/auth-lib/client';
 ```
 
 ---
@@ -121,14 +121,14 @@ OR
 ### Evidence to Gather
 
 ```bash
-# Check all @my-system imports in test
-grep "from '@my-system" test-file.spec.tsx
+# Check all @{project} imports in test
+grep "from '@{project}" test-file.spec.tsx
 
 # Look for server-only packages
 grep "bcryptjs\|jsonwebtoken\|winston" test-file.spec.tsx
 
 # Check if /client suffix is used
-grep "from '@my-system.*lib'" test-file.spec.tsx | grep -v "/client"
+grep "from '@{project}.*lib'" test-file.spec.tsx | grep -v "/client"
 
 # Determine if integration or client test
 ls -la test-file.spec.tsx  # .spec.tsx = client, .integration.spec.ts = integration
@@ -155,8 +155,8 @@ Is this a client test (.spec.tsx)?
 ```typescript
 // ❌ WRONG - Client test without /client imports
 // This is a client test (.spec.tsx)
-import { decodeToken, hashPassword } from '@my-system/auth-lib';
-import { logger } from '@my-system/logging-lib';
+import { decodeToken, hashPassword } from '@{org}/auth-lib';
+import { logger } from '@{org}/logging-lib';
 
 it('should decode token', () => {
   // FAILS: hashPassword not available in client
@@ -164,8 +164,8 @@ it('should decode token', () => {
 });
 
 // ✅ CORRECT - Client test with /client imports
-import { decodeToken } from '@my-system/auth-lib/client';
-import { logger } from '@my-system/logging-lib/client';
+import { decodeToken } from '@{org}/auth-lib/client';
+import { logger } from '@{org}/logging-lib/client';
 
 it('should decode token', () => {
   const decoded = decodeToken('jwt-token');
@@ -232,9 +232,9 @@ Is jest.mock() BEFORE the import?
 
 ```typescript
 // ❌ WRONG - jest.mock() after import
-import { myFunction } from './my-module';  // Module loaded!
+import { myFunction } from './{module-name}';  // Module loaded!
 
-jest.mock('./my-module', () => ({  // Too late - mock not applied
+jest.mock('./{module-name}', () => ({  // Too late - mock not applied
   myFunction: jest.fn()
 }));
 
@@ -243,11 +243,11 @@ it('test', () => {
 });
 
 // ✅ CORRECT - jest.mock() before import
-jest.mock('./my-module', () => ({  // Before import
+jest.mock('./{module-name}', () => ({  // Before import
   myFunction: jest.fn(() => 'mocked')
 }));
 
-import { myFunction } from './my-module';  // Uses mocked version
+import { myFunction } from './{module-name}';  // Uses mocked version
 
 it('test', () => {
   expect(myFunction()).toBe('mocked');  // Passes
@@ -457,7 +457,7 @@ Do tests pass after clearing Metro cache?
 
 ```bash
 # Check if library built
-ls dist/libs/@my-system/[lib]/
+ls dist/libs/@{org}/[lib]/
 
 # Check Metro cache status
 npx nx start my-wallet --dry-run
@@ -550,7 +550,7 @@ render(
 
 ```bash
 # Check library build
-ls -la dist/libs/@my-system/[lib]/
+ls -la dist/libs/@{org}/[lib]/
 
 # Check test configuration
 cat apps/my-wallet/jest.config.ts
@@ -581,15 +581,15 @@ grep -A 5 "jest.mock.*components" apps/my-wallet/**/*.spec.tsx
 ### Scenario: AuthContext Test Fails with "Cannot find module"
 
 ```
-Error: Cannot find module '@my-system/auth-lib/client'
+Error: Cannot find module '@{org}/auth-lib/client'
 ```
 
 ### Investigation Process
 
 1. **Check import in test:**
    ```bash
-   grep "from '@my-system/auth-lib" auth-context.spec.tsx
-   # Found: import from '@my-system/auth-lib' (missing /client!)
+   grep "from '@{org}/auth-lib" auth-context.spec.tsx
+   # Found: import from '@{org}/auth-lib' (missing /client!)
    ```
 
 2. **Check if /client is required:**
@@ -600,11 +600,11 @@ Error: Cannot find module '@my-system/auth-lib/client'
 
 3. **Verdict:** Test wrong
    - Missing /client suffix on auth-lib import
-   - Fix: Change to `@my-system/auth-lib/client`
+   - Fix: Change to `@{org}/auth-lib/client`
 
 4. **Update test imports:**
    ```typescript
-   import { decodeToken } from '@my-system/auth-lib/client';  // Added /client
+   import { decodeToken } from '@{org}/auth-lib/client';  // Added /client
    ```
 
 ---
@@ -614,7 +614,7 @@ Error: Cannot find module '@my-system/auth-lib/client'
 Before submitting a React Native test:
 
 - [ ] jest.mock() calls come BEFORE imports
-- [ ] All @my-system imports have /client suffix (for client tests)
+- [ ] All @{project} imports have /client suffix (for client tests)
 - [ ] No server-only packages (bcryptjs, jsonwebtoken, winston)
 - [ ] Component mocks accept and use props
 - [ ] Component mocks render children if needed

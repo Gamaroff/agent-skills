@@ -76,7 +76,7 @@ ssh -t <your-server> 'sudo reboot'
 ssh <your-server> 'sudo ufw status numbered'
 
 # Allow a port from LAN only
-ssh -t <your-server> 'sudo ufw allow from 192.168.1.0/24 to any port 8080 proto tcp comment "my-service"'
+ssh -t <your-server> 'sudo ufw allow from 192.168.1.0/24 to any port 8080 proto tcp comment "{service-name}"'
 
 # Delete rule by number
 ssh -t <your-server> 'sudo ufw delete 5'
@@ -189,7 +189,7 @@ ssh <your-server> 'swapon --show; free -h'
 ssh <your-server> 'sysctl vm.swappiness'
 
 # Persistent sysctl override (idempotent)
-ssh -t <your-server> 'echo "net.core.somaxconn=4096" | sudo tee /etc/sysctl.d/99-my-app-net.conf && sudo sysctl -p /etc/sysctl.d/99-my-app-net.conf'
+ssh -t <your-server> 'echo "net.core.somaxconn=4096" | sudo tee /etc/sysctl.d/99-{app-name}-net.conf && sudo sysctl -p /etc/sysctl.d/99-{app-name}-net.conf'
 ```
 
 ### File transfer
@@ -202,7 +202,7 @@ scp ./local.sql <your-server>:/tmp/
 scp <your-server>:/var/log/syslog ./
 
 # Sync a directory (mirror, delete extras)
-rsync -avz --delete ./build/ <your-server>:/srv/my-app/build/
+rsync -avz --delete ./build/ <your-server>:/srv/{app-name}/build/
 ```
 
 ## Common Workflows

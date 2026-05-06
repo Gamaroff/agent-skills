@@ -133,7 +133,7 @@ scripts/railway-api.sh \
   'mutation createService($input: ServiceCreateInput!) {
     serviceCreate(input: $input) { id name }
   }' \
-  '{"input":{"projectId":"<project-id>","name":"my-service","source":{"image":"nginx:latest"}}}'
+  '{"input":{"projectId":"<project-id>","name":"{service-name}","source":{"image":"nginx:latest"}}}'
 ```
 
 `ServiceCreateInput` fields:

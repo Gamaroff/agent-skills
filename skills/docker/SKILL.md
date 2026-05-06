@@ -19,44 +19,44 @@ Expert Docker administration for multi-environment infrastructure (development, 
 npm run docker:setup
 
 # Development Environment (daily use)
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
-docker compose -f docker/docker-compose.dev.yml -p my-system logs -f
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} logs -f
 
 # Testing (automated)
 npm run test:local                    # All tests with isolated database
 npm run test:local:coverage           # With coverage reports
 
 # Troubleshooting
-docker logs my-postgres          # Check database logs
-docker logs my-api               # Check API logs
+docker logs {db-service}          # Check database logs
+docker logs {api-service}               # Check API logs
 docker stats                          # Resource usage
-docker compose -f docker/docker-compose.dev.yml -p my-system down -v  # Clean slate
+docker compose -f docker/docker-compose.dev.yml -p {project} down -v  # Clean slate
 ```
 
-**CRITICAL**: Always use `-p my-system` with docker-compose commands for consistent naming.
+**CRITICAL**: Always use `-p {project}` with docker-compose commands for consistent naming.
 
 ## Architecture Overview
 
 ### Service Stack
 
 **Development** (ports 3000, 5432, 6379, 5050, 8082):
-- my-api (Node.js 24, hot-reload)
-- my-postgres (PostgreSQL 16)
-- my-redis (Redis 8)
-- my-app-pgadmin (database UI)
-- my-redis-commander (Redis UI)
+- {api-service} (Node.js 24, hot-reload)
+- {db-service} (PostgreSQL 16)
+- {cache-service} (Redis 8)
+- {app-name}-pgadmin (database UI)
+- {cache-service}-commander (Redis UI)
 
 **Test** (ports 5433, 6380 - non-conflicting):
-- my-postgres-test (isolated test database)
-- my-redis-test (isolated test cache)
+- {db-service}-test (isolated test database)
+- {cache-service}-test (isolated test cache)
 
 **Production** (with monitoring):
-- my-api (3 replicas, load balanced)
-- my-postgres (production-tuned)
-- my-redis (with auth)
-- my-app-nginx (reverse proxy, SSL)
-- my-app-prometheus (metrics)
-- my-app-grafana (dashboards)
+- {api-service} (3 replicas, load balanced)
+- {db-service} (production-tuned)
+- {cache-service} (with auth)
+- {app-name}-nginx (reverse proxy, SSL)
+- {app-name}-prometheus (metrics)
+- {app-name}-grafana (dashboards)
 - ELK stack (logging)
 - backup service (automated daily backups)
 
@@ -82,28 +82,28 @@ npm run docker:setup
 #### Manual Start
 ```bash
 # Start all services
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 
 # View logs (all services)
-docker compose -f docker/docker-compose.dev.yml -p my-system logs -f
+docker compose -f docker/docker-compose.dev.yml -p {project} logs -f
 
 # View specific service logs
-docker compose -f docker/docker-compose.dev.yml -p my-system logs -f my-api
-docker compose -f docker/docker-compose.dev.yml -p my-system logs -f my-postgres
+docker compose -f docker/docker-compose.dev.yml -p {project} logs -f {api-service}
+docker compose -f docker/docker-compose.dev.yml -p {project} logs -f {db-service}
 
 # Stop services (preserve data)
-docker compose -f docker/docker-compose.dev.yml -p my-system down
+docker compose -f docker/docker-compose.dev.yml -p {project} down
 
 # Stop and remove volumes (clean slate)
-docker compose -f docker/docker-compose.dev.yml -p my-system down -v
+docker compose -f docker/docker-compose.dev.yml -p {project} down -v
 ```
 
 #### Service Access
 ```
 API:              http://localhost:3000
-PostgreSQL:       localhost:5432 (my-app/my-app/my-app)
+PostgreSQL:       localhost:5432 ({app-name}/{app-name}/{app-name})
 Redis:            localhost:6379
-PgAdmin:          http://localhost:5050 (admin@my-app.dev/admin)
+PgAdmin:          http://localhost:5050 (admin@{app-name}.dev/admin)
 Redis Commander:  http://localhost:8082
 ```
 
@@ -135,7 +135,7 @@ npm run test:local:coverage
 docker compose -f docker/docker-compose.test.yml up -d
 
 # Check test database
-docker exec my-postgres-test pg_isready -U testuser -d my_test
+docker exec {db-service}-test pg_isready -U testuser -d my_test
 
 # Stop test services and cleanup
 docker compose -f docker/docker-compose.test.yml down -v
@@ -181,19 +181,19 @@ Kibana:             http://localhost:5601
 #### Health Checks
 ```bash
 # Check all containers
-docker compose -f docker/docker-compose.dev.yml -p my-system ps
+docker compose -f docker/docker-compose.dev.yml -p {project} ps
 
 # PostgreSQL ready check
-docker exec my-postgres pg_isready -U my-app -d my-app
+docker exec {db-service} pg_isready -U {app-name} -d {app-name}
 
 # Redis ping check
-docker exec my-redis redis-cli ping
+docker exec {cache-service} redis-cli ping
 
 # API health endpoint
 curl http://localhost:3000/health
 
 # View container health status with details
-docker inspect my-postgres | grep -A 10 Health
+docker inspect {db-service} | grep -A 10 Health
 ```
 
 #### Resource Monitoring
@@ -202,7 +202,7 @@ docker inspect my-postgres | grep -A 10 Health
 docker stats
 
 # Specific container stats
-docker stats my-api my-postgres my-redis
+docker stats {api-service} {db-service} {cache-service}
 
 # System resource usage
 docker system df
@@ -214,15 +214,15 @@ docker system df -v
 #### Container Inspection
 ```bash
 # View container configuration
-docker inspect my-postgres
+docker inspect {db-service}
 
 # View container logs
-docker logs my-postgres
-docker logs --tail 100 my-api
-docker logs --since 30m my-redis
+docker logs {db-service}
+docker logs --tail 100 {api-service}
+docker logs --since 30m {cache-service}
 
 # Follow logs in real-time
-docker logs -f my-api
+docker logs -f {api-service}
 ```
 
 ### Rebuilding Containers
@@ -236,22 +236,22 @@ docker logs -f my-api
 #### When Dependencies Change
 ```bash
 # Rebuild and restart
-docker compose -f docker/docker-compose.dev.yml -p my-system down
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d --build
+docker compose -f docker/docker-compose.dev.yml -p {project} down
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d --build
 
 # Force rebuild without cache
-docker compose -f docker/docker-compose.dev.yml -p my-system build --no-cache
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} build --no-cache
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 ```
 
 #### Production Builds
 ```bash
 # Build production image
-docker build -f apps/my-api/Dockerfile -t my-api:latest .
+docker build -f apps/{api-service}/Dockerfile -t {api-service}:latest .
 
 # Push to registry
-docker tag my-api:latest your-registry/my-api:v1.0.0
-docker push your-registry/my-api:v1.0.0
+docker tag {api-service}:latest your-registry/{api-service}:v1.0.0
+docker push your-registry/{api-service}:v1.0.0
 ```
 
 ## Database Operations
@@ -261,7 +261,7 @@ docker push your-registry/my-api:v1.0.0
 #### Direct Database Access
 ```bash
 # Access PostgreSQL CLI (development)
-docker exec -it my-postgres psql -U my-app -d my-app
+docker exec -it {db-service} psql -U {app-name} -d {app-name}
 
 # Common psql commands
 \dt              # List tables
@@ -270,13 +270,13 @@ docker exec -it my-postgres psql -U my-app -d my-app
 \q               # Quit
 
 # Execute SQL from command line
-docker exec my-postgres psql -U my-app -d my-app -c "SELECT * FROM users LIMIT 10;"
+docker exec {db-service} psql -U {app-name} -d {app-name} -c "SELECT * FROM users LIMIT 10;"
 ```
 
 #### Prisma Migrations
 ```bash
 # Generate Prisma client
-cd apps/my-api
+cd apps/{api-service}
 npx prisma generate
 
 # Push schema changes (development)
@@ -295,23 +295,23 @@ npx prisma migrate reset
 #### Database Backups
 ```bash
 # Create backup with timestamp
-docker exec my-postgres pg_dump -U my-app my-app > \
+docker exec {db-service} pg_dump -U {app-name} {app-name} > \
   "backup_$(date +%Y%m%d_%H%M%S).sql"
 
 # Compressed backup
-docker exec my-postgres pg_dump -U my-app my-app | \
+docker exec {db-service} pg_dump -U {app-name} {app-name} | \
   gzip > "backup_$(date +%Y%m%d_%H%M%S).sql.gz"
 
 # Backup specific tables
-docker exec my-postgres pg_dump -U my-app -t users -t wallets my-app > \
+docker exec {db-service} pg_dump -U {app-name} -t users -t wallets {app-name} > \
   "partial_backup_$(date +%Y%m%d_%H%M%S).sql"
 
 # Restore from backup
-docker exec -i my-postgres psql -U my-app my-app < backup.sql
+docker exec -i {db-service} psql -U {app-name} {app-name} < backup.sql
 
 # Restore from compressed
 gunzip -c backup.sql.gz | \
-  docker exec -i my-postgres psql -U my-app my-app
+  docker exec -i {db-service} psql -U {app-name} {app-name}
 ```
 
 #### Production Automated Backups
@@ -325,7 +325,7 @@ Production environment includes automated daily backups at 2 AM:
 #### Direct Redis Access
 ```bash
 # Access Redis CLI (development)
-docker exec -it my-redis redis-cli
+docker exec -it {cache-service} redis-cli
 
 # Common Redis commands
 PING                    # Test connection
@@ -337,39 +337,39 @@ FLUSHDB                 # Clear current database (WARNING)
 INFO                    # Server information
 
 # Execute command from shell
-docker exec my-redis redis-cli PING
-docker exec my-redis redis-cli INFO memory
+docker exec {cache-service} redis-cli PING
+docker exec {cache-service} redis-cli INFO memory
 ```
 
 #### Redis Monitoring
 ```bash
 # Monitor commands in real-time
-docker exec my-redis redis-cli MONITOR
+docker exec {cache-service} redis-cli MONITOR
 
 # Check memory usage
-docker exec my-redis redis-cli INFO memory
+docker exec {cache-service} redis-cli INFO memory
 
 # View connected clients
-docker exec my-redis redis-cli CLIENT LIST
+docker exec {cache-service} redis-cli CLIENT LIST
 
 # Check keyspace statistics
-docker exec my-redis redis-cli INFO keyspace
+docker exec {cache-service} redis-cli INFO keyspace
 ```
 
 #### Redis Backups
 ```bash
 # Trigger manual save
-docker exec my-redis redis-cli BGSAVE
+docker exec {cache-service} redis-cli BGSAVE
 
 # Check last save time
-docker exec my-redis redis-cli LASTSAVE
+docker exec {cache-service} redis-cli LASTSAVE
 
 # Copy RDB file
-docker cp my-redis:/data/dump.rdb ./redis_backup_$(date +%Y%m%d).rdb
+docker cp {cache-service}:/data/dump.rdb ./redis_backup_$(date +%Y%m%d).rdb
 
 # Restore RDB file
-docker cp ./redis_backup.rdb my-redis:/data/dump.rdb
-docker restart my-redis
+docker cp ./redis_backup.rdb {cache-service}:/data/dump.rdb
+docker restart {cache-service}
 ```
 
 ## Troubleshooting Guide
@@ -384,11 +384,11 @@ docker restart my-redis
 **Diagnosis**:
 ```bash
 # Check container status
-docker compose -f docker/docker-compose.dev.yml -p my-system ps
+docker compose -f docker/docker-compose.dev.yml -p {project} ps
 
 # View container logs
-docker logs my-postgres
-docker logs my-redis
+docker logs {db-service}
+docker logs {cache-service}
 
 # Check Docker daemon status
 docker info
@@ -397,12 +397,12 @@ docker info
 **Solutions**:
 ```bash
 # Solution 1: Clean restart
-docker compose -f docker/docker-compose.dev.yml -p my-system down
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} down
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 
 # Solution 2: Remove volumes (if data corruption suspected)
-docker compose -f docker/docker-compose.dev.yml -p my-system down -v
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} down -v
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 
 # Solution 3: Restart Docker Desktop
 # Quit and restart Docker Desktop application
@@ -410,7 +410,7 @@ docker compose -f docker/docker-compose.dev.yml -p my-system up -d
 
 # Solution 4: Clean Docker state
 docker system prune -f
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 ```
 
 ### Issue 2: Port Conflicts
@@ -459,10 +459,10 @@ docker compose -f docker/docker-compose.test.yml up -d
 docker ps | grep postgres
 
 # Check PostgreSQL logs
-docker logs my-postgres
+docker logs {db-service}
 
 # Test connection
-docker exec my-postgres pg_isready -U my-app -d my-app
+docker exec {db-service} pg_isready -U {app-name} -d {app-name}
 
 # Verify DATABASE_URL
 cat .env | grep DATABASE_URL
@@ -471,21 +471,21 @@ cat .env | grep DATABASE_URL
 **Solutions**:
 ```bash
 # Solution 1: Verify DATABASE_URL format
-# Development: postgresql://my-app:my-app@localhost:5432/my-app?schema=public
+# Development: postgresql://{app-name}:{app-name}@localhost:5432/{app-name}?schema=public
 # Test: postgresql://testuser:testpass@localhost:5433/my_test
 
 # Solution 2: Wait for container to be ready
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 sleep 10  # Wait for PostgreSQL to initialize
-docker exec my-postgres pg_isready -U my-app -d my-app
+docker exec {db-service} pg_isready -U {app-name} -d {app-name}
 
 # Solution 3: Recreate container
-docker compose -f docker/docker-compose.dev.yml -p my-system down
-docker volume rm my-system_postgres_data  # WARNING: destroys data
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} down
+docker volume rm {project}_postgres_data  # WARNING: destroys data
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 
 # Solution 4: Check network connectivity
-docker exec my-api ping my-postgres
+docker exec {api-service} ping {db-service}
 ```
 
 ### Issue 4: Image Caching Issues
@@ -498,10 +498,10 @@ docker exec my-api ping my-postgres
 **Diagnosis**:
 ```bash
 # Check if using bind mounts (development)
-docker inspect my-api | grep -A 20 Mounts
+docker inspect {api-service} | grep -A 20 Mounts
 
 # Check image build date
-docker images | grep my-api
+docker images | grep {api-service}
 ```
 
 **Solutions**:
@@ -511,17 +511,17 @@ docker images | grep my-api
 # TypeScript changes are automatically detected
 
 # For dependency changes (package.json modified)
-docker compose -f docker/docker-compose.dev.yml -p my-system down
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d --build
+docker compose -f docker/docker-compose.dev.yml -p {project} down
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d --build
 
 # For persistent caching issues
-docker compose -f docker/docker-compose.dev.yml -p my-system build --no-cache
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d
+docker compose -f docker/docker-compose.dev.yml -p {project} build --no-cache
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d
 
 # Nuclear option (complete rebuild)
-docker compose -f docker/docker-compose.dev.yml -p my-system down -v
+docker compose -f docker/docker-compose.dev.yml -p {project} down -v
 docker system prune -a -f
-docker compose -f docker/docker-compose.dev.yml -p my-system up -d --build
+docker compose -f docker/docker-compose.dev.yml -p {project} up -d --build
 ```
 
 ### Issue 5: Out of Disk Space
@@ -612,11 +612,11 @@ docker volume prune -f
 docker stats
 
 # Check container logs for errors
-docker logs my-api | grep -i error
-docker logs my-postgres | grep -i error
+docker logs {api-service} | grep -i error
+docker logs {db-service} | grep -i error
 
 # Check database performance
-docker exec my-postgres psql -U my-app -d my-app -c "
+docker exec {db-service} psql -U {app-name} -d {app-name} -c "
   SELECT pid, state, query_start, query
   FROM pg_stat_activity
   WHERE state != 'idle'
@@ -630,13 +630,13 @@ docker exec my-postgres psql -U my-app -d my-app -c "
 # Increase CPUs (recommend 4+) and Memory (recommend 8GB+)
 
 # Solution 2: Optimize PostgreSQL
-docker exec my-postgres psql -U my-app -d my-app -c "VACUUM ANALYZE;"
+docker exec {db-service} psql -U {app-name} -d {app-name} -c "VACUUM ANALYZE;"
 
 # Solution 3: Clear Redis cache
-docker exec my-redis redis-cli FLUSHDB
+docker exec {cache-service} redis-cli FLUSHDB
 
 # Solution 4: Restart containers
-docker compose -f docker/docker-compose.dev.yml -p my-system restart
+docker compose -f docker/docker-compose.dev.yml -p {project} restart
 
 # Solution 5: Check for resource limits in compose file
 # Review docker/docker-compose.dev.yml for resource constraints
@@ -693,7 +693,7 @@ USER nestjs
 #### Security Scanning
 ```bash
 # Scan images for vulnerabilities
-docker scan my-api:latest
+docker scan {api-service}:latest
 
 # Check for outdated base images
 docker images | grep node
@@ -710,7 +710,7 @@ docker compose -f docker/docker-compose.dev.yml build
 # Production: Services communicate on private network
 # Only nginx exposed externally on 80/443
 networks:
-  my-app-network:
+  {app-name}-network:
     driver: bridge
     internal: false  # Only nginx connects externally
 ```
@@ -721,13 +721,13 @@ networks:
 # Redis: Password protection in production
 
 # Verify PostgreSQL auth
-docker exec my-postgres cat /var/lib/postgresql/data/pg_hba.conf
+docker exec {db-service} cat /var/lib/postgresql/data/pg_hba.conf
 ```
 
 ## Best Practices
 
 ### DO
-- ✅ Always use `-p my-system` with docker-compose commands
+- ✅ Always use `-p {project}` with docker-compose commands
 - ✅ Run `npm run docker:setup` for first-time setup (handles secrets, migrations)
 - ✅ Use automated scripts (`npm run test:local`) instead of manual Docker commands
 - ✅ Let scripts handle cleanup (test-local.sh has trap handlers)

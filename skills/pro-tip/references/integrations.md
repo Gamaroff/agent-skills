@@ -80,7 +80,7 @@ Only environment variables prefixed with `VITE_` are exposed to the browser bund
 
 Run Nx commands as `npm exec nx <command>` or `npx nx <command>` — never as bare `nx`. This ensures the workspace's locally installed Nx version is used, not a global one that may differ. Mismatched versions cause subtle build and plugin resolution failures.
 
-**Example:** `npm exec nx test my-app-web-app` — not `nx test my-app-web-app`
+**Example:** `npm exec nx test {app-name}-web-app` — not `nx test {app-name}-web-app`
 **Why it matters:** Global `nx` versions are often out of date with the workspace's `nx` package version, causing cryptic plugin errors.
 
 ---

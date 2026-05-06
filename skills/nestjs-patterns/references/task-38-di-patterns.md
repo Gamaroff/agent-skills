@@ -27,9 +27,9 @@
 ### Applied Fix
 
 **Files Modified**:
-1. `apps/my-api/src/auth/auth.module.ts` - Simplified to single factory
-2. `apps/my-api/src/auth/strategies/local.strategy.ts` - Standard injection
-3. `apps/my-api/src/auth/strategies/google.strategy.ts` - Standard injection
+1. `apps/{api-service}/src/auth/auth.module.ts` - Simplified to single factory
+2. `apps/{api-service}/src/auth/strategies/local.strategy.ts` - Standard injection
+3. `apps/{api-service}/src/auth/strategies/google.strategy.ts` - Standard injection
 
 ### Before (Broken - Dual Factory)
 

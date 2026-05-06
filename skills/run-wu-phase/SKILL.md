@@ -776,14 +776,14 @@ Created branch feature/wu-phase-1 off develop
 Draft PR created: https://github.com/your-org/your-repo/pull/XXX (draft)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[1/8] Task 111 — WU-P1-01: Find-replace @my-system/* → @my-app/* in tsconfig
+[1/8] Task 111 — WU-P1-01: Find-replace @{org}/* → @{new-org}/* in tsconfig
   File: docs/.../task.111.wu-p1-01.md
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [REVIEW]     Task 111 — review-task quick: 0 critical issues
 [IMPL]       Task 111 — implementing...
 [QA cycle 1/5] Task 111 — PASS
 [QA-FORMAL]  Task 111 — qa-task: gate PASS
-[COMMIT]     feat(wu-p1): WU-P1-01 — find-replace @my-system/* scope in tsconfig paths
+[COMMIT]     feat(wu-p1): WU-P1-01 — find-replace @{org}/* scope in tsconfig paths
                - QA gate: PASS
 [STATUS]     task-sequence.md — Task 111 ✅
 [DONE]       Task 111 (WU-P1-01) — 1/8 complete. 7 remaining.

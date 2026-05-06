@@ -1,6 +1,6 @@
 ---
 name: nestjs-debug
-description: Autonomous NestJS debugging for any NestJS application in the monorepo. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works with current (my-api) and future NestJS applications.
+description: Autonomous NestJS debugging for any NestJS application in the monorepo. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works with current ({api-service}) and future NestJS applications.
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -48,7 +48,7 @@ license: MIT
 
 **Before starting, establish:**
 
-1. **Target Application Name**: Which NestJS app to debug (e.g., "my-api", "analytics-api")
+1. **Target Application Name**: Which NestJS app to debug (e.g., "{api-service}", "analytics-api")
 2. **Start Command**: How to run the app
    - Auto-detected from `apps/{app_name}/project.json` (`serve` target)
    - Or user-provided: `NX_DAEMON=false npm run dev:api`
@@ -185,7 +185,7 @@ When you encounter an error, **first select the primary Skill** that categorizes
 **When:** "Cannot find module" or path resolution errors
 **Error Patterns:**
 
-- "Cannot find module '@my-system/auth-lib'"
+- "Cannot find module '@{org}/auth-lib'"
 - Path alias not resolving
 - Library index.ts missing exports
 - package.json main field incorrect
@@ -481,7 +481,7 @@ Error: Unable to connect to database / ECONNREFUSED
 docker compose -f ./docker/docker-compose.dev.yml up -d postgres
 
 # Verify connection in .env
-DATABASE_URL="postgresql://user:password@localhost:5432/my-app"
+DATABASE_URL="postgresql://user:password@localhost:5432/{app-name}"
 
 # Run migrations
 cd apps/{app_name} && npx prisma db push
@@ -575,7 +575,7 @@ async method(): Promise<void> {
 **Pattern: Cannot Find Module**
 
 ```
-Error: Cannot find module '@my-system/auth-lib'
+Error: Cannot find module '@{org}/auth-lib'
 ```
 
 **Root Causes:**
@@ -587,7 +587,7 @@ Error: Cannot find module '@my-system/auth-lib'
 
 **Debug Approach:**
 
-1. Check if library is installed: `npm ls @my-system/auth-lib`
+1. Check if library is installed: `npm ls @{org}/auth-lib`
 2. Verify tsconfig.base.json paths configuration
 3. Check library's index.ts for exports
 4. Verify package.json main/exports fields
@@ -600,7 +600,7 @@ Error: Cannot find module '@my-system/auth-lib'
 {
   "compilerOptions": {
     "paths": {
-      "@my-system/*": ["libs/*/src/index.ts"]
+      "@{org}/*": ["libs/*/src/index.ts"]
     }
   }
 }
@@ -748,9 +748,9 @@ nx.json                           # Monorepo configuration
 
 ---
 
-## 📚 Reference Implementation: my-api
+## 📚 Reference Implementation: {api-service}
 
-The **my-api** application demonstrates NestJS best practices and is the primary example for this skill.
+The **{api-service}** application demonstrates NestJS best practices and is the primary example for this skill.
 
 ### Key Features for Debugging:
 
@@ -780,17 +780,17 @@ GlobalExceptionFilter → Custom exception classes:
 - TypeScript strict mode
 - Comprehensive error logging
 
-### Debugging my-api:
+### Debugging {api-service}:
 
-When debugging my-api specifically:
+When debugging {api-service} specifically:
 
-1. Check `apps/my-api/src/app.module.ts` for module imports
-2. Verify database connection via `apps/my-api/src/config/data-source.service.ts`
-3. Check auth configuration in `apps/my-api/src/auth/auth.module.ts`
+1. Check `apps/{api-service}/src/app.module.ts` for module imports
+2. Verify database connection via `apps/{api-service}/src/config/data-source.service.ts`
+3. Check auth configuration in `apps/{api-service}/src/auth/auth.module.ts`
 4. Review .env for required environment variables
 5. Use `npm run dev:api` to start (NX_DAEMON=false)
 
-**Success Condition for my-api:**
+**Success Condition for {api-service}:**
 
 ```
 ✓ Output contains: "Nest application successfully started"
@@ -831,7 +831,7 @@ Error: Nest can't resolve dependencies of AuthService (ConfigService, ?)
 **Error Output:**
 
 ```
-Error: Cannot find module '@my-system/auth-lib'
+Error: Cannot find module '@{org}/auth-lib'
 ```
 
 **Debugging Steps:**
@@ -892,24 +892,24 @@ Error: ECONNREFUSED 127.0.0.1:5432
 
 **Essential Files for NestJS Debugging:**
 
-**my-api Error Infrastructure:**
+**{api-service} Error Infrastructure:**
 
-- Global Exception Filter: `apps/my-api/src/common/filters/global-exception.filter.ts`
-- Error Codes: `apps/my-api/src/common/utils/error-handler.util.ts`
-- Exception Classes: `apps/my-api/src/common/exceptions/`
+- Global Exception Filter: `apps/{api-service}/src/common/filters/global-exception.filter.ts`
+- Error Codes: `apps/{api-service}/src/common/utils/error-handler.util.ts`
+- Exception Classes: `apps/{api-service}/src/common/exceptions/`
 
 **Configuration:**
 
-- Main entry: `apps/my-api/src/main.ts`
-- App module: `apps/my-api/src/app.module.ts`
-- Config service: `apps/my-api/src/config/config.module.ts`
+- Main entry: `apps/{api-service}/src/main.ts`
+- App module: `apps/{api-service}/src/app.module.ts`
+- Config service: `apps/{api-service}/src/config/config.module.ts`
 
 **Documentation:**
 
 - NestJS Official: https://docs.nestjs.com/
 - Debugging Guide: `docs/development/troubleshooting.md`
 - Error Handling Guide: `docs/development/logging-infrastructure-guide.md`
-- API Architecture: `docs/architecture/my-api-architecture.md`
+- API Architecture: `docs/architecture/{api-service}-architecture.md`
 
 **Commands:**
 

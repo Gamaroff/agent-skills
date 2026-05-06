@@ -22,11 +22,11 @@ This guide provides detailed instructions for completing each of the 11 mandator
 ```markdown
 ## Overview
 
-Refactor `@my-system/cache-lib` to simplify the client-side caching
+Refactor `@{org}/cache-lib` to simplify the client-side caching
 architecture from 3 tiers (L1/L2/L3) to 2 tiers (L1/L2) by removing
 AsyncStorage redundancy and promoting WatermelonDB from L3 to L2.
 
-**Scope**: Affects `libs/cache-lib/` and `apps/my-api/` only.
+**Scope**: Affects `libs/cache-lib/` and `apps/{api-service}/` only.
 **Excludes** `apps/my-wallet/`.
 ```
 
@@ -213,7 +213,7 @@ AsyncStorage is being removed **only from cache-lib** as a cache tier.
 - `libs/cache-lib/` - Complete refactoring
 
 ✅ **Applications**:
-- `apps/my-api/` - Update consumer code
+- `apps/{api-service}/` - Update consumer code
 
 ✅ **Documentation**:
 - Update skill: `.agents/skills/caching/SKILL.md`
@@ -292,8 +292,8 @@ interface CacheStats {
 ### 2. Export Changes
 
 **Removed Exports**:
-- `AsyncStorageCache` from `@my-system/cache-lib/client`
-- `AsyncStorageCache` from `@my-system/cache-lib`
+- `AsyncStorageCache` from `@{org}/cache-lib/client`
+- `AsyncStorageCache` from `@{org}/cache-lib`
 
 **Impact**: Direct imports of AsyncStorageCache will fail
 
@@ -595,12 +595,12 @@ For each test level:
 **Scope**: your API
 
 **Actions**:
-- [ ] Run all my-api tests
+- [ ] Run all {api-service} tests
 - [ ] Verify cache monitoring endpoints work
 - [ ] Verify shopping cache works
 - [ ] Verify chat cache works
 
-**Command**: `npx nx test my-api`
+**Command**: `npx nx test {api-service}`
 ```
 
 ### Key Points
@@ -640,7 +640,7 @@ For each test level:
 ### Functional
 
 - [x] All cache-lib tests pass (build successful)
-- [x] All my-api tests pass (no consumer code changes needed)
+- [x] All {api-service} tests pass (no consumer code changes needed)
 - [x] Client cache uses L1 (Memory) + L2 (WatermelonDB) only
 - [x] Server cache uses L1 (Memory) + L2 (Redis/fallback) unchanged
 - [x] CacheStats returns only `l1` and `l2` in tierStats
@@ -652,7 +652,7 @@ For each test level:
 - [x] Cache write performance improved 20-30% (baseline vs refactored) **VALIDATED**
 - [x] Cache read performance maintained or improved **VALIDATED**
 - [x] No memory leaks detected **VALIDATED**
-- [x] No performance regression in my-api **VALIDATED**
+- [x] No performance regression in {api-service} **VALIDATED**
 
 ### Code Quality
 
@@ -665,7 +665,7 @@ For each test level:
 
 - [x] CHANGELOG.md updated with breaking changes
 - [x] Migration guide provided (in CHANGELOG.md)
-- [x] All consumer code updated (no updates needed in my-api)
+- [x] All consumer code updated (no updates needed in {api-service})
 ```
 
 ### Key Points
@@ -731,7 +731,7 @@ For each risk:
 - **Impact**: Development delay only
 
 **2. Consumer Code Issues**
-- **Risk**: my-api references l3
+- **Risk**: {api-service} references l3
 - **Mitigation**: Grep search and update before testing
 - **Impact**: Compilation errors (easy to fix)
 

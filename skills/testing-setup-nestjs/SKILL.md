@@ -1,6 +1,6 @@
 ---
 name: testing-setup-nestjs
-description: Guide developers through NestJS specific testing patterns for my-api including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and financial operations testing with 95% coverage requirements
+description: Guide developers through NestJS specific testing patterns for {api-service} including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and financial operations testing with 95% coverage requirements
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -25,7 +25,7 @@ Invoke this skill when you need to test:
 
 ## Overview
 
-NestJS testing in my-api uses:
+NestJS testing in {api-service} uses:
 - **Framework**: NestJS Testing Module
 - **Test Runner**: Jest 30.2.0
 - **Environment**: Node.js
@@ -41,7 +41,7 @@ NestJS testing in my-api uses:
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserService } from './user.service';
-import { PrismaService } from '@my-system/prisma';
+import { PrismaService } from '@{org}/prisma';
 
 describe('UserService', () => {
   let service: UserService;
@@ -129,9 +129,9 @@ const mockPrismaService = {
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService } from './payment.service';
-import { PrismaService } from '@my-system/prisma';
+import { PrismaService } from '@{org}/prisma';
 import { WalletService } from '../wallet/wallet.service';
-import { logger } from '@my-system/logging-lib';
+import { logger } from '@{org}/logging-lib';
 
 describe('PaymentService', () => {
   let service: PaymentService;
@@ -501,7 +501,7 @@ describe('Atomic Operations', () => {
 
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '@my-system/prisma';
+import { PrismaService } from '@{org}/prisma';
 import { UserService } from './user.service';
 
 describe('UserService Integration Tests', () => {
@@ -605,14 +605,14 @@ describe('Payment Service Integration', () => {
 
 ### 6.1 E2E Test Structure
 
-**Location**: `apps/my-api/test/integration/`
+**Location**: `apps/{api-service}/test/integration/`
 
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '@my-system/prisma';
+import { PrismaService } from '@{org}/prisma';
 
 describe('User API (E2E)', () => {
   let app: INestApplication;
@@ -817,7 +817,7 @@ describe('TransactionService', () => {
 ### 8.1 Authentication Test
 
 ```typescript
-import { hashPassword, verifyPassword } from '@my-system/auth-lib';
+import { hashPassword, verifyPassword } from '@{org}/auth-lib';
 
 describe('AuthService', () => {
   it('should hash password securely', async () => {
@@ -928,13 +928,13 @@ describe('Input Validation', () => {
 
 ```bash
 # Run integration tests
-npx nx test my-api --no-cache
+npx nx test {api-service} --no-cache
 
 # Run with coverage
-npx nx test my-api --coverage
+npx nx test {api-service} --coverage
 
 # Run specific test file
-npx nx test my-api --testFile=src/modules/users/user.service.integration.spec.ts
+npx nx test {api-service} --testFile=src/modules/users/user.service.integration.spec.ts
 
 # Run E2E tests
 npm run test:e2e:api
@@ -1039,5 +1039,5 @@ Before completing, verify:
 
 - `docs/development/testing-framework-guide.md` - Comprehensive testing guide
 - `docs/development/testing-local-guide.md` - Local test environment setup
-- `apps/my-api/test/integration/README.md` - E2E testing guide
+- `apps/{api-service}/test/integration/README.md` - E2E testing guide
 - NestJS Testing: https://docs.nestjs.com/fundamentals/testing

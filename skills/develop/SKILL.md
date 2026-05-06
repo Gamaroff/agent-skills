@@ -973,8 +973,8 @@ Reference: See CLAUDE.md "Documentation Standards" and `docs/templates/README.md
 **Create Using NX Generator**:
 
 ```bash
-npx nx generate @nx/react-native:library my-lib \
-  --directory=libs/my-lib \
+npx nx generate @nx/react-native:library {lib-name} \
+  --directory=libs/{lib-name} \
   --linter=eslint \
   --unitTestRunner=jest
 ```
@@ -982,7 +982,7 @@ npx nx generate @nx/react-native:library my-lib \
 **Post-Creation**:
 
 - Configure client/server exports if needed
-- Add to namespace: `@my-system/my-lib`
+- Add to namespace: `@{org}/{lib-name}`
 - Create corresponding test files
 
 Reference: See CLAUDE.md "Creating Libraries" for complete setup.
@@ -1012,7 +1012,7 @@ Reference: See CLAUDE.md "Creating Libraries" for complete setup.
 
 **Logging**:
 
-- Always use `@my-system/logging-lib` (not console)
+- Always use `@{org}/logging-lib` (not console)
 - Client: lightweight console logger
 - Server: Winston-based structured logging
 
@@ -1032,17 +1032,17 @@ Reference: See CLAUDE.md "Creating Libraries" for complete setup.
 TodoWrite: ["Research existing code", "Implement feature", "Add tests"]
 
 // 2. Read affected files
-Read: libs/my-lib/src/services/my-service.ts
+Read: libs/{lib-name}/src/services/{service-name}.ts
 
 // 3. Implement with platform separation
-// libs/my-lib/src/server.ts (server-only)
+// libs/{lib-name}/src/server.ts (server-only)
 export class MyService {
   async secureOperation(data: string) {
     // Server-side crypto
   }
 }
 
-// libs/my-lib/src/client.ts (client-safe)
+// libs/{lib-name}/src/client.ts (client-safe)
 export class MyClientService {
   parseData(data: string) {
     // No crypto operations
@@ -1050,7 +1050,7 @@ export class MyClientService {
 }
 
 // 4. Add co-located tests
-// libs/my-lib/src/server.spec.ts
+// libs/{lib-name}/src/server.spec.ts
 describe('MyService', () => {
   it('should handle secure operations', () => {
     // Test implementation
@@ -1058,7 +1058,7 @@ describe('MyService', () => {
 });
 
 // 5. Verify
-npx nx test my-lib --coverage
+npx nx test {lib-name} --coverage
 ```
 
 ## Anti-Patterns to Avoid
@@ -1077,14 +1077,14 @@ npx nx test my-lib --coverage
 - Development patterns: `CLAUDE.md`
 - Story templates: `docs/templates/README.md`
 - Logging guide: `docs/development/logging-infrastructure-guide.md`
-- E2E testing: `apps/my-api/test/integration/groups/README.md`
+- E2E testing: `apps/{api-service}/test/integration/groups/README.md`
 
 **Key Commands**:
 
 - Start Metro: `npx nx start <app-name> --reset-cache --clear`
-- Start API: `npx nx run my-api:serve`
+- Start API: `npx nx run {api-service}:serve`
 - Run tests: `npx nx test <project> --coverage`
-- Build library: `npx nx build @my-system/library-name`
+- Build library: `npx nx build @{org}/library-name`
 
 ---
 

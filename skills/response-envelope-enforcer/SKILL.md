@@ -42,7 +42,7 @@ Invoke this skill when:
 
 **What**: All REST API HTTP endpoints in controller files
 
-**Location**: `apps/my-api/src/**/*.controller.ts`
+**Location**: `apps/{api-service}/src/**/*.controller.ts`
 
 **Must Return**:
 - `StandardSuccessResponse<T>` - Success responses with data
@@ -115,7 +115,7 @@ async findOne(@Param('id') id: string) {
 
 **What**: Data Transfer Objects that represent the `data` field content inside StandardSuccessResponse
 
-**Location**: `apps/my-api/src/**/dto/*-response.dto.ts`
+**Location**: `apps/{api-service}/src/**/dto/*-response.dto.ts`
 
 **Purpose**: DTOs are the PAYLOAD, not the wrapper
 
@@ -176,7 +176,7 @@ export class NotificationResponseDto {
 
 **What**: Internal interfaces used for communication between services, NOT returned from controllers
 
-**Location**: `apps/my-api/src/**/*.service.ts`
+**Location**: `apps/{api-service}/src/**/*.service.ts`
 
 **Purpose**: Internal data structures for service-to-service communication
 
@@ -226,7 +226,7 @@ async searchMessages(query: string): Promise<StandardSuccessResponse<MessageSear
 
 **What**: WebSocket events have their own structure, separate from HTTP responses
 
-**Location**: `apps/my-api/src/**/*.gateway.ts`
+**Location**: `apps/{api-service}/src/**/*.gateway.ts`
 
 **Purpose**: Real-time event notifications over WebSocket connections
 
@@ -367,44 +367,44 @@ Check for file downloads, images, etc. → Verify raw response marker (Category 
 
 ```bash
 # Find explicit wrapping (GOOD)
-grep -n "new StandardSuccessResponse" apps/my-api/src/**/*.controller.ts
-grep -n "new StandardPaginatedResponse" apps/my-api/src/**/*.controller.ts
-grep -n "createRawResponse" apps/my-api/src/**/*.controller.ts
+grep -n "new StandardSuccessResponse" apps/{api-service}/src/**/*.controller.ts
+grep -n "new StandardPaginatedResponse" apps/{api-service}/src/**/*.controller.ts
+grep -n "createRawResponse" apps/{api-service}/src/**/*.controller.ts
 
 # Find potential interceptor reliance (CHECK DOCUMENTATION)
-grep -n "return.*await.*Service" apps/my-api/src/**/*.controller.ts
+grep -n "return.*await.*Service" apps/{api-service}/src/**/*.controller.ts
 
 # Find violations (BAD)
-grep -n "return.*{ success:" apps/my-api/src/**/*.controller.ts
+grep -n "return.*{ success:" apps/{api-service}/src/**/*.controller.ts
 ```
 
 **For DTOs (Payload structures)**:
 
 ```bash
 # Check for inappropriate wrapper fields (VIOLATION)
-grep -n "success:" apps/my-api/src/**/dto/*-response.dto.ts
-grep -n "data:" apps/my-api/src/**/dto/*-response.dto.ts
+grep -n "success:" apps/{api-service}/src/**/dto/*-response.dto.ts
+grep -n "data:" apps/{api-service}/src/**/dto/*-response.dto.ts
 ```
 
 **For Services (Internal interfaces)**:
 
 ```bash
 # Ensure service methods return typed data
-grep -n "Promise<" apps/my-api/src/**/*.service.ts
+grep -n "Promise<" apps/{api-service}/src/**/*.service.ts
 
 # Check for inappropriate StandardSuccessResponse in services (VIOLATION)
-grep -n "StandardSuccessResponse" apps/my-api/src/**/*.service.ts
+grep -n "StandardSuccessResponse" apps/{api-service}/src/**/*.service.ts
 ```
 
 **For Gateways (WebSocket)**:
 
 ```bash
 # Check WebSocket event structure
-grep -n "@SubscribeMessage" apps/my-api/src/**/*.gateway.ts
-grep -n "this.server.emit" apps/my-api/src/**/*.gateway.ts
+grep -n "@SubscribeMessage" apps/{api-service}/src/**/*.gateway.ts
+grep -n "this.server.emit" apps/{api-service}/src/**/*.gateway.ts
 
 # Check for inappropriate HTTP wrapping (VIOLATION)
-grep -n "StandardSuccessResponse" apps/my-api/src/**/*.gateway.ts
+grep -n "StandardSuccessResponse" apps/{api-service}/src/**/*.gateway.ts
 ```
 
 ### Step 3: Validate Pattern Consistency
@@ -532,23 +532,23 @@ Use this checklist to verify compliance:
 ## Critical Files Reference
 
 **Core Infrastructure**:
-- `apps/my-api/src/common/dto/standard-response.dto.ts` - Response wrapper definitions
-- `apps/my-api/src/common/interceptors/response-transform.interceptor.ts` - Auto-wrapping logic
-- `apps/my-api/src/common/filters/global-exception.filter.ts` - Error response wrapping
-- `apps/my-api/src/main.ts` - Global interceptor registration
+- `apps/{api-service}/src/common/dto/standard-response.dto.ts` - Response wrapper definitions
+- `apps/{api-service}/src/common/interceptors/response-transform.interceptor.ts` - Auto-wrapping logic
+- `apps/{api-service}/src/common/filters/global-exception.filter.ts` - Error response wrapping
+- `apps/{api-service}/src/main.ts` - Global interceptor registration
 
 **Reference Controllers**:
-- `apps/my-api/src/wallets/wallets.controller.ts` - Explicit wrapping pattern (all 14 endpoints)
-- `apps/my-api/src/auth/auth.controller.ts` - Interceptor reliance pattern
-- `apps/my-api/src/help/help.controller.ts` - Standard CRUD pattern
+- `apps/{api-service}/src/wallets/wallets.controller.ts` - Explicit wrapping pattern (all 14 endpoints)
+- `apps/{api-service}/src/auth/auth.controller.ts` - Interceptor reliance pattern
+- `apps/{api-service}/src/help/help.controller.ts` - Standard CRUD pattern
 
 **Response DTOs**:
-- `apps/my-api/src/help/dto/conversation-response.dto.ts` - Payload DTO example
-- `apps/my-api/src/notifications/dto/notification-response.dto.ts` - Payload DTO example
+- `apps/{api-service}/src/help/dto/conversation-response.dto.ts` - Payload DTO example
+- `apps/{api-service}/src/notifications/dto/notification-response.dto.ts` - Payload DTO example
 
 **WebSocket**:
-- `apps/my-api/src/common/websocket/websocket-events.ts` - Event structure definitions
-- `apps/my-api/src/chat/chat.gateway.ts` - Gateway implementation example
+- `apps/{api-service}/src/common/websocket/websocket-events.ts` - Event structure definitions
+- `apps/{api-service}/src/chat/chat.gateway.ts` - Gateway implementation example
 
 **Frontend**:
 - `apps/my-wallet/services/api/base-api.ts` - Response extraction logic (line 483-488)

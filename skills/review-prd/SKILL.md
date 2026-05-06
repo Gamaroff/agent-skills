@@ -244,7 +244,7 @@ This is the **KEY DIFFERENTIATOR** from pm-checklist.
    - Endpoints referenced (e.g., "POST /api/v1/users")
    - Database models/tables referenced (e.g., "User model", "waitlist table")
    - Libraries/frameworks claimed (e.g., "uses NestJS", "Express middleware")
-   - File paths mentioned (e.g., "apps/my-api/src/auth/")
+   - File paths mentioned (e.g., "apps/{api-service}/src/auth/")
    - Architecture patterns described (e.g., "modular monolith", "event-driven")
 
 2. **For each service/module claim**:

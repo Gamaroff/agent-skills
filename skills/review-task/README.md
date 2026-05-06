@@ -55,7 +55,7 @@ Q: "Phase 2 lists 'auth-service.ts' but doesn't specify client or server.
     Which path is correct?"
 
 Options:
-  [Server path]    - apps/my-api/src/modules/auth/auth-service.ts (NestJS)
+  [Server path]    - apps/{api-service}/src/modules/auth/auth-service.ts (NestJS)
   [Client path]    - apps/my-wallet/src/services/auth-service.ts (React Native)
   [Both needed]    - Changes required in both client and server
 ```
@@ -64,7 +64,7 @@ Options:
 
 All recommendations in the final report are based on **your decisions**, not AI assumptions:
 
-- ✅ "Update `apps/my-api/src/modules/auth/auth-service.ts`" - _Per user decision_
+- ✅ "Update `apps/{api-service}/src/modules/auth/auth-service.ts`" - _Per user decision_
 - ✅ "Use REST endpoints per architecture standard" - _Per user decision_
 - ❌ NOT: "Recommend using GraphQL" (without asking first)
 

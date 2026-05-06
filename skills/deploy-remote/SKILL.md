@@ -38,7 +38,7 @@ After these, the following are wired up:
 | SSH alias         | <your-server>                                 |
 | Docker context    | <your-server> (`docker --context <your-server>`)|
 | Registry          | `<registry-host>:5000`                          |
-| Compose project   | `my-system`                                 |
+| Compose project   | `{project}`                                 |
 | LAN overlay file  | `docker/docker-compose.lan.yml`               |
 
 ## Quick Reference
@@ -62,13 +62,13 @@ bash scripts/server/remote-status.sh                # full snapshot
 bash scripts/server/remote-test.sh --check          # connectivity only
 
 # Run local tests against remote DB
-bash scripts/server/remote-test.sh my-api
+bash scripts/server/remote-test.sh {api-service}
 ```
 
 ### Direct compose calls (if scripts not enough)
 
 ```bash
-docker --context <your-server> compose -p my-system \
+docker --context <your-server> compose -p {project} \
   -f docker/docker-compose.dev.yml \
   -f docker/docker-compose.lan.yml \
   ps
@@ -79,12 +79,12 @@ docker --context <your-server> compose -p my-system \
 ```bash
 ssh <your-server>                            # interactive shell
 ssh <your-server> 'docker ps'                # one-shot command
-ssh <your-server> 'docker logs my-api -f'  # tail container logs
+ssh <your-server> 'docker logs {api-service} -f'  # tail container logs
 ```
 
 ## Image Flow
 
-1. **Build local** — `docker compose build` tags images as `<registry-host>:5000/my-api:lan`
+1. **Build local** — `docker compose build` tags images as `<registry-host>:5000/{api-service}:lan`
 2. **Push to LAN registry** — `docker compose push` (insecure HTTP, LAN-only)
 3. **Server pulls + runs** — `docker --context <your-server> compose pull && up -d`
 
@@ -100,35 +100,35 @@ MY_IMAGE_TAG=feature-foo bash scripts/server/deploy-remote.sh dev push
 ```bash
 # Edit code locally, then:
 bash scripts/server/deploy-remote.sh dev          # build + push + up
-ssh <your-server> 'docker logs -f my-api'         # watch logs
+ssh <your-server> 'docker logs -f {api-service}'         # watch logs
 ```
 
 ### Run Prisma migrations against remote
 
 ```bash
-docker --context <your-server> compose -p my-system \
+docker --context <your-server> compose -p {project} \
   -f docker/docker-compose.dev.yml -f docker/docker-compose.lan.yml \
-  exec my-api npx prisma migrate deploy
+  exec {api-service} npx prisma migrate deploy
 ```
 
 Or, from local with remote DB pointed at:
 
 ```bash
-DATABASE_URL=postgresql://my-app:my-app@<registry-host>:5434/my-app?schema=public \
+DATABASE_URL=postgresql://{app-name}:{app-name}@<registry-host>:5434/{app-name}?schema=public \
   npx prisma migrate deploy
 ```
 
 ### Run laptop tests against remote DB (offload heavy DB work)
 
 ```bash
-bash scripts/server/remote-test.sh my-api --coverage
+bash scripts/server/remote-test.sh {api-service} --coverage
 ```
 
 ### Inspect registry contents
 
 ```bash
 curl -s http://<registry-host>:5000/v2/_catalog | jq
-curl -s http://<registry-host>:5000/v2/my-api/tags/list | jq
+curl -s http://<registry-host>:5000/v2/{api-service}/tags/list | jq
 ```
 
 ### Prune unused images on server
@@ -143,10 +143,10 @@ ssh <your-server> 'docker system prune -af --volumes'
 |---------|-------------|-----|
 | `Cannot connect to Docker daemon` via context | `ssh <your-server> docker ps` | Re-run `setup-ssh.sh`; user may not be in docker group (reconnect) |
 | `denied: requested access to the resource is denied` on push | Local daemon `insecure-registries` config | Add `<registry-host>:5000` to `~/.docker/daemon.json`, restart Docker Desktop |
-| `connection refused` on registry | `bash scripts/server/remote-status.sh` | Registry container down — `ssh <your-server> 'docker start my-app-registry'` |
+| `connection refused` on registry | `bash scripts/server/remote-status.sh` | Registry container down — `ssh <your-server> 'docker start {app-name}-registry'` |
 | Slow pushes | Layer cache miss | Confirm building from same base; consider pruning local images |
 | Tests can't reach DB | `bash scripts/server/remote-test.sh --check` | ufw rule missing — re-run `bootstrap-remote.sh` |
-| Stack starts then crashes | `ssh <your-server> 'docker logs my-api'` | Check env vars in compose + `.env` files synced to server |
+| Stack starts then crashes | `ssh <your-server> 'docker logs {api-service}'` | Check env vars in compose + `.env` files synced to server |
 
 ## Local Docker Daemon Config (one-time)
 

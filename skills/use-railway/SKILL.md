@@ -167,7 +167,7 @@ When the user wants to create or deploy something, determine the right action fr
      - **No match**: create a new project (`railway init --name <name>`).
 4. When multiple workspaces exist, match by name from `railway whoami --json`.
 
-**Naming heuristic**: app names like "flappy-bird" or "my-api" are service names, not project names. Use the directory or repo name for the project.
+**Naming heuristic**: app names like "flappy-bird" or "{api-service}" are service names, not project names. Use the directory or repo name for the project.
 
 ## Response format
 

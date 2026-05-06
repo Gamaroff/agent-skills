@@ -252,7 +252,7 @@ if [ "$1" = "help" ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     help              Show this help
 
   EXAMPLES:
-    /command init my-project
+    /command init {project-name}
     /command deploy staging
     /command status
     /command rollback

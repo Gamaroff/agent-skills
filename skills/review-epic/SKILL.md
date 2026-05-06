@@ -201,11 +201,11 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 1. **API endpoint validation** — for each new endpoint the epic plans:
    - Check against `.claude/backend-patterns.md` versioning rules
-   - Grep codebase for existing route: `apps/my-api/src/**/*.controller.ts`
+   - Grep codebase for existing route: `apps/{api-service}/src/**/*.controller.ts`
    - Validate naming: `@Controller({ path: '...', version: '...' })` pattern
 
 2. **Service/module duplication check** — for each service/module planned:
-   - Glob: `apps/my-api/src/**/*[service-name]*.ts`
+   - Glob: `apps/{api-service}/src/**/*[service-name]*.ts`
    - Grep: `export class [ServiceName]Service`
    - If found: note file path and what it already implements
 

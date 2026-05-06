@@ -70,7 +70,7 @@ For each entry in the stub's `files:` list:
 
 - If it's a glob (e.g. `prisma/migrations/**`), use Glob to expand and read 2-3 representative files.
 - If it's a single path, read the file. If the file does not exist yet (the task creates it), note this in the spec rather than failing.
-- If it's a path under `my-app-website/` and the file is referenced as something to migrate, read the source for context but plan the destination under `my-system/`.
+- If it's a path under `{app-name}-website/` and the file is referenced as something to migrate, read the source for context but plan the destination under `{project}/`.
 
 ### 3. Draft the four sections
 
@@ -121,9 +121,9 @@ Extract all numeric {N} values, find the global maximum, and use `max + 1` as th
 
 Derive the kebab-case task name from the stub's **title**, not the WU ID. Distil the title down to 2-4 meaningful words in kebab-case that describe the actual work:
 
-- "Upgrade my-system Prisma 6.18 → 7.4; replay all migrations" → `upgrade-prisma`
-- "Run `npx nx migrate 22.5.4` on my-system; verify build green" → `nx-version-upgrade`
-- "Add `platform:web` token to my-system eslint depConstraints" → `add-platform-web-tag`
+- "Upgrade {project} Prisma 6.18 → 7.4; replay all migrations" → `upgrade-prisma`
+- "Run `npx nx migrate 22.5.4` on {project}; verify build green" → `nx-version-upgrade`
+- "Add `platform:web` token to {project} eslint depConstraints" → `add-platform-web-tag`
 - "Audit overlap between scripts/ dirs; produce collision matrix" → `scripts-collision-audit`
 
 Also derive the **Title-Cased Descriptive Name** used for the GitHub issue title — this is simply the kebab-case name converted to Title Case:

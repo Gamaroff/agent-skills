@@ -1428,7 +1428,7 @@ questions:
 #### Important
 
 - **[Vague file location]**: Tasks mention "services folder" without specific path
-  - **Recommendation:** Specify exact path: `apps/my-api/src/modules/[module]/services/[file].ts`
+  - **Recommendation:** Specify exact path: `apps/{api-service}/src/modules/[module]/services/[file].ts`
 
 - **[Missing testing detail]**: Testing section just says "write tests"
   - **Recommendation:** Specify test file locations, frameworks, key scenarios

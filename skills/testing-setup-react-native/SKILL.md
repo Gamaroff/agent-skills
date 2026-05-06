@@ -396,7 +396,7 @@ jest.mock('expo-router', () => ({
 }));
 
 // Mock logger
-import * as loggingLib from '@my-system/logging-lib/client';
+import * as loggingLib from '@{org}/logging-lib/client';
 jest.spyOn(loggingLib, 'logger', 'get').mockReturnValue({
   info: jest.fn(),
   error: jest.fn(),
@@ -440,7 +440,7 @@ describe('DashboardScreen', () => {
 
 ```typescript
 import { render, screen } from '@testing-library/react-native';
-import { generateMockUser, generateMockTransaction } from '@my-system/mock-data-lib/client';
+import { generateMockUser, generateMockTransaction } from '@{org}/mock-data-lib/client';
 import TransactionListScreen from './transaction-list';
 
 describe('TransactionListScreen', () => {
@@ -777,7 +777,7 @@ it('should wait for slow operation', async () => {
 ### 9.1 Testing with Mock Data Library
 
 ```typescript
-import { generateMockUser, generateMockWallet } from '@my-system/mock-data-lib/client';
+import { generateMockUser, generateMockWallet } from '@{org}/mock-data-lib/client';
 
 describe('Wallet Screen', () => {
   it('should display wallet balance', () => {
@@ -794,7 +794,7 @@ describe('Wallet Screen', () => {
 ### 9.2 Testing with Logger Mock
 
 ```typescript
-import * as loggingLib from '@my-system/logging-lib/client';
+import * as loggingLib from '@{org}/logging-lib/client';
 
 describe('Component with Logging', () => {
   let loggerSpy: jest.SpyInstance;

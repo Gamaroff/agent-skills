@@ -256,7 +256,7 @@ app/(drawer)/[feature]/
 **Shared Services** (to be created/modified):
 
 ```
-libs/@my-system/[library]/src/
+libs/@{org}/[library]/src/
 ├── [service1].ts                  # New service
 ├── [service2].ts                  # Modify existing
 └── [types].ts                     # Add new types
