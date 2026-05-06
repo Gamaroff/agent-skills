@@ -9,3 +9,6 @@ __pycache__/
 # Skill packages — build artifacts, regenerate via package_skill.py
 skills/*/*.zip
 *.zip
+
+# Unpacked skill output — never check in (shadow dirs created by unzip inside skill source dir)
+skills/*/*/SKILL.md

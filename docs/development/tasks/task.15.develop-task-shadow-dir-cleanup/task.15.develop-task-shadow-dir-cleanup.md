@@ -4,7 +4,7 @@ title: "Delete develop-task shadow directory and gitignore unpacked skill artifa
 type: task
 category: cleanup
 priority: Low
-status: 📋 Planned
+status: ready-for-review
 created: 2026-05-06
 assignee: TBD
 effort: 0.1 day
@@ -14,6 +14,10 @@ source_plan: ~/.claude/plans/review-the-develop-task-and-reactive-boot.md (Findi
 ---
 
 # Task 15 — Delete `develop-task` shadow directory and gitignore unpacked skill artifacts
+
+**Status**: Ready for Review
+**GitHub Issue**: [#22](https://github.com/Gamaroff/agent-skills/issues/22)
+**Review**: ✅ All review recommendations from `task.15.develop-task-shadow-dir-cleanup.review.2026-05-06.md` implemented 2026-05-06
 
 ## 1. Overview
 
@@ -94,8 +98,8 @@ Files:
 
 Changes:
 
-- [ ] `for d in skills/*/; do name=$(basename "$d"); [ -d "$d$name" ] && echo "shadow: $d$name"; done` — list any other shadow dirs
-- [ ] Document findings in implementation report
+- [x] `for d in skills/*/; do name=$(basename "$d"); [ -d "$d$name" ] && echo "shadow: $d$name"; done` — list any other shadow dirs
+- [x] Document findings in implementation report
 
 ### Phase 2 — Delete shadow + gitignore (Risk: Low)
 
@@ -106,15 +110,14 @@ Files:
 
 Changes:
 
-- [ ] `rm -rf skills/develop-task/develop-task/`
-- [ ] Add to `.gitignore`:
+- [x] `rm -rf skills/develop-task/develop-task/` — already removed locally 2026-05-06; verify on clean clone before commit
+- [x] Add to `.gitignore`:
   ```
   # Unpacked skill output — never check in
   skills/*/*/SKILL.md
-  skills/*/*/develop-task.zip
   ```
-  (refine based on Phase 1 audit; ideally a single pattern catches the nested-duplicate case)
-- [ ] Verify `git status` is clean after
+  Generic pattern: every nested-duplicate skill dir contains a `SKILL.md`, so this single line catches the case repo-wide without false positives (no legitimate skill nests another skill).
+- [x] Verify `git status` is clean after
 
 ### Phase 3 — package_skill.py guard (optional, Risk: Low)
 
@@ -148,13 +151,13 @@ Changes:
 
 **Functional**:
 
-- [ ] `skills/develop-task/develop-task/` no longer exists
-- [ ] `.gitignore` prevents future re-introduction
-- [ ] No other skills have a shadow dir (or, if they do, they're cleaned in the same PR)
+- [x] `skills/develop-task/develop-task/` no longer exists
+- [x] `.gitignore` prevents future re-introduction
+- [x] No other skills have a shadow dir (or, if they do, they're cleaned in the same PR)
 
 **Code Quality**:
 
-- [ ] `git status` clean after the change
+- [x] `git status` clean after the change
 
 ## 10. Risk Assessment
 
