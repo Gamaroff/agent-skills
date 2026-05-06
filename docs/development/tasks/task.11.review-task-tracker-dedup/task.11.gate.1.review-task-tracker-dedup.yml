@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.11.review-task-tracker-dedup'
+task_title: 'Add tracker-issue dedup guard in review-task and review-story'
+gate: PASS
+status_reason: 'All 3 phases implemented correctly; all success criteria met; zero HIGH/MEDIUM issues; dedup guards cover all 4 create paths with proper failure fallbacks.'
+reviewer: 'QA Engineer'
+updated: '2026-05-06T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No security-sensitive code changed. MCP usage for Jira search is safe.'
+  performance:
+    status: PASS
+    notes: 'Documentation-only changes. No runtime performance impact.'
+  reliability:
+    status: PASS
+    notes: 'All 4 dedup paths include explicit search-failure fallback. Existing create behaviour fully preserved on failure.'
+  maintainability:
+    status: PASS
+    notes: 'Tracker dedup subsection documents lookup order, multi-match, closed-issue, failure fallback, and write-back contract in both skills. Intentional MCP/REST asymmetry documented inline.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Verify that [Story {epic}.{story}] {title} matches the actual title format emitted by /create-story Step 5.2a / sync-jira-story at implementation time.'
+      refs: ['skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
