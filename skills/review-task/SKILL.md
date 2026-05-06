@@ -413,7 +413,12 @@ options:
 
 5. **Tracker Issue Linkage**:
 
-   **Detection**: if `JIRA_URL` is set → Jira path; else → GitHub path (existing behaviour unchanged).
+   **Detection**: source the canonical resolver once per skill invocation, then branch on `TRACKER` — see `shared/resources/platform-detection.md`:
+   ```bash
+   source shared/resources/resolve-platform.sh
+   # TRACKER = jira | github
+   ```
+   When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path.
 
    **Jira path:**
    - Check frontmatter for `jira_key:` field
@@ -460,7 +465,7 @@ options:
      - Look for a `**Jira Epic**: [KEY](url)` or `**Jira Issue**: [KEY](url)` line in the document body. If found: verify the KEY matches `jira_key` and the URL ends with `/browse/{jira_key}`. Any mismatch → flag as **Important**: "Body cross-reference link does not match `jira_key`"
      - If no body link is found: flag as **Important** — add one (e.g., `**Jira Issue**: [{jira_key}]({jira_url})`)
 
-   **GitHub path** (when `JIRA_URL` not set):
+   **GitHub path** (when `TRACKER=github`):
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
@@ -1328,7 +1333,7 @@ User Can Now: Run `/develop` to begin implementation
 
 **When to Execute**: Always — after Step 9 completes (regardless of review outcome or status update decision).
 
-**Detection**: if `JIRA_URL` is set → Jira path; else → GitHub path.
+**Detection**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `shared/resources/platform-detection.md`.
 
 **Collect context from previous steps** (both paths):
 
@@ -1365,7 +1370,7 @@ fi
 
 ---
 
-**Jira path** (when `JIRA_URL` is set):
+**Jira path** (when `TRACKER=jira`):
 
 1. Read `jira_key` from task frontmatter (already loaded in Step 1). If absent or `null`, skip this step silently.
 
@@ -1404,7 +1409,7 @@ fi
 
 ---
 
-**GitHub path** (when `JIRA_URL` is not set):
+**GitHub path** (when `TRACKER=github`):
 
 1. **Retrieve `github_issue`** from the task document YAML frontmatter. If absent, skip this step silently.
 

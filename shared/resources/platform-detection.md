@@ -2,36 +2,48 @@
 
 This file is the single source of truth for how skills determine the active tracker and VCS platform. Skills reference this via the explicit path `shared/resources/platform-detection.md`. At package time, `scripts/package_skill.py` bundles this file under `references/` and rewrites the path so installed skills are self-contained.
 
-## Resolver
+## Canonical helper
+
+The resolver is implemented as a sourceable bash helper: `shared/resources/resolve-platform.sh`.
 
 ```bash
-# Helper: read a top-level key from skills-config.yaml using python (project standard).
-# Returns "auto" if file or key is missing.
+# In any skill — source once before the first platform branch:
+source shared/resources/resolve-platform.sh
+# TRACKER = jira | github
+# VCS     = github | bitbucket
+```
+
+`package_skill.py` auto-bundles and rewrites this path into `references/resolve-platform.sh` inside each skill's zip. Installed skills are self-contained.
+
+## Resolver (reference copy)
+
+```bash
 read_config_key() {
-  python -c "
-import yaml, sys
+  local key="$1" val=""
+  # Tier 1: python+pyyaml (full YAML)
+  val=$(python -c "
+import yaml
 try:
     with open('skills-config.yaml') as f:
-        print(yaml.safe_load(f).get('$1', 'auto'))
+        v = yaml.safe_load(f).get('$key', 'auto')
+        print(v if v is not None else 'auto')
 except Exception:
     print('auto')
-" 2>/dev/null
+" 2>/dev/null) || val=""
+  # Tier 2: awk fallback when pyyaml unavailable
+  if [ -z "$val" ] || [ "$val" = "auto" ]; then
+    val=$(awk -F': *' "/^${key}:/{gsub(/[[:space:]]+$/, \"\", \$2); print \$2; exit}" \
+      skills-config.yaml 2>/dev/null)
+    [ -z "$val" ] && val="auto"
+  fi
+  echo "$val"
 }
 
-# Tracker
 TRACKER=$(read_config_key tracker)
-if [ "$TRACKER" = "auto" ]; then
-  if [ -n "$JIRA_URL" ]; then TRACKER="jira"; else TRACKER="github"; fi
-fi
+[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "$JIRA_URL" ] && echo jira || echo github)
 
-# VCS
 VCS=$(read_config_key vcs)
-if [ "$VCS" = "auto" ]; then
-  REMOTE_URL=$(git remote get-url origin)
-  if echo "$REMOTE_URL" | grep -qi "github\.com"; then VCS="github"
-  elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then VCS="bitbucket"
-  else VCS="github"; fi
-fi
+[ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null | grep -qi bitbucket.org && echo bitbucket || echo github)
 ```
 
 ## Env vars
@@ -47,11 +59,11 @@ fi
 - **Migration in progress** (moving between platforms): use explicit config override during the migration window; revert to `auto` when complete.
 - **CI without git remote**: env-var-only path works (`JIRA_URL` set → `tracker: jira`); VCS falls back to `github` default if no remote available.
 
-## Skills using implicit detection today
+## Skills migrated to the helper
 
-The following skills currently use the implicit detection pattern (env var + git remote) directly. Reading `tracker:`/`vcs:` from `skills-config.yaml` is a follow-up migration per-skill:
+All 8 leaf skills now source `resolve-platform.sh`:
 
-- `create-pr`, `create-task`, `finalise`, `review-story`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`
+- `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`
 
 Skills that are platform-agnostic (no resolver needed):
 

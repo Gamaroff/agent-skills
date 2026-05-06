@@ -77,26 +77,23 @@ Before asking the user, check whether parameters were supplied:
 
 ### Step 0.5: Detect Platform
 
-Before interacting with any remote hosting service, detect the platform from the git remote URL:
+Before interacting with any remote hosting service, detect the platform using the canonical resolver. See `shared/resources/platform-detection.md` for the full resolver spec.
 
 ```bash
+source shared/resources/resolve-platform.sh
+# VCS = github | bitbucket; TRACKER = jira | github
+PLATFORM="$VCS"   # PLATFORM keeps backward compat with downstream branches
+
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
-
-if echo "$REMOTE_URL" | grep -qi "github\.com"; then
-  PLATFORM="github"
-  REPO_SLUG=$(echo "$REMOTE_URL" \
-    | sed -E 's|.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
-
-elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
-  PLATFORM="bitbucket"
+if [ "$PLATFORM" = "bitbucket" ]; then
   BB_PATH=$(echo "$REMOTE_URL" \
     | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
-
-else
-  PLATFORM="unknown"
+elif [ "$PLATFORM" = "github" ]; then
+  REPO_SLUG=$(echo "$REMOTE_URL" \
+    | sed -E 's|.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
 fi
 ```
 
@@ -315,7 +312,7 @@ If `GITHUB_ISSUE` is not set, skip silently.
 
 ---
 
-**Bitbucket + Jira path** (when `PLATFORM=bitbucket` and `JIRA_URL` is set):
+**Bitbucket + Jira path** (when `PLATFORM=bitbucket` and `TRACKER=jira`):
 
 Bitbucket Issues are disabled for this project — do NOT use the Bitbucket Issues API. Instead, post the PR link as a comment on the linked Jira issue:
 

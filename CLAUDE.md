@@ -84,13 +84,13 @@ Skills that interact with remote trackers or PRs use this resolver order to pick
 3. **Git remote**: `bitbucket.org` in `origin` → vcs is Bitbucket; `github.com` → vcs is GitHub.
 4. **Default**: GitHub for both.
 
-Current skill behavior (aspirational — config-key honoring is a follow-up):
-- `create-pr`, `create-task`, `finalise`, `review-story`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic` — currently use **implicit detection only** (env var + git remote); reading `tracker:`/`vcs:` from `skills-config.yaml` is a follow-up migration.
+All 8 leaf skills source `shared/resources/resolve-platform.sh` before any tracker/VCS branch:
+- `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`
 
 Skills that are platform-agnostic (no resolver needed):
 - `create-branch`, `commit-changes`, `create-story` (docs-only), `qa-review`, `qa-gate`
 
-The canonical resolver spec lives in `shared/resources/platform-detection.md`.
+The canonical resolver spec lives in `shared/resources/platform-detection.md`. The helper is `shared/resources/resolve-platform.sh`; `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
 
 ## File Naming Conventions (used in target projects)
 

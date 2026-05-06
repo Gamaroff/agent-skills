@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.9.platform-detection-resolver-migration'
+task_title: 'Migrate leaf skills to skills-config.yaml platform-detection resolver'
+gate: PASS
+status_reason: 'All 4 phases complete; 6/6 automated test scenarios pass; 8 skills migrated to canonical resolver; no HIGH/MEDIUM issues found.'
+reviewer: 'QA Engineer'
+updated: '2026-05-06T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 98
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Reads only local skills-config.yaml and git remote URL. No new credentials or network calls.'
+  performance:
+    status: PASS
+    notes: 'One python/awk call per invocation — negligible for interactive skill flows.'
+  reliability:
+    status: PASS
+    notes: 'Graceful degrade chain (python → awk → env-var → git-remote → default). Malformed config handled cleanly.'
+  maintainability:
+    status: PASS
+    notes: 'Single source of truth replaces 8 copies of duplicated detection logic. Technical debt reduced.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Update qa-fix env-var table JIRA_URL row to clarify it is a Tier-2 resolver fallback, not the primary detection mechanism.'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
