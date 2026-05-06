@@ -583,9 +583,17 @@ Iterate until:
 - If fixes address issues, request QA to re-run `review-story` to update the gate
 - Gate ownership remains with QA
 
-### Step 7: Post Fix Summary to PR
+### Step 7: Post Fix Summary to PR — Best-effort, non-blocking
 
-**CRITICAL / BLOCKING**: This step is mandatory. The workflow is NOT complete until the PR comment is posted. Do not skip, defer, or treat as optional.
+**PR-comment authorship contract**:
+
+| Skill | Owns |
+|---|---|
+| `qa-task` | Per-cycle gate decision (best-effort, non-blocking) |
+| `qa-fix` | Per-cycle fix summary (best-effort, non-blocking) |
+| `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
+
+**This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
 
 Use the PR metadata stored in Step 0 (Prerequisites). Compose the comment body then post it via the active platform.
 
@@ -674,13 +682,11 @@ elif [ "$PLATFORM" = "bitbucket" ]; then
 fi
 
 if [ $COMMENT_RC -ne 0 ]; then
-  echo "❌ Failed to post fix-summary comment ($PLATFORM). Comment body printed below for manual posting:"
-  echo "$COMMENT_BODY"
-  exit 1
+  echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
 fi
 ```
 
-**Verify the comment was posted**: Confirm the platform-appropriate call exited with code 0 (`COMMENT_RC=0`). If it fails (network error, auth issue), report the error to the user and retry or provide the comment body for manual posting. Do NOT mark the workflow complete until the comment is confirmed posted.
+**Non-blocking**: If the platform-appropriate call fails (`COMMENT_RC != 0`), log the warning and continue. Do not halt or retry. The implementation report (in git) is the durable audit trail; this PR comment is convenience only.
 
 **Jira tracker comment (optional — after PR comment confirmed):**
 

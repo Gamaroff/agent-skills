@@ -87,7 +87,7 @@ Activate this skill when:
 | Write QA report                 | Create co-located `task.{id}.qa.N.*.md` report file                         |
 | Write gate YAML                 | Create co-located `task.{id}.gate.N.*.yml` file                             |
 | Update task file                | Add QA Results section, update status, link artifacts                        |
-| Post PR comment                 | Post QA summary to PR via `gh pr comment` — CRITICAL / BLOCKING             |
+| Post PR comment                 | Post QA gate decision to PR via `gh pr comment` — best-effort, non-blocking |
 | Communicate to user             | Output final summary with gate decision and next steps                       |
 
 ---
@@ -642,9 +642,17 @@ Add a QA Results section to the task document:
 - FAIL → Status: "In Progress" (requires fixes before re-review)
 - WAIVED → Status: "Completed" (with waiver notes)
 
-### Step 13: Post PR Comment — CRITICAL / BLOCKING
+### Step 13: Post PR Comment — Best-effort, non-blocking
 
-**This step is mandatory. The review is NOT complete until the PR comment is confirmed posted. Do not skip, defer, or treat as optional.**
+**PR-comment authorship contract**:
+
+| Skill | Owns |
+|---|---|
+| `qa-task` | Per-cycle gate decision (best-effort, non-blocking) |
+| `qa-fix` | Per-cycle fix summary (best-effort, non-blocking) |
+| `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
+
+**This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
 
 Use the PR metadata stored in the Prerequisites step. Run:
 
@@ -686,10 +694,8 @@ gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
 2. {Step 2}
 
 ---
-"
+" || echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
 ```
-
-**Verify the comment was posted**: Confirm `gh pr comment` exited with code 0. If it fails, report the error to the user and retry or provide the comment body for manual posting. **Do NOT proceed to Step 13b until the comment is confirmed posted.**
 
 ### Step 13b: Comment on GitHub Issue (graceful — non-blocking)
 

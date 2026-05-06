@@ -4,7 +4,7 @@ title: "Consolidate PR-comment fan-out under finalise"
 type: task
 category: refactoring
 priority: Medium
-status: 📋 Planned
+status: 🔍 Ready for Review
 created: 2026-05-06
 assignee: TBD
 effort: 0.5 day
@@ -15,19 +15,23 @@ source_plan: ~/.claude/plans/review-the-develop-task-and-reactive-boot.md (Findi
 
 # Task 10 — Consolidate PR-comment fan-out under finalise
 
+**Review**: ✅ All review recommendations from `task.10.pr-comment-consolidation.review.2026-05-06.md` implemented 2026-05-06
+
 ## 1. Overview
 
-Four skills (`create-pr`, `qa-task`, `qa-fix`, `finalise`) each post their own PR comment as a "BLOCKING" step. In a `/develop-task` run with 3 QA cycles that's ≥6 PR comments. There is no designated owner of a final summary and no de-dup contract — comments accrete noise rather than narrative.
+Three skills (`qa-task`, `qa-fix`, `finalise`) each post their own PR comment as a "BLOCKING" step. For N QA cycles a `/develop-task` run produces up to 2N+1 PR comments (qa-task per cycle + qa-fix per cycle + finalise summary). There is no designated owner of a final summary and no de-dup contract — comments accrete noise rather than narrative.
 
-**Scope**: demote intermediate comments to non-blocking, designate `finalise` as the canonical summary author, and cross-reference the artifacts.
+(`create-pr` Step 6b posts an *issue* comment, not a PR comment, and is already non-blocking — out of scope.)
+
+**Scope**: demote intermediate PR comments to non-blocking, designate `finalise` as the canonical summary author with marker-based idempotency, and cross-reference the artifacts.
 
 **Key deliverables**:
 
-- `create-pr`, `qa-task`, `qa-fix` PR-comment steps relabelled "best-effort, non-blocking"
-- `finalise` posts a single canonical summary comment listing PR + QA cycles + DoD path
-- All four skills cross-reference each other so it's clear which step owns which comment
+- `qa-task`, `qa-fix` PR-comment steps relabelled "best-effort, non-blocking"
+- `finalise` posts a single canonical summary comment listing PR + QA cycle count + DoD path, idempotent via HTML-comment marker
+- All three skills carry a comment-authorship table inside their PR-comment step
 
-**Expected outcome**: PR comment chain becomes readable — opened, then a single closing summary — instead of a noisy 4–6-comment fan-out.
+**Expected outcome**: PR comment chain compresses from up to 2N+1 to N+1 (N intermediate non-blocking + 1 canonical), and the canonical summary edits in place on re-run.
 
 ## 2. Motivation
 
@@ -45,11 +49,10 @@ Four skills (`create-pr`, `qa-task`, `qa-fix`, `finalise`) each post their own P
 
 ## 3. Technical Background
 
-Current comment-posting steps:
+Current PR-comment posting steps:
 
 | Skill | Step | Currently |
 |---|---|---|
-| `create-pr` | Step 6b | BLOCKING — verify comment posted |
 | `qa-task` | Step 13 | BLOCKING — gate decision posted |
 | `qa-fix` | Step 7 | BLOCKING — fix summary posted |
 | `finalise` | Step 7 | Posts acceptance comment after tracker issue update |
@@ -58,18 +61,19 @@ Target authorship:
 
 | Skill | After change |
 |---|---|
-| `create-pr` | Best-effort initial comment (PR opened, links to docs) — non-blocking |
 | `qa-task` | Best-effort gate decision comment — non-blocking |
 | `qa-fix` | Best-effort fix-applied comment — non-blocking |
-| `finalise` | **Canonical summary**: PR + final gate + QA cycle count + DoD path + accepted status |
+| `finalise` | **Canonical summary**: PR + final gate + QA cycle count + DoD path + accepted status. Idempotent via marker. |
+
+(`create-pr` Step 6b is unchanged — it posts an issue comment via `gh issue comment` and is already labelled "graceful — non-blocking".)
 
 ## 4. Scope
 
 **In Scope**:
 
-- ✅ Wording changes in 3 skills to mark comment posting non-blocking
-- ✅ `finalise` summary template extended to include QA cycle history (read from implementation report)
-- ✅ Cross-references between the 4 skills
+- ✅ Wording changes in `qa-task` and `qa-fix` to mark PR-comment posting non-blocking
+- ✅ `finalise` summary template extended to include QA cycle count (greped from implementation report) and idempotent via marker
+- ✅ Comment-authorship table embedded in PR-comment step of `qa-task`, `qa-fix`, `finalise`
 
 **Out of Scope**:
 
@@ -79,7 +83,7 @@ Target authorship:
 
 ## 5. Breaking Changes
 
-None functional. A pipeline run now produces ~2 PR comments instead of ~4–6 in the best case, but each skill still emits its own comment when it succeeds.
+None functional. A pipeline run with N QA cycles now produces ~N+1 PR comments instead of up to 2N+1, but each skill still emits its own comment when it succeeds (just non-blocking on intermediate ones).
 
 ## 6. Implementation Plan
 
@@ -87,17 +91,16 @@ None functional. A pipeline run now produces ~2 PR comments instead of ~4–6 in
 
 Files:
 
-- `skills/create-pr/SKILL.md` — Step 6b
 - `skills/qa-task/SKILL.md` — Step 13
 - `skills/qa-fix/SKILL.md` — Step 7
 
 Changes:
 
-- [ ] Replace "CRITICAL / BLOCKING: Verify comment was posted" → "Best-effort, non-blocking: log failure but do not halt"
-- [ ] Wrap each `gh pr comment` call with a `|| echo "PR comment failed — non-blocking"` style guard
-- [ ] Add a one-line note: "Final canonical summary is posted by `/finalise` at pipeline end"
+- [x] Replace "CRITICAL / BLOCKING: Verify comment was posted" → "Best-effort, non-blocking: log failure but do not halt"
+- [x] Wrap each `gh pr comment` / Bitbucket REST call with a `|| echo "⚠️ PR comment failed — non-blocking"` style guard
+- [x] Add a one-line note in each step: "Final canonical summary is posted by `/finalise` at pipeline end"
 
-### Phase 2 — Extend finalise summary (Risk: Medium)
+### Phase 2 — Extend finalise summary with idempotency (Risk: Medium)
 
 Files:
 
@@ -105,25 +108,53 @@ Files:
 
 Changes:
 
-- [ ] Update Step 7 PR comment template to include: PR URL, final gate decision, QA cycle count, DoD summary path, accepted status, links to QA reports
-- [ ] Read QA cycle count from the implementation report (`### QA Cycle` grep) when called from `develop-task` / `develop-story`
-- [ ] Keep the comment idempotent (re-runs of finalise update rather than duplicate the comment if possible — best effort)
+- [x] Update Step 7 PR comment template to include: PR URL, final gate decision, QA cycle count, DoD summary path, accepted status, links to QA reports.
+- [x] Prepend body with HTML-comment marker: `<!-- finalise-canonical-summary -->`.
+- [x] Read QA cycle count by grepping the implementation report:
+      ```bash
+      CYCLES=$(grep -c '^### QA Cycle' "$IMPLEMENTATION_REPORT" 2>/dev/null || echo 0)
+      ```
+      Resolve `$IMPLEMENTATION_REPORT` from the path passed by `develop-task` / `develop-story`. If unset or grep fails → omit the cycle-count line from the summary (do not halt).
+- [x] Implement marker-based idempotency:
+      ```bash
+      EXISTING=$(gh pr view "$PR_URL" --json comments \
+        -q '.comments[] | select(.body | startswith("<!-- finalise-canonical-summary -->")) | .url' \
+        | head -1)
+      if [ -n "$EXISTING" ]; then
+        # edit existing canonical comment via its URL/ID — do not rely on --edit-last ordering
+        # (GitHub: gh api -X PATCH /repos/{owner}/{repo}/issues/comments/{id}; Bitbucket: REST PATCH)
+      else
+        gh pr comment "$PR_URL" --body "$BODY"
+      fi
+      ```
+      Bitbucket: equivalent search via `GET /repositories/.../pullrequests/{id}/comments` filtering on the marker, then `PUT` to update or `POST` to create.
 
-### Phase 3 — Cross-references (Risk: Low)
+### Phase 3 — Comment authorship contract (Risk: Low)
 
 Files:
 
-- All 4 skills above
+- `skills/qa-task/SKILL.md` (Step 13)
+- `skills/qa-fix/SKILL.md` (Step 7)
+- `skills/finalise/SKILL.md` (Step 7)
 
 Changes:
 
-- [ ] Add a "Comment Authorship" subsection to each skill's PR-comment section explaining who owns what
+- [x] Embed an identical authorship table inside each PR-comment step:
+
+  ```markdown
+  **PR-comment authorship contract**:
+
+  | Skill | Owns |
+  |---|---|
+  | `qa-task` | Per-cycle gate decision (best-effort, non-blocking) |
+  | `qa-fix` | Per-cycle fix summary (best-effort, non-blocking) |
+  | `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
+  ```
 
 ## 7. Files Summary
 
 **Modified**:
 
-- `skills/create-pr/SKILL.md`
 - `skills/qa-task/SKILL.md`
 - `skills/qa-fix/SKILL.md`
 - `skills/finalise/SKILL.md`
@@ -132,18 +163,20 @@ Changes:
 
 - **Manual**: run `/develop-task` against a sandbox task with 1–2 QA cycles. Verify PR has: 1 open comment, optional intermediate comments per cycle, 1 final summary comment from finalise.
 - **Failure mode**: temporarily revoke `gh pr comment` permission; verify pipeline completes (intermediate comments are non-blocking).
+- **Idempotency**: re-run `/finalise` against the same PR. Assert exactly one comment whose body starts with `<!-- finalise-canonical-summary -->` exists; assert the second run edited the existing comment (same comment ID/URL) rather than creating a new one.
 
 ## 9. Success Criteria
 
 **Functional**:
 
-- [ ] Pipeline does not halt when intermediate PR comment fails
-- [ ] `finalise` posts a single canonical summary comment with all cross-references
-- [ ] Authorship table present in all 4 skills
+- [x] Pipeline does not halt when intermediate PR comment fails
+- [x] `finalise` posts a single canonical summary comment with all cross-references
+- [x] Re-running `finalise` edits the existing canonical comment (matched by marker) instead of duplicating
+- [x] Authorship table present in all 3 affected skills (`qa-task`, `qa-fix`, `finalise`)
 
 **Code Quality**:
 
-- [ ] Each affected skill documents the new comment ownership rule
+- [x] Each affected skill documents the new comment ownership rule
 
 ## 10. Risk Assessment
 
@@ -153,10 +186,41 @@ Changes:
 
 **Low Risk** — Idempotency of finalise summary on resume:
 
-- Mitigation: best-effort idempotency; document that re-running finalise may duplicate the summary.
+- Mitigation: marker-based detection (`<!-- finalise-canonical-summary -->`) + edit by comment URL/ID. Re-runs update in place.
+
+**Low Risk** — Wrong-comment edit:
+
+- Mitigation: target edits via the comment URL/ID returned from the marker search; do NOT rely on `--edit-last` ordering, which would clobber a stray most-recent comment. Search-then-edit only.
 
 ## 11. Rollback Plan
 
 **Immediate (< 30 min)**: revert the wording changes; comments return to blocking. No state change to roll back.
 
 **Triggers**: a real project relies on intermediate comments as the authoritative source (unlikely — implementation report is canonical).
+
+---
+
+## Dev Agent Record
+
+**Implementation Summary**: Demoted qa-task and qa-fix PR comments to non-blocking, designated finalise as canonical PR-comment author with marker-based idempotency, and embedded authorship contract tables in all three skills.
+
+**Start Date**: 2026-05-06
+**Completion Date**: 2026-05-06
+
+**Implementation Approach**:
+
+- Phase 1: `skills/qa-task/SKILL.md` Step 13 — renamed heading to "Best-effort, non-blocking", added authorship table, added `|| echo "⚠️..."` guard, removed blocking halt on failure. Also updated the overview table at L90.
+- Phase 1: `skills/qa-fix/SKILL.md` Step 7 — renamed heading to "Best-effort, non-blocking", added authorship table, replaced `exit 1` on failure with `⚠️` echo, removed "Do NOT mark complete until confirmed" requirement.
+- Phase 2: `skills/finalise/SKILL.md` Step 7 "Add PR Comment" — replaced simple comment template with full canonical summary: marker `<!-- finalise-canonical-summary -->`, QA cycle count grep from `$IMPLEMENTATION_REPORT`, idempotent search-then-edit (GitHub: `gh api -X PATCH /repos/.../issues/comments/{id}`; Bitbucket: `PUT .../pullrequests/{id}/comments/{id}`), all failure paths non-blocking.
+- Phase 3: Authorship contract table embedded in PR-comment step of all three skills (identical 3-row table).
+
+**Testing Results**: No automated tests (SKILL.md instruction files — manual validation only per §8 Testing Strategy).
+
+**Files Modified**:
+- `skills/qa-task/SKILL.md`
+- `skills/qa-fix/SKILL.md`
+- `skills/finalise/SKILL.md`
+- `docs/development/tasks/task.10.pr-comment-consolidation/task.10.pr-comment-consolidation.md` (status + checkboxes)
+
+**Change Log**:
+- 2026-05-06: All three phases implemented. Task marked Ready for Review.
