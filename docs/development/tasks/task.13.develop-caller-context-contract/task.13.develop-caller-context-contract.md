@@ -4,16 +4,19 @@ title: "Document caller-supplied context contract in /develop"
 type: task
 category: documentation
 priority: Low
-status: 📋 Planned
+status: ready-for-review
 created: 2026-05-06
 assignee: TBD
 effort: 0.25 day
-depends_on: —
+depends_on: none
 github_issue: 20
 source_plan: ~/.claude/plans/review-the-develop-task-and-reactive-boot.md (Finding #7)
 ---
 
 # Task 13 — Document caller-supplied context contract in `/develop`
+
+**Status:** Ready for Review
+**Review:** ✅ All review recommendations from `task.13.develop-caller-context-contract.review.2026-05-06.md` implemented 2026-05-06
 
 ## 1. Overview
 
@@ -77,9 +80,9 @@ Files:
 
 Changes:
 
-- [ ] Add "Caller-Supplied Context" subsection near the top of the workflow section
-- [ ] Enumerate the three supported context types with examples
-- [ ] State the rule: "If a caller prepends one of these, treat as authoritative — do not re-Explore or re-read"
+- [x] Add "Caller-Supplied Context" subsection near the top of the workflow section
+- [x] Enumerate the three supported context types with examples
+- [x] State the rule: "If a caller prepends one of these, treat as authoritative — do not re-Explore or re-read"
 
 ### Phase 2 — Cross-reference from pipeline refs (Risk: Low)
 
@@ -89,7 +92,7 @@ Files:
 
 Changes:
 
-- [ ] Add a one-line link: "See `develop` skill's Caller-Supplied Context section for the contract"
+- [x] Add a one-line link: "See `develop` skill's Caller-Supplied Context section for the contract"
 
 ## 7. Files Summary
 
@@ -107,8 +110,8 @@ Changes:
 
 **Functional**:
 
-- [ ] `develop/SKILL.md` documents the caller-supplied context types
-- [ ] `develop-pipeline-step-3-develop-loop.md` cross-references the contract
+- [x] `develop/SKILL.md` documents the caller-supplied context types
+- [x] `develop-pipeline-step-3-develop-loop.md` cross-references the contract
 
 **Code Quality**:
 
