@@ -1,10 +1,10 @@
 # Overview
 
-Skills are modular, self-contained packages that extend Claude Code with specialized workflows, domain knowledge, and tooling. Install them into any project and Claude activates the right skill automatically based on context — or you invoke one explicitly.
+Skills are modular, self-contained packages that extend AI coding agents with specialized workflows, domain knowledge, and tooling. Install them into any project and the agent activates the right skill automatically based on context — or you invoke one explicitly.
 
 ## What is a Skill?
 
-A skill is a directory (`skills/{skill-name}/`) distributed as a `.zip`. When installed into a project under `.agents/skills/`, Claude loads skill metadata at startup and pulls in the full instructions only when the skill is needed.
+A skill is a directory (`skills/{skill-name}/`) distributed as a `.zip`. When installed into a project under `.agents/skills/`, the agent loads skill metadata at startup and pulls in the full instructions only when the skill is needed.
 
 ```
 skills/skill-name/
@@ -23,7 +23,7 @@ description: Concise description of when/why to use this skill (~100 words)
 ---
 ```
 
-The `description` is what Claude reads to decide whether to activate the skill. Make it specific and trigger-oriented, not generic.
+The `description` is what the agent reads to decide whether to activate the skill. Make it specific and trigger-oriented, not generic.
 
 ## Progressive Disclosure
 
@@ -39,7 +39,7 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 
 ## How Skills Activate
 
-**Automatic** — Claude matches your intent against skill descriptions:
+**Automatic** — The agent matches your intent against skill descriptions:
 
 ```
 "Create the next story for epic 2"       → create-story

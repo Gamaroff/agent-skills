@@ -1,12 +1,12 @@
-# Claude Skills
+# Agent Skills
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Validate Skills](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml)
 [![Skills](https://img.shields.io/badge/skills-124-brightgreen)](#skill-categories)
 
-A library of **Claude Code skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 124+ skills covering development, story management, QA, PM, architecture, validation, and more.
+A library of **AI coding agent skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 124+ skills covering development, story management, QA, PM, architecture, validation, and more.
 
-Skills live in `.agents/skills/` inside any project. Claude Code picks them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
+Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 
 ---
 
@@ -42,7 +42,7 @@ skills/my-skill/
 └── assets/           # Templates and boilerplate
 ```
 
-The `description` field in `SKILL.md` frontmatter is what Claude reads to decide whether to activate the skill. Keep it precise.
+The `description` field in `SKILL.md` frontmatter is what the agent reads to decide whether to activate the skill. Keep it precise.
 
 ---
 
@@ -65,7 +65,7 @@ ln -s "$(pwd)/agent-skills/skills" .agents/skills
 unzip <skill-name>.zip -d .agents/skills/
 ```
 
-Skills activate automatically when Claude Code starts — no further configuration needed.
+Skills activate automatically when compatible agents start — no further configuration needed.
 
 ---
 
@@ -141,7 +141,7 @@ Scaffold a new skill:
 python3 skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
 ```
 
-This generates the directory structure with a starter `SKILL.md`. Fill in the `description` frontmatter field — that's the activation trigger Claude reads.
+This generates the directory structure with a starter `SKILL.md`. Fill in the `description` frontmatter field — that's the activation trigger the agent reads.
 
 See [`docs/creating-skills.md`](./docs/creating-skills.md) for the full authoring guide, file structure, and best practices.
 
@@ -185,5 +185,5 @@ No hardcoded project names, server addresses, or credentials.
 
 ## External Resources
 
-- [Claude Code Documentation](https://docs.claude.com/en/docs/claude-code)
+- [Claude Code Documentation](https://docs.claude.com/en/docs/claude-code) — reference implementation
 - [Skills Overview](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)

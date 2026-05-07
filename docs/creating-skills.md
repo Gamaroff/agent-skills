@@ -15,7 +15,7 @@ Skills load in three tiers:
 2. **SKILL.md body** — loaded when the skill triggers
 3. **Bundled resources** — loaded as needed during execution
 
-This means the `description` field is the most critical part of a skill. It's what Claude matches against to auto-activate the skill — keep it under ~100 words, specific, and trigger-focused.
+This means the `description` field is the most critical part of a skill. It's what the agent matches against to auto-activate the skill — keep it under ~100 words, specific, and trigger-focused.
 
 ## Skill Structure
 

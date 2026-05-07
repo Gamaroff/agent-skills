@@ -1,6 +1,6 @@
 # Documentation
 
-Documentation for the Claude Skills library.
+Documentation for the Agent Skills library.
 
 ## Start Here
 
@@ -17,6 +17,6 @@ Documentation for the Claude Skills library.
 
 ## External Resources
 
-- Claude Code Documentation: https://docs.claude.com/en/docs/claude-code
+- Claude Code Documentation (reference implementation): https://docs.claude.com/en/docs/claude-code
 - Skills Overview: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
 - Project guidelines: see [CLAUDE.md](../CLAUDE.md)
