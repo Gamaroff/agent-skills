@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""
+Skill Catalog Generator
+
+Regenerates docs/skill-catalog.md from SKILL.md frontmatters.
+
+Usage:
+    python generate_catalog.py [skills_dir] [output_file]
+
+Defaults:
+    skills_dir  — <repo_root>/skills/
+    output_file — <repo_root>/docs/skill-catalog.md
+
+Categories are assigned by matching skill names against known prefixes/patterns.
+Uncategorized skills fall into "Other".
+"""
+
+import re
+import sys
+from pathlib import Path
+from datetime import date
+
+
+# ---------------------------------------------------------------------------
+# Category assignment rules — order matters (first match wins)
+# ---------------------------------------------------------------------------
+
+CATEGORIES = [
+    ("Development — Orchestration", [
+        "develop-story", "develop-task", "develop",
+    ]),
+    ("Development — Implementation", [
+        "commit-changes", "create-branch", "create-pr", "git-time-travel",
+        "correct-course", "harden", "optimize", "performance-optimizer",
+        "error-handling-enforcer", "enforce-standards",
+    ]),
+    ("Quality Assurance", [
+        "qa-fix", "qa-gate", "qa-planning", "qa-story", "qa-task",
+        "finalise", "validate-story", "review-story", "review-task",
+        "review-epic", "review-prd",
+    ]),
+    ("Architecture & Design", [
+        "architect", "create-architecture-doc", "execute-architect-checklist",
+        "mermaid-architect", "frontend-design", "create-frontend-spec",
+        "document-existing-project", "document-project",
+    ]),
+    ("Product Management & Planning", [
+        "po", "pm-coordinator", "pm-checklist", "scrum-master", "analyst",
+        "greenfield-prd", "prd-template", "create-prd", "brownfield-prd-template",
+        "shard-prd", "shard-doc", "review-prd",
+    ]),
+    ("Epic & Story Lifecycle", [
+        "create-epic", "create-epics-from-shards", "create-story", "edit-epic",
+        "edit-story", "epic-registry-manager", "ensure-epic-github-issue",
+        "ensure-epic-jira-issue", "jira-epic-creator", "parallel-stories",
+        "create-task", "create-issue", "create-bug-report",
+    ]),
+    ("Jira / GitHub Sync", [
+        "sync-jira-epic", "sync-jira-story", "sync-jira-task",
+    ]),
+    ("Validation & Enforcement", [
+        "api-endpoint-validator", "code-smell-validator",
+        "documentation-standards-validator", "navigation-pattern-validator",
+        "offline-first-enforcer", "platform-separation-validator",
+        "response-envelope-enforcer", "test-co-location-enforcer",
+    ]),
+    ("Testing", [
+        "testing-setup-nestjs", "testing-setup-react-native", "testing-setup-shared",
+    ]),
+    ("NestJS", [
+        "nestjs-debug", "nestjs-patterns",
+    ]),
+    ("React Native / Expo", [
+        "react-native-debug", "upgrading-expo", "react-email",
+    ]),
+    ("Infrastructure & DevOps", [
+        "deploy-remote", "docker", "server-admin", "use-railway",
+        "railway-postgres-crud",
+    ]),
+    ("Content & Writing", [
+        "adapt", "arrange", "bolder", "clarify", "colorize", "critique",
+        "delight", "distill", "extract", "normalize", "overdrive", "polish",
+        "quieter", "shannon", "simplify", "typeset", "book-typesetter-pro",
+        "humaniser", "humanize-text",
+    ]),
+    ("Research & Analysis", [
+        "analyst", "brainstorming", "create-research-prompt", "deep-research-prompt",
+        "research-prompt", "audit",
+    ]),
+    ("Skill Tooling", [
+        "create-skill", "find-skills", "autoskill", "agent-md-refactor",
+        "execute-checklist", "generate-ui-prompt",
+    ]),
+    ("User Experience", [
+        "ux-expert", "building-components", "animate", "browser-use",
+    ]),
+    ("Email", [
+        "email-best-practices", "resend",
+    ]),
+    ("Utilities & Misc", [
+        "change-checklist", "change-management", "command-development",
+        "create-doc", "onboard", "pro-tip", "remember-insight",
+        "teach-impeccable", "git-time-travel",
+    ]),
+]
+
+
+def find_repo_root(start: Path) -> Path:
+    p = start.resolve()
+    while p != p.parent:
+        if (p / "shared" / "resources").exists():
+            return p
+        p = p.parent
+    return start.resolve()
+
+
+def parse_frontmatter(text: str) -> dict:
+    match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
+    if not match:
+        return {}
+    fm = {}
+    for line in match.group(1).splitlines():
+        kv = re.match(r"^(\w+):\s*(.*)", line)
+        if kv:
+            fm[kv.group(1)] = kv.group(2).strip().strip('"')
+    # Handle block scalar descriptions
+    if fm.get("description") in (">", "|", ">-", "|-", ">+", "|+"):
+        block = re.search(
+            r"description:\s*[>|][+\-]?\n((?:[ \t]+.+\n?)+)", match.group(1)
+        )
+        if block:
+            fm["description"] = " ".join(
+                l.strip() for l in block.group(1).splitlines()
+            )
+    return fm
+
+
+def assign_category(skill_name: str) -> str:
+    for cat, names in CATEGORIES:
+        if skill_name in names:
+            return cat
+    return "Other"
+
+
+def truncate(text: str, max_words: int = 25) -> str:
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    return " ".join(words[:max_words]) + "…"
+
+
+def generate_catalog(skills_dir: Path, output_file: Path) -> None:
+    skills = {}
+    for skill_path in sorted(skills_dir.iterdir()):
+        if not skill_path.is_dir():
+            continue
+        skill_md = skill_path / "SKILL.md"
+        if not skill_md.exists():
+            continue
+        fm = parse_frontmatter(skill_md.read_text())
+        name = fm.get("name", skill_path.name)
+        desc = fm.get("description", "")
+        cat = assign_category(name)
+        skills.setdefault(cat, []).append((name, truncate(desc)))
+
+    lines = [
+        "# Skill Catalog",
+        "",
+        f"Categorized index of all {sum(len(v) for v in skills.values())} skills in this library.",
+        "",
+        "> **Note:** This file is auto-generated by `skills/create-skill/scripts/generate_catalog.py`.",
+        "> Run `npm run generate-catalog` to regenerate after adding or editing skills.",
+        "",
+    ]
+
+    # Ordered categories first, then "Other"
+    ordered_cats = [cat for cat, _ in CATEGORIES if cat in skills]
+    if "Other" in skills:
+        ordered_cats.append("Other")
+
+    for cat in ordered_cats:
+        entries = skills[cat]
+        lines.append(f"## {cat}")
+        lines.append("")
+        lines.append("| Skill | Description |")
+        lines.append("| ----- | ----------- |")
+        for name, desc in sorted(entries, key=lambda x: x[0]):
+            lines.append(f"| `{name}` | {desc} |")
+        lines.append("")
+
+    output_file.write_text("\n".join(lines))
+    total = sum(len(v) for v in skills.values())
+    print(f"✅ Generated catalog with {total} skills → {output_file}")
+
+
+def main():
+    script_dir = Path(__file__).resolve().parent
+    repo_root = find_repo_root(script_dir)
+
+    skills_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else repo_root / "skills"
+    output_file = Path(sys.argv[2]) if len(sys.argv) > 2 else repo_root / "docs" / "skill-catalog.md"
+
+    if not skills_dir.exists():
+        print(f"❌ Skills directory not found: {skills_dir}")
+        sys.exit(1)
+
+    generate_catalog(skills_dir, output_file)
+
+
+if __name__ == "__main__":
+    main()

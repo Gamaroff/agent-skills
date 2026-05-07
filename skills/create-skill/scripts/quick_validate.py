@@ -63,6 +63,7 @@ def validate_skill(skill_path):
             return False, f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
 
     # Extract and validate description
+    warnings = []
     desc_match = re.search(r'description:\s*(.+)', frontmatter)
     if desc_match:
         description = desc_match.group(1).strip()
@@ -74,6 +75,12 @@ def validate_skill(skill_path):
         # Check for angle brackets
         if '<' in description or '>' in description:
             return False, "Description cannot contain angle brackets (< or >)"
+        # Warn if description is too short or too long (target: ~100 words)
+        word_count = len(description.split())
+        if word_count < 10:
+            warnings.append(f"Description is very short ({word_count} words); aim for ~100 words for reliable auto-activation")
+        elif word_count > 150:
+            warnings.append(f"Description is long ({word_count} words); descriptions over 150 words consume unnecessary context — aim for ~100")
 
     # Check shared/resources/ references exist at repo level
     repo_root = find_repo_root(skill_path)
@@ -88,13 +95,16 @@ def validate_skill(skill_path):
             if not src.exists():
                 return False, f"shared/resources/{filename} referenced but file does not exist"
 
+    for w in warnings:
+        print(f"⚠️  Warning: {w}")
+
     return True, "Skill is valid!"
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
-    
+
     valid, message = validate_skill(sys.argv[1])
     print(message)
     sys.exit(0 if valid else 1)

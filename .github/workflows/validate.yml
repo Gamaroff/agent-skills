@@ -32,3 +32,26 @@ jobs:
             fi
           done
           exit $FAILED
+
+      - name: Packaging smoke test (changed skills)
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '^skills/' | cut -d/ -f1-2 | sort -u)
+          if [ -z "$CHANGED" ]; then
+            echo "No skill directories changed — skipping packaging test."
+            exit 0
+          fi
+          FAILED=0
+          cd skills/create-skill/scripts
+          for SKILL_DIR in $CHANGED; do
+            SKILL_ABS="$(pwd)/../../..$SKILL_DIR"
+            # strip leading slash added by concatenation
+            SKILL_ABS=$(realpath "../../../$SKILL_DIR" 2>/dev/null || echo "../../../$SKILL_DIR")
+            if [ -f "../../../$SKILL_DIR/SKILL.md" ]; then
+              echo "Packaging $SKILL_DIR..."
+              OUTDIR=$(mktemp -d)
+              python3 package_skill.py "../../../$SKILL_DIR" "$OUTDIR" || FAILED=1
+              rm -rf "$OUTDIR"
+            fi
+          done
+          exit $FAILED
