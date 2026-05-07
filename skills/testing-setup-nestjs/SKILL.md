@@ -453,7 +453,7 @@ describe('User with Relations', () => {
       handle: '@alice',
       wallets: [
         { id: 'w1', currency: 'USD', balance: 1000 },
-        { id: 'w2', currency: 'BSV', balance: 0.5 }
+        { id: 'w2', currency: 'EUR', balance: 0.5 }
       ]
     };
 

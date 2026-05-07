@@ -405,7 +405,7 @@ Generate a concrete, step-by-step walkthrough for verifying this story in the ru
 **Structure to generate**:
 ```markdown
 **Prerequisites**:
-- App running (`npm run my-wallet:start:device`)
+- App running (`npm run {app-name}:start:device`)
 - [Auth state, seeded data, or feature flags required]
 
 **Navigation Path**:

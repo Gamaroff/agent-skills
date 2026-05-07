@@ -185,8 +185,8 @@ For stories identified as parallel-safe:
 
    ```
    Modifies:
-   - apps/my-wallet/app/(drawer)/auth/login.tsx
-   - apps/my-wallet/components/LoginForm.tsx
+   - apps/{app-name}/app/(drawer)/auth/login.tsx
+   - apps/{app-name}/components/LoginForm.tsx
 
    Does NOT modify:
    - Backend files
@@ -266,7 +266,7 @@ cd ../worktrees/story-1-1
 npm install
 
 # Run development servers
-npx nx serve my-wallet
+npx nx serve {app-name}
 ```
 
 **Development**:
@@ -290,7 +290,7 @@ git push -u origin feature/story-1-1-1
 
 ```bash
 # Run tests
-npx nx test my-wallet
+npx nx test {app-name}
 
 # Create pull request
 gh pr create --title "Story 1-1: Login UI"
@@ -374,9 +374,9 @@ git worktree remove ../worktrees/story-1-1
 
 **File Boundaries** (MUST RESPECT):
 
-- ✅ apps/my-wallet/app/(drawer)/auth/login.tsx
-- ✅ apps/my-wallet/components/LoginForm.tsx
-- ✅ apps/my-wallet/components/auth/\*
+- ✅ apps/{app-name}/app/(drawer)/auth/login.tsx
+- ✅ apps/{app-name}/components/LoginForm.tsx
+- ✅ apps/{app-name}/components/auth/\*
 - ❌ apps/{api-service}/\*\* (modified by Story 1-2)
 - ❌ libs/auth-lib/\*\* (modified by Story 1-3)
 
@@ -433,7 +433,7 @@ git commit -m "Implement login form validation"
 
 ```bash
 # Run tests for affected modules only
-npx nx test my-wallet --testPathPattern=auth
+npx nx test {app-name} --testPathPattern=auth
 ```
 
 **4. Pull Request**:
@@ -527,7 +527,7 @@ These stories must be developed in order after parallel stories complete.
 ### Preventing Conflicts
 
 **File Boundaries** (strictly enforced):
-- Story 1-1: `apps/my-wallet/app/(drawer)/auth/**`
+- Story 1-1: `apps/{app-name}/app/(drawer)/auth/**`
 - Story 1-2: `apps/{api-service}/src/modules/auth/**`
 - Story 1-3: `libs/auth-lib/src/**`
 

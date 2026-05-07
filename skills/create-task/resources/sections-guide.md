@@ -27,7 +27,7 @@ architecture from 3 tiers (L1/L2/L3) to 2 tiers (L1/L2) by removing
 AsyncStorage redundancy and promoting WatermelonDB from L3 to L2.
 
 **Scope**: Affects `libs/cache-lib/` and `apps/{api-service}/` only.
-**Excludes** `apps/my-wallet/`.
+**Excludes** `apps/{app-name}/`.
 ```
 
 ### Key Points
@@ -222,7 +222,7 @@ AsyncStorage is being removed **only from cache-lib** as a cache tier.
 
 ### Out of Scope
 
-❌ `apps/my-wallet/` - Excluded per requirements
+❌ `apps/{app-name}/` - Excluded per requirements
 ❌ Production deployment - Implementation only
 ❌ Performance benchmarking - Basic testing only
 ```
@@ -905,7 +905,7 @@ For each risk:
 ### Important Reminders
 
 1. **AsyncStorage Still Exists**: It's only being removed from cache-lib,
-   not from the project. It's still used in my-wallet for app settings.
+   not from the project. It's still used in {app-name} for app settings.
 
 2. **Server Unchanged**: Server architecture is already 2-tier and requires
    minimal changes (only stats).

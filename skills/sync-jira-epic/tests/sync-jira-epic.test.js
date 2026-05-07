@@ -180,8 +180,8 @@ test("syncLabelFor — derives label from epic dir name", () => {
 // ---------------------------------------------------------------------------
 test("upsertFrontmatterKeys — updates jira_key in place", () => {
   const src = `---\ntitle: "X"\njira_key: "OLD-1"\n---\n\nbody\n`;
-  const out = lib.upsertFrontmatterKeys(src, { jira_key: "RB-99" });
-  assert.match(out, /jira_key: "RB-99"/);
+  const out = lib.upsertFrontmatterKeys(src, { jira_key: "PROJ-99" });
+  assert.match(out, /jira_key: "PROJ-99"/);
   assert.doesNotMatch(out, /OLD-1/);
 });
 
@@ -321,7 +321,7 @@ test("findExistingByLabel — POSTs to /rest/api/3/search/jql with JSON body", a
     return {
       ok: true,
       status: 200,
-      json: async () => ({ issues: [{ key: "RB-42", fields: { updated: "2026-04-28T09:00:00.000+0000" } }] }),
+      json: async () => ({ issues: [{ key: "PROJ-42", fields: { updated: "2026-04-28T09:00:00.000+0000" } }] }),
     };
   };
   const result = await lib.findExistingByLabel({
@@ -335,7 +335,7 @@ test("findExistingByLabel — POSTs to /rest/api/3/search/jql with JSON body", a
   assert.match(body.jql, /project = "RB"/);
   assert.match(body.jql, /labels = "synced-from-epic.1.foo"/);
   assert.deepEqual(body.fields, ["summary", "updated"]);
-  assert.equal(result.key, "RB-42");
+  assert.equal(result.key, "PROJ-42");
   assert.equal(result.updated, "2026-04-28T09:00:00.000+0000");
 });
 
@@ -361,7 +361,7 @@ test("findExistingByLabel — non-OK response returns null", async () => {
 test("fetchUpdatedTimestamp — returns null on non-OK without throwing", async () => {
   const fakeHttp = async () => ({ ok: false, status: 500 });
   const ts = await lib.fetchUpdatedTimestamp({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "RB-1",
+    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "PROJ-1",
   });
   assert.equal(ts, null);
 });
@@ -372,7 +372,7 @@ test("fetchUpdatedTimestamp — returns timestamp on success", async () => {
     json: async () => ({ fields: { updated: "2026-04-28T10:00:00.000+0000" } }),
   });
   const ts = await lib.fetchUpdatedTimestamp({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "RB-1",
+    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "PROJ-1",
   });
   assert.equal(ts, "2026-04-28T10:00:00.000+0000");
 });
@@ -380,7 +380,7 @@ test("fetchUpdatedTimestamp — returns timestamp on success", async () => {
 test("fetchUpdatedTimestamp — swallows http throws and returns null", async () => {
   const fakeHttp = async () => { throw new Error("network blew up"); };
   const ts = await lib.fetchUpdatedTimestamp({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "RB-1",
+    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "PROJ-1",
   });
   assert.equal(ts, null);
 });

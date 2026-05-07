@@ -2,108 +2,87 @@
 
 ## Document Information
 
-**Project**: NestJS API Backend  
-**Purpose**: Define comprehensive API standards, endpoints, and data models for NestJS backend services
-**Priority**: High
-**Version**: 1.0  
-**Date**: July 2025  
-**Owner**: Project maintainer
-
-## Related Documentation
-
--   **Technical Architecture**: See [Technical Architecture](technical-architecture.md) for system design and infrastructure decisions
--   **Database Schema**: See [Database Schema](database-schema.md) for data models supporting these APIs
--   **Product Requirements**: See [Product Requirements](../product/product-requirements.md) for feature specifications driving API design
--   **Development Workflow**: See [Development Workflow](development-workflow.md) for implementation procedures
+**Purpose**: Define comprehensive API standards, endpoints, and data models for NestJS backend services  
+**Priority**: High  
+**Version**: 1.0
 
 ## API Overview
 
 ### Purpose
 
-The API serves as the unified backend for client applications and admin portals, providing secure, scalable endpoints for business operations, user management, and real-time communications.
+The API serves as the unified backend for client applications, providing secure, scalable endpoints for business operations, user management, and data access.
 
 **Key Capabilities:**
 
--   User and account management
--   Resource CRUD operations with pagination and filtering
--   Real-time data via WebSocket connections
--   Role-based access control and authentication
--   Administrative oversight and management
+- User and account management
+- Resource CRUD operations with pagination and filtering
+- Real-time data via WebSocket connections
+- Role-based access control and authentication
+- Administrative oversight and management
 
 ### Base URL Structure
 
--   **Development**: `http://localhost:3000/api/v1`
--   **Staging**: `https://staging-api.yourdomain.com/api/v1`
--   **Production**: `https://api.yourdomain.com/api/v1`
+- **Development**: `http://localhost:3000/api/v1`
+- **Staging**: `https://staging-api.yourdomain.com/api/v1`
+- **Production**: `https://api.yourdomain.com/api/v1`
 
 ### API Architecture
 
--   **Primary**: REST API with standard HTTP methods
--   **Real-time**: WebSocket connections for chat and live updates
--   **Authentication**: JWT-based authentication with role-based access control
--   **API Gateway**: Kong for routing, rate limiting, and security
+- **Primary**: REST API with standard HTTP methods
+- **Real-time**: WebSocket connections for live updates
+- **Authentication**: JWT-based authentication with role-based access control
 
 ## Authentication & Authorization
 
-### Authentication Strategy
+### JWT Structure
 
-**Mobile Users:**
+**Standard User:**
 
 ```typescript
-interface MobileJWT {
-    sub: string // User ID
-    role: 'mobile_user'
+interface UserJWT {
+    sub: string        // User ID
+    role: 'user' | 'admin'
     permissions: string[]
-    kycLevel: 'tier1' | 'tier2' | 'tier3'
-    handle: string // handle without @ prefix (e.g., 'john_nairobi')
     iat: number
-    exp: number // 24 hours for access tokens
+    exp: number        // 24 hours for access tokens
 }
 ```
 
-**Admin Users:**
+**Admin User:**
 
 ```typescript
 interface AdminJWT {
-    sub: string // Admin ID
-    role:
-        | 'admin_super'
-        | 'admin_regional'
-        | 'admin_compliance'
-        | 'admin_support'
+    sub: string        // Admin ID
+    role: 'admin_super' | 'admin_regional' | 'admin_support'
     permissions: string[]
-    territoryAccess?: string[]
     iat: number
-    exp: number // 8 hours for admin tokens
+    exp: number        // 8 hours for admin tokens
 }
 ```
 
 ### Authorization Levels
 
--   **Guest**: Public endpoints (registration, password reset)
--   **Mobile User**: Authenticated mobile app users with KYC-based limits
--   **Admin**: Administrative users with role-based permissions
--   **System**: Internal service-to-service communication
+- **Guest**: Public endpoints (registration, password reset)
+- **Authenticated User**: Standard authenticated users
+- **Admin**: Administrative users with role-based permissions
+- **System**: Internal service-to-service communication
 
 ### Required Headers
 
 ```
 Authorization: Bearer <jwt_token>
 Content-Type: application/json
-X-Device-ID: <device_fingerprint>     // Mobile only
-X-App-Version: <version>              // Mobile only
-X-Admin-Session: <session_id>         // Admin only
 ```
 
 ## API Standards
 
 ### HTTP Methods
 
--   `GET`: Retrieve data
--   `POST`: Create new resources
--   `PUT`: Update entire resources
--   `PATCH`: Partial updates
--   `DELETE`: Remove resources
+- `GET`: Retrieve data
+- `POST`: Create new resources
+- `PUT`: Update entire resources
+- `PATCH`: Partial updates
+- `DELETE`: Remove resources
 
 ### Success Response Format
 
@@ -117,7 +96,6 @@ X-Admin-Session: <session_id>         // Admin only
         "version": "v1",
         "requestId": "req_123456789",
         "pagination": {
-            // For paginated responses
             "page": 1,
             "limit": 20,
             "total": 150,
@@ -135,8 +113,8 @@ X-Admin-Session: <session_id>         // Admin only
 {
     "success": false,
     "error": {
-        "code": "INSUFFICIENT_BALANCE",
-        "message": "Insufficient wallet balance for this transaction",
+        "code": "INSUFFICIENT_FUNDS",
+        "message": "Insufficient funds for this transaction",
         "details": {
             "required": "100.50",
             "available": "75.25",
@@ -168,11 +146,10 @@ VAL_003: 'INVALID_FIELD_VALUE'
 VAL_004: 'FIELD_LENGTH_EXCEEDED'
 
 // Business Logic
-BIZ_001: 'INSUFFICIENT_BALANCE'
-BIZ_002: 'KYC_VERIFICATION_REQUIRED'
-BIZ_003: 'TRANSACTION_LIMIT_EXCEEDED'
-BIZ_004: 'RECIPIENT_NOT_FOUND'
-BIZ_005: 'DUPLICATE_HANDLE'
+BIZ_001: 'RESOURCE_NOT_FOUND'
+BIZ_002: 'RESOURCE_ALREADY_EXISTS'
+BIZ_003: 'OPERATION_NOT_PERMITTED'
+BIZ_004: 'LIMIT_EXCEEDED'
 
 // System
 SYS_001: 'INTERNAL_SERVER_ERROR'
@@ -183,41 +160,130 @@ SYS_004: 'MAINTENANCE_MODE'
 
 ### Status Codes
 
--   `200`: Success
--   `201`: Created
--   `400`: Bad Request
--   `401`: Unauthorized
--   `403`: Forbidden
--   `404`: Not Found
--   `422`: Validation Error
--   `500`: Internal Server Error
+- `200`: Success
+- `201`: Created
+- `204`: No Content
+- `400`: Bad Request
+- `401`: Unauthorized
+- `403`: Forbidden
+- `404`: Not Found
+- `409`: Conflict
+- `422`: Validation Error
+- `500`: Internal Server Error
 
-## Mobile API Endpoints
+## Example Endpoints
 
-### Authentication & User Management
+### Resource Collection
 
-#### POST /mobile/auth/register
+#### GET /products
 
-**Description**: Register new mobile user with handle-based identity
+**Description**: List products with pagination and filtering  
+**Authorization**: Optional
+
+**Query Parameters**:
+
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 20, max: 100)
+- `search`: Full-text search term
+- `status`: Filter by status
+- `sort`: Sort field (default: createdAt)
+- `order`: Sort direction (asc/desc, default: desc)
+
+**Response**:
+
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "id": "prod_uuid",
+            "name": "Wireless Headphones",
+            "slug": "wireless-headphones",
+            "price": 99.99,
+            "currency": "USD",
+            "status": "active",
+            "createdAt": "2025-07-31T10:30:00Z"
+        }
+    ],
+    "meta": {
+        "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 150,
+            "totalPages": 8,
+            "hasNext": true,
+            "hasPrev": false
+        }
+    }
+}
+```
+
+#### POST /products
+
+**Description**: Create a new product  
+**Authorization**: Required (Admin)
+
+**Request Body**:
+
+```json
+{
+    "name": "Wireless Headphones",
+    "slug": "wireless-headphones",
+    "price": 99.99,
+    "currency": "USD",
+    "categoryId": "cat_electronics",
+    "description": "High-quality wireless headphones"
+}
+```
+
+**Response** (201 Created):
+
+```json
+{
+    "success": true,
+    "data": {
+        "id": "prod_uuid",
+        "name": "Wireless Headphones",
+        "slug": "wireless-headphones",
+        "price": 99.99,
+        "currency": "USD",
+        "status": "draft",
+        "createdAt": "2025-07-31T10:30:00Z"
+    }
+}
+```
+
+#### GET /products/:id
+
+**Description**: Get a single product by ID  
+**Authorization**: Optional
+
+#### PATCH /products/:id
+
+**Description**: Partially update a product  
+**Authorization**: Required (Admin)
+
+#### DELETE /products/:id
+
+**Description**: Delete a product  
+**Authorization**: Required (Admin)  
+**Response**: 204 No Content
+
+### User Management
+
+#### POST /auth/register
+
+**Description**: Register a new user
 
 **Request Body**:
 
 ```json
 {
     "email": "user@example.com",
-    "phone": "+1234567890",
     "password": "SecurePass123!",
-    "handle": "john_nairobi",
-    "referrerHandle": "mary_kampala",
-    "deviceInfo": {
-        "deviceId": "device_uuid",
-        "platform": "ios",
-        "version": "1.0.0"
-    }
+    "name": "Jane Smith"
 }
 ```
-
-**Note**: Handles are stored and transmitted WITHOUT the "@" prefix. The UI layer adds "@" for display purposes only.
 
 **Response**:
 
@@ -228,270 +294,54 @@ SYS_004: 'MAINTENANCE_MODE'
         "user": {
             "id": "user_uuid",
             "email": "user@example.com",
-            "handle": "john_nairobi",
-            "kycLevel": "tier1",
-            "isVerified": false
+            "name": "Jane Smith",
+            "role": "user"
         },
         "tokens": {
             "accessToken": "jwt_access_token",
             "refreshToken": "jwt_refresh_token",
             "expiresIn": 86400
-        },
-        "wallets": [
-            {
-                "id": "wallet_uuid",
-                "type": "PRIMARY",
-                "balance": "0.00000000",
-                "address": "1ABC..."
-            }
-        ]
-    }
-}
-```
-
-#### POST /mobile/auth/login
-
-**Description**: Authenticate mobile user (email, phone, or handle)
-
-**Request Body**:
-
-```json
-{
-    "identifier": "john_nairobi",
-    "password": "SecurePass123!",
-    "deviceInfo": {
-        "deviceId": "device_uuid",
-        "platform": "ios"
-    }
-}
-```
-
-**Note**: Can authenticate using email, phone, or handle (handle without "@" prefix).
-
-#### POST /mobile/auth/social
-
-**Description**: Social authentication (Google, Facebook, Apple)
-
-**Request Body**:
-
-```json
-{
-    "provider": "google",
-    "token": "social_auth_token",
-    "handle": "john_nairobi",
-    "deviceInfo": {
-        "deviceId": "device_uuid",
-        "platform": "ios"
-    }
-}
-```
-
-**Note**: Handle is required for new users and should be provided WITHOUT the "@" prefix.
-
-### Wallet Operations
-
-#### GET /mobile/wallets
-
-**Description**: Get user's wallet information
-**Authorization**: Mobile User Required
-
-**Response**:
-
-```json
-{
-    "success": true,
-    "data": {
-        "accounts": [
-            {
-                "id": "account_primary_uuid",
-                "type": "PRIMARY",
-                "balance": "150.50",
-                "currency": "USD",
-                "isActive": true
-            },
-            {
-                "id": "account_secondary_uuid",
-                "type": "SECONDARY",
-                "balance": "75.00",
-                "currency": "EUR",
-                "isActive": true
-            }
-        ],
-        "totalValueUSD": "245.75"
-    }
-}
-```
-
-#### GET /mobile/wallets/:walletId/transactions
-
-**Description**: Get wallet transaction history with pagination
-
-**Query Parameters**:
-
--   `page`: Page number (default: 1)
--   `limit`: Items per page (default: 20)
--   `type`: Filter by transaction type
--   `status`: Filter by status
-
-**Response**:
-
-```json
-{
-    "success": true,
-    "data": {
-        "transactions": [
-            {
-                "id": "tx_uuid",
-                "type": "SEND",
-                "amount": "25.00",
-                "currency": "EUR",
-                "status": "CONFIRMED",
-                "toAddress": "0x456...",
-                "toHandle": "mary_kampala",
-                "blockHeight": 12345,
-                "networkFee": "0.01",
-                "createdAt": "2025-07-31T10:30:00Z",
-                "completedAt": "2025-07-31T10:31:30Z"
-            }
-        ]
-    },
-    "meta": {
-        "pagination": {
-            "page": 1,
-            "limit": 20,
-            "total": 50,
-            "totalPages": 3
         }
     }
 }
 ```
 
-### Money Transfer Operations
+#### POST /auth/login
 
-#### POST /mobile/transactions/send
-
-**Description**: Send money to another user by handle or address
+**Description**: Authenticate a user
 
 **Request Body**:
 
 ```json
 {
-    "recipientHandle": "mary_kampala",
-    "amount": "25.00",
-    "currency": "EUR",
-    "message": "Coffee money 😄",
-    "walletId": "wallet_usd_uuid"
+    "email": "user@example.com",
+    "password": "SecurePass123!"
 }
 ```
 
-**Response**:
+#### GET /users/me
 
-```json
-{
-    "success": true,
-    "data": {
-        "transactionId": "tx_uuid",
-        "status": "PENDING",
-        "estimatedConfirmation": "2025-07-31T10:35:00Z",
-        "networkFee": "0.01",
-        "recipient": {
-            "handle": "mary_kampala",
-            "displayName": "Mary K."
-        }
-    }
-}
-```
-
-#### POST /mobile/transactions/request
-
-**Description**: Request money from another user
-
-**Request Body**:
-
-```json
-{
-    "recipientHandle": "mary_kampala",
-    "amount": "25.00",
-    "currency": "EUR",
-    "message": "Lunch split",
-    "dueDate": "2025-08-07T23:59:59Z"
-}
-```
-
-### User Management Endpoints
-
-#### GET /users/profile
-
-**Description**: Get current user profile
+**Description**: Get current user profile  
 **Authorization**: Required
 
-#### PUT /users/profile
+#### PATCH /users/me
 
-**Description**: Update user profile
+**Description**: Update current user profile  
 **Authorization**: Required
-
-#### GET /users/:id
-
-**Description**: Get user by ID
-**Authorization**: Admin only
 
 #### GET /users
 
-**Description**: List users with pagination
+**Description**: List users with pagination  
 **Authorization**: Admin only
 
 **Query Parameters**:
 
--   `page`: Page number (default: 1)
--   `limit`: Items per page (default: 10, max: 100)
--   `search`: Search term
--   `sort`: Sort field
--   `order`: Sort order (asc/desc)
-
-### [Feature Module] Endpoints
-
-#### GET /[resource]
-
-**Description**: [Description]
-**Authorization**: [Required/Optional]
-
-**Query Parameters**:
-
--   `param1`: [Description]
--   `param2`: [Description]
-
-**Response**:
-
-```json
-{
-    "success": true,
-    "data": [],
-    "meta": {
-        "pagination": {
-            "page": 1,
-            "limit": 10,
-            "total": 100,
-            "pages": 10
-        }
-    }
-}
-```
-
-#### GET /[resource]/:id
-
-**Description**: [Description]
-
-#### POST /[resource]
-
-**Description**: [Description]
-
-#### PUT /[resource]/:id
-
-**Description**: [Description]
-
-#### DELETE /[resource]/:id
-
-**Description**: [Description]
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 10, max: 100)
+- `search`: Search by name or email
+- `role`: Filter by role
+- `sort`: Sort field
+- `order`: Sort direction (asc/desc)
 
 ## Data Models
 
@@ -510,14 +360,14 @@ SYS_004: 'MAINTENANCE_MODE'
 }
 ```
 
-### [Resource] Model
+### Resource Model Template
 
 ```json
 {
     "id": "uuid",
-    "field1": "string",
-    "field2": "number",
-    "field3": "boolean",
+    "name": "string",
+    "slug": "string",
+    "status": "draft|active|archived",
     "createdAt": "ISO 8601",
     "updatedAt": "ISO 8601"
 }
@@ -527,21 +377,22 @@ SYS_004: 'MAINTENANCE_MODE'
 
 ### User Registration
 
--   `email`: Required, valid email format, unique
--   `password`: Required, minimum 8 characters, must contain uppercase, lowercase, number
--   `name`: Required, 2-50 characters
+- `email`: Required, valid email format, unique
+- `password`: Required, minimum 8 characters, must contain uppercase, lowercase, number, special character
+- `name`: Required, 2-50 characters
 
-### [Resource] Creation
+### Resource Creation
 
--   `field1`: Required, [validation rules]
--   `field2`: Optional, [validation rules]
+- `name`: Required, 1-255 characters
+- `slug`: Required, 3-100 lowercase alphanumeric characters and hyphens, unique
+- `price`: Optional, positive number with max 2 decimal places
 
 ## Pagination
 
 ### Request Parameters
 
--   `page`: Page number (default: 1)
--   `limit`: Items per page (default: 10, max: 100)
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 10, max: 100)
 
 ### Response Format
 
@@ -553,7 +404,7 @@ SYS_004: 'MAINTENANCE_MODE'
             "page": 1,
             "limit": 10,
             "total": 100,
-            "pages": 10,
+            "totalPages": 10,
             "hasNext": true,
             "hasPrev": false
         }
@@ -565,37 +416,37 @@ SYS_004: 'MAINTENANCE_MODE'
 
 ### Query Parameters
 
--   `filter[field]`: Filter by field value
--   `search`: Full-text search
--   `sort`: Sort field
--   `order`: Sort order (asc/desc)
+- `filter[field]`: Filter by field value
+- `search`: Full-text search
+- `sort`: Sort field
+- `order`: Sort direction (asc/desc)
 
 ### Example
 
 ```
-GET /users?filter[role]=admin&search=john&sort=createdAt&order=desc
+GET /products?filter[status]=active&search=headphones&sort=price&order=asc
 ```
 
 ## Rate Limiting
 
 ### Limits
 
--   **Authenticated Users**: 1000 requests per hour
--   **Guest Users**: 100 requests per hour
--   **Admin Users**: 5000 requests per hour
+- **Authenticated Users**: 1000 requests per hour
+- **Guest Users**: 100 requests per hour
+- **Admin Users**: 5000 requests per hour
 
 ### Headers
 
--   `X-RateLimit-Limit`: Request limit
--   `X-RateLimit-Remaining`: Remaining requests
--   `X-RateLimit-Reset`: Reset timestamp
+- `X-RateLimit-Limit`: Request limit
+- `X-RateLimit-Remaining`: Remaining requests
+- `X-RateLimit-Reset`: Reset timestamp
 
 ## File Upload
 
 ### Endpoint: POST /upload
 
-**Description**: Upload files
-**Content-Type**: `multipart/form-data`
+**Description**: Upload files  
+**Content-Type**: `multipart/form-data`  
 **Max File Size**: 10MB
 
 **Response**:
@@ -612,55 +463,49 @@ GET /users?filter[role]=admin&search=john&sort=createdAt&order=desc
 }
 ```
 
-## WebSocket Events (if applicable)
+## WebSocket Events
 
 ### Connection
 
--   **URL**: `ws://localhost:3000/ws`
--   **Authentication**: Query parameter `?token=jwt_token`
+- **URL**: `ws://localhost:3000/ws`
+- **Authentication**: Query parameter `?token=jwt_token`
 
 ### Events
 
--   `connect`: Client connected
--   `disconnect`: Client disconnected
--   `message`: Real-time message
--   `notification`: Push notification
+- `connect`: Client connected
+- `disconnect`: Client disconnected
+- `message`: Real-time message
+- `notification`: Push notification
 
 ## API Versioning
 
 ### Strategy
 
--   URL versioning: `/api/v1/`, `/api/v2/`
--   Backward compatibility for 2 major versions
--   Deprecation notices 6 months before removal
+- URL versioning: `/api/v1/`, `/api/v2/`
+- Backward compatibility for 2 major versions
+- Deprecation notices 6 months before removal
 
 ## Testing
 
 ### Test Categories
 
--   **Unit Tests**: Individual endpoint logic
--   **Integration Tests**: End-to-end API flows
--   **Load Tests**: Performance under load
--   **Security Tests**: Authentication and authorization
+- **Unit Tests**: Individual endpoint logic
+- **Integration Tests**: End-to-end API flows
+- **Load Tests**: Performance under load
+- **Security Tests**: Authentication and authorization
 
 ### Test Data
 
--   Use factories for consistent test data
--   Mock external services
--   Isolated test database
+- Use factories for consistent test data
+- Mock external services
+- Isolated test database
 
 ## Documentation
 
 ### Interactive Documentation
 
--   **Swagger/OpenAPI**: Available at `/api/docs`
--   **Postman Collection**: [Link to collection]
-
-### Code Examples
-
--   cURL examples for each endpoint
--   SDK examples (if applicable)
--   Mobile app integration examples
+- **Swagger/OpenAPI**: Available at `/api/docs`
+- **Postman Collection**: Link to collection
 
 ---
 

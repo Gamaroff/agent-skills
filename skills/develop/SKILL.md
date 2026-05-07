@@ -287,7 +287,7 @@ System Action: Invokes /review-story skill
    ```
    ⚠️  HIGH RISK STORY DETECTED
 
-   This story is flagged as high risk (auth, payments, BSV signing, encryption, or external APIs).
+   This story is flagged as high risk (auth, payments, cryptographic operations, encryption, or external APIs).
    Running /qa-planning before development is strongly recommended to catch architecture or
    security issues before code is written — when they are cheapest to fix.
 
@@ -320,7 +320,7 @@ System Action: Invokes /review-story skill
 ### Example Flow
 
 ```
-User Input: /develop story.312.1.bsv-transaction-signing.md
+User Input: /develop story.312.1.user-authentication.md
 
 System Detection: Story file detected
 System Status Check: Status shows "Ready for Development"
@@ -328,7 +328,7 @@ System Risk Check: risk_level = high
 
 System Warning:
 ⚠️  HIGH RISK STORY DETECTED
-Story: story.312.1.bsv-transaction-signing.md
+Story: story.312.1.user-authentication.md
 Risk Level: high
 
 System Prompt: [Displays AskUserQuestion with 3 options]
@@ -1000,11 +1000,6 @@ Reference: See CLAUDE.md "Creating Libraries" for complete setup.
 
 ## Common Patterns
 
-**Multi-Wallet Architecture**:
-
-- Users have multiple single-currency wallets (BSV, MNEE USD)
-- Each wallet holds one currency type only
-
 **Authentication Flow**:
 
 - Server: Full auth-lib (hashing, JWT generation)
@@ -1016,14 +1011,6 @@ Reference: See CLAUDE.md "Creating Libraries" for complete setup.
 - Client: lightweight console logger
 - Server: Winston-based structured logging
 
-**Group Types** (5 types only):
-
-- `'private_chat'`, `'savings_circle'`, `'betting_pool'`, `'creator_community'`, `'poker_place'`
-
-**Terminology**:
-
-- Use "handle" not "username" for user identity (@handle)
-- Use "client" not "mobile" for platform separation
 
 ## Example: Simple Feature Implementation
 

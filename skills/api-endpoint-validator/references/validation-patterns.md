@@ -23,11 +23,11 @@ This platform uses a **4-layer validation approach**:
 @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
 field!: string;
 
-// Pattern validation (handle WITHOUT @ prefix)
-@Matches(/^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/, {
-  message: 'Handle must contain only alphanumeric characters, dots, underscores, and hyphens, and start/end with alphanumeric'
+// Slug validation (URL-safe identifier)
+@Matches(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, {
+  message: 'Slug must contain only lowercase letters, numbers, and hyphens, and start/end with alphanumeric'
 })
-handle!: string;
+slug!: string;
 
 // Email validation
 @IsEmail({}, { message: 'Please provide a valid email address' })
@@ -64,16 +64,16 @@ percentage!: number;
 ### Enum Validation
 ```typescript
 // Single enum validation
-@IsEnum(ContactType, { 
-  message: 'Contact type must be one of: app_user, bank, mobile_money, paymail, external_wallet, chat_group' 
+@IsEnum(OrderStatus, { 
+  message: 'Status must be one of: pending, processing, shipped, delivered, cancelled' 
 })
-type!: ContactType;
+status!: OrderStatus;
 
 // Array of enum values
-@IsEnum(PaymentStatus, { each: true })
+@IsEnum(UserRole, { each: true })
 @IsArray()
 @ArrayMinSize(1)
-statuses!: PaymentStatus[];
+roles!: UserRole[];
 ```
 
 ### Date Validation
@@ -100,16 +100,16 @@ endDate?: string;
 // Nested object validation
 @IsObject()
 @ValidateNested()
-@Type(() => ContactDetailsDto)
-details!: ContactDetailsDto;
+@Type(() => AddressDto)
+address!: AddressDto;
 
 // Array validation with nested objects
 @IsArray()
 @ArrayMinSize(1)
 @ArrayMaxSize(10)
 @ValidateNested({ each: true })
-@Type(() => ParticipantDto)
-participants!: ParticipantDto[];
+@Type(() => LineItemDto)
+lineItems!: LineItemDto[];
 
 // Optional object with default
 @IsOptional()
@@ -129,16 +129,6 @@ metadata?: MetadataDto = {};
 @Matches(/^[A-Z]{3}$/, { message: 'Currency must be ISO 4217 format (e.g., USD, EUR, GBP)' })
 @Transform(({ value }) => typeof value === 'string' ? value.toUpperCase().trim() : value)
 currency!: string;
-
-// Wallet address validation  
-@IsString()
-@MinLength(26)
-@MaxLength(62)
-@Matches(/^[13][a-km-zA-HJ-NP-Z1-9]{25,61}$/, {
-  message: 'Invalid wallet address format'
-})
-@Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
-walletAddress!: string;
 
 // Account number validation (banking)
 @IsString()
@@ -163,16 +153,15 @@ bankCode!: string;
 
 ### Identity Validation
 ```typescript
-// Handle/username validation (WITHOUT @ prefix)
-// Note: Handles are stored without @ prefix. UI adds @ for display purposes only.
+// Slug/username validation (URL-safe, no special prefix)
 @IsString()
 @MinLength(3)
 @MaxLength(50)
 @Matches(/^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/, {
-  message: 'Handle must contain only alphanumeric characters, dots, underscores, and hyphens, and start/end with alphanumeric'
+  message: 'Username must contain only alphanumeric characters, dots, underscores, and hyphens'
 })
 @Transform(({ value }) => typeof value === 'string' ? value.toLowerCase().trim() : value)
-handle!: string;
+username!: string;
 
 // Country code validation (ISO 3166-1 alpha-2)
 @IsString()
@@ -190,28 +179,9 @@ country!: string;
 password!: string;
 ```
 
-### Enhanced Communication Validation
-
+### File Upload Validation
 ```typescript
-// Chat message content (enhanced)
-@IsString()
-@IsNotEmpty()
-@MaxLength(2000, { message: 'Message cannot exceed 2000 characters' })
-@Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
-content!: string;
-
-// Enhanced message type validation
-@IsEnum([
-  'text', 'image', 'video', 'audio', 'file', 
-  'payment', 'payment_request', 'group_payment',
-  'monetized_content', 'product_share', 'gift_code_share',
-  'betting_pool', 'system', 'savings_update'
-], { 
-  message: 'Invalid message type. Must be one of the supported message types.' 
-})
-messageType!: string;
-
-// Media file validation
+// Media file metadata validation
 @IsString()
 @IsNotEmpty()
 @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
@@ -233,122 +203,41 @@ mimeType!: string;
 @Max(104857600, { message: 'File size cannot exceed 100MB' })
 fileSize!: number;
 
-// URL validation for media
 @IsString()
 @IsUrl({}, { message: 'Invalid URL format' })
 url!: string;
-
-// Betting validation
-@IsString()
-@MinLength(5)
-@MaxLength(200)
-@Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
-bettingTitle!: string;
-
-@IsEnum(['sports', 'markets', 'politics', 'entertainment', 'local'], {
-  message: 'Invalid betting category'
-})
-bettingCategory!: string;
-
-@IsNumber({ maxDecimalPlaces: 8 })
-@Min(0.01, { message: 'Minimum bet must be at least 0.01' })
-@Max(10000, { message: 'Maximum bet cannot exceed 10,000' })
-betAmount!: number;
-
-// Content monetization validation
-@IsEnum(['fixed', 'goal'], {
-  message: 'Pricing model must be either fixed or goal-based'
-})
-pricingModel!: string;
-
-@ValidateIf(o => o.pricingModel === 'fixed')
-@IsNumber({ maxDecimalPlaces: 8 })
-@Min(0.01, { message: 'Content price must be at least 0.01' })
-contentPrice?: number;
-
-@ValidateIf(o => o.pricingModel === 'goal')
-@IsNumber({ maxDecimalPlaces: 8 })
-@Min(0.01)
-targetAmount?: number;
-
-// Group capability validation
-@IsArray()
-@IsEnum(['chat', 'payments', 'savings', 'betting', 'bill_splitting', 'content_monetization'], {
-  each: true,
-  message: 'Invalid capability. Must be one of the supported group capabilities.'
-})
-capabilities!: string[];
-
-// Member permission validation
-@IsArray()
-@IsEnum(['chat', 'payments', 'admin', 'betting', 'savings', 'monetization'], {
-  each: true,
-  message: 'Invalid permission. Must be one of the supported member permissions.'
-})
-permissions!: string[];
-
-// Role hierarchy validation
-@IsEnum(['owner', 'admin', 'moderator', 'member'], {
-  message: 'Invalid role. Must be owner, admin, moderator, or member.'
-})
-role!: string;
-
-// Emoji reaction validation
-@IsString()
-@Matches(/^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])+$/, {
-  message: 'Invalid emoji format'
-})
-emoji!: string;
-
-// Handle / email-like identifier validation
-@IsString()
-@Matches(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, {
-  message: 'Invalid handle format'
-})
-@Transform(({ value }) => typeof value === 'string' ? value.toLowerCase().trim() : value)
-handle!: string;
-
-// Group title validation
-@IsString()
-@MinLength(1)
-@MaxLength(100)
-@Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
-title!: string;
 ```
 
 ## Advanced Validation Patterns
 
 ### Discriminated Union Validation
 ```typescript
-export class CreateContactDto {
-  @IsEnum(ContactType)
-  type!: ContactType;
+// Different payload shapes based on a type discriminator
+export class CreateShipmentDto {
+  @IsEnum(ShipmentMethod)
+  method!: ShipmentMethod;
 
   @IsObject()
   @ValidateNested()
   @Type((options) => {
-    const type = (options?.object as any)?.type;
-    switch (type) {
-      case ContactType.APP_USER: return AppUserContactDetailsDto;
-      case ContactType.BANK: return BankContactDetailsDto;
-      case ContactType.MOBILE_MONEY: return MobileMoneyContactDetailsDto;
-      case ContactType.PAYMAIL: return PaymailContactDetailsDto;
-      case ContactType.EXTERNAL: return ExternalContactDetailsDto;
-      case ContactType.CHAT_GROUP: return ChatGroupContactDetailsDto;
-      default: return BaseContactDetailsDto;
+    const method = (options?.object as any)?.method;
+    switch (method) {
+      case ShipmentMethod.EXPRESS: return ExpressDetailsDto;
+      case ShipmentMethod.STANDARD: return StandardDetailsDto;
+      case ShipmentMethod.OVERNIGHT: return OvernightDetailsDto;
+      default: return BaseShipmentDetailsDto;
     }
   })
-  details!: ContactDetailsUnion;
+  details!: ShipmentDetailsUnion;
 }
 ```
 
 ### Conditional Validation
 ```typescript
 // Validate field only if another field has specific value
-@ValidateIf(o => o.type === 'payment')
-@IsNumber()
-@Min(0.01)
-amount?: number;
+@ValidateIf(o => o.type === 'scheduled')
+@IsISO8601()
+scheduledAt?: string;
 
 // Cross-field validation
 @Validate(PasswordMatchesConfirmation, ['passwordConfirmation'])
@@ -363,13 +252,13 @@ currency!: string;
 
 ### Array Validation Patterns
 ```typescript
-// Participants array with size limits
+// Members array with size limits
 @IsArray()
-@ArrayMinSize(2, { message: 'Group must have at least 2 participants' })
-@ArrayMaxSize(50, { message: 'Group cannot have more than 50 participants' })
+@ArrayMinSize(2, { message: 'Group must have at least 2 members' })
+@ArrayMaxSize(50, { message: 'Group cannot have more than 50 members' })
 @IsString({ each: true })
-@ArrayUnique({ message: 'Participant IDs must be unique' })
-participantIds!: string[];
+@ArrayUnique({ message: 'Member IDs must be unique' })
+memberIds!: string[];
 
 // Permission arrays with enum validation
 @IsOptional()
@@ -382,39 +271,39 @@ permissions?: Permission[];
 
 ### Business Logic Validators
 ```typescript
-// Custom validator for handle availability
-@ValidatorConstraint({ name: 'handleAvailable', async: true })
-export class IsHandleAvailable implements ValidatorConstraintInterface {
-  async validate(handle: string, args: ValidationArguments) {
-    const userService = container.get(UserService);
-    const exists = await userService.handleExists(handle);
+// Custom validator for slug availability
+@ValidatorConstraint({ name: 'slugAvailable', async: true })
+export class IsSlugAvailable implements ValidatorConstraintInterface {
+  async validate(slug: string, args: ValidationArguments) {
+    const productService = container.get(ProductService);
+    const exists = await productService.slugExists(slug);
     return !exists;
   }
 
   defaultMessage(args: ValidationArguments) {
-    return 'Handle $value is already taken';
+    return 'Slug $value is already taken';
   }
 }
 
 // Usage in DTO
-@Validate(IsHandleAvailable)
-handle!: string;
+@Validate(IsSlugAvailable)
+slug!: string;
 ```
 
-### Financial Validators
+### Resource Validators
 ```typescript
-// Sufficient balance validator
-@ValidatorConstraint({ name: 'sufficientBalance', async: true })
-export class HasSufficientBalance implements ValidatorConstraintInterface {
-  async validate(amount: number, args: ValidationArguments) {
-    const { walletId, currency } = args.object as any;
-    const walletService = container.get(WalletService);
-    const balance = await walletService.getBalance(walletId, currency);
-    return balance >= amount;
+// Check that a referenced resource exists and is accessible
+@ValidatorConstraint({ name: 'categoryExists', async: true })
+export class IsCategoryValid implements ValidatorConstraintInterface {
+  async validate(categoryId: string, args: ValidationArguments) {
+    const { regionCode } = args.object as any;
+    const categoryService = container.get(CategoryService);
+    return categoryService.isAvailableInRegion(categoryId, regionCode);
   }
 
-  defaultMessage() {
-    return 'Insufficient wallet balance for this transaction';
+  defaultMessage(args: ValidationArguments): string {
+    const { regionCode } = args.object as any;
+    return `Category not available in region ${regionCode}`;
   }
 }
 ```
@@ -429,13 +318,13 @@ export class HasSufficientBalance implements ValidatorConstraintInterface {
   "error": {
     "code": "VAL_003",
     "message": "Validation failed",
-    "field": "handle",
+    "field": "slug",
     "details": {
       "constraints": {
-        "matches": "Handle must start with @ and contain only alphanumeric characters, dots, underscores, and hyphens",
-        "isHandleAvailable": "Handle @john.doe is already taken"
+        "matches": "Slug must contain only lowercase letters, numbers, and hyphens",
+        "slugAvailable": "Slug 'my-product' is already taken"
       },
-      "value": "john.doe"
+      "value": "my-product"
     }
   }
 }
@@ -443,24 +332,24 @@ export class HasSufficientBalance implements ValidatorConstraintInterface {
 
 ### Nested Validation Errors
 ```typescript
-// Errors in nested objects (e.g., contact details)
+// Errors in nested objects
 {
   "success": false,
   "error": {
     "code": "VAL_002",
     "message": "Validation failed in nested object",
-    "field": "details.bankCode",
+    "field": "address.postalCode",
     "details": {
-      "property": "details",
+      "property": "address",
       "constraints": {
-        "matches": "Invalid SWIFT/BIC code format"
+        "matches": "Invalid postal code format"
       },
       "children": [
         {
-          "property": "bankCode", 
-          "value": "invalid123",
+          "property": "postalCode", 
+          "value": "invalid",
           "constraints": {
-            "matches": "Invalid SWIFT/BIC code format"
+            "matches": "Invalid postal code format"
           }
         }
       ]
@@ -485,7 +374,7 @@ userInput!: string;
 
 // Case normalization for identifiers  
 @Transform(({ value }) => typeof value === 'string' ? value.toLowerCase().trim() : value)
-handle!: string;
+username!: string;
 
 @Transform(({ value }) => typeof value === 'string' ? value.toUpperCase().trim() : value)
 currencyCode!: string;
@@ -522,7 +411,7 @@ amount!: number;
 // Cryptocurrency amount (up to 8 decimal places)
 @IsNumber({ maxDecimalPlaces: 8 })
 @Min(0.00000001)
-@Max(21000000) // Bitcoin supply limit
+@Max(21000000)
 cryptoAmount!: number;
 
 // Percentage-based amounts
@@ -547,46 +436,46 @@ currency!: string;
 
 ## Business Rule Validation
 
-### KYC-Based Validation
+### Tier-Based Limits
 ```typescript
-// Amount limits based on KYC tier
-@Validate(IsWithinKycLimits, ['userKycTier'], {
-  message: 'Transaction amount exceeds limits for your verification level'
+// Amount limits based on subscription tier
+@Validate(IsWithinTierLimits, ['userTier'], {
+  message: 'Amount exceeds the limit for your subscription tier'
 })
 amount!: number;
 
-// Feature access based on verification
-@ValidateIf(o => o.requiresVerification)
-@Validate(IsKycVerified, {
-  message: 'KYC verification required for this operation'
+// Feature access based on tier
+@ValidateIf(o => o.requiresPremium)
+@Validate(IsPremiumUser, {
+  message: 'Upgrade to premium to access this feature'
 })
 @IsOptional()
-verificationConfirmation?: boolean;
+premiumFeatureConfirmation?: boolean;
 ```
 
-### Contact Relationship Validation
+### Resource Ownership
 ```typescript
-// Prevent self-contact creation
-@Validate(IsNotSelfContact, {
-  message: 'Cannot create contact for your own handle'
+// Prevent operations on your own resources (e.g., self-follow)
+@Validate(IsNotSelf, {
+  message: 'Cannot perform this action on your own account'
 })
-handle!: string;
+targetUserId!: string;
 
-// Trust level progression validation
-@Validate(IsValidTrustLevelProgression, ['currentTrustLevel'], {
-  message: 'Trust level can only be upgraded, not downgraded'
+// Enforce progression rules (e.g., status can only move forward)
+@Validate(IsValidStatusTransition, ['currentStatus'], {
+  message: 'Invalid status transition'
 })
-newTrustLevel!: TrustLevel;
+newStatus!: OrderStatus;
 ```
 
-### Transaction Validation
+### Conditional Amount Validation
 ```typescript
-// Payment direction validation
-@ValidateIf(o => o.direction === PaymentDirection.OUTBOUND)
-@Validate(HasSufficientBalance, ['walletId', 'amount', 'currency'])
-direction!: PaymentDirection;
+// Balance check for outbound operations
+@ValidateIf(o => o.direction === TransferDirection.OUTBOUND)
+@Validate(HasSufficientFunds, ['accountId', 'amount', 'currency'])
+direction!: TransferDirection;
 
-// Transaction fee validation
+// Fee reasonableness check
 @IsOptional()
 @IsNumber({ maxDecimalPlaces: 8 })
 @Min(0)
@@ -598,44 +487,36 @@ networkFee?: number;
 
 ## Custom Validation Classes
 
-### Handle Validation
+### Slug Validation
 ```typescript
-@ValidatorConstraint({ name: 'handleFormat', async: false })
-export class HandleFormatValidator implements ValidatorConstraintInterface {
-  validate(handle: string): boolean {
-    // Handle should NOT start with @ (@ is added by UI only)
-    if (handle.startsWith('@')) return false;
-    
-    // Check length
-    if (handle.length < 3 || handle.length > 50) return false;
-    
-    // Must start and end with alphanumeric
-    if (!/^[a-zA-Z0-9]/.test(handle) || !/[a-zA-Z0-9]$/.test(handle)) return false;
-    
-    // Can contain dots, underscores, hyphens in middle
-    return /^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/.test(handle);
+@ValidatorConstraint({ name: 'slugFormat', async: false })
+export class SlugFormatValidator implements ValidatorConstraintInterface {
+  validate(slug: string): boolean {
+    if (slug.length < 3 || slug.length > 100) return false;
+    if (!/^[a-z0-9]/.test(slug) || !/[a-z0-9]$/.test(slug)) return false;
+    return /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug);
   }
 
   defaultMessage(): string {
-    return 'Handle must be 3-50 characters with only letters, numbers, dots, underscores, and hyphens. Do not include @ prefix.';
+    return 'Slug must be 3-100 lowercase characters with only letters, numbers, and hyphens.';
   }
 }
 ```
 
-### Payment Method Validation
+### Region-Aware Category Validation
 ```typescript
-@ValidatorConstraint({ name: 'paymentMethodSupported', async: true })
-export class IsPaymentMethodSupported implements ValidatorConstraintInterface {
-  async validate(paymentMethod: string, args: ValidationArguments): Promise<boolean> {
-    const { country, currency } = args.object as any;
-    const localizationService = container.get(LocalizationService);
-    const supportedMethods = await localizationService.getPaymentMethods(country);
-    return supportedMethods.includes(paymentMethod);
+@ValidatorConstraint({ name: 'categoryValidForRegion', async: true })
+export class IsCategoryValidForRegion implements ValidatorConstraintInterface {
+  async validate(categoryId: string, args: ValidationArguments): Promise<boolean> {
+    const { regionCode } = args.object as any;
+    const categoryService = container.get(CategoryService);
+    const available = await categoryService.getAvailableForRegion(regionCode);
+    return available.includes(categoryId);
   }
 
   defaultMessage(args: ValidationArguments): string {
-    const { country } = args.object as any;
-    return `Payment method not supported in ${country}`;
+    const { regionCode } = args.object as any;
+    return `Category not available in region ${regionCode}`;
   }
 }
 ```
@@ -680,10 +561,10 @@ async uploadFile(@Body() uploadDto: FileUploadDto) {
 ```typescript
 // Clear, actionable error messages
 const ERROR_MESSAGES = {
-  HANDLE_TAKEN: 'This handle is already taken. Please choose a different one.',
+  SLUG_TAKEN: 'This slug is already taken. Please choose a different one.',
   INVALID_AMOUNT: 'Please enter a valid amount between 0.01 and 1,000,000.',
-  INSUFFICIENT_BALANCE: 'You don\'t have enough balance for this transaction.',
-  KYC_REQUIRED: 'Please complete identity verification to access this feature.',
+  INSUFFICIENT_FUNDS: 'Insufficient funds for this operation.',
+  UPGRADE_REQUIRED: 'Please upgrade your plan to access this feature.',
   INVALID_RECIPIENT: 'The recipient you specified could not be found.',
   RATE_LIMIT_EXCEEDED: 'Too many requests. Please wait a moment before trying again.'
 };
@@ -694,9 +575,9 @@ const ERROR_MESSAGES = {
 // Support for multiple languages
 const getErrorMessage = (code: string, locale: string = 'en'): string => {
   const messages = {
-    en: { HANDLE_TAKEN: 'This handle is already taken.' },
-    es: { HANDLE_TAKEN: 'Este identificador ya está en uso.' },
-    fr: { HANDLE_TAKEN: 'Ce nom d\'utilisateur est déjà pris.' }
+    en: { SLUG_TAKEN: 'This slug is already taken.' },
+    es: { SLUG_TAKEN: 'Este identificador ya está en uso.' },
+    fr: { SLUG_TAKEN: 'Ce nom est déjà pris.' }
   };
   return messages[locale]?.[code] || messages.en[code];
 };
@@ -706,74 +587,70 @@ const getErrorMessage = (code: string, locale: string = 'en'): string => {
 
 ### Unit Tests for Validators
 ```typescript
-describe('HandleFormatValidator', () => {
-  let validator: HandleFormatValidator;
+describe('SlugFormatValidator', () => {
+  let validator: SlugFormatValidator;
 
   beforeEach(() => {
-    validator = new HandleFormatValidator();
+    validator = new SlugFormatValidator();
   });
 
-  it('should accept valid handles', () => {
-    expect(validator.validate('john.doe')).toBe(true);
-    expect(validator.validate('alice_99')).toBe(true);
-    expect(validator.validate('user-name')).toBe(true);
+  it('should accept valid slugs', () => {
+    expect(validator.validate('my-product')).toBe(true);
+    expect(validator.validate('product-v2')).toBe(true);
+    expect(validator.validate('abc')).toBe(true);
   });
 
-  it('should reject invalid handles', () => {
-    expect(validator.validate('@john.doe')).toBe(false);    // Should NOT have @
-    expect(validator.validate('.')).toBe(false);             // Too short
+  it('should reject invalid slugs', () => {
+    expect(validator.validate('My-Product')).toBe(false);   // Uppercase
     expect(validator.validate('-invalid')).toBe(false);     // Starts with hyphen
     expect(validator.validate('invalid-')).toBe(false);     // Ends with hyphen
+    expect(validator.validate('ab')).toBe(false);           // Too short
   });
 });
 ```
 
 ### Integration Tests for DTOs
 ```typescript
-describe('CreateContactDto Validation', () => {
-  it('should validate app user contact creation', async () => {
-    const dto = plainToClass(CreateContactDto, {
-      name: 'John Doe',
-      type: ContactType.APP_USER,
-      details: { handle: '@john.doe', publicKey: 'pub_123' }
+describe('CreateProductDto Validation', () => {
+  it('should validate a valid product', async () => {
+    const dto = plainToClass(CreateProductDto, {
+      name: 'Wireless Headphones',
+      slug: 'wireless-headphones',
+      price: 99.99,
+      categoryId: 'cat_electronics'
     });
 
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });
 
-  it('should reject handles with @ prefix', async () => {
-    const dto = plainToClass(CreateContactDto, {
-      name: 'John Doe',
-      type: ContactType.MY_APP,
-      details: { handle: '@john.doe', publicKey: 'pub_123' } // Invalid: should not have @
+  it('should reject a slug with uppercase letters', async () => {
+    const dto = plainToClass(CreateProductDto, {
+      name: 'Wireless Headphones',
+      slug: 'Wireless-Headphones',
+      price: 99.99,
+      categoryId: 'cat_electronics'
     });
 
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].property).toBe('slug');
   });
 
-  it('should reject invalid bank contact', async () => {
-    const dto = plainToClass(CreateContactDto, {
-      name: 'John Doe',
-      type: ContactType.BANK,
-      details: { bankName: '', accountNumber: '123' } // Invalid: missing required fields
+  it('should reject a negative price', async () => {
+    const dto = plainToClass(CreateProductDto, {
+      name: 'Wireless Headphones',
+      slug: 'wireless-headphones',
+      price: -10,
+      categoryId: 'cat_electronics'
     });
 
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].constraints).toContain('bankCode');
+    expect(errors[0].property).toBe('price');
   });
 });
 ```
-
-## Cross-References
-
-- **DTO Definitions**: See [DTO Catalog](./dto-catalog.md) for all DTOs using these patterns
-- **Type Definitions**: See [Type Quick Reference](./type-quick-reference.md) for underlying types
-- **API Contracts**: See [Endpoint-DTO Mapping](./endpoint-dto-mapping.md) for endpoint validation requirements
-- **Implementation Examples**: See [Usage Examples](./usage-examples.md) for practical validation usage
-- **Type Safety Best Practices**: See [`libs/shared-types/docs/TYPE-SAFETY-BEST-PRACTICES.md`](../../../libs/shared-types/docs/TYPE-SAFETY-BEST-PRACTICES.md)
 
 ## Maintenance Guidelines
 

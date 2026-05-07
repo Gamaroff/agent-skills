@@ -56,7 +56,7 @@ Q: "Phase 2 lists 'auth-service.ts' but doesn't specify client or server.
 
 Options:
   [Server path]    - apps/{api-service}/src/modules/auth/auth-service.ts (NestJS)
-  [Client path]    - apps/my-wallet/src/services/auth-service.ts (React Native)
+  [Client path]    - apps/{app-name}/src/services/auth-service.ts (React Native)
   [Both needed]    - Changes required in both client and server
 ```
 

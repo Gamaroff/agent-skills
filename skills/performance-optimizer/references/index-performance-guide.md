@@ -12,14 +12,10 @@ Comprehensive guide to database optimization, indexing strategies, and query pat
 
 **User Authentication & Identity**
 ```sql
--- Essential for login and payment addressing
+-- Essential for login and lookup
 CREATE UNIQUE INDEX idx_users_email ON users(email);
-CREATE UNIQUE INDEX idx_users_handle ON users(handle);
+CREATE UNIQUE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_phone ON users(phone_number) WHERE phone_number IS NOT NULL;
-
--- KYC lookups
-CREATE INDEX idx_kyc_user_level ON kyc_verifications(user_id, level);
-CREATE INDEX idx_kyc_status ON kyc_verifications(status, level);
 ```
 
 **Financial Operations (High Priority)**
@@ -46,15 +42,15 @@ CREATE INDEX idx_payment_requests_due_date ON payment_requests(due_date) WHERE s
 **Real-Time Communication**
 ```sql
 -- Chat participant lookups  
-CREATE INDEX idx_chat_participants_user ON chat_participants(user_id);
-CREATE INDEX idx_chat_participants_group ON chat_participants(group_id, role);
-CREATE UNIQUE INDEX idx_chat_participants_user_group ON chat_participants(user_id, group_id);
+CREATE INDEX idx_thread_members_user ON thread_members(user_id);
+CREATE INDEX idx_thread_members_group ON thread_members(group_id, role);
+CREATE UNIQUE INDEX idx_thread_members_user_group ON thread_members(user_id, group_id);
 
 -- Message performance (real-time chat)
-CREATE INDEX idx_chat_messages_group_created ON chat_messages(group_id, created_at DESC);
-CREATE INDEX idx_chat_messages_sender ON chat_messages(sender_id, created_at DESC);
-CREATE INDEX idx_chat_messages_content_type ON chat_messages(group_id, content_type, created_at DESC);
-CREATE INDEX idx_chat_messages_monetized ON chat_messages(is_monetized, price) WHERE is_monetized = true;
+CREATE INDEX idx_messages_group_created ON messages(group_id, created_at DESC);
+CREATE INDEX idx_messages_sender ON messages(sender_id, created_at DESC);
+CREATE INDEX idx_messages_content_type ON messages(group_id, content_type, created_at DESC);
+CREATE INDEX idx_messages_featured ON messages(is_featured, created_at DESC) WHERE is_featured = true;
 ```
 
 **Notification System**
@@ -80,7 +76,7 @@ CREATE INDEX idx_notification_preferences_enabled ON notification_preferences(us
 ### Query Pattern Analysis
 
 **High-Frequency Operations (Optimize First)**
-1. User authentication by email/handle (10,000+ req/day)
+1. User authentication by email/username (10,000+ req/day)
 2. Wallet balance checks (5,000+ req/day)  
 3. Transaction history pagination (3,000+ req/day)
 4. Real-time chat message loading (2,000+ req/day)
@@ -88,8 +84,8 @@ CREATE INDEX idx_notification_preferences_enabled ON notification_preferences(us
 
 **Medium-Frequency Operations (Monitor Performance)**  
 1. Payment request creation and status updates
-2. KYC verification lookups for feature access
-3. Chat group participant management
+2. Role/permission lookups for feature access
+3. Group/team participant management
 4. Financial transaction reporting and analytics
 
 **Low-Frequency Operations (Basic Indexes)**
@@ -112,15 +108,15 @@ CREATE INDEX idx_wallets_active_balance ON wallets(balance DESC) WHERE status = 
 CREATE INDEX idx_wallets_type_balance ON wallets(type, balance DESC) WHERE status = 'ACTIVE';
 ```
 
-**Communication Domain (Real-Time Critical)**
+**Messaging Domain (Real-Time Critical)**
 ```sql
--- Chat message pagination optimization
-CREATE INDEX idx_chat_messages_group_cursor ON chat_messages(group_id, created_at DESC, id);
-CREATE INDEX idx_chat_messages_unread ON chat_messages(group_id, created_at) 
-  WHERE created_at > (SELECT last_read_at FROM chat_participants WHERE group_id = chat_messages.group_id);
+-- Message pagination optimization
+CREATE INDEX idx_messages_thread_cursor ON messages(thread_id, created_at DESC, id);
+CREATE INDEX idx_messages_unread ON messages(thread_id, created_at)
+  WHERE created_at > (SELECT last_read_at FROM thread_members WHERE thread_id = messages.thread_id);
 
--- Group member activity tracking
-CREATE INDEX idx_chat_participants_activity ON chat_participants(group_id, last_read_at DESC);
+-- Thread member activity tracking
+CREATE INDEX idx_thread_members_activity ON thread_members(thread_id, last_read_at DESC);
 ```
 
 **Notification Domain (Delivery Critical)**  
@@ -165,7 +161,7 @@ CREATE INDEX idx_transactions_archive ON transactions(user_id, type)
 CREATE INDEX idx_transactions_user_type_status_date ON transactions(user_id, type, status, created_at DESC);
 
 -- Chat activity analysis  
-CREATE INDEX idx_chat_messages_group_sender_date ON chat_messages(group_id, sender_id, created_at DESC);
+CREATE INDEX idx_messages_group_sender_date ON messages(group_id, sender_id, created_at DESC);
 
 -- Notification delivery analytics
 CREATE INDEX idx_notification_deliveries_channel_status_date ON notification_deliveries(channel, status, created_at);
@@ -184,11 +180,11 @@ CREATE INDEX idx_notifications_daily ON notifications(type, DATE_TRUNC('day', cr
 
 **Text Search Optimization** 
 ```sql
--- Case-insensitive handle searches (future enhancement)
-CREATE INDEX idx_users_handle_lower ON users(LOWER(handle));
+-- Case-insensitive username searches (future enhancement)
+CREATE INDEX idx_users_username_lower ON users(LOWER(username));
 
 -- Chat message search (future enhancement)  
-CREATE INDEX idx_chat_messages_content_search ON chat_messages USING gin(to_tsvector('english', content));
+CREATE INDEX idx_messages_content_search ON messages USING gin(to_tsvector('english', content));
 ```
 
 ## Query Performance Patterns
@@ -210,13 +206,13 @@ LIMIT $page_size;
 **Offset-Based Pagination (Limited Use)**
 ```sql
 -- Chat messages with offset (small offsets only)
-SELECT * FROM chat_messages
+SELECT * FROM messages
 WHERE group_id = $1
 ORDER BY created_at DESC
 LIMIT $page_size OFFSET $offset;
 
 -- Warning: Performance degrades with large offsets
--- Uses: idx_chat_messages_group_created  
+-- Uses: idx_messages_group_created  
 ```
 
 ### Optimized Aggregation Queries
@@ -258,31 +254,31 @@ ORDER BY month DESC;
 ```sql
 -- User transaction summary with proper join order
 SELECT 
-  u.handle,
+  u.username,
   COUNT(t.id) as tx_count,
   COALESCE(SUM(t.amount), 0) as total_volume
 FROM users u
 LEFT JOIN transactions t ON u.id = t.user_id 
   AND t.created_at >= $date_filter
   AND t.status = 'CONFIRMED'
-GROUP BY u.id, u.handle;
+GROUP BY u.id, u.username;
 
 -- Join order: users → transactions (uses FK index)
 ```
 
 **Chat Activity with Participants**
 ```sql
--- Group activity with participant details  
+-- Group activity with member details  
 SELECT 
-  cg.name as group_name,
-  COUNT(DISTINCT cp.user_id) as member_count,
-  COUNT(cm.id) as message_count,
-  MAX(cm.created_at) as last_activity
-FROM chat_groups cg
-JOIN chat_participants cp ON cg.id = cp.group_id
-LEFT JOIN chat_messages cm ON cg.id = cm.group_id 
-  AND cm.created_at >= $activity_window
-GROUP BY cg.id, cg.name
+  g.name as group_name,
+  COUNT(DISTINCT gm.user_id) as member_count,
+  COUNT(m.id) as message_count,
+  MAX(m.created_at) as last_activity
+FROM groups g
+JOIN group_members gm ON g.id = gm.group_id
+LEFT JOIN messages m ON g.id = m.group_id 
+  AND m.created_at >= $activity_window
+GROUP BY g.id, g.name
 ORDER BY last_activity DESC;
 
 -- Uses multiple indexes efficiently
@@ -352,7 +348,7 @@ ORDER BY n_tup_ins + n_tup_upd + n_tup_del DESC;
 ANALYZE;
 
 -- Update table statistics for specific high-traffic tables
-ANALYZE users, transactions, chat_messages, notifications;
+ANALYZE users, transactions, messages, notifications;
 
 -- Check for index bloat
 SELECT 
@@ -466,7 +462,7 @@ const users = await prisma.user.findMany({
 const users = await prisma.user.findMany({
   select: {
     id: true,
-    handle: true,
+    username: true,
     email: true,
     // Skip heavy fields like profileImageUrl if not needed
   }
@@ -782,12 +778,12 @@ SET work_mem = '64MB';  -- Session-level change
 **Full-Text Search**
 ```sql
 -- Future: Enhanced chat message search
-ALTER TABLE chat_messages ADD COLUMN search_vector tsvector;
-CREATE INDEX idx_chat_messages_search ON chat_messages USING gin(search_vector);
+ALTER TABLE messages ADD COLUMN search_vector tsvector;
+CREATE INDEX idx_messages_search ON messages USING gin(search_vector);
 
 -- Trigger to maintain search vector
-CREATE TRIGGER trig_chat_messages_search_update
-BEFORE INSERT OR UPDATE ON chat_messages
+CREATE TRIGGER trig_messages_search_update
+BEFORE INSERT OR UPDATE ON messages
 FOR EACH ROW EXECUTE FUNCTION 
 tsvector_update_trigger(search_vector, 'pg_catalog.english', content);
 ```
@@ -798,7 +794,7 @@ tsvector_update_trigger(search_vector, 'pg_catalog.english', content);
 CREATE MATERIALIZED VIEW user_financial_summary AS
 SELECT 
   u.id as user_id,
-  u.handle,
+  u.username,
   COUNT(DISTINCT w.id) as wallet_count,
   SUM(w.balance) as total_balance,
   COUNT(t.id) as transaction_count,
@@ -806,7 +802,7 @@ SELECT
 FROM users u
 LEFT JOIN wallets w ON u.id = w.user_id AND w.status = 'ACTIVE'  
 LEFT JOIN transactions t ON u.id = t.user_id
-GROUP BY u.id, u.handle;
+GROUP BY u.id, u.username;
 
 -- Refresh schedule (e.g., hourly)
 CREATE UNIQUE INDEX idx_user_financial_summary_user ON user_financial_summary(user_id);
@@ -816,7 +812,7 @@ CREATE UNIQUE INDEX idx_user_financial_summary_user ON user_financial_summary(us
 ```sql
 -- Future: Implement time-based partitioning for high-volume tables
 -- Benefits: Improved query performance, easier maintenance, better backup strategies
--- Priority tables: transactions, chat_messages, notifications
+-- Priority tables: transactions, messages, notifications
 ```
 
 ## Cross-References

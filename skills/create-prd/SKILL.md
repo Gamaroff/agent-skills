@@ -537,7 +537,7 @@ Run each check sequentially and report findings before proceeding:
 Scan every FR for vague adjectives: "easy", "fast", "simple", "intuitive", "user-friendly", "seamless", "quick", "efficient" (without accompanying metrics). Flag each occurrence. Scan every NFR for missing numeric criteria (must have a specific metric, e.g. "< 2s" not "fast"). Report: `[PASS] All requirements measurable` or `[FAIL] Found N vague requirements: [list]`
 
 **Check 2 — Implementation Leakage:**
-Scan FRs and NFRs for technology names that prescribe implementation rather than capability: framework names (React, Redux, Prisma), library names, data structure names (JSON, array), cloud provider names (AWS, S3). Exception: names that ARE the capability (e.g. "BSV blockchain", "WebSocket"). Report: `[PASS] No implementation leakage` or `[FAIL] Found leakage in: [list]`
+Scan FRs and NFRs for technology names that prescribe implementation rather than capability: framework names (React, Redux, Prisma), library names, data structure names (JSON, array), cloud provider names (AWS, S3). Exception: names that ARE the capability (e.g. "WebSocket", "GraphQL"). Report: `[PASS] No implementation leakage` or `[FAIL] Found leakage in: [list]`
 
 **Check 3 — Traceability:**
 For each FR, verify it can be traced to at least one stated Goal in Section 1d. An FR with no goal justification is a scope risk. Report: `[PASS] All FRs traceable to goals` or `[WARN] N FRs lack clear goal traceability: [list]`

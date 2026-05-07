@@ -164,7 +164,7 @@ Then restart Docker Desktop / `sudo systemctl restart docker`.
 
 - Server is LAN-only; registry has no TLS (acceptable for private network)
 - Single-server setup; no orchestration (Swarm/K8s) for now
-- `my-wallet` (mobile app) does NOT deploy here — Android only
+- `{app-name}` (mobile app) does NOT deploy here — Android only
 - Production data lives on Railway; LAN server is for dev/staging/test workloads
 
 ## Related

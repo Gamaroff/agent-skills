@@ -165,7 +165,7 @@ Flow:
 
 ### 5. Report to User
 
-- ✅ Jira task key (e.g. `RB-47`)
+- ✅ Jira task key (e.g. `PROJ-47`)
 - ✅ Jira URL
 - ✅ Standalone (no parent epic)
 - ✅ Added to backlog (or Kanban warning)
@@ -238,8 +238,8 @@ status: '📋 Planned'
 After sync the script writes (in-place, preserving order):
 
 ```yaml
-jira_key: "RB-47"
-jira_url: "https://yourorg.atlassian.net/browse/RB-47"
+jira_key: "PROJ-47"
+jira_url: "https://yourorg.atlassian.net/browse/PROJ-47"
 task_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/development/tasks/task.1.../task.1....md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
 jira_last_body_hash: "f4b2c1d9a0e72b58"
@@ -286,8 +286,8 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
   "action": "update",
   "dryRun": false,
   "file": "/abs/path/task.md",
-  "jira_key": "RB-47",
-  "jira_url": "https://yourorg.atlassian.net/browse/RB-47",
+  "jira_key": "PROJ-47",
+  "jira_url": "https://yourorg.atlassian.net/browse/PROJ-47",
   "task_bitbucket_url": "https://bitbucket.org/.../task.md",
   "change_summary": "Updated: summary, description, metadata",
   "jira_last_synced_at": "2026-04-28T11:05:33.123+0000",

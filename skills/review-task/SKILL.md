@@ -86,7 +86,7 @@ Before loading the task document, resolve the input to a local file path:
 
 | Pattern | Matches |
 |---------|---------|
-| Matches `[A-Z]+-[0-9]+` (e.g. `RB-45`) | Jira issue key |
+| Matches `[A-Z]+-[0-9]+` (e.g. `PROJ-45`) | Jira issue key |
 | Contains `github.com` | GitHub URL (direct issue or project board) |
 | Starts with `#` followed by digits | Hash notation |
 | All digits | Bare issue number |
@@ -94,7 +94,7 @@ Before loading the task document, resolve the input to a local file path:
 **Step 2 — Extract the issue number / key** from whichever pattern matched:
 
 ```bash
-# Jira key (e.g. RB-45): resolve to local file via frontmatter lookup
+# Jira key (e.g. PROJ-45): resolve to local file via frontmatter lookup
 if echo "$INPUT" | grep -qE '^[A-Z]+-[0-9]+$'; then
   JIRA_KEY="$INPUT"
   LOCAL_PATH=$(grep -rl "jira_key: ${JIRA_KEY}" docs/ 2>/dev/null \
@@ -254,7 +254,7 @@ header: "File Location"
 options:
   - label: "Server: apps/{api-service}/src/modules/auth/auth-service.ts"
     description: "Backend authentication service (NestJS)"
-  - label: "Client: apps/my-wallet/src/services/auth-service.ts"
+  - label: "Client: apps/{app-name}/src/services/auth-service.ts"
     description: "Frontend authentication service (React Native)"
   - label: "Both needed"
     description: "Changes required in both client and server auth services"

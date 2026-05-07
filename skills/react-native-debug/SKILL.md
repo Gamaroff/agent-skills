@@ -9,7 +9,7 @@ license: MIT
 
 ## Overview
 
-The React Native Debugging skill helps you iteratively debug and fix React Native apps in your project, specifically for `@apps/my-wallet/`. This skill handles both Jest test failures and Metro bundler runtime errors, with special focus on the code vs test validation problem - tests may become outdated while code is correct, or vice versa.
+The React Native Debugging skill helps you iteratively debug and fix React Native apps in your project, specifically for `@apps/{app-name}/`. This skill handles both Jest test failures and Metro bundler runtime errors, with special focus on the code vs test validation problem - tests may become outdated while code is correct, or vice versa.
 
 ## Critical Design Principles
 
@@ -146,7 +146,7 @@ Before interactive debugging begins, run these automated checks:
 
 ### Check 1: Metro Cache Staleness
 ```
-Run: npx nx start my-wallet --dry-run (check if it succeeds)
+Run: npx nx start {app-name} --dry-run (check if it succeeds)
 If fails: Metro cache likely stale
 Action: Auto-clear cache without asking
 ```
@@ -171,7 +171,7 @@ If found: Flag as platform separation violation
 
 ### Check 4: Test Setup Validation
 ```
-Verify: apps/my-wallet/src/test-setup.ts exists
+Verify: apps/{app-name}/src/test-setup.ts exists
 If missing: Flag critical issue
 If exists: Verify it contains:
   - @testing-library/jest-native/extend-expect
@@ -224,7 +224,7 @@ Each debugging path below presents findings and offers 2-4 options. User selects
 **Verification**:
 ```bash
 # After fix
-npx nx start my-wallet --reset-cache --clear
+npx nx start {app-name} --reset-cache --clear
 # Check: Does Metro bundler start without errors?
 ```
 
@@ -256,7 +256,7 @@ npx nx start my-wallet --reset-cache --clear
 **Verification**:
 ```bash
 # After fix
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Workflow C: Mock Configuration Debugging
@@ -288,7 +288,7 @@ npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 **Verification**:
 ```bash
 # After fix - check just the mock
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Workflow D: Platform Separation Validation
@@ -323,7 +323,7 @@ npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 **Verification**:
 ```bash
 # After fix - check imports resolve
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Workflow E: Component Rendering Debugging
@@ -355,7 +355,7 @@ npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 **Verification**:
 ```bash
 # After fix
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
 # Or with debug output
 console.log(debug()); // Print component tree
 ```
@@ -389,8 +389,8 @@ console.log(debug()); // Print component tree
 **Verification**:
 ```bash
 # After fix - run multiple times
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
 # Should not be flaky
 ```
 
@@ -473,7 +473,7 @@ After applying a fix:
 
 1. **Re-run the test/Metro**
    ```bash
-   npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+   npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
    ```
 
 2. **Confirm success**
@@ -484,7 +484,7 @@ After applying a fix:
 3. **Check for side effects**
    ```bash
    # Run related tests
-   npx nx test my-wallet --testNamePattern="[related tests]" --no-coverage
+   npx nx test {app-name} --testNamePattern="[related tests]" --no-coverage
    ```
 
 ### Suggested Next Steps

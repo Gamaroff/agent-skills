@@ -654,13 +654,13 @@ All qa-planning outputs are co-located in the story (or task) directory followin
 ### Directory Structure
 
 ```
-story.312.1.bsv-transaction-signing/
-├── story.312.1.bsv-transaction-signing.md
-├── story.312.1.risk.1.bsv-transaction-signing.md       ← qa-planning (pre-dev)
-├── story.312.1.test-design.1.bsv-transaction-signing.md ← qa-planning (pre-dev)
-├── story.312.1.qa.1.bsv-transaction-signing.md         ← qa-story
-├── story.312.1.gate.1.bsv-transaction-signing.yml      ← qa-story
-└── story.312.1.dod.1.bsv-transaction-signing.md        ← finalise
+story.312.1.user-authentication/
+├── story.312.1.user-authentication.md
+├── story.312.1.risk.1.user-authentication.md       ← qa-planning (pre-dev)
+├── story.312.1.test-design.1.user-authentication.md ← qa-planning (pre-dev)
+├── story.312.1.qa.1.user-authentication.md         ← qa-story
+├── story.312.1.gate.1.user-authentication.yml      ← qa-story
+└── story.312.1.dod.1.user-authentication.md        ← finalise
 ```
 
 ---

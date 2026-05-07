@@ -6,7 +6,7 @@
 
 ## Overview
 
-This guide covers the standardized testing framework implemented for the your mobile wallet app platform, specifically designed to meet the 95% coverage requirements for financial operations while ensuring reliable React Native testing.
+This guide covers the standardized testing framework for NestJS/React Native projects, specifically designed to meet coverage requirements for critical operations while ensuring reliable cross-platform testing.
 
 **New in v5.0**: Dual testing strategy with separate Node.js integration tests and React Native client tests, enabling full server-side crypto operations (password hashing, JWT signing, AES encryption) in test environments.
 
@@ -14,7 +14,7 @@ This guide covers the standardized testing framework implemented for the your mo
 
 ### Dual Testing Strategy
 
-The your project uses a **dual testing strategy** to maintain platform separation and security boundaries:
+This project uses a **dual testing strategy** to maintain platform separation and security boundaries:
 
 #### 1. Integration Tests (Node.js Environment)
 
@@ -182,7 +182,7 @@ import {
 // Minimal valid profile
 const user = createTestUserProfile({
   email: 'test@example.com',
-  kycTier: 'TIER_1'
+  role: 'user'
 });
 
 // Complete profile with all optional fields
@@ -506,7 +506,7 @@ coverageThreshold: {
     lines: 95,
     statements: 95
   },
-  'apps/my-wallet/services/api/*-service.ts': {
+  'apps/{app-name}/services/api/*-service.ts': {
     branches: 95,
     functions: 95,
     lines: 95,
@@ -1194,7 +1194,7 @@ import { server } from './src/mocks/server';  // ← Sees your mocked Response!
 **Solution**: Move Response mock to `setupFiles` which runs before ANY imports:
 
 ```javascript
-// apps/my-wallet/jest-pre-setup.js
+// apps/{app-name}/jest-pre-setup.js
 global.Response = class Response {
   constructor(body, init) {
     this.body = body;

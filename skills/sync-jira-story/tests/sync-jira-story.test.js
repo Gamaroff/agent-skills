@@ -29,7 +29,7 @@ priority: 'high'
 test("parseFrontmatter — body containing horizontal rule (---) is preserved verbatim", () => {
   const src = `---
 title: 'X'
-jira_epic: "RB-14"
+jira_epic: "PROJ-14"
 ---
 
 # Heading
@@ -46,7 +46,7 @@ End.
 `;
   const { frontmatter, body } = lib.parseFrontmatter(src);
   assert.equal(frontmatter.title, "X");
-  assert.equal(frontmatter.jira_epic, "RB-14");
+  assert.equal(frontmatter.jira_epic, "PROJ-14");
   // Both rules and surrounding paragraphs must survive intact
   assert.ok(body.includes("Section A"));
   assert.ok(body.includes("Section B with second hr"));
@@ -283,7 +283,7 @@ test("guardConcurrentEdit — no last sync (first run) skips guard", () => {
 test("buildDescriptionAdf — produces valid ADF doc with table for changelog", () => {
   const doc = lib.buildDescriptionAdf({
     body: "## User Story\n\nAs a developer I want X.\n\n## Acceptance Criteria\n\n- AC1\n- AC2\n",
-    frontmatter: { story_type: "feature_enhancement", estimated_effort_hours: "4", jira_epic: "RB-14" },
+    frontmatter: { story_type: "feature_enhancement", estimated_effort_hours: "4", jira_epic: "PROJ-14" },
     epicBbUrl: "https://bitbucket.org/org/repo/src/HEAD/epic.md",
     storyBbUrl: "https://bitbucket.org/org/repo/src/HEAD/story.md",
     changelogEntries: ["| 2026-04-28 09:40 | Initial Jira story created |"],
@@ -409,9 +409,9 @@ test("collectIssueFields — team-managed sets parent.key, NOT customfield_10014
     descAdf: { type: "doc", content: [] },
     storyTypeId: "10001", projectKey: "RB",
     livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-foo", epicKey: "RB-14", useEpicLink: false,
+    syncLabel: "synced-from-foo", epicKey: "PROJ-14", useEpicLink: false,
   });
-  assert.deepEqual(fields.parent, { key: "RB-14" });
+  assert.deepEqual(fields.parent, { key: "PROJ-14" });
   assert.equal(fields.customfield_10014, undefined);
   assert.equal(fields.summary, "S");
   assert.equal(fields.priority.name, "High");
@@ -424,9 +424,9 @@ test("collectIssueFields — classic sets customfield_10014, NOT parent", () => 
     descAdf: { type: "doc", content: [] },
     storyTypeId: "10001", projectKey: "RB",
     livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-foo", epicKey: "RB-14", useEpicLink: true,
+    syncLabel: "synced-from-foo", epicKey: "PROJ-14", useEpicLink: true,
   });
-  assert.equal(fields.customfield_10014, "RB-14");
+  assert.equal(fields.customfield_10014, "PROJ-14");
   assert.equal(fields.parent, undefined);
 });
 
@@ -478,12 +478,12 @@ Some prose.
   const out = lib.upsertInlineLine(
     src,
     /^\*\*Jira Story\*\*:.*$/m,
-    "**Jira Story**: [RB-99](https://real/RB-99)"
+    "**Jira Story**: [PROJ-99](https://real/PROJ-99)"
   );
   // Code-block sample preserved verbatim
   assert.match(out, /SAMPLE-1/);
   // New line inserted outside the code block
-  assert.match(out, /RB-99/);
+  assert.match(out, /PROJ-99/);
   // Code fence count preserved
   assert.equal(out.match(/```/g).length, 2);
 });
@@ -509,9 +509,9 @@ test("upsertInlineLine — inserts after first H1 when no existing line", () => 
   const out = lib.upsertInlineLine(
     src,
     /^\*\*Jira Story\*\*:.*$/m,
-    "**Jira Story**: [RB-1](https://x/RB-1)"
+    "**Jira Story**: [PROJ-1](https://x/PROJ-1)"
   );
-  assert.match(out, /^# Story 1\.2: Foo\n\n\*\*Jira Story\*\*: \[RB-1\]/);
+  assert.match(out, /^# Story 1\.2: Foo\n\n\*\*Jira Story\*\*: \[PROJ-1\]/);
 });
 
 // ---------------------------------------------------------------------------
@@ -548,17 +548,17 @@ test("createStoryWithRetry — 400 mentioning parent flips to Epic Link customfi
         body: JSON.stringify({ errors: { parent: "Field 'parent' cannot be set on this issue type." } }),
       });
     }
-    return makeMockResp({ status: 201, body: JSON.stringify({ key: "RB-99" }) });
+    return makeMockResp({ status: 201, body: JSON.stringify({ key: "PROJ-99" }) });
   };
   const auth = { baseUrl: "https://j", email: "e", token: "t" };
-  const fields = { summary: "S", parent: { key: "RB-14" } };
+  const fields = { summary: "S", parent: { key: "PROJ-14" } };
   const out = { warn() {}, info() {} };
   const resp = await lib.createStoryWithRetry({ http, auth, fields, output: out });
   assert.equal(resp.status, 201);
   assert.equal(calls.length, 2);
-  assert.deepEqual(calls[0].parent, { key: "RB-14" });
+  assert.deepEqual(calls[0].parent, { key: "PROJ-14" });
   assert.equal(calls[1].parent, undefined);
-  assert.equal(calls[1].customfield_10014, "RB-14");
+  assert.equal(calls[1].customfield_10014, "PROJ-14");
 });
 
 test("createStoryWithRetry — 400 mentioning epic_link flips to parent and retries", async () => {
@@ -571,15 +571,15 @@ test("createStoryWithRetry — 400 mentioning epic_link flips to parent and retr
         body: JSON.stringify({ errors: { customfield_10014: "Epic Link is not valid." } }),
       });
     }
-    return makeMockResp({ status: 201, body: JSON.stringify({ key: "RB-99" }) });
+    return makeMockResp({ status: 201, body: JSON.stringify({ key: "PROJ-99" }) });
   };
-  const fields = { summary: "S", customfield_10014: "RB-14" };
+  const fields = { summary: "S", customfield_10014: "PROJ-14" };
   const resp = await lib.createStoryWithRetry({
     http, auth: { baseUrl: "https://j", email: "e", token: "t" },
     fields, output: { warn() {}, info() {} },
   });
   assert.equal(resp.status, 201);
-  assert.deepEqual(calls[1].parent, { key: "RB-14" });
+  assert.deepEqual(calls[1].parent, { key: "PROJ-14" });
 });
 
 test("createStoryWithRetry — non-parent 400 errors propagate immediately", async () => {
@@ -590,7 +590,7 @@ test("createStoryWithRetry — non-parent 400 errors propagate immediately", asy
   await assert.rejects(
     () => lib.createStoryWithRetry({
       http, auth: { baseUrl: "https://j", email: "e", token: "t" },
-      fields: { summary: "S", parent: { key: "RB-14" } },
+      fields: { summary: "S", parent: { key: "PROJ-14" } },
       output: { warn() {}, info() {} },
     }),
     /Summary too long/
@@ -660,8 +660,8 @@ test("findExistingByLabel — warns and adopts first when multiple issues carry 
     status: 200,
     body: JSON.stringify({
       issues: [
-        { key: "RB-50", fields: { updated: "2026-04-28T10:00:00.000Z" } },
-        { key: "RB-51", fields: { updated: "2026-04-28T10:01:00.000Z" } },
+        { key: "PROJ-50", fields: { updated: "2026-04-28T10:00:00.000Z" } },
+        { key: "PROJ-51", fields: { updated: "2026-04-28T10:01:00.000Z" } },
       ],
     }),
   });
@@ -671,10 +671,10 @@ test("findExistingByLabel — warns and adopts first when multiple issues carry 
     http, baseUrl: "https://j", email: "e", token: "t",
     projectKey: "RB", label: "synced-from-foo", output: out,
   });
-  assert.equal(found.key, "RB-50");
+  assert.equal(found.key, "PROJ-50");
   assert.equal(warns.length, 1);
   assert.match(warns[0], /Multiple Jira issues match label/);
-  assert.match(warns[0], /RB-50, RB-51/);
+  assert.match(warns[0], /PROJ-50, PROJ-51/);
 });
 
 test("findExistingByLabel — returns null on empty issues array", async () => {

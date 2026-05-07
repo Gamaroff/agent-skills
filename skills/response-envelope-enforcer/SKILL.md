@@ -551,4 +551,4 @@ Use this checklist to verify compliance:
 - `apps/{api-service}/src/chat/chat.gateway.ts` - Gateway implementation example
 
 **Frontend**:
-- `apps/my-wallet/services/api/base-api.ts` - Response extraction logic (line 483-488)
+- `apps/{app-name}/services/api/base-api.ts` - Response extraction logic (line 483-488)

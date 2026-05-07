@@ -53,7 +53,7 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 
 - A story markdown file at:
   `docs/prds/<domain>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
-- The story **MUST** have `jira_epic` in its frontmatter (e.g. `jira_epic: "RB-14"`).
+- The story **MUST** have `jira_epic` in its frontmatter (e.g. `jira_epic: "PROJ-14"`).
   Run `/sync-jira-epic` on the parent epic first if missing. The script **exits with an error** if absent.
 - Optionally: `epic_source` pointing to the parent epic file for Bitbucket link generation.
 
@@ -92,7 +92,7 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 ```yaml
 title: 'Story 1.2: Wire up new auth middleware'
 epic_source: 'docs/prds/<domain>/epics/epic.<N>.<name>/epic.<N>.<name>.md'
-jira_epic: "RB-14"                 # REQUIRED
+jira_epic: "PROJ-14"                 # REQUIRED
 story_type: 'feature_enhancement'
 priority: 'high'
 estimated_effort_hours: 4
@@ -121,7 +121,7 @@ grep -L 'jira_key:' $(find docs/prds -path '*/stories/*/story.*.md')
 ### 2. Ensure `jira_epic` Is Set
 
 ```yaml
-jira_epic: "RB-14"
+jira_epic: "PROJ-14"
 ```
 
 Run `/sync-jira-epic` on the parent epic if not already done.
@@ -162,9 +162,9 @@ Flow:
 
 ### 5. Report to User
 
-- ✅ Jira story key (e.g. `RB-47`)
+- ✅ Jira story key (e.g. `PROJ-47`)
 - ✅ Jira URL
-- ✅ Parent epic linked (e.g. `RB-14`) — `parent` or Epic Link customfield
+- ✅ Parent epic linked (e.g. `PROJ-14`) — `parent` or Epic Link customfield
 - ✅ Added to backlog (or Kanban warning)
 - ✅ Status transition (if applicable)
 - ✅ Change log entry appended
@@ -215,7 +215,7 @@ If multiple issues carry the same sync label (duplicates from prior failed runs)
 On create, the script:
 
 1. Calls `/rest/api/3/project/<KEY>` to read `style` (`team_managed` or `classic`).
-2. Sends `parent: { key: "RB-14" }` for team-managed, or `customfield_10014: "RB-14"` for classic.
+2. Sends `parent: { key: "PROJ-14" }` for team-managed, or `customfield_10014: "PROJ-14"` for classic.
 3. If Jira responds 400 with a message mentioning `parent`/`epic_link`/`customfield_10014`, retries with the opposite field — handles instances where `style` and the actual accepted linkage disagree.
 
 `JIRA_EPIC_LINK_FIELD` overrides the classic field id (default `customfield_10014`).
@@ -242,9 +242,9 @@ If your story already has a hand-written `## Change Log` heading without HTML ma
 After sync the script writes (in-place, preserving order):
 
 ```yaml
-jira_key: "RB-47"
-jira_url: "https://yourorg.atlassian.net/browse/RB-47"
-jira_epic: "RB-14"
+jira_key: "PROJ-47"
+jira_url: "https://yourorg.atlassian.net/browse/PROJ-47"
+jira_epic: "PROJ-14"
 epic_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prds/.../epic.N.name.md"
 story_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prds/.../story.N.M.slug.md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
@@ -283,9 +283,9 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
   "action": "update",
   "dryRun": false,
   "file": "/abs/path/story.md",
-  "jira_key": "RB-47",
-  "jira_url": "https://yourorg.atlassian.net/browse/RB-47",
-  "jira_epic": "RB-14",
+  "jira_key": "PROJ-47",
+  "jira_url": "https://yourorg.atlassian.net/browse/PROJ-47",
+  "jira_epic": "PROJ-14",
   "epic_bitbucket_url": "https://bitbucket.org/.../epic.md",
   "story_bitbucket_url": "https://bitbucket.org/.../story.md",
   "change_summary": "Updated: summary, description",

@@ -150,7 +150,7 @@ Flow:
 
 ### 4. Report to User
 
-- ✅ Jira epic key (e.g. `RB-14`)
+- ✅ Jira epic key (e.g. `PROJ-14`)
 - ✅ Jira URL
 - ✅ Added to backlog (or Kanban warning)
 - ✅ Status transition (if applicable)
@@ -233,8 +233,8 @@ The local file holds the **full** changelog history. The Jira ADF description re
 After sync the script writes (in-place, preserving order):
 
 ```yaml
-jira_key: "RB-14"
-jira_url: "https://yourorg.atlassian.net/browse/RB-14"
+jira_key: "PROJ-14"
+jira_url: "https://yourorg.atlassian.net/browse/PROJ-14"
 epic_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prds/.../epic.N.name.md"
 prd_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prds/.../prd.<domain>.md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
@@ -274,8 +274,8 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
   "action": "update",
   "dryRun": false,
   "file": "/abs/path/epic.md",
-  "jira_key": "RB-14",
-  "jira_url": "https://yourorg.atlassian.net/browse/RB-14",
+  "jira_key": "PROJ-14",
+  "jira_url": "https://yourorg.atlassian.net/browse/PROJ-14",
   "epic_bitbucket_url": "https://bitbucket.org/.../epic.md",
   "prd_bitbucket_url": "https://bitbucket.org/.../prd.md",
   "change_summary": "Updated: summary, description",

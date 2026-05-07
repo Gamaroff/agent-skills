@@ -1841,7 +1841,7 @@ the app's offline mode allows you to use most wallet features even when you don'
 
 ❌ **Receiving real-time transaction updates**  
 ❌ **Getting current exchange rates**  
-❌ **Completing blockchain transactions**  
+❌ **Completing third-party payment processing**  
 ❌ **Receiving new messages**
 
 ## Managing Your Offline Data

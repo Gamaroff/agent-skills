@@ -619,7 +619,7 @@ describe('LoginForm', () => {
 Mocks that are needed by MANY tests (platform modules, global utilities).
 
 ```typescript
-// apps/my-wallet/src/test-setup.ts
+// apps/{app-name}/src/test-setup.ts
 import '@testing-library/jest-native/extend-expect';
 
 // Global mocks for platform modules
@@ -769,13 +769,13 @@ Before submitting a test with mocks, verify:
 
 ```bash
 # Test just your file to verify mocks work
-npx nx test my-wallet --testPathPattern="my-test.spec.tsx" --no-coverage
+npx nx test {app-name} --testPathPattern="my-test.spec.tsx" --no-coverage
 
 # Test with verbose output to see mock calls
-npx nx test my-wallet --testPathPattern="my-test.spec.tsx" --verbose --no-coverage
+npx nx test {app-name} --testPathPattern="my-test.spec.tsx" --verbose --no-coverage
 
 # Run multiple times to catch flakiness
-for i in {1..5}; do npx nx test my-wallet --testPathPattern="my-test.spec.tsx" --no-coverage; done
+for i in {1..5}; do npx nx test {app-name} --testPathPattern="my-test.spec.tsx" --no-coverage; done
 
 # Clear and rebuild mocks
 jest.clearAllMocks() // In beforeEach

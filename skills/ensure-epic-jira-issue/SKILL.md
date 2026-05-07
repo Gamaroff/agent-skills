@@ -1,6 +1,6 @@
 ---
 name: ensure-epic-jira-issue
-description: Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-epic, and writes jira_key + jira_url to the epic frontmatter. Sets EPIC_JIRA_KEY (e.g. "RB-42") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Callers branch on TRACKER (set by shared/resources/resolve-platform.sh) to pick the right sub-routine.
+description: Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-epic, and writes jira_key + jira_url to the epic frontmatter. Sets EPIC_JIRA_KEY (e.g. "PROJ-42") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Callers branch on TRACKER (set by shared/resources/resolve-platform.sh) to pick the right sub-routine.
 type: internal
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
@@ -20,7 +20,7 @@ This is an **internal sub-routine** called by `review-story`. Do not invoke dire
 
 ## Output (set by this sub-routine, available to the calling skill)
 
-- `EPIC_JIRA_KEY` — Jira issue key (e.g. `RB-42`), or empty string on failure or skip
+- `EPIC_JIRA_KEY` — Jira issue key (e.g. `PROJ-42`), or empty string on failure or skip
 
 ---
 
@@ -38,7 +38,7 @@ Set `EPIC_JIRA_KEY=""` and return. Do not proceed to EJ1.
 
 Read the file at `EPIC_FILE_PATH`. Parse the YAML frontmatter block (between `---` delimiters). Extract:
 
-- `jira_key` — current value (may be absent, null, or a string like `RB-42`)
+- `jira_key` — current value (may be absent, null, or a string like `PROJ-42`)
 - `jira_url` — current value (may be absent or null)
 - `title` — epic title
 
@@ -55,7 +55,7 @@ If the file cannot be read: log warning `⚠️ Epic file not found at EPIC_FILE
 ### Step EJ3: Verify Existing Jira Issue
 
 Call the Atlassian MCP tool `getJiraIssue`:
-- `cloudId`: derived from `JIRA_URL` hostname (e.g. `mediastreamag.atlassian.net`). If cloud resolution fails, call `getAccessibleAtlassianResources` and use the matching entry's `id`.
+- `cloudId`: derived from `JIRA_URL` hostname (e.g. `yourorg.atlassian.net`). If cloud resolution fails, call `getAccessibleAtlassianResources` and use the matching entry's `id`.
 - `issueIdOrKey`: `{jira_key}`
 - `fields`: `["status", "summary"]`
 
@@ -94,7 +94,7 @@ After delegation completes: re-read the epic frontmatter to capture the freshly-
 
 ### Step EJ5: Verify jira_url Shape
 
-Expected shape: `{JIRA_URL}/browse/{jira_key}` (e.g. `https://mediastreamag.atlassian.net/browse/RB-42`).
+Expected shape: `{JIRA_URL}/browse/{jira_key}` (e.g. `https://yourorg.atlassian.net/browse/PROJ-42`).
 
 - If `jira_url` in frontmatter equals the expected shape → no action.
 - If `jira_url` is absent, null, or mismatched → write the correct value to frontmatter:

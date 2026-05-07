@@ -210,14 +210,10 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
    - If found: note file path and what it already implements
 
 3. **Frontend component duplication check** — for each UI component planned:
-   - Glob: `apps/my-wallet/**/*[component-name]*`
+   - Glob: `apps/{app-name}/**/*[component-name]*`
    - If found: note file path
 
-4. **BSV constraint check** — if epic touches wallet/payments:
-   - Verify no references to: SegWit, P2WPKH, P2WSH, P2TR, Bech32, Cashaddr, RBF
-   - Verify: only Legacy addresses (P2PKH, P2SH), Base58 encoding, OP_RETURN
-
-5. **Platform separation check** — if epic touches shared libs:
+4. **Platform separation check** — if epic touches shared libs:
    - Verify client/server separation is planned for `logging-lib`, `auth-lib`, `shared-utils`
    - No Node.js deps (bcrypt, winston, jsonwebtoken) referenced for client builds
 

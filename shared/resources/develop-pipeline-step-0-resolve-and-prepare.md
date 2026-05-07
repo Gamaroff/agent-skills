@@ -167,7 +167,7 @@ If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started 
 
 ### Jira path (when `TRACKER=jira`):
 
-Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `mediastreamag.atlassian.net` from `https://mediastreamag.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` field from the matching entry.
+Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net` from `https://yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` field from the matching entry.
 
 1. **Post pipeline-start comment** — call `addCommentToJiraIssue`:
    - `cloudId`: {derived hostname}

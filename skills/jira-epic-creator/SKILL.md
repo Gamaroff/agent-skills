@@ -34,7 +34,7 @@ Activate when user needs to:
 
 The following Jira environment variables must be available (will prompt if missing):
 
-- `JIRA_URL` - Jira instance URL (e.g., `https://yourcompany.atlassian.net`)
+- `JIRA_URL` - Jira instance URL (e.g., `https://yourorg.atlassian.net`)
 - `JIRA_API_TOKEN` - Jira API token for authentication
 - `JIRA_USER_EMAIL` - Email associated with Jira account
 - `JIRA_PROJECT_KEY` - Project key where epic will be created
@@ -62,7 +62,7 @@ echo "JIRA_USER_EMAIL: $JIRA_USER_EMAIL"
 
 **If variables are not set**, prompt the user for each missing variable:
 
-- "What is your Jira URL?" (default: `https://yourcompany.atlassian.net`)
+- "What is your Jira URL?" (default: `https://yourorg.atlassian.net`)
 - "What is your Jira project key?"
 - "What is your Jira user email?"
 - "What is your Jira API token?"
@@ -102,8 +102,8 @@ The script extracts:
 **After successful creation, the script automatically updates the epic file with:**
 
 ```yaml
-jira_key: "RB-9"
-jira_url: "https://yourcompany.atlassian.net/browse/RB-9"
+jira_key: "PROJ-9"
+jira_url: "https://yourorg.atlassian.net/browse/PROJ-9"
 ```
 
 These are added to the YAML frontmatter to maintain the link between local documentation and Jira.

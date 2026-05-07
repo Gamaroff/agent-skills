@@ -486,9 +486,9 @@ title: 'X'
 
 body
 `;
-  const out = lib.upsertFrontmatterKeys(src, { jira_key: "RB-47", jira_url: "https://x/RB-47" });
-  assert.match(out, /jira_key: "RB-47"/);
-  assert.match(out, /jira_url: "https:\/\/x\/RB-47"/);
+  const out = lib.upsertFrontmatterKeys(src, { jira_key: "PROJ-47", jira_url: "https://x/PROJ-47" });
+  assert.match(out, /jira_key: "PROJ-47"/);
+  assert.match(out, /jira_url: "https:\/\/x\/PROJ-47"/);
 });
 
 test("upsertFrontmatterKeys — null/undefined value removes existing key", () => {
@@ -594,7 +594,7 @@ test("transitionToStatus — finds matching transition by to.name", async () => 
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const out = await lib_inner.transitionToStatus({
     http, baseUrl: "https://j", email: "e", token: "t",
-    issueKey: "RB-1", targetStatus: "In Progress", currentStatus: "To Do",
+    issueKey: "PROJ-1", targetStatus: "In Progress", currentStatus: "To Do",
   });
   assert.equal(out.transitioned, true);
   assert.equal(calls.filter(c => c.method === "POST").length, 1);
@@ -605,7 +605,7 @@ test("transitionToStatus — no-op when target equals current", async () => {
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const out = await lib_inner.transitionToStatus({
     http, baseUrl: "https://j", email: "e", token: "t",
-    issueKey: "RB-1", targetStatus: "Done", currentStatus: "Done",
+    issueKey: "PROJ-1", targetStatus: "Done", currentStatus: "Done",
   });
   assert.equal(out.transitioned, false);
   assert.equal(out.reason, "already");
@@ -629,7 +629,7 @@ test("moveToBacklog — skips on Kanban board", async () => {
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const r = await lib_inner.moveToBacklog({
     http, baseUrl: "https://j", email: "e", token: "t",
-    boardId: "1", issueKey: "RB-1", output: lib_inner.makeOutput({ quiet: true }),
+    boardId: "1", issueKey: "PROJ-1", output: lib_inner.makeOutput({ quiet: true }),
   });
   assert.equal(r.moved, false);
   assert.equal(postCalled, false, "no POST on Kanban");
@@ -658,7 +658,7 @@ test("findExistingByLabel — returns key when issue with label exists", async (
   const fakeFetch = async (url) => {
     if (url.includes("/search")) return {
       ok: true, status: 200,
-      json: async () => ({ issues: [{ key: "RB-99", fields: { updated: "2026-04-28T10:00:00.000Z" } }] }),
+      json: async () => ({ issues: [{ key: "PROJ-99", fields: { updated: "2026-04-28T10:00:00.000Z" } }] }),
     };
     return { ok: false, status: 404, text: async () => "" };
   };
@@ -667,7 +667,7 @@ test("findExistingByLabel — returns key when issue with label exists", async (
     http, baseUrl: "https://j", email: "e", token: "t",
     projectKey: "RB", label: "synced-from-task.1.x",
   });
-  assert.equal(r.key, "RB-99");
+  assert.equal(r.key, "PROJ-99");
 });
 
 // #3 — atomic PUT with returnIssue
@@ -679,7 +679,7 @@ test("putIssueAtomic — parses fields.updated from response body", async () => 
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const r = await lib_inner.putIssueAtomic({
     http, baseUrl: "https://j", email: "e", token: "t",
-    issueKey: "RB-1", fields: { summary: "X" },
+    issueKey: "PROJ-1", fields: { summary: "X" },
   });
   assert.equal(r.updated, "2026-04-28T11:00:00.000Z");
 });
@@ -689,7 +689,7 @@ test("fetchUpdatedTimestampStrict — throws on missing fields.updated", async (
   const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ fields: {} }) });
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   await assert.rejects(
-    lib_inner.fetchUpdatedTimestampStrict({ http, baseUrl: "https://j", email: "e", token: "t", issueKey: "RB-1" }),
+    lib_inner.fetchUpdatedTimestampStrict({ http, baseUrl: "https://j", email: "e", token: "t", issueKey: "PROJ-1" }),
     /missing fields\.updated/,
   );
 });

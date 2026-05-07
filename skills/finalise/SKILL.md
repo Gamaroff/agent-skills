@@ -891,7 +891,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    Extract `jira_key` from story/task frontmatter. If absent or null, skip this step silently.
 
-   Use the Atlassian MCP tools. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `mediastreamag.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
+   Use the Atlassian MCP tools. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
 
    1. **Transition to Done** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
       - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {jira_key}`

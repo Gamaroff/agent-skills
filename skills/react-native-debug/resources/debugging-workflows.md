@@ -24,7 +24,7 @@ ls -lt dist/libs/@{org}/[library-name]/ | head -5
 
 ```bash
 # Check Metro cache freshness
-npx nx start my-wallet --dry-run
+npx nx start {app-name} --dry-run
 
 # Check tsconfig paths
 grep -A 20 '"paths"' tsconfig.json | grep "@{project}"
@@ -49,7 +49,7 @@ grep -A 5 "projectRoot\|cacheVersion" metro.config.js
 
 **Auto-run this**:
 ```bash
-npx nx start my-wallet --reset-cache --clear
+npx nx start {app-name} --reset-cache --clear
 ```
 
 Metro cache is often stale after rebuilds. This is safe to run automatically.
@@ -58,7 +58,7 @@ Metro cache is often stale after rebuilds. This is safe to run automatically.
 
 ```bash
 # Try starting Metro again
-npx nx start my-wallet --reset-cache --clear
+npx nx start {app-name} --reset-cache --clear
 
 # If still failing, check exact error path
 # Metro terminal shows: "from /path/to/file"
@@ -113,10 +113,10 @@ Common errors:
 
 ```bash
 # Check jest.config.ts exists
-ls apps/my-wallet/jest.config.ts
+ls apps/{app-name}/jest.config.ts
 
 # Check required fields
-grep -E "preset|setupFilesAfterEnv|transform|moduleNameMapper" apps/my-wallet/jest.config.ts
+grep -E "preset|setupFilesAfterEnv|transform|moduleNameMapper" apps/{app-name}/jest.config.ts
 ```
 
 **Required jest.config.ts fields**:
@@ -137,10 +137,10 @@ grep -E "preset|setupFilesAfterEnv|transform|moduleNameMapper" apps/my-wallet/je
 
 ```bash
 # Check if test-setup.ts exists
-ls apps/my-wallet/src/test-setup.ts
+ls apps/{app-name}/src/test-setup.ts
 
 # Check if referenced in jest.config.ts
-grep "test-setup.ts" apps/my-wallet/jest.config.ts
+grep "test-setup.ts" apps/{app-name}/jest.config.ts
 ```
 
 **test-setup.ts should contain**:
@@ -156,10 +156,10 @@ jest.mock('@react-native-async-storage/async-storage');
 
 ```bash
 # Check .babelrc.js exists
-ls apps/my-wallet/.babelrc.js
+ls apps/{app-name}/.babelrc.js
 
 # Check required presets
-grep -E "@babel/preset-react|@babel/preset-typescript" apps/my-wallet/.babelrc.js
+grep -E "@babel/preset-react|@babel/preset-typescript" apps/{app-name}/.babelrc.js
 ```
 
 **Required .babelrc.js presets**:
@@ -182,7 +182,7 @@ module.exports = {
 **Issue A**: test-setup.ts missing
 ```bash
 # Create minimal test-setup.ts
-cat > apps/my-wallet/src/test-setup.ts << 'EOF'
+cat > apps/{app-name}/src/test-setup.ts << 'EOF'
 import '@testing-library/jest-native/extend-expect';
 EOF
 ```
@@ -204,14 +204,14 @@ npm install --save-dev @babel/preset-react @babel/preset-typescript
 ### Step 6: Re-run Test
 
 ```bash
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Step 7: If Still Failing
 
 Ask user: **"Can you run this and show me the error?"**
 ```bash
-npx nx test my-wallet --no-coverage --verbose
+npx nx test {app-name} --no-coverage --verbose
 ```
 
 Check for:
@@ -289,7 +289,7 @@ jest.mock('api', () => ({
 
 ```bash
 # Find all mocks for the same module
-grep -r "jest.mock.*api" apps/my-wallet/
+grep -r "jest.mock.*api" apps/{app-name}/
 
 # If found in multiple places, consolidate into one
 ```
@@ -461,7 +461,7 @@ Ask user: "Should function X be removed (server-only) or changed to /client impo
 npx tsc --noEmit
 
 # Run test to verify imports resolve
-npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
+npx nx test {app-name} --testNamePattern="[test name]" --no-coverage
 ```
 
 ### Step 7: Check ESLint Enforcement
@@ -469,7 +469,7 @@ npx nx test my-wallet --testNamePattern="[test name]" --no-coverage
 If this happens repeatedly, ESLint should catch it:
 ```bash
 # Run ESLint on test file
-npx nx lint my-wallet --files="test-file.spec.tsx"
+npx nx lint {app-name} --files="test-file.spec.tsx"
 
 # Should show error like:
 # "Don't import from server-only library in client code"
@@ -719,7 +719,7 @@ If test is flaky (sometimes passes, sometimes fails):
 ```bash
 # Run test multiple times
 for i in {1..5}; do
-  npx nx test my-wallet --testNamePattern="flaky-test" --no-coverage
+  npx nx test {app-name} --testNamePattern="flaky-test" --no-coverage
 done
 
 # If sometimes fails, it's a timing issue
@@ -748,7 +748,7 @@ it('should handle async operation', async () => {
   console.log('4. After waitFor');
 });
 
-// Run with: npx nx test my-wallet --testNamePattern="..." --no-coverage
+// Run with: npx nx test {app-name} --testNamePattern="..." --no-coverage
 ```
 
 Check console output to see where delay occurs.

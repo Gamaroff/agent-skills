@@ -89,13 +89,13 @@ Transform failed for module
 **Quick Diagnosis**:
 ```bash
 # Check test-setup.ts exists
-ls apps/my-wallet/src/test-setup.ts
+ls apps/{app-name}/src/test-setup.ts
 
 # Check jest.config.ts setupFilesAfterEnv
-grep setupFilesAfterEnv apps/my-wallet/jest.config.ts
+grep setupFilesAfterEnv apps/{app-name}/jest.config.ts
 
 # Check jest preset
-grep preset apps/my-wallet/jest.config.ts
+grep preset apps/{app-name}/jest.config.ts
 ```
 
 **Solution Priority**:
@@ -125,13 +125,13 @@ Could not find babel config
 **Quick Diagnosis**:
 ```bash
 # Check babel config exists
-ls -la apps/my-wallet/.babelrc.js
+ls -la apps/{app-name}/.babelrc.js
 
 # Check presets installed
 npm list @babel/preset-react @babel/preset-typescript
 
 # Check config syntax
-node -c apps/my-wallet/.babelrc.js
+node -c apps/{app-name}/.babelrc.js
 ```
 
 **Solution**:
@@ -197,11 +197,11 @@ Unexpected mock call
 **Quick Diagnosis**:
 ```bash
 # Find all mocks for this module
-grep -r "jest.mock.*module-name" apps/my-wallet/
+grep -r "jest.mock.*module-name" apps/{app-name}/
 # Check if declared in multiple places
 
 # Check test-setup.ts
-grep "jest.mock" apps/my-wallet/src/test-setup.ts
+grep "jest.mock" apps/{app-name}/src/test-setup.ts
 ```
 
 **Solution**:
@@ -482,13 +482,13 @@ Test passes when run alone, fails in suite
 **Quick Diagnosis**:
 ```bash
 # Run test multiple times
-for i in {1..5}; do npx nx test my-wallet --testNamePattern="flaky-test"; done
+for i in {1..5}; do npx nx test {app-name} --testNamePattern="flaky-test"; done
 # If sometimes pass, it's flaky
 
 # Run in isolation
-npx nx test my-wallet --testNamePattern="flaky-test"
+npx nx test {app-name} --testNamePattern="flaky-test"
 # vs with other tests
-npx nx test my-wallet
+npx nx test {app-name}
 ```
 
 **Solution**:

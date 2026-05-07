@@ -353,7 +353,7 @@ Create the issue file in the source directory. Use the appropriate tracker refer
 # Issue: {Title}
 
 **Issue ID**: story.{epic}.{story}.issue.{n}
-**Tracker Issue**: {RB-123 (https://mediastreamag.atlassian.net/browse/RB-123) | #45 (https://github.com/...) | #45 (https://bitbucket.org/...)}
+**Tracker Issue**: {PROJ-123 (https://yourorg.atlassian.net/browse/PROJ-123) | #45 (https://github.com/...) | #45 (https://bitbucket.org/...)}
 **Related Story**: [Story {epic}.{story}: {title}](./story.{epic}.{story}.{name}.md)
 **Status**: 🆕 Open
 **Type**: {bug | enhancement | task}
@@ -422,7 +422,7 @@ Add a link to the issue in the source story/task's issues section.
 
 | ID      | Title                                                       | Status  | Priority | Tracker                   |
 | ------- | ----------------------------------------------------------- | ------- | -------- | ------------------------- |
-| issue.1 | [Debounce timing](./story.180.3.issue.1.debounce-timing.md) | 🆕 Open | Medium   | [RB-45](https://...) |
+| issue.1 | [Debounce timing](./story.180.3.issue.1.debounce-timing.md) | 🆕 Open | Medium   | [PROJ-45](https://...) |
 ```
 
 **For Tasks** - Add or update `### Issues` section:
@@ -439,8 +439,8 @@ For **Jira**:
 ```
 ✅ Issue Created!
 
-   Jira Issue: RB-45
-   URL: https://mediastreamag.atlassian.net/browse/RB-45
+   Jira Issue: PROJ-45
+   URL: https://yourorg.atlassian.net/browse/PROJ-45
 
    Local Document: story.180.3.issue.1.debounce-timing.md
    Location: docs/prd/.../stories/story.180.3.quick-re-search/
@@ -531,7 +531,7 @@ Please provide a valid story or task file/directory:
 Error: Jira credentials not set or invalid.
 
 Set the following environment variables:
-  export JIRA_URL=https://yourcompany.atlassian.net
+  export JIRA_URL=https://yourorg.atlassian.net
   export JIRA_PROJECT_KEY=RB
   export JIRA_USER_EMAIL=your-email@example.com
   export JIRA_API_TOKEN=your-api-token

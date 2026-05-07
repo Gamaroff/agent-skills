@@ -501,8 +501,8 @@ task_url="${JIRA_URL}/browse/${task_key}"
 
 **On success**: Add to task YAML frontmatter:
 ```yaml
-jira_key: RB-15
-jira_url: https://mediastreamag.atlassian.net/browse/RB-15
+jira_key: PROJ-15
+jira_url: https://yourorg.atlassian.net/browse/PROJ-15
 ```
 
 **On failure**: Set `jira_key: null`, log warning, continue. Never halt.

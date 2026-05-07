@@ -288,7 +288,7 @@ Report: `[PASS] All requirements measurable` or `[FAIL] Found N vague requiremen
 
 **Check 2 — Implementation Leakage:**
 
-Scan FRs and NFRs for technology names that prescribe implementation rather than capability: framework names (React, Redux, Prisma), library names, data structure names (JSON, array), cloud provider names (AWS, S3). Exception: names that ARE the capability (e.g., "BSV blockchain", "WebSocket").
+Scan FRs and NFRs for technology names that prescribe implementation rather than capability: framework names (React, Redux, Prisma), library names, data structure names (JSON, array), cloud provider names (AWS, S3). Exception: names that ARE the capability (e.g., "WebSocket", "GraphQL").
 
 Report: `[PASS] No implementation leakage` or `[FAIL] Found leakage in: [list]`
 

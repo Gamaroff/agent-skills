@@ -398,8 +398,8 @@ describe('AuthService (Client)', () => {
 npx expo export --dump-assetmap
 
 # Check for server-only imports in mobile bundle
-grep -r "from '@{org}/auth-lib'" apps/my-wallet/
-grep -r "from '@{org}/shared-utils/server'" apps/my-wallet/
+grep -r "from '@{org}/auth-lib'" apps/{app-name}/
+grep -r "from '@{org}/shared-utils/server'" apps/{app-name}/
 ```
 
 #### Expected vs Problematic Patterns
@@ -576,7 +576,7 @@ npm ls bcrypt jsonwebtoken
 
 ```bash
 # Check for server imports in mobile code
-grep -r "from '@{org}/auth-lib'" apps/my-wallet/ | grep -v "mobile"
+grep -r "from '@{org}/auth-lib'" apps/{app-name}/ | grep -v "mobile"
 ```
 
 **Solution**: Replace server imports with mobile-specific imports

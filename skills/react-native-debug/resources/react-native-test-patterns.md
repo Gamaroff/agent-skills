@@ -71,7 +71,7 @@ Does library dist/ directory exist?
         ├─ NO → Test wrong (wrong import)
         │   └─ Fix: Update import in test
         └─ YES → Is Metro cache stale?
-            └─ Fix: npx nx start my-wallet --reset-cache
+            └─ Fix: npx nx start {app-name} --reset-cache
 ```
 
 ### Example: Library Not Exported
@@ -460,13 +460,13 @@ Do tests pass after clearing Metro cache?
 ls dist/libs/@{org}/[lib]/
 
 # Check Metro cache status
-npx nx start my-wallet --dry-run
+npx nx start {app-name} --dry-run
 
 # Look for old Metro cache
 rm -rf node_modules/.cache
 
 # Clear and rebuild
-npx nx start my-wallet --reset-cache --clear
+npx nx start {app-name} --reset-cache --clear
 npm run build:libraries
 ```
 
@@ -553,30 +553,30 @@ render(
 ls -la dist/libs/@{org}/[lib]/
 
 # Check test configuration
-cat apps/my-wallet/jest.config.ts
+cat apps/{app-name}/jest.config.ts
 
 # Check test setup file
-cat apps/my-wallet/src/test-setup.ts
+cat apps/{app-name}/src/test-setup.ts
 
 # Find all mocks
-grep -r "jest.mock" apps/my-wallet/**/*.spec.tsx
+grep -r "jest.mock" apps/{app-name}/**/*.spec.tsx
 
 # Find Metro cache
 du -sh node_modules/.cache 2>/dev/null
 
 # Check metro config
-cat apps/my-wallet/metro.config.js | grep -A 5 "projectRoot\|nodeModulesPaths"
+cat apps/{app-name}/metro.config.js | grep -A 5 "projectRoot\|nodeModulesPaths"
 
 # Find async operations in tests
-grep -r "await\|waitFor" apps/my-wallet/**/*.spec.tsx
+grep -r "await\|waitFor" apps/{app-name}/**/*.spec.tsx
 
 # Find component mocks
-grep -A 5 "jest.mock.*components" apps/my-wallet/**/*.spec.tsx
+grep -A 5 "jest.mock.*components" apps/{app-name}/**/*.spec.tsx
 ```
 
 ---
 
-## Real-World React Native Example: my-wallet
+## Real-World React Native Example: {app-name}
 
 ### Scenario: AuthContext Test Fails with "Cannot find module"
 
@@ -594,7 +594,7 @@ Error: Cannot find module '@{org}/auth-lib/client'
 
 2. **Check if /client is required:**
    ```bash
-   grep "client\|server" apps/my-wallet/contexts/auth-context.tsx
+   grep "client\|server" apps/{app-name}/contexts/auth-context.tsx
    # Found: Used in client component - needs /client import
    ```
 

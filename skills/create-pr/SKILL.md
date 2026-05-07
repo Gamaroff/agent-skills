@@ -326,7 +326,7 @@ Bitbucket Issues are disabled for this project — do NOT use the Bitbucket Issu
 1. Determine the Jira issue key from the source document:
    - Parse the current branch name for a story/task identifier (e.g. `feature/story.37.1.*` or `feature/task.40.*`)
    - Find the corresponding story/task document in the working directory
-   - Read `jira_key` from its YAML frontmatter (e.g. `RB-12`)
+   - Read `jira_key` from its YAML frontmatter (e.g. `PROJ-12`)
 2. If `jira_key` is found, use the `addCommentToJiraIssue` Atlassian MCP tool with:
    - `issueIdOrKey`: `{jira_key}`
    - `contentFormat`: `"markdown"`
