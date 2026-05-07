@@ -346,6 +346,8 @@ Populate these sections:
 > after the story is created and reviewed.
 >
 > Set `jira_key: null` and `jira_url: null` in the story YAML frontmatter. Leave them null.
+>
+> **Note (future GitHub-path work)**: when this skill (or a sibling) starts creating GitHub issues for stories, mirror the `priority:` frontmatter onto the GitHub Project board's "Priority" single-select field by calling `bash shared/resources/set-github-project-priority.sh "{N}" "{priority}"` immediately after the issue is created. GitHub does not auto-sync `priority:*` labels into Project custom fields.
 
 ### 5.3 Populate Dev Notes Section (CRITICAL)
 

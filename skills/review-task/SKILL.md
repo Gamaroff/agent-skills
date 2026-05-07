@@ -436,6 +436,9 @@ options:
    3. **Frontmatter write-back**: on link-existing, write `jira_key` + `jira_url` (or `github_issue`) before the closing `---` of the frontmatter block (same sed-based pattern as `create-task`). Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
    **Jira path:**
+
+   > **Note**: priority drift between local frontmatter and remote Jira is corrected by `/sync-jira-task`, not by review. No analogue of the GitHub Project-board priority helper is needed — Jira priority is a built-in issue field, not a label, and `jira-sync.js` (`normalisePriority` + `diffFields`) already keeps them in sync.
+
    - Check frontmatter for `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
@@ -511,6 +514,10 @@ options:
             - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
             - Insert or repair body cross-reference link: `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`
             - If matched issue `state` is `CLOSED`: log `"⚠️  Linked existing CLOSED tracker issue #{N} — verify intent before continuing."`
+            - Self-heal the board Priority field on the linked issue (no-op if already correct):
+              ```bash
+              bash shared/resources/set-github-project-priority.sh "{N}" || true
+              ```
             - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip the `gh issue create` block below**
          3. **Zero matches** → fall through to create block below
          4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Task {id}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to create block below
@@ -539,9 +546,17 @@ options:
        ```
      - Determine `{milestone_title}` using the same priority as `/create-task`: `milestone:` frontmatter → epic registry lookup → `"Technical Tasks (standalone)"`
      - Write `github_issue: {N}` into frontmatter
+     - Set the board Priority single-select field (label → field mirror; helper never halts):
+       ```bash
+       bash shared/resources/set-github-project-priority.sh "{N}" "{priority}" || true
+       ```
    - If `github_issue:` has a numeric value:
      - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
        - If the issue doesn't exist (command errors), flag as **Critical**
+     - Self-heal the board Priority field (no-op if already correct; reads `priority:*` label when arg omitted):
+       ```bash
+       bash shared/resources/set-github-project-priority.sh "{N}" || true
+       ```
      - **URL consistency check** — verify the cross-reference link in the document body is correct:
        - Look for any markdown link of the form `[#N](url)` or `[#N](https://github.com/...)` in the task body
        - If found: confirm the issue number in the link matches `github_issue:` in frontmatter; and confirm the URL path ends with `/issues/{N}`. Any mismatch → flag as **Important**: "Body link `[#X](url)` does not match frontmatter `github_issue: {N}`"

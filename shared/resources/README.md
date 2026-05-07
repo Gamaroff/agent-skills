@@ -18,6 +18,19 @@ Reference files in skill `.md` files using the exact path `shared/resources/<fil
 
 Skills that source `resolve-platform.sh`: `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`, `sync-jira-story`, `sync-jira-task`
 
+### GitHub Project Boards
+
+| File | Used by (skill count) | Purpose |
+|------|-----------------------|---------|
+| `set-github-project-priority.sh` | 3 skills | Mirrors the `priority:*` label onto the GitHub Project v2 "Priority" single-select field. Idempotent, never halts the caller. Loops over every Project board containing the issue. Derives priority from the issue's label when the arg is omitted. |
+
+Skills that invoke `set-github-project-priority.sh`: `create-task`, `review-task`, `review-story`
+
+**Why GitHub-only**: this helper exists because GitHub does not auto-sync `priority:*` issue labels into a Project v2 board's "Priority" single-select custom field — two separate stores with no built-in mirror. **No Jira/Bitbucket analogue is needed**:
+
+- **Jira**: priority is a first-class issue field (`fields.priority.name`), not a label. Jira boards display issue priority directly — there is no separate board-level priority field to drift out of sync. Local↔remote priority drift is corrected end-to-end by `/sync-jira-task`, `/sync-jira-story`, `/sync-jira-epic` via `jira-sync.js` — see `normalisePriority()` (lowercase frontmatter ↔ Title Case Jira API, with a `PRIORITY_MAP` synonym table and live-priority lookup) and the priority diff inside `diffFields()`.
+- **Bitbucket**: used only as a VCS in this repo (embedded source-document URLs in Jira ADF). No boards, labels, or priority concepts. Nothing to mirror.
+
 ### Develop Pipeline
 
 Ordered step-by-step reference for the full story/task development pipeline. Used by `develop-story` and `develop-task`.

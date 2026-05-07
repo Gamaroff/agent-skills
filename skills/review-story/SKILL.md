@@ -511,6 +511,9 @@ devDebugLog: .ai/debug-log.md
    3. **Frontmatter write-back**: on link-existing, write `jira_key` + `jira_url` (or `github_issue`) before the closing `---` of the frontmatter block (same sed-based pattern as `create-task`). Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
    **Jira path:**
+
+   > **Note**: priority drift between local frontmatter and remote Jira is corrected by `/sync-jira-story`, not by review. No analogue of the GitHub Project-board priority helper is needed — Jira priority is a built-in issue field, not a label, and `jira-sync.js` (`normalisePriority` + `diffFields`) already keeps them in sync.
+
    - Frontmatter MUST contain `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
@@ -605,6 +608,10 @@ devDebugLog: .ai/debug-log.md
        ```
      - Write `github_issue: {N}` into frontmatter
      - Add row to Story Information table: `| GitHub Issue | [#{N}](url) |`
+     - Set the board Priority single-select field (label → field mirror; helper never halts):
+       ```bash
+       bash shared/resources/set-github-project-priority.sh "{N}" "{priority}" || true
+       ```
        4. After writing `github_issue: {N}` to frontmatter, link the story as a sub-issue of the epic (GitHub-only — Jira parent linkage is `sync-jira-story`'s job):
           If `EPIC_TRACKER_KIND=github` and `EPIC_ISSUE_NUM` is non-empty:
           ```bash
@@ -1935,6 +1942,12 @@ User Can Now: Run `/develop` to begin implementation
    REPO=$(gh repo view --json name -q '.name')
    gh project item-add "$BOARD_NUM" --owner "$OWNER" \
      --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
+   ```
+
+   Self-heal the board Priority single-select field (idempotent; reads the issue's `priority:*` label when no arg given). Placed in the comment-posting phase intentionally — it runs on every review pass regardless of whether the issue was created, linked-existing via dedup, or already in frontmatter, so any drift is corrected each review:
+
+   ```bash
+   bash shared/resources/set-github-project-priority.sh "$GITHUB_ISSUE" || true
    ```
 
    Post the comment:
