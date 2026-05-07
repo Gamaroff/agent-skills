@@ -20,7 +20,7 @@ Reference a skill directly when you know which one you need:
 
 ```
 "Use the @architect skill to create backend architecture"
-"Run @qa-review on story 3.2"
+"Run @qa-story on story 3.2"
 "Execute @commit-changes skill"
 ```
 
@@ -30,8 +30,8 @@ Many skills accept a story directory or specific file. Particularly useful for d
 
 ```bash
 /develop @story-directory
-/qa-review @story-directory
-/fix-qa @story-directory
+/qa-story @story-directory
+/qa-fix @story-directory
 ```
 
 ### File Discovery
@@ -41,24 +41,24 @@ Given a story directory, these skills auto-discover:
 - **Story file:** `story.{epic}.{story}.{name}.md`
 - **QA reports:** `story.{epic}.{story}.qa.{number}.*.md`
 - **Gate files:** `story.{epic}.{story}.gate.{number}.*.yml`
-- **Bug reports:** `story.{epic}.{story}.bug.*.md`
+- **Bug reports:** `bug.{epic}.{story}.{n}.{name}.md`
 
 ### Examples
 
 ```bash
 # Implement from a story directory
-/develop docs/prd/core-platform/contact-system/add-contact-via-handle/epics/epic.178.user-discovery-ui/stories/story.178.8.swipe-actions-friend-requests/
+/develop docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/stories/story.178.8.example-feature/
 
 # Review implementation
-/qa-review docs/prd/.../stories/story.178.8.swipe-actions-friend-requests/
+/qa-story docs/prd/.../stories/story.178.8.example-feature/
 
 # Apply QA findings
-/fix-qa docs/prd/.../stories/story.178.8.swipe-actions-friend-requests/
+/qa-fix docs/prd/.../stories/story.178.8.example-feature/
 
 # Specific files also work
-/develop docs/prd/.../story.178.8.swipe-actions-friend-requests.md
-/qa-review docs/prd/.../story.178.8.swipe-actions-friend-requests.md
-/fix-qa docs/prd/.../story.178.8.qa.1.initial-review.md
+/develop docs/prd/.../story.178.8.example-feature.md
+/qa-story docs/prd/.../story.178.8.example-feature.md
+/qa-fix docs/prd/.../story.178.8.qa.1.initial-review.md
 ```
 
 ### Supported Skills
@@ -66,10 +66,34 @@ Given a story directory, these skills auto-discover:
 | Skill | Accepts Directory | Accepts Story File | Accepts QA/Gate/Bug Files |
 |-------|------------------|-------------------|--------------------------|
 | `develop` | Yes | Yes | No |
-| `qa-review` | Yes | Yes | No |
-| `fix-qa` | Yes | Yes | Yes (QA, Gate, Bug) |
+| `qa-story` | Yes | Yes | No |
+| `qa-fix` | Yes | Yes | Yes (QA, Gate, Bug) |
 
 QA/Gate files are numbered (e.g., `.qa.1.`, `.gate.1.`).
+
+## Orchestrated Pipelines
+
+Prefer the orchestrators — they run the full lifecycle automatically.
+
+### `develop-story` — Automated Story Lifecycle
+
+```bash
+/develop-story docs/prd/.../story.178.8.example-feature.md
+"Develop and QA this story end to end"
+```
+
+Calls: `create-branch → review-story → develop → create-pr → qa-story → qa-fix (up to 5 cycles) → finalise → commit-changes`
+
+### `develop-task` — Automated Task Lifecycle
+
+```bash
+/develop-task docs/development/tasks/task.44.db-migration.md
+"Develop and QA this task end to end"
+```
+
+Calls: `create-branch → review-task → develop → create-pr → qa-task → qa-fix (up to 5 cycles) → finalise → commit-changes`
+
+For the full pipeline breakdown and workflow chains see [Workflows](./workflows.md).
 
 ## Most Commonly Used Skills
 
@@ -105,7 +129,7 @@ Anti-hallucination: all technical details extracted from docs, source citations 
 
 Outputs: architecture docs, technology stack with versions, data models, API specs, component diagrams, source tree, deployment plans, security/testing strategies.
 
-### `qa-review` — Quality Review
+### `qa-story` — Quality Review
 
 ```
 "Review story 3.2"
@@ -115,8 +139,8 @@ Outputs: architecture docs, technology stack with versions, data models, API spe
 
 Slash form:
 ```bash
-/qa-review docs/prd/.../stories/story.178.8.swipe-actions-friend-requests/
-/qa-review story.178.8.swipe-actions-friend-requests.md
+/qa-story docs/prd/.../stories/story.178.8.example-feature/
+/qa-story story.178.8.example-feature.md
 ```
 
 Process: risk assessment → requirements traceability → code quality review → test architecture → NFR validation → active refactoring (when safe) → standards compliance.
@@ -125,6 +149,35 @@ Outputs:
 - `story.[epic].[story].qa.[number].[name].md`
 - `story.[epic].[story].gate.[number].[name].yml`
 - Bug reports if issues found
+
+### `create-branch` — Branch Creation
+
+```
+"Create branch for story 178.8"
+/create-branch story.178.8.example-feature.md
+/create-branch --hotfix v1.2.1
+/create-branch --release v1.3.0
+```
+
+Follows Gitflow: feature branches from `develop`, hotfixes from `main`.
+
+### `create-pr` — Pull Requests
+
+```
+"Create a PR for this branch"
+/create-pr
+```
+
+Pushes branch, detects target (`develop`/`main`), generates description from template, creates via `gh pr create`.
+
+### `finalise` — Sprint Completion
+
+```
+"Finalise story 178.8"
+"Mark this story as accepted"
+```
+
+Validates Definition of Done, updates status to `accepted`, generates Sprint Review artifacts. Reports gaps if DoD criteria unmet.
 
 ### `execute-checklist` — Validation
 
@@ -149,6 +202,28 @@ Use when: 1-3 stories, follows existing patterns, low risk, minimal architectura
 
 File naming: `epic.[number].[descriptive-name].md`. Check `/docs/development/epic-registry.md` for unique numbers.
 
+## Configuration
+
+Projects place `skills-config.yaml` at the project root. Key settings:
+
+```yaml
+qa:
+  qaLocation: docs/qa
+prd:
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: "*/epics/epic.{n}.*.md"
+architecture:
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
+devLoadAlwaysFiles:
+  - docs/architecture/concepts/coding-standards.md
+devStoryLocation: nested   # stories nested inside epic directories
+devDebugLog: .ai/debug-log.md
+```
+
+Platform detection (tracker and VCS) resolves from `skills-config.yaml` → env vars (`JIRA_URL`) → git remote → defaults to GitHub.
+
 ## Tips
 
 ### Skill Selection
@@ -156,7 +231,7 @@ File naming: `epic.[number].[descriptive-name].md`. Check `/docs/development/epi
 - **Be specific** — "Create next story" beats "help with story"
 - **Use natural language** — Skills activate based on intent
 - **Reference explicitly** — Use `@skill-name` when you know which one
-- **Check descriptions** — Each skill's description shows when to use it
+- **Prefer orchestrators** — `develop-story` and `develop-task` manage the full lifecycle
 
 ### Story & Epic Management
 
@@ -193,5 +268,5 @@ File naming: `epic.[number].[descriptive-name].md`. Check `/docs/development/epi
 "Which skill should I use for creating documentation?"
 "List all QA-related skills"
 "Show me the architect skill documentation"
-"What does the qa-review skill do?"
+"What does the qa-story skill do?"
 ```

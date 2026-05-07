@@ -20,6 +20,7 @@ skills/skill-name/
 ```
 
 **SKILL.md frontmatter** (required fields):
+
 ```yaml
 ---
 name: skill-name
@@ -32,6 +33,7 @@ The `description` field is critical — it's what Claude uses for auto-activatio
 ## Progressive Disclosure Loading
 
 Skills load in three tiers:
+
 1. **Metadata** (name + description) — always in context
 2. **SKILL.md body** — loaded when skill triggers
 3. **Bundled resources** — loaded as needed during execution
@@ -39,25 +41,34 @@ Skills load in three tiers:
 ## Creating and Packaging Skills
 
 **Initialize a new skill:**
+
 ```bash
 python skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
 ```
 
 **Package a skill into a distributable zip:**
+
 ```bash
 python skills/create-skill/scripts/package_skill.py skills/<skill-name>
 ```
 
 **Validate a skill:**
+
 ```bash
 python skills/create-skill/scripts/quick_validate.py skills/<skill-name>
+```
+
+**Regenerate the skill catalog** (run after adding or editing skills):
+
+```bash
+npm run generate-catalog
 ```
 
 Packaged `.zip` files sit alongside the skill directory and are the distributable format. **Zips are build artifacts and gitignored** (`skills/*/*.zip`) — regenerate with `package_skill.py` whenever you need to install or distribute. Do not commit them.
 
 ## Configuration
 
-Projects using these skills place a `skills-config.yaml` at their project root. The `skills-config.sample.yaml` in this repo documents all available settings:
+Projects using these skills place a `skills-config.yaml` at their project root. All available settings:
 
 ```yaml
 qa:
@@ -71,7 +82,7 @@ architecture:
   architectureShardedLocation: docs/architecture
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-devStoryLocation: nested   # stories nested inside epic directories
+devStoryLocation: nested # stories nested inside epic directories
 devDebugLog: .ai/debug-log.md
 ```
 
@@ -85,23 +96,25 @@ Skills that interact with remote trackers or PRs use this resolver order to pick
 4. **Default**: GitHub for both.
 
 All 8 leaf skills source `shared/resources/resolve-platform.sh` before any tracker/VCS branch:
+
 - `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`
 
 Skills that are platform-agnostic (no resolver needed):
+
 - `create-branch`, `commit-changes`, `create-story` (docs-only), `qa-review`, `qa-gate`
 
 The canonical resolver spec lives in `shared/resources/platform-detection.md`. The helper is `shared/resources/resolve-platform.sh`; `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
 
 ## File Naming Conventions (used in target projects)
 
-| Artifact | Pattern | Example |
-|----------|---------|---------|
-| Epic | `epic.{n}.{name}.md` | `epic.178.user-discovery-ui.md` |
-| Story | `story.{epic}.{story}.{name}.md` | `story.178.8.swipe-actions.md` |
-| QA Report | `story.{epic}.{story}.qa.{n}.{name}.md` | `story.178.8.qa.1.review.md` |
-| Gate File | `story.{epic}.{story}.gate.{n}.{name}.yml` | `story.178.8.gate.1.review.yml` |
-| Bug Report | `bug.{epic}.{story}.{n}.{name}.md` | `bug.178.8.1.crash.md` |
-| Task | `task.{n}.{name}.md` | `task.44.db-migration.md` |
+| Artifact   | Pattern                                    | Example                          |
+| ---------- | ------------------------------------------ | -------------------------------- |
+| Epic       | `epic.{n}.{name}.md`                       | `epic.178.feature-ui.md`         |
+| Story      | `story.{epic}.{story}.{name}.md`           | `story.178.8.example-feature.md` |
+| QA Report  | `story.{epic}.{story}.qa.{n}.{name}.md`    | `story.178.8.qa.1.review.md`     |
+| Gate File  | `story.{epic}.{story}.gate.{n}.{name}.yml` | `story.178.8.gate.1.review.yml`  |
+| Bug Report | `bug.{epic}.{story}.{n}.{name}.md`         | `bug.178.8.1.crash.md`           |
+| Task       | `task.{n}.{name}.md`                       | `task.44.db-migration.md`        |
 
 ### Status Lifecycle
 
@@ -109,7 +122,7 @@ Document status follows a canonical lifecycle defined in `shared/resources/docum
 
 ## Key Skill Categories
 
-**Development workflow (BMAD):** `develop`, `develop-story`, `qa-review`, `qa-fix`, `qa-gate`, `finalise`
+**Development workflow:** `develop`, `develop-story`, `qa-review`, `qa-fix`, `qa-gate`, `finalise`
 
 **Git/version control:** `commit-changes`, `create-branch`, `create-pr`
 
@@ -125,7 +138,7 @@ Document status follows a canonical lifecycle defined in `shared/resources/docum
 
 `shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. At package time, `package_skill.py` auto-bundles referenced files under `references/` inside the zip and rewrites paths accordingly — installed skills are fully self-contained. Never use symlinks or relative paths to reference shared resources.
 
-## BMAD Development Pipeline
+## Development Pipeline
 
 The core story implementation workflow used by these skills:
 

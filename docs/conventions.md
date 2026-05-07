@@ -15,7 +15,7 @@ Example: story.2.3.user-authentication.md
 
 ```
 epic.{number}.{descriptive-name}.md
-Example: epic.163.user-notifications.md
+Example: epic.163.feature-notifications.md
 ```
 
 ### QA Reports
@@ -48,9 +48,7 @@ Example: task.44.database-migration.md
 
 ## Configuration
 
-> The `.bmad-core` directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
-
-Projects using these skills place a `skills-config.yaml` at the project root. The `skills-config.sample.yaml` in this repo documents all available settings:
+Projects using these skills place a `skills-config.yaml` at the project root. All available settings:
 
 ```yaml
 qa:
@@ -68,7 +66,7 @@ architecture:
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 
-devStoryLocation: nested   # stories nested inside epic directories
+devStoryLocation: nested # stories nested inside epic directories
 devDebugLog: .ai/debug-log.md
 ```
 
@@ -93,8 +91,8 @@ architecture:
 
 ```yaml
 qa:
-  qaLocation: "docs/qa"        # Base directory for QA files
-devStoryLocation: "docs/prd"   # Story files location
+  qaLocation: "docs/qa" # Base directory for QA files
+devStoryLocation: "docs/prd" # Story files location
 ```
 
 ## Epic Registry

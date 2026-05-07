@@ -7,51 +7,41 @@ Use the `create-skill` skill to author new skills:
 "Help me build a skill for [workflow]"
 ```
 
-## Authoring Process
+## How Skills Load (Progressive Disclosure)
 
-1. **Understanding** — gather concrete examples
-2. **Planning** — identify reusable resources needed
-3. **Initialize** — `python3 skills/create-skill/scripts/init_skill.py <skill-name> --path skills/`
-4. **Edit** — customize `SKILL.md` and resources
-5. **Package** — `python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>`
-6. **Iterate** — test and improve
+Skills load in three tiers:
 
-## Adding a New Skill (Step-by-Step)
+1. **Metadata** (`name` + `description`) — always in context across every conversation
+2. **SKILL.md body** — loaded when the skill triggers
+3. **Bundled resources** — loaded as needed during execution
 
-```bash
-# 1. Scaffold
-python3 skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
-
-# 2. Fill in SKILL.md (frontmatter `name` + `description` are required)
-# 3. Add supporting files under references/, scripts/, or assets/
-# 4. For docs shared with other skills, add to shared/resources/ and reference as
-#    `shared/resources/<file>` in your .md files
-
-# 5. Validate
-python3 skills/create-skill/scripts/quick_validate.py skills/<skill-name>
-
-# 6. Package
-python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
-```
-
-See [Packaging](./packaging.md) for what the packager does and shared-resource handling.
+This means the `description` field is the most critical part of a skill. It's what Claude matches against to auto-activate the skill — keep it under ~100 words, specific, and trigger-focused.
 
 ## Skill Structure
 
+Each skill lives in `skills/{skill-name}/`:
+
 ```
-skill-name/
-├── SKILL.md (required)
-│   ├── YAML frontmatter
-│   │   ├── name: (required)
-│   │   └── description: (required)
-│   └── Markdown instructions
-└── Bundled Resources (optional)
-    ├── scripts/          - Executable code
-    ├── references/       - Documentation
-    └── assets/           - Templates, files
+skills/skill-name/
+├── SKILL.md          # Required: YAML frontmatter + instructions
+├── skill-name.zip    # Packaged distributable (gitignored — built on demand)
+├── scripts/          # Executable scripts for deterministic tasks
+├── references/       # Documentation loaded into context on demand
+└── assets/           # Templates and boilerplate used in output
 ```
 
-## SKILL.md Template
+## SKILL.md
+
+Minimum required frontmatter:
+
+```yaml
+---
+name: skill-name
+description: Concise description of when/why to use this skill (~100 words max)
+---
+```
+
+Recommended body structure:
 
 ```markdown
 ---
@@ -65,10 +55,6 @@ description: When and how to use this skill
 
 [Clear guidance on when to invoke this skill]
 
-## Key Features
-
-[What the skill provides]
-
 ## Process/Workflow
 
 [Step-by-step guidance]
@@ -80,31 +66,92 @@ description: When and how to use this skill
 ## Integration with Other Skills
 
 [Cross-references to related skills]
-
-## Key Principles
-
-[Core guidelines]
 ```
+
+**`name`** must be hyphen-case (lowercase letters, digits, hyphens; no leading/trailing/consecutive hyphens).
+
+## Adding a New Skill (Step-by-Step)
+
+```bash
+# 1. Scaffold
+python3 skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
+
+# 2. Edit SKILL.md — frontmatter `name` and `description` are required
+# 3. Add supporting files under references/, scripts/, or assets/
+
+# 4. For docs shared with other skills, add to shared/resources/ and reference
+#    using the explicit path `shared/resources/<file>` in your .md files.
+#    The packager auto-bundles and rewrites these paths — never use symlinks
+#    or relative paths or the packager won't detect them.
+
+# 5. Validate
+python3 skills/create-skill/scripts/quick_validate.py skills/<skill-name>
+
+# 6. Package (canonical: packages all skills)
+npm run package
+
+# Or package a single skill
+python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
+```
+
+## Packaging
+
+Zips are **build artifacts** — gitignored (`skills/*/*.zip`). Regenerate whenever you need to install or distribute. Do not commit them.
+
+| Method | Zip location |
+|---|---|
+| `npm run package` | Inside each skill dir: `skills/my-skill/my-skill.zip` |
+| Direct script, no output-dir | Current working directory: `./my-skill.zip` |
+| Direct script with output-dir | Specified directory |
+
+`npm run package` is the canonical workflow — it packages every skill in `skills/`.
+
+See [Packaging](./packaging.md) for full details on what the packager does.
+
+## Validation
+
+`quick_validate.py` checks:
+
+- `SKILL.md` exists with valid YAML frontmatter
+- Required fields `name` and `description` are present
+- `name` is hyphen-case
+- `description` contains no angle brackets
+- All `shared/resources/<file>` references in `.md` files resolve to actual files
+
+Validation runs automatically during packaging but can be run standalone during development.
+
+## Shared Resources
+
+`shared/resources/` is the single source of truth for documentation shared across multiple skills. Reference shared files using the explicit path:
+
+```markdown
+See `shared/resources/code-vs-test-validation.md` for the full framework.
+```
+
+The packager detects this pattern, bundles the file into `references/` inside the zip, and rewrites the path — installed skills are fully self-contained.
+
+## Resource Directory Guide
+
+| Directory | Use for |
+|---|---|
+| `scripts/` | Executable scripts for deterministic, repeatable tasks |
+| `references/` | Documentation loaded into context on demand |
+| `assets/` | Templates and boilerplate used in output |
 
 ## Best Practices
 
-### SKILL.md
+### Description field
+- Most important part of any skill — drives auto-activation
+- Be specific about triggers: "Use when X", "Invoke when Y"
+- Keep under ~100 words
 
+### SKILL.md body
 - Use imperative/infinitive form (verb-first)
-- Be specific in name and description
 - Include "When to Use This Skill" section
-- Provide clear workflow steps
-- Include examples
+- Provide clear workflow steps with examples
+- Avoid duplication between `SKILL.md` and references
 
-### Resources
-
-- **`scripts/`** — for repeatedly rewritten code
-- **`references/`** — for documentation to load as needed
-- **`assets/`** — for files used in output
-
-### Writing Style
-
+### Writing style
 - Objective, instructional language
 - "To accomplish X, do Y" (not "You should do X")
 - Clear, actionable steps
-- Avoid duplication between SKILL.md and references
