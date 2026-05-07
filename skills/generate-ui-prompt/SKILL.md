@@ -226,7 +226,7 @@ Start with a preamble describing:
 
 **Example Preamble:**
 ```
-I'm building a mobile wallet application using:
+I'm building a mobile account application using:
 - React 18 with TypeScript
 - Tailwind CSS for styling
 - React Hook Form for form management

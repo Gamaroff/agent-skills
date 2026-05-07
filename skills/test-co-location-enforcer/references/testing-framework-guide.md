@@ -74,12 +74,12 @@ This project uses a **dual testing strategy** to maintain platform separation an
 import {
   hashPassword,
   comparePassword,
-  generateTokenPair
-} from '@{org}/auth-lib';
+  generateTokenPair,
+} from "@{org}/auth-lib";
 
-describe('Authentication Service Integration Tests', () => {
-  it('should hash and verify passwords', async () => {
-    const plainPassword = 'SecureP@ssw0rd123!';
+describe("Authentication Service Integration Tests", () => {
+  it("should hash and verify passwords", async () => {
+    const plainPassword = "SecureP@ssw0rd123!";
 
     // Password hashing works in Node.js environment
     const hashedPassword = await hashPassword(plainPassword);
@@ -91,20 +91,20 @@ describe('Authentication Service Integration Tests', () => {
     expect(isMatch).toBe(true);
   });
 
-  it('should generate valid JWT tokens', () => {
+  it("should generate valid JWT tokens", () => {
     const tokens = generateTokenPair(
       {
-        sub: 'user-123',
-        email: 'test@example.com',
-        handle: 'testuser'
+        sub: "user-123",
+        email: "test@example.com",
+        handle: "testuser",
       },
       {
-        jwtSecret: 'test-secret',
-        jwtExpiresIn: '15m',
-        refreshSecret: 'refresh-secret',
-        refreshExpiresIn: '7d',
-        saltRounds: 10
-      }
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "15m",
+        refreshSecret: "refresh-secret",
+        refreshExpiresIn: "7d",
+        saltRounds: 10,
+      },
     );
 
     expect(tokens.access_token).toBeDefined();
@@ -153,18 +153,18 @@ describe('LoginForm Component', () => {
 ```typescript
 import {
   runFinancialOperationTests,
-  FinancialTestUtils
-} from '../../test-utils/financial-operations-testing';
+  FinancialTestUtils,
+} from "../../test-utils/financial-operations-testing";
 
 // Automatically generates comprehensive test suite
-runFinancialOperationTests('PaymentProcessor', myPaymentModule, 0.95);
+runFinancialOperationTests("PaymentProcessor", myPaymentModule, 0.95);
 
 // Manual testing with utilities
-describe('Custom Financial Tests', () => {
-  it('should handle precision correctly', () => {
+describe("Custom Financial Tests", () => {
+  it("should handle precision correctly", () => {
     const amount = 123.456;
     FinancialTestUtils.assertFinancialPrecision(amount, 2);
-    FinancialTestUtils.assertCurrencyFormat(amount, 'USD');
+    FinancialTestUtils.assertCurrencyFormat(amount, "USD");
   });
 });
 ```
@@ -176,20 +176,20 @@ describe('Custom Financial Tests', () => {
 ```typescript
 import {
   createTestUserProfile,
-  createCompleteTestUserProfile
-} from '@{org}/shared-types/test-utils';
+  createCompleteTestUserProfile,
+} from "@{org}/shared-types/test-utils";
 
 // Minimal valid profile
 const user = createTestUserProfile({
-  email: 'test@example.com',
-  role: 'user'
+  email: "test@example.com",
+  role: "user",
 });
 
 // Complete profile with all optional fields
 const completeUser = createCompleteTestUserProfile({
-  firstName: 'John',
-  lastName: 'Doe',
-  kycStatus: 'APPROVED'
+  firstName: "John",
+  lastName: "Doe",
+  kycStatus: "APPROVED",
 });
 ```
 
@@ -225,11 +225,11 @@ describe('PaymentForm', () => {
 ```typescript
 import {
   measurePerformance,
-  measureAsyncPerformance
-} from '@{org}/shared-types/test-utils';
+  measureAsyncPerformance,
+} from "@{org}/shared-types/test-utils";
 
-describe('Performance Tests', () => {
-  it('should process transactions within time limits', () => {
+describe("Performance Tests", () => {
+  it("should process transactions within time limits", () => {
     const result = measurePerformance(() => {
       return processTransaction({ amount: 100 });
     }, 100); // 100ms max
@@ -237,7 +237,7 @@ describe('Performance Tests', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should handle async operations efficiently', async () => {
+  it("should handle async operations efficiently", async () => {
     const result = await measureAsyncPerformance(async () => {
       return await processPayment({ amount: 100 });
     }, 2000); // 2s max for financial operations
@@ -252,20 +252,20 @@ describe('Performance Tests', () => {
 ```typescript
 import {
   expectValidationError,
-  expectAsyncValidationError
-} from '@{org}/shared-types/test-utils';
+  expectAsyncValidationError,
+} from "@{org}/shared-types/test-utils";
 
-describe('Error Handling', () => {
-  it('should validate inputs correctly', () => {
+describe("Error Handling", () => {
+  it("should validate inputs correctly", () => {
     expectValidationError(() => {
       validateAmount(-100);
-    }, 'Amount must be positive');
+    }, "Amount must be positive");
   });
 
-  it('should handle async errors', async () => {
+  it("should handle async errors", async () => {
     await expectAsyncValidationError(async () => {
       await processPayment({ amount: 0 });
-    }, 'Minimum amount required');
+    }, "Minimum amount required");
   });
 });
 ```
@@ -364,19 +364,19 @@ Every library in `/libs/` includes these configuration files:
 
    ```typescript
    module.exports = {
-     displayName: '@{org}/auth-lib (Integration)',
-     preset: '../../jest.preset.js',
-     testEnvironment: 'node',
-     setupFiles: ['<rootDir>/src/integration-test-setup.ts'],
-     testMatch: ['**/*.integration.spec.ts'],
+     displayName: "@{org}/auth-lib (Integration)",
+     preset: "../../jest.preset.js",
+     testEnvironment: "node",
+     setupFiles: ["<rootDir>/src/integration-test-setup.ts"],
+     testMatch: ["**/*.integration.spec.ts"],
      transform: {
-       '^.+\\.(ts|tsx)$': [
-         'ts-jest',
+       "^.+\\.(ts|tsx)$": [
+         "ts-jest",
          {
-           tsconfig: '<rootDir>/tsconfig.spec.json'
-         }
-       ]
-     }
+           tsconfig: "<rootDir>/tsconfig.spec.json",
+         },
+       ],
+     },
    };
    ```
 
@@ -384,12 +384,12 @@ Every library in `/libs/` includes these configuration files:
 
    ```typescript
    module.exports = {
-     displayName: '@{org}/auth-lib',
-     preset: 'react-native',
+     displayName: "@{org}/auth-lib",
+     preset: "react-native",
      testPathIgnorePatterns: [
-       '/node_modules/',
-       '\\.integration\\.spec\\.ts$' // Exclude integration tests
-     ]
+       "/node_modules/",
+       "\\.integration\\.spec\\.ts$", // Exclude integration tests
+     ],
      // ... React Native configuration
    };
    ```
@@ -398,11 +398,11 @@ Every library in `/libs/` includes these configuration files:
 
    ```typescript
    // Enable server-side crypto operations
-   process.env['__SERVER_TEST_MODE__'] = 'true';
+   process.env["__SERVER_TEST_MODE__"] = "true";
 
    // Ensure Node.js environment
-   if (typeof window !== 'undefined') {
-     throw new Error('Integration tests must run in Node.js environment');
+   if (typeof window !== "undefined") {
+     throw new Error("Integration tests must run in Node.js environment");
    }
    ```
 
@@ -443,22 +443,22 @@ The system enforces platform separation through environment detection:
 // In password.ts (server-side crypto)
 function isMobileEnvironment(): boolean {
   // Check for React Native
-  if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
+  if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
     return true;
   }
 
   // Check for browser
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     return true;
   }
 
   // Check for explicit server test mode
-  if (process.env['__SERVER_TEST_MODE__'] === 'true') {
+  if (process.env["__SERVER_TEST_MODE__"] === "true") {
     return false; // Allow in server-side tests
   }
 
   // Default to mobile in Jest unless explicitly server mode
-  if (process.env['JEST_WORKER_ID'] && process.env['NODE_ENV'] === 'test') {
+  if (process.env["JEST_WORKER_ID"] && process.env["NODE_ENV"] === "test") {
     return true;
   }
 
@@ -467,7 +467,7 @@ function isMobileEnvironment(): boolean {
 
 export async function hashPassword(plainPassword: string): Promise<string> {
   if (isMobileEnvironment()) {
-    throw new Error('Password hashing not available in mobile environment');
+    throw new Error("Password hashing not available in mobile environment");
   }
   return bcrypt.hash(plainPassword, saltRounds);
 }
@@ -520,20 +520,20 @@ coverageThreshold: {
 ### 1. Test Organization
 
 ```typescript
-describe('Financial Service', () => {
-  describe('Happy Path', () => {
+describe("Financial Service", () => {
+  describe("Happy Path", () => {
     // Success scenarios
   });
 
-  describe('Edge Cases', () => {
+  describe("Edge Cases", () => {
     // Boundary conditions
   });
 
-  describe('Error Handling', () => {
+  describe("Error Handling", () => {
     // Failure scenarios
   });
 
-  describe('Performance', () => {
+  describe("Performance", () => {
     // Speed and efficiency tests
   });
 });
@@ -553,8 +553,8 @@ afterEach(() => {
   expect(mockProcessor.processPayment).toHaveBeenCalledWith(
     expect.objectContaining({
       amount: expect.any(Number),
-      currency: expect.stringMatching(/^[A-Z]{3}$/)
-    })
+      currency: expect.stringMatching(/^[A-Z]{3}$/),
+    }),
   );
 });
 ```
@@ -570,31 +570,34 @@ afterEach(() => {
 **Why Required:** Standalone functions cannot be spied on with `jest.spyOn()` due to Jest's limitations. When you export a function directly, it's not an object property that can be intercepted.
 
 **Pattern:**
+
 ```typescript
 // ✅ CORRECT: Hoisted mock for standalone function
-jest.mock('@{org}/shared-utils', () => ({
+jest.mock("@{org}/shared-utils", () => ({
   formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`),
   calculateFee: jest.fn((amount) => amount * 0.01),
-  validateHandle: jest.fn((handle) => true)
+  validateHandle: jest.fn((handle) => true),
 }));
 
-describe('Payment Component', () => {
-  it('should format currency correctly', () => {
-    const { formatCurrency } = require('@{org}/shared-utils');
-    const result = formatCurrency(100, 'USD');
-    expect(result).toBe('USD 100');
-    expect(formatCurrency).toHaveBeenCalledWith(100, 'USD');
+describe("Payment Component", () => {
+  it("should format currency correctly", () => {
+    const { formatCurrency } = require("@{org}/shared-utils");
+    const result = formatCurrency(100, "USD");
+    expect(result).toBe("USD 100");
+    expect(formatCurrency).toHaveBeenCalledWith(100, "USD");
   });
 });
 ```
 
 **Common Use Cases:**
+
 - Utility functions (`formatCurrency`, `validateEmail`, `parseDate`)
 - Pure transformation functions
 - Validation functions (`validateHandle`, `isValidAmount`)
 - Third-party package mocks
 
 **Limitations:**
+
 - ⚠️ **Fails with subpath exports** (`/client`, `/server`) - use runtime mocking instead
 - ⚠️ **Less flexible** - Mock applies to entire test suite unless reset
 - ⚠️ **Cannot restore** real implementation easily
@@ -608,21 +611,22 @@ describe('Payment Component', () => {
 **Why Preferred:** Provides better test isolation, lifecycle control, and works with all module types including subpath exports.
 
 **Pattern:**
+
 ```typescript
 // ✅ CORRECT: Runtime spy for object method
-import * as loggingLib from '@{org}/logging-lib/client';
+import * as loggingLib from "@{org}/logging-lib/client";
 
-describe('User Service', () => {
+describe("User Service", () => {
   let loggerSpy: jest.SpyInstance;
 
   beforeAll(() => {
     // Create spy once for entire test suite
-    loggerSpy = jest.spyOn(loggingLib, 'logger', 'get').mockReturnValue({
+    loggerSpy = jest.spyOn(loggingLib, "logger", "get").mockReturnValue({
       info: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
       debug: jest.fn(),
-      audit: jest.fn()
+      audit: jest.fn(),
     });
   });
 
@@ -636,25 +640,27 @@ describe('User Service', () => {
     loggerSpy.mockClear();
   });
 
-  it('should log user creation', () => {
+  it("should log user creation", () => {
     const service = new UserService();
-    service.createUser({ handle: '@alice' });
+    service.createUser({ handle: "@alice" });
 
     expect(loggingLib.logger.info).toHaveBeenCalledWith(
-      'User created',
-      expect.objectContaining({ handle: '@alice' })
+      "User created",
+      expect.objectContaining({ handle: "@alice" }),
     );
   });
 });
 ```
 
 **Common Use Cases:**
+
 - Logger mocking (`logger.info`, `logger.error`)
 - Service method mocking (`userService.findById`)
 - Object property mocking (getters, setters)
 - Subpath export mocking (`/client`, `/server`) - **REQUIRED**
 
 **Benefits:**
+
 - ✅ **Better test isolation** with lifecycle hooks
 - ✅ **More reliable** - no hoisting timing issues
 - ✅ **Flexible** - can restore real implementation
@@ -664,55 +670,60 @@ describe('User Service', () => {
 
 #### Decision Tree: Which Mocking Approach?
 
-| Export Type | Hoisted (jest.mock) | Runtime (jest.spyOn) | Recommended |
-|-------------|---------------------|----------------------|-------------|
-| **Standalone function** <br/> `export function foo()` | ✅ Works well | ❌ Cannot spy on functions | **Hoisted** |
-| **Object method** <br/> `export const obj = { foo() {} }` | ⚠️ Works but inflexible | ✅ Full control | **Runtime** |
-| **Getter property** <br/> `export const logger = ...` | ❌ Fails to intercept | ✅ Required | **Runtime** |
-| **Subpath export** <br/> `/client`, `/server` | ❌ Timing issues | ✅ Required | **Runtime** |
-| **Third-party package** <br/> `react-native-uuid` | ✅ Standard approach | ⚠️ Rarely needed | **Hoisted** |
-| **Regular library import** <br/> No subpath | ✅ Works fine | ✅ Also works | **Either** |
+| Export Type                                               | Hoisted (jest.mock)     | Runtime (jest.spyOn)       | Recommended |
+| --------------------------------------------------------- | ----------------------- | -------------------------- | ----------- |
+| **Standalone function** <br/> `export function foo()`     | ✅ Works well           | ❌ Cannot spy on functions | **Hoisted** |
+| **Object method** <br/> `export const obj = { foo() {} }` | ⚠️ Works but inflexible | ✅ Full control            | **Runtime** |
+| **Getter property** <br/> `export const logger = ...`     | ❌ Fails to intercept   | ✅ Required                | **Runtime** |
+| **Subpath export** <br/> `/client`, `/server`             | ❌ Timing issues        | ✅ Required                | **Runtime** |
+| **Third-party package** <br/> `react-native-uuid`         | ✅ Standard approach    | ⚠️ Rarely needed           | **Hoisted** |
+| **Regular library import** <br/> No subpath               | ✅ Works fine           | ✅ Also works              | **Either**  |
 
 ---
 
 #### Common Anti-Patterns
 
 **❌ WRONG: Trying to spy on standalone function**
+
 ```typescript
 // This will NOT work - Jest limitation
-import * as utils from '@{org}/shared-utils';
+import * as utils from "@{org}/shared-utils";
 
-const spy = jest.spyOn(utils, 'formatCurrency'); // ❌ Error: Cannot spy on function
+const spy = jest.spyOn(utils, "formatCurrency"); // ❌ Error: Cannot spy on function
 ```
 
 **Why it fails:** Standalone exported functions are not object properties, so `jest.spyOn()` cannot intercept them.
 
 **✅ Solution:** Use hoisted mock
+
 ```typescript
-jest.mock('@{org}/shared-utils', () => ({
-  formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`)
+jest.mock("@{org}/shared-utils", () => ({
+  formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`),
 }));
 ```
 
 ---
 
 **❌ WRONG: Hoisted mock for subpath export**
+
 ```typescript
 // This will fail due to module resolution timing
-jest.mock('@{org}/logging-lib/client', () => ({
-  logger: { info: jest.fn(), error: jest.fn() }
+jest.mock("@{org}/logging-lib/client", () => ({
+  logger: { info: jest.fn(), error: jest.fn() },
 }));
 ```
 
 **Why it fails:** Subpath exports resolve at runtime, but `jest.mock()` is hoisted before module resolution.
 
 **✅ Solution:** Use runtime mocking (see `jest-subpath-export-resolution-guide.md` for details)
+
 ```typescript
-import * as loggingLib from '@{org}/logging-lib/client';
+import * as loggingLib from "@{org}/logging-lib/client";
 
 beforeAll(() => {
-  jest.spyOn(loggingLib, 'logger', 'get').mockReturnValue({
-    info: jest.fn(), error: jest.fn()
+  jest.spyOn(loggingLib, "logger", "get").mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
   });
 });
 ```
@@ -720,21 +731,24 @@ beforeAll(() => {
 ---
 
 **❌ WRONG: Creating spy in beforeEach instead of beforeAll**
+
 ```typescript
 beforeEach(() => {
-  const loggerSpy = jest.spyOn(loggingLib, 'logger', 'get'); // ❌ Creates new spy every test
+  const loggerSpy = jest.spyOn(loggingLib, "logger", "get"); // ❌ Creates new spy every test
 });
 ```
 
 **Why it fails:** Each test tries to redefine the same property, causing "Cannot redefine property" error.
 
 **✅ Solution:** Create spy in `beforeAll`, clear in `beforeEach`
+
 ```typescript
 let loggerSpy: jest.SpyInstance;
 
 beforeAll(() => {
-  loggerSpy = jest.spyOn(loggingLib, 'logger', 'get').mockReturnValue({
-    info: jest.fn(), error: jest.fn()
+  loggerSpy = jest.spyOn(loggingLib, "logger", "get").mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
   });
 });
 
@@ -746,6 +760,7 @@ beforeEach(() => {
 ---
 
 **❌ WRONG: Using mockRestore() in beforeEach**
+
 ```typescript
 beforeEach(() => {
   loggerSpy.mockRestore(); // ❌ Removes spy entirely
@@ -756,6 +771,7 @@ beforeEach(() => {
 **Why it's wrong:** `mockRestore()` removes the spy completely, requiring recreation every test. Use `mockClear()` to only clear call history.
 
 **✅ Solution:** Use `mockClear()` in `beforeEach`, `mockRestore()` in `afterAll`
+
 ```typescript
 beforeEach(() => {
   loggerSpy.mockClear(); // Clear call history only
@@ -771,11 +787,13 @@ afterAll(() => {
 #### Quick Reference Guide
 
 **Use hoisted mocking (jest.mock()) when:**
+
 - Mocking standalone exported functions (`formatCurrency`, `validateHandle`)
 - Mocking third-party packages (`react-native-uuid`)
 - Simple module replacements without lifecycle needs
 
 **Use runtime mocking (jest.spyOn()) when:**
+
 - Mocking object methods (`logger.info`, `service.method`)
 - Mocking getter properties
 - Working with subpath exports (`/client`, `/server`) - **ALWAYS REQUIRED**
@@ -783,6 +801,7 @@ afterAll(() => {
 - Need different mocks per test
 
 **For more details on subpath export mocking:**
+
 - See `docs/development/jest-subpath-export-resolution-guide.md` for comprehensive patterns
 - See Task 10 documentation for real-world conversion examples
 
@@ -795,23 +814,23 @@ afterAll(() => {
 const testUser = TestFixtures.user.minimal();
 const testTransaction = FinancialTestUtils.generateTransaction({
   from: testUser.id,
-  amount: 100.5
+  amount: 100.5,
 });
 ```
 
 ### 5. Async Testing Patterns
 
 ```typescript
-describe('Async Operations', () => {
-  it('should handle promises correctly', async () => {
+describe("Async Operations", () => {
+  it("should handle promises correctly", async () => {
     const result = await processPayment(validPayment);
 
     await waitFor(() => {
-      expect(result.status).toBe('COMPLETED');
+      expect(result.status).toBe("COMPLETED");
     });
   });
 
-  it('should handle timeout scenarios', async () => {
+  it("should handle timeout scenarios", async () => {
     jest.setTimeout(10000); // Extend for long operations
 
     const result = await processLongTransaction();
@@ -860,15 +879,6 @@ npx nx test <project> --testNamePattern="financial"
 npx nx test <project> --runInBand --detectOpenHandles
 ```
 
-## Integration with BMad
-
-The testing framework integrates with BMad development workflows:
-
-1. **Epic Testing**: Each epic requires corresponding test coverage
-2. **Quality Gates**: 95% coverage enforced before epic completion
-3. **Automated Validation**: Coverage metrics tracked in CI/CD
-4. **Performance Monitoring**: Test performance metrics collected
-
 ## Migration Guide
 
 ### From Existing Tests to Dual Strategy
@@ -879,11 +889,11 @@ Determine if your existing tests should be integration tests or client tests:
 
 ```typescript
 // These need integration tests (server-side crypto):
-import { hashPassword } from '@{org}/auth-lib'; // ❌ Won't work in React Native
-await hashPassword('password'); // Needs Node.js environment
+import { hashPassword } from "@{org}/auth-lib"; // ❌ Won't work in React Native
+await hashPassword("password"); // Needs Node.js environment
 
 // These can use client tests:
-import { decodeToken } from '@{org}/auth-lib/client'; // ✅ Works in React Native
+import { decodeToken } from "@{org}/auth-lib/client"; // ✅ Works in React Native
 decodeToken(token); // Parsing only, no crypto
 ```
 
@@ -901,11 +911,11 @@ mv src/lib/auth-service.spec.ts src/lib/auth-service.integration.spec.ts
 
 ```typescript
 // Before (caused "Password hashing not available" errors)
-import { hashPassword } from '@{org}/auth-lib';
+import { hashPassword } from "@{org}/auth-lib";
 
-describe('Auth Tests', () => {
-  it('should hash password', async () => {
-    const hash = await hashPassword('test'); // ❌ Failed in React Native preset
+describe("Auth Tests", () => {
+  it("should hash password", async () => {
+    const hash = await hashPassword("test"); // ❌ Failed in React Native preset
   });
 });
 
@@ -914,11 +924,11 @@ describe('Auth Tests', () => {
  * Server-side integration tests
  * Environment setup is handled by integration-test-setup.ts
  */
-import { hashPassword } from '@{org}/auth-lib';
+import { hashPassword } from "@{org}/auth-lib";
 
-describe('Auth Integration Tests', () => {
-  it('should hash password', async () => {
-    const hash = await hashPassword('test'); // ✅ Works in Node.js environment
+describe("Auth Integration Tests", () => {
+  it("should hash password", async () => {
+    const hash = await hashPassword("test"); // ✅ Works in Node.js environment
     expect(hash).toBeDefined();
   });
 });
@@ -928,14 +938,14 @@ describe('Auth Integration Tests', () => {
 
 ```typescript
 // Before (tried to use server-side functions)
-import { hashPassword } from '@{org}/auth-lib'; // ❌ Wrong import
+import { hashPassword } from "@{org}/auth-lib"; // ❌ Wrong import
 
 // After (use client-side functions only)
-import { decodeToken, validateEmail } from '@{org}/auth-lib/client'; // ✅ Correct
+import { decodeToken, validateEmail } from "@{org}/auth-lib/client"; // ✅ Correct
 
-describe('Login Form Tests', () => {
-  it('should validate email', () => {
-    const result = validateEmail('test@example.com');
+describe("Login Form Tests", () => {
+  it("should validate email", () => {
+    const result = validateEmail("test@example.com");
     expect(result.valid).toBe(true);
   });
 });
@@ -963,25 +973,25 @@ cat libs/auth-lib/package.json | grep "test"
 
 ```typescript
 // ❌ Old way (fails in React Native preset)
-describe('Password Tests', () => {
-  it('should hash password', async () => {
-    const hash = await hashPassword('test');
+describe("Password Tests", () => {
+  it("should hash password", async () => {
+    const hash = await hashPassword("test");
     expect(hash).toBeDefined();
   });
 });
 
 // ✅ New way (integration test)
 // File: password.integration.spec.ts
-describe('Password Integration Tests', () => {
-  it('should hash password', async () => {
-    const hash = await hashPassword('test');
+describe("Password Integration Tests", () => {
+  it("should hash password", async () => {
+    const hash = await hashPassword("test");
     expect(hash).toBeDefined();
-    expect(hash).not.toBe('test');
+    expect(hash).not.toBe("test");
   });
 
-  it('should compare passwords', async () => {
-    const hash = await hashPassword('test');
-    const match = await comparePassword('test', hash);
+  it("should compare passwords", async () => {
+    const hash = await hashPassword("test");
+    const match = await comparePassword("test", hash);
     expect(match).toBe(true);
   });
 });
@@ -991,15 +1001,15 @@ describe('Password Integration Tests', () => {
 
 ```typescript
 // ❌ Old way (server-side verification in wrong environment)
-import { verifyAccessToken } from '@{org}/auth-lib';
+import { verifyAccessToken } from "@{org}/auth-lib";
 
 // ✅ Integration test (server-side verification)
 // File: token.integration.spec.ts
-import { generateTokenPair, verifyAccessToken } from '@{org}/auth-lib';
+import { generateTokenPair, verifyAccessToken } from "@{org}/auth-lib";
 
-describe('Token Integration Tests', () => {
-  it('should generate and verify tokens', () => {
-    const tokens = generateTokenPair({ sub: '123' }, config);
+describe("Token Integration Tests", () => {
+  it("should generate and verify tokens", () => {
+    const tokens = generateTokenPair({ sub: "123" }, config);
     const result = verifyAccessToken(tokens.access_token, config);
     expect(result.valid).toBe(true);
   });
@@ -1007,11 +1017,11 @@ describe('Token Integration Tests', () => {
 
 // ✅ Client test (token parsing only)
 // File: token-display.spec.tsx
-import { decodeToken, isTokenExpired } from '@{org}/auth-lib/client';
+import { decodeToken, isTokenExpired } from "@{org}/auth-lib/client";
 
-describe('Token Display Tests', () => {
-  it('should decode token for display', () => {
-    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+describe("Token Display Tests", () => {
+  it("should decode token for display", () => {
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
     const payload = decodeToken(token);
     expect(payload).toBeDefined();
   });
@@ -1031,21 +1041,21 @@ libs/auth-lib/src/lib/
 
 ```typescript
 // auth.integration.spec.ts (Node.js)
-import { hashPassword, generateTokenPair } from './auth';
+import { hashPassword, generateTokenPair } from "./auth";
 
-describe('Auth Integration Tests', () => {
-  it('should perform server operations', async () => {
-    const hash = await hashPassword('test');
+describe("Auth Integration Tests", () => {
+  it("should perform server operations", async () => {
+    const hash = await hashPassword("test");
     expect(hash).toBeDefined();
   });
 });
 
 // auth-validators.spec.ts (React Native)
-import { validateEmail, validatePassword } from './auth-validators';
+import { validateEmail, validatePassword } from "./auth-validators";
 
-describe('Auth Validation Tests', () => {
-  it('should validate email format', () => {
-    expect(validateEmail('test@example.com').valid).toBe(true);
+describe("Auth Validation Tests", () => {
+  it("should validate email format", () => {
+    expect(validateEmail("test@example.com").valid).toBe(true);
   });
 });
 ```
@@ -1056,10 +1066,10 @@ describe('Auth Validation Tests', () => {
 
    ```typescript
    // Old
-   import { mockUser } from '../__mocks__/user';
+   import { mockUser } from "../__mocks__/user";
 
    // New
-   import { TestFixtures } from '@{org}/shared-types/test-utils';
+   import { TestFixtures } from "@{org}/shared-types/test-utils";
    const user = TestFixtures.user.minimal();
    ```
 
@@ -1079,12 +1089,12 @@ describe('Auth Validation Tests', () => {
 
    ```typescript
    // Old
-   describe('Payment Tests', () => {
+   describe("Payment Tests", () => {
      // Manual test cases
    });
 
    // New
-   runFinancialOperationTests('PaymentService', paymentModule);
+   runFinancialOperationTests("PaymentService", paymentModule);
    ```
 
 ## Next Steps
@@ -1133,6 +1143,7 @@ Jest executes setup code in this specific order:
 ### When to Use Each Setup File
 
 **Use `setupFiles` (jest-pre-setup.js) for:**
+
 - ✅ **Global API mocks** (Response, fetch, localStorage, etc.)
   ```javascript
   // jest-pre-setup.js
@@ -1146,6 +1157,7 @@ Jest executes setup code in this specific order:
 - ✅ **Environment configuration** that modules need during initialization
 
 **Use `setupFilesAfterEnv` (test-setup.ts) for:**
+
 - ✅ **jest.mock()** declarations for modules
 - ✅ **Test framework extensions** (custom matchers)
 - ✅ **Test lifecycle hooks** (beforeAll, afterEach, etc.)
@@ -1167,6 +1179,7 @@ global.Response = class Response { ... };      // ← Executes SECOND (too late!
 ```
 
 **Why This Fails**:
+
 1. When `import { server }` executes, it loads `./src/mocks/server.ts`
 2. That file has `export const server = setupServer(...)` at top level
 3. `setupServer()` executes immediately and captures reference to native `global.Response`
@@ -1174,6 +1187,7 @@ global.Response = class Response { ... };      // ← Executes SECOND (too late!
 5. But the library already has the old reference - your mock is never used
 
 **Correct Solution**:
+
 ```javascript
 // jest-pre-setup.js - Runs BEFORE any imports
 global.Response = class Response {
@@ -1205,13 +1219,13 @@ global.Response = class Response {
   }
   json() {
     return Promise.resolve(
-      typeof this.body === 'string' ? JSON.parse(this.body) : this.body
+      typeof this.body === "string" ? JSON.parse(this.body) : this.body,
     );
   }
   // ... other Response methods
 };
 
-console.log('[PRE-SETUP] Response.clone() mock installed');
+console.log("[PRE-SETUP] Response.clone() mock installed");
 ```
 
 **Impact**: Eliminated 293 test errors by ensuring MSW saw our mocked Response during initialization.
@@ -1244,9 +1258,9 @@ Need to configure environment variables?
 
 ```javascript
 // jest-pre-setup.js
-console.log('[PRE-SETUP] Starting at:', new Date().toISOString());
+console.log("[PRE-SETUP] Starting at:", new Date().toISOString());
 global.SomeAPI = yourMock;
-console.log('[PRE-SETUP] SomeAPI mock installed');
+console.log("[PRE-SETUP] SomeAPI mock installed");
 ```
 
 **Verify your mock is applied**:
@@ -1324,7 +1338,7 @@ All libraries in `/libs/` are ready for dual testing:
 - groups-lib, help-lib, localization-lib, logging-lib
 - mock-data-lib, notifications-lib, requests-lib, rewards-lib
 - shared-types, shared-utils, shopping-lib, transactions-lib
-- user-lib, wallet-lib
+- user-lib, account-lib
 
 ### 🎯 Key Technical Decisions
 

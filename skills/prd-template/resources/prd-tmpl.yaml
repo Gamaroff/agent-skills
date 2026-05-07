@@ -1,4 +1,3 @@
-# <!-- Powered by BMAD™ Core -->
 template:
   id: prd-template-v2
   name: Product Requirements Document
@@ -100,11 +99,10 @@ sections:
     instruction: |
       Gather technical decisions that will guide the Architect. Steps:
 
-      1. Note: .bmad-core directory was intentionally removed. Check for an attached technical-preferences file to pre-populate choices
-      2. Ask user about: languages, frameworks, starter templates, libraries, APIs, deployment targets
-      3. For unknowns, offer guidance based on project goals and MVP scope
-      4. Document ALL technical choices with rationale (why this choice fits the project)
-      5. These become constraints for the Architect - be specific and complete
+      1. Ask user about: languages, frameworks, starter templates, libraries, APIs, deployment targets
+      2. For unknowns, offer guidance based on project goals and MVP scope
+      3. Document ALL technical choices with rationale (why this choice fits the project)
+      4. These become constraints for the Architect - be specific and complete
     elicit: true
     choices:
       repository: [Monorepo, Polyrepo]

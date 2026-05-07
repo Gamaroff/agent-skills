@@ -89,7 +89,7 @@ If unsure whether a generated file should be included, err on the side of exclus
 
    If a `GITHUB_ISSUE` number is available (passed from the pipeline orchestrator — works for both GitHub and Bitbucket issue numbers):
    - Append ` (#{N})` to the commit subject line
-   - Example: `feat(story.37.1): wallet recovery transparency (#42)`
+   - Example: `feat(story.37.1): account recovery transparency (#42)`
 
    If no issue number is available (standalone invocation or document lacks `github_issue`):
    - Commit message format is unchanged

@@ -102,7 +102,7 @@ const mockPrismaService = {
     delete: jest.fn(),
     count: jest.fn()
   },
-  wallet: {
+  account: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
     create: jest.fn(),
@@ -130,13 +130,13 @@ const mockPrismaService = {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '@{org}/prisma';
-import { WalletService } from '../wallet/wallet.service';
+import { AccountService } from '../account/account.service';
 import { logger } from '@{org}/logging-lib';
 
 describe('PaymentService', () => {
   let service: PaymentService;
   let prismaService: PrismaService;
-  let walletService: WalletService;
+  let accountService: AccountService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -147,7 +147,7 @@ describe('PaymentService', () => {
           useValue: mockPrismaService
         },
         {
-          provide: WalletService,
+          provide: AccountService,
           useValue: {
             findById: jest.fn(),
             updateBalance: jest.fn(),
@@ -159,19 +159,19 @@ describe('PaymentService', () => {
 
     service = module.get<PaymentService>(PaymentService);
     prismaService = module.get<PrismaService>(PrismaService);
-    walletService = module.get<WalletService>(WalletService);
+    accountService = module.get<AccountService>(AccountService);
   });
 
   it('should process payment successfully', async () => {
     // Arrange
     const payment = {
-      fromWalletId: 'wallet1',
-      toWalletId: 'wallet2',
+      fromAccountId: 'account1',
+      toAccountId: 'account2',
       amount: 100,
       currency: 'USD'
     };
 
-    jest.spyOn(walletService, 'validateSufficientFunds').mockResolvedValue(true);
+    jest.spyOn(accountService, 'validateSufficientFunds').mockResolvedValue(true);
     jest.spyOn(prismaService, '$transaction').mockResolvedValue([
       { id: 'tx1', status: 'COMPLETED' }
     ]);
@@ -181,7 +181,7 @@ describe('PaymentService', () => {
 
     // Assert
     expect(result.status).toBe('COMPLETED');
-    expect(walletService.validateSufficientFunds).toHaveBeenCalledWith('wallet1', 100);
+    expect(accountService.validateSufficientFunds).toHaveBeenCalledWith('account1', 100);
     expect(prismaService.$transaction).toHaveBeenCalled();
   });
 });
@@ -217,7 +217,7 @@ describe('UserService Error Handling', () => {
 describe('PaymentService Transactions', () => {
   it('should rollback on transaction failure', async () => {
     // Arrange
-    const payment = { fromWalletId: 'w1', toWalletId: 'w2', amount: 100 };
+    const payment = { fromAccountId: 'w1', toAccountId: 'w2', amount: 100 };
 
     jest.spyOn(prismaService, '$transaction').mockRejectedValue(
       new Error('Transaction failed')
@@ -408,7 +408,7 @@ export const createMockPrismaService = () => ({
     delete: jest.fn(),
     count: jest.fn()
   },
-  wallet: {
+  account: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
     create: jest.fn(),
@@ -446,27 +446,27 @@ export const createMockPrismaService = () => ({
 
 ```typescript
 describe('User with Relations', () => {
-  it('should find user with wallets', async () => {
+  it('should find user with accounts', async () => {
     // Arrange
-    const mockUserWithWallets = {
+    const mockUserWithAccounts = {
       id: '123',
       handle: '@alice',
-      wallets: [
+      accounts: [
         { id: 'w1', currency: 'USD', balance: 1000 },
         { id: 'w2', currency: 'EUR', balance: 0.5 }
       ]
     };
 
-    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(mockUserWithWallets);
+    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(mockUserWithAccounts);
 
     // Act
-    const result = await service.findUserWithWallets('123');
+    const result = await service.findUserWithAccounts('123');
 
     // Assert
-    expect(result.wallets).toHaveLength(2);
+    expect(result.accounts).toHaveLength(2);
     expect(prismaService.user.findUnique).toHaveBeenCalledWith({
       where: { id: '123' },
-      include: { wallets: true }
+      include: { accounts: true }
     });
   });
 });
@@ -529,7 +529,7 @@ describe('UserService Integration Tests', () => {
   beforeEach(async () => {
     // Clean database before each test
     await prismaService.user.deleteMany();
-    await prismaService.wallet.deleteMany();
+    await prismaService.account.deleteMany();
     await prismaService.transaction.deleteMany();
   });
 
@@ -560,7 +560,7 @@ describe('UserService Integration Tests', () => {
 ```typescript
 describe('Payment Service Integration', () => {
   let testUser: any;
-  let testWallet: any;
+  let testAccount: any;
 
   beforeEach(async () => {
     // Seed test data
@@ -572,7 +572,7 @@ describe('Payment Service Integration', () => {
       }
     });
 
-    testWallet = await prismaService.wallet.create({
+    testAccount = await prismaService.account.create({
       data: {
         userId: testUser.id,
         currency: 'USD',
@@ -584,17 +584,17 @@ describe('Payment Service Integration', () => {
   it('should process payment with real database', async () => {
     // Act
     const result = await service.processPayment({
-      fromWalletId: testWallet.id,
-      toWalletId: 'recipient-wallet',
+      fromAccountId: testAccount.id,
+      toAccountId: 'recipient-account',
       amount: 100
     });
 
     // Assert
-    const updatedWallet = await prismaService.wallet.findUnique({
-      where: { id: testWallet.id }
+    const updatedAccount = await prismaService.account.findUnique({
+      where: { id: testAccount.id }
     });
 
-    expect(updatedWallet.balance).toBe(900); // 1000 - 100
+    expect(updatedAccount.balance).toBe(900); // 1000 - 100
   });
 });
 ```
@@ -732,13 +732,13 @@ describe('PaymentService Financial Operations', () => {
   it('should process payment with correct fee calculation', async () => {
     // Arrange
     const payment = {
-      fromWalletId: 'w1',
-      toWalletId: 'w2',
+      fromAccountId: 'w1',
+      toAccountId: 'w2',
       amount: 100,
       currency: 'USD'
     };
 
-    jest.spyOn(prismaService.wallet, 'findUnique')
+    jest.spyOn(prismaService.account, 'findUnique')
       .mockResolvedValueOnce({ id: 'w1', balance: 500, currency: 'USD' })
       .mockResolvedValueOnce({ id: 'w2', balance: 200, currency: 'USD' });
 
@@ -754,13 +754,13 @@ describe('PaymentService Financial Operations', () => {
   it('should reject payment with insufficient funds', async () => {
     // Arrange
     const payment = {
-      fromWalletId: 'w1',
-      toWalletId: 'w2',
+      fromAccountId: 'w1',
+      toAccountId: 'w2',
       amount: 1000,
       currency: 'USD'
     };
 
-    jest.spyOn(prismaService.wallet, 'findUnique')
+    jest.spyOn(prismaService.account, 'findUnique')
       .mockResolvedValue({ id: 'w1', balance: 500, currency: 'USD' });
 
     // Act & Assert
@@ -775,8 +775,8 @@ describe('PaymentService Financial Operations', () => {
     // Verify transaction is recorded in database
   });
 
-  it('should update wallet balances atomically', async () => {
-    // Verify both wallets updated in single transaction
+  it('should update account balances atomically', async () => {
+    // Verify both accounts updated in single transaction
   });
 });
 ```
@@ -861,15 +861,15 @@ describe('Authorization', () => {
   it('should allow user to access own resources', async () => {
     // Arrange
     const userId = '123';
-    const walletId = 'wallet-owned-by-123';
+    const accountId = 'account-owned-by-123';
 
-    jest.spyOn(walletService, 'findById').mockResolvedValue({
-      id: walletId,
+    jest.spyOn(accountService, 'findById').mockResolvedValue({
+      id: accountId,
       userId: '123'
     });
 
     // Act
-    const result = await walletService.canAccess(userId, walletId);
+    const result = await accountService.canAccess(userId, accountId);
 
     // Assert
     expect(result).toBe(true);
@@ -878,15 +878,15 @@ describe('Authorization', () => {
   it('should deny user access to other resources', async () => {
     // Arrange
     const userId = '123';
-    const walletId = 'wallet-owned-by-456';
+    const accountId = 'account-owned-by-456';
 
-    jest.spyOn(walletService, 'findById').mockResolvedValue({
-      id: walletId,
+    jest.spyOn(accountService, 'findById').mockResolvedValue({
+      id: accountId,
       userId: '456'
     });
 
     // Act
-    const result = await walletService.canAccess(userId, walletId);
+    const result = await accountService.canAccess(userId, accountId);
 
     // Assert
     expect(result).toBe(false);
@@ -975,7 +975,7 @@ const module: TestingModule = await Test.createTestingModule({
   providers: [
     UserService,
     { provide: PrismaService, useValue: mockPrismaService },
-    { provide: WalletService, useValue: mockWalletService }
+    { provide: AccountService, useValue: mockAccountService }
   ]
 }).compile();
 ```

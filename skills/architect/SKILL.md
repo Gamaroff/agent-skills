@@ -146,11 +146,13 @@ Invoke the architect skill when you need:
 ### What to Provide
 
 **Minimum Required:**
+
 - Project purpose and goals
 - Key requirements or PRD
 - Any existing technical constraints
 
 **Helpful Context:**
+
 - User stories or use cases
 - Scale and performance expectations
 - Team skills and preferences
@@ -178,6 +180,7 @@ This skill includes supporting resources:
 - **Architect Checklist** (`resources/architect-checklist.md`) - Comprehensive validation framework
 
 Additional resources are available through related skills:
+
 - Architecture templates (via `create-architecture-doc` skill)
 - Brownfield documentation guide (via `document-existing-project` skill)
 - Research frameworks (via `create-research-prompt` skill)
@@ -187,6 +190,7 @@ Additional resources are available through related skills:
 ### Holistic View
 
 Every architectural decision considers:
+
 - **User Impact** - How does this affect user experience?
 - **Developer Experience** - Will the team be productive?
 - **Performance** - Does this scale appropriately?
@@ -204,6 +208,7 @@ Every architectural decision considers:
 ### AI-First Documentation
 
 Architecture documents are designed for:
+
 - AI development agents
 - Human developers
 - Clear, unambiguous implementation guidance
@@ -256,7 +261,6 @@ Architect:
 
 - This skill provides the persona and interface for architecture work
 - Actual workflows are delegated to specialized skills
-- All architecture follows BMAD methodology where applicable
 - Documentation is optimized for AI and human developers
 - Validation is comprehensive and systematic
 

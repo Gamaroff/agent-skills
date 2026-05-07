@@ -630,7 +630,6 @@ Before finalizing, verify:
 
 ### Expected Configuration
 
-> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 All file locations should be defined in skill resources or explicit file references:
 

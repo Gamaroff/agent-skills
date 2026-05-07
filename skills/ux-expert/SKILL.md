@@ -156,7 +156,7 @@ I work seamlessly with other skills in your workflow:
 
 **Creating a specification:**
 ```
-You: "I need to design a user dashboard for our mobile wallet app"
+You: "I need to design a user dashboard for our mobile account app"
 Sally: "Great! Let's create a comprehensive front-end spec. First, let me
 understand your users. Who are the primary users of this dashboard, and
 what are their main goals when they open the app?"

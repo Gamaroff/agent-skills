@@ -121,7 +121,7 @@ When you reach a section marked for elicitation, you'll get options to:
 
 1. **Activation:**
    ```
-   User: "Create a frontend spec for our mobile wallet dashboard"
+   User: "Create a frontend spec for our mobile account dashboard"
    → create-frontend-spec activates
    → Loads front-end-spec-tmpl.yaml
    ```

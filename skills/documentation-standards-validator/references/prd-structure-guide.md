@@ -77,19 +77,19 @@ docs/prd/[domain]/[feature]/
 
 ```
 docs/prd/
-├── core-platform/              # Platform infrastructure
+├── domain-name/              # Platform infrastructure
 │   ├── authentication/
-│   ├── group-system/
+│   ├── module-name/
 │   └── testing-infrastructure/
 │
 ├── financial-features/         # Financial functionality
-│   ├── wallet-management/
+│   ├── module-management/
 │   ├── payments/
 │   ├── compliance/
 │   └── transactions/
 │
-├── user-experience/           # UI/UX features
-│   ├── bottom-action-bar/
+├── ui-domain/           # UI/UX features
+│   ├── example-component/
 │   ├── chat-input-form/
 │   ├── notifications/
 │   └── navigation/
@@ -561,7 +561,7 @@ Do we need progress tracking?
 **Real-world reference from this project**:
 
 ```
-docs/prd/user-experience/bottom-action-bar/
+docs/prd/ui-domain/example-component/
 ├── Core PRD
 │   ├── executive-summary.md                    # 3 pages
 │   ├── goals-and-objectives.md                 # 4 pages

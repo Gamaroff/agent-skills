@@ -14,6 +14,7 @@ Create comprehensive architecture documents using YAML template-driven workflows
 ## When to Use This Skill
 
 Use this skill when:
+
 - Creating new backend/service architecture documents
 - Documenting existing (brownfield) systems
 - Designing frontend-specific architectures
@@ -63,6 +64,7 @@ When this skill is invoked:
 ### Step 1: Template Discovery
 
 If a YAML template has not been provided:
+
 1. List all available templates from `resources/templates/`
 2. Ask user to select one OR provide their own template path
 3. Load the selected template
@@ -115,6 +117,7 @@ The skill includes `resources/elicitation-methods.md` with various elicitation t
 - **And more...**
 
 When user selects method 2-9:
+
 1. Execute the chosen elicitation method
 2. Present results with insights
 3. Offer options:
@@ -127,6 +130,7 @@ When user selects method 2-9:
 ### Agent Permissions
 
 When processing sections with agent permission fields:
+
 - **owner**: Note which agent role initially creates/populates the section
 - **editors**: List agent roles allowed to modify the section
 - **readonly**: Mark sections that cannot be modified after creation
@@ -138,6 +142,7 @@ Example: `_(This section is owned by dev-agent and can only be modified by dev-a
 ### Section Types
 
 Templates may include various section types:
+
 - **text**: Standard markdown content
 - **table**: Structured tabular data
 - **code**: Code blocks with language specification
@@ -147,6 +152,7 @@ Templates may include various section types:
 ### Conditional Sections
 
 Some sections include conditions:
+
 ```yaml
 condition: Project requires external API integrations
 ```
@@ -156,10 +162,12 @@ If condition is not met, skip the section and note this in the document.
 ## YOLO Mode
 
 User can type `#yolo` to toggle YOLO mode:
+
 - **YOLO Mode ON**: Process all sections at once without elicitation stops
 - **YOLO Mode OFF** (default): Interactive mode with elicitation stops
 
 **WARNING:** YOLO mode is faster but skips valuable user feedback. Use only when:
+
 - You fully understand all requirements
 - Template choices are straightforward
 - You're iterating on an existing document
@@ -175,6 +183,7 @@ User can type `#yolo` to toggle YOLO mode:
 ### Document Structure
 
 Generated documents include:
+
 - YAML frontmatter (template metadata)
 - Table of contents (if applicable)
 - All processed sections in order
@@ -217,6 +226,7 @@ Skill:
 ## Critical Reminders
 
 **❌ NEVER:**
+
 - Ask yes/no questions for elicitation
 - Use any format other than 1-9 numbered options
 - Create new elicitation methods (use only from resources file)
@@ -224,6 +234,7 @@ Skill:
 - Create complete documents without user interaction
 
 **✅ ALWAYS:**
+
 - Use exact 1-9 format when `elicit: true`
 - Select options 2-9 from `resources/elicitation-methods.md` only
 - Provide detailed rationale explaining decisions
@@ -268,7 +279,6 @@ A successful architecture document includes:
 - Templates ensure no critical aspects are overlooked
 - Elicitation improves decision quality through collaboration
 - Documents are optimized for AI and human developers
-- Follow BMAD methodology principles throughout
 
 ---
 

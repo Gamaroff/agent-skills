@@ -291,7 +291,6 @@ This role is optimized for AI-driven development:
 
 ## Notes
 
-- This skill is part of a larger BMAD (Build, Measure, Adapt, Deploy) workflow
 - Stories follow a standardized YAML template structure
 - Git worktrees enable true parallel development without merge conflicts
 - Fresh context windows between agent roles (SM → Dev → QA) prevent contamination

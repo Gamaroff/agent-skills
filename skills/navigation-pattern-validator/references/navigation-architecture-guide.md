@@ -37,8 +37,8 @@ app/
 │   ├── _layout.tsx               → Drawer layout
 │   ├── home/
 │   │   └── index.tsx            → Route: /(drawer)/home
-│   ├── wallets/
-│   │   └── index.tsx            → Route: /(drawer)/wallets
+│   ├── accounts/
+│   │   └── index.tsx            → Route: /(drawer)/accounts
 │   ├── contacts/
 │   │   └── index.tsx            → Route: /(drawer)/contacts
 │   └── settings/
@@ -52,7 +52,7 @@ app/
 
 **Folders** = Route segments:
 - `home/` → `/home`
-- `wallets/` → `/wallets`
+- `accounts/` → `/accounts`
 - `settings/security/` → `/settings/security`
 
 **Groups** = Organization without adding route segments:
@@ -77,8 +77,8 @@ import { useRouter } from 'expo-router';
 const router = useRouter();
 
 // Push new screen onto stack
-router.push('/wallets');                    // Adds to stack
-router.push('/(drawer)/wallets');          // Full path
+router.push('/accounts');                    // Adds to stack
+router.push('/(drawer)/accounts');          // Full path
 
 // Navigate back in stack
 router.back();                              // Pop current screen
@@ -107,9 +107,9 @@ Expo Router maintains a navigation stack automatically:
 ```
 User Flow:
 1. router.push('/home')       → Stack: [Home]
-2. router.push('/wallets')    → Stack: [Home, Wallets]
-3. router.push('/settings')   → Stack: [Home, Wallets, Settings]
-4. router.back()              → Stack: [Home, Wallets]
+2. router.push('/accounts')    → Stack: [Home, Accounts]
+3. router.push('/settings')   → Stack: [Home, Accounts, Settings]
+4. router.back()              → Stack: [Home, Accounts]
 5. router.back()              → Stack: [Home]
 
 User Flow (with replace):
@@ -128,7 +128,7 @@ router.push('/contacts/123');              // contacts/:id
 router.push('/transactions?status=pending'); // Query params
 
 // Deep links work
-{app-name}://wallets                          → opens Wallets screen
+{app-name}://accounts                          → opens Accounts screen
 {app-name}://contacts/456                     → opens Contact detail
 ```
 
@@ -178,7 +178,7 @@ export default function DrawerLayout() {
       initialRouteName="home/index"
     >
       <Drawer.Screen name="home/index" options={{ title: 'Home' }} />
-      <Drawer.Screen name="wallets/index" options={{ title: 'Wallets' }} />
+      <Drawer.Screen name="accounts/index" options={{ title: 'Accounts' }} />
       <Drawer.Screen name="contacts/index" options={{ title: 'Contacts' }} />
       {/* etc. */}
     </Drawer>
@@ -233,7 +233,7 @@ export const HomeHeader = () => {
 | Scenario | Navigation Method | Hook | Example |
 |----------|------------------|------|---------|
 | **Standard Navigation** |
-| Navigate forward | `router.push('/route')` | `useRouter()` | Go to Wallets screen |
+| Navigate forward | `router.push('/route')` | `useRouter()` | Go to Accounts screen |
 | Navigate back | `router.back()` | `useRouter()` | Back button in header |
 | Replace screen | `router.replace('/route')` | `useRouter()` | Onboarding → Home |
 | Check back ability | `router.canGoBack()` | `useRouter()` | Onboarding fallback |
@@ -251,7 +251,7 @@ export const HomeHeader = () => {
 // Standard drawer screen header (NO drawer operations)
 import { useRouter } from 'expo-router';
 
-export const WalletsHeader = () => {
+export const AccountsHeader = () => {
   const router = useRouter();
 
   return (
@@ -324,11 +324,11 @@ const router = useRouter();
 **Step 2: Replace Navigation Methods**
 ```typescript
 // Before
-navigation.navigate('Wallets');     // String-based route name
+navigation.navigate('Accounts');     // String-based route name
 navigation.goBack();                // Back navigation
 
 // After
-router.push('/wallets');           // Path-based route
+router.push('/accounts');           // Path-based route
 router.back();                     // Back navigation
 ```
 
@@ -336,12 +336,12 @@ router.back();                     // Back navigation
 ```typescript
 // Before (React Navigation Stack)
 <Stack.Navigator>
-  <Stack.Screen name="Wallets" component={WalletsScreen} />
+  <Stack.Screen name="Accounts" component={AccountsScreen} />
 </Stack.Navigator>
 
 // After (Expo Router - file-based)
-// Just create: app/(drawer)/wallets/index.tsx
-// Route automatically registered as /(drawer)/wallets
+// Just create: app/(drawer)/accounts/index.tsx
+// Route automatically registered as /(drawer)/accounts
 ```
 
 **Step 4: Update Navigation Calls**
@@ -450,9 +450,9 @@ router.push('/settings/security/pin-setup');
 **Problem**:
 ```typescript
 // Home screen
-router.push('/wallets');  // Expo Router
+router.push('/accounts');  // Expo Router
 
-// WalletsHeader
+// AccountsHeader
 navigation.goBack();  // React Navigation - WRONG!
 ```
 
@@ -461,9 +461,9 @@ navigation.goBack();  // React Navigation - WRONG!
 **Fix**:
 ```typescript
 // Home screen
-router.push('/wallets');  // Expo Router
+router.push('/accounts');  // Expo Router
 
-// WalletsHeader
+// AccountsHeader
 router.back();  // Expo Router - CORRECT!
 ```
 
@@ -547,11 +547,11 @@ For each header component:
 ```typescript
 import { renderRouter, screen } from 'expo-router/testing-library';
 
-describe('WalletsHeader navigation', () => {
+describe('AccountsHeader navigation', () => {
   it('should navigate back correctly', () => {
-    // Arrange: Navigate to wallets from home
+    // Arrange: Navigate to accounts from home
     const { router } = renderRouter('/home');
-    router.push('/wallets');
+    router.push('/accounts');
 
     // Act: Press back button
     const backButton = screen.getByLabelText('Go back');
@@ -562,15 +562,15 @@ describe('WalletsHeader navigation', () => {
   });
 
   it('should handle empty stack gracefully', () => {
-    // Arrange: Direct navigation to wallets (no previous screen)
-    const { router } = renderRouter('/wallets');
+    // Arrange: Direct navigation to accounts (no previous screen)
+    const { router } = renderRouter('/accounts');
 
     // Act: Press back button
     const backButton = screen.getByLabelText('Go back');
     backButton.press();
 
     // Assert: Should handle gracefully (fallback or stay)
-    expect(router.pathname).toBe('/wallets'); // or fallback route
+    expect(router.pathname).toBe('/accounts'); // or fallback route
   });
 });
 ```

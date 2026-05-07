@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-The the app Offline Capabilities System represents a **revolutionary transformation** of mobile financial services for emerging markets, positioning the app as the first truly offline-first mobile wallet platform. This system targets the critical connectivity challenges faced by 250M+ smartphone users in Sub-Saharan Africa, rural areas, and developing nations, where network reliability remains a barrier to financial inclusion.
+The the app Offline Capabilities System represents a **revolutionary transformation** of mobile financial services for emerging markets, positioning the app as the first truly offline-first mobile account platform. This system targets the critical connectivity challenges faced by 250M+ smartphone users in Sub-Saharan Africa, rural areas, and developing nations, where network reliability remains a barrier to financial inclusion.
 
 ### Strategic Market Disruption
 
@@ -24,7 +24,7 @@ Based on analysis of emerging market connectivity patterns and competitive posit
 
 ### Revolutionary Offline-First Advantage
 
-the app enables users to maintain complete wallet functionality during network outages, fundamentally changing the relationship between connectivity and financial access. By implementing sophisticated multi-tier caching, intelligent sync mechanisms, and conflict resolution, users can:
+the app enables users to maintain complete account functionality during network outages, fundamentally changing the relationship between connectivity and financial access. By implementing sophisticated multi-tier caching, intelligent sync mechanisms, and conflict resolution, users can:
 
 - **Complete Transactions Offline**: View balances, transaction history, contact management for up to 72 hours without connectivity
 - **Queue Operations Seamlessly**: Send money, make payments, create requests that execute automatically when online
@@ -84,7 +84,7 @@ Mobile financial services in emerging markets face a fundamental architecture fl
 
 ### Offline-First Architecture Revolution
 
-The the app Offline Capabilities System implements a sophisticated **Multi-Tier Caching Architecture** that enables complete wallet functionality independent of network connectivity while maintaining security, compliance, and data integrity standards.
+The the app Offline Capabilities System implements a sophisticated **Multi-Tier Caching Architecture** that enables complete account functionality independent of network connectivity while maintaining security, compliance, and data integrity standards.
 
 #### Core Architectural Components
 
@@ -148,7 +148,7 @@ When a new user taps the "Try without Account" button on the Welcome screen to e
 1. **Guest Mode Flag Set**: AsyncStorage flag `my_guest_mode` is set to `true`
 2. **Mock Data Population**: All local caches (L1-L4) are immediately populated with mock data from `@{org}/mock-data-lib`
 3. **Cache Contents Include**:
-   - Mock wallet with sample balance and currencies
+   - Mock account with sample balance and currencies
    - Mock transaction history (100+ sample transactions)
    - Mock contacts with various payment methods
    - Mock chat messages and conversation history
@@ -159,7 +159,7 @@ When a new user taps the "Try without Account" button on the Welcome screen to e
 
 - **No Runtime Checks**: Data fetching logic doesn't need to check if user is a guest
 - **Instant Performance**: All data available immediately without API calls
-- **Consistent Experience**: Guest users see a fully populated, realistic wallet experience
+- **Consistent Experience**: Guest users see a fully populated, realistic account experience
 - **Simplified Architecture**: Cache layer handles data source, not the business logic layer
 
 **Implementation Pattern:**
@@ -172,7 +172,7 @@ async function activateGuestMode(): Promise<void> {
 
   // Populate all cache tiers with mock data
   await cacheManager.populateWithMockData({
-    wallets: mockWallets,
+    accounts: mockAccounts,
     transactions: mockTransactions,
     contacts: mockContacts,
     messages: mockMessages,
@@ -194,7 +194,7 @@ When a user successfully logs in or completes account creation:
 1. **Authentication Complete**: User receives JWT token and authentication state is established
 2. **Cache Initialization**: All local caches (L1-L4) are cleared of any previous data
 3. **Progressive Cache Population**: Live data is fetched from API and cached as the user navigates:
-   - **Immediate**: User profile, wallet balances, recent transactions
+   - **Immediate**: User profile, account balances, recent transactions
    - **Background**: Full transaction history, contact list, chat messages
    - **On-Demand**: Additional data as user accesses features
 
@@ -214,8 +214,8 @@ async function onAuthenticationSuccess(authToken: string): Promise<void> {
   const profile = await api.getUserProfile();
   await cacheManager.set('user_profile', profile, CacheTier.L2);
 
-  const wallets = await api.getWallets();
-  await cacheManager.set('user_wallets', wallets, CacheTier.L2);
+  const accounts = await api.getAccounts();
+  await cacheManager.set('user_accounts', accounts, CacheTier.L2);
 
   const recentTransactions = await api.getTransactions({ limit: 100 });
   await cacheManager.set(
@@ -239,13 +239,13 @@ async function onAuthenticationSuccess(authToken: string): Promise<void> {
 - **TTL Management**: Different data types have appropriate time-to-live values
 - **Intelligent Eviction**: LRU + TTL policies manage cache size
 
-#### Wallet Reset: Complete Cache Clearing
+#### Account Reset: Complete Cache Clearing
 
-**When User Resets Wallet in Settings:**
+**When User Resets Account in Settings:**
 
-The wallet reset functionality provides a clean slate for users:
+The account reset functionality provides a clean slate for users:
 
-1. **User Initiates Reset**: User navigates to Settings > Reset Wallet and confirms action
+1. **User Initiates Reset**: User navigates to Settings > Reset Account and confirms action
 2. **Complete Cache Clearing**: All local caches are completely cleared:
    - In-memory React context cache (L1)
    - AsyncStorage cache (L2)
@@ -258,11 +258,11 @@ The wallet reset functionality provides a clean slate for users:
 **Implementation Pattern:**
 
 ```typescript
-// Wallet reset handler
-async function resetWallet(): Promise<void> {
+// Account reset handler
+async function resetAccount(): Promise<void> {
   // Show confirmation dialog
   const confirmed = await showConfirmationDialog({
-    title: 'Reset Wallet',
+    title: 'Reset Account',
     message:
       'This will clear all local data and return you to the welcome screen. Continue?',
     confirmText: 'Reset',
@@ -347,7 +347,7 @@ The cache manager internally knows whether to serve mock data (guest mode) or ca
 | **Tap "Try without Account"**        | Immediate full population  | Mock data from `@{org}/mock-data-lib` | Previous cache cleared  |
 | **Login/Signup**                     | Progressive population     | Live API data                                  | Previous cache cleared  |
 | **Normal App Usage (Authenticated)** | Automatic on API responses | Live API data                                  | TTL-based eviction      |
-| **Reset Wallet**                     | N/A                        | N/A                                            | Complete cache clearing |
+| **Reset Account**                     | N/A                        | N/A                                            | Complete cache clearing |
 | **Logout**                           | N/A                        | N/A                                            | Complete cache clearing |
 
 This approach ensures:
@@ -375,11 +375,11 @@ This approach ensures:
 
 #### User Story 1.2: Offline Data Access
 
-**As a user, I want to view my wallet balance and recent transactions when offline so I can make informed financial decisions.**
+**As a user, I want to view my account balance and recent transactions when offline so I can make informed financial decisions.**
 
 **Acceptance Criteria:**
 
-- [ ] Wallet balance displays immediately (<500ms) when offline
+- [ ] Account balance displays immediately (<500ms) when offline
 - [ ] Last 100 transactions available offline with full details
 - [ ] Transaction data includes amounts, recipients, dates, and descriptions
 - [ ] Offline data clearly marked with "Last updated" timestamps
@@ -554,7 +554,7 @@ interface OfflineContextState {
   currentUser: SafeUser;
   activeContacts: Contact[];
   recentTransactions: Transaction[];
-  walletBalance: WalletBalance;
+  accountBalance: AccountBalance;
 
   // Connectivity state
   isOnline: boolean;
@@ -628,8 +628,8 @@ CREATE TABLE offline_messages (
 
 ```typescript
 // SQLite models for complex sync scenarios
-@Model('offline_wallets')
-class OfflineWallet extends Model {
+@Model('offline_accounts')
+class OfflineAccount extends Model {
   @Field('user_id') userId!: string;
   @Field('balance') balance!: number;
   @Field('currency') currency!: string;
@@ -1127,7 +1127,7 @@ interface StorageOptimization {
 
 **Deliverables:**
 
-- Cache user profiles, wallets, and preferences
+- Cache user profiles, accounts, and preferences
 - Implement contact caching with full search functionality
 - Cache recent transaction history with filtering
 - Create offline-first user preferences management
@@ -1827,7 +1827,7 @@ export class OfflineManager {
 
 ## What is Offline Mode?
 
-the app's offline mode allows you to use most wallet features even when you don't have an internet connection. This is especially useful in areas with poor network coverage or during network outages.
+the app's offline mode allows you to use most account features even when you don't have an internet connection. This is especially useful in areas with poor network coverage or during network outages.
 
 ## What Works Offline?
 
@@ -1872,11 +1872,11 @@ You can control how much data the app stores offline:
 
 ## Conclusion
 
-The the app Offline Capabilities System represents a transformative advancement in mobile financial services, specifically designed to address the connectivity challenges faced by users in emerging markets. By implementing a sophisticated multi-tier caching architecture, intelligent synchronization mechanisms, and robust conflict resolution, this system positions the app as the leading offline-first mobile wallet platform.
+The the app Offline Capabilities System represents a transformative advancement in mobile financial services, specifically designed to address the connectivity challenges faced by users in emerging markets. By implementing a sophisticated multi-tier caching architecture, intelligent synchronization mechanisms, and robust conflict resolution, this system positions the app as the leading offline-first mobile account platform.
 
 ### Strategic Value Proposition
 
-**Market Leadership**: the app becomes the first comprehensive offline-capable mobile wallet, providing significant competitive advantage over traditional mobile money operators who remain entirely connectivity-dependent.
+**Market Leadership**: the app becomes the first comprehensive offline-capable mobile account, providing significant competitive advantage over traditional mobile money operators who remain entirely connectivity-dependent.
 
 **User Empowerment**: Users gain financial autonomy regardless of network conditions, enabling financial inclusion even in areas with poor connectivity infrastructure.
 

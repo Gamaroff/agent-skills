@@ -13,7 +13,7 @@ license: MIT
 This is an **internal sub-routine** called by `create-story` and `review-story`. Do not invoke directly.
 
 **Inputs (set by the calling skill before invoking):**
-- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `docs/prd/payment-infrastructure/wallet/epics/epic.163.wallet-security/epic.163.wallet-security.md`)
+- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `docs/prd/service-domain/account/epics/epic.163.module-security/epic.163.module-security.md`)
 
 **Output (set by this sub-routine, available to the calling skill):**
 - `EPIC_ISSUE_NUM` — the GitHub issue number for the epic (integer string), or empty string on failure

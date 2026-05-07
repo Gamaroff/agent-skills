@@ -48,7 +48,6 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 
 ### Location Configuration
 
-> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 **ALWAYS** check skill resources or explicit file references for the `qa.qaLocation/gates` setting.
 
@@ -58,7 +57,7 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 
 **Examples**:
 
-- `story.1.1.5.gate.1.groups-cache-service-implementation.yml`
+- `story.1.1.5.gate.1.feature-implementation.yml`
 - `story.2.3.1.gate.1.payment-processing-integration.yml`
 
 ### Directory Structure
@@ -72,7 +71,7 @@ docs/qa/gates/
     └── story.1.2.gate.1.feature-name.yml
 ```
 
-**Example**: If story is at `docs/prd/core-platform/group-system/story.1.1.5.md`, gate goes to `docs/qa/gates/core-platform/group-system/story.1.1.5.gate.1.groups-cache.yml`
+**Example**: If story is at `docs/prd/domain-name/module-name/story.1.1.5.md`, gate goes to `docs/qa/gates/domain-name/module-name/story.1.1.5.gate.1.feature-cache.yml`
 
 ---
 
@@ -443,7 +442,6 @@ When gate decision is unclear, use AskUserQuestion to clarify:
 
 ### Expected Configuration
 
-> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 All file locations should be defined in skill resources or explicit file references:
 
@@ -463,7 +461,7 @@ docs/qa/
         └── story.2.1.gate.1.feature-name.yml
 ```
 
-**Example**: If PRD is at `docs/prd/user-experience/authentication/`, gates go to `docs/qa/gates/user-experience/authentication/`
+**Example**: If PRD is at `docs/prd/ui-domain/module-name/`, gates go to `docs/qa/gates/ui-domain/module-name/`
 
 ---
 

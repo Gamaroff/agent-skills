@@ -21,7 +21,7 @@ Use this skill when you need to:
 Natural language triggers:
 
 - "Edit story 323.2 to add new acceptance criterion"
-- "Update story.178.8.swipe-actions-friend-requests.md to change status"
+- "Update story.178.8.example-feature.md to change status"
 - "Modify story 163.1 to update tasks"
 
 **Slash Command Usage:**
@@ -35,7 +35,7 @@ Natural language triggers:
 
 # Natural language
 "Edit story 323.2 to update priority"
-"Use @edit-story for story.178.8.swipe-actions-friend-requests.md"
+"Use @edit-story for story.178.8.example-feature.md"
 ```
 
 **Related Skills**:
@@ -324,7 +324,7 @@ If validation fails, present findings to user:
 
 - `story.163.1.seed-phrase-validator/story.163.1.seed-phrase-validator.md` ✓
 - `story.323.2.emergency-recovery-unlock/story.323.2.emergency-recovery-unlock.md` ✓
-- `story.178.8.swipe-actions-friend-requests/story.178.8.swipe-actions-friend-requests.md` ✓
+- `story.178.8.example-feature/story.178.8.example-feature.md` ✓
 
 **Invalid Patterns:**
 
@@ -463,7 +463,7 @@ User: "Change story 178.8 status to ready-for-qa"
 
 Agent:
 
-1. Loads story.178.8.swipe-actions-friend-requests.md
+1. Loads story.178.8.example-feature.md
 2. Validates file type
 3. Locates status field (frontmatter or markdown)
 4. Risk classification: single-field update → LOW RISK → apply directly

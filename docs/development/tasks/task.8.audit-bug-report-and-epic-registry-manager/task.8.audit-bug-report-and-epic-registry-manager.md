@@ -198,7 +198,7 @@ None expected from the audit itself. Any inline remediation must be additive (pr
 **Implementation Approach**:
 
 - Phase 1: Read `skills/create-bug-report/SKILL.md` end-to-end (844 lines). Ran `grep -nE` for all platform identifiers — zero matches. Confirmed: pure markdown-generation skill, no tracker side-effects, no `github_issue`/`jira_key` fields in bug report templates.
-- Phase 2: Read `skills/epic-registry-manager/SKILL.md` end-to-end (114 lines + 2 reference files). Ran same grep — single match was the string "core-platform" used as an example domain name, not a platform API call. Confirmed: registry is a local markdown table, platform-neutral.
+- Phase 2: Read `skills/epic-registry-manager/SKILL.md` end-to-end (114 lines + 2 reference files). Ran same grep — single match was the string "domain-name" used as an example domain name, not a platform API call. Confirmed: registry is a local markdown table, platform-neutral.
 - Phase 3: Wrote `task.8.audit.1.findings.md` with full surface documentation, platform call inventories (both empty), gap classifications (both "no gap"), and recommendations.
 - Phase 4: Skipped — no gaps found in either skill.
 - Phase 5: Skipped — no follow-up tasks needed.

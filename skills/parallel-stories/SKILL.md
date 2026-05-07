@@ -311,8 +311,8 @@ git worktree remove ../worktrees/story-1-1
 For each story (parallel and sequential):
 
 1. Create story file in epic's stories subdirectory: `{epicPath}/stories/{epicNum}.{storyId}.{descriptive-name}.md`
-   - Example: `docs/prd/user-experience/notifications/epics/epic.305/stories/305.1-1.swipe-actions.md`
-   - Example: `docs/prd/core-platform/auth/epics/epic.301/stories/301.2.integration-testing.md`
+   - Example: `docs/prd/ui-domain/module-name/epics/epic.305/stories/305.1-1.example-feature.md`
+   - Example: `docs/prd/domain-name/auth/epics/epic.301/stories/301.2.integration-testing.md`
 
 2. Fill basic information:
    - **Status**: `Draft`
@@ -553,7 +553,7 @@ These stories must be developed in order after parallel stories complete.
 ## Resources
 
 **Architecture**: docs/architecture/auth-architecture.md
-**Epic**: docs/prd/user-experience/authentication/epic-1.md
+**Epic**: docs/prd/ui-domain/module-name/epic-1.md
 **Worktree Guide**: [Git Worktree Documentation](https://git-scm.com/docs/git-worktree)
 ````
 

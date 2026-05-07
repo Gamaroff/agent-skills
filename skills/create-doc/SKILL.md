@@ -63,7 +63,6 @@ When this skill is activated:
 
 If YAML template not provided:
 
-> **Note**: .bmad-core directory was intentionally removed. Templates are now loaded from the skills' resources/ directory.
 
 - List all templates from `resources/`
 - Ask user to select or provide template path

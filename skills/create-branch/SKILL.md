@@ -24,8 +24,8 @@ Use this skill when:
 
 Invoke this skill with any of:
 
-- **A story file path**: `story.178.8.swipe-actions-friend-requests.md`
-- **A story directory**: `stories/story.178.8.swipe-actions-friend-requests/`
+- **A story file path**: `story.178.8.example-feature.md`
+- **A story directory**: `stories/story.178.8.example-feature/`
 - **A task document**: `docs/prd/.../task.123.some-task.md`
 - **A raw description**: `"implement user authentication"`
 - **Explicit type flag**: `--hotfix`, `--release`, `--feature`
@@ -97,9 +97,9 @@ Example: Creating `story.309.2.3A` while on `feature/story.309.2.3` → likely a
 Determine the input type and extract relevant information:
 
 ```
-Input: story.178.8.swipe-actions-friend-requests.md
+Input: story.178.8.example-feature.md
  → Type: feature (from story)
- → Branch Name: feature/story.178.8.swipe-actions-friend-requests
+ → Branch Name: feature/story.178.8.example-feature
  → Base: TBD (will ask user)
 ```
 
@@ -199,7 +199,7 @@ git pull origin <selected-base-branch>
 ### Step 6: Create and Switch to New Branch
 
 ```bash
-git checkout -b feature/story.178.8.swipe-actions-friend-requests
+git checkout -b feature/story.178.8.example-feature
 ```
 
 ### Step 6: Push Branch (Optional)
@@ -207,7 +207,7 @@ git checkout -b feature/story.178.8.swipe-actions-friend-requests
 Optionally push the branch to set up tracking:
 
 ```bash
-git push -u origin feature/story.178.8.swipe-actions-friend-requests
+git push -u origin feature/story.178.8.example-feature
 ```
 
 ### Step 7: Confirm Success
@@ -215,9 +215,9 @@ git push -u origin feature/story.178.8.swipe-actions-friend-requests
 Output a summary with context:
 
 ```
-✅ Created branch: feature/story.178.8.swipe-actions-friend-requests
+✅ Created branch: feature/story.178.8.example-feature
    Base: develop (user selected)
-   Tracking: origin/feature/story.178.8.swipe-actions-friend-requests
+   Tracking: origin/feature/story.178.8.example-feature
 
 Ready to start development!
 ```

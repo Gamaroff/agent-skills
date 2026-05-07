@@ -1,8 +1,6 @@
-<!-- Powered by BMAD™ Core -->
-
 # Change Navigation Checklist
 
-**Purpose:** To systematically guide the selected Agent and user through the analysis and planning required when a significant change (pivot, tech issue, missing requirement, failed story) is identified during the BMad workflow.
+**Purpose:** To systematically guide the selected Agent and user through the analysis and planning required when a significant change (pivot, tech issue, missing requirement, failed story) is identified during the workflow.
 
 **Instructions:** Review each item with the user. Mark `[x]` for completed/confirmed, `[N/A]` if not applicable, or add notes for discussion points.
 
@@ -77,7 +75,7 @@ Think about both immediate and downstream effects.]]
 
 ## 3. Artifact Conflict & Impact Analysis
 
-[[LLM: Documentation drives development in BMad. Check each artifact:
+[[LLM: Documentation drives development. Check each artifact:
 
 1. Does this change invalidate documented decisions?
 2. Are architectural assumptions still valid?

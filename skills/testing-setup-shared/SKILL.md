@@ -476,7 +476,7 @@ npx nx run-many --target=test --all
 **Financial Operations**: 95%+ coverage REQUIRED
 - Payment processing
 - Transaction handling
-- Wallet operations
+- Account operations
 - Fee calculations
 
 **Verify Coverage**:

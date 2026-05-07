@@ -50,7 +50,7 @@ Direct tools only — small task (audit, single module, low risk). Adaptive stra
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: Audit create-bug-report | ✅ PASS | SKILL.md read (844 lines); grep ran; zero platform calls; documented |
-| Phase 2: Audit epic-registry-manager | ✅ PASS | SKILL.md read (114 lines); grep ran; one false positive ("core-platform" example text); documented |
+| Phase 2: Audit epic-registry-manager | ✅ PASS | SKILL.md read (114 lines); grep ran; one false positive ("domain-name" example text); documented |
 | Phase 3: Write findings report | ✅ PASS | `task.8.audit.1.findings.md` created (127 lines); platform call inventories, gap classifications, summary table, conclusion |
 | Phase 4: Inline remediation | ✅ PASS (skipped) | Correctly skipped — no gaps found; checkbox notation clear |
 | Phase 5: Spawn follow-up tasks | ✅ PASS (skipped) | Correctly skipped — no gaps found; checkbox notation clear |

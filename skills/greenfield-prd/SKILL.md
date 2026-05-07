@@ -173,11 +173,10 @@ Use create-doc skill with:
   - Testing Requirements (Unit|Integration|Full Pyramid)
   - Additional Technical Assumptions
 - **Process:**
-  1. Note: .bmad-core directory was intentionally removed. Check for an attached technical-preferences file to pre-populate
-  2. Ask about languages, frameworks, libraries, deployment
-  3. Present with rationale
-  4. **STOP - Present 1-9 elicitation options**
-  5. Wait for user response
+  1. Ask about languages, frameworks, libraries, deployment
+  2. Present with rationale
+  3. **STOP - Present 1-9 elicitation options**
+  4. Wait for user response
 - **Focus:** Constraints for Architect, document ALL choices with rationale
 
 #### Section 5: Epic List (MANDATORY ELICITATION)

@@ -50,8 +50,8 @@ If invoked outside the pipeline (no lite directive), the normal Adaptive Review 
 
 You can invoke this skill with either:
 
-- **A specific story file**: `story.178.8.swipe-actions-friend-requests.md`
-- **A story directory**: `stories/story.178.8.swipe-actions-friend-requests/`
+- **A specific story file**: `story.178.8.example-feature.md`
+- **A story directory**: `stories/story.178.8.example-feature/`
 
 **Important**: Requires active PR for current branch. Review will halt if no PR found. See Prerequisites section.
 
@@ -78,8 +78,8 @@ When creating QA reports and gate files, they will be placed in the same directo
 **Example:**
 
 ```
-Input: stories/story.178.8.swipe-actions-friend-requests/
-Discovers: story.178.8.swipe-actions-friend-requests.md
+Input: stories/story.178.8.example-feature/
+Discovers: story.178.8.example-feature.md
 Creates: story.178.8.qa.1.initial-review.md
 Creates: story.178.8.gate.1.initial-review.yml
 ```
@@ -899,10 +899,10 @@ stories/
 
 **Examples:**
 
-- Story directory: `docs/prd/core-platform/contact-system/add-contact-via-handle/epics/epic.178.user-discovery-ui/stories/story.178.8.swipe-actions-friend-requests/`
-- Story file: `story.178.8.swipe-actions-friend-requests.md`
-- QA report: `story.178.8.qa.1.swipe-actions-friend-requests.md`
-- Gate file: `story.178.8.gate.1.swipe-actions-friend-requests.yml`
+- Story directory: `docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/stories/story.178.8.example-feature/`
+- Story file: `story.178.8.example-feature.md`
+- QA report: `story.178.8.qa.1.example-feature.md`
+- Gate file: `story.178.8.gate.1.example-feature.yml`
 - Bug report: `story.178.8.bug.1.android-swipe-jank.md`
 
 **QA Report Structure:**
@@ -1074,8 +1074,8 @@ stories/
 - **Tasks**: `task.[number].gate.[number].[descriptive-name].yml`
 - **MUST co-locate with the story/task file in the same directory**
 - Examples:
-  - Story: `docs/prd/core-platform/group-system/story.1.1.5.gate.1.groups-cache-service-implementation.yml`
-  - Task: `docs/development/tasks/task.44.transactions-wallet-backend-integration/task.44.gate.1.transactions-wallet-backend-integration.yml`
+  - Story: `docs/prd/domain-name/module-name/story.1.1.5.gate.1.feature-implementation.yml`
+  - Task: `docs/development/tasks/task.44.transactions-account-backend-integration/task.44.gate.1.transactions-account-backend-integration.yml`
 
 **Legacy Note**: Old pattern of storing gates in `docs/qa/gates/[prd-path]/` is deprecated. All new gate files must be co-located.
 
@@ -2195,7 +2195,6 @@ This traceability feeds into quality gates:
 
 ### Expected Configuration
 
-> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 All file locations should be defined in skill resources or explicit file references:
 

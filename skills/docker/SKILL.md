@@ -303,7 +303,7 @@ docker exec {db-service} pg_dump -U {app-name} {app-name} | \
   gzip > "backup_$(date +%Y%m%d_%H%M%S).sql.gz"
 
 # Backup specific tables
-docker exec {db-service} pg_dump -U {app-name} -t users -t wallets {app-name} > \
+docker exec {db-service} pg_dump -U {app-name} -t users -t accounts {app-name} > \
   "partial_backup_$(date +%Y%m%d_%H%M%S).sql"
 
 # Restore from backup

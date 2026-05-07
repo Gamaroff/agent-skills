@@ -28,8 +28,8 @@ Activate this skill when:
 
 \`\`\`
 docs/prd/{domain}/{feature}/epics/
-├── epic.163.wallet-security/
-│   ├── epic.163.wallet-security.md     ← Epic #163
+├── epic.163.module-security/
+│   ├── epic.163.module-security.md     ← Epic #163
 │   └── stories/
 ├── epic.164.transaction-batching/
 │   ├── epic.164.transaction-batching.md ← Epic #164 (next sequential)
@@ -54,8 +54,8 @@ Read epic registry and find highest epic number. Next epic number = highest + 1.
 ### Step 2: Determine Domain and Feature
 
 Prompt user for:
-- **Domain** (e.g., "user-experience", "payment-infrastructure", "core-platform")
-- **Feature** (e.g., "traditional-auth", "wallet", "group-system")
+- **Domain** (e.g., "ui-domain", "service-domain", "domain-name")
+- **Feature** (e.g., "example-auth", "account", "module-name")
 
 Validate that \`docs/prd/{domain}/{feature}/epics/\` directory exists.
 
@@ -82,8 +82,8 @@ touch docs/prd/{domain}/{feature}/epics/epic.{NUMBER}.{name}/epic.{NUMBER}.{name
 
 **Example**:
 \`\`\`bash
-mkdir -p docs/prd/payment-infrastructure/wallet/epics/epic.323.secure-backup/stories/
-touch docs/prd/payment-infrastructure/wallet/epics/epic.323.secure-backup/epic.323.secure-backup.md
+mkdir -p docs/prd/service-domain/account/epics/epic.323.example-backup/stories/
+touch docs/prd/service-domain/account/epics/epic.323.example-backup/epic.323.example-backup.md
 \`\`\`
 
 ### Step 5: Create Epic File with YAML Frontmatter
@@ -98,7 +98,7 @@ Add entry to \`/docs/development/epic-registry.md\` sorted by epic number.
 
 **Registry Entry Format**:
 \`\`\`
-| 323 | - | payment-infrastructure/wallet | epic.323.secure-backup | Epic 323: Secure Backup | NOT_STARTED | YYYY-MM-DD |
+| 323 | - | service-domain/account | epic.323.example-backup | Epic 323: Secure Backup | NOT_STARTED | YYYY-MM-DD |
 \`\`\`
 
 ## Resources

@@ -265,7 +265,6 @@ A story is ready when review shows:
 
 ## Resources
 
-> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 - Story template: `resources/story-template.yaml`
 - Configuration: Inline configuration or explicit file references

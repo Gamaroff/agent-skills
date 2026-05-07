@@ -638,7 +638,7 @@ class ProductionAnimationMonitor {
 
   constructor() {
     this.metricsCollector = new MetricsCollector({
-      service: 'bottom-action-bar',
+      service: 'example-component',
       namespace: 'animations'
     });
   }

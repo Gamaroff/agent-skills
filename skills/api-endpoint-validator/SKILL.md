@@ -83,22 +83,22 @@ async remove(@Param('id') id: string): Promise<void> {
 ```typescript
 // ✅ CORRECT - Resource-based
 @Controller('users')
-@Controller('wallets')
+@Controller('accounts')
 @Controller('transactions')
 
 // ❌ WRONG - Action-based
 @Controller('get-users')
-@Controller('create-wallet')
+@Controller('create-account')
 ```
 
 **Nested resources**:
 ```typescript
 // ✅ CORRECT - Shows relationship
-@Get('users/:userId/wallets')
-@Get('wallets/:walletId/transactions')
+@Get('users/:userId/accounts')
+@Get('accounts/:accountId/transactions')
 
 // ❌ WRONG - Flat structure loses context
-@Get('user-wallets/:userId')
+@Get('user-accounts/:userId')
 ```
 
 **Plural nouns for collections**:
@@ -391,7 +391,7 @@ async findAll(@Query() sort: SortDto) {
 ## Anti-Patterns to Avoid
 
 **NEVER:**
-- ❌ Use verbs in route names (`/getUsers`, `/createWallet`)
+- ❌ Use verbs in route names (`/getUsers`, `/createAccount`)
 - ❌ Mix HTTP methods incorrectly (GET for creating, POST for reading)
 - ❌ Return different response formats from same endpoint
 - ❌ Expose raw Prisma errors to clients
@@ -401,7 +401,7 @@ async findAll(@Query() sort: SortDto) {
 - ❌ Use generic error messages ("Something went wrong")
 
 **ALWAYS:**
-- ✅ Use resource-based naming (`/users`, `/wallets`, `/transactions`)
+- ✅ Use resource-based naming (`/users`, `/accounts`, `/transactions`)
 - ✅ Follow HTTP method semantics correctly
 - ✅ Validate all request inputs with DTOs
 - ✅ Return consistent response formats

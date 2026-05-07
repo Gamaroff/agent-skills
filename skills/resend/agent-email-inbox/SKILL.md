@@ -1,6 +1,6 @@
 ---
 name: agent-email-inbox
-description: Use when setting up an email inbox for an AI agent (Moltbot, Clawdbot, or similar) - configuring inbound email, webhooks, tunneling for local development, and implementing content safety measures.
+description: Use when setting up an email inbox for an AI agent - configuring inbound email, webhooks, tunneling for local development, and implementing content safety measures.
 inputs:
     - name: RESEND_API_KEY
       description: Resend API key for sending and receiving emails. Get yours at https://resend.com/api-keys
@@ -14,7 +14,7 @@ inputs:
 
 ## Overview
 
-Moltbot (formerly Clawdbot) is an AI agent that can send and receive emails. This skill covers setting up a secure email inbox that allows your agent to be notified of incoming emails and respond appropriately, with content safety measures in place.
+This skill covers setting up a secure email inbox that allows your AI agent to be notified of incoming emails and respond appropriately, with content safety measures in place.
 
 **Core principle:** An AI agent's inbox receives untrusted input. Security configuration is important to handle this safely.
 
@@ -930,15 +930,15 @@ vercel deploy --prod
 
 See the Express example in the Webhook Setup section above. Deploy it with a reverse proxy (nginx, caddy) for HTTPS, or behind a load balancer that terminates SSL.
 
-## Clawdbot Integration
+## Agent Integration
 
 ### Webhook Gateway (Recommended)
 
-The best way to connect email to Clawdbot is via the webhook gateway. This takes full advantage of Resend's webhook functionality, delivering emails to your agent in real time — no polling delays, no missed messages.
+The best way to connect email to your agent is via the webhook gateway. This takes full advantage of Resend's webhook functionality, delivering emails in real time — no polling delays, no missed messages.
 
 ```typescript
 async function processWithAgent(email: ProcessedEmail) {
-  // Format email for Clawdbot
+  // Format email for your agent
   const message = `
 📧 **New Email**
 From: ${email.from}
@@ -947,17 +947,17 @@ Subject: ${email.subject}
 ${email.body}
   `.trim();
 
-  // Send to Clawdbot via the gateway API
-  await sendToClawdbot(message);
+  // Forward to your agent's processing function
+  await agent.processMessage(message);
 }
 ```
 
 ### Alternative: Polling
 
-Clawdbot can poll the Resend API for new emails during heartbeats. This is simpler to set up but does not take advantage of Resend's webhook functionality — emails are not delivered in real time, and you may experience delays or missed messages between polling intervals.
+Your agent can poll the Resend API for new emails on a schedule. This is simpler to set up but does not take advantage of Resend's webhook functionality — emails are not delivered in real time, and you may experience delays or missed messages between polling intervals.
 
 ```typescript
-// In your agent's heartbeat check
+// In your agent's scheduled check
 async function checkForNewEmails() {
   // List recent received emails
   const { data: emails } = await resend.emails.list({
@@ -974,9 +974,9 @@ async function checkForNewEmails() {
 }
 ```
 
-### Alternative: External Channel Plugin
+### Alternative: Native Channel Integration
 
-For deep integration, implement Clawdbot's external channel plugin interface to treat email as a first-class channel alongside Telegram, Signal, etc. This also uses webhooks for real-time delivery.
+For deep integration, implement email as a first-class channel in your agent alongside other messaging channels (Telegram, Signal, etc.). This also uses webhooks for real-time delivery.
 
 ## Sending Emails from Your Agent
 

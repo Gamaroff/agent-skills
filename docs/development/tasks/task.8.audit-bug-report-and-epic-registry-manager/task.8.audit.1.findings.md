@@ -82,9 +82,9 @@ The "Technical Task Bug Reports" Notes section (line 844) mentions "Quality gate
 
 | Line | Snippet | Platform |
 |------|---------|----------|
-| 57 | `"core-platform"` (example domain name in text) | None — not a platform call |
+| 57 | `"domain-name"` (example domain name in text) | None — not a platform call |
 
-`grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian|milestone|gh issue|gh pr|JIRA_URL|REMOTE_URL|platform'` → **one match**, which is the string `"core-platform"` used as an example domain name, not a platform API call.
+`grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian|milestone|gh issue|gh pr|JIRA_URL|REMOTE_URL|platform'` → **one match**, which is the string `"domain-name"` used as an example domain name, not a platform API call.
 
 ### Gap Classification
 

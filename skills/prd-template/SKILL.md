@@ -133,7 +133,6 @@ Branding:
 
 **Process:**
 
-> **Note**: .bmad-core directory was intentionally removed. Check for an attached technical-preferences file to pre-populate
 
 1. Check for an attached technical-preferences file to pre-populate
 2. Ask user about: languages, frameworks, starter templates, libraries, APIs, deployment
@@ -338,7 +337,6 @@ Epic Details section is repeatable:
 ### Pattern 3: Technical Pre-Population
 
 ```
-> **Note**: .bmad-core directory was intentionally removed. Check for an attached technical-preferences file to pre-populate
 1. Check for an attached technical-preferences file
 2. Pre-fill Technical Assumptions section
 3. Present to user with "pre-populated from preferences" note

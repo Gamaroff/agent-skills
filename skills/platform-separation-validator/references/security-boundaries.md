@@ -283,7 +283,7 @@ class AuthService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': `MyWallet/${getAppVersion()} ${getCurrentPlatform()}`
+          'User-Agent': `MyApp/${getAppVersion()} ${getCurrentPlatform()}`
         },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
@@ -720,7 +720,7 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          'User-Agent': `MyWallet/${getAppVersion()} ${getCurrentPlatform()}`,
+          'User-Agent': `MyApp/${getAppVersion()} ${getCurrentPlatform()}`,
           'X-Request-ID': generateRequestId(), // Non-cryptographic ID
           ...options.headers
         }

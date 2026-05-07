@@ -86,7 +86,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **Examples** (using globally unique numbers):
 
-- `epic.163.user-notifications.md` (next available from registry)
+- `epic.163.feature-notifications.md` (next available from registry)
 - `epic.164.payment-integration.md` (incremented)
 - `epic.163.5.settings-enhancement.md` (use decimals for intermediate epics)
 

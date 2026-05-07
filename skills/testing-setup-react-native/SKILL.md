@@ -250,7 +250,7 @@ describe('AuthContext', () => {
     });
 
     mockProfileCache.hydrateAuthenticatedProfile.mockResolvedValue();
-    mockWalletCache.refreshAuthenticatedBalances.mockResolvedValue();
+    mockAccountCache.refreshAuthenticatedBalances.mockResolvedValue();
     mockTransactionCache.clearGuestCache.mockResolvedValue();
     // ... reset all mocks used in tests
   });
@@ -777,14 +777,14 @@ it('should wait for slow operation', async () => {
 ### 9.1 Testing with Mock Data Library
 
 ```typescript
-import { generateMockUser, generateMockWallet } from '@{org}/mock-data-lib/client';
+import { generateMockUser, generateMockAccount } from '@{org}/mock-data-lib/client';
 
-describe('Wallet Screen', () => {
-  it('should display wallet balance', () => {
+describe('Account Screen', () => {
+  it('should display account balance', () => {
     const mockUser = generateMockUser();
-    const mockWallet = generateMockWallet({ userId: mockUser.id, balance: 1000 });
+    const mockAccount = generateMockAccount({ userId: mockUser.id, balance: 1000 });
 
-    render(<WalletScreen wallet={mockWallet} />);
+    render(<AccountScreen account={mockAccount} />);
 
     expect(screen.getByText('$1,000.00')).toBeTruthy();
   });

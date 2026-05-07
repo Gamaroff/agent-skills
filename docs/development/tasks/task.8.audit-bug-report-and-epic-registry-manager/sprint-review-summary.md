@@ -62,7 +62,7 @@ None — audit-only deliverable; no skill files modified.
 
 - **Audit Evidence**: `grep -nE` for all platform identifiers run on both skills
   - `create-bug-report`: zero matches
-  - `epic-registry-manager`: one false positive ("core-platform" example domain text) — correctly identified
+  - `epic-registry-manager`: one false positive ("domain-name" example domain text) — correctly identified
 - **Dependency Graph**: 14 files mapped; callers of both skills confirmed to provide their own platform detection
 - **QA Gate**: PASS (98/100) — all phases verified, all NFRs PASS
 
@@ -105,7 +105,7 @@ None — audit-only deliverable; no skill files modified.
 
 1. Open `task.8.audit.1.findings.md` — review platform call inventories (both empty), gap classifications (both "no gap"), summary table
 2. Run `grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian' skills/create-bug-report/SKILL.md` — confirm zero matches
-3. Run `grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian|milestone' skills/epic-registry-manager/SKILL.md` — confirm only "core-platform" example text
+3. Run `grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian|milestone' skills/epic-registry-manager/SKILL.md` — confirm only "domain-name" example text
 4. Check `task.8.gate.1.audit-findings-review.yml` — `gate: PASS`, `top_issues: []`
 
 ---

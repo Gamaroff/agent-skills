@@ -16,12 +16,12 @@
 
 ## Story Statement
 
-**As a** [user type - e.g., "mobile wallet user", "system administrator", "developer"]
+**As a** [user type - e.g., "mobile account user", "system administrator", "developer"]
 **I want** [capability - what the user wants to do]
 **So that** [benefit - why the user wants this capability]
 
 **Example**:
-**As a** mobile wallet user
+**As a** mobile account user
 **I want** to access action bar customization from the main Settings screen
 **So that** I can easily configure my preferred bottom actions without searching through menus
 

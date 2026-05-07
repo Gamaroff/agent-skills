@@ -63,7 +63,7 @@ Invoke this skill when:
 // ✅ CORRECT - Explicit wrapping (recommended for critical endpoints)
 @Post('transfer')
 async transferFunds(@Body() dto: TransferDto) {
-  const transaction = await this.walletsService.transfer(dto);
+  const transaction = await this.accountsService.transfer(dto);
   return new StandardSuccessResponse(transaction);
 }
 
@@ -84,23 +84,23 @@ async findAll(@Query() pagination: PaginationDto) {
 // ❌ VIOLATION - Manual envelope construction
 @Get(':id')
 async findOne(@Param('id') id: string) {
-  const wallet = await this.walletsService.findOne(id);
-  return { success: true, data: wallet }; // WRONG - use StandardSuccessResponse class
+  const account = await this.accountsService.findOne(id);
+  return { success: true, data: account }; // WRONG - use StandardSuccessResponse class
 }
 
 // ❌ VIOLATION - Manual error response
 @Get(':id')
 async findOne(@Param('id') id: string) {
-  const wallet = await this.walletsService.findOne(id);
-  if (!wallet) {
+  const account = await this.accountsService.findOne(id);
+  if (!account) {
     return { success: false, error: 'Not found' }; // WRONG - throw exception instead
   }
-  return new StandardSuccessResponse(wallet);
+  return new StandardSuccessResponse(account);
 }
 ```
 
 **Critical Controllers** (MUST use explicit wrapping):
-- `WalletsController` - Financial operations
+- `AccountsController` - Financial operations
 - `TransactionsController` - Financial records
 - `AuthController` - Authentication/authorization
 - `MoneyLoadController` - Payment processing
@@ -271,7 +271,7 @@ this.server.emit('newMessage', wrapped);
 - `ChatMessageEvent` - Message events
 - `TransactionEvent` - Payment events
 - `UserStatusEvent` - User status changes
-- `WalletBalanceEvent` - Balance updates
+- `AccountBalanceEvent` - Balance updates
 - `NotificationEvent` - System notifications
 - `SystemEvent` - System events
 
@@ -427,7 +427,7 @@ Generate structured report:
 
 **1. Compliant Controllers**
 ```
-✅ WalletsController - 14/14 endpoints use explicit StandardSuccessResponse
+✅ AccountsController - 14/14 endpoints use explicit StandardSuccessResponse
 ✅ HelpController - 8/8 endpoints documented interceptor reliance
 ```
 
@@ -458,8 +458,8 @@ Generate structured report:
 **4. Test Suggestions**
 ```typescript
 // Add response envelope structure tests
-describe('WalletsController', () => {
-  it('should return StandardSuccessResponse with wallet data', async () => {
+describe('AccountsController', () => {
+  it('should return StandardSuccessResponse with account data', async () => {
     const response = await controller.findOne('123');
     expect(response).toBeInstanceOf(StandardSuccessResponse);
     expect(response.success).toBe(true);
@@ -538,7 +538,7 @@ Use this checklist to verify compliance:
 - `apps/{api-service}/src/main.ts` - Global interceptor registration
 
 **Reference Controllers**:
-- `apps/{api-service}/src/wallets/wallets.controller.ts` - Explicit wrapping pattern (all 14 endpoints)
+- `apps/{api-service}/src/accounts/accounts.controller.ts` - Explicit wrapping pattern (all 14 endpoints)
 - `apps/{api-service}/src/auth/auth.controller.ts` - Interceptor reliance pattern
 - `apps/{api-service}/src/help/help.controller.ts` - Standard CRUD pattern
 

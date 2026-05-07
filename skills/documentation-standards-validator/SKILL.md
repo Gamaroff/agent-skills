@@ -28,14 +28,14 @@ Activate this skill when:
 
 \`\`\`
 ✅ CORRECT
-epic.163.wallet-security.md
+epic.163.module-security.md
 story.163.1.encryption-service.md
 task.38.authservice-di-failure.md
 
 ❌ INCORRECT
-epic_163_wallet_security.md // Underscores
-epic-163-wallet-security.md // Hyphens instead of dots
-Epic.163.WalletSecurity.md // Capitalization
+epic_163_account_security.md // Underscores
+epic-163-module-security.md // Hyphens instead of dots
+Epic.163.AccountSecurity.md // Capitalization
 \`\`\`
 
 ### Epic Filename Format
@@ -43,7 +43,7 @@ Epic.163.WalletSecurity.md // Capitalization
 **Pattern**: \`epic.NUMBER.descriptive-name.md\`
 
 \`\`\`
-epic.163.wallet-security.md
+epic.163.module-security.md
 epic.164.transaction-batching.md
 epic.165.chat-encryption.md
 \`\`\`
@@ -55,7 +55,7 @@ epic.165.chat-encryption.md
 **Rule**: Each story MUST be placed in its own self-named subdirectory within the epic's `stories` folder.
 
 ```
-📁 epic.163.wallet-security/
+📁 epic.163.module-security/
   📁 stories/
     📁 story.163.1.encryption-service/
       📄 story.163.1.encryption-service.md
@@ -70,8 +70,8 @@ epic.165.chat-encryption.md
 ## \`\`\`yaml
 
 epic_number: 163
-title: Wallet Security Enhancement
-domain: Wallet
+title: Account Security Enhancement
+domain: Account
 status: 🔄 In Progress
 priority: High
 estimated_stories: 8

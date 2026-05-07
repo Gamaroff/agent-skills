@@ -1,4 +1,3 @@
-# <!-- Powered by BMAD™ Core -->
 template:
   id: architecture-template-v2
   name: Architecture Document
@@ -128,12 +127,11 @@ sections:
     instruction: |
       This is the DEFINITIVE technology selection section. Work with the user to make specific choices:
 
-      1. Note: .bmad-core directory was intentionally removed. Review PRD technical assumptions and any preferences from an attached technical-preferences file
-      2. For each category, present 2-3 viable options with pros/cons
-      3. Make a clear recommendation based on project needs
-      4. Get explicit user approval for each selection
-      5. Document exact versions (avoid "latest" - pin specific versions)
-      6. This table is the single source of truth - all other docs must reference these choices
+      1. For each category, present 2-3 viable options with pros/cons
+      2. Make a clear recommendation based on project needs
+      3. Get explicit user approval for each selection
+      4. Document exact versions (avoid "latest" - pin specific versions)
+      5. This table is the single source of truth - all other docs must reference these choices
 
       Key decisions to finalize - before displaying the table, ensure you are aware of or ask the user about - let the user know if they are not sure on any that you can also provide suggestions with rationale:
 

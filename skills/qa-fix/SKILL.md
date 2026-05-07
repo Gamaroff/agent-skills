@@ -48,8 +48,8 @@ optional:
 
 You can invoke this skill with either:
 
-- **A specific file**: `story.178.8.swipe-actions-friend-requests.md`, `story.178.8.qa.1.initial-review.md`, or `story.178.8.gate.1.initial-review.yml`
-- **A story directory**: `stories/story.178.8.swipe-actions-friend-requests/`
+- **A specific file**: `story.178.8.example-feature.md`, `story.178.8.qa.1.initial-review.md`, or `story.178.8.gate.1.initial-review.yml`
+- **A story directory**: `stories/story.178.8.example-feature/`
 
 **File Discovery Logic:**
 
@@ -85,12 +85,12 @@ When given a directory path, discover all relevant QA artifacts:
 **Example:**
 
 ```
-Input: stories/story.178.8.swipe-actions-friend-requests/
+Input: stories/story.178.8.example-feature/
 Discovers:
-  - Story: story.178.8.swipe-actions-friend-requests.md
+  - Story: story.178.8.example-feature.md
   - QA Report: story.178.8.qa.1.initial-review.md
   - Gate: story.178.8.gate.1.initial-review.yml
-  - Bugs: story.178.8.bug.1.android-jank.md, story.178.8.bug.2.ios-haptics.md
+  - Bugs: story.178.8.bug.1.platform-issue.md, story.178.8.bug.2.platform-issue.md
 ```
 
 ## QA Artifact Locations
@@ -133,7 +133,7 @@ For tasks:
 - Pattern: `story.{epic}.{story}.bug.*.md` in story's own subdirectory
 - Sequential numbering: `story.{epic}.{story}.bug.1.*.md`, `story.{epic}.{story}.bug.2.*.md`, etc.
 - Status tracking: New | In Progress | Ready for QA | Reopened | Closed
-- Example: `stories/story.178.8.swipe-actions/story.178.8.bug.1.android-jank.md`
+- Example: `stories/story.178.8.example-feature/story.178.8.bug.1.platform-issue.md`
 
 ### For Technical Tasks (Non-User-Facing Work)
 

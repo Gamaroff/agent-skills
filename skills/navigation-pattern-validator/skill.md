@@ -34,7 +34,7 @@ Determine the component's navigation context:
 
 **Standard Drawer Headers**: Screen headers inside drawer navigation
 - Should use Expo Router exclusively
-- Example: WalletsHeader, ShoppingHeader, ContactsHeader
+- Example: AccountsHeader, ShoppingHeader, ContactsHeader
 
 **Drawer Layout Components**: Files managing drawer operations
 - Require React Navigation for `DrawerActions.toggleDrawer()`
@@ -114,18 +114,18 @@ Validate that forward and back navigation use consistent systems:
 **Mismatch Examples**:
 ```typescript
 // Home screen navigates forward
-router.push('/(drawer)/wallets');
+router.push('/(drawer)/accounts');
 
-// WalletsHeader navigates back (DIFFERENT SYSTEM)
+// AccountsHeader navigates back (DIFFERENT SYSTEM)
 navigation.goBack(); // ❌ Stack mismatch - no React Navigation stack exists
 ```
 
 **Correct Pattern**:
 ```typescript
 // Home screen navigates forward
-router.push('/(drawer)/wallets');
+router.push('/(drawer)/accounts');
 
-// WalletsHeader navigates back (SAME SYSTEM)
+// AccountsHeader navigates back (SAME SYSTEM)
 router.back(); // ✅ Consistent - uses Expo Router stack
 ```
 
@@ -314,11 +314,11 @@ export const ShoppingHeader = () => {
 
 ```typescript
 // Home screen (forward navigation)
-const handleWalletsPress = () => {
-  router.push('/(drawer)/wallets');  // ✅ Expo Router
+const handleAccountsPress = () => {
+  router.push('/(drawer)/accounts');  // ✅ Expo Router
 };
 
-// WalletsHeader component (back navigation)
+// AccountsHeader component (back navigation)
 const handleBackPress = () => {
   navigation.goBack();  // ❌ React Navigation - MISMATCH!
 };
@@ -329,11 +329,11 @@ const handleBackPress = () => {
 **Automated Fix**:
 ```typescript
 // Home screen (forward navigation) - no change needed
-const handleWalletsPress = () => {
-  router.push('/(drawer)/wallets');  // ✅ Expo Router
+const handleAccountsPress = () => {
+  router.push('/(drawer)/accounts');  // ✅ Expo Router
 };
 
-// WalletsHeader component (back navigation) - FIX
+// AccountsHeader component (back navigation) - FIX
 const router = useRouter();  // ✅ Added router hook
 
 const handleBackPress = () => {

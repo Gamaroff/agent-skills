@@ -78,7 +78,7 @@ Before starting any verification, also create a co-located running summary file 
 
 1. **Determine story/task directory:**
    - Extract directory path from the story/task file path provided
-   - Example: `docs/prd/.../story.311.1.transaction-confirmation-system/`
+   - Example: `docs/prd/.../story.311.1.example-system/`
 
 2. **Create running summary file:**
    - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` starts at 1, increment if re-running finalise
@@ -108,9 +108,9 @@ Before starting any verification, also create a co-located running summary file 
 
 **Example:**
 
-If verifying `docs/prd/.../story.311.1.transaction-confirmation-system/story.311.1.transaction-confirmation-system.md`, create:
+If verifying `docs/prd/.../story.311.1.example-system/story.311.1.example-system.md`, create:
 
-`docs/prd/.../story.311.1.transaction-confirmation-system/story.311.1.dod.1.transaction-confirmation-system.md`
+`docs/prd/.../story.311.1.example-system/story.311.1.dod.1.example-system.md`
 
 ### Step 1: Locate and Read the Story/Task Document
 
@@ -119,13 +119,13 @@ Accept the story/task document path in one of these formats:
 **Full path to markdown file:**
 
 ```
-docs/prd/user-experience/notifications/epics/epic.311.financial-services-integration/stories/story.311.1.transaction-confirmation-system/story.311.1.transaction-confirmation-system.md
+docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/story.311.1.example-system.md
 ```
 
 **Directory path (skill will find the .md file):**
 
 ```
-docs/prd/user-experience/notifications/epics/epic.311.financial-services-integration/stories/story.311.1.transaction-confirmation-system/
+docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/
 ```
 
 **Task path examples:**
@@ -773,7 +773,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
 4. **Reference Running Summary in DoD Section:**
    - Add a reference to the detailed running summary file
-   - Example: "**Detailed Verification Log:** See `story.311.1.dod.1.transaction-confirmation-system.md` for complete verification evidence and timestamps."
+   - Example: "**Detailed Verification Log:** See `story.311.1.dod.1.example-system.md` for complete verification evidence and timestamps."
 
 5. **Generate Sprint Review Summary:**
    - Use the template from `assets/sprint-review-summary-template.md`
@@ -1184,12 +1184,12 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 **User Request:**
 
 ```
-Mark story.311.1.transaction-confirmation-system as complete
+Mark story.311.1.example-system as complete
 ```
 
 **Skill Actions:**
 
-1. Read story document from `docs/prd/.../story.311.1.transaction-confirmation-system.md`
+1. Read story document from `docs/prd/.../story.311.1.example-system.md`
 2. Check for QA reports - found `story.311.1.qa.1.initial-review.md` ✅
 3. Review QA gate file - `story.311.1.gate.1.initial-review.yml` shows PASS ✅
 4. Verify all acceptance criteria are checked (cross-reference with QA report) ✅
@@ -1206,7 +1206,7 @@ Mark story.311.1.transaction-confirmation-system as complete
 ```
 ✅ Story Accepted - Ready for Sprint Review
 
-**Story:** story.311.1.transaction-confirmation-system
+**Story:** story.311.1.example-system
 **Status:** ACCEPTED
 **Acceptance Date:** 2025-02-01
 
@@ -1215,7 +1215,7 @@ Mark story.311.1.transaction-confirmation-system as complete
 All Definition of Done criteria verified:
 - ✅ All 5 acceptance criteria met (verified by QA report)
 - ✅ PR #789 approved by 2 reviewers
-- ✅ Tests in src/notifications/transaction-confirmation.spec.ts
+- ✅ Tests in src/notifications/example-action.spec.ts
 - ✅ Documentation updated
 - ✅ Security review passed (API authentication, input validation - QA verified)
 - ✅ Performance review passed (QA verified)
@@ -1290,15 +1290,15 @@ Check if task.90.swagger-cli-plugin-enablement is ready for acceptance
 **User Request:**
 
 ```
-Verify DoD for docs/prd/user-experience/notifications/epics/epic.311.financial-services-integration/stories/story.311.2.email-notifications/
+Verify DoD for docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.2.example-notifications/
 ```
 
 **Skill Actions:**
 
-1. Use Glob to find `.md` file in directory: `docs/prd/.../story.311.2.email-notifications/*.md`
-2. Found: `story.311.2.email-notifications.md`
-3. Check for QA reports: `docs/prd/.../story.311.2.email-notifications/*.qa.*.md`
-4. Check for gate files: `docs/prd/.../story.311.2.email-notifications/*.gate.*.yml`
+1. Use Glob to find `.md` file in directory: `docs/prd/.../story.311.2.example-notifications/*.md`
+2. Found: `story.311.2.example-notifications.md`
+3. Check for QA reports: `docs/prd/.../story.311.2.example-notifications/*.qa.*.md`
+4. Check for gate files: `docs/prd/.../story.311.2.example-notifications/*.gate.*.yml`
 5. Proceed with DoD verification workflow (Steps 3-8)...
 
 ## Resources

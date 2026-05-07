@@ -89,7 +89,7 @@ When updating status to `accepted`, the following fields MUST be present:
 ```yaml
 ---
 title: Implement User Authentication
-epic: epic.311.financial-services
+epic: epic.311.example-domain
 story_number: story.311.1
 status: in_progress
 assigned_to: jane-doe
@@ -103,7 +103,7 @@ pr_number: 789
 ```yaml
 ---
 title: Implement User Authentication
-epic: epic.311.financial-services
+epic: epic.311.example-domain
 story_number: story.311.1
 status: accepted
 assigned_to: jane-doe

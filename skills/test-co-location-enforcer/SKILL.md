@@ -27,9 +27,9 @@ Activate this skill when:
 Tests MUST be co-located with source files using `.spec.ts` suffix.
 
 \`\`\`
-libs/wallet-lib/src/lib/
-├── wallet-service.ts
-├── wallet-service.spec.ts        ✅ CORRECT - Co-located
+libs/account-lib/src/lib/
+├── account-service.ts
+├── account-service.spec.ts        ✅ CORRECT - Co-located
 ├── transaction-processor.ts
 ├── transaction-processor.spec.ts  ✅ CORRECT - Co-located
 └── balance-calculator.ts
@@ -41,12 +41,12 @@ libs/wallet-lib/src/lib/
 NEVER use __tests__/ directories.
 
 \`\`\`
-libs/wallet-lib/src/
+libs/account-lib/src/
 ├── lib/
-│   ├── wallet-service.ts
+│   ├── account-service.ts
 │   └── transaction-processor.ts
 └── __tests__/                      ❌ FORBIDDEN
-    ├── wallet-service.test.ts      ❌ Not co-located
+    ├── account-service.test.ts      ❌ Not co-located
     └── transaction-processor.test.ts ❌ Not co-located
 \`\`\`
 
@@ -58,10 +58,10 @@ libs/wallet-lib/src/
 
 \`\`\`typescript
 // Source file
-wallet-service.ts
+account-service.ts
 
 // Test file (same directory)
-wallet-service.spec.ts
+account-service.spec.ts
 \`\`\`
 
 ### Integration Tests
@@ -94,8 +94,8 @@ find . -path "*/__tests__/*" -name "*.test.ts" -o -name "*.spec.ts"
 ### Step 2: Move Tests to Co-Location
 
 \`\`\`bash
-# Example: Move wallet-service test
-mv src/__tests__/wallet-service.test.ts src/lib/wallet-service.spec.ts
+# Example: Move account-service test
+mv src/__tests__/account-service.test.ts src/lib/account-service.spec.ts
 
 # Update imports if directory changed
 \`\`\`

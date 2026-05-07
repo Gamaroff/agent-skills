@@ -1,6 +1,4 @@
-# <!-- Powered by BMAD™ Core -->
 # Core Configuration Reference
-# Note: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 # This is a reference showing the structure and purpose of each configuration key.
 # Always read the actual configuration from skill resources or explicit file references to get current values.
 

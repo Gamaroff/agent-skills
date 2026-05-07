@@ -6,17 +6,17 @@ This document contains common navigation violations with example patterns, debug
 
 ## Common Violations
 
-### Case Study 1: WalletsHeader Blank Screen Bug
+### Case Study 1: AccountsHeader Blank Screen Bug
 
 **Severity**: High (user-facing bug causing blank screen)
-**Files Affected**: `src/components/wallets/wallets-header.tsx`
+**Files Affected**: `src/components/accounts/accounts-header.tsx`
 
 **Violation**:
 ```typescript
-// src/components/wallets/wallets-header.tsx
+// src/components/accounts/accounts-header.tsx
 import { useNavigation } from '@react-navigation/native';
 
-export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
+export const AccountsHeader = ({ title }: AccountsHeaderProps) => {
   const navigation = useNavigation();
 
   const handleBackPress = () => {
@@ -33,23 +33,23 @@ export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
 // src/screens/home/index.tsx
 const handleButtonPress = (buttonId: string) => {
   switch (buttonId) {
-    case 'wallets':
-      router.push('/(drawer)/wallets');  // ✅ Expo Router
+    case 'accounts':
+      router.push('/(drawer)/accounts');  // ✅ Expo Router
       break;
   }
 };
 ```
 
 **Problem**:
-- Home screen navigates to Wallets using Expo Router (`router.push()`)
-- WalletsHeader tries to navigate back using React Navigation (`navigation.goBack()`)
+- Home screen navigates to Accounts using Expo Router (`router.push()`)
+- AccountsHeader tries to navigate back using React Navigation (`navigation.goBack()`)
 - No React Navigation stack entry exists from the `router.push()` call
 - `navigation.goBack()` fails silently, showing a blank screen
 
 **User Impact**:
-- User taps "Wallets" button from home screen
-- Wallets screen loads correctly
-- User taps back button in WalletsHeader
+- User taps "Accounts" button from home screen
+- Accounts screen loads correctly
+- User taps back button in AccountsHeader
 - **Blank screen appears instead of returning to home**
 - User stuck, must force close app or use drawer to navigate
 
@@ -57,10 +57,10 @@ const handleButtonPress = (buttonId: string) => {
 
 **Fix**:
 ```typescript
-// src/components/wallets/wallets-header.tsx
+// src/components/accounts/accounts-header.tsx
 import { useRouter } from 'expo-router';  // ✅ Changed from useNavigation
 
-export const WalletsHeader = ({ title }: WalletsHeaderProps) => {
+export const AccountsHeader = ({ title }: AccountsHeaderProps) => {
   const router = useRouter();  // ✅ Changed from navigation
 
   const handleBackPress = () => {
@@ -313,7 +313,7 @@ export const HelpHeader = () => {
 
 **Unexpected Navigation Destination**:
 - User taps back, goes to wrong screen
-- Example: From Wallets → Transactions instead of Home
+- Example: From Accounts → Transactions instead of Home
 - Caused by: Mixed navigation systems, confusing stack state
 
 **Back Button Does Nothing**:
@@ -568,14 +568,14 @@ describe('Navigation stack mismatch detection', () => {
     const { router } = renderRouter('/home');
 
     // Forward navigation using Expo Router
-    await router.push('/wallets');
+    await router.push('/accounts');
 
     // Get header component
-    const walletsHeader = screen.getByTestId('wallets-header');
+    const accountsHeader = screen.getByTestId('accounts-header');
 
     // Check if useRouter is used (not useNavigation)
-    expect(walletsHeader).toHaveNavigationMethod('router.back');
-    expect(walletsHeader).not.toHaveNavigationMethod('navigation.goBack');
+    expect(accountsHeader).toHaveNavigationMethod('router.back');
+    expect(accountsHeader).not.toHaveNavigationMethod('navigation.goBack');
   });
 });
 ```
@@ -587,23 +587,23 @@ describe('Navigation stack mismatch detection', () => {
 ```typescript
 import { testNavigationFlow } from '@/test-utils/navigation';
 
-describe('Wallets navigation flow', () => {
-  it('should navigate through complete wallets flow', async () => {
+describe('Accounts navigation flow', () => {
+  it('should navigate through complete accounts flow', async () => {
     const flow = testNavigationFlow();
 
     // Step 1: Start at home
     await flow.assertScreen('/home');
 
-    // Step 2: Navigate to wallets
-    await flow.press('Wallets button');
-    await flow.assertScreen('/wallets');
+    // Step 2: Navigate to accounts
+    await flow.press('Accounts button');
+    await flow.assertScreen('/accounts');
 
     // Step 3: Press back
     await flow.press('Back button');
     await flow.assertScreen('/home');
 
     // Step 4: Verify home state preserved
-    await flow.assertElementPresent('bottom-action-bar');
+    await flow.assertElementPresent('example-component');
     await flow.assertElementPresent('in-app-notifications');
   });
 });

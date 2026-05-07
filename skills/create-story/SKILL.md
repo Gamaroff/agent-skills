@@ -65,7 +65,6 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 
 **Actions**:
 
-> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 1. Load configuration from skill resources or explicit file references
 2. If configuration does not exist, **HALT** and inform user:
@@ -99,8 +98,8 @@ architecture:
 > **CRITICAL — Story File Location**: Stories are **always** saved inside the `stories/` subdirectory of the epic directory that was provided as input (or identified in Step 1). The path is:
 > `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title-short}/story.{epicNum}.{storyNum}.{story-title-short}.md`
 >
-> Example: If the epic is at `docs/prd/core-platform/my-feature/epics/epic.336.my-epic/epic.336.my-epic.md`, stories go to:
-> `docs/prd/core-platform/my-feature/epics/epic.336.my-epic/stories/story.336.1.my-story/story.336.1.my-story.md`
+> Example: If the epic is at `docs/prd/domain-name/my-feature/epics/epic.336.my-epic/epic.336.my-epic.md`, stories go to:
+> `docs/prd/domain-name/my-feature/epics/epic.336.my-epic/stories/story.336.1.my-story/story.336.1.my-story.md`
 >
 > Do **NOT** use a global `docs/stories/` directory.
 
@@ -800,7 +799,6 @@ This skill implements rigorous safeguards against AI hallucination:
 
 ## Configuration Reference
 
-> **Note**: .bmad-core directory was intentionally removed. Configuration is now handled inline within each skill or through explicit file references.
 
 Expected configuration structure:
 

@@ -1,4 +1,3 @@
-# <!-- Powered by BMAD™ Core -->
 markdownExploder: true
 qa:
   qaLocation: docs/qa
@@ -7,7 +6,7 @@ prd:
   prdVersion: v4
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic-{n}*.md'
+  epicFilePattern: "*/epic-{n}*.md"
 architecture:
   architectureFile: docs/architecture.md
   architectureVersion: v4

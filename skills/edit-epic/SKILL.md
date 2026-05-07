@@ -19,20 +19,20 @@ Use this skill when you need to:
 
 Natural language triggers:
 - "Edit epic 178 to change priority to high"
-- "Update epic.246.user-experience-and-interface.md to add new story"
+- "Update epic.246.feature-and-interface.md to add new story"
 - "Modify epic 163 success criteria"
 
 **Slash Command Usage:**
 ```bash
 # Using epic directory (auto-discovers epic file)
-/edit-epic docs/prd/core-platform/contact-system/add-contact-via-handle/epics/epic.178.user-discovery-ui/
+/edit-epic docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/
 
 # Using specific epic file
-/edit-epic docs/prd/core-platform/contact-system/add-contact-via-handle/epics/epic.178.user-discovery-ui/epic.178.user-discovery-ui.md
+/edit-epic docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/epic.178.feature-ui.md
 
 # Natural language
 "Edit epic 178 to update dependencies"
-"Use @edit-epic for epic.246.user-experience-and-interface.md"
+"Use @edit-epic for epic.246.feature-and-interface.md"
 ```
 
 **Related Skills**:
@@ -48,8 +48,8 @@ Natural language triggers:
 **Flexible Invocation:**
 
 You can invoke this skill with either:
-- **A specific epic file**: `epic.178.user-discovery-ui.md`
-- **An epic directory**: `epics/epic.178.user-discovery-ui/`
+- **A specific epic file**: `epic.178.feature-ui.md`
+- **An epic directory**: `epics/epic.178.feature-ui/`
 
 **File Discovery Logic:**
 
@@ -80,8 +80,8 @@ When given a file path:
 **Example:**
 
 ```
-Input: docs/prd/.../epics/epic.178.user-discovery-ui/
-Discovers: epic.178.user-discovery-ui.md
+Input: docs/prd/.../epics/epic.178.feature-ui/
+Discovers: epic.178.feature-ui.md
 Rejects: story.178.1.search-by-handle.md (if provided)
 ```
 
@@ -172,8 +172,8 @@ Store the classification result — it governs Step 4 and Step 5 behaviour.
 - Filename follows pattern: `epic.[number].[name].md`
 - Uses DOTS for number separator (not underscores)
 - Uses hyphens for word separation in descriptive name (not underscores)
-- Example valid: `epic.163.wallet-security.md`
-- Example invalid: `epic_163_wallet_security.md`
+- Example valid: `epic.163.module-security.md`
+- Example invalid: `epic_163_account_security.md`
 
 **C. Required Sections Presence**
 - Epic Goal section exists
@@ -429,18 +429,18 @@ If validation fails, present findings to user:
 ### File Naming Validation
 
 **Valid Patterns:**
-- `epic.163.wallet-security.md` ✓
-- `epic.246.user-experience-and-interface.md` ✓
-- `epic.178.user-discovery-ui.md` ✓
+- `epic.163.module-security.md` ✓
+- `epic.246.feature-and-interface.md` ✓
+- `epic.178.feature-ui.md` ✓
 
 **Invalid Patterns:**
-- `epic_163_wallet_security.md` ✗ (underscores instead of dots)
-- `epic.163_wallet-security.md` ✗ (mixed separators)
-- `epic-163.wallet-security.md` ✗ (hyphen for number separator)
+- `epic_163_account_security.md` ✗ (underscores instead of dots)
+- `epic.163_module-security.md` ✗ (mixed separators)
+- `epic-163.module-security.md` ✗ (hyphen for number separator)
 
 **Rule from Documentation:**
 > Use DOTS for numbers: `epic.163.name.md` not `epic_163_name.md`
-> Use hyphens for word separation in descriptive names: `wallet-security` not `wallet_security`
+> Use hyphens for word separation in descriptive names: `module-security` not `account_security`
 >
 > Source: `.claude/documentation.md` lines 99-100
 
@@ -534,10 +534,10 @@ If validation fails, present findings to user:
 
 **Low-risk path (metadata/priority change — no blocking gate):**
 ```
-User: /edit-epic epic.178.user-discovery-ui/ "Update priority to high"
+User: /edit-epic epic.178.feature-ui/ "Update priority to high"
 
 Agent:
-1. Discovers: epic.178.user-discovery-ui.md ✓
+1. Discovers: epic.178.feature-ui.md ✓
 2. Loads epic and parses structure
 2b. Classifies change: priority → LOW RISK
 3. Validates: Pre-edit checks pass ✓
@@ -554,10 +554,10 @@ Agent:
 
 **High-risk path (structural change — full gate):**
 ```
-User: /edit-epic epic.178.user-discovery-ui/ "Remove story 3 and add dependency on epic-163"
+User: /edit-epic epic.178.feature-ui/ "Remove story 3 and add dependency on epic-163"
 
 Agent:
-1. Discovers: epic.178.user-discovery-ui.md ✓
+1. Discovers: epic.178.feature-ui.md ✓
 2. Loads epic and parses structure
 2b. Classifies change: Stories Breakdown + dependency → STRUCTURAL (highest risk)
 3. Validates: Pre-edit checks pass ✓

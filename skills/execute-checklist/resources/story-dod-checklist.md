@@ -1,5 +1,3 @@
-<!-- Powered by BMAD™ Core -->
-
 # Story Definition of Done (DoD) Checklist
 
 ## Instructions for Developer Agent

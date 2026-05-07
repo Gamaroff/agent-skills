@@ -47,20 +47,20 @@ export const TransactionListItem = memo(({ transaction, onPress }: Props) => {
 });
 
 // Custom comparison function when needed
-export const WalletCard = memo(
-  ({ wallet }: Props) => {
+export const AccountCard = memo(
+  ({ account }: Props) => {
     return (
       <View>
-        <Text>{wallet.name}</Text>
-        <Text>{wallet.balance.toString()}</Text>
+        <Text>{account.name}</Text>
+        <Text>{account.balance.toString()}</Text>
       </View>
     );
   },
   (prevProps, nextProps) => {
-    // Only re-render if wallet balance or name changed
+    // Only re-render if account balance or name changed
     return (
-      prevProps.wallet.balance.eq(nextProps.wallet.balance) &&
-      prevProps.wallet.name === nextProps.wallet.name
+      prevProps.account.balance.eq(nextProps.account.balance) &&
+      prevProps.account.name === nextProps.account.name
     );
   }
 );
@@ -252,13 +252,13 @@ function SlowUserAvatar({ userId, size = 50 }: Props) {
 ```typescript
 import { useEffect, useRef } from 'react';
 
-function LiveBalanceDisplay({ walletId }: Props) {
+function LiveBalanceDisplay({ accountId }: Props) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Setup interval
     intervalRef.current = setInterval(() => {
-      fetchBalance(walletId);
+      fetchBalance(accountId);
     }, 5000);
 
     // ✅ CORRECT - Cleanup on unmount
@@ -267,19 +267,19 @@ function LiveBalanceDisplay({ walletId }: Props) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [walletId]);
+  }, [accountId]);
 
   return <Text>Balance: ...</Text>;
 }
 
 // ❌ WRONG - No cleanup, causes memory leak
-function LeakyBalanceDisplay({ walletId }: Props) {
+function LeakyBalanceDisplay({ accountId }: Props) {
   useEffect(() => {
     setInterval(() => {
-      fetchBalance(walletId); // Keeps running after unmount!
+      fetchBalance(accountId); // Keeps running after unmount!
     }, 5000);
     // Missing cleanup
-  }, [walletId]);
+  }, [accountId]);
 
   return <Text>Balance: ...</Text>;
 }
@@ -316,12 +316,12 @@ function WebSocketListener() {
 
 ```typescript
 // ❌ WRONG - N+1 query problem
-async function getUsersWithWallets(): Promise<User[]> {
+async function getUsersWithAccounts(): Promise<User[]> {
   const users = await prisma.user.findMany(); // 1 query
 
   // N queries (one per user)
   for (const user of users) {
-    user.wallets = await prisma.wallet.findMany({
+    user.accounts = await prisma.account.findMany({
       where: { userId: user.id }
     });
   }
@@ -330,10 +330,10 @@ async function getUsersWithWallets(): Promise<User[]> {
 }
 
 // ✅ CORRECT - Single query with include
-async function getUsersWithWallets(): Promise<User[]> {
+async function getUsersWithAccounts(): Promise<User[]> {
   return prisma.user.findMany({
     include: {
-      wallets: true // Joins in single query
+      accounts: true // Joins in single query
     }
   });
 }
@@ -341,20 +341,20 @@ async function getUsersWithWallets(): Promise<User[]> {
 // ✅ ALTERNATIVE - DataLoader pattern for GraphQL
 import DataLoader from 'dataloader';
 
-const walletLoader = new DataLoader(async (userIds: string[]) => {
-  const wallets = await prisma.wallet.findMany({
+const accountLoader = new DataLoader(async (userIds: string[]) => {
+  const accounts = await prisma.account.findMany({
     where: { userId: { in: userIds } }
   });
 
-  // Group wallets by userId
-  const walletsByUserId = wallets.reduce((acc, wallet) => {
-    if (!acc[wallet.userId]) acc[wallet.userId] = [];
-    acc[wallet.userId].push(wallet);
+  // Group accounts by userId
+  const accountsByUserId = accounts.reduce((acc, account) => {
+    if (!acc[account.userId]) acc[account.userId] = [];
+    acc[account.userId].push(account);
     return acc;
-  }, {} as Record<string, Wallet[]>);
+  }, {} as Record<string, Account[]>);
 
   // Return in same order as userIds
-  return userIds.map(id => walletsByUserId[id] || []);
+  return userIds.map(id => accountsByUserId[id] || []);
 });
 ```
 
@@ -367,16 +367,16 @@ const walletLoader = new DataLoader(async (userIds: string[]) => {
 
 model Transaction {
   id            String   @id @default(uuid())
-  fromWalletId  String
-  toWalletId    String
+  fromAccountId  String
+  toAccountId    String
   amount        Decimal
   status        String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // ✅ CORRECT - Indexes for common queries
-  @@index([fromWalletId, status])      // WHERE fromWalletId AND status
-  @@index([toWalletId, status])        // WHERE toWalletId AND status
+  @@index([fromAccountId, status])      // WHERE fromAccountId AND status
+  @@index([toAccountId, status])        // WHERE toAccountId AND status
   @@index([createdAt])                 // ORDER BY createdAt
   @@index([status, createdAt])         // WHERE status ORDER BY createdAt
 }
@@ -397,11 +397,11 @@ model User {
 
 ```typescript
 // ✅ CORRECT - Select only needed fields
-async function getTransactionSummaries(walletId: string, page: number = 1, limit: number = 20) {
+async function getTransactionSummaries(accountId: string, page: number = 1, limit: number = 20) {
   const skip = (page - 1) * limit;
 
   return prisma.transaction.findMany({
-    where: { fromWalletId: walletId },
+    where: { fromAccountId: accountId },
     select: {
       id: true,
       amount: true,
@@ -416,9 +416,9 @@ async function getTransactionSummaries(walletId: string, page: number = 1, limit
 }
 
 // ❌ WRONG - Fetching all fields, no pagination
-async function getTransactionSummaries(walletId: string) {
+async function getTransactionSummaries(accountId: string) {
   return prisma.transaction.findMany({
-    where: { fromWalletId: walletId },
+    where: { fromAccountId: accountId },
     // Returns ALL fields and ALL rows
   });
 }
@@ -437,7 +437,7 @@ import { ActivityIndicator } from 'react-native';
 // ✅ CORRECT - Lazy load heavy screens
 const TransactionHistory = lazy(() => import('./screens/TransactionHistory'));
 const Settings = lazy(() => import('./screens/Settings'));
-const WalletDetail = lazy(() => import('./screens/WalletDetail'));
+const AccountDetail = lazy(() => import('./screens/AccountDetail'));
 
 function App() {
   return (
@@ -459,7 +459,7 @@ function App() {
 // ❌ WRONG - Import all screens upfront
 import TransactionHistory from './screens/TransactionHistory';
 import Settings from './screens/Settings';
-import WalletDetail from './screens/WalletDetail';
+import AccountDetail from './screens/AccountDetail';
 // All loaded on app start, increasing initial bundle
 ```
 
@@ -489,10 +489,10 @@ import _ from 'lodash';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // ✅ CORRECT - React Query with caching
-function useWallet(walletId: string) {
+function useAccount(accountId: string) {
   return useQuery({
-    queryKey: ['wallet', walletId],
-    queryFn: () => walletService.getWallet(walletId),
+    queryKey: ['account', accountId],
+    queryFn: () => accountService.getAccount(accountId),
     staleTime: 5 * 60 * 1000, // Consider fresh for 5 minutes
     cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     refetchOnWindowFocus: false, // Don't refetch on focus
@@ -500,15 +500,15 @@ function useWallet(walletId: string) {
 }
 
 // Mutation with cache invalidation
-function useUpdateWallet() {
+function useUpdateAccount() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (data: { id: string; name: string }) =>
-      walletService.updateWallet(data.id, data),
-    onSuccess: (updatedWallet) => {
+      accountService.updateAccount(data.id, data),
+    onSuccess: (updatedAccount) => {
       // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: ['wallet', updatedWallet.id] });
+      queryClient.invalidateQueries({ queryKey: ['account', updatedAccount.id] });
     },
   });
 }
@@ -523,15 +523,15 @@ import { Injectable } from '@nestjs/common';
 import { RedisService } from './redis.service';
 
 @Injectable()
-export class WalletService {
+export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService
   ) {}
 
-  async getWalletBalance(walletId: string): Promise<Decimal> {
+  async getAccountBalance(accountId: string): Promise<Decimal> {
     // ✅ CORRECT - Check cache first
-    const cacheKey = `wallet:${walletId}:balance`;
+    const cacheKey = `account:${accountId}:balance`;
     const cached = await this.redis.get(cacheKey);
 
     if (cached) {
@@ -539,25 +539,25 @@ export class WalletService {
     }
 
     // Not in cache, fetch from database
-    const wallet = await this.prisma.wallet.findUnique({
-      where: { id: walletId },
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
       select: { balance: true },
     });
 
     // Cache for 1 minute
-    await this.redis.setex(cacheKey, 60, wallet.balance.toString());
+    await this.redis.setex(cacheKey, 60, account.balance.toString());
 
-    return wallet.balance;
+    return account.balance;
   }
 
-  async updateBalance(walletId: string, newBalance: Decimal): Promise<void> {
-    await this.prisma.wallet.update({
-      where: { id: walletId },
+  async updateBalance(accountId: string, newBalance: Decimal): Promise<void> {
+    await this.prisma.account.update({
+      where: { id: accountId },
       data: { balance: newBalance },
     });
 
     // ✅ CORRECT - Invalidate cache
-    await this.redis.del(`wallet:${walletId}:balance`);
+    await this.redis.del(`account:${accountId}:balance`);
   }
 }
 ```

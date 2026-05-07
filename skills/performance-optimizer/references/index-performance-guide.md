@@ -20,10 +20,10 @@ CREATE INDEX idx_users_phone ON users(phone_number) WHERE phone_number IS NOT NU
 
 **Financial Operations (High Priority)**
 ```sql
--- Wallet operations (critical for balance checks)
-CREATE UNIQUE INDEX idx_wallets_address ON wallets(address);
-CREATE INDEX idx_wallets_user_type ON wallets(user_id, type);
-CREATE INDEX idx_wallets_user_status ON wallets(user_id, status) WHERE status = 'ACTIVE';
+-- Account operations (critical for balance checks)
+CREATE UNIQUE INDEX idx_accounts_address ON accounts(address);
+CREATE INDEX idx_accounts_user_type ON accounts(user_id, type);
+CREATE INDEX idx_accounts_user_status ON accounts(user_id, status) WHERE status = 'ACTIVE';
 
 -- Transaction performance (high-volume queries)
 CREATE INDEX idx_transactions_user_created ON transactions(user_id, created_at DESC);
@@ -31,7 +31,7 @@ CREATE INDEX idx_transactions_status ON transactions(status);
 CREATE INDEX idx_transactions_user_type ON transactions(user_id, type, status);
 CREATE INDEX idx_transactions_from_user ON transactions(from_user_id, created_at DESC) WHERE from_user_id IS NOT NULL;
 CREATE INDEX idx_transactions_to_user ON transactions(to_user_id, created_at DESC) WHERE to_user_id IS NOT NULL;
-CREATE INDEX idx_transactions_wallet ON transactions(wallet_id, created_at DESC) WHERE wallet_id IS NOT NULL;
+CREATE INDEX idx_transactions_account ON transactions(account_id, created_at DESC) WHERE account_id IS NOT NULL;
 
 -- Payment requests
 CREATE INDEX idx_payment_requests_requester ON payment_requests(requester_id, status, created_at DESC);
@@ -77,7 +77,7 @@ CREATE INDEX idx_notification_preferences_enabled ON notification_preferences(us
 
 **High-Frequency Operations (Optimize First)**
 1. User authentication by email/username (10,000+ req/day)
-2. Wallet balance checks (5,000+ req/day)  
+2. Account balance checks (5,000+ req/day)  
 3. Transaction history pagination (3,000+ req/day)
 4. Real-time chat message loading (2,000+ req/day)
 5. Notification delivery status (1,500+ req/day)
@@ -103,9 +103,9 @@ CREATE INDEX idx_transactions_user_amount_date ON transactions(user_id, amount D
 CREATE INDEX idx_transactions_currency_status ON transactions(currency, status, created_at DESC);
 CREATE INDEX idx_transactions_blockchain_id ON transactions(transaction_id) WHERE transaction_id IS NOT NULL;
 
--- Wallet performance with partial indexes
-CREATE INDEX idx_wallets_active_balance ON wallets(balance DESC) WHERE status = 'ACTIVE';
-CREATE INDEX idx_wallets_type_balance ON wallets(type, balance DESC) WHERE status = 'ACTIVE';
+-- Account performance with partial indexes
+CREATE INDEX idx_accounts_active_balance ON accounts(balance DESC) WHERE status = 'ACTIVE';
+CREATE INDEX idx_accounts_type_balance ON accounts(type, balance DESC) WHERE status = 'ACTIVE';
 ```
 
 **Messaging Domain (Real-Time Critical)**
@@ -137,7 +137,7 @@ CREATE INDEX idx_notification_deliveries_retry ON notification_deliveries(status
 **Active Record Filtering**
 ```sql
 -- Only index active/relevant records
-CREATE INDEX idx_wallets_active_user ON wallets(user_id) WHERE status = 'ACTIVE';
+CREATE INDEX idx_accounts_active_user ON accounts(user_id) WHERE status = 'ACTIVE';
 CREATE INDEX idx_transactions_pending ON transactions(user_id, created_at DESC) WHERE status = 'PENDING';
 CREATE INDEX idx_notifications_unread ON notifications(user_id, created_at DESC) WHERE read_at IS NULL;
 ```
@@ -221,14 +221,14 @@ LIMIT $page_size OFFSET $offset;
 ```sql
 -- User balance summary (optimized)
 SELECT 
-  w.type as wallet_type,
+  w.type as account_type,
   SUM(w.balance) as total_balance,
-  COUNT(*) as wallet_count
-FROM wallets w
+  COUNT(*) as account_count
+FROM accounts w
 WHERE w.user_id = $1 AND w.status = 'ACTIVE'
 GROUP BY w.type;
 
--- Uses: idx_wallets_user_status
+-- Uses: idx_accounts_user_status
 ```
 
 **Transaction Analytics**
@@ -441,7 +441,7 @@ const transactions = await prisma.transaction.findMany({
 // Incorrect: N+1 queries
 const users = await prisma.user.findMany();
 for (const user of users) {
-  const wallets = await prisma.wallet.findMany({
+  const accounts = await prisma.account.findMany({
     where: { userId: user.id }  // Executes N queries
   });
 }
@@ -449,7 +449,7 @@ for (const user of users) {
 // Correct: Single query with includes
 const users = await prisma.user.findMany({
   include: {
-    wallets: {
+    accounts: {
       where: { status: 'ACTIVE' }
     }
   }
@@ -546,12 +546,12 @@ async function getUserBalance(userId: string): Promise<number> {
   }
   
   // Fallback to database  
-  const wallets = await prisma.wallet.findMany({
+  const accounts = await prisma.account.findMany({
     where: { userId, status: 'ACTIVE' },
     select: { balance: true }
   });
   
-  const total = wallets.reduce((sum, w) => sum + w.balance.toNumber(), 0);
+  const total = accounts.reduce((sum, w) => sum + w.balance.toNumber(), 0);
   
   // Cache for 5 minutes
   await redis.setex(`balance:${userId}`, 300, total.toString());
@@ -611,7 +611,7 @@ async function balanceCheckLoadTest() {
     const randomUser = users[Math.floor(Math.random() * users.length)];
     promises.push(
       measureQueryTime(async () => {
-        return await prisma.wallet.findMany({
+        return await prisma.account.findMany({
           where: { userId: randomUser.id, status: 'ACTIVE' },
           select: { balance: true, type: true }
         });
@@ -795,12 +795,12 @@ CREATE MATERIALIZED VIEW user_financial_summary AS
 SELECT 
   u.id as user_id,
   u.username,
-  COUNT(DISTINCT w.id) as wallet_count,
+  COUNT(DISTINCT w.id) as account_count,
   SUM(w.balance) as total_balance,
   COUNT(t.id) as transaction_count,
   MAX(t.created_at) as last_transaction
 FROM users u
-LEFT JOIN wallets w ON u.id = w.user_id AND w.status = 'ACTIVE'  
+LEFT JOIN accounts w ON u.id = w.user_id AND w.status = 'ACTIVE'  
 LEFT JOIN transactions t ON u.id = t.user_id
 GROUP BY u.id, u.username;
 

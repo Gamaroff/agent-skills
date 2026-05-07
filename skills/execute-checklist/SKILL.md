@@ -30,8 +30,6 @@ This skill provides systematic validation of documentation against structured ch
 
 ## Available Checklists
 
-> **Note**: .bmad-core directory was intentionally removed. Checklists are now loaded from the skills' resources/ directory.
-
 This skill uses checklist files from `resources/` directory:
 
 **Core Checklists**:
@@ -303,7 +301,7 @@ Generate comprehensive summary with:
 
 **Uses resources from**:
 
-- `resources/` - Checklist definitions (moved from the removed .bmad-core/checklists/)
+- `resources/` - Checklist definitions
 - `.agents/skills/execute-checklist/resources/` - Local checklist copies
 
 **Outputs used by**:
