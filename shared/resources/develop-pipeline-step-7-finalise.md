@@ -106,11 +106,13 @@ else
 fi
 ```
 
+On any `gh issue close` failure: retry once. If still failing, log the error in the Decisions Log and Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
+
+Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
+
 Then move the project board item to Done using the same GraphQL pattern from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg GitHub path), but with "Done" as the target option (not "In Progress"). If the board move fails, post a comment on the issue warning that the board was not updated.
 
-On any `gh issue close` failure: retry once. If still failing, log the error in the Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
-
-Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} closed (state: {state}). Board: {Done ✅ / ⚠️ update failed}."
+Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — board: {Done ✅ / ⚠️ not found / ⚠️ mutation failed}."
 
 ### Jira (`TRACKER=jira`) — shared structure, story/task text differs
 
@@ -130,7 +132,8 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
    - If not found: log "⚠️ No done-state transition available for {TRACKER_ISSUE}" (non-blocking)
    - On failure: log warning and continue
 
-Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — completion comment posted; transitioned to Done."
+Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — comment: {posted ✅ / ⚠️ failed}."
+Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — transition to Done: {✅ / ⚠️ no matching transition found / ⚠️ failed}."
 
 ---
 

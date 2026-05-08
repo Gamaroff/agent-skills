@@ -690,12 +690,15 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - ✅ Story document updated with DoD verification section
    - ✅ Sprint Review summary created
    - ✅ PR comment posted (if applicable)
-   - ✅ GitHub project board item moved to Done (if applicable)
+   - ✅ Tracker issue closed/transitioned (GitHub: issue #{github_issue} closed | Jira: transitioned to Done) (or ⚠️ failed — manual action required)
+   - ✅ GitHub project board moved to Done (GitHub only — or ⚠️ not found / mutation failed — see PR comment)
 
    **Next Steps:**
    - Story is ready for Sprint Review
    - No further action required
    ```
+
+> **Note:** When generating the actual DoD summary file, substitute `#{github_issue}` with the real issue number and replace each `✅`/`⚠️` with the actual outcome — do not hardcode `✅`.
 
 2. **Update Frontmatter:**
    - Change `status` to `accepted`
@@ -915,6 +918,31 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Extract `github_issue` number from story/task frontmatter
    - Get the repository owner (org) via: `gh repo view --json owner --jq '.owner.login'`
    - Get the repository name via: `gh repo view --json name --jq '.name'`
+   - Close the issue and verify closure:
+
+   ```bash
+   # Post completion comment
+   gh issue comment {github_issue} --body "Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified."
+
+   # Close the issue
+   gh issue close {github_issue} --comment "Closing — accepted. PR: {PR_URL} (pending merge)."
+   ```
+
+   After closing, verify the issue is actually closed:
+
+   ```bash
+   ISSUE_STATE=$(gh issue view {github_issue} --json state -q '.state')
+   if [ "$ISSUE_STATE" = "CLOSED" ]; then
+     echo "✅ GitHub Issue #{github_issue} confirmed closed"
+   else
+     echo "⚠️ GitHub Issue #{github_issue} still open — state: $ISSUE_STATE"
+   fi
+   ```
+
+   On any `gh issue close` failure: retry once. If still failing, log the error in the Decisions Log and Issues Log, and post a PR comment: "⚠️ Issue #{github_issue} could not be closed automatically — please close manually."
+
+   Log outcome in running summary: "GitHub Issue #{github_issue} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
+
    - Query the issue's project board items using GraphQL to discover item ID, project ID, Status field ID, and "Done" option ID — all in one call:
 
    ```bash
@@ -1007,7 +1035,8 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Show path to updated story document
    - Show path to Sprint Review summary
    - Confirm PR comment was posted
-   - Confirm project board item was moved to Done (or note if not found on any board)
+   - Confirm tracker issue closed/transitioned to Done (GitHub: issue closed + state verified; Jira: transitioned via MCP) — or note failure with manual action required
+   - Confirm project board item was moved to Done (GitHub only — or note if not found on any board)
 
 **Step 7 Completion Checklist — tick off each before moving on:**
 
@@ -1017,8 +1046,9 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API)
-- [ ] Tracker issue moved to Done: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub project board item moved via GraphQL mutation **OR** warning comment posted (if transition/mutation failed after retry)
-- [ ] Running summary records board update outcome (success, not-found, or error with detail)
+- [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
+- [ ] Tracker board updated: Jira — N/A (handled by transition above) **OR** GitHub project board item moved to Done via GraphQL mutation **OR** warning comment posted (if mutation failed after retry)
+- [ ] Running summary records issue close outcome AND board update outcome (success, failure, not-found — with detail)
 - [ ] User notified with success message, artifact paths, PR comment link, and board update status
 
 ### Step 8: Report Gaps (In Progress)
