@@ -116,15 +116,15 @@ Categorized index of all 124 skills in this library.
 
 | Skill | Description |
 | ----- | ----------- |
-| `testing-setup-nestjs` | Guide developers through NestJS specific testing patterns for {api-service} including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and financial operations testing with 95%… |
+| `testing-setup-nestjs` | Guide developers through NestJS-specific testing patterns including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and high-coverage testing for sensitive operations |
 | `testing-setup-react-native` | Guide developers through React Native specific testing patterns including component testing, screen testing, hooks, native module mocking, and user interaction patterns with React Native Testing… |
-| `testing-setup-shared` | Guide developers through common testing infrastructure setup for the {project} monorepo including dual testing strategy, test co-location, mocking strategies for subpath exports, platform separation validation,… |
+| `testing-setup-shared` | Guide developers through common testing infrastructure setup for a workspace/monorepo, including dual testing strategy, test co-location, mocking strategies for subpath exports, platform separation validation, and… |
 
 ## NestJS
 
 | Skill | Description |
 | ----- | ----------- |
-| `nestjs-debug` | Autonomous NestJS debugging for any NestJS application in the monorepo. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works… |
+| `nestjs-debug` | Autonomous NestJS debugging for any NestJS application. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works with standalone and… |
 | `nestjs-patterns` | NestJS implementation patterns and anti-patterns guide. Use when creating or modifying NestJS modules, providers, or services; setting up PassportStrategy with dependency injection; using useFactory, forwardRef,… |
 
 ## React Native / Expo

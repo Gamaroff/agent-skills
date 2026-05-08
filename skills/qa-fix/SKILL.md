@@ -504,7 +504,7 @@ Use this summary to ensure fixes follow existing patterns rather than introducin
 - Implement code fixes per plan
 - Add missing tests (unit first; integration where required by AC)
 - Follow project patterns:
-  - your app: Keep imports centralized (platform separation, NX monorepo)
+  - Keep imports centralized where the project enforces platform separation (client/server entry points)
   - Follow DI boundaries and existing patterns
 - Maintain test co-location (.spec.ts files next to source)
 - **Pattern before change**: Before modifying each file, spend one Read() to confirm the existing pattern in that file — do not assume from memory. After implementing each fix, summarize what changed in 2-3 lines and move on; do not retain the full file content.

@@ -22,7 +22,7 @@ This guide provides detailed instructions for completing each of the 11 mandator
 ```markdown
 ## Overview
 
-Refactor `@{org}/cache-lib` to simplify the client-side caching
+Refactor `@your-org/cache-lib` to simplify the client-side caching
 architecture from 3 tiers (L1/L2/L3) to 2 tiers (L1/L2) by removing
 AsyncStorage redundancy and promoting WatermelonDB from L3 to L2.
 
@@ -292,8 +292,8 @@ interface CacheStats {
 ### 2. Export Changes
 
 **Removed Exports**:
-- `AsyncStorageCache` from `@{org}/cache-lib/client`
-- `AsyncStorageCache` from `@{org}/cache-lib`
+- `AsyncStorageCache` from `@your-org/cache-lib/client`
+- `AsyncStorageCache` from `@your-org/cache-lib`
 
 **Impact**: Direct imports of AsyncStorageCache will fail
 

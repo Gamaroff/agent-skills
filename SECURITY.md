@@ -10,7 +10,7 @@
 
 Do **not** open a public issue for security concerns.
 
-Email the maintainer directly (address in the GitHub profile). Include:
+Email **gamaroff@gmail.com** directly. Include:
 - Description of the issue
 - Steps to reproduce
 - Potential impact

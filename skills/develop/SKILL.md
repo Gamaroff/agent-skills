@@ -533,14 +533,14 @@ As you implement each task, continuously update these Dev Agent Record sections:
 
 **Why This Matters**: The Dev Agent Record serves as implementation documentation for QA, future developers, and audit purposes. It should tell the complete story of what was built and how.
 
-### System Architecture
+### Conventions assumed
 
-The system uses:
+This skill works best with the following conventions in your project (adapt as needed):
 
-- **NX monorepo** with npm workspaces
-- **Platform separation** (client/server exports for security and bundle optimization)
+- **Workspaces / monorepo** (npm workspaces, NX, pnpm, Turborepo — any)
+- **Platform separation** (client/server exports for security and bundle optimization), where applicable
 - **Test-first development** with co-located test files
-- **TodoWrite** for task management (3+ step tasks)
+- **Task tracking** (e.g. TodoWrite) for multi-step work
 - **Comprehensive documentation** standards
 
 ## Available Workflows
@@ -979,7 +979,7 @@ npx nx generate @nx/react-native:library {lib-name} \
 **Post-Creation**:
 
 - Configure client/server exports if needed
-- Add to namespace: `@{org}/{lib-name}`
+- Add to namespace: `@your-org/{lib-name}`
 - Create corresponding test files
 
 Reference: See CLAUDE.md "Creating Libraries" for complete setup.
@@ -1004,7 +1004,7 @@ Reference: See CLAUDE.md "Creating Libraries" for complete setup.
 
 **Logging**:
 
-- Always use `@{org}/logging-lib` (not console)
+- Always use `@your-org/logging-lib` (not console)
 - Client: lightweight console logger
 - Server: Winston-based structured logging
 
@@ -1067,7 +1067,7 @@ npx nx test {lib-name} --coverage
 - Start Metro: `npx nx start <app-name> --reset-cache --clear`
 - Start API: `npx nx run {api-service}:serve`
 - Run tests: `npx nx test <project> --coverage`
-- Build library: `npx nx build @{org}/library-name`
+- Build library: `npx nx build @your-org/library-name`
 
 ---
 

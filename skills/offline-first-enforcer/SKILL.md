@@ -37,21 +37,21 @@ Use this skill when:
 
 **L1 Cache** (In-Memory):
 - Purpose: Active session data, hot data
-- Technology: `@{org}/cache-lib` in-memory cache
+- Technology: in-memory map (e.g. LRU cache)
 - Characteristics: Volatile, <10ms access, cleared on app restart
-- Use for: Active session data, hot entities (e.g. current balance, active items)
+- Use for: active session data, hot entities
 
-**L2 Cache** (AsyncStorage):
+**L2 Cache** (Key-Value):
 - Purpose: Non-sensitive persisted data
-- Technology: `@{org}/cache-lib` AsyncStorage layer
+- Technology: AsyncStorage / IndexedDB / localStorage
 - Characteristics: Persistent, ~50ms access, key-value storage
 - Use for: User preferences, UI state, recent search history
 
-**L3 Cache** (SQLite):
+**L3 Cache** (Structured):
 - Purpose: Structured offline-first datasets
-- Technology: `@{org}/cache-lib` SQLite with sync capabilities
+- Technology: SQLite / WatermelonDB / IndexedDB with schema
 - Characteristics: Persistent, relational, observable queries, ~100ms access
-- Use for: Historical records, contact lists, entity metadata, offline queue
+- Use for: historical records, large lists, entity metadata, offline queue
 
 ### Offline-First Patterns
 
@@ -60,14 +60,14 @@ Use this skill when:
 // ✅ CORRECT: Always read from cache first
 async function getItem(entityType: string, id: string): Promise<Entity> {
   // 1. Check L1 cache (in-memory)
-  const cached = cacheLib.get(`${entityType}:${id}`);
+  const cached = cache.get(`${entityType}:${id}`);
   if (cached) return cached;
 
   // 2. Check L3 cache (SQLite)
-  const local = await cacheLib.query(entityType, { id });
+  const local = await cache.query(entityType, { id });
   if (local) {
     // Populate L1 for next access
-    cacheLib.set(`${entityType}:${id}`, local);
+    cache.set(`${entityType}:${id}`, local);
     return local;
   }
 
@@ -75,8 +75,8 @@ async function getItem(entityType: string, id: string): Promise<Entity> {
   if (isOnline()) {
     const remote = await api.get(entityType, id);
     // Populate all caches
-    await cacheLib.set(`${entityType}:${id}`, remote); // L1
-    await cacheLib.upsert(entityType, remote); // L3
+    await cache.set(`${entityType}:${id}`, remote); // L1
+    await cache.upsert(entityType, remote); // L3
     return remote;
   }
 
@@ -90,7 +90,7 @@ async function getItem(entityType: string, id: string): Promise<Entity> {
 async function sendTransaction(tx: Transaction): Promise<void> {
   // 1. Optimistic UI update
   const optimisticTx = { ...tx, status: 'PENDING', id: generateUUID() };
-  await cacheLib.insert('transactions', optimisticTx);
+  await cache.insert('transactions', optimisticTx);
   updateUI(optimisticTx); // Instant feedback
 
   // 2. Queue for background sync
@@ -126,11 +126,11 @@ interface SyncQueueItem {
 
 class OfflineSyncQueue {
   async enqueue(item: SyncQueueItem): Promise<void> {
-    await cacheLib.insert('sync_queue', item);
+    await cache.insert('sync_queue', item);
   }
 
   async processNext(): Promise<void> {
-    const items = await cacheLib.query('sync_queue', { 
+    const items = await cache.query('sync_queue', { 
       orderBy: 'createdAt',
       limit: 10 
     });
@@ -159,23 +159,23 @@ class OfflineSyncQueue {
   private async handleSuccess(item: SyncQueueItem, result: unknown): Promise<void> {
     // Update local record with server ID
     if (item.operation === 'CREATE') {
-      await cacheLib.update(item.entity, 
+      await cache.update(item.entity, 
         { id: item.localId }, 
         { id: result.id, syncedAt: new Date() }
       );
     }
     // Remove from queue
-    await cacheLib.delete('sync_queue', { id: item.id });
+    await cache.delete('sync_queue', { id: item.id });
   }
 
   private async handleFailure(item: SyncQueueItem, error: unknown): Promise<void> {
     if (item.retryCount >= item.maxRetries) {
       // Move to failed queue
-      await cacheLib.insert('sync_failed', { ...item, error: error.message });
-      await cacheLib.delete('sync_queue', { id: item.id });
+      await cache.insert('sync_failed', { ...item, error: error.message });
+      await cache.delete('sync_queue', { id: item.id });
     } else {
       // Increment retry with exponential backoff
-      await cacheLib.update('sync_queue', 
+      await cache.update('sync_queue', 
         { id: item.id }, 
         { 
           retryCount: item.retryCount + 1,
@@ -204,7 +204,7 @@ async function resolveConflict(
   switch (strategy) {
     case ConflictResolution.SERVER_WINS:
       // Discard local changes
-      await cacheLib.update(local.entity, { id: local.id }, server);
+      await cache.update(local.entity, { id: local.id }, server);
       return server;
 
     case ConflictResolution.CLIENT_WINS:
@@ -255,7 +255,7 @@ async function resolveConflict(
 - [ ] Sensitive data NEVER stored in L2/L3 caches
 - [ ] Encryption keys stored ONLY in SecureStore (L0)
 - [ ] Auth tokens refreshed before expiry
-- [ ] Cached financial data integrity validated
+- [ ] Cached data integrity validated
 - [ ] Cache cleared on suspicious activity
 - [ ] Offline operations logged for audit
 
@@ -282,12 +282,12 @@ async function getData(id: string) {
 
 // ✅ CORRECT: Cache-first with network fallback
 async function getData(id: string) {
-  const cached = await cacheLib.get(id);
+  const cached = await cache.get(id);
   if (cached) return cached;
   
   if (isOnline()) {
     const data = await api.get(id);
-    await cacheLib.set(id, data);
+    await cache.set(id, data);
     return data;
   }
   
@@ -335,12 +335,6 @@ await SecureStore.setItemAsync('jwt_token', token, {
 });
 ```
 
-## Reference Documentation
-
-Use the `references/` directory for detailed offline architecture:
-
-- `offline-capabilities-prd.md` - Complete offline system design and requirements
-
 ## Integration with Development Workflow
 
 ### Pre-Implementation Checklist
@@ -378,14 +372,11 @@ When reviewing offline code:
 
 To implement offline-first features:
 
-1. Read `references/offline-capabilities-prd.md` for architecture context
-2. Choose appropriate cache tier based on data sensitivity and access pattern
-3. Implement cache-first read logic
-4. Add optimistic UI updates for writes
-5. Queue writes to sync queue (SQLite L3)
-6. Define conflict resolution strategy
-7. Implement background sync on connectivity changes
-8. Test offline→online transitions
-9. Validate security boundaries
-
-For complex offline scenarios, consult the PRD for multi-tier caching strategies and sync queue patterns.
+1. Choose appropriate cache tier based on data sensitivity and access pattern
+2. Implement cache-first read logic
+3. Add optimistic UI updates for writes
+4. Queue writes to sync queue (L3)
+5. Define conflict resolution strategy
+6. Implement background sync on connectivity changes
+7. Test offline→online transitions
+8. Validate security boundaries

@@ -537,8 +537,8 @@ Using functions from shared libraries (auth-lib, shared-utils, etc.).
 
 ```typescript
 // components/LoginForm.tsx
-import { decodeToken } from '@{org}/auth-lib/client';
-import { validateEmail } from '@{org}/shared-utils';
+import { decodeToken } from '@your-org/auth-lib/client';
+import { validateEmail } from '@your-org/shared-utils';
 
 export function LoginForm() {
   // Uses decodeToken and validateEmail
@@ -548,7 +548,7 @@ export function LoginForm() {
 ### ❌ WRONG Pattern: Wrong Library Path
 
 ```typescript
-jest.mock('@{org}/auth-lib', () => ({ // ❌ Wrong! Should use /client
+jest.mock('@your-org/auth-lib', () => ({ // ❌ Wrong! Should use /client
   decodeToken: jest.fn()
 }));
 ```
@@ -556,7 +556,7 @@ jest.mock('@{org}/auth-lib', () => ({ // ❌ Wrong! Should use /client
 ### ✅ CORRECT Pattern: Use /client Path
 
 ```typescript
-jest.mock('@{org}/auth-lib/client', () => ({
+jest.mock('@your-org/auth-lib/client', () => ({
   decodeToken: jest.fn((token: string) => ({
     userId: '123',
     handle: '@testuser',
@@ -564,7 +564,7 @@ jest.mock('@{org}/auth-lib/client', () => ({
   }))
 }));
 
-jest.mock('@{org}/shared-utils', () => ({
+jest.mock('@your-org/shared-utils', () => ({
   validateEmail: jest.fn((email: string) => ({
     valid: email.includes('@'),
     errors: []
@@ -573,8 +573,8 @@ jest.mock('@{org}/shared-utils', () => ({
 
 import { render, fireEvent } from '@testing-library/react-native';
 import { LoginForm } from '../components/LoginForm';
-import { decodeToken } from '@{org}/auth-lib/client';
-import { validateEmail } from '@{org}/shared-utils';
+import { decodeToken } from '@your-org/auth-lib/client';
+import { validateEmail } from '@your-org/shared-utils';
 
 describe('LoginForm', () => {
   it('should validate email using shared util', () => {
@@ -599,16 +599,16 @@ describe('LoginForm', () => {
 **Library Import Rules**:
 ```typescript
 // Client code (.spec.tsx, .spec.ts for client tests)
-✅ @{org}/auth-lib/client
-✅ @{org}/logging-lib/client
-✅ @{org}/shared-utils/client (for device/ui)
-❌ @{org}/auth-lib (missing /client)
-❌ @{org}/shared-utils/server (server-only)
+✅ @your-org/auth-lib/client
+✅ @your-org/logging-lib/client
+✅ @your-org/shared-utils/client (for device/ui)
+❌ @your-org/auth-lib (missing /client)
+❌ @your-org/shared-utils/server (server-only)
 
 // Integration code (.integration.spec.ts)
-✅ @{org}/auth-lib (default = server)
-✅ @{org}/logging-lib (default = server)
-✅ @{org}/shared-utils/server
+✅ @your-org/auth-lib (default = server)
+✅ @your-org/logging-lib (default = server)
+✅ @your-org/shared-utils/server
 ```
 
 ---

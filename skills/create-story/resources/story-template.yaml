@@ -113,7 +113,7 @@ sections:
           - Do NOT invent screen names — extract from routing docs or core-workflows.md
         template: |
           **Prerequisites**:
-          - App running (`npm run my-wallet:start:device`)
+          - App running (e.g. `npm run start:device` or your project's dev command)
           - [Any auth/data prerequisites]
 
           **Navigation Path**:

@@ -103,7 +103,7 @@ export class ModuleB {}
 
 ## 2. Module & Import Errors
 
-### Error: "Cannot find module '@{org}/auth-lib'"
+### Error: "Cannot find module '@your-org/auth-lib'"
 
 **Quick Diagnosis Checklist:**
 - [ ] Does the library exist in `libs/` directory?
@@ -125,7 +125,7 @@ export class ModuleB {}
 {
   "compilerOptions": {
     "paths": {
-      "@{org}/*": ["libs/*/src/index.ts"]
+      "@your-org/*": ["libs/*/src/index.ts"]
     }
   }
 }
@@ -136,7 +136,7 @@ export * from './lib/auth.module';
 export * from './types';
 
 // In app - Import from path alias
-import { AuthService } from '@{org}/auth-lib';
+import { AuthService } from '@your-org/auth-lib';
 ```
 
 **Skill to Use:** ModuleResolutionDebugging
@@ -519,7 +519,7 @@ npm run build:libraries
 npx nx build {app_name}
 
 # Check build output
-ls dist/libs/@{org}/auth-lib/
+ls dist/libs/@your-org/auth-lib/
 ```
 
 **Skill to Use:** ModuleResolutionDebugging

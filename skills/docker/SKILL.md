@@ -10,6 +10,8 @@ license: MIT
 
 Expert Docker administration for multi-environment infrastructure (development, test, production).
 
+> **Placeholders**: this skill uses `{project}`, `{api-service}`, `{db-service}`, `{cache-service}` as templates — replace with your own service names. See [`docs/placeholders.md`](../../docs/placeholders.md).
+
 ## Quick Reference
 
 ### Most Common Operations

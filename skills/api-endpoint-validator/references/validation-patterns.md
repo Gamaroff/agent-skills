@@ -4,7 +4,7 @@ This document outlines common validation patterns, rules, and error handling str
 
 ## Validation Framework
 
-This platform uses a **4-layer validation approach**:
+A robust API validation strategy uses a **4-layer approach**:
 
 1. **Type-level validation** (compile time) - TypeScript strict mode
 2. **Decorator validation** (runtime) - class-validator 

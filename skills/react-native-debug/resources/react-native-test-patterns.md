@@ -25,7 +25,7 @@ These can cause test failures that require platform-specific investigation techn
 
 ```
 Test Failure:
-Cannot find module '@{org}/auth-lib'
+Cannot find module '@your-org/auth-lib'
 OR
 Module resolution failed for library export
 ```
@@ -46,7 +46,7 @@ Module resolution failed for library export
 
 ```bash
 # Check if library is built
-ls dist/libs/@{org}/[library-name]/
+ls dist/libs/@your-org/[library-name]/
 
 # Check library exports
 cat libs/[library-name]/src/index.ts
@@ -89,7 +89,7 @@ export * from './lib/token-decoder';
 export * from './lib/types';
 
 // Test now works
-import { decodeToken } from '@{org}/auth-lib/client';
+import { decodeToken } from '@your-org/auth-lib/client';
 ```
 
 ---
@@ -155,8 +155,8 @@ Is this a client test (.spec.tsx)?
 ```typescript
 // ❌ WRONG - Client test without /client imports
 // This is a client test (.spec.tsx)
-import { decodeToken, hashPassword } from '@{org}/auth-lib';
-import { logger } from '@{org}/logging-lib';
+import { decodeToken, hashPassword } from '@your-org/auth-lib';
+import { logger } from '@your-org/logging-lib';
 
 it('should decode token', () => {
   // FAILS: hashPassword not available in client
@@ -164,8 +164,8 @@ it('should decode token', () => {
 });
 
 // ✅ CORRECT - Client test with /client imports
-import { decodeToken } from '@{org}/auth-lib/client';
-import { logger } from '@{org}/logging-lib/client';
+import { decodeToken } from '@your-org/auth-lib/client';
+import { logger } from '@your-org/logging-lib/client';
 
 it('should decode token', () => {
   const decoded = decodeToken('jwt-token');
@@ -457,7 +457,7 @@ Do tests pass after clearing Metro cache?
 
 ```bash
 # Check if library built
-ls dist/libs/@{org}/[lib]/
+ls dist/libs/@your-org/[lib]/
 
 # Check Metro cache status
 npx nx start {app-name} --dry-run
@@ -550,7 +550,7 @@ render(
 
 ```bash
 # Check library build
-ls -la dist/libs/@{org}/[lib]/
+ls -la dist/libs/@your-org/[lib]/
 
 # Check test configuration
 cat apps/{app-name}/jest.config.ts
@@ -581,15 +581,15 @@ grep -A 5 "jest.mock.*components" apps/{app-name}/**/*.spec.tsx
 ### Scenario: AuthContext Test Fails with "Cannot find module"
 
 ```
-Error: Cannot find module '@{org}/auth-lib/client'
+Error: Cannot find module '@your-org/auth-lib/client'
 ```
 
 ### Investigation Process
 
 1. **Check import in test:**
    ```bash
-   grep "from '@{org}/auth-lib" auth-context.spec.tsx
-   # Found: import from '@{org}/auth-lib' (missing /client!)
+   grep "from '@your-org/auth-lib" auth-context.spec.tsx
+   # Found: import from '@your-org/auth-lib' (missing /client!)
    ```
 
 2. **Check if /client is required:**
@@ -600,11 +600,11 @@ Error: Cannot find module '@{org}/auth-lib/client'
 
 3. **Verdict:** Test wrong
    - Missing /client suffix on auth-lib import
-   - Fix: Change to `@{org}/auth-lib/client`
+   - Fix: Change to `@your-org/auth-lib/client`
 
 4. **Update test imports:**
    ```typescript
-   import { decodeToken } from '@{org}/auth-lib/client';  // Added /client
+   import { decodeToken } from '@your-org/auth-lib/client';  // Added /client
    ```
 
 ---

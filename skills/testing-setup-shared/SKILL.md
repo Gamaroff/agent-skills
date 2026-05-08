@@ -1,6 +1,6 @@
 ---
 name: testing-setup-shared
-description: Guide developers through common testing infrastructure setup for the {project} monorepo including dual testing strategy, test co-location, mocking strategies for subpath exports, platform separation validation, and troubleshooting common test failures
+description: Guide developers through common testing infrastructure setup for a workspace/monorepo, including dual testing strategy, test co-location, mocking strategies for subpath exports, platform separation validation, and troubleshooting common test failures
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -24,7 +24,7 @@ Invoke this skill when you need to:
 
 ## Overview
 
-The {project} monorepo uses a **dual testing strategy** with strict platform separation:
+This workspace uses a **dual testing strategy** with strict platform separation:
 
 - **Integration Tests** (Node.js): Server-side operations, crypto, JWT, database
 - **Client Tests** (React Native): UI components, device operations, client-side logic
@@ -152,7 +152,7 @@ What are you mocking?
 
 **Pattern**:
 ```typescript
-import * as loggingLib from '@{org}/logging-lib/client';
+import * as loggingLib from '@your-org/logging-lib/client';
 
 describe('MyService', () => {
   let loggerSpy: jest.SpyInstance;
@@ -206,7 +206,7 @@ describe('MyService', () => {
 **Pattern**:
 ```typescript
 // ✅ CORRECT: Hoisted mock for standalone functions
-jest.mock('@{org}/shared-utils', () => ({
+jest.mock('@your-org/shared-utils', () => ({
   formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`),
   calculateFee: jest.fn((amount) => amount * 0.01),
   validateHandle: jest.fn((handle) => true)
@@ -214,7 +214,7 @@ jest.mock('@{org}/shared-utils', () => ({
 
 describe('Payment Component', () => {
   it('should format currency correctly', () => {
-    const { formatCurrency } = require('@{org}/shared-utils');
+    const { formatCurrency } = require('@your-org/shared-utils');
     const result = formatCurrency(100, 'USD');
 
     expect(result).toBe('USD 100');
@@ -232,7 +232,7 @@ describe('Payment Component', () => {
 
 **❌ WRONG: Trying to spy on standalone function**
 ```typescript
-import * as utils from '@{org}/shared-utils';
+import * as utils from '@your-org/shared-utils';
 const spy = jest.spyOn(utils, 'formatCurrency'); // ❌ Error: Cannot spy on function
 ```
 **Why it fails**: Standalone functions are not object properties.
@@ -242,7 +242,7 @@ const spy = jest.spyOn(utils, 'formatCurrency'); // ❌ Error: Cannot spy on fun
 
 **❌ WRONG: Hoisted mock for subpath export**
 ```typescript
-jest.mock('@{org}/logging-lib/client', () => ({
+jest.mock('@your-org/logging-lib/client', () => ({
   logger: { info: jest.fn() }
 }));
 ```
@@ -291,10 +291,10 @@ beforeEach(() => {
 **Validation Check**:
 ```typescript
 // ❌ NEVER in client tests (*.spec.ts)
-import { hashPassword } from '@{org}/auth-lib'; // Server-only!
+import { hashPassword } from '@your-org/auth-lib'; // Server-only!
 
 // ✅ CORRECT: Use /client subpath for client tests
-import { decodeToken } from '@{org}/auth-lib/client'; // Safe for client
+import { decodeToken } from '@your-org/auth-lib/client'; // Safe for client
 ```
 
 ### 4.2 Client-Only Operations
@@ -490,7 +490,7 @@ open test-output/jest/coverage/libs/<library-name>/index.html
 ### 7.3 Success Criteria
 
 ✅ All tests pass
-✅ Coverage meets requirements (80% or 95% for financial)
+✅ Coverage meets requirements (e.g. 80% baseline, higher for sensitive paths)
 ✅ No console warnings or errors
 ✅ Mocks are properly cleaned up (no leaks between tests)
 
@@ -500,7 +500,7 @@ open test-output/jest/coverage/libs/<library-name>/index.html
 
 ### 8.1 Module Resolution Errors
 
-**Error**: `Cannot find module '@{org}/library-name/client'`
+**Error**: `Cannot find module '@your-org/library-name/client'`
 
 **Cause**: Subpath export not configured in moduleNameMapper
 
@@ -544,11 +544,11 @@ beforeEach(() => {
 ```typescript
 // ❌ WRONG
 const logger = { info: jest.fn() };
-jest.mock('@{org}/logging-lib', () => ({ logger })); // Error!
+jest.mock('@your-org/logging-lib', () => ({ logger })); // Error!
 
 // ✅ CORRECT (prefix with "mock")
 const mockLogger = { info: jest.fn() };
-jest.mock('@{org}/logging-lib', () => ({ logger: mockLogger }));
+jest.mock('@your-org/logging-lib', () => ({ logger: mockLogger }));
 ```
 
 ---
@@ -562,10 +562,10 @@ jest.mock('@{org}/logging-lib', () => ({ logger: mockLogger }));
 **Solution**:
 ```typescript
 // ❌ WRONG (client test importing server code)
-import { hashPassword } from '@{org}/auth-lib';
+import { hashPassword } from '@your-org/auth-lib';
 
 // ✅ CORRECT (use /client subpath)
-import { decodeToken } from '@{org}/auth-lib/client';
+import { decodeToken } from '@your-org/auth-lib/client';
 ```
 
 ---
@@ -593,10 +593,10 @@ Before completing, verify these anti-patterns are NOT present:
 - [ ] ❌ Using `mockRestore()` in `beforeEach`
 - [ ] ❌ Server-only imports in client tests
 - [ ] ❌ Client-only imports in integration tests
-- [ ] ❌ Using `any` type for financial data
+- [ ] ❌ Using `any` type for sensitive data (money, identity, security)
 - [ ] ❌ Hardcoded secrets or credentials
-- [ ] ❌ Lowercase transaction status values (use UPPERCASE)
-- [ ] ❌ Missing test coverage for financial operations (<95%)
+- [ ] ❌ Inconsistent enum casing (pick one — UPPERCASE or lowercase — and stick to it)
+- [ ] ❌ Missing test coverage for sensitive operations (apply higher threshold)
 
 ---
 

@@ -39,20 +39,20 @@ Determine where the code will execute:
 **For React Native files** - Check imports use `/client` paths:
 ```typescript
 // ✅ CORRECT
-import { logger } from '@{org}/logging-lib/client';
-import { validateEmail } from '@{org}/shared-utils/client';
-import { decodeToken } from '@{org}/auth-lib/client';
+import { logger } from '@your-org/logging-lib/client';
+import { validateEmail } from '@your-org/shared-utils/client';
+import { decodeToken } from '@your-org/auth-lib/client';
 
 // ❌ VIOLATION
-import { logger } from '@{org}/logging-lib'; // Includes Node.js code
-import { hashPassword } from '@{org}/auth-lib'; // Server-only
+import { logger } from '@your-org/logging-lib'; // Includes Node.js code
+import { hashPassword } from '@your-org/auth-lib'; // Server-only
 ```
 
 **For NestJS files** - Can use default or server imports:
 ```typescript
 // ✅ CORRECT
-import { hashPassword } from '@{org}/auth-lib';
-import { logger } from '@{org}/logging-lib';
+import { hashPassword } from '@your-org/auth-lib';
+import { logger } from '@your-org/logging-lib';
 import * as bcrypt from 'bcrypt';
 ```
 
@@ -88,10 +88,10 @@ const response = await api.post('/keys/generate');
 import * as crypto from 'crypto';
 
 // ❌ Server imports in React Native
-import { logger } from '@{org}/logging-lib';
+import { logger } from '@your-org/logging-lib';
 
 // ✅ Correct - Client import
-import { logger } from '@{org}/logging-lib/client';
+import { logger } from '@your-org/logging-lib/client';
 ```
 
 ## Common Violations & Fixes
@@ -125,7 +125,7 @@ const payload = jwt.verify(token, process.env.JWT_SECRET); // ❌
 **Fix**:
 ```typescript
 // Client parses (doesn't validate) token
-import { decodeToken } from '@{org}/auth-lib/client';
+import { decodeToken } from '@your-org/auth-lib/client';
 const payload = decodeToken(token); // ✅ Parse only
 
 // Server validates JWT

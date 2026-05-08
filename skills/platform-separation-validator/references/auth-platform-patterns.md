@@ -76,14 +76,14 @@ sequenceDiagram
 #### bcrypt Password Hashing (Server-Only)
 
 ```typescript
-// Server-side password hashing with @{org}/auth-lib
+// Server-side password hashing with @your-org/auth-lib
 import {
   hashPassword,
   comparePassword,
   validatePassword,
   needsRehash,
   type AuthConfig
-} from '@{org}/auth-lib';
+} from '@your-org/auth-lib';
 
 @Injectable()
 export class AuthService {
@@ -192,7 +192,7 @@ export class AuthService {
 #### JWT Token Management (Server-Only)
 
 ```typescript
-// Server-side JWT operations with @{org}/auth-lib
+// Server-side JWT operations with @your-org/auth-lib
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -201,7 +201,7 @@ import {
   verifyRefreshToken,
   type JwtPayload,
   type AuthTokens
-} from '@{org}/auth-lib';
+} from '@your-org/auth-lib';
 
 @Injectable()
 export class TokenService {
@@ -281,7 +281,7 @@ export class TokenService {
 import {
   verifyAccessToken,
   extractBearerToken
-} from '@{org}/auth-lib';
+} from '@your-org/auth-lib';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -338,7 +338,7 @@ export class ProtectedController {
 #### React Native Authentication Service
 
 ```typescript
-// Client-side authentication with @{org}/auth-lib/src/client
+// Client-side authentication with @your-org/auth-lib/src/client
 import {
   extractBearerToken,
   decodeToken,
@@ -351,7 +351,7 @@ import {
   type SafeUser,
   type AuthTokens,
   type JwtPayload
-} from '@{org}/auth-lib/src/client';
+} from '@your-org/auth-lib/src/client';
 
 import * as SecureStore from 'expo-secure-store';
 
@@ -613,7 +613,7 @@ import React, {
   ReactNode
 } from 'react';
 import { authService } from '../services/auth-service';
-import type { SafeUser } from '@{org}/auth-lib/src/client';
+import type { SafeUser } from '@your-org/auth-lib/src/client';
 
 interface AuthContextValue {
   user: SafeUser | null;
@@ -745,7 +745,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/auth-context';
-import { validateEmail } from '@{org}/auth-lib/src/client';
+import { validateEmail } from '@your-org/auth-lib/src/client';
 
 export const LoginScreen: React.FC = () => {
   const { login, isLoading } = useAuth();
@@ -903,7 +903,7 @@ export class PasswordSecurityService {
 
 ```typescript
 // Client-side password validation for user experience
-import { validatePassword } from '@{org}/auth-lib/src/client';
+import { validatePassword } from '@your-org/auth-lib/src/client';
 
 export const usePasswordValidation = () => {
   const [passwordStrength, setPasswordStrength] = useState<{
@@ -1356,7 +1356,7 @@ const JWT_SECRET = process.env.JWT_SECRET; // ❌ Exposed in client bundle
 
 ```typescript
 // Server-side password handling
-import { hashPassword } from '@{org}/auth-lib';
+import { hashPassword } from '@your-org/auth-lib';
 
 @Post('register')
 async register(@Body() { email, password }: RegisterDto) {
@@ -1373,7 +1373,7 @@ async register(@Body() { email, password }: RegisterDto) {
 import {
   decodeToken,
   isTokenExpired
-} from '@{org}/auth-lib/src/client';
+} from '@your-org/auth-lib/src/client';
 
 const getTokenInfo = (token: string) => {
   // Parse for UX, don't verify signature
@@ -1412,4 +1412,4 @@ This authentication architecture serves as the foundation for secure financial s
 
 ---
 
-_This guide provides the definitive patterns for authentication implementation across your platform. For specific implementation details, refer to the @{org}/auth-lib documentation and platform-specific architecture guides._
+_This guide provides the definitive patterns for authentication implementation across your platform. For specific implementation details, refer to the @your-org/auth-lib documentation and platform-specific architecture guides._

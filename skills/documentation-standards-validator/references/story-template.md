@@ -136,7 +136,7 @@ export enum [EnumName] {
 import React from 'react';
 import { View, Text } from 'react-native';
 import { useCustomHook } from '@/hooks/useCustomHook';
-import { useTheme } from '@{org}/theme';
+import { useTheme } from '@your-org/theme';
 
 export default function ComponentName() {
   const { data, loading } = useCustomHook();
@@ -257,7 +257,7 @@ interface [Resource]Response {
 
 **AsyncStorage Keys**:
 
-- `@{org}/[feature]-[data]` - [What's stored]
+- `@your-org/[feature]-[data]` - [What's stored]
 
 **Storage Operations**:
 

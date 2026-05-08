@@ -17,7 +17,7 @@ import {
   comparePassword,
   generateTokenPair,
   verifyAccessToken
-} from '@{org}/auth-lib';
+} from '@your-org/auth-lib';
 
 // Server-only utilities (includes AES encryption, HMAC signing)
 import {
@@ -25,10 +25,10 @@ import {
   decryptData,
   generateHMAC,
   verifyHMAC
-} from '@{org}/shared-utils/server';
+} from '@your-org/shared-utils/server';
 
 // Common utilities (validation, formatting)
-import { validateEmail, formatCurrency } from '@{org}/shared-utils';
+import { validateEmail, formatCurrency } from '@your-org/shared-utils';
 ```
 
 #### Client-Side Imports (React Native Mobile)
@@ -39,17 +39,17 @@ import {
   decodeToken,
   isTokenExpired,
   validateLoginCredentials
-} from '@{org}/auth-lib/src/client';
+} from '@your-org/auth-lib/src/client';
 
 // Client-only utilities (device detection, local storage)
 import {
   getDeviceInfo,
   detectPlatform,
   generateClientId
-} from '@{org}/shared-utils/client';
+} from '@your-org/shared-utils/client';
 
 // Common utilities (validation, formatting)
-import { validateEmail, formatCurrency } from '@{org}/shared-utils';
+import { validateEmail, formatCurrency } from '@your-org/shared-utils';
 ```
 
 ## Development Workflows
@@ -67,7 +67,7 @@ import {
   comparePassword,
   generateTokenPair,
   verifyAccessToken
-} from '@{org}/auth-lib';
+} from '@your-org/auth-lib';
 import { RegisterDto, LoginDto } from './dto';
 
 @Injectable()
@@ -138,8 +138,8 @@ import {
   decodeToken,
   isTokenExpired,
   validateLoginCredentials
-} from '@{org}/auth-lib/src/client';
-import { LoginRequest, RegisterRequest } from '@{org}/shared-types';
+} from '@your-org/auth-lib/src/client';
+import { LoginRequest, RegisterRequest } from '@your-org/shared-types';
 import { ApiService } from './base-api-service';
 
 export class AuthService extends ApiService {
@@ -290,10 +290,10 @@ export function generateClientId(): string {
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../auth.service';
-import * as authLib from '@{org}/auth-lib';
+import * as authLib from '@your-org/auth-lib';
 
 // Mock the entire auth library for server testing
-jest.mock('@{org}/auth-lib');
+jest.mock('@your-org/auth-lib');
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -333,10 +333,10 @@ describe('AuthService', () => {
 
 ```typescript
 import { AuthService } from '../auth-service';
-import * as authMobile from '@{org}/auth-lib/src/client';
+import * as authMobile from '@your-org/auth-lib/src/client';
 
 // Mock only the mobile-specific auth imports
-jest.mock('@{org}/auth-lib/src/client');
+jest.mock('@your-org/auth-lib/src/client');
 
 describe('AuthService (Client)', () => {
   let service: AuthService;
@@ -398,24 +398,24 @@ describe('AuthService (Client)', () => {
 npx expo export --dump-assetmap
 
 # Check for server-only imports in mobile bundle
-grep -r "from '@{org}/auth-lib'" apps/{app-name}/
-grep -r "from '@{org}/shared-utils/server'" apps/{app-name}/
+grep -r "from '@your-org/auth-lib'" apps/{app-name}/
+grep -r "from '@your-org/shared-utils/server'" apps/{app-name}/
 ```
 
 #### Expected vs Problematic Patterns
 
 ```typescript
 // ✅ Good: Mobile should only use mobile-specific imports
-import { decodeToken } from '@{org}/auth-lib/src/client';
+import { decodeToken } from '@your-org/auth-lib/src/client';
 
 // ❌ Bad: Mobile importing server crypto functions
-import { hashPassword } from '@{org}/auth-lib'; // Includes bcrypt!
+import { hashPassword } from '@your-org/auth-lib'; // Includes bcrypt!
 
 // ✅ Good: Common utilities can be imported directly
-import { validateEmail } from '@{org}/shared-utils';
+import { validateEmail } from '@your-org/shared-utils';
 
 // ❌ Bad: Mobile importing server-only crypto
-import { encryptData } from '@{org}/shared-utils/server';
+import { encryptData } from '@your-org/shared-utils/server';
 ```
 
 ### 2. Runtime Error Debugging
@@ -426,20 +426,20 @@ import { encryptData } from '@{org}/shared-utils/server';
 
 ```typescript
 // Problem: Mobile code importing server auth functions
-import { hashPassword } from '@{org}/auth-lib';
+import { hashPassword } from '@your-org/auth-lib';
 
 // Solution: Use mobile-specific imports
-import { validateLoginCredentials } from '@{org}/auth-lib/src/client';
+import { validateLoginCredentials } from '@your-org/auth-lib/src/client';
 ```
 
 **Error**: `crypto.randomBytes is not a function`
 
 ```typescript
 // Problem: Client trying to use Node.js crypto
-import { encryptData } from '@{org}/shared-utils/server';
+import { encryptData } from '@your-org/shared-utils/server';
 
 // Solution: Use client-safe alternatives
-import { generateClientId } from '@{org}/shared-utils/client';
+import { generateClientId } from '@your-org/shared-utils/client';
 ```
 
 ### 3. Authentication Flow Debugging
@@ -499,9 +499,9 @@ npx expo export --dump-assetmap
 
 ```typescript
 // Check what gets bundled from each library
-import { validateEmail } from '@{org}/shared-utils'; // ✅ Small impact
-import { decodeToken } from '@{org}/auth-lib/src/client'; // ✅ Small impact
-import { hashPassword } from '@{org}/auth-lib'; // ❌ Bundles bcrypt
+import { validateEmail } from '@your-org/shared-utils'; // ✅ Small impact
+import { decodeToken } from '@your-org/auth-lib/src/client'; // ✅ Small impact
+import { hashPassword } from '@your-org/auth-lib'; // ❌ Bundles bcrypt
 ```
 
 ### 2. Startup Performance
@@ -576,7 +576,7 @@ npm ls bcrypt jsonwebtoken
 
 ```bash
 # Check for server imports in mobile code
-grep -r "from '@{org}/auth-lib'" apps/{app-name}/ | grep -v "mobile"
+grep -r "from '@your-org/auth-lib'" apps/{app-name}/ | grep -v "mobile"
 ```
 
 **Solution**: Replace server imports with mobile-specific imports
@@ -626,8 +626,8 @@ npx expo export --dump-assetmap | grep -E "(bcrypt|jsonwebtoken)"
 
 ### Code Review Security
 
-- [ ] No `@{org}/auth-lib` imports in mobile code (use `/src/client`)
-- [ ] No `@{org}/shared-utils/server` imports in mobile code
+- [ ] No `@your-org/auth-lib` imports in mobile code (use `/src/client`)
+- [ ] No `@your-org/shared-utils/server` imports in mobile code
 - [ ] No plaintext passwords logged on server
 - [ ] No JWT secrets in client-accessible configuration
 - [ ] All financial operations have 95%+ test coverage

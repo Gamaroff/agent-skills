@@ -75,7 +75,7 @@ import {
   hashPassword,
   comparePassword,
   generateTokenPair,
-} from "@{org}/auth-lib";
+} from "@your-org/auth-lib";
 
 describe("Authentication Service Integration Tests", () => {
   it("should hash and verify passwords", async () => {
@@ -122,7 +122,7 @@ describe("Authentication Service Integration Tests", () => {
 ```typescript
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { LoginForm } from './login-form';
-import { decodeToken } from '@{org}/auth-lib/client'; // Client-only import
+import { decodeToken } from '@your-org/auth-lib/client'; // Client-only import
 
 describe('LoginForm Component', () => {
   it('should render and handle login', async () => {
@@ -177,7 +177,7 @@ describe("Custom Financial Tests", () => {
 import {
   createTestUserProfile,
   createCompleteTestUserProfile,
-} from "@{org}/shared-types/test-utils";
+} from "@your-org/shared-types/test-utils";
 
 // Minimal valid profile
 const user = createTestUserProfile({
@@ -226,7 +226,7 @@ describe('PaymentForm', () => {
 import {
   measurePerformance,
   measureAsyncPerformance,
-} from "@{org}/shared-types/test-utils";
+} from "@your-org/shared-types/test-utils";
 
 describe("Performance Tests", () => {
   it("should process transactions within time limits", () => {
@@ -253,7 +253,7 @@ describe("Performance Tests", () => {
 import {
   expectValidationError,
   expectAsyncValidationError,
-} from "@{org}/shared-types/test-utils";
+} from "@your-org/shared-types/test-utils";
 
 describe("Error Handling", () => {
   it("should validate inputs correctly", () => {
@@ -364,7 +364,7 @@ Every library in `/libs/` includes these configuration files:
 
    ```typescript
    module.exports = {
-     displayName: "@{org}/auth-lib (Integration)",
+     displayName: "@your-org/auth-lib (Integration)",
      preset: "../../jest.preset.js",
      testEnvironment: "node",
      setupFiles: ["<rootDir>/src/integration-test-setup.ts"],
@@ -384,7 +384,7 @@ Every library in `/libs/` includes these configuration files:
 
    ```typescript
    module.exports = {
-     displayName: "@{org}/auth-lib",
+     displayName: "@your-org/auth-lib",
      preset: "react-native",
      testPathIgnorePatterns: [
        "/node_modules/",
@@ -573,7 +573,7 @@ afterEach(() => {
 
 ```typescript
 // ✅ CORRECT: Hoisted mock for standalone function
-jest.mock("@{org}/shared-utils", () => ({
+jest.mock("@your-org/shared-utils", () => ({
   formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`),
   calculateFee: jest.fn((amount) => amount * 0.01),
   validateHandle: jest.fn((handle) => true),
@@ -581,7 +581,7 @@ jest.mock("@{org}/shared-utils", () => ({
 
 describe("Payment Component", () => {
   it("should format currency correctly", () => {
-    const { formatCurrency } = require("@{org}/shared-utils");
+    const { formatCurrency } = require("@your-org/shared-utils");
     const result = formatCurrency(100, "USD");
     expect(result).toBe("USD 100");
     expect(formatCurrency).toHaveBeenCalledWith(100, "USD");
@@ -614,7 +614,7 @@ describe("Payment Component", () => {
 
 ```typescript
 // ✅ CORRECT: Runtime spy for object method
-import * as loggingLib from "@{org}/logging-lib/client";
+import * as loggingLib from "@your-org/logging-lib/client";
 
 describe("User Service", () => {
   let loggerSpy: jest.SpyInstance;
@@ -687,7 +687,7 @@ describe("User Service", () => {
 
 ```typescript
 // This will NOT work - Jest limitation
-import * as utils from "@{org}/shared-utils";
+import * as utils from "@your-org/shared-utils";
 
 const spy = jest.spyOn(utils, "formatCurrency"); // ❌ Error: Cannot spy on function
 ```
@@ -697,7 +697,7 @@ const spy = jest.spyOn(utils, "formatCurrency"); // ❌ Error: Cannot spy on fun
 **✅ Solution:** Use hoisted mock
 
 ```typescript
-jest.mock("@{org}/shared-utils", () => ({
+jest.mock("@your-org/shared-utils", () => ({
   formatCurrency: jest.fn((amount, currency) => `${currency} ${amount}`),
 }));
 ```
@@ -708,7 +708,7 @@ jest.mock("@{org}/shared-utils", () => ({
 
 ```typescript
 // This will fail due to module resolution timing
-jest.mock("@{org}/logging-lib/client", () => ({
+jest.mock("@your-org/logging-lib/client", () => ({
   logger: { info: jest.fn(), error: jest.fn() },
 }));
 ```
@@ -718,7 +718,7 @@ jest.mock("@{org}/logging-lib/client", () => ({
 **✅ Solution:** Use runtime mocking (see `jest-subpath-export-resolution-guide.md` for details)
 
 ```typescript
-import * as loggingLib from "@{org}/logging-lib/client";
+import * as loggingLib from "@your-org/logging-lib/client";
 
 beforeAll(() => {
   jest.spyOn(loggingLib, "logger", "get").mockReturnValue({
@@ -889,11 +889,11 @@ Determine if your existing tests should be integration tests or client tests:
 
 ```typescript
 // These need integration tests (server-side crypto):
-import { hashPassword } from "@{org}/auth-lib"; // ❌ Won't work in React Native
+import { hashPassword } from "@your-org/auth-lib"; // ❌ Won't work in React Native
 await hashPassword("password"); // Needs Node.js environment
 
 // These can use client tests:
-import { decodeToken } from "@{org}/auth-lib/client"; // ✅ Works in React Native
+import { decodeToken } from "@your-org/auth-lib/client"; // ✅ Works in React Native
 decodeToken(token); // Parsing only, no crypto
 ```
 
@@ -911,7 +911,7 @@ mv src/lib/auth-service.spec.ts src/lib/auth-service.integration.spec.ts
 
 ```typescript
 // Before (caused "Password hashing not available" errors)
-import { hashPassword } from "@{org}/auth-lib";
+import { hashPassword } from "@your-org/auth-lib";
 
 describe("Auth Tests", () => {
   it("should hash password", async () => {
@@ -924,7 +924,7 @@ describe("Auth Tests", () => {
  * Server-side integration tests
  * Environment setup is handled by integration-test-setup.ts
  */
-import { hashPassword } from "@{org}/auth-lib";
+import { hashPassword } from "@your-org/auth-lib";
 
 describe("Auth Integration Tests", () => {
   it("should hash password", async () => {
@@ -938,10 +938,10 @@ describe("Auth Integration Tests", () => {
 
 ```typescript
 // Before (tried to use server-side functions)
-import { hashPassword } from "@{org}/auth-lib"; // ❌ Wrong import
+import { hashPassword } from "@your-org/auth-lib"; // ❌ Wrong import
 
 // After (use client-side functions only)
-import { decodeToken, validateEmail } from "@{org}/auth-lib/client"; // ✅ Correct
+import { decodeToken, validateEmail } from "@your-org/auth-lib/client"; // ✅ Correct
 
 describe("Login Form Tests", () => {
   it("should validate email", () => {
@@ -1001,11 +1001,11 @@ describe("Password Integration Tests", () => {
 
 ```typescript
 // ❌ Old way (server-side verification in wrong environment)
-import { verifyAccessToken } from "@{org}/auth-lib";
+import { verifyAccessToken } from "@your-org/auth-lib";
 
 // ✅ Integration test (server-side verification)
 // File: token.integration.spec.ts
-import { generateTokenPair, verifyAccessToken } from "@{org}/auth-lib";
+import { generateTokenPair, verifyAccessToken } from "@your-org/auth-lib";
 
 describe("Token Integration Tests", () => {
   it("should generate and verify tokens", () => {
@@ -1017,7 +1017,7 @@ describe("Token Integration Tests", () => {
 
 // ✅ Client test (token parsing only)
 // File: token-display.spec.tsx
-import { decodeToken, isTokenExpired } from "@{org}/auth-lib/client";
+import { decodeToken, isTokenExpired } from "@your-org/auth-lib/client";
 
 describe("Token Display Tests", () => {
   it("should decode token for display", () => {
@@ -1069,7 +1069,7 @@ describe("Auth Validation Tests", () => {
    import { mockUser } from "../__mocks__/user";
 
    // New
-   import { TestFixtures } from "@{org}/shared-types/test-utils";
+   import { TestFixtures } from "@your-org/shared-types/test-utils";
    const user = TestFixtures.user.minimal();
    ```
 

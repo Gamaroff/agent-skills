@@ -1,11 +1,13 @@
 ---
 name: nestjs-debug
-description: Autonomous NestJS debugging for any NestJS application in the monorepo. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works with current ({api-service}) and future NestJS applications.
+description: Autonomous NestJS debugging for any NestJS application. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works with standalone and monorepo-hosted NestJS apps.
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
 
 # NestJS Autonomous Debugging Skill
+
+> **Placeholders**: `{api-service}` is a template name for your NestJS app — substitute the actual project name (NX project, package name, etc.). See [`docs/placeholders.md`](../../docs/placeholders.md).
 
 ## When to Use This Skill
 
@@ -15,7 +17,7 @@ license: MIT
 - Module resolution, dependency injection, or configuration errors occur
 - TypeScript compilation or build errors block development
 - Runtime exceptions need investigation and fixes
-- A new NestJS app is added to the monorepo and needs debugging support
+- A new NestJS app is added (standalone or monorepo) and needs debugging support
 
 **Do NOT use this skill for:**
 
@@ -185,7 +187,7 @@ When you encounter an error, **first select the primary Skill** that categorizes
 **When:** "Cannot find module" or path resolution errors
 **Error Patterns:**
 
-- "Cannot find module '@{org}/auth-lib'"
+- "Cannot find module '@your-org/auth-lib'"
 - Path alias not resolving
 - Library index.ts missing exports
 - package.json main field incorrect
@@ -575,7 +577,7 @@ async method(): Promise<void> {
 **Pattern: Cannot Find Module**
 
 ```
-Error: Cannot find module '@{org}/auth-lib'
+Error: Cannot find module '@your-org/auth-lib'
 ```
 
 **Root Causes:**
@@ -587,7 +589,7 @@ Error: Cannot find module '@{org}/auth-lib'
 
 **Debug Approach:**
 
-1. Check if library is installed: `npm ls @{org}/auth-lib`
+1. Check if library is installed: `npm ls @your-org/auth-lib`
 2. Verify tsconfig.base.json paths configuration
 3. Check library's index.ts for exports
 4. Verify package.json main/exports fields
@@ -600,7 +602,7 @@ Error: Cannot find module '@{org}/auth-lib'
 {
   "compilerOptions": {
     "paths": {
-      "@{org}/*": ["libs/*/src/index.ts"]
+      "@your-org/*": ["libs/*/src/index.ts"]
     }
   }
 }
@@ -831,7 +833,7 @@ Error: Nest can't resolve dependencies of AuthService (ConfigService, ?)
 **Error Output:**
 
 ```
-Error: Cannot find module '@{org}/auth-lib'
+Error: Cannot find module '@your-org/auth-lib'
 ```
 
 **Debugging Steps:**

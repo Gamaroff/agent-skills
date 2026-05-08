@@ -10,14 +10,14 @@ Step-by-step guides for each debugging workflow in the React Native Debug skill.
 
 ```bash
 # Check if the library exists in dist/
-ls -la dist/libs/@{org}/[library-name]/
+ls -la dist/libs/@your-org/[library-name]/
 
 # If not found:
 echo "❌ Library not built"
 
 # If found:
 echo "✅ Library exists, check if up to date"
-ls -lt dist/libs/@{org}/[library-name]/ | head -5
+ls -lt dist/libs/@your-org/[library-name]/ | head -5
 ```
 
 ### Step 2: Run Automated Checks
@@ -42,7 +42,7 @@ grep -A 5 "projectRoot\|cacheVersion" metro.config.js
   ```bash
   npm run build:libraries
   # Or rebuild specific library
-  npx nx build @{org}/[library-name]
+  npx nx build @your-org/[library-name]
   ```
 
 ### Step 4: Clear Metro Cache
@@ -70,7 +70,7 @@ npx nx start {app-name} --reset-cache --clear
 **Issue A**: "Module name mapped to different path"
 ```bash
 # Check if library export path matches tsconfig
-cat dist/libs/@{org}/[lib]/package.json
+cat dist/libs/@your-org/[lib]/package.json
 # Check "main" field matches
 
 cat tsconfig.json
@@ -398,17 +398,17 @@ grep -n "@{project}" test-file.spec.tsx
 **Correct Client Imports**:
 ```typescript
 // ✅ Client tests must use /client imports
-import { decodeToken, isTokenExpired } from '@{org}/auth-lib/client';
-import { logger } from '@{org}/logging-lib/client';
-import { validateEmail } from '@{org}/shared-utils/client';
-import { getDeviceInfo } from '@{org}/shared-utils/client';
+import { decodeToken, isTokenExpired } from '@your-org/auth-lib/client';
+import { logger } from '@your-org/logging-lib/client';
+import { validateEmail } from '@your-org/shared-utils/client';
+import { getDeviceInfo } from '@your-org/shared-utils/client';
 ```
 
 **Wrong Client Imports**:
 ```typescript
 // ❌ Client tests CANNOT use these
-import { hashPassword, generateTokenPair } from '@{org}/auth-lib'; // Missing /client
-import { logger } from '@{org}/logging-lib'; // Missing /client
+import { hashPassword, generateTokenPair } from '@your-org/auth-lib'; // Missing /client
+import { logger } from '@your-org/logging-lib'; // Missing /client
 import bcryptjs from 'bcryptjs'; // ❌ Node.js only
 import jwt from 'jsonwebtoken'; // ❌ Node.js only
 ```
@@ -433,9 +433,9 @@ Build a table of fixes needed:
 ```
 Current Import                 → Correct Import
 ────────────────────────────────────────────────────
-@{org}/auth-lib       → @{org}/auth-lib/client
-@{org}/logging-lib    → @{org}/logging-lib/client
-@{org}/shared-utils   → @{org}/shared-utils/client (if device/ui functions)
+@your-org/auth-lib       → @your-org/auth-lib/client
+@your-org/logging-lib    → @your-org/logging-lib/client
+@your-org/shared-utils   → @your-org/shared-utils/client (if device/ui functions)
 bcryptjs                       → Remove (server-only)
 jsonwebtoken                   → Remove (server-only)
 ```
@@ -445,8 +445,8 @@ jsonwebtoken                   → Remove (server-only)
 **For automated fixing** (ask confirmation):
 ```typescript
 // Find and replace in test file
-// OLD: import { func } from '@{org}/auth-lib'
-// NEW: import { decodeToken } from '@{org}/auth-lib/client'
+// OLD: import { func } from '@your-org/auth-lib'
+// NEW: import { decodeToken } from '@your-org/auth-lib/client'
 ```
 
 **For manual review** (if uncertain):

@@ -1,6 +1,6 @@
 ---
 name: testing-setup-nestjs
-description: Guide developers through NestJS specific testing patterns for {api-service} including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and financial operations testing with 95% coverage requirements
+description: Guide developers through NestJS-specific testing patterns including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and high-coverage testing for sensitive operations
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -41,7 +41,7 @@ NestJS testing in {api-service} uses:
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserService } from './user.service';
-import { PrismaService } from '@{org}/prisma';
+import { PrismaService } from '@your-org/prisma';
 
 describe('UserService', () => {
   let service: UserService;
@@ -129,9 +129,9 @@ const mockPrismaService = {
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService } from './payment.service';
-import { PrismaService } from '@{org}/prisma';
+import { PrismaService } from '@your-org/prisma';
 import { AccountService } from '../account/account.service';
-import { logger } from '@{org}/logging-lib';
+import { logger } from '@your-org/logging-lib';
 
 describe('PaymentService', () => {
   let service: PaymentService;
@@ -501,7 +501,7 @@ describe('Atomic Operations', () => {
 
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '@{org}/prisma';
+import { PrismaService } from '@your-org/prisma';
 import { UserService } from './user.service';
 
 describe('UserService Integration Tests', () => {
@@ -612,7 +612,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '@{org}/prisma';
+import { PrismaService } from '@your-org/prisma';
 
 describe('User API (E2E)', () => {
   let app: INestApplication;
@@ -817,7 +817,7 @@ describe('TransactionService', () => {
 ### 8.1 Authentication Test
 
 ```typescript
-import { hashPassword, verifyPassword } from '@{org}/auth-lib';
+import { hashPassword, verifyPassword } from '@your-org/auth-lib';
 
 describe('AuthService', () => {
   it('should hash password securely', async () => {

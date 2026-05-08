@@ -6,6 +6,8 @@ license: MIT
 ---
 
 > **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+>
+> **Placeholders**: `{project}` in NX commands is a template — substitute your project name. See [`docs/placeholders.md`](../../docs/placeholders.md).
 
 # QA Task Review Skill
 
