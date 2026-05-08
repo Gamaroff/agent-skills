@@ -45,7 +45,10 @@ def validate_skill(skill_path):
         return False, "Invalid frontmatter format"
     
     frontmatter = match.group(1)
-    
+
+    if 'managed-by:' in frontmatter:
+        print("⚠️  Warning: 'managed-by' field found in SKILL.md — this is injected by the packager and should not be authored manually")
+
     # Check required fields
     if 'name:' not in frontmatter:
         return False, "Missing 'name' in frontmatter"

@@ -31,7 +31,8 @@ skill-name/
 ├── SKILL.md (required)
 │   ├── YAML frontmatter metadata (required)
 │   │   ├── name: (required)
-│   │   └── description: (required)
+│   │   ├── description: (required)
+│   │   └── [managed-by, source — injected by packager at zip time, do not author manually]
 │   └── Markdown instructions (required)
 └── Bundled Resources (optional)
     ├── scripts/          - Executable code (Python/Bash/etc.)
@@ -209,7 +210,7 @@ The packaging script will:
    - Description completeness and quality
    - File organization and resource references
 
-2. **Package** the skill if validation passes, creating a zip file named after the skill (e.g., `my-skill.zip`) that includes all files and maintains the proper directory structure for distribution.
+2. **Package** the skill if validation passes, creating a zip file named after the skill (e.g., `my-skill.zip`) that includes all files and maintains the proper directory structure for distribution. The packager also injects `managed-by: agent-skills` and `source: <repo-url>` into the SKILL.md frontmatter inside the zip — do not add these fields manually in source.
 
 If validation fails, the script will report the errors and exit without creating a package. Fix any validation errors and run the packaging command again.
 

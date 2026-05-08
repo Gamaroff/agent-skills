@@ -18,6 +18,18 @@ import zipfile
 from pathlib import Path
 from quick_validate import validate_skill, find_repo_root, collect_shared_refs
 
+MANAGED_BY = "agent-skills"
+SOURCE_URL = "https://github.com/Gamaroff/agent-skills"
+
+
+def inject_origin_metadata(content, managed_by, source_url):
+    """Inject managed-by and source fields into SKILL.md frontmatter."""
+    match = re.match(r'^---\n(.*?)(\n---)', content, re.DOTALL)
+    if not match:
+        return content
+    injected = f"\nmanaged-by: {managed_by}\nsource: {source_url}"
+    return content[:match.start(2)] + injected + content[match.start(2):]
+
 
 def package_skill(skill_path, output_dir=None):
     """
@@ -101,10 +113,13 @@ def package_skill(skill_path, output_dir=None):
                 if not file_path.is_file() or file_path.suffix in EXCLUDE_SUFFIXES:
                     continue
                 arcname = file_path.relative_to(skill_path.parent)
-                if file_path.suffix == '.md' and shared_to_bundle:
+                if file_path.suffix == '.md':
                     content = file_path.read_text()
-                    rewritten = SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
-                    zipf.writestr(str(arcname), rewritten)
+                    if file_path.name == 'SKILL.md':
+                        content = inject_origin_metadata(content, MANAGED_BY, SOURCE_URL)
+                    if shared_to_bundle:
+                        content = SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
+                    zipf.writestr(str(arcname), content)
                 elif file_path.suffix == '.js' and shared_to_bundle:
                     content = file_path.read_text()
                     rewritten = JS_SHARED_RE.sub(lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})', content)
