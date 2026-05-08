@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "agent-skills: A library of Claude Code skills"
+abstract: "Modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling."
+authors:
+  - family-names: Gamaroff
+    given-names: Lorien
+    email: gamaroff@gmail.com
+repository-code: "https://github.com/Gamaroff/agent-skills"
+url: "https://github.com/Gamaroff/agent-skills"
+license: MIT
+type: software
+keywords:
+  - claude-code
+  - ai-agents
+  - skills
+  - llm-tooling
+  - developer-tools
