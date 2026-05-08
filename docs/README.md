@@ -14,6 +14,7 @@ Documentation for the Agent Skills library.
 - **[Conventions](./conventions.md)** — File naming, configuration, epic registry
 - **[Packaging](./packaging.md)** — Validation, shared resources, distribution
 - **[Creating Skills](./creating-skills.md)** — Authoring guide, file structure, best practices
+- **[Placeholders](./placeholders.md)** — Legend for `{project}`, `{api-service}`, `@your-org/...` and other template tokens used in skills
 
 ## External Resources
 
