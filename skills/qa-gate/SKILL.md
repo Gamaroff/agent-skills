@@ -62,16 +62,18 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 
 ### Directory Structure
 
-Gate files mirror PRD folder structure:
+Gate files are **co-located** in the same directory as the story they belong to. Never use a central `docs/qa/gates/` path.
 
 ```
-docs/qa/gates/
-└── [prd-path]/
-    ├── story.1.1.gate.1.feature-name.yml
-    └── story.1.2.gate.1.feature-name.yml
+docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/
+├── story.<N>.<M>.<slug>.md
+├── story.<N>.<M>.qa.1.<name>.md      # QA report
+└── story.<N>.<M>.gate.1.<name>.yml   # Gate file (co-located)
 ```
 
-**Example**: If story is at `docs/prd/domain-name/module-name/story.1.1.5.md`, gate goes to `docs/qa/gates/domain-name/module-name/story.1.1.5.gate.1.feature-cache.yml`
+**Example**: If story is at `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.<slug>.md`, gate goes to `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-cache.yml`
+
+For tasks: gate is co-located in the task directory at `docs/development/tasks/task.<id>.<name>/task.<id>.gate.<N>.<name>.yml`.
 
 ---
 
@@ -447,21 +449,12 @@ All file locations should be defined in skill resources or explicit file referen
 
 ```yaml
 qa:
-  qaLocation: "docs/qa" # Base directory for QA files
+  qaLocation: "docs/qa" # Base directory for QA assessments and other artifacts (NOT gates — gates are co-located with their story/task)
 ```
 
 ### Directory Structure
 
-```
-docs/qa/
-└── gates/
-    └── [mirrored-prd-structure]/
-        ├── story.1.1.gate.1.feature-name.yml
-        ├── story.1.2.gate.1.feature-name.yml
-        └── story.2.1.gate.1.feature-name.yml
-```
-
-**Example**: If PRD is at `docs/prd/ui-domain/module-name/`, gates go to `docs/qa/gates/ui-domain/module-name/`
+Gate files are co-located alongside their story or task — not under `docs/qa/gates/`. See "Directory Structure" earlier in this skill for the canonical layout.
 
 ---
 
