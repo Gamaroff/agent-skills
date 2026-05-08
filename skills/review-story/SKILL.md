@@ -406,7 +406,7 @@ qa:
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epics/epic.{n}.*.md'
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
@@ -2154,7 +2154,7 @@ Expected configuration in `skills-config.yaml`:
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epics/epic.{n}.*.md'
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 
 architecture:
   architectureSharded: true

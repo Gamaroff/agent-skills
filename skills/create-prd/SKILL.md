@@ -118,7 +118,7 @@ Before starting, ensure you have:
    │  ├─ Compatibility requirements
    │  ├─ Risk assessment (technical debt, integration risks)
    │  └─ Incremental, low-risk story sequencing
-   └─ Save to docs/prds/prd.[kebab-name]/prd.[kebab-name].md
+   └─ Save to docs/prd/[domain]/[feature]/prd.[feature].md
 
 3. Quality Validation
    ├─ Run pm-checklist
@@ -251,7 +251,7 @@ Is this correct?"
 ```
 Use create-doc skill with:
 - Template: brownfield-prd-template (resources/brownfield-prd-tmpl.yaml)
-- Output: docs/prds/prd.[kebab-name]/prd.[kebab-name].md
+- Output: docs/prd/[domain]/[feature]/prd.[feature].md
 - Mode: Interactive (mandatory for brownfield)
 ```
 

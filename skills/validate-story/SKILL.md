@@ -729,7 +729,7 @@ Expected configuration in `skills-config.yaml` (same shape as `/review-story`):
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epics/epic.{n}.*.md'
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 
 architecture:
   architectureSharded: true

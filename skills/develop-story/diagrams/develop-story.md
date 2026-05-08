@@ -1,12 +1,12 @@
 # `develop-story` — Harness & Sub-Skill Interaction
 
-Deep-dive review of `skills/develop-story/SKILL.md` plus the eight `shared/resources/develop-pipeline-step-*.md` protocol files that define its 8-step pipeline.
+Deep-dive review of `skills/develop-story/SKILL.md` plus the eight `develop-pipeline-step-*.md` protocol files in `shared/resources/` that define its 8-step pipeline.
 
 ---
 
 ## Technical Summary
 
-`develop-story` is a thin **orchestrator** (~240 lines of SKILL.md). Almost all real logic lives in `shared/resources/develop-pipeline-*.md`, loaded on-demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the single source of truth for state and audit trail.
+`develop-story` is a thin **orchestrator** (~240 lines of SKILL.md). Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on-demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the single source of truth for state and audit trail.
 
 ### External touchpoints
 

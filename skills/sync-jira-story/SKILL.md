@@ -52,7 +52,7 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 ### Required Files
 
 - A story markdown file at:
-  `docs/prds/<domain>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
+  `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
 - The story **MUST** have `jira_epic` in its frontmatter (e.g. `jira_epic: "PROJ-14"`).
   Run `/sync-jira-epic` on the parent epic first if missing. The script **exits with an error** if absent.
 - Optionally: `epic_source` pointing to the parent epic file for Bitbucket link generation.
@@ -91,7 +91,7 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 
 ```yaml
 title: 'Story 1.2: Wire up new auth middleware'
-epic_source: 'docs/prds/<domain>/epics/epic.<N>.<name>/epic.<N>.<name>.md'
+epic_source: 'docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md'
 jira_epic: "PROJ-14"                 # REQUIRED
 story_type: 'feature_enhancement'
 priority: 'high'
@@ -109,13 +109,13 @@ due_date: '2026-05-15'
 ### 1. Identify the Story File
 
 ```
-docs/prds/<domain>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
+docs/prd/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
 ```
 
 To find stories that have **not yet been synced** (no `jira_key`):
 
 ```bash
-grep -L 'jira_key:' $(find docs/prds -path '*/stories/*/story.*.md')
+grep -L 'jira_key:' $(find docs/prd -path '*/stories/*/story.*.md')
 ```
 
 ### 2. Ensure `jira_epic` Is Set
@@ -245,8 +245,8 @@ After sync the script writes (in-place, preserving order):
 jira_key: "PROJ-47"
 jira_url: "https://yourorg.atlassian.net/browse/PROJ-47"
 jira_epic: "PROJ-14"
-epic_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prds/.../epic.N.name.md"
-story_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prds/.../story.N.M.slug.md"
+epic_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prd/.../epic.N.name.md"
+story_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prd/.../story.N.M.slug.md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
 jira_last_body_hash: "f4b2c1d9a0e72b58"
 jira_last_meta_hash: "a91c0aef33eb1d04"

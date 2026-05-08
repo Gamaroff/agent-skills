@@ -1,10 +1,6 @@
 ---
 name: review-epic
-description: "Deep interactive epic review that checks template compliance, detects
-  scope overlap with existing epics, validates against architecture docs, and scans
-  the codebase for already-implemented features. Produces a co-located review report
-  or inline action plan. Use before writing stories to catch structural, duplication,
-  and conflict problems early."
+description: "Deep interactive epic review that checks template compliance, detects scope overlap with existing epics, validates against architecture docs, and scans the codebase for already-implemented features. Produces a co-located review report or inline action plan. Use before writing stories to catch structural, duplication, and conflict problems early."
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---
@@ -111,7 +107,7 @@ Store choice as `output_mode` for Step 9.
 
 1. **Locate epic file**
    - Accept: absolute path, epic number (e.g. `180`), or descriptive name
-   - Search pattern: `docs/prds/**/epics/epic.[N].*/epic.[N].*.md`
+   - Search pattern: `docs/prd/**/epics/epic.[N].*/epic.[N].*.md`
    - If ambiguous, list candidates and ask user to confirm
 
 2. **Load core references**
@@ -128,7 +124,7 @@ Store choice as `output_mode` for Step 9.
    - `.claude/notifications.md` (if epic touches notifications)
 
 4. **Scan for existing stories**
-   - Glob: `docs/prds/**/epics/epic.[N].*/stories/*.md`
+   - Glob: `docs/prd/**/epics/epic.[N].*/stories/**/story.*.md`
    - Read each story found
 
 **Output**: Full context package ready for analysis.
@@ -407,7 +403,7 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 **Option A — Co-located Report**:
 
-Save to: `docs/prds/[domain]/epics/epic.[N].[name]/epic.[N].[name]-review-report.md`
+Save to: `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-review-report.md`
 
 **Report structure**:
 

@@ -13,7 +13,7 @@ license: MIT
 
 Use this skill when:
 
-- Implementing user stories from `docs/stories/`
+- Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/`)
 - Executing technical tasks from `docs/development/tasks/`
 - Starting new feature development
 - Need guidance on development workflow
@@ -29,7 +29,7 @@ You can invoke this skill with:
 - **A specific story file**: `story.178.8.example-feature.md`
 - **A story directory**: `stories/story.178.8.example-feature/`
 - **A specific task file**: `task.1.cache-lib-simplification.md`
-- **A task directory**: `tasks/task.1.cache-lib-simplification/`
+- **A task directory**: `docs/development/tasks/task.1.cache-lib-simplification/`
 - **An epic file**: `epic.178.feature-management.md` (triggers creation workflow)
 
 **File Type Detection:**
@@ -38,11 +38,11 @@ You can invoke this skill with:
    - If detected: Invoke epic handling workflow (see Epic File Handling section)
 
 2. **Story File Detection** - Matches pattern: `story.{epic}.{story}.{name}.md`
-   - Location: co-located within epic directories (`docs/prd/<domain>/epics/epic.{N}.*/stories/`) or as provided by the caller
+   - Location: co-located within epic directories (`docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/`) or as provided by the caller
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 3. **Task File Detection** - Matches pattern: `task.{id}.{name}.md`
-   - Location: `docs/development/tasks/` or subdirectories
+   - Location: `docs/development/tasks/task.{id}.{name}/task.{id}.{name}.md` (each task has its own subdirectory)
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 **Directory Discovery Logic:**
@@ -63,7 +63,7 @@ Input: stories/story.178.8.example-feature/
 Discovers: story.178.8.example-feature.md
 Type: Story File → Use Story Workflow
 
-Input: tasks/task.1.cache-lib-simplification/
+Input: docs/development/tasks/task.1.cache-lib-simplification/
 Discovers: task.1.cache-lib-simplification.md
 Type: Task File → Use Task Workflow
 
@@ -123,7 +123,7 @@ Epic files cannot be developed directly. You must create individual
 stories or tasks from this epic first.
 
 Epic: epic.178.feature-management.md
-Location: docs/prd/ui-domain/module-name/epic.178.feature-management.md
+Location: docs/prd/ui-domain/module-name/epics/epic.178.feature-management/epic.178.feature-management.md
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
@@ -259,7 +259,7 @@ This document has "draft" status and may not be ready for development.
 
 Document: story.178.8.example-feature.md
 Status: draft
-Location: docs/stories/story.178.8.example-feature/
+Location: docs/prd/<domain>/<feature>/epics/epic.178.<name>/stories/story.178.8.example-feature/
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
@@ -548,7 +548,7 @@ This skill works best with the following conventions in your project (adapt as n
 ### 1. Develop Story Workflow
 
 **File Pattern**: `story.{epic}.{story}.{name}.md`
-**Location**: `docs/stories/`
+**Location**: co-located inside the epic dir: `{epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md` (epic-directory = `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/`). Never a global `docs/stories/`.
 
 **Starting Development**:
 
@@ -673,7 +673,7 @@ When tests fail during implementation:
 ### 2. Develop Task Workflow
 
 **File Pattern**: `task.{id}.{name}.md`
-**Location**: `docs/development/tasks/`
+**Location**: `docs/development/tasks/task.{id}.{name}/task.{id}.{name}.md` (each task has its own subdirectory)
 
 **Starting Development**:
 
@@ -797,9 +797,9 @@ Teach what and why you did in detail, as if training a junior engineer.
 
 **Key Paths**:
 
-- Stories: `docs/prd/<domain>/epics/epic.{N}.*/stories/` (co-located within epics)
+- Stories: `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/` (co-located within epics)
 - Tasks: `docs/development/tasks/`
-- QA Artifacts: `docs/qa/`
+- QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{N}.{M}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
 - PRD: `docs/prd/` (sharded)
 - Architecture: `docs/architecture/` (sharded)
 - Debug Log: `.ai/debug-log.md`
@@ -815,7 +815,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 Each story has its own subdirectory containing all related files:
 
 ```
-docs/prd/<domain>/epics/epic.{N}.<name>/stories/
+docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/
 └── story.{epic}.{story}.{story-name}/
     ├── story.{epic}.{story}.{story-name}.md           # Story file (source of truth)
     ├── story.{epic}.{story}.qa.{number}.{descriptive-name}.md  # QA report (created by QA)
@@ -847,7 +847,7 @@ docs/prd/<domain>/epics/epic.{N}.<name>/stories/
 Each task has its own subdirectory containing all related files:
 
 ```
-tasks/
+docs/development/tasks/
 └── task.{id}.{task-name}/
     ├── task.{id}.{task-name}.md                          # Task file (source of truth)
     ├── task.{id}.qa.{number}.{descriptive-name}.md       # QA report (created by QA)

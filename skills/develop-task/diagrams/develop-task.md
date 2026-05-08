@@ -1,12 +1,12 @@
 # `develop-task` — Harness & Sub-Skill Interaction
 
-Deep-dive review of `skills/develop-task/SKILL.md` plus the eight `shared/resources/develop-pipeline-step-*.md` protocol files that define its 8-step pipeline.
+Deep-dive review of `skills/develop-task/SKILL.md` plus the eight `develop-pipeline-step-*.md` protocol files in `shared/resources/` that define its 8-step pipeline.
 
 ---
 
 ## Technical Summary
 
-`develop-task` is a thin **orchestrator** adapted from `develop-story` for standalone technical tasks (refactoring, infra, cleanup). Almost all real logic lives in `shared/resources/develop-pipeline-*.md`, loaded on-demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the single source of truth for state and audit trail. Tasks live in `docs/development/tasks/task.{id}.{name}/`.
+`develop-task` is a thin **orchestrator** adapted from `develop-story` for standalone technical tasks (refactoring, infra, cleanup). Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on-demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the single source of truth for state and audit trail. Tasks live in `docs/development/tasks/task.{id}.{name}/`.
 
 ### External touchpoints
 

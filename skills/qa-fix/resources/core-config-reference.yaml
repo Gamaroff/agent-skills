@@ -12,7 +12,7 @@ prd:
   prdVersion: v4 # PRD schema version
   prdSharded: true # PRD uses sharded structure
   prdShardedLocation: docs/prd # Directory containing epic files
-  epicFilePattern: "*/epic-{n}*.md" # Pattern for finding epics
+  epicFilePattern: "**/epics/epic.{n}.*/epic.{n}.*.md" # Pattern for finding epics
 
 architecture:
   architectureFile: docs/architecture.md # Monolithic architecture file
@@ -28,11 +28,11 @@ devLoadAlwaysFiles: # Files to load on dev agent activation
   - docs/architecture/concepts/source-tree.md
 
 devDebugLog: .ai/debug-log.md # Dev debug log location
-devStoryLocation: docs/stories # Story file directory
+devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/
 
 
 # Usage Examples:
-# - Story files: {devStoryLocation}/{epic}.{story}.*.md
+# - Story files: {epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md
 # - QA gate files: {qa.qaLocation}/gates/{epic}.{story}-*.yml
 # - QA assessments: {qa.qaLocation}/assessments/{epic}.{story}-*.md
-# - Epic files: {prd.prdShardedLocation}/{category}/epic-{n}.*.md
+# - Epic files: {prd.prdShardedLocation}/{domain}/{feature}/epics/epic.{n}.{name}/epic.{n}.{name}.md

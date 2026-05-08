@@ -84,11 +84,11 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 **Fallback Defaults** (if config file doesn't exist but user approves proceeding):
 
 ```yaml
-devStoryLocation: co-located  # Stories are saved inside the epic's own stories/ subdirectory
+devStoryLocation: nested  # Stories are saved inside the epic's own stories/ subdirectory
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic-{n}*.md'
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
@@ -808,7 +808,7 @@ Expected configuration structure:
 # Project structure
 # Stories are saved inside each epic's own stories/ subdirectory — NOT in a global docs/stories/ folder.
 # Path pattern: {epic-directory}/stories/story.{N}.{M}.{title}/story.{N}.{M}.{title}.md
-devStoryLocation: co-located-in-epic
+devStoryLocation: nested
 devDebugLog: .ai/debug-log.md
 
 # PRD configuration
@@ -817,7 +817,7 @@ prd:
   prdVersion: v4
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epic-{n}*.md'
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 
 # Architecture configuration
 architecture:

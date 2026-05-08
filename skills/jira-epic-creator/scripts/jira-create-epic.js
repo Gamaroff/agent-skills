@@ -399,7 +399,7 @@ async function main() {
     if (!summary) {
       console.error("Error: Provide --summary or --file");
       console.log("\nUsage:");
-      console.log("  node jira-create-epic.js --file docs/epics/my-epic.md");
+      console.log("  node jira-create-epic.js --file docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md");
       console.log(
         '  node jira-create-epic.js --summary "Epic Title" --description "Details"',
       );

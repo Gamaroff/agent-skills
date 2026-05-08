@@ -117,7 +117,7 @@ This skill expects a configuration file at `skills-config.yaml` (in project root
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epics/epic.{n}.*.md' # Note: Epic numbers are globally unique (see /docs/development/epic-registry.md)
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md' # Note: Epic numbers are globally unique (see /docs/development/epic-registry.md)
 
 architecture:
   architectureSharded: true
@@ -147,7 +147,7 @@ qa:
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '*/epics/epic.{n}.*.md'
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture

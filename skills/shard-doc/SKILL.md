@@ -239,8 +239,8 @@ Document sharded successfully:
 **Typical sections**: System Design, Data Models, API Endpoints, etc.
 
 ### Large Epic Sharding
-**Source**: `docs/prd/domain/feature/epic.md`
-**Destination**: `docs/prd/domain/feature/epic/`
+**Source**: `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
+**Destination**: `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/shards/`
 **Typical sections**: Multiple user stories, acceptance criteria lists
 
 ---

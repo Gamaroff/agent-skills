@@ -65,18 +65,33 @@ function resolvePrdPath(prdSource, repoRoot) {
   const candidate = path.resolve(repoRoot, prdSource);
   if (fs.existsSync(candidate)) return candidate;
 
+  // Fallback: search under docs/prd/<domain>/<feature>/ for the PRD by basename.
+  // Canonical layout: docs/prd/<domain>/<feature>/prd.<feature>.md
   const basename = path.basename(prdSource, ".md");
-  const dirPart = path.basename(path.dirname(prdSource));
-  const bare = dirPart.replace(/^prd\./, "");
+  const bare = basename.replace(/^prd\./, "");
+  const prdRoot = path.resolve(repoRoot, "docs/prd");
+  if (!fs.existsSync(prdRoot)) return null;
 
-  const variants = [
-    path.resolve(repoRoot, "docs/prds", `prd.${bare}`, `prd.${bare}.md`),
-    path.resolve(repoRoot, "docs/prds", bare, `${bare}.md`),
-    path.resolve(repoRoot, "docs/prds", `${basename}.md`),
-    path.resolve(repoRoot, "docs/prds", `prd.${basename}.md`),
-  ];
-  for (const v of variants) if (fs.existsSync(v)) return v;
-  return null;
+  const targets = new Set([`${bare}.md`, `prd.${bare}.md`, `${basename}.md`]);
+  function walk(dir, depth) {
+    if (depth > 4) return null;
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    for (const e of entries) {
+      const p = path.join(dir, e.name);
+      if (e.isFile() && targets.has(e.name)) return p;
+      if (e.isDirectory()) {
+        const found = walk(p, depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return walk(prdRoot, 0);
 }
 
 // ---------------------------------------------------------------------------

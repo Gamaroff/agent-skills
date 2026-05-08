@@ -26,7 +26,7 @@ If you have uncommitted files (implementation reports, plan drafts) when `create
 
 Implementation reports and QA artifacts should not be included in the PR's committed code. Unstage them before `create-pr` runs its commit step so they remain local working files.
 
-**Example:** `git restore --staged docs/prds/epics/epic.33/stories/story.33.1/story.33.1.implementation.1.md`
+**Example:** `git restore --staged docs/prd/<domain>/<feature>/epics/epic.33.<name>/stories/story.33.1.<slug>/story.33.1.implementation.1.md`
 **Why it matters:** Reports committed to the PR bloat the diff and trigger unnecessary review comments.
 
 ---
@@ -53,7 +53,7 @@ The story register uses status icons that must be updated at each lifecycle stag
 
 Gate files, QA reports, bug reports, and DoD files are always co-located in the story or task directory — never in a central `docs/qa/` path. This keeps all context for a piece of work discoverable in one place.
 
-**Example:** `.plans/tasks/trusted-device-location-info/qa-gate.md` — not `docs/qa/task-14-gate.md`.
+**Example:** `docs/development/tasks/task.14.<name>/task.14.gate.1.<name>.yml` — not `docs/qa/task-14-gate.md`.
 **Why it matters:** Scattered QA artifacts get orphaned when stories are archived or directories are reorganised.
 
 ---

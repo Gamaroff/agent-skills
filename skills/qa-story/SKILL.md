@@ -1074,7 +1074,7 @@ stories/
 - **Tasks**: `task.[number].gate.[number].[descriptive-name].yml`
 - **MUST co-locate with the story/task file in the same directory**
 - Examples:
-  - Story: `docs/prd/domain-name/module-name/story.1.1.5.gate.1.feature-implementation.yml`
+  - Story: `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
   - Task: `docs/development/tasks/task.44.transactions-account-backend-integration/task.44.gate.1.transactions-account-backend-integration.yml`
 
 **Legacy Note**: Old pattern of storing gates in `docs/qa/gates/[prd-path]/` is deprecated. All new gate files must be co-located.
@@ -2201,7 +2201,7 @@ All file locations should be defined in skill resources or explicit file referen
 ```yaml
 qa:
   qaLocation: 'docs/qa' # Base directory for QA files
-devStoryLocation: 'docs/prd' # Story files location
+devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/
 devStoryNestedPattern: "docs/prd/**/epics/*/stories" # Nested story glob pattern
 ```
 

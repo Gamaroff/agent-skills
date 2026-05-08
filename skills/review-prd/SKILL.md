@@ -103,9 +103,8 @@ Before starting the review, resolve the input to a local file path:
 
 Search patterns (try in order, use first match):
 
-1. `docs/prds/prd.*{name}*/prd.*{name}*.md`
-2. `docs/prd/**/prd.*{name}*.md`
-3. `docs/prd/**/*{name}*/*.md` (sharded PRD — look for index or primary file)
+1. `docs/prd/**/prd.*{name}*.md`
+2. `docs/prd/**/*{name}*/*.md` (sharded PRD — look for index or primary file)
 
 **Step 3 — Handle sharded PRDs:**
 
@@ -117,7 +116,7 @@ If no match found: HALT with message:
 ```
 "No PRD found matching '[input]'. Available PRDs:"
 ```
-Then list results of `Glob: docs/prds/prd.*/prd.*.md` and `Glob: docs/prd/**/index.md`.
+Then list results of `Glob: docs/prd/**/prd.*.md` and `Glob: docs/prd/**/index.md`.
 
 ---
 
@@ -185,11 +184,10 @@ Store choice as `output_mode` for Step 11.
    - `.claude/notifications.md` (if PRD touches notifications)
 
 4. **Scan for child epics**:
-   - Glob: `docs/prds/prd.[name]/epics/epic.*/epic.*.md`
-   - Or: `docs/prd/**/epics/epic.*.md` (legacy structure)
+   - Glob: `docs/prd/[domain]/[feature]/epics/epic.*/epic.*.md`
 
 5. **Scan for child stories** under each epic found:
-   - Glob: `docs/prds/prd.[name]/epics/epic.*/stories/**/story.*.md`
+   - Glob: `docs/prd/[domain]/[feature]/epics/epic.*/stories/**/story.*.md`
 
 6. **Load epic registry**:
    - `docs/development/epic-registry.md`
@@ -574,7 +572,7 @@ If flagged: recommend splitting into separate PRDs and suggest scope boundaries.
 
 **Option A — Co-located Report**:
 
-Save to: `docs/prds/prd.[name]/prd.[name]-review-report.md`
+Save to: `docs/prd/[domain]/[feature]/prd.[feature]-review-report.md`
 
 **Report structure**:
 

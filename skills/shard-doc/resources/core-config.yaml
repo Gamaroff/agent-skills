@@ -6,7 +6,7 @@ prd:
   prdVersion: v4
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epic-{n}*.md"
+  epicFilePattern: "**/epics/epic.{n}.*/epic.{n}.*.md"
 architecture:
   architectureFile: docs/architecture.md
   architectureVersion: v4
@@ -18,4 +18,4 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
 devDebugLog: .ai/debug-log.md
-devStoryLocation: docs/stories
+devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/
