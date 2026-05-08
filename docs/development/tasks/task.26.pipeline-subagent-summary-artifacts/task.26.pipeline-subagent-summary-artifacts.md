@@ -4,7 +4,7 @@ title: "Pipeline context-hygiene: persist subagent summaries as artifacts (.summ
 type: task
 category: infrastructure
 priority: High
-status: ready-for-review
+status: accepted
 created: 2026-05-08
 updated: 2026-05-08
 assignee: TBD
@@ -16,7 +16,7 @@ source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section C)
 
 # Task 26 — Pipeline subagent summary artifacts
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `task.26.review.2026-05-08.md` implemented 2026-05-08
 
 > Detailed implementation guide: [task.26.plan.pipeline-subagent-summary-artifacts.md](task.26.plan.pipeline-subagent-summary-artifacts.md)

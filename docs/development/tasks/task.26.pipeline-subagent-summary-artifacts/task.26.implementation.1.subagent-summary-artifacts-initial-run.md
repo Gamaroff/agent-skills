@@ -33,10 +33,10 @@ Define `.summaries/` artifact convention, schema, gitignore entry, and impl-repo
 | 1. create-branch | ✅ Done | Branch `feature/task.26.pipeline-subagent-summary-artifacts` created from main | |
 | 2. review-task | ⏭️ Skipped | Already done 2026-05-08, all fixes applied | Lite mode + completed review |
 | 3. develop | ✅ Done | Task status == `Ready for Review` | All 4 phases (Convention, Report column, Step doc, gitignore) implemented; Phase 5 pilot+resume deferred to tasks 16/24 per scope decision |
-| 4. create-pr | ⏳ Pending | PR URL; issue #44 comment posted | |
+| 4. create-pr | ✅ Done | https://github.com/Gamaroff/agent-skills/pull/50 — `Closes #44` in body | |
 | 5–6. qa-task / qa-fix loop | ⏭️ Skipped | n/a | Lite mode, low-risk infra/docs task |
-| 7. finalise | ⏳ Pending | `task.26.dod.1.*.md`; task `status: accepted` | |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
+| 7. finalise | ✅ Done | `task.26.dod.1.subagent-summary-artifacts.md` written; task status set to `accepted` | Lite-mode finalise; DoD verdict: PASS for in-scope; Phase 5 deferred items annotated |
+| 8. commit-changes | ✅ Done | DoD + status update commit pushed | |
 
 ---
 
@@ -77,9 +77,13 @@ _Skipped (lite mode)._
 
 ## Completion
 
-**Finished**: TBD
-**Final Status**: TBD
-**Branch**: TBD
-**PR**: TBD
+**Finished**: 2026-05-08
+**Final Status**: Completed
+**Branch**: `feature/task.26.pipeline-subagent-summary-artifacts`
+**PR**: https://github.com/Gamaroff/agent-skills/pull/50
 **QA Iterations**: 0 (lite mode skipped)
-**DoD Summary**: TBD
+**DoD Summary**: `task.26.dod.1.subagent-summary-artifacts.md`
+
+## Completion Summary
+
+Lite-mode pipeline executed in 1 pass. All 4 in-scope phases (Convention spec, Report column, Step doc reference, gitignore) complete; Phase 5 pilot wire deferred to task.16 (subagent prerequisite). Schema validated via jq fixture round-trip. Foundation in place for tasks 16-25 to wire their subagents to write `.summaries/step-<N>-<name>.json` artifacts.
