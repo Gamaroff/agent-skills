@@ -131,12 +131,29 @@ Single shared resource is the sole maintenance point. Clear separation: poller o
 
 ## Final Assessment
 
-**Gate Status**: CONCERNS
+**Gate Status**: CONCERNS → **PASS** (after re-review 2026-05-08)
 **Rationale**: One medium-severity issue (Bitbucket credential naming) would cause auth failures for Bitbucket users following the documentation. Two low-severity issues are cosmetic but should be fixed for documentation quality. Core design is correct and complete.
-**Quality Score**: 80/100
+**Quality Score**: 80/100 → **95/100** (after fixes)
 
-**Deployment Recommendation**: CONDITIONAL
+**Deployment Recommendation**: CONDITIONAL → **APPROVED**
 **Conditions**:
 1. Fix `BITBUCKET_USER`/`BITBUCKET_TOKEN` → `BITBUCKET_USERNAME`/`BITBUCKET_APP_PASSWORD`
 2. Add `ERRORS=()` initialization
 3. Fix Jira labels extraction path
+
+---
+
+## Re-Review: Bug Resolution Summary (2026-05-08)
+
+**Re-Review Gate**: PASS
+**Quality Score**: 95/100
+
+All three issues from cycle 1 verified fixed in `shared/resources/tracker-state-poller-subagent.md` (commit `367fd29`):
+
+| Issue | Severity | Status | Verification |
+|-------|----------|--------|--------------|
+| Bitbucket credential names (`BITBUCKET_USER`/`BITBUCKET_TOKEN`) | MEDIUM | FIXED | Line 126: `${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}` confirmed |
+| `ERRORS=()` array not initialized | LOW | FIXED | Lines 71-73: `### Initialization` block with `ERRORS=()` added before Step 1 |
+| Jira labels path `fields.labels[*].value` | LOW | FIXED | Line 165: `fields.labels` (plain strings, example `["bug", "critical"]`) confirmed |
+
+No new issues found. Gate updated to PASS.
