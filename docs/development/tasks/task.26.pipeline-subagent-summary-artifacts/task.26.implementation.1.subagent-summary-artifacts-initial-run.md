@@ -35,7 +35,7 @@ Define `.summaries/` artifact convention, schema, gitignore entry, and impl-repo
 | 3. develop | ✅ Done | Task status == `Ready for Review` | All 4 phases (Convention, Report column, Step doc, gitignore) implemented; Phase 5 pilot+resume deferred to tasks 16/24 per scope decision |
 | 4. create-pr | ✅ Done | https://github.com/Gamaroff/agent-skills/pull/50 — `Closes #44` in body | |
 | 5–6. qa-task / qa-fix loop | ⏭️ Skipped | n/a | Lite mode, low-risk infra/docs task |
-| 7. finalise | ✅ Done | `task.26.dod.1.subagent-summary-artifacts.md` written; task status set to `accepted` | Lite-mode finalise; DoD verdict: PASS for in-scope; Phase 5 deferred items annotated |
+| 7. finalise | ✅ Done | DoD file + status `accepted` + DoD posted to PR #50 + issue #44 commented + project board → Done | Lite-mode finalise; full DoD body in PR comment; board moved via GraphQL singleSelectOptionId; issue auto-closes on PR merge via `Closes #44` |
 | 8. commit-changes | ✅ Done | DoD + status update commit pushed | |
 
 ---
