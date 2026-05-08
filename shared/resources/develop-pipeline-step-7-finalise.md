@@ -68,6 +68,29 @@ Log "Task completed" in Decisions Log.
 
 ---
 
+## Post DoD Body to PR (REQUIRED — lite and standard modes alike)
+
+After the DoD file is written, post its **full content** as a PR comment so reviewers see the acceptance evidence on the PR itself (not only in the repo tree). A one-line "task/story accepted" comment is insufficient.
+
+```bash
+DOD_FILE=$(ls {story-or-task-directory}/{story-or-task-prefix}.dod.*.md 2>/dev/null | sort | tail -1)
+DOD_BODY=$(cat "$DOD_FILE")
+gh pr comment {PR_NUMBER} --body "$(cat <<EOF
+## ✅ Definition of Done
+
+$DOD_BODY
+EOF
+)"
+```
+
+For Jira/Bitbucket, attach the DoD body to the PR via the equivalent Bitbucket PR-comment API or `addCommentToJiraIssue` (whichever the project uses for PR-level visibility).
+
+Log in Decisions Log: "DoD body posted to PR — comment URL: {url}."
+
+This step runs in **both lite and standard modes**. Lite mode skips QA agents (Steps 5–6); it does NOT skip the DoD-on-PR comment, the issue close/comment, or the board transition below.
+
+---
+
 ## Tracker Issue Update
 
 Branch on `TRACKER`:
