@@ -75,6 +75,24 @@ def validate_skill(skill_path):
             block_match = re.search(r'description:\s*[>|][+\-]?\n((?:[ \t]+.+\n?)+)', frontmatter)
             if block_match:
                 description = ' '.join(line.strip() for line in block_match.group(1).splitlines())
+        # Quoted multi-line scalar (double or single quotes spanning lines)
+        elif description.startswith(('"', "'")):
+            quote = description[0]
+            quoted_match = re.search(
+                rf'description:\s*{quote}((?:[^{quote}\\]|\\.)*){quote}',
+                frontmatter,
+                re.DOTALL,
+            )
+            if quoted_match:
+                description = ' '.join(quoted_match.group(1).split())
+        # Plain unquoted multi-line scalar (continuation lines indented)
+        else:
+            plain_match = re.search(
+                r'description:\s*(.+(?:\n[ \t]+\S.*)*)',
+                frontmatter,
+            )
+            if plain_match:
+                description = ' '.join(plain_match.group(1).split())
         # Check for angle brackets
         if '<' in description or '>' in description:
             return False, "Description cannot contain angle brackets (< or >)"
