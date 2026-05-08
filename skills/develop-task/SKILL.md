@@ -103,6 +103,8 @@ After EVERY step completes, before moving to the next step:
 2. Release all intermediate file contents from active consideration — do not re-read files that were already processed unless specifically needed
 3. Summarize the step result in ≤5 bullet points in the implementation report, then treat step as closed
 
+When a step dispatches subagents, persist their summaries per the convention in `shared/resources/subagent-summary-artifact.md` and update the implementation report's `Subagent summary ref` column in the same write. The on-disk JSON lets you safely release the subagent's verbose output from active context — resume reads the summary from disk if needed.
+
 This prevents context accumulation across the 8-step pipeline.
 
 **Never stop between steps.** This pipeline runs hands-free from Step 1 to Step 8. Never output a "done" or "complete" message and stop unless a step explicitly results in HALT or the pipeline has reached Step 8. Completing Step 4 (create-pr) is NOT a terminal state — Step 5 must follow immediately.
@@ -144,7 +146,9 @@ See `shared/resources/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5
 
 ### Step 7: Finalise
 
-See `shared/resources/develop-pipeline-step-7-finalise.md` for the full Step 7 protocol: `/finalise` invocation, completion detection, DoD gaps halt (with commit + push), tracker issue update (GitHub close + board Done, Jira Done transition), DoD summary file location, and Pipeline Progress update.
+See `shared/resources/develop-pipeline-step-7-finalise.md` for the full Step 7 protocol: `/finalise` invocation, completion detection, DoD gaps halt (with commit + push), DoD-body-to-PR comment, tracker issue update (GitHub close + board Done, Jira Done transition), DoD summary file location, Step 7 Completion Checklist, and Pipeline Progress update.
+
+**Lite mode applies to Step 5 only.** Step 7 (finalise + PR DoD comment + issue close + board Done) runs in full in every mode. Do NOT inline `/finalise` by writing the DoD file directly — invoke the skill. See the Step 7 Completion Checklist before marking the row ✅.
 
 ### Step 8: Commit Changes
 

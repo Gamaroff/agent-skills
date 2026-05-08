@@ -38,7 +38,7 @@ Categorized index of all 124 skills in this library.
 | `qa-planning` | Use for upfront test planning and risk assessment before/during development. Provides risk profiling (probability × impact) and comprehensive test design (test levels, priorities, scenarios) to… |
 | `qa-story` | Use for comprehensive quality review during/after implementation. Performs adaptive test architecture review with conditional parallel agents based on story complexity. Uses direct tools for well-documented… |
 | `qa-task` | Comprehensive quality assurance review for technical tasks. Focuses on success criteria validation, implementation phase verification, and non-functional requirements assessment for infrastructure and refactoring work. |
-| `review-epic` | Deep interactive epic review that checks template compliance, detects |
+| `review-epic` | Deep interactive epic review that checks template compliance, detects scope overlap with existing epics, validates against architecture docs, and scans the codebase for already-implemented features.… |
 | `review-prd` | Deep interactive PRD review that verifies claims against the actual |
 | `review-story` | Deep interactive story review that asks clarifying questions to resolve ambiguities, conflicts, and missing information. Use when story has unclear requirements or you need user… |
 | `review-task` | Interactive task document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and implementability issues. Provides user-aligned recommendations based on collaborative… |

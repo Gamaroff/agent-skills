@@ -16,3 +16,6 @@ skills/*/*/SKILL.md
 # Claude Code session state — pipeline locks and other runtime artifacts
 .claude/
 .windsurf/
+
+# Subagent summary artifacts — runtime-local, see shared/resources/subagent-summary-artifact.md
+.summaries/

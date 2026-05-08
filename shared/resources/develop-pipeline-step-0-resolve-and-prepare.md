@@ -393,15 +393,17 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 
 ## Pipeline Progress
 
-| Step | Status | Required Artifacts | Notes |
-| ---- | ------ | ------------------ | ----- |
-| 1. create-branch            | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | |
-| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{date}.md` exists (or skip logged) | |
-| 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | |
-| 4. create-pr                | ⏳ Pending | PR URL; issue/tracker comment posted | |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | |
-| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted` | |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | |
+| Step | Status | Required Artifacts | Notes | Subagent summary ref |
+| ---- | ------ | ------------------ | ----- | -------------------- |
+| 1. create-branch            | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | | — |
+| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{date}.md` exists (or skip logged) | | — |
+| 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | | — |
+| 4. create-pr                | ⏳ Pending | PR URL; issue/tracker comment posted | | — |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | | — |
+| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted` | | — |
+| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
+
+> The `Subagent summary ref` column points to the JSON artifact described in `shared/resources/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
 ---
 
@@ -472,15 +474,17 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 
 ## Pipeline Progress
 
-| Step | Status | Required Artifacts | Notes |
-|------|--------|--------------------|-------|
-| 1. create-branch | ⏳ Pending | Branch `feature/task.{id}.*` exists in git | |
-| 2. review-task | ⏳ Pending | `task.{id}.review.{date}.md` exists (or skip logged) | |
-| 3. develop | ⏳ Pending | Task status == `Ready for Review` | |
-| 4. create-pr | ⏳ Pending | PR URL; issue comment posted | |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted | |
-| 7. finalise | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted` | |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | |
+| Step | Status | Required Artifacts | Notes | Subagent summary ref |
+|------|--------|--------------------|-------|----------------------|
+| 1. create-branch | ⏳ Pending | Branch `feature/task.{id}.*` exists in git | | — |
+| 2. review-task | ⏳ Pending | `task.{id}.review.{date}.md` exists (or skip logged) | | — |
+| 3. develop | ⏳ Pending | Task status == `Ready for Review` | | — |
+| 4. create-pr | ⏳ Pending | PR URL; issue comment posted | | — |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted | | — |
+| 7. finalise | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted` | | — |
+| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | | — |
+
+> The `Subagent summary ref` column points to the JSON artifact described in `shared/resources/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
 ---
 
