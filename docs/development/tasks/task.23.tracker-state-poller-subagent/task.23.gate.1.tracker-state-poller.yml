@@ -1,0 +1,66 @@
+schema: 1
+task: 'task.23.tracker-state-poller-subagent'
+task_title: 'Add shared tracker state poller Explore subagent'
+gate: CONCERNS
+status_reason: 'Core design correct and complete. One medium issue: Bitbucket credential env var names differ from project convention (BITBUCKET_USER vs BITBUCKET_USERNAME). Two low issues: uninitialised ERRORS array, incorrect Jira labels field path.'
+reviewer: 'QA Engineer'
+updated: '2026-05-08T00:00:00Z'
+
+top_issues:
+  - issue: 'Bitbucket credential names inconsistent with project convention'
+    severity: medium
+    location: 'shared/resources/tracker-state-poller-subagent.md — Step 2 VCS=bitbucket'
+    suggested_owner: dev
+    recommendation: 'Change BITBUCKET_USER→BITBUCKET_USERNAME and BITBUCKET_TOKEN→BITBUCKET_APP_PASSWORD'
+  - issue: 'ERRORS bash array not initialized before use'
+    severity: low
+    location: 'shared/resources/tracker-state-poller-subagent.md — Execution Protocol steps 2/3'
+    suggested_owner: dev
+    recommendation: 'Add ERRORS=() at the start of the Execution Protocol'
+  - issue: 'Jira labels field path uses .value but labels are plain strings'
+    severity: low
+    location: 'shared/resources/tracker-state-poller-subagent.md — Step 3 TRACKER=jira'
+    suggested_owner: dev
+    recommendation: 'Change fields.labels[*].value to fields.labels'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Read-only; no secrets in output; credentials via env vars'
+  performance:
+    status: PASS
+    notes: 'Explore subagent boundary isolates raw CLI/MCP output from main context'
+  reliability:
+    status: PASS
+    notes: 'errors[] never-throw contract explicit and consistent across all platform branches'
+  maintainability:
+    status: PASS
+    notes: 'Single shared resource, clear mutation/read separation, usage patterns documented'
+
+recommendations:
+  immediate:
+    - action: 'Fix Bitbucket credential names: BITBUCKET_USER→BITBUCKET_USERNAME, BITBUCKET_TOKEN→BITBUCKET_APP_PASSWORD'
+      refs: ['shared/resources/tracker-state-poller-subagent.md']
+    - action: 'Add ERRORS=() initialization before Execution Protocol Step 1'
+      refs: ['shared/resources/tracker-state-poller-subagent.md']
+    - action: 'Fix Jira labels extraction: fields.labels[*].value → fields.labels'
+      refs: ['shared/resources/tracker-state-poller-subagent.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'Fix three issues listed in immediate recommendations'

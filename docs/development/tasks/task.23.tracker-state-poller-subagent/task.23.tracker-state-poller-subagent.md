@@ -112,6 +112,31 @@ Revert step references to inline polls. Shared resource can remain as dead-lette
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-08
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.23.qa.1.tracker-state-poller.md](./task.23.qa.1.tracker-state-poller.md)
+- **Gate File**: [task.23.gate.1.tracker-state-poller.yml](./task.23.gate.1.tracker-state-poller.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 0 (documentation-only task)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+1. Bitbucket credential env var names inconsistent with project convention (MEDIUM)
+2. ERRORS=() array not initialized in bash examples (LOW)
+3. Jira labels extraction path incorrect — `[*].value` not needed (LOW)
+
+---
+
 ## Dev Agent Record
 
 **Implementation Summary**: Created `shared/resources/tracker-state-poller-subagent.md` — a shared Explore subagent prompt that encapsulates all read-only tracker state polling (PR state, issue state) across GitHub/Jira/Bitbucket. Updated three pipeline step files to reference the new poller instead of inline CLI/MCP calls.
@@ -139,3 +164,4 @@ Revert step references to inline polls. Shared resource can remain as dead-lette
 
 **Change Log**:
 - 2026-05-08: All 4 phases implemented. New shared resource created. Three step files updated.
+- 2026-05-08: QA fixes applied — Bitbucket credential names corrected, ERRORS=() initialization added, Jira labels path fixed.

@@ -66,6 +66,12 @@ Always check `errors` before trusting the state fields:
 
 ## Execution Protocol (run inside the Explore subagent)
 
+### Initialization
+
+```bash
+ERRORS=()
+```
+
 ### Step 1 — Determine platform
 
 Source `shared/resources/resolve-platform.sh` or replicate its logic inline:
@@ -117,7 +123,7 @@ fi
 Derive `{WORKSPACE}` and `{REPO_SLUG}` from git remote URL (`git remote get-url origin`), e.g. `git@bitbucket.org:{workspace}/{slug}.git`.
 
 ```bash
-BB_RESP=$(curl -s -u "${BITBUCKET_USER}:${BITBUCKET_TOKEN}" \
+BB_RESP=$(curl -s -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
   "https://api.bitbucket.org/2.0/repositories/{WORKSPACE}/{REPO_SLUG}/pullrequests/{PR_NUMBER}" 2>&1)
 if echo "$BB_RESP" | jq -e '.id' >/dev/null 2>&1; then
   PR_URL=$(echo "$BB_RESP" | jq -r '.links.html.href')
@@ -156,7 +162,7 @@ Call `getJiraIssue` MCP tool:
 
 Extract:
 - `ISSUE_STATE` = `fields.status.name`
-- `ISSUE_LABELS` = `[fields.labels[*].value]`
+- `ISSUE_LABELS` = `fields.labels` (array of plain strings — e.g. `["bug", "critical"]`)
 - `ISSUE_COLUMN` = `null` (Jira board column not directly available from issue fields)
 - `ISSUE_COMMENTS` = `fields.comment.total`
 
