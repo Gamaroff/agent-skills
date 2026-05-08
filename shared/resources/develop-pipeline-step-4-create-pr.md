@@ -72,6 +72,16 @@ After the PR is created:
     > .claude/state/develop-pipeline.lock.tmp && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock
   ```
 
+### Post-PR State Verification (shared — uses tracker state poller)
+
+Invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty). Verify:
+
+- `result.pr.state == "OPEN"` → proceed normally
+- `result.pr.state == "MERGED"` or `"CLOSED"` → log warning in Issues Log: "PR #{PR_NUMBER} unexpectedly {state} after creation — possible auto-merge or branch policy"; proceed (non-blocking)
+- `result.errors | length > 0` → log each error in Issues Log; proceed (non-blocking)
+
+Log in Decisions Log: "Post-PR state check: PR #{PR_NUMBER} state = {state}. errors = {error_count}."
+
 ---
 
 ## Jira Tracker Update (when `TRACKER=jira` and `TRACKER_ISSUE` is set)

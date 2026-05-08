@@ -84,9 +84,15 @@ This skill produces **task documentation and the co-located plan file only**. It
 
 - ✅ The task directory `docs/development/tasks/task.[ID].[name]/`
 - ✅ `task.[ID].[name].md` (task doc)
-- ✅ `task.[ID].plan.[name].md` (plan doc)
+- ✅ `task.[ID].plan.[name].md` (plan doc — MUST be co-located in the task directory above)
 - ✅ `docs/prd/sprint-status.yaml` status field update (step 5)
 - ✅ Tracker issue creation via `gh` / Jira API (step 4.5)
+
+**Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
+
+- ❌ `~/.claude/plans/` (Claude Code plan-mode default — outside repo, not version-controlled)
+- ❌ `~/.agents/plans/`, `/tmp/`, repo root, or any non-task directory
+- If a source plan exists at `~/.claude/plans/<name>.md`, relocate its content into the co-located plan file. Do not link to the home-directory path.
 
 **If the user asks to "create the task and start implementing"**: create the task documentation, then STOP and explicitly hand off — tell user to invoke `/develop-task` (or similar) as a separate step. Do not chain.
 
@@ -265,6 +271,13 @@ For each risk:
 After collecting all section content (especially the Implementation Plan in Section 6), generate a co-located implementation plan file.
 
 **File**: `task.[ID].plan.[descriptive-name].md` — same directory as the task document.
+
+**CRITICAL — co-location is mandatory. The plan file MUST be written into the task's own directory (`docs/development/tasks/task.[ID].[descriptive-name]/`) alongside the task doc.**
+
+- ❌ NEVER write the plan to `~/.claude/plans/`, `~/.agents/plans/`, `/tmp/`, the repo root, or any other shared/agent-scratch location.
+- ❌ NEVER leave a plan in `~/.claude/plans/` (Claude Code plan-mode default) and link to it from the task — it is outside the repo, invisible to teammates, and not version-controlled.
+- ✅ If a source/upstream plan already exists at `~/.claude/plans/<name>.md` (e.g., from Claude Code plan mode or a prior brainstorm), **relocate its content** into the co-located `task.[ID].plan.[descriptive-name].md` file. Do not just reference the original path.
+- ✅ Use a relative path (filename only) when cross-referencing from the task doc — both files live in the same directory.
 
 **Purpose**: The plan file contains implementation-level detail that the task document deliberately omits: code snippets, exact file changes, function signatures, and line-by-line guidance. The task doc describes *what* to build; the plan describes *how*.
 

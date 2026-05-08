@@ -28,7 +28,7 @@ Single shared Explore prompt encapsulates platform-aware read-only polling. Retu
 
 ## Phase 2 — Poller prompt
 
-`shared/resources/tracker-state-poller-prompt.md`:
+`shared/resources/tracker-state-poller-subagent.md`:
 
 ```
 Source shared/resources/resolve-platform.sh.
@@ -45,9 +45,9 @@ Aggregate; return JSON matching schema. Append API errors to `errors` array; nev
 ## Phase 3 — Migrate callers
 
 Replace inline poll calls in:
-- `develop-pipeline-step-4-create-pr.md` — post-PR state check
-- `develop-pipeline-step-5-6-qa-loop.md` — gate-cycle PR/issue checks
-- `develop-pipeline-step-7-finalise.md` — pre-close polling
+- `shared/resources/develop-pipeline-step-4-create-pr.md` — post-PR state check
+- `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — gate-cycle PR/issue checks
+- `shared/resources/develop-pipeline-step-7-finalise.md` — pre-close polling
 
 Mutations (close, comment, transition) stay inline.
 
@@ -63,6 +63,7 @@ Verify JSON consistent across platforms.
 ## Key References
 
 - `shared/resources/resolve-platform.sh`
+- `shared/resources/subagent-summary-artifact.md` (task.26 — compact-JSON pattern)
 - Existing `gh pr view`, Atlassian MCP tools listed in deferred tools
 
 ## Testing Approach

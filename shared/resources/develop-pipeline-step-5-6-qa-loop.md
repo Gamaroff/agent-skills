@@ -101,7 +101,12 @@ After fixes are applied:
    **Commit**: `{hash}`
    ```
 
-5. Increment the cycle counter and return to 5a.
+5. **Post-fix PR state check (uses tracker state poller)**: Invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty). Check:
+   - `result.pr.state == "OPEN"` → continue QA loop normally
+   - `result.pr.state == "MERGED"` or `"CLOSED"` → HALT: "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
+   - `result.errors | length > 0` → log each error in Issues Log; continue (non-blocking)
+
+6. Increment the cycle counter and return to 5a.
 
 ---
 

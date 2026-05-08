@@ -134,6 +134,18 @@ Document status follows a canonical lifecycle defined in `shared/resources/docum
 
 **Enforcement/validation:** Many `*-enforcer` and `*-validator` skills for domain-specific checks
 
+## Plan File Locations
+
+Implementation plans must be co-located with the work they describe — never left in agent scratch directories like `~/.claude/plans/` (Claude Code plan-mode default), `~/.agents/plans/`, or `/tmp/`.
+
+| Plan type | Location | Filename |
+| --- | --- | --- |
+| Task plan | Inside the task directory | `task.[ID].plan.[descriptive-name].md` |
+| Story plan | Inside the story directory (alongside story doc) | `story.[E].[S].plan.[descriptive-name].md` |
+| General plan (not tied to a task/story) | `.agents/plans/` in the repo | `<descriptive-kebab-case-name>.md` |
+
+If a plan was generated upstream (e.g., Claude Code plan mode wrote it to `~/.claude/plans/<name>.md`), **relocate its content** into the appropriate in-repo location above. Do not link to the home-directory path — it's outside the repo, not version-controlled, and invisible to teammates.
+
 ## Shared Resources
 
 `shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. At package time, `package_skill.py` auto-bundles referenced files under `references/` inside the zip and rewrites paths accordingly — installed skills are fully self-contained. Never use symlinks or relative paths to reference shared resources.

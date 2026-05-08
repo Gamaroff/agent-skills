@@ -46,8 +46,14 @@ This skill produces **the story document and its co-located plan file only**. It
 
 - ✅ The story directory `{epic-directory}/stories/story.{E}.{S}.{name}/`
 - ✅ `story.{E}.{S}.{name}.md` (story doc)
-- ✅ `story.{E}.{S}.plan.{name}.md` (plan doc)
+- ✅ `story.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
 - ✅ `docs/prd/sprint-status.yaml` status field update (Step 6.2)
+
+**Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
+
+- ❌ `~/.claude/plans/` (Claude Code plan-mode default — outside repo, not version-controlled)
+- ❌ `~/.agents/plans/`, `/tmp/`, repo root, or any non-story directory
+- If a source plan exists at `~/.claude/plans/<name>.md`, relocate its content into the co-located plan file. Do not link to the home-directory path.
 
 **If the user asks to "create the story and start implementing"**: complete the story doc + plan, then STOP and explicitly hand off — tell user to invoke `/develop-story` as a separate step. Do not chain.
 
@@ -494,6 +500,13 @@ Create detailed, sequential list of technical tasks based on:
 After collecting tasks/subtasks and dev notes, generate a co-located implementation plan file.
 
 **File**: `story.[N].[M].plan.[descriptive-name].md` — same directory as the story document.
+
+**CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, per `devStoryLocation` config — typically nested under the parent epic directory).**
+
+- ❌ NEVER write the plan to `~/.claude/plans/`, `~/.agents/plans/`, `/tmp/`, the repo root, or any other shared/agent-scratch location.
+- ❌ NEVER leave a plan in `~/.claude/plans/` (Claude Code plan-mode default) and link to it from the story — it is outside the repo, invisible to teammates, and not version-controlled.
+- ✅ If a source/upstream plan already exists at `~/.claude/plans/<name>.md` (e.g., from Claude Code plan mode or a prior brainstorm), **relocate its content** into the co-located `story.[N].[M].plan.[descriptive-name].md` file. Do not just reference the original path.
+- ✅ Use a relative path (filename only) when cross-referencing from the story doc — both files live in the same directory.
 
 **Purpose**: The plan file contains implementation-level detail that the story document deliberately omits: code snippets, exact file changes, function signatures, and line-by-line guidance. The story doc describes *what* to build; the plan describes *how*.
 

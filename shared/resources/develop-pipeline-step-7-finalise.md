@@ -130,18 +130,15 @@ gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted. PR: {PR_URL
 
 #### Shared (both orchestrators)
 
-After closing, verify the issue is actually closed:
-```bash
-ISSUE_STATE=$(gh issue view {TRACKER_ISSUE} --json state -q '.state')
-if [ "$ISSUE_STATE" = "CLOSED" ]; then
-  echo "✅ GitHub Issue #{TRACKER_ISSUE} confirmed closed"
-else
-  echo "⚠️ GitHub Issue #{TRACKER_ISSUE} still open — state: $ISSUE_STATE"
-fi
-```
+After closing, verify the issue is actually closed using the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`). Invoke via Explore subagent with `PR_NUMBER=` (empty) and `ISSUE_KEY={TRACKER_ISSUE}`:
+
+- `result.issue.state == "CLOSED"` → log "✅ GitHub Issue #{TRACKER_ISSUE} confirmed closed"
+- Any other state → log "⚠️ GitHub Issue #{TRACKER_ISSUE} still {state}" — retry `gh issue close` once; if still not CLOSED, post PR comment warning
+- `result.errors | length > 0` → log each error in Issues Log; proceed (non-blocking)
 
 On any `gh issue close` failure: retry once. If still failing, log the error in the Decisions Log and Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
 
+Log in Decisions Log: "Post-close state check (poller): issue #{TRACKER_ISSUE} state = {state}. errors = {error_count}."
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
 
 Then move the project board item to Done using the same GraphQL pattern from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg GitHub path), but with "Done" as the target option (not "In Progress"). If the board move fails, post a comment on the issue warning that the board was not updated.
@@ -166,8 +163,14 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
    - If not found: log "⚠️ No done-state transition available for {TRACKER_ISSUE}" (non-blocking)
    - On failure: log warning and continue
 
+3. **Post-transition state verification** — invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) with `PR_NUMBER=` (empty) and `ISSUE_KEY={TRACKER_ISSUE}`:
+   - `result.issue.state` matches "Done", "Closed", or "Resolved" (case-insensitive) → log "✅ Jira issue {TRACKER_ISSUE} confirmed Done via poller"
+   - Any other state → log "⚠️ Jira issue {TRACKER_ISSUE} still showing {state} — transition may not have taken effect"
+   - `result.errors | length > 0` → log each error in Issues Log; proceed (non-blocking)
+
 Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — comment: {posted ✅ / ⚠️ failed}."
 Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — transition to Done: {✅ / ⚠️ no matching transition found / ⚠️ failed}."
+Log in Decisions Log: "Post-close state check (poller): issue {TRACKER_ISSUE} state = {state}. errors = {error_count}."
 
 ---
 
@@ -181,7 +184,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
 - [ ] Tracker issue commented (GitHub `gh issue comment` or Jira `addCommentToJiraIssue`)
 - [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
-- [ ] Project board / Jira board moved to Done (verify via `gh api` query or Jira `getJiraIssue` status field)
+- [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `shared/resources/tracker-state-poller-subagent.md`)
 - [ ] All five Decisions Log lines written: "DoD summary", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")
 
 This checklist applies in **both lite and standard modes**. Lite mode skips Steps 5–6; it never skips any item in this list.
