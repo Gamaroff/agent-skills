@@ -146,7 +146,9 @@ See `shared/resources/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5
 
 ### Step 7: Finalise
 
-See `shared/resources/develop-pipeline-step-7-finalise.md` for the full Step 7 protocol: `/finalise` invocation, completion detection, DoD gaps halt (with commit + push), tracker issue update (GitHub close + board Done, Jira Done transition), DoD summary file location, and Pipeline Progress update.
+See `shared/resources/develop-pipeline-step-7-finalise.md` for the full Step 7 protocol: `/finalise` invocation, completion detection, DoD gaps halt (with commit + push), DoD-body-to-PR comment, tracker issue update (GitHub close + board Done, Jira Done transition), DoD summary file location, Step 7 Completion Checklist, and Pipeline Progress update.
+
+**Lite mode applies to Step 5 only.** Step 7 (finalise + PR DoD comment + issue close + board Done) runs in full in every mode. Do NOT inline `/finalise` by writing the DoD file directly — invoke the skill. See the Step 7 Completion Checklist before marking the row ✅.
 
 ### Step 8: Commit Changes
 

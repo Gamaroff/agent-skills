@@ -11,6 +11,17 @@ Loaded by `/develop-story` and `/develop-task` during Step 7. Story/task variant
 
 ---
 
+## DO NOT Inline This Step (CRITICAL)
+
+The orchestrator MUST invoke the `/finalise` skill via the Skill tool. It MUST NOT:
+- Write the `dod.N.md` file directly with `Write` (the finalise skill produces it)
+- Set `status: accepted` without first running `/finalise` (status is part of finalise's output, not a precondition)
+- Skip /finalise in lite mode (lite mode only affects Step 5 QA — see `shared/resources/develop-pipeline-lite-mode.md`)
+
+If you find yourself reaching for `Write` to author a DoD file, STOP and invoke `/finalise` instead. Inlining the step bypasses the DoD checks and produces an audit trail that doesn't match what the spec says happened.
+
+---
+
 ## Invoke /finalise
 
 #### develop-story
@@ -157,6 +168,23 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
 
 Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — comment: {posted ✅ / ⚠️ failed}."
 Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — transition to Done: {✅ / ⚠️ no matching transition found / ⚠️ failed}."
+
+---
+
+## Step 7 Completion Checklist (MUST verify before marking ✅)
+
+Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST verify every item below. If any item is missing, the row stays ⏳ and the orchestrator goes back and completes the missing action — do NOT mark ✅ with caveats in the Notes column.
+
+- [ ] `/finalise` skill was invoked (not inlined with `Write`)
+- [ ] `*.dod.{N}.*.md` file exists in the story/task directory
+- [ ] Story/task `status:` (frontmatter) AND `Status:` (body) both read `accepted` / `Accepted`
+- [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
+- [ ] Tracker issue commented (GitHub `gh issue comment` or Jira `addCommentToJiraIssue`)
+- [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
+- [ ] Project board / Jira board moved to Done (verify via `gh api` query or Jira `getJiraIssue` status field)
+- [ ] All five Decisions Log lines written: "DoD summary", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")
+
+This checklist applies in **both lite and standard modes**. Lite mode skips Steps 5–6; it never skips any item in this list.
 
 ---
 
