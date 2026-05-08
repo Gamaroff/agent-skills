@@ -17,6 +17,10 @@ A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is 
 
 Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
 
+### Subagent Summary Replay
+
+For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<N>-*.json` file, prefer reading the JSON summary over re-running the subagent or re-reading the source artifacts the subagent consumed. This is the resume-side counterpart to the on-disk persistence convention in `shared/resources/subagent-summary-artifact.md`. If the JSON file is absent (in-flight pipeline started before the convention existed) or fails `jq -e '.schema_version == 1'`, fall back to the implementation report's textual notes for that step. Do NOT re-dispatch the subagent on resume just to repopulate the summary — the step is already ✅ and re-running is wasted work.
+
 ### develop-story artifact table
 
 | Step | Artifact to verify | Verification command |

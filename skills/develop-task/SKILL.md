@@ -103,6 +103,8 @@ After EVERY step completes, before moving to the next step:
 2. Release all intermediate file contents from active consideration — do not re-read files that were already processed unless specifically needed
 3. Summarize the step result in ≤5 bullet points in the implementation report, then treat step as closed
 
+When a step dispatches subagents, persist their summaries per the convention in `shared/resources/subagent-summary-artifact.md` and update the implementation report's `Subagent summary ref` column in the same write. The on-disk JSON lets you safely release the subagent's verbose output from active context — resume reads the summary from disk if needed.
+
 This prevents context accumulation across the 8-step pipeline.
 
 **Never stop between steps.** This pipeline runs hands-free from Step 1 to Step 8. Never output a "done" or "complete" message and stop unless a step explicitly results in HALT or the pipeline has reached Step 8. Completing Step 4 (create-pr) is NOT a terminal state — Step 5 must follow immediately.
