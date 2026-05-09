@@ -207,3 +207,36 @@ Skill-level work — no unit tests applicable per task §8 and §10 (under "Note
 **QA Report**: co-located at `task.22.qa.1.finalise-dod-parallel-checks.md`
 **Gate File**: co-located at `task.22.gate.1.finalise-dod-parallel-checks.yml`
 **Next Steps**: Apply fix to `SKILL.md:44`, then re-run `/qa-task` or proceed to `/finalise` if team accepts CONCERNS gate.
+
+---
+
+## Re-Review: Cycle 2 — 2026-05-09
+
+**Trigger**: qa-fix cycle 1 applied fixes to `SKILL.md:44` and `SKILL.md:102`.
+**Scope**: Quick verification — trivial 2-line text replacements.
+
+### Issue Resolution
+
+| Issue | Severity | Status | Verification |
+|-------|----------|--------|--------------|
+| Stale serial-write instruction (`SKILL.md:44`) | MEDIUM | ✅ FIXED | `grep` confirms new parallel-aware text present; stale CRITICAL instruction absent |
+| Stale placeholder text (`SKILL.md:102`) | LOW | ✅ FIXED | `grep` confirms `_DoD results will be appended here in 4 consolidated sections_` present |
+
+### Verification Evidence
+
+```
+SKILL.md:44  → "Steps 3–5 dispatch four parallel Explore subagents; the running summary
+               is written in four consolidated appends after all agents return (Step 3d).
+               Do NOT write incrementally."
+SKILL.md:102 → "_DoD results will be appended here in 4 consolidated sections after
+               parallel agent completion._"
+```
+
+No stale `After checking EACH` or `incrementally as each check` text remains.
+
+### Updated Gate Decision
+
+**Gate Status**: PASS ✅ (was CONCERNS)
+**Quality Score**: 93/100 (was 82/100)
+**Deployment Recommendation**: APPROVED (was CONDITIONAL)
+**Rationale**: Both cycle-1 issues resolved. Implementation solid — parallel dispatch, citation rules, failure handling, idempotent re-run all verified. Phase 4 validation remains a deferred future action (non-blocking).
