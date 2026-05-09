@@ -1,10 +1,10 @@
 # AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI agents working with code in this repository.
 
 ## Repository Purpose
 
-This is a library of Claude Code skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into Claude Code via `.agents/skills/` in target projects.
+This is a library of agent skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into agents via `.agents/skills/` in target projects.
 
 ## Skill Structure
 
@@ -28,7 +28,7 @@ description: Concise description of when/why to use this skill
 ---
 ```
 
-The `description` field is critical — it's what Claude uses for auto-activation matching (~100 words always in context).
+The `description` field is critical — it's what agents use for auto-activation matching (~100 words always in context).
 
 ## Progressive Disclosure Loading
 
@@ -136,7 +136,7 @@ Document status follows a canonical lifecycle defined in `shared/resources/docum
 
 ## Plan File Locations
 
-Implementation plans must be co-located with the work they describe — never left in agent scratch directories like `~/.claude/plans/` (Claude Code plan-mode default), `~/.agents/plans/`, or `/tmp/`.
+Implementation plans must be co-located with the work they describe — never left in agent scratch directories like `~/.agents/plans/` or `/tmp/`.
 
 | Plan type | Location | Filename |
 | --- | --- | --- |
@@ -144,7 +144,7 @@ Implementation plans must be co-located with the work they describe — never le
 | Story plan | Inside the story directory (alongside story doc) | `story.[E].[S].plan.[descriptive-name].md` |
 | General plan (not tied to a task/story) | `.agents/plans/` in the repo | `<descriptive-kebab-case-name>.md` |
 
-If a plan was generated upstream (e.g., Claude Code plan mode wrote it to `~/.claude/plans/<name>.md`), **relocate its content** into the appropriate in-repo location above. Do not link to the home-directory path — it's outside the repo, not version-controlled, and invisible to teammates.
+If a plan was generated upstream by an agent scratch directory, **relocate its content** into the appropriate in-repo location above. Do not link to home-directory paths — they're outside the repo, not version-controlled, and invisible to teammates.
 
 ## Shared Resources
 
