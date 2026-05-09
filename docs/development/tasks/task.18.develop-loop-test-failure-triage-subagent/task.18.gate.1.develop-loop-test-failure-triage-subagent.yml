@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.18.develop-loop-test-failure-triage-subagent'
+task_title: 'Add develop-loop test-failure triage Explore subagent'
+gate: PASS
+status_reason: 'All 4 phases verified, all success criteria met, 0 HIGH/MEDIUM issues. One LOW cosmetic wording gap in develop SKILL.md (non-blocking).'
+reviewer: 'QA Engineer'
+updated: '2026-05-09T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Documentation-only change; no auth/authorization paths touched; no new dependencies'
+  performance:
+    status: PASS
+    notes: 'Raw log (1k+ lines) replaced by ≤10-bullet YAML; main context token reduction >90%'
+  reliability:
+    status: PASS
+    notes: 'Bias-toward-real rule prevents false negatives; log retained on failure; three-strikes preserved'
+  maintainability:
+    status: PASS
+    notes: 'New shared resource file follows existing pattern; cross-file references consistent; one LOW cosmetic wording gap'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Clarify skills/develop/SKILL.md:622 — replace "in that file" with explicit path to test-failure-triage-prompt.md'
+      refs: ['skills/develop/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
