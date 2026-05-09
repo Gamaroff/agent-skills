@@ -331,6 +331,31 @@ devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 
 **Note**: PR metadata (PR_URL, PR_NUMBER, PR_STATE, PR_TITLE) is already validated and available from Prerequisites section.
 
+#### Step 1a: Dispatch Findings Ingester Subagent (Primary Path)
+
+Dispatch a read-only Explore subagent to ingest all QA artifacts and return a compact, risk-sorted Findings Summary. This keeps raw artifact content out of main context.
+
+Load the prompt from `shared/resources/qa-findings-ingester-prompt.md`. Provide:
+- `<dir>`: absolute path to the story or task directory
+- `mode`: `story` or `task`
+- `{epic}`, `{story}` (story mode) OR `{id}` (task mode): IDs used for glob construction
+
+**On subagent success**: Findings Summary (YAML) is available in context. Proceed directly to Step 1.5 (no-op path) then Step 2. Raw artifacts were never loaded into main context.
+
+**On `truncated_count > 0`**: Print the warning below and **HALT unconditionally** — including when invoked from an autonomous `/develop-task` pipeline. Do not auto-acknowledge. Pipeline must pause until user confirms they have reviewed the full gate/report manually.
+
+```
+⚠️ QA FINDINGS TRUNCATED — {truncated_count} additional findings not shown.
+Raw QA artifacts contain more findings than the ingester cap (20).
+Pipeline paused. Review the full gate YAML and QA report manually, then re-invoke /qa-fix.
+```
+
+**On subagent failure or error**: Log the failure and fall through to Step 1b.
+
+---
+
+#### Step 1b: Inline Reads (Fallback — only when Step 1a fails)
+
 Parse latest gate YAML for:
 
 - Gate status (PASS|CONCERNS|FAIL|WAIVED)
@@ -375,7 +400,9 @@ For each bug report, extract:
 
 ### Step 1.5: Consolidate Findings and Release Raw Artifacts
 
-After parsing all QA artifacts (gate YAML, QA reports, bug reports), consolidate before building the fix plan:
+**When Step 1a succeeded**: This step is a **no-op** — the ingester subagent already returned a compact Findings Summary and raw artifacts were never loaded into main context. Proceed directly to Step 2.
+
+**When Step 1b (fallback) ran**: After parsing all QA artifacts inline, consolidate before building the fix plan:
 
 1. Write a **Findings Summary** (bullet list):
    - Gate status + quality score

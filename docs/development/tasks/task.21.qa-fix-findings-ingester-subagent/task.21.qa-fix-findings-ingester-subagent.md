@@ -4,7 +4,7 @@ title: "Add pre-qa-fix QA findings ingester Explore subagent"
 type: task
 category: refactoring
 priority: High
-status: ready-for-development
+status: in-progress
 created: 2026-05-08
 updated: 2026-05-08
 assignee: TBD
@@ -16,7 +16,7 @@ source_plan: .agents/plans/purrfect-whisper.md (Section A #6)
 
 # Task 21 — Pre-`/qa-fix` findings ingester subagent
 
-**Status**: Ready for Development
+**Status**: In Progress
 **Review**: ✅ All review recommendations from `task.21.qa-fix-findings-ingester-subagent.review.2026-05-09.md` implemented 2026-05-09
 **GitHub Issue**: [#39](https://github.com/Gamaroff/agent-skills/issues/39)
 
