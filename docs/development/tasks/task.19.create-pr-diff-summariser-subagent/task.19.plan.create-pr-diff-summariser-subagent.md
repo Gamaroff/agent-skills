@@ -18,7 +18,7 @@ Capture `git diff base...HEAD` to a file; dispatch Explore subagent to author PR
 In `skills/create-pr/SKILL.md` PR-body composition step:
 
 ```bash
-DIFF_FILE=".claude/state/pr-diff-$(date +%s).patch"
+DIFF_FILE=".agents/state/pr-diff-$(date +%s).patch"
 git diff "$BASE...HEAD" > "$DIFF_FILE"
 ```
 
