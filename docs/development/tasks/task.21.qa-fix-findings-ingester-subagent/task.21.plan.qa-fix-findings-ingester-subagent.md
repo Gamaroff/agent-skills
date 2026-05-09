@@ -22,21 +22,21 @@ findings:
     source: gate | report | bug.<N>
     file: path/to/file.ts
     description: <one line>
-    suggested_fix_path: <one line>
+    suggested_fix_path: <one-line description of fix approach — NOT a file path>
 truncated_count: 0
 ```
 
 Cap 20; if exceeded → `truncated_count > 0` and `/qa-fix` HALTS until user confirms.
+**Halt is unconditional**: applies even when invoked from autonomous `/develop-task` pipeline. No auto-acknowledge.
 
 ## Phase 2 — Ingester prompt
 
 `shared/resources/qa-findings-ingester-prompt.md`:
 
 ```
-Discover artifacts under <task_dir>:
-  - gate.*.yml
-  - qa.*.md
-  - bug.*.md
+Discover artifacts under <story_dir> OR <task_dir>:
+  Story mode: story.{epic}.{story}.gate.*.yml, story.{epic}.{story}.qa.*.md, story.{epic}.{story}.bug.*.md
+  Task mode:  task.{id}.gate.*.yml, task.{id}.qa.*.md, task.{id}.bug.*.md
 
 Read each. Extract findings. Sort by severity (high first), then source (gate > report > bug).
 Return YAML matching schema. Cap 20.
@@ -48,7 +48,8 @@ If >20 raw findings: include `truncated_count` and stop processing further bug r
 In `skills/qa-fix/SKILL.md` Step 1:
 - Replace inline gate/report/bug-report reads with single ingester dispatch
 - Step 2 (triage) consumes Findings Summary directly
-- If `truncated_count > 0`: print warning, halt for user decision (acknowledge or process further)
+- If `truncated_count > 0`: print warning, halt for user decision (acknowledge or process further). Halt is unconditional — autonomous pipeline pauses too.
+- **Step 1.5 retained as fallback**: when ingester subagent dispatch fails or returns error, fall through to existing inline reads + Step 1.5 release. When ingester succeeds, Step 1.5 becomes a no-op (raw artifacts never reached main context).
 
 Existing Step 3 codebase Explore stays — operates on Findings Summary file paths.
 

@@ -4,7 +4,7 @@ title: "Add pre-qa-fix QA findings ingester Explore subagent"
 type: task
 category: refactoring
 priority: High
-status: planned
+status: ready-for-development
 created: 2026-05-08
 updated: 2026-05-08
 assignee: TBD
@@ -16,7 +16,9 @@ source_plan: .agents/plans/purrfect-whisper.md (Section A #6)
 
 # Task 21 — Pre-`/qa-fix` findings ingester subagent
 
-**Status**: Planned
+**Status**: Ready for Development
+**Review**: ✅ All review recommendations from `task.21.qa-fix-findings-ingester-subagent.review.2026-05-09.md` implemented 2026-05-09
+**GitHub Issue**: [#39](https://github.com/Gamaroff/agent-skills/issues/39)
 
 > Detailed implementation guide: [task.21.plan.qa-fix-findings-ingester-subagent.md](task.21.plan.qa-fix-findings-ingester-subagent.md)
 
@@ -59,10 +61,12 @@ None.
 ### Phase 3 — Wire into qa-fix Step 1 (Medium)
 - [ ] Replace inline reads with summary consumption
 - [ ] Preserve existing Step 3 codebase Explore
+- [ ] Retain existing Step 1.5 (`Consolidate Findings and Release Raw Artifacts`) as fallback path: when ingester subagent fails or returns error, fall through to inline reads + Step 1.5 release. When ingester succeeds, Step 1.5 becomes a no-op (artifacts never loaded into main context).
+- [ ] Truncation halt behaviour: when `truncated_count > 0`, HALT regardless of autonomous mode (`/develop-task` pipeline pauses until user acknowledges). Do not auto-confirm.
 
-### Phase 4 — Validation (Low)
-- [ ] Run on QA cycle with 3+ bug reports
-- [ ] Verify fix prioritisation matches baseline
+### Phase 4 — Acceptance verification (Low)
+- [ ] Verify fix prioritisation matches manual baseline on a real QA cycle
+- [ ] Confirm Step 1.5 fallback fires when ingester dispatch errored (simulate)
 
 ## 7. Files Summary
 
@@ -95,10 +99,10 @@ None.
 
 ## 10. Risk Assessment
 
-**High**: ingester drops a critical finding → developer skips fix. Mitigation: cap is 20 but findings >20 trigger explicit "TRUNCATED — N additional findings not shown" warning that halts qa-fix until user confirms.
+**High**: ingester drops a critical finding → developer skips fix. Mitigation: cap is 20 but findings >20 trigger explicit "TRUNCATED — N additional findings not shown" warning that halts qa-fix until user confirms. **Halt applies in autonomous `/develop-task` pipeline mode too** — no auto-acknowledge; pipeline pauses.
 
 **Medium**: severity mis-sort. Mitigation: include raw severity field; main can re-sort if needed.
 
 ## 11. Rollback Plan
 
-Revert `skills/qa-fix/SKILL.md`; inline reads restored.
+Revert `skills/qa-fix/SKILL.md`; inline reads restored. Delete `shared/resources/qa-findings-ingester-prompt.md`.
