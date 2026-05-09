@@ -11,7 +11,7 @@ assignee: TBD
 effort: ~0.5 day
 depends_on: task.26
 github_issue: 42
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #9)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #9)
 ---
 
 # Task 24 — Pipeline resume stale-context detector subagent

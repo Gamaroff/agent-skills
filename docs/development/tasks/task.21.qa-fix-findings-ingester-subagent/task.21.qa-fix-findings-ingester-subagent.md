@@ -11,7 +11,7 @@ assignee: TBD
 effort: ~0.5 day
 depends_on: —
 github_issue: 39
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #6)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #6)
 ---
 
 # Task 21 — Pre-`/qa-fix` findings ingester subagent

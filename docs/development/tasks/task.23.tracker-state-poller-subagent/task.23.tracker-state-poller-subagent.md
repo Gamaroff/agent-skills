@@ -13,7 +13,7 @@ assignee: TBD
 effort: ~0.5 day
 depends_on: task.26
 github_issue: 41
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #8)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #8)
 ---
 
 # Task 23 — Shared tracker state poller subagent

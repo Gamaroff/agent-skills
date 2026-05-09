@@ -13,7 +13,7 @@ assignee: TBD
 effort: ~0.75 day
 depends_on: —
 github_issue: 34
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #1)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #1)
 ---
 
 # Task 16 — `review-story` pre-pass via 3 parallel Explore subagents

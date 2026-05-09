@@ -11,7 +11,7 @@ assignee: TBD
 effort: ~0.5 day
 depends_on: task.23
 github_issue: 43
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section B)
+source_plan: .agents/plans/purrfect-whisper.md (Section B)
 ---
 
 # Task 25 — Pipeline Phase 0 parallel fan-out

@@ -108,7 +108,7 @@ Task scope, motivation, and Explore-subagent pattern sound. Blocking issues: wro
 #### Important
 - Filename mismatch: task body `test-output-<iter>-<ts>.log` vs plan `test-output-$(date +%s).log`.
   - **Fix (per Q7):** standardise on `test-output-<iter>-<ts>.log`.
-- `source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md` violates in-repo plan rule.
+- `source_plan: .agents/plans/purrfect-whisper.md` violates in-repo plan rule.
   - **Fix (per Q5):** relocate to `.agents/plans/purrfect-whisper.md`; update frontmatter.
 - Scope vs task.29 unclear — sibling task `task.29.develop-task-loop-test-failure-triage-subagent` exists.
   - **Fix (per Q2):** add scope note: task 18 owns prompt + shared step-3 wiring; task.29 owns develop-task pipeline-specific validation.

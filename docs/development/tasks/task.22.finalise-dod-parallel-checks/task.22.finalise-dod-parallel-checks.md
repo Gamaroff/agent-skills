@@ -11,7 +11,7 @@ assignee: TBD
 effort: ~1 day
 depends_on: —
 github_issue: 40
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #7)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #7)
 ---
 
 # Task 22 — `/finalise` DoD parallel checks (4 Explore subagents)

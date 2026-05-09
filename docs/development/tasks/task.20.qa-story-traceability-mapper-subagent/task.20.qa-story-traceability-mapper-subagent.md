@@ -13,7 +13,7 @@ assignee: TBD
 effort: ~0.5 day
 depends_on: —
 github_issue: 38
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #5)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #5)
 ---
 
 # Task 20 — Pre-`/qa-story` traceability mapper subagent

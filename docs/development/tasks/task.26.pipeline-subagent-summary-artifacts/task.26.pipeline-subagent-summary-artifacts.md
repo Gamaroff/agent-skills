@@ -11,7 +11,7 @@ assignee: TBD
 effort: ~0.5 day
 depends_on: —
 github_issue: 44
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section C)
+source_plan: .agents/plans/purrfect-whisper.md (Section C)
 ---
 
 # Task 26 — Pipeline subagent summary artifacts

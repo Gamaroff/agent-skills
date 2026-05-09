@@ -13,7 +13,7 @@ assignee: TBD
 effort: ~0.5 day
 depends_on: task.26
 github_issue: 35
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #2)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #2)
 ---
 
 # Task 17 — Develop-loop iteration audit subagent

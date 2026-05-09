@@ -75,7 +75,7 @@ Task scope sound, but wrong file paths throughout, scope-overlap with task.28 (m
 All required sections present. Frontmatter complete. Filename follows DOTS convention. `github_issue: 35` present. No unfilled placeholders.
 
 ### Optional
-- `source_plan` points to `~/.claude/plans/i-want-you-to-purrfect-whisper.md` — outside repo. Per CLAUDE.md plan-file rule, original plan should be relocated under `.agents/plans/`. Lower priority — task already extracted into in-repo task+plan.
+- `source_plan` points to `.agents/plans/purrfect-whisper.md` — outside repo. Per CLAUDE.md plan-file rule, original plan should be relocated under `.agents/plans/`. Lower priority — task already extracted into in-repo task+plan.
 
 ---
 

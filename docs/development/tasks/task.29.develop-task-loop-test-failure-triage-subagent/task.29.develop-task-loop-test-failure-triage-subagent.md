@@ -11,7 +11,7 @@ assignee: TBD
 effort: ~0.25 day
 depends_on: task.18
 github_issue: 47
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #3, develop-task variant)
+source_plan: .agents/plans/purrfect-whisper.md (Section A #3, develop-task variant)
 mirrors: task.18
 ---
 

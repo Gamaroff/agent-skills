@@ -4,7 +4,7 @@ title: "Index: subagent improvements for /develop-story and /develop-task pipeli
 type: index
 created: 2026-05-08
 updated: 2026-05-08
-source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md
+source_plan: .agents/plans/purrfect-whisper.md
 ---
 
 # Subagent pipeline improvements — task index
@@ -63,4 +63,4 @@ No dependencies. Can start once Wave 0 lands (26 unlocks summary-writing pattern
 - Within a wave, tasks are independent — pick by priority (High first: 17, 18, 21, 22, 26).
 - Wave 0 tasks block roughly half of everything else; landing them first maximises throughput.
 - Tasks 19/20/21/22 modify shared sub-skills (`/create-pr`, `/qa-story`, `/qa-fix`, `/finalise`); their changes apply to both pipelines without separate develop-task mirrors.
-- Source plan: `~/.claude/plans/i-want-you-to-purrfect-whisper.md`.
+- Source plan: `.agents/plans/purrfect-whisper.md`.
