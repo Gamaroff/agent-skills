@@ -12,15 +12,15 @@ parse them, and return a compact risk-sorted Findings Summary. Do not modify any
 
 Discover artifacts using the following globs under <dir>:
 
-Story mode (mode=story):
-  Gate:       story.{epic}.{story}.gate.*.yml   (all matches — use highest number)
-  QA Report:  story.{epic}.{story}.qa.*.md      (all matches — use highest number)
-  Bug Reports: story.{epic}.{story}.bug.*.md    (all matches)
+Story mode (mode=<mode> where <mode>=story):
+  Gate:       story.<epic>.<story>.gate.*.yml   (all matches — use highest number)
+  QA Report:  story.<epic>.<story>.qa.*.md      (all matches — use highest number)
+  Bug Reports: story.<epic>.<story>.bug.*.md    (all matches)
 
-Task mode (mode=task):
-  Gate:       task.{id}.gate.*.yml              (all matches — use highest number)
-  QA Report:  task.{id}.qa.*.md                 (all matches — use highest number)
-  Bug Reports: task.{id}.bug.*.md               (all matches)
+Task mode (mode=<mode> where <mode>=task):
+  Gate:       task.<id>.gate.*.yml              (all matches — use highest number)
+  QA Report:  task.<id>.qa.*.md                 (all matches — use highest number)
+  Bug Reports: task.<id>.bug.*.md               (all matches)
 
 ## What to Extract
 
@@ -84,6 +84,7 @@ Dispatch Explore subagent:
 - subagent_type: Explore
 - Load prompt from: shared/resources/qa-findings-ingester-prompt.md
 - Substitute placeholders:
-  - <dir>: absolute path to story/task directory
-  - mode, epic/story or task_id: from current context
+  - `<dir>`: absolute path to story/task directory
+  - `<mode>`: `story` or `task`
+  - `<epic>`, `<story>` (story mode) OR `<id>` (task mode): from current context
 ```

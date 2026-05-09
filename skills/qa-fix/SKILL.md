@@ -335,10 +335,12 @@ devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 
 Dispatch a read-only Explore subagent to ingest all QA artifacts and return a compact, risk-sorted Findings Summary. This keeps raw artifact content out of main context.
 
-Load the prompt from `shared/resources/qa-findings-ingester-prompt.md`. Provide:
-- `<dir>`: absolute path to the story or task directory
-- `mode`: `story` or `task`
-- `{epic}`, `{story}` (story mode) OR `{id}` (task mode): IDs used for glob construction
+Load the prompt from `shared/resources/qa-findings-ingester-prompt.md`. Substitute placeholders before dispatching:
+- `<dir>`: substitute with absolute path to the story or task directory
+- `<mode>`: substitute with `story` or `task`
+- `<epic>`, `<story>` (story mode) OR `<id>` (task mode): substitute with the relevant IDs from context
+
+Dispatch: `Agent(subagent_type="Explore", prompt=<loaded-prompt-with-substitutions>)`
 
 **On subagent success**: Findings Summary (YAML) is available in context. Proceed directly to Step 1.5 (no-op path) then Step 2. Raw artifacts were never loaded into main context.
 

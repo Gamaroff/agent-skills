@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.21.qa-fix-findings-ingester-subagent'
+task_title: 'Add pre-qa-fix QA findings ingester Explore subagent'
+gate: CONCERNS
+status_reason: 'Two MEDIUM issues — ambiguous "Provide" dispatch instruction and mixed placeholder styles — risk silent fallthrough to Step 1b, defeating context-reduction goal. No HIGH issues; all phases complete; fallback path preserves functionality.'
+reviewer: 'QA Engineer (automated pipeline)'
+updated: '2026-05-09T00:00:00Z'
+
+top_issues:
+  - issue: 'Step 1a dispatch uses "Provide" not "Substitute" — ambiguous, may not substitute <dir> into prompt'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    location: 'Step 1a, lines 338-341'
+    suggested_action: 'Change to explicit "Substitute <dir> with... Dispatch:" pattern matching create-pr line 241'
+  - issue: 'Mixed placeholder styles <dir> vs {epic}/{story}/{id} in ingester prompt body'
+    severity: medium
+    file: 'shared/resources/qa-findings-ingester-prompt.md'
+    location: 'lines 13-22'
+    suggested_action: 'Standardise all placeholders to one style (<angle> or {curly}); update Step 1a instruction to match'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No auth, credentials, or sensitive data. Explore subagent is read-only.'
+  performance:
+    status: PASS
+    notes: 'Design achieves >=70% context-token reduction for Step 1; subagent handles all artifact I/O.'
+  reliability:
+    status: CONCERNS
+    notes: 'Ambiguous dispatch instruction could cause silent fallthrough to Step 1b, silently defeating token-reduction goal. Fallback preserves functionality but no loud failure on ingester mismatch.'
+  maintainability:
+    status: PASS
+    notes: 'Step 1.5 dual-path clearly documented. New file well-structured. Minor placeholder ambiguity could cause future confusion when extending patterns.'
+
+recommendations:
+  immediate:
+    - action: 'Change Step 1a dispatch instruction from "Provide" to "Substitute <dir> with... Dispatch:" matching established create-pr pattern'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'Standardise placeholder styles in qa-findings-ingester-prompt.md; update Step 1a to match chosen style'
+      refs: ['shared/resources/qa-findings-ingester-prompt.md', 'skills/qa-fix/SKILL.md']
+  future:
+    - action: 'Consider non-nested delimiters for YAML schema block in qa-findings-ingester-prompt.md (cosmetic)'
+      refs: ['shared/resources/qa-findings-ingester-prompt.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'Fix dispatch instruction ambiguity in skills/qa-fix/SKILL.md Step 1a'
+    - 'Standardise placeholder styles in shared/resources/qa-findings-ingester-prompt.md'

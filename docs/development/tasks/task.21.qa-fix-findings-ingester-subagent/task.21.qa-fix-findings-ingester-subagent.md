@@ -106,3 +106,24 @@ None.
 ## 11. Rollback Plan
 
 Revert `skills/qa-fix/SKILL.md`; inline reads restored. Delete `shared/resources/qa-findings-ingester-prompt.md`.
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer (automated pipeline)
+**Testing Date**: 2026-05-09
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.21.qa.1.qa-fix-findings-ingester-subagent.md](./task.21.qa.1.qa-fix-findings-ingester-subagent.md)
+- **Gate File**: [task.21.gate.1.qa-fix-findings-ingester-subagent.yml](./task.21.gate.1.qa-fix-findings-ingester-subagent.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: N/A (agent instruction changes — no runnable code)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two MEDIUM issues: (1) ambiguous "Provide" dispatch instruction in Step 1a should say "Substitute"; (2) mixed placeholder styles `<dir>` vs `{epic}` in ingester prompt. Both surgical fixes. No HIGH issues.
