@@ -1,0 +1,54 @@
+schema: 1
+task: 'task.22.finalise-dod-parallel-checks'
+task_title: 'Replace finalise serial DoD checklists with 4 parallel Explore subagents'
+gate: CONCERNS
+status_reason: 'Phases 0–3 complete and correctly implemented. One MEDIUM stale instruction (SKILL.md:44) contradicts the parallel approach; non-blocking but should be fixed before zip repackage.'
+reviewer: 'QA Engineer'
+updated: '2026-05-09T00:00:00Z'
+
+top_issues:
+  - issue: 'Stale serial-write CRITICAL instruction in Workflow intro (SKILL.md:44)'
+    severity: medium
+    location: 'skills/finalise/SKILL.md:44'
+    description: 'Line 44 retains old serial instruction: "After checking EACH Definition of Done item, immediately write the result to the running summary file." Contradicts Step 3d which uses 4 consolidated appends. CRITICAL label increases confusion risk.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 82
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/5 (Phase 4 explicitly deferred to post-acceptance)'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Skill documentation refactoring — no code changes, no auth/data paths, no hardcoded secrets introduced'
+  performance:
+    status: PASS
+    notes: 'Parallel dispatch replaces serial; 4–6 writes vs 19–40 baseline (≥76% reduction); wall-clock ~3–4× improvement by design'
+  reliability:
+    status: PASS
+    notes: 'NEEDS_MANUAL_REVIEW per-section fallback; Never abort on single agent failure rule; idempotent re-run guard; best-effort diff fetch with fallback'
+  maintainability:
+    status: CONCERNS
+    notes: '4 separate prompt files improve independent maintenance. Two stale text fragments remain (1 MEDIUM, 1 LOW). MEDIUM issue at SKILL.md:44 could confuse agents or maintainers reading the file.'
+
+recommendations:
+  immediate:
+    - action: 'Fix SKILL.md:44 — replace "After checking EACH Definition of Done item, immediately write" with parallel-aware equivalent. Fix SKILL.md:102 placeholder text while editing.'
+      refs: ['skills/finalise/SKILL.md']
+  future:
+    - action: 'Run Phase 4 validation on 3 representative tasks (task.21, task.22 post-acceptance, one accepted story) to confirm DoD output equivalence.'
+      refs: ['docs/development/tasks/task.22.finalise-dod-parallel-checks/task.22.finalise-dod-parallel-checks.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'Fix SKILL.md:44 stale serial instruction before running package_skill.py and generate-catalog'
