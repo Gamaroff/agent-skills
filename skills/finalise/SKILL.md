@@ -41,7 +41,7 @@ This skill should be used when:
 
 ## Workflow
 
-Follow this systematic workflow to verify and mark a story/task as complete. **CRITICAL**: After checking EACH Definition of Done item, immediately write the result to the running summary file. Do NOT wait until all checks are complete.
+Follow this systematic workflow to verify and mark a story/task as complete. Steps 3–5 dispatch four parallel Explore subagents; the running summary is written in four consolidated appends after all agents return (Step 3d). Do NOT write incrementally.
 
 ### Step 0: Initialize Task List and Create Running Summary File
 
@@ -99,7 +99,7 @@ Before starting any verification, also create a co-located running summary file 
 
    ## Verification Results
 
-   _Results will be written incrementally as each check completes..._
+   _DoD results will be appended here in 4 consolidated sections after parallel agent completion._
 
    ---
    ```

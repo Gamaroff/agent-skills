@@ -211,7 +211,31 @@ Skill-level work — no unit tests applicable. Validation approach: golden-run c
 
 ### Change Log
 
+- 2026-05-09 (qa-fix): Fixed SKILL.md:44 stale CRITICAL serial-write instruction (replaced with parallel-aware equivalent); fixed SKILL.md:102 stale placeholder text.
 - 2026-05-09: Implemented Phases 0–3. Baseline measured (19–40 writes). 4 prompt files created in `shared/resources/`. `skills/finalise/SKILL.md` Steps 3–5 replaced with parallel dispatch block. Idempotent re-run guard added. Step 6 decision logic updated with NEEDS_MANUAL_REVIEW rule. Phase 4 validation deferred to post-acceptance live run.
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-09
+**Quality Score**: 82/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.22.qa.1.finalise-dod-parallel-checks.md](./task.22.qa.1.finalise-dod-parallel-checks.md)
+- **Gate File**: [task.22.gate.1.finalise-dod-parallel-checks.yml](./task.22.gate.1.finalise-dod-parallel-checks.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 0 (skill documentation refactoring — no unit tests applicable)
+- **Phases Verified**: 4/5 (Phase 4 explicitly deferred)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+One MEDIUM issue: `SKILL.md:44` retains stale CRITICAL-labelled serial-write instruction contradicting new parallel approach. Non-blocking (Step 3d overrides it), but should be fixed before zip repackage. One LOW issue: stale placeholder text at `SKILL.md:102`.
+
+---
 
 ## References
 
