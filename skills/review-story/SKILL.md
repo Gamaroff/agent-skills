@@ -331,6 +331,18 @@ questions:
 5. Use multiSelect where appropriate
 6. Continue review with user's decisions
 
+### Pre-pass Summary Consumption
+
+Before formulating questions in any step, consult the pre-pass summaries from Phase 1.5:
+
+- **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the epic alignment review phase (Step 4).
+- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 5).
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the story should be scoped down or closed.
+
+Severity `low` findings from any summary: add to the review report findings list but do not elevate to a user question unless they cluster with other issues.
+
+If a pre-pass summary is absent (agent failed or returned `alignment: unknown` / `implementation_status: unknown`): treat that axis as unreviewed and rely on in-line discovery for that phase.
+
 ### After Questions Answered
 
 1. **Incorporate User Decisions**: Use answers to inform recommendations
@@ -343,6 +355,8 @@ questions:
 ## Review Workflow (9 Sequential Steps)
 
 **NOTE**: Throughout all steps, collect issues and questions. Ask questions in batches at the end of each major phase (after Step 3, after Step 6) rather than interrupting continuously.
+
+**Pre-pass summaries** (`PREPASS_A`, `PREPASS_B`, `PREPASS_C` from Phase 1.5): Before formulating any question in Steps 2–8, check the relevant pre-pass summary first. If a finding has `severity: high` or `severity: medium`, surface it as a clarifying question rather than asking the user to discover it themselves. If a finding has `severity: low`, note it in the review report without necessarily elevating it to a user question. If the relevant pre-pass summary is absent (agent failed), proceed with in-line discovery as usual.
 
 ### Step 0: Determine Output Format
 
@@ -437,6 +451,34 @@ devDebugLog: .ai/debug-log.md
    - Previous story: only load if the story explicitly references continuity with it
 
 **Output**: Compact context package — story in full, supporting docs selectively loaded
+
+---
+
+### Phase 1.5: Pre-pass (3 Parallel Explore Subagents)
+
+**Purpose**: Front-load conflict detection before interactive Q&A. Three read-only Explore agents run in parallel and return compact YAML summaries. Q&A (Steps 2–8) consumes these summaries to surface high-severity findings as early questions rather than discovering them mid-review.
+
+**Prompt templates**: see `shared/resources/review-story-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
+
+**Actions**:
+
+1. **Resolve variables** from Step 1 output:
+   - `{story_path}` — the resolved story file path
+   - `{epic_path}` — the parent epic file path found by Step 1's Explore subagent
+   - `{arch_location}` — from `skills-config.yaml` → `architecture.architectureShardedLocation` (default: `docs/architecture`)
+
+2. **Dispatch all three agents in a single message** (parallel — one tool-call block, three Agent invocations):
+   - **Agent A** (`subagent_type="Explore"`) — epic alignment prompt from `review-story-prepass-prompts.md`
+   - **Agent B** (`subagent_type="Explore"`) — architecture alignment prompt from `review-story-prepass-prompts.md`
+   - **Agent C** (`subagent_type="Explore"`) — codebase already-implemented prompt from `review-story-prepass-prompts.md`
+
+3. **Collect results**: each agent returns a YAML block. Validate the top-level key (`alignment` for A/B; `implementation_status` for C). If a key is missing or an agent fails: log `⚠️ Pre-pass Agent {A/B/C} failed — proceeding without {epic/architecture/codebase} summary` and continue with the remaining summaries.
+
+4. **Store summaries** as `PREPASS_A`, `PREPASS_B`, `PREPASS_C` in active context for use by the Q&A phase.
+
+**Failure handling**: if all three agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback.
+
+**Output**: up to 3 YAML summaries (epic alignment, architecture alignment, implementation status) available for Steps 2–8
 
 ---
 

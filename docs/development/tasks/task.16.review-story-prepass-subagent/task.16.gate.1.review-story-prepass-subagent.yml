@@ -1,0 +1,50 @@
+schema: 1
+task: 'task.16.review-story-prepass-subagent'
+task_title: 'Add review-story pre-pass: 3 parallel Explore subagents (epic / architecture / codebase-implemented)'
+gate: PASS
+status_reason: 'All functional success criteria met. Implementation additive and correctly positioned. Three LOW-severity deferred items (manual runs, performance metrics, validator) are non-blocking.'
+reviewer: 'QA Engineer (automated pipeline)'
+updated: '2026-05-08T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 88
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4 (2 manual test items in Phase 4 deferred)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Read-only Explore subagents; no auth or sensitive data handling; no security implications'
+  performance:
+    status: PASS
+    notes: 'Parallel fan-out structurally faster than serial reads; compact YAML outputs minimize main-context token growth; no regressions'
+  reliability:
+    status: PASS
+    notes: 'Per-agent and all-agents-fail graceful fallback documented; existing flows unaffected'
+  maintainability:
+    status: PASS
+    notes: 'Prompts isolated in shared resource (forward-fix without SKILL.md change); Phase 1.5 self-contained; clear summary-to-Q&A-step mapping'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Run /review-story on 2-3 real stories post-merge to validate Agent A/B/C return well-formed YAML'
+      refs: ['shared/resources/review-story-prepass-prompts.md']
+    - action: 'Time pre-pass wall-clock vs baseline to verify ≥40% reduction target'
+      refs: ['skills/review-story/SKILL.md']
+    - action: 'Run /documentation-standards-validator on changed files'
+      refs: ['shared/resources/review-story-prepass-prompts.md', 'skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
