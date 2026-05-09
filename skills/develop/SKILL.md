@@ -610,14 +610,27 @@ Before marking story as "Ready for Review":
 
 **Test Failure Handling**:
 
-When tests fail during implementation:
+Always capture test output to a temp file — never stream raw test output to main context (logs can be 1000+ lines for jest/pytest):
 
-1. **First Failure**: Read test output carefully, identify root cause, fix the issue
-2. **Second Failure**: Re-examine approach, consider alternative solution
-3. **Third Failure**: HALT and document the blocker:
-   - What you attempted
-   - Test failures encountered
-   - Potential root causes identified
+```bash
+ITER=<current develop loop iteration, or 1 if not in an orchestrated loop>
+TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
+<test-command> > "$TEST_LOG" 2>&1
+TEST_EXIT=$?
+```
+
+On non-zero exit, dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `shared/resources/test-failure-triage-prompt.md` (substitute `<log_path>` with `$TEST_LOG`). Persist the triage result per the output contract in that file. Main reads only the returned triage summary (counts + ≤10 failure bullets + `next_file` hint).
+
+Log cleanup: `TEST_EXIT == 0` → `rm -f "$TEST_LOG"`; `TEST_EXIT != 0` → retain for post-mortem.
+
+Three-strikes escalation (applied to the triage summary, not the raw log):
+
+1. **First failure**: Analyse triage summary (counts, failure bullets, `next_file` hint), identify root cause, fix
+2. **Second failure**: Re-examine approach using `next_file` hint; consider alternative solution
+3. **Third failure**: HALT and document the blocker:
+   - Triage summary from each attempt
+   - Fix strategies already tried
+   - Potential root causes remaining
    - Ask user for guidance or clarification
 
 **Important**: Do not mark a task as complete if its tests are failing. Tests must pass before checking off task checkboxes.

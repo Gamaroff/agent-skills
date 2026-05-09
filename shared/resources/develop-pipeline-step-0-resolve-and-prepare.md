@@ -31,6 +31,30 @@ Explore subagent (file/directory/bare-filename inputs): find file matching `stor
 
 Extract `{epic_number}` and `{story_number}` from the pattern `story.{epic}.{story}.{name}.md`.
 
+**Epic branch resolution** — immediately after extracting epic_number/story_number:
+
+```bash
+EPIC_REF=$(grep '^epic:' {story-file} | awk '{print $2}')
+```
+
+If `EPIC_REF` is empty or missing: **HALT** — "Story must have an `epic:` frontmatter field referencing a parent epic (e.g. `epic: epic.178.feature-ui`). Add the field and re-run."
+
+```bash
+EPIC_NUM=$(echo "$EPIC_REF" | grep -oE '[0-9]+' | head -1)
+EPIC_SLUG=$(echo "$EPIC_REF" | sed 's/epic\.[0-9]*\.//')
+EPIC_BRANCH="feature/epic.${EPIC_NUM}.${EPIC_SLUG}"
+```
+
+Locate the epic file (required):
+```bash
+EPIC_FILE=$(find docs/ -name "epic.${EPIC_NUM}.*.md" 2>/dev/null \
+  | grep -v '\.review\.' | grep -v '\.gate\.' | grep -v '\.implementation\.' | head -1)
+```
+
+If `EPIC_FILE` is empty: **HALT** — "Epic file `epic.{EPIC_NUM}.*` not found in `docs/`. Ensure the epic document exists before running develop-story."
+
+Store `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH`, and `EPIC_FILE` as pipeline-wide variables.
+
 #### develop-task
 
 Accept any of:
@@ -84,6 +108,21 @@ ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null
 ```
 
 **If a previous run is detected**: ask "A previous pipeline run exists for this story. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
+
+Also detect whether the epic branch already exists:
+
+```bash
+EPIC_BRANCH_LOCAL=$(git branch --list "feature/epic.${EPIC_NUM}.*" | tr -d ' *')
+EPIC_BRANCH_REMOTE=$(git ls-remote --heads origin "feature/epic.${EPIC_NUM}.*" 2>/dev/null \
+  | awk '{print $2}' | sed 's|refs/heads/||')
+if [ -n "$EPIC_BRANCH_LOCAL" ] || [ -n "$EPIC_BRANCH_REMOTE" ]; then
+  EPIC_BRANCH_EXISTS=true
+else
+  EPIC_BRANCH_EXISTS=false
+fi
+```
+
+Store `EPIC_BRANCH_EXISTS` as a pipeline-wide variable.
 
 #### develop-task
 ```bash
@@ -326,19 +365,36 @@ Use the `AskUserQuestion` tool to ask all applicable questions in a single call 
 
 #### develop-story Q1 options
 
-- On `develop` or `main`: ask "Which branch should the feature branch be created from?" Options: "develop" (Recommended) / "Other"
-- On `feature/story.X.Y.*` (sub-story match): ask "Detected a possible sub-story. Which branch should `feature/story.{epic}.{story}.{name}` be based on?" Options: "feature/story.X.Y.{current}" (Recommended) / "develop"
-- On unrelated `feature/*`: ask "Which branch should `feature/story.{epic}.{story}.{name}` be based on?" Options: "develop" (Recommended) / "feature/{current}"
+develop-story always uses the epic branch (`{EPIC_BRANCH}`) as the feature branch base. No free-form Q1 is presented. Instead:
+
+- **If `EPIC_BRANCH_EXISTS=false`**: ask one confirmation question via `AskUserQuestion`:
+  > "Epic branch `{EPIC_BRANCH}` does not exist yet. It will be created from `develop` before your story branch."
+  > Options: "Create epic branch and proceed" (Recommended) / "Abort"
+
+  If the user selects "Abort": HALT cleanly — do not create any branches.
+
+- **If `EPIC_BRANCH_EXISTS=true`**: no question needed. The epic branch will be used automatically. Record this in the Decisions Log.
+
+Store decisions: Feature branch base = `{EPIC_BRANCH}` (always, regardless of current branch).
 
 #### develop-task Q1 options
 
 - On `develop` or `main`: ask "Which branch should the feature branch be created from?" Options: "develop" (Recommended) / "Other"
-- On `feature/task.{id}.*` (sub-task match): ask "Detected a possible sub-task. Which branch should `feature/task.{id}.{name}` be based on?" Options: "feature/task.{id}.{current}" (Recommended) / "develop"
-- On unrelated `feature/*`: ask "Which branch should `feature/task.{id}.{name}` be based on?" Options: "develop" (Recommended) / "feature/{current}"
+- On any `feature/*` branch: ask "Which branch should `feature/task.{id}.{name}` be based on?" Options: "`feature/{current}`" (Recommended) / "develop"
+  - This applies to all feature branches — whether it's an epic branch, another task branch, or any other feature branch.
 
-**Q2 — PR target branch (identical for both):**
+**Q2 — PR target branch:**
 
-Ask "Which branch should the pull request target?" Options: "develop" (Recommended) / "feature/{parent-branch}" / "Other"
+#### develop-story Q2
+
+develop-story always targets the epic branch. Do **not** ask the user:
+
+- PR target = `{EPIC_BRANCH}` (auto-set, identical to Q1 base)
+- Record in Decisions Log: "PR target: {EPIC_BRANCH} (epic branch — auto)"
+
+#### develop-task Q2
+
+Ask "Which branch should the pull request target?" Options: "develop" (Recommended) / "feature/{current-branch}" / "Other"
 
 **Q3 — High-risk gate (only if `risk_level: high` detected):**
 
@@ -382,8 +438,9 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 
 | Setting             | Value                         |
 | ------------------- | ----------------------------- |
-| Feature branch base | {Q1 answer}                   |
-| PR target           | {Q2 answer}                   |
+| Epic branch         | {EPIC_BRANCH} (exists / will be created) |
+| Feature branch base | {EPIC_BRANCH}                 |
+| PR target           | {EPIC_BRANCH}                 |
 | High-risk gate      | {Q3 answer or N/A}            |
 | Story risk level    | {risk_level value or not set} |
 | Pipeline mode       | {lite / standard}             |
@@ -395,10 +452,11 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 
 | Step | Status | Required Artifacts | Notes | Subagent summary ref |
 | ---- | ------ | ------------------ | ----- | -------------------- |
-| 1. create-branch            | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | | — |
+| 1a. create-epic-branch      | ⏳ Pending | Branch `feature/epic.{N}.*` exists in git | | — |
+| 1b. create-story-branch     | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | | — |
 | 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{date}.md` exists (or skip logged) | | — |
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | | — |
-| 4. create-pr                | ⏳ Pending | PR URL; issue/tracker comment posted | | — |
+| 4. create-pr                | ⏳ Pending | PR URL targets `{EPIC_BRANCH}`; issue/tracker comment posted | | — |
 | 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | | — |
 | 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted` | | — |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
@@ -411,8 +469,9 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 
 ### Pipeline Startup — {YYYY-MM-DD}
 
-- Feature branch base: {Q1 answer} — {rationale}
-- PR target branch: {Q2 answer} — {rationale}
+- Epic branch: {EPIC_BRANCH} — {exists / created from develop}
+- Feature branch base: {EPIC_BRANCH} — epic branch (auto)
+- PR target branch: {EPIC_BRANCH} — epic branch (auto)
 - High-risk gate handling: {Q3 answer or N/A}
 
 ---
@@ -531,8 +590,11 @@ Print this to the user before any irreversible action:
 🚀 Starting automated story pipeline
 
 Story:        {story filename}
-Branch:       feature/story.{epic}.{story}.{name} ← {Q1 base branch}
-PR target:    {Q2 answer}
+Epic branch:  {EPIC_BRANCH} ← develop  [will be created]
+              OR
+Epic branch:  {EPIC_BRANCH}  [already exists]
+Branch:       feature/story.{epic}.{story}.{name} ← {EPIC_BRANCH}
+PR target:    {EPIC_BRANCH}
 Report:       {report file path}
 
 Pipeline will now run hands-free.

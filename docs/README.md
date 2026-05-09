@@ -12,6 +12,8 @@ Documentation for the Agent Skills library.
 
 - **[Workflows](./workflows.md)** — Integrated chains: pipeline, sprint cycle, hotfix, parallel dev, change management
 - **[Conventions](./conventions.md)** — File naming, configuration, epic registry
+- **[Task Documents](./task.md)** — Directory layout, frontmatter, status rules, and artifact reference for `develop-task`
+- **[PRD & Story Documents](./prd.md)** — Directory layout, frontmatter, status rules, and artifact reference for `develop-story`
 - **[Packaging](./packaging.md)** — Validation, shared resources, distribution
 - **[Creating Skills](./creating-skills.md)** — Authoring guide, file structure, best practices
 - **[Placeholders](./placeholders.md)** — Legend for `{project}`, `{api-service}`, `@your-org/...` and other template tokens used in skills
