@@ -86,8 +86,19 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 #### develop-story loop body
 
 1. Invoke `/develop` with the story file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
-2. After `/develop` returns, re-read the story file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
-3. Branch on status:
+2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress:
+
+   **Audit prompt:**
+   > Read the story file at `<story_path>`. From the `## Tasks` section, count `[x]` checkboxes (any indent) → `completed`; count all `[ ]` + `[x]` checkboxes (any indent) → `total`. Extract the `Status:` field value from the frontmatter or body header. Run `git log -1 --format=%H` → `last_commit_hash`. Return JSON only (no prose):
+   > ```json
+   > {"status":"...","completed":N,"total":M,"last_commit_hash":"..."}
+   > ```
+
+   On JSON parse failure: retry the Explore dispatch once with the same prompt. If the retry also fails, log `"Audit JSON parse failure at iteration {ITER} — halting"` in Issues Log and HALT.
+
+   Set: `CURRENT_COMPLETED = audit.completed`, `CURRENT_COMMIT_HASH = audit.last_commit_hash`.
+
+3. Branch on `audit.status`:
    - `Ready for Review` → EXIT loop — all tasks done, proceed to Step 4
    - `accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
    - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
@@ -96,8 +107,19 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 #### develop-task loop body
 
 1. Invoke `/develop` with the task file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
-2. After `/develop` returns, re-read the task file from disk. Read the `Status:` field plus current `[x]` count as `CURRENT_COMPLETED`. Capture `CURRENT_COMMIT_HASH=$(git rev-parse HEAD)`.
-3. Branch on status:
+2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress:
+
+   **Audit prompt:**
+   > Read the task file at `<task_path>`. From the `## Implementation Plan` section, count `[x]` checkboxes (any indent) → `completed`; count all `[ ]` + `[x]` checkboxes (any indent) → `total`. Extract the `Status:` field value from the frontmatter or body header. Run `git log -1 --format=%H` → `last_commit_hash`. Return JSON only (no prose):
+   > ```json
+   > {"status":"...","completed":N,"total":M,"last_commit_hash":"..."}
+   > ```
+
+   On JSON parse failure: retry the Explore dispatch once with the same prompt. If the retry also fails, log `"Audit JSON parse failure at iteration {ITER} — halting"` in Issues Log and HALT.
+
+   Set: `CURRENT_COMPLETED = audit.completed`, `CURRENT_COMMIT_HASH = audit.last_commit_hash`.
+
+3. Branch on `audit.status`:
    - `Ready for Review` → EXIT loop — all phases done, proceed to Step 4
    - `accepted` → EXIT loop — treat as success; log unexpected status in Issues Log. Pipeline Step 7 re-runs `/finalise` after QA regardless.
    - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
