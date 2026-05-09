@@ -125,6 +125,32 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
    - `In Progress` → apply stall semantics from `shared/resources/develop-pipeline-resume-contract.md`: check progress (EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR new commit), apply MAX_ITER cap, log and increment `ITER`, output Remaining Work Status banner before re-invoking.
    - Any other status → HALT; log the actual status in Issues Log.
 
+## Test Failure Triage (both orchestrators — applies inside /develop)
+
+When `/develop` runs tests during the develop loop, test output must be captured to a temp file. The raw log is never read into main context; only the triage summary is used.
+
+### Output Capture Pattern
+
+```bash
+ITER=<current develop loop iteration>
+TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
+<test-command> > "$TEST_LOG" 2>&1
+TEST_EXIT=$?
+```
+
+### On Test Failure (TEST_EXIT != 0)
+
+Dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `shared/resources/test-failure-triage-prompt.md`. Substitute `<log_path>` with `$TEST_LOG`. Persist the returned triage YAML as a JSON artifact at `.summaries/step-3-test-triage-<ITER>.json` (schema per `shared/resources/subagent-summary-artifact.md`). Update the implementation report `Subagent summary ref` column with the artifact path.
+
+Main reads only the triage summary (counts + ≤10 failure bullets + `next_file` hint). Never read `$TEST_LOG` directly.
+
+### Log Cleanup
+
+- `TEST_EXIT == 0` → `rm -f "$TEST_LOG"` — log no longer needed
+- `TEST_EXIT != 0` → retain for post-mortem; do not delete on failure
+
+---
+
 ### After loop exits (both orchestrators)
 
 Update Pipeline Progress: ✅ develop
