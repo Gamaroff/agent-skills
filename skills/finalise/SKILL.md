@@ -13,11 +13,11 @@ license: MIT
 
 Mark a story or task as complete by verifying it against a comprehensive Definition of Done (DoD) checklist. This skill automates the verification of acceptance criteria, unit tests, code reviews, documentation updates, security reviews, and compliance checks.
 
-**CRITICAL - Incremental Verification Approach:** This skill writes verification results incrementally as each DoD item is checked. A co-located running summary file (`story.{epic}.{story}.dod.{num}.{story-name}.md`) is created at the start and updated after EACH verification step. This ensures:
-- Real-time visibility into verification progress
-- Complete audit trail of what was checked and when
-- No loss of work if verification is interrupted
-- Transparency for stakeholders who can monitor the running summary file
+**Parallel DoD Verification Approach:** This skill dispatches four read-only Explore subagents in a single parallel message to perform DoD checks (AC traceability, security, compliance, docs/changelog). Each agent returns a structured YAML result. Main context writes the DoD running summary in **one consolidated pass per section** after aggregation — not per individual check. This gives:
+- ~3–4× wall-clock speedup vs serial verification
+- ≥80% reduction in DoD-summary file writes (≤6 writes vs ~25 baseline)
+- Partial-failure isolation: one failed agent marks that section for manual review; others continue
+- Complete audit trail: each section write contains full evidence citations from the agent YAML
 
 Based on the verification results, it either marks the story/task as "Accepted" with generated artifacts, or lists specific gaps that need to be addressed.
 
@@ -41,7 +41,7 @@ This skill should be used when:
 
 ## Workflow
 
-Follow this systematic workflow to verify and mark a story/task as complete. **CRITICAL**: After checking EACH Definition of Done item, immediately write the result to the running summary file. Do NOT wait until all checks are complete.
+Follow this systematic workflow to verify and mark a story/task as complete. Steps 3–5 dispatch four parallel Explore subagents; the running summary is written in four consolidated appends after all agents return (Step 3d). Do NOT write incrementally.
 
 ### Step 0: Initialize Task List and Create Running Summary File
 
@@ -57,9 +57,9 @@ Use `TaskCreate` to register every sub-step you will execute. This prevents skip
 |---|---|
 | Read story document | Locate and parse the story/task markdown file |
 | Review QA reports | Find and read QA report and gate files in story directory |
-| Verify acceptance criteria | Check all AC checkboxes and PR approval status |
-| Security review | Run story-type-specific security checklist |
-| Compliance review | Run applicable compliance checklist (GDPR, WCAG, etc.) |
+| Dispatch parallel DoD checks | Fan out 4 Explore subagents simultaneously: AC traceability, security, compliance, docs/changelog |
+| Aggregate DoD results | Parse 4 YAML responses; flag agent failures as NEEDS_MANUAL_REVIEW |
+| Write consolidated DoD sections | One append per section (AC, security, compliance, docs) to running summary |
 | Make acceptance decision | Evaluate all checks and decide ACCEPT or GAPS |
 | Update story document | Add DoD section (accepted or gap report) to story file |
 | Update frontmatter | Change status, updated, completed_date fields (accepted path only) |
@@ -99,7 +99,7 @@ Before starting any verification, also create a co-located running summary file 
 
    ## Verification Results
 
-   _Results will be written incrementally as each check completes..._
+   _DoD results will be appended here in 4 consolidated sections after parallel agent completion._
 
    ---
    ```
@@ -297,292 +297,162 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    ---
    ```
 
-### Step 3: Verify Core Acceptance Criteria
+### Steps 3–5: Parallel DoD Checks (4 Explore Subagents)
 
-Reference the **Definition of Done checklist** (`references/definition-of-done-checklist.md`) for detailed verification patterns.
+**Overview**: Dispatch four read-only Explore subagents in a **single parallel message** (4 simultaneous Agent tool calls). Each agent performs one DoD domain check and returns a structured YAML result. Main context writes the DoD running summary in **one consolidated append per section** after aggregation.
 
-**Note:** If QA reports were found in Step 2, use them to supplement this verification. Cross-reference manual findings with QA report results.
+**QA report integration**: If QA reports were found in Step 2, include their findings as supplementary context when building the prompts below (paste relevant QA YAML sections). The subagents use QA findings to inform citations.
 
-**Actions:**
+---
 
-1. **Check Acceptance Criteria Completion:**
-   - Look for markdown checkboxes: `- [x]` (complete) vs `- [ ]` (incomplete)
-   - Verify all acceptance criteria checkboxes are marked as complete
-   - If any checkbox is unchecked, note it as a gap
+#### Step 3a: Prepare Shared Context
 
-2. **Verify Unit Tests and Code Review:**
-   - Extract PR number from frontmatter (`pr_number: 123`) or body (`PR #123`, `https://github.com/org/repo/pull/123`, `https://bitbucket.org/.../pull-requests/123`)
-   - Detect platform (run once if not already done) using the canonical resolver — see `shared/resources/platform-detection.md`:
-     ```bash
-     source shared/resources/resolve-platform.sh
-     PLATFORM="$VCS"   # github | bitbucket
-     REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
-     if [ "$PLATFORM" = "bitbucket" ]; then
-       BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
-       BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
-       BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
-       BB_API="https://api.bitbucket.org/2.0"
-     fi
-     ```
-   - Check PR status by platform:
-     - *GitHub*: `gh pr view <number>` — check `state`, `reviewDecision`, and description
-     - *Bitbucket*: `curl -s -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/<number>"` — check `state` (`OPEN`/`MERGED`) and `participants[].approved`
-   - Verify: PR exists and is accessible, approved by at least one reviewer, tests mentioned
-   - If PR is not found, not approved, or tests are missing, note as a gap
+Collect these values before dispatching:
 
-3. **Check Documentation Updates:**
-   - Verify documentation references in the story/task document
-   - Check if PR description mentions documentation updates
-   - For different story types, verify appropriate documentation:
-     - **API stories**: Swagger/OpenAPI specs updated
-     - **UI stories**: User guide or screenshots provided
-     - **Data stories**: Schema documentation updated
-     - **Config stories**: Configuration guide updated
-   - If documentation is missing for the story type, note as a gap
+```bash
+# PR number
+PR_NUMBER=$(grep '^pr_number:' {story-file} | awk '{print $2}' | grep -oE '[0-9]+' | head -1)
+[ -z "$PR_NUMBER" ] && PR_NUMBER=$(grep -oE 'PR #([0-9]+)|pull/([0-9]+)' {story-file} | grep -oE '[0-9]+' | head -1)
 
-4. **Write Acceptance Criteria Results to Running Summary (AFTER EACH CHECK):**
-   - After checking EACH acceptance criterion, immediately append the result to the running summary
-   - After checking PR status, immediately append to running summary
-   - After checking documentation, immediately append to running summary
-   - Do NOT wait until all checks are complete
+# Story type
+STORY_TYPE=$(grep '^type:' {story-file} | awk '{print $2}' | tr -d '"')
+[ -z "$STORY_TYPE" ] && STORY_TYPE="task"
 
-   **Example incremental appends:**
+# Git diff for AC agent (best-effort — empty diff is handled gracefully by the agent)
+DIFF_FILE=".claude/state/pr-diff-$(date +%s).diff"
+[ -n "$PR_NUMBER" ] && gh pr diff "$PR_NUMBER" > "$DIFF_FILE" 2>/dev/null \
+  || git diff HEAD~1 HEAD > "$DIFF_FILE" 2>/dev/null || touch "$DIFF_FILE"
+```
 
-   After checking AC1:
-   ```markdown
-   ## Step 2: Core Acceptance Criteria
+#### Step 3b: Dispatch 4 Explore Subagents in Parallel
 
-   ### AC1: User can submit the form successfully
-   **Status:** ✅ COMPLETE
-   **Evidence:** PR #789 includes implementation in `src/forms/submit-handler.ts:45-78`
-   ```
+**CRITICAL**: Send all 4 Agent tool calls in a **single message**. Do not send them sequentially.
 
-   After checking AC2:
-   ```markdown
-   ### AC2: Validation errors are displayed correctly
-   **Status:** ✅ COMPLETE
-   **Evidence:** Implementation in `src/forms/validation.tsx:120-145`, test coverage in `validation.spec.tsx:67-89`
-   ```
+Read each prompt file to get the template, substitute the placeholder values, then dispatch:
 
-   After checking AC3:
-   ```markdown
-   ### AC3: Success message appears after submission
-   **Status:** ❌ GAP IDENTIFIED
-   **Evidence:** No implementation found in PR #789 or story directory
-   **Action Required:** Implement success message feature
-   ```
+| Agent | Prompt file | Key substitutions |
+|-------|------------|-------------------|
+| 1. AC traceability | `shared/resources/finalise-dod-ac-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
+| 2. Security review | `shared/resources/finalise-dod-security-prompt.md` | `<STORY_FILE>`, `<STORY_TYPE>` |
+| 3. Compliance review | `shared/resources/finalise-dod-compliance-prompt.md` | `<STORY_FILE>` |
+| 4. Docs & changelog | `shared/resources/finalise-dod-docs-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>` |
 
-   After checking PR:
-   ```markdown
-   ### PR Review & Tests
-   **PR Number:** #789
-   **PR Status:** ✅ APPROVED (2 reviewers)
-   **Tests Found:** ✅ Yes - `src/forms/submit-handler.spec.ts` (12 test cases)
-   **Test Coverage:** 94% statement coverage
+Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
-   ---
-   ```
+#### Step 3c: Aggregate Results
 
-   After checking documentation:
-   ```markdown
-   ### Documentation
-   **API Documentation:** ✅ Swagger spec updated in PR #789
-   **User Guide:** ✅ Screenshots added to `docs/user-guide/forms.md`
-   **Architecture Docs:** ⚠️ NOT APPLICABLE for this story type
+After all 4 agents complete, parse each YAML result. Handle agent failures:
+- **Agent returns valid YAML**: extract `overall` field → `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`
+- **Agent errors or returns unparseable output**: set that section's overall to `NEEDS_MANUAL_REVIEW`; mark section for manual verification in the DoD running summary; continue with remaining sections
 
-   ---
-   ```
+**Never abort due to a single agent failure.** One failed section = manual review for that section only.
 
-### Step 4: Conduct Security Review
+#### Step 3d: Write Consolidated DoD Running Summary Sections
 
-Reference `references/definition-of-done-checklist.md` Section "Security Review Checklist" for story-type-specific checks.
+Append sections to the running summary file. **One append per section** — not per individual check. Use the Edit tool four times (one per section).
 
-**Note:** If QA reports were found in Step 2, review the `nfr_validation.security` section to see if security was already assessed. Use QA findings to inform this review.
+**Append 1 — AC & PR section** (from `AC_RESULT`):
 
-**Actions:**
+```markdown
+## Step 2: Core Acceptance Criteria & PR Review
 
-1. **Identify Story Type:** Determine if the story is API/Backend, UI/Frontend, Data/Database, Authentication/Authorization, or Infrastructure/DevOps
+**Overall AC Status:** {AC_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ PARTIAL | 🔍 NEEDS_MANUAL_REVIEW}
+**PR Status:** {ac_result.pr_status} (PR #{PR_NUMBER})
+**PR Review Decision:** {ac_result.pr_review_decision}
 
-2. **Apply Story-Type-Specific Security Checklist:**
-   - **API/Backend:**
-     - Authentication & authorization checks
-     - Input validation (SQL injection, command injection, path traversal, XSS prevention)
-     - Data protection (encryption, no sensitive data in logs)
-     - Error handling (no stack traces to clients)
-     - Dependency vulnerabilities (`npm audit`)
+### Acceptance Criteria
 
-   - **UI/Frontend:**
-     - XSS prevention (input sanitization, CSP headers)
-     - Token storage security (httpOnly cookies, not localStorage)
-     - No sensitive data in client code
-     - Protected routes require authentication
+{for each ac in ac_result.acs:}
+#### {ac.ac_id}: {ac.description}
+**Status:** {✅ PASS | ❌ FAIL}
+- Code evidence: `{ac.code_citation or "not found — FAIL"}`
+- Test evidence: `{ac.test_citation or "not found — FAIL"}`
+{ac.note ? "- Note: " + ac.note : ""}
+{endfor}
 
-   - **Data/Database:**
-     - Database credentials secured
-     - Row-level security if applicable
-     - Foreign key and unique constraints
-     - Migration safety (reversible, no data loss)
-     - PII encryption
+### Documentation
+{for each item in ac_result.docs:}
+- **{item.item}**: {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}{item.citation ? " — `" + item.citation + "`" : ""}{item.note ? " — " + item.note : ""}
+{endfor}
 
-   - **Authentication/Authorization:**
-     - Password hashing (bcrypt/argon2)
-     - Token security (JWT secrets, expiration)
-     - MFA implementation if applicable
-     - Session management (expiration, logout invalidation)
+**Agent summary:** {ac_result.summary}
 
-   - **Infrastructure/DevOps:**
-     - No secrets in version control
-     - Production environment isolated
-     - Security events logged (no PII in logs)
-     - TLS/SSL certificates valid
+---
+```
 
-3. **General Security Questions:**
-   - Has the code been scanned for vulnerabilities?
-   - Are there security-related TODOs or FIXMEs?
-   - Does the implementation follow OWASP Top 10 guidelines?
+**Append 2 — Security section** (from `SECURITY_RESULT`):
 
-4. **Write Security Check Results to Running Summary (AFTER EACH CHECK):**
-   - After checking EACH security item, immediately append the result to the running summary
-   - Do NOT wait until all security checks are complete
-   - For each check category (auth, input validation, data protection, etc.), write results immediately
+```markdown
+## Step 3: Security Review
 
-   **Example incremental appends:**
+**Story Type:** {security_result.story_type}
+**Overall Security Status:** {SEC_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE | 🔍 NEEDS_MANUAL_REVIEW}
 
-   After checking authentication & authorization:
-   ```markdown
-   ## Step 3: Security Review
+{for each check in security_result.checks:}
+### {check.check}
+**Status:** {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}
+{check.citation ? "- Evidence: `" + check.citation + "`" : "- No citation found"}
+{check.note ? "- Note: " + check.note : ""}
+{endfor}
 
-   **Story Type:** API/Backend
+### General Security
+{for each check in security_result.general:}
+- **{check.check}**: {✅ PASS | ❌ FAIL}{check.citation ? " — `" + check.citation + "`" : ""}{check.note ? " — " + check.note : ""}
+{endfor}
 
-   ### Authentication & Authorization
-   **Status:** ✅ PASS
-   **Evidence:**
-   - JWT middleware enforced in `src/auth/jwt-guard.ts:23-45`
-   - Role-based access control in `src/auth/rbac.decorator.ts:12-34`
-   - All endpoints require authentication except `/health`
-   ```
+**Agent summary:** {security_result.summary}
 
-   After checking input validation:
-   ```markdown
-   ### Input Validation
-   **Status:** ❌ GAP IDENTIFIED
-   **Issues Found:**
-   - Email field lacks validation (XSS risk) in `src/forms/submit-handler.ts:67`
-   - No SQL injection protection in `src/database/query-builder.ts:89`
-   **Action Required:**
-   - Add email sanitization using validator library
-   - Use parameterized queries for all database operations
-   ```
+---
+```
 
-   After checking data protection:
-   ```markdown
-   ### Data Protection
-   **Status:** ✅ PASS
-   **Evidence:**
-   - Passwords hashed with bcrypt (12 rounds) in `src/auth/password.service.ts:45`
-   - Sensitive data encrypted at rest using AES-256
-   - No PII in application logs (verified in `src/logging/logger.ts:23`)
-   ```
+**Append 3 — Compliance section** (from `COMPLIANCE_RESULT`):
 
-   After checking error handling:
-   ```markdown
-   ### Error Handling
-   **Status:** ⚠️ CONCERNS
-   **Issues Found:**
-   - Stack traces exposed in development mode only (acceptable)
-   - Generic error messages in production (good)
-   **Recommendation:** Document error codes in API documentation
+```markdown
+## Step 4: Compliance Review
 
-   ---
-   ```
+**Overall Compliance Status:** {COMP_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE | 🔍 NEEDS_MANUAL_REVIEW}
+**Applicable areas:** {list areas where value is true from compliance_result.applicable_areas, or "None — NOT_APPLICABLE"}
 
-### Step 5: Conduct Compliance Review
+{for each check in compliance_result.checks:}
+### {check.area}: {check.check}
+**Status:** {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}
+{check.citation ? "- Evidence: `" + check.citation + "`" : "- No citation found"}
+{check.note ? "- Note: " + check.note : ""}
+{endfor}
 
-Reference `references/definition-of-done-checklist.md` Section "Compliance Review Checklist".
+**Agent summary:** {compliance_result.summary}
 
-**Note:** If QA reports were found in Step 2, review the `nfr_validation` section for compliance-related assessments. Use QA findings to inform this review.
+---
+```
 
-**Actions:**
+**Append 4 — Docs section** (from `DOCS_RESULT`):
 
-1. **Determine Applicable Compliance Requirements:**
-   - **Data Privacy (GDPR, CCPA):** If story involves collecting, processing, or storing personal data
-   - **Financial/Transaction (PCI-DSS, SOX):** If story involves financial transactions or payment data
-   - **Accessibility (WCAG, ADA):** If story involves UI/UX changes
-   - **Industry-Specific:** Healthcare (HIPAA), Financial Services (SOX, FINRA), Government (FedRAMP)
+```markdown
+## Step 4b: Docs & Changelog
 
-2. **Verify Compliance for Applicable Requirements:**
+**Overall Docs Status:** {DOCS_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE | 🔍 NEEDS_MANUAL_REVIEW}
 
-   **Data Privacy:**
-   - Data minimization (only necessary data collected)
-   - User consent obtained where required
-   - Right to access, delete, rectify, and data portability implemented
-   - Data retention policy defined
-   - Third-party data sharing documented and consented
+{for each item in docs_result.checks:}
+### {item.item}
+**Status:** {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}
+{item.citation ? "- Evidence: `" + item.citation + "`" : "- No citation found"}
+{item.note ? "- Note: " + item.note : ""}
+{endfor}
 
-   **Financial/Transaction:**
-   - PCI-DSS compliance for payment card data
-   - No card data storage unless PCI-DSS certified
-   - Tokenization via payment processor
-   - Audit trail for all transactions
-   - Transaction reconciliation capability
+**Agent summary:** {docs_result.summary}
 
-   **Accessibility:**
-   - Keyboard navigation for all interactive elements
-   - Screen reader support (ARIA labels and roles)
-   - WCAG AA color contrast (4.5:1 for normal text)
-   - Visible focus indicators
-   - Alternative text for images
+---
+```
 
-3. **Write Compliance Check Results to Running Summary (AFTER EACH CHECK):**
-   - After checking EACH compliance requirement, immediately append the result to the running summary
-   - Do NOT wait until all compliance checks are complete
-   - For each compliance category (GDPR, PCI-DSS, WCAG, etc.), write results immediately
+#### Step 3e: Clean Up and Proceed
 
-   **Example incremental appends:**
+```bash
+rm -f "$DIFF_FILE"
+```
 
-   After checking GDPR compliance:
-   ```markdown
-   ## Step 4: Compliance Review
+After all 4 appends are complete, proceed directly to Step 6 (Make Acceptance Decision). The decision logic uses `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, and `DOCS_OVERALL`.
 
-   **Applicable Requirements:** Data Privacy (GDPR), Accessibility (WCAG)
-
-   ### Data Privacy (GDPR)
-   **Status:** ❌ GAP IDENTIFIED
-   **Issues Found:**
-   - No user consent flow implemented for data collection
-   - Data retention policy not documented
-   - Right to delete not implemented
-   **Action Required:**
-   - Implement cookie consent banner
-   - Document data retention in privacy policy
-   - Add account deletion API endpoint
-   ```
-
-   After checking accessibility compliance:
-   ```markdown
-   ### Accessibility (WCAG AA)
-   **Status:** ⚠️ CONCERNS
-   **Issues Found:**
-   - Color contrast ratio is 3.8:1 (needs 4.5:1) for button text
-   - Missing ARIA labels on 3 interactive elements
-   **Passes:**
-   - ✅ Keyboard navigation works for all forms
-   - ✅ Screen reader support verified with VoiceOver
-   - ✅ Focus indicators visible on all interactive elements
-   **Action Required:**
-   - Increase button text color contrast to meet WCAG AA
-   - Add ARIA labels to search input, filter dropdown, sort button
-   ```
-
-   After checking financial compliance:
-   ```markdown
-   ### Financial/Transaction (PCI-DSS)
-   **Status:** ⚠️ NOT APPLICABLE
-   **Reason:** Story does not involve payment card data or financial transactions
-   **Evidence:** Feature is limited to user profile management
-
-   ---
-   ```
+**Idempotent re-run**: If the running summary already contains any of the `## Step 2:`, `## Step 3:`, `## Step 4:`, or `## Step 4b:` section headers (from a previous run), **skip** the corresponding append and reuse the existing content. This prevents duplicate sections on re-run.
 
 ### Step 6: Make Acceptance Decision
 
@@ -606,12 +476,23 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 - **If QA gate status is FAIL**: Do NOT accept the story, even if manual checks pass. Review `top_issues[]` and `recommendations.immediate[]` for blocking issues.
 - **If QA gate status is CONCERNS**: Use judgment - review concerns and determine if they are blocking or can be addressed post-acceptance
 - **If QA gate status is WAIVED**: Check that waiver is properly documented and justified, then proceed based on other criteria
-- **If no QA gate exists**: Rely solely on manual DoD verification (Steps 3-5)
+- **If no QA gate exists**: Rely solely on DoD verification from Steps 3–5 parallel checks
+- **If any section has `NEEDS_MANUAL_REVIEW`**: Do NOT accept — treat as a gap and list it in the blocking issues
+
+**Mapping parallel check results to the decision matrix:**
+
+| Decision matrix column | Source variable |
+|---|---|
+| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL) |
+| Tests & PR Approved? | `ac_result.pr_review_decision` (APPROVED) |
+| Docs Updated? | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
+| Security Passed? | `SEC_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
+| Compliance Passed? | `COMP_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
 
 **Actions:**
 
-1. **Read the running summary file** to review all verification results
-2. **Count passes, fails, and concerns** from the incremental verification results
+1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
+2. **Determine pass/fail** for each decision matrix column using the mapping above
 3. **Write the acceptance decision to the running summary:**
 
    **Example decision append (all criteria met):**
