@@ -10,7 +10,7 @@ Categorized index of all 124 skills in this library.
 | Skill | Description |
 | ----- | ----------- |
 | `develop` | Provides guidance for implementing features and technical tasks. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns.… |
-| `develop-story` | Automates the full end-to-end story development lifecycle: create-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise… |
+| `develop-story` | Automates the full end-to-end story development lifecycle: create-epic-branch (if needed) → create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to… |
 | `develop-task` | Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise… |
 
 ## Development — Implementation

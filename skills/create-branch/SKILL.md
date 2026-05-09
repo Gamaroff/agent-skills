@@ -26,6 +26,7 @@ Invoke this skill with any of:
 
 - **A story file path**: `story.178.8.example-feature.md`
 - **A story directory**: `stories/story.178.8.example-feature/`
+- **An epic file path**: `epic.178.feature-ui.md` → creates `feature/epic.178.feature-ui` from `develop`
 - **A task document**: `docs/prd/.../task.123.some-task.md`
 - **A raw description**: `"implement user authentication"`
 - **Explicit type flag**: `--hotfix`, `--release`, `--feature`
@@ -37,6 +38,7 @@ Invoke this skill with any of:
 | Context                             | Branch Type | Base Branch                    |
 | ----------------------------------- | ----------- | ------------------------------ |
 | Story file (`story.*`)              | `feature`   | User choice (see below)        |
+| Epic file (`epic.*`)                | `feature`   | `develop` (fixed — no prompt)  |
 | Task file (`task.*`)                | `feature`   | User choice (see below)        |
 | `--hotfix` flag or "hotfix" keyword | `hotfix`    | `main`                         |
 | `--release` flag or version pattern | `release`   | `develop`                      |
@@ -84,6 +86,7 @@ Example: Creating `story.309.2.3A` while on `feature/story.309.2.3` → likely a
 
 | Branch Type         | Pattern                               | Example                                             |
 | ------------------- | ------------------------------------- | --------------------------------------------------- |
+| **Feature (epic)**  | `feature/epic.<n>.<name>`             | `feature/epic.178.feature-ui`                       |
 | **Feature (story)** | `feature/story.<epic>.<story>.<name>` | `feature/story.180.3.quick-re-search-functionality` |
 | **Feature (task)**  | `feature/task.<id>.<name>`            | `feature/task.123.api-validation`                   |
 | **Feature (desc)**  | `feature/<kebab-case-description>`    | `feature/user-authentication`                       |
@@ -97,6 +100,11 @@ Example: Creating `story.309.2.3A` while on `feature/story.309.2.3` → likely a
 Determine the input type and extract relevant information:
 
 ```
+Input: epic.178.feature-ui.md
+ → Type: feature (from epic)
+ → Branch Name: feature/epic.178.feature-ui
+ → Base: develop (fixed — no user prompt for epic branches)
+
 Input: story.178.8.example-feature.md
  → Type: feature (from story)
  → Branch Name: feature/story.178.8.example-feature
@@ -234,18 +242,19 @@ Ready to start development on sub-story!
 
 ## Quick Reference: Gitflow Rules
 
-| Branch Type | Created From                  | Merges Into        | Purpose                  |
-| ----------- | ----------------------------- | ------------------ | ------------------------ |
-| **Feature** | `develop` or current feature* | `develop` or base* | New functionality        |
-| **Release** | `develop`                     | `main` & `develop` | Release prep & bug fixes |
-| **Hotfix**  | `main`                        | `main` & `develop` | Emergency prod fixes     |
-
-\* Feature branches can be created from the current feature branch for sub-stories. The user chooses the base branch interactively.
+| Branch Type        | Created From     | Merges Into              | Purpose                        |
+| ------------------ | ---------------- | ------------------------ | ------------------------------ |
+| **Feature (epic)** | `develop`        | `develop`                | Epic-level grouping of stories |
+| **Feature (story)**| epic branch      | epic branch (via PR)     | Story implementation           |
+| **Feature (task)** | user choice      | user choice (via PR)     | Technical task implementation  |
+| **Release**        | `develop`        | `main` & `develop`       | Release prep & bug fixes       |
+| **Hotfix**         | `main`           | `main` & `develop`       | Emergency prod fixes           |
 
 > [!IMPORTANT]
 >
 > - Feature branches **never** interact directly with `main`
-> - Sub-story feature branches merge back to their parent feature branch
+> - Story branches are always created from their parent epic branch and PR back to it
+> - Epic branches are created from `develop` and merged back to `develop` when all stories are complete (manually)
 > - Hotfix branches **must** be merged back to both `main` AND `develop`
 > - Every merge to `main` triggers a version tag
 
