@@ -4,9 +4,11 @@ title: "Add pre-qa-fix QA findings ingester Explore subagent"
 type: task
 category: refactoring
 priority: High
-status: in-progress
+status: accepted
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-09
+completed_date: 2026-05-09
+pr_number: 57
 assignee: TBD
 effort: ~0.5 day
 depends_on: —
@@ -16,7 +18,7 @@ source_plan: .agents/plans/purrfect-whisper.md (Section A #6)
 
 # Task 21 — Pre-`/qa-fix` findings ingester subagent
 
-**Status**: In Progress
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `task.21.qa-fix-findings-ingester-subagent.review.2026-05-09.md` implemented 2026-05-09
 **GitHub Issue**: [#39](https://github.com/Gamaroff/agent-skills/issues/39)
 
@@ -127,3 +129,28 @@ Revert `skills/qa-fix/SKILL.md`; inline reads restored. Delete `shared/resources
 
 ### Key Findings
 Re-review cycle 2 PASS (93/100). Two MEDIUM issues fixed: dispatch instruction now "Substitute placeholders before dispatching" + `Dispatch: Agent(...)`; all placeholders standardised to `<angle>` style. No HIGH issues throughout.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.21.qa.1.qa-fix-findings-ingester-subagent.md`
+**Gate File**: `task.21.gate.1.qa-fix-findings-ingester-subagent.yml`
+**Gate Status**: ✅ PASS (93/100, re-review cycle 2)
+
+All Definition of Done criteria verified:
+
+✅ **All 3 implementation phases complete** — schema, prompt, wire-in
+✅ **All success criteria met** — context reduction, risk-sorted findings, cap, truncation halt
+✅ **PR #57** — feat(task.21): add pre-qa-fix findings ingester Explore subagent
+✅ **No breaking changes** — additive changes; fallback preserves original behaviour
+✅ **Security:** N/A (agent instruction changes — no code surface)
+✅ **Compliance:** N/A
+
+**QA NFR Validation:** Security PASS · Performance PASS · Reliability PASS · Maintainability PASS
+
+**Task marked as ACCEPTED on:** 2026-05-09
+
+**Detailed Verification Log:** See `task.21.dod.1.qa-fix-findings-ingester-subagent.md`
