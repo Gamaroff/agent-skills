@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.19.create-pr-diff-summariser-subagent'
+task_title: 'Add create-pr diff summariser Explore subagent'
+gate: PASS
+status_reason: 'All 4 phases verified, functional and performance criteria met, live PR test confirms correct behaviour. One LOW orphaned-file concern — non-blocking.'
+reviewer: 'QA Engineer'
+updated: '2026-05-09T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No user-facing inputs in new code path. EXCLUDE_PATHS from orchestrator flags only (trusted). eval git diff pattern consistent with existing commit-changes skill.'
+  performance:
+    status: PASS
+    notes: 'Diff bytes never enter main context — primary goal met. Output bounded to ≤80 lines. Large-diff fallback (>5000 lines) prevents unbounded subagent output.'
+  reliability:
+    status: PASS
+    notes: 'Explicit fallback to commit-subject body on subagent failure. PR creation never fails due to subagent unavailability. One LOW: orphaned patch file on gh pr create failure — gitignored and harmless.'
+  maintainability:
+    status: PASS
+    notes: 'Prompt co-located in shared/resources/ following test-failure-triage-prompt.md pattern. Clean separation of prompt template from wiring. Rollback documented.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Add trap "rm -f $DIFF_FILE" EXIT at diff-capture time to handle failure-path cleanup'
+      refs: ['skills/create-pr/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

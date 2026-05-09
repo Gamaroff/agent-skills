@@ -192,6 +192,23 @@ Prefer using the conventional commit format: `type(scope): description`
 
 ### Step 5: Generate PR Description
 
+**Diff capture (Phase 1):**
+
+Before composing the PR body, capture the diff to a temp file so the Explore subagent can read it without loading bytes into main context:
+
+```bash
+mkdir -p .agents/state
+DIFF_FILE=".agents/state/pr-diff-$(date +%s).patch"
+
+# Build pathspec excludes for git diff (mirrors EXCLUDE_PATHS from --exclude flags)
+GIT_DIFF_EXCLUDES=""
+for p in "${EXCLUDE_PATHS[@]:-}"; do
+  GIT_DIFF_EXCLUDES="$GIT_DIFF_EXCLUDES ':(exclude)$p'"
+done
+
+eval git diff "$BASE_BRANCH...HEAD" $GIT_DIFF_EXCLUDES > "$DIFF_FILE"
+```
+
 Use the project's PR template:
 
 ```markdown
@@ -219,11 +236,20 @@ List any breaking changes (if applicable)
 Closes #123
 ```
 
-**Auto-populate from commits:**
+**Auto-generate body from diff (Explore subagent):**
+
+Load the prompt from `shared/resources/pr-body-summariser-prompt.md`. Substitute `<DIFF_FILE>` with the value of `$DIFF_FILE`. Dispatch:
+
+```
+Agent(subagent_type="Explore", prompt=<loaded-prompt-with-substitution>)
+```
+
+Store the returned markdown string as `$PR_BODY`.
+
+If the subagent returns an empty response, returns `<!-- diff unavailable -->`, or errors, fall back to the commit-subject body and log the reason:
 
 ```bash
-# Get commit messages for the PR body
-git log origin/$BASE_BRANCH..HEAD --pretty=format:"- %s"
+PR_BODY=$(git log origin/$BASE_BRANCH..HEAD --pretty=format:"- %s")
 ```
 
 ### GitHub Issue Detection
@@ -260,6 +286,7 @@ PR_URL=$(gh pr create \
   --title "$PR_TITLE" \
   --body "$PR_BODY")
 PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+rm -f "$DIFF_FILE"
 ```
 
 **CRITICAL / BLOCKING**: Verify `gh pr create` exited with code 0 and returned a PR URL before proceeding to Step 6b.
@@ -271,9 +298,7 @@ PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 ```bash
 CURRENT_BRANCH=$(git branch --show-current)
 PR_BODY_FILE=$(mktemp)
-cat > "$PR_BODY_FILE" << 'ENDBODY'
-{PR_BODY content}
-ENDBODY
+printf '%s' "$PR_BODY" > "$PR_BODY_FILE"
 
 PR_RESPONSE=$(curl -s -X POST \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests" \
@@ -293,6 +318,7 @@ PR_RESPONSE=$(curl -s -X POST \
     }'
   )")
 rm -f "$PR_BODY_FILE"
+rm -f "$DIFF_FILE"
 
 PR_URL=$(echo "$PR_RESPONSE" | jq -r '.links.html.href // empty')
 PR_ID=$(echo "$PR_RESPONSE"  | jq -r '.id // empty')
