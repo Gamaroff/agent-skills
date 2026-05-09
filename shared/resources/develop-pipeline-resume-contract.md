@@ -87,14 +87,25 @@ If the branch or PR no longer matches, warn the user before proceeding: "Pipelin
 
 ## Develop Loop — Stall Semantics and MAX_ITER Bound
 
-Before iteration 1: count **any** `[x]` checkbox in the story/task file regardless of indent (top-level Tasks/phases AND nested subtasks/sub-steps both count as progress signal). Record `INITIAL_COMPLETED`. Count total checkboxes (`[ ]` + `[x]`, any indent) as `M`. Capture `LAST_COMMIT_HASH=$(git rev-parse HEAD)`. Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
+Before iteration 1: dispatch an Explore subagent (read-only) to capture initial loop state:
 
+**Audit prompt:**
+> Read the story/task file at `<story-or-task-path>`. Count `[x]` checkboxes (any indent) → `completed`; count all `[ ]` + `[x]` checkboxes (any indent) → `total`. Extract the `Status:` field value from the frontmatter or body header. Run `git log -1 --format=%H` → `last_commit_hash`. Return JSON only (no prose):
+> ```json
+> {"status":"...","completed":N,"total":M,"last_commit_hash":"..."}
+> ```
+
+On JSON parse failure: retry the Explore dispatch once. If the retry also fails, fall back to inline shell and log `"Initial audit JSON failed — used inline fallback."`:
 ```bash
 # Count any checked box (top-level or nested):
 grep -cE '\[x\]' {story-or-task-file}
 # Count total checkboxes:
 grep -cE '\[[ x]\]' {story-or-task-file}
+# Last commit hash:
+git rev-parse HEAD
 ```
+
+Record: `INITIAL_COMPLETED = audit.completed` (or fallback), `M = audit.total` (or fallback), `LAST_COMMIT_HASH = audit.last_commit_hash` (or fallback). Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
 
 **Progress is made if EITHER `CURRENT_COMPLETED > LAST_COMPLETED` OR `CURRENT_COMMIT_HASH != LAST_COMMIT_HASH`** (a new commit on the branch counts as progress even if no checkbox ticked, e.g. when only subtask work or test fixes were committed).
 
