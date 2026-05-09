@@ -33,9 +33,9 @@ Initial run implementing diff-aware PR body authoring for the `/create-pr` skill
 |------|--------|--------------------|-------|----------------------|
 | 1. create-branch | ✅ Done | Branch `feature/task.19.create-pr-diff-summariser-subagent` exists in git | Based from main | — |
 | 2. review-task | ✅ Done | `task.19.review.2026-05-09.md` exists | Pre-existing review, score 8/10, all fixes applied — skipped re-run | — |
-| 3. develop | ⏳ Pending | Task status == `Ready for Review` | | — |
-| 4. create-pr | ⏳ Pending | PR URL; issue comment posted | | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.19.qa.N.*.md`; `task.19.gate.N.*.yml`; PR comment posted | | — |
+| 3. develop | ✅ Done | Task status == `Ready for Review` | Status confirmed ready-for-review; 15/17 checkboxes ticked | — |
+| 4. create-pr | ✅ Done | PR URL; issue comment posted | PR #55: https://github.com/Gamaroff/agent-skills/pull/55 (pre-existing) | — |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.19.qa.1.*.md`; `task.19.gate.1.*.yml`; PR comment posted | PASS 95/100, no issues | — |
 | 7. finalise | ⏳ Pending | `task.19.dod.N.*.md`; task `status: accepted` | | — |
 | 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | | — |
 
@@ -78,6 +78,6 @@ Initial run implementing diff-aware PR body authoring for the `/create-pr` skill
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/55
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}

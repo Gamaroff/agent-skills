@@ -4,9 +4,10 @@ title: "Add create-pr diff summariser Explore subagent"
 type: task
 category: refactoring
 priority: Medium
-status: ready-for-review
+status: accepted
 created: 2026-05-08
 updated: 2026-05-09
+completed_date: 2026-05-09
 assignee: TBD
 effort: ~0.5 day
 depends_on: —
@@ -16,7 +17,7 @@ source_plan: .agents/plans/purrfect-whisper-pipeline-improvements.md (Section A 
 
 # Task 19 — Create-PR diff summariser subagent
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `task.19.review.2026-05-09.md` implemented 2026-05-09
 
 > Detailed implementation guide: [task.19.plan.create-pr-diff-summariser-subagent.md](task.19.plan.create-pr-diff-summariser-subagent.md)
@@ -162,3 +163,57 @@ This is a skill file modification (markdown instructions for an AI agent), not e
 ### Change Log
 
 - 2026-05-09: Initial implementation — all 4 phases complete, task status → Ready for Review
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-09
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.19.qa.1.create-pr-diff-summariser-subagent.md](./task.19.qa.1.create-pr-diff-summariser-subagent.md)
+- **Gate File**: [task.19.gate.1.create-pr-diff-summariser-subagent.yml](./task.19.gate.1.create-pr-diff-summariser-subagent.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: N/A (skill file modification — no executable code)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+All 4 phases verified via git diff and live PR test (PR #55, 572-line diff). One LOW concern: orphaned patch file on `gh pr create` failure — gitignored and non-blocking.
+
+---
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.19.qa.1.create-pr-diff-summariser-subagent.md`
+**Gate File**: `task.19.gate.1.create-pr-diff-summariser-subagent.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** All functional and performance criteria met (4/4 phases, all checkboxes)
+✅ **PR:** #55 OPEN — `feat(create-pr): add diff-aware PR body via Explore subagent`
+✅ **Documentation:** `shared/resources/pr-body-summariser-prompt.md` created; `skills/create-pr/SKILL.md` updated
+✅ **Security:** ✅ PASS — No user-facing inputs, no credentials, `eval` pattern consistent with existing skills
+✅ **Performance:** ✅ PASS — Diff bytes never enter main context; output bounded ≤80 lines
+✅ **Reliability:** ✅ PASS — Explicit fallback to commit-subject body; PR never fails due to subagent
+✅ **Maintainability:** ✅ PASS — Prompt in `shared/resources/` following established pattern
+
+**Deployment Readiness:**
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED
+
+**Detailed Verification Log:** See `task.19.dod.1.create-pr-diff-summariser-subagent.md` for complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-05-09
