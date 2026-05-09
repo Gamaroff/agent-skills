@@ -48,7 +48,40 @@ Read the gate file to determine the gate result.
 ### 5a. Run QA Review
 
 #### develop-story
+
+**Pre-step: Dispatch traceability mapper (standard mode only)**
+
+Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `shared/resources/qa-traceability-mapper-prompt.md` for the full execution protocol):
+
+```
+Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
+Inputs:
+  STORY_FILE={STORY_FILE}
+  STORY_DIR={STORY_DIR}
+
+Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+```
+
+After the subagent completes:
+1. Confirm `{STORY_DIR}/.summaries/qa-traceability-matrix.md` was written.
+2. Write the summary JSON artifact to `{STORY_DIR}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
+3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
+
+If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
+
+Skip this pre-step when `PIPELINE_MODE=lite` — the mapper adds overhead that lite mode trades away.
+
+**Invoke `/qa-story`**
+
 Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
+
+When the traceability matrix was successfully generated, pass its path via Skill args:
+
+```
+Skill(qa-story, args="traceability_matrix={STORY_DIR}/.summaries/qa-traceability-matrix.md")
+```
+
+If the matrix was not generated (lite mode or mapper failure), invoke without the `traceability_matrix` arg — qa-story performs internal mapping as before.
 
 #### develop-task
 Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."

@@ -55,6 +55,21 @@ You can invoke this skill with either:
 
 **Important**: Requires active PR for current branch. Review will halt if no PR found. See Prerequisites section.
 
+**Optional Skill arg — caller-supplied traceability matrix:**
+
+When invoked by the `develop-story` orchestrator, a pre-built traceability matrix may be passed via the Skill `args` field:
+
+```
+Skill(qa-story, args="traceability_matrix=<story-dir>/.summaries/qa-traceability-matrix.md")
+```
+
+When `traceability_matrix=<path>` is present in `args`:
+1. Read the matrix file from `<path>`.
+2. **Skip the Requirements Traceability Steps 1–4** (AC extraction, grep for spec/src files, coverage analysis, gap identification) — those were already performed by the Explore subagent.
+3. Use the matrix table directly for coverage assessment and gap identification in the QA report and gate file.
+
+When `traceability_matrix` arg is absent or the file at the path is unreadable: fall back to the existing internal traceability mapping (Steps 1–4 run in main context as before). Log: "No caller-supplied traceability matrix — performing internal mapping."
+
 **File Discovery Logic:**
 
 When given a directory path:
@@ -1919,6 +1934,10 @@ Create a requirements traceability matrix that ensures every acceptance criterio
 **IMPORTANT**: Given-When-Then is used here for documenting the mapping between requirements and tests, NOT for writing the actual test code. Tests should follow your project's testing standards (no BDD syntax in test code).
 
 ### Traceability Process
+
+**Caller-supplied matrix short-circuit**: If `traceability_matrix=<path>` was provided in Skill `args` and the file exists, read the matrix table from `<path>` and proceed directly to **Traceability Outputs** — skip Steps 1–4 below. The Explore subagent already performed AC extraction and grep mapping. Use the matrix rows as-is for coverage assessment and gap identification in the QA report and gate file.
+
+If no matrix was supplied or the file is unreadable, run Steps 1–4 as normal.
 
 #### Step 1: Extract Requirements
 
