@@ -198,3 +198,20 @@ grep -n "configur|project" shared/resources/qa-traceability-mapper-prompt.md
 **Conditions**:
 - Fix `{STORY_FILE}`/`{STORY_DIR}` naming to `{story-file}`/`{story-directory}`
 - Uncheck Phase 2 "configurable per project" item (or implement it)
+
+---
+
+## Re-Review — QA Cycle 2 (2026-05-09)
+
+**Gate Status**: PASS
+**Quality Score**: 93/100
+
+### Issue Resolution
+
+| Issue | Resolution | Status |
+|-------|-----------|--------|
+| MEDIUM: Template variable naming `{STORY_FILE}`/`{STORY_DIR}` | Renamed to `{story-file}`/`{story-directory}` throughout `develop-pipeline-step-5-6-qa-loop.md`; note added that these are resolved in Phase 0a | ✅ FIXED |
+| MEDIUM: Phase 2 "configurable per project" falsely checked | Unchecked; future-work note added documenting `skills-config.yaml` hook needed for multi-language projects | ✅ FIXED |
+| LOW: Transitive packaging dependency | Carried forward as future recommendation (non-blocking) | ⏭️ DEFERRED |
+
+Both blocking conditions met. Maintainability NFR upgraded to PASS. Deployment readiness: APPROVED.

@@ -1,32 +1,24 @@
 schema: 1
 task: 'task.20.qa-story-traceability-mapper-subagent'
 task_title: 'Add pre-qa-story traceability mapper Explore subagent'
-gate: CONCERNS
-status_reason: 'Core implementation correct and backwards-compatible. Two medium gaps: template variable naming inconsistency (STORY_FILE/STORY_DIR vs pipeline convention story-file/story-directory) and Phase 2 checklist item "configurable per project" marked complete but not implemented.'
+gate: PASS
+status_reason: 'Both medium issues resolved: template variable naming fixed ({story-file}/{story-directory} throughout) and Phase 2 configurable-patterns checkbox unchecked with future-work note. Core implementation correct and backwards-compatible.'
 reviewer: 'QA (claude-sonnet-4-6)'
 updated: '2026-05-09T00:00:00Z'
 
-top_issues:
-  - issue: 'Template variable naming inconsistency in step-5-6-qa-loop.md'
-    severity: medium
-    location: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md lines 59-81'
-    suggestion: 'Replace {STORY_FILE}/{STORY_DIR} with {story-file}/{story-directory} to match pipeline doc convention'
-  - issue: '"Configurable per project" grep patterns checklist item marked complete but not implemented'
-    severity: medium
-    location: 'shared/resources/qa-traceability-mapper-prompt.md Steps 3-4; task.20 Phase 2 checkbox'
-    suggestion: 'Uncheck Phase 2 item and document as future work, OR add skills-config.yaml hook for specPatterns/srcPatterns'
+top_issues: []
 
 waiver:
   active: false
 
-quality_score: 78
+quality_score: 93
 
 evidence:
   tests_reviewed: 0
   phases_verified: '5/5 (Phase 5 = this QA review)'
   trace:
     phases_covered: [1, 2, 3, 4, 5]
-    phases_with_issues: [2, 3]
+    phases_with_issues: []
 
 nfr_validation:
   security:
@@ -39,22 +31,18 @@ nfr_validation:
     status: PASS
     notes: 'Graceful fallback on mapper failure; backwards-compatible; Uncertainty column mitigates false-clear coverage'
   maintainability:
-    status: CONCERNS
-    notes: 'Hardcoded grep patterns add latent burden; naming inconsistency makes new section harder to maintain alongside pipeline docs'
+    status: PASS
+    notes: 'Naming inconsistency fixed; configurable-patterns gap correctly documented as future work rather than falsely marked complete'
 
 recommendations:
-  immediate:
-    - action: 'Fix template variable naming: {STORY_FILE} → {story-file}, {STORY_DIR} → {story-directory} in develop-pipeline-step-5-6-qa-loop.md'
-      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
-    - action: 'Uncheck Phase 2 "configurable per project" item and mark as future work (or implement skills-config.yaml hook)'
-      refs: ['docs/development/tasks/task.20.qa-story-traceability-mapper-subagent/task.20.qa-story-traceability-mapper-subagent.md']
+  immediate: []
   future:
     - action: 'Verify transitive packaging: run package_skill.py on develop-story skill, confirm qa-traceability-mapper-prompt.md is bundled'
       refs: ['shared/resources/qa-traceability-mapper-prompt.md', 'skills/develop-story/SKILL.md']
+    - action: 'Implement skills-config.yaml hook for qa.specPatterns/qa.srcPatterns for multi-language project support'
+      refs: ['shared/resources/qa-traceability-mapper-prompt.md']
 
 deployment_readiness:
-  staging: CONDITIONAL
-  production: CONDITIONAL
-  conditions:
-    - 'Fix template variable naming inconsistency'
-    - 'Correct Phase 2 checklist item status'
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
