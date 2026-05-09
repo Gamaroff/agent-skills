@@ -36,7 +36,7 @@ Initial pipeline run to implement the review-story pre-pass feature: 3 parallel 
 | 4. create-pr | ✅ Done | PR #52: https://github.com/Gamaroff/agent-skills/pull/52; issue #34 commented | Post-PR state: OPEN; board: In Progress | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.16.qa.1.review-story-prepass-subagent.md`; `task.16.gate.1.review-story-prepass-subagent.yml`; PR comment posted | PASS (88/100); 0 HIGH, 0 MEDIUM, 3 LOW deferred; 1 QA cycle | — |
 | 7. finalise | ✅ Done | `task.16.dod.1.review-story-prepass-subagent.md`; task `status: accepted`; PR comment posted; issue #34 closed; board moved to Done | ACCEPTED (88/100); all side-effects confirmed | — |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | | — |
+| 8. commit-changes | ✅ Done | All artifacts committed (f3b7f64) and pushed to remote | task.md, qa.md, gate.yml, dod.md, implementation report | — |
 
 ---
 
@@ -98,9 +98,9 @@ Initial pipeline run to implement the review-story pre-pass feature: 3 parallel 
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-05-08
+**Final Status**: Completed
 **Branch**: feature/task.16.review-story-prepass-subagent
 **PR**: https://github.com/Gamaroff/agent-skills/pull/52
 **QA Iterations**: 1 (PASS — no fix cycle needed)
-**DoD Summary**: {populated after Step 7}
+**DoD Summary**: [task.16.dod.1.review-story-prepass-subagent.md](./task.16.dod.1.review-story-prepass-subagent.md) — ACCEPTED (88/100)
