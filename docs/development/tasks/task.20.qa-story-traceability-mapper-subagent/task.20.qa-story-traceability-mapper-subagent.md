@@ -4,9 +4,11 @@ title: "Add pre-qa-story traceability mapper Explore subagent"
 type: task
 category: refactoring
 priority: Medium
-status: ready-for-review
+status: accepted
 created: 2026-05-08
 updated: 2026-05-09
+completed_date: 2026-05-09
+pr_number: 56
 assignee: TBD
 effort: ~0.5 day
 depends_on: —
@@ -16,7 +18,7 @@ source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #5)
 
 # Task 20 — Pre-`/qa-story` traceability mapper subagent
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `task.20.qa-story-traceability-mapper-subagent.review.2026-05-09.md` implemented 2026-05-09
 
 > Detailed implementation guide: [task.20.plan.qa-story-traceability-mapper-subagent.md](task.20.plan.qa-story-traceability-mapper-subagent.md)
@@ -111,11 +113,11 @@ Drop `--traceability-matrix` arg from orchestrator call → `/qa-story` reverts 
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS (Cycle 2)
 **QA Engineer**: QA (claude-sonnet-4-6)
 **Testing Date**: 2026-05-09
-**Quality Score**: 78/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 93/100
+**Gate Decision**: PASS
 
 ### QA Report
 - **Full Report**: [task.20.qa.1.traceability-mapper-initial-review.md](./task.20.qa.1.traceability-mapper-initial-review.md)
@@ -127,5 +129,34 @@ Drop `--traceability-matrix` arg from orchestrator call → `/qa-story` reverts 
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
-### Key Findings
-Two medium-severity gaps: (1) template variable naming `{STORY_FILE}`/`{STORY_DIR}` inconsistent with pipeline doc convention; (2) Phase 2 "configurable per project" item marked complete but not implemented. Core implementation correct and backwards-compatible.
+### Key Findings (Cycle 1)
+Two medium-severity gaps identified: (1) template variable naming `{STORY_FILE}`/`{STORY_DIR}` inconsistent with pipeline doc convention; (2) Phase 2 "configurable per project" item marked complete but not implemented. Both fixed in qa-fix Cycle 1. Re-review (Cycle 2) confirmed both issues resolved — gate upgraded to PASS.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.20.qa.1.traceability-mapper-initial-review.md`
+**Gate File**: `task.20.gate.1.traceability-mapper-initial-review.yml`
+**Gate Status**: ✅ PASS (Cycle 2)
+**Quality Score**: 93/100
+
+All Definition of Done criteria verified:
+
+✅ **All Implementation Phases**: 4/4 complete (Phase 5 = QA validation)
+✅ **Success Criteria**: All functional, performance, and migration criteria met
+✅ **PR**: #56 open — https://github.com/Gamaroff/agent-skills/pull/56
+✅ **Security Review**: Read-only subagent; no source mutation; no secrets
+✅ **Performance**: Greps offloaded to Explore subagent; lite-mode skip preserved
+✅ **Reliability**: Graceful fallback; backwards-compatible; Uncertainty column mitigates false-clear coverage
+✅ **Maintainability**: Naming inconsistency fixed; configurable-patterns gap correctly documented as future work
+
+**Deployment Readiness**: Staging ✅ APPROVED · Production ✅ APPROVED
+
+**Detailed Verification Log:** See `task.20.dod.1.qa-story-traceability-mapper-subagent.md` for complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-05-09
