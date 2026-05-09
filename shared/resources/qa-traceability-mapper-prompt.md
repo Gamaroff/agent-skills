@@ -9,6 +9,8 @@ description: Read-only Explore subagent prompt for building an AC→spec→src t
 
 Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and file reads never land in main context. Produces a markdown table written to `<story-dir>/.summaries/qa-traceability-matrix.md`. **Never mutates source files or QA artifacts.**
 
+> **Packaging note**: This file is referenced transitively from `develop-pipeline-step-5-6-qa-loop.md`. Verify that `package_skill.py` bundles it into the `develop-story` skill zip (run `package_skill.py skills/develop-story` and confirm `qa-traceability-mapper-prompt.md` appears in the zip). If not auto-detected, add an explicit `shared/resources/qa-traceability-mapper-prompt.md` reference to `skills/develop-story/SKILL.md`.
+
 ## Output
 
 **File written**: `<story-dir>/.summaries/qa-traceability-matrix.md`
@@ -37,13 +39,13 @@ Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and fi
 
 ## How to Invoke (from pipeline orchestrators)
 
-Pass the following prompt to an Explore subagent via the `Agent` tool with `subagent_type="Explore"`. Substitute `{STORY_FILE}` and `{STORY_DIR}` before sending.
+Pass the following prompt to an Explore subagent via the `Agent` tool with `subagent_type="Explore"`. Substitute `{story-file}` and `{story-directory}` (resolved in Phase 0a) as the values for `STORY_FILE=` and `STORY_DIR=` before sending.
 
 ```
 Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
 Inputs:
-  STORY_FILE={STORY_FILE}    # absolute path to the story markdown file
-  STORY_DIR={STORY_DIR}      # absolute path to the story directory
+  STORY_FILE={story-file}       # absolute path to the story markdown file (resolved in Phase 0a)
+  STORY_DIR={story-directory}   # absolute path to the story directory (resolved in Phase 0a)
 
 Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation: "Matrix written to {STORY_DIR}/.summaries/qa-traceability-matrix.md — {N} ACs mapped."
 ```
@@ -56,7 +58,7 @@ After the subagent returns, the matrix is at `{STORY_DIR}/.summaries/qa-traceabi
 args="traceability_matrix={STORY_DIR}/.summaries/qa-traceability-matrix.md"
 ```
 
-Write a subagent summary JSON artifact to `{STORY_DIR}/.summaries/step-5-traceability-mapper.json` using the schema from `shared/resources/subagent-summary-artifact.md`:
+Write a subagent summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` using the schema from `shared/resources/subagent-summary-artifact.md`:
 
 ```json
 {

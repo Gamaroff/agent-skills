@@ -56,15 +56,17 @@ Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore s
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
 Inputs:
-  STORY_FILE={STORY_FILE}
-  STORY_DIR={STORY_DIR}
+  STORY_FILE={story-file}
+  STORY_DIR={story-directory}
 
 Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
 ```
 
+`{story-file}` and `{story-directory}` are the story file path and story directory path resolved in Phase 0a.
+
 After the subagent completes:
-1. Confirm `{STORY_DIR}/.summaries/qa-traceability-matrix.md` was written.
-2. Write the summary JSON artifact to `{STORY_DIR}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
+1. Confirm `{story-directory}/.summaries/qa-traceability-matrix.md` was written.
+2. Write the summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
 
 If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
@@ -78,7 +80,7 @@ Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, 
 When the traceability matrix was successfully generated, pass its path via Skill args:
 
 ```
-Skill(qa-story, args="traceability_matrix={STORY_DIR}/.summaries/qa-traceability-matrix.md")
+Skill(qa-story, args="traceability_matrix={story-directory}/.summaries/qa-traceability-matrix.md")
 ```
 
 If the matrix was not generated (lite mode or mapper failure), invoke without the `traceability_matrix` arg — qa-story performs internal mapping as before.

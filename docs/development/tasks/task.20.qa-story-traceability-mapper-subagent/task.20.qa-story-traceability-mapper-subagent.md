@@ -55,7 +55,7 @@ None — additive contract; absent matrix arg → existing behaviour.
 
 ### Phase 2 — Author Explore prompt (Low)
 - [x] Strict matrix output; ≤30 rows
-- [x] Patterns to grep configurable per project
+- [ ] Patterns to grep configurable per project _(future work — current implementation hardcodes `*.spec.ts`, `*.test.ts`, etc. A `skills-config.yaml` hook for `qa.specPatterns`/`qa.srcPatterns` is needed for multi-language projects)_
 
 ### Phase 3 — Wire orchestrator dispatch (Medium)
 - [x] `develop-story` Step 5 prep dispatches mapper (edit `shared/resources/develop-pipeline-step-5-6-qa-loop.md`)
@@ -106,3 +106,26 @@ None — additive contract; absent matrix arg → existing behaviour.
 ## 11. Rollback Plan
 
 Drop `--traceability-matrix` arg from orchestrator call → `/qa-story` reverts to internal mapping.
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA (claude-sonnet-4-6)
+**Testing Date**: 2026-05-09
+**Quality Score**: 78/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.20.qa.1.traceability-mapper-initial-review.md](./task.20.qa.1.traceability-mapper-initial-review.md)
+- **Gate File**: [task.20.gate.1.traceability-mapper-initial-review.yml](./task.20.gate.1.traceability-mapper-initial-review.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: N/A (documentation-only task)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Two medium-severity gaps: (1) template variable naming `{STORY_FILE}`/`{STORY_DIR}` inconsistent with pipeline doc convention; (2) Phase 2 "configurable per project" item marked complete but not implemented. Core implementation correct and backwards-compatible.
