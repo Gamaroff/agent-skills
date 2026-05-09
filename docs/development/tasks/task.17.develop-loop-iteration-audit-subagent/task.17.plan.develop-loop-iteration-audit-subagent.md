@@ -15,7 +15,7 @@ Replace inline story re-read + git log capture in develop-loop with a single Exp
 
 ## Phase 1 — Define audit prompt
 
-Append to `develop-pipeline-step-3-develop-loop.md` near current stall-detection block (lines 84-99):
+Append to `shared/resources/develop-pipeline-step-3-develop-loop.md` near the LOOP body (lines 84-104). Stall-detection logic itself lives in `shared/resources/develop-pipeline-resume-contract.md` lines 88-103.
 
 ```
 DISPATCH (Explore, read-only):
@@ -29,7 +29,7 @@ DISPATCH (Explore, read-only):
 
 ## Phase 2 — Wire into loop
 
-Replace the inline read instructions in `develop-pipeline-step-3-develop-loop.md` lines 84-99 with:
+Replace the inline read instructions in `shared/resources/develop-pipeline-step-3-develop-loop.md` (LOOP body, lines 84-104 — applies to both develop-story and develop-task variants) and update stall-progress comparison in `shared/resources/develop-pipeline-resume-contract.md` lines 88-103 with:
 1. Pre-iteration: dispatch audit, store as `INITIAL_STATE`
 2. Each iteration end: dispatch audit, compare `current.completed > prev.completed` OR `current.last_commit_hash != prev.last_commit_hash`
 3. No progress → halt
@@ -37,12 +37,13 @@ Replace the inline read instructions in `develop-pipeline-step-3-develop-loop.md
 
 ## Phase 3 — Resume contract update
 
-`develop-pipeline-resume-contract.md`: document that resume reads the most recent audit JSON from `.summaries/` (depends on task.26) instead of re-running.
+`shared/resources/develop-pipeline-resume-contract.md`: document that resume reads the most recent audit JSON from `.summaries/` (depends on task.26 — pipeline subagent summary artifacts) instead of re-running the audit subagent.
 
 ## Key References
 
-- Stall detector pseudocode currently inline at `develop-pipeline-step-3-develop-loop.md:84-99`
-- Lock-file `current_step` pattern: `develop-pipeline-step-0-resolve-and-prepare.md`
+- LOOP body currently at `shared/resources/develop-pipeline-step-3-develop-loop.md:84-104` (re-read at line 89 / 99 for story / task variants)
+- Stall detector pseudocode at `shared/resources/develop-pipeline-resume-contract.md:88-103`
+- Lock-file `current_step` pattern: `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`
 
 ## Testing Approach
 

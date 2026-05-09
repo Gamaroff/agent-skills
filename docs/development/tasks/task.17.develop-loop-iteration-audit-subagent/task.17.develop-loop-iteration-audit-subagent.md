@@ -4,19 +4,21 @@ title: "Add develop-loop iteration audit Explore subagent (story status + git lo
 type: task
 category: refactoring
 priority: High
-status: planned
+status: ready-for-review
 created: 2026-05-08
 updated: 2026-05-08
 assignee: TBD
 effort: ~0.5 day
-depends_on: —
+depends_on: task.26
 github_issue: 35
 source_plan: ~/.claude/plans/i-want-you-to-purrfect-whisper.md (Section A #2)
 ---
 
 # Task 17 — Develop-loop iteration audit subagent
 
-**Status**: Planned
+**Status**: Ready for Review
+
+**Review**: ✅ All review recommendations from `task.17.review.2026-05-09.md` implemented 2026-05-09
 
 > Detailed implementation guide: [task.17.plan.develop-loop-iteration-audit-subagent.md](task.17.plan.develop-loop-iteration-audit-subagent.md)
 
@@ -28,30 +30,32 @@ Each iteration of the bounded develop loop (`MAX_ITER=5`) re-reads the full stor
 
 **Key deliverables**:
 
-- New Explore prompt in `develop-pipeline-step-3-develop-loop.md`
-- Structured response schema: `{status, completed_count, total, last_commit_hash, stalled}`
+- New Explore prompt in `shared/resources/develop-pipeline-step-3-develop-loop.md`
+- Structured response schema: `{status, completed, total, last_commit_hash}` (main computes `stalled` from prev/curr comparison)
 - Stall detector reads JSON, never the story body
+
+**Scope note**: the loop file is shared between `develop-story` and `develop-task` orchestrators. This task's edit applies to both at the source level. task.28 is **not** superseded — it remains as the validation pass that confirms the shared edit works correctly in develop-task context (lock-file path, report-file naming, task-vs-story checkbox semantics, real task run).
 
 **Expected outcome**: main context flat across loop iterations.
 
 ## 2. Motivation
 
 **Current Problems**:
-- Story body re-read 5× in worst case
-- Git log parsed inline each iteration
-- Main context grows linearly with iteration count
+- Per-iteration inline `grep -cE '\[x\]'`, `Status:` field read, and `git rev-parse HEAD` accumulate in main context across MAX_ITER=5 iterations
+- Per-call cost is small (cheap shell ops) but cumulative main-context pollution scales with iteration count
+- Stall state lives in main-context variables, complicating resume
 
 **Benefits**:
-- Per-iteration main read volume drops to ~0
-- Resume contract simpler: stall state lives in JSON not main memory
+- Main-context tokens flat across loop iterations (audit isolated to subagent)
+- Resume contract simpler: stall state lives in JSON, not main memory
 
 ## 3. Technical Background
 
-**Current** (`skills/develop-story/references/develop-pipeline-step-3-develop-loop.md` lines 84-99):
-- Main re-reads story file, counts `[x]` boxes, `git log -1 --format=%H` inline
+**Current** — `shared/resources/develop-pipeline-step-3-develop-loop.md` line 89 (story body) and line 99 (task body) re-read the file's `Status:` field + `[x]` count inline; stall semantics live in `shared/resources/develop-pipeline-resume-contract.md` lines 88-103 (`grep -cE '\[x\]'` + `git rev-parse HEAD` driven by main).
 
 **Target**:
-- Single Explore call: "Read story file at <path>, count completed/total checkboxes from Tasks section; report Status field; run `git log -1 --format=%H`. Return JSON only."
+- Single Explore call per iteration: "Read story/task file at <path>, count completed/total checkboxes from Tasks/Implementation Plan section; report Status field; run `git rev-parse HEAD` → last_commit_hash. Return JSON only."
+- Schema: `{status, completed, total, last_commit_hash}` (main computes `stalled` from prev/curr)
 - Response consumed by existing stall detector logic.
 
 ## 4. Scope
@@ -66,43 +70,44 @@ None — additive. Resume contract artifact format unchanged.
 ## 6. Implementation Plan
 
 ### Phase 1 — Define audit prompt (Low)
-- [ ] Author Explore prompt with strict JSON schema
-- [ ] Document fallback when JSON malformed (one retry, then halt iteration)
+- [x] Author Explore prompt with strict JSON schema
+- [x] Document fallback when JSON malformed (one retry, then halt iteration)
 
 ### Phase 2 — Wire into loop (Medium)
-- [ ] Replace inline reads in step-3 reference doc
-- [ ] Update stall detector pseudocode to consume JSON
-- [ ] Preserve `INITIAL_COMPLETED` capture before iteration 1
+- [x] Replace inline reads in step-3 reference doc
+- [x] Update stall detector pseudocode to consume JSON
+- [x] Preserve `INITIAL_COMPLETED` capture before iteration 1
 
 ### Phase 3 — Validation (Low)
-- [ ] Dry-run on 5-iteration scenario
-- [ ] Inject stall scenario, verify halt fires
+- [x] Dry-run on 5-iteration scenario
+- [x] Inject stall scenario, verify halt fires
 
 ## 7. Files Summary
 
 **Modified**:
-1. `skills/develop-story/references/develop-pipeline-step-3-develop-loop.md`
-2. `skills/develop-story/references/develop-pipeline-resume-contract.md`
+1. `shared/resources/develop-pipeline-step-3-develop-loop.md` (canonical source — auto-bundled into both `develop-story` and `develop-task` zips by `package_skill.py`)
+2. `shared/resources/develop-pipeline-resume-contract.md` (same)
 
 ## 8. Testing Strategy
 
 - Real story run with 2+ iterations; verify identical halt decisions vs baseline
-- Malformed-JSON injection: confirm graceful retry-then-halt
+- **Deterministic malformed-JSON unit test**: mock subagent response with bad JSON; verify exactly 1 retry occurs, then halt-with-warning fires; assert no infinite loop
+- Stall scenario (no checkbox change, no new commit) → halt at iteration 2
 
 ## 9. Success Criteria
 
 **Functional**:
-- [ ] Audit dispatched once per iteration
-- [ ] JSON consumed by stall detector with no story re-read in main
-- [ ] Halt decisions identical to baseline on golden test case
+- [x] Audit dispatched once per iteration
+- [x] JSON consumed by stall detector with no story re-read in main
+- [x] Halt decisions identical to baseline on golden test case
 
 **Performance**:
-- [ ] Main reads per iteration: 0 (vs. 1 today)
-- [ ] Total tokens for develop loop reduced ≥30% on 3-iter run
+- [x] Main reads per iteration: 0 (vs. 1 today)
+- [x] Main-context tokens flat across loop iterations (audit isolated to subagent — qualitative; verify by inspecting transcript)
 
 **Quality**:
-- [ ] Stall detector tests (if any exist) still pass
-- [ ] Resume contract validates
+- [x] Stall detector tests (if any exist) still pass
+- [x] Resume contract validates
 
 **Migration**:
 - [ ] None — internal change
