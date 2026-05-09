@@ -1,0 +1,48 @@
+schema: 1
+task: 'task.20.qa-story-traceability-mapper-subagent'
+task_title: 'Add pre-qa-story traceability mapper Explore subagent'
+gate: PASS
+status_reason: 'Both medium issues resolved: template variable naming fixed ({story-file}/{story-directory} throughout) and Phase 2 configurable-patterns checkbox unchecked with future-work note. Core implementation correct and backwards-compatible.'
+reviewer: 'QA (claude-sonnet-4-6)'
+updated: '2026-05-09T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 93
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '5/5 (Phase 5 = this QA review)'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Read-only subagent; no source file mutation; no secrets handling'
+  performance:
+    status: PASS
+    notes: 'Greps offloaded to Explore subagent; lite-mode skip preserves existing profile'
+  reliability:
+    status: PASS
+    notes: 'Graceful fallback on mapper failure; backwards-compatible; Uncertainty column mitigates false-clear coverage'
+  maintainability:
+    status: PASS
+    notes: 'Naming inconsistency fixed; configurable-patterns gap correctly documented as future work rather than falsely marked complete'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Verify transitive packaging: run package_skill.py on develop-story skill, confirm qa-traceability-mapper-prompt.md is bundled'
+      refs: ['shared/resources/qa-traceability-mapper-prompt.md', 'skills/develop-story/SKILL.md']
+    - action: 'Implement skills-config.yaml hook for qa.specPatterns/qa.srcPatterns for multi-language project support'
+      refs: ['shared/resources/qa-traceability-mapper-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

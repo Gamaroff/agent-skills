@@ -11,11 +11,11 @@ task-ref: task.20.qa-story-traceability-mapper-subagent.md
 
 ## Overview
 
-Pre-`/qa-story` Explore agent maps ACs → spec/src files; result passed via `--traceability-matrix <path>`. `/qa-story` skips internal mapping when arg present.
+Pre-`/qa-story` Explore agent maps ACs → spec/src files; result path passed via Skill `args="traceability_matrix=<path>"`. `/qa-story` skips internal mapping when arg present.
 
 ## Phase 1 — Matrix schema
 
-Markdown table written to `<task-dir>/.summaries/qa-traceability-matrix.md`:
+Markdown table written to `<story-dir>/.summaries/qa-traceability-matrix.md`:
 
 ```markdown
 | AC | Spec files | Src files | Coverage |
@@ -41,14 +41,14 @@ Return matrix in markdown table form. Cap 30 ACs.
 
 ## Phase 3 — Orchestrator wiring
 
-In `develop-pipeline-step-5-6-qa-loop.md`:
-- Before `/qa-story` invocation, dispatch mapper
-- Append `--traceability-matrix <path>` arg
+In `shared/resources/develop-pipeline-step-5-6-qa-loop.md`:
+- Before `/qa-story` invocation, dispatch mapper (Explore subagent)
+- Invoke `/qa-story` via the Skill tool with `args="traceability_matrix=<path>"`
 
 ## Phase 4 — `/qa-story` consumption
 
 In `skills/qa-story/SKILL.md`:
-- Accept `--traceability-matrix <path>` arg
+- Parse `traceability_matrix=<path>` from Skill `args`
 - When present, read matrix instead of internal mapping
 - Use coverage column in NFR/AC traceability section
 
