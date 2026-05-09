@@ -1,10 +1,10 @@
 schema: 1
 task: 'task.21.qa-fix-findings-ingester-subagent'
 task_title: 'Add pre-qa-fix QA findings ingester Explore subagent'
-gate: CONCERNS
-status_reason: 'Two MEDIUM issues — ambiguous "Provide" dispatch instruction and mixed placeholder styles — risk silent fallthrough to Step 1b, defeating context-reduction goal. No HIGH issues; all phases complete; fallback path preserves functionality.'
+gate: PASS
+status_reason: 'Both MEDIUM issues resolved: dispatch instruction now says "Substitute placeholders before dispatching" + "Dispatch: Agent(...)" matching create-pr pattern; all placeholders standardised to <angle> style. All 3 phases verified; no HIGH issues; fallback path preserved.'
 reviewer: 'QA Engineer (automated pipeline)'
-updated: '2026-05-09T00:00:00Z'
+updated: '2026-05-09T01:00:00Z'
 
 top_issues:
   - issue: 'Step 1a dispatch uses "Provide" not "Substitute" — ambiguous, may not substitute <dir> into prompt'
@@ -12,16 +12,27 @@ top_issues:
     file: 'skills/qa-fix/SKILL.md'
     location: 'Step 1a, lines 338-341'
     suggested_action: 'Change to explicit "Substitute <dir> with... Dispatch:" pattern matching create-pr line 241'
+    status: closed
+    fixed_date: '2026-05-09'
   - issue: 'Mixed placeholder styles <dir> vs {epic}/{story}/{id} in ingester prompt body'
     severity: medium
     file: 'shared/resources/qa-findings-ingester-prompt.md'
     location: 'lines 13-22'
     suggested_action: 'Standardise all placeholders to one style (<angle> or {curly}); update Step 1a instruction to match'
+    status: closed
+    fixed_date: '2026-05-09'
 
 waiver:
   active: false
 
-quality_score: 80
+quality_score: 93
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-05-09'
+  total_iterations: 1
+  verification_method: 'Manual inspection of changed files against issue descriptions'
 
 evidence:
   tests_reviewed: 0
@@ -55,8 +66,6 @@ recommendations:
       refs: ['shared/resources/qa-findings-ingester-prompt.md']
 
 deployment_readiness:
-  staging: CONDITIONAL
-  production: CONDITIONAL
-  conditions:
-    - 'Fix dispatch instruction ambiguity in skills/qa-fix/SKILL.md Step 1a'
-    - 'Standardise placeholder styles in shared/resources/qa-findings-ingester-prompt.md'
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

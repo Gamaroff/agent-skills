@@ -109,11 +109,11 @@ Revert `skills/qa-fix/SKILL.md`; inline reads restored. Delete `shared/resources
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer (automated pipeline)
 **Testing Date**: 2026-05-09
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 93/100
+**Gate Decision**: PASS (re-review cycle 2 — 2 MEDIUM issues fixed)
 
 ### QA Report
 - **Full Report**: [task.21.qa.1.qa-fix-findings-ingester-subagent.md](./task.21.qa.1.qa-fix-findings-ingester-subagent.md)
@@ -126,4 +126,4 @@ Revert `skills/qa-fix/SKILL.md`; inline reads restored. Delete `shared/resources
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two MEDIUM issues: (1) ambiguous "Provide" dispatch instruction in Step 1a should say "Substitute"; (2) mixed placeholder styles `<dir>` vs `{epic}` in ingester prompt. Both surgical fixes. No HIGH issues.
+Re-review cycle 2 PASS (93/100). Two MEDIUM issues fixed: dispatch instruction now "Substitute placeholders before dispatching" + `Dispatch: Agent(...)`; all placeholders standardised to `<angle>` style. No HIGH issues throughout.

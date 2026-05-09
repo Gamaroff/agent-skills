@@ -4,7 +4,7 @@
 **Gate File**: [task.21.gate.1.qa-fix-findings-ingester-subagent.yml](./task.21.gate.1.qa-fix-findings-ingester-subagent.yml)
 **QA Engineer**: QA Engineer (automated pipeline)
 **Review Date**: 2026-05-09
-**Gate Status**: CONCERNS
+**Gate Status**: PASS (re-review cycle 2)
 
 ---
 
@@ -180,11 +180,23 @@ Not applicable — agent instruction changes, no runnable code.
 
 ## Final Assessment
 
-**Gate Status**: CONCERNS
-**Rationale**: Two MEDIUM issues — ambiguous dispatch instruction and mixed placeholder styles — could cause silent runtime failure of the primary ingester path, silently defeating the context-reduction goal. No HIGH issues; fallback path preserves functionality. Fixes are surgical (2–3 lines each).
-**Quality Score**: 80/100
+**Gate Status**: ~~CONCERNS~~ → **PASS** (after re-review cycle 2)
+**Rationale**: Both MEDIUM issues fixed. Dispatch instruction now uses "Substitute placeholders before dispatching" + explicit `Dispatch: Agent(...)` call. All placeholders standardised to `<angle>` style. All phases verified; fallback path unchanged; no regressions.
+**Quality Score**: 93/100
 
-**Deployment Recommendation**: CONDITIONAL
-**Conditions**:
-1. Fix dispatch instruction to use "Substitute" not "Provide"
-2. Standardise placeholder styles in ingester prompt
+**Deployment Recommendation**: APPROVED
+**Conditions**: None
+
+---
+
+## Re-Review — Cycle 2 (2026-05-09)
+
+### Bug Resolution
+
+| Issue | Status | Fix Verified |
+|---|---|---|
+| MEDIUM-1: "Provide" vs "Substitute" dispatch | FIXED | `skills/qa-fix/SKILL.md` Step 1a now says "Substitute placeholders before dispatching" + `Dispatch: Agent(...)` |
+| MEDIUM-2: Mixed placeholder styles | FIXED | All placeholders in `qa-findings-ingester-prompt.md` standardised to `<angle>` style |
+
+**Gate upgrade**: CONCERNS → PASS
+**Quality score**: 80 → 93
