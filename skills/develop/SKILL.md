@@ -817,11 +817,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 - Architecture: `docs/architecture/` (sharded)
 - Debug Log: `.ai/debug-log.md`
 
-**Always-Loaded Files** (coding standards):
-
-- `docs/architecture/concepts/coding-standards.md`
-- `docs/architecture/concepts/tech-stack.md`
-- `docs/architecture/concepts/source-tree.md`
+**Always-Loaded Files**: resolved by the `develop-task`/`develop-story` orchestrator during Phase 0c-load from `skills-config.yaml devLoadAlwaysFiles`, falling back to `coding-standards.md`, `tech-stack.md`, and `source-tree.md` if the key is absent. Files are pre-loaded and passed as caller-supplied context before `/develop` is invoked — do not re-read them independently.
 
 **Story Directory Structure:**
 

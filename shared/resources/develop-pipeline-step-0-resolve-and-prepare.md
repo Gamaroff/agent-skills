@@ -352,6 +352,29 @@ If `TRACKER_ISSUE` is not set, skip this entire section — do NOT update the de
 
 ---
 
+## 0c-load. Resolve Always-Load Files
+
+Determine the list of files to pre-load as context for `/develop`. This section is identical for both orchestrators.
+
+1. **Check for `skills-config.yaml`** in the project root.
+
+2. **If `skills-config.yaml` exists**, read the `devLoadAlwaysFiles` key:
+   - If the key is present and non-empty, use that list as `ALWAYS_LOAD_FILES`.
+   - If the key is absent or empty, fall back to the defaults below.
+
+3. **If `skills-config.yaml` does not exist**, use the defaults:
+   - `docs/architecture/concepts/coding-standards.md`
+   - `docs/architecture/concepts/tech-stack.md`
+   - `docs/architecture/concepts/source-tree.md`
+
+4. **For each file in `ALWAYS_LOAD_FILES`**: verify it exists on disk. If missing, log a warning — `"⚠️ Always-load file not found: <path> — skipping"` — and remove it from the list.
+
+5. **Log to Decisions Log**: `"Always-load files resolved: {N} files — {comma-separated paths}"`
+
+Store `ALWAYS_LOAD_FILES` as a pipeline-wide variable — it is consumed in Step 3 when invoking `/develop`.
+
+---
+
 ## 0d. Upfront Setup — Gather All Decisions Before Execution
 
 Check the current branch:
@@ -444,6 +467,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | High-risk gate      | {Q3 answer or N/A}            |
 | Story risk level    | {risk_level value or not set} |
 | Pipeline mode       | {lite / standard}             |
+| Always-load files   | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
 | Board status        | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)} |
 
 ---
@@ -527,6 +551,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 | High-risk gate | {Q3 answer or N/A} |
 | Task risk level | {risk_level value or not set} |
 | Pipeline mode | {lite / standard} |
+| Always-load files | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
 | Board status | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)} |
 
 ---

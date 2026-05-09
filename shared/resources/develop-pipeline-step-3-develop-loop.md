@@ -31,7 +31,15 @@ Ask it to find: all files likely affected by the success criteria and implementa
 - Do NOT read these files again in the main context — the summary is sufficient for `/develop` to make informed decisions
 - Log the Explore summary in the Decisions Log: "Pre-develop surface map: {N} files identified in {affected modules}"
 - When invoking `/develop`, present the Explore summary as initial context so `/develop` does NOT need to run its own independent file discovery. State explicitly: "Codebase surface map already completed — {summary}. Proceed directly to alignment analysis using this map."
-- See `/develop` SKILL.md **Caller-Supplied Context** section for the full contract on how orchestrators may prepend context (surface map, plan file path, iteration hint) and how `/develop` must honour it.
+- **Always-load files**: read each file in `ALWAYS_LOAD_FILES` (resolved in Phase 0c-load) and prepend their full contents to the `/develop` invocation context, labelled:
+  ```
+  Always-loaded project files (devLoadAlwaysFiles from skills-config.yaml, or defaults):
+  === <path> ===
+  <file contents>
+  ...
+  ```
+  If `ALWAYS_LOAD_FILES` is empty (all files were missing), log a warning and proceed without them.
+- See `/develop` SKILL.md **Caller-Supplied Context** section for the full contract on how orchestrators may prepend context (surface map, plan file path, always-load files, iteration hint) and how `/develop` must honour it.
 
 ---
 
@@ -85,7 +93,7 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 
 #### develop-story loop body
 
-1. Invoke `/develop` with the story file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
+1. Invoke `/develop` with the story file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
 2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress:
 
    **Audit prompt:**
@@ -106,7 +114,7 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 
 #### develop-task loop body
 
-1. Invoke `/develop` with the task file path. On iteration 1, pass the Explore surface map and plan file (or note that both were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
+1. Invoke `/develop` with the task file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
 2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress:
 
    **Audit prompt:**
