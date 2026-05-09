@@ -18,12 +18,13 @@ Capture failed test output to file; dispatch Explore subagent to classify failur
 Update `skills/develop/SKILL.md` test-running guidance:
 
 ```bash
-# Instead of: npx nx test foo
-# Do:
-TEST_LOG=".claude/state/test-output-$(date +%s).log"
-npx nx test foo > "$TEST_LOG" 2>&1
+# Generic — works with any test runner (jest, pytest, nx, go test, etc.)
+TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
+<test-command> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
 ```
+
+`${ITER}` = current develop-loop iteration number (1..MAX_ITER).
 
 On non-zero exit, dispatch triage instead of streaming log to main.
 
@@ -37,27 +38,36 @@ Read <log_path>. Classify each failing assertion as:
   - flaky: timing/order/network artefact
   - unrelated: pre-existing or environment
 
-Return YAML:
-  counts: {real:N, flaky:N, unrelated:N}
+Return YAML (matches `shared/resources/subagent-summary-artifact.md` contract):
+  counts: {real: N, flaky: N, unrelated: N}
   failures:
-    - {name, classification, file, line, one-line reason}
+    - name: <test name>
+      classification: real | flaky | unrelated
+      file: <path>
+      line: <int>
+      reason: <one-line>
   next_file: <single file path most likely to need a fix>
-  cap: 10 failures (truncate longer; report truncated_count)
+  truncated_count: <int>   # 0 unless >10 failures
+  cap: 10                  # bullets capped; remainder counted in truncated_count
 ```
 
 Bias rule: "If unsure between real and flaky, mark real."
 
 ## Phase 3 — Wiring
 
-In `develop-pipeline-step-3-develop-loop.md`:
-- After test run, if `$TEST_EXIT != 0`, dispatch triage with `<log_path>`
-- Main reads triage YAML; never reads `$TEST_LOG`
-- Cleanup: rm `$TEST_LOG` after step completion
+In `shared/resources/develop-pipeline-step-3-develop-loop.md`:
+- After test run, if `$TEST_EXIT != 0`, dispatch the Agent tool with `subagent_type="Explore"` passing `<log_path>` and the prompt from `shared/resources/test-failure-triage-prompt.md`
+- Main consumes triage YAML only; never reads `$TEST_LOG`
+- Conditional cleanup:
+  - On `TEST_EXIT == 0` → `rm -f "$TEST_LOG"`
+  - On `TEST_EXIT != 0` → retain `$TEST_LOG` for post-mortem; cleaned by next successful run on same iter or out-of-band rotation
 
 ## Key References
 
 - Existing log redirection pattern: none — establish here
-- Compact-summary subagent pattern: `qa-fix/SKILL.md:497`
+- Compact-summary subagent pattern: `skills/qa-fix/SKILL.md` Step 3 "Pre-fix codebase mapping" block
+- Subagent output contract: `shared/resources/subagent-summary-artifact.md` (established by task.17)
+- Sibling: [task.29](../task.29.develop-task-loop-test-failure-triage-subagent/) — develop-task pipeline-specific validation/integration
 
 ## Testing Approach
 
