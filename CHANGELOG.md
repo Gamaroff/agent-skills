@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- **`develop-pipeline`**: `devLoadAlwaysFiles` resolution (Phase 0c-load) — reads `skills-config.yaml` `devLoadAlwaysFiles` key and passes those files as labelled context to `/develop` on the first iteration.
+- **`develop-pipeline`**: Explore audit subagent replaces inline loop reads for pre-develop codebase mapping.
+- **`develop-pipeline`**: test-failure triage Explore subagent for structured diagnosis on failing test suites.
+- **`develop-story`**: epic-branch-first branching enforced — story branches always created from their parent epic branch (`feature/epic.{n}.{name}`), never directly from `develop`.
+- **`create-pr`**: diff-aware PR body generation via Explore subagent — richer, context-aware PR descriptions from actual diff content.
+- **`review-story`**: Phase 1.5 pre-pass with 3 parallel Explore subagents for deeper pre-review codebase analysis.
+- Subagent summaries persisted as `.summaries/` JSON artifacts by the pipeline orchestrator.
+- Shared tracker state poller Explore subagent available for create-pr/finalise flows.
+- `docs/`: PRD/story and task document reference guides (`prd-story-reference.md`, `task-reference.md`).
+- `GOVERNANCE.md`, `CITATION.md`, and Copilot agent instructions (`copilot-instructions.md`).
+
+### Changed
+- **Agent-agnostic repo guidance**: `CLAUDE.md` content migrated to `AGENTS.md`; `CLAUDE.md` is now a thin redirect shim and is gitignored. All "Claude Code"-specific language in `AGENTS.md` replaced with neutral agent terminology.
+- **`qa-gate`**: gate files co-located with their story/task documents instead of central `docs/qa/gates/` — gate path is now `<story-dir>/story.{e}.{s}.gate.{n}.{name}.yml`.
+- PRD/epic/story doc paths canonicalized across skills for consistent path resolution.
+- `.agents/plans/` is now version-controlled; `.agents/state/` is gitignored as a runtime-artifact directory.
+- Pipeline Step 7 (finalise) hardened: DO-NOT-inline rule added, completion checklist documented; lite mode confirmed to still execute all finalise side-effects (post DoD to PR, comment issue, update board).
+- CI workflows disabled to stay within GitHub Free tier action-minute limits.
+
+### Fixed
+- **`create-skill`**: validator now handles both quoted and plain (block-scalar) multi-line `description` fields in `SKILL.md` frontmatter.
+
 ### Removed
 - `skills/offline-first-enforcer/references/offline-capabilities-prd.md` — 1900-line product-specific PRD; skill is now self-contained with generic offline-first patterns.
 - Stale `api-endpoint-validator.zip` build artifact at repo root.
