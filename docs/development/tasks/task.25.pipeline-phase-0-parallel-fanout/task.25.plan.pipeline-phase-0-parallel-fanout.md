@@ -47,9 +47,9 @@ Profile: baseline vs new wall-clock on Phase 0 alone. Target ≥50% reduction.
 
 ## Key References
 
-- `develop-pipeline-step-0-resolve-and-prepare.md` (current serial flow)
-- Lock-file schema: same SKILL.md (lines 121-126)
-- task.23 tracker poller dependency
+- `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (current Phase 0 flow — target of refactor)
+- Lock-file schema: `shared/resources/develop-pipeline-pause.md`
+- `shared/resources/tracker-state-poller-subagent.md` — task.23 dependency (accepted)
 
 ## Testing Approach
 
