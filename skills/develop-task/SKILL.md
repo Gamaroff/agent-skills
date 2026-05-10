@@ -62,15 +62,23 @@ cat .agents/skills/develop-task/SKILL.md
 ```
 Output: "⚠️ Context recovery — re-reading full skill file before resuming."
 
+**Step 0a — Dispatch stale-context detector (Phase 0a):**
+
+Dispatch a read-only Explore subagent using `shared/resources/pipeline-resume-detector-prompt.md`. The subagent reads `.claude/state/develop-pipeline.lock`, lists `.summaries/step-*.json` in the task directory, and diffs artifact mtimes. It returns `recommended_step`, `deltas_since_pause`, and `blocking_issues`.
+
+Surface the detector output to the user and wait for confirmation. If `blocking_issues` is non-empty: **HALT** — require manual resolution before resuming. Use `recommended_step` to narrow Step 1 verification scope.
+
+See `shared/resources/develop-pipeline-resume-contract.md` — Phase 0a for the full dispatch, output validation, and blocking-issues protocol.
+
 **Step 1 — Recover pipeline state from the implementation report:**
 ```bash
 ls {task-directory}/task.{id}.implementation.*.md 2>/dev/null | sort | tail -1
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
-2. **Verify each ✅ step's artifact exists** (see `shared/resources/develop-pipeline-resume-contract.md` — Resume Artifact Verification section) — do not trust the report alone.
+2. **Verify each ✅ step's artifact exists up to `recommended_step - 1`** (see `shared/resources/develop-pipeline-resume-contract.md` — Phase 0b for the full contract). Steps at or after `recommended_step` are treated as ⏳ Pending. If Phase 0a failed validation, fall back to verifying all steps using `current_step` from the lock as the upper bound.
 3. Output: "⚠️ Context recovery — last verified step: Step {N}. Resuming from Step {N+1}."
-4. Continue from Step {N+1} — do NOT re-run completed steps, do NOT skip any pending steps.
+4. Continue from `recommended_step` — do NOT re-run steps already verified, do NOT skip any pending steps.
 
 **This recovery is mandatory even if the user did not explicitly re-invoke `/develop-task`.** If you are in a conversation where `develop-task` was previously running and context was then compressed, you are still the develop-task orchestrator and must complete all remaining steps. A context summary saying "next step: create-pr" does NOT mean the pipeline ends after create-pr — it means Step 4 is next, and Steps 5–8 still follow.
 

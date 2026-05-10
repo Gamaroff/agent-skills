@@ -7,9 +7,58 @@ description: Resume verification contract shared by develop-story and develop-ta
 
 ## When This Contract Applies
 
-This contract is invoked during Phase 0b of `/develop-story` or `/develop-task` when resuming a previous pipeline run. The orchestrator follows these steps to determine which steps are safe to skip (verified ✅) versus which must be re-run (missing artifact or ⏸️ Paused).
+This contract is invoked during Phase 0 of `/develop-story` or `/develop-task` when resuming a previous pipeline run. Phase 0a (stale-context detector) runs first; Phase 0b (artifact verification) uses its output to narrow the verification scope.
 
-## Resume Artifact Verification (CRITICAL)
+---
+
+## Phase 0a — Stale-Context Detector Dispatch
+
+Dispatch a **read-only Explore subagent** using the prompt in `shared/resources/pipeline-resume-detector-prompt.md`. The subagent reads the lock file, lists step summaries, and diffs artifact mtimes — returning `recommended_step`, `deltas_since_pause`, and `blocking_issues`. The orchestrator never re-reads raw artifacts itself; the subagent does the reading.
+
+### Dispatch
+
+```
+Dispatch Explore subagent with the full content of shared/resources/pipeline-resume-detector-prompt.md as its prompt.
+Pass task_or_story_directory from the lock file as context.
+```
+
+### Consume Output
+
+Parse the JSON result:
+
+```bash
+# Validate schema
+jq -e '.schema_version == 1 and (.recommended_step | type == "number") and (.blocking_issues | type == "array")' <output>
+```
+
+If validation fails (parse error or missing required fields): log `"⚠️ Detector output invalid — falling back to full Phase 0b verification"` and proceed to Phase 0b using `current_step` from the lock as the upper bound (treat all steps as unverified).
+
+### Surface Results to User
+
+Always surface the detector output before proceeding, in this format:
+
+```
+⚙️ Resume detector result
+  Recommended step:   {recommended_step}
+  Lock step:          {current_step_in_lock}
+  Summaries seen:     {summaries_seen | join(", ") or "none"}
+  Deltas since pause: {N} — {paths or "none"}
+  Blocking issues:    {blocking_issues | join("; ") or "none"}
+```
+
+Wait for user confirmation before proceeding to Phase 0b. If the user disputes `recommended_step`, accept their correction and record it in the Decisions Log.
+
+### Handle Blocking Issues
+
+If `blocking_issues` is non-empty: **HALT** — display each issue to the user and require manual resolution before resuming. Do not proceed to Phase 0b.
+
+### Narrow Phase 0b Scope
+
+Pass `recommended_step` to Phase 0b. Phase 0b only verifies artifacts for steps **up to `recommended_step - 1`** (i.e., steps the detector considers completed). Steps at or after `recommended_step` are treated as ⏳ Pending.
+
+---
+
+## Phase 0b — Resume Artifact Verification (CRITICAL)
 
 For each step marked ✅ in the implementation report, verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
 

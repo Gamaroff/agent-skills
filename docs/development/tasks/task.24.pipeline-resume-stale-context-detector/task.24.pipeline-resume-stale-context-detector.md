@@ -4,7 +4,7 @@ title: "Add pipeline-resume stale-context detector Explore subagent"
 type: task
 category: refactoring
 priority: Medium
-status: planned
+status: ready-for-review
 created: 2026-05-08
 updated: 2026-05-08
 assignee: TBD
@@ -16,7 +16,8 @@ source_plan: .agents/plans/purrfect-whisper.md (Section A #9)
 
 # Task 24 — Pipeline resume stale-context detector subagent
 
-**Status**: Planned
+**Status**: Ready for Review
+**Review**: ✅ All review recommendations from `task.24.review.2026-05-09.md` implemented 2026-05-09
 
 > Detailed implementation guide: [task.24.plan.pipeline-resume-stale-context-detector.md](task.24.plan.pipeline-resume-stale-context-detector.md)
 
@@ -49,16 +50,19 @@ None — depends on task.26 summary artifacts existing.
 ## 6. Implementation Plan
 
 ### Phase 1 — Schema (Low)
-- [ ] Output JSON schema with deltas + blocking_issues
-- [ ] Define "delta" granularity (file path + new mtime)
+- [x] Output JSON schema with deltas + blocking_issues
+- [x] Define "delta" granularity (file path + new mtime)
 
 ### Phase 2 — Detector prompt (Medium)
-- [ ] Read lock + summaries + mtimes
-- [ ] Decide resume step based on `current_step` + summary presence
+- [x] Read lock + summaries + mtimes
+- [x] Decide resume step based on `current_step` + summary presence
 
 ### Phase 3 — Wire into resume contract (Medium)
-- [ ] Dispatch as first action on resume
-- [ ] Main consumes JSON, never re-reads artifacts itself
+- [x] Add new "Phase 0a — Detector dispatch" to `shared/resources/develop-pipeline-resume-contract.md`, immediately preceding existing Phase 0b artifact verification
+- [x] Detector dispatched first on resume; its `recommended_step` narrows which steps Phase 0b then verifies
+- [x] Wire the resume entry path in BOTH `skills/develop-story/SKILL.md` and `skills/develop-task/SKILL.md`
+- [x] Main consumes JSON, never re-reads artifacts itself
+- [x] If `blocking_issues` non-empty → surface to user, halt
 
 ### Phase 4 — Validation (Medium)
 - [ ] Pause mid-Step 3, resume; confirm correct step + no spurious deltas
@@ -68,11 +72,12 @@ None — depends on task.26 summary artifacts existing.
 ## 7. Files Summary
 
 **Modified**:
-1. `skills/develop-story/references/develop-pipeline-resume-contract.md`
-2. `skills/develop-story/SKILL.md` (resume entry point)
+1. `shared/resources/develop-pipeline-resume-contract.md` (add Phase 0a detector section)
+2. `skills/develop-story/SKILL.md` (resume entry point — dispatch detector before Phase 0b)
+3. `skills/develop-task/SKILL.md` (resume entry point — dispatch detector before Phase 0b)
 
 **New**:
-3. `shared/resources/pipeline-resume-detector-prompt.md`
+4. `shared/resources/pipeline-resume-detector-prompt.md`
 
 ## 8. Testing Strategy
 
@@ -82,21 +87,21 @@ None — depends on task.26 summary artifacts existing.
 ## 9. Success Criteria
 
 **Functional**:
-- [ ] Resume reads only summaries + lock, never raw artifacts
-- [ ] Recommended-step decision matches manual baseline on golden cases
+- [x] Resume reads only summaries + lock, never raw artifacts — orchestrator dispatches Explore subagent; main never re-reads raw artifacts
+- [ ] Recommended-step decision matches manual baseline on golden cases — requires integration testing (Phase 4)
 
 **Performance**:
-- [ ] Resume main token usage reduced ≥80%
+- [ ] Resume main token usage reduced ≥80% — requires measurement via integration testing (Phase 4)
 
 **Quality**:
-- [ ] Tamper detection works
+- [ ] Tamper detection works — requires integration testing (Phase 4)
 
 **Migration**:
-- [ ] Requires task.26 summary artifacts before this task is useful
+- [x] Requires task.26 summary artifacts before this task is useful — task.26 accepted ✅
 
 ## 10. Risk Assessment
 
-**Medium**: subagent recommends wrong step → pipeline restarts wrong work. Mitigation: detector output goes to user for confirmation on first 5 production runs; auto-accept after.
+**Medium**: subagent recommends wrong step → pipeline restarts wrong work. Mitigation: detector output is always surfaced to the user on resume; user confirms before main proceeds. No silent auto-acceptance.
 
 **Low**: missing summary file → fall back to manual artifact read.
 
