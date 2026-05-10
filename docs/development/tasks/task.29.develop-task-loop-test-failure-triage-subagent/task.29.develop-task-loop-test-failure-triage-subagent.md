@@ -3,21 +3,21 @@ id: task.29
 title: "Wire test-failure triage Explore subagent into develop-task pipeline loop"
 type: task
 category: refactoring
-priority: High
-status: planned
+priority: Low
+status: ready-for-review
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-10
 assignee: TBD
-effort: ~0.25 day
+effort: ~0.1 day
 depends_on: task.18
 github_issue: 47
-source_plan: .agents/plans/purrfect-whisper.md (Section A #3, develop-task variant)
 mirrors: task.18
 ---
 
 # Task 29 — Develop-task pipeline test-failure triage subagent
 
-**Status**: Planned
+**Status**: Ready for Review
+**Review**: ✅ Scope reduced 2026-05-10 — task.18 already extracted triage protocol into `shared/resources/develop-pipeline-step-3-develop-loop.md`, which `develop-task/SKILL.md` Step 3 delegates to. Verification-only work remains.
 
 > Detailed implementation guide: [task.29.plan.develop-task-loop-test-failure-triage-subagent.md](task.29.plan.develop-task-loop-test-failure-triage-subagent.md)
 
@@ -44,20 +44,25 @@ None.
 
 ## 6. Implementation Plan
 
-### Phase 1 — Output capture (Low)
-- [ ] Replace `npx test ...` invocation with `> .claude/state/test-output-<iter>-<ts>.log 2>&1`
+Triage protocol already lives in `shared/resources/develop-pipeline-step-3-develop-loop.md` (lines 136–158), extracted by task.18. `skills/develop-task/SKILL.md` Step 3 delegates to that resource, so all three originally-planned phases are satisfied transitively. Remaining work is verification + a one-line cross-reference for discoverability.
 
-### Phase 2 — Wire triage dispatch (Medium)
-- [ ] On non-zero exit, dispatch triage (prompt from task.18)
-- [ ] Main consumes summary only; never reads raw log
+### Phase 1 — Output capture (covered by shared resource)
+- [x] Capture pattern present: `TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"` (shared resource line 144)
 
-### Phase 3 — Cleanup (Low)
-- [ ] Delete temp log on step completion
+### Phase 2 — Triage dispatch (covered by shared resource)
+- [x] Explore dispatch on `TEST_EXIT != 0` using `shared/resources/test-failure-triage-prompt.md` (shared resource line 151)
+- [x] Main consumes summary only; raw log never read (shared resource line 153)
+
+### Phase 3 — Cleanup (covered by shared resource)
+- [x] `rm -f "$TEST_LOG"` on `TEST_EXIT == 0`; retained on failure for post-mortem (shared resource lines 157–158) — deviation from original "delete on completion" wording is intentional and safer.
+
+### Phase 4 — Discoverability (Low) — NEW
+- [x] Add explicit triage mention to `skills/develop-task/SKILL.md` Step 3 cross-reference prose so readers find the protocol without diving into the shared resource.
 
 ## 7. Files Summary
 
 **Modified**:
-1. `skills/develop-task/SKILL.md`
+1. `skills/develop-task/SKILL.md` — Step 3 cross-reference now names test-failure triage explicitly.
 
 ## 8. Testing Strategy
 
@@ -66,9 +71,10 @@ None.
 
 ## 9. Success Criteria
 
-- [ ] Test logs never read into main context
-- [ ] Triage summary surfaces in implementation report
-- [ ] Cleanup confirmed
+- [x] Test logs never read into main context (enforced by shared resource line 153)
+- [x] Triage summary surfaces in implementation report (`Subagent summary ref` column, shared resource line 151)
+- [x] Cleanup confirmed (`rm -f "$TEST_LOG"` on success; retained on failure for post-mortem)
+- [x] Develop-task SKILL Step 3 cross-reference explicitly names the triage protocol
 
 ## 10. Risk Assessment
 
