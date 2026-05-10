@@ -296,6 +296,17 @@ options:
 
 ---
 
+## Pre-pass Summary Consumption
+
+Before formulating questions in any step, consult the pre-pass summaries from Phase 1.5:
+
+- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 3).
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the task should be scoped down or closed.
+
+If a pre-pass summary is absent (agent failed or returned `alignment: unknown` / `implementation_status: unknown`): treat that axis as unreviewed and rely on in-line discovery for that phase.
+
+---
+
 ## Review Workflow (8 Sequential Steps)
 
 **NOTE**: Throughout all steps, collect issues and questions. Ask questions in batches at question points rather than interrupting continuously.
@@ -363,6 +374,32 @@ options:
    - For context and pattern consistency
 
 **Output**: Context package with all necessary documents loaded
+
+---
+
+### Phase 1.5: Pre-pass (2 Parallel Explore Subagents)
+
+**Purpose**: Front-load conflict detection before interactive Q&A. Two read-only Explore agents run in parallel and return compact YAML summaries. Q&A (Steps 2–8) consumes these summaries to surface high-severity findings as early questions rather than discovering them mid-review.
+
+**Prompt templates**: see `shared/resources/review-task-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
+
+**Actions**:
+
+1. **Resolve variables** from Step 1 output:
+   - `{task_path}` — the resolved task file path
+   - `{arch_location}` — from `skills-config.yaml` → `architecture.architectureShardedLocation` (default: `docs/architecture`)
+
+2. **Dispatch both agents in a single message** (parallel — one tool-call block, two Agent invocations):
+   - **Agent B** (`subagent_type="Explore"`) — architecture alignment prompt from `review-task-prepass-prompts.md`
+   - **Agent C** (`subagent_type="Explore"`) — codebase already-implemented prompt from `review-task-prepass-prompts.md`
+
+3. **Collect results**: each agent returns a YAML block. Validate the top-level key (`alignment` for B; `implementation_status` for C). If a key is missing or an agent fails: log `⚠️ Pre-pass Agent {B/C} failed — proceeding without {architecture/codebase} summary` and continue with the remaining summary.
+
+4. **Store summaries** as `PREPASS_B`, `PREPASS_C` in active context for use by the Q&A phase.
+
+**Failure handling**: if both agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback.
+
+**Output**: up to 2 YAML summaries (architecture alignment, implementation status) available for Steps 2–8
 
 ---
 
@@ -720,7 +757,9 @@ options:
 3. Unclear file modifications
 4. Ambiguous change descriptions
 
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering technical and implementation issues from Steps 3-4.
+**Pre-pass integration**: Consult `PREPASS_B` (architecture alignment) first. If `alignment` is `drift` or `conflict` and any finding has `severity: medium|high`, elevate it as the first question in this batch rather than relying on the user to raise it.
+
+**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering technical and implementation issues from Steps 3-4 (supplemented by `PREPASS_B` findings).
 
 **After Questions**: Continue review with technical decisions clarified.
 
@@ -868,7 +907,9 @@ options:
 4. Unclear success criteria
 5. Task scope/complexity (should it be split into sub-tasks?)
 
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering remaining issues from Steps 6-7.
+**Pre-pass integration**: Consult `PREPASS_C` (codebase scan) first. If `implementation_status` is `partial` or `fully-implemented` and any finding has a concrete `found_at` path, surface it as the first question in this batch — ask whether the task should be scoped down or closed.
+
+**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering remaining issues from Steps 6-7 (supplemented by `PREPASS_C` findings).
 
 **Example Questions**:
 

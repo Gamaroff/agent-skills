@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.27.review-task-prepass-subagent'
+task_title: 'Add review-task pre-pass: 2 parallel Explore subagents (architecture / codebase-implemented)'
+gate: PASS
+status_reason: 'All 4 implementation phases verified complete. No HIGH or MEDIUM issues. Additive-only change with explicit fallback handling and catalog rebuilt.'
+reviewer: 'QA Engineer (automated)'
+updated: '2026-05-10T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'N/A — skills/docs-only change; no auth, data, or external services'
+  performance:
+    status: PASS
+    notes: 'Parallel 2-agent dispatch replaces serial main-context reads; compact YAML summaries (≤200 words each)'
+  reliability:
+    status: PASS
+    notes: 'Single-agent and both-agent failure paths documented; schema validation before Q&A consumption'
+  maintainability:
+    status: PASS
+    notes: 'Consistent with task.16 pattern; sibling cross-reference note ensures prompt parity; PREPASS_B/PREPASS_C naming aligned with story equivalent'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Optionally rephrase Pre-pass Consumption section: PREPASS_B mapped to "Step 3" but QP2 batches Steps 3-4; say "QP2" for precision'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
