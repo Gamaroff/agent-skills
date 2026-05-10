@@ -226,3 +226,19 @@ N/A — no code changes.
 **QA Report**: `task.24.qa.1.pipeline-resume-stale-context-detector.md`
 **Gate File**: `task.24.gate.1.pipeline-resume-stale-context-detector.yml`
 **Next Steps**: Apply P1 + P2 fixes, then proceed to finalise
+
+---
+
+## Issue Resolution Summary (QA Cycle 2 — 2026-05-10)
+
+**Gate**: CONCERNS → **PASS** | **Score**: 73 → **90/100**
+
+| Issue | Severity | Status | Fix |
+|-------|----------|--------|-----|
+| Detector exemption list incomplete (steps 1, 4 not exempt) | MEDIUM | ✅ CLOSED | REQUIRED_STEPS logic introduced; exemption list `[1, 2, 4, 8]` applied across all decision cases |
+| Phase 0b missing Phase 0a narrowing cross-reference | MEDIUM | ✅ CLOSED | Scope note added to Phase 0b header |
+| Step 1 output message doesn't reference recommended_step | LOW | ✅ CLOSED | Both SKILL.md files updated |
+
+**Additional fix identified during verification**: `recommended_step = LOCK_STEP + 1` case was still broken because the "all summaries present" evaluation implicitly included exempt steps. Fixed by building `REQUIRED_STEPS` set explicitly (commit f01534e).
+
+**Deployment Recommendation**: APPROVED (staging + production) — conditional deployment conditions cleared.

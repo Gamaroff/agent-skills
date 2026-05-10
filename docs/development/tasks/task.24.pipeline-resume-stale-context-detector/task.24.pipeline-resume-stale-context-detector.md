@@ -111,11 +111,11 @@ Revert resume-contract changes; manual artifact-read path preserved in git histo
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS (Cycle 2)
 **QA Engineer**: QA Agent
 **Testing Date**: 2026-05-10
-**Quality Score**: 73/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 90/100
+**Gate Decision**: PASS
 
 ### QA Report
 - **Full Report**: [task.24.qa.1.pipeline-resume-stale-context-detector.md](./task.24.qa.1.pipeline-resume-stale-context-detector.md)
@@ -124,8 +124,8 @@ Revert resume-contract changes; manual artifact-read path preserved in git histo
 ### Test Coverage Summary
 - **Tests Executed**: 0 (documentation task — no code)
 - **Phases Verified**: 3/4 (Phase 4 deferred)
-- **Critical Issues**: 0 HIGH, 2 MEDIUM
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM (all fixed in cycle 2)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 - Issue 1 (MEDIUM/P1): Detector gap logic flags steps 1 and 4 as missing summaries — only steps 2 and 8 are exempted, causes false `blocking_issues` on resume from Step 5+
