@@ -147,7 +147,7 @@ See `shared/resources/develop-pipeline-step-2-review.md` for the full Step 2 pro
 
 ### Step 3: Develop
 
-See `shared/resources/develop-pipeline-step-3-develop-loop.md` for the full Step 3 protocol: pre-develop codebase mapping (Explore subagent), plan file discovery, internal gate handling (draft/planned, high-risk, alignment), bounded develop loop with stall detection, Remaining Work Status banner, and halt protocol.
+See `shared/resources/develop-pipeline-step-3-develop-loop.md` for the full Step 3 protocol: pre-develop codebase mapping (Explore subagent), plan file discovery, internal gate handling (draft/planned, high-risk, alignment), bounded develop loop with stall detection, Remaining Work Status banner, halt protocol, and **test-failure triage** (capture test output to `.claude/state/test-output-${ITER}-*.log`, dispatch Explore with `shared/resources/test-failure-triage-prompt.md`, main consumes summary only).
 
 ### Step 4: Create PR
 
@@ -226,7 +226,7 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 - **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete.
 - **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
-- **Remove the lock file before every terminal HALT.** After committing the report (per the rule above), run `rm -f .claude/state/develop-pipeline.lock` so a future PreCompact firing in this same session won't try to commit again. The lock is recreated automatically when the user re-invokes `/develop-story` and the resume flow re-enters Step 1 (or the resume verification confirms it should remain past Step 1). The graceful-pause hook also removes the lock itself if it runs — this rule covers the non-hook halt paths.
+- **Remove the lock file before every terminal HALT.** After committing the report (per the rule above), run `rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log` so a future PreCompact firing in this same session won't try to commit again, and so transient Step 3 test logs don't accumulate across runs. The lock is recreated automatically when the user re-invokes `/develop-story` and the resume flow re-enters Step 1 (or the resume verification confirms it should remain past Step 1). The graceful-pause hook also removes the lock itself if it runs — this rule covers the non-hook halt paths.
 - If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.agents/skills/`.
 
 ---

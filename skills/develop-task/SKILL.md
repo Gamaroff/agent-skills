@@ -223,7 +223,7 @@ If a situation arises that is not in this table or the shared defaults table and
 - **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete.
 - **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
-- **Remove the lock file before every terminal HALT.** After committing the report (per the rule above), run `rm -f .claude/state/develop-pipeline.lock` so a future PreCompact firing in this same session won't try to commit again. The lock is recreated automatically when the user re-invokes `/develop-task` and the resume flow re-enters Step 1 (or the resume verification confirms it should remain past Step 1). The graceful-pause hook also removes the lock itself if it runs — this rule covers the non-hook halt paths.
+- **Remove the lock file before every terminal HALT.** After committing the report (per the rule above), run `rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log` so a future PreCompact firing in this same session won't try to commit again, and so transient Step 3 test logs don't accumulate across runs. The lock is recreated automatically when the user re-invokes `/develop-task` and the resume flow re-enters Step 1 (or the resume verification confirms it should remain past Step 1). The graceful-pause hook also removes the lock itself if it runs — this rule covers the non-hook halt paths.
 - If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.agents/skills/`.
 
 ---
