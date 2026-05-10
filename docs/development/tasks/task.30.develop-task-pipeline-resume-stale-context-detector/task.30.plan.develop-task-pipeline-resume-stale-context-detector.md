@@ -11,26 +11,26 @@ task-ref: task.30.develop-task-pipeline-resume-stale-context-detector.md
 
 ## Overview
 
-Mirror of [task.24 plan](../task.24.pipeline-resume-stale-context-detector/task.24.plan.pipeline-resume-stale-context-detector.md). Wire detector into develop-task's resume entry path.
+Mirror of [task.24 plan](../task.24.pipeline-resume-stale-context-detector/task.24.plan.pipeline-resume-stale-context-detector.md). **Phases 1–2 already shipped** in task.24 commit `376924c` (PR #42), which inserted an identical Step 0a into both `skills/develop-story/SKILL.md` and `skills/develop-task/SKILL.md`. Remaining scope is Phase 3 — validation against the develop-task pipeline.
 
-## Phase 1 — Identify resume hook
+## Phase 1 — Identify resume hook (COMPLETED)
 
-In `skills/develop-task/SKILL.md`, find:
-- Lock-file path (likely `.claude/state/develop-task-pipeline.lock`)
-- precompact handler / resume entry section
+`skills/develop-task/SKILL.md:65-71` already contains Step 0a (detector dispatch). Lock path is the shared `.claude/state/develop-pipeline.lock` — no separate develop-task lock file exists. Schema parity is automatic (single shared file).
 
-Verify lock-file schema parity with develop-story. If divergent, document the difference in detector prompt input arg.
+## Phase 2 — Wire detector (COMPLETED in task.24)
 
-## Phase 2 — Wire detector
+Step 0a in `skills/develop-task/SKILL.md` dispatches the detector via `shared/resources/pipeline-resume-detector-prompt.md`, consumes JSON, and halts on `blocking_issues`. No further wiring needed.
 
-First action on resume: dispatch detector (prompt from task.24) with develop-task lock path. Main consumes JSON; halts on `blocking_issues`.
+## Phase 3 — Validation (REMAINING)
 
-## Phase 3 — Validation
+Run against the develop-task pipeline:
+- Forced precompact mid-Step 3
+- Forced precompact post-Step-4 resume
+- Tamper detection (corrupt a summary; verify detector flags it)
+- Missing-summary fallback (delete a `step-N.json`; verify detector surfaces gap without failing)
 
-- Forced precompact mid-Step 3 + post-Step-4
-- Tamper detection
-- Missing summary fallback
+Cross-reference task.24's test plan; same code path, same expected outcomes.
 
 ## Notes
 
-If lock-file schemas diverge enough to break detector prompt, raise schema-unification subtask before this task can ship.
+Lock-file schema parity is guaranteed (single shared file). No schema-unification subtask required.
