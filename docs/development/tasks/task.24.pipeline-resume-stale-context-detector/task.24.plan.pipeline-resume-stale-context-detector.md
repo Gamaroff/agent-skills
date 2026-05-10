@@ -44,10 +44,15 @@ Return JSON only.
 
 ## Phase 3 — Wire into resume
 
-In `skills/develop-story/SKILL.md` resume entry path:
-- First action on resume: dispatch detector
-- Main consumes JSON → proceeds to recommended_step
+Add a new "Phase 0a — Detector dispatch" section to `shared/resources/develop-pipeline-resume-contract.md`, immediately preceding the existing Phase 0b artifact verification flow.
+
+In BOTH `skills/develop-story/SKILL.md` and `skills/develop-task/SKILL.md` resume entry paths:
+- First action on resume: dispatch detector (Phase 0a)
+- Detector returns `recommended_step` + `deltas_since_pause` + `blocking_issues`
+- Phase 0b then verifies only the artifacts up to `recommended_step` (narrows verification scope)
+- Main consumes JSON → proceeds to `recommended_step` after user confirmation
 - If `blocking_issues` non-empty: surface to user, halt
+- Detector output is always surfaced to user; no auto-acceptance.
 
 ## Phase 4 — Validation
 
