@@ -157,6 +157,11 @@ Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
 
+Detect whether the doc has a structured criteria table that the QA traceability mapper can consume:
+  - For stories: a "## Acceptance Criteria" section with at least one numbered item or AC sub-heading.
+  - For tasks: a "## Success Criteria" section with at least one table row or numbered item.
+  - Return `has_success_criteria_table: true` if either is present, else false.
+
 Return compact JSON:
 {
   "risk_level": "low|medium|high|absent",
@@ -164,7 +169,8 @@ Return compact JSON:
   "single_module": true|false,
   "pipeline_mode": "lite|standard",
   "skills_config_exists": true|false,
-  "always_load_files": ["path1", "path2"]
+  "always_load_files": ["path1", "path2"],
+  "has_success_criteria_table": true|false
 }
 ```
 
@@ -181,6 +187,7 @@ TASK_FILE      = RESOLVER_RESULT.absolute_file_path   (or already known from inl
 TASK_DIR       = RESOLVER_RESULT.task_or_story_directory
 PIPELINE_MODE  = LITEMODE_RESULT.pipeline_mode          (default: "standard" on failure)
 ALWAYS_LOAD_FILES = LITEMODE_RESULT.always_load_files   (default: [] on failure)
+HAS_SUCCESS_CRITERIA_TABLE = LITEMODE_RESULT.has_success_criteria_table   (default: false on failure)
 TRACKER_STATE  = TRACKER_RESULT                         (null fields on failure)
 ```
 
@@ -328,6 +335,8 @@ Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from
    - If NOT "In Progress": retry step 2 once; if still not moved, log "⚠️ Jira status not updated — proceeding" in Issues Log
 
 All steps are **non-blocking** — failures are logged but do not halt the pipeline.
+
+> **Note on Jira priority parity with GitHub.** The GitHub Projects v2 path (below) auto-sets `Priority = P2` when unset. The Jira path intentionally does **not** auto-set priority because Jira priority schemes are workflow- and project-specific — auto-setting risks overwriting team conventions (e.g. "Highest/High/Medium/Low/Lowest" vs custom enums). Set Jira priority manually if needed.
 
 Add to the implementation report Pipeline Configuration table:
 

@@ -58,12 +58,26 @@ Before creating the story branch, ensure the epic branch exists. Use `EPIC_BRANC
 
 ### Case A — Epic branch not found locally or remotely (`EPIC_BRANCH_EXISTS=false`)
 
+> **Idempotence guarantee.** Phase 0b's `EPIC_BRANCH_EXISTS=false` is a snapshot — the branch may have been created locally or pushed to the remote between Phase 0b and Step 1a (e.g. another concurrent pipeline run for a sibling story in the same epic). Re-check immediately before each mutation so Case A never HALTs on `git checkout -b` or `git push -u` "branch already exists" errors.
+
 ```bash
 git fetch origin
 git checkout develop
 git pull origin develop
-git checkout -b {EPIC_BRANCH}
-git push -u origin {EPIC_BRANCH}
+
+# Guarded local create — if the branch was created locally between Phase 0b and now, just check it out.
+if git rev-parse --verify --quiet "refs/heads/{EPIC_BRANCH}" >/dev/null; then
+  git checkout {EPIC_BRANCH}
+else
+  git checkout -b {EPIC_BRANCH}
+fi
+
+# Guarded remote push — if the remote branch already exists, set upstream tracking instead of failing.
+if git ls-remote --exit-code --heads origin "{EPIC_BRANCH}" >/dev/null 2>&1; then
+  git branch --set-upstream-to=origin/{EPIC_BRANCH} {EPIC_BRANCH}
+else
+  git push -u origin {EPIC_BRANCH}
+fi
 ```
 
 Log: "✅ Created epic branch: {EPIC_BRANCH} from develop"

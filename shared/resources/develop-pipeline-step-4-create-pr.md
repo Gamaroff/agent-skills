@@ -11,6 +11,19 @@ Loaded by `/develop-story` and `/develop-task` during Step 4. Story/task variant
 
 ---
 
+## PR Target by Skill (Q2 Derivation)
+
+The PR base branch (`--base {Q2_answer}`) is derived in Phase 0d and differs by skill:
+
+| Skill | Q2 source | Default | Why |
+|---|---|---|---|
+| `develop-story` | Auto-set (never asked) | `{EPIC_BRANCH}` (`feature/epic.{n}.{name}`) | Story PRs always target their parent epic branch; the epic branch is merged to `develop` manually once all stories complete. See Phase 0d in `develop-pipeline-step-0-resolve-and-prepare.md`. |
+| `develop-task`  | Asked via `AskUserQuestion` | `develop` | Tasks are standalone; user picks the base (typically `develop`, sometimes `main` for hotfixes). |
+
+`{Q2_answer}` is resolved before Step 4 runs — Step 4 just consumes the variable. If `{Q2_answer}` is empty here, that is a Phase 0d bug; HALT with `Step 4: missing Q2_answer (PR base branch)`.
+
+---
+
 ## Invoke /create-pr
 
 Invoke the `/create-pr` skill passing `--base {Q2_answer}`, `--exclude {implementation-report-path}`, and conditionally `--issue`. The exact invocation commands are in the Implementation Report Exclusion section below. Branch on tracker platform for the `--issue` flag:

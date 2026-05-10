@@ -44,9 +44,18 @@ Update Pipeline Progress: ✅ commit-changes.
 
 ---
 
-## Remove the Pipeline Lock File
+## Cleanup Transient State
 
-Pipeline finished cleanly — no further pause possible:
+Pipeline finished cleanly — no further pause possible. Remove the lock file and any leftover test-output logs from this run:
+
 ```bash
+# Remove transient test-output logs from Step 3 develop loop iterations.
+# Successful iterations remove their own log on TEST_EXIT==0; this catches
+# logs left behind by failed iterations that later recovered, plus any
+# logs from prior aborted runs that never reached cleanup.
+rm -f .claude/state/test-output-*.log
+
+# Remove the pipeline lock — must be last so a crash mid-cleanup still leaves
+# the lock available for resume.
 rm -f .claude/state/develop-pipeline.lock
 ```

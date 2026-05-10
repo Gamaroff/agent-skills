@@ -46,3 +46,35 @@ TRACKER=$(read_config_key tracker)
 
 VCS=$(read_config_key vcs)
 [ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null | grep -qi bitbucket.org && echo bitbucket || echo github)
+
+# tracker_call_with_retry — wrap a non-blocking tracker mutation (gh api,
+# gh issue comment, gh pr comment, gh project, etc.) with 3× exponential
+# backoff (1s, 2s, 4s).
+#
+# Usage:
+#   tracker_call_with_retry gh api graphql -f query='...'
+#   tracker_call_with_retry gh issue close 42
+#
+# Exit code: 0 on first success; non-zero (last attempt's code) after 3 failures.
+# Stdout/stderr of the wrapped command are passed through.
+#
+# Caller policy: failures from this helper are non-blocking — log a warning
+# in the Issues Log and continue. Tracker mutations are best-effort by design;
+# the implementation report + PR remain the source of truth.
+#
+# Note for MCP-driven Jira calls: this helper is shell-only and cannot wrap
+# Atlassian MCP tool invocations. Skill-level retry is required for MCP calls;
+# orchestrator skills that call MCP should implement equivalent 3× retry
+# inline (see develop-pipeline-step-0-resolve-and-prepare.md "Jira path").
+tracker_call_with_retry() {
+  local rc=0
+  local delay
+  for delay in 1 2 4; do
+    "$@" && return 0
+    rc=$?
+    # On the last attempt, do not sleep — just return the failure code.
+    [ "$delay" = "4" ] && return "$rc"
+    sleep "$delay"
+  done
+  return "$rc"
+}

@@ -86,7 +86,44 @@ Skill(qa-story, args="traceability_matrix={story-directory}/.summaries/qa-tracea
 If the matrix was not generated (lite mode or mapper failure), invoke without the `traceability_matrix` arg — qa-story performs internal mapping as before.
 
 #### develop-task
+
+**Pre-step: Dispatch traceability mapper (standard mode + Success Criteria table only)**
+
+Conditions to dispatch the mapper for tasks (all must be true):
+1. `PIPELINE_MODE = standard` (lite mode skips the mapper)
+2. `HAS_SUCCESS_CRITERIA_TABLE = true` (set by Phase 0a Agent 3 — the lite-mode/always-load detector)
+
+If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note):
+
+```
+Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
+Inputs:
+  STORY_FILE={task-file}
+  STORY_DIR={task-directory}
+
+Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+```
+
+After the subagent completes:
+1. Confirm `{task-directory}/.summaries/qa-traceability-matrix.md` was written.
+2. Write the summary JSON artifact to `{task-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
+3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
+
+If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
+
+Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=false`. Tasks with no Success Criteria table (e.g. pure infra cleanup) gain nothing from the mapper.
+
+**Invoke `/qa-task`**
+
 Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
+
+When the traceability matrix was successfully generated, pass its path via Skill args:
+
+```
+Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md")
+```
+
+If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), invoke without the `traceability_matrix` arg.
 
 ### Outcome branching (shared)
 
