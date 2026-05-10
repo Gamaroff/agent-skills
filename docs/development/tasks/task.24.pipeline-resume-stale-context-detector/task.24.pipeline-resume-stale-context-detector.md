@@ -108,3 +108,25 @@ None — depends on task.26 summary artifacts existing.
 ## 11. Rollback Plan
 
 Revert resume-contract changes; manual artifact-read path preserved in git history.
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Agent
+**Testing Date**: 2026-05-10
+**Quality Score**: 73/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.24.qa.1.pipeline-resume-stale-context-detector.md](./task.24.qa.1.pipeline-resume-stale-context-detector.md)
+- **Gate File**: [task.24.gate.1.pipeline-resume-stale-context-detector.yml](./task.24.gate.1.pipeline-resume-stale-context-detector.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 0 (documentation task — no code)
+- **Phases Verified**: 3/4 (Phase 4 deferred)
+- **Critical Issues**: 0 HIGH, 2 MEDIUM
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+- Issue 1 (MEDIUM/P1): Detector gap logic flags steps 1 and 4 as missing summaries — only steps 2 and 8 are exempted, causes false `blocking_issues` on resume from Step 5+
+- Issue 2 (MEDIUM/P2): Phase 0b header lacks explicit cross-reference to Phase 0a scope narrowing — maintenance hazard

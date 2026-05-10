@@ -79,7 +79,7 @@ ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null | sort
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
 2. **Verify each ✅ step's artifact exists up to `recommended_step - 1`** (see `shared/resources/develop-pipeline-resume-contract.md` — Phase 0b for the full contract). Steps at or after `recommended_step` are treated as ⏳ Pending. If Phase 0a failed validation, fall back to verifying all steps using `current_step` from the lock as the upper bound.
-3. Output: "⚠️ Context recovery — last verified step: Step {N}. Resuming from Step {N+1}."
+3. Output: "⚠️ Context recovery — last verified step: Step {recommended_step - 1}. Resuming from recommended step {recommended_step}."
 4. Continue from `recommended_step` — do NOT re-run steps already verified, do NOT skip any pending steps.
 
 **This recovery is mandatory even if the user did not explicitly re-invoke `/develop-story`.** If you are in a conversation where `develop-story` was previously running and context was then compressed, you are still the develop-story orchestrator and must complete all remaining steps. A context summary saying "next step: create-pr" does NOT mean the pipeline ends after create-pr — it means Step 4 is next, and Steps 5–8 still follow.

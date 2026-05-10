@@ -60,7 +60,9 @@ Pass `recommended_step` to Phase 0b. Phase 0b only verifies artifacts for steps 
 
 ## Phase 0b — Resume Artifact Verification (CRITICAL)
 
-For each step marked ✅ in the implementation report, verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
+**Scope**: Verify only steps **up to `recommended_step - 1`** (as determined by Phase 0a). Steps at or after `recommended_step` are ⏳ Pending — do not verify. If Phase 0a failed validation, fall back to verifying all steps using `current_step` from the lock as the upper bound.
+
+For each step marked ✅ in the implementation report (within the Phase 0a scope), verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
 
 A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is treated identically to `⏳ Pending`: re-run from the start of that step. Earlier `✅` steps still skip per their artifact verification. Log: "Resuming after graceful pause — re-running Step {N}."
 

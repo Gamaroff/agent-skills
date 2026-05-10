@@ -97,7 +97,13 @@ Compare the set of valid summary step numbers against `1 .. LOCK_STEP`:
   - `"Summary missing for step {N} — earlier step may have been skipped or corrupted"` 
   - Still set `recommended_step = LOCK_STEP` (conservative)
 
-**Note**: Steps 2 and 8 do not produce summaries (per resume-contract). If they are within range, treat their absence as expected — do not flag as missing.
+**Note**: Steps 1, 2, 4, and 8 do not produce summaries — they do not dispatch Explore subagents. If they are within range, treat their absence as expected — do not flag as missing.
+
+Exemption list: `[1, 2, 4, 8]`
+- Step 1 (create-branch): no subagent
+- Step 2 (review-task / review-story): no subagent
+- Step 4 (create-pr): no subagent
+- Step 8 (commit-changes): no subagent
 
 ### Step 4 — Check artifact mtimes for deltas
 
