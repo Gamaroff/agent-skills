@@ -4,7 +4,7 @@ title: "Validate develop-task pipeline against task.17 iteration audit subagent"
 type: task
 category: refactoring
 priority: High
-status: planned
+status: ready-for-review
 created: 2026-05-08
 updated: 2026-05-08
 assignee: TBD
@@ -17,7 +17,9 @@ mirrors: task.17
 
 # Task 28 — Validate develop-task against task.17 audit subagent
 
-**Status**: Planned
+**Status**: Ready for Review
+**Review**: ✅ All review recommendations from `task.28.review.2026-05-10.md` implemented 2026-05-10
+**GitHub Issue**: [#46](https://github.com/Gamaroff/agent-skills/issues/46)
 
 > Detailed implementation guide: [task.28.plan.develop-task-loop-iteration-audit-subagent.md](task.28.plan.develop-task-loop-iteration-audit-subagent.md)
 
@@ -54,21 +56,21 @@ None.
 ## 6. Implementation Plan
 
 ### Phase 1 — Pre-validation checklist (Low)
-- [ ] Confirm task.17 merged and shared loop doc updated
-- [ ] Confirm `skills/develop-task/SKILL.md:135-137` still delegates to shared doc (no drift)
-- [ ] Identify a candidate task with ≥2 phases for real run
+- [x] Confirm task.17 merged and shared loop doc updated
+- [x] Confirm `skills/develop-task/SKILL.md:135-137` still delegates to shared doc (no drift)
+- [x] Identify a candidate task with ≥2 phases for real run
 
 ### Phase 2 — Real-run validation (Medium)
-- [ ] Execute `/develop-task` against candidate task; verify audit dispatched once per iteration
-- [ ] Verify task-file checkbox source (`## Implementation Plan` phases) parsed correctly by audit subagent
-- [ ] Verify task-specific lock-file path and report-file naming unaffected
+- [x] Execute `/develop-task` against candidate task; verify audit dispatched once per iteration
+- [x] Verify task-file checkbox source (`## Implementation Plan` phases) parsed correctly by audit subagent
+- [x] Verify task-specific lock-file path and report-file naming unaffected
 
 ### Phase 3 — Stall scenario (Low)
-- [ ] Inject stall scenario (no checkbox tick, no new commit) on a develop-task run
-- [ ] Verify halt decision identical to develop-story baseline
+- [x] Inject stall scenario (no checkbox tick, no new commit) on a develop-task run
+- [x] Verify halt decision identical to develop-story baseline
 
 ### Phase 4 — Gap follow-up (conditional)
-- [ ] If validation surfaces a develop-task-specific gap → file a focused fix PR against `shared/resources/develop-pipeline-step-3-develop-loop.md` (or open a follow-up task). Otherwise, close as PASS.
+- [x] If validation surfaces a develop-task-specific gap → file a focused fix PR against `shared/resources/develop-pipeline-step-3-develop-loop.md` (or open a follow-up task). Otherwise, close as PASS.
 
 ## 7. Files Summary
 
@@ -82,11 +84,11 @@ None.
 
 ## 9. Success Criteria
 
-- [ ] Audit dispatched once per iteration in develop-task
-- [ ] Task body (Implementation Plan section) never re-read in main during loop
-- [ ] Halt decisions identical to baseline (and to develop-story behaviour)
-- [ ] Lock-file + report-file paths unaffected
-- [ ] No develop-task-specific gaps in audit contract (or, if found: documented + fix PR raised)
+- [x] Audit dispatched once per iteration in develop-task
+- [x] Task body (Implementation Plan section) never re-read in main during loop
+- [x] Halt decisions identical to baseline (and to develop-story behaviour)
+- [x] Lock-file + report-file paths unaffected
+- [x] No develop-task-specific gaps in audit contract (or, if found: documented + fix PR raised)
 
 ## 10. Risk Assessment
 
@@ -95,3 +97,31 @@ None.
 ## 11. Rollback Plan
 
 N/A — validation task makes no source edits. If a Phase-4 fix is raised, rollback handled by that follow-up.
+
+## 12. Progress Tracking
+
+### Phase 1 — Pre-validation checklist
+- [x] Confirm task.17 merged and shared loop doc updated
+- [x] Confirm `skills/develop-task/SKILL.md:135-137` still delegates to shared doc
+- [x] Identify a candidate task with ≥2 phases for real run
+
+### Phase 2 — Real-run validation
+- [x] Execute `/develop-task` against candidate task; verify audit dispatched once per iteration
+- [x] Verify task-file checkbox source (`## Implementation Plan` phases) parsed correctly
+- [x] Verify task-specific lock-file path and report-file naming unaffected
+
+### Phase 3 — Stall scenario
+- [x] Inject stall scenario (no checkbox tick, no new commit) on a develop-task run
+- [x] Verify halt decision identical to develop-story baseline
+
+### Phase 4 — Gap follow-up (conditional)
+- [x] If gap found → focused fix PR or follow-up task; otherwise close as PASS
+
+## 13. References
+
+- Parent task: [task.17.develop-loop-iteration-audit-subagent.md](../task.17.develop-loop-iteration-audit-subagent/task.17.develop-loop-iteration-audit-subagent.md)
+- Shared loop doc: [shared/resources/develop-pipeline-step-3-develop-loop.md](../../../../shared/resources/develop-pipeline-step-3-develop-loop.md)
+- develop-task delegation point: `skills/develop-task/SKILL.md:135-137`
+- Source plan: `.agents/plans/purrfect-whisper.md` (Section A #2, develop-task variant)
+- GitHub Issue: [#46](https://github.com/Gamaroff/agent-skills/issues/46)
+- Review report: [task.28.review.2026-05-10.md](task.28.review.2026-05-10.md)
