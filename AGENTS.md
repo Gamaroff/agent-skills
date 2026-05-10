@@ -115,6 +115,8 @@ The canonical resolver spec lives in `shared/resources/platform-detection.md`. T
 | Gate File  | `story.{epic}.{story}.gate.{n}.{name}.yml` | `story.178.8.gate.1.review.yml`  |
 | Bug Report | `bug.{epic}.{story}.{n}.{name}.md`         | `bug.178.8.1.crash.md`           |
 | Task       | `task.{n}.{name}.md`                       | `task.44.db-migration.md`        |
+| Review Report (story) | `story.{epic}.{story}.review.{n}.{name}.md` | `story.178.8.review.1.example-feature.md` |
+| Review Report (task)  | `task.{n}.review.{name}.md`                 | `task.29.review.develop-task-loop-test-failure-triage-subagent.md` |
 
 ### Status Lifecycle
 

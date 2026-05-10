@@ -142,7 +142,7 @@ See `shared/resources/develop-pipeline-step-2-review.md` for the full Step 2 pro
 
 ### Step 3: Develop
 
-See `shared/resources/develop-pipeline-step-3-develop-loop.md` for the full Step 3 protocol: pre-develop codebase mapping (Explore subagent), plan file discovery, internal gate handling (draft/planned, high-risk, alignment), bounded develop loop with stall detection, Remaining Work Status banner, and halt protocol.
+See `shared/resources/develop-pipeline-step-3-develop-loop.md` for the full Step 3 protocol: pre-develop codebase mapping (Explore subagent), plan file discovery, internal gate handling (draft/planned, high-risk, alignment), bounded develop loop with stall detection, Remaining Work Status banner, halt protocol, and **test-failure triage** (capture test output to `.claude/state/test-output-${ITER}-*.log`, dispatch Explore with `shared/resources/test-failure-triage-prompt.md`, main consumes summary only).
 
 ### Step 4: Create PR
 

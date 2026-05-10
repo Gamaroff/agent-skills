@@ -324,7 +324,7 @@ question: "Would you like a comprehensive review report saved to a file, or just
 header: "Output Format"
 options:
   - label: "Comprehensive report"
-    description: "Generate detailed review report saved to [task-name].review.[date].md with all findings, user decisions, and recommendations documented."
+    description: "Generate detailed review report saved to task.{n}.review.{descriptive-name}.md with all findings, user decisions, and recommendations documented."
   - label: "Action plan only"
     description: "Provide prioritized list of issues and fixes to action immediately without saving a report file."
 ```
@@ -965,7 +965,7 @@ questions:
 **Actions**:
 
 1. Generate complete review report following the structure below
-2. Save to file: `[task-directory]/[task-name].review.[date].md`
+2. Save to file: `[task-directory]/task.{n}.review.{descriptive-name}.md`
 3. Display summary to user with file location
 
 **Report Structure**:
@@ -1200,7 +1200,7 @@ questions:
 - **Review Duration:** [time]
 ```
 
-**Output**: Save review report to `[task-directory]/[task-name].review.[date].md`
+**Output**: Save review report to `[task-directory]/task.{n}.review.{descriptive-name}.md`
 
 ---
 
@@ -1670,7 +1670,7 @@ This skill uses:
 
 ## Notes
 
-- The review report (`[task-name].review.[date].md`) is the primary output and is always saved separately
+- The review report (`task.{n}.review.{descriptive-name}.md`) is the primary output and is always saved separately. Use DOTS as structural separators and hyphens within the descriptive name. Example: `task.29.review.develop-task-loop-test-failure-triage-subagent.md`. If multiple reviews are needed, append a sequence: `task.29.review.2.{name}.md`.
 - Steps 8.5 and 9 may modify the task document (apply fixes; update `Status:` field) — both are gated on user consent (or pipeline auto-answer)
 - Can be used at any stage: planned, in progress, completed
 - Designed to find problems through collaborative user input
