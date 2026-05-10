@@ -45,6 +45,8 @@ Setup is optional — without the hook, pipelines still resume correctly via pos
 
 See `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` for the full resolve-and-prepare protocol: file/issue resolution (0a), pipeline state check (0b), upfront context reading including status handling and lite-mode detection (0c), tracker signal/board update (0c-reg), upfront Q&A (0d), implementation report creation with templates (0e), and pre-flight summary (0f).
 
+> Phase 0 parallel dispatch (resolver + tracker poller + lite-mode detector) is defined in the shared resource above — do not duplicate the dispatch logic here. Modifications belong in `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`.
+
 ---
 
 ## Phase 1: Pipeline Execution
