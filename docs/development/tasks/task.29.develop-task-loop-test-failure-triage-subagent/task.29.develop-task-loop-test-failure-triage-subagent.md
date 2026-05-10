@@ -4,19 +4,21 @@ title: "Wire test-failure triage Explore subagent into develop-task pipeline loo
 type: task
 category: refactoring
 priority: Low
-status: ready-for-review
+status: accepted
 created: 2026-05-08
 updated: 2026-05-10
+completed_date: 2026-05-10
 assignee: TBD
 effort: ~0.1 day
 depends_on: task.18
 github_issue: 47
 mirrors: task.18
+pr_number: 63
 ---
 
 # Task 29 — Develop-task pipeline test-failure triage subagent
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ Scope reduced 2026-05-10 — task.18 already extracted triage protocol into `shared/resources/develop-pipeline-step-3-develop-loop.md`, which `develop-task/SKILL.md` Step 3 delegates to. Verification-only work remains.
 
 > Detailed implementation guide: [task.29.plan.develop-task-loop-test-failure-triage-subagent.md](task.29.plan.develop-task-loop-test-failure-triage-subagent.md)
@@ -104,3 +106,29 @@ Revert SKILL.md change; streaming-to-main path restored.
 
 ### Key Findings
 All 4 success criteria verified. Zero HIGH/MEDIUM issues. Docs-only change approved for deployment.
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.29.qa.1.develop-task-loop-test-failure-triage-subagent.md`
+**Gate File**: `task.29.gate.1.develop-task-loop-test-failure-triage-subagent.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 98/100
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 4/4 criteria met (SC1–SC4 all verified against shared resource and SKILL.md diff)
+✅ **PR:** PR #63 — feat(task.29): wire test-failure triage subagent into develop-task pipeline
+✅ **Documentation:** AGENTS.md, review-story, review-task skills updated with correct naming conventions
+✅ **Security Review:** ✅ PASS — docs-only, no security surface modified
+✅ **Compliance Review:** ✅ NOT_APPLICABLE — internal tooling task
+✅ **Performance:** ✅ PASS — no runtime changes
+✅ **Reliability:** ✅ PASS — protocol unchanged from task.18
+✅ **Maintainability:** ✅ PASS — discoverability improved
+
+**Task marked as ACCEPTED on:** 2026-05-10
+
+**Detailed Verification Log:** See `task.29.dod.1.develop-task-loop-test-failure-triage-subagent.md` for complete verification evidence.
