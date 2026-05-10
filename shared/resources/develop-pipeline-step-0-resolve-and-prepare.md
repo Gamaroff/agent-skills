@@ -96,6 +96,106 @@ If the Explore subagent cannot find the file, HALT and ask the user to confirm t
 
 ---
 
+## 0a-parallel. Parallel Phase 0 Fan-out
+
+After 0a completes file path resolution, dispatch setup queries in a **single parallel message** (multiple `Agent` tool calls in one response). Do not send them sequentially — dispatch all applicable agents simultaneously and wait for all results before proceeding.
+
+### Which agents to dispatch
+
+| Input form | Resolver | Tracker poller | Lite-mode + board detector |
+|---|---|---|---|
+| Inline-resolved (URL / Jira key) | ❌ (already resolved) | ✅ (ISSUE_KEY from inline step) | ✅ |
+| File / directory / bare-filename | ✅ | ✅ (agent finds ISSUE_KEY itself) | ✅ (agent finds file itself) |
+
+### Agent 1 — Resolver (file/directory/bare-filename inputs only)
+
+Prompt template (pass verbatim to Explore subagent):
+
+```
+Find the {story/task} file that matches:
+  - develop-story: pattern story.{epic}.{story}.*.md, does NOT contain .qa., .gate., .bug., or .implementation. in the filename
+  - develop-task:  pattern task.{id}.*.md, does NOT contain .qa., .gate., .bug., or .implementation. in the filename
+
+Search under docs/. Return:
+  - absolute_file_path
+  - task_or_story_directory (parent directory of the file)
+  - task_id or story_id extracted from the filename pattern
+
+If not found: return { "error": "File not found — <input>" }.
+```
+
+### Agent 2 — Tracker state poller
+
+Prompt template (pass verbatim to Explore subagent):
+
+```
+Run the tracker state poller (shared/resources/tracker-state-poller-subagent.md).
+Inputs:
+  PR_NUMBER=    # empty string (no PR yet in Phase 0)
+  ISSUE_KEY={ISSUE_KEY}    # GitHub issue number or Jira key extracted from document frontmatter
+                           # For file/dir inputs: locate the file (pattern task.{id}.*.md or story.{epic}.{story}.*.md under docs/)
+                           # and extract github_issue: or jira_key: from its YAML frontmatter.
+                           # If not found, use empty string.
+
+Follow the Execution Protocol in the referenced file exactly.
+Return the compact JSON object only — no prose.
+```
+
+### Agent 3 — Lite-mode + always-load detector
+
+Prompt template (pass verbatim to Explore subagent):
+
+```
+Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{epic}.{story}.*.md under docs/).
+
+Evaluate the three lite-mode conditions (all three must be true for PIPELINE_MODE=lite):
+  1. risk_level: frontmatter field is "low" or absent
+  2. Fewer than 3 Tasks defined (for stories) or fewer than 3 implementation phases (for tasks) in the body
+  3. Document mentions a single module / app (scope restricted to one lib or app)
+
+Also check skills-config.yaml in the project root:
+  - Does it exist?
+  - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
+
+Return compact JSON:
+{
+  "risk_level": "low|medium|high|absent",
+  "phase_count": <integer>,
+  "single_module": true|false,
+  "pipeline_mode": "lite|standard",
+  "skills_config_exists": true|false,
+  "always_load_files": ["path1", "path2"]
+}
+```
+
+### Aggregation
+
+After all dispatched agents return:
+
+```
+RESOLVER_RESULT  ← Agent 1 result (or null if not dispatched)
+TRACKER_RESULT   ← Agent 2 result (compact JSON)
+LITEMODE_RESULT  ← Agent 3 result (compact JSON)
+
+TASK_FILE      = RESOLVER_RESULT.absolute_file_path   (or already known from inline resolution)
+TASK_DIR       = RESOLVER_RESULT.task_or_story_directory
+PIPELINE_MODE  = LITEMODE_RESULT.pipeline_mode          (default: "standard" on failure)
+ALWAYS_LOAD_FILES = LITEMODE_RESULT.always_load_files   (default: [] on failure)
+TRACKER_STATE  = TRACKER_RESULT                         (null fields on failure)
+```
+
+Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE and ALWAYS_LOAD_FILES determined.
+
+### Failure handling
+
+| Agent | Failure response |
+|---|---|
+| Resolver | **HALT** — cannot continue without file path. Surface error to user. |
+| Tracker poller | Log warning in Issues Log. Set tracker fields to null. Continue. |
+| Lite-mode detector | Log warning. Default `PIPELINE_MODE=standard`, `ALWAYS_LOAD_FILES=[]`. Continue. |
+
+---
+
 ## 0b. Check Pipeline State — Resume or Restart?
 
 Before asking any questions, check whether a previous run was started:
@@ -196,7 +296,7 @@ fi
 
 **Note (tasks only)**: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations.
 
-**Lite mode detection**: see `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
+**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3). Use `LITEMODE_RESULT.pipeline_mode` directly — do not re-evaluate conditions inline. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
 
 ---
 
@@ -356,20 +456,21 @@ If `TRACKER_ISSUE` is not set, skip this entire section — do NOT update the de
 
 Determine the list of files to pre-load as context for `/develop`. This section is identical for both orchestrators.
 
-1. **Check for `skills-config.yaml`** in the project root.
+`ALWAYS_LOAD_FILES` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3). Use `LITEMODE_RESULT.always_load_files` directly. Apply fallback defaults only when Agent 3 failed or returned an empty list AND `skills_config_exists` is false.
 
-2. **If `skills-config.yaml` exists**, read the `devLoadAlwaysFiles` key:
-   - If the key is present and non-empty, use that list as `ALWAYS_LOAD_FILES`.
-   - If the key is absent or empty, fall back to the defaults below.
+1. **Use 0a-parallel result** (`LITEMODE_RESULT.always_load_files`):
+   - If `LITEMODE_RESULT.skills_config_exists = true` and `always_load_files` is non-empty: use that list.
+   - If `LITEMODE_RESULT.skills_config_exists = true` but `always_load_files` is empty: skills-config.yaml has no `devLoadAlwaysFiles` key — fall back to defaults.
+   - If `LITEMODE_RESULT.skills_config_exists = false` or Agent 3 failed: use defaults.
 
-3. **If `skills-config.yaml` does not exist**, use the defaults:
+2. **Defaults** (when skills-config.yaml absent or Agent 3 failed):
    - `docs/architecture/concepts/coding-standards.md`
    - `docs/architecture/concepts/tech-stack.md`
    - `docs/architecture/concepts/source-tree.md`
 
-4. **For each file in `ALWAYS_LOAD_FILES`**: verify it exists on disk. If missing, log a warning — `"⚠️ Always-load file not found: <path> — skipping"` — and remove it from the list.
+3. **For each file in `ALWAYS_LOAD_FILES`**: verify it exists on disk. If missing, log a warning — `"⚠️ Always-load file not found: <path> — skipping"` — and remove it from the list.
 
-5. **Log to Decisions Log**: `"Always-load files resolved: {N} files — {comma-separated paths}"`
+4. **Log to Decisions Log**: `"Always-load files resolved: {N} files — {comma-separated paths}"`
 
 Store `ALWAYS_LOAD_FILES` as a pipeline-wide variable — it is consumed in Step 3 when invoking `/develop`.
 
