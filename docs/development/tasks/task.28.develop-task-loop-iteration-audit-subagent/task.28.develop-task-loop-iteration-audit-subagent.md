@@ -4,9 +4,10 @@ title: "Validate develop-task pipeline against task.17 iteration audit subagent"
 type: task
 category: refactoring
 priority: High
-status: ready-for-review
+status: accepted
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-10
+completed_date: 2026-05-10
 assignee: TBD
 effort: ~0.15 day
 depends_on: task.17
@@ -17,7 +18,7 @@ mirrors: task.17
 
 # Task 28 — Validate develop-task against task.17 audit subagent
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `task.28.review.2026-05-10.md` implemented 2026-05-10
 **GitHub Issue**: [#46](https://github.com/Gamaroff/agent-skills/issues/46)
 
@@ -137,6 +138,23 @@ N/A — validation task makes no source edits. If a Phase-4 fix is raised, rollb
 
 ### Key Findings
 No critical issues identified. One LOW doc inaccuracy (lock-file path description in §2) noted as non-blocking future editorial item.
+
+## 15. Definition of Done
+
+**Status:** ✅ ACCEPTED — 2026-05-10
+
+| Check | Result |
+|-------|--------|
+| All 5 Success Criteria met | ✅ PASS |
+| PR #62 exists | ✅ PASS |
+| Documentation complete | ✅ PASS |
+| Security | ✅ PASS |
+| Compliance | ✅ NOT_APPLICABLE |
+| QA Gate (95/100) | ✅ PASS |
+
+**DoD Report:** [task.28.dod.1.validate-develop-task-loop-iteration-audit-subagent.md](./task.28.dod.1.validate-develop-task-loop-iteration-audit-subagent.md)
+
+---
 
 ## 13. References
 
