@@ -87,23 +87,25 @@ For each file found:
 
 ### Step 3 — Check for summary gaps
 
-Compare the set of valid summary step numbers against `1 .. LOCK_STEP`:
-
-- **All summaries present** (steps 1..LOCK_STEP all have valid `.json`): `recommended_step = LOCK_STEP + 1`
-  - Rationale: lock was written at end of step N meaning step N completed; resume at N+1
-- **Summary missing for `LOCK_STEP`**: `recommended_step = LOCK_STEP` (re-execute)
-  - Rationale: lock was updated but step may not have fully completed (interrupted mid-step)
-- **Summary missing for an earlier step** (gap before LOCK_STEP): add to `blocking_issues`:
-  - `"Summary missing for step {N} — earlier step may have been skipped or corrupted"` 
-  - Still set `recommended_step = LOCK_STEP` (conservative)
-
-**Note**: Steps 1, 2, 4, and 8 do not produce summaries — they do not dispatch Explore subagents. If they are within range, treat their absence as expected — do not flag as missing.
+**Summary-exempt steps** (never dispatch Explore subagents — absence is expected, never a gap):
 
 Exemption list: `[1, 2, 4, 8]`
 - Step 1 (create-branch): no subagent
 - Step 2 (review-task / review-story): no subagent
 - Step 4 (create-pr): no subagent
 - Step 8 (commit-changes): no subagent
+
+Build `REQUIRED_STEPS` = steps in `1..LOCK_STEP` that are NOT in the exemption list.
+
+Compare the set of valid summary step numbers against `REQUIRED_STEPS`:
+
+- **All required summaries present** (every step in REQUIRED_STEPS has a valid `.json`): `recommended_step = LOCK_STEP + 1`
+  - Rationale: lock was written at end of step N meaning step N completed; resume at N+1
+- **Summary missing for `LOCK_STEP`** (and LOCK_STEP is in REQUIRED_STEPS): `recommended_step = LOCK_STEP` (re-execute)
+  - Rationale: lock was updated but step may not have fully completed (interrupted mid-step)
+- **Summary missing for an earlier required step** (gap in REQUIRED_STEPS before LOCK_STEP): add to `blocking_issues`:
+  - `"Summary missing for step {N} — earlier step may have been skipped or corrupted"` 
+  - Still set `recommended_step = LOCK_STEP` (conservative)
 
 ### Step 4 — Check artifact mtimes for deltas
 
@@ -133,9 +135,9 @@ Emit the result object with all fields. Do NOT emit any other text.
 | Condition | `recommended_step` |
 |-----------|-------------------|
 | Lock absent / unreadable | 1 |
-| All summaries for steps 1..LOCK_STEP present | LOCK_STEP + 1 |
-| Summary for LOCK_STEP absent | LOCK_STEP (re-execute) |
-| Summary gap before LOCK_STEP | LOCK_STEP (conservative) + blocking_issue |
+| All required summaries present (REQUIRED_STEPS all have valid `.json`) | LOCK_STEP + 1 |
+| Summary for LOCK_STEP absent (and LOCK_STEP ∈ REQUIRED_STEPS) | LOCK_STEP (re-execute) |
+| Summary gap for earlier required step | LOCK_STEP (conservative) + blocking_issue |
 | Branch missing | Same as above + blocking_issue |
 
 ---
