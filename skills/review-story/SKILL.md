@@ -371,7 +371,7 @@ question: 'Would you like a comprehensive review report saved to a file, or just
 header: 'Output Format'
 options:
   - label: 'Comprehensive report'
-    description: 'Generate detailed review report saved to [story-name].review.[date].md with all findings, user decisions, and recommendations documented.'
+    description: 'Generate detailed review report saved to story.{epic}.{story}.review.{n}.{descriptive-name}.md with all findings, user decisions, and recommendations documented.'
   - label: 'Action plan only'
     description: 'Provide prioritized list of issues and fixes to action immediately without saving a report file.'
 ```
@@ -1301,7 +1301,7 @@ questions:
 **Actions**:
 
 1. Generate complete review report following the structure below
-2. Save to file: `[story-directory]/[story-name].review.[date].md`
+2. Save to file: `[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md`
 3. Display summary to user with file location
 
 **Report Structure**:
@@ -1660,7 +1660,7 @@ questions:
 - **Review Duration:** [time]
 ```
 
-**Output**: Save review report to `[story-directory]/[story-name].review.[date].md`
+**Output**: Save review report to `[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md`
 
 ---
 
@@ -2222,7 +2222,7 @@ This skill uses:
 
 ## Notes
 
-- Review reports are saved separately as `[story-name].review.[date].md`
+- Review reports are saved separately as `story.{epic}.{story}.review.{n}.{descriptive-name}.md`. Use DOTS as structural separators and hyphens within the descriptive name. Example: `story.178.8.review.1.example-feature.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
 - Story status is updated in-place only when review outcome is READY TO IMPLEMENT and user confirms
 - Can be used at any stage: draft, in progress, completed
 - Supersedes `/validate-story` — provides everything validate-story does plus interactive clarification, epic alignment, consistency checks, and story split recommendations

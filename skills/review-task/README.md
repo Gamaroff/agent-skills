@@ -85,7 +85,7 @@ The review-task skill performs a 7-step comprehensive analysis:
 Generates a comprehensive review report:
 
 ```
-[task-directory]/[task-name].review.[date].md
+[task-directory]/task.{n}.review.{descriptive-name}.md
 ```
 
 Report includes:
