@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.29.develop-task-loop-test-failure-triage-subagent'
+task_title: 'Wire test-failure triage Explore subagent into develop-task pipeline loop'
+gate: PASS
+status_reason: 'All 4 success criteria verified against branch diff and shared resource. Zero HIGH/MEDIUM issues. Docs-only change with no runtime risk.'
+reviewer: 'QA Engineer (Claude)'
+updated: '2026-05-10T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 98
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No security surface touched. No new dependencies.'
+  performance:
+    status: PASS
+    notes: 'Docs-only. No runtime paths modified.'
+  reliability:
+    status: PASS
+    notes: 'No logic changes. Shared resource protocol unchanged from task.18.'
+  maintainability:
+    status: PASS
+    notes: 'Cross-reference improves discoverability. Naming convention standardisation reduces ambiguity.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Normalise {name} → {descriptive-name} placeholder in AGENTS.md review report patterns'
+      refs: ['AGENTS.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
