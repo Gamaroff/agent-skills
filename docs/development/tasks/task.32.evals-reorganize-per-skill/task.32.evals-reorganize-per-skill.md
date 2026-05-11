@@ -1,7 +1,7 @@
 ---
 id: task.32.evals-reorganize-per-skill
 title: "Reorganize evals/ from full-flow/ into per-skill structure"
-status: draft
+status: in-progress
 type: task
 category: refactoring
 priority: medium
@@ -13,7 +13,8 @@ github_issue: 67
 
 # Task 32: Reorganize evals/ from full-flow/ into per-skill structure
 
-**Status:** 📋 Planned
+**Status:** 🟢 Ready for Development
+**Review**: ✅ All review recommendations from `task.32.review.1.evals-reorganize-per-skill.md` implemented 2026-05-11
 **Created:** 2026-05-11
 **Category:** refactoring
 **Priority:** Medium
@@ -135,6 +136,8 @@ npm run eval:create-story
 npm run eval:all
 npm run eval:create-task:cli
 npm run eval:create-task:sdk
+npm run eval:create-story:cli
+npm run eval:create-story:sdk
 ```
 
 **Affected:** any local shell history, contributor docs, CI workflow files.
@@ -183,6 +186,9 @@ Anything that hard-codes `evals/full-flow/scenarios/...` (CI workflow, contribut
 - [ ] `git mv evals/full-flow/scenarios/02-happy-story evals/create-story/scenarios/01-happy`
 - [ ] `git mv evals/full-flow/scenarios/04-story-missing-core-config evals/create-story/scenarios/02-missing-core-config`
 - [ ] Audit each `scenario.json` for hardcoded paths to old folder names — update to `$SANDBOX` relatives
+- [ ] Update `scenario.json:name` field in all 5 scenarios to match new dir basenames (`01-happy`, `02-id-collision`, `03-tracker-live`, `01-happy`, `02-missing-core-config`)
+- [ ] Rewrite stale prose path in `evals/create-task/scenarios/03-tracker-live/README.md` (`evals/full-flow/lib/tracker-cleanup.mjs` → `evals/shared/lib/tracker-cleanup.mjs`)
+- [ ] `git rm evals/full-flow/README.md` (content rescued into Phase 5 split)
 - [ ] `rmdir evals/full-flow/scenarios && rmdir evals/full-flow`
 
 **Dependencies:** Phase 2
@@ -202,10 +208,14 @@ Anything that hard-codes `evals/full-flow/scenarios/...` (CI workflow, contribut
 
 **Files:** `docs/evals.md`, new `evals/create-task/README.md`, new `evals/create-story/README.md`, removed `evals/full-flow/README.md`
 
-- [ ] Split `evals/full-flow/README.md` content into two per-skill READMEs (driver contract section moves to `evals/shared/README.md`)
-- [ ] Update `docs/evals.md` recipes + canonical references to point at new paths
+- [ ] Write per-skill READMEs (`evals/create-task/README.md`, `evals/create-story/README.md`) using content rescued from old `evals/full-flow/README.md` (removed in Phase 3)
 - [ ] Add `evals/shared/README.md` describing the runner contract + how to add a driver
-- [ ] Update `AGENTS.md` evals paragraph if it names old paths
+- [ ] Update `docs/evals.md` recipes + canonical references to point at new paths
+- [ ] Rename L4 layer label from "Full-flow" to "End-to-end" in:
+  - [ ] `AGENTS.md:178` (paragraph mentioning "(unit → fixture → protocol → full-flow)")
+  - [ ] `docs/evals.md:185` (`**L4 Full-flow**` heading + table row)
+  - [ ] `docs/README.md:19` ("(unit → protocol → full-flow)")
+- [ ] Update `AGENTS.md` evals paragraph path references (`evals/full-flow/README.md` → `evals/shared/README.md`)
 
 **Dependencies:** Phase 4
 
@@ -312,16 +322,9 @@ None. Pure file moves with deterministic test coverage.
 - **Mitigation:** Phase 3 audit step + `grep -r "full-flow" evals/ scripts/ docs/`
 - **Rollback:** revert the move commit; tests go green again
 
-**2. CI workflow path filter regression**
-- **Risk:** `.github/workflows/test.yml` uses `paths:` filter to skip jobs when `evals/` unchanged; if filter still references `full-flow/`, CI may not trigger on new layout
-- **Probability:** Medium — filters exist but unverified
-- **Impact:** silent — CI doesn't run, regressions slip in
-- **Mitigation:** read `test.yml` carefully in Phase 4, verify trigger fires on a no-op commit
-- **Rollback:** update filter; no code rollback needed
-
 ### LOW RISK
 
-**3. Scenario renumbering breaks an external doc**
+**2. Scenario renumbering breaks an external doc**
 - **Risk:** a blog post / external README links to `01-happy-task/`
 - **Probability:** Low — repo is internal
 - **Impact:** dead link only

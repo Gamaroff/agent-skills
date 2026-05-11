@@ -95,6 +95,24 @@ grep -rn "full-flow\|01-happy-task\|03-task-id-collision\|05-tracker-payload-liv
 
 Most paths use `$SANDBOX` placeholder which is runtime-resolved — those are stable. Hardcoded scenario names should not appear (replay fixtures use relative paths inside the scenario folder). If found, update string-by-string.
 
+**Update `scenario.json:name` field** (each file's `"name"` is informational, but stale value misleads readers — runner uses dir basename):
+
+| File (post-move) | Old `name` | New `name` |
+|------------------|-----------|-----------|
+| `evals/create-task/scenarios/01-happy/scenario.json` | `01-happy-task` | `01-happy` |
+| `evals/create-task/scenarios/02-id-collision/scenario.json` | `03-task-id-collision` | `02-id-collision` |
+| `evals/create-task/scenarios/03-tracker-live/scenario.json` | `05-tracker-payload-live` | `03-tracker-live` |
+| `evals/create-story/scenarios/01-happy/scenario.json` | `02-happy-story` | `01-happy` |
+| `evals/create-story/scenarios/02-missing-core-config/scenario.json` | `04-story-missing-core-config` | `02-missing-core-config` |
+
+**Fix stale prose path** in `evals/create-task/scenarios/03-tracker-live/README.md` line ~46: `evals/full-flow/lib/tracker-cleanup.mjs` → `evals/shared/lib/tracker-cleanup.mjs`.
+
+**Remove old README before rmdir** (Phase 5 will write new READMEs from rescued content):
+
+```bash
+git rm evals/full-flow/README.md
+```
+
 **Cleanup:**
 
 ```bash
@@ -179,7 +197,17 @@ Reference table at the bottom of `docs/evals.md`:
 
 **Update `AGENTS.md`:**
 
-Search for `evals/full-flow` references; replace with `evals/`.
+Search for `evals/full-flow` references; replace with appropriate new path (`evals/shared/README.md` for the README pointer).
+
+**Rename L4 layer label** — `full-flow` is used as the L4 *layer name* in the eval taxonomy in three places. Rename to **"End-to-end"** (or chosen replacement) for consistency with new directory structure:
+
+| File | Line | Current | New |
+|------|------|---------|-----|
+| `AGENTS.md` | ~178 | `(unit → fixture → protocol → full-flow)` | `(unit → fixture → protocol → end-to-end)` |
+| `docs/evals.md` | ~185 | `**L4 Full-flow**` (heading + table row) | `**L4 End-to-end**` |
+| `docs/README.md` | ~19 | `(unit → protocol → full-flow)` | `(unit → protocol → end-to-end)` |
+
+Verify with: `grep -rn "full-flow" AGENTS.md docs/` — should return only commit-message/CHANGELOG matches after this step.
 
 ## Key Patterns and References
 
