@@ -466,7 +466,7 @@ Every file the harness creates or mutates, with its lifecycle. Anchor for "did t
 
 When updating this document, verify:
 
-1. **Mermaid syntax** — paste each diagram into <https://mermaid.live> or run `npx -y @mermaid-js/mermaid-cli -i diagrams/develop-task.md -o /tmp/out.svg` to confirm parse + render.
+1. **Mermaid syntax** — paste each diagram into <https://mermaid.live> or run `npx -y @mermaid-js/mermaid-cli -i skills/develop-task/README.md -o /tmp/out.svg` to confirm parse + render.
 2. **Subagent dispatch parity** — every row in the contract table maps to an actual `Agent(subagent_type="Explore", ...)` call in `SKILL.md` or a `develop-pipeline-*.md` protocol file in `shared/resources/`. No hallucinated subagents.
 3. **Step coverage** — every `develop-pipeline-step-*.md` file in `shared/resources/` is referenced by at least one diagram node.
 4. **Lock-file mutations** — every `current_step` write shown in any diagram corresponds to a mutation point listed in `develop-pipeline-pause.md` "Lock file" section.

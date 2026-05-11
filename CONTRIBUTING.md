@@ -38,7 +38,7 @@ python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
 
 - One skill or change per PR
 - Keep SKILL.md descriptions generic — no project-specific names or private infra
-- Run `npm run generate-catalog` after adding or editing skills (regenerates `docs/skill-catalog.md`)
+- Run `npm run generate-catalog` after adding or editing skills (regenerates `docs/reference/skill-catalog.md`)
 - Run `quick_validate.py` before submitting
 
 ## Reporting Issues

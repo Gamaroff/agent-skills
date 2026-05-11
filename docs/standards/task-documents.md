@@ -1,14 +1,14 @@
 # Task Documents
 
-Reference for projects using `develop-task`. Covers the required directory layout, frontmatter schema, status rules, and auto-generated artifacts.
+> **Audience:** anyone authoring or generating standalone technical task documents in a project that uses these skills.
 
-Use `create-task` to produce a task document. Use `develop-task` (or `develop`) to run the full implementation pipeline.
+Schema and conventions for task markdown files consumed by `create-task`, `review-task`, and `develop-task`.
 
----
+## Purpose
 
-## Directory Layout
+A task is a standalone unit of technical work — refactor, infrastructure change, tooling, cleanup, migration — that does not need a PRD or epic. Tasks are tracked individually in the [task registry](#task-registry).
 
-Each task lives in its own directory under `docs/development/tasks/`:
+## Directory layout
 
 ```
 docs/development/tasks/
@@ -22,22 +22,13 @@ docs/development/tasks/
     └── task.{N}.gate.{N}.{name}.yml             # QA gate decision (auto)
 ```
 
-The base path `docs/development/tasks/` is fixed — there is no configuration key to override it.
+The base path `docs/development/tasks/` is fixed — no configuration key overrides it.
 
----
+## File naming
 
-## File Naming
+See [file naming](./file-naming.md). Pattern: `task.{N}.{name}.md`. Directory stem matches.
 
-- Structural segments separated by dots: `task.17.cache-lib-simplification.md`
-- Descriptive name uses hyphens, all lowercase: `cache-lib-simplification`
-- Never use underscores or camelCase in the descriptive segment
-- Directory name matches the filename stem exactly (no extension)
-
-See [conventions.md](./conventions.md) for the full naming pattern reference.
-
----
-
-## Frontmatter Schema
+## Frontmatter schema
 
 ```yaml
 ---
@@ -59,46 +50,22 @@ updated: 2026-01-15
 | `title` | string | Yes | Human-readable title |
 | `type` | literal | Yes | Must be exactly `task` |
 | `category` | enum | Yes | `refactoring`, `infrastructure`, `documentation`, `testing`, `other` |
-| `status` | enum | Yes | See [Status Lifecycle](#status-lifecycle) |
+| `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
 | `priority` | enum | Yes | `Critical`, `High`, `Medium`, `Low` |
 | `assignee` | string | Yes | `TBD` or a name |
 | `created` | ISO date | Yes | `YYYY-MM-DD` |
 | `updated` | ISO date | Yes | `YYYY-MM-DD` — update on every change |
-| `risk_level` | enum | Optional | `high`, `medium`, `low` — triggers the high-risk gate in the pipeline |
+| `risk_level` | enum | Optional | `high`, `medium`, `low` — triggers the high-risk gate |
 | `effort` | string | Optional | Free text estimate, e.g. `~0.5 day` |
 | `depends_on` | string | Optional | `task.N` — blocks pipeline if the dependency is not `accepted` |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
-| `jira_key` | string\|null | Optional | `PROJ-123` or `null` — pipeline skips Jira ops when absent |
+| `jira_key` | string\|null | Optional | `PROJ-123` or `null` |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
 | `pr_number` | integer | Optional | Set by pipeline after PR creation — do not set manually |
 | `completed_date` | ISO date | Optional | Set by `finalise` when status reaches `accepted` |
 | `source_plan` | string | Optional | Path to an upstream plan file, for traceability |
 
----
-
-## Status Lifecycle
-
-```
-draft → planned → ready-for-development → in-progress → ready-for-review → accepted
-```
-
-`cancelled` is reachable from any non-terminal state.
-
-| Frontmatter value | Body label | Set by | Precondition |
-|---|---|---|---|
-| `draft` | `Draft` | `create-task` | Initial state |
-| `planned` | `Planned` | Author or `create-task` | Author confirms draft is complete |
-| `ready-for-development` | `Ready for Development` | `review-task` | Review passes |
-| `in-progress` | `In Progress` | `develop` | Was `ready-for-development` |
-| `ready-for-review` | `Ready for Review` | `develop` | All Implementation Plan phases checked off |
-| `accepted` | `Accepted` | `finalise` | DoD passed, QA gate PASS or WAIVED |
-| `cancelled` | `Cancelled` | Human or any skill | Manual decision — terminal state |
-
-**Sync rule**: frontmatter `status:` uses `lowercase-kebab-case`; the `**Status:**` line in the document body uses `Title Case`. Both must be updated in the same edit. The `finalise` skill enforces this and will fail the DoD check if they diverge.
-
----
-
-## Required Document Sections
+## Required body sections
 
 `create-task` produces a document with these 11 sections. `review-task` validates all are present and substantive:
 
@@ -116,49 +83,46 @@ draft → planned → ready-for-development → in-progress → ready-for-review
 
 The **Implementation Plan** section must contain a checkbox list. `develop-task` tracks progress by counting checked vs unchecked items across pipeline iterations.
 
----
-
-## Co-located Artifacts
-
-These files are generated automatically by skills during the pipeline. Do not create or modify them manually (gate files are owned exclusively by QA skills):
+## Co-located artifacts
 
 | Artifact | Pattern | Written by | Purpose |
 |---|---|---|---|
 | Plan file | `task.{N}.plan.{name}.md` | `create-task` | Detailed implementation guide |
 | Review report | `task.{N}.review.{YYYY-MM-DD}.md` | `review-task` (Step 2) | Review findings |
 | Implementation report | `task.{N}.implementation.{N}.{name}.md` | `develop-task` pipeline | Pipeline run record |
-| QA report | `task.{N}.qa.{N}.{name}.md` | `qa-review` (Step 5) | QA assessment narrative |
+| QA report | `task.{N}.qa.{N}.{name}.md` | `qa-task` (Step 5) | QA assessment narrative |
 | Definition of Done | `task.{N}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |
-| QA gate | `task.{N}.gate.{N}.{name}.yml` | `qa-review` / `qa-gate` | Machine-readable gate decision — **never modified by dev skills** |
+| QA gate | `task.{N}.gate.{N}.{name}.yml` | `qa-task` / `qa-gate` | Machine-readable gate decision — **never modified by dev skills** |
 
----
+## Status lifecycle
 
-## skills-config.yaml
+See [`status-lifecycle.md`](./status-lifecycle.md) for the full table. Task-specific transitions:
 
-Task path resolution is fixed (`docs/development/tasks/`). These keys affect pipeline behaviour:
+| Frontmatter value | Set by | Precondition |
+|---|---|---|
+| `draft` | `create-task` | Initial state |
+| `ready-for-development` | `review-task` | Review passes |
+| `in-progress` | `develop` | Was `ready-for-development` |
+| `ready-for-review` | `develop` | All Implementation Plan phases checked off |
+| `accepted` | `finalise` | DoD passed, QA gate PASS or WAIVED |
 
-```yaml
-devLoadAlwaysFiles:
-  - docs/architecture/concepts/coding-standards.md   # loaded at pipeline start
+## Task registry
 
-devDebugLog: .ai/debug-log.md   # optional pipeline debug log
-```
+`docs/development/tasks/task-registry.md` is the single source of truth for task numbering and status. Rules:
 
-Full configuration reference: [conventions.md](./conventions.md).
+- Read **Next Available Task Number** before running `create-task` — that's your `task.{N}`.
+- The new registry row is committed atomically with the new task files.
+- Task numbers are **globally unique and never reused**, even after cancellation.
 
----
-
-## Prerequisites Checklist
+## Prerequisites checklist
 
 Before running `develop-task`, verify:
 
 - [ ] Task file exists at `docs/development/tasks/task.{N}.{name}/task.{N}.{name}.md`
-- [ ] `status:` is `draft`, `planned`, or `ready-for-development` (any other value halts the pipeline)
+- [ ] `status:` is `draft`, `planned`, or `ready-for-development`
 - [ ] Implementation Plan has at least one unchecked item
 - [ ] Frontmatter `status:` and body `**Status:**` are in sync
 - [ ] If `depends_on` is set, the dependency task is `accepted`
-
----
 
 ## Invocation
 
@@ -167,3 +131,12 @@ Before running `develop-task`, verify:
 /develop task.17.cache-lib-simplification.md
 /develop #297    # GitHub issue number
 ```
+
+## See also
+
+- [Status lifecycle](./status-lifecycle.md)
+- [File naming](./file-naming.md)
+- [Configuration](../reference/configuration.md)
+- [Task Development Runbook](../runbooks/task-development.md)
+- [`create-task` SKILL.md](../../skills/create-task/SKILL.md)
+- [`develop-task` SKILL.md](../../skills/develop-task/SKILL.md)

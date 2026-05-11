@@ -175,4 +175,4 @@ Stories are the unit of work. QA gate files (PASS/CONCERNS/FAIL/WAIVED) are owne
 
 ## Evals
 
-The repo ships a four-layer eval suite for the create-task / create-story skills (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes (`claude-sdk`, `claude-cli`) and the live-tracker scenario are opt-in. See [docs/evals.md](./docs/evals.md) and `evals/shared/README.md` for the full setup, scenario layout, and how to add a driver for another agent.
+The repo ships a four-layer eval suite for the create-task / create-story skills (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes (`claude-sdk`, `claude-cli`) and the live-tracker scenario are opt-in. See [docs/contributing/evals.md](./docs/contributing/evals.md) and `evals/shared/README.md` for the full setup, scenario layout, and how to add a driver for another agent.

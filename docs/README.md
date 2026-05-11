@@ -1,26 +1,48 @@
 # Documentation
 
-Documentation for the Agent Skills library.
+Documentation for the Agent Skills library, organised by reader intent.
 
-## Start Here
+## I want to use these skills in my project
 
-- **[Overview](./overview.md)** — What skills are, progressive disclosure, key principles
-- **[Usage](./usage.md)** — How to invoke skills (natural language, explicit, slash commands)
-- **[Skill Catalog](./skill-catalog.md)** — Categorized index of all 124 skills
+- **[Runbooks](./runbooks/README.md)** — step-by-step walkthroughs
+  - [Story Development](./runbooks/story-development.md)
+  - [Task Development](./runbooks/task-development.md)
+  - [QA Flow](./runbooks/qa-flow.md)
+  - [Bug Fix](./runbooks/bug-fix.md)
+  - [Hotfix](./runbooks/hotfix.md)
+  - [Sprint Cycle](./runbooks/sprint-cycle.md)
+  - [PM Workflows](./runbooks/pm-workflows.md)
+  - [Jira Publish](./runbooks/jira-publish.md)
+  - [New Project Setup](./runbooks/new-project-setup.md)
+- **Reference** — look up specific behaviour
+  - [Invocation](./reference/invocation.md) — natural language, explicit, slash commands
+  - [Configuration](./reference/configuration.md) — `skills-config.yaml` keys + placeholders
+  - [Skill Catalog](./reference/skill-catalog.md) — categorised index of all skills
+- **Standards** — rules for documents you author
+  - [File naming](./standards/file-naming.md)
+  - [Status lifecycle](./standards/status-lifecycle.md)
+  - [PRD documents](./standards/prd-documents.md)
+  - [Epic documents](./standards/epic-documents.md)
+  - [Story documents](./standards/story-documents.md)
+  - [Task documents](./standards/task-documents.md)
+  - [Epic registry](./standards/epic-registry.md)
 
-## Operations
+## I want to understand what skills are
 
-- **[Workflows](./workflows.md)** — Integrated chains: pipeline, sprint cycle, hotfix, parallel dev, change management
-- **[Conventions](./conventions.md)** — File naming, configuration, epic registry
-- **[Task Documents](./task.md)** — Directory layout, frontmatter, status rules, and artifact reference for `develop-task`
-- **[PRD & Story Documents](./prd.md)** — Directory layout, frontmatter, status rules, and artifact reference for `develop-story`
-- **[Packaging](./packaging.md)** — Validation, shared resources, distribution
-- **[Creating Skills](./creating-skills.md)** — Authoring guide, file structure, best practices
-- **[Evals](./evals.md)** — Four-layer test suite (unit → protocol → end-to-end), pluggable agent drivers, live tracker scenario setup
-- **[Placeholders](./placeholders.md)** — Legend for `{project}`, `{api-service}`, `@your-org/...` and other template tokens used in skills
+- [Overview](./concepts/overview.md) — what skills are, progressive disclosure, key principles
 
-## External Resources
+## I'm authoring a skill in this repo
 
-- Claude Code Documentation (reference implementation): https://docs.claude.com/en/docs/claude-code
+- [Authoring skills](./contributing/authoring-skills.md) — file structure, frontmatter, best practices
+- [Packaging](./contributing/packaging.md) — validation, shared resources, distribution
+- [Evals](./contributing/evals.md) — four-layer test suite, drivers, live tracker scenarios
+
+## I'm running the library day-to-day
+
+- [Workflows](./operations/workflows.md) — pipeline diagrams, sprint cycle, hotfix, Jira sync, change management
+
+## External
+
+- Claude Code: https://docs.claude.com/en/docs/claude-code
 - Skills Overview: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
-- Project guidelines: see [CLAUDE.md](../CLAUDE.md)
+- Project guidelines: [`CLAUDE.md`](../CLAUDE.md)

@@ -1,4 +1,6 @@
-# Creating Skills
+# Authoring Skills
+
+> **Audience:** contributors authoring new skills in this repo.
 
 Use the `create-skill` skill to author new skills:
 
@@ -107,6 +109,7 @@ Zips are **build artifacts** — gitignored (`skills/*/*.zip`). Regenerate whene
 `npm run package` is the canonical workflow — it packages every skill in `skills/`.
 
 See [Packaging](./packaging.md) for full details on what the packager does.
+
 
 ## Validation
 

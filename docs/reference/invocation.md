@@ -1,6 +1,10 @@
-# Using Skills
+# Skill Invocation
+
+> **Audience:** developers using these skills in a downstream project.
 
 Three ways to invoke a skill: natural language, explicit reference, or slash command.
+
+> For end-to-end walkthroughs that chain these invocations together, see the [Runbooks](../runbooks/README.md).
 
 ## Natural Language Triggers
 
@@ -93,7 +97,7 @@ Calls: `create-branch → review-story → develop → create-pr → qa-story �
 
 Calls: `create-branch → review-task → develop → create-pr → qa-task → qa-fix (up to 5 cycles) → finalise → commit-changes`
 
-For the full pipeline breakdown and workflow chains see [Workflows](./workflows.md).
+For the full pipeline breakdown and workflow chains see [Workflows](../operations/workflows.md).
 
 ## Most Commonly Used Skills
 

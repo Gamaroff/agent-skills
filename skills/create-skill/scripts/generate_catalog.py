@@ -2,14 +2,14 @@
 """
 Skill Catalog Generator
 
-Regenerates docs/skill-catalog.md from SKILL.md frontmatters.
+Regenerates docs/reference/skill-catalog.md from SKILL.md frontmatters.
 
 Usage:
     python generate_catalog.py [skills_dir] [output_file]
 
 Defaults:
     skills_dir  — <repo_root>/skills/
-    output_file — <repo_root>/docs/skill-catalog.md
+    output_file — <repo_root>/docs/reference/skill-catalog.md
 
 Categories are assigned by matching skill names against known prefixes/patterns.
 Uncategorized skills fall into "Other".
@@ -198,7 +198,7 @@ def main():
     repo_root = find_repo_root(script_dir)
 
     skills_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else repo_root / "skills"
-    output_file = Path(sys.argv[2]) if len(sys.argv) > 2 else repo_root / "docs" / "skill-catalog.md"
+    output_file = Path(sys.argv[2]) if len(sys.argv) > 2 else repo_root / "docs" / "reference" / "skill-catalog.md"
 
     if not skills_dir.exists():
         print(f"❌ Skills directory not found: {skills_dir}")

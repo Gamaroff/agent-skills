@@ -1,6 +1,10 @@
 # Overview
 
+> **Audience:** anyone — first orientation to what skills are.
+
 Skills are modular, self-contained packages that extend AI coding agents with specialized workflows, domain knowledge, and tooling. Install them into any project and the agent activates the right skill automatically based on context — or you invoke one explicitly.
+
+> Want to skip the theory and start shipping? Jump to the [Runbooks](../runbooks/README.md) — [Story Development](../runbooks/story-development.md) and [Task Development](../runbooks/task-development.md).
 
 ## What is a Skill?
 
@@ -139,7 +143,7 @@ python skills/create-skill/scripts/quick_validate.py skills/<skill-name>
 
 Zips are build artifacts — gitignored (`skills/*/*.zip`). Regenerate with `package_skill.py` when installing or distributing. Never commit zips.
 
-See [Packaging](./packaging.md) and [Creating Skills](./creating-skills.md) for full details.
+See [Packaging](../contributing/packaging.md) and [Authoring skills](../contributing/authoring-skills.md) for full details.
 
 ## Configuration
 
@@ -165,9 +169,10 @@ vcs: bitbucket
 
 ## Further Reading
 
-- [Usage](./usage.md) — invocation patterns and file discovery
-- [Skill Catalog](./skill-catalog.md) — full index of all 124+ skills
-- [Conventions](./conventions.md) — file naming, status lifecycle, epic registry
-- [Workflows](./workflows.md) — sprint cycle, hotfix, parallel dev, change management
-- [Packaging](./packaging.md) — distribution, validation, shared resources
-- [Creating Skills](./creating-skills.md) — authoring guide and best practices
+- [Invocation](../reference/invocation.md) — invocation patterns and file discovery
+- [Skill Catalog](../reference/skill-catalog.md) — full index of all skills
+- [Configuration](../reference/configuration.md) — `skills-config.yaml` keys, placeholders
+- [Standards](../standards/) — file naming, status lifecycle, document schemas
+- [Workflows](../operations/workflows.md) — sprint cycle, hotfix, parallel dev, change management
+- [Packaging](../contributing/packaging.md) — distribution, validation, shared resources
+- [Authoring skills](../contributing/authoring-skills.md) — authoring guide and best practices

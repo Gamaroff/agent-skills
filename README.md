@@ -8,7 +8,7 @@ A library of **AI coding agent skills** — modular, self-contained packages tha
 
 Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 
-See [docs/overview.md](./docs/overview.md) for how skills work.
+See [docs/concepts/overview.md](./docs/concepts/overview.md) for how skills work.
 
 ---
 
@@ -84,7 +84,7 @@ Skills activate automatically when compatible agents start — no further config
 ### Meta / skill authoring
 [`create-skill`](./skills/create-skill/SKILL.md) · [`find-skills`](./skills/find-skills/SKILL.md) · [`autoskill`](./skills/autoskill/SKILL.md) · [`onboard`](./skills/onboard/SKILL.md) · [`document-project`](./skills/document-project/SKILL.md) · [`remember-insight`](./skills/remember-insight/SKILL.md) · [`pro-tip`](./skills/pro-tip/SKILL.md)
 
-Full catalog with descriptions: [`docs/skill-catalog.md`](./docs/skill-catalog.md)
+Full catalog with descriptions: [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md)
 
 ---
 
@@ -94,7 +94,7 @@ Full catalog with descriptions: [`docs/skill-catalog.md`](./docs/skill-catalog.m
 # Validate a skill
 python3 skills/create-skill/scripts/quick_validate.py skills/<skill-name>
 
-# Regenerate docs/skill-catalog.md (run after adding or editing skills)
+# Regenerate docs/reference/skill-catalog.md (run after adding or editing skills)
 npm run generate-catalog
 
 # Package a single skill into a distributable zip
@@ -116,7 +116,7 @@ Packaged `.zip` files are build artifacts (gitignored). Regenerate them any time
 python3 skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
 ```
 
-See [`docs/creating-skills.md`](./docs/creating-skills.md) for the full authoring guide.
+See [`docs/contributing/authoring-skills.md`](./docs/contributing/authoring-skills.md) for the full authoring guide.
 
 ---
 
@@ -126,13 +126,16 @@ Full documentation under [`docs/`](./docs/README.md):
 
 | Doc | What's in it |
 |-----|-------------|
-| [Overview](./docs/overview.md) | What skills are, progressive disclosure, key principles |
-| [Usage](./docs/usage.md) | Natural language, explicit invocation, slash commands |
-| [Skill Catalog](./docs/skill-catalog.md) | Categorized index of all skills |
-| [Workflows](./docs/workflows.md) | Pipeline, sprint cycle, hotfix, parallel dev, change management |
-| [Conventions](./docs/conventions.md) | File naming, configuration, status lifecycle |
-| [Packaging](./docs/packaging.md) | Distribution, validation, shared resources |
-| [Creating Skills](./docs/creating-skills.md) | Authoring guide, file structure, best practices |
+| [Overview](./docs/concepts/overview.md) | What skills are, progressive disclosure, key principles |
+| [Runbooks](./docs/runbooks/README.md) | Step-by-step walkthroughs — [story development](./docs/runbooks/story-development.md), [task development](./docs/runbooks/task-development.md) |
+| [Invocation](./docs/reference/invocation.md) | Natural language, explicit invocation, slash commands |
+| [Configuration](./docs/reference/configuration.md) | `skills-config.yaml` keys, placeholders |
+| [Skill Catalog](./docs/reference/skill-catalog.md) | Categorized index of all skills |
+| [Standards](./docs/standards/) | File naming, status lifecycle, document schemas (PRD / epic / story / task) |
+| [Workflows](./docs/operations/workflows.md) | Pipeline, sprint cycle, hotfix, parallel dev, change management |
+| [Authoring skills](./docs/contributing/authoring-skills.md) | Authoring guide, file structure, best practices |
+| [Packaging](./docs/contributing/packaging.md) | Distribution, validation, shared resources |
+| [Evals](./docs/contributing/evals.md) | Four-layer test suite, drivers, live tracker scenarios |
 
 ---
 
@@ -143,7 +146,7 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version:
 1. Scaffold: `python3 skills/create-skill/scripts/init_skill.py <name> --path skills/`
 2. Write a sharp `description` in frontmatter (this is what activates the skill)
 3. Validate: `python3 skills/create-skill/scripts/quick_validate.py skills/<name>`
-4. Update [`docs/skill-catalog.md`](./docs/skill-catalog.md)
+4. Update [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md)
 5. Open a PR — one skill per PR
 
 No hardcoded project names, server addresses, or credentials.

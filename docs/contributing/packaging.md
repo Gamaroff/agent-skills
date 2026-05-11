@@ -1,5 +1,7 @@
 # Packaging Skills for Distribution
 
+> **Audience:** contributors authoring or releasing skills in this repo.
+
 Skills are distributed as `.zip` files. Each zip is self-contained — shared documentation is bundled in automatically.
 
 ## Quick Start

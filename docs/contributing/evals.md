@@ -1,4 +1,6 @@
-# Evals — Runbook
+# Evals
+
+> **Audience:** contributors authoring or maintaining skills in this repo.
 
 Task-oriented guide for running the eval suite. Recipes first; reference tables at the bottom.
 
