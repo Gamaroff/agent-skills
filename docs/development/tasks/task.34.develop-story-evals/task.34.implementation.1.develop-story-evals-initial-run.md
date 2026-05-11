@@ -3,7 +3,7 @@
 **Task**: `task.34.develop-story-evals.md`
 **Run Number**: 1
 **Started**: 2026-05-11 (Phase 0)
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,7 +37,7 @@ Initial run — implementing develop-story eval suite (protocol + step-isolation
 | 4. create-pr | ✅ Done | PR #72 targeting main | https://github.com/Gamaroff/agent-skills/pull/72 | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.34.qa.1.develop-story-evals.md`; `task.34.gate.1.develop-story-evals.yml` | PASS — 0 cycles of qa-fix needed; gate PASS first try | — |
 | 7. finalise | ✅ Done | `task.34.dod.1.develop-story-evals.md`; task `status: accepted`; issue #69 closed; board Done | ACCEPTED — 0 DoD gaps | — |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | | — |
+| 8. commit-changes | ✅ Done | All artifacts committed at dded0b5; pushed to origin | Pipeline lock removed | — |
 
 ---
 
@@ -97,9 +97,9 @@ Initial run — implementing develop-story eval suite (protocol + step-isolation
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-05-11
+**Final Status**: Completed
 **Branch**: feature/task.34.develop-story-evals
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/72
+**QA Iterations**: 1 (PASS first try — 0 qa-fix cycles)
+**DoD Summary**: docs/development/tasks/task.34.develop-story-evals/task.34.dod.1.develop-story-evals.md
