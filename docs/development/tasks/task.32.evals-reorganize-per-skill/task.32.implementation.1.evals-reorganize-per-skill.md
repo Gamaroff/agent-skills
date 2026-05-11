@@ -4,7 +4,8 @@ title: "Implementation Report: Reorganize evals/ from full-flow/ into per-skill 
 type: implementation-report
 task-ref: task.32.evals-reorganize-per-skill.md
 started: 2026-05-11
-status: in-progress
+status: completed
+finished: 2026-05-11
 ---
 
 # Implementation Report: Task 32 — Reorganize evals/ per-skill
@@ -31,7 +32,7 @@ status: in-progress
 | 5 | QA Task | ✅ Done (PASS 100/100) | — |
 | 6 | QA Fix | ✅ Done (skipped — gate PASS, no issues) | — |
 | 7 | Finalise | ✅ Done | — |
-| 8 | Commit Changes | ⏳ Pending | — |
+| 8 | Commit Changes | ✅ Done | — |
 
 ## Decisions Log
 
@@ -62,6 +63,26 @@ status: in-progress
 - Final audit: 0 remaining `full-flow` references outside task docs
 - `npm run eval:all`: 4/4 replay scenarios pass; 03-tracker-live correctly skipped in replay mode
 
+### Step 7: Finalise
+- DoD verified: 4 parallel agents — AC PASS, security PASS, compliance NOT_APPLICABLE, docs PASS
+- Task status updated: in-progress → accepted
+- PR #70 canonical comment posted
+- GitHub issue #67 closed
+- Project board item moved to Done
+
+### Step 8: Commit Changes
+- Committed QA report, gate file, DoD summary, accepted task doc, updated implementation report
+- Final push to origin/feature/task.32.evals-reorganize-per-skill
+- Pipeline lock removed
+
+## Final Status
+
+**Completed:** 2026-05-11
+**QA Iterations:** 1 (PASS, no fixes needed)
+**PR:** #70 (open, pending merge)
+
+All 8 pipeline steps completed. Task accepted.
+
 ## Issues & Escalations
 
-_None yet._
+_None._
