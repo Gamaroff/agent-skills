@@ -1,14 +1,43 @@
 {
-  "name": "03-task-id-collision",
+  "name": "02-id-collision",
   "skill": "create-task",
   "description": "Collision HALT: an existing task.42.original.md is in the sandbox. The agent must refuse to overwrite, refuse to create a new task.42.*, and emit a halt log naming the collision. Validates the harness's negative-existence + halt-log assertion shape.",
   "prompt": "Create task 42 for cache lib simplification.",
   "assertions": [
-    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.42.original.md"] },
-    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.original.md", "ORIGINAL CONTENT MARKER"] },
-    { "fn": "fileAbsent", "args": ["$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md"] },
-    { "fn": "fileExists", "args": ["$SANDBOX/.eval/halt.log"] },
-    { "fn": "fileMatches", "args": ["$SANDBOX/.eval/halt.log", "task\\.42 already exists"] },
-    { "fn": "answerQueueDrained" }
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.original.md"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.original.md",
+        "ORIGINAL CONTENT MARKER"
+      ]
+    },
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/.eval/halt.log"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/halt.log",
+        "task\\.42 already exists"
+      ]
+    },
+    {
+      "fn": "answerQueueDrained"
+    }
   ]
 }

@@ -1,16 +1,70 @@
 {
-  "name": "01-happy-task",
+  "name": "01-happy",
   "skill": "create-task",
   "description": "Happy-path create-task: agent creates task.42.cache-lib-simplification.md with all 11 mandatory sections, ≥2 source citations, valid frontmatter, and posts a tracker payload.",
   "prompt": "Create a task for simplifying the cache lib. Architectural source: docs/architecture/tech-stack.md#caching and docs/architecture/coding-standards.md#naming.",
   "assertions": [
-    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md"] },
-    { "fn": "frontmatterHas", "args": ["$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md", ["id", "status", "created"]] },
-    { "fn": "frontmatterEquals", "args": ["$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md", { "id": "task.42.cache-lib-simplification", "status": "draft" }] },
-    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md", "## 1\\. Overview"] },
-    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md", "## 11\\. Rollback Plan"] },
-    { "fn": "hasAtLeastNSourceCitations", "args": ["$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md", 2] },
-    { "fn": "trackerPayloadMatches", "args": ["$SANDBOX/.eval/tracker-payload.json", { "dryRun": true, "summary": "/cache lib/i", "issueType": "Task" }] },
-    { "fn": "answerQueueDrained" }
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md"
+      ]
+    },
+    {
+      "fn": "frontmatterHas",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md",
+        [
+          "id",
+          "status",
+          "created"
+        ]
+      ]
+    },
+    {
+      "fn": "frontmatterEquals",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md",
+        {
+          "id": "task.42.cache-lib-simplification",
+          "status": "draft"
+        }
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md",
+        "## 1\\. Overview"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md",
+        "## 11\\. Rollback Plan"
+      ]
+    },
+    {
+      "fn": "hasAtLeastNSourceCitations",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md",
+        2
+      ]
+    },
+    {
+      "fn": "trackerPayloadMatches",
+      "args": [
+        "$SANDBOX/.eval/tracker-payload.json",
+        {
+          "dryRun": true,
+          "summary": "/cache lib/i",
+          "issueType": "Task"
+        }
+      ]
+    },
+    {
+      "fn": "answerQueueDrained"
+    }
   ]
 }

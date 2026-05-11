@@ -1,15 +1,52 @@
 {
-  "name": "05-tracker-payload-live",
+  "name": "03-tracker-live",
   "requiresLiveDriver": true,
   "skill": "create-task",
   "description": "LIVE tracker scenario. Calls the real Jira/GitHub tracker via the platform resolver, asserts a created issue exists, then cleans up. Requires JIRA_URL/JIRA_TOKEN or GH_TOKEN. Skipped (clean exit) by the runner whenever the driver's isAvailable() returns false — replay driver cannot satisfy this scenario; intended for DRIVER=claude-sdk on a workflow_dispatch CI run, NOT for local hermetic CI.",
   "prompt": "Create a task for cache lib eval — issue should land in the configured tracker. Architectural source: docs/architecture/tech-stack.md#caching.",
   "assertions": [
-    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.1.cache-lib-eval.md"] },
-    { "fn": "frontmatterHas", "args": ["$SANDBOX/docs/tasks/task.1.cache-lib-eval.md", ["id", "status", "created"]] },
-    { "fn": "hasAtLeastNSourceCitations", "args": ["$SANDBOX/docs/tasks/task.1.cache-lib-eval.md", 1] },
-    { "fn": "fileExists", "args": ["$SANDBOX/.eval/tracker-receipt.json"] },
-    { "fn": "trackerPayloadMatches", "args": ["$SANDBOX/.eval/tracker-receipt.json", { "createdInRealTracker": true, "issueKey": "/^[A-Z]+-\\d+$|^\\d+$/" }] },
-    { "fn": "answerQueueDrained" }
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.1.cache-lib-eval.md"
+      ]
+    },
+    {
+      "fn": "frontmatterHas",
+      "args": [
+        "$SANDBOX/docs/tasks/task.1.cache-lib-eval.md",
+        [
+          "id",
+          "status",
+          "created"
+        ]
+      ]
+    },
+    {
+      "fn": "hasAtLeastNSourceCitations",
+      "args": [
+        "$SANDBOX/docs/tasks/task.1.cache-lib-eval.md",
+        1
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/.eval/tracker-receipt.json"
+      ]
+    },
+    {
+      "fn": "trackerPayloadMatches",
+      "args": [
+        "$SANDBOX/.eval/tracker-receipt.json",
+        {
+          "createdInRealTracker": true,
+          "issueKey": "/^[A-Z]+-\\d+$|^\\d+$/"
+        }
+      ]
+    },
+    {
+      "fn": "answerQueueDrained"
+    }
   ]
 }
