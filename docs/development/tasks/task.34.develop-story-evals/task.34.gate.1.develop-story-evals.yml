@@ -1,0 +1,48 @@
+schema: 1
+task: 'task.34.develop-story-evals'
+task_title: 'Build evals for develop-story pipeline'
+gate: PASS
+status_reason: 'All 6 phases complete. 160/160 tests pass. No regressions. Story-specific assertions (prTargetsEpicBranch, epicBranchExists, resumeRehydrated) unit-tested. NFRs all PASS.'
+reviewer: 'QA Engineer'
+updated: '2026-05-11T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 98
+
+evidence:
+  tests_reviewed: 160
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No auth/payments/sensitive data. EVAL_MODE guard on qa-fix marker.'
+  performance:
+    status: PASS
+    notes: 'Test suite runs in ~15s (target <30s). Deterministic replay mode.'
+  reliability:
+    status: PASS
+    notes: 'All 160 tests deterministic; replay requires no creds.'
+  maintainability:
+    status: PASS
+    notes: 'Mirrors task.33 patterns. README documents adding scenarios and resume scenario semantics.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Run eval:develop-story:smoke with ANTHROPIC_API_KEY when live driver available'
+      refs: ['evals/develop-story/smoke/01-end-to-end-dry/']
+    - action: 'Implement runInterruptible in a driver to enable 02-resume-mid-loop scenario'
+      refs: ['evals/develop-story/smoke/02-resume-mid-loop/']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

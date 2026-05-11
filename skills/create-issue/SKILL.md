@@ -1,6 +1,6 @@
 ---
 name: create-issue
-description: Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development. Creates an issue via the GitHub CLI (GitHub), Bitbucket REST API (Bitbucket), or Jira REST API (Jira). Platform is auto-detected: Jira takes priority when JIRA_URL is set, otherwise detected from the git remote URL.
+description: 'Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development. Creates an issue via the GitHub CLI (GitHub), Bitbucket REST API (Bitbucket), or Jira REST API (Jira). Platform is auto-detected: Jira takes priority when JIRA_URL is set, otherwise detected from the git remote URL.'
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---

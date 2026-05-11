@@ -70,6 +70,14 @@ def validate_skill(skill_path):
     desc_match = re.search(r'description:\s*(.+)', frontmatter)
     if desc_match:
         description = desc_match.group(1).strip()
+        # Unquoted description containing ': ' breaks YAML parsers (GitHub, etc.)
+        block_scalars = ('>', '|', '>-', '|-', '>+', '|+')
+        if description not in block_scalars and not description.startswith(('"', "'")):
+            if ': ' in description:
+                return False, (
+                    "Description is unquoted but contains ': ' — GitHub's YAML parser "
+                    "will reject this. Wrap in single quotes: description: '...'"
+                )
         # YAML block scalar — extract actual multi-line content
         if description in ('>', '|', '>-', '|-', '>+', '|+'):
             block_match = re.search(r'description:\s*[>|][+\-]?\n((?:[ \t]+.+\n?)+)', frontmatter)
