@@ -55,7 +55,7 @@ This document is structured for two audiences:
 
 ## Mermaid Theme (shared by all diagrams below)
 
-See `shared/resources/develop-pipeline-readme-mermaid-theme.md` for the canonical theme init block and the semicolon caveat. Both `develop-story` and `develop-task` README diagrams share this theme — update it there, not here.
+See `references/develop-pipeline-readme-mermaid-theme.md` for the canonical theme init block and the semicolon caveat. Both `develop-story` and `develop-task` README diagrams share this theme — update it there, not here.
 
 ---
 
@@ -395,13 +395,13 @@ Every Explore subagent dispatched by `develop-task`. Each row is meant to anchor
 | # | Subagent | Dispatch point | Input prompt source | Output schema (key fields) | Persistence | Failure semantics |
 |---|---|---|---|---|---|---|
 | 1 | **Resolver** | Phase 0a-parallel (file/dir/bare-filename inputs only) | inline prompt in `develop-pipeline-step-0-resolve-and-prepare.md` §0a-parallel Agent 1 | `{ absolute_file_path: string, task_directory: string, task_id: string }` or `{ error: string }` | none (in-memory only) | HALT — cannot continue without file path |
-| 2 | **Tracker state poller** | Phase 0a-parallel + Step 5b post-fix | `shared/resources/tracker-state-poller-subagent.md` | compact JSON `{ pr: { state, number }, issue: { state, labels, board_status }, errors: [] }` | optional `step-5-post-fix-tracker.json` (Step 5b) | log warning, set fields null, continue (non-blocking) |
+| 2 | **Tracker state poller** | Phase 0a-parallel + Step 5b post-fix | `references/tracker-state-poller-subagent.md` | compact JSON `{ pr: { state, number }, issue: { state, labels, board_status }, errors: [] }` | optional `step-5-post-fix-tracker.json` (Step 5b) | log warning, set fields null, continue (non-blocking) |
 | 3 | **Lite-mode + always-load detector** | Phase 0a-parallel | inline prompt in step-0 §0a-parallel Agent 3. Sets `pipeline_mode=lite` only when **all three** are true: (a) `risk_level ∈ {low, absent}`, (b) `phase_count ≤ 2`, (c) `single_module = true`. Any false ⇒ standard. | `{ risk_level: low\|medium\|high\|absent, phase_count: int, single_module: bool, pipeline_mode: lite\|standard, skills_config_exists: bool, always_load_files: string[], has_success_criteria_table: bool }` | none | log warning, default `pipeline_mode=standard`, `always_load_files=[]` |
-| 4 | **Pipeline-resume stale-context detector** | Phase 0a (resume only — when lock exists) | `shared/resources/pipeline-resume-detector-prompt.md` | `{ schema_version: 1, recommended_step: int, current_step_in_lock: int, summaries_seen: string[], deltas_since_pause: object[], blocking_issues: string[] }` | none (transient) | invalid JSON → fall back to full Phase 0b verification using `current_step` as upper bound |
+| 4 | **Pipeline-resume stale-context detector** | Phase 0a (resume only — when lock exists) | `references/pipeline-resume-detector-prompt.md` | `{ schema_version: 1, recommended_step: int, current_step_in_lock: int, summaries_seen: string[], deltas_since_pause: object[], blocking_issues: string[] }` | none (transient) | invalid JSON → fall back to full Phase 0b verification using `current_step` as upper bound |
 | 5 | **Pre-develop surface map** | Step 3 pre-develop (skipped on resume if Decisions Log has cached entry) | inline prompt in `develop-pipeline-step-3-develop-loop.md` "Pre-develop Codebase Mapping" | unstructured: `<path> — <1-line description>` × N (max 20) | `step-3-pre-develop-map.json` (per `subagent-summary-artifact.md` schema) | log warning, proceed without surface map |
-| 6 | **Initial loop audit** | Step 3, before iteration 1 | `shared/resources/loop-audit-prompt.md` (substitute `<DOC_TYPE>=task`, `<TASKS_SECTION>=## Implementation Plan`) | JSON `{ status: string, completed: int, total: int, last_commit_hash: string }` | `step-3-iteration-audit-0.json` | retry once on JSON parse failure; then inline shell fallback (`grep -cE '\[x\]'`) |
-| 7 | **Per-iteration loop audit** | Step 3, after every `/develop` return | `shared/resources/loop-audit-prompt.md` (same substitutions as #6) | same as #6 | `step-3-iteration-audit-{ITER}.json` | retry once; on second failure HALT with "Audit JSON parse failure" |
-| 8 | **Test-failure triage** | Step 3 develop loop, on `TEST_EXIT != 0` | `shared/resources/test-failure-triage-prompt.md` | YAML `{ counts: {real, flaky, unrelated}, failures: [{ name, classification, file, line, reason }] (≤10), next_file: string, truncated_count: int, cap: 10 }` | `step-3-test-triage-{ITER}.json` with `raw_artifact_paths: [<test-log>]` | bias rule: "if unsure between real and flaky, classify as real" — agent always returns YAML |
+| 6 | **Initial loop audit** | Step 3, before iteration 1 | `references/loop-audit-prompt.md` (substitute `<DOC_TYPE>=task`, `<TASKS_SECTION>=## Implementation Plan`) | JSON `{ status: string, completed: int, total: int, last_commit_hash: string }` | `step-3-iteration-audit-0.json` | retry once on JSON parse failure; then inline shell fallback (`grep -cE '\[x\]'`) |
+| 7 | **Per-iteration loop audit** | Step 3, after every `/develop` return | `references/loop-audit-prompt.md` (same substitutions as #6) | same as #6 | `step-3-iteration-audit-{ITER}.json` | retry once; on second failure HALT with "Audit JSON parse failure" |
+| 8 | **Test-failure triage** | Step 3 develop loop, on `TEST_EXIT != 0` | `references/test-failure-triage-prompt.md` | YAML `{ counts: {real, flaky, unrelated}, failures: [{ name, classification, file, line, reason }] (≤10), next_file: string, truncated_count: int, cap: 10 }` | `step-3-test-triage-{ITER}.json` with `raw_artifact_paths: [<test-log>]` | bias rule: "if unsure between real and flaky, classify as real" — agent always returns YAML |
 
 ### Bias / canon rules cross-reference
 
@@ -480,20 +480,20 @@ When updating this document, verify:
 | Concern | Authoritative file |
 |---|---|
 | Orchestrator skeleton | `skills/develop-task/SKILL.md` |
-| Phase 0 (resolve, fan-out, status, Q&A) | `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` |
-| Step 1 (create-branch + lock) | `shared/resources/develop-pipeline-step-1-create-branch.md` |
-| Step 2 (review-task gate) | `shared/resources/develop-pipeline-step-2-review.md` |
-| Step 3 (develop loop + triage) | `shared/resources/develop-pipeline-step-3-develop-loop.md` |
-| Step 4 (create-pr) | `shared/resources/develop-pipeline-step-4-create-pr.md` |
-| Steps 5–6 (QA loop) | `shared/resources/develop-pipeline-step-5-6-qa-loop.md` |
-| Step 7 (finalise) | `shared/resources/develop-pipeline-step-7-finalise.md` |
-| Step 8 (commit) | `shared/resources/develop-pipeline-step-8-commit.md` |
-| Resume contract (artifact verify, MAX_ITER, plan freshness) | `shared/resources/develop-pipeline-resume-contract.md` |
-| Resume detector prompt | `shared/resources/pipeline-resume-detector-prompt.md` |
-| Test-triage prompt | `shared/resources/test-failure-triage-prompt.md` |
-| Loop-audit prompt (Step 3 initial + per-iteration) | `shared/resources/loop-audit-prompt.md` |
-| Mermaid theme (README diagrams) | `shared/resources/develop-pipeline-readme-mermaid-theme.md` |
-| Subagent summary persistence | `shared/resources/subagent-summary-artifact.md` |
-| Lite mode | `shared/resources/develop-pipeline-lite-mode.md` |
-| Graceful pause (lock + hook) | `shared/resources/develop-pipeline-pause.md` + `skills/develop-task/scripts/on-precompact.sh` |
-| Autonomous defaults | `shared/resources/develop-pipeline-autonomous-defaults.md` |
+| Phase 0 (resolve, fan-out, status, Q&A) | `references/develop-pipeline-step-0-resolve-and-prepare.md` |
+| Step 1 (create-branch + lock) | `references/develop-pipeline-step-1-create-branch.md` |
+| Step 2 (review-task gate) | `references/develop-pipeline-step-2-review.md` |
+| Step 3 (develop loop + triage) | `references/develop-pipeline-step-3-develop-loop.md` |
+| Step 4 (create-pr) | `references/develop-pipeline-step-4-create-pr.md` |
+| Steps 5–6 (QA loop) | `references/develop-pipeline-step-5-6-qa-loop.md` |
+| Step 7 (finalise) | `references/develop-pipeline-step-7-finalise.md` |
+| Step 8 (commit) | `references/develop-pipeline-step-8-commit.md` |
+| Resume contract (artifact verify, MAX_ITER, plan freshness) | `references/develop-pipeline-resume-contract.md` |
+| Resume detector prompt | `references/pipeline-resume-detector-prompt.md` |
+| Test-triage prompt | `references/test-failure-triage-prompt.md` |
+| Loop-audit prompt (Step 3 initial + per-iteration) | `references/loop-audit-prompt.md` |
+| Mermaid theme (README diagrams) | `references/develop-pipeline-readme-mermaid-theme.md` |
+| Subagent summary persistence | `references/subagent-summary-artifact.md` |
+| Lite mode | `references/develop-pipeline-lite-mode.md` |
+| Graceful pause (lock + hook) | `references/develop-pipeline-pause.md` + `skills/develop-task/scripts/on-precompact.sh` |
+| Autonomous defaults | `references/develop-pipeline-autonomous-defaults.md` |
