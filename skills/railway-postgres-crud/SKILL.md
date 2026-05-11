@@ -9,8 +9,6 @@ description: >
   "remove from the live environment", "look up user in staging/production",
   or "run SQL against Railway".
 type: project
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Railway PostgreSQL CRUD

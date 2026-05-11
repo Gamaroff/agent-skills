@@ -1,8 +1,6 @@
 ---
 name: change-management
 description: Orchestrate structured response to project changes (pivots, tech issues, missing requirements, failed stories). Use when significant changes affect project direction requiring comprehensive impact analysis.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Change Management

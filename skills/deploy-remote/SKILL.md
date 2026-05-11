@@ -2,8 +2,6 @@
 name: deploy-remote
 description: Deploy and manage Docker stacks on a LAN server via SSH-backed Docker context and a local registry. Use for any remote container build, push, deploy, restart, log, migrate, or teardown operation. Configure server alias, registry host, and compose project in your project's deploy scripts.
 type: project
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Deploy Remote Skill

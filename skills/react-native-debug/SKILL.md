@@ -1,8 +1,6 @@
 ---
 name: react-native-debug
 description: Iterative debugging for React Native apps. Handles Jest test failures and Metro bundler errors with an interactive approach to determine whether implementation or test is incorrect.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # React Native Debugging Skill
@@ -533,7 +531,7 @@ Both skills share:
 
 See accompanying documentation files:
 
-1. **shared/resources/code-vs-test-validation.md** - Shared framework for determining if code or test is wrong
+1. **references/code-vs-test-validation.md** - Shared framework for determining if code or test is wrong
 2. **react-native-test-patterns.md** - React Native-specific test failure patterns
 3. **error-patterns.md** - Comprehensive error message reference
 4. **debugging-workflows.md** - Step-by-step guides for each workflow

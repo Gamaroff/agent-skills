@@ -1,8 +1,6 @@
 ---
 name: api-endpoint-validator
 description: This skill should be used when creating NestJS API endpoints, reviewing RESTful API design, validating controller patterns, ensuring DTO validation, implementing pagination/filtering, or enforcing API conventions. Use when designing new endpoints, reviewing controller code, refactoring APIs, or ensuring consistent API patterns across the NestJS backend.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # API Endpoint Design Validator

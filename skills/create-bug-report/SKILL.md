@@ -1,8 +1,6 @@
 ---
 name: create-bug-report
 description: Create bug report files for issues found during QA testing. Use when QA identifies bugs during story testing. Implements sequential numbering, uses bug report template, and co-locates with story files.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Create Bug Report

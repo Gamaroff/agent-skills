@@ -1,11 +1,9 @@
 ---
 name: develop
 description: Provides guidance for implementing features and technical tasks. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns. Covers task planning, platform separation, testing, and documentation standards. Includes story-driven development workflow with quality gates and comprehensive validation.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 
 # Develop
 
@@ -161,7 +159,7 @@ fi
 - `/develop` must never write, update, or delete `.claude/state/develop-pipeline.lock`. The lock's lifecycle is owned by the orchestrator (created in its Step 1, mutated as it advances steps, removed before terminal HALT).
 - Read-only check; no race risk.
 - If the lock exists but its `branch` field does not match the current git branch, log a warning ("Stale pipeline lock detected — branch mismatch; treating as standalone") and fall back to `CALLER_MODE=standalone`. This protects against an abandoned lock from a previous run.
-- Lock schema: see `shared/resources/develop-pipeline-pause.md`.
+- Lock schema: see `references/develop-pipeline-pause.md`.
 
 ## Caller-Supplied Context
 
@@ -619,7 +617,7 @@ TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
 TEST_EXIT=$?
 ```
 
-On non-zero exit, dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `shared/resources/test-failure-triage-prompt.md` (substitute `<log_path>` with `$TEST_LOG`). Persist the triage result per the output contract in that file. Main reads only the returned triage summary (counts + ≤10 failure bullets + `next_file` hint).
+On non-zero exit, dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `references/test-failure-triage-prompt.md` (substitute `<log_path>` with `$TEST_LOG`). Persist the triage result per the output contract in that file. Main reads only the returned triage summary (counts + ≤10 failure bullets + `next_file` hint).
 
 Log cleanup: `TEST_EXIT == 0` → `rm -f "$TEST_LOG"`; `TEST_EXIT != 0` → retain for post-mortem.
 

@@ -1,8 +1,6 @@
 ---
 name: documentation-standards-validator
 description: Validate documentation follows naming conventions with DOTS not underscores, YAML frontmatter requirements, and structural standards. Use when creating PRDs, epics, or stories, validating documentation structure, reviewing doc PRs, or auditing documentation consistency. Enforces epic.163.name.md format and status indicators.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Documentation Standards Validator

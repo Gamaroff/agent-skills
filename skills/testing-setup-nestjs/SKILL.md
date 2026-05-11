@@ -1,8 +1,6 @@
 ---
 name: testing-setup-nestjs
 description: Guide developers through NestJS-specific testing patterns including TestingModule setup, Prisma mocking, controller/service testing, E2E integration tests, and high-coverage testing for sensitive operations
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Testing Setup - NestJS

@@ -7,7 +7,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const shared = require("../../../shared/resources/create-skills-lib.js");
+const shared = require("../references/create-skills-lib.js");
 
 const {
   parseFrontmatter,

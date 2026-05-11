@@ -1,11 +1,9 @@
 ---
 name: create-task
 description: Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 
 # Create Task
 
@@ -435,10 +433,10 @@ Once validated:
 
 ### 4.5 Create Tracker Issue
 
-After the task document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `shared/resources/platform-detection.md`):
+After the task document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
-source shared/resources/resolve-platform.sh
+source references/resolve-platform.sh
 # TRACKER = jira | github; VCS = github | bitbucket
 ```
 
@@ -448,7 +446,7 @@ source shared/resources/resolve-platform.sh
 
 > **Note**: Tasks are NOT linked to epics — no `customfield_10014` is set.
 >
-> **Priority on Jira**: setting `"priority": {"name": $priority}` on the issue is the canonical mechanism — Jira boards display it directly, so no separate board-field mirror is needed (unlike the GitHub path, which calls `set-github-project-priority.sh`). Ongoing local↔remote priority drift is handled by `/sync-jira-task` via `shared/resources/jira-sync.js` (`normalisePriority` + `diffFields`).
+> **Priority on Jira**: setting `"priority": {"name": $priority}` on the issue is the canonical mechanism — Jira boards display it directly, so no separate board-field mirror is needed (unlike the GitHub path, which calls `set-github-project-priority.sh`). Ongoing local↔remote priority drift is handled by `/sync-jira-task` via `references/jira-sync.js` (`normalisePriority` + `diffFields`).
 
 Map priority to Jira values:
 
@@ -588,7 +586,7 @@ gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="op
 
 2b. Set Priority field on the board item (mirrors the label already applied). Helper is idempotent and never halts the caller — pass the lowercase priority from frontmatter, or omit it to derive from the issue's `priority:*` label:
    ```bash
-   bash shared/resources/set-github-project-priority.sh "{github_issue_number}" "{priority}" || true
+   bash references/set-github-project-priority.sh "{github_issue_number}" "{priority}" || true
    ```
 
 3. Add `github_issue: {N}` to the task's YAML frontmatter.

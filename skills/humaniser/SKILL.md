@@ -15,8 +15,6 @@ allowed-tools:
   - Grep
   - Glob
   - AskUserQuestion
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Humaniser: Remove AI Writing Patterns

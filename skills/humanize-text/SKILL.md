@@ -2,7 +2,6 @@
 name: humanize-text
 description: This skill should be used when rewriting AI-generated text to sound completely human, eliminating detection patterns and robotic flow. Use when content needs to pass AI detection tools, sound conversational, or add human personality to technical/formal content.
 version: 1.0.0
-license: MIT
 tags: [writing, content, ai-detection, humanization, rewriting, text-transformation]
 examples:
   - "Humanize this text: [paste AI text]"

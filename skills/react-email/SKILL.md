@@ -1,7 +1,6 @@
 ---
 name: react-email
 description: Use when creating HTML email templates with React components - welcome emails, password resets, notifications, order confirmations, newsletters, or transactional emails.
-license: MIT
 metadata:
   author: Resend
   version: "1.1.0"

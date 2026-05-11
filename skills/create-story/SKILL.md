@@ -1,11 +1,9 @@
 ---
 name: create-story
 description: Primary workflow for creating the next logical story in a development sequence. Implements a rigorous 10-step process to identify, extract, and document story requirements with complete technical context and anti-hallucination safeguards.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 
 # Create Story Workflow
 
@@ -353,7 +351,7 @@ Populate these sections:
 >
 > Set `jira_key: null` and `jira_url: null` in the story YAML frontmatter. Leave them null.
 >
-> **Note (future GitHub-path work)**: when this skill (or a sibling) starts creating GitHub issues for stories, mirror the `priority:` frontmatter onto the GitHub Project board's "Priority" single-select field by calling `bash shared/resources/set-github-project-priority.sh "{N}" "{priority}"` immediately after the issue is created. GitHub does not auto-sync `priority:*` labels into Project custom fields.
+> **Note (future GitHub-path work)**: when this skill (or a sibling) starts creating GitHub issues for stories, mirror the `priority:` frontmatter onto the GitHub Project board's "Priority" single-select field by calling `bash references/set-github-project-priority.sh "{N}" "{priority}"` immediately after the issue is created. GitHub does not auto-sync `priority:*` labels into Project custom fields.
 
 ### 5.3 Populate Dev Notes Section (CRITICAL)
 

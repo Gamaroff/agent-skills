@@ -1,8 +1,6 @@
 ---
 name: shard-doc
 description: Document sharding utility that splits large markdown documents into smaller files organized by level 2 sections. Use when documents are too large or when modular documentation structure is needed.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Shard Doc (Document Splitting)

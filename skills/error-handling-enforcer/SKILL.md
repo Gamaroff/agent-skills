@@ -1,8 +1,6 @@
 ---
 name: error-handling-enforcer
 description: Ensure consistent error handling across client and server. Use when adding error handling, reviewing exceptions, implementing error boundaries, creating error classes, validating error codes, ensuring proper logging, or implementing retry logic and circuit breakers.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Error Handling Enforcer

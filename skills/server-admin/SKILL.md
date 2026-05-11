@@ -2,8 +2,6 @@
 name: server-admin
 description: Sysadmin operations on a LAN server via SSH. Covers apt updates, ufw firewall rules, systemd service management, user/group management, disk and memory diagnostics, log inspection, and routine maintenance. Use for any non-Docker server-side task.
 type: project
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Server Admin Skill

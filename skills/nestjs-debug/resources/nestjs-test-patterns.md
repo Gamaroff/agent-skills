@@ -1,6 +1,6 @@
 # NestJS-Specific Test Patterns
 
-This document supplements `shared/resources/code-vs-test-validation.md` with patterns specific to NestJS testing.
+This document supplements `references/code-vs-test-validation.md` with patterns specific to NestJS testing.
 
 **Reference the shared framework for core methodology.** This document adds NestJS-specific context.
 
@@ -553,4 +553,4 @@ NestJS tests fail for platform-specific reasons:
 5. **Mock incomplete** - Test mock doesn't match service
 6. **Module not imported** - Test module setup wrong
 
-**Use the `shared/resources/code-vs-test-validation.md` framework to decide code vs test,** then use this supplement to understand NestJS-specific patterns.
+**Use the `references/code-vs-test-validation.md` framework to decide code vs test,** then use this supplement to understand NestJS-specific patterns.

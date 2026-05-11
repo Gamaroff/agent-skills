@@ -1,8 +1,6 @@
 ---
 name: jira-epic-creator
 description: Create Jira epics from epic markdown documents. Use when user wants to sync local epic documentation to Jira, create Jira tickets from epic files, or publish epics to Jira project management.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Jira Epic Creator

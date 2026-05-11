@@ -1,11 +1,9 @@
 ---
 name: review-story
 description: Deep interactive story review that asks clarifying questions to resolve ambiguities, conflicts, and missing information. Use when story has unclear requirements or you need user input to guide recommendations.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 
 # Review Story
 
@@ -458,7 +456,7 @@ devDebugLog: .ai/debug-log.md
 
 **Purpose**: Front-load conflict detection before interactive Q&A. Three read-only Explore agents run in parallel and return compact YAML summaries. Q&A (Steps 2–8) consumes these summaries to surface high-severity findings as early questions rather than discovering them mid-review.
 
-**Prompt templates**: see `shared/resources/review-story-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
+**Prompt templates**: see `references/review-story-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
 
 **Actions**:
 
@@ -531,9 +529,9 @@ devDebugLog: .ai/debug-log.md
 
 5. **Tracker Issue Linkage**:
 
-   Detect tracker platform using the canonical resolver — see `shared/resources/platform-detection.md`. Source the helper once per skill invocation:
+   Detect tracker platform using the canonical resolver — see `references/platform-detection.md`. Source the helper once per skill invocation:
    ```bash
-   source shared/resources/resolve-platform.sh
+   source references/resolve-platform.sh
    # TRACKER = jira | github
    ```
    - When `TRACKER=jira` → **Jira path** (check for `jira_key:` in frontmatter)
@@ -652,7 +650,7 @@ devDebugLog: .ai/debug-log.md
      - Add row to Story Information table: `| GitHub Issue | [#{N}](url) |`
      - Set the board Priority single-select field (label → field mirror; helper never halts):
        ```bash
-       bash shared/resources/set-github-project-priority.sh "{N}" "{priority}" || true
+       bash references/set-github-project-priority.sh "{N}" "{priority}" || true
        ```
        4. After writing `github_issue: {N}` to frontmatter, link the story as a sub-issue of the epic (GitHub-only — Jira parent linkage is `sync-jira-story`'s job):
           If `EPIC_TRACKER_KIND=github` and `EPIC_ISSUE_NUM` is non-empty:
@@ -1905,7 +1903,7 @@ User Can Now: Run `/develop` to begin implementation
 
 **Actions**:
 
-1. **Detect tracker platform**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `shared/resources/platform-detection.md`.
+1. **Detect tracker platform**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `references/platform-detection.md`.
 
 3. **Collect context from previous steps**:
 
@@ -1989,7 +1987,7 @@ User Can Now: Run `/develop` to begin implementation
    Self-heal the board Priority single-select field (idempotent; reads the issue's `priority:*` label when no arg given). Placed in the comment-posting phase intentionally — it runs on every review pass regardless of whether the issue was created, linked-existing via dedup, or already in frontmatter, so any drift is corrected each review:
 
    ```bash
-   bash shared/resources/set-github-project-priority.sh "$GITHUB_ISSUE" || true
+   bash references/set-github-project-priority.sh "$GITHUB_ISSUE" || true
    ```
 
    Post the comment:

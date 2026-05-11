@@ -1,8 +1,6 @@
 ---
 name: sync-jira-task
 description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (default-branch refs). Maintains a Change Log in both the local task and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # sync-jira-task
@@ -317,7 +315,7 @@ On error: `{ "error": "<message>" }` and a non-zero exit code.
 
 ## Architecture
 
-The script is a thin wrapper over `shared/resources/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs). `sync-jira-epic` and `sync-jira-story` can adopt this lib in a follow-up.
+The script is a thin wrapper over `references/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs). `sync-jira-epic` and `sync-jira-story` can adopt this lib in a follow-up.
 
 ## Tests
 

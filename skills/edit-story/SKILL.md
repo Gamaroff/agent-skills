@@ -1,8 +1,6 @@
 ---
 name: edit-story
 description: Edit story documents with comprehensive validation and diff preview. Use when modifying story files. Rejects epic files with appropriate message.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Edit Story
