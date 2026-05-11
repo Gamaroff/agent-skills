@@ -52,6 +52,15 @@ python skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
 python skills/create-skill/scripts/package_skill.py skills/<skill-name>
 ```
 
+**Bundle shared resources in-tree** (required before commit if you added/changed `shared/resources/` refs):
+
+```bash
+npm run bundle              # all skills
+npm run bundle:skill skills/<skill-name>
+```
+
+Bundling copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in `.md` and `.js` files. This makes each skill directory self-contained, so installers that copy a skill verbatim (e.g. `npx skills add`) produce a working install without needing the rest of the repo. Idempotent — safe to re-run.
+
 **Validate a skill:**
 
 ```bash
@@ -102,16 +111,17 @@ Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-regis
 
 ## Shared Resources
 
-`shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. At package time, `package_skill.py` auto-bundles referenced files under `references/` inside each skill's zip and rewrites paths accordingly — installed skills are fully self-contained. Never use symlinks or relative paths.
+`shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. Two distribution paths consume these:
+
+- **`package_skill.py`** (zip distribution) — bundles referenced files under `references/` inside each skill's `.zip` and rewrites paths.
+- **`bundle_skill.py`** (in-tree, for `npx skills add` and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`.
+
+Never use symlinks or relative paths.
 
 ## Development Pipeline
 
-```
-validate-story → develop → qa-story → qa-fix (if needed) → finalise
-```
-
-Stories are the unit of work. QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills — dev skills must never modify gate files. Full pipeline reference: [`docs/operations/workflows.md`](./docs/operations/workflows.md). Walkthroughs: [`docs/runbooks/`](./docs/runbooks/README.md).
+Stories are the unit of work; tasks are standalone. Pipeline reference: [`docs/operations/workflows.md`](./docs/operations/workflows.md). Walkthroughs: [`docs/runbooks/`](./docs/runbooks/README.md). Anti-patterns: [`docs/reference/anti-patterns.md`](./docs/reference/anti-patterns.md). Design rationale: [`docs/reference/faq.md`](./docs/reference/faq.md).
 
 ## Evals
 
-Four-layer eval suite for create-task / create-story / develop-task / develop-story (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes (`claude-sdk`, `claude-cli`) and the live-tracker scenario are opt-in. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) and `evals/shared/README.md`.
+Four-layer eval suite (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes are opt-in. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) and `evals/shared/README.md`.

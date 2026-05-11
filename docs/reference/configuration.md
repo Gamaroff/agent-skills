@@ -7,9 +7,6 @@ Projects place a `skills-config.yaml` at the repository root. This file is the s
 ## Full schema
 
 ```yaml
-qa:
-  qaLocation: docs/qa
-
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
@@ -31,7 +28,6 @@ devDebugLog: .ai/debug-log.md
 
 | Key | Type | Default | What it controls |
 |---|---|---|---|
-| `qa.qaLocation` | path | `docs/qa` | Base directory for QA assessments and gate files when not co-located |
 | `prd.prdSharded` | bool | `true` | Whether the PRD is split into one file per level-2 section |
 | `prd.prdShardedLocation` | path | `docs/prd` | Base directory for sharded PRD + epics + stories |
 | `prd.epicFilePattern` | glob | `"*/epics/epic.{n}.*.md"` | How the pipeline locates the parent epic of a story |
@@ -42,6 +38,20 @@ devDebugLog: .ai/debug-log.md
 | `devStoryLocation` | `nested` \| path | `nested` | Story layout mode — see below |
 | `devDebugLog` | path | `.ai/debug-log.md` | Optional pipeline debug log location |
 
+## QA artifacts are co-located
+
+There is **no `qa.qaLocation` configuration**. QA artifacts (review reports, NFR assessments, traceability matrices, DoD checklists, gate files) are always co-located with the story or task document they belong to:
+
+```
+story directory:
+  story.{E}.{S}.{name}.md
+  story.{E}.{S}.qa.{N}.{name}.md       # QA review report
+  story.{E}.{S}.dod.{N}.{name}.md      # Definition of Done
+  story.{E}.{S}.gate.{N}.{name}.yml    # Gate decision (owned by QA skills)
+```
+
+Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
+
 ## Story layout modes
 
 | Mode | Story path | Use when |
@@ -51,12 +61,61 @@ devDebugLog: .ai/debug-log.md
 
 When using a flat path, the story's `epic:` frontmatter field is still **required** — it's used for branch targeting and epic-level tracking even though the directory structure is flat.
 
-## QA-specific shape
+## Worked example — typical project
+
+Complete `skills-config.yaml` for an NX-style monorepo with NestJS + Expo:
 
 ```yaml
-qa:
-  qaLocation: "docs/qa"   # Base directory for QA files
-devStoryLocation: "docs/prd"   # Story files location
+# Tracker and VCS — explicit overrides bypass the auto-resolver
+tracker: jira
+vcs: bitbucket
+
+# Product docs
+prd:
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: "*/epics/epic.{n}.*.md"
+
+# Architecture docs
+architecture:
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
+  architectureVersion: v4
+
+# Story layout — stories live inside their parent epic directory
+devStoryLocation: nested
+
+# Loaded into every pipeline run
+devLoadAlwaysFiles:
+  - docs/architecture/concepts/coding-standards.md
+  - docs/architecture/concepts/tech-stack.md
+  - docs/architecture/concepts/source-tree.md
+
+# Pipeline debug log
+devDebugLog: .ai/debug-log.md
+```
+
+(QA artifacts are co-located with the story/task and need no configuration — see ["QA artifacts are co-located"](#qa-artifacts-are-co-located) above.)
+
+Greenfield variant (flat story layout, GitHub, no Jira):
+
+```yaml
+prd:
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: "*/epics/epic.{n}.*.md"
+
+devStoryLocation: docs/stories   # flat, not nested
+
+devLoadAlwaysFiles:
+  - docs/architecture/coding-standards.md
+```
+
+Minimal task-only project (no PRD/epic flow):
+
+```yaml
+devLoadAlwaysFiles:
+  - docs/architecture/coding-standards.md
 ```
 
 ## Placeholders used in skill examples

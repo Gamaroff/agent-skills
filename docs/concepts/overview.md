@@ -90,7 +90,7 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 `create-doc`, `document-project`, `document-existing-project`, `deep-research-prompt`, `analyst`, `brainstorming`
 
 **Writing and editing:**
-`critique`, `polish`, `simplify`, `bolder`, `distill`, `normalize`, `extract`
+`simplify`, `extract`
 
 ## The Development Pipeline
 
@@ -150,8 +150,6 @@ See [Packaging](../contributing/packaging.md) and [Authoring skills](../contribu
 Projects place a `skills-config.yaml` at their root to tune skill behaviour:
 
 ```yaml
-qa:
-  qaLocation: docs/qa
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
@@ -166,6 +164,8 @@ devDebugLog: .ai/debug-log.md
 tracker: jira # explicit platform override
 vcs: bitbucket
 ```
+
+QA artifacts (review reports, gate files, DoD) are co-located with their story/task — no `qa.qaLocation` config is needed.
 
 ## Further Reading
 

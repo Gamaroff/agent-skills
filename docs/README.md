@@ -19,8 +19,13 @@ Documentation for the Agent Skills library, organised by reader intent.
   - [Document Existing Project](./runbooks/document-existing-project.md)
 - **Reference** — look up specific behaviour
   - [Invocation](./reference/invocation.md) — natural language, explicit, slash commands
-  - [Configuration](./reference/configuration.md) — `skills-config.yaml` keys + placeholders
+  - [Activation phrases](./reference/activation-phrases.md) — natural-language phrases that trigger each skill
+  - [Commands](./reference/commands.md) — every `/foo` invocation, consolidated
+  - [Configuration](./reference/configuration.md) — `skills-config.yaml` keys + worked examples + placeholders
   - [Skill Catalog](./reference/skill-catalog.md) — categorised index of all skills
+  - [Glossary](./reference/glossary.md) — terms used across the docs
+  - [FAQ](./reference/faq.md) — design rationale
+  - [Anti-patterns](./reference/anti-patterns.md) — collected "never do X" rules
   - [Troubleshooting](./reference/troubleshooting.md) — common pipeline failures and recovery
 - **Standards** — rules for documents you author
   - [File naming](./standards/file-naming.md)
@@ -35,17 +40,25 @@ Documentation for the Agent Skills library, organised by reader intent.
 
 ## I want to understand what skills are
 
+- [Getting started](./concepts/getting-started.md) — install → first command
 - [Overview](./concepts/overview.md) — what skills are, progressive disclosure, key principles
+- [Architecture](./concepts/architecture.md) — system view, dependency map, design principles
 
 ## I'm authoring a skill in this repo
 
 - [Authoring skills](./contributing/authoring-skills.md) — file structure, frontmatter, best practices
+- [Doc style guide](./contributing/doc-style.md) — voice, structure, callouts, link conventions
 - [Packaging](./contributing/packaging.md) — validation, shared resources, distribution
 - [Evals](./contributing/evals/README.md) — four-layer test suite, drivers, live tracker scenarios
+- [Releases](./contributing/releases.md) — versioning, release checklist, publishing
 
 ## I'm running the library day-to-day
 
 - [Workflows](./operations/workflows.md) — pipeline diagrams, sprint cycle, hotfix, Jira sync, change management
+
+## Worked examples
+
+Real task artifacts produced by this repo running its own pipeline on itself: [`../examples/README.md`](../examples/README.md). Useful for seeing what the generated documents (review reports, QA gates, DoD checklists, implementation reports) actually look like.
 
 ## A note on `docs/development/`
 

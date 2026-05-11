@@ -71,24 +71,19 @@ If the gate is `CONCERNS` or `FAIL`:
 
 ## File organisation
 
+**All QA artifacts are co-located with the story or task they belong to.** There is no central `docs/qa/` directory.
+
 ```
-docs/
-├── prd/
-│   └── [domain]/[feature]/
-│       ├── story.1.1.md
-│       └── story.1.1.qa.{N}.{name}.md     # narrative (co-located)
-└── qa/
-    ├── assessments/
-    │   ├── 1.1-risk-{date}.md
-    │   ├── 1.1-test-design-{date}.md
-    │   ├── 1.1-nfr-{date}.md
-    │   └── 1.1-trace-{date}.md
-    └── gates/
-        └── [mirrored-prd-structure]/
-            └── story.1.1.gate.{N}.{name}.yml
+docs/prd/[domain]/[feature]/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/
+├── story.{E}.{S}.{name}.md                       # the story
+├── story.{E}.{S}.qa.{N}.{name}.md                # QA narrative + NFR + traceability
+├── story.{E}.{S}.dod.{N}.{name}.md               # Definition of Done
+└── story.{E}.{S}.gate.{N}.{name}.yml             # gate decision (QA-owned)
 ```
 
-Configure base via `qa.qaLocation` in `skills-config.yaml`. See [Configuration](../reference/configuration.md).
+Tasks follow the same pattern under `docs/development/tasks/task.{N}.{name}/`. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts) for the full artifact list.
+
+> **Legacy note:** older skill text references `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are deprecated; co-location is the canonical layout.
 
 ## Cross-skill data flow
 

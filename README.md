@@ -25,7 +25,13 @@ See [docs/concepts/overview.md](./docs/concepts/overview.md) for how skills work
 
 ## Installing Skills
 
-**Single skill:**
+**With `npx skills` (recommended):**
+```bash
+npx skills add https://github.com/Gamaroff/agent-skills --skill <skill-name>
+```
+Each skill is self-contained in-tree (shared resources pre-bundled into `references/`), so installs work without cloning the rest of the repo.
+
+**Single skill, manual:**
 ```bash
 mkdir -p .agents/skills
 cp -r path/to/agent-skills/skills/<skill-name> .agents/skills/
@@ -77,9 +83,16 @@ python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
 
 # Package all skills
 npm run package
+
+# Bundle shared resources into each skill's references/ (in-tree, committed)
+npm run bundle
+# or a single skill
+npm run bundle:skill -- skills/<skill-name>
 ```
 
 Packaged `.zip` files are build artifacts (gitignored). Regenerate them any time with `package_skill.py`. The packager auto-bundles shared resources and rewrites paths so installed skills are fully self-contained.
+
+`npm run bundle` does the same rewrite **in-tree**: it copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in source files. Commit the result. This is what makes `npx skills add` installs work without the rest of the repo. The script is idempotent; run it before committing whenever you add or change a `shared/resources/` reference.
 
 ---
 

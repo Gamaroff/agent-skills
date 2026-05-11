@@ -211,8 +211,6 @@ File naming: `epic.[number].[descriptive-name].md`. Check `/docs/development/epi
 Projects place `skills-config.yaml` at the project root. Key settings:
 
 ```yaml
-qa:
-  qaLocation: docs/qa
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd

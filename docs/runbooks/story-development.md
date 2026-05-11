@@ -15,12 +15,10 @@ Use when the change is large enough to need product framing: it lives under a PR
     prdShardedLocation: docs/prd
     epicFilePattern: "*/epics/epic.{n}.*.md"
   devStoryLocation: nested     # stories nested inside epic directories
-  qa:
-    qaLocation: docs/qa
   devLoadAlwaysFiles:
     - docs/architecture/concepts/coding-standards.md
   ```
-  Full reference: [`../reference/configuration.md`](../reference/configuration.md).
+  QA artifacts (review reports, DoD, gate files) are co-located with the story — no `qa.qaLocation` config is needed. Full reference: [`../reference/configuration.md`](../reference/configuration.md).
 - The repo has an **epic registry** at `docs/development/epic-registry.md`. Epic numbers are globally unique — `create-epic` and `epic-registry-manager` enforce this.
 - Branch hygiene: `develop` exists (story PRs target an epic branch cut from `develop`).
 - Platform detection (GitHub vs Bitbucket vs Jira) is automatic — see [`../../shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).
