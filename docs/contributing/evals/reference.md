@@ -9,9 +9,9 @@ Architecture and contracts for the eval suite. For recipes see [recipes](./recip
 
 | Layer | Location | What it catches | Runs via |
 | --- | --- | --- | --- |
-| **L1 Unit** | `skills/*/tests/*.test.js` | Pure helpers — filename regex, id allocators, sprint-status merges, template-section detection | `npm run test:node` |
-| **L2 Golden fixture** | embedded in L1 | Template substitution + sprint-status merge against known inputs | `npm run test:node` |
-| **L3 Protocol checker** | `tests/skill-protocol.test.js`, `evals/develop-task/protocol/` | SKILL.md ↔ template ↔ sub-skill drift; HALT/STOP terminator presence; mandatory-section counts; pipeline shape and step contracts | `npm run test:node` |
+| **L1 Unit** | `skills/*/tests/*.test.js` | Pure helpers — filename regex, id allocators, sprint-status merges, template-section detection | `npm test` |
+| **L2 Golden fixture** | embedded in L1 | Template substitution + sprint-status merge against known inputs | `npm test` |
+| **L3 Protocol checker** | `tests/skill-protocol.test.js`, `evals/develop-task/protocol/` | SKILL.md ↔ template ↔ sub-skill drift; HALT/STOP terminator presence; mandatory-section counts; pipeline shape and step contracts | `npm test` |
 | **L4 End-to-end** | `evals/create-task/`, `evals/create-story/`, `evals/develop-task/step-isolation/` | End-to-end artefact shape; pipeline step contracts; branch/lock/PR/QA artefact assertions | `npm run eval:all` + `npm run eval:develop-task` |
 | **L5 Smoke** | `evals/develop-task/smoke/` | Full pipeline live run against real git sandbox; GH PR optional | `npm run eval:develop-task:smoke` |
 
@@ -63,8 +63,7 @@ Each scenario is `scenario.json` + `answers.jsonl` + `env.json` + `replay/`.
 ### Scripts
 
 ```bash
-npm test                         # platform resolver + L1 + L2 + L3 + L4 replay
-npm run test:node                 # L1 + L2 + L3 + assertion + driver tests (incl. develop-task + develop-story protocol)
+npm test                         # platform resolver + L1 + L2 + L3 + L4 replay (the hermetic CI gate)
 npm run test:platform             # resolve-platform.sh tests only
 npm run eval:all                  # L4: all create-task + create-story + develop-task + develop-story step-isolation, replay
 npm run eval:create-task          # L4: create-task scenario 01, replay

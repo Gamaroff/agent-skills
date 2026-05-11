@@ -14,13 +14,13 @@ npm test
 
 Runs platform resolver shell tests + L1 unit + L2 fixture + L3 protocol + L4 replay (~90 tests, no network, no creds). Same gate CI runs on every push. Takes seconds.
 
-### 2. "I changed a SKILL.md or a script — re-run the fast loop"
+### 2. "I'm iterating on one test file"
 
 ```bash
-npm run test:node
+node --test evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs
 ```
 
-Skips the bash platform-resolver test. Use while iterating on a skill.
+Runs a single file directly via node's test runner — bypasses npm overhead. Use while editing one test. For the full suite, stick with `npm test`.
 
 ### 3. "I want to run one skill's scenarios in replay mode"
 

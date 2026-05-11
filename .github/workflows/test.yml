@@ -18,10 +18,8 @@ jobs:
         with:
           node-version: '20'
       - run: node --version
-      - name: Platform resolver test
-        run: bash shared/resources/resolve-platform.test.sh
-      - name: Node tests (unit + protocol + driver + assertions)
-        run: npm run test:node
+      - name: Hermetic tests (platform resolver + unit + protocol + driver + assertions)
+        run: npm test
       - name: Replay-mode end-to-end evals
         run: npm run eval:all
       - name: develop-task evals (protocol + step-isolation)

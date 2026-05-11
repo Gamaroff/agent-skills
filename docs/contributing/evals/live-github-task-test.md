@@ -22,7 +22,7 @@ For hermetic fast feedback, prefer `npm run eval:develop-task` instead.
 |---|---|
 | `gh` CLI authenticated | `gh auth status` |
 | `ANTHROPIC_API_KEY` set | `echo $ANTHROPIC_API_KEY` |
-| Node 18+ | `node --version` |
+| Node 20+ | `node --version` |
 | `git` configured | `git config user.email` |
 | Claude Code with skills loaded | skills listed in session sidebar |
 

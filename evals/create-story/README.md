@@ -22,7 +22,7 @@ node evals/shared/runner.mjs evals/create-story/scenarios/01-happy
 npm run eval:create-story:sdk
 ```
 
-See `docs/evals.md` for full environment setup, token sources, and CI integration.
+See [`docs/contributing/evals/README.md`](../../docs/contributing/evals/README.md) for full environment setup, token sources, and CI integration.
 
 ## Scenario layout
 
