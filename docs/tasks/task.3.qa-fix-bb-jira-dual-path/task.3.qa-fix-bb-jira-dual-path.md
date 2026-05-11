@@ -42,7 +42,7 @@ The `qa-fix` skill is the only pipeline skill in `agent-skills` that still hard-
 - `qa-fix` fails on Bitbucket projects: `gh pr view` returns "no PR for this branch" because the remote is `bitbucket.org`.
 - Even if a PR exists on Bitbucket, `gh pr comment` cannot post to it.
 - Jira issue linked to the story/task receives no fix-summary signal — QA reviewers checking Jira have no record of fixes applied.
-- Develop pipeline (validate-story → develop → qa-review → **qa-fix** → finalise) is broken at this step for any BB+Jira team.
+- Develop pipeline (review-story --validate → develop → qa-review → **qa-fix** → finalise) is broken at this step for any BB+Jira team.
 
 **Benefits**:
 

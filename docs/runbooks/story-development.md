@@ -34,7 +34,7 @@ flowchart TD
     D --> E
     E --> F[review-epic]
     F --> G[create-story]
-    G --> H[review-story / validate-story]
+    G --> H[review-story / review-story --validate]
     H --> I[develop-story orchestrator]
     I --> J[Merged PR + Accepted story]
 ```
@@ -47,7 +47,7 @@ flowchart TD
 
 ### A.1 `create-prd`
 
-**Use when:** adding a significant feature (4+ stories, architectural impact) to an existing codebase. For a brand-new product, use `greenfield-prd` instead — the rest of this runbook still applies.
+**Use when:** adding a significant feature (4+ stories, architectural impact) to an existing codebase. For a brand-new product, use `new-product-prd` instead — the rest of this runbook still applies.
 
 | | |
 |---|---|
@@ -130,20 +130,20 @@ Epic GitHub/Jira issues are created automatically downstream by `develop-story` 
 
 Two options depending on how much human input you want:
 
-| Skill | Interactive? | When to use |
+| Mode | Interactive? | When to use |
 |---|---|---|
-| `review-story` | Yes — asks clarifying questions, applies fixes | First-pass review, ambiguous requirements |
-| `validate-story` | No — read-only GO/NO-GO with 1–10 readiness score | Pre-implementation gate, batch validation |
+| `review-story` (default) | Yes — asks clarifying questions, applies fixes | First-pass review, ambiguous requirements |
+| `review-story --validate` | No — read-only GO/NO-GO with 1–10 readiness score | Pre-implementation gate, batch validation, CI |
 
 ```bash
 /review-story <story-path>
-# or
-/validate-story <story-path>
+# or (automated/non-interactive)
+/review-story --validate <story-path>
 ```
 
-`review-story` produces a co-located review report `story.{E}.{S}.review.{YYYY-MM-DD}.md`. Both update the story's `status` once it's `ready-for-development`.
+`review-story` produces a co-located review report `story.{E}.{S}.review.{n}.{name}.md`. Validate mode produces `story.{E}.{S}.validate.{YYYY-MM-DD}.md`. Both update the story's `status` once it's `ready-for-development`.
 
-References: [`../../skills/review-story/SKILL.md`](../../skills/review-story/SKILL.md), [`../../skills/validate-story/SKILL.md`](../../skills/validate-story/SKILL.md).
+Reference: [`../../skills/review-story/SKILL.md`](../../skills/review-story/SKILL.md).
 
 ---
 

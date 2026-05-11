@@ -25,9 +25,9 @@ flowchart LR
 For each story going into the sprint:
 
 ```
-1. /create-story         → next story for the active epic
-2. /validate-story       → GO/NO-GO readiness score (non-interactive)
-   OR /review-story      → interactive review with clarifying questions
+1. /create-story                    → next story for the active epic
+2. /review-story --validate         → GO/NO-GO readiness score (non-interactive)
+   OR /review-story                 → interactive review with clarifying questions
 ```
 
 Validate the whole backlog before development starts. A story that scores below the readiness threshold should be deferred or reworked.

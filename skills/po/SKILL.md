@@ -48,7 +48,7 @@ This skill provides the following capabilities. Simply ask for what you need, or
 
 **Purpose**: Comprehensive pre-implementation story validation
 **Use when**: Before starting development on a story
-**Invokes**: `validate-story` skill
+**Invokes**: `review-story --validate` skill
 **Example**: "Validate story 2.3 for implementation readiness"
 
 ### 2. Execute Checklist
@@ -113,7 +113,7 @@ Based on user selection or natural language:
 
 **For "Validate Story"**:
 
-- Invoke `validate-story` skill
+- Invoke `review-story --validate` skill
 - Assist with any follow-up questions
 - Review validation report with user
 - Determine next steps based on GO/NO-GO decision
@@ -158,7 +158,7 @@ Based on user selection or natural language:
 
 **Coordinates**:
 
-- `validate-story` - Pre-implementation story validation
+- `review-story --validate` - Pre-implementation story validation
 - `execute-checklist` - Systematic validation engine
 - `correct-course` - Change management and navigation
 - `shard-doc` - Document organization utility
@@ -276,7 +276,7 @@ This skill uses these resource files:
 
 Other resources are provided by invoked skills:
 
-- `validate-story` skill resources (story template, core config)
+- `review-story --validate` skill resources (story template, core config)
 - `execute-checklist` skill resources (multiple checklists)
 - `correct-course` skill resources (change checklist)
 - `shard-doc` skill resources (core config)

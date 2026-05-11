@@ -196,7 +196,7 @@ Testing strategy completeness: good. Rollback plan: realistic. Success criteria:
 
 1. Apply the 4 Critical fixes to `task.34.develop-story-evals.md` + `task.34.plan.develop-story-evals.md`.
 2. Apply the 5 Important fixes.
-3. Re-run `/review-task 69` (or `/validate-story` equivalent) for re-scoring.
+3. Re-run `/review-task 69` (or `/review-story --validate` equivalent) for re-scoring.
 4. Then `/develop` with confidence the protocol tests will actually find the epic-branch contract where it lives.
 
 ---

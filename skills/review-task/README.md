@@ -229,7 +229,7 @@ The review skill rigorously detects:
 - `/qa-technical-task` - QA review for tasks
 - `/develop` - Implementation guidance
 
-### Differences from validate-story
+### Differences from review-story
 
 | Feature | review-task | review-story |
 |---------|------------|--------------|

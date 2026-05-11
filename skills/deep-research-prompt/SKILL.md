@@ -23,7 +23,7 @@ Activate when user needs:
 - "Validate product hypothesis..."
 - "Investigate competitive landscape..."
 
-**Recommended by:** `greenfield-prd` and `create-prd` when market validation uncertainty exists
+**Recommended by:** `new-product-prd` and `create-prd` when market validation uncertainty exists
 
 ## Purpose
 
@@ -157,7 +157,7 @@ Generate well-structured research prompts that:
 
 **Recommended by:**
 
-- `greenfield-prd` - Before PRD if market validation needed
+- `new-product-prd` - Before PRD if market validation needed
 - `create-prd` - For competitive or technical research
 
 **Feeds into:**

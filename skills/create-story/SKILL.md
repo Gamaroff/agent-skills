@@ -751,7 +751,7 @@ Architecture documents consulted: [list files read]
 For Complex Stories:
 
 1. Carefully review the story draft
-2. Optionally have Product Owner run `validate-story` skill for comprehensive validation
+2. Optionally have Product Owner run `review-story --validate` skill for comprehensive validation
 3. Update status to "Approved" when ready
 4. Hand off to Developer for implementation
 
@@ -778,7 +778,7 @@ For Simple Stories:
 **Outputs used by**:
 
 - `develop` - Developers implement stories created by this skill
-- `validate-story` - Product owners validate story completeness
+- `review-story --validate` - Product owners validate story completeness
 
 ---
 

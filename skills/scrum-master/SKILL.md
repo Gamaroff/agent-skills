@@ -99,7 +99,7 @@ Systematic response to project pivots, blockers, or requirement changes:
 **Called by these skills**:
 
 - `develop` - Developers use stories created by scrum-master
-- `validate-story` - Product owners validate stories before approval
+- `review-story --validate` - Product owners validate stories before approval (automated GO/NO-GO)
 - `qa-planning` - QA uses stories to plan testing approach
 
 **Complements these skills**:

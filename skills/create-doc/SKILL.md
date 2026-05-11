@@ -15,7 +15,7 @@ Activate this skill when:
 - Documents need comprehensive rationale for decisions
 - User collaboration is essential (not just document generation)
 
-**Note:** This skill is typically invoked by higher-level skills like `greenfield-prd` or `create-prd`, not directly by users.
+**Note:** This skill is typically invoked by higher-level skills like `new-product-prd` or `create-prd`, not directly by users.
 
 ## ⚠️ CRITICAL EXECUTION RULES ⚠️
 
@@ -267,8 +267,7 @@ worth validating - should MVP include due dates?
 
 This skill is typically called by:
 
-- **`greenfield-prd`** - Uses with `prd-template`
-- **`create-prd`** - Uses with `brownfield-prd-template`
+- **`create-prd`** - Uses with `prd-template` (mode=greenfield) or `brownfield-prd-template` (mode=brownfield). `new-product-prd` reaches this skill via `create-prd` mode=greenfield delegation.
 - Other document creation workflows requiring templates
 
 This skill calls:
@@ -297,14 +296,16 @@ A successful create-doc execution produces:
 
 ## Example Activation
 
-**Internal Activation (from greenfield-prd):**
+**Internal Activation (from create-prd):**
 
 ```
-greenfield-prd skill: "Use create-doc with prd-template to generate PRD"
+create-prd skill: "Use create-doc with [prd-template | brownfield-prd-template] to generate PRD"
 → create-doc activates with template path
 → Processes each section interactively
-→ Returns completed PRD to greenfield-prd
+→ Returns completed PRD to create-prd
 ```
+
+(For greenfield, the chain is: `new-product-prd` → `create-prd` mode=greenfield → `create-doc` + `prd-template`.)
 
 **Direct Activation (advanced users):**
 

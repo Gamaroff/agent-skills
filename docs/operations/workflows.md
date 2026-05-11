@@ -9,7 +9,7 @@ The unit of work in most chains is a **story** or **task**. For step-by-step wal
 ### Story pipeline
 
 ```
-validate-story → develop → qa-story → qa-fix (if needed) → finalise
+review-story --validate → develop → qa-story → qa-fix (if needed) → finalise
 ```
 
 Automated orchestrator (preferred):
@@ -46,7 +46,7 @@ QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills �
 
 ```
 Pre-Implementation:
-validate-story → GO/NO-GO + readiness score
+review-story --validate → GO/NO-GO + readiness score
     ↓
 Implementation:
 develop → execution + tests + DoD checklist

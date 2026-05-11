@@ -256,7 +256,7 @@ Proposal as critical input for deeper replanning effort."
 
 **May lead to:**
 
-- PM replan (greenfield-prd or create-prd)
+- PM replan (new-product-prd or create-prd)
 - Architect redesign
 - PO/SM backlog reorganization
 

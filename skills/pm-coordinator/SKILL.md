@@ -27,7 +27,7 @@ This skill acts as a **navigation hub** that routes you to the appropriate speci
 **Workflow:**
 
 1. Use `deep-research-prompt` if market validation needed
-2. Use `greenfield-prd` to create comprehensive PRD
+2. Use `new-product-prd` to create comprehensive PRD
    - Internally uses `create-doc` + `prd-template`
    - Validates with `pm-checklist`
 3. Use `shard-prd` if PRD is large (split into manageable files)
@@ -72,8 +72,8 @@ This skill acts as a **navigation hub** that routes you to the appropriate speci
 
 ### Core Workflow Skills
 
-- **`greenfield-prd`** - New product requirements from scratch
-- **`create-prd`** - Enhancements to existing projects
+- **`new-product-prd`** - New product requirements from scratch (thin wrapper that delegates to `create-prd` with `mode=greenfield`)
+- **`create-prd`** - PRD orchestrator. Default mode is brownfield (enhancements to existing projects); greenfield mode is reached via `new-product-prd`
 - **`change-management`** - Handle pivots and corrections
 
 ### Task Skills
@@ -102,7 +102,7 @@ This skill acts as a **navigation hub** that routes you to the appropriate speci
 User Request Analysis:
 ├─ "Create PRD for..." / "New product..." / "Product requirements..."
 │  ├─ Existing codebase? → create-prd
-│  └─ New product? → greenfield-prd
+│  └─ New product? → new-product-prd
 │
 ├─ "Create epic..." / "Need an epic for..."
 │  └─ create-epic
@@ -165,7 +165,7 @@ User Request Analysis:
 
 ```
 User: "I need to create a PRD for a new mobile banking app"
-→ Activate: greenfield-prd
+→ Activate: new-product-prd
 ```
 
 **Example 2:**

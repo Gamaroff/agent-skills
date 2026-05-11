@@ -231,7 +231,7 @@ docs/prd/
 
 **Called by:**
 
-- `greenfield-prd` - After PRD completion if large
+- `new-product-prd` - After PRD completion if large
 - `create-prd` - After PRD completion if large
 - User request - Direct activation
 

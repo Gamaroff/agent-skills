@@ -10,7 +10,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 
 | Say something like… | Activates |
 |---|---|
-| "Create a PRD for a new mobile app" | `greenfield-prd` |
+| "Create a PRD for a new mobile app" | `new-product-prd` |
 | "Create a brownfield PRD for the auth refactor" | `create-prd` |
 | "Shard this PRD" / "Split the PRD into sections" | `shard-prd` |
 | "Create an epic for the notifications feature" | `create-epic` |
@@ -26,7 +26,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Review epic 178" | `review-epic` |
 | "Review story 2.3" / "Story 2.3 has unclear requirements" | `review-story` |
 | "Review this task" | `review-task` |
-| "Validate story 2.3" / "Is story 2.3 ready?" | `validate-story` |
+| "Validate story 2.3" / "Is story 2.3 ready?" | `review-story --validate` |
 
 ## Development
 

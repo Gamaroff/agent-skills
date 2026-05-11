@@ -75,10 +75,10 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 `commit-changes`, `create-branch`, `create-pr`
 
 **Story and epic lifecycle:**
-`create-story`, `review-story`, `edit-story`, `validate-story`, `create-epic`, `review-epic`, `edit-epic`
+`create-story`, `review-story`, `edit-story`, `create-epic`, `review-epic`, `edit-epic`
 
 **Product management:**
-`greenfield-prd`, `create-prd`, `scrum-master`, `po`, `create-task`, `change-management`
+`new-product-prd`, `create-prd`, `scrum-master`, `po`, `create-task`, `change-management`
 
 **Architecture:**
 `architect`, `create-architecture-doc`, `execute-architect-checklist`, `mermaid-architect`
@@ -97,7 +97,7 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 The core workflow for implementing stories:
 
 ```
-validate-story → develop → qa-story → qa-fix (if needed) → finalise
+review-story --validate → develop → qa-story → qa-fix (if needed) → finalise
 ```
 
 `develop-story` and `develop-task` automate this full pipeline end-to-end, including branch creation, PR, QA cycles (up to 5), and finalisation. QA gate files (`PASS / CONCERNS / FAIL / WAIVED`) are owned exclusively by QA skills — dev skills never touch them.

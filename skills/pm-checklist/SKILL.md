@@ -17,7 +17,7 @@ Activate this skill when:
 
 **Do NOT use for:**
 
-- Creating PRDs (use `greenfield-prd` or `create-prd`)
+- Creating PRDs (use `new-product-prd` or `create-prd`)
 - Quick spot-checks (this is comprehensive validation)
 
 ## Purpose
@@ -464,7 +464,7 @@ Ask user if they want:
 **Called by:**
 
 - `create-doc` - At end of PRD creation
-- `greenfield-prd` - Before completion
+- `new-product-prd` - Before completion
 - `create-prd` - Before completion
 
 **May trigger:**
@@ -493,15 +493,15 @@ A successful pm-checklist execution produces:
 
 ## Example Activation
 
-**From greenfield-prd:**
+**From new-product-prd:**
 
 ```
-greenfield-prd: PRD creation complete, running pm-checklist
+new-product-prd: PRD creation complete, running pm-checklist
 → pm-checklist activates
 → Asks: Interactive or comprehensive mode?
 → Validates all 9 categories
 → Generates comprehensive report
-→ Returns to greenfield-prd with results
+→ Returns to new-product-prd with results
 ```
 
 **Direct activation:**

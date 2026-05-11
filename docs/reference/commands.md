@@ -17,7 +17,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | Command | What it does | Reference |
 |---|---|---|
 | `/create-prd` | Author a brownfield PRD interactively | [PRD documents](../standards/prd-documents.md), [`create-prd`](../../skills/create-prd/SKILL.md) |
-| `/greenfield-prd` | Author a greenfield PRD interactively | [`greenfield-prd`](../../skills/greenfield-prd/SKILL.md) |
+| `/new-product-prd` | Author a greenfield PRD interactively | [`new-product-prd`](../../skills/new-product-prd/SKILL.md) |
 | `/shard-prd <path>` | Split a large PRD by level-2 section | [`shard-prd`](../../skills/shard-prd/SKILL.md) |
 | `/create-epic` | Author an epic (assigns next registry number) | [Epic documents](../standards/epic-documents.md), [`create-epic`](../../skills/create-epic/SKILL.md) |
 | `/create-story` | Author the next story for an epic | [Story documents](../standards/story-documents.md), [`create-story`](../../skills/create-story/SKILL.md) |
@@ -33,7 +33,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/review-epic <path>` | Epic review, scope-overlap detection | [`review-epic`](../../skills/review-epic/SKILL.md) |
 | `/review-story <path>` | Interactive story review | [`review-story`](../../skills/review-story/SKILL.md) |
 | `/review-task <path>` | Interactive task review | [`review-task`](../../skills/review-task/SKILL.md) |
-| `/validate-story <path>` | Non-interactive GO/NO-GO readiness score | [`validate-story`](../../skills/validate-story/SKILL.md) |
+| `/review-story --validate <path>` | Non-interactive GO/NO-GO readiness score | [`review-story`](../../skills/review-story/SKILL.md) |
 
 ## QA
 

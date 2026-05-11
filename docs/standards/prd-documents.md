@@ -2,7 +2,7 @@
 
 > **Audience:** anyone authoring or generating PRDs in a project that uses these skills.
 
-Schema and conventions for PRD (Product Requirements Document) files consumed by `create-prd`, `greenfield-prd`, `review-prd`, and `shard-prd`.
+Schema and conventions for PRD (Product Requirements Document) files consumed by `create-prd`, `new-product-prd`, `review-prd`, and `shard-prd`.
 
 ## Purpose
 
@@ -28,7 +28,7 @@ When sharded, the body splits across files in `{feature}/` per level-2 section. 
 
 ## Body sections (greenfield template)
 
-`create-prd` / `greenfield-prd` produces a document with these eight level-2 sections:
+`create-prd` / `new-product-prd` produces a document with these eight level-2 sections:
 
 1. **Goals and Background Context** — problem statement, target users, business goals
 2. **Requirements** — functional + non-functional (numbered FR/NFR), mandatory elicitation
@@ -52,7 +52,7 @@ When sharded, the body splits across files in `{feature}/` per level-2 section. 
 
 ## Templates
 
-- `prd-template` — greenfield (used by `greenfield-prd`)
+- `prd-template` — greenfield (used by `new-product-prd`)
 - `brownfield-prd-template` — adding a feature to an existing codebase (used by `create-prd`)
 
 Each template defines its required structure in `resources/*.yaml` and the `create-doc` engine enforces mandatory elicitation per section.
@@ -73,7 +73,7 @@ When a PRD exceeds ~5 epics or ~30 stories, shard it for navigability:
 
 ## Prerequisites checklist
 
-Before running `create-prd` / `greenfield-prd`:
+Before running `create-prd` / `new-product-prd`:
 
 - [ ] `prd.prdSharded` and `prd.prdShardedLocation` are set in `skills-config.yaml`
 - [ ] (Brownfield only) project architecture is documented — see `document-project` SKILL
@@ -89,7 +89,7 @@ Before downstream epic creation:
 
 ```
 /create-prd                          # brownfield (existing codebase)
-/greenfield-prd                      # new product
+/new-product-prd                      # new product
 /review-prd <prd-path>               # interactive review against codebase
 /shard-prd <prd-path>                # split large PRD
 ```
@@ -102,7 +102,7 @@ Before downstream epic creation:
 - [Status lifecycle](./status-lifecycle.md)
 - [Configuration](../reference/configuration.md)
 - [`create-prd` SKILL.md](../../skills/create-prd/SKILL.md)
-- [`greenfield-prd` SKILL.md](../../skills/greenfield-prd/SKILL.md)
+- [`new-product-prd` SKILL.md](../../skills/new-product-prd/SKILL.md)
 - [`review-prd` SKILL.md](../../skills/review-prd/SKILL.md)
 - [`shard-prd` SKILL.md](../../skills/shard-prd/SKILL.md)
 - [`pm-checklist` SKILL.md](../../skills/pm-checklist/SKILL.md)

@@ -1,41 +1,75 @@
 ---
 name: create-prd
-description: Create PRDs for enhancements to existing projects. Use when adding significant features to existing codebases that require comprehensive planning (4+ stories, architectural changes).
+description: Create Product Requirements Documents. Default mode is brownfield (enhancements to existing projects with 4+ stories or architectural changes). Greenfield mode is invoked indirectly via the new-product-prd skill. Orchestrates create-doc, the appropriate PRD template, and pm-checklist.
 ---
 
-# Brownfield PRD Creation
+# PRD Creation
 
 ## When to Use This Skill
 
-Activate this skill when the user needs to:
+Activate this skill directly for **brownfield enhancements** to existing projects:
 
 - Add **significant enhancements** to existing codebase (4+ stories, architectural changes)
 - Integrate new **major features** into established systems
 - Perform **substantial modifications** requiring comprehensive planning
 - Add features that require **deep understanding** of existing architecture
 
-**Natural activation triggers:**
+**Natural activation triggers (brownfield):**
 
 - "Add [major feature] to existing app"
 - "Enhance [existing system] with..."
 - "Integrate [new capability] into our..."
 - "Modify [existing product] to support..."
 
-**Decision Tree:**
+**Decision Tree (brownfield):**
 
 - **Large enhancement** (4+ stories, architectural changes) → Use THIS skill
 - **Medium enhancement** (1-3 stories, follows existing patterns) → Use `create-epic`
 - **Small change** (single session, isolated) → Use `brownfield-story`
 
-**Do NOT use for:**
+**Do NOT use directly for:**
 
-- Greenfield projects (use `greenfield-prd`)
+- Greenfield projects → activate `new-product-prd` (which delegates here with `mode=greenfield`)
 - Small enhancements (use `create-epic` or `brownfield-story`)
 - Bug fixes (use GitHub issues)
 
-## Critical: Scope Assessment Required
+## Mode Parameter
 
-**BEFORE proceeding, assess enhancement complexity:**
+This skill supports two modes. The mode determines pre-flight checks, template selection, validation depth, and which PRD sections are emitted.
+
+| Mode | Default | Set by | Template | Output path |
+|------|---------|--------|----------|-------------|
+| `brownfield` | yes | direct activation | `brownfield-prd-template` | `docs/prd/[domain]/[feature]/prd.[feature].md` |
+| `greenfield` | no | delegated from `new-product-prd` | `prd-template` | `docs/prd.md` |
+
+Throughout this skill, sections marked **(brownfield only)** or **(greenfield only)** apply to the respective mode. Sections without a mode tag run in both.
+
+## ⚠️ Documentation-Only Scope — Do NOT Implement
+
+This skill produces **the PRD document and its associated planning artifacts only** (epic files via subsequent skills, tracker issues, handoff prompts). It MUST NOT begin implementing any feature the PRD describes, nor scaffold any source code.
+
+**Forbidden during this skill** (regardless of how compelling it seems):
+
+- ❌ Editing, creating, or deleting any source file outside `docs/prd/` or `docs/prd.md` (and the tracker-issue side effect)
+- ❌ Running migrations, codegen, build, lint-fix, or refactor commands
+- ❌ Creating branches, committing, or pushing code changes
+- ❌ Installing/removing dependencies or modifying `package.json`
+- ❌ Auto-invoking `create-epic`, `create-story`, `develop-story`, or any implementation skill on completion
+- ❌ Starting "phase 1" of any epic or story to "get a head start"
+
+**Allowed writes** (the only filesystem changes this skill may make):
+
+- ✅ The PRD file (`docs/prd/[domain]/[feature]/prd.[feature].md` for brownfield, `docs/prd.md` for greenfield) and its directory
+- ✅ Tracker issue creation if the workflow includes it
+- ✅ Handoff prompt files (Architect/UX Expert) emitted as part of Step 4
+
+**If the user asks to "create the PRD and start the first epic"**: complete the PRD (including Step 4 handoff prompts), then STOP and explicitly hand off — tell user to invoke `/create-epic` or `/create-epics-from-shards` as a separate step. Do not chain.
+
+## Step 0: Scope Assessment (brownfield only)
+
+Skip for `mode=greenfield` — a new product already implies large scope.
+
+**BEFORE proceeding (brownfield only), assess enhancement complexity:**
 
 1. **Can this be completed in 1-2 focused development sessions?**
    - YES → Recommend `brownfield-story` instead
@@ -57,30 +91,9 @@ Activate this skill when the user needs to:
 [create-prd/create-epic/brownfield-story] because [rationale]."
 ```
 
-## ⚠️ Documentation-Only Scope — Do NOT Implement
-
-This skill produces **the PRD document and its associated planning artifacts only** (epic files via subsequent skills, tracker issues, handoff prompts). It MUST NOT begin implementing any feature the PRD describes, nor scaffold any source code.
-
-**Forbidden during this skill** (regardless of how compelling it seems):
-
-- ❌ Editing, creating, or deleting any source file outside `docs/prd/` (and the tracker-issue side effect)
-- ❌ Running migrations, codegen, build, lint-fix, or refactor commands
-- ❌ Creating branches, committing, or pushing code changes
-- ❌ Installing/removing dependencies or modifying `package.json`
-- ❌ Auto-invoking `create-epic`, `create-story`, `develop-story`, or any implementation skill on completion
-- ❌ Starting "phase 1" of any epic or story to "get a head start"
-
-**Allowed writes** (the only filesystem changes this skill may make):
-
-- ✅ The PRD file `docs/prd/[domain]/[feature]/prd.[name].md` (and its directory)
-- ✅ Tracker issue creation if the workflow includes it (GitHub/Jira issue for the PRD/initiative)
-- ✅ Handoff prompt files (Architect/UX Expert) emitted as part of Step 4
-
-**If the user asks to "create the PRD and start the first epic"**: complete the PRD (including Step 4 handoff prompts), then STOP and explicitly hand off — tell user to invoke `/create-epic` or `/create-epics-from-shards` as a separate step. Do not chain.
-
 ## Prerequisites
 
-Before starting, ensure you have:
+### Brownfield mode
 
 1. **Existing Project Analysis** (CRITICAL):
    - Check if `document-project` was already run
@@ -98,40 +111,73 @@ Before starting, ensure you have:
    - Every recommendation MUST be grounded in actual project analysis (not assumptions)
    - Confirm understanding with user before ANY suggestions
 
+### Greenfield mode
+
+1. **Project Brief** (strongly recommended) — problem statement, target users, success metrics, MVP scope, constraints
+2. **Market Research** (optional) — competitive analysis, user research, market context
+3. **Business Goals** (essential) — why building, what success looks like, timeline
+
+If Project Brief is missing, the template will guide gathering this during the Goals section, but creating a brief first is more efficient.
+
 ## Workflow Overview
 
 ```
 1. Pre-Flight Check & Analysis
-   ├─ Continuation detection (resume incomplete PRD if found)
-   ├─ Active input document discovery (briefs, research, context)
-   ├─ Check for document-project output
-   ├─ Assess scope complexity
-   ├─ Analyze existing project structure
-   └─ Confirm understanding with user
+   ├─ (brownfield) Continuation detection, document discovery,
+   │   document-project check, scope, project analysis
+   └─ (greenfield) Project Brief check, optional deep-research-prompt
 
-2. Interactive Brownfield PRD Creation
-   ├─ Activate create-doc with brownfield-prd-template
-   ├─ Process sections with emphasis on:
-   │  ├─ Integration with existing system
-   │  ├─ Compatibility requirements
-   │  ├─ Risk assessment (technical debt, integration risks)
-   │  └─ Incremental, low-risk story sequencing
-   └─ Save to docs/prd/[domain]/[feature]/prd.[feature].md
+2. Interactive PRD Creation
+   ├─ Activate create-doc with template (mode-selected)
+   ├─ Process sections (mode-conditional subsections)
+   └─ Save to output path (mode-selected)
+
+2.5 Visual Architecture Diagram (conditional, via mermaid-architect)
 
 3. Quality Validation
-   ├─ Run pm-checklist
-   ├─ Run 4 targeted checks (measurability, leakage, traceability, SMART)
-   ├─ Validate integration approach
-   └─ Ensure backward compatibility
+   ├─ pm-checklist (both modes)
+   └─ (brownfield) 4 targeted requirement-quality checks
 
-4. Next Steps
-   ├─ Generate handoff prompts
-   └─ Provide integration guidance
+4. Next Steps & Handoff
+   ├─ UX Expert prompt (if UI)
+   ├─ Architect prompt
+   └─ (brownfield) Integration testing & rollback guidance
 ```
 
 ## Detailed Execution Steps
 
 ### Step 1: Pre-Flight Check & Analysis
+
+#### Greenfield branch (mode=greenfield)
+
+**1a. Project Brief check:**
+
+1. Ask if Project Brief exists
+2. If NO:
+   - **Strongly recommend** creating Project Brief first (essential foundation, clearer scope, better PRD)
+   - If user insists on PRD without brief, proceed but note this in the PRD
+3. If brief exists:
+   - Request brief location/content and review
+
+**1b. Market validation:**
+
+- If uncertain about market fit → recommend `deep-research-prompt`
+- If confident → proceed to PRD creation
+
+**Example dialog:**
+
+```
+"Do you have a Project Brief for this product? It provides essential
+foundation (problem statement, target users, success metrics, MVP scope,
+constraints). Creating a brief first will make the PRD process much smoother.
+
+If no brief exists, I can still create the PRD, but we'll need to gather
+that foundational information as we go."
+```
+
+Skip to Step 2 once pre-flight complete.
+
+#### Brownfield branch (mode=brownfield, default)
 
 **1a. Continuation Detection (check FIRST):**
 
@@ -208,7 +254,7 @@ If not available, I STRONGLY recommend running it first for better
 enhancement planning."
 ```
 
-**1e. Analyze Existing Project:**
+**1d. Analyze Existing Project:**
 
 **If document-project available:**
 
@@ -225,7 +271,7 @@ enhancement planning."
 - Note integration points
 - Identify technical debt
 
-**1c. Confirm Understanding (CRITICAL):**
+**1e. Confirm Understanding (CRITICAL):**
 
 For every assumption made about existing project:
 
@@ -242,9 +288,18 @@ Is this correct?"
 
 **Do NOT proceed until user validates understanding.**
 
-### Step 2: Interactive Brownfield PRD Creation
+### Step 2: Interactive PRD Creation
 
-**Activate create-doc with brownfield-prd-template:**
+#### Greenfield invocation (mode=greenfield)
+
+```
+Use create-doc skill with:
+- Template: prd-template (resources/prd-tmpl.yaml)
+- Output: docs/prd.md
+- Mode: Interactive (default)
+```
+
+#### Brownfield invocation (mode=brownfield)
 
 ```
 Use create-doc skill with:
@@ -255,11 +310,17 @@ Use create-doc skill with:
 
 **Section-by-Section Process:**
 
-#### Section 1: Intro Project Analysis and Context
+#### Section 1: Goals, Background, and Project Analysis
 
-**Purpose:** Establish existing project understanding
+**Greenfield (mode=greenfield):**
 
-**Subsections:**
+- **Goals:** Bullet list of desired outcomes
+- **Background:** 1-2 paragraphs on what this solves and why
+- **Change Log:** Version tracking table
+- **Source:** Project Brief if available, otherwise elicit from user
+- **No mandatory elicitation** (but can ask clarifying questions)
+
+**Brownfield (mode=brownfield) — Intro Project Analysis and Context:**
 
 **1a. Existing Project Overview:**
 
@@ -287,26 +348,20 @@ Use create-doc skill with:
 
 #### Section 2: Requirements (MANDATORY ELICITATION)
 
-**Emphasis on:**
-
-- **Integration with existing system**
-- **Backward compatibility**
-- **Technical debt awareness**
-
-**Subsections:**
+**Both modes — Functional and Non-Functional Requirements:**
 
 **Functional Requirements (FR):**
 
-- What enhancement must do
-- How it integrates with existing functionality
-- Example: "FR1: The existing Todo List will integrate with the new AI duplicate detection service without breaking current functionality."
+- What the product/enhancement must do
+- Testable, WHAT not HOW, MVP-scoped
+- **Brownfield emphasis:** integration with existing functionality
 
 **Non-Functional Requirements (NFR):**
 
-- Performance constraints from existing system
-- Example: "NFR1: Enhancement must maintain existing performance characteristics and not exceed current memory usage by more than 20%."
+- Specific metrics ("< 200ms response time" not "fast response")
+- **Brownfield emphasis:** must respect existing system performance characteristics
 
-**Compatibility Requirements (CR) - CRITICAL FOR BROWNFIELD:**
+**Compatibility Requirements (CR) — (brownfield only) CRITICAL:**
 
 - CR1: Existing API compatibility
 - CR2: Database schema compatibility
@@ -315,74 +370,60 @@ Use create-doc skill with:
 
 **Process:**
 
-1. Draft requirements based on validated project understanding
-2. Present with detailed rationale
-3. Confirm: "These requirements are based on my understanding of your existing system. Please review carefully and confirm they align with your project's reality."
-4. **STOP - Present 1-9 elicitation options**
-5. Wait for user response
-6. Iterate based on feedback
+1. Draft requirements based on validated understanding (brownfield) or goals (greenfield)
+2. Present with detailed rationale (trade-offs, assumptions)
+3. **STOP — Present 1-9 elicitation options**
+4. Wait for user response
+5. Iterate based on feedback
 
 **❌ Do NOT proceed if:**
-- Any FR uses vague language without measurable criteria (e.g., "fast", "easy", "intuitive") — replace with specific, testable statements
+- Any FR uses vague language without measurable criteria (e.g., "fast", "easy", "intuitive")
 - Any FR prescribes implementation technology (e.g., "use React component X") instead of capability
-- NFRs lack specific metrics (e.g., "< 200ms response time" not "fast response")
-- Compatibility Requirements (CR) section is absent or incomplete
+- NFRs lack specific metrics
+- **(brownfield)** Compatibility Requirements (CR) section is absent or incomplete
 
-#### Section 3: UI Enhancement Goals (conditional, no mandatory elicitation)
+#### Section 3: UI Design / UI Enhancement Goals (conditional)
 
-**Condition:** Only if enhancement includes UI changes
+**Condition:** Only if PRD has UX/UI requirements.
 
-**Focus:**
+**Greenfield — UI Design Goals (MANDATORY ELICITATION):**
+
+- Overall UX Vision
+- Key Interaction Paradigms
+- Core Screens and Views (conceptual)
+- Accessibility (None|WCAG AA|WCAG AAA)
+- Branding
+- Target Platforms
+
+Pre-fill with educated guesses, clearly indicate assumptions, STOP for 1-9 elicitation.
+
+**Brownfield — UI Enhancement Goals (no mandatory elicitation):**
 
 - Integration with existing UI patterns
 - Design system consistency
 - Modified/new screens only (not complete redesign)
 - UI consistency requirements
 
-#### Section 4: Technical Constraints and Integration Requirements
+#### Section 4: Technical Constraints / Technical Assumptions
 
-**Replaces separate architecture documentation for brownfield**
+**Greenfield — Technical Assumptions (MANDATORY ELICITATION):**
 
-**Subsections:**
+- Repository Structure (Monorepo|Polyrepo)
+- Service Architecture (Monolith|Microservices|Serverless)
+- Testing Requirements (Unit|Integration|Full Pyramid)
+- Additional Technical Assumptions (languages, frameworks, libraries, deployment)
 
-**Existing Technology Stack:**
+Present with rationale, STOP for 1-9 elicitation. Document ALL choices with rationale — these become constraints for the Architect.
 
-- Extract from document-project if available
-- Include version numbers and constraints
-- Languages, frameworks, database, infrastructure, external dependencies
+**Brownfield — Technical Constraints and Integration Requirements** (replaces separate architecture documentation):
 
-**Integration Approach:**
+- **Existing Technology Stack** — extract from document-project, include versions
+- **Integration Approach** — database, API, frontend, testing strategies
+- **Code Organization and Standards** — patterns, file structure, naming, conventions
+- **Deployment and Operations** — build, deployment, monitoring, configuration
+- **Risk Assessment and Mitigation** — technical debt, integration risks, deployment risks, mitigations
 
-- Database integration strategy
-- API integration strategy
-- Frontend integration strategy
-- Testing integration strategy
-
-**Code Organization and Standards:**
-
-- How new code fits existing patterns
-- File structure approach
-- Naming conventions
-- Coding standards
-- Documentation standards
-
-**Deployment and Operations:**
-
-- Build process integration
-- Deployment strategy
-- Monitoring and logging
-- Configuration management
-
-**Risk Assessment and Mitigation:**
-
-- Reference technical debt from document-project
-- Include "Workarounds and Gotchas"
-- Technical risks
-- Integration risks
-- Deployment risks
-- Mitigation strategies
-
-#### Section 5: Epic and Story Structure (MANDATORY ELICITATION)
+#### Section 5: Epic List / Epic and Story Structure (MANDATORY ELICITATION)
 
 **Principle:** PRDs are living documents. Assess complexity honestly — multiple epics improve parallelism, reduce coupling, and make delivery more manageable. Do not default to a single epic.
 
@@ -414,6 +455,8 @@ Score the PRD against these 6 signals. Each signal present = 1 point:
 
 If 0–2 signals, document explicitly: *"This PRD scores [N]/6 on the complexity rubric. A single epic is appropriate because [reason]."*
 
+**Greenfield Epic 1 rule:** Epic 1 = Foundation + initial functionality. Subsequent epics build incrementally. Cross-cutting concerns flow through epics. Epics deliver deployable, testable value.
+
 **Step 4 — Elicitation:**
 
 5. **STOP — Present 1-9 elicitation options**
@@ -425,29 +468,33 @@ If 0–2 signals, document explicitly: *"This PRD scores [N]/6 on the complexity
 - Complexity signal score and rationale
 - Cross-epic dependency map (if multiple epics)
 
-**PRD Extensibility:**
+**PRD Extensibility (brownfield):**
 
 PRDs grow over time — it is expected and normal to add new epics as scope evolves. When working with an existing PRD:
 
 - Check if the user's intent is to **extend** an existing PRD (add a new epic area) rather than create from scratch
 - If extending: append the new epic to the existing PRD's Epic and Story Structure section; do not re-create the whole PRD
-- The continuation detection step (1a) must offer an **Extend** option for completed PRDs:
+- The continuation detection step (1a) must offer an **Extend** option for completed PRDs
 
-```
-"This PRD appears complete. Would you like to:
-[R] Resume — Continue an incomplete section
-[E] Extend — Add a new epic area to this PRD
-[S] Start fresh — Create a new PRD"
-```
-
-**IMPORTANT - Epic Numbering:**
+**IMPORTANT — Epic Numbering:**
 When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
 
-#### Section 6: Epic Details (MANDATORY per epic)
+#### Section 6: Epic Details (MANDATORY ELICITATION per epic, REPEATABLE)
 
-**CRITICAL STORY SEQUENCING FOR BROWNFIELD:**
+**Both modes — Story structure:**
 
-**Rules:**
+```
+As a [user type],
+I want [action],
+So that [benefit].
+```
+
+- **Acceptance Criteria:** testable, comprehensive
+- **Logical sequencing** within epic
+- **AI-agent-sized** (2-4 hours)
+- **Vertical slices** delivering clear value
+
+**Brownfield — Story sequencing rules (additional):**
 
 - Stories MUST ensure existing functionality remains intact
 - Each story MUST include verification that existing features still work
@@ -456,27 +503,10 @@ When epic files are created from this PRD, they will be assigned **globally uniq
 - Focus on incremental integration (not big-bang changes)
 - Size for AI agent execution in existing codebase context
 
-**Confirmation Required:**
-"This story sequence is designed to minimize risk to your existing system.
-Does this order make sense given your project's architecture and constraints?"
+**Confirmation Required (brownfield):**
+"This story sequence is designed to minimize risk to your existing system. Does this order make sense given your project's architecture and constraints?"
 
-**Story Structure:**
-
-**User Story:**
-
-```
-As a [user type],
-I want [action],
-So that [benefit].
-```
-
-**Acceptance Criteria:**
-
-- Define both new functionality AND existing system integrity
-- Testable, comprehensive
-- Include integration verification
-
-**Integration Verification (IV) - UNIQUE TO BROWNFIELD:**
+**Integration Verification (IV) — (brownfield only):**
 
 - IV1: Existing functionality verification
 - IV2: Integration point verification
@@ -485,16 +515,16 @@ So that [benefit].
 **Process:**
 
 1. Draft complete epic with all stories
-2. Present with rationale (risk minimization approach)
-3. **STOP - Present 1-9 elicitation options**
+2. Present with rationale (greenfield: vertical-slice / value; brownfield: risk minimization)
+3. **STOP — Present 1-9 elicitation options**
 4. Wait for user response
 5. Refine based on feedback
 
 **❌ Do NOT proceed if:**
-- Any story lacks Integration Verification (IV) criteria
-- Story sequence has a step that modifies existing behaviour before verifying current behaviour still works
-- Acceptance criteria are not independently testable (no shared pass/fail conditions across stories)
-- No rollback consideration is documented for any story that modifies shared infrastructure (DB schema, APIs, auth)
+- Acceptance criteria are not independently testable
+- **(brownfield)** Any story lacks Integration Verification (IV) criteria
+- **(brownfield)** Story sequence has a step that modifies existing behaviour before verifying current behaviour still works
+- **(brownfield)** No rollback consideration is documented for any story that modifies shared infrastructure (DB schema, APIs, auth)
 
 ### Step 2.5: Visual Architecture Diagram (conditional, via `mermaid-architect`)
 
@@ -513,21 +543,21 @@ So that [benefit].
 
 ### Step 3: Quality Validation
 
-**Same as greenfield:**
+**Both modes:**
 
 1. Offer to output full PRD
 2. Run `pm-checklist` validation
 3. Address blockers
 4. Insert results into Checklist Results section
 
-**Additional brownfield validation:**
+**Brownfield-only additional validation:**
 
 - Verify compatibility requirements comprehensive
 - Ensure integration approach sound
 - Validate risk assessment includes technical debt
 - Confirm story sequencing minimizes existing system risk
 
-**Targeted requirement quality checks (run after pm-checklist):**
+**Targeted requirement quality checks (brownfield only — run after pm-checklist):**
 
 Run each check sequentially and report findings before proceeding:
 
@@ -549,13 +579,14 @@ Report total: `Quality checks: X/4 passed`. Address any FAILs before proceeding 
 
 **Always execute this step.** Do not end the skill after Step 3 validation. The handoff prompts are a required output — the PRD is not complete until they are generated.
 
-**Generate handoff prompts:**
+**Generate handoff prompts (both modes):**
 
-- UX Expert Prompt (if UI changes)
-- Architect Prompt (emphasizing integration with existing architecture)
+- UX Expert Prompt (if UI)
+- Architect Prompt
 
 **Brownfield-specific guidance:**
 
+- Architect prompt emphasizes integration with existing architecture
 - Integration testing strategy
 - Rollback procedures
 - Monitoring for existing functionality
@@ -563,144 +594,130 @@ Report total: `Quality checks: X/4 passed`. Address any FAILs before proceeding 
 
 ## Key Principles
 
-### Deep Understanding Required
+### Both modes
 
-- **Analyze, don't assume** - Ground all recommendations in actual project analysis
-- **Confirm understanding** - Validate every assumption with user
-- **Respect existing patterns** - Integrate, don't disrupt
+- **MVP-first** — scope to deliverable value, not exhaustive feature list
+- **Logical sequencing** — Epic 1 establishes foundation, subsequent epics build incrementally
+- **AI-agent-sized stories** — 2-4 hours each, vertical slices with clear acceptance criteria
 
-### Compatibility First
+### Greenfield-specific
 
-- **Backward compatibility mandatory** - Existing functionality must not break
-- **Integration verification explicit** - Test existing features after each story
-- **Risk minimization** - Sequence stories for lowest risk
+- **Collaborative Creation** — section-by-section elicitation; user owns scope decisions
+- **Documented assumptions** — every technical choice carries rationale for the Architect
 
-### Incremental Integration
+### Brownfield-specific
 
-- **No big-bang changes** - Gradual integration reduces risk
-- **Rollback considerations** - Plan for reverting if issues arise
-- **Existing system integrity** - Each story validates current functionality
-
-### Technical Debt Awareness
-
-- **Acknowledge existing debt** - Don't ignore known issues
-- **Mitigation strategies** - Plan for working around constraints
-- **Debt increase minimization** - Don't make debt worse
+- **Deep Understanding Required** — analyze, don't assume; confirm every assumption with user; respect existing patterns
+- **Compatibility First** — backward compatibility mandatory; integration verification explicit; sequence stories for lowest risk
+- **Incremental Integration** — no big-bang changes; rollback considerations; each story validates existing system integrity
+- **Technical Debt Awareness** — acknowledge existing debt; plan mitigation; don't make debt worse
 
 ## Integration with Other Skills
 
 **This skill orchestrates:**
 
-- `create-doc` - Document creation engine
-- `brownfield-prd-template` - Brownfield PRD structure
-- `pm-checklist` - Quality validation
-- `mermaid-architect` - System Topology / C4 Context diagram when the PRD benefits from a visual
+- `create-doc` — Document creation engine
+- `prd-template` — Greenfield PRD structure (mode=greenfield)
+- `brownfield-prd-template` — Brownfield PRD structure (mode=brownfield)
+- `pm-checklist` — Quality validation
+- `mermaid-architect` — System Topology / C4 Context diagram when justified
 
 **This skill may recommend:**
 
-- `document-project` - If existing project analysis missing
-- `shard-prd` - If PRD becomes large
-- `create-epics-from-shards` - After sharding
+- `deep-research-prompt` — Before greenfield PRD if market validation needed
+- `document-project` — Before brownfield PRD if existing project analysis missing
+- `shard-prd` — If PRD becomes large
+- `create-epics-from-shards` — After sharding
 
-**May use in analysis:**
+**Wrapper / entry-point skills:**
 
-- Existing architecture docs
-- Technical debt documentation
-- API documentation
+- `new-product-prd` — Greenfield entry point; delegates here with `mode=greenfield`
 
 ## Success Criteria
 
-A successful brownfield PRD produces:
+**Both modes:**
 
-1. **Deep Project Understanding**
-   - Existing architecture analyzed
-   - Tech stack documented
-   - Technical debt assessed
-   - Integration points identified
+1. **Comprehensive Requirements** — FRs (capability-focused), NFRs (with metrics)
+2. **Appropriate Epic Structure** — 6-signal complexity assessment completed; multiple epics proposed when 3+ signals present
+3. **Quality Validated** — pm-checklist passed; Checklist Results inserted
+4. **Clear Handoffs** — Architect prompt; UX Expert prompt if applicable
 
-2. **Comprehensive Requirements**
-   - Functional requirements (with integration awareness)
-   - Non-functional requirements (existing system constraints)
-   - **Compatibility requirements** (backward compatibility ensured)
+**Brownfield additional:**
 
-3. **Risk-Aware Planning**
-   - Technical debt incorporated into risk assessment
-   - Integration risks identified
-   - Mitigation strategies defined
-   - Rollback procedures planned
+5. **Deep Project Understanding** — existing architecture analyzed; tech stack documented; technical debt assessed; integration points identified
+6. **Compatibility Requirements** — backward compatibility ensured (CR1–CR4)
+7. **Risk-Aware Planning** — technical debt incorporated; integration/deployment risks identified; mitigations defined; rollback procedures planned
+8. **Incremental Story Sequencing** — stories minimize risk; Integration Verification (IV1–IV3) explicit; gradual rollout; existing functionality protected
+9. **Brownfield Quality Checks** — 4 targeted checks passed (measurability, leakage, traceability, SMART NFRs)
+10. **Brownfield Handoff** — Architect prompt is integration-focused; integration testing guidance included
 
-4. **Appropriate Epic Structure**
-   - 6-signal complexity assessment completed and documented
-   - Multiple epics proposed when 3+ signals present
-   - Each epic maps to a distinct functional area
-   - PRDs with 3+ domain areas or 8+ stories justify single-epic choice explicitly
-   - PRD extensibility acknowledged — future epics can be added without full rewrite
+## Example Activations
 
-5. **Incremental Story Sequencing**
-   - Stories minimize risk to existing system
-   - Integration verification explicit
-   - Gradual rollout approach
-   - Existing functionality protected
-
-7. **Quality Validated**
-   - Passed pm-checklist
-   - Passed 4 targeted checks (measurability, leakage, traceability, SMART NFRs)
-   - Compatibility requirements validated
-   - Integration approach sound
-
-8. **Clear Handoffs**
-   - Architect prompt (integration-focused)
-   - UX Expert prompt (if applicable)
-   - Integration testing guidance
-
-## Example Activation
-
-**Natural Language Trigger:**
+**Brownfield (direct activation):**
 
 ```
 User: "Add biometric authentication to our existing mobile banking app"
 
-→ create-prd activates
-→ Checks for document-project output
+→ create-prd activates (mode=brownfield, default)
+→ Continuation detection, document discovery, document-project check
 → Analyzes existing authentication system
 → Confirms understanding with user
 → Uses create-doc + brownfield-prd-template
 → Emphasizes compatibility requirements
 → Sequences stories for minimal risk
-→ Validates with pm-checklist
+→ Validates with pm-checklist + 4 targeted checks
 → Returns complete brownfield PRD
+```
+
+**Greenfield (delegated via new-product-prd):**
+
+```
+User: "Create a PRD for a new mobile app"
+
+→ new-product-prd activates
+→ Delegates to create-prd with mode=greenfield
+→ Project Brief check + optional deep-research-prompt
+→ Uses create-doc + prd-template
+→ No brownfield-only sections emitted
+→ Validates with pm-checklist
+→ Returns complete greenfield PRD at docs/prd.md
 ```
 
 ## Common Pitfalls to Avoid
 
-❌ **Assuming project structure** - Must analyze, not guess
-❌ **Ignoring technical debt** - Known issues impact enhancement planning
-❌ **Big-bang integration** - Incremental approach reduces risk
-❌ **Skipping compatibility requirements** - Backward compatibility critical
-❌ **Not validating understanding** - Confirm assumptions before proceeding
-❌ **Recommending full PRD for small changes** - Use create-epic or brownfield-story for simpler enhancements
-❌ **Starting fresh without checking for existing PRD** - Always check for incomplete in-progress work first
-❌ **Ignoring existing reference documents** - Scan for briefs, research, context docs before asking the user
-❌ **Vague requirements** - "Fast", "easy", "intuitive" are not requirements; replace with measurable criteria
-❌ **Implementation leakage** - FRs describe capability, not implementation; no technology names in requirements
-❌ **Defaulting to a single epic** - Always run the complexity assessment; complex PRDs warrant multiple epics for parallelism and delivery manageability
-❌ **Forcing all epics upfront** - PRDs are living documents; epics can be added as scope evolves — don't block progress waiting for a complete epic list
+❌ **Vague requirements** — "Fast", "easy", "intuitive" are not requirements; replace with measurable criteria
+❌ **Implementation leakage** — FRs describe capability, not implementation; no technology names in requirements
+❌ **Defaulting to a single epic** — Always run the complexity assessment; complex PRDs warrant multiple epics
 
+**Brownfield additional:**
+
+❌ **Assuming project structure** — Must analyze, not guess
+❌ **Ignoring technical debt** — Known issues impact enhancement planning
+❌ **Big-bang integration** — Incremental approach reduces risk
+❌ **Skipping compatibility requirements** — Backward compatibility critical
+❌ **Not validating understanding** — Confirm assumptions before proceeding
+❌ **Recommending full PRD for small changes** — Use create-epic or brownfield-story for simpler enhancements
+❌ **Starting fresh without checking for existing PRD** — Always check for incomplete in-progress work first
+❌ **Ignoring existing reference documents** — Scan for briefs, research, context docs before asking the user
+❌ **Forcing all epics upfront** — PRDs are living documents; epics can be added as scope evolves
+
+✅ **Run the 6-signal complexity assessment before proposing epic structure**
+✅ **Propose multiple epics when 3+ complexity signals are present**
+✅ **Validate quality with pm-checklist (both modes) AND the 4 targeted checks (brownfield)**
+
+**Brownfield additional:**
 ✅ **Check for existing PRD before starting (offer Extend for completed PRDs)**
 ✅ **Scan and load all discoverable reference documents first**
 ✅ **Analyze existing project thoroughly**
 ✅ **Confirm understanding at every step**
-✅ **Run the 6-signal complexity assessment before proposing epic structure**
-✅ **Propose multiple epics when 3+ complexity signals are present**
 ✅ **Emphasize compatibility and integration**
 ✅ **Sequence stories for risk minimization**
-✅ **Validate quality with pm-checklist AND the 4 targeted checks**
 
 ## Notes
 
 - Brownfield PRDs require more upfront analysis than greenfield
-- Always recommend `document-project` if not already run
-- Compatibility Requirements section is unique to brownfield
-- Integration Verification in stories is brownfield-specific
-- Story sequencing for risk minimization is critical
-- Technical debt must be incorporated into planning
+- For brownfield, always recommend `document-project` if not already run
+- Compatibility Requirements and Integration Verification sections are brownfield-only
+- Story sequencing for risk minimization is brownfield-critical
+- Technical debt must be incorporated into brownfield planning
+- Greenfield delegation source is always `new-product-prd` — users should not be told to invoke this skill directly with `mode=greenfield`

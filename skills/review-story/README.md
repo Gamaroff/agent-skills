@@ -229,19 +229,9 @@ The review skill rigorously detects:
 
 ### Complements
 
-- `/validate-story` - Pre-implementation validation
 - `/create-story` - Story creation workflow
+- `/edit-story` - Modify existing stories
 - `/develop` - Implementation guidance
-
-### Differences from validate-story
-
-| Feature     | review-story                    | validate-story          |
-| ----------- | ------------------------------- | ----------------------- |
-| **Purpose** | Find problems & recommend fixes | Validate readiness      |
-| **Timing**  | Any stage                       | Pre-implementation      |
-| **Depth**   | Deeper analysis                 | Standard checks         |
-| **Output**  | Comprehensive review report     | GO/NO-GO decision       |
-| **Focus**   | Improvement recommendations     | Compliance verification |
 
 ## Tips for Best Results
 
@@ -272,6 +262,5 @@ A story is ready when review shows:
 ## See Also
 
 - `/create-story` - Create new story documents
-- `/validate-story` - Pre-implementation validation
 - `/edit-story` - Modify existing stories
 - `/develop` - Implement stories

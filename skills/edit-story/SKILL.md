@@ -42,7 +42,7 @@ Natural language triggers:
 - `edit-epic` - Edit epic documents (use this for epic files)
 - `develop` - Implement stories
 - `qa-story` - Review story implementations
-- `validate-story` - Pre-implementation validation
+- `review-story --validate` - Pre-implementation validation (automated, non-interactive)
 
 ---
 
@@ -426,9 +426,9 @@ If validation fails, present findings to user:
 - Implements fixes based on QA feedback
 - May update story sections after fixes
 
-**validate-story**:
+**review-story --validate**:
 
-- Pre-implementation validation
+- Pre-implementation validation (automated, read-only)
 - Use before `develop` begins
 - May identify story edits needed
 

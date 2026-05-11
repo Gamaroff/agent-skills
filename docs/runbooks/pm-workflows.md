@@ -26,7 +26,7 @@ flowchart TD
 
 ```
 1. /deep-research-prompt        (optional — market/competitor research first)
-2. /greenfield-prd              → uses create-doc + prd-template → validates with pm-checklist
+2. /new-product-prd              → uses create-doc + prd-template → validates with pm-checklist
 3. /shard-prd                   (if 5+ epics or 30+ stories)
 4. /create-epics-from-shards    → one epic per sharded section
 5. → Handoff to UX Expert and Architect
@@ -78,7 +78,7 @@ See [`change-management` SKILL.md](../../skills/change-management/SKILL.md) for 
 
 | User says | Activates | Why |
 |---|---|---|
-| "Create PRD for new mobile app" | `greenfield-prd` | "new" + "PRD" |
+| "Create PRD for new mobile app" | `new-product-prd` | "new" + "PRD" |
 | "Add feature to existing system" | `create-prd` or `create-epic` | "add" + "existing" (size-dependent) |
 | "Story failed due to…" | `change-management` | "failed" + reason |
 | "Validate my PRD" | `pm-checklist` | "validate" + "PRD" |
@@ -88,7 +88,7 @@ See [`change-management` SKILL.md](../../skills/change-management/SKILL.md) for 
 - [PRD documents standard](../standards/prd-documents.md)
 - [Epic documents standard](../standards/epic-documents.md)
 - [Story Development Runbook](./story-development.md) — downstream of every chain above
-- [`greenfield-prd` SKILL.md](../../skills/greenfield-prd/SKILL.md)
+- [`new-product-prd` SKILL.md](../../skills/new-product-prd/SKILL.md)
 - [`create-prd` SKILL.md](../../skills/create-prd/SKILL.md)
 - [`pm-checklist` SKILL.md](../../skills/pm-checklist/SKILL.md)
 - [`change-management` SKILL.md](../../skills/change-management/SKILL.md)

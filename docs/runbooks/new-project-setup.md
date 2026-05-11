@@ -15,7 +15,7 @@ The order of operations for going from "empty repo" to "first story in flight." 
 flowchart TD
     A[Empty repo] --> B[architect: full-stack architecture]
     B --> C[execute-architect-checklist]
-    C --> D[greenfield-prd]
+    C --> D[new-product-prd]
     D --> E[shard-prd if large]
     E --> F[create-epics-from-shards]
     F --> G[create-story: first story]
@@ -27,7 +27,7 @@ flowchart TD
 ```
 1. /architect                              → full-stack architecture doc
 2. /execute-architect-checklist            → validate the architecture
-3. /greenfield-prd                         → product requirements
+3. /new-product-prd                         → product requirements
 4. /shard-prd            (optional)        → split if 5+ epics or 30+ stories
 5. /create-epics-from-shards               → one epic per sharded section
 6. /create-story                           → first story for epic 1
@@ -59,7 +59,7 @@ Before step 1:
 
 - [`architect` SKILL.md](../../skills/architect/SKILL.md)
 - [`execute-architect-checklist` SKILL.md](../../skills/execute-architect-checklist/SKILL.md)
-- [`greenfield-prd` SKILL.md](../../skills/greenfield-prd/SKILL.md)
+- [`new-product-prd` SKILL.md](../../skills/new-product-prd/SKILL.md)
 - [`shard-prd` SKILL.md](../../skills/shard-prd/SKILL.md)
 - [PRD documents standard](../standards/prd-documents.md)
 - [PM Workflows Runbook](./pm-workflows.md)

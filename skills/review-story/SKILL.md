@@ -1,6 +1,6 @@
 ---
 name: review-story
-description: Deep interactive story review that asks clarifying questions to resolve ambiguities, conflicts, and missing information. Use when story has unclear requirements or you need user input to guide recommendations.
+description: Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements or you need user input. Validate mode (--validate flag or "is this story ready?"): automated non-interactive GO/NO-GO gate with 1–10 readiness score — use for pre-implementation gates, batch validation across multiple stories, CI pipelines, or quick sanity checks without user interaction.
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
@@ -9,7 +9,11 @@ description: Deep interactive story review that asks clarifying questions to res
 
 ## When to Use This Skill
 
-Use this skill when:
+This skill has two modes. Use the right one for the job:
+
+### Interactive Mode (default)
+
+Use when:
 
 - Story has **ambiguous requirements** that need clarification
 - You need to **resolve conflicts or gaps interactively**
@@ -28,26 +32,45 @@ Natural language triggers:
 - "Review the quality of story.310.5.md"
 - "Find problems in the notification story"
 
-## When to Use vs /validate-story
+### Validate Mode (`--validate`)
 
-**Use `/review-story` (this skill) when**:
+Use when:
 
-- 🔄 Story has **ambiguous requirements** that need clarification
-- 🔄 You need to **resolve conflicts or gaps interactively**
-- 🔄 You want **user input on technical decisions**
-- 🔄 You're investigating why a story implementation went off-track
-- 🔄 Story needs **deep analysis with clarifying questions**
-- 🔄 You want to collaboratively refine the story with user input
-
-**Use `/validate-story` instead when**:
-
-- ✅ You need **automated validation** without user interaction
-- ✅ Story appears complete and you want GO/NO-GO decision
+- ✅ You need **automated GO/NO-GO decision** without user interaction
+- ✅ Story appears complete and you want a readiness gate
 - ✅ You're doing **batch validation** of multiple stories
-- ✅ You want a **fast pre-implementation gate** (systematic check)
-- ✅ You need a readiness score for project tracking
+- ✅ Running a **CI-style pre-implementation gate**
+- ✅ You need a **readiness score** for project tracking
+- ✅ You want to verify a story that was just edited is now clean
 
-**Key Difference**: `/review-story` is **interactive** (asks clarifying questions to resolve ambiguities), while `/validate-story` is **automated** (no questions asked).
+Natural language triggers:
+
+- "Validate story 2.3"
+- "Is story.310.5 ready to implement?"
+- "Run the pre-implementation gate on #297"
+- "Score this story's readiness"
+- "Batch validate all stories in Epic 4"
+
+**How to invoke validate mode:**
+
+```
+/review-story --validate path/to/story.md
+/review-story --validate #297
+/review-story --validate story.310.5
+```
+
+Or via natural language (agent detects intent): "Is this story ready?", "Score this story", "Validate all stories in Epic 4".
+
+**Key differences between modes:**
+
+| | Interactive | Validate |
+|---|---|---|
+| Questions asked | Yes — up to 3 question points | Never |
+| Edits story | Yes (with user approval) | Never |
+| Output artifact | `.review.{n}.{name}.md` | `.validate.{date}.md` |
+| Verdict label | READY / NEEDS REVISION / REQUIRES REWORK | GO / NO-GO (Revision) / NO-GO (Rework) |
+| CI exit code | N/A | Non-zero on NO-GO |
+| Batch support | No | Yes |
 
 ## Purpose
 
@@ -95,9 +118,23 @@ required:
       - Bare issue number:               297
 
 optional:
+  - mode: |
+      "--validate" flag OR natural language intent → activates Validate mode (non-interactive GO/NO-GO gate).
+      Omit for default Interactive mode.
   - focus_areas: Specific areas to focus on (e.g., "testing", "API specs")
   - review_depth: "quick" | "standard" | "thorough" (default: "standard")
+      In validate mode, "quick" runs in 5-10 min (critical issues only), "standard" in 15-30 min, "thorough" in 30-60 min.
+      In interactive mode, "quick" = 15-30 min, "standard" = 30-60 min, "thorough" = 60-90+ min.
 ```
+
+### Mode Detection
+
+Activate **Validate mode** when any of the following are true:
+- `--validate` flag present in the invocation
+- Natural language intent: "validate", "is this story ready?", "score this story", "batch validate", "CI gate", "pre-implementation gate"
+- Called programmatically by `develop-story`, `scrum-master`, or `po` pipeline (these always use validate mode)
+
+Default to **Interactive mode** for all other invocations.
 
 ## Input Resolution
 
@@ -356,13 +393,17 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 
 **Pre-pass summaries** (`PREPASS_A`, `PREPASS_B`, `PREPASS_C` from Phase 1.5): Before formulating any question in Steps 2–8, check the relevant pre-pass summary first. If a finding has `severity: high` or `severity: medium`, surface it as a clarifying question rather than asking the user to discover it themselves. If a finding has `severity: low`, note it in the review report without necessarily elevating it to a user question. If the relevant pre-pass summary is absent (agent failed), proceed with in-line discovery as usual.
 
-### Step 0: Determine Output Format
+### Step 0: Determine Mode and Output Format
 
-**Purpose**: Ask user whether they want a comprehensive review report file or just an actionable plan
+**Purpose**: Detect interactive vs validate mode; in interactive mode ask user for output format preference.
 
 **Actions**:
 
-1. Use `AskUserQuestion` to ask about desired output format:
+1. **Detect mode** (from invocation flags / natural language — see Mode Detection above):
+   - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Auto-select "Comprehensive report" (saved as `.validate.{date}.md`). Skip all Question Points (QP1, QP2, QP3) and Steps 9.5 and 10.
+   - **Interactive mode**: set `MODE=interactive`. Continue to step 2 below.
+
+2. **Interactive mode only** — use `AskUserQuestion` to ask about desired output format:
 
 ```yaml
 question: 'Would you like a comprehensive review report saved to a file, or just an actionable plan for immediate fixes?'
@@ -374,11 +415,13 @@ options:
     description: 'Provide prioritized list of issues and fixes to action immediately without saving a report file.'
 ```
 
-2. Store user's choice for use in Step 9 (final output generation)
+3. Store `MODE` and output format preference for use throughout the workflow.
 
-**Pipeline note**: When invoked by the `develop-story` orchestrator, this question will be answered autonomously ("Comprehensive report" is always selected). If running inside the develop-story pipeline, skip the AskUserQuestion and proceed directly with "Comprehensive report" as the format selection. Only ask interactively when invoked standalone.
+**Pipeline note**: When invoked by the `develop-story` orchestrator, always use validate mode — set `MODE=validate` and skip the `AskUserQuestion`. Only ask interactively when invoked standalone in interactive mode.
 
-3. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
+4. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
+
+**Interactive mode task list:**
 
 | Task Subject | Description |
 |---|---|
@@ -395,7 +438,22 @@ options:
 | Offer to implement fixes | Ask user if fixes should be applied now (Step 9.5 — always execute) |
 | Update document status | Offer status update based on review outcome |
 
-**Output**: User's output format preference captured; task list initialized
+**Validate mode task list:**
+
+| Task Subject | Description |
+|---|---|
+| Load config & context | Load skills-config.yaml, locate story + architecture docs |
+| Template compliance | Verify story structure against template |
+| Epic alignment | Check story fits within its parent epic |
+| Technical accuracy | Anti-hallucination check of implementation details |
+| Completeness & gap analysis | Identify missing ACs, tasks, NFRs |
+| Consistency & conflicts | Detect internal contradictions |
+| Quality & clarity | Score story readability and precision |
+| Previous story context | Review predecessor story if applicable |
+| Generate validation report | Write verdict + findings to `.validate.{date}.md` |
+| Post tracker comment | Notify linked issue with verdict (non-blocking) |
+
+**Output**: Mode and output format captured; task list initialized
 
 ---
 
@@ -736,7 +794,7 @@ devDebugLog: .ai/debug-log.md
 
 ### QUESTION POINT 1: Epic & Structure Clarifications
 
-**CRITICAL**: Before continuing to technical review, ask batched questions about:
+**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to technical review, ask batched questions about:
 
 1. Template compliance issues (unfilled placeholders, missing sections)
 2. File naming violations
@@ -943,7 +1001,7 @@ This prevents the first-phase document load from polluting the technical review 
 
 ### QUESTION POINT 2: Technical & Completeness Clarifications
 
-**CRITICAL**: Before continuing to consistency review, ask batched questions about:
+**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to consistency review, ask batched questions about:
 
 1. Hallucinated technologies or approaches
 2. Missing technical specifications
@@ -1222,7 +1280,7 @@ Proceed to Phase 3 (recommendations and output) with a clean context containing 
 
 ### QUESTION POINT 3: Quality & Clarity Clarifications (Final)
 
-**CRITICAL**: Before generating final report, ask batched questions about:
+**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and proceed to Step 9. In Interactive mode: before generating final report, ask batched questions about:
 
 1. Ambiguous requirements or ACs
 2. Conflicting information requiring resolution
@@ -1285,12 +1343,128 @@ questions:
 
 ### Step 9: Generate Output
 
-**Purpose**: Provide actionable recommendations for story improvement in user's preferred format
+**Purpose**: Produce the output artifact appropriate to the active mode.
 
-**CRITICAL**: Use the output format preference captured in Step 0 to determine whether to generate:
+**CRITICAL**: Branch on `MODE`:
 
-- **Comprehensive Report**: Full review report saved to file
-- **Action Plan Only**: Prioritized list of fixes for immediate action
+- **Validate mode** → generate Option V (Validation Report) below. Never generate Option A or B.
+- **Interactive mode** → use the output format preference from Step 0: Option A (Comprehensive Report) or Option B (Action Plan Only).
+
+---
+
+### Option V: Validation Report (Validate mode only)
+
+**Actions**:
+
+1. Compute the **Implementation Readiness Score** (1–10 weighted average of per-dimension scores).
+2. Determine the **Verdict**:
+   - ✅ **GO** — score ≥ 8 AND zero Critical issues
+   - ⚠️ **NO-GO (Revision)** — score 5–7, OR Important issues materially blocking confidence
+   - 🚨 **NO-GO (Rework)** — score < 5 OR any Critical issue present
+3. Write the report to `[story-directory]/[story-name].validate.[date].md`.
+4. Print a concise stdout summary (for CI / pipeline callers):
+
+```
+Verdict: <GO|NO-GO (Revision)|NO-GO (Rework)>
+Score:   <N>/10
+Issues:  <critical> critical · <important> important · <optional> optional
+Report:  <path>
+```
+
+5. **CI exit code**: if Verdict is any NO-GO variant, exit non-zero so pipelines / CI gates fail automatically.
+
+**Report Structure**:
+
+```markdown
+# Story Validation Report: Story [Epic].[Story] — [Title]
+
+**Validated:** [ISO date]
+**Validation Depth:** [Quick/Standard/Thorough]
+**Story Status:** [Current status from story]
+**Verdict:** ✅ GO / ⚠️ NO-GO (Revision) / 🚨 NO-GO (Rework)
+**Implementation Readiness Score:** [1-10]/10
+
+---
+
+## Executive Summary
+
+[2-3 sentences: what was validated, what the verdict is, single biggest blocker if any.]
+
+**Critical Issues:** [count] 🚨
+**Important Issues:** [count] ⚠️
+**Optional Improvements:** [count] 💡
+
+**Confidence Level for Successful Implementation:** [High/Medium/Low]
+
+---
+
+## Verdict Justification
+
+[1-2 sentences citing the specific rules that fired — e.g. "Critical hallucination in Dev Notes → Rework" or "Score 8.5/10, zero criticals → GO".]
+
+---
+
+## Scoring Breakdown
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Template Compliance | [1-10]/10 | [1-line note] |
+| Epic Alignment | [1-10]/10 | [1-line note] |
+| Technical Accuracy | [1-10]/10 | [1-line note] |
+| Completeness | [1-10]/10 | [1-line note] |
+| Consistency | [1-10]/10 | [1-line note] |
+| Quality & Clarity | [1-10]/10 | [1-line note] |
+| Previous Story Continuity | [1-10]/10 or N/A | [1-line note] |
+
+**Overall:** [weighted average]/10
+
+---
+
+## 1. Template Structure Compliance — [PASS / ISSUES FOUND]
+## 2. Epic Alignment — [ALIGNED / DEVIATIONS FOUND]
+## 3. Technical Accuracy — [ACCURATE / ISSUES FOUND]
+## 4. Completeness & Gaps — [COMPLETE / GAPS FOUND]
+## 5. Consistency & Conflicts — [CONSISTENT / CONFLICTS FOUND]
+## 6. Quality & Clarity
+## 7. Previous Story Context — [CONSISTENT / ISSUES FOUND / N/A]
+
+(Each section: Critical / Important / Optional sub-buckets. Same format as Interactive Comprehensive Report sections.)
+
+---
+
+## Summary of Findings
+
+### Must Fix (Critical) — [count]
+### Should Fix (Important) — [count]
+### Consider (Optional) — [count]
+
+---
+
+## Next Steps
+
+**If GO:** Story ready for implementation. Run `/develop` to begin.
+
+**If NO-GO (Revision):** Run `/review-story` (interactive) to resolve interactively and apply fixes. Re-run `/review-story --validate` after fixes to confirm GO.
+
+**If NO-GO (Rework):** Run `/review-story` (interactive) to walk through issues, or `/create-story` to regenerate from scratch.
+
+---
+
+## Validation Metadata
+
+- **Mode:** validate (automated, read-only)
+- **Validation Date:** [ISO date]
+- **Validation Depth:** [Quick/Standard/Thorough]
+- **Story File:** [path]
+- **Parent Epic:** [epic file path]
+- **Architecture Docs Consulted:** [list]
+
+---
+
+*Generated by /review-story --validate. No changes made to the story document. To apply fixes, run /review-story (interactive).*
+```
+
+**Output**: Validation report saved to `.validate.{date}.md`. Stdout summary printed.
 
 ---
 
@@ -1758,7 +1932,7 @@ questions:
 
 **Purpose**: Give the user the option to have the agent apply the recommended fixes to the story document immediately.
 
-**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10. Do not skip or end the skill without presenting this offer.
+**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10, **in Interactive mode only**. **Skip entirely in Validate mode** — validate mode is read-only and never modifies the story document.
 
 **Pipeline note**: When invoked by the `develop-story` orchestrator, skip the `AskUserQuestion` and auto-answer **"Yes, apply all critical + important fixes"** — the pipeline proceeds autonomously and needs the story fully corrected before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 9.5 auto-answered: Yes, apply all critical + important fixes — pipeline proceeds autonomously."
 
@@ -1811,9 +1985,9 @@ options:
 
 ### Step 10: Update Document Status (if applicable)
 
-**Purpose**: Update the story document status based on the review outcome
+**Purpose**: Update the story document status based on the review outcome.
 
-**CRITICAL**: This step ensures the story status reflects its readiness for development immediately after review.
+**CRITICAL**: **Skip entirely in Validate mode** — status transitions are the interactive review's job. In validate mode, proceed directly to Step 11 (post tracker comment).
 
 **Pipeline note**: When invoked by the `develop-story` orchestrator and the review outcome is READY TO IMPLEMENT, skip the `AskUserQuestion` and auto-answer **"Yes, update status"** — the pipeline needs the story promoted to `Ready for Development` before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 10 auto-answered: Yes, update status — pipeline proceeds autonomously." If the outcome is NEEDS REVISION or REQUIRES REWORK, do NOT skip the step — HALT the pipeline and surface the review findings to the user; the story is not ready for development.
 
@@ -1990,10 +2164,10 @@ User Can Now: Run `/develop` to begin implementation
    bash references/set-github-project-priority.sh "$GITHUB_ISSUE" || true
    ```
 
-   Post the comment:
+   Post the comment (wrapped in `tracker_call_with_retry` — 3× exponential backoff, sourced from `references/resolve-platform.sh`):
 
    ```bash
-   gh issue comment "$GITHUB_ISSUE" --body "## Story Review Complete
+   tracker_call_with_retry gh issue comment "$GITHUB_ISSUE" --body "## Story Review Complete
 
    **Recommendation**: ${RECOMMENDATION}
    **Readiness Score**: ${SCORE}/10
@@ -2051,18 +2225,31 @@ User Can Now: Run `/develop` to begin implementation
 
 ## Success Criteria
 
-Review is successfully completed when:
+**Interactive mode** — review is successfully completed when:
 
-✅ All steps (0-11) systematically executed according to review depth
+✅ All steps (0–11) systematically executed according to review depth
 ✅ Issues categorized by severity (critical/important/optional)
 ✅ Hallucinations identified and documented
 ✅ Gaps and inconsistencies flagged with specific locations
 ✅ Actionable recommendations provided for each issue
 ✅ Implementation readiness score calculated
-✅ Clear GO/NO-GO recommendation made
-✅ Comprehensive review report generated and saved (if applicable)
-✅ Document status updated to reflect readiness (if fixes completed)
-✅ GitHub issue comment posted with review outcome (Step 11 — graceful: skipped if `github_issue` absent from frontmatter)
+✅ Clear READY / NEEDS REVISION / REQUIRES REWORK recommendation made
+✅ Report or action plan generated (per user choice)
+✅ Document status updated to reflect readiness (if fixes completed and user confirms)
+✅ Tracker comment posted with review outcome (Step 11 — graceful: skipped if tracker key absent)
+
+**Validate mode** — validation is successfully completed when:
+
+✅ All steps (0–9, 11) systematically executed without user interaction
+✅ Issues categorized by severity with precise locations
+✅ Hallucinations identified and documented with evidence
+✅ Scoring breakdown produced with per-dimension scores
+✅ Clear GO / NO-GO (Revision) / NO-GO (Rework) verdict rendered with justification
+✅ Validation report saved to `[story-dir]/[story-name].validate.[date].md`
+✅ Stdout summary printed for pipeline/CI callers
+✅ Exit non-zero if verdict is any NO-GO variant
+✅ **Zero modifications** to the story document (besides the `.validate.` report itself)
+✅ Tracker comment posted with verdict (Step 11 — graceful: skipped if tracker key absent)
 
 ---
 
@@ -2070,76 +2257,74 @@ Review is successfully completed when:
 
 **Called by**:
 
-- `scrum-master` - For story quality assurance
-- `po` - For product owner review
-- Manual invocation by user
+- `develop-story` pipeline — as a pre-implementation gate (validate mode, auto-selected)
+- `scrum-master` — for story quality assurance (validate mode for batch, interactive for single)
+- `po` — for product owner review (validate mode)
+- Manual invocation by user (either mode)
 
 **Calls**:
 
-- `mermaid-architect` - Validates any embedded Mermaid diagrams (Step 6.5) and recommends a diagram if absent and a visual would materially clarify the spec
+- `mermaid-architect` — validates any embedded Mermaid diagrams (Step 6.5) and recommends a diagram if absent
 
 **Outputs used by**:
 
-- Scrum masters to improve story quality
-- Developers to understand story issues before starting
-- Product owners to validate story accuracy
-- QA to understand testing completeness
+- `develop` — reads verdict before starting implementation
+- Scrum masters — project-readiness tracking, batch validation
+- Developers — understand story issues before starting
+- Product owners — validate story accuracy
+- QA — understand testing completeness
 
 ---
 
 ## Common Use Cases
 
-### 1. Pre-Implementation Review
+### 1. Pre-Implementation Gate (Validate mode)
+
+"Is story 2.3 ready to develop?" / `/review-story --validate story.2.3.auth-flow.md`
+
+Standard depth → verdict → if GO, proceed to `/develop`; if NO-GO, run interactive mode.
+
+### 2. Batch Validation (Validate mode)
+
+"Validate all stories in Epic 4"
+
+Iterate story files → quick depth on each → aggregate verdicts into per-epic readiness summary.
+
+### 3. Post-Edit Confirmation (Validate mode)
+
+"I just edited story 3.2. Is it clean now?"
+
+Standard depth → verdict → confirm GO or show remaining blockers.
+
+### 4. CI Quality Gate (Validate mode)
+
+"Block the PR if the story isn't ready"
+
+Quick depth in CI → exit non-zero on NO-GO → post comment to tracker issue.
+
+### 5. Pre-Implementation Review (Interactive mode)
 
 "Before starting work on story 2.3, review it for issues"
 
-**Process**:
+Standard review depth → clarifying questions → actionable recommendations → apply fixes.
 
-1. Standard review depth
-2. Focus on implementation readiness
-3. Flag blockers for developer
-
-### 2. Quality Audit
+### 6. Quality Audit (Interactive mode)
 
 "Review all stories in Epic 3 for quality"
 
-**Process**:
+Thorough depth → pattern violations → consistency across stories.
 
-1. Thorough review depth
-2. Look for pattern violations
-3. Ensure consistency across stories
-
-### 3. Post-Mortem Analysis
+### 7. Post-Mortem Analysis (Interactive mode)
 
 "Story 4.2 implementation went off-track. Review the story to see why"
 
-**Process**:
+Thorough depth → gaps and ambiguities → compare original story to Dev Agent Record.
 
-1. Thorough review depth
-2. Focus on gaps and ambiguities
-3. Compare original story to Dev Agent Record
-4. Identify what was missing or unclear
-
-### 4. Epic Migration Review
-
-"Epic was updated. Review story 1.5 to ensure it still aligns"
-
-**Process**:
-
-1. Standard review depth
-2. Focus on epic alignment
-3. Check for new requirements or removed ones
-
-### 5. Architecture Validation
+### 8. Architecture Validation (Interactive mode)
 
 "New architecture docs published. Review story 3.2 for accuracy"
 
-**Process**:
-
-1. Standard review depth
-2. Focus on technical accuracy
-3. Verify all sources still valid
-4. Check for new patterns or standards
+Standard depth → focus on technical accuracy → verify sources still valid.
 
 ---
 
@@ -2223,7 +2408,7 @@ This skill uses:
 - Review reports are saved separately as `story.{epic}.{story}.review.{n}.{descriptive-name}.md`. Use DOTS as structural separators and hyphens within the descriptive name. Example: `story.178.8.review.1.example-feature.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
 - Story status is updated in-place only when review outcome is READY TO IMPLEMENT and user confirms
 - Can be used at any stage: draft, in progress, completed
-- Supersedes `/validate-story` — provides everything validate-story does plus interactive clarification, epic alignment, consistency checks, and story split recommendations
+- Use `--validate` flag (or natural language like "is this story ready?") for the automated non-interactive gate. Validate mode is a strict subset of interactive mode — same checks, same scoring, no questions, read-only, CI-friendly exit codes.
 - Designed to find problems, not just validate compliance
 
 ```

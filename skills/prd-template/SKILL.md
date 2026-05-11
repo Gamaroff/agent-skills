@@ -9,12 +9,12 @@ description: Greenfield PRD template structure and guidance. Defines the complet
 
 This skill provides the template structure for creating Product Requirements Documents (PRDs) for **greenfield projects** - new products or features built from scratch without existing codebase constraints.
 
-**Typical users:** The `create-doc` skill or `greenfield-prd` workflow skill
+**Typical users:** The `create-doc` skill or `new-product-prd` workflow skill
 
 **Not for:**
 
 - Brownfield enhancements (use `brownfield-prd-template` instead)
-- Direct user interaction (users should interact with `greenfield-prd`)
+- Direct user interaction (users should interact with `new-product-prd`)
 
 ## Template Overview
 
@@ -300,7 +300,8 @@ workflow:
 
 **Used by:**
 
-- `greenfield-prd` - Primary consumer
+- `new-product-prd` - User-facing entry point (greenfield)
+- `create-prd` (mode=greenfield) - Orchestrator invoked by `new-product-prd`
 - `create-doc` - Execution engine
 
 **References:**
@@ -314,11 +315,12 @@ workflow:
 
 ```
 1. User wants PRD for new product
-2. greenfield-prd activates
-3. greenfield-prd calls create-doc with prd-template
-4. create-doc processes template section by section
-5. At completion, runs pm-checklist
-6. Outputs UX Expert and Architect prompts
+2. new-product-prd activates (user-facing entry point)
+3. new-product-prd delegates to create-prd with mode=greenfield
+4. create-prd calls create-doc with prd-template
+5. create-doc processes template section by section
+6. At completion, create-prd runs pm-checklist
+7. create-prd outputs UX Expert and Architect prompts
 ```
 
 ### Pattern 2: Epic Expansion
@@ -360,4 +362,4 @@ A successful PRD using this template produces:
 - Brownfield projects should use `brownfield-prd-template`
 - Template structure is rigid, content is flexible
 - Elicitation points are mandatory for quality
-- Users interact with `greenfield-prd`, not this template directly
+- Users interact with `new-product-prd`, not this template directly

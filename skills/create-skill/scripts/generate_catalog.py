@@ -46,7 +46,7 @@ CATEGORIES = [
     ]),
     ("Product Management & Planning", [
         "po", "pm-coordinator", "pm-checklist", "scrum-master", "analyst",
-        "greenfield-prd", "prd-template", "create-prd", "brownfield-prd-template",
+        "new-product-prd", "prd-template", "create-prd", "brownfield-prd-template",
         "shard-prd", "shard-doc", "review-prd",
     ]),
     ("Epic & Story Lifecycle", [
