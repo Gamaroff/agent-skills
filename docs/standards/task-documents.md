@@ -96,7 +96,7 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 
 ## Status lifecycle
 
-See [`status-lifecycle.md`](./status-lifecycle.md) for the full table. Task-specific transitions:
+> The canonical lifecycle lives at [`status-lifecycle.md`](./status-lifecycle.md). The table below is the **task-specific subset** showing which skill sets which status — same enum, scoped to this document type.
 
 | Frontmatter value | Set by | Precondition |
 |---|---|---|

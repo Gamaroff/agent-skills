@@ -64,115 +64,54 @@ python skills/create-skill/scripts/quick_validate.py skills/<skill-name>
 npm run generate-catalog
 ```
 
-Packaged `.zip` files sit alongside the skill directory and are the distributable format. **Zips are build artifacts and gitignored** (`skills/*/*.zip`) — regenerate with `package_skill.py` whenever you need to install or distribute. Do not commit them.
+Packaged `.zip` files are build artifacts (gitignored: `skills/*/*.zip`). Regenerate with `package_skill.py`; never commit.
 
 ## Configuration
 
-Projects using these skills place a `skills-config.yaml` at their project root. All available settings:
-
-```yaml
-qa:
-  qaLocation: docs/qa
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
-architecture:
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
-devLoadAlwaysFiles:
-  - docs/architecture/concepts/coding-standards.md
-devStoryLocation: nested # stories nested inside epic directories
-devDebugLog: .ai/debug-log.md
-```
+Projects place a `skills-config.yaml` at their root. Full schema and key reference: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 
 ### Platform Detection
 
-Skills that interact with remote trackers or PRs use this resolver order to pick the platform:
+Skills that interact with remote trackers or PRs use a resolver order to pick the platform — explicit config → env vars → git remote → default GitHub. Canonical spec: [`shared/resources/platform-detection.md`](./shared/resources/platform-detection.md).
 
-1. **`skills-config.yaml`**: explicit `tracker:` and `vcs:` keys (values: `jira | github`, `bitbucket | github`).
-2. **Env vars**: `JIRA_URL` set → tracker is Jira; otherwise GitHub.
-3. **Git remote**: `bitbucket.org` in `origin` → vcs is Bitbucket; `github.com` → vcs is GitHub.
-4. **Default**: GitHub for both.
+All leaf skills that branch on platform source `shared/resources/resolve-platform.sh` before the branch. `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
 
-All 8 leaf skills source `shared/resources/resolve-platform.sh` before any tracker/VCS branch:
+## File Naming
 
-- `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`
+Canonical patterns: [`docs/standards/file-naming.md`](./docs/standards/file-naming.md). Document-specific schemas under [`docs/standards/`](./docs/standards/) (epic, story, task, PRD).
 
-Skills that are platform-agnostic (no resolver needed):
+## Status Lifecycle
 
-- `create-branch`, `commit-changes`, `create-story` (docs-only), `qa-review`, `qa-gate`
+Canonical spec: [`shared/resources/document-status-lifecycle.md`](./shared/resources/document-status-lifecycle.md). TL;DR: `draft → planned → ready-for-development → in-progress → ready-for-review → accepted`, with `cancelled` reachable from any non-terminal state. Frontmatter `status:` uses `lowercase-kebab-case`; body `**Status:**` uses `Title Case`. Update both in the same edit.
 
-The canonical resolver spec lives in `shared/resources/platform-detection.md`. The helper is `shared/resources/resolve-platform.sh`; `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
+## Skill Catalog
 
-## File Naming Conventions (used in target projects)
-
-| Artifact   | Pattern                                    | Example                          |
-| ---------- | ------------------------------------------ | -------------------------------- |
-| Epic       | `epic.{n}.{name}.md`                       | `epic.178.feature-ui.md`         |
-| Story      | `story.{epic}.{story}.{name}.md`           | `story.178.8.example-feature.md` |
-| QA Report  | `story.{epic}.{story}.qa.{n}.{name}.md`    | `story.178.8.qa.1.review.md`     |
-| Gate File  | `story.{epic}.{story}.gate.{n}.{name}.yml` | `story.178.8.gate.1.review.yml`  |
-| Bug Report | `bug.{epic}.{story}.{n}.{name}.md`         | `bug.178.8.1.crash.md`           |
-| Task       | `task.{n}.{name}.md`                       | `task.44.db-migration.md`        |
-| Review Report (story) | `story.{epic}.{story}.review.{n}.{name}.md` | `story.178.8.review.1.example-feature.md` |
-| Review Report (task)  | `task.{n}.review.{name}.md`                 | `task.29.review.develop-task-loop-test-failure-triage-subagent.md` |
-
-### Status Lifecycle
-
-Document status follows a canonical lifecycle defined in `shared/resources/document-status-lifecycle.md`: `Draft → Planned → Ready for Development → In Progress → Ready for Review → Accepted`, with `Cancelled` reachable from any non-terminal state. Frontmatter `status:` uses lowercase kebab-case; body `Status:` uses Title Case. Both must be updated together.
-
-## Key Skill Categories
-
-**Development workflow:** `develop`, `develop-story`, `qa-review`, `qa-fix`, `qa-gate`, `finalise`
-
-**Git/version control:** `commit-changes`, `create-branch`, `create-pr`
-
-**Story/epic lifecycle:** `create-story`, `review-story`, `review-epic`, `edit-story`, `edit-epic`, `validate-story`
-
-**Product management:** `greenfield-prd`, `create-prd`, `create-epic`, `brownfield-story`, `scrum-master`
-
-**Architecture:** `architect`, `create-architecture-doc`, `execute-architect-checklist`
-
-**Enforcement/validation:** Many `*-enforcer` and `*-validator` skills for domain-specific checks
+Generated index of all skills: [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md). Run `npm run generate-catalog` after adding or editing skills.
 
 ## Plan File Locations
 
-Implementation plans must be co-located with the work they describe — never left in agent scratch directories like `~/.agents/plans/` or `/tmp/`.
-
-| Plan type | Location | Filename |
-| --- | --- | --- |
-| Task plan | Inside the task directory | `task.[ID].plan.[descriptive-name].md` |
-| Story plan | Inside the story directory (alongside story doc) | `story.[E].[S].plan.[descriptive-name].md` |
-| General plan (not tied to a task/story) | `.agents/plans/` in the repo | `<descriptive-kebab-case-name>.md` |
-
-If a plan was generated upstream by an agent scratch directory, **relocate its content** into the appropriate in-repo location above. Do not link to home-directory paths — they're outside the repo, not version-controlled, and invisible to teammates.
+Canonical rules: [`docs/standards/plan-file-locations.md`](./docs/standards/plan-file-locations.md). TL;DR: plans must be co-located with the work they describe — task plans inside the task dir, story plans inside the story dir, general plans in `.agents/plans/` in the repo. Never leave plans in agent scratch dirs (`~/.agents/plans/`, `/tmp/`).
 
 ## Task Registry
 
-`docs/development/tasks/task-registry.md` is the single source of truth for task numbering and status. Before creating a new task:
+Canonical rules: [`docs/standards/task-registry.md`](./docs/standards/task-registry.md). TL;DR: `docs/development/tasks/task-registry.md` owns task numbering. Read **Next Available Task Number** before `/create-task`, append a row, increment the counter, commit atomically with the new task files. Task numbers are globally unique and never reused.
 
-1. Read **Next Available Task Number** from the registry — that's your `task.[N]`.
-2. After running `/create-task`, add a row to the registry table.
-3. Increment **Next Available Task Number**.
-4. Commit registry update **in the same commit** as the new task files (atomic).
+## Epic Registry
 
-Task numbers are globally unique and never reused, even after cancellation.
+Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/development/epic-registry.md` is the single source of truth.
 
 ## Shared Resources
 
-`shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. At package time, `package_skill.py` auto-bundles referenced files under `references/` inside the zip and rewrites paths accordingly — installed skills are fully self-contained. Never use symlinks or relative paths to reference shared resources.
+`shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. At package time, `package_skill.py` auto-bundles referenced files under `references/` inside each skill's zip and rewrites paths accordingly — installed skills are fully self-contained. Never use symlinks or relative paths.
 
 ## Development Pipeline
 
-The core story implementation workflow used by these skills:
-
 ```
-validate-story → develop → qa-review → qa-fix (if needed) → finalise
+validate-story → develop → qa-story → qa-fix (if needed) → finalise
 ```
 
-Stories are the unit of work. QA gate files (PASS/CONCERNS/FAIL/WAIVED) are owned by QA skills — dev skills must never modify gate files.
+Stories are the unit of work. QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills — dev skills must never modify gate files. Full pipeline reference: [`docs/operations/workflows.md`](./docs/operations/workflows.md). Walkthroughs: [`docs/runbooks/`](./docs/runbooks/README.md).
 
 ## Evals
 
-The repo ships a four-layer eval suite for the create-task / create-story skills (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes (`claude-sdk`, `claude-cli`) and the live-tracker scenario are opt-in. See [docs/contributing/evals.md](./docs/contributing/evals.md) and `evals/shared/README.md` for the full setup, scenario layout, and how to add a driver for another agent.
+Four-layer eval suite for create-task / create-story / develop-task / develop-story (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes (`claude-sdk`, `claude-cli`) and the live-tracker scenario are opt-in. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) and `evals/shared/README.md`.

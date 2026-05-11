@@ -46,45 +46,18 @@ Skills activate automatically when compatible agents start — no further config
 
 ---
 
-## Skill Categories
+## Skill Catalog
 
-### Development workflow
-[`develop`](./skills/develop/SKILL.md) · [`develop-story`](./skills/develop-story/SKILL.md) · [`develop-task`](./skills/develop-task/SKILL.md) · [`qa-planning`](./skills/qa-planning/SKILL.md) · [`qa-story`](./skills/qa-story/SKILL.md) · [`qa-task`](./skills/qa-task/SKILL.md) · [`qa-fix`](./skills/qa-fix/SKILL.md) · [`qa-gate`](./skills/qa-gate/SKILL.md) · [`finalise`](./skills/finalise/SKILL.md) · [`correct-course`](./skills/correct-course/SKILL.md) · [`validate-story`](./skills/validate-story/SKILL.md)
+Full categorised index with descriptions (auto-generated): [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md).
 
-### Git & version control
-[`commit-changes`](./skills/commit-changes/SKILL.md) · [`create-branch`](./skills/create-branch/SKILL.md) · [`create-pr`](./skills/create-pr/SKILL.md) · [`git-time-travel`](./skills/git-time-travel/SKILL.md) · [`create-issue`](./skills/create-issue/SKILL.md)
+Featured starting points:
 
-### Story & epic lifecycle
-[`create-story`](./skills/create-story/SKILL.md) · [`review-story`](./skills/review-story/SKILL.md) · [`edit-story`](./skills/edit-story/SKILL.md) · [`create-epic`](./skills/create-epic/SKILL.md) · [`review-epic`](./skills/review-epic/SKILL.md) · [`edit-epic`](./skills/edit-epic/SKILL.md) · [`parallel-stories`](./skills/parallel-stories/SKILL.md) · [`scrum-master`](./skills/scrum-master/SKILL.md) · [`po`](./skills/po/SKILL.md)
-
-### Product management
-[`greenfield-prd`](./skills/greenfield-prd/SKILL.md) · [`create-prd`](./skills/create-prd/SKILL.md) · [`shard-prd`](./skills/shard-prd/SKILL.md) · [`review-prd`](./skills/review-prd/SKILL.md) · [`pm-coordinator`](./skills/pm-coordinator/SKILL.md) · [`pm-checklist`](./skills/pm-checklist/SKILL.md) · [`change-management`](./skills/change-management/SKILL.md) · [`audit`](./skills/audit/SKILL.md) · [`epic-registry-manager`](./skills/epic-registry-manager/SKILL.md)
-
-### Architecture
-[`architect`](./skills/architect/SKILL.md) · [`create-architecture-doc`](./skills/create-architecture-doc/SKILL.md) · [`execute-architect-checklist`](./skills/execute-architect-checklist/SKILL.md) · [`mermaid-architect`](./skills/mermaid-architect/SKILL.md) · [`shard-doc`](./skills/shard-doc/SKILL.md)
-
-### Enforcement & validation
-[`api-endpoint-validator`](./skills/api-endpoint-validator/SKILL.md) · [`code-smell-validator`](./skills/code-smell-validator/SKILL.md) · [`documentation-standards-validator`](./skills/documentation-standards-validator/SKILL.md) · [`navigation-pattern-validator`](./skills/navigation-pattern-validator/SKILL.md) · [`offline-first-enforcer`](./skills/offline-first-enforcer/SKILL.md) · [`platform-separation-validator`](./skills/platform-separation-validator/SKILL.md) · [`response-envelope-enforcer`](./skills/response-envelope-enforcer/SKILL.md) · [`test-co-location-enforcer`](./skills/test-co-location-enforcer/SKILL.md) · [`error-handling-enforcer`](./skills/error-handling-enforcer/SKILL.md) · [`enforce-standards`](./skills/enforce-standards/SKILL.md)
-
-### Frontend & UI
-[`create-frontend-spec`](./skills/create-frontend-spec/SKILL.md) · [`frontend-design`](./skills/frontend-design/SKILL.md) · [`generate-ui-prompt`](./skills/generate-ui-prompt/SKILL.md) · [`ux-expert`](./skills/ux-expert/SKILL.md) · [`building-components`](./skills/building-components/SKILL.md) · [`delight`](./skills/delight/SKILL.md) · [`performance-optimizer`](./skills/performance-optimizer/SKILL.md)
-
-### Infrastructure & services
-[`docker`](./skills/docker/SKILL.md) · [`deploy-remote`](./skills/deploy-remote/SKILL.md) · [`use-railway`](./skills/use-railway/SKILL.md) · [`railway-postgres-crud`](./skills/railway-postgres-crud/SKILL.md) · [`server-admin`](./skills/server-admin/SKILL.md)
-
-### Framework-specific
-[`nestjs-patterns`](./skills/nestjs-patterns/SKILL.md) · [`nestjs-debug`](./skills/nestjs-debug/SKILL.md) · [`react-native-debug`](./skills/react-native-debug/SKILL.md) · [`testing-setup-nestjs`](./skills/testing-setup-nestjs/SKILL.md) · [`testing-setup-react-native`](./skills/testing-setup-react-native/SKILL.md) · [`testing-setup-shared`](./skills/testing-setup-shared/SKILL.md) · [`upgrading-expo`](./skills/upgrading-expo/SKILL.md) · [`react-email`](./skills/react-email/SKILL.md) · [`resend`](./skills/resend/SKILL.md)
-
-### Research & analysis
-[`analyst`](./skills/analyst/SKILL.md) · [`research-prompt`](./skills/research-prompt/SKILL.md) · [`create-research-prompt`](./skills/create-research-prompt/SKILL.md) · [`deep-research-prompt`](./skills/deep-research-prompt/SKILL.md) · [`brainstorming`](./skills/brainstorming/SKILL.md) · [`shannon`](./skills/shannon/SKILL.md)
-
-### Writing & content
-[`distill`](./skills/distill/SKILL.md) · [`normalize`](./skills/normalize/SKILL.md) · [`polish`](./skills/polish/SKILL.md) · [`critique`](./skills/critique/SKILL.md) · [`extract`](./skills/extract/SKILL.md) · [`bolder`](./skills/bolder/SKILL.md) · [`quieter`](./skills/quieter/SKILL.md) · [`typeset`](./skills/typeset/SKILL.md) · [`arrange`](./skills/arrange/SKILL.md)
-
-### Meta / skill authoring
-[`create-skill`](./skills/create-skill/SKILL.md) · [`find-skills`](./skills/find-skills/SKILL.md) · [`autoskill`](./skills/autoskill/SKILL.md) · [`onboard`](./skills/onboard/SKILL.md) · [`document-project`](./skills/document-project/SKILL.md) · [`remember-insight`](./skills/remember-insight/SKILL.md) · [`pro-tip`](./skills/pro-tip/SKILL.md)
-
-Full catalog with descriptions: [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md)
+- **Development orchestrators:** [`develop-story`](./skills/develop-story/SKILL.md), [`develop-task`](./skills/develop-task/SKILL.md)
+- **Authoring:** [`create-story`](./skills/create-story/SKILL.md), [`create-task`](./skills/create-task/SKILL.md), [`create-epic`](./skills/create-epic/SKILL.md), [`create-prd`](./skills/create-prd/SKILL.md)
+- **Review:** [`review-story`](./skills/review-story/SKILL.md), [`review-task`](./skills/review-task/SKILL.md), [`review-epic`](./skills/review-epic/SKILL.md), [`review-prd`](./skills/review-prd/SKILL.md)
+- **QA:** [`qa-story`](./skills/qa-story/SKILL.md), [`qa-task`](./skills/qa-task/SKILL.md), [`qa-fix`](./skills/qa-fix/SKILL.md)
+- **Git/PR:** [`create-branch`](./skills/create-branch/SKILL.md), [`commit-changes`](./skills/commit-changes/SKILL.md), [`create-pr`](./skills/create-pr/SKILL.md)
+- **Meta:** [`create-skill`](./skills/create-skill/SKILL.md), [`find-skills`](./skills/find-skills/SKILL.md), [`document-project`](./skills/document-project/SKILL.md)
 
 ---
 
@@ -135,7 +108,7 @@ Full documentation under [`docs/`](./docs/README.md):
 | [Workflows](./docs/operations/workflows.md) | Pipeline, sprint cycle, hotfix, parallel dev, change management |
 | [Authoring skills](./docs/contributing/authoring-skills.md) | Authoring guide, file structure, best practices |
 | [Packaging](./docs/contributing/packaging.md) | Distribution, validation, shared resources |
-| [Evals](./docs/contributing/evals.md) | Four-layer test suite, drivers, live tracker scenarios |
+| [Evals](./docs/contributing/evals/README.md) | Four-layer test suite, drivers, live tracker scenarios |
 
 ---
 
