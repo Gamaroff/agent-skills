@@ -1,0 +1,9 @@
+{
+  "skipped": false,
+  "pr": {
+    "number": 101,
+    "url": "https://github.com/eval-owner/eval-repo/pull/101",
+    "baseRefName": "feature/epic.5.example",
+    "title": "feat(story.5.1): example story implementation"
+  }
+}

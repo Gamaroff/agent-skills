@@ -1,6 +1,6 @@
 ---
 name: develop-task
-description: Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/development/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; optional task-register integration; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".
+description: 'Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/development/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; optional task-register integration; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".'
 copyright: "Copyright (c) 2025 Lorien Gamaroff"
 license: MIT
 ---

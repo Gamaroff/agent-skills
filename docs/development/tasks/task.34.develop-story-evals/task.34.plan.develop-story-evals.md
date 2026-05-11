@@ -13,11 +13,13 @@ task-ref: task.34.develop-story-evals.md
 
 Mirror task.33's structure for develop-story while adding story-specific assertions (epic branch rules, PR base targeting, resume rehydration). Reuses task.33's shared infra wholesale. The riskiest part is Phase 5's resume-mid-loop scenario, which requires a deterministic kill signal — design that mechanism carefully.
 
+> **Naming correction (2026-05-11 review):** "Epic branch creation" lives in **Step 1a (`create-epic-branch`)** of `shared/resources/develop-pipeline-step-1-create-branch.md`. It is NOT "Phase 0d" — Phase 0d in `develop-story/SKILL.md` is the upfront-prompts step (Q1 base + Q2 PR target). All epic-branch protocol assertions parse the step-1 shared resource.
+
 ## Phase-by-Phase Implementation Guide
 
 ### Phase 1 — Story-specific assertions
 
-**File: `evals/develop-story/assertions.mjs`**
+**File: `evals/shared/assertions.mjs`** (extend — no skill-local file; consistent with task.33)
 
 ```js
 import { execFile } from 'node:child_process';
@@ -45,8 +47,15 @@ export async function epicBranchBasedOn(sandbox, epicNum, expectedBase = 'develo
   const branches = await sandbox.branchList();
   const epicBranch = branches.find(b => new RegExp(`^feature/epic\\.${epicNum}\\.`).test(b));
   if (!epicBranch) return { ok: false, reason: 'epic branch not found' };
-  const { stdout } = await sandbox.run('git', ['merge-base', epicBranch, expectedBase]);
-  return { ok: stdout.trim().length > 0, mergeBase: stdout.trim() };
+  // Stronger than `merge-base`: assert the epic branch's first commit equals base HEAD at fixture-init time,
+  // and that there are zero commits on `expectedBase` not reachable from the epic branch's parent.
+  const { stdout: forkPoint } = await sandbox.run('git', ['merge-base', '--fork-point', expectedBase, epicBranch]).catch(() => ({ stdout: '' }));
+  if (!forkPoint.trim()) {
+    // Fallback: ensure epic branch is a descendant of expectedBase head as captured at fixture init
+    const { stdout: ancestorCheck } = await sandbox.run('git', ['merge-base', '--is-ancestor', expectedBase, epicBranch]).then(() => ({ stdout: 'ok' })).catch(() => ({ stdout: '' }));
+    return { ok: ancestorCheck === 'ok', reason: ancestorCheck === 'ok' ? null : 'epic branch not descended from expectedBase' };
+  }
+  return { ok: true, forkPoint: forkPoint.trim() };
 }
 
 export function resumeRehydrated(events, { expectedStep, expectedIter }) {
@@ -106,21 +115,26 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('Phase 0d documents base=develop and only-if-missing', async () => {
-  const content = await readFile('skills/develop-story/SKILL.md', 'utf8');
-  const phase0d = content.match(/Phase 0d[\s\S]+?(?=\n## |\n### Phase )/);
-  assert.ok(phase0d, 'Phase 0d block not found');
-  assert.match(phase0d[0], /base[: ]+develop/i, 'Phase 0d must specify base=develop');
-  assert.match(phase0d[0], /only.if.missing|already.exists|skip/i, 'Phase 0d must specify only-if-missing semantics');
-  assert.match(phase0d[0], /feature\/epic\.\{n\}\.\{name\}|feature\/epic\.\d+/, 'Phase 0d must specify naming pattern');
+const STEP1_PATH = 'shared/resources/develop-pipeline-step-1-create-branch.md';
+const STEP4_PATH = 'shared/resources/develop-pipeline-step-4-create-pr.md';
+
+test('Step 1a (create-epic-branch) documents base=develop and only-if-missing', async () => {
+  const content = await readFile(STEP1_PATH, 'utf8');
+  assert.match(content, /create-epic-branch/i, 'Step 1a label missing');
+  assert.match(content, /from develop/i, 'Step 1a must specify base = develop');
+  assert.match(content, /pre-existing|already.exists|EPIC_BRANCH_EXISTS/i, 'Step 1a must specify only-if-missing semantics');
+  assert.match(content, /feature\/epic\.\{n\}\.\{name\}|feature\/epic\./, 'Step 1a must specify naming pattern');
 });
 
 test('PR creation step targets epic branch not develop', async () => {
+  const content = await readFile(STEP4_PATH, 'utf8');
+  assert.match(content, /--base.*EPIC_BRANCH|--base.*feature\/epic|epic.branch/i, 'PR creation must target epic branch');
+  assert.doesNotMatch(content, /--base develop\b/, 'PR creation must NOT hardcode --base develop');
+});
+
+test('SKILL.md description references create-epic-branch', async () => {
   const content = await readFile('skills/develop-story/SKILL.md', 'utf8');
-  const prSection = content.match(/create.pr|create-pr[\s\S]+?(?=\n## |\n### )/i);
-  assert.ok(prSection, 'PR creation section not found');
-  assert.match(prSection[0], /--base.*epic|epic.branch|epic_branch/i, 'PR creation must target epic branch');
-  assert.doesNotMatch(prSection[0], /--base develop\b/, 'PR creation must NOT hardcode --base develop');
+  assert.match(content, /create-epic-branch/, 'SKILL.md description should mention create-epic-branch');
 });
 ```
 
@@ -131,8 +145,8 @@ test('PR creation step targets epic branch not develop', async () => {
 ```json
 {
   "name": "develop-story-step-00-create-epic-branch-fresh",
-  "skill": "create-branch",
-  "description": "Phase 0d: epic branch created from develop on first story",
+  "skill": "develop-story",
+  "description": "Step 1a (create-epic-branch): epic branch created from develop on first story. Driver invokes develop-story; remaining steps short-circuited via fixture state.",
   "prompt": "Create the epic branch for epic.5",
   "fixtures": {
     "git": {
@@ -228,7 +242,8 @@ Choose option 1 first; fall back to option 2 if marker-based isn't reliable.
   ],
   "assertions": [
     { "fn": "resumeRehydrated", "args": ["$EVENTS_COMBINED", { "expectedStep": "qa-fix", "expectedIter": 3 }] },
-    { "fn": "pipelineStepsRan", "args": ["$EVENTS_COMBINED", ["finalise","commit-changes"]] }
+    { "fn": "pipelineStepsRan", "args": ["$EVENTS_COMBINED", ["finalise","commit-changes"]] },
+    { "fn": "iterCountAtMost", "args": ["$EVENTS_COMBINED", "qa-fix", 5], "comment": "MAX_ITER respected across resume" }
   ],
   "keepSandboxOnFailure": true
 }
@@ -238,12 +253,13 @@ Runner extension: support `stages[]` for multi-invocation scenarios. Likely a sm
 
 ### Phase 6 — Scripts + CI + docs
 
-**`package.json`:**
+**`package.json`** — match task.33 shape; assertions live in `evals/shared/assertions.mjs` (no `--assertions` flag needed):
 
 ```json
-"eval:develop-story": "node evals/shared/runner.mjs --assertions evals/develop-story/assertions.mjs evals/develop-story/step-isolation/* && node --test evals/develop-story/protocol/*.test.mjs",
-"eval:develop-story:smoke": "node evals/shared/runner.mjs --assertions evals/develop-story/assertions.mjs evals/develop-story/smoke/*",
-"eval:all": "npm run eval:create-task && npm run eval:create-story && npm run eval:develop-task && npm run eval:develop-story"
+"eval:develop-story": "node --test 'evals/develop-story/protocol/*.test.mjs' && for s in evals/develop-story/step-isolation/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
+"eval:develop-story:smoke": "node evals/shared/runner.mjs evals/develop-story/smoke/01-end-to-end-dry",
+"eval:develop-story:resume": "node evals/shared/runner.mjs evals/develop-story/smoke/02-resume-mid-loop",
+"eval:all": "for s in evals/create-task/scenarios/*/ evals/create-story/scenarios/*/ evals/develop-task/step-isolation/*/ evals/develop-story/step-isolation/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done"
 ```
 
 **`.github/workflows/test.yml`** — extend deterministic + smoke jobs added in task.33.
@@ -261,6 +277,15 @@ Runner extension: support `stages[]` for multi-invocation scenarios. Likely a sm
 ```
 
 **`evals/develop-story/README.md`** — document layers, especially the resume scenario's kill mechanism so future contributors understand the marker-based design.
+
+### Phase 1.5 — Runner + qa-fix extensions (load-bearing for Phase 5)
+
+**Files:** `evals/shared/runner.mjs`, `skills/qa-fix/SKILL.md` (or `shared/resources/develop-pipeline-step-5-6-qa-loop.md`)
+
+- [ ] Runner: argv currently single scenarioDir. Add scenario-config detection: if `scenario.json` has `stages[]`, run each in sequence; concat events into `$EVENTS_COMBINED`.
+- [ ] Runner: implement `killOn: { type: "marker", path }` — `fs.watch` on the path; on appearance, `child.kill('SIGINT')` then proceed to next stage.
+- [ ] qa-fix: at end of each iteration, `if (process.env.EVAL_MODE === '1') fs.writeFileSync('.task-state/qa-fix-iter-${N}.marker', '')`. Single line, behind env-guard.
+- [ ] Unit test: `EVAL_MODE` unset → no marker file written. Asserts no production-path FS side effect.
 
 ## Key Patterns and References
 

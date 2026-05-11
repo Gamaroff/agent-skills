@@ -286,6 +286,94 @@ export function noLockFilesLeft(dirPath) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// develop-story pipeline assertions
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert a GitHub PR receipt shows the PR targets an epic branch (not develop).
+ *
+ * Reads a JSON receipt file at receiptPath (shape: { skipped, pr: { baseRefName, ... } }).
+ * Skipped receipts pass — GH_TOKEN absent is acceptable in CI.
+ *
+ * @param {string} receiptPath  Path to a JSON GhReceipt file
+ * @param {number} epicNum      Epic number (e.g. 5 → base must match /^feature\/epic\.5\./)
+ */
+export function prTargetsEpicBranch(receiptPath, epicNum) {
+  if (!fs.existsSync(receiptPath)) {
+    return { ok: false, reason: `prTargetsEpicBranch: receipt file not found: ${receiptPath}` };
+  }
+  let receipt;
+  try {
+    receipt = JSON.parse(fs.readFileSync(receiptPath, "utf-8"));
+  } catch (e) {
+    return { ok: false, reason: `prTargetsEpicBranch: could not parse ${receiptPath}: ${e.message}` };
+  }
+  if (receipt.skipped) return { ok: true, reason: "" };
+  if (!receipt.pr) return { ok: false, reason: "prTargetsEpicBranch: receipt has no pr field" };
+  const expected = new RegExp(`^feature/epic\\.${epicNum}\\.`);
+  const actual = receipt.pr.baseRefName ?? "";
+  if (actual === "develop") {
+    return { ok: false, reason: `prTargetsEpicBranch: PR targets develop — expected epic branch matching ${expected}` };
+  }
+  const ok = expected.test(actual);
+  return {
+    ok,
+    reason: ok ? "" : `prTargetsEpicBranch: base "${actual}" does not match ${expected}`,
+  };
+}
+
+/**
+ * Assert that a branch matching the epic pattern exists in a git repo at repoPath.
+ *
+ * In replay mode, reads `.eval/branches.json`. In live mode, runs `git branch --list`.
+ *
+ * @param {string} repoPath  Path to a git repo or replay sandbox
+ * @param {number} epicNum   Epic number (e.g. 5 → matches /^feature\/epic\.5\./)
+ */
+export function epicBranchExists(repoPath, epicNum) {
+  const namePattern = `^feature/epic\\.${epicNum}\\.`;
+  return branchExists(repoPath, namePattern);
+}
+
+/**
+ * Assert resume was detected and the expected step reached the expected iteration count.
+ *
+ * Reads a JSON file at eventsPath containing an array of RecordedEvent objects.
+ *
+ * @param {string} eventsPath                 Path to a JSON file with RecordedEvent[]
+ * @param {{ expectedStep: string, expectedIter: number }} opts
+ */
+export function resumeRehydrated(eventsPath, opts = {}) {
+  if (!fs.existsSync(eventsPath)) {
+    return { ok: false, reason: `resumeRehydrated: events file not found: ${eventsPath}` };
+  }
+  let events;
+  try {
+    events = JSON.parse(fs.readFileSync(eventsPath, "utf-8"));
+  } catch (e) {
+    return { ok: false, reason: `resumeRehydrated: could not parse ${eventsPath}: ${e.message}` };
+  }
+  const resumeEvent = events.find(
+    e => e.skill === "resume-detector" || /resume/i.test(String(e.skill ?? "")),
+  );
+  if (!resumeEvent) {
+    return { ok: false, reason: "resumeRehydrated: no resume detection event found in events" };
+  }
+  if (opts.expectedStep && opts.expectedIter != null) {
+    const stepCount = events.filter(
+      e => e.skill === opts.expectedStep && e.status === "started",
+    ).length;
+    if (stepCount < opts.expectedIter) {
+      return {
+        ok: false,
+        reason: `resumeRehydrated: expected "${opts.expectedStep}" to reach iter ${opts.expectedIter}, got ${stepCount}`,
+      };
+    }
+  }
+  return { ok: true, reason: "" };
+}
+
 /** Recursive file search by extension. */
 function findFiles(dir, ext) {
   const results = [];

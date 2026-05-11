@@ -205,7 +205,16 @@ After fixes are applied:
    - `null` / missing / empty (poller succeeded but state field absent) → log warning `"⚠️ PR state unknown after qa-fix push — re-polling once"`; re-invoke the poller once. If the second result is still null/missing, log `"⚠️ PR state could not be determined — proceeding optimistically (treating as OPEN)"` in Issues Log and continue. Do **not** HALT on null — flaky `gh pr view` is more common than mid-loop close.
    - `result.errors | length > 0` → log each error in Issues Log; treat `pr.state` per the rules above (the poller may still return a usable state alongside non-fatal errors).
 
-6. Increment the cycle counter and return to 5a.
+6. **Emit eval marker (EVAL_MODE guard)**: If the environment variable `EVAL_MODE=1` is set, write an empty marker file after each completed qa-fix iteration so eval harnesses can detect the iteration boundary and send a kill signal for resume testing:
+   ```bash
+   if [ "${EVAL_MODE}" = "1" ]; then
+     mkdir -p .task-state
+     touch ".task-state/qa-fix-iter-${QA_CYCLE}.marker"
+   fi
+   ```
+   This is a no-op in all production runs where `EVAL_MODE` is unset.
+
+7. Increment the cycle counter and return to 5a.
 
 ---
 

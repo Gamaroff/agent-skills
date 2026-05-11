@@ -1,0 +1,12 @@
+[
+  {"skill": "qa-story", "args": null, "status": "started", "timestamp": 1000},
+  {"skill": "qa-fix",   "args": null, "status": "started", "timestamp": 2000},
+  {"skill": "qa-story", "args": null, "status": "started", "timestamp": 3000},
+  {"skill": "qa-fix",   "args": null, "status": "started", "timestamp": 4000},
+  {"skill": "qa-story", "args": null, "status": "started", "timestamp": 5000},
+  {"skill": "qa-fix",   "args": null, "status": "started", "timestamp": 6000},
+  {"skill": "qa-story", "args": null, "status": "started", "timestamp": 7000},
+  {"skill": "qa-fix",   "args": null, "status": "started", "timestamp": 8000},
+  {"skill": "qa-story", "args": null, "status": "started", "timestamp": 9000},
+  {"skill": "qa-fix",   "args": null, "status": "started", "timestamp": 10000}
+]

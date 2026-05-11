@@ -1,0 +1,10 @@
+{
+  "name": "develop-story-step-03-develop-loop",
+  "skill": "develop-story",
+  "description": "Step 3: develop loop advances story.5.1.example to ready-for-review status.",
+  "prompt": "Run step 3 (develop) of the develop-story pipeline for story.5.1.example.",
+  "assertions": [
+    { "fn": "fileExists",   "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.example.md"] },
+    { "fn": "fileMatches",  "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.example.md", "ready-for-review"] }
+  ]
+}
