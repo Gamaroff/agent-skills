@@ -8,41 +8,18 @@ A library of **AI coding agent skills** — modular, self-contained packages tha
 
 Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 
+See [docs/overview.md](./docs/overview.md) for how skills work.
+
 ---
 
 ## Contents
 
-- [How It Works](#how-it-works)
 - [Installing Skills](#installing-skills)
 - [Skill Categories](#skill-categories)
 - [Scripts](#scripts)
 - [Creating Skills](#creating-skills)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
-
----
-
-## How It Works
-
-Skills load in three tiers — only what's needed enters the context window:
-
-| Tier | What loads | When |
-|------|-----------|------|
-| **Metadata** | Skill name + description (~100 words) | Always — used for auto-activation matching |
-| **SKILL.md body** | Full instructions + patterns | When the skill triggers |
-| **References** | Domain guides, templates, examples | On demand during execution |
-
-Each skill is a directory:
-
-```
-skills/my-skill/
-├── SKILL.md          # YAML frontmatter + instructions
-├── scripts/          # Deterministic helper scripts
-├── references/       # Docs loaded into context as needed
-└── assets/           # Templates and boilerplate
-```
-
-The `description` field in `SKILL.md` frontmatter is what the agent reads to decide whether to activate the skill. Keep it precise.
 
 ---
 
@@ -135,15 +112,11 @@ Packaged `.zip` files are build artifacts (gitignored). Regenerate them any time
 
 ## Creating Skills
 
-Scaffold a new skill:
-
 ```bash
 python3 skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
 ```
 
-This generates the directory structure with a starter `SKILL.md`. Fill in the `description` frontmatter field — that's the activation trigger the agent reads.
-
-See [`docs/creating-skills.md`](./docs/creating-skills.md) for the full authoring guide, file structure, and best practices.
+See [`docs/creating-skills.md`](./docs/creating-skills.md) for the full authoring guide.
 
 ---
 
