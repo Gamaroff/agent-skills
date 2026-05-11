@@ -45,7 +45,7 @@ Given a story directory, these skills auto-discover:
 - **Story file:** `story.{epic}.{story}.{name}.md`
 - **QA reports:** `story.{epic}.{story}.qa.{number}.*.md`
 - **Gate files:** `story.{epic}.{story}.gate.{number}.*.yml`
-- **Bug reports:** `bug.{epic}.{story}.{n}.{name}.md`
+- **Bug reports:** `story.{epic}.{story}.bug.{n}.{name}.md`
 
 ### Examples
 

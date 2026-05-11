@@ -27,7 +27,7 @@ flowchart TD
 
 ```
 1. [QA finds issue during review]   → /qa-story or /qa-task
-2. /create-bug-report               → bug.{epic}.{story}.{n}.{name}.md (co-located)
+2. /create-bug-report               → story.{epic}.{story}.bug.{n}.{name}.md (co-located)
 3. [Developer fixes bug]            → /qa-fix can be used to drive the fix
 4. /qa-story <story>                → re-review against the bug report
 5. /commit-changes                  → focused commit referencing the bug report
@@ -36,12 +36,11 @@ flowchart TD
 ## Bug report naming
 
 ```
-bug.{epic}.{story}.{n}.{name}.md          # bug against a story
+story.{epic}.{story}.bug.{n}.{name}.md    # bug against a story
+task.{n}.bug.{n}.{name}.md               # bug against a task
 ```
 
-`{n}` is the sequential bug number within the story. See [file naming](../standards/file-naming.md).
-
-Tasks don't have a dedicated bug-report skill — record task bugs in the task's QA report instead.
+`{n}` is the sequential bug number within the story or task. See [file naming](../standards/file-naming.md).
 
 ## Pitfalls
 

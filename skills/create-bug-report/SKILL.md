@@ -812,7 +812,7 @@ reproduction_steps:
 6. **Initial Status**: Always start with "New" status
 7. **Severity-Driven**: HIGH/MEDIUM → Create bug report, LOW → QA report only
 8. **Naming Convention**:
-   - Story bugs: `bug.{epic}.{story}.{n}.{name}.md`
+   - Story bugs: `story.{epic}.{story}.bug.{n}.{name}.md`
    - Task bugs: `task.{id}.bug.{n}.{name}.md`
 
 ---
@@ -830,9 +830,9 @@ reproduction_steps:
 
 **Story Bugs**:
 
-- Pattern: `bug.{epic}.{story}.{number}.{name}.md`
+- Pattern: `story.{epic}.{story}.bug.{number}.{name}.md`
 - Location: Co-located with story file in story directory
-- Numbering resets for each story (story 8.5.3 has bug.8.5.3.1, bug.8.5.3.2, etc.)
+- Numbering resets for each story (story 8.5.3 has story.8.5.3.bug.1, story.8.5.3.bug.2, etc.)
 
 **Technical Task Bugs**:
 
