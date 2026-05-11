@@ -1,0 +1,9 @@
+{
+  "name": "develop-story-step-00-create-epic-branch-exists",
+  "skill": "develop-story",
+  "description": "Step 1a: create-epic-branch is a no-op when feature/epic.5.example already exists — only-if-missing semantics.",
+  "prompt": "Run step 1a (create-epic-branch) of the develop-story pipeline for story.5.1.example. Epic branch already exists.",
+  "assertions": [
+    { "fn": "epicBranchExists", "args": ["$SANDBOX", 5] }
+  ]
+}

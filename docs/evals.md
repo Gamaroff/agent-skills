@@ -2,7 +2,7 @@
 
 Task-oriented guide for running the eval suite. Recipes first; reference tables at the bottom.
 
-Suite catches drift between SKILL.md prose, deterministic helpers, and end-to-end behaviour for `create-task` / `create-story` / `develop-task`.
+Suite catches drift between SKILL.md prose, deterministic helpers, and end-to-end behaviour for `create-task` / `create-story` / `develop-task` / `develop-story`.
 
 ---
 
@@ -13,6 +13,8 @@ npm test                         # everything hermetic — no creds needed
 npm run eval:create-task:sdk     # one live scenario via Claude SDK (needs ANTHROPIC_API_KEY)
 npm run eval:develop-task        # develop-task protocol + step-isolation (no creds)
 npm run eval:develop-task:smoke  # full end-to-end smoke (needs ANTHROPIC_API_KEY)
+npm run eval:develop-story       # develop-story protocol + step-isolation (no creds)
+npm run eval:develop-story:smoke # develop-story full smoke (needs ANTHROPIC_API_KEY)
 ```
 
 If `npm test` is green, every push will stay green in CI. Live drivers are opt-in.
@@ -145,6 +147,8 @@ You don't need both local and CI live setups — pick one.
 | create-story scenario | `evals/create-story/scenarios/<name>/` (see `evals/create-story/README.md#adding-a-scenario`) |
 | develop-task step-isolation scenario | `evals/develop-task/step-isolation/<name>/` (see `evals/develop-task/README.md#adding-a-scenario`) |
 | develop-task protocol test | `evals/develop-task/protocol/*.test.mjs` |
+| develop-story step-isolation scenario | `evals/develop-story/step-isolation/<name>/` (see `evals/develop-story/README.md#adding-a-scenario`) |
+| develop-story protocol test | `evals/develop-story/protocol/*.test.mjs` |
 | Agent backend (Gemini, Goose, Aider, …) | `evals/shared/drivers/<name>.mjs` (see `evals/shared/README.md#adding-a-driver-for-another-agent`) |
 | Structural assertion fn | `evals/shared/assertions.mjs` + register in `runner.mjs` switch + test in `evals/shared/tests/assertions.test.mjs` |
 
@@ -155,6 +159,36 @@ npm run eval:develop-task
 ```
 
 Runs all protocol tests (`evals/develop-task/protocol/*.test.mjs`) then all step-isolation scenarios in replay mode. Deterministic — no model calls, no creds needed.
+
+### 13. "I want to run the develop-story evals"
+
+```bash
+npm run eval:develop-story
+```
+
+Runs all protocol tests (`evals/develop-story/protocol/*.test.mjs`) then all 10 step-isolation scenarios in replay mode. Includes story-specific checks: epic branch creation (`create-epic-branch`), only-if-missing semantics, PR targets epic branch (`prTargetsEpicBranch`), and the 9-step sub-skill ordering. Deterministic — no model calls, no creds needed.
+
+### 14. "I want to run the develop-story smoke test"
+
+Full 8-step pipeline for a story with git-sandbox + optional gh-sandbox:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run eval:develop-story:smoke
+```
+
+Full — with real GitHub PR targeting the epic branch:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... GH_TOKEN=ghp_... GH_REPO=your-handle/eval-sandbox npm run eval:develop-story:smoke
+```
+
+Key assertion: `prTargetsEpicBranch` verifies the PR base is `feature/epic.5.example`, not `develop`. This is the primary regression guard for story pipeline drift.
+
+Resume test (requires `EVAL_MODE=1` + kill support in driver):
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run eval:develop-story:resume
+```
 
 ### 12. "I want to run the develop-task smoke test"
 
@@ -249,6 +283,18 @@ Add a driver: drop `evals/shared/drivers/<name>.mjs` implementing the contract i
 | `07-finalise` | develop-task | `evals/develop-task/step-isolation/07-finalise/` | DoD file produced, task accepted |
 | `08-commit-changes` | develop-task | `evals/develop-task/step-isolation/08-commit-changes/` | No lock files left, implementation report present |
 | `01-end-to-end-dry` | develop-task | `evals/develop-task/smoke/01-end-to-end-dry/` | **Live** full 8-step pipeline; GH PR optional via `GH_TOKEN` |
+| `00-create-epic-branch-fresh` | develop-story | `evals/develop-story/step-isolation/00-create-epic-branch-fresh/` | Epic branch created from develop (no pre-existing branch) |
+| `00-create-epic-branch-exists` | develop-story | `evals/develop-story/step-isolation/00-create-epic-branch-exists/` | Epic branch already exists — only-if-missing no-op |
+| `01-create-story-branch` | develop-story | `evals/develop-story/step-isolation/01-create-story-branch/` | Story branch created from epic branch, not develop |
+| `02-review-story` | develop-story | `evals/develop-story/step-isolation/02-review-story/` | Review report produced |
+| `03-develop-loop` | develop-story | `evals/develop-story/step-isolation/03-develop-loop/` | Story status progressed to ready-for-review |
+| `04-create-pr` | develop-story | `evals/develop-story/step-isolation/04-create-pr/` | PR targets epic branch (`prTargetsEpicBranch` regression guard) |
+| `05-qa-story` | develop-story | `evals/develop-story/step-isolation/05-qa-story/` | QA report + gate file produced with PASS |
+| `06-qa-fix` | develop-story | `evals/develop-story/step-isolation/06-qa-fix/` | qa-fix loop bounded (≤5 iterations) |
+| `07-finalise` | develop-story | `evals/develop-story/step-isolation/07-finalise/` | DoD file produced, story accepted |
+| `08-commit-changes` | develop-story | `evals/develop-story/step-isolation/08-commit-changes/` | No lock files left, implementation report present |
+| `01-end-to-end-dry` | develop-story | `evals/develop-story/smoke/01-end-to-end-dry/` | **Live** full pipeline; epic branch + PR-base assertions |
+| `02-resume-mid-loop` | develop-story | `evals/develop-story/smoke/02-resume-mid-loop/` | **Live** pipeline killed mid qa-fix, resumed; verifies `resumeRehydrated` |
 
 Each scenario is `scenario.json` + `answers.jsonl` + `env.json` + `replay/`.
 
@@ -256,19 +302,22 @@ Each scenario is `scenario.json` + `answers.jsonl` + `env.json` + `replay/`.
 
 ```bash
 npm test                         # platform resolver + L1 + L2 + L3 + L4 replay
-npm run test:node                # L1 + L2 + L3 + assertion + driver tests (incl. develop-task protocol)
-npm run test:platform            # resolve-platform.sh tests only
-npm run eval:all                 # L4: all create-task + create-story + develop-task step-isolation, replay
-npm run eval:create-task         # L4: create-task scenario 01, replay
-npm run eval:create-task:all     # L4: all create-task scenarios, replay
-npm run eval:create-task:cli     # L4: create-task scenario 01, DRIVER=claude-cli
-npm run eval:create-task:sdk     # L4: create-task scenario 01, DRIVER=claude-sdk
-npm run eval:create-story        # L4: create-story scenario 01, replay
-npm run eval:create-story:all    # L4: all create-story scenarios, replay
-npm run eval:create-story:cli    # L4: create-story scenario 01, DRIVER=claude-cli
-npm run eval:create-story:sdk    # L4: create-story scenario 01, DRIVER=claude-sdk
-npm run eval:develop-task        # L3+L4: develop-task protocol tests + step-isolation scenarios, replay
-npm run eval:develop-task:smoke  # L5: develop-task full smoke (needs ANTHROPIC_API_KEY)
+npm run test:node                 # L1 + L2 + L3 + assertion + driver tests (incl. develop-task + develop-story protocol)
+npm run test:platform             # resolve-platform.sh tests only
+npm run eval:all                  # L4: all create-task + create-story + develop-task + develop-story step-isolation, replay
+npm run eval:create-task          # L4: create-task scenario 01, replay
+npm run eval:create-task:all      # L4: all create-task scenarios, replay
+npm run eval:create-task:cli      # L4: create-task scenario 01, DRIVER=claude-cli
+npm run eval:create-task:sdk      # L4: create-task scenario 01, DRIVER=claude-sdk
+npm run eval:create-story         # L4: create-story scenario 01, replay
+npm run eval:create-story:all     # L4: all create-story scenarios, replay
+npm run eval:create-story:cli     # L4: create-story scenario 01, DRIVER=claude-cli
+npm run eval:create-story:sdk     # L4: create-story scenario 01, DRIVER=claude-sdk
+npm run eval:develop-task         # L3+L4: develop-task protocol tests + step-isolation scenarios, replay
+npm run eval:develop-task:smoke   # L5: develop-task full smoke (needs ANTHROPIC_API_KEY)
+npm run eval:develop-story        # L3+L4: develop-story protocol tests + step-isolation scenarios, replay
+npm run eval:develop-story:smoke  # L5: develop-story full smoke (needs ANTHROPIC_API_KEY)
+npm run eval:develop-story:resume # L5: develop-story resume-mid-loop (needs ANTHROPIC_API_KEY + EVAL_MODE=1)
 ```
 
 ### Canonical sources
@@ -279,7 +328,9 @@ This doc navigates. Authoritative details live next to the code:
 - `evals/create-task/README.md` — create-task scenario coverage and how to run
 - `evals/create-story/README.md` — create-story scenario coverage and how to run
 - `evals/develop-task/README.md` — develop-task eval layers, smoke test usage, adding new scenarios
+- `evals/develop-story/README.md` — develop-story eval layers, epic-branch assertions, resume scenario
 - `evals/create-task/scenarios/03-tracker-live/README.md` — live tracker env contract, receipt shape, safety notes
 - `evals/develop-task/smoke/01-end-to-end-dry/README.md` — smoke test env contract, failure investigation, cleanup
+- `evals/develop-story/smoke/01-end-to-end-dry/README.md` — develop-story smoke env contract, PR-base assertion
 - `evals/shared/drivers/types.mjs` — `AgentDriver` JSDoc contract
 - `.github/workflows/test.yml` — CI gating

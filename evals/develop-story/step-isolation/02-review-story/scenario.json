@@ -1,0 +1,9 @@
+{
+  "name": "develop-story-step-02-review-story",
+  "skill": "develop-story",
+  "description": "Step 2: review-story produces a review report for story.5.1.example.",
+  "prompt": "Run step 2 (review-story) of the develop-story pipeline for story.5.1.example.",
+  "assertions": [
+    { "fn": "fileExists", "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.review.1.example.md"] }
+  ]
+}

@@ -72,11 +72,12 @@ async function loadDriver(name) {
   return d;
 }
 
-function runAssertions(assertions, ctx) {
+function runAssertions(assertions, ctx, pathResolver) {
+  const resolve = pathResolver || ((p, sb) => resolvePath(p, sb));
   const results = [];
   for (const a of assertions) {
     const args = (a.args || []).map(v =>
-      typeof v === "string" ? resolvePath(v, ctx.sandbox) : v,
+      typeof v === "string" ? resolve(v, ctx.sandbox) : v,
     );
     switch (a.fn) {
       case "fileExists":                 results.push(A.fileExists(...args)); break;
@@ -93,10 +94,47 @@ function runAssertions(assertions, ctx) {
       case "loopBoundedAt":             results.push(A.loopBoundedAt(args[0], args[1], args[2])); break;
       case "prCreated":                 results.push(A.prCreated(args[0], typeof args[1] === "object" ? args[1] : {})); break;
       case "noLockFilesLeft":           results.push(A.noLockFilesLeft(...args)); break;
+      // develop-story pipeline assertions
+      case "prTargetsEpicBranch":       results.push(A.prTargetsEpicBranch(args[0], args[1])); break;
+      case "epicBranchExists":          results.push(A.epicBranchExists(args[0], args[1])); break;
+      case "resumeRehydrated":          results.push(A.resumeRehydrated(args[0], typeof args[1] === "object" ? args[1] : {})); break;
       default: results.push({ ok: false, reason: `unknown assertion fn: ${a.fn}` });
     }
   }
   return results;
+}
+
+/**
+ * Run a single driver stage, optionally killing on marker file appearance.
+ *
+ * For replay mode or drivers without runInterruptible, killOn is ignored
+ * (the stage completes normally — fixtures don't need kill semantics).
+ */
+async function runStage(driver, ctx, stage = {}) {
+  if (!stage.killOn) return driver.run(ctx);
+  if (stage.killOn.type !== "marker") {
+    process.stderr.write(`runner: unsupported killOn.type "${stage.killOn.type}" — running stage normally\n`);
+    return driver.run(ctx);
+  }
+  if (typeof driver.runInterruptible !== "function") {
+    process.stderr.write("runner: killOn requires driver.runInterruptible — running stage normally\n");
+    return driver.run(ctx);
+  }
+  const markerPath = resolvePath(stage.killOn.path, ctx.sandbox);
+  const { promise: runPromise, kill } = driver.runInterruptible(ctx);
+  const markerWatchInterval = 250;
+  const markerPromise = new Promise(resolve => {
+    if (fs.existsSync(markerPath)) { resolve(); return; }
+    const iv = setInterval(() => {
+      if (fs.existsSync(markerPath)) { clearInterval(iv); resolve(); }
+    }, markerWatchInterval);
+  });
+  const winner = await Promise.race([runPromise.then(() => "done"), markerPromise.then(() => "marker")]);
+  if (winner === "marker") {
+    process.stderr.write(`runner: marker found at ${markerPath} — signalling driver\n`);
+    kill();
+  }
+  return runPromise.catch(() => ({ remainingAnswers: [] }));
 }
 
 async function main() {
@@ -138,26 +176,74 @@ async function main() {
     ? path.join(REPO_ROOT, "skills", scenario.skill)
     : "";
 
-  const driverCtx = {
+  const baseCtx = {
     sandbox,
     skill: scenario.skill || "",
     skillRoot,
-    prompt: scenario.prompt || "",
     answers: readJSONL(path.join(absScenarioDir, "answers.jsonl")),
     env: driverEnv,
   };
 
   let driverResult;
+  let combinedEventsPath;
+
   try {
-    driverResult = await driver.run(driverCtx);
+    if (Array.isArray(scenario.stages)) {
+      // Multi-stage run: iterate stages, concatenate events
+      const combinedEvents = [];
+      let remainingAnswers = [...baseCtx.answers];
+
+      for (const stage of scenario.stages) {
+        const stageCtx = {
+          ...baseCtx,
+          prompt: stage.command || scenario.prompt || "",
+          answers: remainingAnswers,
+        };
+        process.stderr.write(`[${driverName}] stage: ${stage.phase || "unnamed"}\n`);
+        const stageResult = await runStage(driver, stageCtx, stage);
+        remainingAnswers = stageResult.remainingAnswers || [];
+
+        // Collect events written by this stage
+        const eventsFile = path.join(sandbox, ".eval", "pipeline-events.json");
+        if (fs.existsSync(eventsFile)) {
+          try {
+            const stageEvents = JSON.parse(fs.readFileSync(eventsFile, "utf-8"));
+            combinedEvents.push(...stageEvents);
+            // Remove so next stage starts fresh
+            fs.rmSync(eventsFile);
+          } catch { /* ignore parse errors */ }
+        }
+      }
+
+      // Write combined events
+      combinedEventsPath = path.join(sandbox, ".eval", "pipeline-events-combined.json");
+      fs.mkdirSync(path.join(sandbox, ".eval"), { recursive: true });
+      fs.writeFileSync(combinedEventsPath, JSON.stringify(combinedEvents));
+      driverResult = { remainingAnswers };
+    } else {
+      // Single-stage run (existing behaviour)
+      const driverCtx = { ...baseCtx, prompt: scenario.prompt || "" };
+      driverResult = await driver.run(driverCtx);
+    }
   } catch (e) {
     process.stderr.write(`[${driverName}] driver error: ${e.message}\n`);
     if (!process.env.KEEP_SANDBOX) fs.rmSync(sandbox, { recursive: true, force: true });
     process.exit(1);
   }
 
+  // Resolve $EVENTS_COMBINED token in assertions
+  const combinedPath = combinedEventsPath || path.join(sandbox, ".eval", "pipeline-events-combined.json");
+  function resolvePathExtended(p, sandbox) {
+    return resolvePath(p, sandbox)
+      .replace(/\$EVENTS_COMBINED/g, combinedPath);
+  }
+
   const ctx = { sandbox, remainingAnswers: driverResult.remainingAnswers || [] };
-  const results = runAssertions(scenario.assertions || [], ctx);
+  const results = runAssertions(
+    scenario.assertions || [],
+    ctx,
+    resolvePathExtended,
+  );
   const agg = A.aggregate(results);
 
   for (const f of agg.failures) process.stderr.write(`  ✗ ${f.reason}\n`);

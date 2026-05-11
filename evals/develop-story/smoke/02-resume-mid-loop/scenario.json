@@ -1,0 +1,25 @@
+{
+  "name": "develop-story-smoke-02-resume-mid-loop",
+  "skill": "develop-story",
+  "description": "Resume scenario: pipeline killed mid qa-fix loop (after iter 2), resumed from lock file. Verifies resumeRehydrated + iteration count.",
+  "mode": "smoke",
+  "stages": [
+    {
+      "label": "stage-1-run-to-qa-fix",
+      "prompt": "Run the develop-story pipeline for story.5.1.example. Start from the beginning.",
+      "killOn": {
+        "type": "marker",
+        "path": ".task-state/qa-fix-iter-2.marker"
+      }
+    },
+    {
+      "label": "stage-2-resume",
+      "prompt": "Resume the develop-story pipeline for story.5.1.example from where it was interrupted.",
+      "killOn": null
+    }
+  ],
+  "assertions": [
+    { "fn": "resumeRehydrated", "args": ["$SANDBOX/.eval/pipeline-events-combined.json", { "expectedStep": "qa-fix", "expectedIter": 2 }] },
+    { "fn": "noLockFilesLeft",  "args": ["$SANDBOX"] }
+  ]
+}

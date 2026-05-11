@@ -1,0 +1,10 @@
+{
+  "name": "develop-story-step-01-create-story-branch",
+  "skill": "develop-story",
+  "description": "Step 1b: create-story-branch creates feature/story.5.1.example from the epic branch (not develop).",
+  "prompt": "Run step 1b (create-story-branch) of the develop-story pipeline for story.5.1.example.",
+  "assertions": [
+    { "fn": "branchExists", "args": ["$SANDBOX", "^feature/story\\.5\\.1"] },
+    { "fn": "epicBranchExists", "args": ["$SANDBOX", 5] }
+  ]
+}

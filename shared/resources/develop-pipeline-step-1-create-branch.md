@@ -35,6 +35,8 @@ If the lock exists but its `branch` field does not match any existing local bran
 
 ## Step 1a: Ensure Epic Branch Exists (develop-story only)
 
+Epic branch naming convention: `feature/epic.{n}.{name}` (e.g. `feature/epic.5.payments`). Set by Phase 0 as `EPIC_BRANCH="feature/epic.${EPIC_NUM}.${EPIC_SLUG}"`.
+
 Before creating the story branch, ensure the epic branch exists. Use `EPIC_BRANCH`, `EPIC_BRANCH_EXISTS`, `EPIC_BRANCH_LOCAL`, and `EPIC_BRANCH_REMOTE` set in Phase 0.
 
 ### Case A — Epic branch not found locally or remotely (`EPIC_BRANCH_EXISTS=false`)

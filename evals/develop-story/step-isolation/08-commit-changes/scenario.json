@@ -1,0 +1,10 @@
+{
+  "name": "develop-story-step-08-commit-changes",
+  "skill": "develop-story",
+  "description": "Step 8: commit-changes removes pipeline lock and commits implementation report.",
+  "prompt": "Run step 8 (commit-changes) of the develop-story pipeline for story.5.1.example.",
+  "assertions": [
+    { "fn": "noLockFilesLeft", "args": ["$SANDBOX"] },
+    { "fn": "fileExists",      "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example-initial-run.md"] }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "develop-story-smoke-01-end-to-end-dry",
+  "skill": "develop-story",
+  "description": "Happy-path end-to-end: full pipeline for story.5.1.example with git-sandbox + optional gh-sandbox.",
+  "prompt": "Run the full develop-story pipeline for story.5.1.example. Epic: epic.5.example. Use dry-run/sandbox mode.",
+  "mode": "smoke",
+  "assertions": [
+    { "fn": "epicBranchExists",    "args": ["$SANDBOX", 5] },
+    { "fn": "branchExists",        "args": ["$SANDBOX", "^feature/story\\.5\\.1"] },
+    { "fn": "pipelineStepsRan",    "args": ["$SANDBOX/.eval/pipeline-events.json", ["create-epic-branch", "create-story-branch", "review-story", "develop", "create-pr", "qa-story", "finalise", "commit-changes"]] },
+    { "fn": "prTargetsEpicBranch", "args": ["$SANDBOX/.eval/gh-receipt.json", 5] },
+    { "fn": "noLockFilesLeft",     "args": ["$SANDBOX"] }
+  ]
+}
