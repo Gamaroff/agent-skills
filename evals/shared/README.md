@@ -14,11 +14,18 @@ evals/shared/
 │   ├── claude-sdk.mjs  # Live driver via @anthropic-ai/claude-agent-sdk
 │   └── claude-cli.mjs  # Live driver via claude CLI subprocess
 ├── lib/
-│   └── tracker-cleanup.mjs  # Receipt-driven Jira/GitHub issue cleanup
+│   ├── tracker-cleanup.mjs   # Receipt-driven Jira/GitHub issue cleanup
+│   ├── git-sandbox.mjs       # Throwaway git repos for eval sandboxes
+│   ├── gh-sandbox.mjs        # Injectable GH PR creation helper (skips when GH_TOKEN absent)
+│   └── pipeline-recorder.mjs # Wraps a driver to record Skill tool-use events
 └── tests/
     ├── drivers.test.mjs
     ├── assertions.test.mjs
-    └── tracker-cleanup.test.mjs
+    ├── tracker-cleanup.test.mjs
+    ├── git-sandbox.test.mjs
+    ├── gh-sandbox.test.mjs
+    ├── pipeline-recorder.test.mjs
+    └── develop-task-assertions.test.mjs
 ```
 
 ## Runner contract
@@ -43,6 +50,35 @@ The runner reads `<scenario-dir>/scenario.json` and dispatches to the selected d
 1. Export a new function from `evals/shared/assertions.mjs`
 2. Register it in the `runner.mjs` assertion dispatcher
 3. Add a test in `evals/shared/tests/assertions.test.mjs`
+
+## Shared lib helpers
+
+### git-sandbox
+
+`createSandbox({ fixtureFiles={}, initialCommit=true, branch="develop" })` — creates a throwaway git repo in a tmpdir prefixed `agent-skills-eval-`. Returns `{ path, run, commit, branchList, cleanup }`.
+
+- `run(cmd)` — runs a shell command in the sandbox, returns stdout
+- `commit(msg)` — stages all changes and creates a commit
+- `branchList()` — returns array of local branch names
+- `cleanup()` — removes the tmpdir (noop on failure)
+
+Use for any scenario that needs a real git repo without touching the working tree.
+
+### gh-sandbox
+
+`createGhSandbox({ repo, branch, base, title, body, exec })` — creates a GitHub PR (or returns a skipped receipt when `GH_TOKEN` is absent or `repo`/`branch` are missing).
+
+- `exec` is injectable — pass a stub for unit tests; defaults to real `gh` CLI
+- Skipped receipts have `{ skipped: true, reason }` — `prCreated` assertion treats these as a pass
+- Success receipts have `{ skipped: false, pr: { number, url, baseRefName } }`
+
+### pipeline-recorder
+
+`wrapDriver(driver)` — wraps any `AgentDriver`, intercepting `Skill` tool-use events. Returns `{ driver: WrappedDriver, events: RecordedEvent[] }`.
+
+- `RecordedEvent = { skill, args, status: "started", timestamp }`
+- `events` array is mutable — inspect after the scenario run
+- Caller writes `events` to `.eval/pipeline-events.json` for persistence across process boundaries
 
 ## Sabotage-verify workflow
 

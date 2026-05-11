@@ -2,7 +2,7 @@
 
 Task-oriented guide for running the eval suite. Recipes first; reference tables at the bottom.
 
-Suite catches drift between SKILL.md prose, deterministic helpers, and end-to-end behaviour for `create-task` / `create-story`.
+Suite catches drift between SKILL.md prose, deterministic helpers, and end-to-end behaviour for `create-task` / `create-story` / `develop-task`.
 
 ---
 
@@ -11,6 +11,8 @@ Suite catches drift between SKILL.md prose, deterministic helpers, and end-to-en
 ```bash
 npm test                         # everything hermetic — no creds needed
 npm run eval:create-task:sdk     # one live scenario via Claude SDK (needs ANTHROPIC_API_KEY)
+npm run eval:develop-task        # develop-task protocol + step-isolation (no creds)
+npm run eval:develop-task:smoke  # full end-to-end smoke (needs ANTHROPIC_API_KEY)
 ```
 
 If `npm test` is green, every push will stay green in CI. Live drivers are opt-in.
@@ -25,7 +27,7 @@ If `npm test` is green, every push will stay green in CI. Live drivers are opt-i
 npm test
 ```
 
-Runs platform resolver shell tests + L1 unit + L2 fixture + L3 protocol + L4 replay (~78 tests, no network, no creds). Same gate CI runs on every push. Takes seconds.
+Runs platform resolver shell tests + L1 unit + L2 fixture + L3 protocol + L4 replay (~90 tests, no network, no creds). Same gate CI runs on every push. Takes seconds.
 
 ### 2. "I changed a SKILL.md or a script — re-run the fast loop"
 
@@ -51,7 +53,7 @@ Replay copies fixture artefacts into a sandbox tmpdir and runs structural assert
 npm run eval:all
 ```
 
-Loops all create-task + create-story scenarios. Scenario 03-tracker-live is skipped unless creds are present.
+Loops all create-task + create-story + develop-task step-isolation scenarios. Scenario 03-tracker-live is skipped unless creds are present.
 
 ### 5. "I want to hit the real model — Claude SDK"
 
@@ -141,8 +143,38 @@ You don't need both local and CI live setups — pick one.
 | Protocol assertion | `tests/skill-protocol.test.js` |
 | create-task scenario | `evals/create-task/scenarios/<name>/` (see `evals/create-task/README.md#adding-a-scenario`) |
 | create-story scenario | `evals/create-story/scenarios/<name>/` (see `evals/create-story/README.md#adding-a-scenario`) |
+| develop-task step-isolation scenario | `evals/develop-task/step-isolation/<name>/` (see `evals/develop-task/README.md#adding-a-scenario`) |
+| develop-task protocol test | `evals/develop-task/protocol/*.test.mjs` |
 | Agent backend (Gemini, Goose, Aider, …) | `evals/shared/drivers/<name>.mjs` (see `evals/shared/README.md#adding-a-driver-for-another-agent`) |
 | Structural assertion fn | `evals/shared/assertions.mjs` + register in `runner.mjs` switch + test in `evals/shared/tests/assertions.test.mjs` |
+
+### 11. "I want to run the develop-task evals"
+
+```bash
+npm run eval:develop-task
+```
+
+Runs all protocol tests (`evals/develop-task/protocol/*.test.mjs`) then all step-isolation scenarios in replay mode. Deterministic — no model calls, no creds needed.
+
+### 12. "I want to run the develop-task smoke test"
+
+The smoke test exercises the full 8-step pipeline with a live model against a sandboxed git repo.
+
+Minimum — no PR creation:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run eval:develop-task:smoke
+```
+
+Full — with real GitHub PR (created and cleaned up):
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... GH_TOKEN=ghp_... GH_REPO=your-handle/eval-sandbox npm run eval:develop-task:smoke
+```
+
+When `GH_TOKEN` is absent, the `prCreated` assertion is a no-op (skipped, not failed). `KEEP_SANDBOX=1` is baked in — on failure the sandbox tmpdir is preserved for investigation.
+
+The `develop-task-smoke` job in `.github/workflows/test.yml` is `workflow_dispatch` only. Set `ANTHROPIC_API_KEY` (and optionally `GH_TOKEN` + `GH_REPO`) as repo secrets, then trigger from the Actions tab.
 
 ### 10. "An eval failed — where do I look?"
 
@@ -183,10 +215,11 @@ export ANTHROPIC_API_KEY="$(security find-generic-password -a "$USER" -s anthrop
 | --- | --- | --- | --- |
 | **L1 Unit** | `skills/*/tests/*.test.js` | Pure helpers — filename regex, id allocators, sprint-status merges, template-section detection | `npm run test:node` |
 | **L2 Golden fixture** | embedded in L1 | Template substitution + sprint-status merge against known inputs | `npm run test:node` |
-| **L3 Protocol checker** | `tests/skill-protocol.test.js` | SKILL.md ↔ template ↔ sub-skill drift; HALT/STOP terminator presence; mandatory-section counts | `npm run test:node` |
-| **L4 End-to-end** | `evals/create-task/`, `evals/create-story/` | End-to-end artefact shape (frontmatter, sections, citations, tracker payload, halt logs) | `npm run eval:all` |
+| **L3 Protocol checker** | `tests/skill-protocol.test.js`, `evals/develop-task/protocol/` | SKILL.md ↔ template ↔ sub-skill drift; HALT/STOP terminator presence; mandatory-section counts; pipeline shape and step contracts | `npm run test:node` |
+| **L4 End-to-end** | `evals/create-task/`, `evals/create-story/`, `evals/develop-task/step-isolation/` | End-to-end artefact shape; pipeline step contracts; branch/lock/PR/QA artefact assertions | `npm run eval:all` + `npm run eval:develop-task` |
+| **L5 Smoke** | `evals/develop-task/smoke/` | Full pipeline live run against real git sandbox; GH PR optional | `npm run eval:develop-task:smoke` |
 
-L1–L3 + L4 replay run on every push. Live drivers (`claude-sdk`, `claude-cli`) and the live-tracker scenario are `workflow_dispatch` only.
+L1–L4 replay run on every push. Live drivers (`claude-sdk`, `claude-cli`), the live-tracker scenario, and the smoke test are `workflow_dispatch` only.
 
 ### Drivers
 
@@ -207,6 +240,15 @@ Add a driver: drop `evals/shared/drivers/<name>.mjs` implementing the contract i
 | `03-tracker-live` | create-task | `evals/create-task/scenarios/03-tracker-live/` | **Live** Jira/GitHub round-trip; needs live driver + creds; cleans up after itself |
 | `01-happy` | create-story | `evals/create-story/scenarios/01-happy/` | Required template sections, ≥2 citations, sprint-status merge |
 | `02-missing-core-config` | create-story | `evals/create-story/scenarios/02-missing-core-config/` | HALT — no core-config.yaml → no story file, halt.log emitted |
+| `01-create-branch` | develop-task | `evals/develop-task/step-isolation/01-create-branch/` | Feature branch created, pipeline lock written |
+| `02-review-task` | develop-task | `evals/develop-task/step-isolation/02-review-task/` | Review report produced |
+| `03-develop` | develop-task | `evals/develop-task/step-isolation/03-develop/` | Task status progressed to ready-for-review |
+| `04-create-pr` | develop-task | `evals/develop-task/step-isolation/04-create-pr/` | PR created (or skipped) with correct base |
+| `05-qa-task` | develop-task | `evals/develop-task/step-isolation/05-qa-task/` | QA report + gate file produced with PASS/CONCERNS |
+| `06-qa-fix-loop` | develop-task | `evals/develop-task/step-isolation/06-qa-fix-loop/` | qa-fix loop is bounded (≤5 iterations) |
+| `07-finalise` | develop-task | `evals/develop-task/step-isolation/07-finalise/` | DoD file produced, task accepted |
+| `08-commit-changes` | develop-task | `evals/develop-task/step-isolation/08-commit-changes/` | No lock files left, implementation report present |
+| `01-end-to-end-dry` | develop-task | `evals/develop-task/smoke/01-end-to-end-dry/` | **Live** full 8-step pipeline; GH PR optional via `GH_TOKEN` |
 
 Each scenario is `scenario.json` + `answers.jsonl` + `env.json` + `replay/`.
 
@@ -214,9 +256,9 @@ Each scenario is `scenario.json` + `answers.jsonl` + `env.json` + `replay/`.
 
 ```bash
 npm test                         # platform resolver + L1 + L2 + L3 + L4 replay
-npm run test:node                # L1 + L2 + L3 + assertion + driver tests
+npm run test:node                # L1 + L2 + L3 + assertion + driver tests (incl. develop-task protocol)
 npm run test:platform            # resolve-platform.sh tests only
-npm run eval:all                 # L4: all create-task + create-story scenarios, replay
+npm run eval:all                 # L4: all create-task + create-story + develop-task step-isolation, replay
 npm run eval:create-task         # L4: create-task scenario 01, replay
 npm run eval:create-task:all     # L4: all create-task scenarios, replay
 npm run eval:create-task:cli     # L4: create-task scenario 01, DRIVER=claude-cli
@@ -225,15 +267,19 @@ npm run eval:create-story        # L4: create-story scenario 01, replay
 npm run eval:create-story:all    # L4: all create-story scenarios, replay
 npm run eval:create-story:cli    # L4: create-story scenario 01, DRIVER=claude-cli
 npm run eval:create-story:sdk    # L4: create-story scenario 01, DRIVER=claude-sdk
+npm run eval:develop-task        # L3+L4: develop-task protocol tests + step-isolation scenarios, replay
+npm run eval:develop-task:smoke  # L5: develop-task full smoke (needs ANTHROPIC_API_KEY)
 ```
 
 ### Canonical sources
 
 This doc navigates. Authoritative details live next to the code:
 
-- `evals/shared/README.md` — runner contract, driver-adding guide, sabotage-verify workflow
+- `evals/shared/README.md` — runner contract, driver-adding guide, sabotage-verify workflow, new lib helpers (git-sandbox, gh-sandbox, pipeline-recorder)
 - `evals/create-task/README.md` — create-task scenario coverage and how to run
 - `evals/create-story/README.md` — create-story scenario coverage and how to run
+- `evals/develop-task/README.md` — develop-task eval layers, smoke test usage, adding new scenarios
 - `evals/create-task/scenarios/03-tracker-live/README.md` — live tracker env contract, receipt shape, safety notes
+- `evals/develop-task/smoke/01-end-to-end-dry/README.md` — smoke test env contract, failure investigation, cleanup
 - `evals/shared/drivers/types.mjs` — `AgentDriver` JSDoc contract
 - `.github/workflows/test.yml` — CI gating
