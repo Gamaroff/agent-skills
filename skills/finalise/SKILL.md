@@ -1,11 +1,9 @@
 ---
 name: finalise
 description: Verify story/task completion against comprehensive Definition of Done criteria (acceptance criteria, tests, code reviews, documentation, security review, compliance check), then update status to 'accepted' and generate Sprint Review artifacts, or list gaps if incomplete. Use when finalising stories or tasks for Sprint Review.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 
 # Finalise Story/Task
 
@@ -332,10 +330,10 @@ Read each prompt file to get the template, substitute the placeholder values, th
 
 | Agent | Prompt file | Key substitutions |
 |-------|------------|-------------------|
-| 1. AC traceability | `shared/resources/finalise-dod-ac-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
-| 2. Security review | `shared/resources/finalise-dod-security-prompt.md` | `<STORY_FILE>`, `<STORY_TYPE>` |
-| 3. Compliance review | `shared/resources/finalise-dod-compliance-prompt.md` | `<STORY_FILE>` |
-| 4. Docs & changelog | `shared/resources/finalise-dod-docs-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>` |
+| 1. AC traceability | `references/finalise-dod-ac-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
+| 2. Security review | `references/finalise-dod-security-prompt.md` | `<STORY_FILE>`, `<STORY_TYPE>` |
+| 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>` |
+| 4. Docs & changelog | `references/finalise-dod-docs-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>` |
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 

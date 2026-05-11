@@ -1,8 +1,6 @@
 ---
 name: document-existing-project
 description: Generate comprehensive brownfield architecture documentation for existing codebases optimized for AI development. Analyzes actual code patterns, technical debt, and constraints. Use when documenting legacy systems or existing projects for enhancement or onboarding.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Document an Existing Project

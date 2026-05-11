@@ -1,9 +1,7 @@
 ---
 name: ensure-epic-jira-issue
-description: 'Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-epic, and writes jira_key + jira_url to the epic frontmatter. Sets EPIC_JIRA_KEY (e.g. "PROJ-42") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Callers branch on TRACKER (set by shared/resources/resolve-platform.sh) to pick the right sub-routine.'
+description: 'Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-epic, and writes jira_key + jira_url to the epic frontmatter. Sets EPIC_JIRA_KEY (e.g. "PROJ-42") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.'
 type: internal
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Ensure Epic Jira Issue — Sub-Routine
@@ -15,7 +13,7 @@ This is an **internal sub-routine** called by `review-story`. Do not invoke dire
 ## Inputs (set by the calling skill before invoking)
 
 - `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `docs/prd/infra/epics/epic.12.payments/epic.12.payments.md`)
-- `TRACKER` — set by `shared/resources/resolve-platform.sh` in the calling skill (must be `jira` for this sub-routine to act)
+- `TRACKER` — set by `references/resolve-platform.sh` in the calling skill (must be `jira` for this sub-routine to act)
 - Env: `JIRA_URL`, plus Atlassian MCP credentials (cloudId derived from `JIRA_URL` hostname)
 
 ## Output (set by this sub-routine, available to the calling skill)

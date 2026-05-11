@@ -1,8 +1,6 @@
 ---
 name: sync-jira-epic
 description: Sync a local epic markdown file to Jira — creates the epic if it has no jira_key, updates it if jira_key is already set. Top-level work item (no parent). Embeds Bitbucket links to the parent PRD and epic file in the Jira description (rendered via ADF). Renders the Stories Breakdown markdown table as a real ADF table in Jira. Maintains a Change Log in both the local epic and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this epic in Jira", "update this epic in Jira", "sync epic to Jira", "push epic changes to Jira", or "publish epic to Jira".
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # sync-jira-epic
@@ -308,7 +306,7 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
 
 ## Architecture
 
-The script is a thin wrapper over `shared/resources/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs, project-style detection). Shared with `sync-jira-task` and `sync-jira-story`.
+The script is a thin wrapper over `references/jira-sync.js`, which holds the shared primitives (frontmatter, ADF, changelog, http+retry, auth, diff, guard, board/transition/priority APIs, project-style detection). Shared with `sync-jira-task` and `sync-jira-story`.
 
 **Migration note:** older versions of this script used Jira REST API v2 with a plain-text description. Existing epics synced via that older version are upgraded to v3+ADF on the next sync — the body of the Jira description will look different (real tables, real bullet lists, real headings) but `jira_key` and the epic key itself are unchanged.
 

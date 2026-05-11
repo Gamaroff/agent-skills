@@ -2,8 +2,6 @@
 name: docker
 description: Comprehensive Docker administration and troubleshooting for multi-service projects. Manages development, test, and production environments with PostgreSQL, Redis, and monitoring stack.
 type: project
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Docker Administration Skill

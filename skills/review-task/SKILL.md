@@ -1,11 +1,9 @@
 ---
 name: review-task
 description: Interactive task document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and implementability issues. Provides user-aligned recommendations based on collaborative input.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 
 # Review Task
 
@@ -381,7 +379,7 @@ options:
 
 **Purpose**: Front-load conflict detection before interactive Q&A. Two read-only Explore agents run in parallel and return compact YAML summaries. Q&A (Steps 2–8) consumes these summaries to surface high-severity findings as early questions rather than discovering them mid-review.
 
-**Prompt templates**: see `shared/resources/review-task-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
+**Prompt templates**: see `references/review-task-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
 
 **Actions**:
 
@@ -452,9 +450,9 @@ options:
 
 5. **Tracker Issue Linkage**:
 
-   **Detection**: source the canonical resolver once per skill invocation, then branch on `TRACKER` — see `shared/resources/platform-detection.md`:
+   **Detection**: source the canonical resolver once per skill invocation, then branch on `TRACKER` — see `references/platform-detection.md`:
    ```bash
-   source shared/resources/resolve-platform.sh
+   source references/resolve-platform.sh
    # TRACKER = jira | github
    ```
    When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path.
@@ -553,7 +551,7 @@ options:
             - If matched issue `state` is `CLOSED`: log `"⚠️  Linked existing CLOSED tracker issue #{N} — verify intent before continuing."`
             - Self-heal the board Priority field on the linked issue (no-op if already correct):
               ```bash
-              bash shared/resources/set-github-project-priority.sh "{N}" || true
+              bash references/set-github-project-priority.sh "{N}" || true
               ```
             - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip the `gh issue create` block below**
          3. **Zero matches** → fall through to create block below
@@ -585,14 +583,14 @@ options:
      - Write `github_issue: {N}` into frontmatter
      - Set the board Priority single-select field (label → field mirror; helper never halts):
        ```bash
-       bash shared/resources/set-github-project-priority.sh "{N}" "{priority}" || true
+       bash references/set-github-project-priority.sh "{N}" "{priority}" || true
        ```
    - If `github_issue:` has a numeric value:
      - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
        - If the issue doesn't exist (command errors), flag as **Critical**
      - Self-heal the board Priority field (no-op if already correct; reads `priority:*` label when arg omitted):
        ```bash
-       bash shared/resources/set-github-project-priority.sh "{N}" || true
+       bash references/set-github-project-priority.sh "{N}" || true
        ```
      - **URL consistency check** — verify the cross-reference link in the document body is correct:
        - Look for any markdown link of the form `[#N](url)` or `[#N](https://github.com/...)` in the task body
@@ -1432,7 +1430,7 @@ User Can Now: Run `/develop` to begin implementation
 
 **When to Execute**: Always — after Step 9 completes (regardless of review outcome or status update decision).
 
-**Detection**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `shared/resources/platform-detection.md`.
+**Detection**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `references/platform-detection.md`.
 
 **Collect context from previous steps** (both paths):
 

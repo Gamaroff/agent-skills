@@ -39,7 +39,9 @@
     "validate:all": "for d in skills/*/; do [ -f \"${d}SKILL.md\" ] && python3 skills/create-skill/scripts/quick_validate.py \"$d\" || true; done",
     "generate-catalog": "python3 skills/create-skill/scripts/generate_catalog.py",
     "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
-    "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py"
+    "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py",
+    "bundle": "python3 skills/create-skill/scripts/bundle_skill.py --all",
+    "bundle:skill": "python3 skills/create-skill/scripts/bundle_skill.py"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138"

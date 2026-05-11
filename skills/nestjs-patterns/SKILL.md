@@ -1,8 +1,6 @@
 ---
 name: nestjs-patterns
 description: NestJS implementation patterns and anti-patterns guide. Use when creating or modifying NestJS modules, providers, or services; setting up PassportStrategy with dependency injection; using useFactory, forwardRef, or complex DI patterns; debugging "Cannot resolve dependencies" or "undefined service" errors; implementing authentication, authorization, or security modules; working with circular dependencies or module imports. Prevents common DI mistakes (dual-factory pattern, DI timing issues). Provides proven working patterns and implementation checklists.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # NestJS Patterns Skill

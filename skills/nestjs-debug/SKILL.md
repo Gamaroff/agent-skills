@@ -1,8 +1,6 @@
 ---
 name: nestjs-debug
 description: Autonomous NestJS debugging for any NestJS application. Systematically diagnoses and resolves module, DI, configuration, and runtime errors through structured 6-step workflow. Works with standalone and monorepo-hosted NestJS apps.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # NestJS Autonomous Debugging Skill
@@ -325,7 +323,7 @@ When you encounter an error, **first select the primary Skill** that categorizes
 - ✅ **Test Wrong** (30%): Test expectations outdated or test setup flawed
 - ✅ **Both Wrong** (5%): Both code and test have issues
 
-**Decision Matrix:** See `shared/resources/code-vs-test-validation.md` for detailed framework
+**Decision Matrix:** See `references/code-vs-test-validation.md` for detailed framework
 **NestJS-Specific Patterns:** See `resources/nestjs-test-patterns.md` for platform-specific guidance
 
 ---

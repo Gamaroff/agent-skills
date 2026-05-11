@@ -1,8 +1,6 @@
 ---
 name: validate-story
 description: Automated, non-interactive validation of a story document. Produces a GO/NO-GO verdict with a 1–10 implementation-readiness score and categorized findings. Read-only — never edits the story and never asks questions. Use as a pre-implementation gate or for batch validation. For interactive review that resolves ambiguities and applies fixes, use /review-story instead.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Validate Story

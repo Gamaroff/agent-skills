@@ -8,8 +8,6 @@ description: >
   deployments, services, environments, buckets, object storage, build failures,
   or infrastructure operations, even if they don't say "Railway" explicitly.
 allowed-tools: Bash(railway:*), Bash(which:*), Bash(command:*), Bash(npm:*), Bash(npx:*), Bash(curl:*), Bash(python3:*)
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Use Railway

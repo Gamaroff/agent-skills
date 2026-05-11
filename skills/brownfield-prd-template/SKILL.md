@@ -1,8 +1,6 @@
 ---
 name: brownfield-prd-template
 description: Brownfield PRD template structure for existing project enhancements. Defines structure for PRDs that add features to established codebases with emphasis on compatibility and integration.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Brownfield PRD Template

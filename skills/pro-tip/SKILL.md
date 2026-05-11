@@ -1,8 +1,6 @@
 ---
 name: pro-tip
 description: Surfaces 1–3 contextually-relevant tips for Claude Code usage, agentic coding patterns, architectural decisions, and 3rd party integrations. Use when the user wants a tip, hint, or guidance on how to work more effectively with Claude or their stack. Reads session context to deliver pointed, immediately applicable advice.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Pro Tip

@@ -1,8 +1,6 @@
 ---
 name: create-epic
 description: Create single epic for medium-sized brownfield enhancements (1-3 stories). Use when enhancement follows existing patterns, has minimal architectural changes, and manageable integration complexity.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Brownfield Epic Creation
@@ -239,8 +237,8 @@ Set env var `SKIP_TRACKER=1` to skip tracker issue creation entirely. The epic f
 if [ "$SKIP_TRACKER" = "1" ]; then
   echo "ℹ️  SKIP_TRACKER=1 — skipping tracker issue creation"
 else
-  # Platform detection — see shared/resources/platform-detection.md
-  source shared/resources/resolve-platform.sh
+  # Platform detection — see references/platform-detection.md
+  source references/resolve-platform.sh
   # TRACKER = jira | github; VCS = github | bitbucket
   # proceed to platform branch below
 fi

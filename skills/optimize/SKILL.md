@@ -3,8 +3,6 @@ name: optimize
 description: Diagnoses and fixes UI performance across loading speed, rendering, animations, images, and bundle size. Use when the user mentions slow, laggy, janky, performance, bundle size, load time, or wants a faster, smoother experience.
 user-invocable: true
 argument-hint: "[target]"
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 Identify and fix performance issues to create faster, smoother user experiences.

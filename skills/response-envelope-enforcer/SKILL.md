@@ -1,8 +1,6 @@
 ---
 name: response-envelope-enforcer
 description: Validate and enforce standardized API response wrapping patterns. Ensures HTTP endpoints wrap responses in StandardSuccessResponse/StandardPaginatedResponse, domain DTOs are used as payload data, service interfaces remain internal, and special cases (WebSocket events, binary files) are handled correctly. Use when creating/reviewing controller endpoints, debugging frontend data extraction errors, or auditing API response consistency.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Response Envelope Enforcer

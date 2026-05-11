@@ -1,8 +1,6 @@
 ---
 name: git-time-travel
 description: Expert in navigating and manipulating git history. Covers finding bugs with bisect, understanding code evolution, recovering lost work, and rewriting history safely. Understands that git history is your time machine. Use when "git history, git bisect, find when bug introduced, recover deleted, rewrite history, git blame, lost commit, " mentioned. 
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Git Time Travel

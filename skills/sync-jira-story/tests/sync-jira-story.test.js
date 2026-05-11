@@ -600,7 +600,7 @@ test("createStoryWithRetry — non-parent 400 errors propagate immediately", asy
 // ---------------------------------------------------------------------------
 // Shared lib reliability — HTTP retry on 5xx and 429
 // ---------------------------------------------------------------------------
-const sharedLib = require("../../../shared/resources/jira-sync.js");
+const sharedLib = require("../references/jira-sync.js");
 
 test("makeHttp — retries 5xx with exponential backoff (then succeeds)", async () => {
   let calls = 0;

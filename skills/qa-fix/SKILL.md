@@ -1,8 +1,6 @@
 ---
 name: qa-fix
 description: Implement fixes based on QA feedback. Use when QA has provided a gate file or assessments and you need to systematically address issues, close coverage gaps, and update the story file. Follows deterministic prioritization for risk-first fix implementation.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # QA Fix
@@ -171,10 +169,10 @@ Cross-reference: `create-pr` and `finalise` use the same variables — set them 
 
 ### Platform Detection
 
-Run once before the PR existence check. All downstream branches use `$PLATFORM` and `$TRACKER`. See `shared/resources/platform-detection.md` for the full resolver spec.
+Run once before the PR existence check. All downstream branches use `$PLATFORM` and `$TRACKER`. See `references/platform-detection.md` for the full resolver spec.
 
 ```bash
-source shared/resources/resolve-platform.sh
+source references/resolve-platform.sh
 # TRACKER = jira | github; VCS = github | bitbucket
 PLATFORM="$VCS"
 
@@ -335,7 +333,7 @@ devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 
 Dispatch a read-only Explore subagent to ingest all QA artifacts and return a compact, risk-sorted Findings Summary. This keeps raw artifact content out of main context.
 
-Load the prompt from `shared/resources/qa-findings-ingester-prompt.md`. Substitute placeholders before dispatching:
+Load the prompt from `references/qa-findings-ingester-prompt.md`. Substitute placeholders before dispatching:
 - `<dir>`: substitute with absolute path to the story or task directory
 - `<mode>`: substitute with `story` or `task`
 - `<epic>`, `<story>` (story mode) OR `<id>` (task mode): substitute with the relevant IDs from context

@@ -1,8 +1,6 @@
 ---
 name: navigation-pattern-validator
 description: Enforce consistent Expo Router navigation patterns across React Native screens and headers. Use when creating new screens, implementing navigation flows, reviewing header components, debugging navigation stack mismatches, or auditing codebase for navigation consistency. Prevents mixed Expo Router/React Navigation paradigms that cause blank screens and navigation bugs.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Navigation Pattern Validator

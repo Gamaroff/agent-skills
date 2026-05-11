@@ -1,8 +1,6 @@
 ---
 name: code-smell-validator
 description: This skill provides guidance for identifying and refactoring common code smells in any codebase. It utilizes sub-agents for parallel scanning and generates a comprehensive refactoring plan document (refactor-DDMMYYYY-N.md).
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Code Smell Validator

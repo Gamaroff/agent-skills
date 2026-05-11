@@ -1,11 +1,9 @@
 ---
 name: qa-task
 description: Comprehensive quality assurance review for technical tasks. Focuses on success criteria validation, implementation phase verification, and non-functional requirements assessment for infrastructure and refactoring work.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 >
 > **Placeholders**: `{project}` in NX commands is a template — substitute your project name. See [`docs/placeholders.md`](../../docs/placeholders.md).
 
@@ -21,7 +19,7 @@ This skill guides QA engineers through comprehensive quality assurance reviews f
 
 ## Lite Mode (Pipeline Contract)
 
-When invoked from the `/develop-task` orchestrator, the call may be prefixed with the lite-mode directive. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, pipeline behaviour, and directive format.
+When invoked from the `/develop-task` orchestrator, the call may be prefixed with the lite-mode directive. See `references/develop-pipeline-lite-mode.md` for trigger conditions, pipeline behaviour, and directive format.
 
 **Effect on this skill**:
 

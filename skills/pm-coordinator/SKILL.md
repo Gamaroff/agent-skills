@@ -1,8 +1,6 @@
 ---
 name: pm-coordinator
 description: Product management workflow coordinator. Use when creating PRDs, managing product requirements, creating epics/stories, or handling project changes. Guides you to the right PM skill based on context.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Product Manager Coordinator

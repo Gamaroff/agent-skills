@@ -1,8 +1,6 @@
 ---
 name: enforce-standards
 description: 'Enforce naming conventions and file structure architecture on a specific target directory. Use when the user asks to "fix filenames", "apply naming conventions", or "restructure" a folder.'
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Enforce Architecture and Naming Standards

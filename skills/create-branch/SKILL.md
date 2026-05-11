@@ -1,8 +1,6 @@
 ---
 name: create-branch
 description: Create git branches following Gitflow conventions. This skill should be used when starting work on a new feature, hotfix, or release. Accepts story files, task documents, or descriptions to generate properly-named branches from the correct base branch (develop or main).
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Create Branch

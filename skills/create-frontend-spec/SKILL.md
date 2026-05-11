@@ -1,8 +1,6 @@
 ---
 name: create-frontend-spec
 description: Create comprehensive UI/UX specification documents using interactive YAML-driven workflow. Use when starting new features, planning UI overhauls, or documenting design requirements for frontend development.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Create Frontend Specification

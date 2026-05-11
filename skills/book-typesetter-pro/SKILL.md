@@ -2,8 +2,6 @@
 name: book-typesetter-pro
 description: "Formats Markdown into a novel-style book with highlighted AI-synthesized transitions for editorial review."
 version: "1.2.0"
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Book Typesetter & Continuity Skill (Review Mode)

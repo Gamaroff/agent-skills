@@ -1,11 +1,9 @@
 ---
 name: qa-story
 description: Use for comprehensive quality review during/after implementation. Performs adaptive test architecture review with conditional parallel agents based on story complexity. Uses direct tools for well-documented stories, spawns agents for complex/high-risk scenarios. Includes NFR validation (security, performance, reliability, maintainability) and requirements traceability mapping. Automatically performs re-review when previous gate has concerns or issues.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
-> **Status lifecycle**: see [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
 
 # QA Review
 
@@ -17,7 +15,7 @@ Comprehensive quality assurance review combining adaptive automated checks, test
 
 ## Lite Mode (Pipeline Contract)
 
-When invoked from the `/develop-story` orchestrator, the call may be prefixed with the lite-mode directive. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, pipeline behaviour, and directive format.
+When invoked from the `/develop-story` orchestrator, the call may be prefixed with the lite-mode directive. See `references/develop-pipeline-lite-mode.md` for trigger conditions, pipeline behaviour, and directive format.
 
 **Effect on this skill**:
 

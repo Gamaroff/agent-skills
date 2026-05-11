@@ -1,8 +1,6 @@
 ---
 name: edit-epic
 description: Edit epic documents with validation, cascade analysis for child stories, and diff preview. Use when modifying epic files. Rejects story files with appropriate message.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Edit Epic

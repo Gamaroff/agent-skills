@@ -1,8 +1,6 @@
 ---
 name: change-checklist
 description: Change impact assessment framework with 6 sections. Systematic guide for analyzing significant project changes. Used by correct-course and change-management skills.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Change Navigation Checklist

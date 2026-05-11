@@ -1,8 +1,6 @@
 ---
 name: shard-prd
 description: Split large PRDs into smaller, manageable markdown files by level 2 sections. Use when PRD becomes large (more than 5 epics, more than 30 stories) to improve navigation and epic creation workflow.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Document Sharding

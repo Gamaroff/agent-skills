@@ -1,8 +1,6 @@
 ---
 name: test-co-location-enforcer
 description: 'Ensure all tests are co-located with source files using .spec.ts suffix instead of __tests__/ directories. Use when creating new tests, moving legacy tests, validating test organization, or auditing test structure. Enforces 1:1 test-to-source file mapping and proper file naming conventions.'
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Test Co-Location Enforcer

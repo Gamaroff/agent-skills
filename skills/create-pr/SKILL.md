@@ -1,8 +1,6 @@
 ---
 name: create-pr
 description: Create pull requests following project conventions. This skill should be used when ready to submit code for review. Automatically commits any uncommitted changes using /commit-changes before creating the PR. Prompts for target branch (typically develop), pushes the current branch, generates a PR description, and opens a PR using the GitHub CLI (GitHub) or Bitbucket REST API (Bitbucket). Platform is auto-detected from the git remote URL.
-copyright: "Copyright (c) 2025 Lorien Gamaroff"
-license: MIT
 ---
 
 # Create Pull Request
@@ -84,10 +82,10 @@ Before asking the user, check whether parameters were supplied:
 
 ### Step 0.5: Detect Platform
 
-Before interacting with any remote hosting service, detect the platform using the canonical resolver. See `shared/resources/platform-detection.md` for the full resolver spec.
+Before interacting with any remote hosting service, detect the platform using the canonical resolver. See `references/platform-detection.md` for the full resolver spec.
 
 ```bash
-source shared/resources/resolve-platform.sh
+source references/resolve-platform.sh
 # VCS = github | bitbucket; TRACKER = jira | github
 PLATFORM="$VCS"   # PLATFORM keeps backward compat with downstream branches
 
@@ -238,7 +236,7 @@ Closes #123
 
 **Auto-generate body from diff (Explore subagent):**
 
-Load the prompt from `shared/resources/pr-body-summariser-prompt.md`. Substitute `<DIFF_FILE>` with the value of `$DIFF_FILE`. Dispatch:
+Load the prompt from `references/pr-body-summariser-prompt.md`. Substitute `<DIFF_FILE>` with the value of `$DIFF_FILE`. Dispatch:
 
 ```
 Agent(subagent_type="Explore", prompt=<loaded-prompt-with-substitution>)
