@@ -193,6 +193,18 @@ When `GH_TOKEN` is absent, the `prCreated` assertion is a no-op (skipped, not fa
 
 The `develop-task-smoke` job in `.github/workflows/test.yml` is `workflow_dispatch` only. Set `ANTHROPIC_API_KEY` (and optionally `GH_TOKEN` + `GH_REPO`) as repo secrets, then trigger from the Actions tab.
 
+### 15. "I want a full live test with real GitHub branches and PRs — fresh documents"
+
+See **[live-github-test.md](./live-github-test.md)** for the end-to-end walkthrough.
+
+Creates a throwaway GitHub repo, bootstraps a minimal Node.js project, authors PRD/epic/story docs, runs `/develop-story` live, and verifies branches, PR targeting, QA gate, and implementation report. Use when you want real-world validation outside the eval framework's fixture infrastructure.
+
+### 16. "I want a full live test of develop-task with real GitHub — fresh task doc"
+
+See **[live-github-task-test.md](./live-github-task-test.md)** for the end-to-end walkthrough.
+
+Mirror of recipe 15 for the `develop-task` pipeline. Creates a throwaway repo, authors a single task doc (no PRD/epic), runs `/develop-task` live, and verifies feature branch naming, PR targeting (`develop`, not an epic branch), QA gate, and implementation report.
+
 ### 10. "An eval failed — where do I look?"
 
 - **L1/L2/L3 failure:** node test output names the file + line.
