@@ -154,7 +154,6 @@ Full categorised index below.
 
 | Skill | Description |
 | ----- | ----------- |
-| `react-email` | Use when creating HTML email templates with React components - welcome emails, password resets, notifications, order confirmations, newsletters, or transactional emails. |
 | `react-native-debug` | Iterative debugging for React Native apps. Handles Jest test failures and Metro bundler errors with an interactive approach to determine whether implementation or test is… |
 | `upgrading-expo` | Guidelines for upgrading Expo SDK versions and fixing dependency issues |
 
@@ -205,13 +204,6 @@ Full categorised index below.
 | `building-components` | Guide for building modern, accessible, and composable UI components. Use when building new components, implementing accessibility, creating composable APIs, setting up design tokens, publishing to… |
 | `ux-expert` | UX Expert (Sally) specializing in user experience design and intuitive interfaces. Use for UI/UX design, wireframes, prototypes, front-end specifications, AI-powered UI generation prompts, and user… |
 
-## Email
-
-| Skill | Description |
-| ----- | ----------- |
-| `email-best-practices` | Use when building email features, emails going to spam, high bounce rates, setting up SPF/DKIM/DMARC authentication, implementing email capture, ensuring compliance (CAN-SPAM, GDPR, CASL), handling… |
-| `resend` | Use when working with Resend email platform - routes to specific sub-skills for sending, receiving, audiences, or broadcasts. |
-
 ## Utilities & Misc
 
 | Skill | Description |
@@ -220,7 +212,6 @@ Full categorised index below.
 | `change-management` | Orchestrate structured response to project changes (pivots, tech issues, missing requirements, failed stories). Use when significant changes affect project direction requiring comprehensive impact analysis. |
 | `command-development` | This skill should be used when the user asks to "create a slash command", "add a command", "write a custom command", "define command arguments", "use… |
 | `create-doc` | YAML-driven document creation engine with mandatory user interaction. Use when creating PRDs, epics, or any document from a YAML template that requires section-by-section collaboration. |
-| `pro-tip` | Surfaces 1–3 contextually-relevant tips for Claude Code usage, agentic coding patterns, architectural decisions, and 3rd party integrations. Use when the user wants a tip, hint,… |
 | `remember-insight` | Saves an insight to the project's persistent memory system. Reads all existing memory files, determines whether the insight can be merged into an existing file… |
 
 ## Other

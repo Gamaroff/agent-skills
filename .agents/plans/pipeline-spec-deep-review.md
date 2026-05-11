@@ -14,8 +14,8 @@ The draft circulating earlier referred to non-existent "READMEs" — the real sp
 |---|---|---|
 | `skills/develop-story/SKILL.md` | 253 | Orchestrator spec (loaded into context on invoke) |
 | `skills/develop-task/SKILL.md` | 250 | Orchestrator spec |
-| `skills/develop-story/diagrams/develop-story.md` | 245 | Sequence diagram + technical summary (reference only) |
-| `skills/develop-task/diagrams/develop-task.md` | 251 | Sequence diagram + technical summary |
+| `skills/develop-story/README.md` | — | Skill overview and reference (replaces former `diagrams/develop-story.md`) |
+| `skills/develop-task/README.md` | — | Skill overview and reference (replaces former `diagrams/develop-task.md`) |
 | `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` | 744 | Phase 0 protocol |
 | `shared/resources/develop-pipeline-step-1-create-branch.md` | 210 | Step 1 protocol |
 | `shared/resources/develop-pipeline-step-2-review.md` | 140 | Step 2 protocol |
@@ -69,7 +69,7 @@ GitHub board GraphQL (Phase 0c-reg GitHub path, lines 339–429 of step-0) and J
 ### Nice-to-have
 
 **N1. Mermaid theme block duplicated across both diagram files.**
-~24 identical lines of `themeVariables` JSON in `skills/develop-story/diagrams/develop-story.md` lines 53–76 and `skills/develop-task/diagrams/develop-task.md` lines 54–77. Drift risk; any theme change must be applied to both files.
+~24 identical lines of `themeVariables` JSON that were formerly in `skills/develop-story/diagrams/develop-story.md` and `skills/develop-task/diagrams/develop-task.md` (both removed). If Mermaid themes are re-introduced in the READMEs, extract to `shared/resources/mermaid-theme.md`.
 *Fix*: extract to `shared/resources/mermaid-theme.md` containing only the `%%{init: { ... }}%%` block. Each diagram file includes via `<!-- shared:shared/resources/mermaid-theme.md -->` or similar marker (verify `package_skill.py` includes the file or add bundling support). Lower-friction alternative: leave duplicated and accept the drift risk — diagram files are reference-only, not part of the orchestrator's progressive disclosure loading.
 
 **N2. GitHub auto-Priority vs Jira parity unexplained.**
@@ -81,8 +81,7 @@ Both orchestrators pass `--base {Q2_answer}` to `/create-pr` (step-4 line 16). F
 *Fix*: add a "PR target by skill" subsection at the top of step-4-create-pr.md cross-referencing Phase 0d's Q2 derivation. Two-line addition.
 
 **N4. Diagram files claim `Explore` is the only subagent — out of date.**
-Both `diagrams/develop-*.md` line 19 say "Subagents: Explore for file resolution (Phase 0a) and pre-develop codebase surface map (Phase 3)." But the codebase now dispatches Explore agents for: file resolution, tracker poller, lite-mode detector, pre-develop surface map, iteration audit, test-failure triage, traceability mapper (story), resume detector — 8 distinct prompts in `shared/resources/`.
-*Fix*: update the "Subagents" row in both diagrams' External touchpoints tables to enumerate the 8 subagent roles, or generalise to "Explore subagents (8 prompts in `shared/resources/`) for resolution, tracker polling, lite-mode detection, codebase mapping, iteration audit, test triage, traceability mapping, resume detection."
+Both `diagrams/develop-*.md` (now removed) previously said "Subagents: Explore for file resolution (Phase 0a) and pre-develop codebase surface map (Phase 3)." The codebase now dispatches 8 Explore agents. If subagent inventory is re-documented in the READMEs, enumerate: file resolution, tracker poller, lite-mode detector, pre-develop surface map, iteration audit, test-failure triage, traceability mapper (story), resume detector.
 
 ---
 
@@ -101,7 +100,7 @@ The draft circulating before this review included findings that turned out to be
 | I7 "Lite-mode trigger conditions buried" | Conditions are listed inline three times: step-0 lines 151–154 (Agent 3 prompt), `develop-pipeline-lite-mode.md` lines 10–16, and the Decisions Log entry on line 55. Three independent occurrences is sufficient. |
 | I8 "`Subagent summary ref` column path schema undocumented" | Documented in `subagent-summary-artifact.md` lines 60–62: "populate it with the relative path to the JSON artifact (e.g. `.summaries/step-3-iteration-audit.json`). For steps without subagents, use `—`." |
 | I9 "Decisions Log unbounded growth" | Premature optimisation. Implementation reports for completed stories are committed and archived; runaway growth would only matter on pathologically long runs (we have not observed any), and an archive-rotation mechanism adds resume complexity. |
-| I11 "Verification checklist references deleted `diagrams/` path" | `diagrams/` still exists — `skills/develop-story/diagrams/develop-story.md` and `skills/develop-task/diagrams/develop-task.md` are both present and tracked. |
+| I11 "Verification checklist references deleted `diagrams/` path" | `diagrams/` directories have since been removed. All doc references updated to point to `skills/develop-*/README.md`. |
 | N1 / N2 "Subagent contract table row drift / lock schema undocumented" | No such "subagent contract table" exists in the current SKILL.md or diagrams files. Lock schema is fully documented in `develop-pipeline-pause.md` lines 70–106 with a 12-row field table. |
 | N3 "Resume detector pause timestamp" | Detector already reads the lock and surfaces `current_step_in_lock` + `summaries_seen`; adding `paused_at` from lock mtime is cosmetic. |
 | N6 "Summary-exempt-steps reasoning not explained" | `pipeline-resume-detector-prompt.md` lines 90–96 list each exempt step with a one-line rationale ("Step 1 (create-branch): no subagent" etc.). Sufficient. |
@@ -165,10 +164,10 @@ graph TD
 | I2 | `skills/develop-story/SKILL.md:150` |
 | I3 | `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (Agent 3 schema), `shared/resources/develop-pipeline-step-5-6-qa-loop.md` (task block), `shared/resources/qa-traceability-mapper-prompt.md` (verify task compatibility) |
 | I4 | `shared/resources/resolve-platform.sh` (new helper function), `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg call sites), `shared/resources/develop-pipeline-step-1-create-branch.md` (pre-flight), `shared/resources/develop-pipeline-step-4-create-pr.md`, `shared/resources/develop-pipeline-step-7-finalise.md`, `shared/resources/develop-pipeline-autonomous-defaults.md` (note) |
-| N1 | New: `shared/resources/mermaid-theme.md`. Updated: both `diagrams/develop-*.md`. Possibly: `skills/create-skill/scripts/package_skill.py` (bundling). |
+| N1 | New: `shared/resources/mermaid-theme.md`. Updated: both `skills/develop-*/README.md` (if Mermaid re-introduced). Possibly: `skills/create-skill/scripts/package_skill.py` (bundling). |
 | N2 | `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (footnote after Jira 0c-reg) |
 | N3 | `shared/resources/develop-pipeline-step-4-create-pr.md` (new "PR target by skill" subsection) |
-| N4 | Both `skills/develop-*/diagrams/develop-*.md` (External touchpoints "Subagents" row) |
+| N4 | `diagrams/` directories removed — if subagent inventory is re-documented, add to both `skills/develop-*/README.md`. |
 
 ## Reuse / Existing Utilities
 
@@ -179,7 +178,7 @@ graph TD
 
 ## Verification (end-to-end)
 
-1. **Doc-only changes (I2, N2, N3, N4)**: render diagrams with `npx -y @mermaid-js/mermaid-cli -i skills/develop-story/diagrams/develop-story.md -o /tmp/story.svg` and same for task; run `npm run generate-catalog` and confirm no skill validation errors.
+1. **Doc-only changes (I2, N2, N3, N4)**: run `npm run generate-catalog` and confirm no skill validation errors. (`diagrams/` removed — skip the mermaid-cli render step.)
 2. **Hook trap (C1)**: write a scratch test that creates a fake lock, removes `jq` from PATH (or simulates a kill mid-script), runs the hook, asserts lock is gone. Add to `skills/develop-{story,task}/scripts/` or document in `develop-pipeline-pause.md`'s verification checklist.
 3. **Step 1a idempotence (C2)**: in a scratch repo, manually create `feature/epic.999.test` locally and remotely, then run `/develop-story` against a story with `epic: epic.999.test` — confirm Step 1a logs "already exists" and proceeds.
 4. **Log cleanup (I1)**: run a story to completion that has at least one test failure (so `test-output-*.log` is created), confirm `ls .claude/state/test-output-*.log` returns empty after Step 8.

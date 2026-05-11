@@ -141,7 +141,7 @@ sequenceDiagram
     DS-->>U: status: accepted
 ```
 
-Deep sequence: [`skills/develop-story/diagrams/develop-story.md`](../../skills/develop-story/diagrams/develop-story.md).
+Reference: [`skills/develop-story/README.md`](../../skills/develop-story/README.md).
 
 ## Packaging flow
 
@@ -191,5 +191,5 @@ See also [FAQ](../reference/faq.md) for the rationale behind each.
 - [Getting started](./getting-started.md) — install and first command
 - [FAQ](../reference/faq.md) — why the design works this way
 - [Anti-patterns](../reference/anti-patterns.md) — what to never do
-- [`develop-story` deep sequence](../../skills/develop-story/diagrams/develop-story.md)
-- [`develop-task` deep sequence](../../skills/develop-task/diagrams/develop-task.md)
+- [`develop-story` README](../../skills/develop-story/README.md)
+- [`develop-task` README](../../skills/develop-task/README.md)

@@ -28,7 +28,7 @@ flowchart TD
     C --> D[Merged PR + Accepted task]
 ```
 
-`develop-task` runs an 8-step pipeline mirroring `develop-story` — see [Phase B](#phase-b--implementation-develop-task) and the deep sequence diagram at [`../../skills/develop-task/diagrams/develop-task.md`](../../skills/develop-task/diagrams/develop-task.md).
+`develop-task` runs an 8-step pipeline mirroring `develop-story` — see [Phase B](#phase-b--implementation-develop-task) and the skill README at [`../../skills/develop-task/README.md`](../../skills/develop-task/README.md).
 
 ---
 
@@ -108,7 +108,7 @@ Task `status` advances to `accepted`. PR is left for human merge. The task regis
 
 Re-invoke `/develop-task <same-path>` to resume. The skill verifies per-step artifacts (branch, PR, gate file, etc.) and continues at the first incomplete step.
 
-**Reference:** [`../../skills/develop-task/SKILL.md`](../../skills/develop-task/SKILL.md). Sequence diagram: [`../../skills/develop-task/diagrams/develop-task.md`](../../skills/develop-task/diagrams/develop-task.md).
+**Reference:** [`../../skills/develop-task/SKILL.md`](../../skills/develop-task/SKILL.md). See also: [`../../skills/develop-task/README.md`](../../skills/develop-task/README.md).
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Audience:** reference — high-level pipeline diagrams and an index into the [Runbooks](../runbooks/README.md).
 
-The unit of work in most chains is a **story** or **task**. For step-by-step walkthroughs, follow a runbook. For deep sequence diagrams, see the develop-story / develop-task `diagrams/` directories.
+The unit of work in most chains is a **story** or **task**. For step-by-step walkthroughs, follow a runbook. For implementation details, see the develop-story / develop-task READMEs.
 
 ## Pipelines at a glance
 
@@ -20,7 +20,7 @@ develop-story [story-file-path]
         → qa-fix (up to 5 cycles) → finalise → commit-changes
 ```
 
-Deep sequence: [`skills/develop-story/diagrams/develop-story.md`](../../skills/develop-story/diagrams/develop-story.md).
+Reference: [`skills/develop-story/README.md`](../../skills/develop-story/README.md).
 Walkthrough: [Story Development Runbook](../runbooks/story-development.md).
 
 ### Task pipeline
@@ -37,7 +37,7 @@ develop-task [task-file-path]
         → qa-fix (up to 5 cycles) → finalise → commit-changes
 ```
 
-Deep sequence: [`skills/develop-task/diagrams/develop-task.md`](../../skills/develop-task/diagrams/develop-task.md).
+Reference: [`skills/develop-task/README.md`](../../skills/develop-task/README.md).
 Walkthrough: [Task Development Runbook](../runbooks/task-development.md).
 
 QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills — **dev skills never modify gate files**.

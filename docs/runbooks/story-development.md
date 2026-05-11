@@ -39,7 +39,7 @@ flowchart TD
     I --> J[Merged PR + Accepted story]
 ```
 
-`develop-story` itself runs an 8-step pipeline — see [Phase D](#phase-d--implementation-develop-story) and the deep sequence diagram at [`../../skills/develop-story/diagrams/develop-story.md`](../../skills/develop-story/diagrams/develop-story.md).
+`develop-story` itself runs an 8-step pipeline — see [Phase D](#phase-d--implementation-develop-story) and the skill README at [`../../skills/develop-story/README.md`](../../skills/develop-story/README.md).
 
 ---
 
@@ -203,7 +203,7 @@ Add `--lite` (or answer "Lite" at the Phase 0 prompt) to skip pre-develop codeba
 
 If the pipeline is interrupted, re-invoke `/develop-story <same-path>`. The skill verifies per-step artifacts (branch exists? PR open? gate file present?) and resumes at the first incomplete step. It will not redo completed work.
 
-**Reference:** [`../../skills/develop-story/SKILL.md`](../../skills/develop-story/SKILL.md). Sequence diagram: [`../../skills/develop-story/diagrams/develop-story.md`](../../skills/develop-story/diagrams/develop-story.md).
+**Reference:** [`../../skills/develop-story/SKILL.md`](../../skills/develop-story/SKILL.md). See also: [`../../skills/develop-story/README.md`](../../skills/develop-story/README.md).
 
 ---
 

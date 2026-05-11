@@ -80,7 +80,6 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/create-skill` | Scaffold a new skill | [Authoring skills](../contributing/authoring-skills.md) |
 | `/document-project` | Generate brownfield architecture doc | [Document Existing Project](../runbooks/document-existing-project.md) |
 | `/remember-insight` | Save an insight to project memory | [`remember-insight`](../../skills/remember-insight/SKILL.md) |
-| `/pro-tip` | Surface contextual tips | [`pro-tip`](../../skills/pro-tip/SKILL.md) |
 
 ## Checklists
 

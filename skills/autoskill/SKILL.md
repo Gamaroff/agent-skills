@@ -1,7 +1,6 @@
 ---
 name: autoskill
 description: Analyze coding sessions to detect corrections and preferences, then propose targeted improvements to Skills used in the session. Use this skill when the user asks to "learn from this session", "update skills", or "remember this pattern". Extracts durable preferences and codifies them into the appropriate skill files.
-license: Complete terms in LICENSE.txt
 ---
 
 This skill analyzes coding sessions to extract durable preferences from corrections and approvals, then proposes targeted updates to Skills that were active during the session. It acts as a learning mechanism across sessions, ensuring Claude improves based on feedback.
@@ -11,6 +10,7 @@ The user triggers autoskill after a session where Skills were used. The skill de
 ## When to activate
 
 Trigger on explicit requests:
+
 - "autoskill", "learn from this session", "update skills from these corrections"
 - "remember this pattern", "make sure you do X next time"
 
@@ -21,19 +21,23 @@ Do NOT activate for one-off corrections or when the user declines skill modifica
 Scan the session for:
 
 **Corrections** (highest value)
+
 - "No, use X instead of Y"
 - "We always do it this way"
 - "Don't do X in this codebase"
 
 **Repeated patterns** (high value)
+
 - Same feedback given 2+ times
 - Consistent naming/structure choices across multiple files
 
 **Approvals** (supporting evidence)
+
 - "Yes, that's right"
 - "Perfect, keep doing it this way"
 
 **Ignore:**
+
 - Context-specific one-offs ("use X here" without "always")
 - Ambiguous feedback
 - Contradictory signals (ask for clarification instead)
@@ -41,6 +45,7 @@ Scan the session for:
 ## Signal quality filter
 
 Before proposing any change, ask:
+
 1. Was this correction repeated, or stated as a general rule?
 2. Would this apply to future sessions, or just this task?
 3. Is it specific enough to be actionable?
@@ -51,6 +56,7 @@ Only propose changes that pass all four.
 ### What counts as "new information"
 
 **Worth capturing:**
+
 - Project-specific conventions ("we use `cn()` not `clsx()` here")
 - Custom component/utility locations ("buttons are in `@/components/ui`")
 - Team preferences that differ from defaults ("we prefer explicit returns")
@@ -59,6 +65,7 @@ Only propose changes that pass all four.
 - Integrations and API quirks specific to this stack
 
 **NOT worth capturing (I already know this):**
+
 - General best practices (DRY, separation of concerns)
 - Language/framework conventions (React hooks rules, TypeScript basics)
 - Common library usage (standard Tailwind classes, typical Next.js patterns)
@@ -121,6 +128,7 @@ Wait for explicit approval before editing any file.
 ## Applying changes
 
 When approved:
+
 1. Edit the target file with minimal, focused changes
 2. If git is available, commit with message: `chore(autoskill): [brief description]`
 3. Report what was changed

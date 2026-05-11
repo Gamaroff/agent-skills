@@ -75,7 +75,6 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Create a new skill for X" | `create-skill` |
 | "Document this existing project" | `document-project` |
 | "Remember this — we use NX for testing" | `remember-insight` |
-| "Give me a pro tip on testing React Native" | `pro-tip` |
 
 ## Architecture
 
