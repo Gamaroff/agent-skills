@@ -25,6 +25,8 @@ npx skills add https://github.com/Gamaroff/agent-skills --list
 
 `--all` is shorthand for `--skill '*' --agent '*' -y` (install all skills into every detected agent directory, skip prompts). Each skill is self-contained — shared resources are pre-bundled into `references/`, so no clone is needed.
 
+**Re-running the same command updates skills** — installs are idempotent and overwrite the existing skill directory with the latest version from the source.
+
 Restart your agent (e.g. Claude Code) in the project dir after install so it picks up `.agents/skills/`.
 
 ### Option B — copy the source skills (developing skills)

@@ -38,6 +38,8 @@ npx skills add https://github.com/Gamaroff/agent-skills --all
 ```
 `--all` is shorthand for `--skill '*' --agent '*' -y` — installs all skills into every detected agent directory and skips confirmation prompts. Preview without installing with `--list`.
 
+**Re-running the same command updates skills** — installs are idempotent and overwrite the existing skill directory with the latest version.
+
 Each skill is self-contained in-tree (shared resources pre-bundled into `references/`), so installs work without cloning the rest of the repo.
 
 **Single skill, manual:**
