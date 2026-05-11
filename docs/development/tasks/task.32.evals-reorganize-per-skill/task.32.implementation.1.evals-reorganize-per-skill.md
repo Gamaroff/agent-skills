@@ -27,10 +27,10 @@ status: in-progress
 | 1 | Create Branch | ✅ Done | — |
 | 2 | Review Task | ✅ Done (skipped — already reviewed) | — |
 | 3 | Develop | ✅ Done | — |
-| 4 | Create PR | ⏳ Pending | — |
-| 5 | QA Task | ⏳ Pending | — |
-| 6 | QA Fix | ⏳ Pending | — |
-| 7 | Finalise | ⏳ Pending | — |
+| 4 | Create PR | ✅ Done | — |
+| 5 | QA Task | ✅ Done (PASS 100/100) | — |
+| 6 | QA Fix | ✅ Done (skipped — gate PASS, no issues) | — |
+| 7 | Finalise | ✅ Done | — |
 | 8 | Commit Changes | ⏳ Pending | — |
 
 ## Decisions Log

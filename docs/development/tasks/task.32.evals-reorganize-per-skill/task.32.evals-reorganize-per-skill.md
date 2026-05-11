@@ -1,7 +1,7 @@
 ---
 id: task.32.evals-reorganize-per-skill
 title: "Reorganize evals/ from full-flow/ into per-skill structure"
-status: in-progress
+status: accepted
 type: task
 category: refactoring
 priority: medium
@@ -360,6 +360,50 @@ N/A — this task is atomic. Either all moves land or none.
 
 ## QA Artifacts (created during QA)
 
-- QA report: `task.32.qa.1.evals-reorganize-per-skill.md`
-- Bug reports (if issues found): `task.32.bug.N.<name>.md`
-- Quality gate: `task.32.gate.1.evals-reorganize-per-skill.yml`
+- QA report: [task.32.qa.1.evals-reorganize-per-skill.md](./task.32.qa.1.evals-reorganize-per-skill.md)
+- Quality gate: [task.32.gate.1.evals-reorganize-per-skill.yml](./task.32.gate.1.evals-reorganize-per-skill.yml)
+- Bug reports: None (0 issues found)
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer (automated pipeline)
+**Testing Date**: 2026-05-11
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.32.qa.1.evals-reorganize-per-skill.md](./task.32.qa.1.evals-reorganize-per-skill.md)
+- **Gate File**: [task.32.gate.1.evals-reorganize-per-skill.yml](./task.32.gate.1.evals-reorganize-per-skill.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 78/78 (npm test) + 4/4 replay evals
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. All success criteria met. Zero orphaned `full-flow` references.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+**Accepted:** 2026-05-11
+
+### QA Report Summary
+
+**QA Report**: `task.32.qa.1.evals-reorganize-per-skill.md`
+**Gate File**: `task.32.gate.1.evals-reorganize-per-skill.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** All 4 criteria met (npm test 78/78, eval:all 4/4, full-flow removed, history preserved)
+✅ **PR:** #70 open at https://github.com/Gamaroff/agent-skills/pull/70
+✅ **Documentation:** docs/evals.md, AGENTS.md, docs/README.md updated; 3 new READMEs created
+✅ **Security:** PASS — pure restructure, no new logic/deps/auth changes
+✅ **Compliance:** NOT_APPLICABLE — internal refactoring only
+✅ **Performance:** PASS — npm test timing stable; 19 evals tests newly discovered
+
+**Detailed Verification Log:** See `task.32.dod.1.evals-reorganize-per-skill.md` for complete verification evidence.
