@@ -41,6 +41,30 @@ python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
 - Run `npm run generate-catalog` after adding or editing skills (regenerates `docs/reference/skill-catalog.md`)
 - Run `quick_validate.py` before submitting
 
+### Before you open a PR
+
+Run the eval suite locally — CI runs the same gates and rejects regressions. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) for the full reference; the minimum is:
+
+```bash
+npm test                              # required — must be green (L1 unit + L2 fixture + L3 protocol + L4 replay)
+```
+
+Add the skill-specific suite when your change touches that skill:
+
+```bash
+npm run eval:create-task              # or :create-story, :develop-task, :develop-story
+```
+
+For changes to the develop-story / develop-task orchestrators, also run a smoke pass:
+
+```bash
+npm run eval:develop-story:smoke      # needs ANTHROPIC_API_KEY
+```
+
+For behavioural changes (prompts, step transitions, Phase 0 questions), additionally walk through [`docs/contributing/evals/live-github-test.md`](./docs/contributing/evals/live-github-test.md) (story) or [`live-github-task-test.md`](./docs/contributing/evals/live-github-task-test.md) (task) — these catch model-attention regressions that hermetic tests can't.
+
+If you fix a regression, add a protocol test under `evals/{skill}/protocol/` or a replay scenario under `evals/{skill}/step-isolation/<name>/` so it stays fixed (see [`recipes.md`](./docs/contributing/evals/recipes.md) recipe #9).
+
 ## Reporting Issues
 
 Open a GitHub issue. Include the skill name, what you asked it to do, and what went wrong.

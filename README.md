@@ -26,9 +26,18 @@ See [docs/concepts/overview.md](./docs/concepts/overview.md) for how skills work
 ## Installing Skills
 
 **With `npx skills` (recommended):**
+
+Install a single skill:
 ```bash
 npx skills add https://github.com/Gamaroff/agent-skills --skill <skill-name>
 ```
+
+Install every skill in the repo:
+```bash
+npx skills add https://github.com/Gamaroff/agent-skills --all
+```
+`--all` is shorthand for `--skill '*' --agent '*' -y` — installs all skills into every detected agent directory and skips confirmation prompts. Preview without installing with `--list`.
+
 Each skill is self-contained in-tree (shared resources pre-bundled into `references/`), so installs work without cloning the rest of the repo.
 
 **Single skill, manual:**

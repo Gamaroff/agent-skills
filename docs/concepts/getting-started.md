@@ -6,9 +6,28 @@ From "I cloned the repo" to "I ran my first command" in under ten minutes.
 
 ## 1. Install the skills
 
-The skills in this library are designed to be installed into target projects under `.agents/skills/`. Two paths:
+The skills in this library are designed to be installed into target projects under `.agents/skills/`. Three paths:
 
-### Option A — copy the source skills (developing skills)
+### Option A — `npx skills add` (recommended for consumers)
+
+In your target project root:
+
+```bash
+# Install one skill
+npx skills add https://github.com/Gamaroff/agent-skills --skill develop-story
+
+# Install every skill in the repo
+npx skills add https://github.com/Gamaroff/agent-skills --all
+
+# Preview available skills without installing
+npx skills add https://github.com/Gamaroff/agent-skills --list
+```
+
+`--all` is shorthand for `--skill '*' --agent '*' -y` (install all skills into every detected agent directory, skip prompts). Each skill is self-contained — shared resources are pre-bundled into `references/`, so no clone is needed.
+
+Restart your agent (e.g. Claude Code) in the project dir after install so it picks up `.agents/skills/`.
+
+### Option B — copy the source skills (developing skills)
 
 If you're authoring or modifying skills in this repo, work directly in `skills/`:
 
@@ -18,9 +37,9 @@ cd agent-skills
 npm install            # node deps for catalog generator
 ```
 
-### Option B — install packaged skills into your project
+### Option C — install packaged skills into your project (manual)
 
-If you're consuming skills in another project, package them and copy the zip:
+If you can't use `npx skills add` (offline, locked-down CI, etc.), package skills manually and copy the zip:
 
 ```bash
 # In this repo:
@@ -98,6 +117,17 @@ The simplest end-to-end smoke test:
 ```
 
 If the file appears at the right path with a status of `draft`, the install is working. If not, check [`../reference/troubleshooting.md`](../reference/troubleshooting.md).
+
+### Working on the agent-skills repo itself?
+
+If you cloned `agent-skills` to author or modify skills (not just consume them), validate the dev environment by running the hermetic eval suite:
+
+```bash
+npm install
+npm test            # L1 unit + L2 fixture + L3 protocol + L4 replay — no creds required
+```
+
+Green means your environment, packager, and bundler are all working. This is also the gate CI enforces on every push. See [`../contributing/evals/README.md`](../contributing/evals/README.md) for the full eval workflow (layers, drivers, when to run each).
 
 ## What's next
 
