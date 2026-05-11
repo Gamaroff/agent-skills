@@ -1,0 +1,48 @@
+schema: 1
+task: 'task.33.develop-task-evals'
+task_title: 'Build evals for develop-task pipeline (protocol + step-isolation + smoke)'
+gate: PASS
+status_reason: 'All 6 phases implemented. 125 tests pass, 0 failures. 12 protocol tests + 15 step-isolation assertions green. No regressions. Smoke scenario deferred to opt-in live driver.'
+reviewer: 'QA Engineer'
+updated: '2026-05-11T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 125
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Eval-only scope; no production code modified; GH_TOKEN gated correctly in gh-sandbox'
+  performance:
+    status: PASS
+    notes: 'test:node +3% duration (well under 10% threshold); eval:develop-task runs in <200ms'
+  reliability:
+    status: PASS
+    notes: 'All assertions deterministic; replay fixtures static; skip paths return pass not error'
+  maintainability:
+    status: PASS
+    notes: 'All new modules unit tested; README documents layer architecture; one LOW doc inconsistency (DoD criterion 12 vs Phase 3 spec, non-blocking)'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Reword DoD criterion 12 to match implemented approach (shared assertions.mjs is correct target per Phase 3 spec)'
+      refs: ['docs/development/tasks/task.33.develop-task-evals/task.33.develop-task-evals.md']
+    - action: 'Run smoke test with ANTHROPIC_API_KEY to validate live driver end-to-end'
+      refs: ['evals/develop-task/smoke/01-end-to-end-dry/README.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
