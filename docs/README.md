@@ -60,9 +60,9 @@ Documentation for the Agent Skills library, organised by reader intent.
 
 Real task artifacts produced by this repo running its own pipeline on itself: [`../examples/README.md`](../examples/README.md). Useful for seeing what the generated documents (review reports, QA gates, DoD checklists, implementation reports) actually look like.
 
-## A note on `docs/development/`
+## A note on `docs/tasks/`
 
-`docs/development/` is **data**, not docs — it holds task instances (`tasks/task.{N}.*`), the [epic registry](../docs/standards/epic-registry.md), and the [task registry](../docs/standards/task-registry.md). It sits under `docs/` for historical reasons; treat it as a work-items archive, not a sibling of `concepts/`, `reference/`, `standards/`, `contributing/`, `runbooks/`, or `operations/`.
+`docs/tasks/` is **data**, not docs — it holds task instances (`task.{N}.{name}/`) and the [task registry](./tasks/task-registry.md). Treat it as a work-items archive, not a sibling of `concepts/`, `reference/`, `standards/`, `contributing/`, `runbooks/`, or `operations/`. (Previously lived at `docs/development/tasks/`.)
 
 ## External
 

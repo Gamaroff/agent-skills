@@ -11,7 +11,7 @@ A task is a standalone unit of technical work — refactor, infrastructure chang
 ## Directory layout
 
 ```
-docs/development/tasks/
+docs/tasks/
 └── task.{N}.{name}/
     ├── task.{N}.{name}.md                       # main document (human-authored)
     ├── task.{N}.plan.{name}.md                  # implementation plan
@@ -22,7 +22,7 @@ docs/development/tasks/
     └── task.{N}.gate.{N}.{name}.yml             # QA gate decision (auto)
 ```
 
-The base path `docs/development/tasks/` is fixed — no configuration key overrides it.
+The base path `docs/tasks/` is fixed — no configuration key overrides it.
 
 ## File naming
 
@@ -108,7 +108,7 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 
 ## Task registry
 
-`docs/development/tasks/task-registry.md` is the single source of truth for task numbering and status. Rules:
+`docs/tasks/task-registry.md` is the single source of truth for task numbering and status. Rules:
 
 - Read **Next Available Task Number** before running `create-task` — that's your `task.{N}`.
 - The new registry row is committed atomically with the new task files.
@@ -118,7 +118,7 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 
 Before running `develop-task`, verify:
 
-- [ ] Task file exists at `docs/development/tasks/task.{N}.{name}/task.{N}.{name}.md`
+- [ ] Task file exists at `docs/tasks/task.{N}.{name}/task.{N}.{name}.md`
 - [ ] `status:` is `draft`, `planned`, or `ready-for-development`
 - [ ] Implementation Plan has at least one unchecked item
 - [ ] Frontmatter `status:` and body `**Status:**` are in sync
@@ -127,7 +127,7 @@ Before running `develop-task`, verify:
 ## Invocation
 
 ```
-/develop docs/development/tasks/task.17.cache-lib-simplification/
+/develop docs/tasks/task.17.cache-lib-simplification/
 /develop task.17.cache-lib-simplification.md
 /develop #297    # GitHub issue number
 ```

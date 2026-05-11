@@ -91,7 +91,7 @@ Calls: `create-branch → review-story → develop → create-pr → qa-story �
 ### `develop-task` — Automated Task Lifecycle
 
 ```bash
-/develop-task docs/development/tasks/task.44.db-migration.md
+/develop-task docs/tasks/task.44.db-migration.md
 "Develop and QA this task end to end"
 ```
 
@@ -204,7 +204,7 @@ Modes: interactive (section-by-section, user confirms) or YOLO (one pass, compre
 
 Use when: 1-3 stories, follows existing patterns, low risk, minimal architectural changes.
 
-File naming: `epic.[number].[descriptive-name].md`. Check `/docs/development/epic-registry.md` for unique numbers.
+File naming: `epic.[number].[descriptive-name].md`. Check `/docs/epic-registry.md` for unique numbers.
 
 ## Configuration
 

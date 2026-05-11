@@ -137,21 +137,21 @@ For tasks:
 
 **Task Document** (in task subdirectory):
 
-- Pattern: `docs/development/tasks/task.{id}.{name}/task.{id}.{name}.md`
+- Pattern: `docs/tasks/task.{id}.{name}/task.{id}.{name}.md`
 
 **QA Report** (co-located in task subdirectory):
 
-- Pattern: `docs/development/tasks/task.{id}.{name}/task.{id}.qa.{number}.{name}.md`
+- Pattern: `docs/tasks/task.{id}.{name}/task.{id}.qa.{number}.{name}.md`
 
 **Quality Gate** (co-located in task subdirectory):
 
-- Pattern: `docs/development/tasks/task.{id}.{name}/task.{id}.gate.{number}.{name}.yml`
+- Pattern: `docs/tasks/task.{id}.{name}/task.{id}.gate.{number}.{name}.yml`
 - Discovery glob: `task.{id}.gate.*.yml` in the task subdirectory; sort by gate number and take the latest
 
 **Bug Report Files** (co-located in task subdirectory):
 
 - Pattern: `task.{id}.bug.{number}.{name}.md` in task subdirectory
-- Location: `docs/development/tasks/task.{id}.{name}/task.{id}.bug.{number}.{name}.md`
+- Location: `docs/tasks/task.{id}.{name}/task.{id}.bug.{number}.{name}.md`
 - Sequential numbering: `task.{id}.bug.1.*.md`, `task.{id}.bug.2.*.md`, etc.
 - Status tracking: New | In Progress | Ready for QA | Reopened | Closed
 
@@ -1069,13 +1069,13 @@ You: "Update QA report and gate with bug resolutions for {task_id}"
 
 **What Gets Updated** (NOT new versions created):
 
-1. **Latest QA Report** (`docs/development/tasks/task.{id}.{name}/task.{id}.qa.{number}.{name}.md`):
+1. **Latest QA Report** (`docs/tasks/task.{id}.{name}/task.{id}.qa.{number}.{name}.md`):
    - Adds "Bug Resolution Summary" section at end
    - Lists each bug fixed with verification results
    - Updates gate status and deployment recommendation
    - Adds new timestamp
 
-2. **Latest Quality Gate** (`docs/development/tasks/task.{id}.{name}/task.{id}.gate.{number}.{name}.yml`):
+2. **Latest Quality Gate** (`docs/tasks/task.{id}.{name}/task.{id}.gate.{number}.{name}.yml`):
    - Updates `gate` field (CONCERNS → PASS)
    - Updates `status_reason` with fix summary
    - Updates `updated` timestamp

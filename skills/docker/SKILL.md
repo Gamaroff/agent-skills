@@ -753,10 +753,6 @@ docker exec {db-service} cat /var/lib/postgresql/data/pg_hba.conf
 
 ### Documentation
 - **Primary**: `/docker/DOCKER-INFRASTRUCTURE.md` - Complete 2,887-line guide
-- **Development**: `/docs/development/environment-guide.md` - Setup walkthrough
-- **Testing**: `/docs/development/testing-local-guide.md` - Test environment details
-- **Deployment**: `/docs/development/deployment-guide.md` - Production deployment
-- **Troubleshooting**: `/docs/development/troubleshooting.md` - Common issues
 - **Main Guide**: `/CLAUDE.md` - Development workflow integration
 
 ### Helper Scripts

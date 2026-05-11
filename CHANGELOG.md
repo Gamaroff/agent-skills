@@ -56,7 +56,7 @@ All notable changes to this project will be documented in this file. Format foll
 - `docs/placeholders.md` — legend for `{project}`, `{api-service}`, `{db-service}`, `{cache-service}`, `@your-org/...` template tokens used across skills, with substitution guidance.
 - Placeholder notes in `docker`, `deploy-remote`, `nestjs-debug`, `qa-task` linking to `docs/placeholders.md`.
 - `CHANGELOG.md`.
-- `examples/README.md` pointing at `docs/development/tasks/` as a worked record of the develop/QA pipeline.
+- `examples/README.md` pointing at `docs/tasks/` as a worked record of the develop/QA pipeline.
 
 ### Notes
 - This pass is the OSS-readiness sweep: domain-specific business entities (financial wallets, mobile-money market analysis, etc.) and references to non-existent private libraries were removed or genericized so that every skill stands on its own when installed into an arbitrary project.

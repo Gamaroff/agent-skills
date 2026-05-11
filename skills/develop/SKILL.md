@@ -12,7 +12,7 @@ description: Provides guidance for implementing features and technical tasks. Us
 Use this skill when:
 
 - Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/`)
-- Executing technical tasks from `docs/development/tasks/`
+- Executing technical tasks from `docs/tasks/`
 - Starting new feature development
 - Need guidance on development workflow
 - Working through task sequences with tests
@@ -27,7 +27,7 @@ You can invoke this skill with:
 - **A specific story file**: `story.178.8.example-feature.md`
 - **A story directory**: `stories/story.178.8.example-feature/`
 - **A specific task file**: `task.1.cache-lib-simplification.md`
-- **A task directory**: `docs/development/tasks/task.1.cache-lib-simplification/`
+- **A task directory**: `docs/tasks/task.1.cache-lib-simplification/`
 - **An epic file**: `epic.178.feature-management.md` (triggers creation workflow)
 
 **File Type Detection:**
@@ -40,7 +40,7 @@ You can invoke this skill with:
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 3. **Task File Detection** - Matches pattern: `task.{id}.{name}.md`
-   - Location: `docs/development/tasks/task.{id}.{name}/task.{id}.{name}.md` (each task has its own subdirectory)
+   - Location: `docs/tasks/task.{id}.{name}/task.{id}.{name}.md` (each task has its own subdirectory)
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 **Directory Discovery Logic:**
@@ -61,7 +61,7 @@ Input: stories/story.178.8.example-feature/
 Discovers: story.178.8.example-feature.md
 Type: Story File → Use Story Workflow
 
-Input: docs/development/tasks/task.1.cache-lib-simplification/
+Input: docs/tasks/task.1.cache-lib-simplification/
 Discovers: task.1.cache-lib-simplification.md
 Type: Task File → Use Task Workflow
 
@@ -684,7 +684,7 @@ Three-strikes escalation (applied to the triage summary, not the raw log):
 ### 2. Develop Task Workflow
 
 **File Pattern**: `task.{id}.{name}.md`
-**Location**: `docs/development/tasks/task.{id}.{name}/task.{id}.{name}.md` (each task has its own subdirectory)
+**Location**: `docs/tasks/task.{id}.{name}/task.{id}.{name}.md` (each task has its own subdirectory)
 
 **Starting Development**:
 
@@ -809,7 +809,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 **Key Paths**:
 
 - Stories: `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/` (co-located within epics)
-- Tasks: `docs/development/tasks/`
+- Tasks: `docs/tasks/`
 - QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{N}.{M}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
 - PRD: `docs/prd/` (sharded)
 - Architecture: `docs/architecture/` (sharded)
@@ -854,7 +854,7 @@ docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/
 Each task has its own subdirectory containing all related files:
 
 ```
-docs/development/tasks/
+docs/tasks/
 └── task.{id}.{task-name}/
     ├── task.{id}.{task-name}.md                          # Task file (source of truth)
     ├── task.{id}.qa.{number}.{descriptive-name}.md       # QA report (created by QA)
@@ -1066,7 +1066,6 @@ npx nx test {lib-name} --coverage
 
 - Development patterns: `CLAUDE.md`
 - Story templates: `docs/templates/README.md`
-- Logging guide: `docs/development/logging-infrastructure-guide.md`
 - E2E testing: `apps/{api-service}/test/integration/groups/README.md`
 
 **Key Commands**:

@@ -23,7 +23,7 @@ Activate this skill when:
 - PRD must be sharded first (using `shard-prd`)
 - Shards exist in PRD root directory (e.g., `docs/prd/system-name/`)
 - Understanding of system architecture and dependencies
-- **CRITICAL**: Access to epic registry (`/docs/development/epic-registry.md`) for number allocation
+- **CRITICAL**: Access to epic registry (`/docs/epic-registry.md`) for number allocation
 
 **Do NOT use for:**
 - PRDs that haven't been sharded (shard first)
@@ -237,7 +237,7 @@ dependencies: ["epic.163", "epic.164"]  # Use actual epic numbers from registry
 **CRITICAL - Epic Registry Integration:**
 
 Before creating any epic files, you MUST:
-1. Check `/docs/development/epic-registry.md` for next available epic number
+1. Check `/docs/epic-registry.md` for next available epic number
 2. Reserve N sequential numbers in the registry (where N = number of epics you're creating)
 3. Update "Next Available Epic Number" counter in registry
 4. Use the reserved numbers for your epic files

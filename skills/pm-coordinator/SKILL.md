@@ -148,7 +148,7 @@ User Request Analysis:
 - Epic numbers are globally unique across the entire system
 - PRDs use relative numbers ("Epic 1", "Epic 2")
 - Epic files use global registry numbers (epic.163.md, epic.164.md, etc.)
-- Check `/docs/development/epic-registry.md` before creating epic files
+- Check `/docs/epic-registry.md` before creating epic files
 - See [Epic Numbering System in CLAUDE.md](../../CLAUDE.md#epic-numbering-system)
 
 ### Quality Standards

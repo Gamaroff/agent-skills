@@ -129,8 +129,8 @@ docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.
 **Task path examples:**
 
 ```
-docs/development/tasks/task.90.swagger-cli-plugin-enablement/task.90.swagger-cli-plugin-enablement.md
-docs/development/tasks/task.90.swagger-cli-plugin-enablement/
+docs/tasks/task.90.swagger-cli-plugin-enablement/task.90.swagger-cli-plugin-enablement.md
+docs/tasks/task.90.swagger-cli-plugin-enablement/
 ```
 
 **Actions:**
@@ -1151,7 +1151,7 @@ Check if task.90.swagger-cli-plugin-enablement is ready for acceptance
 
 **Skill Actions:**
 
-1. Read task document from `docs/development/tasks/task.90.../task.90...md`
+1. Read task document from `docs/tasks/task.90.../task.90...md`
 2. Check for QA reports - none found
 3. Verify acceptance criteria - 1 checkbox unchecked ❌
 4. Find PR reference - no PR number found ❌
@@ -1191,7 +1191,7 @@ Check if task.90.swagger-cli-plugin-enablement is ready for acceptance
 
 **Estimated Effort:** Medium (3-5 hours)
 
-**Gap report added to:** docs/development/tasks/task.90.../task.90...md
+**Gap report added to:** docs/tasks/task.90.../task.90...md
 ```
 
 ### Example 3: Directory Path Provided

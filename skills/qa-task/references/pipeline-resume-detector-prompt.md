@@ -28,7 +28,7 @@ Return **JSON only** — no prose, no markdown fences, no explanation:
   "summaries_seen": ["step-1-pre-develop-map.json", "step-2-review-prepass.json"],
   "deltas_since_pause": [
     {
-      "path": "docs/development/tasks/task.24.../task.24.*.md",
+      "path": "docs/tasks/task.24.../task.24.*.md",
       "old_mtime": "2026-05-10T10:00:00Z",
       "new_mtime": "2026-05-10T10:05:00Z",
       "concern": "external edit during pause"

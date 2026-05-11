@@ -11,7 +11,7 @@ This document is structured for two audiences:
 
 ## Technical Summary
 
-`develop-task` is a thin **orchestrator** for standalone technical tasks (refactoring, infra, cleanup). Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the durable source of truth for state and audit trail. Tasks live in `docs/development/tasks/task.{id}.{name}/`.
+`develop-task` is a thin **orchestrator** for standalone technical tasks (refactoring, infra, cleanup). Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the durable source of truth for state and audit trail. Tasks live in `docs/tasks/task.{id}.{name}/`.
 
 ### External touchpoints
 

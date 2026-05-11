@@ -2,9 +2,9 @@
 
 Worked examples of the skills in this repository being applied to real work.
 
-## `docs/development/tasks/`
+## `docs/tasks/`
 
-The [`docs/development/tasks/`](../docs/development/tasks/) directory contains the actual task documents, QA reports, gate files, implementation reports, and Sprint Review summaries produced by the develop/QA pipeline as it iterated on this codebase itself.
+The [`docs/tasks/`](../docs/tasks/) directory contains the actual task documents, QA reports, gate files, implementation reports, and Sprint Review summaries produced by the develop/QA pipeline as it iterated on this codebase itself.
 
 Each task subdirectory typically includes:
 

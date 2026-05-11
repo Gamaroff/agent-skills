@@ -441,7 +441,7 @@ PRDs grow over time — it is expected and normal to add new epics as scope evol
 ```
 
 **IMPORTANT - Epic Numbering:**
-When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/development/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
+When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
 
 #### Section 6: Epic Details (MANDATORY per epic)
 

@@ -598,7 +598,6 @@ async method() {
 - **NestJS Documentation**: https://docs.nestjs.com/
 - **Prisma Documentation**: https://www.prisma.io/docs/
 - **TypeScript Handbook**: https://www.typescriptlang.org/docs/
-- **Repository Troubleshooting Guide**: `docs/development/troubleshooting.md`
 
 ---
 

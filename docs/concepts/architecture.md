@@ -11,9 +11,9 @@ flowchart TB
     subgraph CP[Consuming project]
         SC[skills-config.yaml]
         AS[.agents/skills/<br/>installed zips]
-        PJD[docs/prd/<br/>docs/development/]
-        ER[epic-registry.md]
-        TR[task-registry.md]
+        PJD[docs/prd/<br/>docs/tasks/]
+        ER[docs/epic-registry.md]
+        TR[docs/tasks/task-registry.md]
     end
 
     subgraph AGENT[Agent runtime]

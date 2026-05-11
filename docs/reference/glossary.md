@@ -45,8 +45,8 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 
 | Term | Definition |
 |---|---|
-| **Epic registry** | `docs/development/epic-registry.md` in the consuming project. Single source of truth for epic numbers. Globally unique, never reused. See [Epic registry](../standards/epic-registry.md). |
-| **Task registry** | `docs/development/tasks/task-registry.md` in the consuming project. Single source of truth for task numbers. Globally unique, never reused. See [Task registry](../standards/task-registry.md). |
+| **Epic registry** | `docs/epic-registry.md` in the consuming project. Single source of truth for epic numbers. Globally unique, never reused. See [Epic registry](../standards/epic-registry.md). |
+| **Task registry** | `docs/tasks/task-registry.md` in the consuming project. Single source of truth for task numbers. Globally unique, never reused. See [Task registry](../standards/task-registry.md). |
 | **Atomic registry update** | Rule that a new epic/task and its registry row must commit in the same git commit. |
 
 ## Library mechanics

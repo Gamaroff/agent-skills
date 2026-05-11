@@ -54,7 +54,7 @@ Follow this strict procedural sequence. **DO NOT skip steps** unless the specifi
    - **Verification**: Ensure cross-cutting smells (e.g., Shotgun Surgery) are identified across partitions.
 9. **Prompt for Save Location**:
    - **Action**: MANDATORY: Ask the user where the plan document should be saved.
-   - **Default**: `docs/development/refactoring`.
+   - **Default**: `docs/refactoring`.
 10. **Generate Refactoring Plan**:
    - **Action**: Create the plan using the [Plan Document Template](#refactoring-plan-document-template).
    - **Verification**: Confirm the file follows the naming convention: `refactor-DDMMYYYY-[N].md`.

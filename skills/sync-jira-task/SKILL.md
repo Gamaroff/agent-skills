@@ -51,7 +51,7 @@ One-way sync of a local technical task markdown file to Jira. Auto-detects creat
 
 ### Required Files
 
-- A task markdown file at `docs/development/tasks/task.<N>.<slug>/task.<N>.<slug>.md`.
+- A task markdown file at `docs/tasks/task.<N>.<slug>/task.<N>.<slug>.md`.
 - The task does **NOT** require any epic frontmatter. If `jira_epic` is set, it is ignored.
 
 ### Required Environment Variables
@@ -114,13 +114,13 @@ due_date: '2026-05-15'               # ISO date (optional)
 ### 1. Identify the Task File
 
 ```
-docs/development/tasks/task.<N>.<slug>/task.<N>.<slug>.md
+docs/tasks/task.<N>.<slug>/task.<N>.<slug>.md
 ```
 
 To find tasks that have **not yet been synced** (no `jira_key`):
 
 ```bash
-grep -L 'jira_key:' $(find docs/development/tasks -name 'task.*.md' -not -name '*.plan.*' -not -name '*.qa.*' -not -name '*.bug.*')
+grep -L 'jira_key:' $(find docs/tasks -name 'task.*.md' -not -name '*.plan.*' -not -name '*.qa.*' -not -name '*.bug.*')
 ```
 
 ### 2. Check Environment Variables
@@ -238,7 +238,7 @@ After sync the script writes (in-place, preserving order):
 ```yaml
 jira_key: "PROJ-47"
 jira_url: "https://yourorg.atlassian.net/browse/PROJ-47"
-task_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/development/tasks/task.1.../task.1....md"
+task_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/tasks/task.1.../task.1....md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
 jira_last_body_hash: "f4b2c1d9a0e72b58"
 jira_last_meta_hash: "a91c0aef33eb1d04"

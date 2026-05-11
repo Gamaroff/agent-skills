@@ -172,4 +172,3 @@ Then restart Docker Desktop / `sudo systemctl restart docker`.
 - **`server-admin` skill** — sysadmin ops (apt, ufw, systemd, disk)
 - **`docker` skill** — local Docker workflows
 - **`use-railway` skill** — managed cloud deploys
-- **[Remote Server Deployment Guide](../../../docs/development/remote-server-deployment.md)** — full setup walkthrough

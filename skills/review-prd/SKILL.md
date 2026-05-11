@@ -178,7 +178,7 @@ Store choice as `output_mode` for Step 11.
    - `.claude/database-redis.md`
    - `.claude/testing.md`
    - `docs/architecture/routing-and-file-structure.md`
-   - `docs/development/naming-conventions.md`
+   - `docs/standards/naming-conventions.md`
    - `.claude/notifications.md` (if PRD touches notifications)
 
 4. **Scan for child epics**:
@@ -188,7 +188,7 @@ Store choice as `output_mode` for Step 11.
    - Glob: `docs/prd/[domain]/[feature]/epics/epic.*/stories/**/story.*.md`
 
 6. **Load epic registry**:
-   - `docs/development/epic-registry.md`
+   - `docs/epic-registry.md`
 
 **Output**: Full context package ready for analysis.
 
@@ -785,11 +785,11 @@ options:
 | File | Purpose |
 |------|---------|
 | Brownfield PRD template YAML | Template compliance baseline (section structure) |
-| `docs/development/epic-registry.md` | Epic alignment verification |
+| `docs/epic-registry.md` | Epic alignment verification |
 | `.claude/backend-patterns.md` | Architecture source — NestJS, API, DI |
 | `.claude/database-redis.md` | Architecture source — DB, Redis, safety rules |
 | `.claude/testing.md` | Architecture source — test standards, co-location |
 | `docs/architecture/routing-and-file-structure.md` | Routing and file structure |
-| `docs/development/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
+| `docs/standards/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
 | `skills/pm-checklist/SKILL.md` | Complementary checklist validation (optional integration) |
 | `skills/review-epic/SKILL.md` | Pattern reference for question batching and scoring |

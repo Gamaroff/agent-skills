@@ -71,7 +71,7 @@ docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/
 
 **Example**: If story is at `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.<slug>.md`, gate goes to `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-cache.yml`
 
-For tasks: gate is co-located in the task directory at `docs/development/tasks/task.<id>.<name>/task.<id>.gate.<N>.<name>.yml`.
+For tasks: gate is co-located in the task directory at `docs/tasks/task.<id>.<name>/task.<id>.gate.<N>.<name>.yml`.
 
 ---
 

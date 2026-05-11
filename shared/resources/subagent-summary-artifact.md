@@ -20,8 +20,8 @@ When a step in `/develop-story` or `/develop-task` dispatches a subagent (e.g. E
 Examples:
 
 ```
-docs/development/stories/178/story.178.8.example/.summaries/step-2-review-prepass.json
-docs/development/tasks/task.26.foo/.summaries/step-3-iteration-audit.json
+docs/prd/app/core/epics/epic.178/stories/story.178.8.example/.summaries/step-2-review-prepass.json
+docs/tasks/task.26.foo/.summaries/step-3-iteration-audit.json
 ```
 
 ## Schema

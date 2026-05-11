@@ -359,7 +359,7 @@ For comprehensive investigation details, root cause analysis, and research findi
 
 ### Original Task 38 Files
 
-**Location**: `/docs/development/tasks/task.38.authservice-di-failure/`
+**Location**: `/docs/tasks/task.38.authservice-di-failure/`
 
 **Files**:
 - `README.md` - Quick summary and resolution

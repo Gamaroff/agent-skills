@@ -2,7 +2,7 @@
 
 > **Audience:** anyone creating a task in a project that uses these skills.
 
-**Location:** `docs/development/tasks/task-registry.md` (inside the consuming project).
+**Location:** `docs/tasks/task-registry.md` (inside the consuming project).
 
 The task registry is the single source of truth for task numbering and status. Task numbers are **globally unique and never reused**, even after cancellation.
 

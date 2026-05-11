@@ -1,0 +1,46 @@
+schema: 1
+task: 'task.30.develop-task-pipeline-resume-stale-context-detector'
+task_title: 'Wire pipeline resume stale-context detector into develop-task orchestrator'
+gate: PASS
+status_reason: 'All 3 Phase 3 success criteria verified via static analysis. No HIGH/MEDIUM issues. Documentation-only task — NFRs N/A or PASS.'
+reviewer: 'QA Engineer'
+updated: '2026-05-10T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'N/A — no auth/crypto/payments touched. No source changes.'
+  performance:
+    status: PASS
+    notes: 'N/A — documentation-only task. No runtime code changed.'
+  reliability:
+    status: PASS
+    notes: 'N/A — no source changes. Wiring already active since task.24 PR #42.'
+  maintainability:
+    status: PASS
+    notes: 'Implementation notes (§12) detailed with file+line references. Plan updated. Review report present.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Fix section numbering in task document — §12 appears before §11 (cosmetic, P3)'
+      refs: ['docs/tasks/task.30.develop-task-pipeline-resume-stale-context-detector/task.30.develop-task-pipeline-resume-stale-context-detector.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

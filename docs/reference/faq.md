@@ -76,9 +76,9 @@ Same reason as epic numbers — task references travel out of context. `task.44.
 
 So consuming projects can use whatever directory naming they prefer. The pattern resolves to the actual parent epic of a given story.
 
-### Why is `docs/development/` not configurable?
+### Why are `docs/tasks/`, `docs/epic-registry.md`, and `docs/tasks/task-registry.md` not configurable?
 
-For the same reason the task registry has a fixed location: enough projects share this convention that pinning it removes a configuration burden. Tasks don't need the per-project flexibility that PRDs and stories need.
+Enough projects share these conventions that pinning the paths removes a configuration burden. Tasks and registries don't need the per-project flexibility that PRDs and stories need — they're flat catalogues with no naming variation that would benefit from configuration. PRDs *are* configurable via `prd.epicFilePattern` because story/epic layouts genuinely vary.
 
 ## Repo design
 

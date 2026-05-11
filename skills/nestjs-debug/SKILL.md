@@ -907,8 +907,6 @@ Error: ECONNREFUSED 127.0.0.1:5432
 **Documentation:**
 
 - NestJS Official: https://docs.nestjs.com/
-- Debugging Guide: `docs/development/troubleshooting.md`
-- Error Handling Guide: `docs/development/logging-infrastructure-guide.md`
 - API Architecture: `docs/architecture/{api-service}-architecture.md`
 
 **Commands:**

@@ -37,7 +37,7 @@ Activate this skill when:
 - ✅ All implementation phases completed
 - ✅ Tests are passing
 - ✅ Breaking changes documented with migration paths
-- ✅ Technical task document exists at `docs/development/tasks/task.[id].[name]/task.[id].[name].md`
+- ✅ Technical task document exists at `docs/tasks/task.[id].[name]/task.[id].[name].md`
 
 **Keywords**: `qa task`, `qa-task`, `technical review`, `qa refactoring`, `qa infrastructure`
 
@@ -208,7 +208,7 @@ Log the chosen approach in the QA report's "Review Methodology" section.
 
 Verify all prerequisites met:
 
-- [ ] Task document exists at `docs/development/tasks/task.[id].[name]/task.[id].[name].md`
+- [ ] Task document exists at `docs/tasks/task.[id].[name]/task.[id].[name].md`
 - [ ] Status is "Completed" or "Ready for QA"
 - [ ] All implementation phases have checkboxes marked complete
 - [ ] Developer has marked success criteria as complete
@@ -872,7 +872,7 @@ bug_resolution:
 
 ```
 # Task Subdirectory — all QA artifacts co-located with task file
-docs/development/tasks/task.1.cache-lib-simplification/
+docs/tasks/task.1.cache-lib-simplification/
 ├── task.1.cache-lib-simplification.md          # Main task document
 ├── task.1.qa.1.cache-lib-simplification.md     # QA report (co-located)
 ├── task.1.gate.1.cache-lib-simplification.yml  # Gate file (co-located)

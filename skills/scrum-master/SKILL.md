@@ -115,7 +115,7 @@ This skill expects a configuration file at `skills-config.yaml` (in project root
 prd:
   prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md' # Note: Epic numbers are globally unique (see /docs/development/epic-registry.md)
+  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md' # Note: Epic numbers are globally unique (see /docs/epic-registry.md)
 
 architecture:
   architectureSharded: true
@@ -175,7 +175,7 @@ All technical details MUST be:
 
 - Epic files use global registry numbers: `epic.163.md`, `epic.164.md`, etc.
 - PRDs use relative numbers: "Epic 1", "Epic 2" (these get mapped to global numbers)
-- Always check `/docs/development/epic-registry.md` for current numbering
+- Always check `/docs/epic-registry.md` for current numbering
 - When referencing epics in stories, use actual epic file numbers
 - See [Epic Numbering System in CLAUDE.md](../../CLAUDE.md#epic-numbering-system)
 

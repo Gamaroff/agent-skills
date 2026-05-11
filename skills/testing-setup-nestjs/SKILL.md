@@ -1035,7 +1035,5 @@ Before completing, verify:
 
 ## References
 
-- `docs/development/testing-framework-guide.md` - Comprehensive testing guide
-- `docs/development/testing-local-guide.md` - Local test environment setup
 - `apps/{api-service}/test/integration/README.md` - E2E testing guide
 - NestJS Testing: https://docs.nestjs.com/fundamentals/testing

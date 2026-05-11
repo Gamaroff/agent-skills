@@ -57,9 +57,9 @@ QA artifacts (review reports, gate files, DoD) are co-located with the story/tas
 Stories and tasks need globally unique numbers. Create the empty registries in your project:
 
 ```bash
-mkdir -p docs/development/tasks
-touch docs/development/epic-registry.md
-touch docs/development/tasks/task-registry.md
+mkdir -p docs/tasks
+touch docs/epic-registry.md
+touch docs/tasks/task-registry.md
 ```
 
 The first `/create-epic` and `/create-task` invocations will populate them. See [epic registry](../standards/epic-registry.md) and [task registry](../standards/task-registry.md).
@@ -94,7 +94,7 @@ The simplest end-to-end smoke test:
 
 ```bash
 # In your project:
-/create-task        # produces task.{N}.{name}/ under docs/development/tasks/
+/create-task        # produces task.{N}.{name}/ under docs/tasks/
 ```
 
 If the file appears at the right path with a status of `draft`, the install is working. If not, check [`../reference/troubleshooting.md`](../reference/troubleshooting.md).

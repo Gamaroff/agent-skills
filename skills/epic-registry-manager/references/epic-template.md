@@ -2,7 +2,7 @@
 ╔═══════════════════════════════════════════════════════════════╗
 ║ ⚠️  CRITICAL: Check Epic Registry BEFORE Creating This Epic  ║
 ║                                                                ║
-║ 1. Open: /docs/development/epic-registry.md                  ║
+║ 1. Open: /docs/epic-registry.md                  ║
 ║ 2. Use "Next Available Epic Number" for YOUR epic number     ║
 ║ 3. Update registry table with your epic details              ║
 ║ 4. Increment "Next Available Epic Number" counter            ║

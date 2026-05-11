@@ -5,6 +5,6 @@
   "prompt": "Run step 6 (qa-fix) of the develop-task pipeline for task.42.example.",
   "assertions": [
     { "fn": "loopBoundedAt", "args": ["$SANDBOX/.eval/pipeline-events.json", "qa-fix", 5] },
-    { "fn": "fileExists",    "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.gate.1.example.yml"] }
+    { "fn": "fileExists",    "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.1.example.yml"] }
   ]
 }

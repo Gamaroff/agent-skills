@@ -79,7 +79,7 @@ task.{id}.issue.{n}.{descriptive-name}.md
 **Location**: Co-located in the task directory:
 
 ```
-docs/development/tasks/task.4.nx-monorepo-structure-audit/
+docs/tasks/task.4.nx-monorepo-structure-audit/
 ├── task.4.nx-monorepo-structure-audit.md
 ├── task.4.issue.1.missing-nx-config.md       ← New issue
 └── task.4.bug.1.build-failure.md             ← Existing bug (from QA)
@@ -105,7 +105,7 @@ Parse the input to determine:
 /create-issue story.180.3.quick-re-search.md "Title" "Description"
 
 # Task directory
-/create-issue docs/development/tasks/task.4.nx-monorepo-structure-audit/
+/create-issue docs/tasks/task.4.nx-monorepo-structure-audit/
 
 # Task file
 /create-issue task.4.nx-monorepo-structure-audit.md "Title" "Description"
@@ -519,7 +519,7 @@ Error: Could not find story or task at the specified path.
 
 Please provide a valid story or task file/directory:
   - Story: docs/prd/.../stories/story.X.X.name/
-  - Task: docs/development/tasks/task.X.name/
+  - Task: docs/tasks/task.X.name/
 ```
 
 ### Not Authenticated
@@ -635,7 +635,6 @@ Output:
 
 ## References
 
-- [Git Strategy](file:///docs/development/git-strategy.md) - Gitflow branching model
 - [GitHub CLI Documentation](https://cli.github.com/manual/gh_issue_create) - `gh issue create` options
 - [Bitbucket REST API — Issues](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-issue-tracker/) - Bitbucket issue creation
 - [Bitbucket App Passwords](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/) - Authentication for Bitbucket API

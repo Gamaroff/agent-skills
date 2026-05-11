@@ -15,7 +15,7 @@ If the work is a user-facing feature inside a PRD, use the [Story Development Ru
 ## Prerequisites
 
 - `skills-config.yaml` exists at project root. Tasks read very little from it; defaults are usually fine.
-- The repo has a **task registry** at `docs/development/tasks/task-registry.md`. It tracks the **Next Available Task Number** and the status of every task. Task numbers are globally unique and never reused.
+- The repo has a **task registry** at `docs/tasks/task-registry.md`. It tracks the **Next Available Task Number** and the status of every task. Task numbers are globally unique and never reused.
 - Branch hygiene: `develop` exists (task PRs typically target `develop`, but Phase 0 of `develop-task` lets you pick a different base).
 - Platform detection (GitHub vs Bitbucket vs Jira) is automatic — see [`../../shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).
 
@@ -40,7 +40,7 @@ flowchart TD
 |---|---|
 | **Invoke** | `"create a task for X"` · `/create-task` |
 | **Inputs** | Interactive elicitation: scope, motivation, success criteria, risk profile, non-functional constraints. |
-| **Outputs** | `docs/development/tasks/task.{N}.{name}/task.{N}.{name}.md` plus a new row in `task-registry.md`. `{N}` is read from the registry's **Next Available Task Number**. |
+| **Outputs** | `docs/tasks/task.{N}.{name}/task.{N}.{name}.md` plus a new row in `task-registry.md`. `{N}` is read from the registry's **Next Available Task Number**. |
 | **Pitfalls** | The registry update **must be in the same commit** as the new task files — atomic. Don't reuse a cancelled task's number; always increment. Frontmatter `status:` is lowercase kebab-case; body `Status:` is Title Case. |
 | **Reference** | [`../../skills/create-task/SKILL.md`](../../skills/create-task/SKILL.md). See also `AGENTS.md` § "Task Registry". |
 
@@ -61,9 +61,9 @@ flowchart TD
 One command runs the full lifecycle.
 
 ```bash
-/develop-task docs/development/tasks/task.{N}.{name}/
+/develop-task docs/tasks/task.{N}.{name}/
 # or
-/develop-task docs/development/tasks/task.{N}.{name}.md
+/develop-task docs/tasks/task.{N}.{name}.md
 ```
 
 ### Phase 0 — Resolve & Prepare
@@ -153,17 +153,17 @@ Everything else — `create-branch`, `develop`, `create-pr`, `qa-fix`, `finalise
 gh pr view --json baseRefName,statusCheckRollup
 
 # Gate file exists and is PASS or WAIVED
-ls docs/development/tasks/task.{N}.{name}/*.gate.*.yml
-grep '^gate:' docs/development/tasks/task.{N}.{name}/*.gate.*.yml
+ls docs/tasks/task.{N}.{name}/*.gate.*.yml
+grep '^gate:' docs/tasks/task.{N}.{name}/*.gate.*.yml
 
 # Task status is accepted
-grep -E '^status:|^Status:' docs/development/tasks/task.{N}.{name}.md
+grep -E '^status:|^Status:' docs/tasks/task.{N}.{name}.md
 
 # Registry row reflects final status
-grep "task.{N}" docs/development/tasks/task-registry.md
+grep "task.{N}" docs/tasks/task-registry.md
 
 # Implementation report exists
-ls docs/development/tasks/task.{N}.{name}/*.implementation.*.md
+ls docs/tasks/task.{N}.{name}/*.implementation.*.md
 
 # DoD summary posted to PR
 gh pr view --json comments | jq '.comments[].body' | grep -i 'definition of done'

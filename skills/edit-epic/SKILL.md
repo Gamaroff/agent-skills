@@ -588,7 +588,7 @@ Agent:
 
 ## Notes
 
-- **Epic numbers are globally unique** - Check `/docs/development/epic-registry.md` if changing epic number
+- **Epic numbers are globally unique** - Check `/docs/epic-registry.md` if changing epic number
 - **Story files live in `stories/` subdirectory** - Per documentation structure requirements
 - **YAML frontmatter is critical** - Many systems depend on valid frontmatter
 - **Cascade analysis is unique to this skill** - Story edits don't need cascade checks

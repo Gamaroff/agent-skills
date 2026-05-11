@@ -110,15 +110,14 @@ Store choice as `output_mode` for Step 9.
 
 2. **Load core references**
    - `docs/templates/epic-template.md` — template compliance baseline
-   - `docs/development/epic-registry.md` — registry conflict detection
-   - `docs/development/epic-creation-checklist.md` — creation rules
+   - `docs/epic-registry.md` — registry conflict detection
 
 3. **Load architecture docs** (all in parallel)
    - `.claude/backend-patterns.md`
    - `.claude/database-redis.md`
    - `.claude/testing.md`
    - `docs/architecture/routing-and-file-structure.md`
-   - `docs/development/naming-conventions.md`
+   - `docs/standards/naming-conventions.md`
    - `.claude/notifications.md` (if epic touches notifications)
 
 4. **Scan for existing stories**
@@ -167,7 +166,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 **Actions**:
 
-1. Read full `docs/development/epic-registry.md`
+1. Read full `docs/epic-registry.md`
 2. Extract this epic's domain, title, and primary deliverables
 3. For every other epic in the registry:
    - Compare titles for near-duplicates (semantic overlap, not just exact string match)
@@ -211,7 +210,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
    - Verify client/server separation is planned for `logging-lib`, `auth-lib`, `shared-utils`
    - No Node.js deps (bcrypt, winston, jsonwebtoken) referenced for client builds
 
-6. **Naming convention check** against `docs/development/naming-conventions.md`:
+6. **Naming convention check** against `docs/standards/naming-conventions.md`:
    - Route names: kebab-case
    - Components: PascalCase
    - "handle" not "username" for user identity
@@ -479,7 +478,7 @@ Save to: `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-revi
 | `.claude/database-redis.md` | ✅/⚠️/❌ | [finding] |
 | `.claude/testing.md` | ✅/⚠️/❌ | [finding] |
 | `docs/architecture/routing-and-file-structure.md` | ✅/⚠️/❌ | [finding] |
-| `docs/development/naming-conventions.md` | ✅/⚠️/❌ | [finding] |
+| `docs/standards/naming-conventions.md` | ✅/⚠️/❌ | [finding] |
 
 ---
 
@@ -619,11 +618,10 @@ options:
 | File | Purpose |
 |------|---------|
 | `docs/templates/epic-template.md` | Template compliance baseline |
-| `docs/development/epic-registry.md` | Registry conflict detection |
-| `docs/development/epic-creation-checklist.md` | Creation rules (numbers, naming) |
+| `docs/epic-registry.md` | Registry conflict detection |
 | `.claude/backend-patterns.md` | Architecture source — NestJS, API, DI |
 | `.claude/database-redis.md` | Architecture source — DB, Redis, safety rules |
 | `.claude/testing.md` | Architecture source — test standards, co-location |
 | `docs/architecture/routing-and-file-structure.md` | Routing and file structure |
-| `docs/development/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
+| `docs/standards/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
 | `.agents/skills/review-story/SKILL.md` | Reference for question batching patterns |

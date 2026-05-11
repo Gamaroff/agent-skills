@@ -263,6 +263,5 @@ ssh -t <your-server> 'sudo apt clean'
 ## Related
 
 - **`deploy-remote` skill** — Docker stack ops on this same server
-- **[Remote Server Deployment Guide](../../../docs/development/remote-server-deployment.md)** — initial setup
 - **`scripts/server/bootstrap-remote.sh`** — initial provisioning script (re-run for drift fixes)
 - **`scripts/server/remote-status.sh`** — read-only health snapshot

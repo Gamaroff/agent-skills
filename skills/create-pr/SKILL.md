@@ -5,7 +5,7 @@ description: Create pull requests following project conventions. This skill shou
 
 # Create Pull Request
 
-This skill creates pull requests following the conventions defined in `docs/development/developer-workflow.md`.
+This skill creates pull requests following project conventions.
 
 ## When to Use This Skill
 

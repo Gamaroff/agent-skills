@@ -58,8 +58,8 @@ Store `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH`, and `EPIC_FILE` as pipeline-wide v
 #### develop-task
 
 Accept any of:
-- **Task file**: `docs/development/tasks/task.2.home-page-content-realignment/task.2.home-page-content-realignment.md`
-- **Task directory**: `docs/development/tasks/task.2.home-page-content-realignment/`
+- **Task file**: `docs/tasks/task.2.home-page-content-realignment/task.2.home-page-content-realignment.md`
+- **Task directory**: `docs/tasks/task.2.home-page-content-realignment/`
 - **Bare filename**: `task.2.home-page-content-realignment.md`
 - **GitHub issue URL** (direct or project board): `https://github.com/.../issues/297` or URL containing `issue=`
 - **Issue hash notation**: `#297`
@@ -461,7 +461,7 @@ Add to the implementation report Pipeline Configuration table:
 | Tracker Issue | #{TRACKER_ISSUE} (GitHub) or not linked |
 | Board status | In Progress ✅ / ⚠️ update failed |
 
-If `TRACKER_ISSUE` is not set, skip this entire section — do NOT update the deprecated register (`docs/development/todo-list.md`).
+If `TRACKER_ISSUE` is not set, skip this entire section — no fallback register needed.
 
 ---
 

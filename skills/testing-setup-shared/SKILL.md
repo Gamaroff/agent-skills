@@ -506,8 +506,6 @@ open test-output/jest/coverage/libs/<library-name>/index.html
 1. Verify `jest.config.ts` has moduleNameMapper for subpath exports
 2. Use runtime mocking (jest.spyOn) instead of hoisted mocking
 
-**Reference**: See `docs/development/jest-subpath-export-resolution-guide.md`
-
 ---
 
 ### 8.2 "Cannot redefine property" Error
@@ -629,8 +627,4 @@ Before completing, verify these anti-patterns are NOT present:
 
 ## References
 
-- `docs/development/testing-framework-guide.md` - Comprehensive testing framework guide
-- `docs/development/jest-subpath-export-resolution-guide.md` - Subpath export mocking patterns
-- `docs/development/testing.md` - General testing strategy
-- `docs/development/testing-local-guide.md` - Local test environment setup
-- `docs/development/tasks/task.10.jest-test-infrastructure-fixes/` - Common failure patterns and fixes
+- `docs/tasks/task.10.jest-test-infrastructure-fixes/` - Common failure patterns and fixes

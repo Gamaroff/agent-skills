@@ -81,9 +81,9 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 ```json
 {
   "skill": "develop-task",
-  "report_path": "docs/development/tasks/task.42.foo/task.42.implementation.1.foo-initial-run.md",
+  "report_path": "docs/tasks/task.42.foo/task.42.implementation.1.foo-initial-run.md",
   "task_or_story_id": "42",
-  "task_or_story_directory": "docs/development/tasks/task.42.foo",
+  "task_or_story_directory": "docs/tasks/task.42.foo",
   "branch": "feature/task.42.foo",
   "pr_url": "https://github.com/org/repo/pull/108",
   "tracker": "github",

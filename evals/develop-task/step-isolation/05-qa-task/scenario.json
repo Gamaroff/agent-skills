@@ -4,8 +4,8 @@
   "description": "Step 5: qa-task produces a QA report and gate file co-located with the task.",
   "prompt": "Run step 5 (qa-task) of the develop-task pipeline for task.42.example.",
   "assertions": [
-    { "fn": "fileExists", "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.qa.1.example.md"] },
-    { "fn": "fileExists", "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.gate.1.example.yml"] },
-    { "fn": "fileMatches", "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.gate.1.example.yml", "PASS|CONCERNS"] }
+    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.qa.1.example.md"] },
+    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.1.example.yml"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.1.example.yml", "PASS|CONCERNS"] }
   ]
 }

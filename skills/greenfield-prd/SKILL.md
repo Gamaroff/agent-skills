@@ -193,7 +193,7 @@ Use create-doc skill with:
 - **Key Rule:** Epics deliver deployable, testable value
 
 **IMPORTANT - Epic Numbering:**
-When epics are later converted to epic files (via `create-epics-from-shards` or manual creation), they will be assigned **globally unique** epic numbers from the system registry (`/docs/development/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc., but understand these are _relative numbers_ within the PRD. The actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc.
+When epics are later converted to epic files (via `create-epics-from-shards` or manual creation), they will be assigned **globally unique** epic numbers from the system registry (`/docs/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc., but understand these are _relative numbers_ within the PRD. The actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc.
 
 #### Section 6: Epic Details (MANDATORY ELICITATION per epic, REPEATABLE)
 

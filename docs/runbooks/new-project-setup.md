@@ -51,7 +51,7 @@ Before step 1:
   devStoryLocation: nested
   ```
 
-- `docs/development/epic-registry.md` exists (empty registry — `create-epic` and `epic-registry-manager` will populate it).
+- `docs/epic-registry.md` exists (empty registry — `create-epic` and `epic-registry-manager` will populate it).
 - `develop` branch created from `main`.
 - Choose tracker (GitHub vs Jira) — see [platform detection](../../shared/resources/platform-detection.md).
 

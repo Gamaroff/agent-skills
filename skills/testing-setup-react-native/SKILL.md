@@ -965,7 +965,5 @@ Before completing, verify:
 
 ## References
 
-- `docs/development/testing-framework-guide.md` - Comprehensive testing guide
-- `docs/development/testing.md` - General testing strategy
 - `apps/{app-name}/test-setup.ts` - Global React Native test configuration
 - React Native Testing Library: https://callstack.github.io/react-native-testing-library/

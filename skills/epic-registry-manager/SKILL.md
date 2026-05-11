@@ -41,7 +41,7 @@ docs/prd/{domain}/{feature}/epics/
 
 ### Epic Registry File
 
-**Location**: \`/docs/development/epic-registry.md\`
+**Location**: \`/docs/epic-registry.md\`
 
 ## Workflow: Create New Epic
 
@@ -92,7 +92,7 @@ Use template from \`/docs/templates/epic-template.md\`.
 
 ### Step 6: Update Epic Registry
 
-Add entry to \`/docs/development/epic-registry.md\` sorted by epic number.
+Add entry to \`/docs/epic-registry.md\` sorted by epic number.
 
 **Registry Entry Format**:
 \`\`\`

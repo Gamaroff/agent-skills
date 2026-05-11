@@ -802,7 +802,6 @@ afterAll(() => {
 
 **For more details on subpath export mocking:**
 
-- See `docs/development/jest-subpath-export-resolution-guide.md` for comprehensive patterns
 - See Task 10 documentation for real-world conversion examples
 
 ---

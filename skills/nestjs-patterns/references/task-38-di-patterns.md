@@ -317,7 +317,7 @@ inject: [
 
 ### Internal Documentation
 
-Full task documentation at `/docs/development/tasks/task.38.authservice-di-failure/`:
+Full task documentation at `/docs/tasks/task.38.authservice-di-failure/`:
 - `README.md` - Quick summary and resolution
 - `task.38.authservice-di-failure.md` - Comprehensive bug report with full timeline
 - `nestjs-research-findings.md` - Community solutions and known NestJS issues

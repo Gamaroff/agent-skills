@@ -71,7 +71,7 @@ This skill produces **task documentation and the co-located plan file only**. It
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
-- ❌ Editing, creating, or deleting any source file outside `docs/development/tasks/task.[ID].[name]/` (and the tracker-issue side effect in step 4.5)
+- ❌ Editing, creating, or deleting any source file outside `docs/tasks/task.[ID].[name]/` (and the tracker-issue side effect in step 4.5)
 - ❌ Running migrations, codegen, build, lint-fix, or refactor commands
 - ❌ Creating branches, committing, or pushing code changes
 - ❌ Installing/removing dependencies or modifying `package.json`
@@ -80,7 +80,7 @@ This skill produces **task documentation and the co-located plan file only**. It
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The task directory `docs/development/tasks/task.[ID].[name]/`
+- ✅ The task directory `docs/tasks/task.[ID].[name]/`
 - ✅ `task.[ID].[name].md` (task doc)
 - ✅ `task.[ID].plan.[name].md` (plan doc — MUST be co-located in the task directory above)
 - ✅ `docs/prd/sprint-status.yaml` status field update (step 5)
@@ -123,7 +123,7 @@ When this skill is activated:
 **CRITICAL**: Follow exact naming pattern:
 
 ```
-docs/development/tasks/task.[ID].[descriptive-name]/
+docs/tasks/task.[ID].[descriptive-name]/
 ├── task.[ID].[descriptive-name].md                    # Main task
 ├── task.[ID].plan.[descriptive-name].md               # Implementation plan (created alongside task)
 ├── task.[ID].qa.[number].[descriptive-name].md        # QA report (created by QA)
@@ -161,8 +161,8 @@ Prompt user for:
 
 From this, auto-generate:
 
-- **Task ID**: Read `docs/development/tasks/task-registry.md` and use the **Next Available Task Number** value. If the registry file does not exist, fall back to scanning `docs/development/tasks/` for the highest `task.[N]` and incrementing.
-- **Directory Path**: `docs/development/tasks/task.[ID].[kebab-case-name]/`
+- **Task ID**: Read `docs/tasks/task-registry.md` and use the **Next Available Task Number** value. If the registry file does not exist, fall back to scanning `docs/tasks/` for the highest `task.[N]` and incrementing.
+- **Directory Path**: `docs/tasks/task.[ID].[kebab-case-name]/`
 - **File Path**: `task.[ID].[kebab-case-name].md`
 - **Registry update** (after the task doc + plan are written, in Step 5): add a new row to `task-registry.md` and increment **Next Available Task Number**. Commit the registry update in the same commit as the new task files.
 
@@ -271,7 +271,7 @@ After collecting all section content (especially the Implementation Plan in Sect
 
 **File**: `task.[ID].plan.[descriptive-name].md` — same directory as the task document.
 
-**CRITICAL — co-location is mandatory. The plan file MUST be written into the task's own directory (`docs/development/tasks/task.[ID].[descriptive-name]/`) alongside the task doc.**
+**CRITICAL — co-location is mandatory. The plan file MUST be written into the task's own directory (`docs/tasks/task.[ID].[descriptive-name]/`) alongside the task doc.**
 
 - ❌ NEVER write the plan to `~/.claude/plans/`, `~/.agents/plans/`, `/tmp/`, the repo root, or any other shared/agent-scratch location.
 - ❌ NEVER leave a plan in `~/.claude/plans/` (Claude Code plan-mode default) and link to it from the task — it is outside the repo, invisible to teammates, and not version-controlled.
@@ -404,7 +404,7 @@ Once validated:
 1. **Create Directory**
 
    ```bash
-   mkdir -p docs/development/tasks/task.[ID].[name]/
+   mkdir -p docs/tasks/task.[ID].[name]/
    ```
 
 2. **Generate Markdown File**
@@ -568,7 +568,7 @@ gh issue create \
 **Milestone selection** — determine `{milestone_title}` in this order:
 
 1. If the task document has a `milestone:` frontmatter field, use that value verbatim
-2. If the task has an `epic:` frontmatter field (e.g. `epic: 23`), look up the milestone title from the epic registry (`docs/development/epic-registry.md`) — format: `"Epic {N} — {Epic Title}"`
+2. If the task has an `epic:` frontmatter field (e.g. `epic: 23`), look up the milestone title from the epic registry (`docs/epic-registry.md`) — format: `"Epic {N} — {Epic Title}"`
 3. Otherwise default to `"Technical Tasks (standalone)"`
 
 If the chosen milestone doesn't exist yet, auto-create it first:
@@ -599,8 +599,8 @@ This is the terminal step of the skill. After completing it, **end the session a
 
 Actions:
 
-1. Task document created at `docs/development/tasks/task.[ID].[name]/task.[ID].[name].md`
-2. Plan file created at `docs/development/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
+1. Task document created at `docs/tasks/task.[ID].[name]/task.[ID].[name].md`
+2. Plan file created at `docs/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
 3. If `docs/prd/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this task's ID/key
@@ -906,7 +906,7 @@ A successful create-task execution produces:
 1. ✅ **Complete Task Document** - All 11 sections populated
 2. ✅ **User-Validated Content** - Every section reviewed with user
 3. ✅ **Proper Naming** - Follows convention (dots/hyphens pattern)
-4. ✅ **Correct Directory Structure** - `docs/development/tasks/task.[ID].[name]/`
+4. ✅ **Correct Directory Structure** - `docs/tasks/task.[ID].[name]/`
 5. ✅ **Markdown Formatting** - Proper headers, code blocks, lists
 6. ✅ **Checklist Ready** - Progress tracking with [ ] boxes
 7. ✅ **QA-Ready** - Notes where QA artifacts will be created

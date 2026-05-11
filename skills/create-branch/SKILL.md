@@ -5,7 +5,7 @@ description: Create git branches following Gitflow conventions. This skill shoul
 
 # Create Branch
 
-This skill creates git branches following the Gitflow branching model defined in `docs/development/git-strategy.md`.
+This skill creates git branches following the Gitflow branching model.
 
 ## When to Use This Skill
 
@@ -361,6 +361,3 @@ Output:
 - `/create-pr` - Create a pull request for the current branch
 - `/develop` - Full story implementation workflow
 
-## References
-
-- [Git Strategy](file:///docs/development/git-strategy.md) - Complete Gitflow documentation

@@ -30,14 +30,14 @@ Use this skill when:
 - **Location**: Co-located with story file in story directory
 - **Used For**: Bugs found during user-facing feature testing
 - **Example**: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
-- **Reference**: Follows `docs/development/naming-conventions.md`
+- **Reference**: Follows `docs/standards/naming-conventions.md`
 
 ### Technical Task Bug Reports
 
 - **Pattern**: `task.{id}.bug.{number}.{name}.md`
-- **Location**: Co-located in task subdirectory `docs/development/tasks/task.{id}.{name}/`
+- **Location**: Co-located in task subdirectory `docs/tasks/task.{id}.{name}/`
 - **Used For**: Bugs found during technical task QA (refactoring, infrastructure, technical debt)
-- **Example**: `docs/development/tasks/task.1.cache-lib-simplification/task.1.bug.1.memory-leak.md`
+- **Example**: `docs/tasks/task.1.cache-lib-simplification/task.1.bug.1.memory-leak.md`
 
 **Decision Rule**:
 
@@ -122,7 +122,7 @@ optional:
 
 **Format**: `story.{epic}.{story}.bug.{bug-number}.{descriptive-name}.md`
 
-**Reference**: Follow the naming convention as specified in `docs/development/naming-conventions.md`
+**Reference**: Follow the naming convention as specified in `docs/standards/naming-conventions.md`
 
 **Descriptive Name**:
 
@@ -408,8 +408,8 @@ Use these guidelines to assign priority:
 
 **Find Task Document**:
 
-- Pattern: `docs/development/tasks/task.{id}.{name}/task.{id}.{name}.md`
-- Example: `docs/development/tasks/task.1.cache-lib-simplification/task.1.cache-lib-simplification.md`
+- Pattern: `docs/tasks/task.{id}.{name}/task.{id}.{name}.md`
+- Example: `docs/tasks/task.1.cache-lib-simplification/task.1.cache-lib-simplification.md`
 
 **Extract Task Information**:
 
@@ -427,7 +427,7 @@ Use these guidelines to assign priority:
 
 1. Search for existing bug reports in task subdirectory
    - Pattern: `task.{id}.bug.*.md`
-   - Location: `docs/development/tasks/task.{id}.{name}/`
+   - Location: `docs/tasks/task.{id}.{name}/`
    - Example: `task.1.bug.1.*.md`, `task.1.bug.2.*.md`
 
 2. Find highest bug number
@@ -469,7 +469,7 @@ Use these guidelines to assign priority:
 
 **File Location**: Task subdirectory (co-located with task document)
 
-- Full path: `docs/development/tasks/task.{id}.{name}/task.{id}.bug.{number}.{name}.md`
+- Full path: `docs/tasks/task.{id}.{name}/task.{id}.bug.{number}.{name}.md`
 
 **Initial Bug Report Content**:
 
@@ -806,7 +806,7 @@ reproduction_steps:
 2. **Sequential Numbering**: Always increment from highest existing number (per story/task)
 3. **Co-location**:
    - Story bugs → Same directory as story file
-   - Task bugs → Task subdirectory (`docs/development/tasks/task.{id}.{name}/`)
+   - Task bugs → Task subdirectory (`docs/tasks/task.{id}.{name}/`)
 4. **Template-Based**: Use bug report template for consistency (same template for both types)
 5. **Bidirectional Links**: Link bug in story/task, link story/task in bug
 6. **Initial Status**: Always start with "New" status
@@ -837,6 +837,6 @@ reproduction_steps:
 **Technical Task Bugs**:
 
 - Pattern: `task.{id}.bug.{number}.{name}.md`
-- Location: Co-located in task subdirectory (`docs/development/tasks/task.{id}.{name}/`)
+- Location: Co-located in task subdirectory (`docs/tasks/task.{id}.{name}/`)
 - Numbering resets for each task (task 1 has task.1.bug.1, task.1.bug.2, etc.)
 - Quality gates are co-located in the task subdirectory (`task.{id}.gate.{number}.{name}.yml`)

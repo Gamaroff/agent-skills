@@ -30,7 +30,7 @@ The scenario uses `KEEP_SANDBOX=1` — on failure the sandbox tmpdir is **not** 
 ```bash
 cd /tmp/eval-develop-task-smoke-<id>
 git log --oneline
-ls docs/development/tasks/
+ls docs/tasks/
 ```
 
 Clean up manually when done:

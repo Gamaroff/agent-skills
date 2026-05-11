@@ -532,7 +532,7 @@ test("mapStatus — strips emoji and maps to Jira canonical status", () => {
 });
 
 test("syncLabelFor — derives stable label from task dir name", () => {
-  const label = task.syncLabelFor("/repo/docs/development/tasks/task.1.cache-lib/task.1.cache-lib.md");
+  const label = task.syncLabelFor("/repo/docs/tasks/task.1.cache-lib/task.1.cache-lib.md");
   assert.equal(label, "synced-from-task.1.cache-lib");
 });
 

@@ -43,7 +43,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 **Allowed writes** (the only filesystem changes this skill may make):
 
 - ✅ The epic file `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md`
-- ✅ `/docs/development/epic-registry.md` (number reservation per the global numbering rule)
+- ✅ `/docs/epic-registry.md` (number reservation per the global numbering rule)
 - ✅ Tracker issue creation if the workflow includes it (GitHub/Jira issue for the epic itself)
 
 **If the user asks to "create the epic and start the first story"**: create the epic doc, then STOP and explicitly hand off — tell user to invoke `/create-story` as a separate step. Do not chain.
@@ -66,7 +66,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **Epic Numbering (CRITICAL):**
 
-- Check `/docs/development/epic-registry.md` for next available epic number
+- Check `/docs/epic-registry.md` for next available epic number
 - Epic numbers are globally unique across entire system
 - Reserve your number before creating epic file
 
@@ -76,7 +76,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **CRITICAL - Global Epic Numbering**:
 
-1. Check `/docs/development/epic-registry.md` for next available number
+1. Check `/docs/epic-registry.md` for next available number
 2. Add your epic to registry table
 3. Increment "Next Available Epic Number" counter
 4. Use that number in your epic filename

@@ -44,7 +44,7 @@ description: 'Enforce naming conventions and file structure architecture on a sp
     - Warn if excluded directory doesn't exist in target directory
 
 ### 1.1 Load Documentation
-1.  Read `docs/development/naming-conventions.md` to refresh on naming rules.
+1.  Read `docs/standards/naming-conventions.md` to refresh on naming rules.
     - **Key Rules**:
       - Components = `PascalCase.tsx`
       - Routes = `kebab-case.tsx`

@@ -19,7 +19,7 @@ Use when the change is large enough to need product framing: it lives under a PR
     - docs/architecture/concepts/coding-standards.md
   ```
   QA artifacts (review reports, DoD, gate files) are co-located with the story — no `qa.qaLocation` config is needed. Full reference: [`../reference/configuration.md`](../reference/configuration.md).
-- The repo has an **epic registry** at `docs/development/epic-registry.md`. Epic numbers are globally unique — `create-epic` and `epic-registry-manager` enforce this.
+- The repo has an **epic registry** at `docs/epic-registry.md`. Epic numbers are globally unique — `create-epic` and `epic-registry-manager` enforce this.
 - Branch hygiene: `develop` exists (story PRs target an epic branch cut from `develop`).
 - Platform detection (GitHub vs Bitbucket vs Jira) is automatic — see [`../../shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).
 
@@ -93,7 +93,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | **Invoke** | `"create an epic for <scope> from <prd-path>"` · `/create-epic` |
 | **Inputs** | PRD path; the section/sections this epic covers. |
 | **Outputs** | `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md` plus a stories/ subdir (empty at first). `{N}` is the next number from the **epic registry**. |
-| **Pitfalls** | Never invent an epic number — `epic-registry-manager` assigns it and updates `docs/development/epic-registry.md`. Commit the registry update **in the same commit** as the new epic file. |
+| **Pitfalls** | Never invent an epic number — `epic-registry-manager` assigns it and updates `docs/epic-registry.md`. Commit the registry update **in the same commit** as the new epic file. |
 | **Calls** | `epic-registry-manager`, `documentation-standards-validator`, optionally `mermaid-architect`. |
 | **Reference** | [`../../skills/create-epic/SKILL.md`](../../skills/create-epic/SKILL.md) |
 
