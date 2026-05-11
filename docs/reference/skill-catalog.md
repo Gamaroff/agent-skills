@@ -16,6 +16,17 @@ If you're new to the library, start here:
 - **Git / PR:** `create-branch`, `commit-changes`, `create-pr`
 - **Meta:** `create-skill`, `find-skills`, `document-project`
 
+## Scope notes
+
+Skill categories below vary in scope:
+
+- **Foundational** (most users need): Development — Orchestration / Implementation, QA, Epic & Story Lifecycle, Jira / GitHub Sync, Skill Tooling.
+- **Workflow-specific** (use when applicable): Product Management & Planning, Architecture & Design, Validation & Enforcement.
+- **Stack-specific** (skip if your stack differs): Testing, NestJS, React Native / Expo, Infrastructure & DevOps, Email.
+- **Specialised** (narrow use cases): User Experience, Content & Writing, Research & Analysis.
+
+Within each category, skills are listed alphabetically.
+
 Full categorised index below.
 
 ## Development — Orchestration
@@ -67,7 +78,6 @@ Full categorised index below.
 | `document-existing-project` | Generate comprehensive brownfield architecture documentation for existing codebases optimized for AI development. Analyzes actual code patterns, technical debt, and constraints. Use when documenting legacy systems… |
 | `document-project` | Generate comprehensive brownfield architecture documentation for existing projects optimized for AI development agents |
 | `execute-architect-checklist` | Comprehensive architecture validation using the Architect Solution Validation Checklist. Validates technical design for robustness, scalability, security, and requirements alignment. Use before finalizing architecture documents or… |
-| `frontend-design` | Create distinctive, production-grade frontend interfaces with high design quality. Generates creative, polished code that avoids generic AI aesthetics. Use when the user asks to build… |
 | `mermaid-architect` | Visual consultant and orchestrator for Mermaid diagrams. Generates, reviews, and validates diagrams embedded in PRDs, Epics, Stories, Tasks, and general documentation. Acts as a context-aware… |
 
 ## Product Management & Planning
@@ -162,30 +172,15 @@ Full categorised index below.
 
 | Skill | Description |
 | ----- | ----------- |
-| `adapt` | Adapt designs to work across different screen sizes, devices, contexts, or platforms. Implements breakpoints, fluid layouts, and touch targets. Use when the user mentions responsive… |
-| `arrange` | Improve layout, spacing, and visual rhythm. Fixes monotonous grids, inconsistent spacing, and weak visual hierarchy. Use when the user mentions layout feeling off, spacing issues,… |
-| `bolder` | Amplify safe or boring designs to make them more visually interesting and stimulating. Increases impact while maintaining usability. Use when the user says the design… |
 | `book-typesetter-pro` | Formats Markdown into a novel-style book with highlighted AI-synthesized transitions for editorial review. |
-| `clarify` | Improve unclear UX copy, error messages, microcopy, labels, and instructions to make interfaces easier to understand. Use when the user mentions confusing text, unclear labels,… |
-| `colorize` | Add strategic color to features that are too monochromatic or lack visual interest, making interfaces more engaging and expressive. Use when the user mentions the… |
-| `critique` | Evaluate design from a UX perspective, assessing visual hierarchy, information architecture, emotional resonance, cognitive load, and overall quality with quantitative scoring, persona-based testing, and actionable… |
-| `delight` | Add moments of joy, personality, and unexpected touches that make interfaces memorable and enjoyable to use. Elevates functional to delightful. Use when the user asks… |
-| `distill` | Strip designs to their essence by removing unnecessary complexity. Great design is simple, powerful, and clean. Use when the user asks to simplify, declutter, reduce… |
 | `extract` | Extract and consolidate reusable components, design tokens, and patterns into your design system. Identifies opportunities for systematic reuse and enriches your component library. Use when… |
 | `humaniser` | Remove signs of AI-generated writing from text. Use when editing or reviewing text to make it sound more natural and human-written. Based on Wikipedia's comprehensive… |
 | `humanize-text` | This skill should be used when rewriting AI-generated text to sound completely human, eliminating detection patterns and robotic flow. Use when content needs to pass… |
-| `normalize` | Audits and realigns UI to match design system standards, spacing, tokens, and patterns. Use when the user mentions consistency, design drift, mismatched styles, tokens, or… |
-| `overdrive` | Pushes interfaces past conventional limits with technically ambitious implementations — shaders, spring physics, scroll-driven reveals, 60fps animations. Use when the user wants to wow, impress,… |
-| `polish` | Performs a final quality pass fixing alignment, spacing, consistency, and micro-detail issues before shipping. Use when the user mentions polish, finishing touches, pre-launch review, something… |
-| `quieter` | Tones down visually aggressive or overstimulating designs, reducing intensity while preserving quality. Use when the user mentions too bold, too loud, overwhelming, aggressive, garish, or… |
-| `shannon` | Autonomous AI pentester for web apps and APIs. Run white-box security assessments with Shannon — analyzes source code, identifies attack vectors, and executes real exploits… |
-| `typeset` | Improves typography by fixing font choices, hierarchy, sizing, weight, and readability so text feels intentional. Use when the user mentions fonts, type, readability, text hierarchy,… |
 
 ## Research & Analysis
 
 | Skill | Description |
 | ----- | ----------- |
-| `audit` | Run technical quality checks across accessibility, performance, theming, responsive design, and anti-patterns. Generates a scored report with P0-P3 severity ratings and actionable plan. Use when… |
 | `brainstorming` | Facilitate interactive brainstorming sessions using proven ideation techniques to generate and refine ideas collaboratively |
 | `create-research-prompt` | Create comprehensive research prompts for technical deep-dive analysis including product validation, market research, technology assessment, competitive intelligence, and strategic options. Use when needing structured research… |
 | `deep-research-prompt` | Generate comprehensive research prompts for various analysis types (product validation, market opportunity, competitive intelligence, etc.). Use when market validation or deep investigation needed before PRD… |
@@ -206,7 +201,6 @@ Full categorised index below.
 
 | Skill | Description |
 | ----- | ----------- |
-| `animate` | Review a feature and enhance it with purposeful animations, micro-interactions, and motion effects that improve usability and delight. Use when the user mentions adding animation,… |
 | `browser-use` | Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill… |
 | `building-components` | Guide for building modern, accessible, and composable UI components. Use when building new components, implementing accessibility, creating composable APIs, setting up design tokens, publishing to… |
 | `ux-expert` | UX Expert (Sally) specializing in user experience design and intuitive interfaces. Use for UI/UX design, wireframes, prototypes, front-end specifications, AI-powered UI generation prompts, and user… |
@@ -226,10 +220,8 @@ Full categorised index below.
 | `change-management` | Orchestrate structured response to project changes (pivots, tech issues, missing requirements, failed stories). Use when significant changes affect project direction requiring comprehensive impact analysis. |
 | `command-development` | This skill should be used when the user asks to "create a slash command", "add a command", "write a custom command", "define command arguments", "use… |
 | `create-doc` | YAML-driven document creation engine with mandatory user interaction. Use when creating PRDs, epics, or any document from a YAML template that requires section-by-section collaboration. |
-| `onboard` | Designs and improves onboarding flows, empty states, and first-run experiences to help users reach value quickly. Use when the user mentions onboarding, first-time users, empty… |
 | `pro-tip` | Surfaces 1–3 contextually-relevant tips for Claude Code usage, agentic coding patterns, architectural decisions, and 3rd party integrations. Use when the user wants a tip, hint,… |
 | `remember-insight` | Saves an insight to the project's persistent memory system. Reads all existing memory files, determines whether the insight can be merged into an existing file… |
-| `teach-impeccable` | One-time setup that gathers design context for your project and saves it to your AI config file. Run once to establish persistent design guidelines. |
 
 ## Other
 
