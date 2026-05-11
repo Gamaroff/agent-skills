@@ -45,7 +45,7 @@ Setup is optional — without the hook, pipelines still resume correctly via pos
 
 ## Phase 0: Resolve & Prepare
 
-See `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` for the full resolve-and-prepare protocol: file/issue resolution (0a), pipeline state check (0b), upfront context reading including status handling and lite-mode detection (0c), tracker signal/board update (0c-reg), upfront Q&A (0d), implementation report creation with templates (0e), and pre-flight summary (0f).
+See `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` for the full resolve-and-prepare protocol: file/issue resolution (0a), pipeline state check (0b), upfront context reading including status handling and lite-mode detection (0c), tracker signal/board update procedure (0c-reg — **defined in step-0 but invoked from Step 1** after the lock is written; see step-1 §"Signal Work Started"), upfront prompts via AskUserQuestion (0d — Q1 base + Q2 PR target with auto-derived recommended option; qa-planning silent skip, no Q3), implementation report creation with templates (0e), and pre-flight summary (0f).
 
 ---
 
@@ -226,7 +226,18 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 - **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete.
 - **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
-- **Remove the lock file before every terminal HALT.** After committing the report (per the rule above), run `rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log` so a future PreCompact firing in this same session won't try to commit again, and so transient Step 3 test logs don't accumulate across runs. The lock is recreated automatically when the user re-invokes `/develop-story` and the resume flow re-enters Step 1 (or the resume verification confirms it should remain past Step 1). The graceful-pause hook also removes the lock itself if it runs — this rule covers the non-hook halt paths.
+- **Snapshot then remove the lock file before every terminal HALT.** After committing the report (per the rule above), copy the active lock to a halt snapshot and then remove the active lock + transient logs:
+
+  ```bash
+  if [ -f .claude/state/develop-pipeline.lock ]; then
+    jq --arg reason "{halt_reason}" --arg step "{halt_step}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+       '. + {halted_at: $ts, halt_reason: $reason, halt_step: $step}' \
+       .claude/state/develop-pipeline.lock > .claude/state/develop-pipeline.last-halt.json
+  fi
+  rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log
+  ```
+
+  Removing the active lock prevents a future PreCompact firing in this same session from re-running the pause flow, and stops accumulation of transient Step 3 test logs. The **halt snapshot** (`develop-pipeline.last-halt.json`) preserves resume context so the next `/develop-story` invocation can re-enter Phase 0b artifact verification: the resume detector subagent reads the snapshot when no active lock is present, surfaces it to the user, and offers "Resume from {halt_step}" or "Start fresh" (latter deletes the snapshot). The graceful-pause hook also removes the active lock itself if it runs — this rule covers the non-hook halt paths.
 - If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.agents/skills/`.
 
 ---
