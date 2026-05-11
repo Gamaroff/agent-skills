@@ -1,13 +1,15 @@
 ---
 name: qa-traceability-mapper-prompt
-description: Read-only Explore subagent prompt for building an AC→spec→src traceability matrix before /qa-story runs. Reads the story file, extracts ACs, greps for related spec and source files, and writes a markdown table to <story-dir>/.summaries/qa-traceability-matrix.md. Dispatched by the develop-story orchestrator in Step 5 so mapping greps never run in main context.
+description: Read-only Explore subagent prompt for building an AC/Success-Criteria → spec → src traceability matrix before /qa-story or /qa-task runs. Reads the story or task file, extracts criteria, greps for related spec and source files, and writes a markdown table to <doc-dir>/.summaries/qa-traceability-matrix.md. Dispatched by the develop-story orchestrator in Step 5 (always in standard mode) and by the develop-task orchestrator in Step 5 (only when the task has a Success Criteria table — see lite-mode detector flag `has_success_criteria_table`).
 ---
 
 # QA Traceability Mapper — Explore Subagent
 
 ## Purpose
 
-Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and file reads never land in main context. Produces a markdown table written to `<story-dir>/.summaries/qa-traceability-matrix.md`. **Never mutates source files or QA artifacts.**
+Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and file reads never land in main context. Produces a markdown table written to `<doc-dir>/.summaries/qa-traceability-matrix.md`. **Never mutates source files or QA artifacts.**
+
+> **Doc type**: this prompt accepts both **story** and **task** documents. Variable names use `STORY_FILE`/`STORY_DIR` for backwards compatibility, but the values may point at a task file/directory. The mapper detects the doc type from the filename prefix (`story.*` vs `task.*`) and writes the title row accordingly. For task docs, the source criteria section is **Success Criteria** instead of **Acceptance Criteria** — both produce the same matrix shape.
 
 > **Packaging note**: This file is referenced transitively from `develop-pipeline-step-5-6-qa-loop.md`. Verify that `package_skill.py` bundles it into the `develop-story` skill zip (run `package_skill.py skills/develop-story` and confirm `qa-traceability-mapper-prompt.md` appears in the zip). If not auto-detected, add an explicit `shared/resources/qa-traceability-mapper-prompt.md` reference to `skills/develop-story/SKILL.md`.
 
@@ -20,15 +22,17 @@ Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and fi
 ```markdown
 # QA Traceability Matrix
 
-**Story**: story.{epic}.{story}.{name}.md
+**Story** (or **Task**): story.{epic}.{story}.{name}.md / task.{id}.{name}.md
 **Generated**: {YYYY-MM-DD}
 
-| AC | Spec files | Src files | Coverage | Uncertainty |
-|----|-----------|-----------|----------|-------------|
-| AC1: {short description} | `path/to/foo.spec.ts` | `path/to/foo.ts` | full | — |
-| AC2: {short description} | `path/to/bar.spec.ts` | — | partial | No spec found for bar module |
-| AC3: {short description} | — | — | none | No matching spec or src found |
+| Criterion | Spec files | Src files | Coverage | Uncertainty |
+|-----------|-----------|-----------|----------|-------------|
+| AC1 / SC1: {short description} | `path/to/foo.spec.ts` | `path/to/foo.ts` | full | — |
+| AC2 / SC2: {short description} | `path/to/bar.spec.ts` | — | partial | No spec found for bar module |
+| AC3 / SC3: {short description} | — | — | none | No matching spec or src found |
 ```
+
+For **task** documents, use `SC` (Success Criterion) row prefixes; for **story** documents, use `AC` (Acceptance Criterion). The first row label is determined by the source section heading inside the doc.
 
 **Constraints**:
 - Maximum 30 rows (one per AC + edge cases; truncate with note if more)
@@ -83,11 +87,11 @@ Write a subagent summary JSON artifact to `{story-directory}/.summaries/step-5-t
 
 ## Execution Protocol (run inside the Explore subagent)
 
-### Step 1 — Read the story file
+### Step 1 — Read the doc file
 
-Read `{STORY_FILE}`. Extract:
-- Story title and epic/story numbers
-- All Acceptance Criteria (look for `## Acceptance Criteria`, `### AC`, or numbered list items under "Acceptance Criteria")
+Read `{STORY_FILE}` (may be a story or task file — detect via `basename` prefix). Extract:
+- Title and epic/story or task numbers
+- All criteria — for **story** docs, look for `## Acceptance Criteria`, `### AC`, or numbered list items under "Acceptance Criteria"; for **task** docs, look for `## Success Criteria`, `### SC`, or table rows under "Success Criteria". Treat both the same way for matrix generation.
 - File List section if present (pre-populated spec/src hints)
 
 ### Step 2 — Derive search keywords per AC

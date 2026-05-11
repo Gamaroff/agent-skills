@@ -34,5 +34,6 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 | Pipeline mode (lite vs standard) | See `references/develop-pipeline-lite-mode.md` for trigger conditions and behaviour. Default to `standard` if any condition fails. |
 | qa-story / qa-task invocation in lite mode | Prepend the lite-mode directive (see lite-mode contract) to the invocation context |
 | Final commit push (Step 8) | Always push after Step 8 commit so PR reflects completed report |
+| Tracker mutation retry policy | 3× exponential backoff (1s, 2s, 4s). Shell calls (`gh`) wrap with `tracker_call_with_retry` from `shared/resources/resolve-platform.sh`. Atlassian MCP calls retry inline with the same schedule. All tracker mutations are non-blocking — final failure logs a warning in Issues Log and continues. |
 
 If a situation arises that is not covered by this table or the skill-specific table, and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.

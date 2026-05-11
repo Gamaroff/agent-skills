@@ -1,0 +1,44 @@
+schema: 1
+task: 'task.32.evals-reorganize-per-skill'
+task_title: 'Reorganize evals/ from full-flow/ into per-skill structure'
+gate: PASS
+status_reason: 'All 5 phases completed. 78/78 tests pass. 4/4 replay evals pass. Zero orphaned full-flow references. evals/full-flow/ removed. No issues found.'
+reviewer: 'QA Engineer (automated pipeline)'
+updated: '2026-05-11T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 78
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Pure file restructure — no logic changes, no new dependencies, no auth changes'
+  performance:
+    status: PASS
+    notes: 'npm test ~1.1s stable; 19 evals tests newly discovered (previously excluded by stale glob)'
+  reliability:
+    status: PASS
+    notes: 'git mv preserves history; eval:all exit 0; rollback is git revert'
+  maintainability:
+    status: PASS
+    notes: 'Per-skill ownership established; 3 new READMEs; shared/README documents runner contract'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -20,8 +20,10 @@ Return **JSON only** — no prose, no markdown fences, no explanation:
 ```json
 {
   "schema_version": 1,
+  "source": "lock",
   "recommended_step": 5,
   "current_step_in_lock": 4,
+  "halt_reason": null,
   "summaries_seen": ["step-1-pre-develop-map.json", "step-2-review-prepass.json"],
   "deltas_since_pause": [
     {
@@ -40,8 +42,10 @@ Return **JSON only** — no prose, no markdown fences, no explanation:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `schema_version` | integer | yes | Always `1` |
+| `source` | string | yes | `"lock"` (active pipeline), `"halt_snapshot"` (prior terminal HALT), or `"none"` (fresh start) |
 | `recommended_step` | integer | yes | Step the orchestrator should resume from (1–8) |
-| `current_step_in_lock` | integer | yes | `current_step` from the lock file |
+| `current_step_in_lock` | integer | yes | `current_step` from active lock, or `halt_step` from snapshot, or `0` if none |
+| `halt_reason` | string\|null | yes | Populated only when `source == "halt_snapshot"`; otherwise `null` |
 | `summaries_seen` | string[] | yes | Filenames (not full paths) of `.summaries/step-*.json` found and valid |
 | `deltas_since_pause` | object[] | yes | Artifacts whose mtime exceeds their summary's `completed_at`. Empty array if none. |
 | `blocking_issues` | string[] | yes | Human-readable issues that must be resolved before resuming. Empty array if none. |
@@ -59,20 +63,34 @@ Return **JSON only** — no prose, no markdown fences, no explanation:
 
 ## Detector Logic
 
-### Step 1 — Read the lock file
+### Step 1 — Read the lock file (or halt snapshot)
 
+Active lock first:
 ```bash
 cat .claude/state/develop-pipeline.lock
 ```
 
-Extract:
-- `current_step` → `LOCK_STEP`
+If absent, fall back to the **halt snapshot** written by terminal HALTs:
+```bash
+cat .claude/state/develop-pipeline.last-halt.json
+```
+
+Extract from whichever is present:
+- `current_step` (lock) or `halt_step` (snapshot) → `LOCK_STEP`
 - `task_or_story_directory` → `DOC_DIR`
 - `branch` → verify it exists: `git branch --list "{branch}"`
 
-If lock file absent or invalid JSON: set `blocking_issues: ["Lock file absent or unreadable — cannot determine resume step"]`, `recommended_step: 1`.
+Snapshot-specific fields (when reading `last-halt.json`):
+- `halt_reason` → human-readable cause (include in `deltas_since_pause` for the user surface)
+- `halted_at` → ISO-8601 timestamp of the halt
 
-If branch does not exist locally: add `"Branch recorded in lock does not exist — manual recovery required"` to `blocking_issues`.
+Set an output field `source: "lock" | "halt_snapshot" | "none"` so the orchestrator can prompt the user appropriately ("resume the active pipeline?" vs. "resume from the prior halt at step X?").
+
+If both files are absent: set `blocking_issues: ["No active lock and no halt snapshot — cannot determine resume step"]`, `recommended_step: 1`, `source: "none"`. The orchestrator should treat this as a fresh start.
+
+If the file is present but invalid JSON: add `"Lock/snapshot file unreadable — cannot determine resume step"` to `blocking_issues`.
+
+If branch does not exist locally: add `"Branch recorded in lock/snapshot does not exist — manual recovery required"` to `blocking_issues`.
 
 ### Step 2 — List and validate step summaries
 

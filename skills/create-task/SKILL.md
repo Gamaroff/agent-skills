@@ -163,9 +163,10 @@ Prompt user for:
 
 From this, auto-generate:
 
-- **Task ID**: Scan existing `docs/development/tasks/` for highest task.[N], increment to task.[N+1]
+- **Task ID**: Read `docs/development/tasks/task-registry.md` and use the **Next Available Task Number** value. If the registry file does not exist, fall back to scanning `docs/development/tasks/` for the highest `task.[N]` and incrementing.
 - **Directory Path**: `docs/development/tasks/task.[ID].[kebab-case-name]/`
 - **File Path**: `task.[ID].[kebab-case-name].md`
+- **Registry update** (after the task doc + plan are written, in Step 5): add a new row to `task-registry.md` and increment **Next Available Task Number**. Commit the registry update in the same commit as the new task files.
 
 ### 1.5 Analyse Git History for Technical Context
 

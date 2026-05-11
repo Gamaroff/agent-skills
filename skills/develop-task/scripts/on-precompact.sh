@@ -20,6 +20,13 @@ set -uo pipefail
 
 LOCK=".claude/state/develop-pipeline.lock"
 
+# Always-run cleanup: ensure lock is removed regardless of which exit path is
+# taken (including SIGTERM/timeout from the harness, jq-missing degraded mode,
+# or unexpected errors). A leftover lock would block the next pipeline
+# invocation with a collision halt — so removing it on any exit is safer than
+# leaving it. Idempotent — `rm -f` on success path is a noop.
+trap 'rm -f "$LOCK"' EXIT
+
 emit_empty() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreCompact","additionalContext":""}}'
   exit 0
@@ -30,9 +37,11 @@ if [ ! -f "$LOCK" ]; then
   emit_empty
 fi
 
-# jq is required for safe parsing — degrade gracefully if missing
+# jq is required for safe parsing — degrade gracefully if missing.
+# The EXIT trap will remove the lock so the next invocation can recover via
+# Phase 0b post-compaction artifact verification.
 if ! command -v jq >/dev/null 2>&1; then
-  echo "on-precompact: jq not found, skipping pause processing" >&2
+  echo "on-precompact: jq not found, skipping pause processing (lock will be removed by EXIT trap)" >&2
   emit_empty
 fi
 

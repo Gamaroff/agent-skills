@@ -1,0 +1,9 @@
+# Sprint status — updated by create-story / create-task at finalisation time.
+tasks:
+  - id: task.42.cache-lib-simplification
+    status: draft
+stories:
+  - id: story.178.7.previous-feature
+    status: done
+  - id: story.178.8.example-feature
+    status: ready-for-dev

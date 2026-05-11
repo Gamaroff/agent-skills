@@ -18,11 +18,25 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "bash shared/resources/resolve-platform.test.sh",
+    "test": "bash shared/resources/resolve-platform.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'tests/*.test.js' 'evals/shared/tests/*.test.mjs'",
+    "test:node": "node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'tests/*.test.js' 'evals/shared/tests/*.test.mjs'",
+    "test:platform": "bash shared/resources/resolve-platform.test.sh",
+    "eval:create-task": "node evals/shared/runner.mjs evals/create-task/scenarios/01-happy",
+    "eval:create-task:all": "for s in evals/create-task/scenarios/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
+    "eval:create-task:cli": "DRIVER=claude-cli node evals/shared/runner.mjs evals/create-task/scenarios/01-happy",
+    "eval:create-task:sdk": "DRIVER=claude-sdk node evals/shared/runner.mjs evals/create-task/scenarios/01-happy",
+    "eval:create-story": "node evals/shared/runner.mjs evals/create-story/scenarios/01-happy",
+    "eval:create-story:all": "for s in evals/create-story/scenarios/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
+    "eval:create-story:cli": "DRIVER=claude-cli node evals/shared/runner.mjs evals/create-story/scenarios/01-happy",
+    "eval:create-story:sdk": "DRIVER=claude-sdk node evals/shared/runner.mjs evals/create-story/scenarios/01-happy",
+    "eval:all": "for s in evals/create-task/scenarios/*/ evals/create-story/scenarios/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
     "validate": "python3 skills/create-skill/scripts/quick_validate.py",
     "validate:all": "for d in skills/*/; do [ -f \"${d}SKILL.md\" ] && python3 skills/create-skill/scripts/quick_validate.py \"$d\" || true; done",
     "generate-catalog": "python3 skills/create-skill/scripts/generate_catalog.py",
     "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
     "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.138"
   }
 }

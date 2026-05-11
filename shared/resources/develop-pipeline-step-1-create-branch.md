@@ -29,26 +29,7 @@ If the lock exists but its `branch` field does not match any existing local bran
 
 ---
 
-## Pre-flight Board Check (mandatory gate before create-branch)
-
-**GitHub only**: If `TRACKER=github` and `TRACKER_ISSUE` is set, verify the board status before proceeding. This catches cases where Phase 0c-reg was skipped or silently failed:
-
-```bash
-BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
-BOARD_STATUS=$(gh project item-list "$BOARD_NUM" --owner "$(gh repo view --json owner -q '.owner.login')" --format json 2>/dev/null \
-  | jq -r '.items[] | select(.content.number == {TRACKER_ISSUE}) | .status // "unknown"')
-echo "Board status for #{TRACKER_ISSUE}: $BOARD_STATUS"
-```
-
-- If `$BOARD_STATUS` is `In Progress`: proceed — 0c-reg succeeded.
-- If `$BOARD_STATUS` is `Todo` or `unknown`: re-run the full 0c-reg GitHub board update (GraphQL mutation from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` — 0c-reg GitHub path), then re-check. Log the outcome in the implementation report Pipeline Configuration table (`Board status` row).
-- If the retry also fails: log `⚠️ Board status update failed — proceeding without board update` in the Issues Log and continue.
-
-**Jira**: If `TRACKER=jira` and `TRACKER_ISSUE` is set, call `getJiraIssue` MCP tool to verify the issue is "In Progress" before proceeding:
-- `cloudId`: {hostname from `JIRA_URL`}, `issueIdOrKey`: `{TRACKER_ISSUE}`, `fields: ["status"]`
-- If `fields.status.name` is "In Progress": proceed — 0c-reg succeeded
-- If not "In Progress": re-apply transition using `getTransitionsForJiraIssue` + `transitionJiraIssue` (same pattern as 0c-reg step 2 in the step-0 shared doc); log outcome in Pipeline Configuration table (`Tracker status` row)
-- If retry fails: log `⚠️ Jira status update failed — proceeding` in Issues Log and continue
+> **Note (relocated):** the previous "Pre-flight Board Check" section has been removed. Tracker signalling no longer runs in Phase 0 — it now runs **after** branch + lock creation in this step (see "Signal Work Started" below). This avoids leaving the tracker stuck in `In Progress` if branch creation fails.
 
 ---
 
@@ -58,12 +39,26 @@ Before creating the story branch, ensure the epic branch exists. Use `EPIC_BRANC
 
 ### Case A — Epic branch not found locally or remotely (`EPIC_BRANCH_EXISTS=false`)
 
+> **Idempotence guarantee.** Phase 0b's `EPIC_BRANCH_EXISTS=false` is a snapshot — the branch may have been created locally or pushed to the remote between Phase 0b and Step 1a (e.g. another concurrent pipeline run for a sibling story in the same epic). Re-check immediately before each mutation so Case A never HALTs on `git checkout -b` or `git push -u` "branch already exists" errors.
+
 ```bash
 git fetch origin
 git checkout develop
 git pull origin develop
-git checkout -b {EPIC_BRANCH}
-git push -u origin {EPIC_BRANCH}
+
+# Guarded local create — if the branch was created locally between Phase 0b and now, just check it out.
+if git rev-parse --verify --quiet "refs/heads/{EPIC_BRANCH}" >/dev/null; then
+  git checkout {EPIC_BRANCH}
+else
+  git checkout -b {EPIC_BRANCH}
+fi
+
+# Guarded remote push — if the remote branch already exists, set upstream tracking instead of failing.
+if git ls-remote --exit-code --heads origin "{EPIC_BRANCH}" >/dev/null 2>&1; then
+  git branch --set-upstream-to=origin/{EPIC_BRANCH} {EPIC_BRANCH}
+else
+  git push -u origin {EPIC_BRANCH}
+fi
 ```
 
 Log: "✅ Created epic branch: {EPIC_BRANCH} from develop"
@@ -202,6 +197,19 @@ The lock file is read by `.agents/skills/develop-task/scripts/on-precompact.sh` 
 ### Shared note
 
 From Step 2 onward, the per-step banner directive updates `current_step`. Step 4 also writes `pr_url` after the PR is created.
+
+---
+
+## Signal Work Started (mandatory — runs after lock written)
+
+Now that the branch and lock both exist, signal the tracker. Execute the **0c-reg procedure** defined in `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` §"0c-reg. Signal Work Started" — both Jira and GitHub paths. The procedure body is unchanged; only the timing has moved here.
+
+Rationale for the move:
+- If branch creation fails, the tracker is **not** left stuck `In Progress` (previous behaviour leaked state on early HALT).
+- The branch name passed in the comment body (`Pipeline started — branch: {branch-name}`) is now guaranteed to exist on the remote after Step 1.
+- Failure semantics unchanged — every action remains non-blocking; warnings go to the Issues Log.
+
+Run the procedure exactly once per pipeline. On resume, the resume-detector subagent's `summaries_seen` includes the post-condition log line; if absent and Step 1 is otherwise ✅, re-run the signal (idempotent — comment is benign duplicate, transition is no-op when already in target state).
 
 ---
 

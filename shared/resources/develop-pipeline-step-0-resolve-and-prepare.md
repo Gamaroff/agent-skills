@@ -157,6 +157,11 @@ Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
 
+Detect whether the doc has a structured criteria table that the QA traceability mapper can consume:
+  - For stories: a "## Acceptance Criteria" section with at least one numbered item or AC sub-heading.
+  - For tasks: a "## Success Criteria" section with at least one table row or numbered item.
+  - Return `has_success_criteria_table: true` if either is present, else false.
+
 Return compact JSON:
 {
   "risk_level": "low|medium|high|absent",
@@ -164,7 +169,8 @@ Return compact JSON:
   "single_module": true|false,
   "pipeline_mode": "lite|standard",
   "skills_config_exists": true|false,
-  "always_load_files": ["path1", "path2"]
+  "always_load_files": ["path1", "path2"],
+  "has_success_criteria_table": true|false
 }
 ```
 
@@ -181,6 +187,7 @@ TASK_FILE      = RESOLVER_RESULT.absolute_file_path   (or already known from inl
 TASK_DIR       = RESOLVER_RESULT.task_or_story_directory
 PIPELINE_MODE  = LITEMODE_RESULT.pipeline_mode          (default: "standard" on failure)
 ALWAYS_LOAD_FILES = LITEMODE_RESULT.always_load_files   (default: [] on failure)
+HAS_SUCCESS_CRITERIA_TABLE = LITEMODE_RESULT.has_success_criteria_table   (default: false on failure)
 TRACKER_STATE  = TRACKER_RESULT                         (null fields on failure)
 ```
 
@@ -302,6 +309,10 @@ fi
 
 ## 0c-reg. Signal Work Started
 
+> **Execution timing — relocated.** This procedure is **defined here** but **invoked from Step 1** (after branch + lock creation). Do **not** execute during Phase 0. See `shared/resources/develop-pipeline-step-1-create-branch.md` §"Signal Work Started" for the call site.
+>
+> Rationale: previously fired in Phase 0c-reg before branch creation, which left trackers stuck `In Progress` when Step 1 failed. Moving the signal after the lock writes guarantees the branch named in the comment actually exists.
+
 If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started on the linked tracker issue. Branch on `TRACKER`. **This section is identical for develop-story and develop-task.**
 
 ### Jira path (when `TRACKER=jira`):
@@ -328,6 +339,8 @@ Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from
    - If NOT "In Progress": retry step 2 once; if still not moved, log "⚠️ Jira status not updated — proceeding" in Issues Log
 
 All steps are **non-blocking** — failures are logged but do not halt the pipeline.
+
+> **Note on Jira priority parity with GitHub.** The GitHub Projects v2 path (below) auto-sets `Priority = P2` when unset. The Jira path intentionally does **not** auto-set priority because Jira priority schemes are workflow- and project-specific — auto-setting risks overwriting team conventions (e.g. "Highest/High/Medium/Low/Lowest" vs custom enums). Set Jira priority manually if needed.
 
 Add to the implementation report Pipeline Configuration table:
 
@@ -483,54 +496,49 @@ Check the current branch:
 git branch --show-current
 ```
 
-Use the `AskUserQuestion` tool to ask all applicable questions in a single call (up to 3 questions: Q1, Q2, and Q3 if applicable).
+Use the `AskUserQuestion` tool to ask all applicable questions in a single call. Auto-derived values are presented as the **first (Recommended)** option — selecting it requires only one keypress, but the user retains override capability via "Other".
+
+**qa-planning skip is silent** — the pipeline always skips `/qa-planning`. Do **not** prompt for it. Record `"qa-planning: skipped (auto)"` in the Decisions Log.
 
 **Q1 — Feature branch base:**
 
 #### develop-story Q1 options
 
-develop-story always uses the epic branch (`{EPIC_BRANCH}`) as the feature branch base. No free-form Q1 is presented. Instead:
+If `EPIC_BRANCH_EXISTS=false`, ask **two** questions in the same `AskUserQuestion` call:
 
-- **If `EPIC_BRANCH_EXISTS=false`**: ask one confirmation question via `AskUserQuestion`:
-  > "Epic branch `{EPIC_BRANCH}` does not exist yet. It will be created from `develop` before your story branch."
-  > Options: "Create epic branch and proceed" (Recommended) / "Abort"
+1. "Epic branch `{EPIC_BRANCH}` does not exist yet. Create it from `develop`?"
+   Options: "Create epic branch from develop" (Recommended) / "Abort pipeline"
+   - "Abort" → HALT cleanly, do not create any branches.
+2. "Confirm story branch base?"
+   Options: "`{EPIC_BRANCH}` (epic branch — recommended)" / "develop" / "Other"
 
-  If the user selects "Abort": HALT cleanly — do not create any branches.
+If `EPIC_BRANCH_EXISTS=true`, ask only Q1.2 (skip the creation prompt).
 
-- **If `EPIC_BRANCH_EXISTS=true`**: no question needed. The epic branch will be used automatically. Record this in the Decisions Log.
-
-Store decisions: Feature branch base = `{EPIC_BRANCH}` (always, regardless of current branch).
+Store: Feature branch base = answer to Q1.2.
 
 #### develop-task Q1 options
 
-- On `develop` or `main`: ask "Which branch should the feature branch be created from?" Options: "develop" (Recommended) / "Other"
-- On any `feature/*` branch: ask "Which branch should `feature/task.{id}.{name}` be based on?" Options: "`feature/{current}`" (Recommended) / "develop"
-  - This applies to all feature branches — whether it's an epic branch, another task branch, or any other feature branch.
+Ask "Which branch should `feature/task.{id}.{name}` be based on?"
+- On `develop` or `main`: Options: "develop" (Recommended) / "main" / "Other"
+- On any `feature/*` branch: Options: "`feature/{current}`" (Recommended) / "develop" / "Other"
 
 **Q2 — PR target branch:**
 
 #### develop-story Q2
 
-develop-story always targets the epic branch. Do **not** ask the user:
+Ask "Confirm PR target branch?"
+Options: "`{EPIC_BRANCH}` (epic branch — recommended)" / "develop" / "Other"
 
-- PR target = `{EPIC_BRANCH}` (auto-set, identical to Q1 base)
-- Record in Decisions Log: "PR target: {EPIC_BRANCH} (epic branch — auto)"
+> Default Yes preserves the epic-branch flow; "develop" or "Other" let the user redirect (e.g. for a hotfix story that should land directly on develop).
 
 #### develop-task Q2
 
-Ask "Which branch should the pull request target?" Options: "develop" (Recommended) / "feature/{current-branch}" / "Other"
-
-**Q3 — High-risk gate (only if `risk_level: high` detected):**
-
-#### develop-story Q3
-
-Ask "This story is flagged `risk_level: high`. The `/develop` skill will offer to run `/qa-planning` first. Should this pipeline skip that gate?" Options: "Skip qa-planning" (Recommended) / "Pause at that gate"
-
-#### develop-task Q3
-
-Ask "This task is flagged `risk_level: high`. The `/develop` skill will offer to run `/qa-planning` first. Should this pipeline skip that gate?" Options: "Skip qa-planning" (Recommended) / "Pause at that gate"
+Ask "Which branch should the pull request target?"
+Options: "develop" (Recommended) / "feature/{current-branch}" / "Other"
 
 If the user selects "Other" for Q1 or Q2, follow up with a plain text request for the branch name. Store all answers. Do not ask again mid-pipeline.
+
+**No Q3** — qa-planning skip is silent (see paragraph above).
 
 ---
 
@@ -565,7 +573,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | Epic branch         | {EPIC_BRANCH} (exists / will be created) |
 | Feature branch base | {EPIC_BRANCH}                 |
 | PR target           | {EPIC_BRANCH}                 |
-| High-risk gate      | {Q3 answer or N/A}            |
+| qa-planning gate    | skipped (auto)                |
 | Story risk level    | {risk_level value or not set} |
 | Pipeline mode       | {lite / standard}             |
 | Always-load files   | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
@@ -597,7 +605,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 - Epic branch: {EPIC_BRANCH} — {exists / created from develop}
 - Feature branch base: {EPIC_BRANCH} — epic branch (auto)
 - PR target branch: {EPIC_BRANCH} — epic branch (auto)
-- High-risk gate handling: {Q3 answer or N/A}
+- qa-planning gate: skipped (auto — no prompt)
 
 ---
 
@@ -649,7 +657,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 |---------|-------|
 | Feature branch base | {Q1 answer} |
 | PR target | {Q2 answer} |
-| High-risk gate | {Q3 answer or N/A} |
+| qa-planning gate | skipped (auto) |
 | Task risk level | {risk_level value or not set} |
 | Pipeline mode | {lite / standard} |
 | Always-load files | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
@@ -678,7 +686,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 ### Pipeline Startup — {YYYY-MM-DD}
 - Feature branch base: {Q1 answer} — {rationale}
 - PR target branch: {Q2 answer} — {rationale}
-- High-risk gate handling: {Q3 answer or N/A}
+- qa-planning gate: skipped (auto — no prompt)
 
 ---
 

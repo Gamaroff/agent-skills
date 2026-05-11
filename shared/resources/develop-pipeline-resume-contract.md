@@ -118,10 +118,18 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
 
 ```bash
-grep -c "^### QA Cycle" {implementation-report-path}
+COMPLETED=$(grep -c "^### QA Cycle" {implementation-report-path})
+NEXT_CYCLE=$((COMPLETED + 1))
 ```
 
-Set the cycle counter to this value before re-entering the loop. This ensures the 5-cycle limit is respected across resumes.
+Set the cycle counter to `NEXT_CYCLE` (= completed + 1) before re-entering the loop. This is the cycle **about to be attempted**.
+
+Examples:
+- 0 entries → `NEXT_CYCLE=1` (fresh start, equivalent to non-resume)
+- 2 entries → `NEXT_CYCLE=3` (cycles 1 + 2 complete, attempting 3 next)
+- 5 entries → `NEXT_CYCLE=6` → exceeds limit → trigger Loop Limit Escalation immediately
+
+This convention ensures the 5-cycle limit is respected across resumes. Mid-cycle resume (entry written but qa-fix not yet committed) is handled by re-running 5a — `/qa-story` / `/qa-task` is idempotent and will overwrite the same `qa.N.md` / `gate.N.yml` for the in-flight cycle.
 
 ## Branch and PR Cross-Check
 
@@ -138,23 +146,11 @@ If the branch or PR no longer matches, warn the user before proceeding: "Pipelin
 
 ## Develop Loop — Stall Semantics and MAX_ITER Bound
 
-Before iteration 1: dispatch an Explore subagent (read-only) to capture initial loop state:
+Before iteration 1: dispatch an Explore subagent (read-only) to capture initial loop state, using the **shared loop-audit prompt** (`shared/resources/loop-audit-prompt.md`).
 
-**Audit prompt:**
-> Read the story/task file at `<story-or-task-path>`. Count `[x]` checkboxes (any indent) → `completed`; count all `[ ]` + `[x]` checkboxes (any indent) → `total`. Extract the `Status:` field value from the frontmatter or body header. Run `git log -1 --format=%H` → `last_commit_hash`. Return JSON only (no prose):
-> ```json
-> {"status":"...","completed":N,"total":M,"last_commit_hash":"..."}
-> ```
+Substitute: `<DOC_TYPE>` = `story` or `task` (per orchestrator); `<DOC_PATH>` = absolute story/task file path; `<TASKS_SECTION>` = `## Tasks` (story) or `## Implementation Plan` (task). Pass the resulting prompt verbatim.
 
-On JSON parse failure: retry the Explore dispatch once. If the retry also fails, fall back to inline shell and log `"Initial audit JSON failed — used inline fallback."`:
-```bash
-# Count any checked box (top-level or nested):
-grep -cE '\[x\]' {story-or-task-file}
-# Count total checkboxes:
-grep -cE '\[[ x]\]' {story-or-task-file}
-# Last commit hash:
-git rev-parse HEAD
-```
+Failure semantics: this is the **initial audit** row in the shared prompt's "Caller Failure Semantics" table — JSON parse failure → retry once → inline shell fallback (`grep -cE '\[x\]'` + `grep -cE '\[[ x]\]'` + `git rev-parse HEAD`) and log `"Initial audit JSON failed — used inline fallback."`. Persistence: write `step-3-iteration-audit-0.json` per the shared prompt's "Persistence" table.
 
 Record: `INITIAL_COMPLETED = audit.completed` (or fallback), `M = audit.total` (or fallback), `LAST_COMMIT_HASH = audit.last_commit_hash` (or fallback). Set `ITER=1`, `MAX_ITER=5`, `LAST_COMPLETED=INITIAL_COMPLETED`.
 

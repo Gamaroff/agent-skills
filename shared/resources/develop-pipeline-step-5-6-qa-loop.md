@@ -25,17 +25,23 @@ Each cycle = one `/qa-task` + one `/qa-fix`. A clean PASS on any qa-task review 
 
 ## Finding the Latest Gate File
 
+Use a format-agnostic regex to extract the numeric `{N}` from each filename, sort numerically, and pick the highest. Robust to story/task names that contain dots.
+
 #### develop-story
 ```bash
-ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null | sort -t. -k5 -n | tail -1
+ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null \
+  | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
+  | sort -k1,1 -n | tail -1 | cut -f2-
 ```
-The gate file pattern is `story.{epic}.{story}.gate.{N}.{name}.yml` — field 5 (dot-delimited) is the numeric gate index.
 
 #### develop-task
 ```bash
-ls {task-directory}/task.{id}.gate.*.yml 2>/dev/null | sort -t. -k4 -n | tail -1
+ls {task-directory}/task.{id}.gate.*.yml 2>/dev/null \
+  | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
+  | sort -k1,1 -n | tail -1 | cut -f2-
 ```
-The gate file pattern is `task.{id}.gate.{N}.{name}.yml` — field 4 (dot-delimited) is the numeric gate index.
+
+The gate file pattern is `…gate.{N}.{name}.yml` — the awk splits on `gate.`, takes the first `.`-delimited token from the right side as `{N}`. Names containing dots (e.g. `auth.v2`) no longer affect ordering.
 
 **Note (tasks only)**: The legacy path `docs/qa/gates/tasks/` is deprecated. qa-task v2.0 co-locates gate files in the task directory alongside the task document.
 
@@ -71,7 +77,12 @@ After the subagent completes:
 
 If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
 
-Skip this pre-step when `PIPELINE_MODE=lite` — the mapper adds overhead that lite mode trades away.
+Skip this pre-step when any of:
+- `PIPELINE_MODE=lite` — the mapper adds overhead that lite mode trades away.
+- Story has **no Acceptance Criteria section** (`grep -ciE '^##+ +acceptance criteria' {story-file}` returns 0). Nothing to map.
+- Story has **≤ 2 ACs** (count `^- ` or `^[0-9]+\.` lines under the AC heading). The mapper's overhead exceeds its value at this size; qa-story's internal mapping is sufficient.
+
+Log the bypass reason in the Decisions Log (`Traceability mapper skipped: {reason}`).
 
 **Invoke `/qa-story`**
 
@@ -86,7 +97,44 @@ Skill(qa-story, args="traceability_matrix={story-directory}/.summaries/qa-tracea
 If the matrix was not generated (lite mode or mapper failure), invoke without the `traceability_matrix` arg — qa-story performs internal mapping as before.
 
 #### develop-task
+
+**Pre-step: Dispatch traceability mapper (standard mode + Success Criteria table only)**
+
+Conditions to dispatch the mapper for tasks (all must be true):
+1. `PIPELINE_MODE = standard` (lite mode skips the mapper)
+2. `HAS_SUCCESS_CRITERIA_TABLE = true` (set by Phase 0a Agent 3 — the lite-mode/always-load detector)
+
+If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note):
+
+```
+Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
+Inputs:
+  STORY_FILE={task-file}
+  STORY_DIR={task-directory}
+
+Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+```
+
+After the subagent completes:
+1. Confirm `{task-directory}/.summaries/qa-traceability-matrix.md` was written.
+2. Write the summary JSON artifact to `{task-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
+3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
+
+If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
+
+Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=false`. Tasks with no Success Criteria table (e.g. pure infra cleanup) gain nothing from the mapper.
+
+**Invoke `/qa-task`**
+
 Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
+
+When the traceability matrix was successfully generated, pass its path via Skill args:
+
+```
+Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md")
+```
+
+If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), invoke without the `traceability_matrix` arg.
 
 ### Outcome branching (shared)
 
@@ -113,7 +161,18 @@ After fixes are applied:
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
-1. Invoke the `/commit-changes` skill to stage and commit the fix changes using a Conventional Commits message:
+1. **Exclude the implementation report from this commit** — Step 8 owns the sole report commit, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. Before invoking `/commit-changes`, unstage the report explicitly:
+
+   ```bash
+   # develop-story
+   git reset HEAD -- '**/story.*.implementation.*.md' 2>/dev/null || true
+   # develop-task
+   git reset HEAD -- '**/task.*.implementation.*.md' 2>/dev/null || true
+   ```
+
+   Then invoke `/commit-changes` with an explicit `exclude` directive in the prompt: pass `exclude=story.{epic}.{story}.implementation.*.md` (or `task.{id}.implementation.*.md`). The skill respects the directive and will not re-stage the report.
+
+   Conventional Commits message:
 
    #### develop-story
    `fix(story.{epic}.{story}): qa-fix cycle {N} — {brief summary of fixes}`
@@ -121,7 +180,7 @@ After fixes are applied:
    #### develop-task
    `fix(task.{id}): qa-fix cycle {N} — {brief summary of fixes}`
 
-   The implementation report does NOT need to be included in this commit — it will be finalised in Step 8.
+   Rationale: previously the report was simply "not needed" in qa-fix commits but nothing prevented inclusion. Decisions Log / QA Iteration History entries written during the cycle would silently land in `fix(...)` commits, splitting report history across the branch. Step 8 is the single owner of the report commit (`docs(...)`).
 
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
@@ -136,10 +195,15 @@ After fixes are applied:
    **Commit**: `{hash}`
    ```
 
-5. **Post-fix PR state check (uses tracker state poller)**: Invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty). Check:
-   - `result.pr.state == "OPEN"` → continue QA loop normally
-   - `result.pr.state == "MERGED"` or `"CLOSED"` → HALT: "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
-   - `result.errors | length > 0` → log each error in Issues Log; continue (non-blocking)
+5. **Post-fix PR state check (uses tracker state poller)**: Invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty).
+
+   Persist the result to `{story-or-task-directory}/.summaries/step-5-post-fix-tracker-{N}.json` where `{N}` is the **current cycle number** (do NOT overwrite earlier cycles' artifacts — each cycle gets its own file). Schema per `shared/resources/subagent-summary-artifact.md`. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the latest path.
+
+   Branch on `result.pr.state`:
+   - `"OPEN"` → continue QA loop normally.
+   - `"MERGED"` or `"CLOSED"` → HALT: "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
+   - `null` / missing / empty (poller succeeded but state field absent) → log warning `"⚠️ PR state unknown after qa-fix push — re-polling once"`; re-invoke the poller once. If the second result is still null/missing, log `"⚠️ PR state could not be determined — proceeding optimistically (treating as OPEN)"` in Issues Log and continue. Do **not** HALT on null — flaky `gh pr view` is more common than mid-loop close.
+   - `result.errors | length > 0` → log each error in Issues Log; treat `pr.state` per the rules above (the poller may still return a usable state alongside non-fatal errors).
 
 6. Increment the cycle counter and return to 5a.
 

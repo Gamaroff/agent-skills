@@ -1,0 +1,3 @@
+{"matches": "task title", "answer": "Cache lib eval"}
+{"matches": "tracker|jira|github", "answer": "create"}
+{"matches": "confirm|proceed", "answer": "yes"}

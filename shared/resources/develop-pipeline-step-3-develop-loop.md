@@ -94,15 +94,11 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 #### develop-story loop body
 
 1. Invoke `/develop` with the story file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
-2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress:
+2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`shared/resources/loop-audit-prompt.md`).
 
-   **Audit prompt:**
-   > Read the story file at `<story_path>`. From the `## Tasks` section, count `[x]` checkboxes (any indent) → `completed`; count all `[ ]` + `[x]` checkboxes (any indent) → `total`. Extract the `Status:` field value from the frontmatter or body header. Run `git log -1 --format=%H` → `last_commit_hash`. Return JSON only (no prose):
-   > ```json
-   > {"status":"...","completed":N,"total":M,"last_commit_hash":"..."}
-   > ```
+   Substitute: `<DOC_TYPE>=story`, `<DOC_PATH>={story_path}`, `<TASKS_SECTION>=## Tasks`. Pass the resulting prompt verbatim to the Explore subagent.
 
-   On JSON parse failure: retry the Explore dispatch once with the same prompt. If the retry also fails, log `"Audit JSON parse failure at iteration {ITER} — halting"` in Issues Log and HALT.
+   Failure semantics + persistence: per the shared prompt's "Caller Failure Semantics" and "Persistence" tables (this is the per-iteration row — JSON parse failure on retry HALTs).
 
    Set: `CURRENT_COMPLETED = audit.completed`, `CURRENT_COMMIT_HASH = audit.last_commit_hash`.
 
@@ -115,15 +111,11 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 #### develop-task loop body
 
 1. Invoke `/develop` with the task file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
-2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress:
+2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`shared/resources/loop-audit-prompt.md`).
 
-   **Audit prompt:**
-   > Read the task file at `<task_path>`. From the `## Implementation Plan` section, count `[x]` checkboxes (any indent) → `completed`; count all `[ ]` + `[x]` checkboxes (any indent) → `total`. Extract the `Status:` field value from the frontmatter or body header. Run `git log -1 --format=%H` → `last_commit_hash`. Return JSON only (no prose):
-   > ```json
-   > {"status":"...","completed":N,"total":M,"last_commit_hash":"..."}
-   > ```
+   Substitute: `<DOC_TYPE>=task`, `<DOC_PATH>={task_path}`, `<TASKS_SECTION>=## Implementation Plan`. Pass the resulting prompt verbatim to the Explore subagent.
 
-   On JSON parse failure: retry the Explore dispatch once with the same prompt. If the retry also fails, log `"Audit JSON parse failure at iteration {ITER} — halting"` in Issues Log and HALT.
+   Failure semantics + persistence: per the shared prompt's "Caller Failure Semantics" and "Persistence" tables (this is the per-iteration row — JSON parse failure on retry HALTs).
 
    Set: `CURRENT_COMPLETED = audit.completed`, `CURRENT_COMMIT_HASH = audit.last_commit_hash`.
 

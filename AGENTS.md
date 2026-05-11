@@ -148,6 +148,17 @@ Implementation plans must be co-located with the work they describe — never le
 
 If a plan was generated upstream by an agent scratch directory, **relocate its content** into the appropriate in-repo location above. Do not link to home-directory paths — they're outside the repo, not version-controlled, and invisible to teammates.
 
+## Task Registry
+
+`docs/development/tasks/task-registry.md` is the single source of truth for task numbering and status. Before creating a new task:
+
+1. Read **Next Available Task Number** from the registry — that's your `task.[N]`.
+2. After running `/create-task`, add a row to the registry table.
+3. Increment **Next Available Task Number**.
+4. Commit registry update **in the same commit** as the new task files (atomic).
+
+Task numbers are globally unique and never reused, even after cancellation.
+
 ## Shared Resources
 
 `shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. At package time, `package_skill.py` auto-bundles referenced files under `references/` inside the zip and rewrites paths accordingly — installed skills are fully self-contained. Never use symlinks or relative paths to reference shared resources.
@@ -161,3 +172,7 @@ validate-story → develop → qa-review → qa-fix (if needed) → finalise
 ```
 
 Stories are the unit of work. QA gate files (PASS/CONCERNS/FAIL/WAIVED) are owned by QA skills — dev skills must never modify gate files.
+
+## Evals
+
+The repo ships a four-layer eval suite for the create-task / create-story skills (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes (`claude-sdk`, `claude-cli`) and the live-tracker scenario are opt-in. See [docs/evals.md](./docs/evals.md) and `evals/shared/README.md` for the full setup, scenario layout, and how to add a driver for another agent.

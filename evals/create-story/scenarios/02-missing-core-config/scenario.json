@@ -1,0 +1,43 @@
+{
+  "name": "02-missing-core-config",
+  "skill": "create-story",
+  "description": "Missing-config HALT: sandbox has no core-config.yaml, so create-story must halt before producing a story file. Asserts the halt-log shape and that no docs/stories/ tree was written.",
+  "prompt": "Create story 8 under epic 178.",
+  "assertions": [
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/core-config.yaml"
+      ]
+    },
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.8.example-feature.md"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/.eval/halt.log"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/halt.log",
+        "core-config\\.yaml"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/halt.log",
+        "HALT"
+      ]
+    },
+    {
+      "fn": "answerQueueDrained"
+    }
+  ]
+}
