@@ -172,3 +172,7 @@ validate-story → develop → qa-review → qa-fix (if needed) → finalise
 ```
 
 Stories are the unit of work. QA gate files (PASS/CONCERNS/FAIL/WAIVED) are owned by QA skills — dev skills must never modify gate files.
+
+## Evals
+
+The repo ships a four-layer eval suite for the create-task / create-story skills (unit → fixture → protocol → full-flow). Hermetic layers run in CI on every push; live driver modes (`claude-sdk`, `claude-cli`) and the live-tracker scenario are opt-in. See [docs/evals.md](./docs/evals.md) and `evals/full-flow/README.md` for the full setup, scenario layout, and how to add a driver for another agent.

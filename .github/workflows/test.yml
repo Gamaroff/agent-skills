@@ -1,0 +1,50 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-replay:
+    name: unit + replay evals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --version
+      - name: Platform resolver test
+        run: bash shared/resources/resolve-platform.test.sh
+      - name: Node tests (unit + protocol + driver + assertions)
+        run: npm run test:node
+      - name: Replay-mode full-flow evals
+        run: npm run eval:full-flow:all
+
+  live-tracker:
+    name: live-tracker sandbox (manual)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    needs: unit-and-replay
+    env:
+      JIRA_URL:    ${{ secrets.JIRA_URL }}
+      JIRA_USER:   ${{ secrets.JIRA_USER }}
+      JIRA_TOKEN:  ${{ secrets.JIRA_TOKEN }}
+      GH_TOKEN:    ${{ secrets.GH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Skip if no creds
+        if: env.JIRA_TOKEN == '' && env.GH_TOKEN == ''
+        run: |
+          echo "::warning::No tracker creds configured — live-tracker job skipped"
+          exit 0
+      - name: Live tracker scenario
+        if: env.JIRA_TOKEN != '' || env.GH_TOKEN != ''
+        run: DRIVER=claude-sdk node evals/full-flow/runner.mjs evals/full-flow/scenarios/05-tracker-payload-live

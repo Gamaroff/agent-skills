@@ -1,0 +1,7 @@
+{
+  "dryRun": true,
+  "summary": "Cache lib simplification",
+  "issueType": "Task",
+  "projectKey": "PLAT",
+  "labels": ["task.42", "cache-lib"]
+}

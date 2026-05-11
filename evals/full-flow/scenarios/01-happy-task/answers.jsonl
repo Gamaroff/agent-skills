@@ -1,0 +1,4 @@
+{"matches": "task title", "answer": "Cache lib simplification"}
+{"matches": "epic|parent", "answer": "epic.7.platform-core"}
+{"matches": "tracker|jira|github", "answer": "skip"}
+{"matches": "confirm|proceed", "answer": "yes"}

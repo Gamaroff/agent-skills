@@ -18,11 +18,20 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "bash shared/resources/resolve-platform.test.sh",
+    "test": "bash shared/resources/resolve-platform.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'tests/*.test.js' 'evals/full-flow/tests/*.test.mjs'",
+    "test:node": "node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'tests/*.test.js' 'evals/full-flow/tests/*.test.mjs'",
+    "test:platform": "bash shared/resources/resolve-platform.test.sh",
+    "eval:full-flow": "node evals/full-flow/runner.mjs evals/full-flow/scenarios/01-happy-task",
+    "eval:full-flow:all": "for s in evals/full-flow/scenarios/*/; do node evals/full-flow/runner.mjs \"$s\" || exit 1; done",
+    "eval:full-flow:cli": "DRIVER=claude-cli node evals/full-flow/runner.mjs evals/full-flow/scenarios/01-happy-task",
+    "eval:full-flow:sdk": "DRIVER=claude-sdk node evals/full-flow/runner.mjs evals/full-flow/scenarios/01-happy-task",
     "validate": "python3 skills/create-skill/scripts/quick_validate.py",
     "validate:all": "for d in skills/*/; do [ -f \"${d}SKILL.md\" ] && python3 skills/create-skill/scripts/quick_validate.py \"$d\" || true; done",
     "generate-catalog": "python3 skills/create-skill/scripts/generate_catalog.py",
     "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
     "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.138"
   }
 }
