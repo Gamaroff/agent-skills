@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Full-flow eval runner.
+ * Eval runner for skill end-to-end scenarios.
  *
  * Usage:
- *   node evals/full-flow/runner.mjs <scenario-dir>
+ *   node evals/shared/runner.mjs <scenario-dir>
  *
  * Driver selection (DRIVER env, default = replay):
  *   replay      — copy scenarios/<name>/replay/** into a sandbox; no agent

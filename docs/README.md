@@ -16,7 +16,7 @@ Documentation for the Agent Skills library.
 - **[PRD & Story Documents](./prd.md)** — Directory layout, frontmatter, status rules, and artifact reference for `develop-story`
 - **[Packaging](./packaging.md)** — Validation, shared resources, distribution
 - **[Creating Skills](./creating-skills.md)** — Authoring guide, file structure, best practices
-- **[Evals](./evals.md)** — Four-layer test suite (unit → protocol → full-flow), pluggable agent drivers, live tracker scenario setup
+- **[Evals](./evals.md)** — Four-layer test suite (unit → protocol → end-to-end), pluggable agent drivers, live tracker scenario setup
 - **[Placeholders](./placeholders.md)** — Legend for `{project}`, `{api-service}`, `@your-org/...` and other template tokens used in skills
 
 ## External Resources

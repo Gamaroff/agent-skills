@@ -1,4 +1,4 @@
-# 05-tracker-payload-live
+# 03-tracker-live
 
 **Live tracker scenario** — actually creates an issue in a real Jira project or GitHub repo, asserts the receipt, then deletes/closes the issue. Not part of the hermetic CI gate.
 
@@ -43,7 +43,7 @@ After the skill runs, it MUST write `.eval/tracker-receipt.json` with:
 }
 ```
 
-The runner's cleanup helper (`evals/full-flow/lib/tracker-cleanup.mjs`) reads this receipt and:
+The runner's cleanup helper (`evals/shared/lib/tracker-cleanup.mjs`) reads this receipt and:
 
 - Jira: `jira issue delete <KEY> --force`
 - GitHub: `gh issue close <N> -R <repo>` + `gh issue lock` (GitHub does not permit issue deletion)

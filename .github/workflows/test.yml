@@ -22,8 +22,8 @@ jobs:
         run: bash shared/resources/resolve-platform.test.sh
       - name: Node tests (unit + protocol + driver + assertions)
         run: npm run test:node
-      - name: Replay-mode full-flow evals
-        run: npm run eval:full-flow:all
+      - name: Replay-mode end-to-end evals
+        run: npm run eval:all
 
   live-tracker:
     name: live-tracker sandbox (manual)
@@ -47,4 +47,4 @@ jobs:
           exit 0
       - name: Live tracker scenario
         if: env.JIRA_TOKEN != '' || env.GH_TOKEN != ''
-        run: DRIVER=claude-sdk node evals/full-flow/runner.mjs evals/full-flow/scenarios/05-tracker-payload-live
+        run: DRIVER=claude-sdk node evals/shared/runner.mjs evals/create-task/scenarios/03-tracker-live

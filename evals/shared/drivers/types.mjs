@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Driver contract for full-flow eval backends.
+ * Driver contract for skill eval backends.
  *
  * Drivers own *invocation* — how an agent is launched, how skills are
  * discovered, how Q&A is intercepted. Everything else (sandboxing, fixture

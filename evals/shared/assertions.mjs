@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Structural assertions for full-flow scenarios.
+ * Structural assertions for end-to-end eval scenarios.
  *
  * Never assert prose equality on LLM output. Instead, assert structure:
  *   - sections exist
