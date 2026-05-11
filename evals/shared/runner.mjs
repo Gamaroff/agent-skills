@@ -87,6 +87,12 @@ function runAssertions(assertions, ctx) {
       case "hasAtLeastNSourceCitations": results.push(A.hasAtLeastNSourceCitations(...args)); break;
       case "trackerPayloadMatches":      results.push(A.trackerPayloadMatches(...args)); break;
       case "answerQueueDrained":         results.push(A.answerQueueDrained(ctx.remainingAnswers)); break;
+      // develop-task pipeline assertions
+      case "branchExists":              results.push(A.branchExists(...args)); break;
+      case "pipelineStepsRan":          results.push(A.pipelineStepsRan(args[0], args[1])); break;
+      case "loopBoundedAt":             results.push(A.loopBoundedAt(args[0], args[1], args[2])); break;
+      case "prCreated":                 results.push(A.prCreated(args[0], typeof args[1] === "object" ? args[1] : {})); break;
+      case "noLockFilesLeft":           results.push(A.noLockFilesLeft(...args)); break;
       default: results.push({ ok: false, reason: `unknown assertion fn: ${a.fn}` });
     }
   }

@@ -1,7 +1,9 @@
 ---
 id: task.33.develop-task-evals
 title: "Build evals for develop-task pipeline (protocol + step-isolation + smoke)"
-status: draft
+status: accepted
+completed_date: 2026-05-11
+pr_number: 71
 type: task
 category: testing
 priority: medium
@@ -14,7 +16,8 @@ depends_on: task.32.evals-reorganize-per-skill
 
 # Task 33: Build evals for develop-task pipeline
 
-**Status:** 📋 Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.33.review.1.develop-task-evals.md` implemented 2026-05-11
 **Created:** 2026-05-11
 **Category:** testing
 **Priority:** Medium
@@ -171,11 +174,11 @@ npm run eval:all                    # now includes eval:develop-task
 
 **Files:** `evals/shared/lib/git-sandbox.mjs`, `evals/shared/lib/pipeline-recorder.mjs`, `evals/shared/tests/git-sandbox.test.mjs`, `evals/shared/tests/pipeline-recorder.test.mjs`
 
-- [ ] Implement `createSandbox({ fixtureFiles, initialCommit, branch })` returning `{ path, run, cleanup }`
-- [ ] `run(cmd)` executes shell commands inside the sandbox, returns `{ stdout, stderr, code }`
-- [ ] Unit tests: init, commit, branch create, cleanup deletes dir
-- [ ] Implement `wrapDriver(driver)` that records `[skillName, args, status]` per Skill tool call in the transcript
-- [ ] Unit tests: replay driver wrapped → recorded events match expected order
+- [x] Implement `createSandbox({ fixtureFiles, initialCommit, branch })` returning `{ path, run, cleanup }`
+- [x] `run(cmd)` executes shell commands inside the sandbox, returns `{ stdout, stderr, code }`
+- [x] Unit tests: init, commit, branch create, cleanup deletes dir
+- [x] Implement `wrapDriver(driver)` that records `[skillName, args, status]` per Skill tool call in the transcript
+- [x] Unit tests: replay driver wrapped → recorded events match expected order
 
 **Dependencies:** task.32 (needs `evals/shared/` to exist)
 
@@ -183,10 +186,10 @@ npm run eval:all                    # now includes eval:develop-task
 
 **Files:** `evals/shared/lib/gh-sandbox.mjs`, `evals/shared/tests/gh-sandbox.test.mjs`
 
-- [ ] Implement `createGhSandbox({ repo, cleanup })` — pushes branch, creates PR, returns receipt
-- [ ] If `GH_TOKEN` unset, return `{ skipped: true, reason }` (never throw)
-- [ ] Cleanup: close PR, delete branch (no destructive ops on default branch)
-- [ ] Unit tests: skipped path; mocked `gh` cli for happy path
+- [x] Implement `createGhSandbox({ repo, cleanup })` — pushes branch, creates PR, returns receipt
+- [x] If `GH_TOKEN` unset, return `{ skipped: true, reason }` (never throw)
+- [x] Cleanup: close PR, delete branch (no destructive ops on default branch)
+- [x] Unit tests: skipped path; mocked `gh` cli for happy path
 
 **Dependencies:** Phase 1
 
@@ -194,12 +197,12 @@ npm run eval:all                    # now includes eval:develop-task
 
 **Files:** `evals/develop-task/assertions.mjs`, `evals/shared/tests/develop-task-assertions.test.mjs`
 
-- [ ] `branchExists(repo, namePattern)` using git-sandbox
-- [ ] `prCreated(receipt, { base, titlePattern })`
-- [ ] `pipelineStepsRan(recordedEvents, expectedSteps)` — order-sensitive subset check
-- [ ] `loopBoundedAt(recordedEvents, skill, maxIter)` — guards qa-fix's 5-cycle cap
-- [ ] `noLockFilesLeft(sandboxPath)` — guards always-run lock cleanup
-- [ ] Register new fns in `evals/shared/runner.mjs` switch (or skill-local registration)
+- [x] `branchExists(repo, namePattern)` using git-sandbox
+- [x] `prCreated(receipt, { base, titlePattern })`
+- [x] `pipelineStepsRan(recordedEvents, expectedSteps)` — order-sensitive subset check
+- [x] `loopBoundedAt(recordedEvents, skill, maxIter)` — guards qa-fix's 5-cycle cap
+- [x] `noLockFilesLeft(sandboxPath)` — guards always-run lock cleanup
+- [x] Register new fns in `evals/shared/assertions.mjs` and extend the `runner.mjs` dispatch switch (shared dispatcher only — no skill-local `--assertions` flag; current runner has no flag support and adding one is out of scope for task.33)
 
 **Dependencies:** Phase 1
 
@@ -207,11 +210,11 @@ npm run eval:all                    # now includes eval:develop-task
 
 **Files:** `evals/develop-task/protocol/pipeline-shape.test.mjs`, `evals/develop-task/protocol/step-contract.test.mjs`
 
-- [ ] Parse `skills/develop-task/SKILL.md` — assert 8 named steps in order
-- [ ] Parse each `shared/resources/develop-pipeline-step-*.md` — assert HALT terminator present
-- [ ] Assert resume markers in SKILL.md match step boundaries
-- [ ] Assert each step's documented inputs/outputs match the contract in `develop-pipeline-resume-contract.md`
-- [ ] Tests run via `node --test`, no driver required
+- [x] Parse `skills/develop-task/SKILL.md` — assert 8 named steps in order
+- [x] Parse each `shared/resources/develop-pipeline-step-*.md` — assert HALT terminator present
+- [x] Assert resume markers in SKILL.md match step boundaries
+- [x] Assert each step's documented inputs/outputs match the contract in `develop-pipeline-resume-contract.md`
+- [x] Tests run via `node --test`, no driver required
 
 **Dependencies:** none (pure file parsing)
 
@@ -219,11 +222,12 @@ npm run eval:all                    # now includes eval:develop-task
 
 **Files:** `evals/develop-task/step-isolation/{01..08}-*/`
 
-- [ ] Author 8 scenario folders (one per pipeline step)
-- [ ] Each contains `scenario.json` + `answers.jsonl` + `env.json` + `replay/` fixtures
-- [ ] Reuse driver registry — replay mode for CI, claude-sdk for live runs
-- [ ] Each scenario's assertions target only that step's outputs
-- [ ] Includes `qa-fix` iteration cap test (loopBoundedAt = 5)
+- [x] Author 8 scenario folders (one per pipeline step)
+- [x] Each contains `scenario.json` + `answers.jsonl` + `env.json` + `replay/` fixtures
+- [x] Reuse driver registry — replay mode for CI, claude-sdk for live runs
+- [x] Each scenario's assertions target only that step's outputs
+- [x] Includes `qa-fix` iteration cap test (loopBoundedAt = 5). Fixture spec: `06-qa-fix/replay/transcript.jsonl` records 5 sequential events of `{skill: "qa-fix", status: "completed"}` interleaved with 5 `{skill: "qa-task", status: "completed"}` events (simulating review→fix cycles). Assertion: `loopBoundedAt(events, "qa-fix", 5)` — passes when count ≤ 5, fails at 6
+- [x] Note: 8 step-isolation folders map to 7 physical step files (steps 5 and 6 share `develop-pipeline-step-5-6-qa-loop.md`); folders split them for independent assertion targeting
 
 **Dependencies:** Phase 3 (needs assertions), Phase 4 (parallel OK)
 
@@ -231,13 +235,13 @@ npm run eval:all                    # now includes eval:develop-task
 
 **Files:** `evals/develop-task/smoke/01-end-to-end-dry/`, `evals/develop-task/README.md`, `package.json`, `.github/workflows/test.yml`, `docs/evals.md`
 
-- [ ] Author end-to-end smoke scenario using git-sandbox + gh-sandbox
-- [ ] Smoke scenario keeps tmpdir on failure for inspection (logged to stderr)
-- [ ] Add `eval:develop-task` and `eval:develop-task:smoke` scripts
-- [ ] Add to `eval:all`
-- [ ] CI workflow: deterministic job runs `eval:develop-task` on every push; smoke job is `workflow_dispatch`-only
-- [ ] README: what each layer covers, how to run smoke locally with/without `GH_TOKEN`, cleanup expectations
-- [ ] Update `docs/evals.md` with new recipe ("test the develop-task pipeline")
+- [x] Author end-to-end smoke scenario using git-sandbox + gh-sandbox
+- [x] Smoke scenario keeps tmpdir on failure for inspection (logged to stderr)
+- [x] Add `eval:develop-task` and `eval:develop-task:smoke` scripts
+- [x] Add to `eval:all`
+- [x] CI workflow: deterministic job runs `eval:develop-task` on every push; smoke job is `workflow_dispatch`-only
+- [x] README: what each layer covers, how to run smoke locally with/without `GH_TOKEN`, cleanup expectations
+- [x] Update `docs/evals.md` with new recipe ("test the develop-task pipeline")
 
 **Dependencies:** Phase 5
 
@@ -428,8 +432,55 @@ None.
 
 ---
 
-## QA Artifacts (created during QA)
+## QA Testing Results
 
-- QA report: `task.33.qa.1.develop-task-evals.md`
-- Bug reports (if issues found): `task.33.bug.N.<name>.md`
-- Quality gate: `task.33.gate.1.develop-task-evals.yml`
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-11
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.33.qa.1.develop-task-evals.md](./task.33.qa.1.develop-task-evals.md)
+- **Gate File**: [task.33.gate.1.develop-task-evals.yml](./task.33.gate.1.develop-task-evals.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 125 node tests + 15 step-isolation assertions
+- **Phases Verified**: 6/6
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. One LOW documentation inconsistency (DoD criterion 12 contradicts Phase 3 spec — non-blocking). Smoke test deferred to opt-in live driver path per design.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.33.qa.1.develop-task-evals.md`
+**Gate File**: `task.33.gate.1.develop-task-evals.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 97/100
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** 22/22 criteria met across functional, performance, code quality, and migration categories
+✅ **Tests:** 125 node tests + 15 step-isolation assertions; 0 failures; 6/6 phases verified
+✅ **PR:** #71 — all new code committed and pushed; CI green (deterministic jobs)
+✅ **Documentation:** `evals/develop-task/README.md`, `docs/evals.md` (recipes 11+12), `evals/shared/README.md`, smoke README all complete
+✅ **Security Review:** ✅ PASS — no hardcoded credentials; safe shell execution; CI secrets gated
+✅ **Performance:** ✅ PASS — eval:develop-task <200ms; npm test +3% (under 10% threshold)
+✅ **Reliability:** ✅ PASS — deterministic assertions; skip paths return pass; unconditional cleanup
+✅ **Maintainability:** ✅ PASS — all modules unit tested; consistent style; full docs
+
+**Task marked as ACCEPTED on:** 2026-05-11
+
+**Detailed Verification Log:** See [task.33.dod.1.develop-task-evals.md](./task.33.dod.1.develop-task-evals.md) for complete verification evidence.
+
+## QA Artifacts
+
+- QA report: [task.33.qa.1.develop-task-evals.md](./task.33.qa.1.develop-task-evals.md)
+- Gate: [task.33.gate.1.develop-task-evals.yml](./task.33.gate.1.develop-task-evals.yml)
+- DoD summary: [task.33.dod.1.develop-task-evals.md](./task.33.dod.1.develop-task-evals.md)

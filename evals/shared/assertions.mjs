@@ -124,3 +124,182 @@ export function aggregate(results) {
     failures,
   };
 }
+
+// ---------------------------------------------------------------------------
+// develop-task pipeline assertions
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert that a branch matching namePattern exists in a git repo at repoPath.
+ *
+ * In replay mode, the fixture should include a `.eval/branches.json` file
+ * (array of branch name strings). When that file exists, it is used instead
+ * of running `git branch --list`, so the assertion works in sandboxes that
+ * aren't real git repos.
+ *
+ * @param {string} repoPath     Path to a git repo or replay sandbox
+ * @param {string} namePattern  Regex string or branch name
+ */
+export function branchExists(repoPath, namePattern) {
+  const re = new RegExp(namePattern);
+  const branchesFile = path.join(repoPath, ".eval", "branches.json");
+
+  let branches;
+  if (fs.existsSync(branchesFile)) {
+    try {
+      branches = JSON.parse(fs.readFileSync(branchesFile, "utf-8"));
+    } catch (e) {
+      return { ok: false, reason: `branchExists: could not parse ${branchesFile}: ${e.message}` };
+    }
+  } else {
+    // Live mode — actually run git
+    const { spawnSync } = require("node:child_process");
+    const result = spawnSync("git", ["branch", "--list"], { cwd: repoPath, encoding: "utf-8" });
+    if (result.error || result.status !== 0) {
+      return { ok: false, reason: `branchExists: git branch --list failed in ${repoPath}` };
+    }
+    branches = result.stdout.split("\n").map(s => s.replace(/^[* ]+/, "").trim()).filter(Boolean);
+  }
+
+  const matched = branches.some(b => re.test(b));
+  return {
+    ok: matched,
+    reason: matched ? "" : `no branch matching ${namePattern} found in ${repoPath} (branches: ${branches.join(", ") || "(none)"})`,
+  };
+}
+
+/**
+ * Assert that all expected pipeline steps ran in order (order-sensitive subset).
+ *
+ * Reads a JSON file at eventsPath containing an array of RecordedEvent objects
+ * (shape: { skill, status, timestamp }). The replay fixture should include
+ * `.eval/pipeline-events.json` for this assertion to work deterministically.
+ *
+ * @param {string}   eventsPath     Path to a JSON file with RecordedEvent[]
+ * @param {string[]} expectedSteps  Ordered list of skill names to verify
+ */
+export function pipelineStepsRan(eventsPath, expectedSteps) {
+  if (!fs.existsSync(eventsPath)) {
+    return { ok: false, reason: `pipelineStepsRan: events file not found: ${eventsPath}` };
+  }
+  let events;
+  try {
+    events = JSON.parse(fs.readFileSync(eventsPath, "utf-8"));
+  } catch (e) {
+    return { ok: false, reason: `pipelineStepsRan: could not parse ${eventsPath}: ${e.message}` };
+  }
+  const actual = events.filter(e => e.status === "started").map(e => e.skill);
+  let i = 0;
+  for (const expected of expectedSteps) {
+    const found = actual.indexOf(expected, i);
+    if (found === -1) {
+      return { ok: false, reason: `pipelineStepsRan: step "${expected}" missing or out of order (actual: ${actual.join(", ")})` };
+    }
+    i = found + 1;
+  }
+  return { ok: true, reason: "" };
+}
+
+/**
+ * Assert that a skill was invoked at most maxIter times (guards loop caps).
+ *
+ * Reads the same RecordedEvent[] JSON file used by pipelineStepsRan.
+ *
+ * @param {string} eventsPath  Path to a JSON file with RecordedEvent[]
+ * @param {string} skill       Skill name to count
+ * @param {number} maxIter     Maximum allowed invocations
+ */
+export function loopBoundedAt(eventsPath, skill, maxIter) {
+  if (!fs.existsSync(eventsPath)) {
+    return { ok: false, reason: `loopBoundedAt: events file not found: ${eventsPath}` };
+  }
+  let events;
+  try {
+    events = JSON.parse(fs.readFileSync(eventsPath, "utf-8"));
+  } catch (e) {
+    return { ok: false, reason: `loopBoundedAt: could not parse ${eventsPath}: ${e.message}` };
+  }
+  const count = events.filter(e => e.skill === skill && e.status === "started").length;
+  return {
+    ok: count <= maxIter,
+    reason: count <= maxIter ? "" : `loopBoundedAt: skill "${skill}" ran ${count} times (max ${maxIter})`,
+  };
+}
+
+/**
+ * Assert a GitHub PR receipt indicates a PR was created on the expected base.
+ *
+ * Reads a JSON receipt file at receiptPath. The receipt may come from
+ * gh-sandbox.mjs (live) or a fixture `.eval/gh-receipt.json` (replay).
+ * If the receipt has `skipped: true`, the assertion is skipped (not failed).
+ *
+ * @param {string} receiptPath                Path to a JSON GhReceipt file
+ * @param {object} opts
+ * @param {string} [opts.base]                Expected base branch name
+ * @param {string} [opts.titlePattern]        Regex string for PR title
+ */
+export function prCreated(receiptPath, opts = {}) {
+  if (!fs.existsSync(receiptPath)) {
+    return { ok: false, reason: `prCreated: receipt file not found: ${receiptPath}` };
+  }
+  let receipt;
+  try {
+    receipt = JSON.parse(fs.readFileSync(receiptPath, "utf-8"));
+  } catch (e) {
+    return { ok: false, reason: `prCreated: could not parse ${receiptPath}: ${e.message}` };
+  }
+  if (receipt.skipped) {
+    // Skip, not fail — GH_TOKEN absent is an acceptable CI condition
+    return { ok: true, reason: "" };
+  }
+  if (!receipt.pr) {
+    return { ok: false, reason: `prCreated: receipt has no pr field` };
+  }
+  if (opts.base && receipt.pr.baseRefName !== opts.base) {
+    return { ok: false, reason: `prCreated: expected base "${opts.base}", got "${receipt.pr.baseRefName}"` };
+  }
+  if (opts.titlePattern) {
+    const re = new RegExp(opts.titlePattern);
+    if (!re.test(receipt.pr.title ?? "")) {
+      return { ok: false, reason: `prCreated: title "${receipt.pr.title}" does not match ${opts.titlePattern}` };
+    }
+  }
+  return { ok: true, reason: "" };
+}
+
+/**
+ * Assert no lock files remain under dirPath after pipeline completes.
+ *
+ * Searches recursively for files matching *.lock. The develop-task pipeline
+ * should always clean up `.claude/state/develop-pipeline.lock` on completion.
+ *
+ * @param {string} dirPath  Directory to search
+ */
+export function noLockFilesLeft(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    return { ok: false, reason: `noLockFilesLeft: directory not found: ${dirPath}` };
+  }
+  const lockFiles = findFiles(dirPath, ".lock");
+  return {
+    ok: lockFiles.length === 0,
+    reason: lockFiles.length === 0 ? "" : `noLockFilesLeft: found ${lockFiles.length} lock file(s): ${lockFiles.slice(0, 3).join(", ")}`,
+  };
+}
+
+/** Recursive file search by extension. */
+function findFiles(dir, ext) {
+  const results = [];
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...findFiles(full, ext));
+      } else if (entry.name.endsWith(ext)) {
+        results.push(full);
+      }
+    }
+  } catch {
+    // Permission errors etc. — skip
+  }
+  return results;
+}

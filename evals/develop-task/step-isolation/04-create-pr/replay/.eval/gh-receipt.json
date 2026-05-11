@@ -1,0 +1,9 @@
+{
+  "skipped": false,
+  "pr": {
+    "number": 101,
+    "url": "https://github.com/eval-owner/eval-repo/pull/101",
+    "baseRefName": "develop",
+    "title": "feat(task.42): example task implementation"
+  }
+}

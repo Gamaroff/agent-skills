@@ -1,0 +1,10 @@
+{
+  "name": "develop-task-step-08-commit-changes",
+  "skill": "develop-task",
+  "description": "Step 8: commit-changes finalises the pipeline and removes the lock file.",
+  "prompt": "Run step 8 (commit-changes) of the develop-task pipeline for task.42.example.",
+  "assertions": [
+    { "fn": "noLockFilesLeft", "args": ["$SANDBOX"] },
+    { "fn": "fileExists",      "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.implementation.1.example-initial-run.md"] }
+  ]
+}

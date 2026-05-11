@@ -1,0 +1,10 @@
+{
+  "name": "develop-task-step-07-finalise",
+  "skill": "develop-task",
+  "description": "Step 7: finalise produces a DoD summary and sets task status to accepted.",
+  "prompt": "Run step 7 (finalise) of the develop-task pipeline for task.42.example.",
+  "assertions": [
+    { "fn": "fileExists",   "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.dod.1.example.md"] },
+    { "fn": "fileMatches",  "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.example.md", "accepted"] }
+  ]
+}

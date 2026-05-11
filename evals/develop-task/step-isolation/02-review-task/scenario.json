@@ -1,0 +1,9 @@
+{
+  "name": "develop-task-step-02-review-task",
+  "skill": "develop-task",
+  "description": "Step 2: review-task skipped when task is ready-for-development and review report exists.",
+  "prompt": "Run step 2 (review-task) of the develop-task pipeline for task.42.example.",
+  "assertions": [
+    { "fn": "fileExists", "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.review.2026-05-11.md"] }
+  ]
+}
