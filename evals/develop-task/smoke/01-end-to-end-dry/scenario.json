@@ -1,0 +1,17 @@
+{
+  "name": "develop-task-smoke-end-to-end-dry",
+  "skill": "develop-task",
+  "description": "Full pipeline smoke test against a sandbox repo. Verifies all 8 steps ran in order, branch exists, lock cleaned up. GH PR creation is gated on GH_TOKEN.",
+  "prompt": "Run /develop-task on docs/development/tasks/task.42.example/task.42.example.md",
+  "requiresLiveDriver": true,
+  "assertions": [
+    { "fn": "pipelineStepsRan", "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        ["create-branch", "review-task", "develop", "create-pr", "qa-task", "finalise", "commit-changes"]
+      ]
+    },
+    { "fn": "branchExists",    "args": ["$SANDBOX", "^feature/task\\.42"] },
+    { "fn": "prCreated",       "args": ["$SANDBOX/.eval/gh-receipt.json", { "base": "develop" }] },
+    { "fn": "noLockFilesLeft", "args": ["$SANDBOX"] }
+  ]
+}

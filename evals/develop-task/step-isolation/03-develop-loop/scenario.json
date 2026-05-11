@@ -1,0 +1,10 @@
+{
+  "name": "develop-task-step-03-develop-loop",
+  "skill": "develop-task",
+  "description": "Step 3: develop loop completes, task status updated to ready-for-review.",
+  "prompt": "Run step 3 (develop) of the develop-task pipeline for task.42.example.",
+  "assertions": [
+    { "fn": "fileExists", "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.example.md"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.example.md", "ready-for-review|Ready for Review"] }
+  ]
+}

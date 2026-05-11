@@ -1,0 +1,5 @@
+{"matches": "base branch", "answer": "develop"}
+{"matches": "PR target", "answer": "develop"}
+{"matches": "alignment|implement|ready", "answer": "Yes, ready to implement"}
+{"matches": "PR title", "answer": "feat(task.42): example task implementation"}
+{"matches": "confirm|sprint review", "answer": "yes"}

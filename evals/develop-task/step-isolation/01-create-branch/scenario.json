@@ -1,0 +1,10 @@
+{
+  "name": "develop-task-step-01-create-branch",
+  "skill": "develop-task",
+  "description": "Step 1: create-branch invoked for task.42 produces the expected feature branch.",
+  "prompt": "Run step 1 (create-branch) of the develop-task pipeline for task.42.example.",
+  "assertions": [
+    { "fn": "branchExists", "args": ["$SANDBOX", "^feature/task\\.42"] },
+    { "fn": "fileExists",   "args": ["$SANDBOX/.claude/state/develop-pipeline.lock"] }
+  ]
+}

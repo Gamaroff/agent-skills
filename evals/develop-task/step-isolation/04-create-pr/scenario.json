@@ -1,0 +1,9 @@
+{
+  "name": "develop-task-step-04-create-pr",
+  "skill": "develop-task",
+  "description": "Step 4: create-pr produces a PR targeting the expected base branch.",
+  "prompt": "Run step 4 (create-pr) of the develop-task pipeline for task.42.example.",
+  "assertions": [
+    { "fn": "prCreated", "args": ["$SANDBOX/.eval/gh-receipt.json", { "base": "develop" }] }
+  ]
+}

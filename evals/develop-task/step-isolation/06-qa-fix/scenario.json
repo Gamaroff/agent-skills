@@ -1,0 +1,10 @@
+{
+  "name": "develop-task-step-06-qa-fix",
+  "skill": "develop-task",
+  "description": "Step 6: qa-fix loop is bounded at 5 iterations. Fixture records 5 qa-fix invocations — loopBoundedAt asserts count <= 5.",
+  "prompt": "Run step 6 (qa-fix) of the develop-task pipeline for task.42.example.",
+  "assertions": [
+    { "fn": "loopBoundedAt", "args": ["$SANDBOX/.eval/pipeline-events.json", "qa-fix", 5] },
+    { "fn": "fileExists",    "args": ["$SANDBOX/docs/development/tasks/task.42.example/task.42.gate.1.example.yml"] }
+  ]
+}
