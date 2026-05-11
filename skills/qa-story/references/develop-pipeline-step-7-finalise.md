@@ -87,7 +87,9 @@ After the DoD file is written, post its **full content** as a PR comment so revi
 ```bash
 DOD_FILE=$(ls {story-or-task-directory}/{story-or-task-prefix}.dod.*.md 2>/dev/null | sort | tail -1)
 DOD_BODY=$(cat "$DOD_FILE")
-gh pr comment {PR_NUMBER} --body "$(cat <<EOF
+# Wrap in tracker_call_with_retry for transient GitHub/API failures (3× exponential backoff).
+# Source the helper from references/resolve-platform.sh first.
+tracker_call_with_retry gh pr comment {PR_NUMBER} --body "$(cat <<EOF
 ## ✅ Definition of Done
 
 $DOD_BODY
@@ -111,22 +113,24 @@ Branch on `TRACKER`:
 
 If `TRACKER_ISSUE` is set, explicitly close the issue and move the project board to Done:
 
+All `gh issue comment`/`gh issue close` calls below MUST be wrapped in `tracker_call_with_retry` (3× exponential backoff — see `references/resolve-platform.sh`). Source the helper at the top of the step.
+
 #### develop-story
 ```bash
 # 1. Post completion comment
-gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: accepted. All DoD criteria verified."
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: accepted. All DoD criteria verified."
 
 # 2. Close the issue
-gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
+tracker_call_with_retry gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
 ```
 
 #### develop-task
 ```bash
 # 1. Post completion comment
-gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: accepted. All DoD criteria verified."
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: accepted. All DoD criteria verified."
 
 # 2. Close the issue
-gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
+tracker_call_with_retry gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
 ```
 
 #### Shared (both orchestrators)
@@ -134,10 +138,10 @@ gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted. PR: {PR_URL
 After closing, verify the issue is actually closed using the tracker state poller (see `references/tracker-state-poller-subagent.md`). Invoke via Explore subagent with `PR_NUMBER=` (empty) and `ISSUE_KEY={TRACKER_ISSUE}`:
 
 - `result.issue.state == "CLOSED"` → log "✅ GitHub Issue #{TRACKER_ISSUE} confirmed closed"
-- Any other state → log "⚠️ GitHub Issue #{TRACKER_ISSUE} still {state}" — retry `gh issue close` once; if still not CLOSED, post PR comment warning
+- Any other state → log "⚠️ GitHub Issue #{TRACKER_ISSUE} still {state}" — `tracker_call_with_retry` already retried 3× during close; if still not CLOSED, post PR comment warning
 - `result.errors | length > 0` → log each error in Issues Log; proceed (non-blocking)
 
-On any `gh issue close` failure: retry once. If still failing, log the error in the Decisions Log and Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
+On any `gh issue close` failure: `tracker_call_with_retry` retries 3× (1s, 2s, 4s) automatically. If all retries fail, log the error in the Decisions Log and Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
 
 Log in Decisions Log: "Post-close state check (poller): issue #{TRACKER_ISSUE} state = {state}. errors = {error_count}."
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."

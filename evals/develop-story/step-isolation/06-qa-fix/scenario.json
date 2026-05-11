@@ -4,7 +4,7 @@
   "description": "Step 6: qa-fix loop is bounded at MAX_ITER=5 when gate has CONCERNS.",
   "prompt": "Run step 6 (qa-fix loop) of the develop-story pipeline for story.5.1.example.",
   "assertions": [
-    { "fn": "loopBoundedAt", "args": ["$SANDBOX/.eval/pipeline-events.json", 5] },
+    { "fn": "loopBoundedAt", "args": ["$SANDBOX/.eval/pipeline-events.json", "qa-fix", 5] },
     { "fn": "fileExists",    "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.1.example.yml"] }
   ]
 }

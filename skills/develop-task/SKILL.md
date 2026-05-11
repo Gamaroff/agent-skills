@@ -117,6 +117,14 @@ This prevents context accumulation across the 8-step pipeline.
 
 **Never stop between steps.** This pipeline runs hands-free from Step 1 to Step 8. Never output a "done" or "complete" message and stop unless a step explicitly results in HALT or the pipeline has reached Step 8. Completing Step 4 (create-pr) is NOT a terminal state — Step 5 must follow immediately.
 
+**Step Transition Protocol (mandatory — prevents orchestrator stalls).** Every step ends with the same three actions, executed *in order, with no text output between them*:
+
+1. **Update Pipeline Progress row** for the just-completed step (`✅ Done`).
+2. **Bash tool call** advancing the lock to the next step (see lock-update snippet below). If the just-completed step was Step 8, the call instead *removes* the lock.
+3. **Emit the Step {N+1} banner** (or the Phase 2 Completion banner if N=8). Banner emission and the next sub-skill invocation must happen in the same assistant turn as actions 1–2 — do NOT pause for user acknowledgement, do NOT summarise progress to the user, do NOT print "Returning to pipeline orchestrator" or any equivalent. The lock-update Bash call is the binding signal that the next step has started; without it the pipeline is considered stalled.
+
+Failure mode to avoid: a sub-skill returns control with a "complete" message and the orchestrator emits a natural-language summary before invoking the next step's tool call. Under context pressure the model may then yield to the user. **The lock-update tool call is what guarantees forward motion** — emit it the moment the sub-skill returns, before any prose.
+
 **Step banners (required).** Before starting each step, output a visible banner:
 ```
 ═══ DEVELOP-TASK PIPELINE: STEP {N}/8 — {STEP-NAME} ═══

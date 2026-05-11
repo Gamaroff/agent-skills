@@ -656,10 +656,10 @@ Add a QA Results section to the task document:
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
 
-Use the PR metadata stored in the Prerequisites step. Run:
+Use the PR metadata stored in the Prerequisites step. Source the retry helper from `references/resolve-platform.sh` and wrap the comment in `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). Run:
 
 ```bash
-gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
+tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
 
 **Gate Decision**: {PASS/CONCERNS/FAIL}
 **Quality Score**: {score}/100
@@ -696,7 +696,7 @@ gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
 2. {Step 2}
 
 ---
-" || echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
+" || echo "⚠️ PR comment failed after 3 retries — non-blocking. Final canonical summary will be posted by /finalise."
 ```
 
 ### Step 13b: Comment on GitHub Issue (graceful — non-blocking)
@@ -705,9 +705,9 @@ Extract `github_issue` from the task document YAML frontmatter (read in Step 2).
 
 ```bash
 if [ -n "$GITHUB_ISSUE_QA" ]; then
-  gh issue comment "$GITHUB_ISSUE_QA" \
+  tracker_call_with_retry gh issue comment "$GITHUB_ISSUE_QA" \
     --body "QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}" \
-    || echo "⚠️  Issue comment failed — continuing"
+    || echo "⚠️  Issue comment failed after 3 retries — continuing"
 fi
 ```
 
@@ -741,8 +741,8 @@ If `github_issue` is absent from the frontmatter, skip silently. Failure does NO
 - [ ] Gate YAML file created and saved (co-located with task)
 - [ ] Task file `## QA Testing Results` section updated with gate status and artifact links
 - [ ] Task status updated per gate decision
-- [ ] PR comment posted via `gh pr comment "$PR_URL"` (Step 13 — BLOCKING): confirm exit code 0
-- [ ] GitHub Issue comment posted (Step 13b — graceful): skipped if `github_issue` absent from frontmatter
+- [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (Step 13 — BLOCKING): confirm exit code 0 after up to 3 attempts
+- [ ] GitHub Issue comment posted via `tracker_call_with_retry gh issue comment` (Step 13b — graceful): skipped if `github_issue` absent from frontmatter; non-blocking on persistent failure
 - [ ] User notified with gate decision, issues summary, and next steps (Step 14 — BLOCKING)
 
 ---

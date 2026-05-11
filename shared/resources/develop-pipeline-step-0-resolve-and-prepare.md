@@ -350,8 +350,8 @@ Add to the implementation report Pipeline Configuration table:
 ### GitHub path (when `TRACKER=github`):
 
 ```bash
-# 1. Post pipeline-start comment
-gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
+# 1. Post pipeline-start comment (wrapped in tracker_call_with_retry — 3× backoff)
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
 
 # 2. Move issue to "In Progress" on the Projects board (graceful — warn and continue on any failure)
 (
@@ -539,6 +539,20 @@ Options: "develop" (Recommended) / "feature/{current-branch}" / "Other"
 If the user selects "Other" for Q1 or Q2, follow up with a plain text request for the branch name. Store all answers. Do not ask again mid-pipeline.
 
 **No Q3** — qa-planning skip is silent (see paragraph above).
+
+**Required-question count check (mandatory — prevents silent prompt drops).** Before issuing the `AskUserQuestion` tool call, count the questions you are about to send and verify against this table:
+
+| Scenario | Required questions in the call | Count |
+|---|---|---|
+| `develop-story`, `EPIC_BRANCH_EXISTS=false` | Q1.1 (create epic branch) + Q1.2 (story branch base) + Q2 (PR target) | **3** |
+| `develop-story`, `EPIC_BRANCH_EXISTS=true` | Q1.2 (story branch base) + Q2 (PR target) | **2** |
+| `develop-task` | Q1 (branch base) + Q2 (PR target) | **2** |
+
+Resume cases skip any question whose answer is already recorded in the Decisions Log (typical resume: 0 questions).
+
+If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `references/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
+
+Decisions Log entry after the call must list every question that was asked and its answer, so reviewers can verify the count matches the table above.
 
 ---
 

@@ -1262,10 +1262,13 @@ After review:
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List
 6. **Post QA Summary to PR** — **CRITICAL / BLOCKING**: This step is mandatory. The review is NOT complete until the PR comment is confirmed posted. Do not skip, defer, or treat as optional.
 
-   Use the PR metadata stored in Prerequisites. Run:
+   Use the PR metadata stored in Prerequisites. Source the retry helper, then post the comment wrapped in `tracker_call_with_retry` (3× exponential backoff: 1s, 2s, 4s — see `references/resolve-platform.sh`). Transient GitHub API / Anthropic API errors are common on long QA runs; retry transparently before reporting failure:
 
      ```bash
-     gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
+     # shellcheck source=references/resolve-platform.sh
+     . "$(dirname "$0")/references/resolve-platform.sh"  # adjust path to wherever the bundled helper lives in this skill install
+
+     tracker_call_with_retry gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
 
      **Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
      **Quality Score**: [score]/100
@@ -1308,17 +1311,17 @@ After review:
      "
      ```
 
-   **Verify the comment was posted**: Confirm `gh pr comment` exited with code 0. If it fails, report the error to the user and retry or provide the comment body for manual posting. Do NOT proceed to step 6b until the comment is confirmed posted.
+   **Verify the comment was posted**: Confirm `tracker_call_with_retry` exited with code 0. The helper retries 3× on transient failure (GitHub 5xx, rate limit, Anthropic API blip). If all 3 attempts fail, report the error to the user and provide the comment body for manual posting. Do NOT proceed to step 6b until the comment is confirmed posted.
 
 6b. **Comment on GitHub Issue (graceful — non-blocking)**
 
-   Extract `github_issue` from the story/task document YAML frontmatter (read in Prerequisites). If present, post a summary comment to the linked Issue:
+   Extract `github_issue` from the story/task document YAML frontmatter (read in Prerequisites). If present, post a summary comment to the linked Issue (also wrapped in `tracker_call_with_retry`):
 
    ```bash
    if [ -n "$GITHUB_ISSUE_QA" ]; then
-     gh issue comment "$GITHUB_ISSUE_QA" \
+     tracker_call_with_retry gh issue comment "$GITHUB_ISSUE_QA" \
        --body "QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}" \
-       || echo "⚠️  Issue comment failed — continuing"
+       || echo "⚠️  Issue comment failed after 3 retries — continuing"
    fi
    ```
 
@@ -1337,8 +1340,8 @@ After review:
 - [ ] Story/task status updated (`Ready for Done` / `Reopened` / etc.) per gate decision
 - [ ] Bug report files created for all HIGH and MEDIUM severity issues (if any)
 - [ ] Story Bug Reports section updated with current bug statuses (if any)
-- [ ] PR comment posted via `gh pr comment "$PR_URL"` (step 6 — BLOCKING): confirm exit code 0
-- [ ] GitHub Issue comment posted (step 6b — graceful): skipped if `github_issue` absent from frontmatter
+- [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (step 6 — BLOCKING): confirm exit code 0 after up to 3 attempts
+- [ ] GitHub Issue comment posted via `tracker_call_with_retry gh issue comment` (step 6b — graceful): skipped if `github_issue` absent from frontmatter; non-blocking on persistent failure
 - [ ] Next steps communicated to user (step 7 — BLOCKING): gate decision + issues + next steps output
 
 **File Creation Locations (Updated 2025-12-09):**

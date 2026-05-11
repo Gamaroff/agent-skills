@@ -59,3 +59,29 @@ rm -f .claude/state/test-output-*.log
 # the lock available for resume.
 rm -f .claude/state/develop-pipeline.lock
 ```
+
+---
+
+## Step 8 Completion Checklist (BLOCKING — verify before emitting the Phase 2 Completion banner)
+
+Run these post-condition checks. **If any fails, do NOT emit "Story/Task Development Complete" — fix the gap and re-check.**
+
+```bash
+# 1. Lock file removed
+[ ! -f .claude/state/develop-pipeline.lock ] || { echo "❌ Step 8 incomplete: lock file still present"; exit 1; }
+
+# 2. Test-output logs cleaned
+ls .claude/state/test-output-*.log 2>/dev/null | grep -q . && { echo "❌ Step 8 incomplete: test-output logs remain"; exit 1; } || true
+
+# 3. Implementation report finalised — Final Status must be 'Completed' or 'Accepted', Finished must NOT be '—'
+REPORT="${IMPLEMENTATION_REPORT:?must be set from lock or context}"
+grep -qE "^\*\*Final Status:\*\* (Completed|Accepted)" "$REPORT" || { echo "❌ Step 8 incomplete: Final Status not set to Completed/Accepted in $REPORT"; exit 1; }
+grep -qE "^\*\*Finished:\*\* [0-9]" "$REPORT" || { echo "❌ Step 8 incomplete: Finished timestamp missing in $REPORT"; exit 1; }
+
+# 4. Pipeline Progress table has no ⏳ Pending rows
+grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progress still has ⏳ Pending rows"; exit 1; } || true
+
+echo "✅ Step 8 post-conditions verified"
+```
+
+These checks address regressions #3 and #4 from the live-github-test (impl report stuck at "In Progress / Finished: —", lock file not removed). Treat the bash assertions as binding — emit the Phase 2 Completion banner only after all four pass.

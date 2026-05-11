@@ -696,7 +696,8 @@ COMMENT_BODY="## 🛠️ QA Fixes Applied
 
 ```bash
 if [ "$PLATFORM" = "github" ]; then
-  gh pr comment "$PR_URL" --body "$COMMENT_BODY"
+  # Wrapped in tracker_call_with_retry (3× exponential backoff). Source the helper from references/resolve-platform.sh first.
+  tracker_call_with_retry gh pr comment "$PR_URL" --body "$COMMENT_BODY"
   COMMENT_RC=$?
 elif [ "$PLATFORM" = "bitbucket" ]; then
   BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$COMMENT_BODY" '{content: {raw: $raw}}')
@@ -709,11 +710,11 @@ elif [ "$PLATFORM" = "bitbucket" ]; then
 fi
 
 if [ $COMMENT_RC -ne 0 ]; then
-  echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
+  echo "⚠️ PR comment failed after retries — non-blocking. Final canonical summary will be posted by /finalise."
 fi
 ```
 
-**Non-blocking**: If the platform-appropriate call fails (`COMMENT_RC != 0`), log the warning and continue. Do not halt or retry. The implementation report (in git) is the durable audit trail; this PR comment is convenience only.
+**Non-blocking**: GitHub path retries 3× automatically via `tracker_call_with_retry`. If all attempts fail (`COMMENT_RC != 0`), log the warning and continue. Bitbucket path is single-shot for now (no equivalent helper); a failure logs and continues. The implementation report (in git) is the durable audit trail; this PR comment is convenience only.
 
 **Jira tracker comment (optional — after PR comment confirmed):**
 
@@ -1102,7 +1103,7 @@ This executes full QA process and updates original QA artifacts.
 
 - **develop**: Main development workflow
 - **execute-checklist**: Run Definition of Done validation
-- **validate-story**: Pre-implementation story validation
+- **review-story --validate**: Pre-implementation story validation (automated GO/NO-GO, non-interactive)
 - **qa-create-task**: Full QA review process for technical tasks
 
 ## Resources

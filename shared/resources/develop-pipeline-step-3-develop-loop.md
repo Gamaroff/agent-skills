@@ -153,9 +153,9 @@ Main reads only the triage summary (counts + ≤10 failure bullets + `next_file`
 
 ### After loop exits (both orchestrators)
 
-Update Pipeline Progress: ✅ develop
+Update Pipeline Progress: ✅ develop.
 
-**Do not pause, do not summarise to the user, do not wait.** Proceed directly to Step 4.
+**Apply the Step Transition Protocol from the orchestrator SKILL.md immediately.** Concretely, your next assistant turn after `/develop` returns MUST contain — in this order, with no prose between — (1) the Pipeline Progress ✅ update, (2) the Bash lock-update advancing `current_step` to 4, (3) the Step 4 banner, (4) the `/create-pr` invocation. Do NOT print "Returning to pipeline orchestrator", "Development complete", or any summary message before issuing the lock-update Bash tool call. The lock advancement is what proves Step 4 has started; if the model emits a summary instead, the pipeline will stall under context pressure (observed regression in live-github-test runs).
 
 ---
 

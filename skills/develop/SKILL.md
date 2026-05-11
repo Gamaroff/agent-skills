@@ -665,7 +665,8 @@ Three-strikes escalation (applied to the triage summary, not the raw log):
    - **Invoked by `develop-story` orchestrator**: **SKIP `/finalise`** — the pipeline's Step 7 runs `/finalise` after QA review and after PR creation, when all artifacts are available. Calling it here (before a PR exists) would produce premature DoD files and a failed or misplaced PR comment. Go directly to step 7.
    - **Invoked directly by user (not from `develop-story`)**: **CRITICAL / BLOCKING** — Invoke the `/finalise` skill. It performs the full DoD checklist, generates the Sprint Review summary, and posts a PR comment. If `/finalise` finds gaps, address them before proceeding.
 7. Set story status to 'Ready for Review'
-8. HALT
+8. **Return to caller silently** — when invoked from `develop-story` / `develop-task`, do NOT emit "Pipeline bypass: skipping /finalise", "Development complete", "Returning to pipeline orchestrator", or any similar terminal-sounding message. Return control with a minimal status only (e.g. `develop done — status: Ready for Review`). The orchestrator's Step Transition Protocol takes over immediately; verbose closing text increases the chance the orchestrator stalls under context pressure (observed regression in live-github-test).
+9. HALT
 ```
 
 **Story Completion Checklist — tick off each before halting:**
@@ -756,7 +757,8 @@ After status validation passes:
    - **Invoked by `develop-task` orchestrator**: **SKIP `/finalise`** — the pipeline's Step 7 runs `/finalise` after QA review and after PR creation, when all artifacts are available. Go directly to step 9.
    - **Invoked directly by user (not from `develop-task`)**: **CRITICAL / BLOCKING** — Invoke the `/finalise` skill. It performs the full DoD checklist and generates review artifacts. If `/finalise` finds gaps, address them before proceeding.
 9. Set task status to 'Ready for Review'
-10. HALT
+10. **Return to caller silently** — when invoked from `develop-task` / `develop-story`, do NOT emit "Pipeline bypass: skipping /finalise", "Development complete", "Returning to pipeline orchestrator", or any similar terminal-sounding message. Return control with a minimal status only (e.g. `develop done — status: Ready for Review`). The orchestrator's Step Transition Protocol takes over immediately; verbose closing text increases the chance the orchestrator stalls under context pressure.
+11. HALT
 ```
 
 **Task Completion Checklist — tick off each before halting:**
