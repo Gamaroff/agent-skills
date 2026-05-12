@@ -525,73 +525,17 @@ jira_url: https://yourorg.atlassian.net/browse/PROJ-15
 
 #### GitHub Path (when `TRACKER=github`)
 
-Read `project.yml` (repo root) to get `github.project_board_name` for the `--project` flag:
+Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={path to the task file just created}`. The sub-routine handles:
 
-```bash
-# Build clickable document link
-REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-DOC_URL="https://github.com/$REPO/blob/develop/{task-file-relative-path}"
+- milestone resolution (frontmatter `milestone:` → epic-registry lookup via the task's `epic:` field → `"Technical Tasks (standalone)"` default), auto-creating the milestone if needed
+- creating the issue with title `[Task {id}] {title}`, body assembled from Overview / Key Deliverables / Success Criteria / Metadata / Document sections, and labels `task` + `priority:{priority}`
+- adding the issue to the GitHub Project board
+- mirroring the priority label onto the board's Priority single-select field
+- writing `github_issue: {N}` into the task's frontmatter and inserting the body cross-reference link
 
-gh issue create \
-  --title "[Task {id}] {title}" \
-  --project "{project_board_name}" \
-  --body "## Overview
+On return, `TASK_ISSUE_NUM` is set (integer) or empty (on failure).
 
-{First paragraph of the task's Overview section — 2-4 sentences describing what the task does and why}
-
-## Key Deliverables
-
-{Bulleted list from the task's Key Deliverables or Scope section}
-
-## Success Criteria (summary)
-
-{2-5 most important success criteria, as a checkbox list}
-
-## Metadata
-
-| Field | Value |
-|-------|-------|
-| Priority | {priority} |
-| Effort | {effort_estimate} |
-| Category | {category} |
-| Depends on | {depends_on or —} |
-
-## Document
-
-📄 [Task Document]($DOC_URL)
-📁 \`{task-file-relative-path}\`" \
-  --label "task" \
-  --label "priority:{priority}" \
-  --milestone "{milestone_title}"
-```
-
-**Milestone selection** — determine `{milestone_title}` in this order:
-
-1. If the task document has a `milestone:` frontmatter field, use that value verbatim
-2. If the task has an `epic:` frontmatter field (e.g. `epic: 23`), look up the milestone title from the epic registry (`docs/epic-registry.md`) — format: `"Epic {N} — {Epic Title}"`
-3. Otherwise default to `"Technical Tasks (standalone)"`
-
-If the chosen milestone doesn't exist yet, auto-create it first:
-
-```bash
-gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="open"
-```
-
-**On success**:
-1. Parse the issue URL from the `gh` output (e.g. `https://github.com/org/repo/issues/42`)
-2. Add the issue to the GitHub Project board:
-   ```bash
-   gh project item-add {project_board_number} --owner {owner} --url {issue_url}
-   ```
-
-2b. Set Priority field on the board item (mirrors the label already applied). Helper is idempotent and never halts the caller — pass the lowercase priority from frontmatter, or omit it to derive from the issue's `priority:*` label:
-   ```bash
-   bash references/set-github-project-priority.sh "{github_issue_number}" "{priority}" || true
-   ```
-
-3. Add `github_issue: {N}` to the task's YAML frontmatter.
-
-**On failure**: Set `github_issue: null`, log warning, continue. Never halt.
+**On failure**: the sub-routine logs a warning and returns empty. `create-task` leaves `github_issue:` unwritten and continues. Never halt.
 
 ### 5. Post-Generation Steps — STOP HERE
 
