@@ -9,8 +9,8 @@ epic_file: ../../epic.1.quickstart-and-decision-tree-entry-point.md
 prd_source: docs/prd/onboarding/prd.onboarding.md
 jira_key: null
 jira_url: null
-github_issue: null
-github_url: null
+github_issue: 82
+github_url: https://github.com/Gamaroff/agent-skills/issues/82
 created: 2026-05-11
 updated: 2026-05-12
 completed_date: 2026-05-12

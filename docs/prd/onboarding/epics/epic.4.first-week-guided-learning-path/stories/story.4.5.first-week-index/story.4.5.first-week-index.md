@@ -9,8 +9,8 @@ epic_file: ../../epic.4.first-week-guided-learning-path.md
 prd_source: docs/prd/onboarding/prd.onboarding.md
 jira_key: null
 jira_url: null
-github_issue: null
-github_url: null
+github_issue: 86
+github_url: https://github.com/Gamaroff/agent-skills/issues/86
 created: 2026-05-11
 updated: 2026-05-11
 ---
