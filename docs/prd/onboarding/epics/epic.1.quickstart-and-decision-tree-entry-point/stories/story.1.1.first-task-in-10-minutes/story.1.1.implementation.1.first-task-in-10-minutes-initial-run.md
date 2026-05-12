@@ -39,7 +39,7 @@ Initial run — author `docs/concepts/quickstart-task.md` walkthrough guide and 
 | 2. review-story             | ✅ Done | `story.1.1.validate.2026-05-12.md` exists | Verdict: GO (8.5/10); 0 critical, 2 important; status → ready-for-development | — |
 | 3. develop                  | ✅ Done | `docs/concepts/quickstart-task.md` exists (141 lines); story status = `ready-for-review` | All 8 tasks complete; dynamic walkthrough deferred to QA per pipeline nesting constraint | — |
 | 4. create-pr                | ✅ Done | PR #77 — https://github.com/Gamaroff/agent-skills/pull/77 | Targets epic branch; no github_issue linked; 44 files, 5525 insertions | — |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.1.1.qa.1.*.md`; `story.1.1.gate.1.*.yml`; PR comment posted | | — |
+| 5–6. qa-story / qa-fix loop | ⚠️ Needs Attention | `story.1.1.qa.1.quickstart-walkthrough.md` ✅; `story.1.1.gate.1.quickstart-walkthrough.yml` ✅ (CONCERNS 90/100); PR comments posted ✅ | MEDIUM: AC3 dynamic walkthrough requires human verification on clean macOS clone; LOW: AC1 path fixed | — |
 | 7. finalise                 | ⏳ Pending | `story.1.1.dod.1.*.md`; story `status: accepted` | | — |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
 
