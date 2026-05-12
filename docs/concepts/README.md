@@ -9,6 +9,7 @@ Foundational explanations of what skills are, how they work, and how to get star
 - [Getting started](./getting-started.md) — install → first command
 - [Overview](./overview.md) — what skills are, progressive disclosure, key principles
 - [Architecture](./architecture.md) — system view, dependency map, design principles
+- [Which path?](./which-path.md) — decision tree: task vs story vs hotfix vs parallel
 
 ## See also
 
