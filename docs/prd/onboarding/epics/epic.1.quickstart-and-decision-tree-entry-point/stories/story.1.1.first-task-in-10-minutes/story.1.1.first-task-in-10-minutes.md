@@ -27,7 +27,7 @@ updated: 2026-05-11
 
 ## Acceptance Criteria
 
-1. New file `docs/concepts/quickstart-task.md` exists with valid YAML frontmatter (`name`, `description`, `type`, `status`, `version`, `created`) and follows the lifecycle in `docs/standards/document-status-lifecycle.md` (`draft → planned → ready-for-development → in-progress → ready-for-review → accepted`). Body `**Status:**` mirrors frontmatter `status:` in Title Case.
+1. New file `docs/concepts/quickstart-task.md` exists with valid YAML frontmatter (`name`, `description`, `type`, `status`, `version`, `created`) and follows the lifecycle in `docs/standards/status-lifecycle.md` (`draft → planned → ready-for-development → in-progress → ready-for-review → accepted`). Body `**Status:**` mirrors frontmatter `status:` in Title Case.
 2. Walkthrough covers, in this order: (a) install verification, (b) `/create-task` invocation with a tiny example task, (c) `/develop-task` invocation, (d) reviewing the produced artifacts, (e) cleanup of the practice task to avoid registry pollution.
 3. Walking the doc **verbatim** on a clean clone produces all six expected artifacts — task spec, plan file, implementation report, QA report, gate file, DoD checklist — in ≤ 10 minutes wall time. Verified by walking on macOS (zsh) at minimum; Linux (bash) target per parent NFR3.
 4. Doc body is ≤ 400 lines (parent NFR4).
@@ -195,6 +195,7 @@ Documentation-only — no UI navigation. "Navigation" here means: open the doc, 
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
 | 2026-05-12 | 1.1     | Validation passed (8.5/10, GO) — status → ready-for-development | review-story |
 | 2026-05-12 | 1.2     | Implementation complete — docs/concepts/quickstart-task.md created; status → ready-for-review | dev-agent |
+| 2026-05-12 | 1.3     | qa-fix: corrected AC1 path (document-status-lifecycle.md → status-lifecycle.md); MEDIUM concern (AC3 dynamic walkthrough) requires human verification | qa-fix |
 
 ## Dev Agent Record
 
@@ -266,9 +267,30 @@ Follow Dev Notes → Manual Testing Steps verbatim. Critical:
 - [ ] No console.log statements or debugging code left in (N/A — docs only)
 - [ ] CI/CD pipeline passing (markdown link check workflow per commit `f6810df`)
 
-## QA Report
+## QA Testing Results
 
-_(Link added when QA completes.)_
+**QA Status**: ⚠️ CONCERNS
+**QA Engineer**: QA Engineer (develop-story pipeline)
+**Testing Date**: 2026-05-12
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [story.1.1.qa.1.quickstart-walkthrough.md](./story.1.1.qa.1.quickstart-walkthrough.md)
+- **Gate File**: [story.1.1.gate.1.quickstart-walkthrough.yml](./story.1.1.gate.1.quickstart-walkthrough.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 3/4 (AC3 partial — dynamic walkthrough deferred)
+- **Tests Executed**: Static validation (docs-only story; no automated test suite)
+- **Critical Issues**: 0
+- **Medium Issues**: 1 (AC3 unverified dynamic walkthrough)
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+AC3 dynamic walkthrough on clean macOS clone was not executed — pipeline nesting prevents `/develop-task` from running inside a live `/develop-story` pipeline. All other ACs pass static verification. The doc is complete and structurally sound; gap is verification-only. Human must run clean-clone walkthrough before story can be marked Accepted.
 
 ## Bug Reports
 

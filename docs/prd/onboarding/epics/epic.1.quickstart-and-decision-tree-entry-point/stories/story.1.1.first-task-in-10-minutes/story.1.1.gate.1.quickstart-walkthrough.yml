@@ -1,0 +1,53 @@
+schema: 1
+story: '1.1'
+story_title: 'First task in 10 minutes — quickstart'
+gate: CONCERNS
+status_reason: 'AC1, AC2, AC4 statically verified PASS. AC3 (dynamic walkthrough) structurally sound but empirically unverified — pipeline nesting prevented execution. One MEDIUM issue blocks full acceptance.'
+reviewer: 'QA Engineer (develop-story pipeline)'
+updated: '2026-05-12T00:00:00Z'
+
+top_issues:
+  - issue: 'AC3 dynamic walkthrough not executed on clean macOS clone'
+    severity: medium
+    suggested_owner: dev
+  - issue: 'AC1 in story file references wrong path (document-status-lifecycle.md vs status-lifecycle.md)'
+    severity: low
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+expires: '2026-05-26T00:00:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 4]
+    ac_gaps: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No secrets, no auth flows, no external service dependencies. Practice task is self-contained.'
+  performance:
+    status: CONCERNS
+    notes: 'AC3 ≤10-min wall-time constraint not empirically verified. Structural analysis indicates feasibility.'
+  reliability:
+    status: PASS
+    notes: 'All 5 cross-references resolve. Registry pollution mitigated. Troubleshooting table covers common failures.'
+  maintainability:
+    status: PASS
+    notes: '141 lines (≤400 cap). Versioned frontmatter, Change Log, links to authoritative standards docs.'
+
+recommendations:
+  immediate:
+    - action: 'Run dynamic walkthrough on clean macOS clone — confirm 6 artifacts in ≤10 min, then mark story accepted'
+      refs: ['docs/concepts/quickstart-task.md']
+  future:
+    - action: 'Update AC1 in story file to reference docs/standards/status-lifecycle.md (not document-status-lifecycle.md)'
+      refs: ['docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md']
+    - action: 'Linux walkthrough deferred to Story 1.5 per Dev Notes'
+      refs: []
