@@ -680,51 +680,14 @@ devDebugLog: .ai/debug-log.md
           ```
           If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_ISSUE_NUM=""`.
        2. If the file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set or empty. Set `EPIC_TRACKER_KIND="github"`.
-       3. Create the story issue:
-       ```bash
-       REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-       DOC_URL="https://github.com/$REPO/blob/develop/{story-file-relative-path}"
+       3. Invoke the `ensure-story-github-issue` sub-routine with `STORY_FILE_PATH={resolved story file path}` and `EPIC_ISSUE_NUM={value returned by ensure-epic-github-issue}`. The sub-routine handles:
+          - creating the issue (with title `[Story {epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {epic} — {epic_title}`)
+          - adding it to the GitHub Project board
+          - mirroring the priority label onto the board's Priority single-select field
+          - linking the new issue as a sub-issue of the parent epic issue (only if `EPIC_ISSUE_NUM` is non-empty)
+          - writing `github_issue: {N}` into the story frontmatter and adding/repairing the Story Information table row.
 
-       gh issue create \
-         --title "[Story {epic}.{story}] {title}" \
-         --project "Your GitHub Project Board" \
-         --body "## Overview
-
-       {First 2-4 sentences from the story's purpose/description}
-
-       ## Acceptance Criteria
-
-       {Acceptance criteria formatted as checkbox list}
-
-       ## Document
-
-       📄 [Story Document]($DOC_URL)
-       📁 \`{story-file-relative-path}\`" \
-         --label "story" \
-         --label "priority:{priority}" \
-         --milestone "Epic {epic} — {epic_title}"
-       ```
-     - Write `github_issue: {N}` into frontmatter
-     - Add row to Story Information table: `| GitHub Issue | [#{N}](url) |`
-     - Set the board Priority single-select field (label → field mirror; helper never halts):
-       ```bash
-       bash references/set-github-project-priority.sh "{N}" "{priority}" || true
-       ```
-       4. After writing `github_issue: {N}` to frontmatter, link the story as a sub-issue of the epic (GitHub-only — Jira parent linkage is `sync-jira-story`'s job):
-          If `EPIC_TRACKER_KIND=github` and `EPIC_ISSUE_NUM` is non-empty:
-          ```bash
-          OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
-          REPO_NAME=$(gh repo view --json name -q '.name')
-          STORY_NUM={N from the newly created issue}
-
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${OWNER}/${REPO_NAME}/issues/${EPIC_ISSUE_NUM}/sub_issues \
-            -f sub_issue_id=${STORY_NUM}
-          ```
-          On success: log `✅ Story #${STORY_NUM} linked as sub-issue of Epic #${EPIC_ISSUE_NUM}.`
-          On failure: log `⚠️ Sub-issue linking failed — story issue created but not hierarchically linked.` Do NOT halt.
+          On return, `STORY_ISSUE_NUM` is set (integer) or empty (on failure). Failure is non-blocking — review continues with a flagged Important gap.
    - If `github_issue:` has a numeric value:
      - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
        - If the issue doesn't exist (command errors), flag as **Critical**
