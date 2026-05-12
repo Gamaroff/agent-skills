@@ -2,7 +2,9 @@
 id: story.2.2.capture-epics-as-worked-examples
 title: "Story 2.2: Capture all 4 epic docs as worked examples"
 type: story
-status: ready-for-review
+status: accepted
+completed_date: 2026-05-12
+pr_number: 102
 priority: high
 epic: 2
 epic_file: ../../epic.2.worked-prd-epic-story-examples.md
@@ -17,7 +19,7 @@ updated: 2026-05-11
 
 # Story 2.2: Capture all 4 epic docs as worked examples
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ Critical/Important recommendations implemented 2026-05-12 — see [`story.2.2.review.1.capture-epics-as-worked-examples.md`](story.2.2.review.1.capture-epics-as-worked-examples.md)
 
 ## Story Statement
@@ -106,6 +108,7 @@ No conflicts.
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
 | 2026-05-12 | 1.1     | Review passed (8/10); AC2 + Dev Notes updated; status → Ready for Development | review-story  |
 | 2026-05-12 | 1.2     | Implementation complete; 5 files created; status → Ready for Review | develop-story |
+| 2026-05-12 | 1.3     | QA PASS (100/100); DoD verified; status → Accepted; PR #102 | finalise |
 
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 
@@ -158,3 +161,51 @@ Per Dev Notes: a helper script to automate capture for future PRDs is identified
 - [x] All 4 provenance frontmatters present
 - [x] All 4 equivalence diffs pass
 - [x] README index lists all 4
+
+## QA Testing Results
+
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-12
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [story.2.2.qa.1.capture-epics-as-worked-examples.md](story.2.2.qa.1.capture-epics-as-worked-examples.md)
+- **Gate File**: [story.2.2.gate.1.capture-epics-as-worked-examples.yml](story.2.2.gate.1.capture-epics-as-worked-examples.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 3/3
+- **Tests Executed**: 4 equivalence diffs + 5 static-validation checks
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. All 3 ACs verified via direct file inspection; all 4 captured epics match source content modulo provenance fields.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+- **QA Report**: [`story.2.2.qa.1.capture-epics-as-worked-examples.md`](story.2.2.qa.1.capture-epics-as-worked-examples.md)
+- **Gate File**: [`story.2.2.gate.1.capture-epics-as-worked-examples.yml`](story.2.2.gate.1.capture-epics-as-worked-examples.yml)
+- **Gate Status**: ✅ PASS
+- **Quality Score**: 100/100
+
+All applicable Definition of Done criteria verified:
+
+- ✅ **Acceptance Criteria:** 3/3 met (AC1: 4 epics copied; AC2: README index complete; AC3: provenance schema on all 4)
+- ✅ **Tests:** 4/4 equivalence diffs PASS + 5/5 static validation checks PASS
+- ✅ **PR Review:** PR #102 OPEN, targeting epic branch
+- ✅ **Documentation:** Dev Agent Record complete; README.md index drafted
+- ⚠️ **Security Review:** N/A — docs-only story
+- ⚠️ **Compliance Review:** N/A — docs-only worked examples
+
+**Detailed Verification Log:** See [`story.2.2.dod.1.capture-epics-as-worked-examples.md`](story.2.2.dod.1.capture-epics-as-worked-examples.md) for complete verification evidence.
+
+**Story marked as ACCEPTED on:** 2026-05-12
