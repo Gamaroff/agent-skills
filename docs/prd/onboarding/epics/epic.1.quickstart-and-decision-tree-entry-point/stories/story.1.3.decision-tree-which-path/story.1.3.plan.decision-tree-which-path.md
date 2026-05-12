@@ -25,7 +25,7 @@ Q2: Is it broken in production right now?
 └── no  → Q3
 
 Q3: Is this part of a coordinated multi-stream effort?
-├── yes → /parallel-stories
+├── yes → /create-parallel-stories
 └── no  → /create-story  ← default for ambiguous user-facing work
 ```
 
@@ -55,15 +55,15 @@ flowchart TD
     Start[I want to do work] --> Q1{User-facing?}
     Q1 -->|No| Task["/create-task"]
     Q1 -->|Yes| Q2{Broken in prod?}
-    Q2 -->|Yes| Hotfix["/hotfix"]
+    Q2 -->|Yes| Hotfix["/create-branch --hotfix"]
     Q2 -->|No| Q3{Coordinated multi-stream?}
-    Q3 -->|Yes| Parallel["/parallel-stories"]
+    Q3 -->|Yes| Parallel["/create-parallel-stories"]
     Q3 -->|No| Story["/create-story"]
 
     Task --> TaskLinks["📖 task-development.md<br/>🚀 quickstart-task.md"]
     Story --> StoryLinks["📖 story-development.md<br/>🚀 quickstart-story.md"]
     Hotfix --> HotfixLinks["📖 hotfix.md"]
-    Parallel --> ParallelLinks["📖 parallel-stories.md"]
+    Parallel --> ParallelLinks["📖 create-parallel-stories.md"]
 ```
 
 ### Task 4 — Prose fallback
@@ -82,7 +82,7 @@ If Mermaid does not render in your viewer, walk this question chain:
    - No → continue to question 3.
 
 3. **Is this part of a coordinated multi-stream effort** (e.g., several developers shipping pieces in parallel)?
-   - Yes → **/parallel-stories** (see [parallel-stories.md](../runbooks/parallel-stories.md))
+   - Yes → **/create-parallel-stories** (see [create-parallel-stories.md](../runbooks/create-parallel-stories.md))
    - No → **/create-story** (see [story-development.md](../runbooks/story-development.md), [quickstart-story.md](./quickstart-story.md))
 ```
 

@@ -86,7 +86,7 @@ so that I land in the right runbook without trial-and-error.
 **Acceptance Criteria:**
 
 1. New file `docs/concepts/which-path.md` exists.
-2. Decision tree covers four leaves: task (`/create-task`), story (`/create-story`), hotfix (`/hotfix`), parallel (`/parallel-stories`).
+2. Decision tree covers four leaves: task (`/create-task`), story (`/create-story`), hotfix (`/create-branch --hotfix`), parallel (`/create-parallel-stories`).
 3. Each leaf links to the matching runbook AND the matching quickstart (where one exists).
 4. Format: Mermaid flowchart + prose fallback for accessibility.
 5. Doc ≤ 250 lines.

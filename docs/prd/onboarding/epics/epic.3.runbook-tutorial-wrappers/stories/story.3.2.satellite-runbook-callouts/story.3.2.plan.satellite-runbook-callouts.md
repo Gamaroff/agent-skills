@@ -41,7 +41,7 @@ Four surgical inserts. Common template, runbook-specific "use this if / use that
 > - You're not sure → [decision tree](../concepts/which-path.md)
 ```
 
-### parallel-stories.md
+### create-parallel-stories.md
 
 ```markdown
 > ### Is this the right runbook?
@@ -74,7 +74,7 @@ Each ≈ 9 lines including blockquote prefix.
 ### Task 1 — Snapshot
 
 ```bash
-for f in hotfix bug-fix parallel-stories change-management; do
+for f in hotfix bug-fix create-parallel-stories change-management; do
   cp docs/runbooks/$f.md /tmp/$f-before.md
 done
 ```
@@ -86,7 +86,7 @@ Edit tool, per file. `old_string` = title line + first content line (for uniquen
 ### Task 4 — Diff verify × 4
 
 ```bash
-for f in hotfix bug-fix parallel-stories change-management; do
+for f in hotfix bug-fix create-parallel-stories change-management; do
   # Compare lines below the inserted block to the snapshot
   diff <(sed -n '/^---$/,$p' docs/runbooks/$f.md) /tmp/$f-before.md
 done

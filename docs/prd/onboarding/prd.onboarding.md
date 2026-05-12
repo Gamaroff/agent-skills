@@ -72,10 +72,10 @@ Solving the onboarding gap **by dogfooding the story pipeline** kills both birds
 - **FR1:** A new user can open `README.md` and find a "Start here" callout that links to a decision tree (task vs. story vs. hotfix vs. parallel) within the first viewport.
 - **FR2:** `docs/concepts/quickstart-task.md` provides a step-by-step walkthrough that, when followed verbatim on a clean clone, produces a complete task artifact set (spec → plan → implementation report → QA → gate → DoD) in ≤ 10 minutes of wall time.
 - **FR3:** `docs/concepts/quickstart-story.md` provides a step-by-step walkthrough that, when followed verbatim, produces a complete story artifact set (PRD reference → epic → story → review → develop → PR → QA → gate → DoD → sprint review) in ≤ 60 minutes of wall time.
-- **FR4:** `docs/concepts/which-path.md` presents a decision tree that maps user intent ("ship a feature", "fix a bug", "refactor", "parallel work") to the correct skill entry point (`/create-story`, `/hotfix`, `/create-task`, `/parallel-stories`).
+- **FR4:** `docs/concepts/which-path.md` presents a decision tree that maps user intent ("ship a feature", "fix a bug", "refactor", "parallel work") to the correct skill entry point (`/create-story`, `/create-branch --hotfix`, `/create-task`, `/create-parallel-stories`).
 - **FR5:** `examples/` contains at least one worked PRD example (this PRD itself, narrated), four worked epic examples (one per epic in this PRD), and one full story lifecycle including a story that failed `qa-gate` and was revised.
 - **FR6:** Each anchor runbook (`story-development.md`, `task-development.md`) gains a "Before you start" prerequisite section and a "Common first-time errors" troubleshooting section, without rewriting the existing reference body.
-- **FR7:** Each satellite runbook (`hotfix.md`, `bug-fix.md`, `parallel-stories.md`, `change-management.md`) gains an "Is this the right runbook?" decision callout at the top.
+- **FR7:** Each satellite runbook (`hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, `change-management.md`) gains an "Is this the right runbook?" decision callout at the top.
 - **FR8:** `docs/runbooks/first-week.md` indexes a four-day guided learning path (Day 1 tasks → Day 2 stories → Day 3 review/QA failures → Day 4 parallel + change-mgmt) with measurable completion criteria per day.
 
 ### 2.2 Non-Functional Requirements
@@ -241,7 +241,7 @@ Epic 3 (runbook wrappers) ── independent
 **Acceptance Criteria**
 
 1. New file `docs/concepts/which-path.md` exists.
-2. Decision tree covers four leaves: task (`/create-task`), story (`/create-story`), hotfix (`/hotfix`), parallel work (`/parallel-stories`).
+2. Decision tree covers four leaves: task (`/create-task`), story (`/create-story`), hotfix (`/create-branch --hotfix`), parallel work (`/create-parallel-stories`).
 3. Each leaf links to the matching runbook AND the matching quickstart (where one exists).
 4. Format: Mermaid flowchart + prose fallback (accessibility).
 5. Doc ≤ 250 lines.
@@ -397,7 +397,7 @@ Epic 3 (runbook wrappers) ── independent
 
 #### Story 3.2 — "Is this the right runbook?" callouts for satellites
 
-> As a new user landing on `hotfix.md`, `bug-fix.md`, `parallel-stories.md`, or `change-management.md`,
+> As a new user landing on `hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, or `change-management.md`,
 > I want a top-of-page callout that confirms (or redirects) my path,
 > so that I don't follow a runbook that doesn't match my situation.
 
@@ -507,7 +507,7 @@ Epic 3 (runbook wrappers) ── independent
 **Acceptance Criteria**
 
 1. `docs/runbooks/first-week/day-4-parallel.md` exists.
-2. Day 4 cross-links to `parallel-stories.md` and `change-management.md` (both with Epic 3.2 callouts in place).
+2. Day 4 cross-links to `create-parallel-stories.md` and `change-management.md` (both with Epic 3.2 callouts in place).
 3. Completion criteria: user has either (a) two stories in parallel worktrees or (b) one change-management Sprint Change Proposal in their repo.
 4. Doc ≤ 300 lines.
 

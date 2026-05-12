@@ -110,7 +110,7 @@ Full categorised index below.
 | `ensure-epic-jira-issue` | 'Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating… |
 | `epic-registry-manager` | Manage global epic numbering and registry updates. Use when creating new epics to assign next available epic number, validate epic.NUMBER.name.md filename format, update epic-registry.md with… |
 | `jira-epic-creator` | Create Jira epics from epic markdown documents. Use when user wants to sync local epic documentation to Jira, create Jira tickets from epic files, or… |
-| `parallel-stories` | Generate stories organized for parallel development using Git worktrees. Implements hybrid numbering (1-1, 1-2 for parallel, 2, 3 for sequential) with dependency mapping, conflict prevention,… |
+| `create-parallel-stories` | Generate stories organized for parallel development using Git worktrees. Implements hybrid numbering (1-1, 1-2 for parallel, 2, 3 for sequential) with dependency mapping, conflict prevention,… |
 
 ## Jira / GitHub Sync
 

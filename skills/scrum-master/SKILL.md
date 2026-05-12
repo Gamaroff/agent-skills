@@ -61,7 +61,7 @@ Generate stories organized for parallel development using Git worktrees:
 - Setup Git worktree structure
 - Generate coordination matrix
 
-**Use the `parallel-stories` skill** for parallel development workflows.
+**Use the `create-parallel-stories` skill** for parallel development workflows.
 
 ### 3. Story Validation
 
@@ -92,7 +92,7 @@ Systematic response to project pivots, blockers, or requirement changes:
 **Calls these skills**:
 
 - `create-story` - Primary story creation workflow
-- `parallel-stories` - Parallel development setup
+- `create-parallel-stories` - Parallel development setup
 - `execute-checklist` - Story validation and quality gates
 - `correct-course` - Change management and pivots
 
@@ -212,7 +212,7 @@ User request → Story creation?
   ├─ YES → Single sequential story?
   │   ├─ YES → Use `create-story` skill
   │   └─ NO → Parallel stories?
-  │       └─ YES → Use `parallel-stories` skill
+  │       └─ YES → Use `create-parallel-stories` skill
   └─ NO → Validation?
       ├─ YES → Use `execute-checklist` skill
       └─ NO → Pivot/blocker?

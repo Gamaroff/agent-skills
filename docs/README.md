@@ -14,7 +14,7 @@ Documentation for the Agent Skills library, organised by reader intent.
   - [PM Workflows](./runbooks/pm-workflows.md)
   - [Jira Publish](./runbooks/jira-publish.md)
   - [New Project Setup](./runbooks/new-project-setup.md)
-  - [Parallel Stories](./runbooks/parallel-stories.md)
+  - [Parallel Stories](./runbooks/create-parallel-stories.md)
   - [Change Management](./runbooks/change-management.md)
   - [Document Existing Project](./runbooks/document-existing-project.md)
 - **Reference** — look up specific behaviour

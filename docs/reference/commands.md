@@ -93,7 +93,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 
 | Command | What it does | Reference |
 |---|---|---|
-| `/parallel-stories <epic-path>` | Coordination matrix + worktree setup for parallel dev | [Parallel Stories](../runbooks/parallel-stories.md) |
+| `/create-parallel-stories <epic-path>` | Coordination matrix + worktree setup for parallel dev | [Parallel Stories](../runbooks/create-parallel-stories.md) |
 | `/scrum-master` | Story creation, validation, sprint coordination | [Sprint Cycle](../runbooks/sprint-cycle.md) |
 
 ## Coverage note

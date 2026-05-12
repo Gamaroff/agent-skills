@@ -25,7 +25,7 @@ If you want **API-style reference** instead of a walkthrough, see:
 | [PM Workflows](./pm-workflows.md) | Framing work before development — greenfield PRD, brownfield enhancement, change management. |
 | [Jira Publish](./jira-publish.md) | Syncing local epics/stories/tasks to Jira and driving status transitions from frontmatter. |
 | [New Project Setup](./new-project-setup.md) | Spinning up a brand-new project — architecture → PRD → first story. |
-| [Parallel Stories](./parallel-stories.md) | Developing multiple stories under one epic in parallel via Git worktrees. |
+| [Parallel Stories](./create-parallel-stories.md) | Developing multiple stories under one epic in parallel via Git worktrees. |
 | [Change Management](./change-management.md) | Responding to pivots, blockers, or scope changes mid-project. |
 | [Document Existing Project](./document-existing-project.md) | Generating brownfield architecture docs before adopting the library on an existing codebase. |
 
@@ -44,7 +44,7 @@ Every runbook in this directory follows the same skeleton so readers can move be
 ### Depth targets
 
 - **Anchor runbooks** (story-development, task-development, qa-flow): ~200–300 lines. They cover a full lifecycle and are read end-to-end.
-- **Satellite runbooks** (hotfix, bug-fix, sprint-cycle, parallel-stories, change-management, document-existing-project, new-project-setup, jira-publish, pm-workflows): ~80–150 lines. They cover one focused scenario and lean on anchor runbooks for shared context.
+- **Satellite runbooks** (hotfix, bug-fix, sprint-cycle, create-parallel-stories, change-management, document-existing-project, new-project-setup, jira-publish, pm-workflows): ~80–150 lines. They cover one focused scenario and lean on anchor runbooks for shared context.
 
 If a satellite outgrows ~200 lines, consider promoting it or splitting out a satellite of its own.
 

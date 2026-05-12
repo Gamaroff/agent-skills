@@ -22,7 +22,7 @@ Make existing runbooks safer to land in cold — without rewriting them — by a
 
 **Existing System Context:**
 
-- Current relevant functionality: `docs/runbooks/` contains anchor runbooks (`story-development.md` ~274 lines, `task-development.md` ~183 lines) and satellites (`hotfix.md`, `bug-fix.md`, `parallel-stories.md`, `change-management.md` — 51–96 lines each).
+- Current relevant functionality: `docs/runbooks/` contains anchor runbooks (`story-development.md` ~274 lines, `task-development.md` ~183 lines) and satellites (`hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, `change-management.md` — 51–96 lines each).
 - Technology stack: Markdown, with cross-references between runbooks and standards docs.
 - Integration points: Runbooks link to each other, to `docs/standards/`, and to `docs/reference/`. No automated rendering pipeline.
 
@@ -65,7 +65,7 @@ so that I don't bounce off the 274-line body.
 
 ### Story 3.2: "Is this the right runbook?" callouts for satellites
 
-As a new user landing on `hotfix.md`, `bug-fix.md`, `parallel-stories.md`, or `change-management.md`,
+As a new user landing on `hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, or `change-management.md`,
 I want a top-of-page callout that confirms (or redirects) my path,
 so that I don't follow a runbook that does not match my situation.
 

@@ -10,7 +10,7 @@
 
 ## Summary
 
-Adds `docs/concepts/which-path.md` — a decision tree that routes new users to the right skill via three questions. Covers all four workflow entry points: `/create-task`, `/create-story`, `/hotfix`, `/parallel-stories`.
+Adds `docs/concepts/which-path.md` — a decision tree that routes new users to the right skill via three questions. Covers all four workflow entry points: `/create-task`, `/create-story`, `/create-branch --hotfix`, `/create-parallel-stories`.
 
 ---
 
@@ -112,7 +112,7 @@ Open `docs/concepts/which-path.md` on GitHub — the Mermaid decision tree rende
 ## Known Limitations
 
 - Task 6 (visual Mermaid render on GitHub) requires manual reviewer verification — not blockable by automation
-- No `/hotfix` or `/parallel-stories` quickstart files exist yet; only runbook links provided for those leaves
+- No `/create-branch --hotfix` or `/create-parallel-stories` quickstart files exist yet; only runbook links provided for those leaves
 
 ---
 

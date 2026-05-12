@@ -31,7 +31,7 @@ pr_number: 96
 ## Acceptance Criteria
 
 1. New file `docs/concepts/which-path.md` exists with valid frontmatter and lifecycle compliance.
-2. Decision tree covers four leaves: task (`/create-task`), story (`/create-story`), hotfix (`/hotfix`), parallel work (`/parallel-stories`).
+2. Decision tree covers four leaves: task (`/create-task`), story (`/create-story`), hotfix (`/create-branch --hotfix`), parallel work (`/create-parallel-stories`).
 3. Each leaf links to the matching runbook AND the matching quickstart (where one exists — task quickstart from Story 1.1, story quickstart from Story 1.2).
 4. Format: Mermaid `flowchart` + prose fallback (for accessibility — screen readers + non-Mermaid markdown renderers).
 5. Doc body ≤ 250 lines.
@@ -53,7 +53,7 @@ N/A.
   - `docs/runbooks/task-development.md`
   - `docs/runbooks/story-development.md`
   - `docs/runbooks/hotfix.md`
-  - `docs/runbooks/parallel-stories.md`
+  - `docs/runbooks/create-parallel-stories.md`
 
 ### Testing Requirements
 
@@ -69,7 +69,7 @@ N/A.
 
 **Verification steps:**
 - **AC1:** file exists; frontmatter valid; `documentation-standards-validator` PASS.
-- **AC2:** scan for 4 leaf nodes naming `/create-task`, `/create-story`, `/hotfix`, `/parallel-stories`.
+- **AC2:** scan for 4 leaf nodes naming `/create-task`, `/create-story`, `/create-branch --hotfix`, `/create-parallel-stories`.
 - **AC3:** each leaf has 1–2 outbound links; all resolve (link check).
 - **AC4:** Mermaid block renders on GitHub preview; prose fallback section present.
 - **AC5:** `wc -l ≤ 250`.
@@ -137,7 +137,7 @@ No conflicts.
 
 ### Summary / Testing Instructions / Areas Requiring Special Attention / Known Limitations
 
-Created `docs/concepts/which-path.md` — Mermaid `flowchart TD` + prose fallback routing users to `/create-task`, `/create-story`, `/hotfix`, or `/parallel-stories` via 3 questions.
+Created `docs/concepts/which-path.md` — Mermaid `flowchart TD` + prose fallback routing users to `/create-task`, `/create-story`, `/create-branch --hotfix`, or `/create-parallel-stories` via 3 questions.
 
 **Testing instructions:**
 1. Open the file on GitHub after PR is raised — confirm Mermaid renders (not a code block)

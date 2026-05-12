@@ -38,8 +38,8 @@ Remove a worktree when done: `git worktree remove ../agent-skills-feat-x`.
 
 ## Branch (a) — Parallel stories (~3 hours)
 
-- [ ] Read [`docs/runbooks/parallel-stories.md`](../parallel-stories.md). The Epic 3.2 callout at the top tells you whether this is the right fit.
-- [ ] Invoke `/parallel-stories` to scope 2 stories that can run in parallel.
+- [ ] Read [`docs/runbooks/create-parallel-stories.md`](../create-parallel-stories.md). The Epic 3.2 callout at the top tells you whether this is the right fit.
+- [ ] Invoke `/create-parallel-stories` to scope 2 stories that can run in parallel.
 - [ ] Open 2 git worktrees, one per story branch.
 - [ ] Run `/develop-story` in each.
 - [ ] Confirm both PRs open without conflict.
@@ -72,5 +72,5 @@ Remove a worktree when done: `git worktree remove ../agent-skills-feat-x`.
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | User unfamiliar with git worktree | Medium | Low | Primer in doc |
-| Branch (a) — parallel stories conflict on shared files | Medium | Medium | `/parallel-stories` skill scopes for non-overlapping work |
+| Branch (a) — parallel stories conflict on shared files | Medium | Medium | `/create-parallel-stories` skill scopes for non-overlapping work |
 | Branch (b) — `/correct-course` requires a real pivot to feel meaningful | Medium | Low | Allow simulated pivot for the practice run |

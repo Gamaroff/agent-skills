@@ -32,7 +32,7 @@ Two surgical inserts. Same template, parameterised per runbook.
 
 - The work is **internal** (refactor, infra, cleanup) → see [`task-development.md`](./task-development.md)
 - The work is **broken in production** → see [`hotfix.md`](./hotfix.md)
-- The work is part of a **coordinated multi-stream effort** → see [`parallel-stories.md`](./parallel-stories.md)
+- The work is part of a **coordinated multi-stream effort** → see [`create-parallel-stories.md`](./create-parallel-stories.md)
 - You're not sure → see the [decision tree](../concepts/which-path.md)
 
 ---

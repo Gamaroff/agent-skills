@@ -52,7 +52,7 @@ CATEGORIES = [
     ("Epic & Story Lifecycle", [
         "create-epic", "create-epics-from-shards", "create-story", "edit-epic",
         "edit-story", "epic-registry-manager", "ensure-epic-github-issue",
-        "ensure-epic-jira-issue", "jira-epic-creator", "parallel-stories",
+        "ensure-epic-jira-issue", "jira-epic-creator", "create-parallel-stories",
         "create-task", "create-issue", "create-bug-report",
     ]),
     ("Jira / GitHub Sync", [
