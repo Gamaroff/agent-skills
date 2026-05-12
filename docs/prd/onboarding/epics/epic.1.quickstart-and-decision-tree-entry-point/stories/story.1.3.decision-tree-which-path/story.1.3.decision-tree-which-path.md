@@ -2,7 +2,7 @@
 id: story.1.3.decision-tree-which-path
 title: "Story 1.3: Decision tree — which path?"
 type: story
-status: draft
+status: ready-for-review
 priority: high
 epic: 1
 epic_file: ../../epic.1.quickstart-and-decision-tree-entry-point.md
@@ -12,12 +12,13 @@ jira_url: null
 github_issue: 85
 github_url: https://github.com/Gamaroff/agent-skills/issues/85
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-12
 ---
 
 # Story 1.3: Decision tree — which path?
 
-**Status**: Draft
+**Status**: Ready for Review
+**Review**: ✅ Optional recommendations implemented 2026-05-12 — see `story.1.3.review.1.decision-tree-which-path.md`
 
 ## Story Statement
 
@@ -55,8 +56,10 @@ N/A.
 ### Testing Requirements
 
 - Static: `documentation-standards-validator`.
+- Mermaid pre-flight: run `mermaid-architect` skill for syntax validation before relying on GitHub preview.
 - Mermaid rendering: visually verify on GitHub preview before merging (Mermaid blocks render server-side on github.com).
 - Link check: all 4 runbooks + 2 quickstarts must resolve.
+- Branch coverage: verify each decision-tree branch terminates at exactly one leaf (no orphan questions, no dead ends).
 
 ### Manual Testing Steps
 
@@ -98,13 +101,13 @@ No conflicts.
 
 > Detailed implementation guide: [story.1.3.plan.decision-tree-which-path.md](story.1.3.plan.decision-tree-which-path.md)
 
-- [ ] **Task 1**: File skeleton + frontmatter (AC: 1)
-- [ ] **Task 2**: Draft decision questions hierarchy (intent → context → leaf) (AC: 2)
-- [ ] **Task 3**: Author Mermaid `flowchart` (AC: 2, 4)
-- [ ] **Task 4**: Author prose fallback that mirrors the flowchart's branching (AC: 4)
-- [ ] **Task 5**: Wire leaf links to runbooks + quickstarts (AC: 3)
+- [x] **Task 1**: File skeleton + frontmatter (AC: 1)
+- [x] **Task 2**: Draft decision questions hierarchy (intent → context → leaf) (AC: 2)
+- [x] **Task 3**: Author Mermaid `flowchart` (AC: 2, 4)
+- [x] **Task 4**: Author prose fallback that mirrors the flowchart's branching (AC: 4)
+- [x] **Task 5**: Wire leaf links to runbooks + quickstarts (AC: 3)
 - [ ] **Task 6**: Visual verify Mermaid render on GitHub preview (AC: 4)
-- [ ] **Task 7**: Static validation, line-count check, status flip (AC: 1, 5)
+- [x] **Task 7**: Static validation, line-count check, status flip (AC: 1, 5)
 
 ## Testing
 
@@ -115,18 +118,31 @@ No conflicts.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-12 | 1.1     | Review #1 passed (9/10) — optional fixes applied, status → Ready for Development | review-story |
 
 ## Dev Agent Record
 
-_(Populated by `/develop-story`.)_
+- **Branch**: `feature/story.1.3.decision-tree-which-path`
+- **Implemented**: 2026-05-12 by `develop-story` pipeline
+- **Key decisions**: Implemented directly (pure doc story, no code changes); Mermaid `flowchart TD` pattern from siblings; 78 lines (well under 250 cap)
+- **Files created**: `docs/concepts/which-path.md`
+- **Files modified**: `docs/concepts/README.md` (added entry)
 
 ## QA Handoff
 
-**Completed**: _(Date)_ **Developer**: _(Name)_ **Branch**: _(branch)_ **PR**: _(link)_
+**Completed**: 2026-05-12 **Developer**: develop-story pipeline **Branch**: `feature/story.1.3.decision-tree-which-path` **PR**: _(see Step 4)_
 
 ### Summary / Testing Instructions / Areas Requiring Special Attention / Known Limitations
 
-_(Developer fills in.)_
+Created `docs/concepts/which-path.md` — Mermaid `flowchart TD` + prose fallback routing users to `/create-task`, `/create-story`, `/hotfix`, or `/parallel-stories` via 3 questions.
+
+**Testing instructions:**
+1. Open the file on GitHub after PR is raised — confirm Mermaid renders (not a code block)
+2. Verify 4 leaf nodes name the correct skills
+3. Click all 6 outbound links — 4 runbooks + 2 quickstarts — confirm they resolve
+4. Run `wc -l docs/concepts/which-path.md` — should be ≤ 250
+
+**Special attention:** Task 6 (visual Mermaid verify) requires GitHub preview — must be done after PR is raised.
 
 ### QA Prerequisites Checklist
 
