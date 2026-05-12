@@ -9,7 +9,17 @@ This skill orchestrates the complete task development lifecycle, calling each sk
 
 ## Setup — Pipeline Hooks (one-time, per project)
 
-Register two hooks in the project's `.claude/settings.json` to keep the pipeline hands-free:
+**Quick install** — run the bundled installer (idempotent, safe to re-run):
+
+```bash
+bash .agents/skills/develop-task/scripts/install-hooks.sh
+```
+
+The installer auto-detects the install path, creates `.claude/settings.json` if missing, and registers both hooks while preserving any existing settings. Pass `--dry-run` to preview the patch without writing.
+
+---
+
+**Manual install** — register two hooks in the project's `.claude/settings.json` to keep the pipeline hands-free:
 
 - **`PreCompact`** — graceful pause on imminent context compaction (see `references/develop-pipeline-pause.md`).
 - **`Stop`** — forced continuation when the orchestrator tries to stop mid-pipeline. This is the structural defence against the failure mode where a sub-skill returns control with a "complete" message and the orchestrator yields to the user under context pressure. The hook reads `.claude/state/develop-pipeline.lock` and, if `current_step < 8`, injects a `decision: "block"` reason that lists the next required actions (Bash → Edit → banner → invoke). It honours Claude Code's `stop_hook_active` flag to avoid infinite loops.

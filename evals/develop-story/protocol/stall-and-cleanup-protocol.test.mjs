@@ -32,6 +32,8 @@ const TASK_SKILL     = path.join(REPO_ROOT, "skills", "develop-task",  "SKILL.md
 const DEVELOP_SKILL  = path.join(REPO_ROOT, "skills", "develop",       "SKILL.md");
 const STORY_ON_STOP  = path.join(REPO_ROOT, "skills", "develop-story", "scripts", "on-stop.sh");
 const TASK_ON_STOP   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "on-stop.sh");
+const STORY_INSTALL  = path.join(REPO_ROOT, "skills", "develop-story", "scripts", "install-hooks.sh");
+const TASK_INSTALL   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "install-hooks.sh");
 const STEP0_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-0-resolve-and-prepare.md");
 const STEP3_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-3-develop-loop.md");
 const STEP8_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-8-commit.md");
@@ -86,6 +88,38 @@ test("#2b — develop-task on-stop.sh is byte-identical to develop-story on-stop
   const storyHook = await readFile(STORY_ON_STOP, "utf-8");
   const taskHook  = await readFile(TASK_ON_STOP,  "utf-8");
   assert.equal(taskHook, storyHook, "Both on-stop.sh scripts must be identical (the lock's `skill` field selects branch)");
+});
+
+test("#2b — install-hooks.sh exists and is byte-identical between story and task", async () => {
+  const storyScript = await readFile(STORY_INSTALL, "utf-8");
+  const taskScript  = await readFile(TASK_INSTALL,  "utf-8");
+  assert.equal(taskScript, storyScript, "install-hooks.sh must be byte-identical across develop-{story,task}");
+  // Core contract assertions
+  assert.match(storyScript, /set -euo pipefail/,                    "must use safe bash defaults");
+  assert.match(storyScript, /command -v jq/,                        "must check for jq prerequisite");
+  assert.match(storyScript, /\.agents\/skills\/develop-story/,      ".agents path candidate (npx skills add)");
+  assert.match(storyScript, /\.claude\/skills\/develop-story/,      ".claude path candidate (symlink/monorepo)");
+  assert.match(storyScript, /already registered/,                   "must be idempotent (skip on duplicate)");
+  assert.match(storyScript, /--dry-run/,                            "must support --dry-run flag");
+  assert.match(storyScript, /PreCompact/,                           "must register PreCompact hook");
+  assert.match(storyScript, /Stop/,                                 "must register Stop hook");
+});
+
+test("#2b — SKILL.md Setup section advertises install-hooks.sh as quick install", async () => {
+  const storyContent = await readFile(STORY_SKILL, "utf-8");
+  const taskContent  = await readFile(TASK_SKILL,  "utf-8");
+  for (const [label, content] of [["story", storyContent], ["task", taskContent]]) {
+    assert.match(
+      content,
+      /install-hooks\.sh/,
+      `${label}: Setup section must reference install-hooks.sh`,
+    );
+    assert.match(
+      content,
+      /Quick install/i,
+      `${label}: Setup section must label the script as the recommended install path`,
+    );
+  }
 });
 
 test("#2b — Step Transition Protocol lists Bash lock-update as action #1 (not #2)", async () => {
