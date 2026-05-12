@@ -39,8 +39,8 @@ Initial run — author `docs/concepts/quickstart-task.md` walkthrough guide and 
 | 2. review-story             | ✅ Done | `story.1.1.validate.2026-05-12.md` exists | Verdict: GO (8.5/10); 0 critical, 2 important; status → ready-for-development | — |
 | 3. develop                  | ✅ Done | `docs/concepts/quickstart-task.md` exists (141 lines); story status = `ready-for-review` | All 8 tasks complete; dynamic walkthrough deferred to QA per pipeline nesting constraint | — |
 | 4. create-pr                | ✅ Done | PR #77 — https://github.com/Gamaroff/agent-skills/pull/77 | Targets epic branch; no github_issue linked; 44 files, 5525 insertions | — |
-| 5–6. qa-story / qa-fix loop | ⚠️ Needs Attention | `story.1.1.qa.1.quickstart-walkthrough.md` ✅; `story.1.1.gate.1.quickstart-walkthrough.yml` ✅ (CONCERNS 90/100); PR comments posted ✅ | MEDIUM: AC3 dynamic walkthrough requires human verification on clean macOS clone; LOW: AC1 path fixed | — |
-| 7. finalise                 | ⏳ Pending | `story.1.1.dod.1.*.md`; story `status: accepted` | | — |
+| 5–6. qa-story / qa-fix loop | ✅ Done | `story.1.1.qa.1.quickstart-walkthrough.md` ✅; `story.1.1.gate.1.quickstart-walkthrough.yml` ✅ (WAIVED 90/100); PR comments posted ✅ | AC3 dynamic walkthrough waived by user (pipeline nesting); LOW AC1 path fixed | — |
+| 7. finalise                 | ✅ Done | `story.1.1.dod.1.first-task-in-10-minutes.md` ✅; story `status: accepted` ✅; sprint-review-summary ✅; PR comment posted ✅ | No github_issue — tracker ops skipped | — |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -59,6 +59,12 @@ Initial run — author `docs/concepts/quickstart-task.md` walkthrough guide and 
 - Pipeline mode: standard (8 tasks > 3 threshold)
 - Always-load files: defaults — no skills-config.yaml; architecture files absent, skipped
 - Tracker: github; github_issue: null → tracker operations skipped
+
+### Step 5-6 — 2026-05-12
+
+- QA gate: CONCERNS (90/100) — MEDIUM: AC3 dynamic walkthrough unverified; LOW: AC1 path fixed
+- User waived AC3 verification explicitly — gate updated to WAIVED
+- Proceeding to Step 7 (finalise)
 
 ### Step 3 — 2026-05-12
 

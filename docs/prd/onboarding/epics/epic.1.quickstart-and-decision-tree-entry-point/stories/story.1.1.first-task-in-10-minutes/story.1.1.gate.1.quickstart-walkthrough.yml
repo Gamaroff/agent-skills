@@ -1,8 +1,8 @@
 schema: 1
 story: '1.1'
 story_title: 'First task in 10 minutes — quickstart'
-gate: CONCERNS
-status_reason: 'AC1, AC2, AC4 statically verified PASS. AC3 (dynamic walkthrough) structurally sound but empirically unverified — pipeline nesting prevented execution. One MEDIUM issue blocks full acceptance.'
+gate: WAIVED
+status_reason: 'AC1, AC2, AC4 statically verified PASS. AC3 (dynamic walkthrough) waived by user — pipeline nesting prevented execution; user accepted risk explicitly on 2026-05-12. Structural analysis confirms doc is complete and correct.'
 reviewer: 'QA Engineer (develop-story pipeline)'
 updated: '2026-05-12T00:00:00Z'
 
@@ -15,7 +15,10 @@ top_issues:
     suggested_owner: dev
 
 waiver:
-  active: false
+  active: true
+  reason: 'AC3 dynamic walkthrough cannot run inside active develop-story pipeline (nested lock conflict). User explicitly waived on 2026-05-12.'
+  approver: 'user (gamaroff@gmail.com)'
+  waived_at: '2026-05-12T00:00:00Z'
 
 quality_score: 90
 

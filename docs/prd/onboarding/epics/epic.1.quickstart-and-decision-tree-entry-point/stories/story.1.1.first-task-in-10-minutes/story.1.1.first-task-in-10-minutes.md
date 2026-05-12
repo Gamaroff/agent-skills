@@ -2,7 +2,7 @@
 id: story.1.1.first-task-in-10-minutes
 title: "Story 1.1: First task in 10 minutes — quickstart"
 type: story
-status: ready-for-review
+status: accepted
 priority: high
 epic: 1
 epic_file: ../../epic.1.quickstart-and-decision-tree-entry-point.md
@@ -12,12 +12,13 @@ jira_url: null
 github_issue: null
 github_url: null
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-12
+completed_date: 2026-05-12
 ---
 
 # Story 1.1: First task in 10 minutes — quickstart
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 ## Story Statement
 
@@ -196,6 +197,7 @@ Documentation-only — no UI navigation. "Navigation" here means: open the doc, 
 | 2026-05-12 | 1.1     | Validation passed (8.5/10, GO) — status → ready-for-development | review-story |
 | 2026-05-12 | 1.2     | Implementation complete — docs/concepts/quickstart-task.md created; status → ready-for-review | dev-agent |
 | 2026-05-12 | 1.3     | qa-fix: corrected AC1 path (document-status-lifecycle.md → status-lifecycle.md); MEDIUM concern (AC3 dynamic walkthrough) requires human verification | qa-fix |
+| 2026-05-12 | 1.4     | DoD PASSED — status → accepted; AC3 waived by user (pipeline nesting); PR #77 | finalise |
 
 ## Dev Agent Record
 
@@ -269,11 +271,11 @@ Follow Dev Notes → Manual Testing Steps verbatim. Critical:
 
 ## QA Testing Results
 
-**QA Status**: ⚠️ CONCERNS
+**QA Status**: ✅ WAIVED
 **QA Engineer**: QA Engineer (develop-story pipeline)
 **Testing Date**: 2026-05-12
 **Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Gate Decision**: WAIVED (AC3 dynamic walkthrough waived by user — pipeline nesting constraint)
 
 ### QA Report
 
@@ -305,3 +307,19 @@ _None._
 ### Closed Bugs
 
 _None._
+
+## Definition of Done - PASSED ✅
+
+**DoD Verification**: [story.1.1.dod.1.first-task-in-10-minutes.md](./story.1.1.dod.1.first-task-in-10-minutes.md)
+**Decision**: ACCEPTED
+**Date**: 2026-05-12
+**QA Gate**: WAIVED (90/100) — AC3 dynamic walkthrough waived by user (pipeline nesting constraint)
+
+| Check | Status |
+|-------|--------|
+| Acceptance Criteria (AC1, AC2, AC4) | ✅ PASS |
+| Acceptance Criteria (AC3) | ✅ WAIVED (user-approved) |
+| PR #77 | ✅ OPEN |
+| Security | ✅ PASS |
+| Compliance | ✅ NOT_APPLICABLE |
+| Docs & Changelog | ✅ PASS |
