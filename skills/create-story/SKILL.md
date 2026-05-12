@@ -343,15 +343,38 @@ Populate these sections:
 
 ### 5.2a Create Tracker Issue
 
-> ⛔ **SKIP THIS STEP ENTIRELY.**
->
-> Do NOT create Jira issues, GitHub issues, or any remote tracker issues during story creation.
-> Tracker sync is a separate, explicitly-triggered operation. The user must run `/sync-jira-story`
-> after the story is created and reviewed.
->
-> Set `jira_key: null` and `jira_url: null` in the story YAML frontmatter. Leave them null.
->
-> **Note (future GitHub-path work)**: when this skill (or a sibling) starts creating GitHub issues for stories, mirror the `priority:` frontmatter onto the GitHub Project board's "Priority" single-select field by calling `bash references/set-github-project-priority.sh "{N}" "{priority}"` immediately after the issue is created. GitHub does not auto-sync `priority:*` labels into Project custom fields.
+After the story document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `references/platform-detection.md`):
+
+```bash
+source references/resolve-platform.sh
+# TRACKER = jira | github
+```
+
+#### Jira Path (when `TRACKER=jira`)
+
+> Jira story sync is still deferred to `/sync-jira-story` — set `jira_key: null` and `jira_url: null` in the story frontmatter and leave them null. The user runs `/sync-jira-story` after story creation to push to Jira (the script handles parent-epic linkage, ADF rendering, and the concurrent-edit guard).
+
+#### GitHub Path (when `TRACKER=github`)
+
+1. Derive the parent epic file path using the grandparent directory rule:
+   ```bash
+   STORY_DIR=$(dirname "{resolved story file path}")
+   EPIC_DIR=$(dirname "$(dirname "$STORY_DIR")")
+   EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
+   ```
+   If the file doesn't exist, glob for `epic.*.md` in `${EPIC_DIR}`. If still not found, set `EPIC_ISSUE_NUM=""` and continue with a logged warning.
+
+2. If the epic file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set (integer) or empty.
+
+3. Invoke the `ensure-story-github-issue` sub-routine with `STORY_FILE_PATH={just-written story file path}` and `EPIC_ISSUE_NUM` from step 2. The sub-routine handles:
+   - dedup-by-title search (adopts an existing issue if exactly one matches),
+   - creating the issue with title `[Story {epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {epic} — {epic_title}`,
+   - adding it to the GitHub Project board,
+   - mirroring the priority label onto the board's Priority single-select field,
+   - linking the new issue as a sub-issue of the parent epic issue (when `EPIC_ISSUE_NUM` is non-empty),
+   - writing `github_issue: {N}` into the story frontmatter and inserting the body cross-reference link.
+
+**On failure**: the sub-routine logs a warning and returns `STORY_ISSUE_NUM=""`. `create-story` leaves `github_issue:` unwritten and continues. Never halt.
 
 ### 5.3 Populate Dev Notes Section (CRITICAL)
 
