@@ -42,7 +42,7 @@ CATEGORIES = [
     ("Architecture & Design", [
         "architect", "create-architecture-doc", "execute-architect-checklist",
         "mermaid-architect", "create-frontend-spec",
-        "document-existing-project", "document-project",
+        "document-existing-project", "document-existing-project",
     ]),
     ("Product Management & Planning", [
         "po", "pm-coordinator", "pm-checklist", "scrum-master", "analyst",
@@ -178,7 +178,7 @@ def generate_catalog(skills_dir: Path, output_file: Path) -> None:
         "- **Review:** `review-prd`, `review-epic`, `review-story`, `review-task`",
         "- **QA:** `qa-story`, `qa-task`, `qa-fix`, `qa-gate`",
         "- **Git / PR:** `create-branch`, `commit-changes`, `create-pr`",
-        "- **Meta:** `create-skill`, `find-skills`, `document-project`",
+        "- **Meta:** `create-skill`, `find-skills`, `document-existing-project`",
         "",
         "## Scope notes",
         "",

@@ -12,6 +12,12 @@ See [docs/concepts/overview.md](./docs/concepts/overview.md) for how skills work
 
 ---
 
+> ### 🚀 Start here
+>
+> - **First time?** → [Decision tree](./docs/concepts/which-path.md) tells you which path fits your work.
+> - **Want a 10-min hands-on?** → [Task quickstart](./docs/concepts/quickstart-task.md)
+> - **Want a 60-min full chain?** → [Story quickstart](./docs/concepts/quickstart-story.md)
+
 ## Contents
 
 - [Installing Skills](#installing-skills)
@@ -74,7 +80,7 @@ Featured starting points:
 - **Review:** [`review-story`](./skills/review-story/SKILL.md), [`review-task`](./skills/review-task/SKILL.md), [`review-epic`](./skills/review-epic/SKILL.md), [`review-prd`](./skills/review-prd/SKILL.md)
 - **QA:** [`qa-story`](./skills/qa-story/SKILL.md), [`qa-task`](./skills/qa-task/SKILL.md), [`qa-fix`](./skills/qa-fix/SKILL.md)
 - **Git/PR:** [`create-branch`](./skills/create-branch/SKILL.md), [`commit-changes`](./skills/commit-changes/SKILL.md), [`create-pr`](./skills/create-pr/SKILL.md)
-- **Meta:** [`create-skill`](./skills/create-skill/SKILL.md), [`find-skills`](./skills/find-skills/SKILL.md), [`document-project`](./skills/document-project/SKILL.md)
+- **Meta:** [`create-skill`](./skills/create-skill/SKILL.md), [`find-skills`](./skills/find-skills/SKILL.md), [`document-existing-project`](./skills/document-existing-project/SKILL.md)
 
 ---
 

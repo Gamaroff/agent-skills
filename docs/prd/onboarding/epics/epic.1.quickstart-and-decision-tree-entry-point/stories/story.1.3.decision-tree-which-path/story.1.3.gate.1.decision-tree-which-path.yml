@@ -1,0 +1,42 @@
+schema: 1
+story: '1.3'
+story_title: 'Decision tree — which path?'
+gate: PASS
+status_reason: 'All 5 ACs verified. All 8 outbound links resolve. Line count 78/250. Task 6 (visual Mermaid render) pending manual reviewer check — LOW risk.'
+reviewer: 'QA Agent (develop-story pipeline)'
+updated: '2026-05-12T11:30:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+expires: '2026-05-26T00:00:00Z'
+
+evidence:
+  tests_reviewed: 5
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Static markdown documentation — no auth, no PII, no runtime concerns'
+  performance:
+    status: PASS
+    notes: 'Static file — no runtime behaviour'
+  reliability:
+    status: PASS
+    notes: 'Static markdown — no failure modes'
+  maintainability:
+    status: PASS
+    notes: '78 lines; follows sibling file pattern; clear section structure; default leaf documented'
+
+recommendations:
+  immediate:
+    - action: 'Reviewer manually opens PR #96 and confirms Mermaid renders (not code block)'
+      refs: ['docs/concepts/which-path.md']
+  future: []

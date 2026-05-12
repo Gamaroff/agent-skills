@@ -42,7 +42,8 @@ fi
 # 1. Resolve priority — argument wins, else read from issue labels.
 if [ -z "$PRIORITY_IN" ]; then
   LABELS=$(gh issue view "$ISSUE_NUM" --json labels -q '.labels[].name' 2>/dev/null || true)
-  PRIORITY_IN=$(echo "$LABELS" | sed -n 's/^priority:\(critical\|high\|medium\|low\)$/\1/p' | head -1)
+  # BSD/macOS sed needs -E for alternation in regex; GNU sed accepts -E too.
+  PRIORITY_IN=$(echo "$LABELS" | sed -nE 's/^priority:(critical|high|medium|low)$/\1/p' | head -1)
 fi
 
 # Lowercase + strip whitespace for matching.

@@ -31,9 +31,9 @@ devDebugLog: .ai/debug-log.md
 | `prd.prdSharded` | bool | `true` | Whether the PRD is split into one file per level-2 section |
 | `prd.prdShardedLocation` | path | `docs/prd` | Base directory for sharded PRD + epics + stories |
 | `prd.epicFilePattern` | glob | `"*/epics/epic.{n}.*.md"` | How the pipeline locates the parent epic of a story |
-| `architecture.architectureSharded` | bool | — | Whether architecture docs are split per level-2 section |
-| `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for sharded architecture docs |
-| `architecture.architectureVersion` | string | (unset) | Architecture template version selector |
+| `architecture.architectureSharded` | bool | — | Whether architecture docs are split per level-2 section. Full spec: [Architecture documents](../standards/architecture-docs.md) |
+| `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for sharded architecture docs. Full spec: [Architecture documents](../standards/architecture-docs.md) |
+| `architecture.architectureVersion` | string | (unset) | Architecture template version selector. Use `v4` for new projects. See [Architecture documents](../standards/architecture-docs.md#architectureversion) |
 | `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
 | `devStoryLocation` | `nested` \| path | `nested` | Story layout mode — see below |
 | `devDebugLog` | path | `.ai/debug-log.md` | Optional pipeline debug log location |

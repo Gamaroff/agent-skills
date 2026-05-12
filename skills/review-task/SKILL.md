@@ -3,7 +3,7 @@ name: review-task
 description: Interactive task document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and implementability issues. Provides user-aligned recommendations based on collaborative input.
 ---
 
-> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
 
 # Review Task
 
@@ -556,35 +556,14 @@ options:
             - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip the `gh issue create` block below**
          3. **Zero matches** → fall through to create block below
          4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Task {id}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to create block below
-       ```bash
-       REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-       DOC_URL="https://github.com/$REPO/blob/develop/{task-file-relative-path}"
+       Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={resolved task file path}`. The sub-routine handles:
+       - resolving the milestone (frontmatter `milestone:` → epic-registry lookup → `"Technical Tasks (standalone)"` default)
+       - creating the issue (title `[Task {id}] {title}`, `task` + `priority:{priority}` labels)
+       - adding it to the GitHub Project board
+       - mirroring the priority label onto the board's Priority single-select field
+       - writing `github_issue: {N}` into the task frontmatter and adding/repairing the body cross-reference link.
 
-       gh issue create \
-         --title "[Task {id}] {title}" \
-         --project "your app Website Development Board" \
-         --body "## Overview
-
-       {First paragraph of the task's Overview section}
-
-       ## Key Deliverables
-
-       {Bulleted list from the task's Key Deliverables or Scope section}
-
-       ## Document
-
-       📄 [Task Document]($DOC_URL)
-       📁 \`{task-file-relative-path}\`" \
-         --label "task" \
-         --label "priority:{priority}" \
-         --milestone "{milestone_title}"
-       ```
-     - Determine `{milestone_title}` using the same priority as `/create-task`: `milestone:` frontmatter → epic registry lookup → `"Technical Tasks (standalone)"`
-     - Write `github_issue: {N}` into frontmatter
-     - Set the board Priority single-select field (label → field mirror; helper never halts):
-       ```bash
-       bash references/set-github-project-priority.sh "{N}" "{priority}" || true
-       ```
+       On return, `TASK_ISSUE_NUM` is set (integer) or empty (on failure). Failure is non-blocking — review continues with a flagged Important gap.
    - If `github_issue:` has a numeric value:
      - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
        - If the issue doesn't exist (command errors), flag as **Critical**

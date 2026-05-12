@@ -3,7 +3,7 @@ name: finalise
 description: Verify story/task completion against comprehensive Definition of Done criteria (acceptance criteria, tests, code reviews, documentation, security review, compliance check), then update status to 'accepted' and generate Sprint Review artifacts, or list gaps if incomplete. Use when finalising stories or tasks for Sprint Review.
 ---
 
-> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
 
 # Finalise Story/Task
 

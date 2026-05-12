@@ -1,0 +1,98 @@
+---
+id: story.4.2.day-2-stories
+title: "Story 4.2: Day 2 — Stories"
+type: story
+status: draft
+priority: high
+epic: 4
+epic_file: ../../epic.4.first-week-guided-learning-path.md
+prd_source: docs/prd/onboarding/prd.onboarding.md
+jira_key: null
+jira_url: null
+github_issue: 88
+github_url: https://github.com/Gamaroff/agent-skills/issues/88
+created: 2026-05-11
+updated: 2026-05-11
+---
+
+# Story 4.2: Day 2 — Stories
+
+**Status**: Draft
+
+## Story Statement
+
+**As a** new user on Day 2,
+**I want** a guided story walkthrough,
+**so that** I shift from task pipeline to story pipeline confidently.
+
+## Acceptance Criteria
+
+1. `docs/runbooks/first-week/day-2-stories.md` exists with frontmatter and checkpoints.
+2. Day 2 spans the story quickstart (Story 1.2 output) plus 1 follow-up story.
+3. Completion criteria: user has ≥ 1 fully-developed story PR in their working repo.
+4. Doc body ≤ 300 lines.
+
+## Dev Notes
+
+### Previous Story Insights
+
+- Story 1.2 (`quickstart-story.md`) is Day 2's primary reference.
+- Story 4.1 established the day-doc pattern (frontmatter, checkpoint-style, time budgets per section, "What you learned" + "Next" footer).
+
+### File Locations
+
+- **New file:** `docs/runbooks/first-week/day-2-stories.md`.
+- **Linked:** `docs/concepts/quickstart-story.md` (Story 1.2), `docs/runbooks/story-development.md`.
+
+### Testing Requirements / Manual Testing Steps / Rollback Plan / Technical Constraints
+
+Mirror Story 4.1's structure. 300-line cap, walkthrough as integration test, simple revert rollback.
+
+### Manual Testing Steps
+
+**Verification:**
+- AC1: file + checkpoints present.
+- AC2: refs to `quickstart-story.md` + 1 follow-up story.
+- AC3: user has ≥ 1 story PR after completion.
+- AC4: `wc -l ≤ 300`.
+
+**Edge cases:**
+- Story pipeline produces a PR on GitHub. Day 2 user MUST be authenticated (`gh auth status`). Day 2 prerequisite section must enforce this.
+- Follow-up story should produce a small, easily-merged PR — avoid anything that needs design review.
+
+### Git History Insights
+
+- Same as 1.2 — recent pipeline regressions per `df0b690`.
+
+## Tasks / Subtasks
+
+> Detailed implementation guide: [story.4.2.plan.day-2-stories.md](story.4.2.plan.day-2-stories.md)
+
+- [ ] **Task 1**: File skeleton (AC: 1)
+- [ ] **Task 2**: "Hour 1: quickstart" section refs Story 1.2 (AC: 2)
+- [ ] **Task 3**: "Hour 2–3: follow-up story" with concrete story description (AC: 2)
+- [ ] **Task 4**: "End of day: verify ≥ 1 story PR" checklist (AC: 3)
+- [ ] **Task 5**: Walkthrough verification (AC: 3)
+- [ ] **Task 6**: Static validation + status flip (AC: 1, 4)
+
+## Testing
+
+Walkthrough + static + link check.
+
+## Change Log
+
+| Date       | Version | Description                          | Author        |
+|------------|---------|--------------------------------------|---------------|
+| 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+
+## Dev Agent Record / QA Handoff / QA Report / Bug Reports
+
+_(Populated downstream.)_
+
+### QA Prerequisites Checklist
+
+- [ ] Doc exists with checkpoints
+- [ ] Day completes in ≤ 4 hours
+- [ ] User has ≥ 1 story PR after completion
+- [ ] Doc ≤ 300 lines
+- [ ] `gh auth status` enforced in prereqs
