@@ -39,7 +39,7 @@ Copy the onboarding PRD to `examples/prd-example/` with provenance frontmatter a
 | 4. create-pr                | ✅ Done | PR #101 targets `feature/epic.2.worked-prd-epic-story-examples`; issue #93 commented | https://github.com/Gamaroff/agent-skills/pull/101 | — |
 | 5–6. qa-story / qa-fix loop | ✅ Done | `story.2.1.qa.1.capture-prd-as-worked-example.md`; `story.2.1.gate.1.capture-prd-as-worked-example.yml`; PR comment posted | PASS 100/100 — no qa-fix needed | — |
 | 7. finalise                 | ✅ Done | `story.2.1.dod.1.capture-prd-as-worked-example.md`; story `status: accepted`; sprint-review-summary.md; PR comment + issue #93 closed | ACCEPTED 100/100 — all ACs PASS | — |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
+| 8. commit-changes           | ✅ Done | All artifacts committed (49a012a) and pushed | 6 files, 603 insertions | — |
 
 ---
 
