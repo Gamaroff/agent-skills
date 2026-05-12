@@ -2,7 +2,7 @@
 id: story.1.2.first-story-in-60-minutes
 title: "Story 1.2: First story in 60 minutes — quickstart"
 type: story
-status: ready-for-review
+status: accepted
 priority: high
 epic: 1
 epic_file: ../../epic.1.quickstart-and-decision-tree-entry-point.md
@@ -13,11 +13,12 @@ github_issue: 78
 github_url: https://github.com/Gamaroff/agent-skills/issues/78
 created: 2026-05-11
 updated: 2026-05-12
+completed_date: 2026-05-12
 ---
 
 # Story 1.2: First story in 60 minutes — quickstart
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ Critical/Important recommendations from `story.1.2.review.1.first-story-in-60-minutes.md` implemented 2026-05-12
 
 ## Story Statement
@@ -141,7 +142,7 @@ No conflicts. Story file follows Story 1.1's directory shape under epic 1.
 
 ## QA Handoff
 
-**Completed**: 2026-05-12 **Developer**: dev-agent (Claude) **Branch**: feature/story.1.2.first-story-in-60-minutes **PR**: (pending Step 4)
+**Completed**: 2026-05-12 **Developer**: dev-agent (Claude) **Branch**: feature/story.1.2.first-story-in-60-minutes **PR**: https://github.com/Gamaroff/agent-skills/pull/95
 
 ### Summary of Changes
 
@@ -175,7 +176,53 @@ New file `docs/concepts/quickstart-story.md` (192 lines) — mirrors `quickstart
 
 ## QA Report
 
-_(Added on QA completion.)_
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Agent (Claude)
+**Testing Date**: 2026-05-12
+**Quality Score**: 90/100
+**Gate Decision**: PASS
+
+### QA Artifacts
+
+- **Full Report**: [story.1.2.qa.1.first-story-in-60-minutes.md](./story.1.2.qa.1.first-story-in-60-minutes.md)
+- **Gate File**: [story.1.2.gate.1.first-story-in-60-minutes.yml](./story.1.2.gate.1.first-story-in-60-minutes.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 5/5 (AC3 partial — live walk deferred)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Two LOW findings, no blocking issues:
+1. Section time budgets sum to 62 min (exceeds 60-min promise by 2 min) — reduce §2 budget from ≤5 to ≤3 min
+2. task-registry cleanup not explicit in §7 — add one bullet
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+**Accepted:** 2026-05-12
+
+### QA Report Summary
+
+**QA Report**: `story.1.2.qa.1.first-story-in-60-minutes.md`
+**Gate File**: `story.1.2.gate.1.first-story-in-60-minutes.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 90/100
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** All 5 criteria met (AC3 partial — live walk deferred per Task 10 per pipeline context)
+✅ **Documentation:** All cross-references verified, Change Log present, Dev Agent Record + QA Handoff complete
+✅ **Security Review:** ✅ PASS — docs-only, no credentials or sensitive data
+✅ **Compliance:** ✅ PASS — file naming, frontmatter, status lifecycle, heading hierarchy
+✅ **NFR Validation:** Security PASS · Performance PASS · Reliability PASS · Maintainability PASS
+
+**Detailed Verification Log:** See `story.1.2.dod.1.first-story-in-60-minutes.md` for complete verification evidence.
+**Sprint Review Summary:** See `sprint-review-summary.md`
+
+---
 
 ## Bug Reports
 

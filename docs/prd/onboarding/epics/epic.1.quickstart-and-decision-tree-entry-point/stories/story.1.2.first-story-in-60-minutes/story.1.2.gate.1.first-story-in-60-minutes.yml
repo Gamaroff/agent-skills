@@ -1,0 +1,56 @@
+schema: 1
+story: '1.2'
+story_title: 'First story in 60 minutes — quickstart'
+gate: PASS
+status_reason: 'All 5 ACs verified statically. Two LOW-severity findings (time budget math off by 2 min; task-registry cleanup placement). No blocking issues.'
+reviewer: 'QA Agent (Claude)'
+updated: '2026-05-12T00:00:00Z'
+
+top_issues:
+  - issue: 'Section time budgets sum to 62 min, exceeds 60-min promise by 2 min'
+    severity: low
+    suggested_owner: dev
+  - issue: 'task-registry cleanup not explicit in §7 cleanup section (only in troubleshooting table)'
+    severity: low
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+expires: '2026-05-26T00:00:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 4, 5]
+    ac_gaps: []
+    ac_partial: [3]
+    ac3_note: 'Artifact types listed; live macOS walk deferred — pipeline context'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Docs-only story — no code, no secrets, N/A'
+  performance:
+    status: PASS
+    notes: 'Static content; all cross-references verified'
+  reliability:
+    status: PASS
+    notes: 'All 5 See-also links resolve; (pending Epic 2) marker correctly placed'
+  maintainability:
+    status: PASS
+    notes: '192 lines, well-structured, mirrors established quickstart-task.md pattern'
+
+recommendations:
+  immediate:
+    - action: 'Reduce §2 time budget from ≤5 min to ≤3 min so section totals ≤60 min'
+      refs: ['docs/concepts/quickstart-story.md']
+    - action: 'Add task-registry cancellation bullet to §7 cleanup section'
+      refs: ['docs/concepts/quickstart-story.md']
+  future:
+    - action: 'Resolve examples/story-walkthrough/ link when Epic 2 lands'
+      refs: ['docs/concepts/quickstart-story.md']
+    - action: 'Perform live macOS stopwatch walk; record elapsed in implementation report'
+      refs: ['docs/concepts/quickstart-story.md']
