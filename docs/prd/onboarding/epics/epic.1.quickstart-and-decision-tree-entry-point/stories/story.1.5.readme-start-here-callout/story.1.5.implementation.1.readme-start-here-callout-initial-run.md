@@ -39,7 +39,7 @@ Initial run — insert a "Start here" callout block near the top of `README.md` 
 | 4. create-pr                | ✅ Done | PR URL targets `feature/epic.1.quickstart-and-decision-tree-entry-point`; issue comment posted | PR #98: https://github.com/Gamaroff/agent-skills/pull/98 | — |
 | 5–6. qa-story / qa-fix loop | ✅ Done | `story.1.5.qa.1.readme-start-here-callout.md`; `story.1.5.gate.1.readme-start-here-callout.yml`; PR #98 comment posted | PASS 100/100 — 0 issues; no qa-fix needed | `.summaries/step-5-traceability-mapper.json` |
 | 7. finalise                 | ✅ Done | `story.1.5.dod.1.readme-start-here-callout.md`; story `status: accepted` | Issue #83 closed, board Done, canonical PR comment posted | — |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | In progress | — |
+| 8. commit-changes           | ✅ Done | All artifacts committed and pushed | Committed in `8a3059b`, pushed to PR #98 | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
