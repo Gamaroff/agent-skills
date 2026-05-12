@@ -52,8 +52,8 @@ This skill provides strategic analysis and research capabilities to support busi
   - Outputs structured prompt for thorough analysis
 
 ### Brownfield Documentation
-- **document-project** - Generate documentation for existing projects
-  - Delegates to `document-project` skill
+- **document-existing-project** - Generate documentation for existing projects
+  - Delegates to `document-existing-project` skill
   - Creates comprehensive technical documentation from codebase
   - Optimized for AI-assisted development workflows
 
@@ -68,7 +68,7 @@ This skill provides strategic analysis and research capabilities to support busi
 - `create-doc` - For all template-based document creation
 - `brainstorming` - For facilitated ideation sessions
 - `research-prompt` - For research planning
-- `document-project` - For brownfield project documentation
+- `document-existing-project` - For brownfield project documentation
 
 **Outputs used by:**
 - `pm` skill - Uses briefs and research for PRD creation
@@ -131,8 +131,8 @@ This skill provides strategic analysis and research capabilities to support busi
 
 ### 6. Brownfield Documentation Workflow
 ```
-1. Invoke: analyst document-project
-2. Skill delegates to document-project skill
+1. Invoke: analyst document-existing-project
+2. Skill delegates to document-existing-project skill
 3. Analyze existing codebase
 4. Document actual state (not aspirational)
 5. Capture technical debt and constraints
@@ -177,6 +177,6 @@ This skill uses the following resource files:
 ## Notes
 
 - **Task-focused approach**: This skill focuses on delivering specific analytical outputs rather than role-playing
-- **Delegation pattern**: Complex workflows delegate to specialized skills (brainstorming, research-prompt, document-project)
+- **Delegation pattern**: Complex workflows delegate to specialized skills (brainstorming, research-prompt, document-existing-project)
 - **Template-driven**: Most documents use YAML templates processed by the create-doc skill
 - **Integration ready**: Outputs are designed to feed into downstream PM, Architect, and UX workflows

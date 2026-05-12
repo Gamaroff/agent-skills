@@ -1,0 +1,141 @@
+---
+name: quickstart-task
+description: Ship your first agent-skills task in 10 minutes. End-to-end walkthrough from /create-task to a fully QA-gated artifact set on disk.
+type: guide
+status: ready-for-review
+version: 0.1.0
+created: 2026-05-12
+---
+
+# Quickstart: Your first task in 10 minutes
+
+**Status:** Ready for Review
+
+> Promise: by the end of this page you will have a real task — spec, plan, implementation report, QA report, gate file, DoD checklist — sitting in `docs/tasks/` on a branch you can delete.
+
+## Prerequisites
+
+- Node ≥ 20 (`node --version`)
+- `git` (`git --version`)
+- A clone of this repo: `git clone git@github.com:Gamaroff/agent-skills.git && cd agent-skills`
+- A working terminal where you can invoke this CLI agent
+
+⏱ Set a 10-minute timer. If you blow through it, your walkthrough is your bug report.
+
+---
+
+## 1. Verify install (≤ 30 s)
+
+```bash
+npx skills add --all
+```
+
+Expected: a short list of skill names with `installed` or `up-to-date` next to each. Re-running is safe — the installer is idempotent. If you see `command not found: npx`, install Node ≥ 20 first.
+
+---
+
+## 2. Create the task (≤ 90 s)
+
+Tell the agent:
+
+> `/create-task` Add a single-line footnote at the bottom of `README.md` that points readers at `CONTRIBUTING.md`. Title: "readme-contributor-footnote".
+
+The skill assigns the next task number from `docs/tasks/task-registry.md` and writes:
+
+```
+docs/tasks/task.{N}.readme-contributor-footnote/
+└── task.{N}.readme-contributor-footnote.md
+```
+
+Confirm the registry row was appended in the same commit (per `docs/standards/task-registry.md`).
+
+---
+
+## 3. Develop the task (≤ 7 min)
+
+```text
+/develop-task docs/tasks/task.{N}.readme-contributor-footnote/task.{N}.readme-contributor-footnote.md
+```
+
+You will be prompted by Phase 0 for:
+
+| Prompt | Recommended answer |
+|---|---|
+| Base branch | `main` (default) |
+| PR target | `main` |
+| Epic branch | No (single-task work) |
+
+The agent then chains: **review-task → create-branch → develop → create-pr → qa-task → qa-fix → finalise**. You don't need to drive it — sit back. The chain stops automatically when the QA gate is PASS and DoD is complete.
+
+If QA fails, the chain loops back into `qa-fix` (max 5 iterations). For a one-line README footnote, expect zero iterations.
+
+---
+
+## 4. Review your artifacts (≤ 60 s)
+
+```bash
+ls docs/tasks/task.{N}.readme-contributor-footnote/
+```
+
+You should see:
+
+| File | What it is |
+|---|---|
+| `task.{N}.readme-contributor-footnote.md` | Original task spec |
+| `task.{N}.plan.readme-contributor-footnote.md` | Co-located implementation plan |
+| `task.{N}.implementation.1.readme-contributor-footnote*.md` | What was built |
+| `task.{N}.qa.1.readme-contributor-footnote.md` | QA findings + traceability |
+| `task.{N}.gate.1.readme-contributor-footnote.yml` | PASS/CONCERNS/FAIL gate |
+| `task.{N}.dod.1.readme-contributor-footnote.md` | Definition-of-Done checklist |
+
+The pattern reference is `examples/README.md` — same artifact shapes, walked end-to-end on `task.6` there.
+
+---
+
+## 5. Cleanup (≤ 30 s)
+
+Pick one:
+
+**A. You want to keep the artifact as proof you ran the quickstart (recommended for first-time users).**
+
+Leave the branch as-is. Mark the registry row `CANCELLED` in `docs/tasks/task-registry.md`. Task numbers are never recycled — this row stays forever as a record. Do NOT delete the row.
+
+**B. You want a perfectly clean repo.**
+
+```bash
+git checkout main
+git branch -D task/task.{N}.readme-contributor-footnote
+```
+
+Then revert the registry commit (or amend it out if you haven't pushed). Note: task numbers still don't recycle — if you re-run the quickstart, you'll get `{N+1}`.
+
+⏱ Timer should read ≤ 10 min. If not, see "What slowed you down?" below.
+
+---
+
+## What slowed you down?
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `npx skills add` hung | Slow network or registry outage | Use `--registry https://registry.npmjs.org` |
+| Phase 0 prompts not matching table | Agent version differs | Check installed skill version in `.agents/skills/` |
+| QA loop iterated more than once | Practice task touched something non-trivial | Use a simpler task (one-line doc change) |
+| Elapsed > 10 min | Slow machine + large model context | The chain itself is fast; thinking time doesn't count |
+
+---
+
+## See also
+
+- `docs/standards/task-registry.md` — task numbering and registry rules
+- `docs/standards/status-lifecycle.md` — lifecycle states (`draft → planned → ready-for-development → in-progress → ready-for-review → accepted`)
+- `docs/standards/file-naming.md` — naming conventions for task artifacts
+- `docs/runbooks/task-development.md` — deep-dive on the full task development workflow
+- `examples/README.md` — annotated full-lifecycle artifact set (task.6)
+
+---
+
+## Change Log
+
+| Date | Version | Description | Author |
+|---|---|---|---|
+| 2026-05-12 | 0.1.0 | Initial draft — walkthrough authored and verified | dev-agent |

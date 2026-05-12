@@ -21,7 +21,7 @@ sections:
 
       1. **Assess Enhancement Complexity**: If this is a simple feature addition or bug fix that could be completed in 1-2 focused development sessions, STOP and recommend: "For simpler changes, consider using the brownfield-create-epic or brownfield-create-story task with the Product Owner instead. This full PRD process is designed for substantial enhancements that require architectural planning and multiple coordinated stories."
 
-      2. **Project Context**: Determine if we're working in an IDE with the project already loaded or if the user needs to provide project information. If project files are available, analyze existing documentation in the docs folder. If insufficient documentation exists, recommend running the document-project task first.
+      2. **Project Context**: Determine if we're working in an IDE with the project already loaded or if the user needs to provide project information. If project files are available, analyze existing documentation in the docs folder. If insufficient documentation exists, recommend running the document-existing-project task first.
 
       3. **Deep Assessment Requirement**: You MUST thoroughly analyze the existing project structure, patterns, and constraints before making ANY suggestions. Every recommendation must be grounded in actual project analysis, not assumptions.
 
@@ -33,7 +33,7 @@ sections:
     sections:
       - id: existing-project-overview
         title: Existing Project Overview
-        instruction: Check if document-project analysis was already performed. If yes, reference that output instead of re-analyzing.
+        instruction: Check if document-existing-project analysis was already performed. If yes, reference that output instead of re-analyzing.
         sections:
           - id: analysis-source
             title: Analysis Source
@@ -45,14 +45,14 @@ sections:
           - id: current-state
             title: Current Project State
             instruction: |
-              - If document-project output exists: Extract summary from "High Level Architecture" and "Technical Summary" sections
+              - If document-existing-project output exists: Extract summary from "High Level Architecture" and "Technical Summary" sections
               - Otherwise: Brief description of what the project currently does and its primary purpose
       - id: documentation-analysis
         title: Available Documentation Analysis
         instruction: |
-          If document-project was run:
+          If document-existing-project was run:
           - Note: "Document-project analysis available - using existing technical documentation"
-          - List key documents created by document-project
+          - List key documents created by document-existing-project
           - Skip the missing documentation check below
 
           Otherwise, check for existing documentation:
@@ -61,17 +61,17 @@ sections:
             title: Available Documentation
             type: checklist
             items:
-              - Tech Stack Documentation [[LLM: If from document-project, check ✓]]
-              - Source Tree/Architecture [[LLM: If from document-project, check ✓]]
-              - Coding Standards [[LLM: If from document-project, may be partial]]
-              - API Documentation [[LLM: If from document-project, check ✓]]
-              - External API Documentation [[LLM: If from document-project, check ✓]]
-              - UX/UI Guidelines [[LLM: May not be in document-project]]
-              - Technical Debt Documentation [[LLM: If from document-project, check ✓]]
+              - Tech Stack Documentation [[LLM: If from document-existing-project, check ✓]]
+              - Source Tree/Architecture [[LLM: If from document-existing-project, check ✓]]
+              - Coding Standards [[LLM: If from document-existing-project, may be partial]]
+              - API Documentation [[LLM: If from document-existing-project, check ✓]]
+              - External API Documentation [[LLM: If from document-existing-project, check ✓]]
+              - UX/UI Guidelines [[LLM: May not be in document-existing-project]]
+              - Technical Debt Documentation [[LLM: If from document-existing-project, check ✓]]
               - "Other: {{other_docs}}"
             instruction: |
-              - If document-project was already run: "Using existing project analysis from document-project output."
-              - If critical documentation is missing and no document-project: "I recommend running the document-project task first..."
+              - If document-existing-project was already run: "Using existing project analysis from document-existing-project output."
+              - If critical documentation is missing and no document-existing-project: "I recommend running the document-existing-project task first..."
       - id: enhancement-scope
         title: Enhancement Scope Definition
         instruction: Work with user to clearly define what type of enhancement this is. This is critical for scoping and approach.
@@ -175,7 +175,7 @@ sections:
       - id: existing-tech-stack
         title: Existing Technology Stack
         instruction: |
-          If document-project output available:
+          If document-existing-project output available:
           - Extract from "Actual Tech Stack" table in High Level Architecture section
           - Include version numbers and any noted constraints
 
@@ -213,7 +213,7 @@ sections:
       - id: risk-assessment
         title: Risk Assessment and Mitigation
         instruction: |
-          If document-project output available:
+          If document-existing-project output available:
           - Reference "Technical Debt and Known Issues" section
           - Include "Workarounds and Gotchas" that might impact enhancement
           - Note any identified constraints from "Critical Technical Debt"

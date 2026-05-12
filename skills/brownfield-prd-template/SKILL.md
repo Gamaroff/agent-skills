@@ -49,7 +49,7 @@ The brownfield PRD template (`resources/brownfield-prd-tmpl.yaml`) emphasizes:
 - MUST assess enhancement complexity first
 - If simple (1-2 sessions) → Recommend brownfield-story instead
 - If medium (1-3 stories) → Recommend create-epic instead
-- Check for document-project output
+- Check for document-existing-project output
 - Analyze existing documentation
 - Confirm understanding with user before proceeding
 
@@ -107,13 +107,13 @@ CR1: All existing API endpoints must remain functional with identical
 
 **Subsections:**
 
-- Existing Technology Stack (from document-project or analysis)
+- Existing Technology Stack (from document-existing-project or analysis)
 - Integration Approach (database, API, frontend, testing)
 - Code Organization and Standards (how new code fits existing patterns)
 - Deployment and Operations (build, deployment, monitoring, config)
 - Risk Assessment and Mitigation (technical debt, integration risks, deployment risks)
 
-**If document-project available:**
+**If document-existing-project available:**
 
 - Extract from "Actual Tech Stack" table
 - Reference "Technical Debt and Known Issues"
@@ -218,14 +218,14 @@ workflow:
 **References:**
 
 - `pm-checklist` - Validation
-- `document-project` - Existing project analysis (if available)
+- `document-existing-project` - Existing project analysis (if available)
 
 ## Common Patterns
 
 ### Pattern 1: Document-Project Available
 
 ```
-1. Check for document-project output
+1. Check for document-existing-project output
 2. Extract tech stack from "Actual Tech Stack" table
 3. Reference "Technical Debt and Known Issues"
 4. Use "Workarounds and Gotchas" in risk assessment

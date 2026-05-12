@@ -57,7 +57,7 @@ Invoke the architect skill when you need:
 
 ### Project Documentation
 
-- **document-project** - Generate comprehensive brownfield documentation
+- **document-existing-project** - Generate comprehensive brownfield documentation
   - Use the `document-existing-project` skill
   - Analyzes existing codebase and creates documentation
   - Captures technical debt, patterns, and constraints
@@ -113,7 +113,7 @@ Invoke the architect skill when you need:
 ### For Existing Projects (Brownfield)
 
 1. **Analyze Codebase**
-   - Use `document-project` to analyze existing code
+   - Use `document-existing-project` to analyze existing code
    - Understand current architecture and patterns
    - Identify technical debt and constraints
 
@@ -234,7 +234,7 @@ Architect:
 User: "Document our legacy e-commerce platform"
 
 Architect:
-1. Uses document-project skill to analyze codebase
+1. Uses document-existing-project skill to analyze codebase
 2. Identifies key patterns and technical debt
 3. Maps actual system structure (not ideal)
 4. Documents integration points and constraints

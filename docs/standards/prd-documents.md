@@ -76,7 +76,7 @@ When a PRD exceeds ~5 epics or ~30 stories, shard it for navigability:
 Before running `create-prd` / `new-product-prd`:
 
 - [ ] `prd.prdSharded` and `prd.prdShardedLocation` are set in `skills-config.yaml`
-- [ ] (Brownfield only) project architecture is documented — see `document-project` SKILL
+- [ ] (Brownfield only) project architecture is documented — see `document-existing-project` SKILL
 - [ ] Stakeholder input gathered for goals, requirements, success criteria
 
 Before downstream epic creation:
