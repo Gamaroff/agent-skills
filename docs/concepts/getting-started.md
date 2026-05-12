@@ -131,18 +131,14 @@ npm test            # L1 unit + L2 fixture + L3 protocol + L4 replay — no cred
 
 Green means your environment, packager, and bundler are all working. This is also the gate CI enforces on every push. See [`../contributing/evals/README.md`](../contributing/evals/README.md) for the full eval workflow (layers, drivers, when to run each).
 
-## What's next
+## Next steps
 
-- New to the library? Read [overview](./overview.md) and [architecture](./architecture.md).
-- Want to see real worked examples? See [`examples/README.md`](../../examples/README.md) — actual task artifacts produced by this repo running its own pipeline on itself.
-- New to a specific skill? Look it up in [`../reference/skill-catalog.md`](../reference/skill-catalog.md).
-- Building your own skill? Start at [`../contributing/authoring-skills.md`](../contributing/authoring-skills.md).
-- Want to run multiple stories in parallel? See [parallel stories](../runbooks/parallel-stories.md).
+You've installed agent-skills. Pick your first action:
 
-## See also
+- **Internal work (refactor, infra, cleanup)** → follow [`quickstart-task.md`](./quickstart-task.md) — ships a real task in 10 minutes.
+- **User-facing work (feature, bug, UX)** → follow [`quickstart-story.md`](./quickstart-story.md) — ships a real story in 60 minutes.
+- **Not sure which** → see [`which-path.md`](./which-path.md) — the decision tree.
 
-- [Overview](./overview.md)
-- [Architecture](./architecture.md)
-- [Glossary](../reference/glossary.md) — terms used across the docs
-- [Configuration](../reference/configuration.md) — full `skills-config.yaml` reference
-- [Runbooks](../runbooks/README.md) — walkthroughs by goal
+### More depth
+
+For reference material once you've shipped your first artifact: [runbooks](../runbooks/README.md), [standards](../standards/), [reference](../reference/).
