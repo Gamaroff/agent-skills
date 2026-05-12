@@ -3,7 +3,7 @@ name: develop
 description: Provides guidance for implementing features and technical tasks. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns. Covers task planning, platform separation, testing, and documentation standards. Includes story-driven development workflow with quality gates and comprehensive validation.
 ---
 
-> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
 
 # Develop
 

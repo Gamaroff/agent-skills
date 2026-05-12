@@ -338,7 +338,7 @@ This skill references:
 - [`docs/standards/architecture-docs.md`](../../docs/standards/architecture-docs.md) — the layout contract this skill satisfies.
 - [`docs/examples/architecture/`](../../docs/examples/architecture/) — copy-paste skeleton showing the target shape.
 - [`docs/reference/configuration.md`](../../docs/reference/configuration.md) — `skills-config.yaml` schema (`architecture.architectureShardedLocation`, `devLoadAlwaysFiles`).
-- [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md) — `status:` frontmatter values.
+- [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md) — `status:` frontmatter values.
 
 ---
 

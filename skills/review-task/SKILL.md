@@ -3,7 +3,7 @@ name: review-task
 description: Interactive task document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and implementability issues. Provides user-aligned recommendations based on collaborative input.
 ---
 
-> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
 
 # Review Task
 

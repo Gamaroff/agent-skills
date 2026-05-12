@@ -3,7 +3,7 @@ name: create-task
 description: Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work.
 ---
 
-> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
 
 # Create Task
 

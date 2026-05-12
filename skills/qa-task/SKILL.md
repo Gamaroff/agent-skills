@@ -3,7 +3,7 @@ name: qa-task
 description: Comprehensive quality assurance review for technical tasks. Focuses on success criteria validation, implementation phase verification, and non-functional requirements assessment for infrastructure and refactoring work.
 ---
 
-> **Status lifecycle**: see [`references/document-status-lifecycle.md`](../../references/document-status-lifecycle.md)
+> **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
 >
 > **Placeholders**: `{project}` in NX commands is a template — substitute your project name. See [`docs/placeholders.md`](../../docs/placeholders.md).
 

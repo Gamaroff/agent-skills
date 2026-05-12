@@ -23,7 +23,7 @@ from pathlib import Path
 
 from quick_validate import collect_shared_refs, find_repo_root
 
-SHARED_REF_RE = re.compile(r'shared/resources/([^\s`\'")\]*]+)')
+SHARED_REF_RE = re.compile(r'(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
 JS_SHARED_RE = re.compile(
     r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)'
 )
