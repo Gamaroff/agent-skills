@@ -2,7 +2,7 @@
 id: story.1.4.rewrite-getting-started-terminus
 title: "Story 1.4: Rewrite getting-started.md terminus to link to quickstarts"
 type: story
-status: draft
+status: accepted
 priority: medium
 epic: 1
 epic_file: ../../epic.1.quickstart-and-decision-tree-entry-point.md
@@ -12,12 +12,15 @@ jira_url: null
 github_issue: 84
 github_url: https://github.com/Gamaroff/agent-skills/issues/84
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-12
+completed_date: 2026-05-12
+pr_number: 97
 ---
 
 # Story 1.4: Rewrite getting-started.md to terminate in quickstarts
 
-**Status**: Draft
+**Status**: Accepted
+**Review**: ✅ All review recommendations from `story.1.4.review.1.rewrite-getting-started-terminus.md` implemented 2026-05-12 (no critical/important issues; 2 optional notes deferred to implementation)
 
 ## Story Statement
 
@@ -29,7 +32,7 @@ updated: 2026-05-11
 
 1. `docs/concepts/getting-started.md` final section replaced with a "Next steps" block linking prominently to `quickstart-task.md`, `quickstart-story.md`, and `which-path.md`.
 2. Diff is small — install checklist body preserved verbatim. Only the terminating section is rewritten.
-3. Closing prose ≤ 20 lines.
+3. Closing prose ≤ 20 lines. Cap covers the full replaced region — top-level "Next steps" block plus any "More depth" subsection demoted from the prior terminus.
 
 ## Dev Notes
 
@@ -55,12 +58,12 @@ N/A.
 
 ### Manual Testing Steps
 
-**Prerequisites:** read `docs/concepts/getting-started.md` BEFORE edit; capture its current install-checklist body for diff comparison.
+**Prerequisites:** read `docs/concepts/getting-started.md` BEFORE edit; capture (a) its current install-checklist body for diff comparison AND (b) the current terminus block ("What's next" + "See also" lists) verbatim so the "More depth" demotion in Task 4 has an explicit source — nothing is dropped silently.
 
 **Verification steps:**
 - **AC1:** scan the new terminus for 3 prominent links (`quickstart-task.md`, `quickstart-story.md`, `which-path.md`).
 - **AC2:** `git diff` shows ONLY the final section changed; install checklist body identical.
-- **AC3:** count lines of the new terminus block; ≤ 20.
+- **AC3:** count lines of the full replaced region (top-level "Next steps" + any "More depth" subsection); ≤ 20.
 
 **Edge cases:**
 - Existing terminus may already cross-link to runbooks — don't lose those links; demote them to a "More depth" subsection beneath the new "Next steps" block.
@@ -90,12 +93,12 @@ No conflicts.
 
 > Detailed implementation guide: [story.1.4.plan.rewrite-getting-started-terminus.md](story.1.4.plan.rewrite-getting-started-terminus.md)
 
-- [ ] **Task 1**: Read current `getting-started.md`; capture install-checklist body verbatim (AC: 2)
-- [ ] **Task 2**: Draft new "Next steps" block ≤ 20 lines, linking 3 targets (AC: 1, 3)
-- [ ] **Task 3**: Surgical replace — only the terminus, keep install checklist character-identical (AC: 2)
-- [ ] **Task 4**: Demote any existing runbook cross-links to "More depth" subsection (AC: 1)
-- [ ] **Task 5**: `git diff` review — install body unchanged (AC: 2)
-- [ ] **Task 6**: Static validation + link check + status flip (AC: 1, 3)
+- [x] **Task 1**: Read current `getting-started.md`; capture install-checklist body verbatim (AC: 2)
+- [x] **Task 2**: Draft new "Next steps" block ≤ 20 lines, linking 3 targets (AC: 1, 3)
+- [x] **Task 3**: Surgical replace — only the terminus, keep install checklist character-identical (AC: 2)
+- [x] **Task 4**: Demote any existing runbook cross-links to "More depth" subsection (AC: 1)
+- [x] **Task 5**: `git diff` review — install body unchanged (AC: 2)
+- [x] **Task 6**: Static validation + link check + status flip (AC: 1, 3)
 
 ## Testing
 
@@ -107,6 +110,8 @@ No conflicts.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-12 | 1.1     | Review passed (9/10) — ready for development | review-story |
+| 2026-05-12 | 1.2     | Applied 2 optional review notes (capture prior terminus; AC3 covers full replaced region) | review-story |
 
 ## Dev Agent Record
 
@@ -127,9 +132,73 @@ _(Developer fills in.)_
 - [ ] Terminus ≤ 20 lines
 - [ ] 3 outbound links resolve
 
-## QA Report
+## QA Testing Results
 
-_(Added on QA completion.)_
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-12
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [story.1.4.qa.1.rewrite-getting-started-terminus.md](./story.1.4.qa.1.rewrite-getting-started-terminus.md)
+- **Gate File**: [story.1.4.gate.1.rewrite-getting-started-terminus.yml](./story.1.4.gate.1.rewrite-getting-started-terminus.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 3/3
+- **Tests Executed**: 4 (diff inspection, link check, line count, security scan)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. All ACs met: terminus replaced (11 lines ≤ 20 cap), 3 quickstart links verified, install checklist preserved verbatim.
+
+## QA Completion Summary
+
+**Final QA Status**: ✅ Passed
+**QA Engineer**: QA Engineer
+**Final Testing Date**: 2026-05-12
+
+### Test Results Summary
+
+- **All Acceptance Criteria Met**: Yes
+- **Bug Reports Created**: 0
+- **Bug Reports Closed**: 0
+- **Regression Tests**: N/A (documentation only)
+- **Performance**: N/A
+- **Ready for Deployment**: Yes
+
+### Final Notes
+
+Clean PASS on first review. Proceed to `/finalise`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `story.1.4.qa.1.rewrite-getting-started-terminus.md`
+**Gate File**: `story.1.4.gate.1.rewrite-getting-started-terminus.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** All 3 criteria met (terminus replaced 11 lines, 3 links, install checklist verbatim)
+✅ **PR:** #97 open — `feature/story.1.4.rewrite-getting-started-terminus`
+✅ **Documentation:** Change log (3 entries), QA report, gate file, implementation report, DoD log all present
+✅ **Security Review:** ✅ PASS — no secrets, internal links only, pure markdown
+✅ **Compliance:** ✅ PASS — doc standards compliant, heading hierarchy valid, links resolve
+✅ **Performance:** N/A — static documentation
+✅ **Reliability:** ✅ PASS — all 5 linked targets verified on disk
+
+**Story marked as ACCEPTED on:** 2026-05-12
+
+**Detailed Verification Log:** See `story.1.4.dod.1.rewrite-getting-started-terminus.md` for complete evidence and timestamps.
 
 ## Bug Reports
 

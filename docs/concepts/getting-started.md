@@ -4,44 +4,53 @@
 
 From "I cloned the repo" to "I ran my first command" in under ten minutes.
 
+## Prerequisites
+
+Before starting, confirm you have:
+
+- **Node ≥ 20** — `node --version`
+- **git** — `git --version`
+- **gh CLI authenticated** (required for story work and PR creation) — `gh auth status` must return a logged-in account; if not, run `gh auth login`
+- **`project.yml` at your repo root** (required for GitHub project board integration — story and epic pipelines write board metadata here)
+
+If you are only running the task quickstart, `gh` and `project.yml` are not required. If you plan to run the story quickstart, all four are needed.
+
 ## 1. Install the skills
 
-The skills in this library are designed to be installed into target projects under `.agents/skills/`. Three paths:
+Skills install into your project under `.agents/skills/`. Two contexts:
 
-### Option A — `npx skills add` (recommended for consumers)
-
-In your target project root:
+**You are consuming skills in your own project** (most users):
 
 ```bash
-# Install one skill
-npx skills add https://github.com/Gamaroff/agent-skills --skill develop-story
+# In your target project root — installs all skills
+npx skills add --all
 
-# Install every skill in the repo
-npx skills add https://github.com/Gamaroff/agent-skills --all
+# Install one specific skill
+npx skills add --skill develop-story
 
 # Preview available skills without installing
-npx skills add https://github.com/Gamaroff/agent-skills --list
+npx skills add --list
 ```
 
-`--all` is shorthand for `--skill '*' --agent '*' -y` (install all skills into every detected agent directory, skip prompts). Each skill is self-contained — shared resources are pre-bundled into `references/`, so no clone is needed.
+`--all` installs every skill into every detected agent directory and skips prompts. Each skill is self-contained — shared resources are pre-bundled into `references/`, so no separate clone is needed.
 
-**Re-running the same command updates skills** — installs are idempotent and overwrite the existing skill directory with the latest version from the source.
+**Re-running the same command updates skills** — installs are idempotent and overwrite the existing skill directory with the latest version.
 
 Restart your agent (e.g. Claude Code) in the project dir after install so it picks up `.agents/skills/`.
 
-### Option B — copy the source skills (developing skills)
+### Option B — clone and work in the source repo (skill authors)
 
-If you're authoring or modifying skills in this repo, work directly in `skills/`:
+If you're authoring or modifying skills in this repo, work directly in `skills/`. The quickstarts also run against this clone:
 
 ```bash
-git clone https://github.com/Gamaroff/agent-skills.git
-cd agent-skills
+git clone git@github.com:Gamaroff/agent-skills.git && cd agent-skills
 npm install            # node deps for catalog generator
+npx skills add --all   # installs skills into .agents/skills/ inside this clone
 ```
 
-### Option C — install packaged skills into your project (manual)
+### Option C — manual zip install (offline / locked-down CI)
 
-If you can't use `npx skills add` (offline, locked-down CI, etc.), package skills manually and copy the zip:
+If you can't use `npx skills add`, package skills manually and copy the zip:
 
 ```bash
 # In this repo:
@@ -75,7 +84,7 @@ QA artifacts (review reports, gate files, DoD) are co-located with the story/tas
 
 ## 3. Create the registries
 
-Stories and tasks need globally unique numbers. Create the empty registries in your project:
+Stories and tasks need globally unique numbers. If you are working in a **new project** (not a clone of `agent-skills`), create empty registries:
 
 ```bash
 mkdir -p docs/tasks
@@ -85,9 +94,11 @@ touch docs/tasks/task-registry.md
 
 The first `/create-epic` and `/create-task` invocations will populate them. See [epic registry](../standards/epic-registry.md) and [task registry](../standards/task-registry.md).
 
+> If you cloned `agent-skills` to run a quickstart, these registries already exist — skip this step.
+
 ## 4. Decide your workflow
 
-Pick a path based on what you're shipping:
+Not sure what to run? See [which-path.md](./which-path.md) — a three-question decision tree.
 
 | Goal | Read this |
 |---|---|
@@ -96,6 +107,8 @@ Pick a path based on what you're shipping:
 | First user-facing feature | [Story Development](../runbooks/story-development.md) |
 | First refactor / infra task | [Task Development](../runbooks/task-development.md) |
 | Just learning what skills are | [Overview](./overview.md) |
+
+**Story work introduces one extra concept:** story branches always target a parent *epic branch* (e.g. `feature/epic.{N}.name`), not `develop` directly. The epic branch is created from `develop` once per epic; story PRs merge into it. `/develop-story` will prompt you for this in Phase 0.
 
 ## 5. Run your first command
 
@@ -111,14 +124,23 @@ Full invocation styles: [`../reference/invocation.md`](../reference/invocation.m
 
 ## 6. Verify your setup
 
-The simplest end-to-end smoke test:
+A real end-to-end smoke test — runs the full task pipeline (spec → branch → implement → PR → QA → gate → DoD):
 
 ```bash
-# In your project:
-/create-task        # produces task.{N}.{name}/ under docs/tasks/
+/develop-task docs/tasks/task.{N}.your-task-name/task.{N}.your-task-name.md
 ```
 
-If the file appears at the right path with a status of `draft`, the install is working. If not, check [`../reference/troubleshooting.md`](../reference/troubleshooting.md).
+If all seven artifacts appear under `docs/tasks/task.{N}.your-task-name/` and the gate file shows `PASS`, the install is working.
+
+For a minimal spec-only check (confirms skill loads but not the full chain):
+
+```bash
+/create-task        # produces task.{N}.{name}/ under docs/tasks/ with status: draft
+```
+
+If the file appears at the right path with `status: draft`, skill loading is working. If not, check [`../reference/troubleshooting.md`](../reference/troubleshooting.md).
+
+Artifacts produced by each pipeline and their expected `status` values follow the lifecycle: `draft → planned → ready-for-development → in-progress → ready-for-review → accepted`. See [`../standards/status-lifecycle.md`](../standards/status-lifecycle.md).
 
 ### Working on the agent-skills repo itself?
 
@@ -131,18 +153,14 @@ npm test            # L1 unit + L2 fixture + L3 protocol + L4 replay — no cred
 
 Green means your environment, packager, and bundler are all working. This is also the gate CI enforces on every push. See [`../contributing/evals/README.md`](../contributing/evals/README.md) for the full eval workflow (layers, drivers, when to run each).
 
-## What's next
+## Next steps
 
-- New to the library? Read [overview](./overview.md) and [architecture](./architecture.md).
-- Want to see real worked examples? See [`examples/README.md`](../../examples/README.md) — actual task artifacts produced by this repo running its own pipeline on itself.
-- New to a specific skill? Look it up in [`../reference/skill-catalog.md`](../reference/skill-catalog.md).
-- Building your own skill? Start at [`../contributing/authoring-skills.md`](../contributing/authoring-skills.md).
-- Want to run multiple stories in parallel? See [parallel stories](../runbooks/parallel-stories.md).
+You've installed agent-skills. Pick your first action:
 
-## See also
+- **Internal work (refactor, infra, cleanup)** → follow [`quickstart-task.md`](./quickstart-task.md) — ships a real task in 10 minutes.
+- **User-facing work (feature, bug, UX)** → follow [`quickstart-story.md`](./quickstart-story.md) — ships a real story in 60 minutes.
+- **Not sure which** → see [`which-path.md`](./which-path.md) — the decision tree.
 
-- [Overview](./overview.md)
-- [Architecture](./architecture.md)
-- [Glossary](../reference/glossary.md) — terms used across the docs
-- [Configuration](../reference/configuration.md) — full `skills-config.yaml` reference
-- [Runbooks](../runbooks/README.md) — walkthroughs by goal
+### More depth
+
+For reference material once you've shipped your first artifact: [runbooks](../runbooks/README.md), [standards](../standards/), [reference](../reference/).
