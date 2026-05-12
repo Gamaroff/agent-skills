@@ -108,7 +108,7 @@ No conflicts.
 - [x] **Task 3**: Author Mermaid `flowchart` (AC: 2, 4)
 - [x] **Task 4**: Author prose fallback that mirrors the flowchart's branching (AC: 4)
 - [x] **Task 5**: Wire leaf links to runbooks + quickstarts (AC: 3)
-- [ ] **Task 6**: Visual verify Mermaid render on GitHub preview (AC: 4)
+- [x] **Task 6**: Visual verify Mermaid render on GitHub preview (AC: 4) — ✅ confirmed 2026-05-12
 - [x] **Task 7**: Static validation, line-count check, status flip (AC: 1, 5)
 
 ## Testing
