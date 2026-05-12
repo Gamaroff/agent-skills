@@ -130,16 +130,21 @@ bash references/set-github-project-priority.sh "${STORY_ISSUE_NUM}" "${priority}
 
 **Link story as sub-issue of parent epic** (only if `EPIC_ISSUE_NUM` is non-empty):
 
+The GitHub sub-issues API requires the **internal database id** of the child issue, not its visible issue number. It must be passed as a typed integer (`-F`), not a string (`-f`):
+
 ```bash
 if [ -n "${EPIC_ISSUE_NUM}" ]; then
   REPO_NAME=$(gh repo view --json name -q '.name')
-  gh api \
-    --method POST \
-    -H "Accept: application/vnd.github+json" \
-    /repos/${OWNER}/${REPO_NAME}/issues/${EPIC_ISSUE_NUM}/sub_issues \
-    -f sub_issue_id=${STORY_ISSUE_NUM} 2>/dev/null \
-    && echo "✅ Story #${STORY_ISSUE_NUM} linked as sub-issue of Epic #${EPIC_ISSUE_NUM}." \
-    || echo "⚠️ Sub-issue linking failed — story issue created but not hierarchically linked."
+  SUB_ID=$(gh api /repos/${OWNER}/${REPO_NAME}/issues/${STORY_ISSUE_NUM} --jq .id 2>/dev/null)
+  if [ -n "$SUB_ID" ]; then
+    gh api \
+      --method POST \
+      -H "Accept: application/vnd.github+json" \
+      /repos/${OWNER}/${REPO_NAME}/issues/${EPIC_ISSUE_NUM}/sub_issues \
+      -F sub_issue_id="$SUB_ID" 2>/dev/null \
+      && echo "✅ Story #${STORY_ISSUE_NUM} linked as sub-issue of Epic #${EPIC_ISSUE_NUM}." \
+      || echo "⚠️ Sub-issue linking failed — story issue created but not hierarchically linked."
+  fi
 fi
 ```
 
