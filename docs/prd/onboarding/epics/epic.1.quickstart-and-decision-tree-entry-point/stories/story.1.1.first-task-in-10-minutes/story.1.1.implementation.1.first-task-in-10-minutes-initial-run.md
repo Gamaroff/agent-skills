@@ -41,7 +41,7 @@ Initial run — author `docs/concepts/quickstart-task.md` walkthrough guide and 
 | 4. create-pr                | ✅ Done | PR #77 — https://github.com/Gamaroff/agent-skills/pull/77 | Targets epic branch; no github_issue linked; 44 files, 5525 insertions | — |
 | 5–6. qa-story / qa-fix loop | ✅ Done | `story.1.1.qa.1.quickstart-walkthrough.md` ✅; `story.1.1.gate.1.quickstart-walkthrough.yml` ✅ (WAIVED 90/100); PR comments posted ✅ | AC3 dynamic walkthrough waived by user (pipeline nesting); LOW AC1 path fixed | — |
 | 7. finalise                 | ✅ Done | `story.1.1.dod.1.first-task-in-10-minutes.md` ✅; story `status: accepted` ✅; sprint-review-summary ✅; PR comment posted ✅ | No github_issue — tracker ops skipped | — |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
+| 8. commit-changes           | ✅ Done | All artifacts committed (f0c5f20) and pushed to remote | — | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -91,9 +91,9 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-05-12
+**Final Status**: Completed
 **Branch**: feature/story.1.1.first-task-in-10-minutes
 **PR**: https://github.com/Gamaroff/agent-skills/pull/77
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 1 (gate WAIVED — AC3 waived by user)
+**DoD Summary**: story.1.1.dod.1.first-task-in-10-minutes.md — ACCEPTED (90/100)
