@@ -9,51 +9,17 @@ This skill orchestrates the complete task development lifecycle, calling each sk
 
 ## Setup — Pipeline Hooks (one-time, per project)
 
-**Quick install** — run the bundled installer (idempotent, safe to re-run):
+The pipeline runs hands-free when two Claude Code hooks (`PreCompact` for graceful pause; `Stop` for forced continuation) are registered in `.claude/settings.json`. **Strongly recommended** — without the `Stop` hook, the orchestrator relies on prose-level "never stop between steps" rules that have been observed to fail under context pressure.
+
+**Install both with one command** (idempotent, preserves existing settings, `--dry-run` available):
 
 ```bash
 bash .agents/skills/develop-task/scripts/install-hooks.sh
 ```
 
-The installer auto-detects the install path, creates `.claude/settings.json` if missing, and registers both hooks while preserving any existing settings. Pass `--dry-run` to preview the patch without writing.
+**Full reference** — every hook in this pipeline, what each does, escape valves, interaction diagram, troubleshooting, and authoring contract for new hooks: [`references/develop-pipeline-hooks.md`](references/develop-pipeline-hooks.md). For the deep PreCompact pause/resume semantics specifically: [`references/develop-pipeline-pause.md`](references/develop-pipeline-pause.md).
 
----
-
-**Manual install** — register two hooks in the project's `.claude/settings.json` to keep the pipeline hands-free:
-
-- **`PreCompact`** — graceful pause on imminent context compaction (see `references/develop-pipeline-pause.md`).
-- **`Stop`** — forced continuation when the orchestrator tries to stop mid-pipeline. This is the structural defence against the failure mode where a sub-skill returns control with a "complete" message and the orchestrator yields to the user under context pressure. The hook reads `.claude/state/develop-pipeline.lock` and, if `current_step < 8`, injects a `decision: "block"` reason that lists the next required actions (Bash → Edit → banner → invoke). It honours Claude Code's `stop_hook_active` flag to avoid infinite loops.
-
-```json
-{
-  "hooks": {
-    "PreCompact": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .agents/skills/develop-task/scripts/on-precompact.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .agents/skills/develop-task/scripts/on-stop.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Setup is optional but **strongly recommended** — without the `Stop` hook, the orchestrator relies entirely on the SKILL.md prose to resist stopping between steps, which has been observed to fail under context pressure. The hook noops outside pipeline runs (no lock file = no side effects). Legitimate halts (failed sub-skill, autonomous-defaults miss) pass the hook naturally because the terminal-HALT protocol removes the lock before stopping.
+Hooks noop outside pipeline runs — zero overhead when no `.claude/state/develop-pipeline.lock` is present.
 
 ## When to Use This Skill
 
