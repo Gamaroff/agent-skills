@@ -1,0 +1,39 @@
+schema: 1
+story: '1.4'
+story_title: 'Rewrite getting-started.md terminus to link to quickstarts'
+gate: PASS
+status_reason: 'All 3 ACs met — terminus replaced with 11-line Next steps block, install checklist preserved verbatim, 3 quickstart links verified on disk.'
+reviewer: 'QA Engineer'
+updated: '2026-05-12T12:30:00Z'
+
+top_issues: []
+waiver:
+  active: false
+
+quality_score: 100
+expires: '2026-05-26T12:30:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Documentation-only — no secrets, no attack surface.'
+  performance:
+    status: PASS
+    notes: 'N/A — static documentation.'
+  reliability:
+    status: PASS
+    notes: 'All 5 linked targets resolve on disk.'
+  maintainability:
+    status: PASS
+    notes: 'Heading hierarchy valid; terminus concise and consistent with doc style.'
+
+recommendations:
+  immediate: []
+  future: []

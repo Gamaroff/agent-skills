@@ -101,7 +101,7 @@ def package_skill(skill_path, output_dir=None):
     try:
         EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
         EXCLUDE_SUFFIXES = {'.pyc', '.pyo', '.map'}
-        SHARED_REF_RE = re.compile(r'shared/resources/([^\s`\'")\]*]+)')
+        SHARED_REF_RE = re.compile(r'(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
         # Matches require("...path.../shared/resources/file") and rewrites to require("../references/file")
         JS_SHARED_RE = re.compile(r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)')
 

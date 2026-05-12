@@ -36,7 +36,7 @@ flowchart TD
 ## Chain 2 — Brownfield enhancement (large, 4+ stories)
 
 ```
-1. /document-project            (if no architecture docs exist)
+1. /document-existing-project            (if no architecture docs exist)
 2. /create-prd                  → brownfield-prd-template
 3. /pm-checklist                → validate completeness
 4. → Architect for tech design
@@ -93,4 +93,4 @@ See [`change-management` SKILL.md](../../skills/change-management/SKILL.md) for 
 - [`pm-checklist` SKILL.md](../../skills/pm-checklist/SKILL.md)
 - [`change-management` SKILL.md](../../skills/change-management/SKILL.md)
 - [`correct-course` SKILL.md](../../skills/correct-course/SKILL.md)
-- [`document-project` SKILL.md](../../skills/document-project/SKILL.md)
+- [`document-existing-project` SKILL.md](../../skills/document-existing-project/SKILL.md)

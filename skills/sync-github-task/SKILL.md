@@ -1,0 +1,208 @@
+---
+name: sync-github-task
+description: Sync a local technical task markdown file to GitHub Issues — creates the task issue if it has no github_issue, updates it if github_issue is already set. Standalone task — NOT linked to a parent epic issue (milestone carries the relationship if any). Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Maintains a Change Log in the local task file. GitHub-only sibling of sync-jira-task. Use when the user says "create this task in GitHub", "sync task to GitHub", "push task changes to GitHub", or "publish task to GitHub".
+---
+
+# sync-github-task
+
+## Purpose
+
+One-way sync of a local technical task markdown file to GitHub Issues. Auto-detects create vs update from `github_issue` in frontmatter.
+
+| `github_issue` present? | Action |
+|---|---|
+| Absent / null | **Pre-flight dedup search by title**, then **Create** (no parent linkage; milestone resolved from frontmatter / epic-registry / standalone default) if no match. Writes `github_issue` back to file. |
+| Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`, append Change Log row. |
+
+**Difference from `sync-github-story`:** tasks are **standalone** — no parent epic issue lookup, no sub-issue linking. Milestone is the only relationship to a higher-level work item, mirroring `sync-jira-task`'s "no jira_epic" stance.
+
+## When to Use
+
+- "Create this task in GitHub"
+- "Sync / push / update this task to GitHub"
+- "I've edited the task, push changes to GitHub"
+- "Publish this task file to GitHub"
+
+## When NOT to Use
+
+- Task is actually a user-facing story → use `/sync-github-story` instead.
+- Project tracks via Jira → use `/sync-jira-task`.
+
+## Prerequisites
+
+### Required Files
+
+- A task markdown file at `docs/tasks/task.<N>.<slug>/task.<N>.<slug>.md`.
+- `project.yml` at the repo root with `github.owner`, `github.repo`, `github.project_board_name`, `github.project_board_number`.
+
+### Required Tools
+
+- `gh` CLI authenticated (`gh auth status` returns OK).
+
+## Workflow
+
+### 1. Identify the Task File
+
+```
+docs/tasks/task.<N>.<slug>/task.<N>.<slug>.md
+```
+
+To find tasks that have **not yet been synced** (no `github_issue`):
+
+```bash
+grep -L 'github_issue:' $(find docs/tasks -name 'task.*.md' \
+  -not -name '*.plan.*' -not -name '*.qa.*' -not -name '*.bug.*' -not -name '*.implementation.*')
+```
+
+### 2. Source the Platform Resolver and Confirm GitHub
+
+```bash
+source references/resolve-platform.sh
+# Expect TRACKER=github. If TRACKER=jira, abort and tell the user to run /sync-jira-task.
+```
+
+### 3. Read Task Frontmatter
+
+Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if present), `milestone`, `epic`, `category`, `estimated_effort_hours`, `depends_on`, `labels`.
+
+Parse the task id from the filename: `task.{N}.` → `TASK_N`.
+
+### 4. Branch: Create vs Update
+
+#### 4a. Create Path (`github_issue` absent or null)
+
+Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={resolved task file path}`. The sub-routine:
+
+- runs a dedup-by-title search and adopts any single match,
+- resolves the milestone (frontmatter `milestone:` → epic-registry lookup → `"Technical Tasks (standalone)"`),
+- creates the issue if no match,
+- adds it to the Project board, mirrors the Priority field,
+- writes `github_issue: {N}` into the task frontmatter,
+- inserts/repairs the body cross-reference link.
+
+On return, `TASK_ISSUE_NUM` is set (integer) or empty (on failure).
+
+Append a Change Log row to the task markdown:
+
+```markdown
+| YYYY-MM-DD HH:MM | Initial GitHub issue created (#{TASK_ISSUE_NUM}) |
+```
+
+Continue to Step 5 (status reconciliation).
+
+#### 4b. Update Path (`github_issue` present)
+
+```bash
+ISSUE_NUM={github_issue from frontmatter}
+REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+
+# Verify the issue still exists
+gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue-${ISSUE_NUM}.json \
+  || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
+```
+
+Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt from the task document's Overview / Key Deliverables / Success Criteria / Metadata / Document sections.
+
+If anything changed, run:
+
+```bash
+gh issue edit ${ISSUE_NUM} \
+  --title "[Task ${TASK_N}] ${TASK_TITLE}" \
+  --body-file <(printf '%s' "$NEW_BODY") \
+  --milestone "${MILESTONE_TITLE}" \
+  --add-label "priority:${priority}" \
+  --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
+```
+
+If the priority label changed, also re-mirror the board's Priority field:
+
+```bash
+bash references/set-github-project-priority.sh "${ISSUE_NUM}" "${priority}" || true
+```
+
+Append a Change Log row describing what changed:
+
+```markdown
+| YYYY-MM-DD HH:MM | Updated: title, body, milestone, priority |
+```
+
+Skip-when-no-diff: if title, body, labels, and milestone are all identical to the remote state, skip `gh issue edit`, skip the Change Log entry, and proceed to Step 5.
+
+### 5. Status Reconciliation (open vs closed)
+
+Map frontmatter `status` to GitHub state:
+
+| Frontmatter status | GitHub state |
+|---|---|
+| `draft`, `planned`, `ready-for-development`, `in-progress`, `ready-for-review` | `open` |
+| `accepted`, `done`, `complete`, `completed`, `cancelled` | `closed` |
+
+```bash
+DESIRED=open  # or closed, per the map above
+CURRENT=$(gh issue view ${TASK_ISSUE_NUM} --json state -q '.state' | tr '[:upper:]' '[:lower:]')
+
+if [ "$CURRENT" != "$DESIRED" ]; then
+  if [ "$DESIRED" = "closed" ]; then
+    REASON=completed
+    [ "$STATUS" = "cancelled" ] && REASON=not_planned
+    gh issue close ${TASK_ISSUE_NUM} --reason ${REASON}
+  else
+    gh issue reopen ${TASK_ISSUE_NUM}
+  fi
+fi
+```
+
+### 6. Report to User
+
+- ✅ GitHub issue number (e.g. `#42`)
+- ✅ Issue URL
+- ✅ Standalone (no parent epic issue)
+- ✅ Milestone (e.g. `Technical Tasks (standalone)` or `Epic 5 — Cache Refactor`)
+- ✅ Added to project board + Priority field mirrored
+- ✅ State reconciled (`open` / `closed`)
+- ✅ Change log entry appended (or `no-diff, skipped`)
+- ✅ Task frontmatter updated (on create only)
+
+## Change Log Format
+
+```markdown
+<!-- github-sync-changelog-start -->
+## Change Log
+
+| Date (UTC)       | Change                                |
+|------------------|---------------------------------------|
+| 2026-05-12 09:40 | Initial GitHub issue created (#42)    |
+| 2026-05-12 11:05 | Updated: title, body, milestone       |
+<!-- github-sync-changelog-end -->
+```
+
+If the task already has a hand-written `## Change Log` heading without HTML markers, the first sync wraps it in markers in place and preserves any existing `| date | change |` rows.
+
+## Frontmatter Fields Written
+
+After sync the skill writes (in-place, preserving order):
+
+```yaml
+github_issue: 42
+```
+
+The full URL is reconstructable from `project.yml` (`owner` + `repo`) and the issue number, so no `github_url` field is persisted.
+
+## Error Handling
+
+| Error | Resolution |
+|---|---|
+| `TRACKER != github` | Abort with `Run /sync-jira-task instead.` |
+| `gh auth status` fails | Abort with instruction to run `gh auth login` |
+| `project.yml` missing or malformed | Abort with diagnostic |
+| Issue referenced by `github_issue` no longer exists | Abort update; user must reconcile manually |
+| Milestone lookup fails (e.g. `epic:` field set but no matching epic-registry row) | Falls through to `"Technical Tasks (standalone)"` and logs a warning |
+| Project board add fails | Warn and continue |
+| Priority field mirror fails | Warn and continue |
+
+## Notes
+
+- Tasks are deliberately **standalone** in this skill, matching `sync-jira-task`. If you need parent linkage, the milestone carries the relationship.
+- GitHub Issues is treated as a **read-only mirror** — edit the task file and re-sync; do not edit the issue directly. The skill does not detect or guard against concurrent remote edits.
+- Status reconciliation is **lossy** going GitHub → markdown: `closed` only tells us the issue is done, not which terminal status (`accepted` vs `cancelled`) the task is in. Frontmatter is authoritative.
+- For bulk re-sync: iterate over `find docs/tasks -name 'task.*.md'` (filtered as in Step 1) and invoke the skill once per file.

@@ -96,9 +96,9 @@ Skip for `mode=greenfield` — a new product already implies large scope.
 ### Brownfield mode
 
 1. **Existing Project Analysis** (CRITICAL):
-   - Check if `document-project` was already run
+   - Check if `document-existing-project` was already run
    - If YES → Use existing analysis
-   - If NO → Strongly recommend running `document-project` first
+   - If NO → Strongly recommend running `document-existing-project` first
    - Benefits: Tech stack documentation, architecture overview, technical debt assessment, API docs
 
 2. **Project Context** (ESSENTIAL):
@@ -124,7 +124,7 @@ If Project Brief is missing, the template will guide gathering this during the G
 ```
 1. Pre-Flight Check & Analysis
    ├─ (brownfield) Continuation detection, document discovery,
-   │   document-project check, scope, project analysis
+   │   document-existing-project check, scope, project analysis
    └─ (greenfield) Project Brief check, optional deep-research-prompt
 
 2. Interactive PRD Creation
@@ -240,10 +240,10 @@ you'd like me to include before we begin?"
 
 Load all confirmed documents before proceeding.
 
-**1c. Check for document-project Output:**
+**1c. Check for document-existing-project Output:**
 
 ```
-"Have you run document-project on this codebase? It provides:
+"Have you run document-existing-project on this codebase? It provides:
 - Complete tech stack documentation
 - Architecture overview
 - API documentation
@@ -256,7 +256,7 @@ enhancement planning."
 
 **1d. Analyze Existing Project:**
 
-**If document-project available:**
+**If document-existing-project available:**
 
 - Extract from "High Level Architecture" section
 - Review "Technical Summary"
@@ -324,12 +324,12 @@ Use create-doc skill with:
 
 **1a. Existing Project Overview:**
 
-- Analysis Source (document-project output | IDE analysis | user-provided)
+- Analysis Source (document-existing-project output | IDE analysis | user-provided)
 - Current Project State (what it does, primary purpose)
 
 **1b. Available Documentation Analysis:**
 
-- If document-project run → Reference existing docs
+- If document-existing-project run → Reference existing docs
 - Otherwise → Check for: Tech stack, architecture, API docs, UI guidelines, technical debt
 
 **1c. Enhancement Scope Definition:**
@@ -417,7 +417,7 @@ Present with rationale, STOP for 1-9 elicitation. Document ALL choices with rati
 
 **Brownfield — Technical Constraints and Integration Requirements** (replaces separate architecture documentation):
 
-- **Existing Technology Stack** — extract from document-project, include versions
+- **Existing Technology Stack** — extract from document-existing-project, include versions
 - **Integration Approach** — database, API, frontend, testing strategies
 - **Code Organization and Standards** — patterns, file structure, naming, conventions
 - **Deployment and Operations** — build, deployment, monitoring, configuration
@@ -625,7 +625,7 @@ Report total: `Quality checks: X/4 passed`. Address any FAILs before proceeding 
 **This skill may recommend:**
 
 - `deep-research-prompt` — Before greenfield PRD if market validation needed
-- `document-project` — Before brownfield PRD if existing project analysis missing
+- `document-existing-project` — Before brownfield PRD if existing project analysis missing
 - `shard-prd` — If PRD becomes large
 - `create-epics-from-shards` — After sharding
 
@@ -659,7 +659,7 @@ Report total: `Quality checks: X/4 passed`. Address any FAILs before proceeding 
 User: "Add biometric authentication to our existing mobile banking app"
 
 → create-prd activates (mode=brownfield, default)
-→ Continuation detection, document discovery, document-project check
+→ Continuation detection, document discovery, document-existing-project check
 → Analyzes existing authentication system
 → Confirms understanding with user
 → Uses create-doc + brownfield-prd-template
@@ -716,7 +716,7 @@ User: "Create a PRD for a new mobile app"
 ## Notes
 
 - Brownfield PRDs require more upfront analysis than greenfield
-- For brownfield, always recommend `document-project` if not already run
+- For brownfield, always recommend `document-existing-project` if not already run
 - Compatibility Requirements and Integration Verification sections are brownfield-only
 - Story sequencing for risk minimization is brownfield-critical
 - Technical debt must be incorporated into brownfield planning
