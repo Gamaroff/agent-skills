@@ -27,12 +27,14 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 
-const STORY_SKILL   = path.join(REPO_ROOT, "skills", "develop-story", "SKILL.md");
-const TASK_SKILL    = path.join(REPO_ROOT, "skills", "develop-task",  "SKILL.md");
-const DEVELOP_SKILL = path.join(REPO_ROOT, "skills", "develop",       "SKILL.md");
-const STEP0_SHARED  = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-0-resolve-and-prepare.md");
-const STEP3_SHARED  = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-3-develop-loop.md");
-const STEP8_SHARED  = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-8-commit.md");
+const STORY_SKILL    = path.join(REPO_ROOT, "skills", "develop-story", "SKILL.md");
+const TASK_SKILL     = path.join(REPO_ROOT, "skills", "develop-task",  "SKILL.md");
+const DEVELOP_SKILL  = path.join(REPO_ROOT, "skills", "develop",       "SKILL.md");
+const STORY_ON_STOP  = path.join(REPO_ROOT, "skills", "develop-story", "scripts", "on-stop.sh");
+const TASK_ON_STOP   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "on-stop.sh");
+const STEP0_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-0-resolve-and-prepare.md");
+const STEP3_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-3-develop-loop.md");
+const STEP8_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-8-commit.md");
 
 // ── Regression #2: Step Transition Protocol present in both orchestrators ──
 
@@ -47,6 +49,62 @@ test("#2 — develop-task SKILL.md documents Step Transition Protocol", async ()
   const content = await readFile(TASK_SKILL, "utf-8");
   assert.match(content, /Step Transition Protocol/, "Step Transition Protocol heading missing");
   assert.match(content, /lock-update Bash call is the binding signal/i, "binding-signal rationale missing");
+});
+
+// ── Regression #2b: Stop-hook structural backstop ──
+// Prose-only "never stop between steps" rules failed under context pressure
+// (observed during story 2.2 dogfood run on 2026-05-12). The Stop hook is the
+// structural defence: when the orchestrator tries to yield mid-pipeline, the
+// hook reads the lock and returns `decision: "block"` forcing continuation.
+
+test("#2b — develop-story Setup section registers both PreCompact and Stop hooks", async () => {
+  const content = await readFile(STORY_SKILL, "utf-8");
+  assert.match(content, /"PreCompact":/,           "Setup section must register PreCompact hook");
+  assert.match(content, /"Stop":/,                 "Setup section must register Stop hook");
+  assert.match(content, /on-stop\.sh/,             "Setup section must reference on-stop.sh");
+  assert.match(content, /stop_hook_active/,        "Setup section must mention stop_hook_active loop protection");
+  assert.match(content, /decision:\s*"block"/i,    "Setup must document decision:'block' contract");
+});
+
+test("#2b — develop-task Setup section registers both PreCompact and Stop hooks", async () => {
+  const content = await readFile(TASK_SKILL, "utf-8");
+  assert.match(content, /"PreCompact":/,           "Setup section must register PreCompact hook");
+  assert.match(content, /"Stop":/,                 "Setup section must register Stop hook");
+  assert.match(content, /on-stop\.sh/,             "Setup section must reference on-stop.sh");
+});
+
+test("#2b — develop-story on-stop.sh exists and honours stop_hook_active loop protection", async () => {
+  const content = await readFile(STORY_ON_STOP, "utf-8");
+  assert.match(content, /stop_hook_active/,                       "must read stop_hook_active flag");
+  assert.match(content, /develop-pipeline\.lock/,                 "must reference pipeline lock file");
+  assert.match(content, /current_step/,                           "must check current_step field");
+  assert.match(content, /decision.*block/i,                       "must emit decision:'block' when blocking");
+  assert.match(content, /set -uo pipefail/,                       "must use safe bash defaults");
+});
+
+test("#2b — develop-task on-stop.sh is byte-identical to develop-story on-stop.sh", async () => {
+  const storyHook = await readFile(STORY_ON_STOP, "utf-8");
+  const taskHook  = await readFile(TASK_ON_STOP,  "utf-8");
+  assert.equal(taskHook, storyHook, "Both on-stop.sh scripts must be identical (the lock's `skill` field selects branch)");
+});
+
+test("#2b — Step Transition Protocol lists Bash lock-update as action #1 (not #2)", async () => {
+  const storyContent = await readFile(STORY_SKILL, "utf-8");
+  const taskContent  = await readFile(TASK_SKILL,  "utf-8");
+  // Action #1 = Bash; action #2 = Edit. Reordered 2026-05-12 to anchor the model
+  // into the next step before the natural turn-boundary heuristic can fire.
+  for (const [label, content] of [["story", storyContent], ["task", taskContent]]) {
+    assert.match(
+      content,
+      /1\.\s*\*\*Bash tool call\*\*\s*advancing the lock/,
+      `${label}: Step Transition action #1 must be the Bash lock-update call`,
+    );
+    assert.match(
+      content,
+      /2\.\s*\*\*Edit the implementation report\*\*/,
+      `${label}: Step Transition action #2 must be the implementation-report Edit`,
+    );
+  }
 });
 
 test("#2 — develop SKILL.md mandates silent return to orchestrator", async () => {

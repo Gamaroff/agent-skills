@@ -7,9 +7,12 @@ description: 'Automates the full end-to-end task development lifecycle: create-b
 
 This skill orchestrates the complete task development lifecycle, calling each skill in sequence and maintaining an implementation report that records every significant decision and issue encountered along the way.
 
-## Setup — Graceful Pause Hook (one-time, per project)
+## Setup — Pipeline Hooks (one-time, per project)
 
-Register the bundled `PreCompact` hook in the project's `.claude/settings.json` to enable graceful pause on context compaction. See `references/develop-pipeline-pause.md` for the full setup instructions, lock-file contract, and pause/resume semantics.
+Register two hooks in the project's `.claude/settings.json` to keep the pipeline hands-free:
+
+- **`PreCompact`** — graceful pause on imminent context compaction (see `references/develop-pipeline-pause.md`).
+- **`Stop`** — forced continuation when the orchestrator tries to stop mid-pipeline. This is the structural defence against the failure mode where a sub-skill returns control with a "complete" message and the orchestrator yields to the user under context pressure. The hook reads `.claude/state/develop-pipeline.lock` and, if `current_step < 8`, injects a `decision: "block"` reason that lists the next required actions (Bash → Edit → banner → invoke). It honours Claude Code's `stop_hook_active` flag to avoid infinite loops.
 
 ```json
 {
@@ -24,12 +27,23 @@ Register the bundled `PreCompact` hook in the project's `.claude/settings.json` 
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .agents/skills/develop-task/scripts/on-stop.sh"
+          }
+        ]
+      }
     ]
   }
 }
 ```
 
-Setup is optional — without the hook, pipelines still resume correctly via post-compaction recovery, just without the PR comment and pause-state report entry. The hook noops when no pipeline lock is active — zero overhead outside pipeline runs.
+Setup is optional but **strongly recommended** — without the `Stop` hook, the orchestrator relies entirely on the SKILL.md prose to resist stopping between steps, which has been observed to fail under context pressure. The hook noops outside pipeline runs (no lock file = no side effects). Legitimate halts (failed sub-skill, autonomous-defaults miss) pass the hook naturally because the terminal-HALT protocol removes the lock before stopping.
 
 ## When to Use This Skill
 
@@ -117,13 +131,19 @@ This prevents context accumulation across the 8-step pipeline.
 
 **Never stop between steps.** This pipeline runs hands-free from Step 1 to Step 8. Never output a "done" or "complete" message and stop unless a step explicitly results in HALT or the pipeline has reached Step 8. Completing Step 4 (create-pr) is NOT a terminal state — Step 5 must follow immediately.
 
-**Step Transition Protocol (mandatory — prevents orchestrator stalls).** Every step ends with the same three actions, executed *in order, with no text output between them*:
+**Step Transition Protocol (mandatory — prevents orchestrator stalls).** Every step ends with the same four actions, executed *in order, with no text output between them*:
 
-1. **Update Pipeline Progress row** for the just-completed step (`✅ Done`).
-2. **Bash tool call** advancing the lock to the next step (see lock-update snippet below). If the just-completed step was Step 8, the call instead *removes* the lock.
-3. **Emit the Step {N+1} banner** (or the Phase 2 Completion banner if N=8). Banner emission and the next sub-skill invocation must happen in the same assistant turn as actions 1–2 — do NOT pause for user acknowledgement, do NOT summarise progress to the user, do NOT print "Returning to pipeline orchestrator" or any equivalent. The lock-update Bash call is the binding signal that the next step has started; without it the pipeline is considered stalled.
+1. **Bash tool call** advancing the lock to the next step (see lock-update snippet below). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, the call instead *removes* the lock.
+2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`).
+3. **Emit the Step {N+1} banner** (or the Phase 2 Completion banner if N=8):
+   ```
+   ═══ DEVELOP-TASK PIPELINE: STEP {N+1}/8 — {STEP-NAME} ═══
+   ```
+4. **Invoke the next sub-skill** via the Skill tool in the same assistant turn. Do NOT pause for user acknowledgement, do NOT summarise progress to the user, do NOT print "Returning to pipeline orchestrator" or any equivalent.
 
-Failure mode to avoid: a sub-skill returns control with a "complete" message and the orchestrator emits a natural-language summary before invoking the next step's tool call. Under context pressure the model may then yield to the user. **The lock-update tool call is what guarantees forward motion** — emit it the moment the sub-skill returns, before any prose.
+Failure mode this defends against: a sub-skill returns control with a "complete" message and the orchestrator emits a natural-language summary before issuing the lock-update Bash call. Under context pressure the model may then yield to the user. **The lock-update Bash call must come FIRST** — emit it the moment the sub-skill returns, before any prose. The lock-update Bash call is the binding signal that the next step has started; without it the pipeline is considered stalled. Putting Bash (a state-changing tool call with a persistent side effect) at position #1 instead of #2 anchors the model into the next step before the natural turn-boundary heuristic can fire.
+
+A `Stop` hook is also registered (see Setup) as a structural backstop: if the orchestrator nonetheless tries to stop mid-pipeline, the hook reads the lock and returns a `decision: "block"` reason that re-prompts the orchestrator to run actions 1–4 above.
 
 **Step banners (required).** Before starting each step, output a visible banner:
 ```
@@ -131,7 +151,7 @@ Failure mode to avoid: a sub-skill returns control with a "complete" message and
 ```
 This creates persistent checkpoints that survive context compression and make the pipeline position unambiguous.
 
-**Lock file `current_step` update (required, Steps 2–8).** Immediately after the banner, update the pipeline lock file so the PreCompact hook knows where the pipeline is:
+**Lock file `current_step` update (required, Steps 2–8).** Per the Step Transition Protocol above, this is **action #1** — the first tool call after a sub-skill returns, before the row update or banner. Both the `PreCompact` and `Stop` hooks read this field to know where the pipeline is:
 ```bash
 jq --argjson n {N} '.current_step = $n' .claude/state/develop-pipeline.lock \
   > .claude/state/develop-pipeline.lock.tmp && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock
