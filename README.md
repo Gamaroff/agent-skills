@@ -12,6 +12,12 @@ See [docs/concepts/overview.md](./docs/concepts/overview.md) for how skills work
 
 ---
 
+> ### 🚀 Start here
+>
+> - **First time?** → [Decision tree](./docs/concepts/which-path.md) tells you which path fits your work.
+> - **Want a 10-min hands-on?** → [Task quickstart](./docs/concepts/quickstart-task.md)
+> - **Want a 60-min full chain?** → [Story quickstart](./docs/concepts/quickstart-story.md)
+
 ## Contents
 
 - [Installing Skills](#installing-skills)
