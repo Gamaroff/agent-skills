@@ -18,7 +18,7 @@ stepsCompleted: [intro-analysis, requirements, technical-constraints, epic-struc
 
 ### 1.1 Existing Project Overview
 
-**Analysis Source:** IDE-based fresh analysis (no prior `document-project` run). Pre-flight exploration recorded in [`~/.claude/plans/i-want-to-dogfood-concurrent-sparkle.md`](../../../.claude/plans/i-want-to-dogfood-concurrent-sparkle.md).
+**Analysis Source:** IDE-based fresh analysis (no prior `document-existing-project` run). Pre-flight exploration recorded in [`~/.claude/plans/i-want-to-dogfood-concurrent-sparkle.md`](../../../.claude/plans/i-want-to-dogfood-concurrent-sparkle.md).
 
 **Current Project State:** `agent-skills` is a library of modular agent skills — self-contained packages (SKILL.md + scripts + references + assets) that extend AI coding agents with domain workflows. Skills are distributed via `.zip` packages and an `npx skills add` installer. The repo dogfoods its own **task** pipeline (`create-task` → `develop-task` → `qa-task` → `finalise`) against itself — see `docs/tasks/` (34 task directories). The **story** pipeline (`create-prd` → `create-epic` → `create-story` → `develop-story`) has never been exercised against this repo.
 
@@ -33,7 +33,7 @@ stepsCompleted: [intro-analysis, requirements, technical-constraints, epic-struc
 - [ ] Technical Debt Documentation — none formal
 - [x] Other: [`docs/runbooks/`](../../runbooks/), [`docs/operations/workflows.md`](../../operations/workflows.md), [`docs/reference/`](../../reference/), [`examples/README.md`](../../../examples/README.md)
 
-> No `document-project` output exists. Pre-flight exploration was sufficient because the repo is documentation-heavy and self-describing; a full `document-project` pass is recommended before any architectural PRDs, but not blocking for this onboarding-shaped one.
+> No `document-existing-project` output exists. Pre-flight exploration was sufficient because the repo is documentation-heavy and self-describing; a full `document-existing-project` pass is recommended before any architectural PRDs, but not blocking for this onboarding-shaped one.
 
 ### 1.3 Enhancement Scope Definition
 

@@ -1,15 +1,17 @@
 ---
 name: document-existing-project
-description: Generate comprehensive brownfield architecture documentation for existing codebases optimized for AI development. Analyzes actual code patterns, technical debt, and constraints. Use when documenting legacy systems or existing projects for enhancement or onboarding.
+description: Generate brownfield architecture documentation for existing codebases, written directly into a sharded docs/architecture/ tree (index.md + concepts/{coding-standards,tech-stack,source-tree}.md + optional shards). Documents actual code patterns, technical debt, and constraints. Use when documenting legacy systems or existing projects for enhancement or onboarding.
 ---
 
 # Document an Existing Project
 
 ## Purpose
 
-Generate comprehensive documentation for existing projects optimized for AI development agents. This skill creates structured reference materials that enable AI agents to understand project context, conventions, and patterns for effective contribution to any codebase.
+Generate comprehensive documentation for an existing project, written **directly into a sharded `docs/architecture/` tree** that downstream pipeline skills (`develop`, `create-story`, `review-story`, `qa-*`, `finalise`) consume via `devLoadAlwaysFiles`.
 
-**Key Focus**: Document what EXISTS, not what should exist - including technical debt, workarounds, and real-world constraints.
+This skill **never** produces a monolithic `docs/brownfield-architecture.md`. The output shape is fixed by [`docs/standards/architecture-docs.md`](../../docs/standards/architecture-docs.md). A consumer who already has a monolith from older runs can split it with `/shard-doc`; this skill only generates the sharded form going forward.
+
+**Key Focus**: Document what EXISTS, not what should exist — including technical debt, workarounds, and real-world constraints.
 
 ## When to Use This Skill
 
@@ -135,287 +137,209 @@ Critical to capture:
 
 **IF PRD PROVIDED:** Also analyze what would need to change for the enhancement.
 
-### 3. Core Documentation Generation
+#### Elicit Coding Standards Explicitly
 
-Generate a comprehensive BROWNFIELD architecture document that reflects the ACTUAL state of the codebase.
+The required `concepts/coding-standards.md` shard rarely falls out of code reading alone. After the patterns scan above, **explicitly elicit** the following from the user (or infer from lint/format configs and call it out as inferred):
 
-#### Document Structure
+- **Languages and idioms** — per language: version, style guide, idiomatic patterns. (`tsconfig.json`, `pyproject.toml`, etc.)
+- **Naming** — filenames, directories, exported symbols, env vars.
+- **Formatting and linting** — tools, config files, what is enforced in CI.
+- **Organisation** — co-location rules (e.g. `foo.ts` + `foo.spec.ts`), module-public-API conventions.
+- **Do-not** — anti-patterns specific to this project (deprecated packages, restricted globals, etc.).
+
+If the project has no written standards, say so honestly in the output. Don't invent rules.
+
+### 3. Core Documentation Generation — Sharded Output Contract
+
+The skill writes directly into a sharded `docs/architecture/` tree. **No monolithic file is ever produced.**
+
+#### Resolve the output base
+
+1. Read `skills-config.yaml` at the consumer-project root.
+2. Resolve `{arch}` ← `architecture.architectureShardedLocation`. Default: `docs/architecture`.
+3. Ensure `{arch}/` and `{arch}/concepts/` exist on disk (create if missing).
+
+If `skills-config.yaml` is absent, prompt the user to create one. Reference [`docs/reference/configuration.md`](../../docs/reference/configuration.md). Do not proceed without `{arch}` resolved.
+
+#### Required shards (always written)
+
+These three are **mandatory** and loaded by every downstream pipeline run via `devLoadAlwaysFiles`. Missing any of them breaks `develop`, `develop-story`, `develop-task`, and the reviewers.
+
+##### `{arch}/concepts/coding-standards.md`
+
+Frontmatter: `---\ntitle: Coding standards\nstatus: draft\n---`
+
+Required sections (use these exact headings):
 
 ```markdown
-# [Project Name] Brownfield Architecture Document
+# Coding standards
 
-## Introduction
+> Conventions the agent must obey when writing code in this project. Loaded into every pipeline run.
 
-This document captures the CURRENT STATE of the [Project Name] codebase, including technical debt, workarounds, and real-world patterns. It serves as a reference for AI agents working on enhancements.
-
-### Document Scope
-
-[If PRD provided: "Focused on areas relevant to: {enhancement description}"]
-[If no PRD: "Comprehensive documentation of entire system"]
-
-### Change Log
-
-| Date   | Version | Description                 | Author    |
-| ------ | ------- | --------------------------- | --------- |
-| [Date] | 1.0     | Initial brownfield analysis | [Analyst] |
-
-## Quick Reference - Key Files and Entry Points
-
-### Critical Files for Understanding the System
-
-- **Main Entry**: `src/index.js` (or actual entry point)
-- **Configuration**: `config/app.config.js`, `.env.example`
-- **Core Business Logic**: `src/services/`, `src/domain/`
-- **API Definitions**: `src/routes/` or link to OpenAPI spec
-- **Database Models**: `src/models/` or link to schema files
-- **Key Algorithms**: [List specific files with complex logic]
-
-### If PRD Provided - Enhancement Impact Areas
-
-[Highlight which files/modules will be affected by the planned enhancement]
-
-## High Level Architecture
-
-### Technical Summary
-
-[Brief overview of the system architecture as it actually exists]
-
-### Actual Tech Stack
-
-| Category  | Technology | Version | Notes                      |
-| --------- | ---------- | ------- | -------------------------- |
-| Runtime   | Node.js    | 16.x    | [Any constraints]          |
-| Framework | Express    | 4.18.2  | [Custom middleware?]       |
-| Database  | PostgreSQL | 13      | [Connection pooling setup] |
-[etc...]
-
-### Repository Structure Reality Check
-
-- **Type**: [Monorepo/Polyrepo/Hybrid]
-- **Package Manager**: [npm/yarn/pnpm]
-- **Notable**: [Any unusual structure decisions]
-
-## Source Tree and Module Organization
-
-### Project Structure (Actual)
-
-```text
-project-root/
-├── src/
-│   ├── controllers/     # HTTP request handlers
-│   ├── services/        # Business logic (NOTE: inconsistent patterns between modules)
-│   ├── models/          # Database models
-│   ├── utils/           # Mixed bag - needs refactoring
-│   └── legacy/          # DO NOT MODIFY - old system still in use
-├── tests/               # Jest tests (60% coverage)
-├── scripts/             # Build and deployment scripts
-└── config/              # Environment configs
+## Languages and idioms
+## Naming
+## Formatting and linting
+## Organisation
+## Do not
 ```
 
-### Key Modules and Their Purpose
+Populate from the "Elicit Coding Standards Explicitly" step. Mark inferred rules as inferred (e.g. "_Inferred from `.eslintrc.json`._").
 
-[List major modules with actual file paths and responsibilities]
+##### `{arch}/concepts/tech-stack.md`
 
-## Data Models and APIs
+Frontmatter: `---\ntitle: Tech stack\nstatus: draft\n---`
 
-### Data Models
+Required sections:
 
-Instead of duplicating, reference actual model files:
-- **User Model**: See `src/models/User.js`
-- **Order Model**: See `src/models/Order.js`
-- **Related Types**: TypeScript definitions in `src/types/`
+```markdown
+# Tech stack
 
-### API Specifications
+> Runtimes, languages, frameworks, and major libraries actually in use. Loaded into every pipeline run.
 
-- **OpenAPI Spec**: `docs/api/openapi.yaml` (if exists)
-- **Postman Collection**: `docs/api/postman-collection.json`
-- **Manual Endpoints**: [List any undocumented endpoints discovered]
-
-## Technical Debt and Known Issues
-
-### Critical Technical Debt
-
-1. **[Component Name]**: [Description of debt, why it exists, impact]
-2. **[Another Component]**: [Specific technical debt details]
-[etc...]
-
-### Workarounds and Gotchas
-
-- **[Workaround 1]**: [Description and why it's necessary]
-- **[Gotcha 1]**: [What developers need to know]
-[etc...]
-
-## Integration Points and External Dependencies
-
-### External Services
-
-| Service  | Purpose  | Integration Type | Key Files                      |
-| -------- | -------- | ---------------- | ------------------------------ |
-| Stripe   | Payments | REST API         | `src/integrations/stripe/`     |
-| SendGrid | Emails   | SDK              | `src/services/emailService.js` |
-[etc...]
-
-### Internal Integration Points
-
-- **Frontend Communication**: [How frontend communicates with backend]
-- **Background Jobs**: [Queue/worker setup]
-[etc...]
-
-## Development and Deployment
-
-### Local Development Setup
-
-1. [Actual steps that work (not ideal steps)]
-2. [Known issues with setup]
-3. [Required environment variables]
-
-### Build and Deployment Process
-
-- **Build Command**: [Actual build command]
-- **Deployment**: [How deployments actually work]
-- **Environments**: [Dev, Staging, Prod details]
-
-## Testing Reality
-
-### Current Test Coverage
-
-- **Unit Tests**: [Actual coverage percentage]
-- **Integration Tests**: [State of integration tests]
-- **E2E Tests**: [E2E test status]
-- **Manual Testing**: [Manual QA process]
-
-### Running Tests
-
-```bash
-[Actual test commands]
+## Runtimes
+## Languages
+## Frameworks
+## Major libraries
+## Build and tooling
+## Infrastructure
 ```
 
-## If Enhancement PRD Provided - Impact Analysis
+Use real version numbers from lockfiles and config. Call out "actual" vs "in package.json but unused" if relevant.
 
-### Files That Will Need Modification
+##### `{arch}/concepts/source-tree.md`
 
-Based on the enhancement requirements, these files will be affected:
-- `path/to/file.js` - [What needs to change]
-[etc...]
+Frontmatter: `---\ntitle: Source tree\nstatus: draft\n---`
 
-### New Files/Modules Needed
+Required sections:
 
-- `path/to/new/file.js` - [Purpose]
-[etc...]
+```markdown
+# Source tree
 
-### Integration Considerations
+> Where things live in this repository. Loaded into every pipeline run.
 
-- [How enhancement integrates with existing code]
-- [Constraints to be aware of]
-[etc...]
-
-## Appendix - Useful Commands and Scripts
-
-### Frequently Used Commands
-
-```bash
-[List of common dev commands]
+## Top-level layout
+## Where to put what
+## Workspace boundaries  (omit if not a monorepo)
+## Do not touch without a reason
 ```
 
-### Debugging and Troubleshooting
+Show a real tree (run `ls` / inspect on disk). Annotate inconsistencies and legacy areas in-line. Reference paths agents should not modify.
 
-- **Logs**: [Where logs are]
-- **Debug Mode**: [How to enable debugging]
-- **Common Issues**: [Link to troubleshooting]
-```
+#### Optional shards (write when content exists)
 
-### 4. Document Delivery
+Each optional shard lives at `{arch}/<shard-name>.md` with `---\ntitle: ...\nstatus: draft\n---` frontmatter. Only write a shard if the project has substantive content for it — empty shards add noise.
 
-#### In Web UI (Gemini, ChatGPT, Claude)
-- Present the entire document in one response (or multiple if too long)
-- Tell user to copy and save as `docs/brownfield-architecture.md` or `docs/project-architecture.md`
-- Mention it can be sharded later in IDE if needed
+| Shard | Purpose | Skip when |
+|---|---|---|
+| `quick-reference.md` | Critical files, entry points, "if you only read three files" | Source tree already covers it |
+| `data-models.md` | Pointers to actual model files; do not duplicate them | No persistent data layer |
+| `technical-debt.md` | Critical debt, workarounds, gotchas | Project is genuinely clean (rare) |
+| `integrations.md` | External services, internal integration points | No external integrations |
+| `deployment.md` | Local dev setup, build, deploy environments | Standard mechanism with no quirks |
+| `testing.md` | Coverage reality, how to run tests, manual QA process | Tests are standard and documented in README |
+| `impact-analysis.md` | Files to modify + new files needed for the PRD's enhancement | **Only write when a PRD is in scope** |
+| `appendix.md` | Frequently used commands, debugging tips, troubleshooting pointers | Nothing project-specific to add |
 
-#### In IDE Environment
-- Create the document as `docs/brownfield-architecture.md`
-- Inform user this single document contains all architectural information
-- Can be sharded later using related skills if desired
+Use the same brownfield/REALITY tone for every shard: reference real files, name workarounds explicitly, do not invent best-practice prose.
 
-The document should be comprehensive enough that future agents can understand:
-- The actual state of the system (not idealized)
-- Where to find key files and logic
-- What technical debt exists
-- What constraints must be respected
-- If PRD provided: What needs to change for the enhancement
+#### Writer protocol
 
-### 5. Quality Assurance
+For each shard the analysis produced (required + applicable optional):
 
-**CRITICAL:** Before finalizing the document:
+1. Compute target path under `{arch}/`.
+2. **If file already exists:** read it, generate the new content, then **show a unified diff** of new vs existing to the user. Ask: `[overwrite / merge / skip]`.
+   - `overwrite` — write new content, replacing the file entirely.
+   - `merge` — present a merged candidate marking new sections clearly (e.g. `<!-- new -->`). Re-prompt to confirm before writing.
+   - `skip` — leave the existing file untouched, but still include it in the index.
+3. **If file is new:** write directly.
+4. After processing all shards, **regenerate `{arch}/index.md`** to list every shard now present in `{arch}/`. Format follows [`docs/examples/architecture/index.md`](../../docs/examples/architecture/index.md): required-shards block, optional-shards block, See also.
+5. Print a summary to the user: `written: [...]`, `merged: [...]`, `skipped: [...]`. Do not silently overwrite.
 
-1. **Accuracy Check**: Verify all technical details match the actual codebase
-2. **Completeness Review**: Ensure all major system components are documented
-3. **Focus Validation**: If user provided scope, verify relevant areas are emphasized
-4. **Clarity Assessment**: Check that explanations are clear for AI agents
-5. **Navigation**: Ensure document has clear section structure for easy reference
+**HARD RULE:** Never write `docs/brownfield-architecture.md` or any other monolithic architecture file. If the user explicitly asks for a monolith, refuse and explain that the sharded layout is what downstream pipeline skills consume.
 
-Apply advanced elicitation techniques after major sections to refine based on user feedback.
+### 4. Quality Assurance
+
+**CRITICAL:** Before declaring done:
+
+1. **Accuracy** — every technical detail matches the actual codebase. Spot-check at least one claim per shard against the source.
+2. **Completeness** — all three required `concepts/` shards exist and are non-trivial.
+3. **Focus** — if the user provided enhancement scope, relevant areas are emphasised; `impact-analysis.md` is present.
+4. **No invention** — no "best practice" prose that is not grounded in actual code or stated standards.
+5. **Index hygiene** — `{arch}/index.md` links every shard present in the directory (no dangling links, no missing entries).
+6. **No monolith** — `docs/brownfield-architecture.md` does not exist. If it does (legacy run), tell the user to delete it or `/shard-doc` it; do not consume it.
+
+Apply advanced elicitation techniques after major shards to refine based on user feedback.
 
 ## Success Criteria
 
-✅ Single comprehensive brownfield architecture document created
-✅ Document reflects REALITY including technical debt and workarounds
-✅ Key files and modules are referenced with actual paths
-✅ Models/APIs reference source files rather than duplicating content
-✅ If PRD provided: Clear impact analysis showing what needs to change
-✅ Document enables AI agents to navigate and understand the actual codebase
-✅ Technical constraints and "gotchas" are clearly documented
-✅ Honest assessment of current state (not aspirational)
+✅ `{arch}/index.md` exists and lists every shard present.
+✅ `{arch}/concepts/coding-standards.md`, `{arch}/concepts/tech-stack.md`, `{arch}/concepts/source-tree.md` all exist and contain real content (not placeholders).
+✅ Each shard reflects REALITY including technical debt and workarounds.
+✅ Files and modules are referenced with actual paths; data models / APIs reference source files instead of duplicating them.
+✅ If PRD provided: `impact-analysis.md` shows what needs to change.
+✅ Technical constraints and "gotchas" are clearly documented in `technical-debt.md` (or inline where they belong).
+✅ No `docs/brownfield-architecture.md` or other monolithic architecture file produced.
+✅ Existing files were never silently overwritten (each existing target was diffed and confirmed).
 
 ## Examples
 
-### Example 1: Document E-Commerce Platform
+### Example 1: Brownfield E-Commerce Platform
 
 ```
-User: "Document our legacy Node.js e-commerce platform"
+User: "Document our legacy Node.js e-commerce platform — we're adding crypto payments."
 
 Skill:
-1. Asks if there's a PRD or planned enhancement
-2. User says: "We want to add cryptocurrency payments"
-3. Analyzes codebase focusing on payment-related modules
-4. Documents actual payment flow (including legacy Stripe integration)
-5. Identifies where crypto integration needs to happen
-6. Notes technical debt in payment service
-7. Provides focused brownfield documentation
+1. Sees PRD/enhancement in scope. Focuses on payment-adjacent modules.
+2. Resolves {arch} = docs/architecture from skills-config.yaml.
+3. Elicits coding standards (style is mixed CommonJS + some ESM; lint is loose).
+4. Writes:
+   - docs/architecture/index.md
+   - docs/architecture/concepts/coding-standards.md
+   - docs/architecture/concepts/tech-stack.md  (Node 16 actual, package.json says 18)
+   - docs/architecture/concepts/source-tree.md
+   - docs/architecture/integrations.md          (Stripe, PayPal, SendGrid)
+   - docs/architecture/technical-debt.md        (payment service has dual code paths)
+   - docs/architecture/impact-analysis.md       (crypto entry points + new wallet service)
+5. Skips data-models.md (Mongoose models are well-named, source-tree covers it).
+6. Prints summary: written 6, merged 0, skipped 0.
 ```
 
-### Example 2: Comprehensive Documentation
+### Example 2: Comprehensive Documentation, No PRD
 
 ```
-User: "Document our Python Flask API"
+User: "Document our Python Flask API end-to-end. No specific enhancement planned."
 
 Skill:
-1. Asks about focus - user wants full documentation
-2. Analyzes entire codebase systematically
-3. Discovers inconsistent patterns between modules
-4. Documents actual structure (not ideal)
-5. Identifies key files and entry points
-6. Notes technical debt and workarounds
-7. Creates comprehensive brownfield architecture doc
+1. No PRD — asks the four-option question, user picks option 4 (everything).
+2. Resolves {arch} = docs/architecture.
+3. Writes the three required concepts/ shards.
+4. Writes deployment.md (Docker + Heroku deployment is quirky) and testing.md (60% coverage, no E2E).
+5. Skips impact-analysis.md (no PRD).
+6. Existing concepts/coding-standards.md already exists from a prior partial run:
+   diff shown → user picks "merge" → merged candidate written after confirmation.
+7. Prints summary: written 4, merged 1, skipped 0.
 ```
 
 ## Notes
 
-- This skill creates ONE document that captures the TRUE state of the system
-- References actual files rather than duplicating content when possible
-- Documents technical debt, workarounds, and constraints honestly
-- For brownfield projects with PRD: Provides clear enhancement impact analysis
-- The goal is PRACTICAL documentation for AI agents doing real work
-- Avoid aspirational language - focus on reality
-- Be honest about problems and technical debt
-- Highlight areas that can't be changed vs. areas that need improvement
+- This skill captures the TRUE state of the system, sharded for pipeline consumption.
+- References actual files rather than duplicating their content.
+- Documents technical debt, workarounds, and constraints honestly.
+- For brownfield projects with a PRD: produces an `impact-analysis.md` shard showing what needs to change.
+- The goal is PRACTICAL documentation that AI agents can load via `devLoadAlwaysFiles` for real work.
+- Avoid aspirational language — focus on reality.
+- Be honest about problems and technical debt.
+- Highlight areas that can't be changed vs. areas that need improvement.
+- Never write a monolithic architecture file. If the user has one from a legacy run, point them at `/shard-doc`.
 
 ## Resources
 
-This skill may reference:
-- Brownfield architecture template (via `create-architecture-doc` skill if needed)
-- Project analysis tools and techniques
-- Documentation standards from main architect skill
+This skill references:
+- [`docs/standards/architecture-docs.md`](../../docs/standards/architecture-docs.md) — the layout contract this skill satisfies.
+- [`docs/examples/architecture/`](../../docs/examples/architecture/) — copy-paste skeleton showing the target shape.
+- [`docs/reference/configuration.md`](../../docs/reference/configuration.md) — `skills-config.yaml` schema (`architecture.architectureShardedLocation`, `devLoadAlwaysFiles`).
+- [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md) — `status:` frontmatter values.
 
 ---
 
-**Remember**: The best brownfield documentation is honest, practical, and focused on enabling real work - not creating an idealized view of the system.
+**Remember**: The best brownfield documentation is honest, practical, sharded for pipeline consumption, and grounded in code that actually exists — not an idealised view of the system.

@@ -93,6 +93,10 @@ Canonical patterns: [`docs/standards/file-naming.md`](./docs/standards/file-nami
 
 Canonical spec: [`shared/resources/document-status-lifecycle.md`](./shared/resources/document-status-lifecycle.md). TL;DR: `draft → planned → ready-for-development → in-progress → ready-for-review → accepted`, with `cancelled` reachable from any non-terminal state. Frontmatter `status:` uses `lowercase-kebab-case`; body `**Status:**` uses `Title Case`. Update both in the same edit.
 
+## Architecture Documents
+
+Canonical spec: [`docs/standards/architecture-docs.md`](./docs/standards/architecture-docs.md). TL;DR: a consumer project must put architecture docs under `docs/architecture/` (sharded, default) with required files `concepts/coding-standards.md`, `concepts/tech-stack.md`, and `concepts/source-tree.md` — these are loaded into every pipeline run via `devLoadAlwaysFiles`. Copy-paste skeleton: [`docs/examples/architecture/`](./docs/examples/architecture/). Generate from an existing codebase with `/document-existing-project`.
+
 ## Skill Catalog
 
 Generated index of all skills: [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md). Run `npm run generate-catalog` after adding or editing skills.

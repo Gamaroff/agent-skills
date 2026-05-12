@@ -2,7 +2,7 @@
 
 > **Audience:** developers spinning up a brand-new project with this library.
 
-The order of operations for going from "empty repo" to "first story in flight." For an existing codebase you're documenting, use [`document-project`](../../skills/document-project/SKILL.md) instead.
+The order of operations for going from "empty repo" to "first story in flight." For an existing codebase you're documenting, use [`document-existing-project`](../../skills/document-existing-project/SKILL.md) instead.
 
 ## When to use this runbook
 
@@ -62,5 +62,6 @@ Before step 1:
 - [`new-product-prd` SKILL.md](../../skills/new-product-prd/SKILL.md)
 - [`shard-prd` SKILL.md](../../skills/shard-prd/SKILL.md)
 - [PRD documents standard](../standards/prd-documents.md)
+- [Architecture documents standard](../standards/architecture-docs.md) — required `docs/architecture/` layout, with copy-paste skeleton at [`docs/examples/architecture/`](../examples/architecture/)
 - [PM Workflows Runbook](./pm-workflows.md)
 - [Story Development Runbook](./story-development.md)

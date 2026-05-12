@@ -73,7 +73,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 |---|---|
 | "Find me a skill for X" / "Is there a skill for…" | `find-skills` |
 | "Create a new skill for X" | `create-skill` |
-| "Document this existing project" | `document-project` |
+| "Document this existing project" | `document-existing-project` |
 | "Remember this — we use NX for testing" | `remember-insight` |
 
 ## Architecture

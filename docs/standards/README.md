@@ -18,6 +18,7 @@ Rules and schemas that documents in a consuming project must follow. Skills enfo
 - [Plan file locations](./plan-file-locations.md) — where implementation plans live
 - [Epic registry](./epic-registry.md) — global epic numbering
 - [Task registry](./task-registry.md) — global task numbering
+- [Architecture documents](./architecture-docs.md) — required `docs/architecture/` tree, shard rules, version field
 
 ## Section template
 
