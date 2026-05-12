@@ -2,7 +2,7 @@
 id: story.2.1.capture-prd-as-worked-example
 title: "Story 2.1: Capture this PRD as the worked PRD example"
 type: story
-status: ready-for-review
+status: accepted
 priority: high
 epic: 2
 epic_file: ../../epic.2.worked-prd-epic-story-examples.md
@@ -13,11 +13,13 @@ github_issue: 93
 github_url: https://github.com/Gamaroff/agent-skills/issues/93
 created: 2026-05-11
 updated: 2026-05-12
+completed_date: 2026-05-12
+pr_number: 101
 ---
 
 # Story 2.1: Capture this PRD as the worked PRD example
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ Important recommendations from `story.2.1.review.1.capture-prd-as-worked-example.md` implemented 2026-05-12
 
 ## Story Statement
@@ -133,12 +135,64 @@ No conflicts.
 - [x] Narrative README adds insight beyond summary
 - [x] `source_sha` field present and resolves on GitHub
 
-## QA Report
+## QA Testing Results
 
-_(Added on QA completion.)_
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer (develop-story pipeline)
+**Testing Date**: 2026-05-12
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [story.2.1.qa.1.capture-prd-as-worked-example.md](./story.2.1.qa.1.capture-prd-as-worked-example.md)
+- **Gate File**: [story.2.1.gate.1.capture-prd-as-worked-example.yml](./story.2.1.gate.1.capture-prd-as-worked-example.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 3/3
+- **Tests Executed**: Direct static inspection (no executable tests — doc-only story)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues. One LOW observation (examples/README.md caveat now inconsistent) intentionally deferred to Story 2.4 per IV2.
+
+## QA Completion Summary
+
+**Final QA Status**: ✅ Passed
+**QA Engineer**: QA Engineer (develop-story pipeline)
+**Final Testing Date**: 2026-05-12
+
+### Test Results Summary
+
+- **All Acceptance Criteria Met**: Yes
+- **Bug Reports Created**: 0
+- **Bug Reports Closed**: 0
+- **Regression Tests**: N/A (doc-only)
+- **Performance**: N/A (static files)
+- **Ready for Deployment**: Yes
 
 ## Bug Reports
 
 ### Open / In QA / Closed
 
 _None._
+
+## Definition of Done — PASSED ✅
+
+**Accepted:** 2026-05-12
+**DoD Report:** [story.2.1.dod.1.capture-prd-as-worked-example.md](./story.2.1.dod.1.capture-prd-as-worked-example.md)
+**PR:** https://github.com/Gamaroff/agent-skills/pull/101
+
+| Check | Status |
+|-------|--------|
+| All Acceptance Criteria Met | ✅ PASS |
+| PR Open | ✅ PASS (#101) |
+| Security Review | ✅ PASS (doc-only — no surface) |
+| Compliance Review | ⚠️ NOT_APPLICABLE (doc-only) |
+| Docs & Changelog | ✅ PASS |
+| QA Gate | ✅ PASS (100/100) |
+
+**Story accepted and ready for Sprint Review.**
