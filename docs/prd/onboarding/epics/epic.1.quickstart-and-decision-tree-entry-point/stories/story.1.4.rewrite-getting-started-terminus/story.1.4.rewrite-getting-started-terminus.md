@@ -2,7 +2,7 @@
 id: story.1.4.rewrite-getting-started-terminus
 title: "Story 1.4: Rewrite getting-started.md terminus to link to quickstarts"
 type: story
-status: in-progress
+status: accepted
 priority: medium
 epic: 1
 epic_file: ../../epic.1.quickstart-and-decision-tree-entry-point.md
@@ -12,12 +12,14 @@ jira_url: null
 github_issue: 84
 github_url: https://github.com/Gamaroff/agent-skills/issues/84
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-12
+completed_date: 2026-05-12
+pr_number: 97
 ---
 
 # Story 1.4: Rewrite getting-started.md to terminate in quickstarts
 
-**Status**: In Progress
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `story.1.4.review.1.rewrite-getting-started-terminus.md` implemented 2026-05-12 (no critical/important issues; 2 optional notes deferred to implementation)
 
 ## Story Statement
@@ -130,9 +132,73 @@ _(Developer fills in.)_
 - [ ] Terminus ≤ 20 lines
 - [ ] 3 outbound links resolve
 
-## QA Report
+## QA Testing Results
 
-_(Added on QA completion.)_
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-12
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [story.1.4.qa.1.rewrite-getting-started-terminus.md](./story.1.4.qa.1.rewrite-getting-started-terminus.md)
+- **Gate File**: [story.1.4.gate.1.rewrite-getting-started-terminus.yml](./story.1.4.gate.1.rewrite-getting-started-terminus.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 3/3
+- **Tests Executed**: 4 (diff inspection, link check, line count, security scan)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. All ACs met: terminus replaced (11 lines ≤ 20 cap), 3 quickstart links verified, install checklist preserved verbatim.
+
+## QA Completion Summary
+
+**Final QA Status**: ✅ Passed
+**QA Engineer**: QA Engineer
+**Final Testing Date**: 2026-05-12
+
+### Test Results Summary
+
+- **All Acceptance Criteria Met**: Yes
+- **Bug Reports Created**: 0
+- **Bug Reports Closed**: 0
+- **Regression Tests**: N/A (documentation only)
+- **Performance**: N/A
+- **Ready for Deployment**: Yes
+
+### Final Notes
+
+Clean PASS on first review. Proceed to `/finalise`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `story.1.4.qa.1.rewrite-getting-started-terminus.md`
+**Gate File**: `story.1.4.gate.1.rewrite-getting-started-terminus.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** All 3 criteria met (terminus replaced 11 lines, 3 links, install checklist verbatim)
+✅ **PR:** #97 open — `feature/story.1.4.rewrite-getting-started-terminus`
+✅ **Documentation:** Change log (3 entries), QA report, gate file, implementation report, DoD log all present
+✅ **Security Review:** ✅ PASS — no secrets, internal links only, pure markdown
+✅ **Compliance:** ✅ PASS — doc standards compliant, heading hierarchy valid, links resolve
+✅ **Performance:** N/A — static documentation
+✅ **Reliability:** ✅ PASS — all 5 linked targets verified on disk
+
+**Story marked as ACCEPTED on:** 2026-05-12
+
+**Detailed Verification Log:** See `story.1.4.dod.1.rewrite-getting-started-terminus.md` for complete evidence and timestamps.
 
 ## Bug Reports
 
