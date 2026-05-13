@@ -109,7 +109,7 @@ Run `npm run generate-catalog` so `docs/reference/skill-catalog.md` reflects the
 
 ## Reuse
 
-- **Config resolution pattern:** match how `create-story`, `review-story`, `parallel-stories` resolve `architecture.architectureShardedLocation` (default `docs/architecture`). Same default, same lookup order — no new pattern.
+- **Config resolution pattern:** match how `create-story`, `review-story`, `create-parallel-stories` resolve `architecture.architectureShardedLocation` (default `docs/architecture`). Same default, same lookup order — no new pattern.
 - **Diff-and-prompt UX:** `skills/edit-story/` and `skills/edit-epic/` already implement "show diff, prompt before write" for existing-file edits. The refactor should mirror that flow in prose (the skill is markdown-only — no shared script to import — but the instruction shape and prompt wording should match for consistency).
 - **Index-file shape:** copy the structure of `docs/examples/architecture/index.md` verbatim.
 - **Status frontmatter:** every new shard gets `---\ntitle: ...\nstatus: draft\n---` per `shared/resources/document-status-lifecycle.md`.

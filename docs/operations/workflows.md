@@ -88,7 +88,7 @@ See [Story Development Runbook — Phase B](../runbooks/story-development.md#pha
 ## Parallel development
 
 ```
-scrum-master → parallel-stories → epic coordination matrix + worktree setup
+scrum-master → create-parallel-stories → epic coordination matrix + worktree setup
     ↓
 Multiple developers work simultaneously in isolated worktrees
     ↓
@@ -97,7 +97,7 @@ Merge in any order (with proper file boundaries)
 Sequential stories follow
 ```
 
-See [`parallel-stories` SKILL.md](../../skills/parallel-stories/SKILL.md).
+See [`create-parallel-stories` SKILL.md](../../skills/create-parallel-stories/SKILL.md).
 
 ## Cross-cutting references
 

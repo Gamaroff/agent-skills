@@ -1,6 +1,6 @@
 ---
 name: which-path
-description: Decision tree routing new users to the right skill — /create-task, /create-story, /hotfix, or /parallel-stories — based on three questions about their intent.
+description: Decision tree routing new users to the right skill — /create-task, /create-story, /create-branch --hotfix, or /create-parallel-stories — based on three questions about their intent.
 type: guide
 status: draft
 version: 1.0
@@ -9,7 +9,7 @@ created: 2026-05-12
 
 # Which path? — Decision tree
 
-Not sure whether to run `/create-task`, `/create-story`, `/hotfix`, or `/parallel-stories`? Answer three questions.
+Not sure whether to run `/create-task`, `/create-story`, `/create-branch --hotfix`, or `/create-parallel-stories`? Answer three questions.
 
 ## Decision flowchart
 
@@ -20,15 +20,15 @@ flowchart TD
     Q1 -->|No — internal work\nrefactor / infra / cleanup| Task["/create-task"]
     Q1 -->|Yes| Q2{Is something\nbroken in production\nright now?}
 
-    Q2 -->|Yes — urgent fix| Hotfix["/hotfix"]
+    Q2 -->|Yes — urgent fix| Hotfix["/create-branch --hotfix"]
     Q2 -->|No| Q3{Is this part of a\ncoordinated multi-stream\neffort?}
 
-    Q3 -->|Yes — parallel teams| Parallel["/parallel-stories"]
+    Q3 -->|Yes — parallel teams| Parallel["/create-parallel-stories"]
     Q3 -->|No — or unsure| Story["/create-story"]
 
     Task --> TaskLinks["📖 Runbook: task-development.md\n🚀 Quickstart: quickstart-task.md"]
     Hotfix --> HotfixLinks["📖 Runbook: hotfix.md"]
-    Parallel --> ParallelLinks["📖 Runbook: parallel-stories.md"]
+    Parallel --> ParallelLinks["📖 Runbook: create-parallel-stories.md"]
     Story --> StoryLinks["📖 Runbook: story-development.md\n🚀 Quickstart: quickstart-story.md"]
 ```
 
@@ -48,7 +48,7 @@ A feature, bug fix, or UX change is user-facing. A refactor, infrastructure chan
 
 **Question 2 — Is something broken in production right now?**
 
-- **Yes** (urgent fix needed immediately) → use [/hotfix](../runbooks/hotfix.md)
+- **Yes** (urgent fix needed immediately) → use [/create-branch --hotfix](../runbooks/hotfix.md)
 - **No** → continue to Question 3.
 
 ---
@@ -57,7 +57,7 @@ A feature, bug fix, or UX change is user-facing. A refactor, infrastructure chan
 
 For example: several developers are each shipping separate pieces of a larger feature in parallel.
 
-- **Yes** → use [/parallel-stories](../runbooks/parallel-stories.md)
+- **Yes** → use [/create-parallel-stories](../runbooks/create-parallel-stories.md)
 - **No** (or unsure) → use [/create-story](../runbooks/story-development.md)
   - Quickstart: [quickstart-story.md](./quickstart-story.md)
 
@@ -68,8 +68,8 @@ For example: several developers are each shipping separate pieces of a larger fe
 | Situation | Skill |
 |-----------|-------|
 | Feature, bug fix, UX change — non-urgent, solo | `/create-story` |
-| Feature, bug fix, UX change — parallel teams | `/parallel-stories` |
-| Production system broken right now | `/hotfix` |
+| Feature, bug fix, UX change — parallel teams | `/create-parallel-stories` |
+| Production system broken right now | `/create-branch --hotfix` |
 | Refactor, infra, cleanup, tech debt | `/create-task` |
 
 ## Related

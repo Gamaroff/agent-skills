@@ -1,0 +1,42 @@
+schema: 1
+story: '2.1'
+story_title: 'Capture this PRD as the worked PRD example'
+gate: PASS
+status_reason: 'All 3 ACs verified by direct inspection. File equivalence confirmed (diff = 3 provenance lines). README narrative meets requirements. One LOW observation deferred to Story 2.4 per IV2.'
+reviewer: 'QA Engineer (develop-story pipeline)'
+updated: '2026-05-12T09:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+expires: '2026-05-26T09:00:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Documentation-only story; no auth/data/API surface. No security concerns.'
+  performance:
+    status: PASS
+    notes: 'Static files; no runtime performance concerns.'
+  reliability:
+    status: PASS
+    notes: 'Copy verified faithful by diff. source_sha resolves in git log for staleness detection.'
+  maintainability:
+    status: PASS
+    notes: 'captured_skill_version anchors staleness detection. Package.json pattern established for future captures.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Story 2.4: update examples/README.md to remove now-false caveat and add PRD/epic/story navigation'
+      refs: ['examples/README.md']

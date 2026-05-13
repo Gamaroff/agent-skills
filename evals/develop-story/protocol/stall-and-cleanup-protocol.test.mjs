@@ -27,12 +27,17 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 
-const STORY_SKILL   = path.join(REPO_ROOT, "skills", "develop-story", "SKILL.md");
-const TASK_SKILL    = path.join(REPO_ROOT, "skills", "develop-task",  "SKILL.md");
-const DEVELOP_SKILL = path.join(REPO_ROOT, "skills", "develop",       "SKILL.md");
-const STEP0_SHARED  = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-0-resolve-and-prepare.md");
-const STEP3_SHARED  = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-3-develop-loop.md");
-const STEP8_SHARED  = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-8-commit.md");
+const STORY_SKILL    = path.join(REPO_ROOT, "skills", "develop-story", "SKILL.md");
+const TASK_SKILL     = path.join(REPO_ROOT, "skills", "develop-task",  "SKILL.md");
+const DEVELOP_SKILL  = path.join(REPO_ROOT, "skills", "develop",       "SKILL.md");
+const STORY_ON_STOP  = path.join(REPO_ROOT, "skills", "develop-story", "scripts", "on-stop.sh");
+const TASK_ON_STOP   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "on-stop.sh");
+const STORY_INSTALL  = path.join(REPO_ROOT, "skills", "develop-story", "scripts", "install-hooks.sh");
+const TASK_INSTALL   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "install-hooks.sh");
+const HOOKS_DOC      = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-hooks.md");
+const STEP0_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-0-resolve-and-prepare.md");
+const STEP3_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-3-develop-loop.md");
+const STEP8_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-8-commit.md");
 
 // ── Regression #2: Step Transition Protocol present in both orchestrators ──
 
@@ -47,6 +52,128 @@ test("#2 — develop-task SKILL.md documents Step Transition Protocol", async ()
   const content = await readFile(TASK_SKILL, "utf-8");
   assert.match(content, /Step Transition Protocol/, "Step Transition Protocol heading missing");
   assert.match(content, /lock-update Bash call is the binding signal/i, "binding-signal rationale missing");
+});
+
+// ── Regression #2b: Stop-hook structural backstop ──
+// Prose-only "never stop between steps" rules failed under context pressure
+// (observed during story 2.2 dogfood run on 2026-05-12). The Stop hook is the
+// structural defence: when the orchestrator tries to yield mid-pipeline, the
+// hook reads the lock and returns `decision: "block"` forcing continuation.
+
+test("#2b — develop-story Setup section names both hooks and points to install script + canonical doc", async () => {
+  const content = await readFile(STORY_SKILL, "utf-8");
+  assert.match(content, /PreCompact/,                                  "Setup section must name the PreCompact hook");
+  assert.match(content, /\bStop\b/,                                    "Setup section must name the Stop hook");
+  assert.match(content, /install-hooks\.sh/,                           "Setup section must reference the install script");
+  assert.match(content, /references\/develop-pipeline-hooks\.md/,      "Setup section must link the canonical hooks doc");
+});
+
+test("#2b — develop-task Setup section names both hooks and points to install script + canonical doc", async () => {
+  const content = await readFile(TASK_SKILL, "utf-8");
+  assert.match(content, /PreCompact/,                                  "Setup section must name the PreCompact hook");
+  assert.match(content, /\bStop\b/,                                    "Setup section must name the Stop hook");
+  assert.match(content, /install-hooks\.sh/,                           "Setup section must reference the install script");
+  assert.match(content, /references\/develop-pipeline-hooks\.md/,      "Setup section must link the canonical hooks doc");
+});
+
+test("#2b — develop-story on-stop.sh exists and honours stop_hook_active loop protection", async () => {
+  const content = await readFile(STORY_ON_STOP, "utf-8");
+  assert.match(content, /stop_hook_active/,                       "must read stop_hook_active flag");
+  assert.match(content, /develop-pipeline\.lock/,                 "must reference pipeline lock file");
+  assert.match(content, /current_step/,                           "must check current_step field");
+  assert.match(content, /decision.*block/i,                       "must emit decision:'block' when blocking");
+  assert.match(content, /set -uo pipefail/,                       "must use safe bash defaults");
+});
+
+test("#2b — develop-task on-stop.sh is byte-identical to develop-story on-stop.sh", async () => {
+  const storyHook = await readFile(STORY_ON_STOP, "utf-8");
+  const taskHook  = await readFile(TASK_ON_STOP,  "utf-8");
+  assert.equal(taskHook, storyHook, "Both on-stop.sh scripts must be identical (the lock's `skill` field selects branch)");
+});
+
+test("#2b — install-hooks.sh exists and is byte-identical between story and task", async () => {
+  const storyScript = await readFile(STORY_INSTALL, "utf-8");
+  const taskScript  = await readFile(TASK_INSTALL,  "utf-8");
+  assert.equal(taskScript, storyScript, "install-hooks.sh must be byte-identical across develop-{story,task}");
+  // Core contract assertions
+  assert.match(storyScript, /set -euo pipefail/,                    "must use safe bash defaults");
+  assert.match(storyScript, /command -v jq/,                        "must check for jq prerequisite");
+  assert.match(storyScript, /\.agents\/skills\/develop-story/,      ".agents path candidate (npx skills add)");
+  assert.match(storyScript, /\.claude\/skills\/develop-story/,      ".claude path candidate (symlink/monorepo)");
+  assert.match(storyScript, /already registered/,                   "must be idempotent (skip on duplicate)");
+  assert.match(storyScript, /--dry-run/,                            "must support --dry-run flag");
+  assert.match(storyScript, /PreCompact/,                           "must register PreCompact hook");
+  assert.match(storyScript, /Stop/,                                 "must register Stop hook");
+});
+
+test("#2b — SKILL.md Setup section advertises install-hooks.sh and links the canonical hooks doc", async () => {
+  const storyContent = await readFile(STORY_SKILL, "utf-8");
+  const taskContent  = await readFile(TASK_SKILL,  "utf-8");
+  for (const [label, content] of [["story", storyContent], ["task", taskContent]]) {
+    assert.match(
+      content,
+      /install-hooks\.sh/,
+      `${label}: Setup section must reference install-hooks.sh`,
+    );
+    assert.match(
+      content,
+      /references\/develop-pipeline-hooks\.md/,
+      `${label}: Setup section must link the canonical hooks doc`,
+    );
+  }
+});
+
+// ── Regression #2c: Canonical hooks documentation index ──
+// Created 2026-05-12 to centralise every hook in one place after the Stop
+// hook was added. Replaces ad-hoc per-hook prose in SKILL.md Setup sections.
+
+test("#2c — canonical hooks doc exists and catalogues both hooks", async () => {
+  const content = await readFile(HOOKS_DOC, "utf-8");
+  // Catalog must mention both events by name
+  assert.match(content, /PreCompact/,                            "must catalogue PreCompact hook");
+  assert.match(content, /\bStop\b/,                              "must catalogue Stop hook");
+  // Both scripts referenced
+  assert.match(content, /on-precompact\.sh/,                     "must reference on-precompact.sh");
+  assert.match(content, /on-stop\.sh/,                           "must reference on-stop.sh");
+  assert.match(content, /install-hooks\.sh/,                     "must reference install-hooks.sh");
+  // Stop hook contract elements
+  assert.match(content, /stop_hook_active/,                      "must document stop_hook_active loop protection");
+  assert.match(content, /decision.*block/i,                      "must document decision:'block' return contract");
+  assert.match(content, /current_step/,                          "must document current_step lock field");
+  // Required sections (allows for emoji/formatting prefixes before the heading text)
+  assert.match(content, /## Hook catalog/,                       "must have a 'Hook catalog' section");
+  assert.match(content, /## Interaction model/,                  "must have an 'Interaction model' section");
+  assert.match(content, /## Troubleshooting/,                    "must have a 'Troubleshooting' section");
+  assert.match(content, /## Authoring contract for new hooks/,   "must define the contract for adding new hooks");
+});
+
+test("#2c — pause doc cross-links the canonical hooks index", async () => {
+  // Test the source-of-truth file (bundled copies are auto-generated)
+  const content = await readFile(path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-pause.md"), "utf-8");
+  assert.match(
+    content,
+    /develop-pipeline-hooks\.md/,
+    "pause doc must link the canonical hooks doc so readers find the broader index",
+  );
+});
+
+test("#2b — Step Transition Protocol lists Bash lock-update as action #1 (not #2)", async () => {
+  const storyContent = await readFile(STORY_SKILL, "utf-8");
+  const taskContent  = await readFile(TASK_SKILL,  "utf-8");
+  // Action #1 = Bash; action #2 = Edit. Reordered 2026-05-12 to anchor the model
+  // into the next step before the natural turn-boundary heuristic can fire.
+  for (const [label, content] of [["story", storyContent], ["task", taskContent]]) {
+    assert.match(
+      content,
+      /1\.\s*\*\*Bash tool call\*\*\s*advancing the lock/,
+      `${label}: Step Transition action #1 must be the Bash lock-update call`,
+    );
+    assert.match(
+      content,
+      /2\.\s*\*\*Edit the implementation report\*\*/,
+      `${label}: Step Transition action #2 must be the implementation-report Edit`,
+    );
+  }
 });
 
 test("#2 — develop SKILL.md mandates silent return to orchestrator", async () => {

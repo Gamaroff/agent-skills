@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-Documentation-only story. Single new file `docs/concepts/which-path.md` — Mermaid flowchart TD + prose fallback routing users to `/create-task`, `/create-story`, `/hotfix`, or `/parallel-stories`. All 5 ACs pass. All 8 outbound links resolve. One item (Task 6 — visual Mermaid render) requires manual verification via GitHub PR preview; not blockable by automation.
+Documentation-only story. Single new file `docs/concepts/which-path.md` — Mermaid flowchart TD + prose fallback routing users to `/create-task`, `/create-story`, `/create-branch --hotfix`, or `/create-parallel-stories`. All 5 ACs pass. All 8 outbound links resolve. One item (Task 6 — visual Mermaid render) requires manual verification via GitHub PR preview; not blockable by automation.
 
 ## Review Methodology
 
@@ -40,7 +40,7 @@ Adaptive strategy: **Direct tools** (Rule 2 — small story, <5 files, docs-only
 | AC  | Description | Status | Verification |
 |-----|-------------|--------|--------------|
 | AC1 | `docs/concepts/which-path.md` exists with valid frontmatter | ✅ PASS | File present; frontmatter: name, description, type, status, version, created — matches sibling pattern |
-| AC2 | Decision tree covers 4 leaves: task, story, hotfix, parallel | ✅ PASS | All 4 leaf nodes found in Mermaid: `"/create-task"`, `"/create-story"`, `"/hotfix"`, `"/parallel-stories"` |
+| AC2 | Decision tree covers 4 leaves: task, story, hotfix, parallel | ✅ PASS | All 4 leaf nodes found in Mermaid: `"/create-task"`, `"/create-story"`, `"/create-branch --hotfix"`, `"/create-parallel-stories"` |
 | AC3 | Each leaf links to runbook + quickstart (where exists) | ✅ PASS | Prose fallback has 4 runbook links + 2 quickstart links; all 8 target files confirmed present |
 | AC4 | Mermaid `flowchart` + prose fallback | ✅ PASS | 1× `flowchart TD` block; 1× "Prose fallback" section |
 | AC5 | Doc body ≤ 250 lines | ✅ PASS | 78 lines |
@@ -53,8 +53,8 @@ All outbound links from prose fallback verified to resolve:
 |------|-------------|--------|
 | `/create-task` | `docs/runbooks/task-development.md` | ✅ |
 | `quickstart-task.md` | `docs/concepts/quickstart-task.md` | ✅ |
-| `/hotfix` | `docs/runbooks/hotfix.md` | ✅ |
-| `/parallel-stories` | `docs/runbooks/parallel-stories.md` | ✅ |
+| `/create-branch --hotfix` | `docs/runbooks/hotfix.md` | ✅ |
+| `/create-parallel-stories` | `docs/runbooks/create-parallel-stories.md` | ✅ |
 | `/create-story` | `docs/runbooks/story-development.md` | ✅ |
 | `quickstart-story.md` | `docs/concepts/quickstart-story.md` | ✅ |
 | `docs/runbooks/README.md` | `docs/runbooks/README.md` | ✅ |
@@ -119,10 +119,10 @@ All outbound links from prose fallback verified to resolve:
 wc -l docs/concepts/which-path.md                     # 78 ≤ 250
 grep -c '```mermaid' docs/concepts/which-path.md       # 1
 grep -c 'Prose fallback' docs/concepts/which-path.md   # 1
-grep "/create-task|/create-story|/hotfix|/parallel-stories" docs/concepts/which-path.md
+grep "/create-task|/create-story|/hotfix|/create-parallel-stories" docs/concepts/which-path.md
 # confirmed all 4 leaf nodes
 ls docs/runbooks/task-development.md docs/runbooks/story-development.md \
-   docs/runbooks/hotfix.md docs/runbooks/parallel-stories.md \
+   docs/runbooks/hotfix.md docs/runbooks/create-parallel-stories.md \
    docs/concepts/quickstart-task.md docs/concepts/quickstart-story.md
 # all 6 ✅
 git diff --name-only origin/feature/epic.1.quickstart-and-decision-tree-entry-point...HEAD

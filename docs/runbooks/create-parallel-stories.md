@@ -22,7 +22,7 @@ If stories share files, do not use this runbook — sequence them via the normal
 
 ```mermaid
 flowchart TD
-    A[scrum-master + parallel-stories] --> B[Epic coordination matrix]
+    A[scrum-master + create-parallel-stories] --> B[Epic coordination matrix]
     B --> C[Worktree per story]
     C --> D[develop-story per worktree<br/>in parallel]
     D --> E[Merge in any order to epic branch]
@@ -32,7 +32,7 @@ flowchart TD
 ## Steps
 
 ```
-1. /parallel-stories <epic-path>     → produces coordination matrix + worktree setup commands
+1. /create-parallel-stories <epic-path>     → produces coordination matrix + worktree setup commands
 2. For each parallelisable story:
    git worktree add ../{repo}-story-{E}.{S} feature/story.{E}.{S}.{name}
    cd ../{repo}-story-{E}.{S}
@@ -44,13 +44,13 @@ flowchart TD
 ## Pitfalls
 
 - **Don't share dirty worktrees across agent sessions** — each session needs an isolated checkout.
-- **File-boundary discipline is on you.** `parallel-stories` produces a coordination matrix; respect it. If a story's diff touches files claimed by a sibling, abort and re-sequence.
+- **File-boundary discipline is on you.** `create-parallel-stories` produces a coordination matrix; respect it. If a story's diff touches files claimed by a sibling, abort and re-sequence.
 - **PRs target the epic branch**, not `develop`. Same convention as serial development.
 - **Worktree cleanup:** after merge, remove the worktree (`git worktree remove ../{repo}-story-…`) to free disk space.
 
 ## See also
 
-- [`parallel-stories` SKILL.md](../../skills/parallel-stories/SKILL.md)
+- [`create-parallel-stories` SKILL.md](../../skills/create-parallel-stories/SKILL.md)
 - [`scrum-master` SKILL.md](../../skills/scrum-master/SKILL.md)
 - [Story Development Runbook](./story-development.md)
 - [Sprint Cycle Runbook](./sprint-cycle.md)

@@ -21,7 +21,7 @@ updated: 2026-05-11
 
 ## Story Statement
 
-**As a** new user landing on `hotfix.md`, `bug-fix.md`, `parallel-stories.md`, or `change-management.md`,
+**As a** new user landing on `hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, or `change-management.md`,
 **I want** a top-of-page callout that confirms (or redirects) my path,
 **so that** I do not follow a runbook that does not match my situation.
 
@@ -41,7 +41,7 @@ updated: 2026-05-11
 
 ### File Locations
 
-- **Modified:** `docs/runbooks/hotfix.md`, `docs/runbooks/bug-fix.md`, `docs/runbooks/parallel-stories.md`, `docs/runbooks/change-management.md`. [Source: live tree.]
+- **Modified:** `docs/runbooks/hotfix.md`, `docs/runbooks/bug-fix.md`, `docs/runbooks/create-parallel-stories.md`, `docs/runbooks/change-management.md`. [Source: live tree.]
 - **Linked:** `docs/concepts/which-path.md` (Story 1.3 output).
 
 ### Testing Requirements

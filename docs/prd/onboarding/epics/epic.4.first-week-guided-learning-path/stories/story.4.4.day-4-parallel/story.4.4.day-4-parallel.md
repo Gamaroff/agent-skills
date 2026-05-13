@@ -28,7 +28,7 @@ updated: 2026-05-11
 ## Acceptance Criteria
 
 1. `docs/runbooks/first-week/day-4-parallel.md` exists with frontmatter and checkpoints.
-2. Day 4 cross-links to `parallel-stories.md` and `change-management.md` (both with Epic 3.2 callouts in place).
+2. Day 4 cross-links to `create-parallel-stories.md` and `change-management.md` (both with Epic 3.2 callouts in place).
 3. Completion criteria: user has either (a) two stories in parallel worktrees OR (b) one change-management Sprint Change Proposal in their repo.
 4. Doc body ≤ 300 lines.
 
@@ -42,7 +42,7 @@ updated: 2026-05-11
 ### File Locations
 
 - **New file:** `docs/runbooks/first-week/day-4-parallel.md`.
-- **Linked:** `docs/runbooks/parallel-stories.md`, `docs/runbooks/change-management.md`.
+- **Linked:** `docs/runbooks/create-parallel-stories.md`, `docs/runbooks/change-management.md`.
 
 ### Testing Requirements
 

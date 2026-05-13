@@ -100,7 +100,7 @@ so that I am equipped for week-2+ scenarios.
 **Acceptance Criteria:**
 
 1. `docs/runbooks/first-week/day-4-parallel.md` exists.
-2. Day 4 cross-links to `parallel-stories.md` and `change-management.md` (both with Epic 3.2 callouts in place).
+2. Day 4 cross-links to `create-parallel-stories.md` and `change-management.md` (both with Epic 3.2 callouts in place).
 3. Completion criteria: user has either (a) two stories in parallel worktrees or (b) one change-management Sprint Change Proposal in their repo.
 4. Doc ≤ 300 lines.
 

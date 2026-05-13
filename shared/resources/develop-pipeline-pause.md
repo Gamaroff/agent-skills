@@ -9,6 +9,8 @@ Reference doc for the `/develop-task` and `/develop-story` orchestrator skills. 
 
 Audience: maintainers of the `develop-task`/`develop-story` skills, authors of sub-skills they invoke, and operators wiring the hook into a project.
 
+> **Looking for the full hook catalogue?** This document is the deep dive on the `PreCompact` hook only. For the complete list of pipeline hooks (PreCompact + Stop), the install script, the interaction diagram, troubleshooting, and the contract for adding new hooks, see [`develop-pipeline-hooks.md`](develop-pipeline-hooks.md).
+
 ---
 
 ## Problem

@@ -1,0 +1,41 @@
+schema: 1
+story: '2.3'
+story_title: 'Capture a story with the messy path (real QA-gate FAIL → PASS)'
+gate: PASS
+status_reason: 'Story correctly descoped per provenance-gate protocol — no genuine QA-gate FAIL found in Epics 1–4. Documentation changes are accurate, complete, and consistent.'
+reviewer: 'QA Engineer'
+updated: '2026-05-13T00:00:00Z'
+
+top_issues: []
+waiver:
+  active: false
+
+quality_score: 100
+expires: '2026-05-27T00:00:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 0
+  trace:
+    ac_covered: [3]
+    ac_gaps: []
+    ac_na: [1, 2]
+    notes: 'AC1 and AC2 are N/A (correctly descoped). AC3 (no manufactured failure) verified via survey result and spot-check of gate files.'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No code — no security surface.'
+  performance:
+    status: PASS
+    notes: 'No code — no performance surface.'
+  reliability:
+    status: PASS
+    notes: 'Descope protocol correctly applied; no state inconsistencies.'
+  maintainability:
+    status: PASS
+    notes: 'Change Log complete (v1.0–v1.3); cross-links valid; status lifecycle followed.'
+
+recommendations:
+  immediate: []
+  future: []

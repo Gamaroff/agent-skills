@@ -1,0 +1,42 @@
+schema: 1
+story: "2.2"
+story_title: "Capture all 4 epic docs as worked examples"
+gate: PASS
+status_reason: "All 3 ACs verified; equivalence diffs clean for all 4 epics; provenance schema applied uniformly. Docs-only story with zero risk."
+reviewer: "QA Engineer"
+updated: "2026-05-12T00:00:00Z"
+
+top_issues: []
+waiver:
+  active: false
+
+quality_score: 100
+expires: "2026-05-26T00:00:00Z"
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3]
+    ac_gaps: []
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "N/A — docs-only, no executable code, no secrets"
+  performance:
+    status: PASS
+    notes: "N/A — static markdown"
+  reliability:
+    status: PASS
+    notes: "Source SHA recorded in provenance — snapshots are verifiable"
+  maintainability:
+    status: PASS
+    notes: "Provenance fields enable drift detection; consistent with Story 2.1 schema"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Optional: extract a bash helper script to automate epic-capture for future PRDs"
+      refs: ["scripts/"]

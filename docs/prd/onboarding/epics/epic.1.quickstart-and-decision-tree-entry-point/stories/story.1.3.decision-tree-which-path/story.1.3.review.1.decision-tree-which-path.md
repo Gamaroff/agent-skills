@@ -48,7 +48,7 @@ Verified on disk:
 - ✅ `docs/runbooks/task-development.md`
 - ✅ `docs/runbooks/story-development.md`
 - ✅ `docs/runbooks/hotfix.md`
-- ✅ `docs/runbooks/parallel-stories.md`
+- ✅ `docs/runbooks/create-parallel-stories.md`
 - ✅ `docs/concepts/quickstart-task.md` (from Story 1.1)
 - ✅ `docs/concepts/quickstart-story.md` (from Story 1.2)
 - ✅ Git history reference `a79d3ee` cited for inline-Mermaid convention

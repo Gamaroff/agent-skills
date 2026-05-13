@@ -56,7 +56,7 @@ Day 3 is recommended but optional. Day 4 can follow Day 2 directly if you skip D
 Once you've completed the days you want:
 
 - Use [`docs/runbooks/task-development.md`](./task-development.md) and [`story-development.md`](./story-development.md) as your reference anchors.
-- For specific scenarios: [`hotfix.md`](./hotfix.md), [`bug-fix.md`](./bug-fix.md), [`parallel-stories.md`](./parallel-stories.md), [`change-management.md`](./change-management.md).
+- For specific scenarios: [`hotfix.md`](./hotfix.md), [`bug-fix.md`](./bug-fix.md), [`create-parallel-stories.md`](./create-parallel-stories.md), [`change-management.md`](./change-management.md).
 - All standards live in [`docs/standards/`](../standards/).
 ```
 
