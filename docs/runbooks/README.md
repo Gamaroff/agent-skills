@@ -16,6 +16,7 @@ If you want **API-style reference** instead of a walkthrough, see:
 
 | Runbook | Use it when… |
 |---|---|
+| [First-Week Onboarding](./first-week.md) | Starting fresh with agent-skills. Four structured days covering the task pipeline, story pipeline, QA recovery, and parallel development. |
 | [Story Development](./story-development.md) | Shipping a user-facing feature that fits inside a PRD → epic → story hierarchy. Covers `create-prd` → `review-prd` → `create-epic` → `review-epic` → `create-story` → `review-story` → `develop-story`. |
 | [Task Development](./task-development.md) | Standalone technical work (refactor, infra, cleanup, tooling) that doesn't need a PRD or epic. Covers `create-task` → `review-task` → `develop-task`. |
 | [QA Flow](./qa-flow.md) | Running QA without the full develop-story / develop-task orchestrator — pre-implementation planning, manual review, or rework on findings. |

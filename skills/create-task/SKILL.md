@@ -444,82 +444,21 @@ source references/resolve-platform.sh
 
 #### Jira Path (when `TRACKER=jira`)
 
-> **Note**: Tasks are NOT linked to epics — no `customfield_10014` is set.
+> **Note**: Tasks are NOT linked to a Jira epic — they are standalone work items.
 >
 > **Priority on Jira**: setting `"priority": {"name": $priority}` on the issue is the canonical mechanism — Jira boards display it directly, so no separate board-field mirror is needed (unlike the GitHub path, which calls `set-github-project-priority.sh`). Ongoing local↔remote priority drift is handled by `/sync-jira-task` via `references/jira-sync.js` (`normalisePriority` + `diffFields`).
 
-Map priority to Jira values:
+Invoke the `ensure-task-jira-issue` sub-routine with `TASK_FILE_PATH={path to the task file just created}`. The sub-routine handles:
 
-| Task priority | Jira priority |
-|---------------|---------------|
-| Critical / High | High |
-| Medium | Medium |
-| Low | Low |
+- delegation to `sync-jira-task` for idempotent create (label-search dedup),
+- priority mapping (Critical/High → High, Medium → Medium, Low → Low) via `references/jira-sync.js`,
+- adding the issue to the project backlog (Scrum boards only),
+- embedding Bitbucket links via ADF,
+- writing `jira_key: {KEY}` and `jira_url: {JIRA_URL}/browse/{KEY}` into the task frontmatter and inserting the body cross-reference link.
 
-```bash
-JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
+On return, `TASK_JIRA_KEY` is set (e.g. `PROJ-15`) or empty (on failure).
 
-body_file=$(mktemp)
-cat > "$body_file" <<'BODY'
-## Overview
-
-{First paragraph of the task's Overview section — 2-4 sentences}
-
-## Key Deliverables
-
-{Bulleted list from the task's Key Deliverables or Scope section}
-
-## Success Criteria (summary)
-
-- [ ] {Most important criterion 1}
-- [ ] {Most important criterion 2}
-
-## Metadata
-
-| Field | Value |
-|-------|-------|
-| Priority | {priority} |
-| Effort | {effort_estimate} |
-| Category | {category} |
-| Depends on | {depends_on or —} |
-
-## Document
-
-📁 `{task-file-relative-path}`
-BODY
-
-JIRA_RESPONSE=$(curl -s -X POST \
-  "${JIRA_URL}/rest/api/2/issue" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Basic ${JIRA_AUTH}" \
-  -d "$(jq -n \
-    --arg summary "[Task {id}] {title}" \
-    --arg description "$(cat "$body_file")" \
-    --arg project "$JIRA_PROJECT_KEY" \
-    --arg priority "{High|Medium|Low}" \
-    '{
-      "fields": {
-        "project": {"key": $project},
-        "summary": $summary,
-        "description": $description,
-        "issuetype": {"name": "Task"},
-        "priority": {"name": $priority}
-      }
-    }'
-  )")
-rm -f "$body_file"
-
-task_key=$(echo "$JIRA_RESPONSE" | jq -r '.key // empty')
-task_url="${JIRA_URL}/browse/${task_key}"
-```
-
-**On success**: Add to task YAML frontmatter:
-```yaml
-jira_key: PROJ-15
-jira_url: https://yourorg.atlassian.net/browse/PROJ-15
-```
-
-**On failure**: Set `jira_key: null`, log warning, continue. Never halt.
+**On failure**: the sub-routine logs a warning and returns `TASK_JIRA_KEY=""`. `create-task` leaves `jira_key: null` and continues. Never halt. Users can still run `/sync-jira-task` manually later to retry.
 
 ---
 

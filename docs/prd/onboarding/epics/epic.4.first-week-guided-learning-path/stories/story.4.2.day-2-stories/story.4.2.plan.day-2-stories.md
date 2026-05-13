@@ -36,7 +36,12 @@ New file at `docs/runbooks/first-week/day-2-stories.md`. Same pattern as Day 1, 
 
 ## Hour 2–3 — Follow-up story (~90 min)
 
-**Story:** "Add a 'See also' subsection at the bottom of `docs/runbooks/README.md` linking the first-week index."
+Pick **one** follow-up story in your working repo. Selection criteria:
+
+- Small, well-bounded — finishable in ~90 min including QA cycle.
+- Docs-only or single-file code change preferred (avoids needing design review).
+- Net-new content, not a refactor — easier to scope.
+- Example shapes: a new "See also" section, a new short concept doc, a small README cross-link, a single new fixture.
 
 - [ ] `/create-prd` (brownfield, single epic, single story scope).
 - [ ] `/create-epic` (1 epic).

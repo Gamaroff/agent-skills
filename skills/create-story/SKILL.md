@@ -352,7 +352,24 @@ source references/resolve-platform.sh
 
 #### Jira Path (when `TRACKER=jira`)
 
-> Jira story sync is still deferred to `/sync-jira-story` — set `jira_key: null` and `jira_url: null` in the story frontmatter and leave them null. The user runs `/sync-jira-story` after story creation to push to Jira (the script handles parent-epic linkage, ADF rendering, and the concurrent-edit guard).
+1. Derive the parent epic file path using the grandparent directory rule:
+   ```bash
+   STORY_DIR=$(dirname "{resolved story file path}")
+   EPIC_DIR=$(dirname "$(dirname "$STORY_DIR")")
+   EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
+   ```
+   If the file doesn't exist, glob for `epic.*.md` in `${EPIC_DIR}`. If still not found, set `EPIC_JIRA_KEY=""` and continue with a logged warning.
+
+2. If the epic file exists, invoke the `ensure-epic-jira-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_JIRA_KEY` is set (e.g. `PROJ-42`) or empty.
+
+3. Invoke the `ensure-story-jira-issue` sub-routine with `STORY_FILE_PATH={just-written story file path}` and `EPIC_JIRA_KEY` from step 2. The sub-routine handles:
+   - delegation to `sync-jira-story` for idempotent create (search by title/labels first),
+   - linking the new story to the parent epic via `parent` field (team-managed) or Epic Link customfield (classic),
+   - adding it to the project backlog (Scrum boards only),
+   - embedding Bitbucket links via ADF,
+   - writing `jira_key: {KEY}` and `jira_url: {JIRA_URL}/browse/{KEY}` into the story frontmatter and inserting the body cross-reference link.
+
+**On failure**: the sub-routine logs a warning and returns `STORY_JIRA_KEY=""`. `create-story` leaves `jira_key: null` and continues. Never halt. Users can still run `/sync-jira-story` manually later to retry.
 
 #### GitHub Path (when `TRACKER=github`)
 
