@@ -2,7 +2,7 @@
 id: story.3.3.common-first-time-errors
 title: "Story 3.3: 'Common first-time errors' troubleshooting sections"
 type: story
-status: ready-for-review
+status: accepted
 priority: medium
 epic: 3
 epic_file: ../../epic.3.runbook-tutorial-wrappers.md
@@ -12,12 +12,14 @@ jira_url: null
 github_issue: 80
 github_url: https://github.com/Gamaroff/agent-skills/issues/80
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-13
+completed_date: 2026-05-13
+pr_number: 109
 ---
 
 # Story 3.3: "Common first-time errors" troubleshooting sections
 
-**Status**: Ready for Review
+**Status**: Accepted
 **GitHub Issue**: [#80](https://github.com/Gamaroff/agent-skills/issues/80)
 **Review**: ✅ All review recommendations from `story.3.3.review.1.common-first-time-errors.md` implemented 2026-05-13
 
@@ -134,10 +136,49 @@ No conflicts.
 
 **Deferred Work:** None.
 
-### QA Prerequisites Checklist
+## QA Testing Results
 
-- [ ] Both runbooks have troubleshooting sections
-- [ ] Each section ≥ 5 entries (or speculative markers documented)
-- [ ] Each entry has provenance (commit SHA or implementation report link)
-- [ ] Each section ≤ 60 lines
-- [ ] Existing body untouched (diff verified)
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-13
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [story.3.3.qa.1.common-first-time-errors.md](./story.3.3.qa.1.common-first-time-errors.md)
+- **Gate File**: [story.3.3.gate.1.common-first-time-errors.yml](./story.3.3.gate.1.common-first-time-errors.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues. All ACs verified; implementation additive-only with provenance on all real entries.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `story.3.3.qa.1.common-first-time-errors.md`
+**Gate File**: `story.3.3.gate.1.common-first-time-errors.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** All 4 criteria met — both runbooks have troubleshooting sections (53/54 lines), 5+ entries each, provenance verified, speculative entry marked
+✅ **PR:** PR #109 open with all changes committed
+✅ **Documentation:** Story Change Log current; Dev Agent Record complete; all artifacts co-located
+✅ **Security:** ✅ PASS — docs-only, no credentials, no malicious content
+✅ **Reliability:** ✅ PASS — provenance links to stable implementation reports
+✅ **Maintainability:** ✅ PASS — speculative entry marked for future confirmation
+
+**Detailed Verification Log:** See `story.3.3.dod.1.common-first-time-errors.md`
+
+**Story marked as ACCEPTED on:** 2026-05-13
