@@ -2,6 +2,8 @@
 
 > **Audience:** anyone responding to a pivot, blocker, or scope change mid-project.
 
+> ⚠️ **Epic 3.2 pending:** A proactive change-risk assessment guide (preventing pivots before they happen) will link here once Epic 3.2 lands. This runbook covers reactive response; Epic 3.2 will add the preventive layer.
+
 When the plan breaks — a story fails, a tech assumption turns out wrong, a stakeholder demands a pivot, a requirement was missing — drive the response through `change-management` rather than improvising. The output is a Sprint Change Proposal with concrete artifact edits.
 
 ## When to use this runbook

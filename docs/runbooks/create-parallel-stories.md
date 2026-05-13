@@ -2,6 +2,8 @@
 
 > **Audience:** teams developing multiple stories of one epic simultaneously without merge conflicts.
 
+> ⚠️ **Epic 3.2 pending:** An advanced multi-team and cross-epic coordination guide will link here once Epic 3.2 lands. The steps below cover single-repo parallel stories within one epic; Epic 3.2 will extend this to larger-scale parallel patterns.
+
 When several stories under the same epic can be implemented in parallel — different files, different concerns — use Git worktrees to isolate them and let multiple developers (or multiple agent sessions) work at the same time.
 
 ## When to use this runbook
