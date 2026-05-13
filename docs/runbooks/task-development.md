@@ -1,5 +1,26 @@
 # Runbook — Task Development
 
+## Before you start
+
+> This is the **anchor reference** for task work. Skim it cold and you'll bounce off — it assumes you already know the shape of the task chain.
+
+**If you haven't shipped a task artifact before:** stop and follow [`quickstart-task`](../concepts/quickstart-task.md) first. It produces a real artifact in 10 minutes.
+
+**Skim these standards first (5 min total):**
+
+- [`file-naming.md`](../standards/file-naming.md) — DOTS, kebab-case, dots-as-separators
+- [`status-lifecycle.md`](../standards/status-lifecycle.md) — frontmatter status pairing
+- [`task-registry.md`](../standards/task-registry.md) — globally-unique numbering
+
+**Use a different runbook instead if:**
+
+- The work is **user-facing** (needs PRD/epic framing) → see [`story-development.md`](./story-development.md)
+- The work is **broken in production** → see [`hotfix.md`](./hotfix.md)
+- The work is part of a **coordinated multi-stream effort** → see [`create-parallel-stories.md`](./create-parallel-stories.md)
+- You're not sure → see the [decision tree](../concepts/which-path.md)
+
+---
+
 End-to-end walkthrough for shipping a standalone technical task (refactor, infra change, tooling, cleanup) using this repo's skills. Tasks don't need a PRD or an epic — they live in their own registry.
 
 ## When to use this runbook

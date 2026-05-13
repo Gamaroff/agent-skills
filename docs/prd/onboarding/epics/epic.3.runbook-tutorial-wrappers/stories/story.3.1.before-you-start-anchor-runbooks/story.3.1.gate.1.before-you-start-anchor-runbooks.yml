@@ -1,0 +1,29 @@
+gate: PASS
+quality_score: 100
+story: story.3.1.before-you-start-anchor-runbooks
+review_number: 1
+reviewed: 2026-05-13
+pr: https://github.com/Gamaroff/agent-skills/pull/107
+branch: feature/story.3.1.before-you-start-anchor-runbooks
+reviewer: qa-story
+
+summary: >
+  Docs-only story. All 4 ACs pass. Sections inserted correctly in both runbooks.
+  20 lines each (under 30-line cap). Zero deleted lines. All 11 links resolve.
+  No issues found.
+
+top_issues: []
+
+ac_coverage:
+  ac1: PASS
+  ac2: PASS
+  ac3: PASS
+  ac4: PASS
+
+nfr_coverage:
+  maintainability: PASS
+  link_integrity: PASS
+  body_integrity: PASS
+
+risk_level: low
+review_strategy: direct-tools

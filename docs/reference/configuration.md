@@ -139,6 +139,79 @@ Notes:
 - Where a skill assumes a specific stack (NX, Docker Compose, NestJS, Expo Router), the assumption is called out in the skill's "When to Use" section. Skip the skill if your stack differs materially.
 - Placeholder names follow this doc; if a skill uses different ones, that skill links here and lists its own legend.
 
+## Claude Code hooks — `.claude/settings.json`
+
+The `/develop-story` and `/develop-task` pipelines register two hooks in the project's `.claude/settings.json`:
+
+| Hook event | Script | Purpose |
+|---|---|---|
+| `PreCompact` | `on-precompact.sh` | Checkpoints the running pipeline before Claude Code compacts the conversation |
+| `Stop` | `on-stop.sh` | Blocks the orchestrator from yielding mid-pipeline when it tries to end its turn early |
+
+**Install (idempotent):**
+
+```bash
+bash .agents/skills/develop-story/scripts/install-hooks.sh
+```
+
+The install script patches `.claude/settings.json` safely — preserves existing keys, skips entries already present, supports `--dry-run`. Result:
+
+```json
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-precompact.sh" }] }
+    ],
+    "Stop": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-stop.sh" }] }
+    ]
+  }
+}
+```
+
+Both scripts are byte-identical across `develop-story` and `develop-task` installs — the lock file's `skill` field selects the right orchestrator at runtime.
+
+Full reference (hook catalogue, lock-file format, escape valves, interaction diagram): [`shared/resources/develop-pipeline-hooks.md`](../../shared/resources/develop-pipeline-hooks.md). Deep dive on graceful pause / resume semantics: [`shared/resources/develop-pipeline-pause.md`](../../shared/resources/develop-pipeline-pause.md).
+
+## Environment variables
+
+`skills-config.yaml` controls layout and paths. Credentials and remote service endpoints go in environment variables — typically `.env` at repo root (gitignored).
+
+### Jira
+
+| Variable | Example | Required | Purpose |
+|---|---|---|---|
+| `JIRA_URL` | `https://yourorg.atlassian.net` | Yes | Jira base URL; also triggers platform auto-detection |
+| `JIRA_USER_EMAIL` | `dev@example.com` | Yes | Basic Auth username |
+| `JIRA_API_TOKEN` | `ATATT3x...` | Yes | Basic Auth password — generate in Atlassian account settings |
+| `JIRA_PROJECT_KEY` | `PROJ` | Yes | Target project key for issue creation |
+| `JIRA_BOARD_ID` | `42` | No | Numeric board ID; omit → issues created but not placed in backlog |
+| `JIRA_EPIC_LINK_FIELD` | `customfield_10014` | No | Classic-project epic link field; unset = use default |
+| `JIRA_EPIC_NAME_FIELD` | `customfield_10011` | No | Classic-project epic name field; set to `none` for team-managed projects |
+
+### Bitbucket
+
+| Variable | Example | Required | Purpose |
+|---|---|---|---|
+| `BITBUCKET_USERNAME` | `jsmith` | Yes | Basic Auth username |
+| `BITBUCKET_APP_PASSWORD` | `ATB...` | Yes | App password (not account password) — Bitbucket → Personal settings → App passwords |
+| `BITBUCKET_REPO_URL` | `https://bitbucket.org/org/repo` | No | Override if git remote auto-detect fails |
+
+### GitHub
+
+GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no env vars needed in normal use. Set `GH_TOKEN` only in CI environments where interactive login is unavailable.
+
+### Platform resolution order
+
+Skills resolve tracker and VCS in this order:
+
+1. Explicit `tracker:` / `vcs:` in `skills-config.yaml`
+2. Environment variables (`JIRA_URL` present → Jira; `BITBUCKET_USERNAME` present → Bitbucket)
+3. Git remote URL pattern
+4. Default: GitHub
+
+Full spec: [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).
+
 ## See also
 
 - [File naming](../standards/file-naming.md)
