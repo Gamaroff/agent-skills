@@ -2,7 +2,7 @@
 id: story.3.1.before-you-start-anchor-runbooks
 title: "Story 3.1: 'Before you start' for anchor runbooks"
 type: story
-status: in-progress
+status: ready-for-review
 priority: high
 epic: 3
 epic_file: ../../epic.3.runbook-tutorial-wrappers.md
@@ -17,7 +17,7 @@ updated: 2026-05-11
 
 # Story 3.1: "Before you start" for anchor runbooks
 
-**Status**: In Progress
+**Status**: Ready for Review
 **Review**: ✅ All review recommendations from `story.3.1.review.1.before-you-start-anchor-runbooks.md` implemented 2026-05-13
 **GitHub Issue**: [#79](https://github.com/Gamaroff/agent-skills/issues/79)
 
@@ -103,10 +103,45 @@ No conflicts.
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
 | 2026-05-13 | 1.1     | Review passed (9/10) — ready for development | review-story |
+| 2026-05-13 | 1.2     | Implemented — "Before you start" sections inserted in both runbooks | dev-agent |
 
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 
-_(Populated downstream.)_
+### Implementation Summary
+
+Inserted a "Before you start" prerequisite section into both anchor runbooks. Each section is 21 lines (well under the 30-line cap), lists the relevant quickstart, three standards docs to skim, and a "use a different runbook instead if" list with self-reference removed. All 4 ACs pass: sections present (AC1), 3-element checklist (AC2), 21 ≤ 30 lines (AC3), zero deleted lines (AC4). All linked files verified to exist.
+
+### Start Date
+
+2026-05-13
+
+### Completion Date
+
+2026-05-13
+
+### Implementation Approach
+
+- **Task 1**: Snapshot line counts (story-development.md=274, task-development.md=183) — used as diff baseline
+- **Tasks 2–3**: Drafted and inserted "Before you start" section into `story-development.md` after title, before intro paragraph. References quickstart-story, epic-registry, task-development, hotfix, create-parallel-stories, which-path.
+- **Task 4**: Drafted and inserted equivalent section into `task-development.md`. Self-reference to task-development removed from "use different runbook" list; replaced with story-development forward-ref.
+- **Task 5**: Diff verified — `git diff | grep "^-"` returned zero deleted lines. Pure insertions only.
+- **Task 6**: Section line counts = 21 each (AC3 pass). All 8 linked files resolved on disk (AC2, link check pass).
+
+### Testing Results
+
+All ACs verified:
+- AC1: "## Before you start" heading present in both files ✅
+- AC2: Each section contains quickstart link + 3 standards links + alt-runbook list ✅
+- AC3: 21 lines per section ≤ 30 ✅
+- AC4: Zero deleted lines in git diff ✅
+- Link check: all 8 target files exist ✅
+
+### File List
+
+**Modified:**
+- `docs/runbooks/story-development.md` — inserted "Before you start" section (21 lines)
+- `docs/runbooks/task-development.md` — inserted "Before you start" section (21 lines)
+- `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.1.before-you-start-anchor-runbooks/story.3.1.before-you-start-anchor-runbooks.md` — status updated, tasks checked off, Dev Agent Record populated
 
 ### QA Prerequisites Checklist
 
