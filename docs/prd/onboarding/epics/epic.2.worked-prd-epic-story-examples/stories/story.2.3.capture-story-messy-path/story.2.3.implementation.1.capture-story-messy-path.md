@@ -21,7 +21,7 @@ started: 2026-05-13T00:00:00Z
 | 5 | QA Review | ✅ Done | — |
 | 6 | QA Fix | ✅ Skipped (PASS — no fixes needed) | — |
 | 7 | Finalise | ✅ Done | — |
-| 8 | Commit Changes | 🔄 In Progress | — |
+| 8 | Commit Changes | ✅ Done | — |
 
 ## Decisions Log
 
