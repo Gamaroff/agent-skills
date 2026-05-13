@@ -2,9 +2,23 @@
 
 Documentation for the Agent Skills library, organised by reader intent.
 
+> **New to this repo?** Start with the [Learning Path in the root README](../README.md#new-here-start-with-the-learning-path) — it sequences these docs for a first-time reader.
+
+## Section indexes
+
+Each area of the docs has its own index page with full contents and intro:
+
+- [Concepts](./concepts/README.md) — what skills are, how they work
+- [Runbooks](./runbooks/README.md) — step-by-step walkthroughs
+- [Reference](./reference/README.md) — invocation, configuration, catalog, glossary
+- [Standards](./standards/README.md) — document schemas and conventions
+- [Contributing](./contributing/README.md) — authoring, packaging, evals, releases
+- [Operations](./operations/README.md) — running the library day-to-day
+
 ## I want to use these skills in my project
 
 - **[Runbooks](./runbooks/README.md)** — step-by-step walkthroughs
+  - [First-Week Onboarding](./runbooks/first-week.md) — start here if new
   - [Story Development](./runbooks/story-development.md)
   - [Task Development](./runbooks/task-development.md)
   - [QA Flow](./runbooks/qa-flow.md)
