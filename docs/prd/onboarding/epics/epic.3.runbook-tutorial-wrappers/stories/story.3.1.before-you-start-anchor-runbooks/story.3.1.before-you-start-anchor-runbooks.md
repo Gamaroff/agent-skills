@@ -2,7 +2,7 @@
 id: story.3.1.before-you-start-anchor-runbooks
 title: "Story 3.1: 'Before you start' for anchor runbooks"
 type: story
-status: ready-for-review
+status: accepted
 priority: high
 epic: 3
 epic_file: ../../epic.3.runbook-tutorial-wrappers.md
@@ -11,13 +11,15 @@ jira_key: null
 jira_url: null
 github_issue: 79
 github_url: https://github.com/Gamaroff/agent-skills/issues/79
+pr_number: 107
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-13
+completed_date: 2026-05-13
 ---
 
 # Story 3.1: "Before you start" for anchor runbooks
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `story.3.1.review.1.before-you-start-anchor-runbooks.md` implemented 2026-05-13
 **GitHub Issue**: [#79](https://github.com/Gamaroff/agent-skills/issues/79)
 
@@ -145,7 +147,38 @@ All ACs verified:
 
 ### QA Prerequisites Checklist
 
-- [ ] Both runbooks have "Before you start" sections
-- [ ] Each section ≤ 30 lines
-- [ ] Existing body character-identical (diff verified)
-- [ ] All outbound links resolve
+- [x] Both runbooks have "Before you start" sections
+- [x] Each section ≤ 30 lines
+- [x] Existing body character-identical (diff verified)
+- [x] All outbound links resolve
+
+### QA Results
+
+**QA #1**: PASS (2026-05-13)
+- Report: [`story.3.1.qa.1.before-you-start-anchor-runbooks.md`](story.3.1.qa.1.before-you-start-anchor-runbooks.md)
+- Gate: [`story.3.1.gate.1.before-you-start-anchor-runbooks.yml`](story.3.1.gate.1.before-you-start-anchor-runbooks.yml)
+- Quality score: 100/100 — no issues found
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `story.3.1.qa.1.before-you-start-anchor-runbooks.md`
+**Gate File**: `story.3.1.gate.1.before-you-start-anchor-runbooks.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria verified:
+
+✅ **AC1**: "## Before you start" section inserted in both runbooks (line 3 each)
+✅ **AC2**: Each section lists quickstart + 3 standards docs + alt-runbook list (11 links total, all resolving)
+✅ **AC3**: 20 lines per section — under 30-line cap
+✅ **AC4**: Zero deleted lines in git diff — existing body character-identical
+✅ **Link integrity**: All 11 outbound links resolve on disk
+✅ **Security**: NOT_APPLICABLE (docs-only, no code)
+✅ **Compliance**: File naming and story conventions compliant
+
+**Story marked as ACCEPTED on:** 2026-05-13
+**Detailed Verification Log:** See [`story.3.1.dod.1.before-you-start-anchor-runbooks.md`](story.3.1.dod.1.before-you-start-anchor-runbooks.md) for complete verification evidence.
