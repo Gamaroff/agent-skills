@@ -2,7 +2,7 @@
 id: story.4.2.day-2-stories
 title: "Story 4.2: Day 2 — Stories"
 type: story
-status: draft
+status: ready-for-review
 priority: high
 epic: 4
 epic_file: ../../epic.4.first-week-guided-learning-path.md
@@ -17,7 +17,8 @@ updated: 2026-05-11
 
 # Story 4.2: Day 2 — Stories
 
-**Status**: Draft
+**Status**: Ready for Review
+**Review**: ✅ Critical/Important recommendations implemented 2026-05-13 — see `story.4.2.review.1.day-2-stories.md`
 
 ## Story Statement
 
@@ -68,12 +69,12 @@ Mirror Story 4.1's structure. 300-line cap, walkthrough as integration test, sim
 
 > Detailed implementation guide: [story.4.2.plan.day-2-stories.md](story.4.2.plan.day-2-stories.md)
 
-- [ ] **Task 1**: File skeleton (AC: 1)
-- [ ] **Task 2**: "Hour 1: quickstart" section refs Story 1.2 (AC: 2)
-- [ ] **Task 3**: "Hour 2–3: follow-up story" with concrete story description (AC: 2)
-- [ ] **Task 4**: "End of day: verify ≥ 1 story PR" checklist (AC: 3)
-- [ ] **Task 5**: Walkthrough verification (AC: 3)
-- [ ] **Task 6**: Static validation + status flip (AC: 1, 4)
+- [x] **Task 1**: File skeleton (AC: 1)
+- [x] **Task 2**: "Hour 1: quickstart" section refs Story 1.2 (AC: 2)
+- [x] **Task 3**: "Hour 2–3: follow-up story" with concrete story description (AC: 2)
+- [x] **Task 4**: "End of day: verify ≥ 1 story PR" checklist (AC: 3)
+- [x] **Task 5**: Walkthrough verification (AC: 3)
+- [x] **Task 6**: Static validation + status flip (AC: 1, 4)
 
 ## Testing
 
@@ -84,6 +85,8 @@ Walkthrough + static + link check.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-13 | 1.1     | Review passed (9/10) — ready for development; plan follow-up story rewritten generic | review-story  |
+| 2026-05-13 | 1.2     | Implementation complete — day-2-stories.md created (87 lines); status → ready-for-review | develop-story |
 
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 
