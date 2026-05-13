@@ -2,7 +2,7 @@
 id: story.3.1.before-you-start-anchor-runbooks
 title: "Story 3.1: 'Before you start' for anchor runbooks"
 type: story
-status: draft
+status: in-progress
 priority: high
 epic: 3
 epic_file: ../../epic.3.runbook-tutorial-wrappers.md
@@ -17,7 +17,9 @@ updated: 2026-05-11
 
 # Story 3.1: "Before you start" for anchor runbooks
 
-**Status**: Draft
+**Status**: In Progress
+**Review**: ✅ All review recommendations from `story.3.1.review.1.before-you-start-anchor-runbooks.md` implemented 2026-05-13
+**GitHub Issue**: [#79](https://github.com/Gamaroff/agent-skills/issues/79)
 
 ## Story Statement
 
@@ -84,12 +86,12 @@ No conflicts.
 
 > Detailed implementation guide: [story.3.1.plan.before-you-start-anchor-runbooks.md](story.3.1.plan.before-you-start-anchor-runbooks.md)
 
-- [ ] **Task 1**: Snapshot both runbooks (pre-edit) for diff comparison (AC: 4)
-- [ ] **Task 2**: Draft "Before you start" content for `story-development.md` ≤ 30 lines (AC: 1, 2, 3)
-- [ ] **Task 3**: Insert into `story-development.md` between title and body (AC: 1)
-- [ ] **Task 4**: Draft + insert "Before you start" for `task-development.md` ≤ 30 lines (AC: 1, 2, 3)
-- [ ] **Task 5**: Diff verification — existing body character-identical (AC: 4)
-- [ ] **Task 6**: Static validation + link check + status flip (AC: all)
+- [x] **Task 1**: Snapshot both runbooks (pre-edit) for diff comparison (AC: 4)
+- [x] **Task 2**: Draft "Before you start" content for `story-development.md` ≤ 30 lines (AC: 1, 2, 3)
+- [x] **Task 3**: Insert into `story-development.md` between title and body (AC: 1)
+- [x] **Task 4**: Draft + insert "Before you start" for `task-development.md` ≤ 30 lines (AC: 1, 2, 3)
+- [x] **Task 5**: Diff verification — existing body character-identical (AC: 4)
+- [x] **Task 6**: Static validation + link check + status flip (AC: all)
 
 ## Testing
 
@@ -100,6 +102,7 @@ No conflicts.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-13 | 1.1     | Review passed (9/10) — ready for development | review-story |
 
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 

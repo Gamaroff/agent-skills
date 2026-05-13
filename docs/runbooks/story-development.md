@@ -1,5 +1,26 @@
 # Runbook — Story Development
 
+## Before you start
+
+> This is the **anchor reference** for story work. Skim it cold and you'll bounce off — it assumes you already know the shape of the story chain.
+
+**If you haven't shipped a story artifact before:** stop and follow [`quickstart-story`](../concepts/quickstart-story.md) first. It produces a real artifact in 60 minutes.
+
+**Skim these standards first (5 min total):**
+
+- [`file-naming.md`](../standards/file-naming.md) — DOTS, kebab-case, dots-as-separators
+- [`status-lifecycle.md`](../standards/status-lifecycle.md) — frontmatter status pairing
+- [`epic-registry.md`](../standards/epic-registry.md) — globally-unique numbering
+
+**Use a different runbook instead if:**
+
+- The work is **internal** (refactor, infra, cleanup) → see [`task-development.md`](./task-development.md)
+- The work is **broken in production** → see [`hotfix.md`](./hotfix.md)
+- The work is part of a **coordinated multi-stream effort** → see [`create-parallel-stories.md`](./create-parallel-stories.md)
+- You're not sure → see the [decision tree](../concepts/which-path.md)
+
+---
+
 End-to-end walkthrough for shipping a user-facing feature using this repo's skills. Takes you from "I have a product idea" to a merged PR with a green QA gate.
 
 ## When to use this runbook
