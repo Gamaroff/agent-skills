@@ -1,0 +1,39 @@
+schema: 1
+story: '3.2'
+story_title: "'Is this the right runbook?' callouts for satellites"
+gate: PASS
+status_reason: 'All 4 ACs verified programmatically; insertions-only diffs confirmed; link resolves; DoD complete.'
+reviewer: 'QA Engineer'
+updated: '2026-05-13T00:00:00Z'
+
+top_issues: []
+waiver:
+  active: false
+
+quality_score: 100
+expires: '2026-05-27T00:00:00Z'
+
+evidence:
+  tests_reviewed: 4
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Documentation change only — no security surface'
+  performance:
+    status: PASS
+    notes: 'Not applicable — markdown-only'
+  reliability:
+    status: PASS
+    notes: 'All links resolve; docs/concepts/which-path.md exists'
+  maintainability:
+    status: PASS
+    notes: 'Surgical insertions only; content-specific callouts; diff gate verifiable'
+
+recommendations:
+  immediate: []
+  future: []

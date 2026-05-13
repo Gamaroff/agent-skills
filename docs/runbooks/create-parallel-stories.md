@@ -1,5 +1,16 @@
 # Runbook — Parallel Story Development
 
+> ### Is this the right runbook?
+>
+> **Use this if** you have 2+ developers (or 2+ agent sessions) shipping interdependent stories simultaneously.
+>
+> **Use a different runbook if:**
+> - You're alone, shipping one story end-to-end → [`story-development.md`](./story-development.md)
+> - The work is internal and not user-facing → [`task-development.md`](./task-development.md)
+> - You're not sure → [decision tree](../concepts/which-path.md)
+
+---
+
 > **Audience:** teams developing multiple stories of one epic simultaneously without merge conflicts.
 
 When several stories under the same epic can be implemented in parallel — different files, different concerns — use Git worktrees to isolate them and let multiple developers (or multiple agent sessions) work at the same time.

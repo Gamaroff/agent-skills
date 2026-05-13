@@ -1,5 +1,16 @@
 # Runbook — Change Management
 
+> ### Is this the right runbook?
+>
+> **Use this if** mid-pipeline conditions changed and the current PRD/epic/story plan no longer fits — pivots, missing reqs, blocked stories.
+>
+> **Use a different runbook if:**
+> - You're starting fresh, not changing course → [`story-development.md`](./story-development.md)
+> - The change is a routine bug → [`bug-fix.md`](./bug-fix.md)
+> - You're not sure → [decision tree](../concepts/which-path.md)
+
+---
+
 > **Audience:** anyone responding to a pivot, blocker, or scope change mid-project.
 
 When the plan breaks — a story fails, a tech assumption turns out wrong, a stakeholder demands a pivot, a requirement was missing — drive the response through `change-management` rather than improvising. The output is a Sprint Change Proposal with concrete artifact edits.
