@@ -2,7 +2,7 @@
 id: story.4.5.first-week-index
 title: "Story 4.5: First-week index"
 type: story
-status: ready-for-review
+status: accepted
 priority: medium
 epic: 4
 epic_file: ../../epic.4.first-week-guided-learning-path.md
@@ -17,7 +17,7 @@ updated: 2026-05-11
 
 # Story 4.5: First-week index
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `story.4.5.review.1.first-week-index.md` implemented 2026-05-13
 **GitHub Issue**: [#86](https://github.com/Gamaroff/agent-skills/issues/86)
 
@@ -96,6 +96,7 @@ Static + link check + diff inspection.
 | 2026-05-13 | 1.1     | Review fixes: body GitHub link, Task 5/6 polish, split downstream sections | review-story |
 | 2026-05-13 | 1.2     | Review passed - ready for development | review-story |
 | 2026-05-13 | 1.3     | Implementation complete — first-week.md created, README.md updated | develop |
+| 2026-05-13 | 1.4     | QA PASS (95/100) — all 4 ACs verified, story accepted | qa-story |
 
 ## Dev Agent Record
 
@@ -145,16 +146,27 @@ Static + link check: 7/7 links pass. Line count: 34/100 limit. Diff: insertion-o
 
 ## QA Report
 
-_(Populated by /qa-story.)_
+**QA #1**: [`story.4.5.qa.1.first-week-index.md`](story.4.5.qa.1.first-week-index.md)
+**Gate**: [`story.4.5.gate.1.first-week-index.yml`](story.4.5.gate.1.first-week-index.yml) — **PASS** (95/100)
+**Date**: 2026-05-13
+
+| AC | Result |
+|----|--------|
+| AC1: file at runbook level (not nested) | ✅ PASS |
+| AC2: 4 Day rows with description + criterion | ✅ PASS |
+| AC3: 6 outbound + 1 inbound links resolve | ✅ PASS |
+| AC4: 34 lines ≤ 100 | ✅ PASS |
+
+No issues found.
 
 ## Bug Reports
 
-_(Populated if QA finds defects.)_
+_(None — QA PASS with no issues.)_
 
 ### QA Prerequisites Checklist
 
-- [ ] Index file exists at correct path (NOT nested)
-- [ ] 4 day-rows present with description + criterion
-- [ ] All 6 outbound links resolve
-- [ ] runbooks/README.md modification is insertion-only (diff verified)
-- [ ] Doc ≤ 100 lines
+- [x] Index file exists at correct path (NOT nested)
+- [x] 4 day-rows present with description + criterion
+- [x] All 6 outbound links resolve
+- [x] runbooks/README.md modification is insertion-only (diff verified)
+- [x] Doc ≤ 100 lines
