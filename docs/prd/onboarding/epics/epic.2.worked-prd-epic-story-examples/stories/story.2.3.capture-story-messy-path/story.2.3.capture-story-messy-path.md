@@ -112,6 +112,32 @@ No conflicts.
 | 2026-05-13 | 1.2     | Status flipped to Ready for Development after review residue cleanup (Testing section field-name fix) | review-story  |
 | 2026-05-13 | 1.3     | **DESCOPED**: No genuine QA-gate FAIL found in Epics 1, 3, 4 (all stories gated PASS or WAIVED on first cycle). Story cancelled per Dev Notes descope protocol. Epic 2 DoD checkbox "Story 2.3 messy-path is real" marked N/A — see this entry. | develop-story |
 
+## QA Testing Results
+
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-13
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [story.2.3.qa.1.capture-story-messy-path-descoped.md](./story.2.3.qa.1.capture-story-messy-path-descoped.md)
+- **Gate File**: [story.2.3.gate.1.capture-story-messy-path-descoped.yml](./story.2.3.gate.1.capture-story-messy-path-descoped.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: AC3 ✅ (AC1, AC2 N/A — descoped)
+- **Tests Executed**: 0 (documentation-only)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Story correctly executed its provenance-gate descope protocol. Survey confirmed 0 genuine QA-gate FAILs across 7 stories in Epics 1–4. Epic 2 DoD checkbox properly annotated N/A.
+
+---
+
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 
 ### Implementation Summary
@@ -166,3 +192,28 @@ If a future story run in Epics 3 or 4 produces a genuine `gate: FAIL`, a new sto
 - [x] All 4 captured files present (or story descoped with rationale) — descoped with rationale
 - [ ] ~~README narrative names specific cause + fix~~ — N/A (descoped)
 - [ ] ~~Provenance frontmatters complete~~ — N/A (descoped)
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED (Cancelled/Descoped)
+**Acceptance Date:** 2026-05-13
+
+### QA Report Summary
+
+**QA Report**: `story.2.3.qa.1.capture-story-messy-path-descoped.md`
+**Gate File**: `story.2.3.gate.1.capture-story-messy-path-descoped.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All applicable Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** AC3 PASS (no manufactured failure); AC1/AC2 N/A (correctly descoped per provenance-gate rule)
+✅ **Documentation:** Change Log v1.0–v1.3 complete; Implementation Summary with survey table + descope rationale
+✅ **Epic DoD:** Checkbox "Story 2.3 messy-path is real" annotated N/A with link to Change Log v1.3
+✅ **Security:** N/A — zero code changes (documentation-only PR)
+✅ **Compliance:** N/A — zero code changes
+
+**Story marked as complete on:** 2026-05-13
+**PR:** #103 — https://github.com/Gamaroff/agent-skills/pull/103
+
+**Detailed Verification Log:** See `story.2.3.dod.1.capture-story-messy-path.md`
