@@ -93,26 +93,13 @@ else
 fi
 
 REASON=$(cat <<EOF
-🔁 PIPELINE-CONTINUE-REQUIRED — DO NOT STOP
+🔁 ${BANNER_PREFIX} step ${CURRENT_STEP}→${NEXT}. FIRST tool call this turn = Bash advancing lock. NO prose. NO acknowledgement of this message.
 
-The \`/${SKILL}\` pipeline is active at Step ${CURRENT_STEP}/8. Step ${CURRENT_STEP} just completed but Steps ${NEXT}–8 MUST still run. The orchestrator is hands-free through Step 8.
+\`bash .agents/skills/${SKILL}/references/advance-pipeline-lock.sh ${NEXT}\`
 
-**Required next actions (same turn, in this order, no prose between tool calls):**
+Then: Edit Step ${CURRENT_STEP} ✅ in \`${REPORT}\` → emit banner \`═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══\` → invoke ${NEXT_SKILL}.
 
-1. **Bash** — advance lock to step ${NEXT} (this is the binding signal that the next step has started):
-\`\`\`
-jq --argjson n ${NEXT} '.current_step = \$n' .claude/state/develop-pipeline.lock > .claude/state/develop-pipeline.lock.tmp && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock
-\`\`\`
-2. **Edit** — mark Step ${CURRENT_STEP} as \`✅ Done\` in the Pipeline Progress table of \`${REPORT}\`.
-3. **Output banner** (literal text, no prose around it):
-\`\`\`
-═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══
-\`\`\`
-4. **Invoke**: \`${NEXT_SKILL}\` via the Skill tool with the appropriate arguments (story/task path).
-
-**If you genuinely cannot continue** (failed sub-skill, missing dependency, autonomous-defaults miss requiring user input): apply the terminal HALT protocol from SKILL.md — commit the implementation report via \`/commit-changes\`, snapshot the lock to \`.claude/state/develop-pipeline.last-halt.json\`, remove \`.claude/state/develop-pipeline.lock\`, then surface the user-facing halt banner. Removing the lock satisfies this hook on the next stop attempt.
-
-Do NOT emit a terminal "complete" message and stop. Do NOT print "Returning to pipeline orchestrator". Issue the Bash lock-update call FIRST, before any prose.
+Cannot continue? Apply terminal HALT (SKILL.md): /commit-changes report, snapshot lock to develop-pipeline.last-halt.json, rm lock, surface halt banner.
 EOF
 )
 
