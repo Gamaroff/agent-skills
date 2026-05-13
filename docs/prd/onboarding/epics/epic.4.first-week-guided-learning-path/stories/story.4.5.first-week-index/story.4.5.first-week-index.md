@@ -2,7 +2,7 @@
 id: story.4.5.first-week-index
 title: "Story 4.5: First-week index"
 type: story
-status: draft
+status: ready-for-review
 priority: medium
 epic: 4
 epic_file: ../../epic.4.first-week-guided-learning-path.md
@@ -17,7 +17,9 @@ updated: 2026-05-11
 
 # Story 4.5: First-week index
 
-**Status**: Draft
+**Status**: Ready for Review
+**Review**: ✅ All review recommendations from `story.4.5.review.1.first-week-index.md` implemented 2026-05-13
+**GitHub Issue**: [#86](https://github.com/Gamaroff/agent-skills/issues/86)
 
 ## Story Statement
 
@@ -74,13 +76,13 @@ No conflicts.
 
 > Detailed implementation guide: [story.4.5.plan.first-week-index.md](story.4.5.plan.first-week-index.md)
 
-- [ ] **Task 1**: File skeleton + frontmatter (AC: 1)
-- [ ] **Task 2**: Day-1–Day-4 table with description + completion criterion (AC: 2)
-- [ ] **Task 3**: "Before you start" preamble linking quickstarts (AC: 3)
-- [ ] **Task 4**: "After the week" outro pointing at runbook anchors (AC: 3)
-- [ ] **Task 5**: Insert single inbound link in `docs/runbooks/README.md` (AC: 3)
-- [ ] **Task 6**: Diff verify README change is insertion-only (AC: pre-existing structure preserved)
-- [ ] **Task 7**: Static validation + line count + link check + status flip (AC: 1, 4)
+- [x] **Task 1**: File skeleton + frontmatter (AC: 1)
+- [x] **Task 2**: Day-1–Day-4 table with description + completion criterion (AC: 2)
+- [x] **Task 3**: "Before you start" preamble linking quickstarts (AC: 3)
+- [x] **Task 4**: "After the week" outro pointing at runbook anchors (AC: 3)
+- [x] **Task 5**: Insert single inbound link in `docs/runbooks/README.md` (AC: 3). Idempotent — if a `first-week` link already exists, skip insertion.
+- [x] **Task 6**: Diff verify README change is insertion-only (AC: 3 — quality gate)
+- [x] **Task 7**: Static validation + line count + link check + status flip (AC: 1, 4)
 
 ## Testing
 
@@ -91,10 +93,63 @@ Static + link check + diff inspection.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-13 | 1.1     | Review fixes: body GitHub link, Task 5/6 polish, split downstream sections | review-story |
+| 2026-05-13 | 1.2     | Review passed - ready for development | review-story |
+| 2026-05-13 | 1.3     | Implementation complete — first-week.md created, README.md updated | develop |
 
-## Dev Agent Record / QA Handoff / QA Report / Bug Reports
+## Dev Agent Record
 
-_(Populated downstream.)_
+**Start Date**: 2026-05-13
+**Completion Date**: 2026-05-13
+
+### Implementation Summary
+
+Created `docs/runbooks/first-week.md` — a 34-line hub index listing all four onboarding day runbooks with one-line descriptions and completion criteria. Added a single inbound link from `docs/runbooks/README.md` (insertion-only, verified by diff). All 6 outbound links verified on disk.
+
+### Implementation Approach
+
+- **Task 1 + Frontmatter**: File created with YAML frontmatter following existing day-doc convention (`name`, `description`, `type: guide`, `status`, `version`, `created`).
+- **Task 2 — Day table**: Pulled descriptions from each day doc's YAML `description` field; derived one-line completion criteria from each day's "End of day — Verify" section.
+- **Task 3 — Preamble**: "Before you start" section with two quickstart links (`../concepts/quickstart-task.md`, `../concepts/quickstart-story.md`).
+- **Task 4 — Outro**: Single sentence pointing to the full runbook index.
+- **Task 5 — README inbound link**: Idempotent insertion at top of Available Runbooks table (no pre-existing first-week mention, confirmed by grep).
+- **Task 6 — Diff verify**: `git diff docs/runbooks/README.md` shows one `+` line only, zero `-` lines — insertion-only confirmed.
+- **Task 7 — Validation**: `wc -l = 34` (≤100 ✅); all 7 links resolved on disk ✅.
+
+### Testing Results
+
+Static + link check: 7/7 links pass. Line count: 34/100 limit. Diff: insertion-only (0 deletions).
+
+### File List
+
+- **Created**: `docs/runbooks/first-week.md`
+- **Modified**: `docs/runbooks/README.md` (1 row added to Available Runbooks table)
+- **Modified**: `docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.5.first-week-index/story.4.5.first-week-index.md` (status + task checkboxes)
+
+### Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-05-13 | Created `docs/runbooks/first-week.md` with hub index content |
+| 2026-05-13 | Added First-Week Onboarding row to `docs/runbooks/README.md` |
+
+## QA Handoff Notes
+
+**What was built**: `docs/runbooks/first-week.md` — hub index at runbook level (NOT nested).
+
+**Verification checklist**:
+- AC1: `ls docs/runbooks/first-week.md` exists (NOT in `first-week/`)
+- AC2: Table has 4 rows (Day 1–4) each with description + completion criterion
+- AC3: 6 outbound links resolve (`first-week/day-{1-4}-*.md`, `../concepts/quickstart-{task,story}.md`) + README inbound link present
+- AC4: `wc -l docs/runbooks/first-week.md` → 34 (≤100)
+
+## QA Report
+
+_(Populated by /qa-story.)_
+
+## Bug Reports
+
+_(Populated if QA finds defects.)_
 
 ### QA Prerequisites Checklist
 
