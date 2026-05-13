@@ -5,9 +5,9 @@ type: implementation-report
 story-ref: story.3.3.common-first-time-errors.md
 github_issue: 80
 started: 2026-05-13T09:34:55Z
-finished: ~
-final_status: ~
-qa_iterations: 0
+finished: 2026-05-13
+final_status: completed
+qa_iterations: 1
 ---
 
 # Implementation Report: Story 3.3 — Common first-time errors
@@ -30,7 +30,7 @@ qa_iterations: 0
 | 5 | QA Review | ✅ Done | PASS 100/100 — all 4 ACs verified, no issues | |
 | 6 | QA Fix | ✅ Done | N/A — QA passed first cycle | |
 | 7 | Finalise | ✅ Done | Story accepted; issue #80 closed; board → Done; canonical PR comment posted | |
-| 8 | Commit Changes | ⏳ Pending | | |
+| 8 | Commit Changes | ✅ Done | Commit 34bc0cf pushed to origin | |
 
 ## Decisions Log
 
@@ -47,4 +47,18 @@ _(None yet.)_
 
 ## Completion Summary
 
-_(Populated at Step 8.)_
+**Status:** Completed
+**QA Iterations:** 1 (PASS first cycle)
+**Final Gate:** PASS 100/100
+
+**Artifacts:**
+- Branch: `feature/story.3.3.common-first-time-errors`
+- PR: https://github.com/Gamaroff/agent-skills/pull/109
+- QA Report: `story.3.3.qa.1.common-first-time-errors.md`
+- Gate: `story.3.3.gate.1.common-first-time-errors.yml`
+- DoD: `story.3.3.dod.1.common-first-time-errors.md`
+- Sprint Review: `sprint-review-summary.md`
+
+**Key commits:**
+- `45c914b` — docs(story.3.3): add 'Common first-time errors' troubleshooting sections (#80)
+- `34bc0cf` — docs(story.3.3): QA passed, story accepted — DoD verified (#80)
