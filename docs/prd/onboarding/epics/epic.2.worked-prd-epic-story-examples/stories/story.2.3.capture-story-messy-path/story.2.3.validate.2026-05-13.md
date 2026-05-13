@@ -1,0 +1,129 @@
+# Story Validation Report: Story 2.3 — Capture a story with the messy path
+
+**Validated:** 2026-05-13
+**Validation Depth:** Standard
+**Story Status:** Ready for Development
+**Verdict:** ✅ GO
+**Implementation Readiness Score:** 9/10
+
+---
+
+## Executive Summary
+
+Story 2.3 is structurally complete and ready for implementation. All critical and important issues from Review #1 have been addressed in v1.2 (provenance schema aligned to 4-field standard, FAIL/PASS commit identification specified via gate YAML pattern, descope→Epic 2 DoD N/A convention documented). The story explicitly anticipates and documents the descope path — which is the most likely execution given no genuine QA-gate FAIL has occurred in Epic 1 stories. The descope _is_ valid development for this story.
+
+**Critical Issues:** 0 🚨
+**Important Issues:** 0 ⚠️
+**Optional Improvements:** 1 💡
+
+**Confidence Level for Successful Implementation:** High
+
+---
+
+## Verdict Justification
+
+Score 9/10, zero Critical issues → GO. All review.1 fixes applied. Descope path is fully specified and the story explicitly handles both outcomes (genuine FAIL found → capture; no FAIL → cancel with DoD N/A annotation).
+
+---
+
+## Scoring Breakdown
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Template Compliance | 10/10 | All sections present; DOT naming; no placeholders |
+| Epic Alignment | 9/10 | ACs 1-3 map directly to epic Story 2.3 ACs |
+| Technical Accuracy | 9/10 | No hallucinations; provenance schema references real 2.1/2.2 precedent |
+| Completeness | 9/10 | Tasks cover all ACs; descope path explicit (Task 2 → STOP) |
+| Consistency | 9/10 | 4-field provenance schema consistent with Stories 2.1/2.2 |
+| Quality & Clarity | 9/10 | Clear go/no-go decision tree; actionable tasks with AC refs |
+| Previous Story Continuity | 9/10 | Explicitly builds on 2.1/2.2 insights; schema reuse documented |
+
+**Overall:** 9/10
+
+---
+
+## 1. Template Structure Compliance — PASS
+
+All required sections present (Status, Story Statement, ACs, Tasks, Dev Notes, Testing, Manual Testing Steps, Change Log, Dev Agent Record stub). File naming follows DOT convention (`story.2.3.capture-story-messy-path.md`). Frontmatter complete: `github_issue: 94`, `status: ready-for-development`. No unfilled placeholders.
+
+---
+
+## 2. Epic Alignment — ALIGNED
+
+Story ACs map precisely to Epic 2 Story 2.3 ACs:
+- AC1 (dir with 4 files) ↔ epic AC1
+- AC2 (README narrative) ↔ epic AC2
+- AC3 (4-field provenance, real commit) ↔ epic AC3
+
+---
+
+## 3. Technical Accuracy — ACCURATE
+
+No hallucinations. All technical claims trace to real precedent (Stories 2.1/2.2 provenance schema). Gate YAML verdict identification pattern is accurate and testable.
+
+---
+
+## 4. Completeness & Gaps — COMPLETE
+
+- Tasks 1-6 cover all ACs with explicit AC references
+- Task 2 is a hard gate: survey → descope if no FAIL found
+- Descope exit path documented: mark `cancelled`, update Epic 2 DoD checkbox N/A
+- Rollback plan present
+- Testing: static validator + `git log --follow` provenance check
+
+---
+
+## 5. Consistency & Conflicts — CONSISTENT
+
+4-field schema (`captured_skill_version`, `captured_date`, `source_sha`, `source_path`) consistent across Dev Notes, AC3, Manual Testing Steps, and Task 4. No internal contradictions.
+
+---
+
+## 6. Quality & Clarity — 9/10
+
+Clear decision tree: Task 1 (survey) → Task 2 (descope if empty, STOP) → Tasks 3–6 (capture). The "do not manufacture a failure" constraint is explicit and prominently placed.
+
+### Optional
+
+- 💡 Tasks 3–6 could include a note that they are skipped entirely if Task 2 triggers descope — currently implied but not stated inline in the task list.
+
+---
+
+## 7. Previous Story Context — CONSISTENT
+
+Story explicitly references 2.1/2.2 schema and README pattern. Change Log shows v1.1/v1.2 review fixes applied. No continuity issues.
+
+---
+
+## Summary of Findings
+
+### Must Fix (Critical) — 0
+### Should Fix (Important) — 0
+### Consider (Optional) — 1
+
+1. Add inline note to Tasks 3–6 header: "Skip if Task 2 triggers descope."
+
+---
+
+## Next Steps
+
+**Story is GO.** Ready for implementation. The most likely execution path is:
+1. Survey (Task 1): find no genuine QA-gate FAIL in Epics 1, 3, 4
+2. Descope (Task 2): mark story `cancelled`, record in Change Log, update Epic 2 DoD checkbox N/A
+3. STOP — no further tasks execute
+
+---
+
+## Validation Metadata
+
+- **Mode:** validate (automated, read-only)
+- **Validation Date:** 2026-05-13
+- **Validation Depth:** Standard
+- **Story File:** `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.capture-story-messy-path.md`
+- **Parent Epic:** `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/epic.2.worked-prd-epic-story-examples.md`
+- **Prior Review Applied:** `story.2.3.review.1.capture-story-messy-path.md` (v1.2 fixes confirmed)
+- **Architecture Docs Consulted:** N/A (no code — documentation-only story)
+
+---
+
+*Generated by /review-story --validate. No changes made to the story document.*

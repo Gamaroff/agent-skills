@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# install-hooks.sh — Register PreCompact + Stop hooks in the project's
-# `.claude/settings.json` for the /develop-story and /develop-task pipelines.
+# install-hooks.sh — Register PreCompact + Stop + PostToolUse hooks in the
+# project's `.claude/settings.json` for the /develop-story and /develop-task
+# pipelines.
 #
 # Idempotent: re-running adds nothing if both hooks are already present.
 # Preserves all existing settings.json content (other hooks, permissions, env).
@@ -11,9 +12,9 @@
 #   3. .claude/skills/develop-story/scripts/   (dev symlink / monorepo)
 #   4. .claude/skills/develop-task/scripts/    (dev symlink / monorepo)
 #
-# Both `on-precompact.sh` and `on-stop.sh` are byte-identical across the two
-# skills (the lock file's `skill` field branches behaviour at runtime), so
-# registering one pair covers both pipelines.
+# All three hook scripts (`on-precompact.sh`, `on-stop.sh`, `on-skill-return.sh`)
+# are byte-identical across the two skills (the lock file's `skill` field
+# branches behaviour at runtime), so registering one set covers both pipelines.
 #
 # Usage:
 #   bash .agents/skills/develop-story/scripts/install-hooks.sh
@@ -62,7 +63,7 @@ CANDIDATES=(
 
 BASE=""
 for c in "${CANDIDATES[@]}"; do
-  if [ -f "$c/on-stop.sh" ] && [ -f "$c/on-precompact.sh" ]; then
+  if [ -f "$c/on-stop.sh" ] && [ -f "$c/on-precompact.sh" ] && [ -f "$c/on-skill-return.sh" ]; then
     BASE="$c"
     break
   fi
@@ -89,6 +90,7 @@ fi
 
 PRECOMPACT_CMD="bash ${BASE}/on-precompact.sh"
 STOP_CMD="bash ${BASE}/on-stop.sh"
+POSTTOOLUSE_CMD="bash ${BASE}/on-skill-return.sh"
 
 # --- ensure settings file exists and is valid JSON ---------------------------
 
@@ -149,16 +151,18 @@ echo "  Hook base:     ${BASE}"
 $DRY_RUN && echo "  Mode:          DRY RUN (no writes)"
 echo ""
 
-patch_hook "PreCompact" "$PRECOMPACT_CMD"
-patch_hook "Stop"       "$STOP_CMD"
+patch_hook "PreCompact"  "$PRECOMPACT_CMD"
+patch_hook "Stop"        "$STOP_CMD"
+patch_hook "PostToolUse" "$POSTTOOLUSE_CMD"
 
 echo ""
 if $DRY_RUN; then
   echo "Dry run complete. Re-run without --dry-run to apply."
 else
-  echo "✅ Done. Both hooks are now registered."
-  echo "   • PreCompact: graceful pause on context compaction"
-  echo "   • Stop:       forced continuation when pipeline tries to stop mid-run"
+  echo "✅ Done. All three hooks are now registered."
+  echo "   • PreCompact:  graceful pause on context compaction"
+  echo "   • Stop:        forced continuation when pipeline tries to stop mid-run"
+  echo "   • PostToolUse: auto-advance lock + inject next-step banner on Skill return"
   echo ""
   echo "   Re-running this script is safe — it skips entries that already exist."
 fi
