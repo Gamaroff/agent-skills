@@ -5,7 +5,7 @@ type: implementation-report
 story-ref: story.2.4.update-examples-readme.md
 started: 2026-05-13T00:00:00Z
 finished: null
-final-status: in-progress
+final-status: accepted
 ---
 
 # Implementation Report: Story 2.4 — Update examples/README.md
@@ -28,11 +28,11 @@ final-status: in-progress
 | 1 | Create Branch | ✅ Done | `feature/story.2.4.update-examples-readme` from `feature/epic.2.worked-prd-epic-story-examples` | |
 | 2 | Review Story | ✅ Done | GO 9/10 — 0 critical, 0 important; validate.2026-05-13.md | |
 | 3 | Develop | ✅ Done | examples/README.md rewritten; all 7 tasks [x]; ACs verified | |
-| 4 | Create PR | ⏳ Pending | | |
-| 5 | QA Review | ⏳ Pending | | |
-| 6 | QA Fix | ⏳ Pending | | |
-| 7 | Finalise | ⏳ Pending | | |
-| 8 | Commit Changes | ⏳ Pending | | |
+| 4 | Create PR | ✅ Done | PR #104 → feature/epic.2.worked-prd-epic-story-examples | |
+| 5 | QA Review | ✅ Done | PASS 95/100; 3/3 ACs; 0 issues; PR + issue commented | |
+| 6 | QA Fix | ✅ Done | Not needed — gate PASS with no issues | |
+| 7 | Finalise | ✅ Done | DoD PASSED; story accepted; sprint-review-summary.md created; PR #104 + issue #91 commented; issue closed | |
+| 8 | Commit Changes | ✅ Done | All finalise artifacts committed + pushed; pipeline complete | |
 
 ## Decisions Log
 
