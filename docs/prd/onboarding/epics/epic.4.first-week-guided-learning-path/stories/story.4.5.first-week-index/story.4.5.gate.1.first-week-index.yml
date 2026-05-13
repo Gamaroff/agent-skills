@@ -1,0 +1,28 @@
+gate: PASS
+quality_score: 95
+story: story.4.5.first-week-index
+story_file: docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.5.first-week-index/story.4.5.first-week-index.md
+pr: https://github.com/Gamaroff/agent-skills/pull/114
+qa_report: story.4.5.qa.1.first-week-index.md
+reviewed: 2026-05-13
+reviewer: qa-story
+
+ac_results:
+  - ac: 1
+    criterion: "docs/runbooks/first-week.md exists at runbook level (NOT nested)"
+    result: PASS
+  - ac: 2
+    criterion: "Index lists Day 1–4 with description + completion criterion each"
+    result: PASS
+  - ac: 3
+    criterion: "Index links to 4 day docs + 2 quickstarts; README inbound link present"
+    result: PASS
+  - ac: 4
+    criterion: "Doc body ≤ 100 lines"
+    result: PASS
+
+top_issues: []
+
+summary: >
+  All 4 ACs pass. 7/7 links resolve. README modification is insertion-only (1 row, 0 deletions).
+  34-line doc well within 100-line cap. No issues found. Story ready to finalise.
