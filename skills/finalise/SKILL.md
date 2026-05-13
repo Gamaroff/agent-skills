@@ -1272,3 +1272,17 @@ Use this template to generate the Sprint Review summary artifact when marking a 
 5. Summarize with a PASS/FAIL verdict and list any blocking items
 
 NEVER end without producing the full checklist output.
+
+---
+
+## Pipeline Lock Cooperation (when invoked by `/develop-story` or `/develop-task`)
+
+When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last action** before returning, so the orchestrator's next turn does not depend on model discipline:
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalise 2>/dev/null || true
+fi
+```
+
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `PostToolUse` and `Stop` hooks: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).
