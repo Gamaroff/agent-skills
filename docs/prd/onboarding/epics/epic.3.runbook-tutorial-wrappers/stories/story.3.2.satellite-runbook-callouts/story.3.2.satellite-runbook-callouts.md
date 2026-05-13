@@ -2,7 +2,7 @@
 id: story.3.2.satellite-runbook-callouts
 title: "Story 3.2: 'Is this the right runbook?' callouts for satellites"
 type: story
-status: ready-for-review
+status: accepted
 priority: high
 epic: 3
 epic_file: ../../epic.3.runbook-tutorial-wrappers.md
@@ -12,12 +12,13 @@ jira_url: null
 github_issue: 81
 github_url: https://github.com/Gamaroff/agent-skills/issues/81
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-13
+completed_date: 2026-05-13
 ---
 
 # Story 3.2: "Is this the right runbook?" callouts for satellites
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `story.3.2.review.1.satellite-runbook-callouts.md` implemented 2026-05-13
 **Tracker**: [#81](https://github.com/Gamaroff/agent-skills/issues/81)
 
@@ -151,3 +152,66 @@ Surgical insertions using Edit tool, one per file. Each edit anchored on `{title
 - [x] Each callout ≤ 10 lines
 - [x] Each callout references `which-path.md`
 - [x] All 4 diffs show insertions only
+
+## QA Testing Results
+
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-13
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [story.3.2.qa.1.satellite-runbook-callouts.md](./story.3.2.qa.1.satellite-runbook-callouts.md)
+- **Gate File**: [story.3.2.gate.1.satellite-runbook-callouts.yml](./story.3.2.gate.1.satellite-runbook-callouts.yml)
+
+### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 4/4
+- **Tests Executed**: 4 automated checks (grep, diff, line-count, link)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. All 4 acceptance criteria verified programmatically. Insertions-only confirmed; `which-path.md` link resolves.
+
+## QA Completion Summary
+
+**Final QA Status**: ✅ Passed
+**QA Engineer**: QA Engineer
+**Final Testing Date**: 2026-05-13
+
+### Test Results Summary
+
+- **All Acceptance Criteria Met**: Yes
+- **Bug Reports Created**: 0
+- **Bug Reports Closed**: 0
+- **Regression Tests**: N/A (doc-only changes)
+- **Performance**: N/A
+- **Ready for Deployment**: Yes
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `story.3.2.qa.1.satellite-runbook-callouts.md`
+**Gate File**: `story.3.2.gate.1.satellite-runbook-callouts.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 4 criteria met (AC1–AC4 verified programmatically)
+✅ **PR Review:** PR #108 open; documentation-only story (no code test suite required)
+✅ **Documentation:** Story change log updated (3 versions); 4 runbooks modified with callout insertions
+✅ **Security Review:** ✅ NOT_APPLICABLE — documentation change only, no security surface
+✅ **Compliance:** ✅ NOT_APPLICABLE — internal developer documentation, no PII/GDPR/accessibility UI
+✅ **Reliability:** ✅ PASS — all links resolve; `docs/concepts/which-path.md` exists
+
+**Story marked as ACCEPTED on:** 2026-05-13
+
+**Detailed Verification Log:** See `story.3.2.dod.1.satellite-runbook-callouts.md` for complete verification evidence.
