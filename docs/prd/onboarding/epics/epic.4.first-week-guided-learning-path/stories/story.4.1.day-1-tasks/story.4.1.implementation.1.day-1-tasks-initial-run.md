@@ -37,8 +37,8 @@ Initial pipeline run to implement Day 1 guided task checklist at `docs/runbooks/
 | 2. review-story             | ✅ Done | `story.4.1.review.1.day-1-tasks.md` exists | Skipped — status `ready-for-development` + review report exists | — |
 | 3. develop                  | ✅ Done | Story status == `Ready for Review` | Created `docs/runbooks/first-week/day-1-tasks.md` (98 lines, all ACs verified); all 7 tasks checked; story → Ready for Review | — |
 | 4. create-pr                | ✅ Done | PR URL targets `feature/epic.4.first-week-guided-learning-path`; issue comment posted | PR #110: https://github.com/Gamaroff/agent-skills/pull/110; issue #89 commented; report not leaked ✅ | — |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.4.1.qa.{N}.*.md`; `story.4.1.gate.{N}.*.yml`; PR comment posted | | — |
-| 7. finalise                 | ⏳ Pending | `story.4.1.dod.{N}.*.md`; story `status: accepted` | | — |
+| 5–6. qa-story / qa-fix loop | ✅ Done | `story.4.1.qa.1.day-1-tasks.md`; `story.4.1.gate.1.day-1-tasks.yml`; PR comment posted | QA PASS (90/100); qa-fix skipped (no issues); 1 QA cycle | — |
+| 7. finalise                 | ✅ Done | `story.4.1.dod.1.day-1-tasks.md`; story `status: accepted` | DoD PASS; issue #89 closed; board → Done; PR comment posted | — |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
 
 ---
