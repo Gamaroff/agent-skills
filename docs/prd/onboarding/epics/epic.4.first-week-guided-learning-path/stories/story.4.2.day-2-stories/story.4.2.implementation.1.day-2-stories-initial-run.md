@@ -38,8 +38,8 @@ Create `docs/runbooks/first-week/day-2-stories.md` — a guided Day 2 walkthroug
 | 3. develop                  | ✅ Done | Story status == `Ready for Review` | Created day-2-stories.md (87 lines); all 6 tasks checked; status → ready-for-review | — |
 | 4. create-pr                | ✅ Done | PR URL targets `feature/epic.4.first-week-guided-learning-path`; issue/tracker comment posted | PR #111: https://github.com/Gamaroff/agent-skills/pull/111 | — |
 | 5–6. qa-story / qa-fix loop | ✅ Done | `story.4.2.qa.*.md`; `story.4.2.gate.*.yml`; PR comment posted | PASS 95/100; 0 critical/medium; qa-fix not needed | — |
-| 7. finalise                 | ⏳ Pending | `story.4.2.dod.*.md`; story `status: accepted` | | — |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
+| 7. finalise                 | ✅ Done | `story.4.2.dod.1.day-2-stories.md`; story `status: accepted` | DoD PASS (95/100, 4/4 ACs); sprint-review-summary created; PR #111 acceptance comment; issue #88 closed; board already Done | — |
+| 8. commit-changes           | ✅ Done | All artifacts committed and pushed | Commit 6d6319e (finalise artifacts); implementation report committed separately | — |
 
 ---
 
@@ -81,6 +81,15 @@ Create `docs/runbooks/first-week/day-2-stories.md` — a guided Day 2 walkthroug
 - All 6 task checkboxes marked complete
 - Story status: ready-for-development → ready-for-review
 
+### Step 7 — 2026-05-13
+
+- DoD verification: 4 parallel Explore agents dispatched (AC, security, compliance, docs)
+- All 4 agents returned PASS; decision: ACCEPTED
+- Story frontmatter: `status: ready-for-review` → `status: accepted`; `completed_date: 2026-05-13` added; changelog v1.3 added
+- Artifacts created: `story.4.2.dod.1.day-2-stories.md`, `story.4.2.sprint-review-summary.md`
+- PR #111 acceptance comment posted; issue #88 closed with comment; board already in Done state
+- QA score: 95/100; iterations: 1
+
 ### Step 5-6 — 2026-05-13
 
 - QA review: direct tools (story < 5 files, docs-only)
@@ -107,28 +116,16 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-05-13
+**Final Status**: Completed
 **Branch**: feature/story.4.2.day-2-stories
 **PR**: https://github.com/Gamaroff/agent-skills/pull/111
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 1
+**DoD Summary**: ACCEPTED — 95/100, 4/4 ACs, all domains PASS
 
 ---
 
-## Pipeline Paused — 2026-05-13T13:11:00Z
+## Pipeline Resume Note — 2026-05-13
 
-⏸️ **Context compaction imminent.** The `/develop-story` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
-
-**State at pause**:
-
-- Skill: `/develop-story`
-- Branch: `feature/story.4.2.day-2-stories`
-- Last step boundary: Step 7
-- PR: not yet created
-- Tracker: github #88
-
-**Resume**: re-invoke `/develop-story <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
-
-**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+Pipeline was paused at Step 7 due to context compaction. Resumed and completed successfully on same date. All steps 1–8 now Done.
 
