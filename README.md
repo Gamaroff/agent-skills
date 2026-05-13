@@ -8,20 +8,29 @@ A library of **AI coding agent skills** — modular, self-contained packages tha
 
 Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 
-See [docs/concepts/overview.md](./docs/concepts/overview.md) for how skills work.
+**Example.** Type `/create-story` in an agent session → the `create-story` skill activates → the agent walks you through 10 questions → a fully-formed `story.{N}.{name}.md` lands in your repo with frontmatter, acceptance criteria, technical context, and links to its parent epic. Type `/develop-story <path>` next and the agent runs the full review → branch → implement → PR → QA loop.
+
+See [docs/concepts/overview.md](./docs/concepts/overview.md) for the model, or jump straight into the Learning Path below.
 
 ---
 
-> ### 🚀 Start here
->
-> - **First time?** → [Decision tree](./docs/concepts/which-path.md) tells you which path fits your work.
-> - **Want a 10-min hands-on?** → [Task quickstart](./docs/concepts/quickstart-task.md)
-> - **Want a 60-min full chain?** → [Story quickstart](./docs/concepts/quickstart-story.md)
+## New here? Start with the Learning Path
+
+If this is your first time with agent-skills, work through these in order. Each builds on the last.
+
+1. **[Overview](./docs/concepts/overview.md)** (5 min) — what a skill *is* and how progressive disclosure works.
+2. **[Decision tree](./docs/concepts/which-path.md)** (2 min) — pick the path that fits the work in front of you.
+3. **[Task quickstart](./docs/concepts/quickstart-task.md)** (10 min hands-on) — ship your first standalone task.
+4. **[First-Week Onboarding](./docs/runbooks/first-week.md)** (4 days, paced) — structured walkthrough of the task pipeline, story pipeline, QA recovery, and parallel development.
+5. **[Story quickstart](./docs/concepts/quickstart-story.md)** (60 min) — full PRD → epic → story → PR chain.
+6. **[Runbooks](./docs/runbooks/README.md)** & **[Reference](./docs/reference/README.md)** — go deep on specific workflows or look up specific behaviour.
+
+---
 
 ## Contents
 
 - [Installing Skills](#installing-skills)
-- [Skill Categories](#skill-categories)
+- [Skill Catalog](#skill-catalog)
 - [Scripts](#scripts)
 - [Creating Skills](#creating-skills)
 - [Documentation](#documentation)
