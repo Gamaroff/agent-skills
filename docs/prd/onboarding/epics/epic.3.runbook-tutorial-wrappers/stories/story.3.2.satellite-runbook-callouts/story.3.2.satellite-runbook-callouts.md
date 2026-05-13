@@ -2,7 +2,7 @@
 id: story.3.2.satellite-runbook-callouts
 title: "Story 3.2: 'Is this the right runbook?' callouts for satellites"
 type: story
-status: draft
+status: ready-for-review
 priority: high
 epic: 3
 epic_file: ../../epic.3.runbook-tutorial-wrappers.md
@@ -17,7 +17,9 @@ updated: 2026-05-11
 
 # Story 3.2: "Is this the right runbook?" callouts for satellites
 
-**Status**: Draft
+**Status**: Ready for Review
+**Review**: ✅ All review recommendations from `story.3.2.review.1.satellite-runbook-callouts.md` implemented 2026-05-13
+**Tracker**: [#81](https://github.com/Gamaroff/agent-skills/issues/81)
 
 ## Story Statement
 
@@ -37,7 +39,7 @@ updated: 2026-05-11
 ### Previous Story Insights
 
 - Story 3.1 established the diff-inspection gate pattern for runbook augmentation. Reuse.
-- Story 1.3 (which-path.md) is the cross-reference target. If 1.3 not yet landed, leave the link in place — markdown link checker tolerates if directory exists.
+- Story 1.3 (`docs/concepts/which-path.md`) has landed; cross-reference link resolves.
 
 ### File Locations
 
@@ -85,11 +87,11 @@ No conflicts.
 
 > Detailed implementation guide: [story.3.2.plan.satellite-runbook-callouts.md](story.3.2.plan.satellite-runbook-callouts.md)
 
-- [ ] **Task 1**: Snapshot all 4 satellites for diff comparison (AC: 4)
-- [ ] **Task 2**: Draft 4 callouts (parameterised per runbook) ≤ 10 lines each (AC: 1, 2, 3)
-- [ ] **Task 3**: Insert into each file (AC: 1)
-- [ ] **Task 4**: Diff verification × 4 (AC: 4)
-- [ ] **Task 5**: Static validation + link check + status flip (AC: all)
+- [x] **Task 1**: Snapshot all 4 satellites for diff comparison (AC: 4)
+- [x] **Task 2**: Draft 4 callouts (parameterised per runbook) ≤ 10 lines each (AC: 1, 2, 3)
+- [x] **Task 3**: Insert into each file (AC: 1)
+- [x] **Task 4**: Diff verification × 4 (AC: 4)
+- [x] **Task 5**: Static validation + link check + status flip (AC: all)
 
 ## Testing
 
@@ -100,14 +102,52 @@ No conflicts.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-13 | 1.1     | Review #1 passed (9/10) — status → ready-for-development | review-story  |
+| 2026-05-13 | 1.2     | All 4 callouts implemented; status → ready-for-review | dev-agent     |
 
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 
-_(Populated downstream.)_
+### Implementation Summary
+
+Four satellite runbooks (`hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, `change-management.md`) each received a top-of-file "Is this the right runbook?" callout block. Each callout is 8 lines, references `docs/concepts/which-path.md`, and is separated from the existing body by a `---` horizontal rule. All original body content is character-identical to pre-change.
+
+### Start Date
+
+2026-05-13
+
+### Completion Date
+
+2026-05-13
+
+### Implementation Approach
+
+Surgical insertions using Edit tool, one per file. Each edit anchored on `{title}\n\n{audience blockquote}` to ensure uniqueness. Callout content sourced from `story.3.2.plan.satellite-runbook-callouts.md` (pre-approved verbatim templates). Diff verification confirmed insertions-only via `diff new old` (all `<` lines, no `>` lines, no body changes). Line count verified at 8 per callout (≤10 AC3 ✅). `which-path.md` link verified in all 4 files (AC2 ✅).
+
+### Testing Results
+
+- Diff verification × 4: PASS (insertions only)
+- Line count × 4: PASS (8 lines each, ≤10)
+- Link check × 4: PASS (`which-path.md` present in all)
+- No code/tests applicable (markdown-only changes)
+
+### File List
+
+**Modified:**
+- `docs/runbooks/hotfix.md` — added callout block at top
+- `docs/runbooks/bug-fix.md` — added callout block at top
+- `docs/runbooks/create-parallel-stories.md` — added callout block at top
+- `docs/runbooks/change-management.md` — added callout block at top
+- `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.2.satellite-runbook-callouts/story.3.2.satellite-runbook-callouts.md` — status, tasks, this record
+
+### Change Log (Dev Agent)
+
+| Date | Description |
+|---|---|
+| 2026-05-13 | Implemented all 4 callout insertions; diff-verified; all ACs met |
 
 ### QA Prerequisites Checklist
 
-- [ ] All 4 satellite runbooks have callouts
-- [ ] Each callout ≤ 10 lines
-- [ ] Each callout references `which-path.md`
-- [ ] All 4 diffs show insertions only
+- [x] All 4 satellite runbooks have callouts
+- [x] Each callout ≤ 10 lines
+- [x] Each callout references `which-path.md`
+- [x] All 4 diffs show insertions only

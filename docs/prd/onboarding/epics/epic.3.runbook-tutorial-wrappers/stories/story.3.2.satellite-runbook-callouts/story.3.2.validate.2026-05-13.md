@@ -1,0 +1,134 @@
+# Story Validation Report: Story 3.2 — 'Is this the right runbook?' callouts for satellites
+
+**Validated:** 2026-05-13
+**Validation Depth:** Standard
+**Story Status:** Ready for Development
+**Verdict:** ✅ GO
+**Implementation Readiness Score:** 9/10
+
+---
+
+## Executive Summary
+
+Story 3.2 is well-specified and ready to implement. Four satellite runbooks receive surgical top-of-file callout inserts with specific, approved templates provided in the co-located plan file. All referenced files verified to exist; prior interactive review (9/10) already resolved structural concerns.
+
+**Critical Issues:** 0 🚨
+**Important Issues:** 0 ⚠️
+**Optional Improvements:** 1 💡
+
+**Confidence Level for Successful Implementation:** High
+
+---
+
+## Verdict Justification
+
+Score 9/10, zero Critical issues → GO. All ACs are measurable, all referenced files exist, specific callout templates provided in plan — developer can implement without ambiguity.
+
+---
+
+## Scoring Breakdown
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Template Compliance | 10/10 | All required sections present, no placeholders |
+| Epic Alignment | 9/10 | ACs match epic 3.2 story description exactly |
+| Technical Accuracy | 10/10 | All 4 runbooks + which-path.md verified to exist |
+| Completeness | 9/10 | Plan file with verbatim callout content provided |
+| Consistency | 10/10 | No internal contradictions detected |
+| Quality & Clarity | 9/10 | ACs measurable, tasks mapped, testing specified |
+| Previous Story Continuity | 9/10 | Story 3.1 landed; diff-inspection gate pattern referenced |
+
+**Overall:** 9/10
+
+---
+
+## 1. Template Structure Compliance — PASS
+
+All required sections present: Status, Story Statement (As a / I want / So that ✅), Acceptance Criteria (numbered ✅), Tasks (checkbox format ✅), Dev Notes, Manual Testing Steps, Change Log, Dev Agent Record, QA Handoff, QA Prerequisites. File naming follows dot-separated convention.
+
+---
+
+## 2. Epic Alignment — ALIGNED
+
+Epic 3.2 description: "Is this the right runbook?" callouts at top of satellite runbooks. Story ACs map directly:
+- AC1 → callout block in each of the 4 files ✅
+- AC2 → cross-reference `which-path.md` ✅
+- AC3 → ≤10 lines per callout ✅
+- AC4 → existing body untouched ✅
+
+---
+
+## 3. Technical Accuracy — ACCURATE
+
+All file references verified:
+- `docs/runbooks/hotfix.md` ✅
+- `docs/runbooks/bug-fix.md` ✅
+- `docs/runbooks/create-parallel-stories.md` ✅
+- `docs/runbooks/change-management.md` ✅
+- `docs/concepts/which-path.md` ✅
+
+No invented libraries, frameworks, or tools. Story 3.1 confirmed landed (epic branch, PR #79 merged).
+
+---
+
+## 4. Completeness & Gaps — COMPLETE
+
+Plan file `story.3.2.plan.satellite-runbook-callouts.md` provides verbatim callout content for all 4 runbooks (~9 lines each, within AC3 cap). Tasks 1–5 cover: snapshot → draft → insert → diff-verify × 4 → validate + status flip. All ACs covered by tasks.
+
+---
+
+## 5. Consistency & Conflicts — CONSISTENT
+
+No contradictions. Task 2 references plan file for specific wording; plan content is runbook-specific (not generic). AC4 / diff-verification gate is gating (blocking), consistent with Story 3.1 established pattern per Dev Notes.
+
+---
+
+## 6. Quality & Clarity
+
+- Story Statement: 9/10 — clear role, action, benefit
+- Acceptance Criteria: 10/10 — each is specific, testable, measurable
+- Tasks: 9/10 — actionable sequence, reference to plan for content
+- Dev Notes: 9/10 — file locations, testing, constraints, rollback plan all present
+- Testing Guidance: 9/10 — diff inspection, link check, static validator specified
+
+---
+
+## 7. Previous Story Context — CONSISTENT
+
+Story 3.1 completed (pipeline complete, PR merged). Dev Notes correctly reference diff-inspection gate pattern from 3.1. `which-path.md` (Story 1.3 output) confirmed present in live tree.
+
+---
+
+## Summary of Findings
+
+### Must Fix (Critical) — 0
+
+None.
+
+### Should Fix (Important) — 0
+
+None.
+
+### Consider (Optional) — 1
+
+1. **QA Prerequisites Checklist** — lists 4 checks but doesn't mention the link check. Minor; doesn't block implementation.
+
+---
+
+## Next Steps
+
+**Story is GO.** Run `/develop` to begin implementation. Developer should read `story.3.2.plan.satellite-runbook-callouts.md` first — verbatim callout templates are ready.
+
+---
+
+## Validation Metadata
+
+- **Mode:** validate (automated, read-only)
+- **Validation Date:** 2026-05-13
+- **Validation Depth:** Standard
+- **Story File:** `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.2.satellite-runbook-callouts/story.3.2.satellite-runbook-callouts.md`
+- **Parent Epic:** `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/epic.3.runbook-tutorial-wrappers.md`
+- **Architecture Docs Consulted:** None (doc-only story; no code architecture applicable)
+- **Prior Review:** `story.3.2.review.1.satellite-runbook-callouts.md` — 9/10, passed
+
+*Generated by /review-story --validate. No changes made to the story document.*
