@@ -15,7 +15,7 @@ Day-doc with controlled-FAIL recipe. References Epic 2.3 worked example if lande
 
 ## Recipe for inducing a controlled FAIL
 
-The user creates a story with a deliberately-tight AC that the first implementation pass will miss. Example: "Doc body ≤ 50 lines." First write 80 lines. `qa-gate` will FAIL on AC4. The fix is to trim. Re-run `qa-gate` → PASS.
+The user creates a story with a deliberately-tight AC that the first implementation pass will miss. Example: "Doc body ≤ 50 lines." First write 100 lines. `qa-gate` will FAIL on the line-count AC (verifiable via `wc -l`). The fix is to trim. Re-run `qa-gate` → PASS.
 
 This is a teaching device, not manufactured QA fraud — the AC is real, the FAIL is mechanical, the fix is concrete.
 
@@ -45,17 +45,17 @@ Most of `develop-story`'s value is in the iteration loop. If your first 5 storie
 
 ## Hour 1 — Set up a controlled FAIL (~30 min)
 
-**Story:** "Add a one-paragraph 'About this repo' section to `docs/concepts/overview.md`. AC: paragraph ≤ 50 words."
+**Story:** "Add a short 'About this repo' section to `docs/concepts/overview.md`. AC: section ≤ 50 lines (verified by `wc -l`)."
 
 - [ ] `/create-story` with this AC.
-- [ ] Open the story and **deliberately write 100 words** on the first draft.
+- [ ] Open the story and **deliberately write 100 lines** on the first draft.
 - [ ] `/develop-story` — let it run through to `qa-gate`.
 - [ ] Observe the FAIL gate artifact.
 
 ## Hour 2 — Recover (~30 min)
 
 - [ ] Read the FAIL findings.
-- [ ] Trim the paragraph to ≤ 50 words.
+- [ ] Trim the section to ≤ 50 lines.
 - [ ] Re-run `qa-gate` (or let `qa-fix` chain handle it via `/develop-story`'s loop).
 - [ ] Observe the PASS gate artifact.
 

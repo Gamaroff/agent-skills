@@ -2,7 +2,7 @@
 id: story.4.3.day-3-messy-path
 title: "Story 4.3: Day 3 — Review concerns and QA-gate failures"
 type: story
-status: draft
+status: ready-for-review
 priority: medium
 epic: 4
 epic_file: ../../epic.4.first-week-guided-learning-path.md
@@ -17,7 +17,8 @@ updated: 2026-05-11
 
 # Story 4.3: Day 3 — Messy path
 
-**Status**: Draft
+**Status**: Ready for Review
+**Review**: ✅ Critical/Important recommendations implemented 2026-05-13 — see `story.4.3.review.1.day-3-messy-path.md`
 
 ## Story Statement
 
@@ -28,7 +29,7 @@ updated: 2026-05-11
 ## Acceptance Criteria
 
 1. `docs/runbooks/first-week/day-3-messy-path.md` exists with frontmatter and checkpoints.
-2. Day 3 references the Epic 2.3 worked messy-path artifact (`examples/story-messy-path/`) and walks the user through reproducing a similar shape of failure-and-recovery on their own work.
+2. Day 3 includes a descoped-state disclaimer (Story 2.3 was cancelled — no canonical `examples/story-messy-path/` artifact exists) and provides a standalone recipe that walks the user through reproducing a FAIL→PASS shape on their own work.
 3. Completion criteria: user has ≥ 1 `qa-gate: FAIL` artifact followed by a `qa-gate: PASS` revision in their repo.
 4. Doc body ≤ 300 lines.
 
@@ -36,8 +37,8 @@ updated: 2026-05-11
 
 ### Previous Story Insights
 
-- Day 3 is **content-gated on Story 2.3**: it references the messy-path example as its anchor. If Story 2.3 was descoped (no real FAIL captured), Day 3 must use a generic-recipe approach with explicit "we don't have a canonical messy-path example yet" disclaimer.
-- Story 4.1 and 4.2 established the day-doc shape.
+- **Story 2.3 was cancelled** (see `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/` — `status: cancelled`). No canonical `examples/story-messy-path/` artifact exists. Day 3 uses the descoped-disclaimer branch: explicit "no canonical messy-path example captured yet" note plus a standalone controlled-FAIL recipe.
+- Story 4.1 and 4.2 established the day-doc shape (frontmatter, checkpoints, ≤ 300 lines).
 
 ### File Locations
 
@@ -55,13 +56,13 @@ updated: 2026-05-11
 
 **Verification:**
 - AC1: file + checkpoints present.
-- AC2: refs Epic 2.3 artifact (or descoped-state disclaimer).
+- AC2: descoped-state disclaimer present (refs cancelled Story 2.3); standalone FAIL→PASS recipe present.
 - AC3: user produces FAIL gate then PASS gate on their own story.
 - AC4: `wc -l ≤ 300`.
 
 **Edge cases:**
-- Forcing a FAIL deliberately is awkward. The day must offer a recipe: e.g., "Create a story whose AC says 'Doc ≤ 50 lines' and intentionally write 100 lines on the first pass — QA will fail, you'll fix and re-run."
-- If 2.3 descoped, Day 3 falls back to the generic recipe with no canonical example. Document this branch clearly.
+- Forcing a FAIL deliberately is awkward. The day must offer a recipe: e.g., "Create a story whose AC says 'Doc ≤ 50 lines' and intentionally write 100 lines on the first pass — QA will fail, you'll fix and re-run." Use **line count** (not word count) — `qa-gate` verifies mechanically via `wc -l`.
+- Story 2.3 is cancelled → no canonical example. Day 3 uses the standalone-recipe branch. The descoped disclaimer must be explicit so users aren't searching for a missing artifact.
 
 ### Rollback Plan
 
@@ -79,13 +80,13 @@ updated: 2026-05-11
 
 > Detailed implementation guide: [story.4.3.plan.day-3-messy-path.md](story.4.3.plan.day-3-messy-path.md)
 
-- [ ] **Task 1**: File skeleton (AC: 1)
-- [ ] **Task 2**: "Why the messy path?" intro section (AC: 2)
-- [ ] **Task 3**: Recipe for inducing a controlled FAIL (AC: 3)
-- [ ] **Task 4**: Recovery walkthrough — `qa-fix` loop, revision, second `qa-gate` run (AC: 3)
-- [ ] **Task 5**: Link to Epic 2.3 messy-path artifact OR descoped disclaimer (AC: 2)
-- [ ] **Task 6**: Walkthrough verification (AC: 3)
-- [ ] **Task 7**: Static validation + status flip (AC: 1, 4)
+- [x] **Task 1**: File skeleton (AC: 1)
+- [x] **Task 2**: "Why the messy path?" intro section (AC: 2)
+- [x] **Task 3**: Recipe for inducing a controlled FAIL (AC: 3)
+- [x] **Task 4**: Recovery walkthrough — `qa-fix` loop, revision, second `qa-gate` run (AC: 3)
+- [x] **Task 5**: Add explicit descoped disclaimer (Story 2.3 cancelled — no `examples/story-messy-path/`) (AC: 2)
+- [x] **Task 6**: Walkthrough verification (AC: 3)
+- [x] **Task 7**: Static validation + status flip (AC: 1, 4)
 
 ## Testing
 
@@ -96,10 +97,42 @@ Walkthrough + static + link check.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-13 | 1.1     | Review #1: committed AC2 to descoped-disclaimer branch (2.3 cancelled); aligned line-count recipe; tightened Dev Notes | review-story  |
+| 2026-05-13 | 1.2     | Review passed — status promoted to Ready for Development | review-story  |
 
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 
-_(Populated downstream.)_
+### Implementation Summary
+
+Created `docs/runbooks/first-week/day-3-messy-path.md` — 84 lines, well under the 300-line cap. Mirrors the Day 1/Day 2 day-doc pattern (frontmatter, prerequisites, hourly checkpoints, end-of-day verify, what-you-learned, next-day link). Includes explicit descoped disclaimer for Story 2.3/`examples/story-messy-path/`. Controlled-FAIL recipe uses line count (`wc -l`) — mechanically verifiable by `qa-gate`.
+
+**Start Date:** 2026-05-13
+**Completion Date:** 2026-05-13
+
+### Implementation Approach
+
+- **Task 1 (skeleton):** Created file with frontmatter matching Day 1/Day 2 schema (`name`, `description`, `type: guide`, `status: draft`, `version`, `created`).
+- **Task 2 (why section):** "Why this day?" section explains the pedagogical purpose — surfaces the messy path before users hit it by surprise.
+- **Task 3 (controlled FAIL recipe):** Hour 1 steps: `/create-story` with `≤ 50 lines` AC, deliberately write 100 lines, run `/develop-story` to `qa-gate`. Chose line count because `wc -l` is the mechanical check `qa-gate` can verify deterministically.
+- **Task 4 (recovery walkthrough):** Hour 2 steps: read FAIL findings, trim to ≤ 50 lines, re-run `qa-gate` or let `qa-fix` loop handle it. Expected PASS artifact named.
+- **Task 5 (descoped disclaimer):** Explicit `⚠️ Descoped notice` block citing Story 2.3 cancelled; `examples/story-messy-path/` does not exist. Recipe stands alone.
+- **Task 6 (walkthrough verification):** End-of-day checklist: FAIL gate artifact present, PASS gate artifact present, revision diff visible in `git log --oneline`.
+- **Task 7 (static validation):** `wc -l` = 84 (≤ 300 ✅). Story status set to `Ready for Review`.
+
+### Testing Results
+
+Static validation: `wc -l docs/runbooks/first-week/day-3-messy-path.md` → 84 lines (AC4 ✅). No executable test suite — doc-only story.
+
+### File List
+
+- **Created:** `docs/runbooks/first-week/day-3-messy-path.md`
+- **Modified:** `docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.3.day-3-messy-path/story.4.3.day-3-messy-path.md` (status, checkboxes, Dev Agent Record)
+
+### Change Log
+
+| Date       | Description |
+|------------|-------------|
+| 2026-05-13 | Created day-3-messy-path.md (84 lines); all tasks complete |
 
 ### QA Prerequisites Checklist
 
@@ -107,4 +140,4 @@ _(Populated downstream.)_
 - [ ] Recipe for controlled FAIL is reproducible
 - [ ] User produces FAIL→PASS pair during walkthrough
 - [ ] Doc ≤ 300 lines
-- [ ] Descoped-2.3 branch handled if applicable
+- [ ] Descoped-2.3 disclaimer present and explicit
