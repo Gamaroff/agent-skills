@@ -114,6 +114,7 @@ All failures are **non-blocking**. The caller (`review-story`) handles empty out
 
 | Scenario | Log level | EPIC_JIRA_KEY returned |
 |---|---|---|
+| TRACKER != jira | Info | `""` |
 | Epic file not found | Warning | `""` |
 | Jira issue verified (existing key) | — | `{jira_key}` |
 | Jira 404 (issue deleted) | Critical | `""` |
