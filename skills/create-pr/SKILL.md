@@ -653,3 +653,17 @@ Output:
 - [GitHub CLI Documentation](https://cli.github.com/manual/gh_pr_create) - `gh pr create` options
 - [Bitbucket REST API — Pull Requests](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/) - Bitbucket PR creation
 - [Bitbucket App Passwords](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/) - Authentication for Bitbucket API
+
+---
+
+## Pipeline Lock Cooperation (when invoked by `/develop-story` or `/develop-task`)
+
+When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last action** before returning, so the orchestrator's next turn does not depend on model discipline:
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  bash .agents/skills/create-pr/references/advance-pipeline-lock.sh --skill create-pr 2>/dev/null || true
+fi
+```
+
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `PostToolUse` and `Stop` hooks: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

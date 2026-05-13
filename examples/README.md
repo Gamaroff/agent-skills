@@ -2,9 +2,7 @@
 
 Worked examples of the skills in this repository being applied to real work.
 
-This repo dogfoods itself: the pipeline that runs `develop-task` / `qa-task` / `finalise` on *this codebase* writes its artifacts to [`docs/tasks/`](../docs/tasks/). Those artifacts are the examples.
-
-> No story, epic, or PRD examples live here — this repo is a skill library, not a product, so the story/epic/PRD pipelines aren't exercised against it. Look at a product repo that consumes these skills for those.
+This repo dogfoods itself — the story, epic, PRD, and task pipelines have all been run against it. Task artifacts live in [`docs/tasks/`](../docs/tasks/); PRD, epic, and story artifacts live in [`examples/prd-example/`](./prd-example/), [`examples/epic-examples/`](./epic-examples/), and the canonical story directories under [`docs/prd/onboarding/epics/`](../docs/prd/onboarding/epics/).
 
 ## Start here: one task end-to-end
 
@@ -18,6 +16,21 @@ This repo dogfoods itself: the pipeline that runs `develop-task` / `qa-task` / `
 6. [`task.6.gate.1.*.yml`](../docs/tasks/task.6.create-epic-jira-tracker-path/task.6.gate.1.create-epic-jira-tracker-path.yml) — `qa-gate` PASS/CONCERNS/FAIL decision.
 7. [`task.6.dod.1.*.md`](../docs/tasks/task.6.create-epic-jira-tracker-path/task.6.dod.1.create-epic-jira-tracker-path.md) — `finalise` DoD checklist.
 8. [`sprint-review-summary.md`](../docs/tasks/task.6.create-epic-jira-tracker-path/sprint-review-summary.md) — Sprint Review artifact.
+
+## Or: one story end-to-end
+
+For the story pipeline, walk [`story.2.3.capture-story-messy-path/`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/) in this order:
+
+1. [`story.2.3.capture-story-messy-path.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.capture-story-messy-path.md) — story spec produced by `create-story`.
+2. [`story.2.3.review.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.review.1.capture-story-messy-path.md) — `review-story` interactive review.
+3. [`story.2.3.plan.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.plan.capture-story-messy-path.md) — co-located implementation plan.
+4. [`story.2.3.implementation.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.implementation.1.capture-story-messy-path.md) — what `develop-story` actually did.
+5. [`story.2.3.qa.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.qa.1.capture-story-messy-path-descoped.md) — `qa-story` report.
+6. [`story.2.3.gate.1.*.yml`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.gate.1.capture-story-messy-path-descoped.yml) — `qa-gate` decision (this story was **descoped** rather than passing QA — the gate shows the descope rationale).
+7. [`story.2.3.dod.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.dod.1.capture-story-messy-path.md) — `finalise` DoD checklist.
+8. [`sprint-review-summary.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/sprint-review-summary.md) — Sprint Review artifact.
+
+> **Note:** This story was **descoped** during the pipeline run — no `examples/story-messy-path/` directory was produced. The full artifact set (including the descoped gate) lives at the path above and shows what happens when a story is cancelled rather than completed.
 
 ## Artifact reference
 
@@ -45,6 +58,24 @@ Arrived here from a specific skill? Jump straight to a representative output:
 - **`qa-gate`** → [task.6 gate file](../docs/tasks/task.6.create-epic-jira-tracker-path/task.6.gate.1.create-epic-jira-tracker-path.yml)
 - **`finalise`** → [task.6 DoD](../docs/tasks/task.6.create-epic-jira-tracker-path/task.6.dod.1.create-epic-jira-tracker-path.md), [sprint review](../docs/tasks/task.6.create-epic-jira-tracker-path/sprint-review-summary.md)
 - **Multi-task plan decomposition** → [`index.subagent-pipeline-improvements.md`](../docs/tasks/index.subagent-pipeline-improvements.md) — single plan split into tasks 16–31 with dependency waves.
+- **`create-prd`** → [PRD example](./prd-example/prd.onboarding.md)
+- **`create-epic`** → [Epic examples (×4)](./epic-examples/)
+- **`create-story`** → [Story 2.3 — full lifecycle (descoped)](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/)
+- **`develop-story`** → [Story 2.3 — implementation report + gate + DoD](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/)
+
+## Worked PRD example
+
+[`examples/prd-example/`](./prd-example/) — a real PRD produced by `/create-prd` brownfield mode against this repo. See its [narrative README](./prd-example/README.md) for what was easy, what required iteration, and what `pm-checklist` flagged.
+
+## Worked epic examples
+
+[`examples/epic-examples/`](./epic-examples/) — four real epic docs from the same PRD, one per epic in the onboarding pipeline. Read them side-by-side for cross-pattern comparison, or via the [epic README](./epic-examples/README.md).
+
+## Worked story walkthrough
+
+[`docs/prd/onboarding/epics/.../story.2.3.capture-story-messy-path/`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/) — a real story that ran through the full `develop-story` pipeline and was **descoped** at QA. Shows the complete lifecycle: spec → review → plan → implement → QA → gate (descoped) → DoD → sprint review.
+
+The story had no copy placed in `examples/story-messy-path/` because the descope decision happened during the pipeline run — the canonical artifact set lives at the path above. This is the messy path: not every story ships.
 
 ## Recency
 

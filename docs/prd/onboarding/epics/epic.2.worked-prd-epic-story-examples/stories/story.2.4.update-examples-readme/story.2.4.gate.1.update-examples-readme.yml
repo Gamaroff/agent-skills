@@ -1,0 +1,42 @@
+schema: 1
+story: '2.4'
+story_title: 'Update examples/README.md — remove caveat, cross-link PRD/epic/story examples'
+gate: PASS
+status_reason: 'All 3 ACs verified via deterministic grep checks. Key link targets resolve. Existing content preserved. Documentation-only change — no code or test coverage concerns.'
+reviewer: 'QA Engineer'
+updated: '2026-05-13T00:00:00Z'
+
+top_issues: []
+waiver:
+  active: false
+
+quality_score: 95
+expires: '2026-05-27T00:00:00Z'
+
+evidence:
+  tests_reviewed: 5
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3]
+    ac_gaps: []
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: 'Documentation only — no auth, data, or API surface affected.'
+  performance:
+    status: PASS
+    notes: 'Markdown file — no runtime performance implications.'
+  reliability:
+    status: PASS
+    notes: 'Key link targets spot-checked and verified (task.6, prd-example, epic-examples, story.2.3).'
+  maintainability:
+    status: PASS
+    notes: 'Clear structure; new sections follow same pattern as existing task walkthrough.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consider adding a script to lint outbound links in examples/README.md on CI'
+      refs: ['examples/README.md']
