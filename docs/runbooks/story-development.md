@@ -293,3 +293,59 @@ Once you're satisfied, merge the PR (manual gate). When all stories under an epi
 - Platform detection: [`../../shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)
 - Plan file locations: `AGENTS.md` § "Plan File Locations"
 - Document schemas: [`../standards/story-documents.md`](../standards/story-documents.md), [`../standards/epic-documents.md`](../standards/epic-documents.md), [`../standards/prd-documents.md`](../standards/prd-documents.md)
+
+---
+
+## Common first-time errors
+
+Friction events recorded during this PRD's dogfood run (Epics 1–3).
+
+### Pipeline paused — PIPELINE-PAUSED banner appears mid-run
+
+**You see:** `═══ DEVELOP-STORY PIPELINE: PAUSED — CONTEXT COMPACTION IMMINENT ═══`
+**Cause:** Context window reached capacity; PreCompact hook fired and committed pipeline state before compaction.
+**Fix:**
+1. Open a fresh Claude Code session.
+2. Run `/develop-story <story-file-path>` and choose **Resume**.
+
+_Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.1.before-you-start-anchor-runbooks/story.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md`_
+
+### Phase 0 base-branch prompt shows no `develop` option
+
+**You see:** Q1 lists only `main` and feature branches; `develop` is absent.
+**Cause:** Repo was initialised from `main` without creating a Gitflow `develop` branch.
+**Fix:**
+1. `git checkout -b develop main && git push -u origin develop`
+2. Re-invoke `/develop-story <path>` — `develop` will appear.
+
+_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.implementation.1.first-task-in-10-minutes-initial-run.md`_
+
+### "Lock file exists" blocks a fresh pipeline run
+
+**You see:** Phase 0b halts with a stale lock warning referencing a previous story's branch.
+**Cause:** A prior pipeline halted without cleanup; `.claude/state/develop-pipeline.lock` persists.
+**Fix:**
+1. `rm .claude/state/develop-pipeline.lock`
+2. Re-run `/develop-story <path>`.
+
+_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.implementation.1.first-story-in-60-minutes-initial-run.md`_
+
+### Step 4 marked ✅ Done but PR URL is empty
+
+**You see:** Implementation report row 4 shows ✅ Done; `pr_url` in lock is blank; no PR visible on GitHub.
+**Cause:** Pipeline was interrupted during Step 4 after updating the report but before PR creation completed.
+**Fix:**
+1. Re-run `/develop-story <path>` and choose **Resume**.
+2. Pipeline re-enters Step 4 and creates the PR.
+
+_Provenance: `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.implementation.1.capture-story-messy-path.md`_
+
+### `/finalise` flags "CHANGELOG.md not updated"
+
+**You see:** DoD gap: `CHANGELOG.md entry missing`.
+**Cause:** `/develop` skipped CHANGELOG because the story appeared docs-only; `/finalise` enforces the check regardless.
+**Fix:**
+1. Add an entry to `CHANGELOG.md` under the current version heading.
+2. Re-invoke `/finalise` — it detects the entry and clears the gap.
+
+_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.5.readme-start-here-callout/story.1.5.implementation.1.readme-start-here-callout-initial-run.md`_
