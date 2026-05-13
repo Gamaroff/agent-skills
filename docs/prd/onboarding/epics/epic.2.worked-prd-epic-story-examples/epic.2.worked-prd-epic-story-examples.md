@@ -119,7 +119,7 @@ so that the "no story/epic/PRD examples live here" caveat is removed.
 - [ ] All captured artifacts have skill-version frontmatter
 - [ ] All cross-links resolve
 - [ ] `documentation-standards-validator` passes
-- [ ] Story 2.3 messy-path is real (provenance traceable to a specific QA-gate FAIL in this PRD's run)
+- [x] ~~Story 2.3 messy-path is real (provenance traceable to a specific QA-gate FAIL in this PRD's run)~~ — **N/A**: Story 2.3 descoped 2026-05-13; no genuine QA-gate FAIL occurred in Epics 1, 3, or 4. See story.2.3 Change Log v1.3.
 
 ## Completion Tracking
 
@@ -135,5 +135,5 @@ so that the "no story/epic/PRD examples live here" caveat is removed.
 
 - Story 2.1: ❌ Not Started
 - Story 2.2: ❌ Not Started
-- Story 2.3: ❌ Not Started
+- Story 2.3: 🚫 Cancelled (descoped — no real QA-gate FAIL found; DoD checkbox N/A)
 - Story 2.4: ❌ Not Started
