@@ -202,3 +202,60 @@ Merge the PR manually once you're satisfied.
 - Plan file locations: `AGENTS.md` § "Plan File Locations"
 - Task registry rules: `AGENTS.md` § "Task Registry"
 - Document schema: [`../standards/task-documents.md`](../standards/task-documents.md)
+
+---
+
+## Common first-time errors
+
+Friction events from this PRD's dogfood run; shared entries cross-referenced from story pipeline (same orchestrator mechanism).
+
+### Pipeline paused — PIPELINE-PAUSED banner appears mid-run
+
+**You see:** `═══ DEVELOP-TASK PIPELINE: PAUSED — CONTEXT COMPACTION IMMINENT ═══`
+**Cause:** Context window reached capacity; PreCompact hook fired and committed pipeline state before compaction.
+**Fix:**
+1. Open a fresh Claude Code session.
+2. Run `/develop-task <task-file-path>` and choose **Resume**.
+
+_Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.1.before-you-start-anchor-runbooks/story.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md` (same PreCompact hook mechanism)_
+
+### Phase 0 base-branch prompt shows no `develop` option
+
+**You see:** Q1 lists only `main` and feature branches; `develop` is absent.
+**Cause:** Repo was initialised from `main` without creating a Gitflow `develop` branch.
+**Fix:**
+1. `git checkout -b develop main && git push -u origin develop`
+2. Re-invoke `/develop-task <path>` — `develop` will appear.
+
+_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.implementation.1.first-task-in-10-minutes-initial-run.md` (same Phase 0 mechanism)_
+
+### "Lock file exists" blocks a fresh pipeline run
+
+**You see:** Phase 0b halts with a stale lock warning referencing a previous task's branch.
+**Cause:** A prior pipeline halted without cleanup; `.claude/state/develop-pipeline.lock` persists.
+**Fix:**
+1. `rm .claude/state/develop-pipeline.lock`
+2. Re-run `/develop-task <path>`.
+
+_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.implementation.1.first-story-in-60-minutes-initial-run.md` (same lock mechanism)_
+
+### `/finalise` flags "CHANGELOG.md not updated"
+
+**You see:** DoD gap: `CHANGELOG.md entry missing`.
+**Cause:** `/develop` skipped CHANGELOG for a task marked internal; `/finalise` enforces it when public behaviour changed.
+**Fix:**
+1. Add an entry to `CHANGELOG.md` under the current version heading.
+2. Re-invoke `/finalise` — it detects the entry and clears the gap.
+
+_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.5.readme-start-here-callout/story.1.5.implementation.1.readme-start-here-callout-initial-run.md` (same DoD check)_
+
+### Task registry shows a duplicate "Next Available" number
+
+**You see:** Two tasks share the same number; `/create-task` used the same counter value twice.
+**Cause:** Task registry counter not incremented atomically when two creation runs ran close together.
+**Fix:**
+1. Open `docs/tasks/task-registry.md`.
+2. Renumber the duplicate task to the next available number.
+3. Rename the task directory and file to match the new number.
+
+_(speculative — confirm in future runs)_
