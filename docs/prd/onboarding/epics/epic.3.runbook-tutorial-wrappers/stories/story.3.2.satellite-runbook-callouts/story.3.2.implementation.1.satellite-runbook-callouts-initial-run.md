@@ -3,9 +3,9 @@ id: story.3.2.implementation.1
 title: "Implementation Report: Satellite runbook callouts"
 type: implementation-report
 story-ref: story.3.2.satellite-runbook-callouts.md
-status: in-progress
+status: completed
 started: 2026-05-13
-finished: ~
+finished: 2026-05-13
 ---
 
 # Implementation Report: Satellite Runbook Callouts (Story 3.2)
@@ -32,9 +32,9 @@ finished: ~
 | 3 | Develop | ✅ Done | — |
 | 4 | Create PR | ✅ Done | — |
 | 5 | QA Review | ✅ Done | — |
-| 6 | QA Fix | ⏳ Pending | — |
-| 7 | Finalise | ⏳ Pending | — |
-| 8 | Commit Changes | ⏳ Pending | — |
+| 6 | QA Fix | ⏸️ Skipped | Gate PASS, no top_issues |
+| 7 | Finalise | ✅ Done | — |
+| 8 | Commit Changes | ✅ Done | — |
 
 ## Decisions Log
 
@@ -46,23 +46,27 @@ finished: ~
 
 ## Step Notes
 
-_(Populated as steps complete.)_
+- **Step 5**: QA gate PASS 100/100 — 4 ACs verified (grep, diff, line-count, link). All NFRs PASS.
+- **Step 6**: Skipped — gate clean PASS, `top_issues: []`.
+- **Step 7**: Finalise complete — story status `accepted`, DoD PASSED section added, issue #81 closed, project board moved to Done, PR #108 canonical summary posted.
+- **Step 8**: Committed QA artifacts + story.md (dec56be), then implementation report (this file).
 
----
+## Completion Summary
 
-## Pipeline Paused — 2026-05-13T09:16:33Z
+**Status**: Completed
+**Completed**: 2026-05-13
+**QA Iterations**: 1 (PASS on first cycle)
+**Story Status**: accepted
+**PR**: [#108](https://github.com/Gamaroff/agent-skills/pull/108)
+**Issue**: [#81](https://github.com/Gamaroff/agent-skills/issues/81) — CLOSED
 
-⏸️ **Context compaction imminent.** The `/develop-story` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+### Artifacts
 
-**State at pause**:
-
-- Skill: `/develop-story`
-- Branch: `feature/story.3.2.satellite-runbook-callouts`
-- Last step boundary: Step 5
-- PR: not yet created
-- Tracker: github #81
-
-**Resume**: re-invoke `/develop-story <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 5.
-
-**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+| Artifact | Path |
+|---|---|
+| Story doc | `story.3.2.satellite-runbook-callouts.md` |
+| QA report | `story.3.2.qa.1.satellite-runbook-callouts.md` |
+| Gate file | `story.3.2.gate.1.satellite-runbook-callouts.yml` |
+| DoD summary | `story.3.2.dod.1.satellite-runbook-callouts.md` |
+| Sprint review | `sprint-review-summary.md` |
 
