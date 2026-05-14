@@ -103,7 +103,7 @@ You should see:
 |---|---|
 | `task.{N}.readme-contributor-footnote.md` | Original task spec |
 | `task.{N}.plan.readme-contributor-footnote.md` | Co-located implementation plan |
-| `task.{N}.implementation.1.readme-contributor-footnote*.md` | What was built |
+| `task.{N}.implementation.1.readme-contributor-footnote.md` | What was built |
 | `task.{N}.qa.1.readme-contributor-footnote.md` | QA findings + traceability |
 | `task.{N}.gate.1.readme-contributor-footnote.yml` | PASS/CONCERNS/FAIL gate |
 | `task.{N}.dod.1.readme-contributor-footnote.md` | Definition-of-Done checklist |

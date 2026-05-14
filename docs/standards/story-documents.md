@@ -20,7 +20,7 @@ docs/prd/
                     └── story.{E}.{S}.{name}/
                         ├── story.{E}.{S}.{name}.md                      # main document (human-authored)
                         ├── story.{E}.{S}.plan.{name}.md                 # story plan
-                        ├── story.{E}.{S}.review.{YYYY-MM-DD}.md         # review report (auto)
+                        ├── story.{E}.{S}.review.{N}.{name}.md           # review report (auto)
                         ├── story.{E}.{S}.implementation.{N}.{name}.md   # pipeline report (auto)
                         ├── story.{E}.{S}.qa.{N}.{name}.md               # QA assessment (auto)
                         ├── story.{E}.{S}.dod.{N}.{name}.md              # definition of done (auto)
@@ -75,7 +75,7 @@ These files are generated automatically by skills during the pipeline. Do not cr
 | Artifact | Pattern | Written by | Purpose |
 |---|---|---|---|
 | Plan file | `story.{E}.{S}.plan.{name}.md` | `create-story` | Story implementation guide |
-| Review report | `story.{E}.{S}.review.{YYYY-MM-DD}.md` | `review-story` (Step 2) | Review findings |
+| Review report | `story.{E}.{S}.review.{N}.{name}.md` | `review-story` (Step 2) | Review findings |
 | Implementation report | `story.{E}.{S}.implementation.{N}.{name}.md` | `develop-story` pipeline | Pipeline run record |
 | QA report | `story.{E}.{S}.qa.{N}.{name}.md` | `qa-story` (Step 5) | QA assessment narrative |
 | Definition of Done | `story.{E}.{S}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |

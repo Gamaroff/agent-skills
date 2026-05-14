@@ -23,7 +23,7 @@ Canonical filename patterns used across the library. Skills enforce these patter
 | Bug report (story) | `story.{epic}.{story}.bug.{n}.{name}.md` | `story.2.3.bug.1.login-timeout.md` |
 | Bug report (task) | `task.{n}.bug.{n}.{name}.md` | `task.44.bug.1.migration-failure.md` |
 | Review report (story) | `story.{epic}.{story}.review.{n}.{name}.md` | `story.2.3.review.1.example.md` |
-| Review report (task) | `task.{n}.review.{name}.md` | `task.29.review.subagent-triage.md` |
+| Review report (task) | `task.{n}.review.{n}.{name}.md` | `task.29.review.1.subagent-triage.md` |
 
 Epic numbers are **globally unique** — see [`epic-registry.md`](./epic-registry.md). Task numbers are **globally unique and never reused** — see `AGENTS.md` § "Task Registry".
 
