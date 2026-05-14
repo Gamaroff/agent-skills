@@ -15,25 +15,41 @@ created: 2026-05-12
 
 ## Prerequisites
 
+Universal:
+
 - Node ≥ 20 (`node --version`)
 - `git` (`git --version`)
-- `gh` CLI authenticated: `gh auth status` must return a logged-in account (required for PR creation)
-- `project.yml` at repo root (needed for GitHub project board integration)
-- A clone of this repo: `git clone git@github.com:Gamaroff/agent-skills.git && cd agent-skills`
+- Skills installed in your project: `npx skills add https://github.com/Gamaroff/agent-skills --all`
 - A working terminal where you can invoke this CLI agent
+
+Platform-specific — pick the row that matches your project. Skills auto-detect via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)).
+
+| VCS | Tracker | Auth / env required |
+|---|---|---|
+| GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration |
+| GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
 ⏱ Set a 60-minute timer. If you blow through it, your walkthrough is your bug report.
 
 ---
 
-## 1. Verify install (≤ 2 min)
+## 1. Verify prerequisites (≤ 1 min)
+
+Pick the check that matches your platform:
 
 ```bash
-npx skills add --all
+# GitHub VCS
 gh auth status
+
+# Bitbucket VCS
+[ -n "$BITBUCKET_USERNAME" ] && [ -n "$BITBUCKET_APP_PASSWORD" ] && echo "bitbucket auth ok"
+
+# Jira tracker (run in addition to VCS check above)
+[ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo "jira auth ok"
 ```
 
-Expected: skills report `installed` or `up-to-date`; `gh` reports a logged-in account. If `gh auth status` shows `not logged in`, run `gh auth login` first. Re-running `npx skills add --all` is idempotent — safe to repeat.
+Expected: logged-in account / "ok" message. If `gh` shows `not logged in`, run `gh auth login`. For Bitbucket/Jira, set the env vars in your shell profile.
 
 ---
 
@@ -106,7 +122,7 @@ The agent then chains: **create-branch → review-story → develop → create-p
 
 If QA loops more than once it is working as intended; a one-line README change should pass first try.
 
-> **Note:** PR creation requires a round-trip to the GitHub API (1–2 min). This latency is external and does not count toward your 60-min budget.
+> **Note:** PR creation requires a round-trip to your VCS host (GitHub or Bitbucket, 1–2 min). Tracker issue creation (GitHub Issues or Jira) adds another 30–60 s. This latency is external and does not count toward your 60-min budget.
 
 ---
 
@@ -126,7 +142,7 @@ You should have all 10 artifact types:
 | 4 | `story.{N}.1.plan.add-footer-link.md` | Co-located implementation plan |
 | 5 | `story.{N}.1.review.{date}.md` | Story review report |
 | 6 | `story.{N}.1.implementation.1.*.md` | What was built + pipeline log |
-| 7 | PR URL | GitHub Pull Request (opened by `/develop-story`) |
+| 7 | PR URL | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
 | 8 | `story.{N}.1.qa.1.*.md` | QA findings + traceability matrix |
 | 9 | `story.{N}.1.gate.1.*.yml` | PASS / CONCERNS / FAIL gate |
 | 10 | `story.{N}.1.dod.1.*.md` | Definition-of-Done checklist + sprint review summary |
@@ -143,7 +159,7 @@ Pick one:
 
 Leave the branch as-is. Mark the epic row `CANCELLED` in `docs/epic-registry.md`. Mark the story `status: cancelled` in its frontmatter. Numbers are never recycled — the rows stay forever as records.
 
-Close the practice PR on GitHub and close any practice GitHub issues the chain opened.
+Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice tracker issues the chain opened (GitHub Issues or Jira).
 
 **B. Full cleanup.**
 
@@ -154,7 +170,7 @@ git branch -D feature/epic.{N}.footer-link feature/story.{N}.1.add-footer-link
 
 Revert or drop the PRD/epic/story commits from your branch. Mark registry rows `CANCELLED` — do NOT delete them.
 
-If a practice GitHub milestone was created: delete it once all linked issues are closed.
+If a practice GitHub milestone or Jira sprint/version was created: delete it once all linked issues are closed.
 
 ⏱ Timer should read ≤ 60 min. If not, see "What slowed you down?" below.
 
@@ -165,10 +181,13 @@ If a practice GitHub milestone was created: delete it once all linked issues are
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `gh auth status` not logged in | `gh` not configured | Run `gh auth login` |
+| `BITBUCKET_APP_PASSWORD` rejected | Token expired or missing scopes | Regenerate app password with `repo:write` + `pullrequest:write` scopes |
+| Jira issue creation fails | Wrong `JIRA_URL` or token | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
+| Skill picked wrong platform | Auto-detect mis-fired | Set explicit `tracker:` / `vcs:` in `skills-config.yaml` |
 | Phase 0 prompts differ from table above | Skill version drift | Check `.agents/skills/develop-story/` version |
 | `/develop-story` pauses at QA planning | Expected — test plan generation | Wait 30–60 s |
 | QA loop ran more than once | Practice change touched something non-trivial | Use a simpler story (one-line file change) |
-| Elapsed > 60 min | GitHub API latency | API round-trips are out-of-scope; timer pauses while waiting |
+| Elapsed > 60 min | VCS/tracker API latency | API round-trips are out-of-scope; timer pauses while waiting |
 | Epic registry conflict on merge | Two branches appended the same row | Resolve conflict: increment the number in your branch |
 | Dual registry pollution | Pipeline bug triggered a task lane | Check `docs/tasks/task-registry.md`; mark any spurious row `CANCELLED` |
 

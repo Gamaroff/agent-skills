@@ -10,10 +10,20 @@ Before starting, confirm you have:
 
 - **Node ≥ 20** — `node --version`
 - **git** — `git --version`
-- **gh CLI authenticated** (required for story work and PR creation) — `gh auth status` must return a logged-in account; if not, run `gh auth login`
-- **`project.yml` at your repo root** (required for GitHub project board integration — story and epic pipelines write board metadata here)
 
-If you are only running the task quickstart, `gh` and `project.yml` are not required. If you plan to run the story quickstart, all four are needed.
+### Platform auth
+
+Skills auto-detect your platform via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)). Pick the row that matches your project:
+
+| VCS | Tracker | Auth / env required |
+|---|---|---|
+| GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration |
+| GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+
+`project.yml` is GitHub-only — it carries GitHub project-board metadata. Bitbucket/Jira users skip it.
+
+Task quickstart still needs VCS auth (PR creation) but can skip tracker auth via `SKIP_TRACKER=1`. Story quickstart needs all of the above for the platform combo you picked.
 
 ## 1. Install the skills
 
