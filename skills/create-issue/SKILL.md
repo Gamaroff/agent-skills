@@ -59,7 +59,7 @@ story.{epic}.{story}.issue.{n}.{descriptive-name}.md
 **Location**: Co-located in the story directory:
 
 ```
-docs/prd/.../stories/story.180.3.quick-re-search/
+${PRD_ROOT}/.../stories/story.180.3.quick-re-search/
 ├── story.180.3.quick-re-search.md
 ├── story.180.3.issue.1.debounce-timing.md    ← New issue
 └── story.180.3.bug.1.search-crash.md         ← Existing bug (from QA)
@@ -99,7 +99,7 @@ Parse the input to determine:
 
 ```bash
 # Story directory
-/create-issue docs/prd/.../stories/story.180.3.quick-re-search/
+/create-issue ${PRD_ROOT}/.../stories/story.180.3.quick-re-search/
 
 # Story file
 /create-issue story.180.3.quick-re-search.md "Title" "Description"
@@ -195,7 +195,7 @@ Related to: story.180.3.quick-re-search
 
 - **From PR**: #{pr_number} (if applicable)
 - **Story/Task**: story.180.3.quick-re-search
-- **Local Doc**: `docs/prd/<domain>/<feature>/epics/epic.180.<name>/stories/story.180.3.quick-re-search/story.180.3.issue.1.debounce-timing.md`
+- **Local Doc**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.180.<name>/stories/story.180.3.quick-re-search/story.180.3.issue.1.debounce-timing.md`
 
 ## Acceptance Criteria
 
@@ -441,7 +441,7 @@ For **Jira**:
    URL: https://yourorg.atlassian.net/browse/PROJ-45
 
    Local Document: story.180.3.issue.1.debounce-timing.md
-   Location: docs/prd/.../stories/story.180.3.quick-re-search/
+   Location: ${PRD_ROOT}/.../stories/story.180.3.quick-re-search/
 
 Next Steps:
    1. Start work: /create-branch story.180.3.issue.1.debounce-timing.md
@@ -518,7 +518,7 @@ Apply GitHub labels based on context:
 Error: Could not find story or task at the specified path.
 
 Please provide a valid story or task file/directory:
-  - Story: docs/prd/.../stories/story.X.X.name/
+  - Story: ${PRD_ROOT}/.../stories/story.X.X.name/
   - Task: docs/tasks/task.X.name/
 ```
 

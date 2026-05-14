@@ -76,7 +76,7 @@ Before starting any verification, also create a co-located running summary file 
 
 1. **Determine story/task directory:**
    - Extract directory path from the story/task file path provided
-   - Example: `docs/prd/.../story.311.1.example-system/`
+   - Example: `${PRD_ROOT}/.../story.311.1.example-system/`
 
 2. **Create running summary file:**
    - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` starts at 1, increment if re-running finalise
@@ -106,9 +106,9 @@ Before starting any verification, also create a co-located running summary file 
 
 **Example:**
 
-If verifying `docs/prd/.../story.311.1.example-system/story.311.1.example-system.md`, create:
+If verifying `${PRD_ROOT}/.../story.311.1.example-system/story.311.1.example-system.md`, create:
 
-`docs/prd/.../story.311.1.example-system/story.311.1.dod.1.example-system.md`
+`${PRD_ROOT}/.../story.311.1.example-system/story.311.1.dod.1.example-system.md`
 
 ### Step 1: Locate and Read the Story/Task Document
 
@@ -117,13 +117,13 @@ Accept the story/task document path in one of these formats:
 **Full path to markdown file:**
 
 ```
-docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/story.311.1.example-system.md
+${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/story.311.1.example-system.md
 ```
 
 **Directory path (skill will find the .md file):**
 
 ```
-docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/
+${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/
 ```
 
 **Task path examples:**
@@ -1098,7 +1098,7 @@ Mark story.311.1.example-system as complete
 
 **Skill Actions:**
 
-1. Read story document from `docs/prd/.../story.311.1.example-system.md`
+1. Read story document from `${PRD_ROOT}/.../story.311.1.example-system.md`
 2. Check for QA reports - found `story.311.1.qa.1.initial-review.md` ✅
 3. Review QA gate file - `story.311.1.gate.1.initial-review.yml` shows PASS ✅
 4. Verify all acceptance criteria are checked (cross-reference with QA report) ✅
@@ -1132,12 +1132,12 @@ All Definition of Done criteria verified:
 - ✅ Maintainability review passed (QA verified)
 
 **QA Reports:**
-- QA Report: docs/prd/.../story.311.1.../story.311.1.qa.1.initial-review.md
-- Gate File: docs/prd/.../story.311.1.../story.311.1.gate.1.initial-review.yml
+- QA Report: ${PRD_ROOT}/.../story.311.1.../story.311.1.qa.1.initial-review.md
+- Gate File: ${PRD_ROOT}/.../story.311.1.../story.311.1.gate.1.initial-review.yml
 
 **Artifacts Generated:**
-- Updated: docs/prd/.../story.311.1.../story.311.1...md
-- Created: docs/prd/.../story.311.1.../sprint-review-summary.md
+- Updated: ${PRD_ROOT}/.../story.311.1.../story.311.1...md
+- Created: ${PRD_ROOT}/.../story.311.1.../sprint-review-summary.md
 - PR Comment: https://github.com/org/repo/pull/789#comment-xyz
 ```
 
@@ -1199,15 +1199,15 @@ Check if task.90.swagger-cli-plugin-enablement is ready for acceptance
 **User Request:**
 
 ```
-Verify DoD for docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.2.example-notifications/
+Verify DoD for ${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.2.example-notifications/
 ```
 
 **Skill Actions:**
 
-1. Use Glob to find `.md` file in directory: `docs/prd/.../story.311.2.example-notifications/*.md`
+1. Use Glob to find `.md` file in directory: `${PRD_ROOT}/.../story.311.2.example-notifications/*.md`
 2. Found: `story.311.2.example-notifications.md`
-3. Check for QA reports: `docs/prd/.../story.311.2.example-notifications/*.qa.*.md`
-4. Check for gate files: `docs/prd/.../story.311.2.example-notifications/*.gate.*.yml`
+3. Check for QA reports: `${PRD_ROOT}/.../story.311.2.example-notifications/*.qa.*.md`
+4. Check for gate files: `${PRD_ROOT}/.../story.311.2.example-notifications/*.gate.*.yml`
 5. Proceed with DoD verification workflow (Steps 3-8)...
 
 ## Resources

@@ -12,7 +12,7 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
 
 ## Inputs (set by the calling skill before invoking)
 
-- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `docs/prd/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`)
+- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `${PRD_ROOT}/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 - `EPIC_JIRA_KEY` — parent epic Jira key (e.g. `PROJ-42`), or empty string if no parent epic Jira issue exists yet. The caller should run `ensure-epic-jira-issue` first to populate this.
 - `TRACKER` — set by `references/resolve-platform.sh` in the calling skill (must be `jira` for this sub-routine to act)
 - Env: `JIRA_URL`, plus Atlassian MCP credentials (cloudId derived from `JIRA_URL` hostname)
