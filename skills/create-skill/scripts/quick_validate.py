@@ -22,7 +22,7 @@ def find_repo_root(skill_path):
 
 def collect_shared_refs(content):
     """Return list of filenames referenced via shared/resources/<filename>."""
-    return re.findall(r'shared/resources/([^\s`\'")\]*]+)', content)
+    return [f.rstrip('.,;:') for f in re.findall(r'shared/resources/([^\s`\'")\]*]+)', content)]
 
 
 def validate_skill(skill_path):

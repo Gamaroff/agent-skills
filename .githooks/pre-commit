@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Runs npm run bundle when shared/resources or any SKILL.md is staged,
+# then re-stages the resulting references/ changes.
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+if git diff --cached --name-only | grep -qE '^(shared/resources/|skills/[^/]+/SKILL\.md)'; then
+  echo "▶ Bundling shared resources into skills/*/references/ ..."
+  cd "$REPO_ROOT"
+  npm run bundle --silent
+  git add skills/*/references/
+  echo "✓ Bundle complete — references/ changes staged."
+fi
