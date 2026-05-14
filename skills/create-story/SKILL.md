@@ -69,7 +69,7 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 
 **Actions**:
 
-0. **Resolve paths.** Run `source shared/resources/resolve-paths.sh` (or its bundled copy at `references/resolve-paths.sh`). This exports `PRD_ROOT` (default `docs/prd`) and `ARCH_ROOT` (default `docs/architecture`). Use these for every path operation below — examples in this skill show `docs/prd/...` but you must substitute `${PRD_ROOT}/...` against the actual project. Same for architecture paths.
+0. **Resolve paths.** Run `source references/resolve-paths.sh` (or its bundled copy at `references/resolve-paths.sh`). This exports `PRD_ROOT` (default `docs/prd`) and `ARCH_ROOT` (default `docs/architecture`). Use these for every path operation below — examples in this skill show `docs/prd/...` but you must substitute `${PRD_ROOT}/...` against the actual project. Same for architecture paths.
 
 1. Load configuration from skills-config.yaml
 2. If configuration does not exist, **HALT** and inform user:
@@ -111,7 +111,7 @@ architecture:
 
 ### 1.1 Locate Epic Files and Review Existing Stories
 
-1. Locate epic files at the fixed path `docs/prd/{domain}/{feature}/epics/epic.{N}.*/epic.{N}.*.md`.
+1. Locate epic files at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.*/epic.{N}.*.md`.
 
 2. Look for existing story files inside the epic's `stories/` subdirectory (i.e. `{epic-directory}/stories/`). Load the highest-numbered `story.{epicNum}.{storyNum}.*` file found there.
 
@@ -149,7 +149,7 @@ architecture:
 
 ### 2.1 Extract Story Requirements
 
-1. Read the identified epic file (at `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`)
+1. Read the identified epic file (at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`)
 2. Extract for this specific story:
    - Story title and description
    - Acceptance criteria (numbered list)

@@ -109,7 +109,7 @@ Systematic response to project pivots, blockers, or requirement changes:
 
 ## Configuration Requirements
 
-**Resolve paths first.** Source `shared/resources/resolve-paths.sh` to populate `${PRD_ROOT}` and `${ARCH_ROOT}` env vars. Defaults are `docs/prd` and `docs/architecture`. All path operations in this skill use these env vars.
+**Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` and `${ARCH_ROOT}` env vars. Defaults are `docs/prd` and `docs/architecture`. All path operations in this skill use these env vars.
 
 This skill expects a configuration file at `skills-config.yaml` (in project root) that defines:
 

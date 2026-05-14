@@ -2237,7 +2237,7 @@ This traceability feeds into quality gates:
 ### Expected Configuration
 
 
-**Resolve paths first.** Source `shared/resources/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) — the PRD root is configurable. The nested structure under it (and QA artifact co-location) is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
+**Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) — the PRD root is configurable. The nested structure under it (and QA artifact co-location) is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
 - Stories: nested at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`
 - QA artifacts (review report, NFR, traceability, gate, DoD): co-located with the story file. No `qa.qaLocation` key.

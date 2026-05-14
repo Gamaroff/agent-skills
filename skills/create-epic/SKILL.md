@@ -88,7 +88,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 - `epic.164.payment-integration.md` (incremented)
 - `epic.163.5.settings-enhancement.md` (use decimals for intermediate epics)
 
-**Location**: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[number].[descriptive-name]/` (Directory name must exactly match file name). Resolve `${PRD_ROOT}` from `skills-config.yaml` via `shared/resources/resolve-paths.sh` (default: `docs/prd`).
+**Location**: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[number].[descriptive-name]/` (Directory name must exactly match file name). Resolve `${PRD_ROOT}` from `skills-config.yaml` via `references/resolve-paths.sh` (default: `docs/prd`).
 
 **Naming Rules**:
 

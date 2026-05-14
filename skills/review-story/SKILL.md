@@ -463,7 +463,7 @@ options:
 
 **Actions**:
 
-0. **Resolve paths.** Source `shared/resources/resolve-paths.sh` (or `references/resolve-paths.sh`) to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). All path operations below use these env vars.
+0. **Resolve paths.** Source `references/resolve-paths.sh` (or `references/resolve-paths.sh`) to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). All path operations below use these env vars.
 
 1. Load `skills-config.yaml` from project root
    - If missing, use fallback defaults and notify user
