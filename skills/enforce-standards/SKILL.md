@@ -53,7 +53,7 @@ description: 'Enforce naming conventions and file structure architecture on a sp
       - Styles = `kebab-case.styles.ts` or match component name
       - Tests = Match source file + `.spec.tsx` or `.spec.ts` (co-located, NOT in `__tests__/`)
       - **Enum Values** = `UPPER_CASE` (e.g., `MessageType.TEXT = 'TEXT'`)
-2.  Read `docs/architecture/routing-and-file-structure.md` to refresh on structural rules.
+2.  Read `${ARCH_ROOT}/routing-and-file-structure.md` (default: `docs/architecture/routing-and-file-structure.md`) to refresh on structural rules.
     - **Key Rules**:
       - Feature-first structure: `components/features/[feature]/[Component]`
       - Generic UI components: `components/ui/[Component]`

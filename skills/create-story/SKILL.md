@@ -270,7 +270,7 @@ Extract and document:
 
 ### 4.1 Cross-Reference with Project Structure
 
-1. Review `docs/architecture/unified-project-structure.md` (or equivalent)
+1. Review `${ARCH_ROOT}/unified-project-structure.md` (or equivalent)
 2. Verify that story requirements align with:
    - Defined file paths and directories
    - Component location conventions
@@ -431,8 +431,8 @@ Organize Dev Notes by these categories:
 Generate a concrete, step-by-step walkthrough for verifying this story in the running app. This is distinct from automated test design — it is a human-readable smoke test guide.
 
 **Sources to consult** (in priority order):
-1. `docs/architecture/routing-and-file-structure.md` — for navigation paths and screen names
-2. `docs/architecture/concepts/core-workflows.md` — for user flows
+1. `${ARCH_ROOT}/routing-and-file-structure.md` — for navigation paths and screen names
+2. `${ARCH_ROOT}/concepts/core-workflows.md` — for user flows
 3. The story's own acceptance criteria — one verification step per AC
 4. Integration notes in the story (what parent component or screen triggers this feature)
 
