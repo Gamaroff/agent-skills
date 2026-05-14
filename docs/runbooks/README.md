@@ -14,6 +14,14 @@ If you want **API-style reference** instead of a walkthrough, see:
 
 ## Available Runbooks
 
+**New to agent-skills? Start here:**
+
+- 🚀 **Brand-new project** (no codebase yet) → [New Project Setup](./new-project-setup.md)
+- 🏗️ **Existing codebase** (adopting agent-skills onto something you already have) → [Document Existing Project](./document-existing-project.md)
+- 📚 **Want a structured walkthrough first** → [First-Week Onboarding](./first-week.md)
+
+After those, pick a runbook from the table below as the work in front of you demands.
+
 | Runbook | Use it when… |
 |---|---|
 | [First-Week Onboarding](./first-week.md) | Starting fresh with agent-skills. Four structured days covering the task pipeline, story pipeline, QA recovery, and parallel development. |

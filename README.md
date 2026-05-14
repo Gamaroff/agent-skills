@@ -40,7 +40,19 @@ If this is your first time with agent-skills, work through these in order. Each 
 
 ## Installing Skills
 
-**With `npx skills` (recommended):**
+**Setting up a fresh project? Run the wizard.** Interactive script that handles install + config + credentials + registries + hooks in one go:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
+```
+
+Idempotent — safe to re-run later to update credentials or change platform. Full walkthrough: [`docs/concepts/getting-started.md`](./docs/concepts/getting-started.md#quick-setup-wizard).
+
+If you already have a project set up and just need to add or update skills, use the install commands below.
+
+---
+
+**With `npx skills` (recommended for skill-only installs):**
 
 Install a single skill:
 ```bash

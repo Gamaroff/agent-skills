@@ -4,6 +4,92 @@
 
 Common failure modes for `develop-story`, `develop-task`, and the surrounding skills, plus what to do.
 
+## Tracker auth failure (Jira 401 / Bitbucket 403 / `gh` not authenticated)
+
+**Symptom:** Skill exits with `401 Unauthorized`, `403 Forbidden`, or `gh: not authenticated`. Local files written; remote sync skipped.
+
+**Cause:** Missing or stale credentials.
+
+**Fix — quickest path:** re-run the setup wizard, which detects existing `.env` values and lets you update only the bad one:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
+```
+
+**Fix — manual:**
+
+| Platform | Check |
+|---|---|
+| GitHub | `gh auth status` — re-run `gh auth login` if expired |
+| Jira | `curl -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/myself"` — should return your user JSON, not a 401 |
+| Bitbucket | `curl -u "$BITBUCKET_USERNAME:$BITBUCKET_APP_PASSWORD" "https://api.bitbucket.org/2.0/user"` |
+
+Tokens are revocable — if `curl` confirms the creds are wrong, regenerate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) (Jira) or Bitbucket → Settings → App passwords (Bitbucket). To work offline without fixing this, set `SKIP_TRACKER=1`.
+
+## `npx skills add --all` hangs or fails
+
+**Symptom:** Install command stalls, errors with `ENOTFOUND`, or finishes with `.agents/skills/` empty.
+
+**Cause:** Network issue, npm cache corruption, or `.agents/` permission problem.
+
+**Fix:**
+
+```bash
+# Verify network reach to GitHub
+curl -fsSL -o /dev/null https://github.com/Gamaroff/agent-skills && echo ok
+
+# Clear npm cache and retry
+npm cache clean --force
+npx --yes skills add https://github.com/Gamaroff/agent-skills --all
+
+# Install one skill at a time to isolate the failure
+npx skills add https://github.com/Gamaroff/agent-skills --skill develop-task
+```
+
+**Offline / locked-down CI:** use the zip path documented in [`../concepts/getting-started.md`](../concepts/getting-started.md#option-c--manual-zip-install-offline--locked-down-ci).
+
+## Hooks not firing — `.claude/settings.json` missing or empty
+
+**Symptom:** `/develop-story` and `/develop-task` don't auto-advance through phases. Pipeline stalls after each skill returns instead of continuing.
+
+**Cause:** Pipeline hooks (`PreCompact`, `Stop`, `PostToolUse`) aren't registered in `.claude/settings.json`.
+
+**Fix:**
+
+```bash
+# Verify hooks are present
+cat .claude/settings.json | jq '.hooks'
+# Should show keys: PreCompact, Stop, PostToolUse
+
+# Install or re-install (idempotent — preserves other settings)
+bash .agents/skills/develop-task/scripts/install-hooks.sh
+
+# Preview without writing
+bash .agents/skills/develop-task/scripts/install-hooks.sh --dry-run
+```
+
+If the hook script is missing, your skills aren't installed yet — run `npx skills add --all` first.
+
+## Skills not picking up stories / tasks from the expected location
+
+**Symptom:** `create-story` or `develop-story` can't find epics, or writes artifacts to the wrong directory.
+
+**Cause:** `skills-config.yaml` paths don't match your actual repo layout. Common offenders:
+
+- `prd.prdShardedLocation` points to a path that doesn't exist
+- `devStoryLocation: nested` set on a flat layout (or vice versa)
+- `prd.epicFilePattern` glob doesn't match your epic filenames
+
+**Fix:** open `skills-config.yaml` at your repo root and verify each path resolves:
+
+```bash
+# Replace placeholders with what your config says
+ls docs/prd                          # prdShardedLocation should be readable
+ls docs/prd/*/epics/epic.*.md        # epicFilePattern should match real files
+```
+
+Full schema and key reference: [Configuration](./configuration.md). If unsure, re-run the [setup wizard](../concepts/getting-started.md#quick-setup-wizard) — it scaffolds a config that matches the standard layout.
+
 ## Pipeline halts with "epic frontmatter missing"
 
 **Symptom:** `develop-story` exits immediately. The story file has no `epic:` field in frontmatter.
