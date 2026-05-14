@@ -2,6 +2,8 @@
 
 > **Audience:** developers using these skills — things NOT to do, with rationale.
 
+> **First time here?** Some rules below (gate files, registry rows, lifecycle status) won't fully land until you've shipped a story or task and seen the artifacts in person. Skim this list now to flag the names, then re-read after your first run through [`../concepts/quickstart-task.md`](../concepts/quickstart-task.md) or [`../concepts/quickstart-story.md`](../concepts/quickstart-story.md). The rules make a lot more sense once you've held the artifacts they protect.
+
 Rules scattered across the docs, collected and explained. Each entry: the rule, why it exists, what happens if you ignore it, and how to do it right.
 
 ## Never edit gate files by hand

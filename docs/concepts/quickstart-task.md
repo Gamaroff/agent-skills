@@ -13,6 +13,8 @@ created: 2026-05-12
 
 > Promise: by the end of this page you will have a real task — spec, plan, implementation report, QA report, gate file, DoD checklist — sitting in `docs/tasks/` on a branch you can delete.
 
+> **Haven't set up agent-skills in this project yet?** Run the [setup wizard](./getting-started.md#quick-setup-wizard) first — it installs skills, writes `skills-config.yaml`, creates the registries, and registers the pipeline hooks. The prerequisites below assume that's done.
+
 ## Prerequisites
 
 Universal:
@@ -30,7 +32,7 @@ Platform-specific — needed because `/develop-task` opens a PR and (optionally)
 | GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 | Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
-To skip tracker integration entirely (PR-only), set `SKIP_TRACKER=1` when prompted in Phase 0.
+Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc. To skip tracker integration entirely (PR-only), set `SKIP_TRACKER=1` when prompted in Phase 0.
 
 ⏱ Set a 10-minute timer. If you blow through it, your walkthrough is your bug report.
 
@@ -119,6 +121,8 @@ Pick one:
 **A. You want to keep the artifact as proof you ran the quickstart (recommended for first-time users).**
 
 Leave the branch as-is. Mark the registry row `CANCELLED` in `docs/tasks/task-registry.md`. Task numbers are never recycled — this row stays forever as a record. Do NOT delete the row.
+
+> **What a registry row looks like:** one markdown table line per task — columns are `Task # | Title link | Status | Type | Priority | Date | Issue | Depends on`. To cancel, change the `Status` cell from `accepted` / `in-progress` / `draft` to `CANCELLED` and leave the other cells untouched. Do **not** decrement the **Next Available Task Number** counter — numbers stay used even when cancelled. Full schema: [`../standards/task-registry.md`](../standards/task-registry.md).
 
 **B. You want a perfectly clean repo.**
 

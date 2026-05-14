@@ -153,7 +153,6 @@ Full categorised index below.
 | Skill | Description |
 | ----- | ----------- |
 | `react-native-debug` | Iterative debugging for React Native apps. Handles Jest test failures and Metro bundler errors with an interactive approach to determine whether implementation or test is… |
-| `upgrading-expo` | Guidelines for upgrading Expo SDK versions and fixing dependency issues |
 
 ## Infrastructure & DevOps
 

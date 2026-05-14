@@ -1,6 +1,8 @@
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/platform-detection.md. Regenerate via `npm run bundle`. -->
 # Platform Detection (canonical)
 
+> **Setting up a project? Skip this doc.** Run the [setup wizard](../../docs/concepts/getting-started.md#quick-setup-wizard) — it picks the platform interactively and writes the right `skills-config.yaml` for you. This document is the resolver-internals reference for skill authors and for cases where you need to override auto-detection.
+
 This file is the single source of truth for how skills determine the active tracker and VCS platform. Skills reference this via the explicit path `references/platform-detection.md`. At package time, `scripts/package_skill.py` bundles this file under `references/` and rewrites the path so installed skills are self-contained.
 
 ## Canonical helper

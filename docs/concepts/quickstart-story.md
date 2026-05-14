@@ -13,6 +13,8 @@ created: 2026-05-12
 
 > Promise: by the end of this page you will have a real story — PRD, epic, story, review, implementation report, PR, QA report, gate file, DoD checklist, and sprint review summary — sitting in `docs/prd/` on a branch you can delete.
 
+> **Haven't set up agent-skills in this project yet?** Run the [setup wizard](./getting-started.md#quick-setup-wizard) first — it installs skills, writes `skills-config.yaml`, creates the registries, and registers the pipeline hooks. The prerequisites below assume that's done.
+
 ## Prerequisites
 
 Universal:
@@ -29,6 +31,8 @@ Platform-specific — pick the row that matches your project. Skills auto-detect
 | GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration |
 | GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 | Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+
+Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc.
 
 ⏱ Set a 60-minute timer. If you blow through it, your walkthrough is your bug report.
 
@@ -118,6 +122,8 @@ Phase 0 of `/develop-story` will ask several questions. Recommended answers for 
 | Create epic branch from develop? | Yes |
 | Lite mode? | Yes — speeds up a trivial single-file story |
 
+> **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). It skips the parallel QA agents and the traceability matrix step, but **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour. Pick `No` for anything with cross-file impact, security implications, or unclear acceptance criteria.
+
 The agent then chains: **create-branch → review-story → develop → create-pr → qa-story → qa-fix → finalise → commit**. Sit back — the chain completes automatically when the QA gate is PASS and DoD is done.
 
 If QA loops more than once it is working as intended; a one-line README change should pass first try.
@@ -147,7 +153,7 @@ You should have all 10 artifact types:
 | 9 | `story.{N}.1.gate.1.add-footer-link.yml` | PASS / CONCERNS / FAIL gate |
 | 10 | `story.{N}.1.dod.1.add-footer-link.md` | Definition-of-Done checklist + sprint review summary |
 
-For an annotated example of what these files look like, see `examples/story-walkthrough/` (pending Epic 2).
+For annotated worked examples of the upstream artifacts, see [`examples/prd-example/`](../../examples/prd-example/) (the PRD that drove this onboarding effort) and [`examples/epic-examples/`](../../examples/epic-examples/) (its four epics). For a deliberate FAIL → PASS walkthrough, see [Day 3 — Messy Path](../runbooks/first-week/day-3-messy-path.md).
 
 ---
 
@@ -158,6 +164,8 @@ Pick one:
 **A. Keep the artifact as proof (recommended for first-time users).**
 
 Leave the branch as-is. Mark the epic row `CANCELLED` in `docs/epic-registry.md`. Mark the story `status: cancelled` in its frontmatter. Numbers are never recycled — the rows stay forever as records.
+
+> **What a registry row looks like:** epic rows have columns `Epic # | Tracker key | Domain | Folder | Title | Status | Created`. To cancel, change the `Status` cell to `CANCELLED` (or `🚫 Cancelled`) and leave the other cells untouched. Do **not** decrement the **Next Available Epic Number** counter — numbers stay used even when cancelled. Full schemas: [`../standards/epic-registry.md`](../standards/epic-registry.md), [`../standards/task-registry.md`](../standards/task-registry.md).
 
 Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice tracker issues the chain opened (GitHub Issues or Jira).
 
@@ -199,7 +207,8 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 - `docs/standards/file-naming.md` — naming conventions for story artifacts
 - `docs/runbooks/story-development.md` — deep-dive on the full story development workflow (Phase A–D)
 - `examples/README.md` — annotated full-lifecycle artifact set (`task.6` worked task example)
-- `examples/story-walkthrough/` — canonical worked story (pending Epic 2)
+- `examples/prd-example/`, `examples/epic-examples/` — worked PRD + epic artifacts produced by dogfooding this onboarding effort
+- `docs/runbooks/first-week/day-3-messy-path.md` — FAIL → PASS walkthrough (recipe-style; no canonical messy-path example artifact exists — Story 2.3 was descoped)
 - `docs/concepts/quickstart-task.md` — 10-minute task quickstart (simpler entry point)
 
 ---

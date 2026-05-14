@@ -23,6 +23,13 @@ Skills auto-detect your platform via `skills-config.yaml` + env vars + git remot
 | GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 | Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
+### How to pick a row
+
+- **Your VCS is fixed.** Use GitHub or Bitbucket depending on where your repo lives — there's no flexibility here.
+- **Your tracker is a choice — pick the one your team already uses.** If your team coordinates on Jira (standups, sprint board, backlog), pick Jira. If issues live alongside the code on GitHub, pick GitHub Issues. The skills push the same artifacts either way; the tracker is just where notifications and board states surface.
+- **No tracker at all?** Set `SKIP_TRACKER=1` for any single run. Useful for offline work, dry runs, or solo projects where the tracker would just be noise.
+- **GitHub VCS + Jira tracker is a common combo** in orgs that migrated code to GitHub but kept Jira for product management. It's fully supported.
+
 `project.yml` is GitHub-only — it carries GitHub project-board metadata. Bitbucket/Jira users skip it.
 
 Task quickstart still needs VCS auth (PR creation) but can skip tracker auth via `SKIP_TRACKER=1`. Story quickstart needs all of the above for the platform combo you picked.
@@ -73,6 +80,52 @@ export BITBUCKET_APP_PASSWORD=your-app-password
 | Variable | Effect |
 |---|---|
 | `SKIP_TRACKER=1` | Skip all remote tracker calls (GitHub Issues / Jira). Local files and registries still written. Useful offline or for planning-only runs. |
+
+## Quick setup (wizard)
+
+**Recommended for new projects.** An interactive script that walks through the full setup — prerequisites, platform, credentials, config, registries, skills, and hooks — in one session.
+
+**Safe to re-run.** Existing files are detected and you'll be prompted before any overwrite. Existing `.env` values appear as defaults (secrets show as `[currently set — Enter to keep]`), so you can re-run to update one credential without retyping the rest.
+
+```bash
+# From your project root — curl and run directly:
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
+
+# Or if you cloned agent-skills locally:
+bash /path/to/agent-skills/scripts/setup-consumer.sh
+
+# Preview every action without writing anything:
+bash /path/to/agent-skills/scripts/setup-consumer.sh --dry-run
+```
+
+### What the wizard does
+
+| Step | Action | Skippable? |
+|------|---------|------------|
+| 1 | Checks `node`, `git`, `jq`, `curl` are on PATH — exits if any missing | No |
+| 2 | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira | No |
+| 3 | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input | — |
+| 4 | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore` | Yes |
+| 5 | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path | Yes (skips if file exists and you decline overwrite) |
+| 6 | Creates `docs/epic-registry.md` and `docs/tasks/task-registry.md` if absent | Idempotent |
+| 7 | Runs `npx skills add --all` | Yes |
+| 8 | Runs `install-hooks.sh` to register Claude Code pipeline hooks | Yes |
+
+### Files produced
+
+```
+.env.example                          # credential keys, no values
+.env                                  # live credentials (if confirmed)
+skills-config.yaml                    # project configuration
+docs/epic-registry.md                 # empty — populated by /create-epic
+docs/tasks/task-registry.md           # empty — populated by /create-task
+.agents/skills/                       # installed skills
+.claude/settings.json                 # updated with pipeline hooks
+```
+
+> The manual steps below cover the same ground — use them if you need finer control or are running in a CI/locked-down environment.
+
+---
 
 ## 1. Install the skills
 

@@ -2,7 +2,7 @@
 epic_number: 3
 title: "Runbook Tutorial Wrappers"
 domain: "onboarding"
-status: "✅ Accepted"
+status: "📋 Planned"
 priority: "Medium"
 estimated_stories: 3
 created: 2026-05-11

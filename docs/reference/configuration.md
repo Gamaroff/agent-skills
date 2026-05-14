@@ -2,6 +2,8 @@
 
 > **Audience:** developers using these skills in a downstream project.
 
+> **Setting up a fresh project?** The [setup wizard](../concepts/getting-started.md#quick-setup-wizard) generates a working `skills-config.yaml` interactively. Use this doc to tweak the result, look up a specific key, or hand-author a config in a non-standard layout.
+
 Projects place a `skills-config.yaml` at the repository root. This file is the single source of truth for paths, layout modes, and shared options the skills read at runtime.
 
 ## Full schema

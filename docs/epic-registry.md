@@ -24,7 +24,7 @@ type: registry
 
 | Epic # | Tracker key | Domain / feature      | Folder                                              | Title                                       | Status      | Created    |
 |-------:|-------------|------------------------|-----------------------------------------------------|---------------------------------------------|-------------|------------|
-| 1      | gh#73       | onboarding/onboarding  | epic.1.quickstart-and-decision-tree-entry-point     | Quickstart & Decision-Tree Entry Point      | 📋 Planned | 2026-05-11 |
-| 2      | gh#74       | onboarding/onboarding  | epic.2.worked-prd-epic-story-examples               | Worked PRD / Epic / Story Examples          | 📋 Planned | 2026-05-11 |
+| 1      | gh#73       | onboarding/onboarding  | epic.1.quickstart-and-decision-tree-entry-point     | Quickstart & Decision-Tree Entry Point      | ✅ Accepted | 2026-05-11 |
+| 2      | gh#74       | onboarding/onboarding  | epic.2.worked-prd-epic-story-examples               | Worked PRD / Epic / Story Examples          | ✅ Accepted | 2026-05-11 |
 | 3      | gh#75       | onboarding/onboarding  | epic.3.runbook-tutorial-wrappers                    | Runbook Tutorial Wrappers                   | 📋 Planned | 2026-05-11 |
-| 4      | gh#76       | onboarding/onboarding  | epic.4.first-week-guided-learning-path              | First-Week Guided Learning Path             | 📋 Planned | 2026-05-11 |
+| 4      | gh#76       | onboarding/onboarding  | epic.4.first-week-guided-learning-path              | First-Week Guided Learning Path             | ✅ Accepted | 2026-05-11 |

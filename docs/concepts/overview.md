@@ -169,6 +169,8 @@ QA artifacts (review reports, gate files, DoD) are co-located with their story/t
 
 ## Further Reading
 
+**If you're new, read [Getting Started](./getting-started.md) next** — it takes you from "I cloned the repo" to "I ran my first command" in under ten minutes, including the setup wizard. Everything below is reference material you'll come back to.
+
 - [Invocation](../reference/invocation.md) — invocation patterns and file discovery
 - [Skill Catalog](../reference/skill-catalog.md) — full index of all skills
 - [Configuration](../reference/configuration.md) — `skills-config.yaml` keys, placeholders
