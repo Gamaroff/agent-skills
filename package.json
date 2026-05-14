@@ -43,7 +43,8 @@
     "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
     "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py",
     "bundle": "python3 skills/create-skill/scripts/bundle_skill.py --all",
-    "bundle:skill": "python3 skills/create-skill/scripts/bundle_skill.py"
+    "bundle:skill": "python3 skills/create-skill/scripts/bundle_skill.py",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138"
