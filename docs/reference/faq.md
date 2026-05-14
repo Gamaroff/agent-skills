@@ -58,7 +58,7 @@ To make them self-contained at installation time. The packager bundles shared re
 
 Because the artifacts (plan, review, implementation, QA, DoD, gate) all belong to one story and should be findable together. A flat list of `story.{E}.{S}.{name}.md` becomes an unsearchable mess as soon as you have 50 stories with 5–7 artifacts each.
 
-If you really want flat, set `devStoryLocation: docs/stories` — the `epic:` frontmatter still drives branch targeting.
+Nested layout is a [fixed convention](./configuration.md#fixed-conventions-not-configurable) — there is no flat-layout mode.
 
 ### Why two status fields (frontmatter + body)?
 
@@ -72,13 +72,9 @@ Same reason as epic numbers — task references travel out of context. `task.44.
 
 ## Configuration
 
-### Why is `prd.epicFilePattern` a glob and not a fixed path?
+### Why are PRD, epic, story, task, and registry paths not configurable?
 
-So consuming projects can use whatever directory naming they prefer. The pattern resolves to the actual parent epic of a given story.
-
-### Why are `docs/tasks/`, `docs/epic-registry.md`, and `docs/tasks/task-registry.md` not configurable?
-
-Enough projects share these conventions that pinning the paths removes a configuration burden. Tasks and registries don't need the per-project flexibility that PRDs and stories need — they're flat catalogues with no naming variation that would benefit from configuration. PRDs *are* configurable via `prd.epicFilePattern` because story/epic layouts genuinely vary.
+Enough projects share these conventions that pinning the paths removes a configuration burden. Skills hardcode `docs/prd/`, nested stories, `docs/tasks/`, and the two registry filenames — see [Fixed conventions](./configuration.md#fixed-conventions-not-configurable). If you need a different layout, you are off the supported path.
 
 ## Repo design
 
