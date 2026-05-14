@@ -1,0 +1,9 @@
+# Pre-commit hooks for agent-skills.
+# Install once per clone:  pip install pre-commit && pre-commit install
+# See: https://pre-commit.com/
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)

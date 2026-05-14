@@ -21,3 +21,23 @@ CLAUDE.md
 
 # Subagent summary artifacts — runtime-local, see shared/resources/subagent-summary-artifact.md
 .summaries/
+
+# Secrets — defensive, none should ever be tracked
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+credentials
+credentials.*
+secrets.json
+secrets.yaml
+secrets.yml
+*.sqlite
+*.sqlite3
