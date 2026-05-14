@@ -18,6 +18,7 @@ See [docs/concepts/overview.md](./docs/concepts/overview.md) for the model, or j
 
 If this is your first time with agent-skills, work through these in order. Each builds on the last.
 
+0. **[Getting Started](./docs/concepts/getting-started.md)** (10 min) — prerequisites, platform auth, and the setup wizard. **Start here before anything else.**
 1. **[Overview](./docs/concepts/overview.md)** (5 min) — what a skill *is* and how progressive disclosure works.
 2. **[Decision tree](./docs/concepts/which-path.md)** (2 min) — pick the path that fits the work in front of you.
 3. **[Task quickstart](./docs/concepts/quickstart-task.md)** (10 min hands-on) — ship your first standalone task.
@@ -40,13 +41,13 @@ If this is your first time with agent-skills, work through these in order. Each 
 
 ## Installing Skills
 
-**Setting up a fresh project? Run the wizard.** Interactive script that handles install + config + credentials + registries + hooks in one go:
+**Setting up a fresh project?** Read **[Getting Started](./docs/concepts/getting-started.md)** first — it covers prerequisites, platform auth, and env var setup. Then run the wizard, which handles install + config + credentials + registries + hooks in one go:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 ```
 
-Idempotent — safe to re-run later to update credentials or change platform. Full walkthrough: [`docs/concepts/getting-started.md`](./docs/concepts/getting-started.md#quick-setup-wizard).
+Idempotent — safe to re-run later to update credentials or change platform.
 
 If you already have a project set up and just need to add or update skills, use the install commands below.
 

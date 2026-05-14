@@ -109,7 +109,7 @@ bash /path/to/agent-skills/scripts/setup-consumer.sh --dry-run
 | 5 | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path | Yes (skips if file exists and you decline overwrite) |
 | 6 | Creates `docs/epic-registry.md` and `docs/tasks/task-registry.md` if absent | Idempotent |
 | 7 | Runs `npx skills add --all` | Yes |
-| 8 | Runs `install-hooks.sh` to register Claude Code pipeline hooks | Yes |
+| 8 | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes |
 
 ### Files produced
 

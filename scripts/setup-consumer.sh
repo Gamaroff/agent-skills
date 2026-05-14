@@ -338,29 +338,88 @@ install_skills() {
 }
 
 # ── 7. pipeline hooks ────────────────────────────────────────────────────────
+
+# Patch a single hook event into SETTINGS_FILE. Idempotent.
+_patch_hook() {
+  local event="$1" cmd="$2"
+  local already
+  already=$(jq --arg event "$event" --arg cmd "$cmd" \
+    '[.hooks[$event][]?.hooks[]?.command] | index($cmd)' \
+    "$HOOKS_SETTINGS_FILE")
+  if [[ "$already" != "null" ]]; then
+    info "  ${event}: already registered"
+    return 0
+  fi
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC}   ${event}: would add (${cmd})"
+    return 0
+  fi
+  local tmp; tmp=$(mktemp)
+  jq --arg event "$event" --arg cmd "$cmd" \
+    '.hooks //= {}
+     | .hooks[$event] //= []
+     | .hooks[$event] += [{matcher: "*", hooks: [{type: "command", command: $cmd}]}]' \
+    "$HOOKS_SETTINGS_FILE" > "$tmp"
+  mv "$tmp" "$HOOKS_SETTINGS_FILE"
+  ok "  ${event}: registered"
+}
+
 install_hooks() {
   heading "Pipeline hooks"
 
-  local hook_script=".agents/skills/develop-task/scripts/install-hooks.sh"
+  # Detect whether Claude Code is already configured in this project
+  local claude_configured=false
+  [[ -f ".claude/settings.json" ]] && claude_configured=true
 
-  if [[ ! -f "$hook_script" ]] && [[ "$DRY_RUN" == false ]]; then
-    warn "Hook script not found (skills not installed?) — skipping"
-    info "Run later: bash $hook_script"
+  # Find the hook scripts base directory (same candidate order as install-hooks.sh)
+  local base=""
+  local _candidates=(
+    ".agents/skills/develop-story/scripts"
+    ".agents/skills/develop-task/scripts"
+    ".claude/skills/develop-story/scripts"
+    ".claude/skills/develop-task/scripts"
+  )
+  for _c in "${_candidates[@]}"; do
+    if [[ -f "$_c/on-stop.sh" ]] && [[ -f "$_c/on-precompact.sh" ]] && [[ -f "$_c/on-skill-return.sh" ]]; then
+      base="$_c"
+      break
+    fi
+  done
+
+  if [[ -z "$base" ]] && [[ "$DRY_RUN" == false ]]; then
+    if $claude_configured; then
+      warn "Claude Code detected (.claude/settings.json) but hook scripts not found — install skills first"
+    else
+      warn "Hook scripts not found (skills not installed?) — skipping"
+    fi
+    info "Run later: bash .agents/skills/develop-task/scripts/install-hooks.sh"
     return
   fi
 
-  ask "Install Claude Code pipeline hooks? [Y/n]:"
-  read -r _hooks
-  if [[ "${_hooks:-Y}" =~ ^[Yy]$ ]]; then
-    if [[ "$DRY_RUN" == true ]]; then
-      echo -e "${YELLOW}[dry-run]${NC} would run: bash $hook_script"
-    else
-      bash "$hook_script"
-      ok "Hooks installed"
-    fi
+  if $claude_configured; then
+    ask "Claude Code detected — update .claude/settings.json with pipeline hooks? [Y/n]:"
   else
-    info "Skipped — run later: bash $hook_script"
+    ask "Install Claude Code pipeline hooks into .claude/settings.json? [Y/n]:"
   fi
+  read -r _hooks
+  [[ ! "${_hooks:-Y}" =~ ^[Yy]$ ]] && { info "Skipped — run later: bash .agents/skills/develop-task/scripts/install-hooks.sh"; return; }
+
+  # Ensure settings file exists and is valid JSON
+  HOOKS_SETTINGS_FILE=".claude/settings.json"
+  if [[ "$DRY_RUN" == false ]]; then
+    mkdir -p .claude
+    [[ ! -f "$HOOKS_SETTINGS_FILE" ]] && echo "{}" > "$HOOKS_SETTINGS_FILE"
+    if ! jq -e . "$HOOKS_SETTINGS_FILE" >/dev/null 2>&1; then
+      err "${HOOKS_SETTINGS_FILE} is not valid JSON — skipping hook install"
+      info "Fix the file manually, then run: bash .agents/skills/develop-task/scripts/install-hooks.sh"
+      return
+    fi
+  fi
+
+  _patch_hook "PreCompact"  "bash ${base}/on-precompact.sh"
+  _patch_hook "Stop"        "bash ${base}/on-stop.sh"
+  _patch_hook "PostToolUse" "bash ${base}/on-skill-return.sh"
+  [[ "$DRY_RUN" == false ]] && ok "Pipeline hooks registered in ${HOOKS_SETTINGS_FILE}"
 }
 
 # ── summary ──────────────────────────────────────────────────────────────────

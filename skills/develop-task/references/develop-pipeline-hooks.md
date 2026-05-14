@@ -211,7 +211,7 @@ If you add a third hook to this pipeline (e.g., a `SessionStart` resumer or a `P
 3. **Reads `.claude/state/develop-pipeline.lock`** for state — never invents new lock files
 4. **Honours Claude Code's anti-loop flags** (`stop_hook_active`, equivalents for other events)
 5. **Documented here** — add a new section to this file plus a row in the catalog table
-6. **Installable via `install-hooks.sh`** — extend the script's hook list rather than creating a parallel installer
+6. **Installable via `install-hooks.sh`** — extend the script's hook list rather than creating a parallel installer. Exception: `setup-consumer.sh` patches inline to avoid a chicken-and-egg dependency on skills being installed first; it is not a general precedent.
 7. **Test coverage** — add protocol assertions to `evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs`
 8. **Update both SKILL.md Setup sections** — but keep them short; this doc is the canonical reference
 
