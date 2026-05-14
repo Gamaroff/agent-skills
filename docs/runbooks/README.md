@@ -51,4 +51,4 @@ If a satellite outgrows ~200 lines, consider promoting it or splitting out a sat
 
 ### Mermaid diagrams
 
-Runbooks use Mermaid. GitHub renders Mermaid natively; some other viewers (older IDE extensions, plain text viewers) do not. If you're authoring a new diagram, validate it with [`mermaid-architect`](../../skills/mermaid-architect/SKILL.md) before committing.
+Runbooks use Mermaid. GitHub renders Mermaid natively; Bitbucket needs a plugin or a Mermaid-aware viewer; Jira/Confluence renders via the official Mermaid macro. Older IDE extensions and plain text viewers will show raw fenced blocks. If you're authoring a new diagram, validate it with [`mermaid-architect`](../../skills/mermaid-architect/SKILL.md) before committing.

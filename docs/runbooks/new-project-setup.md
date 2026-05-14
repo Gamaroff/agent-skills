@@ -53,7 +53,14 @@ Before step 1:
 
 - `docs/epic-registry.md` exists (empty registry — `create-epic` and `epic-registry-manager` will populate it).
 - `develop` branch created from `main`.
-- Choose tracker (GitHub vs Jira) — see [platform detection](../../shared/resources/platform-detection.md).
+- Choose your platform combo — VCS (`github` or `bitbucket`) and tracker (`github` Issues or `jira`) are independent. Auto-detected from git remote + `JIRA_URL` env var, or override explicitly in `skills-config.yaml`:
+
+  ```yaml
+  tracker: jira       # or: github | auto (default)
+  vcs: bitbucket      # or: github   | auto (default)
+  ```
+
+  Auth env vars per combo: `gh auth login` (GitHub VCS); `BITBUCKET_USERNAME` + `BITBUCKET_APP_PASSWORD` (Bitbucket VCS); `JIRA_URL` + `JIRA_USER_EMAIL` + `JIRA_API_TOKEN` (Jira tracker). Full spec: [platform detection](../../shared/resources/platform-detection.md).
 
 ## See also
 

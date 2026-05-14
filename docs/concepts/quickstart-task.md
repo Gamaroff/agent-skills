@@ -15,22 +15,42 @@ created: 2026-05-12
 
 ## Prerequisites
 
+Universal:
+
 - Node ≥ 20 (`node --version`)
 - `git` (`git --version`)
-- A clone of this repo: `git clone git@github.com:Gamaroff/agent-skills.git && cd agent-skills`
+- Skills installed in your project: `npx skills add https://github.com/Gamaroff/agent-skills --all`
 - A working terminal where you can invoke this CLI agent
+
+Platform-specific — needed because `/develop-task` opens a PR and (optionally) a tracker issue. Skills auto-detect via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)).
+
+| VCS | Tracker | Auth / env required |
+|---|---|---|
+| GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`) |
+| GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+
+To skip tracker integration entirely (PR-only), set `SKIP_TRACKER=1` when prompted in Phase 0.
 
 ⏱ Set a 10-minute timer. If you blow through it, your walkthrough is your bug report.
 
 ---
 
-## 1. Verify install (≤ 30 s)
+## 1. Verify prerequisites (≤ 30 s)
 
 ```bash
-npx skills add --all
+node --version
+git --version
+
+# VCS auth — pick your platform:
+gh auth status                                                              # GitHub
+[ -n "$BITBUCKET_USERNAME" ] && [ -n "$BITBUCKET_APP_PASSWORD" ] && echo ok  # Bitbucket
+
+# Jira (only if tracker is Jira):
+[ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo ok
 ```
 
-Expected: a short list of skill names with `installed` or `up-to-date` next to each. Re-running is safe — the installer is idempotent. If you see `command not found: npx`, install Node ≥ 20 first.
+Expected: Node ≥ 20, git present, VCS auth confirmed, Jira auth confirmed if applicable.
 
 ---
 
@@ -117,7 +137,9 @@ Then revert the registry commit (or amend it out if you haven't pushed). Note: t
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `npx skills add` hung | Slow network or registry outage | Use `--registry https://registry.npmjs.org` |
+| `npx skills add` hung during install | Slow network or registry outage | Use `--registry https://registry.npmjs.org` |
+| `gh`/Bitbucket/Jira auth failure | Token expired or env vars missing | Re-auth `gh auth login` or re-export env vars (see Prerequisites) |
+| Skill picked wrong platform | Auto-detect mis-fired | Set explicit `tracker:` / `vcs:` in `skills-config.yaml` |
 | Phase 0 prompts not matching table | Agent version differs | Check installed skill version in `.agents/skills/` |
 | QA loop iterated more than once | Practice task touched something non-trivial | Use a simpler task (one-line doc change) |
 | Elapsed > 10 min | Slow machine + large model context | The chain itself is fast; thinking time doesn't count |

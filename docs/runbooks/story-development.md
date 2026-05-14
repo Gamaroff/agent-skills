@@ -244,9 +244,6 @@ Inside `finalise`, the platform resolver picks one of:
 After the pipeline completes, confirm:
 
 ```bash
-# PR is open against the epic branch with a green gate
-gh pr view --json baseRefName,statusCheckRollup
-
 # Gate file exists and is PASS or WAIVED
 ls docs/prd/.../story.{E}.{S}.{name}/*.gate.*.yml
 grep '^gate:' docs/prd/.../story.{E}.{S}.{name}/*.gate.*.yml
@@ -256,9 +253,18 @@ grep -E '^status:|^Status:' docs/prd/.../story.{E}.{S}.{name}.md
 
 # Implementation report exists
 ls docs/prd/.../story.{E}.{S}.{name}/*.implementation.*.md
+```
 
-# DoD summary was posted to the PR
+PR-side checks depend on your VCS:
+
+```bash
+# GitHub
+gh pr view --json baseRefName,statusCheckRollup
 gh pr view --json comments | jq '.comments[].body' | grep -i 'definition of done'
+
+# Bitbucket — view PR in the web UI, or:
+curl -u $BITBUCKET_USERNAME:$BITBUCKET_APP_PASSWORD \
+  "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests/{id}"
 ```
 
 Once you're satisfied, merge the PR (manual gate). When all stories under an epic are accepted, merge the epic branch to `develop`.
