@@ -45,7 +45,7 @@ This skill produces **the story document and its co-located plan file only**. It
 - ✅ The story directory `{epic-directory}/stories/story.{E}.{S}.{name}/`
 - ✅ `story.{E}.{S}.{name}.md` (story doc)
 - ✅ `story.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
-- ✅ `docs/prd/sprint-status.yaml` status field update (Step 6.2)
+- ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (Step 6.2)
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
 
@@ -695,7 +695,7 @@ Review all sections for:
    | 2025-10-30 | 1.0 | Initial draft created by Scrum Master | SM Agent |
    ```
 3. Save the story file to the self-named subdirectory inside the epic's `stories/` folder: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
-4. If `docs/prd/sprint-status.yaml` exists, update it:
+4. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this story's key
    - Update its status from `backlog` → `ready-for-dev`

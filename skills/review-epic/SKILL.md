@@ -103,9 +103,11 @@ Store choice as `output_mode` for Step 9.
 
 **Actions** (run in parallel where possible):
 
+0. **Resolve paths.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). Path operations below substitute these env vars.
+
 1. **Locate epic file**
    - Accept: absolute path, epic number (e.g. `180`), or descriptive name
-   - Search pattern: `docs/prd/**/epics/epic.[N].*/epic.[N].*.md`
+   - Search pattern: `${PRD_ROOT}/**/epics/epic.[N].*/epic.[N].*.md`
    - If ambiguous, list candidates and ask user to confirm
 
 2. **Load core references**
@@ -116,12 +118,12 @@ Store choice as `output_mode` for Step 9.
    - `.claude/backend-patterns.md`
    - `.claude/database-redis.md`
    - `.claude/testing.md`
-   - `docs/architecture/routing-and-file-structure.md`
+   - `${ARCH_ROOT}/routing-and-file-structure.md`
    - `docs/standards/naming-conventions.md`
    - `.claude/notifications.md` (if epic touches notifications)
 
 4. **Scan for existing stories**
-   - Glob: `docs/prd/**/epics/epic.[N].*/stories/**/story.*.md`
+   - Glob: `${PRD_ROOT}/**/epics/epic.[N].*/stories/**/story.*.md`
    - Read each story found
 
 **Output**: Full context package ready for analysis.
@@ -215,7 +217,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
    - Components: PascalCase
    - "handle" not "username" for user identity
 
-7. **Routing/structure check** against `docs/architecture/routing-and-file-structure.md`:
+7. **Routing/structure check** against `${ARCH_ROOT}/routing-and-file-structure.md`:
    - Expo Router file conventions
    - Feature-first directory layout
 
@@ -400,7 +402,7 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 **Option A — Co-located Report**:
 
-Save to: `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-review-report.md`
+Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-review-report.md`
 
 **Report structure**:
 
@@ -477,7 +479,7 @@ Save to: `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-revi
 | `.claude/backend-patterns.md` | ✅/⚠️/❌ | [finding] |
 | `.claude/database-redis.md` | ✅/⚠️/❌ | [finding] |
 | `.claude/testing.md` | ✅/⚠️/❌ | [finding] |
-| `docs/architecture/routing-and-file-structure.md` | ✅/⚠️/❌ | [finding] |
+| `${ARCH_ROOT}/routing-and-file-structure.md` | ✅/⚠️/❌ | [finding] |
 | `docs/standards/naming-conventions.md` | ✅/⚠️/❌ | [finding] |
 
 ---
@@ -622,6 +624,6 @@ options:
 | `.claude/backend-patterns.md` | Architecture source — NestJS, API, DI |
 | `.claude/database-redis.md` | Architecture source — DB, Redis, safety rules |
 | `.claude/testing.md` | Architecture source — test standards, co-location |
-| `docs/architecture/routing-and-file-structure.md` | Routing and file structure |
+| `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure |
 | `docs/standards/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
 | `.agents/skills/review-story/SKILL.md` | Reference for question batching patterns |

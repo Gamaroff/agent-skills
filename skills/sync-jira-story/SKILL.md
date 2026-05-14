@@ -47,10 +47,14 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 
 ## Prerequisites
 
+### Resolve paths
+
+Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). Path references below substitute this env var.
+
 ### Required Files
 
 - A story markdown file at:
-  `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
+  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
 - The story **MUST** have `jira_epic` in its frontmatter (e.g. `jira_epic: "PROJ-14"`).
   Run `/sync-jira-epic` on the parent epic first if missing. The script **exits with an error** if absent.
 - Optionally: `epic_source` pointing to the parent epic file for Bitbucket link generation.
@@ -89,7 +93,7 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 
 ```yaml
 title: 'Story 1.2: Wire up new auth middleware'
-epic_source: 'docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md'
+epic_source: '${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md'
 jira_epic: "PROJ-14"                 # REQUIRED
 story_type: 'feature_enhancement'
 priority: 'high'
@@ -107,13 +111,13 @@ due_date: '2026-05-15'
 ### 1. Identify the Story File
 
 ```
-docs/prd/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
+${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
 ```
 
 To find stories that have **not yet been synced** (no `jira_key`):
 
 ```bash
-grep -L 'jira_key:' $(find docs/prd -path '*/stories/*/story.*.md')
+grep -L 'jira_key:' $(find "$PRD_ROOT" -path '*/stories/*/story.*.md')
 ```
 
 ### 2. Ensure `jira_epic` Is Set

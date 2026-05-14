@@ -80,12 +80,14 @@ npm install -g @kayvan/markdown-tree-parser
 
 **Usage:**
 
+First source `references/resolve-paths.sh` to populate `${PRD_ROOT}` and `${ARCH_ROOT}` (defaults: `docs/prd`, `docs/architecture`).
+
 ```bash
-# For PRD
-md-tree explode docs/prd.md docs/prd
+# For PRD — explode the monolithic PRD into the configured sharded location
+md-tree explode docs/prd.md "$PRD_ROOT"
 
 # For Architecture
-md-tree explode docs/architecture.md docs/architecture
+md-tree explode docs/architecture.md "$ARCH_ROOT"
 
 # General
 md-tree explode [source-document] [destination-folder]
@@ -259,7 +261,7 @@ User: "Split docs/prd.md into smaller files"
 
 → shard-prd activates
 → Checks skills-config.yaml for markdownExploder setting (default: true)
-→ Runs: md-tree explode docs/prd.md docs/prd
+→ Runs: md-tree explode docs/prd.md "$PRD_ROOT"
 → Success - 8 files created
 → Reports results
 ```

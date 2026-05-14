@@ -65,6 +65,10 @@ Activate this skill when:
 
 ## ⚠️ CRITICAL EXECUTION RULES ⚠️
 
+### Resolve paths first
+
+Source `references/resolve-paths.sh` (bundled from `shared/resources/resolve-paths.sh`) to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). The `sprint-status.yaml` update step below uses `${PRD_ROOT}`; task locations under `docs/tasks/` are fixed.
+
 ### Documentation-Only Scope — Do NOT Implement
 
 This skill produces **task documentation and the co-located plan file only**. It MUST NOT perform, begin, or scaffold the implementation work that the task describes.
@@ -83,7 +87,7 @@ This skill produces **task documentation and the co-located plan file only**. It
 - ✅ The task directory `docs/tasks/task.[ID].[name]/`
 - ✅ `task.[ID].[name].md` (task doc)
 - ✅ `task.[ID].plan.[name].md` (plan doc — MUST be co-located in the task directory above)
-- ✅ `docs/prd/sprint-status.yaml` status field update (step 5)
+- ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (step 5)
 - ✅ Tracker issue creation via `gh` / Jira API (step 4.5)
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
@@ -484,7 +488,7 @@ Actions:
 
 1. Task document created at `docs/tasks/task.[ID].[name]/task.[ID].[name].md`
 2. Plan file created at `docs/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
-3. If `docs/prd/sprint-status.yaml` exists, update it:
+3. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this task's ID/key
    - Update its status to `ready-for-dev`
