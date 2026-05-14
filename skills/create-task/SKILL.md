@@ -67,7 +67,7 @@ Activate this skill when:
 
 ### Resolve paths first
 
-Source `references/resolve-paths.sh` (bundled from `shared/resources/resolve-paths.sh`) to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). The `sprint-status.yaml` update step below uses `${PRD_ROOT}`; task locations under `docs/tasks/` are fixed.
+Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). The `sprint-status.yaml` update step below uses `${PRD_ROOT}`; task locations under `docs/tasks/` are fixed.
 
 ### Documentation-Only Scope — Do NOT Implement
 
