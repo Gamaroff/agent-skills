@@ -41,15 +41,12 @@ Before step 1:
 - `skills-config.yaml` at repo root with at least:
 
   ```yaml
-  prd:
-    prdSharded: true
-    prdShardedLocation: docs/prd
-    epicFilePattern: "*/epics/epic.{n}.*.md"
   architecture:
     architectureSharded: true
     architectureShardedLocation: docs/architecture
-  devStoryLocation: nested
   ```
+
+  PRD location (`docs/prd/`) and story layout (nested inside epic) are [fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable).
 
 - `docs/epic-registry.md` exists (empty registry — `create-epic` and `epic-registry-manager` will populate it).
 - `develop` branch created from `main`.

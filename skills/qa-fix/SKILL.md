@@ -314,16 +314,7 @@ Before starting fixes:
 4. Locate story file using the nested pattern: glob `{devStoryNestedPattern}/**/story.{epic}.{story}.*.md` — this searches the full nested epic structure. If `devStoryNestedPattern` is not set in config, default to `docs/prd/**/epics/*/stories`. HALT if story not found → ask user for path.
 5. HALT if story not found → ask for correct story id/path
 
-**Default Configuration Values** (used if `skills-config.yaml` not found):
-
-```yaml
-qa:
-  qaLocation: docs/qa
-
-# Stories stored within epic directories (nested within epics)
-devStoryLocation: nested
-devStoryNestedPattern: "docs/prd/**/epics/*/stories"
-```
+PRD/epic/story locations and QA artifact co-location are fixed conventions — not configurable. See [docs/reference/configuration.md](../../docs/reference/configuration.md#fixed-conventions-not-configurable). Stories nest inside their epic at `docs/prd/**/epics/*/stories`; QA artifacts live alongside the story.
 
 ### Step 1: Collect QA Findings
 

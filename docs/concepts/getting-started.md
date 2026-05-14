@@ -203,18 +203,11 @@ Repeat for each skill you want. The packager auto-bundles shared resources, so e
 At your project root, place a minimal config. For a typical story-driven project:
 
 ```yaml
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
-
-devStoryLocation: nested   # stories live inside their epic directory
-
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 ```
 
-QA artifacts (review reports, gate files, DoD) are co-located with the story/task — no configuration needed. Full schema and key reference: [`../reference/configuration.md`](../reference/configuration.md).
+PRD location (`docs/prd/`) and story layout (nested inside epic) are [fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable), not configurable. QA artifacts are co-located with the story/task — no configuration needed. Full schema and key reference: [`../reference/configuration.md`](../reference/configuration.md).
 
 ## 3. Create the registries
 

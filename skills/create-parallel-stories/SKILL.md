@@ -67,26 +67,22 @@ Epic 1: User Authentication
 
    > "`skills-config.yaml` not found. Create this file to customize story locations, or continue with default settings."
 
-3. Extract configurations (with defaults if file missing):
-   - `devStoryLocation` - Story storage mode: `nested` (default) means stories are stored within epic directories
-   - `prd.*` - PRD structure and locations (default: `prdSharded: true`, `prdShardedLocation: docs/prd`)
+3. Extract configurations:
    - `architecture.*` - Architecture document settings (default: `architectureSharded: true`, `architectureShardedLocation: docs/architecture`)
+
+   PRD/epic/story locations are fixed conventions (see docs/reference/configuration.md):
+   - PRDs: `docs/prd/`
+   - Epics: `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+   - Stories: nested at `{epic-dir}/stories/`
+   - QA artifacts: co-located with the story.
 
 **Default Configuration Values** (used if `skills-config.yaml` not found):
 
 ```yaml
 markdownExploder: true
-qa:
-  qaLocation: docs/qa
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
-# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
-devStoryLocation: nested
 devDebugLog: .ai/debug-log.md
 ```
 
@@ -109,7 +105,7 @@ devDebugLog: .ai/debug-log.md
 #### 1.1 Identify Current Epic and Story Dependencies
 
 1. **Locate Epic Files**
-   - Based on `prdSharded` configuration
+   - Look under `docs/prd/{domain}/{feature}/epics/`
    - Identify the target epic for parallel story creation
 
 2. **Analyze Epic Requirements**

@@ -32,7 +32,7 @@ docs/prd/
 docs/prd/auth/login-flow/epics/epic.178.feature-ui/stories/story.178.1.login-form/story.178.1.login-form.md
 ```
 
-This layout requires `devStoryLocation: nested` in `skills-config.yaml`. For flat layout see [Configuration](../reference/configuration.md#story-layout-modes).
+Nested story layout is a [fixed convention](../reference/configuration.md#fixed-conventions-not-configurable) — flat layouts are not supported.
 
 ## File naming
 
@@ -111,7 +111,7 @@ Before running `develop-story`, verify:
 - [ ] Story file exists at the correct nested path under `docs/prd/`
 - [ ] `epic:` frontmatter is set and matches an actual epic directory stem
 - [ ] Parent epic file exists
-- [ ] `prd.prdSharded: true` and `prd.prdShardedLocation` are set in `skills-config.yaml`
+- [ ] Story lives at the nested path under `docs/prd/` (fixed convention)
 - [ ] `status:` is `draft`, `planned`, or `ready-for-development`
 - [ ] Frontmatter `status:` and body `**Status:**` are in sync
 

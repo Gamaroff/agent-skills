@@ -465,24 +465,17 @@ options:
 
 1. Load `skills-config.yaml` from project root
    - If missing, use fallback defaults and notify user
-   - Extract: `devStoryLocation` (default: `nested`), `prd.*`, `architecture.*`
+   - Extract: `architecture.*`
+
+   PRD/epic/story locations are fixed conventions — not read from config. See [Fixed conventions](../../docs/reference/configuration.md#fixed-conventions-not-configurable).
 
 **Default Configuration Values** (used if `skills-config.yaml` not found):
 
 ```yaml
 markdownExploder: true
-qa:
-  qaLocation: docs/qa
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
-# Stories stored within epic directories
-devStoryLocation: nested
-devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 devDebugLog: .ai/debug-log.md
 ```
 
@@ -2338,20 +2331,16 @@ For each technical claim in story:
 Expected configuration in `skills-config.yaml`:
 
 ```yaml
-# Project structure
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
-
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
-
-# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
-devStoryLocation: nested
-devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 ```
+
+PRD/epic/story locations are fixed conventions (see [docs/reference/configuration.md](../../docs/reference/configuration.md#fixed-conventions-not-configurable)):
+
+- PRDs: `docs/prd/`
+- Epics: `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+- Stories: nested at `{epic-dir}/stories/`
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.
 

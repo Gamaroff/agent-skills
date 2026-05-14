@@ -150,22 +150,17 @@ See [Packaging](../contributing/packaging.md) and [Authoring skills](../contribu
 Projects place a `skills-config.yaml` at their root to tune skill behaviour:
 
 ```yaml
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-devStoryLocation: nested # stories nested inside epic directories
 devDebugLog: .ai/debug-log.md
 tracker: jira # explicit platform override
 vcs: bitbucket
 ```
 
-QA artifacts (review reports, gate files, DoD) are co-located with their story/task — no `qa.qaLocation` config is needed.
+PRD, epic, and story locations are [fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable) — `docs/prd/` with stories nested inside their epic directory. QA artifacts are co-located with their story/task — no configuration needed.
 
 ## Further Reading
 

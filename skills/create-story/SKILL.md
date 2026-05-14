@@ -80,19 +80,14 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
    >    Please add and configure core-config.yaml before proceeding."
 
 3. Extract key configurations:
-   - `devStoryLocation` - Where to save story files
-   - `prd.*` - PRD structure and location settings
    - `architecture.*` - Architecture document settings
    - `workflow.*` - Workflow preferences
+
+   PRD/epic/story locations are fixed conventions — not read from config. See [Fixed conventions](../../docs/reference/configuration.md#fixed-conventions-not-configurable).
 
 **Fallback Defaults** (if config file doesn't exist but user approves proceeding):
 
 ```yaml
-devStoryLocation: nested  # Stories are saved inside the epic's own stories/ subdirectory
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
@@ -115,9 +110,7 @@ architecture:
 
 ### 1.1 Locate Epic Files and Review Existing Stories
 
-1. Based on `prdSharded` from config, locate epic files:
-   - **Sharded**: Use `prdShardedLocation` + `epicFilePattern`
-   - **Monolithic**: Parse sections from main PRD file
+1. Locate epic files at the fixed path `docs/prd/{domain}/{feature}/epics/epic.{N}.*/epic.{N}.*.md`.
 
 2. Look for existing story files inside the epic's `stories/` subdirectory (i.e. `{epic-directory}/stories/`). Load the highest-numbered `story.{epicNum}.{storyNum}.*` file found there.
 
@@ -155,7 +148,7 @@ architecture:
 
 ### 2.1 Extract Story Requirements
 
-1. Read the identified epic file (from `prdShardedLocation` or PRD sections)
+1. Read the identified epic file (at `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`)
 2. Extract for this specific story:
    - Story title and description
    - Acceptance criteria (numbered list)
@@ -539,7 +532,7 @@ After collecting tasks/subtasks and dev notes, generate a co-located implementat
 
 **File**: `story.[N].[M].plan.[descriptive-name].md` — same directory as the story document.
 
-**CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, per `devStoryLocation` config — typically nested under the parent epic directory).**
+**CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, nested under the parent epic directory).**
 
 - ❌ NEVER write the plan to `~/.claude/plans/`, `~/.agents/plans/`, `/tmp/`, the repo root, or any other shared/agent-scratch location.
 - ❌ NEVER leave a plan in `~/.claude/plans/` (Claude Code plan-mode default) and link to it from the story — it is outside the repo, invisible to teammates, and not version-controlled.
@@ -856,19 +849,13 @@ This skill implements rigorous safeguards against AI hallucination:
 Expected configuration structure:
 
 ```yaml
-# Project structure
-# Stories are saved inside each epic's own stories/ subdirectory — NOT in a global docs/stories/ folder.
-# Path pattern: {epic-directory}/stories/story.{N}.{M}.{title}/story.{N}.{M}.{title}.md
-devStoryLocation: nested
-devDebugLog: .ai/debug-log.md
+# PRD/epic/story locations are fixed conventions (see docs/reference/configuration.md):
+#   PRDs:    docs/prd/
+#   Epics:   docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
+#   Stories: nested at {epic-dir}/stories/story.{E}.{S}.{title}/story.{E}.{S}.{title}.md
+# These are NOT configurable.
 
-# PRD configuration
-prd:
-  prdFile: docs/prd.md
-  prdVersion: v4
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
+devDebugLog: .ai/debug-log.md
 
 # Architecture configuration
 architecture:

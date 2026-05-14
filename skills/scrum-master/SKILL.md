@@ -112,17 +112,9 @@ Systematic response to project pivots, blockers, or requirement changes:
 This skill expects a configuration file at `skills-config.yaml` (in project root) that defines:
 
 ```yaml
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md' # Note: Epic numbers are globally unique (see /docs/epic-registry.md)
-
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
-
-# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
-devStoryLocation: nested
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
@@ -130,27 +122,21 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/source-tree.md
 ```
 
-If this file doesn't exist, the skill will use sensible defaults:
+PRD/epic/story locations are fixed conventions (see [docs/reference/configuration.md](../../docs/reference/configuration.md#fixed-conventions-not-configurable)):
 
-- Stories: Stored within epic directories at `{epicPath}/stories/`
-- Epics: `docs/prd/{category}/{component}/epics/`
+- PRDs: `docs/prd/`
+- Epics: `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md` — epic numbers globally unique (see `docs/epic-registry.md`)
+- Stories: nested at `{epic-dir}/stories/story.{E}.{S}.{name}/`
+- QA artifacts: co-located with the story (no `qa.qaLocation` key)
 - Architecture: `docs/architecture/`
 
 **Default Configuration Values** (used if `skills-config.yaml` not found):
 
 ```yaml
 markdownExploder: true
-qa:
-  qaLocation: docs/qa
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
   architectureSharded: true
   architectureShardedLocation: docs/architecture
-# Stories stored within epic directories
-devStoryLocation: nested
 devDebugLog: .ai/debug-log.md
 ```
 

@@ -2237,14 +2237,10 @@ This traceability feeds into quality gates:
 ### Expected Configuration
 
 
-All file locations should be defined in skill resources or explicit file references:
+Story location and QA artifact co-location are fixed conventions (see [docs/reference/configuration.md](../../docs/reference/configuration.md#fixed-conventions-not-configurable)):
 
-```yaml
-qa:
-  qaLocation: 'docs/qa' # Base directory for QA files
-devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/
-devStoryNestedPattern: "docs/prd/**/epics/*/stories" # Nested story glob pattern
-```
+- Stories: nested at `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`
+- QA artifacts (review report, NFR, traceability, gate, DoD): co-located with the story file. No `qa.qaLocation` key.
 
 ### File Naming Conventions (Updated 2025-12-09)
 

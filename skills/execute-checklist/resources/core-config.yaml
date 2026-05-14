@@ -1,12 +1,7 @@
 markdownExploder: true
-qa:
-  qaLocation: docs/qa
-prd:
-  prdFile: docs/prd.md
-  prdVersion: v4
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: "**/epics/epic.{n}.*/epic.{n}.*.md"
+# PRD/epic/story locations are fixed conventions — not configurable.
+# PRDs live at docs/prd/. Stories nest at {epic-dir}/stories/.
+# QA artifacts are co-located with the story (no qa.qaLocation key).
 architecture:
   architectureFile: docs/architecture.md
   architectureVersion: v4
@@ -18,4 +13,3 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
 devDebugLog: .ai/debug-log.md
-devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/
