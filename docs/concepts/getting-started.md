@@ -10,6 +10,8 @@ Before starting, confirm you have:
 
 - **Node ≥ 20** — `node --version`
 - **git** — `git --version`
+- **jq** — `jq --version` (required by hook installer and Bitbucket scripts — `brew install jq` / `apt install jq`)
+- **curl** — `curl --version` (required by Bitbucket scripts — pre-installed on most systems)
 
 ### Platform auth
 
@@ -24,6 +26,53 @@ Skills auto-detect your platform via `skills-config.yaml` + env vars + git remot
 `project.yml` is GitHub-only — it carries GitHub project-board metadata. Bitbucket/Jira users skip it.
 
 Task quickstart still needs VCS auth (PR creation) but can skip tracker auth via `SKIP_TRACKER=1`. Story quickstart needs all of the above for the platform combo you picked.
+
+### Persisting env vars
+
+Place credentials in a `.env` file at your project root (add `.env` to `.gitignore`) and load with `source .env`, or export them from your shell profile (`~/.zshrc` / `~/.bashrc`). Skills read from the shell environment — there is no separate secrets store.
+
+**GitHub** — no env vars needed; auth is handled by the `gh` CLI:
+
+```bash
+gh auth login
+```
+
+**Jira** (GitHub+Jira or Bitbucket+Jira):
+
+| Variable | Required | Description |
+|---|---|---|
+| `JIRA_URL` | ✅ | Jira instance URL, e.g. `https://yourorg.atlassian.net` |
+| `JIRA_USER_EMAIL` | ✅ | Email associated with your Jira account |
+| `JIRA_API_TOKEN` | ✅ | API token — generate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `JIRA_PROJECT_KEY` | ✅ | Project key, e.g. `MYPROJ` — shown in Jira next to the project name |
+| `JIRA_BOARD_ID` | ⚠️ Scrum only | Board ID for backlog placement; skipped silently on Kanban boards |
+
+```bash
+export JIRA_URL=https://yourorg.atlassian.net
+export JIRA_USER_EMAIL=you@example.com
+export JIRA_API_TOKEN=your-api-token
+export JIRA_PROJECT_KEY=MYPROJ
+export JIRA_BOARD_ID=1          # Scrum boards only
+```
+
+**Bitbucket** (Bitbucket+Jira):
+
+| Variable | Required | Description |
+|---|---|---|
+| `BITBUCKET_USERNAME` | ✅ | Your Bitbucket username |
+| `BITBUCKET_APP_PASSWORD` | ✅ | App password — generate at Bitbucket → Settings → App passwords |
+| `BITBUCKET_REPO_URL` | optional | Override auto-detected repo base URL (rarely needed) |
+
+```bash
+export BITBUCKET_USERNAME=your-username
+export BITBUCKET_APP_PASSWORD=your-app-password
+```
+
+**Escape hatch:**
+
+| Variable | Effect |
+|---|---|
+| `SKIP_TRACKER=1` | Skip all remote tracker calls (GitHub Issues / Jira). Local files and registries still written. Useful offline or for planning-only runs. |
 
 ## 1. Install the skills
 
@@ -47,6 +96,28 @@ npx skills add --list
 **Re-running the same command updates skills** — installs are idempotent and overwrite the existing skill directory with the latest version.
 
 Restart your agent (e.g. Claude Code) in the project dir after install so it picks up `.agents/skills/`.
+
+### 1b. Install pipeline hooks (one-time per project)
+
+The `develop-task` and `develop-story` pipelines run hands-free when three Claude Code hooks are registered in `.claude/settings.json`. Without the `Stop` hook the orchestrator relies on prose-level rules that fail under context pressure — **strongly recommended**.
+
+```bash
+bash .agents/skills/develop-task/scripts/install-hooks.sh
+```
+
+This single script covers both pipelines. It is idempotent (safe to re-run), preserves any existing `settings.json` content, and requires `jq`.
+
+| Hook | Purpose |
+|------|---------|
+| `PreCompact` | Graceful pause before context compaction |
+| `Stop` | Force continuation if pipeline stops mid-run |
+| `PostToolUse` | Auto-advance lock + inject next-step banner on Skill return |
+
+Preview what it would change without writing:
+
+```bash
+bash .agents/skills/develop-task/scripts/install-hooks.sh --dry-run
+```
 
 ### Option B — clone and work in the source repo (skill authors)
 
