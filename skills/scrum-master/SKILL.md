@@ -109,12 +109,15 @@ Systematic response to project pivots, blockers, or requirement changes:
 
 ## Configuration Requirements
 
+**Resolve paths first.** Source `shared/resources/resolve-paths.sh` to populate `${PRD_ROOT}` and `${ARCH_ROOT}` env vars. Defaults are `docs/prd` and `docs/architecture`. All path operations in this skill use these env vars.
+
 This skill expects a configuration file at `skills-config.yaml` (in project root) that defines:
 
 ```yaml
+prd:
+  prdShardedLocation: docs/prd            # ${PRD_ROOT}
 architecture:
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
+  architectureShardedLocation: docs/architecture   # ${ARCH_ROOT}
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
@@ -122,22 +125,21 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/source-tree.md
 ```
 
-PRD/epic/story locations are fixed conventions (see [docs/reference/configuration.md](../../docs/reference/configuration.md#fixed-conventions-not-configurable)):
+Both roots are configurable; the *nested* structure under each is fixed (see [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
-- PRDs: `docs/prd/`
-- Epics: `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md` — epic numbers globally unique (see `docs/epic-registry.md`)
+- PRDs live under `${PRD_ROOT}/`
+- Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md` — epic numbers globally unique (see `docs/epic-registry.md`)
 - Stories: nested at `{epic-dir}/stories/story.{E}.{S}.{name}/`
 - QA artifacts: co-located with the story (no `qa.qaLocation` key)
-- Architecture: `docs/architecture/`
+- Architecture: under `${ARCH_ROOT}/`
 
 **Default Configuration Values** (used if `skills-config.yaml` not found):
 
 ```yaml
-markdownExploder: true
+prd:
+  prdShardedLocation: docs/prd
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-devDebugLog: .ai/debug-log.md
 ```
 
 ## Anti-Hallucination Protocol

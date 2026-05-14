@@ -69,29 +69,30 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 
 **Actions**:
 
+0. **Resolve paths.** Run `source shared/resources/resolve-paths.sh` (or its bundled copy at `references/resolve-paths.sh`). This exports `PRD_ROOT` (default `docs/prd`) and `ARCH_ROOT` (default `docs/architecture`). Use these for every path operation below — examples in this skill show `docs/prd/...` but you must substitute `${PRD_ROOT}/...` against the actual project. Same for architecture paths.
 
-1. Load configuration from skill resources or explicit file references
+1. Load configuration from skills-config.yaml
 2. If configuration does not exist, **HALT** and inform user:
 
-   > "core-config.yaml not found. This file is required for story creation. You can either:
+   > "skills-config.yaml not found. This file is required for story creation. You can either:
    >
    > 1. Copy it from project templates and configure it for your project
    > 2. Create the configuration manually based on the reference structure
-   >    Please add and configure core-config.yaml before proceeding."
+   >    Please add and configure skills-config.yaml before proceeding."
 
 3. Extract key configurations:
    - `architecture.*` - Architecture document settings
    - `workflow.*` - Workflow preferences
 
-   PRD/epic/story locations are fixed conventions — not read from config. See [Fixed conventions](../../docs/reference/configuration.md#fixed-conventions-not-configurable).
+   PRD and architecture roots are configurable via `prd.prdShardedLocation` and `architecture.architectureShardedLocation` — resolved into `${PRD_ROOT}` / `${ARCH_ROOT}` in Step 0.0. Nested structure under each root is fixed. See [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 **Fallback Defaults** (if config file doesn't exist but user approves proceeding):
 
 ```yaml
+prd:
+  prdShardedLocation: docs/prd
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-  architectureVersion: v4
 ```
 
 > **CRITICAL — Story File Location**: Stories are **always** saved inside the `stories/` subdirectory of the epic directory that was provided as input (or identified in Step 1). The path is:
@@ -197,12 +198,7 @@ If a previous story exists (e.g., creating 2.3, so 2.2 exists):
 
 ### 3.1 Determine Architecture Reading Strategy
 
-- **If `architectureVersion: >= v4` and `architectureSharded: true`**:
-  - Read `{architectureShardedLocation}/index.md` first
-  - Follow structured reading order based on story type (see 3.2)
-
-- **Else** (monolithic architecture):
-  - Use `architectureFile` and read relevant sections
+Read `${ARCH_ROOT}/index.md` (or `${ARCH_ROOT}/README.md`) first if present, then follow the structured reading order below.
 
 ### 3.2 Read Architecture Documents Based on Story Type
 
@@ -851,18 +847,15 @@ Expected configuration structure:
 ```yaml
 # PRD/epic/story locations are fixed conventions (see docs/reference/configuration.md):
 #   PRDs:    docs/prd/
-#   Epics:   docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
+#   Epics:   ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
 #   Stories: nested at {epic-dir}/stories/story.{E}.{S}.{title}/story.{E}.{S}.{title}.md
-# These are NOT configurable.
+# PRD and architecture roots are configurable; the nested structure is fixed.
 
-devDebugLog: .ai/debug-log.md
+prd:
+  prdShardedLocation: docs/prd        # ${PRD_ROOT}
 
-# Architecture configuration
 architecture:
-  architectureFile: docs/architecture.md
-  architectureVersion: v4
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
+  architectureShardedLocation: docs/architecture  # ${ARCH_ROOT}
 
 # Always-load files for developers
 devLoadAlwaysFiles:

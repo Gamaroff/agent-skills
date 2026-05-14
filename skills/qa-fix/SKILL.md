@@ -308,13 +308,11 @@ Before starting fixes:
 
    > "`skills-config.yaml` not found. Create this file to customize paths, or continue with default settings."
 
-3. Resolve paths (with defaults if file missing):
-   - `qa_root`: `qa.qaLocation` (default: `docs/qa`)
-   - Story location: `nested` means stories are stored within epic directories at `{epicPath}/stories/`
-4. Locate story file using the nested pattern: glob `{devStoryNestedPattern}/**/story.{epic}.{story}.*.md` — this searches the full nested epic structure. If `devStoryNestedPattern` is not set in config, default to `docs/prd/**/epics/*/stories`. HALT if story not found → ask user for path.
+3. Resolve paths: source `shared/resources/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). QA artifacts are co-located with the story (no `qa.qaLocation` key).
+4. Locate story file via glob `${PRD_ROOT}/**/epics/*/stories/**/story.{epic}.{story}.*.md` — this searches the full nested epic structure. HALT if not found → ask user for path.
 5. HALT if story not found → ask for correct story id/path
 
-PRD/epic/story locations and QA artifact co-location are fixed conventions — not configurable. See [docs/reference/configuration.md](../../docs/reference/configuration.md#fixed-conventions-not-configurable). Stories nest inside their epic at `docs/prd/**/epics/*/stories`; QA artifacts live alongside the story.
+The PRD root is configurable; the nested structure under it and QA-artifact co-location are fixed (see [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)).
 
 ### Step 1: Collect QA Findings
 

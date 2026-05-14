@@ -463,20 +463,21 @@ options:
 
 **Actions**:
 
+0. **Resolve paths.** Source `shared/resources/resolve-paths.sh` (or `references/resolve-paths.sh`) to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). All path operations below use these env vars.
+
 1. Load `skills-config.yaml` from project root
    - If missing, use fallback defaults and notify user
    - Extract: `architecture.*`
 
-   PRD/epic/story locations are fixed conventions — not read from config. See [Fixed conventions](../../docs/reference/configuration.md#fixed-conventions-not-configurable).
+   PRD and architecture roots are configurable; nested structure under each is fixed. See [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 **Default Configuration Values** (used if `skills-config.yaml` not found):
 
 ```yaml
-markdownExploder: true
+prd:
+  prdShardedLocation: docs/prd
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-devDebugLog: .ai/debug-log.md
 ```
 
 2. Load the story document directly using the Read tool — this is the primary artifact and must be in main context.
@@ -2331,15 +2332,16 @@ For each technical claim in story:
 Expected configuration in `skills-config.yaml`:
 
 ```yaml
+prd:
+  prdShardedLocation: docs/prd
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
 ```
 
-PRD/epic/story locations are fixed conventions (see [docs/reference/configuration.md](../../docs/reference/configuration.md#fixed-conventions-not-configurable)):
+Both roots are configurable; nested structure is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
-- PRDs: `docs/prd/`
-- Epics: `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+- PRDs live under `${PRD_ROOT}/`
+- Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
 - Stories: nested at `{epic-dir}/stories/`
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.

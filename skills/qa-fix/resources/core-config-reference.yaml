@@ -1,33 +1,24 @@
 # Core Configuration Reference
 # This is a reference showing the structure and purpose of each configuration key.
-# Always read the actual configuration from skill resources or explicit file references to get current values.
+# Always read the actual configuration from skills-config.yaml at project root.
+#
+# Resolve paths first:
+#   source shared/resources/resolve-paths.sh
+#   # exports PRD_ROOT (default: docs/prd) and ARCH_ROOT (default: docs/architecture)
 
-markdownExploder: true # Markdown processing flag
-
-qa:
-  qaLocation: docs/qa # QA artifacts root directory (gates/, assessments/)
-
-# PRD/epic/story locations are fixed conventions — not configurable.
-# PRDs live at docs/prd/. Epics live at docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md.
-# Stories nest at {epic-dir}/stories/story.{E}.{S}.{name}/.
+prd:
+  prdShardedLocation: docs/prd  # ${PRD_ROOT} — configurable
 
 architecture:
-  architectureFile: docs/architecture.md # Monolithic architecture file
-  architectureVersion: v4 # Architecture schema version
-  architectureSharded: true # Architecture is sharded
-  architectureShardedLocation: docs/architecture # Directory containing architecture docs
-
-customTechnicalDocuments: null # Custom doc references (optional)
+  architectureShardedLocation: docs/architecture  # ${ARCH_ROOT} — configurable
 
 devLoadAlwaysFiles: # Files to load on dev agent activation
   - docs/architecture/concepts/coding-standards.md
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
 
-devDebugLog: .ai/debug-log.md # Dev debug log location
 
-
-# Usage Examples:
-# - Story files: {epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md
+# Usage Examples (substitute ${PRD_ROOT} / ${ARCH_ROOT} for the literals shown):
+# - Epic files:  ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
+# - Story files: {epic-directory}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md
 # - QA artifacts: co-located with the story file (no qa.qaLocation key)
-# - Epic files: docs/prd/{domain}/{feature}/epics/epic.{n}.{name}/epic.{n}.{name}.md
