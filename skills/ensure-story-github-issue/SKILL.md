@@ -11,7 +11,7 @@ type: internal
 This is an **internal sub-routine** called by `create-story` and `review-story`. Do not invoke directly.
 
 **Inputs (set by the calling skill before invoking):**
-- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `docs/prd/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`)
+- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `${PRD_ROOT}/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 - `EPIC_ISSUE_NUM` — parent epic GitHub issue number (integer string, or empty if no parent epic issue exists)
 
 **Output (set by this sub-routine, available to the calling skill):**

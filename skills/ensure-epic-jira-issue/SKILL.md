@@ -12,7 +12,7 @@ This is an **internal sub-routine** called by `review-story`. Do not invoke dire
 
 ## Inputs (set by the calling skill before invoking)
 
-- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `docs/prd/infra/epics/epic.12.payments/epic.12.payments.md`)
+- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `${PRD_ROOT}/infra/epics/epic.12.payments/epic.12.payments.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 - `TRACKER` — set by `references/resolve-platform.sh` in the calling skill (must be `jira` for this sub-routine to act)
 - Env: `JIRA_URL`, plus Atlassian MCP credentials (cloudId derived from `JIRA_URL` hostname)
 

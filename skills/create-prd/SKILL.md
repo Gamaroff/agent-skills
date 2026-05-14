@@ -37,10 +37,12 @@ Activate this skill directly for **brownfield enhancements** to existing project
 
 This skill supports two modes. The mode determines pre-flight checks, template selection, validation depth, and which PRD sections are emitted.
 
+**Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). Output paths below use this env var.
+
 | Mode | Default | Set by | Template | Output path |
 |------|---------|--------|----------|-------------|
-| `brownfield` | yes | direct activation | `brownfield-prd-template` | `docs/prd/[domain]/[feature]/prd.[feature].md` |
-| `greenfield` | no | delegated from `new-product-prd` | `prd-template` | `docs/prd.md` |
+| `brownfield` | yes | direct activation | `brownfield-prd-template` | `${PRD_ROOT}/[domain]/[feature]/prd.[feature].md` |
+| `greenfield` | no | delegated from `new-product-prd` | `prd-template` | `docs/prd.md` (monolithic — sharded into `${PRD_ROOT}` later) |
 
 Throughout this skill, sections marked **(brownfield only)** or **(greenfield only)** apply to the respective mode. Sections without a mode tag run in both.
 
@@ -50,7 +52,7 @@ This skill produces **the PRD document and its associated planning artifacts onl
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
-- ❌ Editing, creating, or deleting any source file outside `docs/prd/` or `docs/prd.md` (and the tracker-issue side effect)
+- ❌ Editing, creating, or deleting any source file outside `${PRD_ROOT}/` or `docs/prd.md` (and the tracker-issue side effect)
 - ❌ Running migrations, codegen, build, lint-fix, or refactor commands
 - ❌ Creating branches, committing, or pushing code changes
 - ❌ Installing/removing dependencies or modifying `package.json`
@@ -59,7 +61,7 @@ This skill produces **the PRD document and its associated planning artifacts onl
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The PRD file (`docs/prd/[domain]/[feature]/prd.[feature].md` for brownfield, `docs/prd.md` for greenfield) and its directory
+- ✅ The PRD file (`${PRD_ROOT}/[domain]/[feature]/prd.[feature].md` for brownfield, `docs/prd.md` for greenfield) and its directory
 - ✅ Tracker issue creation if the workflow includes it
 - ✅ Handoff prompt files (Architect/UX Expert) emitted as part of Step 4
 
@@ -183,7 +185,7 @@ Skip to Step 2 once pre-flight complete.
 
 Before anything else, scan for an existing in-progress PRD for this feature:
 
-- Check `docs/prd/` and subdirectories for any PRD file related to the enhancement being discussed
+- Check `${PRD_ROOT}/` and subdirectories for any PRD file related to the enhancement being discussed
 - If found, read it and check its `stepsCompleted` frontmatter field (or infer completion from section headings)
 - If a PRD is found, determine whether it is incomplete or complete, then report to the user:
 
@@ -221,9 +223,9 @@ Scan the project for existing reference documents before asking the user for any
 
 - `*brief*.md` — Product or feature briefs
 - `*research*.md` — Research or analysis documents
-- `docs/prd/**` — Prior PRD artefacts
+- `${PRD_ROOT}/**` — Prior PRD artefacts
 - `docs/project-context.md` — Project context (loaded automatically)
-- `docs/architecture/**` — Architecture documentation
+- `${ARCH_ROOT}/**` — Architecture documentation
 
 Report findings:
 
@@ -304,7 +306,7 @@ Use create-doc skill with:
 ```
 Use create-doc skill with:
 - Template: brownfield-prd-template (resources/brownfield-prd-tmpl.yaml)
-- Output: docs/prd/[domain]/[feature]/prd.[feature].md
+- Output: ${PRD_ROOT}/[domain]/[feature]/prd.[feature].md
 - Mode: Interactive (mandatory for brownfield)
 ```
 

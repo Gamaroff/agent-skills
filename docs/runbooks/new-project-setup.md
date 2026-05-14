@@ -42,14 +42,12 @@ Before step 1:
 
   ```yaml
   prd:
-    prdSharded: true
     prdShardedLocation: docs/prd
-    epicFilePattern: "*/epics/epic.{n}.*.md"
   architecture:
-    architectureSharded: true
     architectureShardedLocation: docs/architecture
-  devStoryLocation: nested
   ```
+
+  Both roots are configurable (defaults shown). Nested structure under each root is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 - `docs/epic-registry.md` exists (empty registry — `create-epic` and `epic-registry-manager` will populate it).
 - `develop` branch created from `main`.

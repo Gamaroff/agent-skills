@@ -4,6 +4,8 @@ Worked examples of the skills in this repository being applied to real work.
 
 This repo dogfoods itself — the story, epic, PRD, and task pipelines have all been run against it. Task artifacts live in [`docs/tasks/`](../docs/tasks/); PRD, epic, and story artifacts live in [`examples/prd-example/`](./prd-example/), [`examples/epic-examples/`](./epic-examples/), and the canonical story directories under [`docs/prd/onboarding/epics/`](../docs/prd/onboarding/epics/).
 
+> **Path note:** All links below use this repo's default `PRD_ROOT=docs/prd`. In a project with a custom `prd.prdShardedLocation`, mentally substitute your root for `docs/prd/` in any path. See [Configuration](../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
+
 ## Start here: one task end-to-end
 
 [`task.6.create-epic-jira-tracker-path`](../docs/tasks/task.6.create-epic-jira-tracker-path/) is a representative full lifecycle. Walk it in this order:

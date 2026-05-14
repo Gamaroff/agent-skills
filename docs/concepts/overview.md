@@ -151,21 +151,16 @@ Projects place a `skills-config.yaml` at their root to tune skill behaviour:
 
 ```yaml
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-devStoryLocation: nested # stories nested inside epic directories
-devDebugLog: .ai/debug-log.md
 tracker: jira # explicit platform override
 vcs: bitbucket
 ```
 
-QA artifacts (review reports, gate files, DoD) are co-located with their story/task — no `qa.qaLocation` config is needed.
+PRD and architecture roots are configurable (defaults shown). The nested structure under each root (epics, stories, QA co-location) is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 ## Further Reading
 

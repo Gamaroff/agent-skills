@@ -74,21 +74,22 @@ If the hook script is missing, your skills aren't installed yet — run `npx ski
 
 **Symptom:** `create-story` or `develop-story` can't find epics, or writes artifacts to the wrong directory.
 
-**Cause:** `skills-config.yaml` paths don't match your actual repo layout. Common offenders:
+**Cause:** Either the PRD root in `skills-config.yaml` doesn't match where your files actually live, or your nested layout doesn't match the [fixed conventions](./configuration.md#configurable-roots-and-fixed-conventions).
 
-- `prd.prdShardedLocation` points to a path that doesn't exist
-- `devStoryLocation: nested` set on a flat layout (or vice versa)
-- `prd.epicFilePattern` glob doesn't match your epic filenames
-
-**Fix:** open `skills-config.yaml` at your repo root and verify each path resolves:
+**Fix:** verify your configured root and the nested layout:
 
 ```bash
-# Replace placeholders with what your config says
-ls docs/prd                          # prdShardedLocation should be readable
-ls docs/prd/*/epics/epic.*.md        # epicFilePattern should match real files
+# What's the configured PRD root?
+source shared/resources/resolve-paths.sh
+echo "PRD_ROOT=$PRD_ROOT ARCH_ROOT=$ARCH_ROOT"
+
+# Does it exist?
+ls "$PRD_ROOT"                              # base PRD directory
+ls "$PRD_ROOT"/*/epics/epic.*.md            # epic files
+ls "$PRD_ROOT"/*/epics/*/stories            # nested story directories
 ```
 
-Full schema and key reference: [Configuration](./configuration.md). If unsure, re-run the [setup wizard](../concepts/getting-started.md#quick-setup-wizard) — it scaffolds a config that matches the standard layout.
+If the root is wrong, set `prd.prdShardedLocation` in `skills-config.yaml` to the right path. If the *nested* layout is non-standard (e.g. you have a global `docs/stories/` folder), move files onto the convention — skills won't adapt to custom nested layouts.
 
 ## Pipeline halts with "epic frontmatter missing"
 

@@ -27,7 +27,7 @@ One-way sync of a local epic markdown file to Jira. Auto-detects create vs updat
 - **Live priority resolution** — fetches `/rest/api/3/priority` and matches user input against the actual Jira instance, falling back to a built-in synonym map (`critical`→`Highest`, etc.).
 - **Issue type cache** — Jira `Epic` type id is cached to `<repo>/.cache/jira-issuetypes-<PROJECT>.json` for 24h.
 - **Stories Breakdown ADF table** — the markdown `## Stories Breakdown` table is rendered as a real ADF table (header row + data rows) in the Jira description, not raw pipes. Inline markdown links (`[label](url)`) inside cells render as ADF link marks. Escaped pipes (`\|`) in cells are preserved.
-- **PRD path resolution** — `prd_source` frontmatter is resolved through multiple path conventions (`docs/prd/<domain>/<feature>/prd.<feature>.md`, basename match) before giving up.
+- **PRD path resolution** — `prd_source` frontmatter is resolved through multiple path conventions (`${PRD_ROOT}/<domain>/<feature>/prd.<feature>.md`, basename match) before giving up. `${PRD_ROOT}` resolves via `references/resolve-paths.sh` (default: `docs/prd`).
 - **Bullet/ordered lists** — body sections containing `- item` or `1. item` lines render as proper ADF lists, not paragraphs with hard-breaks.
 - **Default-branch Bitbucket URLs** — links use the resolved `origin/HEAD` branch (e.g. `main`) instead of `HEAD`.
 - **HTTP retry** — automatic retry with exponential backoff on 5xx and network errors. 4xx responses fail fast.
@@ -47,10 +47,14 @@ One-way sync of a local epic markdown file to Jira. Auto-detects create vs updat
 
 ## Prerequisites
 
+### Resolve paths
+
+Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). Path references below substitute this env var.
+
 ### Required Files
 
 - An epic markdown file at:
-  `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
+  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
 - Optionally: `prd_source` pointing to the parent PRD file for Bitbucket link generation.
 
 ### Required Environment Variables
@@ -87,7 +91,7 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 
 ```yaml
 title: 'Epic 1: NX Workspace Foundation'
-prd_source: 'docs/prd/build/setup-nx-monorepo/prd.setup-nx-monorepo.md'
+prd_source: 'docs/prd/build/setup-nx-monorepo/prd.setup-nx-monorepo.md'  # literal repo path (substitute ${PRD_ROOT} if custom)
 epic_type: 'foundation'
 priority: 'high'
 estimated_sprints: 2
@@ -104,13 +108,13 @@ due_date: '2026-05-15'
 ### 1. Identify the Epic File
 
 ```
-docs/prd/<domain>/<feature>/epics/epic.<N>.<slug>/epic.<N>.<slug>.md
+${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/epic.<N>.<slug>.md
 ```
 
 To find epics that have **not yet been synced** (no `jira_key`):
 
 ```bash
-grep -L 'jira_key:' $(find docs/prd -path '*/epics/*/epic.*.md' -not -path '*/stories/*')
+grep -L 'jira_key:' $(find "$PRD_ROOT" -path '*/epics/*/epic.*.md' -not -path '*/stories/*')
 ```
 
 ### 2. Optional — Dry Run

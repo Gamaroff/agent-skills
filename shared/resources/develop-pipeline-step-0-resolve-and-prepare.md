@@ -156,6 +156,7 @@ Evaluate the three lite-mode conditions (all three must be true for PIPELINE_MOD
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
+  - Source `shared/resources/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
 Detect whether the doc has a structured criteria table that the QA traceability mapper can consume:
   - For stories: a "## Acceptance Criteria" section with at least one numbered item or AC sub-heading.
@@ -476,10 +477,10 @@ Determine the list of files to pre-load as context for `/develop`. This section 
    - If `LITEMODE_RESULT.skills_config_exists = true` but `always_load_files` is empty: skills-config.yaml has no `devLoadAlwaysFiles` key — fall back to defaults.
    - If `LITEMODE_RESULT.skills_config_exists = false` or Agent 3 failed: use defaults.
 
-2. **Defaults** (when skills-config.yaml absent or Agent 3 failed):
-   - `docs/architecture/concepts/coding-standards.md`
-   - `docs/architecture/concepts/tech-stack.md`
-   - `docs/architecture/concepts/source-tree.md`
+2. **Defaults** (when skills-config.yaml absent or Agent 3 failed) — anchored to `${ARCH_ROOT}` (default `docs/architecture`):
+   - `${ARCH_ROOT}/concepts/coding-standards.md`
+   - `${ARCH_ROOT}/concepts/tech-stack.md`
+   - `${ARCH_ROOT}/concepts/source-tree.md`
 
 3. **For each file in `ALWAYS_LOAD_FILES`**: verify it exists on disk. If missing, log a warning — `"⚠️ Always-load file not found: <path> — skipping"` — and remove it from the list.
 

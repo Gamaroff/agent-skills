@@ -42,7 +42,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The epic file `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md`
+- ✅ The epic file `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md`
 - ✅ `/docs/epic-registry.md` (number reservation per the global numbering rule)
 - ✅ Tracker issue creation if the workflow includes it (GitHub/Jira issue for the epic itself)
 
@@ -88,7 +88,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 - `epic.164.payment-integration.md` (incremented)
 - `epic.163.5.settings-enhancement.md` (use decimals for intermediate epics)
 
-**Location**: `docs/prd/[domain]/[feature]/epics/epic.[number].[descriptive-name]/` (Directory name must exactly match file name)
+**Location**: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[number].[descriptive-name]/` (Directory name must exactly match file name). Resolve `${PRD_ROOT}` from `skills-config.yaml` via `references/resolve-paths.sh` (default: `docs/prd`).
 
 **Naming Rules**:
 
@@ -319,7 +319,7 @@ After generating the epic file, invoke `documentation-standards-validator` to co
 - Filename uses dots as separators (`epic.NUMBER.descriptive-name.md`)
 - All required YAML frontmatter fields are present (epic_number, title, domain, status, priority, estimated_stories, created, target_completion)
 - Status indicator uses the standard icon (✅ 🔄 ⚠️ ❌ 📋)
-- File placed in correct location (`docs/prd/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
+- File placed in correct location (`${PRD_ROOT}/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
 
 ## Key Principles
 

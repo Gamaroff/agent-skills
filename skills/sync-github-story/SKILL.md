@@ -30,10 +30,14 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 
 ## Prerequisites
 
+### Resolve paths
+
+Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). All path operations below use this env var.
+
 ### Required Files
 
 - A story markdown file at:
-  `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
+  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
 - `project.yml` at the repo root with:
   ```yaml
   github:
@@ -53,13 +57,13 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 ### 1. Identify the Story File
 
 ```
-docs/prd/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
+${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
 ```
 
 To find stories that have **not yet been synced** (no `github_issue`):
 
 ```bash
-grep -L 'github_issue:' $(find docs/prd -path '*/stories/*/story.*.md')
+grep -L 'github_issue:' $(find "$PRD_ROOT" -path '*/stories/*/story.*.md')
 ```
 
 ### 2. Source the Platform Resolver and Confirm GitHub
@@ -231,4 +235,4 @@ The full URL is reconstructable from `project.yml` (`owner` + `repo`) and the is
 - GitHub Issues is treated as a **read-only mirror** of the markdown — edit the story file and re-sync; do not edit the issue directly. The skill does not detect or guard against concurrent remote edits (there is no Jira-style `updated` timestamp to anchor against).
 - Status reconciliation is **lossy** going GitHub → markdown: `closed` only tells us the issue is done, not which terminal status (`accepted` vs `cancelled`) the story is in. The frontmatter is authoritative; the skill never writes status back from GitHub.
 - The skill assumes a one-to-one mapping between story files and GitHub issues. If two stories somehow point at the same `github_issue`, both will edit the same issue in turn — clean up manually.
-- For bulk re-sync: iterate over `find docs/prd -path '*/stories/*/story.*.md'` and invoke the skill once per file.
+- For bulk re-sync: iterate over `find "$PRD_ROOT" -path '*/stories/*/story.*.md'` and invoke the skill once per file.

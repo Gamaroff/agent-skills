@@ -11,7 +11,7 @@ Activate when user needs to:
 
 - Create a Jira epic from a local epic markdown file
 - Sync epic documentation to Jira project management
-- Publish epics defined in `docs/prd/*/*/epics/epic.*.md` to Jira
+- Publish epics defined in `${PRD_ROOT}/*/*/epics/epic.*.md` (default `docs/prd/`) to Jira
 - Generate Jira tickets from structured epic documents
 
 **Natural triggers:**
@@ -45,7 +45,7 @@ The following Jira environment variables must be available (will prompt if missi
 2. **Execute the script** with the epic file path:
 
 ```bash
-node .scripts/jira-create-epic.js --file docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md
+node .scripts/jira-create-epic.js --file "$PRD_ROOT/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md"
 ```
 
 ### Environment Variable Check
@@ -122,7 +122,7 @@ The script supports these flags:
 To preview before creating:
 
 ```bash
-node .scripts/jira-create-epic.js --file docs/prd/.../epic.N.name.md --dry-run
+node .scripts/jira-create-epic.js --file "$PRD_ROOT/.../epic.N.name.md" --dry-run
 ```
 
 ## Workflow

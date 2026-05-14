@@ -204,17 +204,16 @@ At your project root, place a minimal config. For a typical story-driven project
 
 ```yaml
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
 
-devStoryLocation: nested   # stories live inside their epic directory
+architecture:
+  architectureShardedLocation: docs/architecture
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 ```
 
-QA artifacts (review reports, gate files, DoD) are co-located with the story/task — no configuration needed. Full schema and key reference: [`../reference/configuration.md`](../reference/configuration.md).
+PRD and architecture roots are configurable (defaults shown). The *nested* layout under each root (epics, stories, QA artifacts) is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions). Full schema: [`../reference/configuration.md`](../reference/configuration.md).
 
 ## 3. Create the registries
 

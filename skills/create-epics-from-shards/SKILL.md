@@ -21,7 +21,7 @@ Activate this skill when:
 
 **Prerequisites:**
 - PRD must be sharded first (using `shard-prd`)
-- Shards exist in PRD root directory (e.g., `docs/prd/system-name/`)
+- Shards exist in PRD root directory (`${PRD_ROOT}/<system-name>/` — `${PRD_ROOT}` resolves to `docs/prd` by default; source `references/resolve-paths.sh` to override)
 - Understanding of system architecture and dependencies
 - **CRITICAL**: Access to epic registry (`/docs/epic-registry.md`) for number allocation
 
@@ -257,7 +257,7 @@ Before creating any epic files, you MUST:
 
 **Epic Directory:**
 ```
-docs/prd/[system-name]/epics/
+${PRD_ROOT}/[system-name]/epics/
 ├── epic.163.core-infrastructure.md
 ├── epic.164.basic-messaging.md
 ├── epic.165.payment-integration.md

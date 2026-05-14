@@ -23,10 +23,10 @@ Natural language triggers:
 **Slash Command Usage:**
 ```bash
 # Using epic directory (auto-discovers epic file)
-/edit-epic docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/
+/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.178.feature-ui/
 
 # Using specific epic file
-/edit-epic docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/epic.178.feature-ui.md
+/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.178.feature-ui/epic.178.feature-ui.md
 
 # Natural language
 "Edit epic 178 to update dependencies"
@@ -78,7 +78,7 @@ When given a file path:
 **Example:**
 
 ```
-Input: docs/prd/.../epics/epic.178.feature-ui/
+Input: ${PRD_ROOT}/.../epics/epic.178.feature-ui/
 Discovers: epic.178.feature-ui.md
 Rejects: story.178.1.search-by-handle.md (if provided)
 ```

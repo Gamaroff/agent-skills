@@ -6,39 +6,48 @@
 
 Projects place a `skills-config.yaml` at the repository root. This file is the single source of truth for paths, layout modes, and shared options the skills read at runtime.
 
+## Configurable roots and fixed conventions
+
+**Two root paths are configurable** (with defaults):
+
+- `prd.prdShardedLocation` — default `docs/prd`
+- `architecture.architectureShardedLocation` — default `docs/architecture`
+
+Skills resolve these via [`shared/resources/resolve-paths.sh`](../../shared/resources/resolve-paths.sh), which exports `${PRD_ROOT}` and `${ARCH_ROOT}`.
+
+**The nested structure under each root is fixed**:
+
+- **PRD discovery.** PRDs live directly under `${PRD_ROOT}` (e.g. `${PRD_ROOT}/onboarding/prd.onboarding.md`).
+- **Epic location.** Epics live at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`.
+- **Story layout.** Stories nest inside their parent epic at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`. Flat layouts are **not supported** — `create-story` will refuse to write outside the epic directory.
+- **Architecture docs.** Coding standards / tech stack / source tree live at `${ARCH_ROOT}/concepts/{coding-standards,tech-stack,source-tree}.md`.
+- **QA artifacts.** Co-located with the story/task — see [QA artifacts are co-located](#qa-artifacts-are-co-located) below.
+
 ## Full schema
 
 ```yaml
+tracker: jira       # optional override — see Platform Detection
+vcs: bitbucket      # optional override — see Platform Detection
+
 prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
+  prdShardedLocation: docs/prd        # root for PRD shard tree
 
 architecture:
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
-  architectureVersion: v4   # optional, default unset
+  architectureShardedLocation: docs/architecture   # root for architecture docs
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-
-devStoryLocation: nested   # "nested" or an absolute repo path like "docs/stories"
-devDebugLog: .ai/debug-log.md
 ```
 
 ## Key reference
 
 | Key | Type | Default | What it controls |
 |---|---|---|---|
-| `prd.prdSharded` | bool | `true` | Whether the PRD is split into one file per level-2 section |
-| `prd.prdShardedLocation` | path | `docs/prd` | Base directory for sharded PRD + epics + stories |
-| `prd.epicFilePattern` | glob | `"*/epics/epic.{n}.*.md"` | How the pipeline locates the parent epic of a story |
-| `architecture.architectureSharded` | bool | — | Whether architecture docs are split per level-2 section. Full spec: [Architecture documents](../standards/architecture-docs.md) |
-| `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for sharded architecture docs. Full spec: [Architecture documents](../standards/architecture-docs.md) |
-| `architecture.architectureVersion` | string | (unset) | Architecture template version selector. Use `v4` for new projects. See [Architecture documents](../standards/architecture-docs.md#architectureversion) |
+| `tracker` | `jira` \| `github` | (auto-detected) | Issue tracker override. See [Platform Detection](../../shared/resources/platform-detection.md) |
+| `vcs` | `github` \| `bitbucket` | (auto-detected from git remote) | VCS override. See [Platform Detection](../../shared/resources/platform-detection.md) |
+| `prd.prdShardedLocation` | path | `docs/prd` | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills. |
+| `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md) |
 | `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
-| `devStoryLocation` | `nested` \| path | `nested` | Story layout mode — see below |
-| `devDebugLog` | path | `.ai/debug-log.md` | Optional pipeline debug log location |
 
 ## QA artifacts are co-located
 
@@ -54,15 +63,6 @@ story directory:
 
 Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
 
-## Story layout modes
-
-| Mode | Story path | Use when |
-|---|---|---|
-| `nested` | `{epic-dir}/stories/story.{E}.{S}.{name}/` | Stories are logically scoped to their epic (recommended) |
-| flat path (e.g. `docs/stories`) | `{flat-path}/story.{E}.{S}.{name}/` | Stories are managed independently of epic directory layout |
-
-When using a flat path, the story's `epic:` frontmatter field is still **required** — it's used for branch targeting and epic-level tracking even though the directory structure is flat.
-
 ## Worked example — typical project
 
 Complete `skills-config.yaml` for an NX-style monorepo with NestJS + Expo:
@@ -72,53 +72,31 @@ Complete `skills-config.yaml` for an NX-style monorepo with NestJS + Expo:
 tracker: jira
 vcs: bitbucket
 
-# Product docs
+# PRD root — nested structure underneath is fixed (see above)
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
 
-# Architecture docs
+# Architecture docs root
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-  architectureVersion: v4
-
-# Story layout — stories live inside their parent epic directory
-devStoryLocation: nested
 
 # Loaded into every pipeline run
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
-
-# Pipeline debug log
-devDebugLog: .ai/debug-log.md
 ```
 
-(QA artifacts are co-located with the story/task and need no configuration — see ["QA artifacts are co-located"](#qa-artifacts-are-co-located) above.)
+(Nested PRD/epic/story layout under `${PRD_ROOT}` is fixed — see [Configurable roots and fixed conventions](#configurable-roots-and-fixed-conventions). QA artifacts are co-located with the story/task and need no configuration — see ["QA artifacts are co-located"](#qa-artifacts-are-co-located) above.)
 
-Greenfield variant (flat story layout, GitHub, no Jira):
-
-```yaml
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
-
-devStoryLocation: docs/stories   # flat, not nested
-
-devLoadAlwaysFiles:
-  - docs/architecture/coding-standards.md
-```
-
-Minimal task-only project (no PRD/epic flow):
+Minimal task-only project (no PRD/epic flow) — relies entirely on defaults:
 
 ```yaml
 devLoadAlwaysFiles:
   - docs/architecture/coding-standards.md
 ```
+
+`PRD_ROOT` and `ARCH_ROOT` resolve to their defaults (`docs/prd`, `docs/architecture`) when the keys are absent.
 
 ## Placeholders used in skill examples
 
@@ -144,7 +122,7 @@ Notes:
 ## See also
 
 - [File naming](../standards/file-naming.md)
-- [Story documents](../standards/story-documents.md) — uses `prd.*` and `devStoryLocation`
+- [Story documents](../standards/story-documents.md) — story directory conventions
 - [Task documents](../standards/task-documents.md) — uses `devLoadAlwaysFiles`, `devDebugLog`
 - [Story Development Runbook](../runbooks/story-development.md)
 - [Task Development Runbook](../runbooks/task-development.md)

@@ -45,7 +45,7 @@ This skill produces **the story document and its co-located plan file only**. It
 - ✅ The story directory `{epic-directory}/stories/story.{E}.{S}.{name}/`
 - ✅ `story.{E}.{S}.{name}.md` (story doc)
 - ✅ `story.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
-- ✅ `docs/prd/sprint-status.yaml` status field update (Step 6.2)
+- ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (Step 6.2)
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
 
@@ -69,34 +69,30 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 
 **Actions**:
 
+0. **Resolve paths.** Run `source references/resolve-paths.sh` (or its bundled copy at `references/resolve-paths.sh`). This exports `PRD_ROOT` (default `docs/prd`) and `ARCH_ROOT` (default `docs/architecture`). Use these for every path operation below — examples in this skill show `docs/prd/...` but you must substitute `${PRD_ROOT}/...` against the actual project. Same for architecture paths.
 
-1. Load configuration from skill resources or explicit file references
+1. Load configuration from skills-config.yaml
 2. If configuration does not exist, **HALT** and inform user:
 
-   > "core-config.yaml not found. This file is required for story creation. You can either:
+   > "skills-config.yaml not found. This file is required for story creation. You can either:
    >
    > 1. Copy it from project templates and configure it for your project
    > 2. Create the configuration manually based on the reference structure
-   >    Please add and configure core-config.yaml before proceeding."
+   >    Please add and configure skills-config.yaml before proceeding."
 
 3. Extract key configurations:
-   - `devStoryLocation` - Where to save story files
-   - `prd.*` - PRD structure and location settings
    - `architecture.*` - Architecture document settings
    - `workflow.*` - Workflow preferences
+
+   PRD and architecture roots are configurable via `prd.prdShardedLocation` and `architecture.architectureShardedLocation` — resolved into `${PRD_ROOT}` / `${ARCH_ROOT}` in Step 0.0. Nested structure under each root is fixed. See [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 **Fallback Defaults** (if config file doesn't exist but user approves proceeding):
 
 ```yaml
-devStoryLocation: nested  # Stories are saved inside the epic's own stories/ subdirectory
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-  architectureVersion: v4
 ```
 
 > **CRITICAL — Story File Location**: Stories are **always** saved inside the `stories/` subdirectory of the epic directory that was provided as input (or identified in Step 1). The path is:
@@ -115,9 +111,7 @@ architecture:
 
 ### 1.1 Locate Epic Files and Review Existing Stories
 
-1. Based on `prdSharded` from config, locate epic files:
-   - **Sharded**: Use `prdShardedLocation` + `epicFilePattern`
-   - **Monolithic**: Parse sections from main PRD file
+1. Locate epic files at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.*/epic.{N}.*.md`.
 
 2. Look for existing story files inside the epic's `stories/` subdirectory (i.e. `{epic-directory}/stories/`). Load the highest-numbered `story.{epicNum}.{storyNum}.*` file found there.
 
@@ -155,7 +149,7 @@ architecture:
 
 ### 2.1 Extract Story Requirements
 
-1. Read the identified epic file (from `prdShardedLocation` or PRD sections)
+1. Read the identified epic file (at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`)
 2. Extract for this specific story:
    - Story title and description
    - Acceptance criteria (numbered list)
@@ -204,12 +198,7 @@ If a previous story exists (e.g., creating 2.3, so 2.2 exists):
 
 ### 3.1 Determine Architecture Reading Strategy
 
-- **If `architectureVersion: >= v4` and `architectureSharded: true`**:
-  - Read `{architectureShardedLocation}/index.md` first
-  - Follow structured reading order based on story type (see 3.2)
-
-- **Else** (monolithic architecture):
-  - Use `architectureFile` and read relevant sections
+Read `${ARCH_ROOT}/index.md` (or `${ARCH_ROOT}/README.md`) first if present, then follow the structured reading order below.
 
 ### 3.2 Read Architecture Documents Based on Story Type
 
@@ -281,7 +270,7 @@ Extract and document:
 
 ### 4.1 Cross-Reference with Project Structure
 
-1. Review `docs/architecture/unified-project-structure.md` (or equivalent)
+1. Review `${ARCH_ROOT}/unified-project-structure.md` (or equivalent)
 2. Verify that story requirements align with:
    - Defined file paths and directories
    - Component location conventions
@@ -442,8 +431,8 @@ Organize Dev Notes by these categories:
 Generate a concrete, step-by-step walkthrough for verifying this story in the running app. This is distinct from automated test design — it is a human-readable smoke test guide.
 
 **Sources to consult** (in priority order):
-1. `docs/architecture/routing-and-file-structure.md` — for navigation paths and screen names
-2. `docs/architecture/concepts/core-workflows.md` — for user flows
+1. `${ARCH_ROOT}/routing-and-file-structure.md` — for navigation paths and screen names
+2. `${ARCH_ROOT}/concepts/core-workflows.md` — for user flows
 3. The story's own acceptance criteria — one verification step per AC
 4. Integration notes in the story (what parent component or screen triggers this feature)
 
@@ -539,7 +528,7 @@ After collecting tasks/subtasks and dev notes, generate a co-located implementat
 
 **File**: `story.[N].[M].plan.[descriptive-name].md` — same directory as the story document.
 
-**CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, per `devStoryLocation` config — typically nested under the parent epic directory).**
+**CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, nested under the parent epic directory).**
 
 - ❌ NEVER write the plan to `~/.claude/plans/`, `~/.agents/plans/`, `/tmp/`, the repo root, or any other shared/agent-scratch location.
 - ❌ NEVER leave a plan in `~/.claude/plans/` (Claude Code plan-mode default) and link to it from the story — it is outside the repo, invisible to teammates, and not version-controlled.
@@ -706,7 +695,7 @@ Review all sections for:
    | 2025-10-30 | 1.0 | Initial draft created by Scrum Master | SM Agent |
    ```
 3. Save the story file to the self-named subdirectory inside the epic's `stories/` folder: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
-4. If `docs/prd/sprint-status.yaml` exists, update it:
+4. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this story's key
    - Update its status from `backlog` → `ready-for-dev`
@@ -856,26 +845,17 @@ This skill implements rigorous safeguards against AI hallucination:
 Expected configuration structure:
 
 ```yaml
-# Project structure
-# Stories are saved inside each epic's own stories/ subdirectory — NOT in a global docs/stories/ folder.
-# Path pattern: {epic-directory}/stories/story.{N}.{M}.{title}/story.{N}.{M}.{title}.md
-devStoryLocation: nested
-devDebugLog: .ai/debug-log.md
+# PRD/epic/story locations are fixed conventions (see docs/reference/configuration.md):
+#   PRDs:    docs/prd/
+#   Epics:   ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
+#   Stories: nested at {epic-dir}/stories/story.{E}.{S}.{title}/story.{E}.{S}.{title}.md
+# PRD and architecture roots are configurable; the nested structure is fixed.
 
-# PRD configuration
 prd:
-  prdFile: docs/prd.md
-  prdVersion: v4
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
+  prdShardedLocation: docs/prd        # ${PRD_ROOT}
 
-# Architecture configuration
 architecture:
-  architectureFile: docs/architecture.md
-  architectureVersion: v4
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
+  architectureShardedLocation: docs/architecture  # ${ARCH_ROOT}
 
 # Always-load files for developers
 devLoadAlwaysFiles:

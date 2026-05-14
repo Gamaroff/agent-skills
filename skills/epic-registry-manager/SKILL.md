@@ -25,7 +25,7 @@ Activate this skill when:
 **Rule**: Epic numbers are globally unique across ALL domains and features.
 
 \`\`\`
-docs/prd/{domain}/{feature}/epics/
+${PRD_ROOT}/{domain}/{feature}/epics/
 ├── epic.163.module-security/
 │   ├── epic.163.module-security.md     ← Epic #163
 │   └── stories/
@@ -55,7 +55,7 @@ Prompt user for:
 - **Domain** (e.g., "ui-domain", "service-domain", "domain-name")
 - **Feature** (e.g., "example-auth", "account", "module-name")
 
-Validate that \`docs/prd/{domain}/{feature}/epics/\` directory exists.
+Validate that \`${PRD_ROOT}/{domain}/{feature}/epics/\` directory exists.
 
 ### Step 3: Validate Directory and File Names
 
@@ -73,12 +73,14 @@ Validate that \`docs/prd/{domain}/{feature}/epics/\` directory exists.
 
 Create nested subdirectory structure:
 
+First source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`).
+
 \`\`\`bash
-mkdir -p docs/prd/{domain}/{feature}/epics/epic.{NUMBER}.{name}/stories/
-touch docs/prd/{domain}/{feature}/epics/epic.{NUMBER}.{name}/epic.{NUMBER}.{name}.md
+mkdir -p "$PRD_ROOT/{domain}/{feature}/epics/epic.{NUMBER}.{name}/stories/"
+touch "$PRD_ROOT/{domain}/{feature}/epics/epic.{NUMBER}.{name}/epic.{NUMBER}.{name}.md"
 \`\`\`
 
-**Example**:
+**Example** (with default `PRD_ROOT=docs/prd`):
 \`\`\`bash
 mkdir -p docs/prd/service-domain/account/epics/epic.323.example-backup/stories/
 touch docs/prd/service-domain/account/epics/epic.323.example-backup/epic.323.example-backup.md

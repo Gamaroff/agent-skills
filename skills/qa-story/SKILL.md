@@ -78,7 +78,7 @@ When given a directory path:
 4. If multiple story files found, use the one matching the directory name
 5. If no story file found, HALT and ask user for the correct path
 
-When given only a story ID (e.g., `story.336.1`) with no path, locate the story directory using the nested pattern: `docs/prd/**/epics/*/stories/story.{epic}.{story}.*`
+When given only a story ID (e.g., `story.336.1`) with no path, locate the story directory using the nested pattern: `${PRD_ROOT}/**/epics/*/stories/story.{epic}.{story}.*`
 
 **QA Artifacts Creation:**
 
@@ -2237,14 +2237,10 @@ This traceability feeds into quality gates:
 ### Expected Configuration
 
 
-All file locations should be defined in skill resources or explicit file references:
+**Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) — the PRD root is configurable. The nested structure under it (and QA artifact co-location) is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
-```yaml
-qa:
-  qaLocation: 'docs/qa' # Base directory for QA files
-devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/
-devStoryNestedPattern: "docs/prd/**/epics/*/stories" # Nested story glob pattern
-```
+- Stories: nested at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`
+- QA artifacts (review report, NFR, traceability, gate, DoD): co-located with the story file. No `qa.qaLocation` key.
 
 ### File Naming Conventions (Updated 2025-12-09)
 

@@ -11,7 +11,7 @@ type: internal
 This is an **internal sub-routine** called by `create-story` and `review-story`. Do not invoke directly.
 
 **Inputs (set by the calling skill before invoking):**
-- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `docs/prd/service-domain/account/epics/epic.163.module-security/epic.163.module-security.md`)
+- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `${PRD_ROOT}/service-domain/account/epics/epic.163.module-security/epic.163.module-security.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 
 **Output (set by this sub-routine, available to the calling skill):**
 - `EPIC_ISSUE_NUM` — the GitHub issue number for the epic (integer string), or empty string on failure

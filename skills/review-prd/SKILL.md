@@ -99,10 +99,12 @@ Before starting the review, resolve the input to a local file path:
 
 **Step 2 — Glob search for PRD by name:**
 
+(First source `references/resolve-paths.sh` to populate `${PRD_ROOT}` — default `docs/prd`.)
+
 Search patterns (try in order, use first match):
 
-1. `docs/prd/**/prd.*{name}*.md`
-2. `docs/prd/**/*{name}*/*.md` (sharded PRD — look for index or primary file)
+1. `${PRD_ROOT}/**/prd.*{name}*.md`
+2. `${PRD_ROOT}/**/*{name}*/*.md` (sharded PRD — look for index or primary file)
 
 **Step 3 — Handle sharded PRDs:**
 
@@ -114,7 +116,7 @@ If no match found: HALT with message:
 ```
 "No PRD found matching '[input]'. Available PRDs:"
 ```
-Then list results of `Glob: docs/prd/**/prd.*.md` and `Glob: docs/prd/**/index.md`.
+Then list results of `Glob: ${PRD_ROOT}/**/prd.*.md` and `Glob: ${PRD_ROOT}/**/index.md`.
 
 ---
 
@@ -177,15 +179,15 @@ Store choice as `output_mode` for Step 11.
    - `.claude/backend-patterns.md`
    - `.claude/database-redis.md`
    - `.claude/testing.md`
-   - `docs/architecture/routing-and-file-structure.md`
+   - `${ARCH_ROOT}/routing-and-file-structure.md`
    - `docs/standards/naming-conventions.md`
    - `.claude/notifications.md` (if PRD touches notifications)
 
 4. **Scan for child epics**:
-   - Glob: `docs/prd/[domain]/[feature]/epics/epic.*/epic.*.md`
+   - Glob: `${PRD_ROOT}/[domain]/[feature]/epics/epic.*/epic.*.md`
 
 5. **Scan for child stories** under each epic found:
-   - Glob: `docs/prd/[domain]/[feature]/epics/epic.*/stories/**/story.*.md`
+   - Glob: `${PRD_ROOT}/[domain]/[feature]/epics/epic.*/stories/**/story.*.md`
 
 6. **Load epic registry**:
    - `docs/epic-registry.md`
@@ -570,7 +572,7 @@ If flagged: recommend splitting into separate PRDs and suggest scope boundaries.
 
 **Option A — Co-located Report**:
 
-Save to: `docs/prd/[domain]/[feature]/prd.[feature]-review-report.md`
+Save to: `${PRD_ROOT}/[domain]/[feature]/prd.[feature]-review-report.md`
 
 **Report structure**:
 
@@ -789,7 +791,7 @@ options:
 | `.claude/backend-patterns.md` | Architecture source — NestJS, API, DI |
 | `.claude/database-redis.md` | Architecture source — DB, Redis, safety rules |
 | `.claude/testing.md` | Architecture source — test standards, co-location |
-| `docs/architecture/routing-and-file-structure.md` | Routing and file structure |
+| `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure |
 | `docs/standards/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
 | `skills/pm-checklist/SKILL.md` | Complementary checklist validation (optional integration) |
 | `skills/review-epic/SKILL.md` | Pattern reference for question batching and scoring |
