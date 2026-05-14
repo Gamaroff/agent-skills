@@ -41,12 +41,13 @@ Before step 1:
 - `skills-config.yaml` at repo root with at least:
 
   ```yaml
+  prd:
+    prdShardedLocation: docs/prd
   architecture:
-    architectureSharded: true
     architectureShardedLocation: docs/architecture
   ```
 
-  PRD location (`docs/prd/`) and story layout (nested inside epic) are [fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable).
+  Both roots are configurable (defaults shown). Nested structure under each root is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 - `docs/epic-registry.md` exists (empty registry — `create-epic` and `epic-registry-manager` will populate it).
 - `develop` branch created from `main`.

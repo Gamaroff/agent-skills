@@ -203,11 +203,17 @@ Repeat for each skill you want. The packager auto-bundles shared resources, so e
 At your project root, place a minimal config. For a typical story-driven project:
 
 ```yaml
+prd:
+  prdShardedLocation: docs/prd
+
+architecture:
+  architectureShardedLocation: docs/architecture
+
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 ```
 
-PRD location (`docs/prd/`) and story layout (nested inside epic) are [fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable), not configurable. QA artifacts are co-located with the story/task — no configuration needed. Full schema and key reference: [`../reference/configuration.md`](../reference/configuration.md).
+PRD and architecture roots are configurable (defaults shown). The *nested* layout under each root (epics, stories, QA artifacts) is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions). Full schema: [`../reference/configuration.md`](../reference/configuration.md).
 
 ## 3. Create the registries
 

@@ -211,15 +211,15 @@ File naming: `epic.[number].[descriptive-name].md`. Check `/docs/epic-registry.m
 Projects place `skills-config.yaml` at the project root. Key settings:
 
 ```yaml
+prd:
+  prdShardedLocation: docs/prd
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-devDebugLog: .ai/debug-log.md
 ```
 
-PRD location (`docs/prd/`) and story layout (nested inside epic) are [fixed conventions](./configuration.md#fixed-conventions-not-configurable), not configurable.
+Both roots are configurable (defaults shown). Nested layout under each root is fixed — see [Configurable roots and fixed conventions](./configuration.md#configurable-roots-and-fixed-conventions).
 
 Platform detection (tracker and VCS) resolves from `skills-config.yaml` → env vars (`JIRA_URL`) → git remote → defaults to GitHub.
 

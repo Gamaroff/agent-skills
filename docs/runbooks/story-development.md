@@ -10,10 +10,14 @@ Use when the change is large enough to need product framing: it lives under a PR
 
 - Project root has a `skills-config.yaml`. Minimum keys used by the story pipeline:
   ```yaml
+  prd:
+    prdShardedLocation: docs/prd
+  architecture:
+    architectureShardedLocation: docs/architecture
   devLoadAlwaysFiles:
     - docs/architecture/concepts/coding-standards.md
   ```
-  PRD location (`docs/prd/`) and story layout (nested inside epic) are [fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable). QA artifacts (review reports, DoD, gate files) are co-located with the story — no `qa.qaLocation` config is needed. Full reference: [`../reference/configuration.md`](../reference/configuration.md).
+  PRD and architecture roots are configurable (defaults shown). Nested layout under `${PRD_ROOT}` is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions). QA artifacts are co-located with the story — no `qa.qaLocation` config is needed.
 - The repo has an **epic registry** at `docs/epic-registry.md`. Epic numbers are globally unique — `create-epic` and `epic-registry-manager` enforce this.
 - Branch hygiene: `develop` exists (story PRs target an epic branch cut from `develop`).
 - Platform detection (GitHub vs Bitbucket vs Jira) is automatic — see [`../../shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).

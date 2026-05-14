@@ -32,7 +32,7 @@ docs/prd/
 docs/prd/auth/login-flow/epics/epic.178.feature-ui/stories/story.178.1.login-form/story.178.1.login-form.md
 ```
 
-Nested story layout is a [fixed convention](../reference/configuration.md#fixed-conventions-not-configurable) — flat layouts are not supported.
+Nested story layout under `${PRD_ROOT}` is a [fixed convention](../reference/configuration.md#configurable-roots-and-fixed-conventions) — flat layouts are not supported. The PRD root itself is configurable (default `docs/prd`).
 
 ## File naming
 
@@ -111,7 +111,7 @@ Before running `develop-story`, verify:
 - [ ] Story file exists at the correct nested path under `docs/prd/`
 - [ ] `epic:` frontmatter is set and matches an actual epic directory stem
 - [ ] Parent epic file exists
-- [ ] Story lives at the nested path under `docs/prd/` (fixed convention)
+- [ ] Story lives at the nested path under `${PRD_ROOT}` (default `docs/prd/`; configurable)
 - [ ] `status:` is `draft`, `planned`, or `ready-for-development`
 - [ ] Frontmatter `status:` and body `**Status:**` are in sync
 

@@ -150,17 +150,17 @@ See [Packaging](../contributing/packaging.md) and [Authoring skills](../contribu
 Projects place a `skills-config.yaml` at their root to tune skill behaviour:
 
 ```yaml
+prd:
+  prdShardedLocation: docs/prd
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-devDebugLog: .ai/debug-log.md
 tracker: jira # explicit platform override
 vcs: bitbucket
 ```
 
-PRD, epic, and story locations are [fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable) — `docs/prd/` with stories nested inside their epic directory. QA artifacts are co-located with their story/task — no configuration needed.
+PRD and architecture roots are configurable (defaults shown). The nested structure under each root (epics, stories, QA co-location) is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 ## Further Reading
 

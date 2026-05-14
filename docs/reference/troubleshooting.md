@@ -74,17 +74,22 @@ If the hook script is missing, your skills aren't installed yet — run `npx ski
 
 **Symptom:** `create-story` or `develop-story` can't find epics, or writes artifacts to the wrong directory.
 
-**Cause:** Your repo layout doesn't match the [fixed conventions](./configuration.md#fixed-conventions-not-configurable). Paths and story layout are hardcoded, not configurable — PRDs must live at `docs/prd/`, epics at `docs/prd/{domain}/epics/epic.{N}.{name}/epic.{N}.{name}.md`, and stories must nest inside the epic directory.
+**Cause:** Either the PRD root in `skills-config.yaml` doesn't match where your files actually live, or your nested layout doesn't match the [fixed conventions](./configuration.md#configurable-roots-and-fixed-conventions).
 
-**Fix:** verify the expected paths resolve:
+**Fix:** verify your configured root and the nested layout:
 
 ```bash
-ls docs/prd                          # base PRD directory
-ls docs/prd/*/epics/epic.*.md        # epic files
-ls docs/prd/*/epics/*/stories        # nested story directories
+# What's the configured PRD root?
+source shared/resources/resolve-paths.sh
+echo "PRD_ROOT=$PRD_ROOT ARCH_ROOT=$ARCH_ROOT"
+
+# Does it exist?
+ls "$PRD_ROOT"                              # base PRD directory
+ls "$PRD_ROOT"/*/epics/epic.*.md            # epic files
+ls "$PRD_ROOT"/*/epics/*/stories            # nested story directories
 ```
 
-If files are elsewhere, move them onto the convention. Skills will not adapt to a custom layout.
+If the root is wrong, set `prd.prdShardedLocation` in `skills-config.yaml` to the right path. If the *nested* layout is non-standard (e.g. you have a global `docs/stories/` folder), move files onto the convention — skills won't adapt to custom nested layouts.
 
 ## Pipeline halts with "epic frontmatter missing"
 

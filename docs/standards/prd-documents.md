@@ -19,7 +19,7 @@ docs/prd/
             └── epic.{N}.{name}/    # see epic-documents.md
 ```
 
-When sharded, the body splits across files in `{feature}/` per level-2 section. The pipeline locates epics at the fixed path `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md` — see [Fixed conventions](../reference/configuration.md#fixed-conventions-not-configurable).
+When sharded, the body splits across files in `{feature}/` per level-2 section. The pipeline locates epics at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`, where `${PRD_ROOT}` is configurable (default `docs/prd`) — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 ## File naming
 
@@ -75,7 +75,7 @@ When a PRD exceeds ~5 epics or ~30 stories, shard it for navigability:
 
 Before running `create-prd` / `new-product-prd`:
 
-- [ ] PRD lives under `docs/prd/` (fixed convention — see [Configuration](../reference/configuration.md#fixed-conventions-not-configurable))
+- [ ] PRD lives under `${PRD_ROOT}` (default `docs/prd/`; configurable via `prd.prdShardedLocation` — see [Configuration](../reference/configuration.md#configurable-roots-and-fixed-conventions))
 - [ ] (Brownfield only) project architecture is documented — see `document-existing-project` SKILL
 - [ ] Stakeholder input gathered for goals, requirements, success criteria
 
