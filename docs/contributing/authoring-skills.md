@@ -26,11 +26,12 @@ Each skill lives in `skills/{skill-name}/`:
 ```
 skills/skill-name/
 ├── SKILL.md          # Required: YAML frontmatter + instructions
-├── skill-name.zip    # Packaged distributable (gitignored — built on demand)
+├── references/       # Shared resources bundled in-place (committed to git)
 ├── scripts/          # Executable scripts for deterministic tasks
-├── references/       # Documentation loaded into context on demand
 └── assets/           # Templates and boilerplate used in output
 ```
+
+`skill-name.zip` is a build artifact (gitignored). See [Packaging](./packaging.md) for zip distribution details.
 
 ## SKILL.md
 
@@ -72,44 +73,79 @@ description: When and how to use this skill
 
 **`name`** must be hyphen-case (lowercase letters, digits, hyphens; no leading/trailing/consecutive hyphens).
 
-## Adding a New Skill (Step-by-Step)
+## Workflows
+
+### Adding a new skill
 
 ```bash
 # 1. Scaffold
 python3 skills/create-skill/scripts/init_skill.py <skill-name> --path skills/
 
 # 2. Edit SKILL.md — frontmatter `name` and `description` are required
+
 # 3. Add supporting files under references/, scripts/, or assets/
+#    For docs shared with other skills, add to shared/resources/ and reference
+#    using the explicit path `shared/resources/<file>` in SKILL.md.
+#    Never use symlinks or relative paths — the bundler won't detect them.
 
-# 4. For docs shared with other skills, add to shared/resources/ and reference
-#    using the explicit path `shared/resources/<file>` in your .md files.
-#    The packager auto-bundles and rewrites these paths — never use symlinks
-#    or relative paths or the packager won't detect them.
-
-# 5. Validate
+# 4. Validate
 python3 skills/create-skill/scripts/quick_validate.py skills/<skill-name>
 
-# 6. Package (canonical: packages all skills)
-npm run package
+# 5. Regenerate the skill catalog
+npm run generate-catalog
 
-# Or package a single skill
-python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
+# 6. Commit — the pre-commit hook handles bundling automatically (see below)
+git add skills/<skill-name>/ docs/reference/skill-catalog.md
+git commit -m "feat(skills): add <skill-name>"
 ```
 
-## Packaging
+### Editing an existing skill
 
-Zips are **build artifacts** — gitignored (`skills/*/*.zip`). Regenerate whenever you need to install or distribute. Do not commit them.
+```bash
+# Edit SKILL.md, scripts/, assets/, or shared/resources/ as needed
 
-| Method | Zip location |
-|---|---|
-| `npm run package` | Inside each skill dir: `skills/my-skill/my-skill.zip` |
-| Direct script, no output-dir | Current working directory: `./my-skill.zip` |
-| Direct script with output-dir | Specified directory |
+# Validate (if you changed SKILL.md frontmatter or shared refs)
+python3 skills/create-skill/scripts/quick_validate.py skills/<skill-name>
 
-`npm run package` is the canonical workflow — it packages every skill in `skills/`.
+# Regenerate catalog (if description changed)
+npm run generate-catalog
 
-See [Packaging](./packaging.md) for full details on what the packager does.
+# Commit — bundling is automatic if shared/resources or SKILL.md was staged
+git add ...
+git commit
+```
 
+### Editing a shared resource
+
+```bash
+# Edit shared/resources/<file>
+
+# Commit — the pre-commit hook detects the staged shared/resources change,
+# runs npm run bundle, and re-stages all affected references/ dirs automatically
+git add shared/resources/<file>
+git commit
+```
+
+## Bundling
+
+`npx skills add` installs skills by copying their directories verbatim from the repo. Skills that reference `shared/resources/` files must have those files resolved into their `references/` directory before the commit lands — otherwise installed skills will have broken paths.
+
+The pre-commit hook handles this automatically. It is wired up via the `prepare` npm script, so a fresh clone just needs:
+
+```bash
+npm install   # runs git config core.hooksPath .githooks
+```
+
+To bundle manually (e.g. after a failed hook or without committing):
+
+```bash
+npm run bundle                          # all skills
+npm run bundle:skill skills/<name>      # one skill
+```
+
+Bundled `references/` files are committed to git — this is intentional.
+
+See [Packaging](./packaging.md) for the full distribution story (in-tree bundle vs zip).
 
 ## Validation
 
@@ -131,14 +167,14 @@ Validation runs automatically during packaging but can be run standalone during 
 See `shared/resources/code-vs-test-validation.md` for the full framework.
 ```
 
-The packager detects this pattern, bundles the file into `references/` inside the zip, and rewrites the path — installed skills are fully self-contained.
+The bundler detects this pattern, copies the file into `references/` inside the skill directory, and rewrites the path — installed skills are fully self-contained.
 
 ## Resource Directory Guide
 
 | Directory | Use for |
 |---|---|
+| `references/` | Shared resources bundled in-place (auto-managed — do not edit manually) |
 | `scripts/` | Executable scripts for deterministic, repeatable tasks |
-| `references/` | Documentation loaded into context on demand |
 | `assets/` | Templates and boilerplate used in output |
 
 ## Best Practices
