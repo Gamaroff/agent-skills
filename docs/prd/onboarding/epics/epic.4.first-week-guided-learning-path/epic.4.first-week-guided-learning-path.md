@@ -2,11 +2,12 @@
 epic_number: 4
 title: "First-Week Guided Learning Path"
 domain: "onboarding"
-status: "📋 Planned"
+status: "✅ Accepted"
 priority: "Medium"
 estimated_stories: 5
 created: 2026-05-11
 target_completion: 2026-06-29
+accepted: 2026-05-14
 prd_source: "docs/prd/onboarding/prd.onboarding.md"
 github_issue: 76
 github_url: "https://github.com/Gamaroff/agent-skills/issues/76"

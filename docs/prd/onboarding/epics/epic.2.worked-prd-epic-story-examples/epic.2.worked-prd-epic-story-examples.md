@@ -2,11 +2,13 @@
 epic_number: 2
 title: "Worked PRD / Epic / Story Examples"
 domain: "onboarding"
-status: "📋 Planned"
+status: "✅ Accepted"
 priority: "Medium"
 estimated_stories: 4
 created: 2026-05-11
 target_completion: 2026-06-22
+accepted: 2026-05-14
+notes: "Story 2.3 (capture-story-messy-path) descoped; remaining 3 stories accepted."
 prd_source: "docs/prd/onboarding/prd.onboarding.md"
 github_issue: 74
 github_url: "https://github.com/Gamaroff/agent-skills/issues/74"

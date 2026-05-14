@@ -2,11 +2,12 @@
 epic_number: 1
 title: "Quickstart & Decision-Tree Entry Point"
 domain: "onboarding"
-status: "📋 Planned"
+status: "✅ Accepted"
 priority: "High"
 estimated_stories: 5
 created: 2026-05-11
 target_completion: 2026-06-08
+accepted: 2026-05-14
 prd_source: "docs/prd/onboarding/prd.onboarding.md"
 github_issue: 73
 github_url: "https://github.com/Gamaroff/agent-skills/issues/73"
