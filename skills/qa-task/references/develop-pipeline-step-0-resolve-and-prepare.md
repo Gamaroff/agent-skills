@@ -602,7 +602,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | ---- | ------ | ------------------ | ----- | -------------------- |
 | 1a. create-epic-branch      | ⏳ Pending | Branch `feature/epic.{N}.*` exists in git | | — |
 | 1b. create-story-branch     | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | | — |
-| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{date}.md` exists (or skip logged) | | — |
+| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged) | | — |
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | | — |
 | 4. create-pr                | ⏳ Pending | PR URL targets `{EPIC_BRANCH}`; issue/tracker comment posted | | — |
 | 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | | — |
@@ -685,7 +685,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 | Step | Status | Required Artifacts | Notes | Subagent summary ref |
 |------|--------|--------------------|-------|----------------------|
 | 1. create-branch | ⏳ Pending | Branch `feature/task.{id}.*` exists in git | | — |
-| 2. review-task | ⏳ Pending | `task.{id}.review.{date}.md` exists (or skip logged) | | — |
+| 2. review-task | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged) | | — |
 | 3. develop | ⏳ Pending | Task status == `Ready for Review` | | — |
 | 4. create-pr | ⏳ Pending | PR URL; issue comment posted | | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted | | — |

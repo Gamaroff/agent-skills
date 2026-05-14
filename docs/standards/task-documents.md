@@ -15,7 +15,7 @@ docs/tasks/
 └── task.{N}.{name}/
     ├── task.{N}.{name}.md                       # main document (human-authored)
     ├── task.{N}.plan.{name}.md                  # implementation plan
-    ├── task.{N}.review.{YYYY-MM-DD}.md          # review report (auto)
+    ├── task.{N}.review.{N}.{name}.md            # review report (auto)
     ├── task.{N}.implementation.{N}.{name}.md    # pipeline report (auto)
     ├── task.{N}.qa.{N}.{name}.md                # QA assessment (auto)
     ├── task.{N}.dod.{N}.{name}.md               # definition of done (auto)
@@ -88,7 +88,7 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 | Artifact | Pattern | Written by | Purpose |
 |---|---|---|---|
 | Plan file | `task.{N}.plan.{name}.md` | `create-task` | Detailed implementation guide |
-| Review report | `task.{N}.review.{YYYY-MM-DD}.md` | `review-task` (Step 2) | Review findings |
+| Review report | `task.{N}.review.{N}.{name}.md` | `review-task` (Step 2) | Review findings |
 | Implementation report | `task.{N}.implementation.{N}.{name}.md` | `develop-task` pipeline | Pipeline run record |
 | QA report | `task.{N}.qa.{N}.{name}.md` | `qa-task` (Step 5) | QA assessment narrative |
 | Definition of Done | `task.{N}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |

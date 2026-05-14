@@ -140,12 +140,12 @@ You should have all 10 artifact types:
 | 2 | `epic.{N}.footer-link.md` | Parent epic |
 | 3 | `story.{N}.1.add-footer-link.md` | Story spec |
 | 4 | `story.{N}.1.plan.add-footer-link.md` | Co-located implementation plan |
-| 5 | `story.{N}.1.review.{date}.md` | Story review report |
-| 6 | `story.{N}.1.implementation.1.*.md` | What was built + pipeline log |
+| 5 | `story.{N}.1.review.1.add-footer-link.md` | Story review report |
+| 6 | `story.{N}.1.implementation.1.add-footer-link.md` | What was built + pipeline log |
 | 7 | PR URL | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
-| 8 | `story.{N}.1.qa.1.*.md` | QA findings + traceability matrix |
-| 9 | `story.{N}.1.gate.1.*.yml` | PASS / CONCERNS / FAIL gate |
-| 10 | `story.{N}.1.dod.1.*.md` | Definition-of-Done checklist + sprint review summary |
+| 8 | `story.{N}.1.qa.1.add-footer-link.md` | QA findings + traceability matrix |
+| 9 | `story.{N}.1.gate.1.add-footer-link.yml` | PASS / CONCERNS / FAIL gate |
+| 10 | `story.{N}.1.dod.1.add-footer-link.md` | Definition-of-Done checklist + sprint review summary |
 
 For an annotated example of what these files look like, see `examples/story-walkthrough/` (pending Epic 2).
 
