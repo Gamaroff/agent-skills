@@ -37,6 +37,7 @@ After those, pick a runbook from the table below as the work in front of you dem
 | [Parallel Stories](./create-parallel-stories.md) | Developing multiple stories under one epic in parallel via Git worktrees. |
 | [Change Management](./change-management.md) | Responding to pivots, blockers, or scope changes mid-project. |
 | [Document Existing Project](./document-existing-project.md) | Generating brownfield architecture docs before adopting the library on an existing codebase. |
+| [Release & Install](./release-and-install.md) | Cutting a versioned release (maintainers) and running the consumer setup wizard to install skills into a project. |
 
 ## Runbook conventions
 
