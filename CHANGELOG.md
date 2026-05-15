@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- **Release automation:** `.github/workflows/release.yml` triggers on `v*.*.*` tag push — runs `npm test`, validates skills via `quick_validate.py`, then creates a GitHub release with auto-generated notes (source tarball attached automatically).
+- **`scripts/release.sh`:** end-to-end semver release script (`--major|--minor|--patch`, `--dry-run`). Confirms clean main branch, runs pre-release checks (`npm test`, `validate:all`, `generate-catalog`), bumps version from latest git tag, moves `[Unreleased]` → `[vX.Y.Z]` in CHANGELOG, commits, tags, and pushes. Verifies `[Unreleased]` has non-empty content before tagging. Portable across BSD/GNU sed (uses awk for multi-line CHANGELOG insert).
+- **`scripts/setup-consumer.sh --update`:** flag that skips the full wizard and downloads only the latest skills release into `.agents/skills/`. For day-to-day skill upgrades after initial setup.
+- **`scripts/setup-consumer.sh` docs scaffold (step 6):** creates `${PRD_DIR}/`, `${ARCH_DIR}/index.md`, and three required always-loaded stubs (`concepts/coding-standards.md`, `concepts/tech-stack.md`, `concepts/source-tree.md`). Honours user-customised paths from `skills-config.yaml`. Idempotent; warns when stubs need filling in.
+- **`SKILLS_VERSION` env var:** consumers can pin `setup-consumer.sh` installs to a specific release tag (e.g. `SKILLS_VERSION=v1.0.0`).
 - **`README.md`:** "Start here" callout block (lines 15–19) — links to decision tree (`docs/concepts/which-path.md`), task quickstart, and story quickstart; visible within the first viewport at 1080p.
 - **Docs (onboarding & rationale):** `docs/concepts/getting-started.md` (install → first command), `docs/concepts/architecture.md` (system view + dependency map + design principles), `docs/reference/glossary.md`, `docs/reference/faq.md` (design rationale), `docs/reference/anti-patterns.md`, `docs/reference/commands.md` (every `/foo` consolidated), `docs/reference/activation-phrases.md`, `docs/contributing/doc-style.md`, `docs/contributing/releases.md`.
 - **CI:** `.github/workflows/docs-link-check.yml` + `.github/markdown-link-check.json` — markdown link checker on every PR touching docs.
@@ -29,6 +34,9 @@ All notable changes to this project will be documented in this file. Format foll
 - `GOVERNANCE.md`, `CITATION.md`, and Copilot agent instructions (`copilot-instructions.md`).
 
 ### Changed
+- **Skill install model:** replaced `npx skills add` (third-party Vercel Labs `skills` npm package, unrelated to this repo) with direct tarball download from this repo's GitHub releases. `setup-consumer.sh` resolves the latest release tag via the GitHub API and downloads from `archive/refs/tags/<tag>.tar.gz`. Manual installs and CI use the same URL pattern.
+- **`docs/contributing/releases.md`, `docs/concepts/getting-started.md`:** rewritten to describe the tag-driven release flow (push `v*.*.*` → workflow creates release → consumers pull pinned tarball). Removed `npx skills add` install commands across `README.md`, `AGENTS.md`, `docs/concepts/quickstart-{task,story}.md`, `docs/runbooks/first-week/day-1-tasks.md`, `docs/reference/troubleshooting.md`, `docs/contributing/{packaging,authoring-skills}.md`, `docs/architecture/concepts/tech-stack.md`, `shared/resources/develop-pipeline-hooks.md`, `skills/develop-{story,task}/scripts/install-hooks.sh`, and example PRD/epic templates.
+- **Pipeline hook installation** in `setup-consumer.sh` step 7 now patches `.claude/settings.json` inline via `jq` rather than delegating to `install-hooks.sh` — breaks the chicken-and-egg between skills install and hook registration.
 - **Docs reorganisation:** `docs/` restructured into audience-driven subdirectories — `concepts/`, `runbooks/`, `reference/`, `standards/`, `contributing/`, `operations/`. Flat docs moved with `git mv` (history preserved): `overview.md` → `concepts/`; `usage.md` → `reference/invocation.md`; `skill-catalog.md` → `reference/`; `creating-skills.md` → `contributing/authoring-skills.md`; `packaging.md`, `evals.md` → `contributing/`; `workflows.md` → `operations/`; `prd.md` → `standards/story-documents.md` (split, see Added); `task.md` → `standards/task-documents.md`; `conventions.md` → `standards/file-naming.md` (split, see Added). `placeholders.md` folded into `reference/configuration.md`. `evals.md` split into `contributing/evals/{README,recipes,reference,secrets}.md`.
 - **`AGENTS.md`:** trimmed duplicated content — file-naming table, status lifecycle, configuration snippet, plan-file-locations, task-registry rules, development pipeline, and evals descriptions now link to canonical homes under `docs/standards/`, `docs/reference/`, `docs/operations/`, and `docs/contributing/`.
 - **`README.md`:** skill-categories list replaced with link to generated `docs/reference/skill-catalog.md` + a short curated featured-starting-points list.
@@ -41,6 +49,9 @@ All notable changes to this project will be documented in this file. Format foll
 - CI workflows disabled to stay within GitHub Free tier action-minute limits.
 
 ### Fixed
+- **`setup-consumer.sh install_skills`:** `cp -r` of a skill directory into an existing target produced a nested `develop-story/develop-story/` directory rather than overwriting. Added `rm -rf` of the target before copy so re-runs and `--update` produce clean overwrites.
+- **`setup-consumer.sh scaffold_docs`:** previously hardcoded `docs/prd/` and `docs/architecture/` even when the user picked custom paths in the wizard, leaving the configured directories empty. Now reads `PRD_DIR`/`ARCH_DIR` from the wizard answers or parses them from an existing `skills-config.yaml`.
+- **`scripts/release.sh` CHANGELOG sed:** original `sed -i.bak 's|...|...\n...|'` corrupted CHANGELOG.md on macOS because BSD sed does not interpret `\n` as newline in replacement strings. Replaced with portable awk-based multi-line insert.
 - **`create-skill`**: validator now handles both quoted and plain (block-scalar) multi-line `description` fields in `SKILL.md` frontmatter.
 
 ### Removed
