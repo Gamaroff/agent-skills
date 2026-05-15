@@ -66,7 +66,31 @@ git pull --rebase
 bash scripts/release.sh --minor
 ```
 
-If `main` has diverged from `develop` (e.g. a hotfix landed on `main`), use a regular merge or rebase `develop` first.
+### After a PR-based merge: sync `develop` with `main`
+
+`gh pr merge --merge` (or "Create a merge commit" in the GitHub UI) creates a merge commit on `main` that `develop` doesn't have. After every PR-based release prep, `develop` is behind `main` by that merge commit. If you skip syncing, the next `develop → main` PR shows surprising diffs or fails the next `--ff-only` merge.
+
+Pick one of:
+
+**Sync after every release** (simplest):
+
+```bash
+git checkout develop
+git pull --rebase                    # in case anything new landed
+git merge --ff-only main             # bring the merge commit back
+git push
+```
+
+**Use squash or rebase merges instead** (avoids the merge commit):
+
+```bash
+# When merging the release-prep PR:
+gh pr merge --rebase                 # OR --squash
+```
+
+Both leave `main` with the same content as `develop` (no extra commit), so no follow-up sync is needed. Choose `--rebase` to preserve develop's commit history on main, or `--squash` for a single commit per release prep.
+
+If `main` has diverged from `develop` for other reasons (e.g. a hotfix landed directly on `main`), use a regular merge or rebase `develop` first.
 
 ## Cutting a release
 
