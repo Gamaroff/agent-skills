@@ -27,7 +27,7 @@ Before cutting a repo release:
 
 This repo uses **`develop`** as the integration branch. Feature work and PRs land on `develop`; **`main`** only receives release-ready code. `scripts/release.sh` enforces this: it refuses to run on any branch except `main`.
 
-The promotion path before each release. First, make sure develop is clean and pushed:
+The promotion path before each release starts by making sure develop is clean and pushed:
 
 ```bash
 git checkout develop
@@ -110,14 +110,14 @@ The GitHub Actions workflow then handles release creation. No manual `gh release
 
 ## Sync `develop` with `main` after release
 
-`release.sh` adds a `chore(release): vX.Y.Z` commit and an annotated tag on `main`, then pushes both. **Develop is now behind `main`** by the chore(release) commit (and, for the PR-based path, also by the merge/rebase/squash commit). This is true regardless of which branch-flow variant you used to advance `main`.
+`release.sh` adds a `chore(release): vX.Y.Z` commit and an annotated tag on `main`, then pushes both. **Develop is now behind `main`** by the chore(release) commit (and, for the PR-based path, also by the PR merge commit — whichever artefact `--merge`, `--rebase`, or `--squash` produced). This is true regardless of which branch-flow variant you used to advance `main`.
 
 Sync develop forward:
 
 ```bash
 git checkout develop
 git pull --rebase        # in case anything new landed on develop while you were running the release
-git merge main           # brings main's commits (and the new tag's commit) into develop
+git merge main           # brings main's commits, including the chore(release) commit, into develop
 git push
 ```
 
