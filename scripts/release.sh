@@ -102,8 +102,17 @@ git fetch --quiet origin main
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main)
 if [[ "$LOCAL" != "$REMOTE" ]]; then
-  err "Local main is not up to date with origin/main"
-  echo "Run: git pull --rebase"
+  err "Local main is not in sync with origin/main"
+  if git merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
+    # origin/main is an ancestor of local — local is ahead
+    echo "Local is ahead of origin/main. Run: git push"
+  elif git merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
+    # local is an ancestor of origin/main — local is behind
+    echo "Local is behind origin/main. Run: git pull --rebase"
+  else
+    # Diverged — neither is an ancestor of the other
+    echo "Local has diverged from origin/main. Reconcile manually (rebase / merge), then re-run."
+  fi
   exit 1
 fi
 ok "Up to date with origin/main"
