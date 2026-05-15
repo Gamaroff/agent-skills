@@ -41,54 +41,19 @@ If this is your first time with agent-skills, work through these in order. Each 
 
 ## Installing Skills
 
-**Setting up a fresh project?** Read **[Getting Started](./docs/concepts/getting-started.md)** first — it covers prerequisites, platform auth, and env var setup. Then run the wizard, which handles install + config + credentials + registries + hooks in one go:
+**Fresh project** — run the setup wizard (platform, credentials, config, registries, hooks, skills in one go):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 ```
 
-Idempotent — safe to re-run later to update credentials or change platform.
-
-If you already have a project set up and just need to add or update skills, use the install commands below.
-
----
-
-**Refresh skills in an already-configured project:**
+**Update skills only** (already configured):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
-`--update` assumes the project has already been through the full wizard. It skips platform/credential/config/hook setup and only downloads the latest GitHub release tarball into `.agents/skills/`. Idempotent: re-run to pull a newer release.
-
-For a **first-time install** in a fresh project, omit `--update` to get the full wizard (see [Getting Started](./docs/concepts/getting-started.md)).
-
-Pin to a specific version with `SKILLS_VERSION`:
-
-```bash
-SKILLS_VERSION=v1.0.0 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
-```
-
-Each skill is self-contained in-tree (shared resources pre-bundled into `references/`), so installs work without cloning the rest of the repo.
-
-**Single skill, manual (from a local clone):**
-```bash
-mkdir -p .agents/skills
-cp -r path/to/agent-skills/skills/<skill-name> .agents/skills/
-```
-
-**All skills (clone + symlink):**
-```bash
-git clone https://github.com/Gamaroff/agent-skills.git
-ln -s "$(pwd)/agent-skills/skills" .agents/skills
-```
-
-**From a packaged zip:**
-```bash
-unzip <skill-name>.zip -d .agents/skills/
-```
-
-Skills activate automatically when compatible agents start — no further configuration needed.
+For version pinning, manual installs, zip installs, and the maintainer release flow, see the [Release & Install runbook](./docs/runbooks/release-and-install.md).
 
 ---
 
@@ -161,6 +126,7 @@ Full documentation under [`docs/`](./docs/README.md):
 | [Workflows](./docs/operations/workflows.md) | Pipeline, sprint cycle, hotfix, parallel dev, change management |
 | [Authoring skills](./docs/contributing/authoring-skills.md) | Authoring guide, file structure, best practices |
 | [Packaging](./docs/contributing/packaging.md) | Distribution, validation, shared resources |
+| [Release & Install](./docs/runbooks/release-and-install.md) | Cutting a release (maintainers) and running the consumer setup wizard |
 | [Evals](./docs/contributing/evals/README.md) | Four-layer test suite, drivers, live tracker scenarios |
 
 ---

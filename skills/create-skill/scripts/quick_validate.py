@@ -10,6 +10,18 @@ import os
 import re
 from pathlib import Path
 
+# ANSI colour helpers — disabled when not a TTY (e.g. CI pipe)
+_USE_COLOR = sys.stdout.isatty()
+
+def _c(code, text):
+    return f"\033[{code}m{text}\033[0m" if _USE_COLOR else text
+
+def green(t):   return _c("32", t)
+def red(t):     return _c("31", t)
+def yellow(t):  return _c("33", t)
+def bold(t):    return _c("1",  t)
+def dim(t):     return _c("2",  t)
+
 def find_repo_root(skill_path):
     """Walk up from skill_path to find the repo root (contains shared/resources/)."""
     path = Path(skill_path).resolve()
@@ -47,7 +59,7 @@ def validate_skill(skill_path):
     frontmatter = match.group(1)
 
     if 'managed-by:' in frontmatter:
-        print("⚠️  Warning: 'managed-by' field found in SKILL.md — this is injected by the packager and should not be authored manually")
+        print(yellow("  ⚠  Warning: 'managed-by' field found in SKILL.md — injected by packager, do not author manually"))
 
     # Check required fields
     if 'name:' not in frontmatter:
@@ -125,15 +137,19 @@ def validate_skill(skill_path):
                 return False, f"shared/resources/{filename} referenced but file does not exist"
 
     for w in warnings:
-        print(f"⚠️  Warning: {w}")
+        print(yellow(f"  ⚠  {w}"))
 
-    return True, "Skill is valid!"
+    return True, None
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
 
+    skill_name = Path(sys.argv[1]).name
     valid, message = validate_skill(sys.argv[1])
-    print(message)
+    if valid:
+        print(green("  ✓ ") + bold(skill_name))
+    else:
+        print(red("  ✗ ") + bold(skill_name) + dim(" — ") + red(message))
     sys.exit(0 if valid else 1)
