@@ -38,7 +38,7 @@
     "eval:develop-story:resume": "node evals/shared/runner.mjs evals/develop-story/smoke/02-resume-mid-loop",
     "eval:all": "for s in evals/create-task/scenarios/*/ evals/create-story/scenarios/*/ evals/develop-task/step-isolation/*/ evals/develop-story/step-isolation/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
     "validate": "python3 skills/create-skill/scripts/quick_validate.py",
-    "validate:all": "for d in skills/*/; do [ -f \"${d}SKILL.md\" ] && python3 skills/create-skill/scripts/quick_validate.py \"$d\" || true; done",
+    "validate:all": "printf '\\033[1mValidating skills…\\033[0m\\n\\n'; pass=0; fail=0; for d in skills/*/; do if [ -f \"${d}SKILL.md\" ]; then if python3 skills/create-skill/scripts/quick_validate.py \"$d\"; then pass=$((pass+1)); else fail=$((fail+1)); fi; fi; done; echo ''; if [ $fail -eq 0 ]; then printf \"  \\033[32m●\\033[0m \\033[1m%d\\033[0m passed  \\033[2m0 failed\\033[0m\\n\" $pass; else printf \"  \\033[32m●\\033[0m \\033[1m%d\\033[0m passed  \\033[31m●\\033[0m \\033[1m%d\\033[0m failed\\n\" $pass $fail; fi; echo ''; [ $fail -eq 0 ]",
     "generate-catalog": "python3 skills/create-skill/scripts/generate_catalog.py",
     "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
     "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py",
