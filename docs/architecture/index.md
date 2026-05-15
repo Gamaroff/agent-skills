@@ -19,7 +19,7 @@ This repository is unusual: it is not an application — it is a **library of sk
 These three files are loaded into every pipeline run via `devLoadAlwaysFiles`:
 
 - [Coding standards](./concepts/coding-standards.md) — conventions for SKILL.md authoring, script style, frontmatter, naming
-- [Tech stack](./concepts/tech-stack.md) — Node 20+, Python 3 scripts, packaging tooling, eval harness
+- [Tech stack](./concepts/tech-stack.md) — Node 22+, Python 3 scripts, packaging tooling, eval harness
 - [Source tree](./concepts/source-tree.md) — where skills, shared resources, docs, evals, and tests live
 
 ## Optional shards

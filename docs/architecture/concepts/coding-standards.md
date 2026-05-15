@@ -61,7 +61,7 @@ Run these locally when you touch a skill or shared resource:
 - `npm run validate -- skills/<changed-skill>/` — checks `SKILL.md` frontmatter.
 - `npm run bundle` — required after `shared/resources/` edits.
 - `npm run generate-catalog` — required after adding/editing skills.
-- `npm test` — Node 20+ test runner suite (skill unit tests + eval protocol tests).
+- `npm test` — Node 22+ test runner suite (skill unit tests + eval protocol tests; relies on `node --test` glob expansion).
 
 ## Do not
 

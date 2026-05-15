@@ -19,7 +19,7 @@
 #   bash scripts/setup-consumer.sh --dry-run     # print actions, write nothing
 #   bash scripts/setup-consumer.sh --update      # re-download skills only (skip wizard)
 #
-# Requires: node ≥ 20, git, jq, curl
+# Requires: node ≥ 22, git, jq, curl
 
 set -euo pipefail
 

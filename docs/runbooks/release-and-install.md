@@ -64,6 +64,17 @@ git checkout develop && git pull --rebase
 git merge main && git push
 ```
 
+### If the release workflow fails
+
+If CI fails between the tag push and `gh release create`, the tag exists on origin but no GitHub Release is published — consumers running `setup-consumer.sh` will see "No GitHub releases found — falling back to main".
+
+Two recovery paths:
+
+- **CI was the only thing wrong** (transient flake, expired token): re-run the workflow against the existing tag — `gh workflow run release.yml -f tag=v0.1.0 -R Gamaroff/agent-skills`.
+- **You had to land a fix on `main` first**: `bash scripts/release.sh --retry v0.1.0` deletes and re-pushes the tag at the new `main` HEAD.
+
+Full decision guide: [`../contributing/releases.md#recovering-from-a-failed-release`](../contributing/releases.md#recovering-from-a-failed-release).
+
 ---
 
 ## Installing skills (consumers)
