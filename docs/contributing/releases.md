@@ -32,26 +32,26 @@ Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which:
 
 Consumers install from the tagged tarball. `setup-consumer.sh` resolves the latest release tag via the GitHub API at install time.
 
+Use `scripts/release.sh` — it runs all checks, bumps the version, updates CHANGELOG, commits, tags, and pushes in one command:
+
 ```bash
-# Ensure clean state
-git status         # clean
-git pull --rebase
+# From main, with a clean working tree:
+bash scripts/release.sh --patch   # bug fixes, docs, catalog regen
+bash scripts/release.sh --minor   # new skills, new shared resources
+bash scripts/release.sh --major   # breaking changes
 
-# Decide the version bump (semver)
-#   MAJOR: breaking changes to skill invocation, frontmatter schemas, or pipeline contracts
-#   MINOR: new skills, new shared resources, new runbooks
-#   PATCH: bug fixes, doc-only changes, regeneration
-
-# Update CHANGELOG: move [Unreleased] entries under [vX.Y.Z] - YYYY-MM-DD
-# Commit the changelog rename
-git commit -am "chore(release): vX.Y.Z"
-
-# Tag — this triggers the release workflow
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
-git push origin main vX.Y.Z
+# Preview without writing anything:
+bash scripts/release.sh --dry-run --minor
 ```
 
-The GitHub Actions workflow handles release creation. No manual `gh release create` needed.
+The script:
+1. Confirms you're on `main` with a clean, up-to-date working tree
+2. Runs `npm test`, `npm run validate:all`, and `npm run generate-catalog` — fails fast on any red
+3. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
+4. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
+5. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
+
+The GitHub Actions workflow then handles release creation. No manual `gh release create` needed.
 
 ## What changes are breaking?
 
