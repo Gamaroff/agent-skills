@@ -321,20 +321,46 @@ create_registries() {
 
 # ── 6. install skills ────────────────────────────────────────────────────────
 SKILLS_REPO="https://github.com/Gamaroff/agent-skills"
-SKILLS_TARBALL="https://github.com/Gamaroff/agent-skills/archive/refs/heads/main.tar.gz"
+SKILLS_API="https://api.github.com/repos/Gamaroff/agent-skills/releases/latest"
+
+_resolve_skills_version() {
+  # Honour explicit override first
+  if [[ -n "${SKILLS_VERSION:-}" ]]; then
+    echo "$SKILLS_VERSION"
+    return
+  fi
+  # Try latest GitHub release tag; fall back to main
+  local _tag
+  _tag=$(curl -fsSL "$SKILLS_API" 2>/dev/null \
+    | grep '"tag_name"' | head -1 \
+    | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+  echo "${_tag:-main}"
+}
+
+_version_tarball() {
+  local _v="$1"
+  if [[ "$_v" == "main" ]]; then
+    echo "${SKILLS_REPO}/archive/refs/heads/main.tar.gz"
+  else
+    echo "${SKILLS_REPO}/archive/refs/tags/${_v}.tar.gz"
+  fi
+}
 
 install_skills() {
   heading "Install skills"
 
-  ask "Install all skills now? (download from ${SKILLS_REPO}) [Y/n]:"
+  local _version; _version=$(_resolve_skills_version)
+  local _tarball; _tarball=$(_version_tarball "$_version")
+
+  ask "Install skills ${_version} from ${SKILLS_REPO}? [Y/n]:"
   read -r _install
   if [[ "${_install:-Y}" =~ ^[Yy]$ ]]; then
     if [[ "$DRY_RUN" == true ]]; then
-      echo -e "${YELLOW}[dry-run]${NC} would download ${SKILLS_TARBALL} and extract into .agents/skills/"
+      echo -e "${YELLOW}[dry-run]${NC} would download ${_tarball} and extract into .agents/skills/"
     else
-      info "Downloading skills from ${SKILLS_REPO} ..."
+      info "Downloading skills ${_version} ..."
       local _tmpdir; _tmpdir=$(mktemp -d)
-      curl -fsSL "$SKILLS_TARBALL" | tar -xz -C "$_tmpdir" --strip-components=1
+      curl -fsSL "$_tarball" | tar -xz -C "$_tmpdir" --strip-components=1
       mkdir -p .agents/skills
       for _skill_dir in "$_tmpdir"/skills/*/; do
         [[ -f "${_skill_dir}SKILL.md" ]] || continue
@@ -342,10 +368,10 @@ install_skills() {
         cp -r "$_skill_dir" ".agents/skills/${_name}"
       done
       rm -rf "$_tmpdir"
-      ok "Skills installed into .agents/skills/"
+      ok "Skills ${_version} installed into .agents/skills/"
     fi
   else
-    info "Skipped — re-run this script or manually: curl -fsSL ${SKILLS_TARBALL} | tar -xz"
+    info "Skipped — run: SKILLS_VERSION=${_version} bash <(curl -fsSL ${SKILLS_REPO}/raw/main/scripts/setup-consumer.sh)"
   fi
 }
 
@@ -440,7 +466,7 @@ print_summary() {
   echo ""
   echo "  Platform   $VCS + $TRACKER"
   echo "  Config     skills-config.yaml"
-  echo "  Skills     .agents/skills/  (from ${SKILLS_REPO})"
+  echo "  Skills     .agents/skills/  (from ${SKILLS_REPO} — tag resolved at install time)"
   echo "  Registries docs/epic-registry.md"
   echo "             docs/tasks/task-registry.md"
   echo ""
