@@ -176,12 +176,21 @@ else
   if [[ "$DRY_RUN" == true ]]; then
     echo -e "${YELLOW}[dry-run]${NC} would replace '## [Unreleased]' with '## [${NEXT_VERSION}] - ${TODAY}' in ${CHANGELOG}"
   else
-    # Insert a fresh [Unreleased] section above the new versioned entry
-    # Works with both BSD sed (macOS) and GNU sed (Linux)
-    sed -i.bak \
-      "s|## \[Unreleased\]|## [Unreleased]\n\n## [${NEXT_VERSION}] - ${TODAY}|" \
-      "$CHANGELOG"
-    rm -f "${CHANGELOG}.bak"
+    # Insert a fresh [Unreleased] section above the new versioned entry.
+    # BSD sed (macOS) does NOT interpret \n in replacement strings, so use
+    # awk for portable multi-line replacement.
+    _tmp=$(mktemp)
+    awk -v ver="${NEXT_VERSION}" -v date="${TODAY}" '
+      /^## \[Unreleased\]/ && !done {
+        print "## [Unreleased]"
+        print ""
+        print "## [" ver "] - " date
+        done = 1
+        next
+      }
+      { print }
+    ' "$CHANGELOG" > "$_tmp"
+    mv "$_tmp" "$CHANGELOG"
     ok "CHANGELOG updated — [${NEXT_VERSION}] - ${TODAY}"
   fi
 fi

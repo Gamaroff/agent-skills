@@ -254,6 +254,20 @@ write_env_files() {
 }
 
 # ── 4. skills-config.yaml ────────────────────────────────────────────────────
+# Globals set by write_skills_config — consumed by scaffold_docs so it
+# creates dirs at the *user-chosen* paths, not the hardcoded defaults.
+PRD_DIR="docs/prd"
+ARCH_DIR="docs/architecture"
+
+# Extract a path value from an existing skills-config.yaml.
+# Usage: _read_config_path prdShardedLocation
+_read_config_path() {
+  local _key="$1"
+  [[ ! -f "skills-config.yaml" ]] && return
+  grep -E "^[[:space:]]*${_key}:" skills-config.yaml 2>/dev/null \
+    | head -1 | sed -E "s/^[[:space:]]*${_key}:[[:space:]]*//"
+}
+
 write_skills_config() {
   heading "skills-config.yaml"
 
@@ -262,7 +276,11 @@ write_skills_config() {
     ask "Overwrite? [y/N]:"
     read -r _ow
     if [[ ! "${_ow:-N}" =~ ^[Yy]$ ]]; then
-      info "Skipped"
+      info "Skipped — reading existing PRD/architecture paths for scaffold step"
+      PRD_DIR=$(_read_config_path prdShardedLocation)
+      PRD_DIR=${PRD_DIR:-docs/prd}
+      ARCH_DIR=$(_read_config_path architectureShardedLocation)
+      ARCH_DIR=${ARCH_DIR:-docs/architecture}
       return
     fi
   fi
@@ -275,6 +293,10 @@ write_skills_config() {
 
   ask "Coding-standards path  (default: ${_arch_loc}/concepts/coding-standards.md):"
   read -r _cs_path; _cs_path=${_cs_path:-${_arch_loc}/concepts/coding-standards.md}
+
+  # Export to globals for scaffold_docs to consume
+  PRD_DIR="$_prd_loc"
+  ARCH_DIR="$_arch_loc"
 
   local tracker_block=""
   if [[ "$TRACKER" == "jira" ]]; then
@@ -326,26 +348,27 @@ create_registries() {
 # ── 6. docs scaffold ─────────────────────────────────────────────────────────
 scaffold_docs() {
   heading "Docs scaffold"
+  info "Using PRD_DIR=${PRD_DIR} ARCH_DIR=${ARCH_DIR} (from skills-config.yaml)"
 
-  # docs/prd/
-  if [[ -d "docs/prd" ]]; then
-    info "docs/prd/ exists — skipped"
+  # ${PRD_DIR}/
+  if [[ -d "${PRD_DIR}" ]]; then
+    info "${PRD_DIR}/ exists — skipped"
   else
     if [[ "$DRY_RUN" == true ]]; then
-      echo -e "${YELLOW}[dry-run]${NC} would create docs/prd/"
+      echo -e "${YELLOW}[dry-run]${NC} would create ${PRD_DIR}/"
     else
-      mkdir -p docs/prd
-      ok "docs/prd/"
+      mkdir -p "${PRD_DIR}"
+      ok "${PRD_DIR}/"
     fi
   fi
 
-  # docs/architecture/concepts/ — three required always-loaded files
+  # ${ARCH_DIR}/concepts/ — three required always-loaded files
   local _arch_created=false
   for _file in \
-    "docs/architecture/index.md" \
-    "docs/architecture/concepts/coding-standards.md" \
-    "docs/architecture/concepts/tech-stack.md" \
-    "docs/architecture/concepts/source-tree.md"
+    "${ARCH_DIR}/index.md" \
+    "${ARCH_DIR}/concepts/coding-standards.md" \
+    "${ARCH_DIR}/concepts/tech-stack.md" \
+    "${ARCH_DIR}/concepts/source-tree.md"
   do
     if [[ -f "$_file" ]]; then
       info "$_file exists — skipped"
@@ -429,6 +452,9 @@ install_skills() {
       for _skill_dir in "$_tmpdir"/skills/*/; do
         [[ -f "${_skill_dir}SKILL.md" ]] || continue
         local _name; _name=$(basename "$_skill_dir")
+        # Remove existing target so cp -r overwrites cleanly rather than
+        # nesting (cp -r src dest copies *into* dest when dest exists)
+        rm -rf ".agents/skills/${_name}"
         cp -r "$_skill_dir" ".agents/skills/${_name}"
       done
       rm -rf "$_tmpdir"
