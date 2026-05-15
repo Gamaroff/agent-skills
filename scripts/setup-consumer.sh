@@ -261,11 +261,17 @@ ARCH_DIR="docs/architecture"
 
 # Extract a path value from an existing skills-config.yaml.
 # Usage: _read_config_path prdShardedLocation
+# Strips: key prefix, trailing comments (# ...), and surrounding quotes
+# so hand-edited skills-config.yaml values parse correctly.
 _read_config_path() {
   local _key="$1"
   [[ ! -f "skills-config.yaml" ]] && return
   grep -E "^[[:space:]]*${_key}:" skills-config.yaml 2>/dev/null \
-    | head -1 | sed -E "s/^[[:space:]]*${_key}:[[:space:]]*//"
+    | head -1 \
+    | sed -E "s/^[[:space:]]*${_key}:[[:space:]]*//" \
+    | sed -E 's/[[:space:]]*#.*$//' \
+    | sed -E 's/^"//; s/"$//; s/^'\''//; s/'\''$//' \
+    | sed -E 's/[[:space:]]+$//'
 }
 
 write_skills_config() {
@@ -458,7 +464,19 @@ install_skills() {
     else
       info "Downloading skills ${_version} ..."
       local _tmpdir; _tmpdir=$(mktemp -d)
-      curl -fsSL "$_tarball" | tar -xz -C "$_tmpdir" --strip-components=1
+      local _archive="${_tmpdir}/skills.tar.gz"
+      # Download to file first so we can report failures clearly. Piping
+      # curl into tar with `set -euo pipefail` kills the script silently
+      # on 404, which is the common failure mode (invalid SKILLS_VERSION).
+      if ! curl -fsSL "$_tarball" -o "$_archive"; then
+        err "Download failed: $_tarball"
+        err "If you set SKILLS_VERSION, verify the tag exists:"
+        err "  gh release list -R Gamaroff/agent-skills"
+        err "  curl -fsSL ${SKILLS_API}"
+        rm -rf "$_tmpdir"
+        return 1
+      fi
+      tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
       mkdir -p .agents/skills
       for _skill_dir in "$_tmpdir"/skills/*/; do
         [[ -f "${_skill_dir}SKILL.md" ]] || continue
