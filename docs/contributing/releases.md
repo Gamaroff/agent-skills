@@ -50,12 +50,15 @@ git push
 bash scripts/release.sh --minor
 ```
 
+No develop sync needed afterwards — `main` and `develop` share the same SHAs after a fast-forward, so develop already contains everything that landed on main.
+
 **PR-based** (recommended for teams with branch protection on `main`):
 
 ```bash
 # From develop, open a release-prep PR. Replace vX.Y.Z with the version
-# you plan to cut — run `bash scripts/release.sh --dry-run --<bump>` to
-# see what it'll be.
+# you plan to cut — run `bash scripts/release.sh --dry-run --<bump>` from
+# a local main checkout and look for the line:
+#   ✓ Next version: vX.Y.Z  (minor bump)
 gh pr create --base main --head develop \
   --title "Release prep — vX.Y.Z" \
   --body "Promoting develop to main for next release."
@@ -101,9 +104,11 @@ All three require the same `git merge main` sync on develop afterwards.
 ## Cutting a release
 
 Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which:
-1. Validates all skills via `quick_validate.py`
-2. Creates a GitHub release with auto-generated notes
-3. Attaches the source tarball automatically (GitHub adds `Source code (tar.gz)` to every release)
+1. Installs npm dependencies
+2. Runs `npm test` (hermetic test suite)
+3. Verifies the skill catalog is up to date — fails if `generate-catalog` would produce a diff against the committed `docs/reference/skill-catalog.md`
+4. Validates every skill via `quick_validate.py`
+5. Creates a GitHub release with auto-generated notes — GitHub attaches the source tarball (`Source code (tar.gz)`) automatically
 
 Consumers install from the tagged tarball. `setup-consumer.sh` resolves the latest release tag via the GitHub API at install time.
 
