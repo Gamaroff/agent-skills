@@ -23,6 +23,31 @@ Before cutting a repo release:
 - [ ] No skills have outdated `shared/resources/*` references — `package_skill.py` validation passes for all skills
 - [ ] `validate.yml` CI workflow is green on the release commit
 
+## Branch flow
+
+This repo uses **`develop`** as the integration branch. Feature work and PRs land on `develop`; **`main`** only receives release-ready code. `scripts/release.sh` enforces this: it refuses to run on any branch except `main`.
+
+The promotion path before each release:
+
+```bash
+# 1. Make sure develop is clean and pushed
+git checkout develop
+git status            # clean
+git pull --rebase
+git push
+
+# 2. Fast-forward main to develop (or open a develop → main PR)
+git checkout main
+git pull --rebase
+git merge --ff-only develop
+git push
+
+# 3. Cut the release (see below)
+bash scripts/release.sh --minor
+```
+
+If main has diverged from develop (e.g. a hotfix landed on main), use a regular merge or rebase develop first.
+
 ## Cutting a release
 
 Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which:
