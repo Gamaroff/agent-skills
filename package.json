@@ -14,7 +14,7 @@
   "author": "Lorien Gamaroff",
   "type": "commonjs",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "main": "index.js",
   "directories": {

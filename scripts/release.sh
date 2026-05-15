@@ -24,7 +24,7 @@
 #   re-creates it at current main HEAD, re-pushes — triggers the workflow
 #   afresh. Aborts if a published Release already exists for that tag.
 #
-# Requires: node >=20, git, curl, sed (BSD or GNU both work)
+# Requires: node >=22 (npm test uses node --test glob support), git, curl, sed (BSD or GNU both work)
 
 set -euo pipefail
 

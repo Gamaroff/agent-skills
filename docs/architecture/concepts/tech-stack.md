@@ -9,7 +9,7 @@ status: draft
 
 ## Runtimes
 
-- **Node.js:** `>=20` (declared in `package.json` → `engines.node`). The test runner uses native `node --test`; eval scripts use `.mjs` ESM modules.
+- **Node.js:** `>=22` (declared in `package.json` → `engines.node`). The test runner uses native `node --test`, which relies on glob-pattern expansion landed in Node 21+; eval scripts use `.mjs` ESM modules.
 - **Python:** Python 3 (3.10+ in practice — `python3` shebangs). Used for skill packaging, bundling, validation, catalog generation. No `requirements.txt` — scripts use stdlib only (`pathlib`, `yaml`-from-pip-if-needed, `shutil`, etc.).
 - **Bash:** POSIX `bash` for `shared/resources/resolve-platform.sh` and a few shell test scripts.
 
