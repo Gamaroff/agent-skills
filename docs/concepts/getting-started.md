@@ -108,7 +108,7 @@ bash /path/to/agent-skills/scripts/setup-consumer.sh --dry-run
 | 4 | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore` | Yes |
 | 5 | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path | Yes (skips if file exists and you decline overwrite) |
 | 6 | Creates `docs/epic-registry.md` and `docs/tasks/task-registry.md` if absent | Idempotent |
-| 7 | Runs `npx skills add --all` | Yes |
+| 7 | Downloads the latest release from GitHub and extracts skills into `.agents/skills/` | Yes |
 | 8 | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes |
 
 ### Files produced
@@ -134,19 +134,30 @@ Skills install into your project under `.agents/skills/`. Two contexts:
 **You are consuming skills in your own project** (most users):
 
 ```bash
-# In your target project root — installs all skills
-npx skills add --all
-
-# Install one specific skill
-npx skills add --skill develop-story
-
-# Preview available skills without installing
-npx skills add --list
+# In your target project root — download and install the latest release
+curl -fsSL https://github.com/Gamaroff/agent-skills/archive/refs/tags/$(
+  curl -fsSL https://api.github.com/repos/Gamaroff/agent-skills/releases/latest \
+    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/'
+).tar.gz | tar -xz --strip-components=1 -C /tmp/agent-skills-install \
+  --wildcards 'agent-skills-*/skills/*'
+mkdir -p .agents/skills
+for d in /tmp/agent-skills-install/skills/*/; do
+  [ -f "${d}SKILL.md" ] && cp -r "$d" ".agents/skills/$(basename $d)"
+done
 ```
 
-`--all` installs every skill into every detected agent directory and skips prompts. Each skill is self-contained — shared resources are pre-bundled into `references/`, so no separate clone is needed.
+The wizard (`setup-consumer.sh`) handles this automatically — the manual commands above are for scripted or CI installs.
 
-**Re-running the same command updates skills** — installs are idempotent and overwrite the existing skill directory with the latest version.
+To pin a specific version, replace the `releases/latest` API call with a tag directly:
+
+```bash
+SKILLS_VERSION=v1.0.0
+curl -fsSL "https://github.com/Gamaroff/agent-skills/archive/refs/tags/${SKILLS_VERSION}.tar.gz" | ...
+```
+
+Each skill is self-contained — shared resources are pre-bundled into `references/`, so no separate clone is needed.
+
+**Re-running the install is idempotent** — overwrite the existing `.agents/skills/` directory to update to a newer release.
 
 Restart your agent (e.g. Claude Code) in the project dir after install so it picks up `.agents/skills/`.
 
@@ -178,13 +189,14 @@ If you're authoring or modifying skills in this repo, work directly in `skills/`
 
 ```bash
 git clone git@github.com:Gamaroff/agent-skills.git && cd agent-skills
-npm install            # node deps for catalog generator
-npx skills add --all   # installs skills into .agents/skills/ inside this clone
+npm install                # node deps for catalog generator and evals
+npm run bundle             # ensure shared resources are bundled into each skill's references/
+# Then copy skills/ into your target project's .agents/skills/ as needed
 ```
 
 ### Option C — manual zip install (offline / locked-down CI)
 
-If you can't use `npx skills add`, package skills manually and copy the zip:
+If you can't download from GitHub at install time, package skills manually and copy the zip:
 
 ```bash
 # In this repo:

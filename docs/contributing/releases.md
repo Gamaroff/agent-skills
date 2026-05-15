@@ -25,6 +25,13 @@ Before cutting a repo release:
 
 ## Cutting a release
 
+Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which:
+1. Validates all skills via `quick_validate.py`
+2. Creates a GitHub release with auto-generated notes
+3. Attaches the source tarball automatically (GitHub adds `Source code (tar.gz)` to every release)
+
+Consumers install from the tagged tarball. `setup-consumer.sh` resolves the latest release tag via the GitHub API at install time.
+
 ```bash
 # Ensure clean state
 git status         # clean
@@ -39,10 +46,12 @@ git pull --rebase
 # Commit the changelog rename
 git commit -am "chore(release): vX.Y.Z"
 
-# Tag
+# Tag — this triggers the release workflow
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin main vX.Y.Z
 ```
+
+The GitHub Actions workflow handles release creation. No manual `gh release create` needed.
 
 ## What changes are breaking?
 
@@ -74,10 +83,11 @@ A change is a **patch** if neither of the above and the user-facing behaviour is
 
 Skills are distributed two ways:
 
-1. **In-tree** — consumers copy `skills/<name>/` directly (shared resources already bundled by `bundle_skill.py`).
-2. **Packaged zips** — `skills/<name>/<name>.zip`. Build with `python3 skills/create-skill/scripts/package_skill.py skills/<name>`. Zips are gitignored — distribute via release attachments or `npx skills add`.
+1. **Tagged release tarball** (primary) — `setup-consumer.sh` and manual installs download the source tarball for the latest GitHub release tag. Skills are self-contained because `npm run bundle` has been run and committed — shared resources are pre-bundled into each skill's `references/` directory.
 
-For a repo release, attach a "full library zip" (all skills) and individual skill zips to the GitHub release. See `npm run package` for the multi-skill packager.
+2. **Packaged zips** (offline / CI) — `skills/<name>/<name>.zip`. Build with `python3 skills/create-skill/scripts/package_skill.py skills/<name>`. Zips are gitignored — generate on demand and distribute out-of-band.
+
+> `npx skills add` (the `skills` npm package from Vercel Labs) is **not used** — it has no knowledge of this repository.
 
 ## Catalog regeneration
 
