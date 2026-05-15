@@ -9,12 +9,14 @@
 #   3. Credential collection      (.env / .env.example, gh auth check)
 #   4. skills-config.yaml         (PRD path, story layout, coding-standards path)
 #   5. Registry creation          (docs/epic-registry.md, docs/tasks/task-registry.md)
-#   6. Skills install             (npx skills add --all)
-#   7. Pipeline hook install      (.claude/settings.json via install-hooks.sh)
+#   6. docs/ scaffold             (docs/prd/, docs/architecture/concepts/, docs/tasks/)
+#   7. Skills install             (latest release from github.com/Gamaroff/agent-skills)
+#   8. Pipeline hook install      (.claude/settings.json via inline jq)
 #
 # Usage:
-#   bash scripts/setup-consumer.sh
-#   bash scripts/setup-consumer.sh --dry-run   # print actions, write nothing
+#   bash scripts/setup-consumer.sh               # full wizard
+#   bash scripts/setup-consumer.sh --dry-run     # print actions, write nothing
+#   bash scripts/setup-consumer.sh --update      # re-download skills only (skip wizard)
 #
 # Requires: node ≥ 20, git, jq, curl
 
@@ -33,9 +35,11 @@ ask()     { echo -en "${BOLD}$1${NC} "; }
 
 # ── flags ────────────────────────────────────────────────────────────────────
 DRY_RUN=false
+UPDATE_ONLY=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run) DRY_RUN=true; shift ;;
+    --dry-run)  DRY_RUN=true;    shift ;;
+    --update)   UPDATE_ONLY=true; shift ;;
     --help|-h)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -319,7 +323,67 @@ create_registries() {
   fi
 }
 
-# ── 6. install skills ────────────────────────────────────────────────────────
+# ── 6. docs scaffold ─────────────────────────────────────────────────────────
+scaffold_docs() {
+  heading "Docs scaffold"
+
+  # docs/prd/
+  if [[ -d "docs/prd" ]]; then
+    info "docs/prd/ exists — skipped"
+  else
+    if [[ "$DRY_RUN" == true ]]; then
+      echo -e "${YELLOW}[dry-run]${NC} would create docs/prd/"
+    else
+      mkdir -p docs/prd
+      ok "docs/prd/"
+    fi
+  fi
+
+  # docs/architecture/concepts/ — three required always-loaded files
+  local _arch_created=false
+  for _file in \
+    "docs/architecture/index.md" \
+    "docs/architecture/concepts/coding-standards.md" \
+    "docs/architecture/concepts/tech-stack.md" \
+    "docs/architecture/concepts/source-tree.md"
+  do
+    if [[ -f "$_file" ]]; then
+      info "$_file exists — skipped"
+      continue
+    fi
+    local _name; _name=$(basename "$_file" .md)
+    local _content
+    case "$_name" in
+      index)
+        _content="# Architecture\n\nProject architecture overview. See [concepts/](concepts/) for always-loaded context files.\n\n## Sections\n\n- [Coding standards](concepts/coding-standards.md)\n- [Tech stack](concepts/tech-stack.md)\n- [Source tree](concepts/source-tree.md)\n"
+        ;;
+      coding-standards)
+        _content="# Coding Standards\n\n> Fill in: naming conventions, formatting rules, lint config, language idioms, do-not-do patterns.\n\n## Naming\n\n## Formatting\n\n## Linting\n\n## Patterns to avoid\n"
+        ;;
+      tech-stack)
+        _content="# Tech Stack\n\n> Fill in: runtime versions, package managers, build tooling, framework versions, infrastructure targets.\n\n## Runtime\n\n## Languages\n\n## Frameworks\n\n## Infrastructure\n"
+        ;;
+      source-tree)
+        _content="# Source Tree\n\n> Fill in: top-level directory map, monorepo workspace layout, where domain code / infra / docs / tests live.\n\n\`\`\`\n.\n├── # fill in your project structure\n\`\`\`\n"
+        ;;
+    esac
+    if [[ "$DRY_RUN" == true ]]; then
+      echo -e "${YELLOW}[dry-run]${NC} would create $_file"
+    else
+      mkdir -p "$(dirname "$_file")"
+      printf '%b' "$_content" > "$_file"
+      ok "$_file"
+      _arch_created=true
+    fi
+  done
+
+  if [[ "$_arch_created" == true ]]; then
+    warn "Architecture stubs created — fill them in before running /develop-story or /develop-task"
+    info "Tip: run /document-existing-project to auto-generate from your codebase"
+  fi
+}
+
+# ── 7. install skills ────────────────────────────────────────────────────────
 SKILLS_REPO="https://github.com/Gamaroff/agent-skills"
 SKILLS_API="https://api.github.com/repos/Gamaroff/agent-skills/releases/latest"
 
@@ -464,40 +528,61 @@ install_hooks() {
 print_summary() {
   heading "Done"
   echo ""
-  echo "  Platform   $VCS + $TRACKER"
-  echo "  Config     skills-config.yaml"
+  if [[ "$UPDATE_ONLY" == false ]]; then
+    echo "  Platform   $VCS + $TRACKER"
+    echo "  Config     skills-config.yaml"
+    echo "  Docs       docs/prd/  docs/architecture/concepts/  docs/tasks/"
+    echo "  Registries docs/epic-registry.md"
+    echo "             docs/tasks/task-registry.md"
+  fi
   echo "  Skills     .agents/skills/  (from ${SKILLS_REPO} — tag resolved at install time)"
-  echo "  Registries docs/epic-registry.md"
-  echo "             docs/tasks/task-registry.md"
   echo ""
   echo -e "${BOLD}Verify the install:${NC}"
-  echo "  ls .agents/skills/ | head           # should list installed skills"
-  echo "  cat .claude/settings.json | jq '.hooks'   # should show PreCompact / Stop / PostToolUse"
-  echo "  cat skills-config.yaml              # should reflect the answers you gave"
+  echo "  ls .agents/skills/ | head                  # should list installed skills"
+  echo "  cat .claude/settings.json | jq '.hooks'    # should show PreCompact / Stop / PostToolUse"
+  [[ "$UPDATE_ONLY" == false ]] && \
+  echo "  cat skills-config.yaml                     # should reflect the answers you gave"
   echo ""
   echo -e "${BOLD}Next steps:${NC}"
-  echo "  1. Restart Claude Code in this project directory"
-  echo "  2. Run /create-task to verify skill loading"
-  echo "  3. See docs/concepts/quickstart-task.md for a 10-minute walkthrough"
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    echo "  1. Restart Claude Code to pick up the updated skills"
+  else
+    echo "  1. Fill in docs/architecture/concepts/*.md (or run /document-existing-project)"
+    echo "  2. Restart Claude Code in this project directory"
+    echo "  3. Run /create-task to verify skill loading"
+    echo "  4. See docs/concepts/quickstart-task.md for a 10-minute walkthrough"
+  fi
   echo ""
   echo -e "${BOLD}Something not working?${NC}  See docs/reference/troubleshooting.md"
-  [[ "$DRY_RUN" == true ]] && echo ""  && warn "Dry-run mode — no files were written."
+  [[ "$DRY_RUN" == true ]] && echo "" && warn "Dry-run mode — no files were written."
   echo ""
 }
 
 # ── main ─────────────────────────────────────────────────────────────────────
 main() {
   echo ""
-  echo -e "${BOLD}agent-skills setup wizard${NC}"
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    echo -e "${BOLD}agent-skills — update skills${NC}"
+  else
+    echo -e "${BOLD}agent-skills setup wizard${NC}"
+  fi
   [[ "$DRY_RUN" == true ]] && echo -e "${YELLOW}dry-run mode — no files will be written${NC}"
   echo ""
 
   check_prereqs
+
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    install_skills
+    print_summary
+    return
+  fi
+
   select_platform
   collect_env_vars
   write_env_files
   write_skills_config
   create_registries
+  scaffold_docs
   install_skills
   install_hooks
   print_summary

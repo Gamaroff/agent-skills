@@ -96,6 +96,9 @@ bash /path/to/agent-skills/scripts/setup-consumer.sh
 
 # Preview every action without writing anything:
 bash /path/to/agent-skills/scripts/setup-consumer.sh --dry-run
+
+# Update skills to the latest release (skips the full wizard):
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
 ### What the wizard does
@@ -108,8 +111,9 @@ bash /path/to/agent-skills/scripts/setup-consumer.sh --dry-run
 | 4 | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore` | Yes |
 | 5 | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path | Yes (skips if file exists and you decline overwrite) |
 | 6 | Creates `docs/epic-registry.md` and `docs/tasks/task-registry.md` if absent | Idempotent |
-| 7 | Downloads the latest release from GitHub and extracts skills into `.agents/skills/` | Yes |
-| 8 | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes |
+| 7 | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/` | Idempotent |
+| 8 | Downloads the latest release from GitHub and extracts skills into `.agents/skills/` | Yes |
+| 9 | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes |
 
 ### Files produced
 
