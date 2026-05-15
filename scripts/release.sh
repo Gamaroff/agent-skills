@@ -173,6 +173,21 @@ fi
 if ! grep -q '## \[Unreleased\]' "$CHANGELOG"; then
   warn "No [Unreleased] section found in CHANGELOG.md — skipping CHANGELOG update"
 else
+  # Verify [Unreleased] has at least one non-blank, non-heading content line
+  # before the next `## [` heading. An empty section means there's nothing
+  # worth releasing.
+  _unreleased_content=$(awk '
+    /^## \[Unreleased\]/ { in_section=1; next }
+    /^## \[/ && in_section { exit }
+    in_section && NF > 0 && !/^### / { print; exit }
+  ' "$CHANGELOG")
+  if [[ -z "$_unreleased_content" ]]; then
+    err "[Unreleased] section in ${CHANGELOG} is empty"
+    echo "Add entries describing what's changing, then re-run."
+    exit 1
+  fi
+  ok "[Unreleased] has content"
+
   if [[ "$DRY_RUN" == true ]]; then
     echo -e "${YELLOW}[dry-run]${NC} would replace '## [Unreleased]' with '## [${NEXT_VERSION}] - ${TODAY}' in ${CHANGELOG}"
   else

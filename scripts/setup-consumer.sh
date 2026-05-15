@@ -439,6 +439,17 @@ install_skills() {
   local _version; _version=$(_resolve_skills_version)
   local _tarball; _tarball=$(_version_tarball "$_version")
 
+  # Warn loudly when falling back to main — consumers should pin to a tag
+  # once releases exist
+  if [[ "$_version" == "main" && -z "${SKILLS_VERSION:-}" ]]; then
+    warn "No GitHub releases found — falling back to the main branch (unpinned, may change at any time)"
+  fi
+
+  # --update bypasses install_hooks; warn if hooks may need refreshing
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    info "--update skips hook installation. If hook scripts have moved, re-run without --update."
+  fi
+
   ask "Install skills ${_version} from ${SKILLS_REPO}? [Y/n]:"
   read -r _install
   if [[ "${_install:-Y}" =~ ^[Yy]$ ]]; then
