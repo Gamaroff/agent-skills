@@ -163,6 +163,29 @@ Skills are distributed two ways:
 
 > `npx skills add` (the `skills` npm package from Vercel Labs) is **not used** — it has no knowledge of this repository.
 
+## Recovering from a failed release
+
+The release runs in two halves: `scripts/release.sh` locally (push tag), then `.github/workflows/release.yml` in CI (publish GitHub Release object). If CI fails between tag push and `gh release create`, the tag exists on origin but no Release is published — `setup-consumer.sh` then warns "No GitHub releases found" and falls back to `main`.
+
+Two recovery paths, depending on whether you need to ship a fix on `main` first:
+
+**A. CI was the only thing wrong** (flaky test, transient outage). Re-run the workflow against the existing tag — no tag surgery:
+
+```bash
+gh workflow run release.yml -f tag=v0.1.0 -R Gamaroff/agent-skills
+```
+
+Or use the GitHub UI: Actions → Release → "Run workflow" → enter the tag.
+
+**B. You had to land a fix on `main`** (e.g. a workflow tweak). Delete the tag and re-push it at the new HEAD:
+
+```bash
+bash scripts/release.sh --retry           # retry latest tag
+bash scripts/release.sh --retry v0.1.0    # retry a specific tag
+```
+
+`--retry` skips CHANGELOG and version-bump, refuses to run if a Release is already published for that tag, then deletes + re-pushes the tag — triggering the workflow afresh.
+
 ## Catalog regeneration
 
 The catalog (`docs/reference/skill-catalog.md`) is generated from skill frontmatter. Run after any change to a skill's `description` field:

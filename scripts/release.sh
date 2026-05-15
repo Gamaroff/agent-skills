@@ -2,12 +2,13 @@
 # release.sh — Cut a semver release of agent-skills.
 #
 # Usage:
-#   bash scripts/release.sh --patch   # bug fixes, docs, catalog regen
-#   bash scripts/release.sh --minor   # new skills, new shared resources
-#   bash scripts/release.sh --major   # breaking changes
-#   bash scripts/release.sh --dry-run --minor   # preview without writing
+#   bash scripts/release.sh --patch          # bug fixes, docs, catalog regen
+#   bash scripts/release.sh --minor          # new skills, new shared resources
+#   bash scripts/release.sh --major          # breaking changes
+#   bash scripts/release.sh --dry-run --minor      # preview without writing
+#   bash scripts/release.sh --retry [<tag>]        # re-run CI for an orphaned tag
 #
-# What it does:
+# What it does (fresh release):
 #   1. Confirms working tree is clean and on main
 #   2. Runs pre-release checks (npm test, validate:all, generate-catalog)
 #   3. Calculates next version from latest git tag
@@ -16,7 +17,14 @@
 #   6. Creates annotated tag vX.Y.Z
 #   7. Pushes main + tag  →  triggers .github/workflows/release.yml
 #
-# Requires: node >=20, git, sed (BSD or GNU both work)
+# What --retry does:
+#   Recovers from an "orphan tag" — a vX.Y.Z tag exists on origin but the
+#   Release workflow failed before publishing the GitHub Release object.
+#   Skips bump, CHANGELOG, and commit; deletes the tag locally + remote,
+#   re-creates it at current main HEAD, re-pushes — triggers the workflow
+#   afresh. Aborts if a published Release already exists for that tag.
+#
+# Requires: node >=20, git, curl, sed (BSD or GNU both work)
 
 set -euo pipefail
 
@@ -32,6 +40,9 @@ heading() { echo -e "\n${BOLD}── $* ─────────────�
 # ── flags ────────────────────────────────────────────────────────────────────
 BUMP=""
 DRY_RUN=false
+RETRY=false
+RETRY_TAG=""
+REPO_SLUG="Gamaroff/agent-skills"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,6 +50,13 @@ while [[ $# -gt 0 ]]; do
     --minor) BUMP=minor; shift ;;
     --patch) BUMP=patch; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
+    --retry)
+      RETRY=true; shift
+      # Optional positional tag argument — consume it only if it looks like a tag
+      if [[ $# -gt 0 && "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        RETRY_TAG="$1"; shift
+      fi
+      ;;
     --help|-h)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -46,9 +64,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$BUMP" ]]; then
-  err "Specify a bump type: --major, --minor, or --patch"
-  echo "Usage: bash scripts/release.sh [--dry-run] --major|--minor|--patch"
+if [[ "$RETRY" == false && -z "$BUMP" ]]; then
+  err "Specify a bump type or --retry"
+  echo "Usage:"
+  echo "  bash scripts/release.sh [--dry-run] --major|--minor|--patch"
+  echo "  bash scripts/release.sh [--dry-run] --retry [<tag>]"
+  exit 1
+fi
+
+if [[ "$RETRY" == true && -n "$BUMP" ]]; then
+  err "--retry is mutually exclusive with --major/--minor/--patch"
   exit 1
 fi
 
@@ -151,7 +176,7 @@ else
   fi
 fi
 
-# ── 3. calculate next version ─────────────────────────────────────────────────
+# ── 3. calculate next version (or resolve retry tag) ─────────────────────────
 heading "Version"
 
 LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
@@ -161,14 +186,45 @@ if [[ -z "$LATEST_TAG" ]]; then
 fi
 ok "Latest tag: ${LATEST_TAG}"
 
-NEXT_VERSION=$(bump_version "$LATEST_TAG" "$BUMP")
-ok "Next version: ${NEXT_VERSION}  (${BUMP} bump)"
-
-if [[ "$DRY_RUN" == true ]]; then
-  echo -e "${YELLOW}[dry-run]${NC} would create tag ${NEXT_VERSION} and push"
+if [[ "$RETRY" == true ]]; then
+  # Default to latest tag if no explicit tag passed
+  if [[ -z "$RETRY_TAG" ]]; then
+    RETRY_TAG="$LATEST_TAG"
+    info "No tag passed — defaulting to latest: ${RETRY_TAG}"
+  fi
+  if [[ "$RETRY_TAG" == "v0.0.0" ]]; then
+    err "No real tag to retry. Cut a fresh release with --patch/--minor/--major."
+    exit 1
+  fi
+  # Safety check: refuse if a published Release already exists for this tag
+  info "Checking GitHub Release status for ${RETRY_TAG} ..."
+  HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+    "https://api.github.com/repos/${REPO_SLUG}/releases/tags/${RETRY_TAG}")
+  if [[ "$HTTP" == "200" ]]; then
+    err "Release ${RETRY_TAG} is already published on GitHub — nothing to retry."
+    echo "If you want to ship a new release, use --patch/--minor/--major."
+    exit 1
+  elif [[ "$HTTP" != "404" ]]; then
+    warn "Unexpected response from GitHub API (HTTP ${HTTP}) — proceeding anyway."
+  fi
+  ok "No published Release for ${RETRY_TAG} — safe to retry"
+  NEXT_VERSION="$RETRY_TAG"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC} would delete and re-push tag ${RETRY_TAG}"
+  fi
+else
+  NEXT_VERSION=$(bump_version "$LATEST_TAG" "$BUMP")
+  ok "Next version: ${NEXT_VERSION}  (${BUMP} bump)"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC} would create tag ${NEXT_VERSION} and push"
+  fi
 fi
 
-# ── 4. update CHANGELOG ───────────────────────────────────────────────────────
+# ── 4. update CHANGELOG (skip for --retry) ───────────────────────────────────
+if [[ "$RETRY" == true ]]; then
+  info "Skipping CHANGELOG update — retry reuses existing tag"
+else
+
 heading "CHANGELOG"
 
 CHANGELOG="CHANGELOG.md"
@@ -219,10 +275,28 @@ else
   fi
 fi
 
+fi  # end "skip CHANGELOG for --retry"
+
 # ── 5. commit + tag + push ────────────────────────────────────────────────────
 heading "Commit, tag, push"
 
-if [[ "$DRY_RUN" == true ]]; then
+if [[ "$RETRY" == true ]]; then
+  # Retry path: delete + recreate + re-push the tag at current main HEAD
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC} would run:"
+    echo "  git tag -d ${NEXT_VERSION}"
+    echo "  git push origin :refs/tags/${NEXT_VERSION}"
+    echo "  git tag -a ${NEXT_VERSION} -m 'Release ${NEXT_VERSION}'"
+    echo "  git push origin ${NEXT_VERSION}"
+  else
+    # Local delete is best-effort — the tag may already be gone
+    git tag -d "${NEXT_VERSION}" 2>/dev/null || true
+    git push origin ":refs/tags/${NEXT_VERSION}"
+    git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
+    git push origin "${NEXT_VERSION}"
+    ok "Re-pushed tag ${NEXT_VERSION}"
+  fi
+elif [[ "$DRY_RUN" == true ]]; then
   echo -e "${YELLOW}[dry-run]${NC} would run:"
   echo "  git add CHANGELOG.md"
   echo "  git commit -m 'chore(release): ${NEXT_VERSION}'"
@@ -244,15 +318,23 @@ heading "Done"
 echo ""
 if [[ "$DRY_RUN" == true ]]; then
   warn "Dry-run — nothing written or pushed."
-  echo "  Would have released: ${NEXT_VERSION}"
+  if [[ "$RETRY" == true ]]; then
+    echo "  Would have retried: ${NEXT_VERSION}"
+  else
+    echo "  Would have released: ${NEXT_VERSION}"
+  fi
 else
-  ok "Released ${NEXT_VERSION}"
+  if [[ "$RETRY" == true ]]; then
+    ok "Retried ${NEXT_VERSION}"
+  else
+    ok "Released ${NEXT_VERSION}"
+  fi
   echo ""
   echo "  GitHub Actions will now:"
   echo "    1. Validate all skills"
   echo "    2. Create the GitHub release with auto-generated notes"
   echo "    3. Attach the source tarball (consumers will pick it up automatically)"
   echo ""
-  echo "  Monitor: https://github.com/Gamaroff/agent-skills/actions"
+  echo "  Monitor: https://github.com/${REPO_SLUG}/actions"
 fi
 echo ""
