@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - 'skills/**'
+      - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
   push:
     branches: [main, develop]
     paths:
       - 'skills/**'
+      - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
 
 jobs:
@@ -31,3 +33,14 @@ jobs:
             python skills/create-skill/scripts/quick_validate.py "$skill_dir" || failed=1
           done
           exit $failed
+
+      - name: Catalog up-to-date check
+        run: |
+          # generate-catalog is a pure Python script — no Node setup needed.
+          python3 skills/create-skill/scripts/generate_catalog.py
+          if ! git diff --quiet docs/reference/skill-catalog.md; then
+            echo "::error::Skill catalog is out of date."
+            echo "Run 'npm run generate-catalog' locally and commit the diff."
+            git --no-pager diff docs/reference/skill-catalog.md | head -100
+            exit 1
+          fi

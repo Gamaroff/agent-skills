@@ -3,18 +3,21 @@
 #
 # Documented in: docs/concepts/getting-started.md § "Quick setup (wizard)"
 #
-# Covers:
+# Covers (numbering matches docs/concepts/getting-started.md § "What the wizard does"):
 #   1. Prerequisite checks        (node, git, jq, curl)
 #   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
-#   3. Credential collection      (.env / .env.example, gh auth check)
-#   4. skills-config.yaml         (PRD path, story layout, coding-standards path)
-#   5. Registry creation          (docs/epic-registry.md, docs/tasks/task-registry.md)
-#   6. Skills install             (npx skills add --all)
-#   7. Pipeline hook install      (.claude/settings.json via install-hooks.sh)
+#   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
+#   4. .env files                 (.env.example always; .env optionally; gitignore)
+#   5. skills-config.yaml         (PRD path, story layout, coding-standards path)
+#   6. Registry creation          (docs/epic-registry.md, docs/tasks/task-registry.md)
+#   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
+#   8. Skills install             (latest release from github.com/Gamaroff/agent-skills)
+#   9. Pipeline hook install      (.claude/settings.json via inline jq)
 #
 # Usage:
-#   bash scripts/setup-consumer.sh
-#   bash scripts/setup-consumer.sh --dry-run   # print actions, write nothing
+#   bash scripts/setup-consumer.sh               # full wizard
+#   bash scripts/setup-consumer.sh --dry-run     # print actions, write nothing
+#   bash scripts/setup-consumer.sh --update      # re-download skills only (skip wizard)
 #
 # Requires: node ≥ 20, git, jq, curl
 
@@ -33,9 +36,11 @@ ask()     { echo -en "${BOLD}$1${NC} "; }
 
 # ── flags ────────────────────────────────────────────────────────────────────
 DRY_RUN=false
+UPDATE_ONLY=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run) DRY_RUN=true; shift ;;
+    --dry-run)  DRY_RUN=true;    shift ;;
+    --update)   UPDATE_ONLY=true; shift ;;
     --help|-h)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -202,6 +207,7 @@ collect_env_vars() {
   fi
 }
 
+# ── 4. .env files ────────────────────────────────────────────────────────────
 write_env_files() {
   [[ ${#ENV_LINES[@]} -eq 0 ]] && return
 
@@ -249,7 +255,27 @@ write_env_files() {
   fi
 }
 
-# ── 4. skills-config.yaml ────────────────────────────────────────────────────
+# ── 5. skills-config.yaml ────────────────────────────────────────────────────
+# Globals set by write_skills_config — consumed by scaffold_docs so it
+# creates dirs at the *user-chosen* paths, not the hardcoded defaults.
+PRD_DIR="docs/prd"
+ARCH_DIR="docs/architecture"
+
+# Extract a path value from an existing skills-config.yaml.
+# Usage: _read_config_path prdShardedLocation
+# Strips: key prefix, trailing comments (# ...), and surrounding quotes
+# so hand-edited skills-config.yaml values parse correctly.
+_read_config_path() {
+  local _key="$1"
+  [[ ! -f "skills-config.yaml" ]] && return
+  grep -E "^[[:space:]]*${_key}:" skills-config.yaml 2>/dev/null \
+    | head -1 \
+    | sed -E "s/^[[:space:]]*${_key}:[[:space:]]*//" \
+    | sed -E 's/[[:space:]]*#.*$//' \
+    | sed -E 's/^"//; s/"$//; s/^'\''//; s/'\''$//' \
+    | sed -E 's/[[:space:]]+$//'
+}
+
 write_skills_config() {
   heading "skills-config.yaml"
 
@@ -258,7 +284,11 @@ write_skills_config() {
     ask "Overwrite? [y/N]:"
     read -r _ow
     if [[ ! "${_ow:-N}" =~ ^[Yy]$ ]]; then
-      info "Skipped"
+      info "Skipped — reading existing PRD/architecture paths for scaffold step"
+      PRD_DIR=$(_read_config_path prdShardedLocation)
+      PRD_DIR=${PRD_DIR:-docs/prd}
+      ARCH_DIR=$(_read_config_path architectureShardedLocation)
+      ARCH_DIR=${ARCH_DIR:-docs/architecture}
       return
     fi
   fi
@@ -271,6 +301,10 @@ write_skills_config() {
 
   ask "Coding-standards path  (default: ${_arch_loc}/concepts/coding-standards.md):"
   read -r _cs_path; _cs_path=${_cs_path:-${_arch_loc}/concepts/coding-standards.md}
+
+  # Export to globals for scaffold_docs to consume
+  PRD_DIR="$_prd_loc"
+  ARCH_DIR="$_arch_loc"
 
   local tracker_block=""
   if [[ "$TRACKER" == "jira" ]]; then
@@ -300,7 +334,7 @@ ${tracker_block}"
   ok "skills-config.yaml"
 }
 
-# ── 5. registries ────────────────────────────────────────────────────────────
+# ── 6. registries ────────────────────────────────────────────────────────────
 create_registries() {
   heading "Registries"
 
@@ -319,25 +353,150 @@ create_registries() {
   fi
 }
 
-# ── 6. install skills ────────────────────────────────────────────────────────
-install_skills() {
-  heading "Install skills"
+# ── 7. docs scaffold ─────────────────────────────────────────────────────────
+scaffold_docs() {
+  heading "Docs scaffold"
+  info "Using PRD_DIR=${PRD_DIR} ARCH_DIR=${ARCH_DIR} (from skills-config.yaml)"
 
-  ask "Install all skills now? (npx skills add --all) [Y/n]:"
-  read -r _install
-  if [[ "${_install:-Y}" =~ ^[Yy]$ ]]; then
-    if [[ "$DRY_RUN" == true ]]; then
-      echo -e "${YELLOW}[dry-run]${NC} would run: npx skills add --all"
-    else
-      npx skills add --all
-      ok "Skills installed into .agents/skills/"
-    fi
+  # ${PRD_DIR}/
+  if [[ -d "${PRD_DIR}" ]]; then
+    info "${PRD_DIR}/ exists — skipped"
   else
-    info "Skipped — run 'npx skills add --all' later"
+    if [[ "$DRY_RUN" == true ]]; then
+      echo -e "${YELLOW}[dry-run]${NC} would create ${PRD_DIR}/"
+    else
+      mkdir -p "${PRD_DIR}"
+      ok "${PRD_DIR}/"
+    fi
+  fi
+
+  # ${ARCH_DIR}/concepts/ — three required always-loaded files
+  local _arch_created=false
+  for _file in \
+    "${ARCH_DIR}/index.md" \
+    "${ARCH_DIR}/concepts/coding-standards.md" \
+    "${ARCH_DIR}/concepts/tech-stack.md" \
+    "${ARCH_DIR}/concepts/source-tree.md"
+  do
+    if [[ -f "$_file" ]]; then
+      info "$_file exists — skipped"
+      continue
+    fi
+    local _name; _name=$(basename "$_file" .md)
+    local _content
+    case "$_name" in
+      index)
+        _content="# Architecture\n\nProject architecture overview. See [concepts/](concepts/) for always-loaded context files.\n\n## Sections\n\n- [Coding standards](concepts/coding-standards.md)\n- [Tech stack](concepts/tech-stack.md)\n- [Source tree](concepts/source-tree.md)\n"
+        ;;
+      coding-standards)
+        _content="# Coding Standards\n\n> Fill in: naming conventions, formatting rules, lint config, language idioms, do-not-do patterns.\n\n## Naming\n\n## Formatting\n\n## Linting\n\n## Patterns to avoid\n"
+        ;;
+      tech-stack)
+        _content="# Tech Stack\n\n> Fill in: runtime versions, package managers, build tooling, framework versions, infrastructure targets.\n\n## Runtime\n\n## Languages\n\n## Frameworks\n\n## Infrastructure\n"
+        ;;
+      source-tree)
+        _content="# Source Tree\n\n> Fill in: top-level directory map, monorepo workspace layout, where domain code / infra / docs / tests live.\n\n\`\`\`\n.\n├── # fill in your project structure\n\`\`\`\n"
+        ;;
+    esac
+    if [[ "$DRY_RUN" == true ]]; then
+      echo -e "${YELLOW}[dry-run]${NC} would create $_file"
+    else
+      mkdir -p "$(dirname "$_file")"
+      printf '%b' "$_content" > "$_file"
+      ok "$_file"
+      _arch_created=true
+    fi
+  done
+
+  if [[ "$_arch_created" == true ]]; then
+    warn "Architecture stubs created — fill them in before running /develop-story or /develop-task"
+    info "Tip: run /document-existing-project to auto-generate from your codebase"
   fi
 }
 
-# ── 7. pipeline hooks ────────────────────────────────────────────────────────
+# ── 8. install skills ────────────────────────────────────────────────────────
+SKILLS_REPO="https://github.com/Gamaroff/agent-skills"
+SKILLS_API="https://api.github.com/repos/Gamaroff/agent-skills/releases/latest"
+
+_resolve_skills_version() {
+  # Honour explicit override first
+  if [[ -n "${SKILLS_VERSION:-}" ]]; then
+    echo "$SKILLS_VERSION"
+    return
+  fi
+  # Try latest GitHub release tag; fall back to main
+  local _tag
+  _tag=$(curl -fsSL "$SKILLS_API" 2>/dev/null \
+    | grep '"tag_name"' | head -1 \
+    | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+  echo "${_tag:-main}"
+}
+
+_version_tarball() {
+  local _v="$1"
+  if [[ "$_v" == "main" ]]; then
+    echo "${SKILLS_REPO}/archive/refs/heads/main.tar.gz"
+  else
+    echo "${SKILLS_REPO}/archive/refs/tags/${_v}.tar.gz"
+  fi
+}
+
+install_skills() {
+  heading "Install skills"
+
+  local _version; _version=$(_resolve_skills_version)
+  local _tarball; _tarball=$(_version_tarball "$_version")
+
+  # Warn loudly when falling back to main — consumers should pin to a tag
+  # once releases exist
+  if [[ "$_version" == "main" && -z "${SKILLS_VERSION:-}" ]]; then
+    warn "No GitHub releases found — falling back to the main branch (unpinned, may change at any time)"
+  fi
+
+  # --update bypasses install_hooks; warn if hooks may need refreshing
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    info "--update skips hook installation. If hook scripts have moved, re-run without --update."
+  fi
+
+  ask "Install skills ${_version} from ${SKILLS_REPO}? [Y/n]:"
+  read -r _install
+  if [[ "${_install:-Y}" =~ ^[Yy]$ ]]; then
+    if [[ "$DRY_RUN" == true ]]; then
+      echo -e "${YELLOW}[dry-run]${NC} would download ${_tarball} and extract into .agents/skills/"
+    else
+      info "Downloading skills ${_version} ..."
+      local _tmpdir; _tmpdir=$(mktemp -d)
+      local _archive="${_tmpdir}/skills.tar.gz"
+      # Download to file first so we can report failures clearly. Piping
+      # curl into tar with `set -euo pipefail` kills the script silently
+      # on 404, which is the common failure mode (invalid SKILLS_VERSION).
+      if ! curl -fsSL "$_tarball" -o "$_archive"; then
+        err "Download failed: $_tarball"
+        err "If you set SKILLS_VERSION, verify the tag exists:"
+        err "  gh release list -R Gamaroff/agent-skills"
+        err "  curl -fsSL ${SKILLS_API}"
+        rm -rf "$_tmpdir"
+        return 1
+      fi
+      tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
+      mkdir -p .agents/skills
+      for _skill_dir in "$_tmpdir"/skills/*/; do
+        [[ -f "${_skill_dir}SKILL.md" ]] || continue
+        local _name; _name=$(basename "$_skill_dir")
+        # Remove existing target so cp -r overwrites cleanly rather than
+        # nesting (cp -r src dest copies *into* dest when dest exists)
+        rm -rf ".agents/skills/${_name}"
+        cp -r "$_skill_dir" ".agents/skills/${_name}"
+      done
+      rm -rf "$_tmpdir"
+      ok "Skills ${_version} installed into .agents/skills/"
+    fi
+  else
+    info "Skipped — run: SKILLS_VERSION=${_version} bash <(curl -fsSL ${SKILLS_REPO}/raw/main/scripts/setup-consumer.sh)"
+  fi
+}
+
+# ── 9. pipeline hooks ────────────────────────────────────────────────────────
 
 # Patch a single hook event into SETTINGS_FILE. Idempotent.
 _patch_hook() {
@@ -426,40 +585,61 @@ install_hooks() {
 print_summary() {
   heading "Done"
   echo ""
-  echo "  Platform   $VCS + $TRACKER"
-  echo "  Config     skills-config.yaml"
-  echo "  Skills     .agents/skills/"
-  echo "  Registries docs/epic-registry.md"
-  echo "             docs/tasks/task-registry.md"
+  if [[ "$UPDATE_ONLY" == false ]]; then
+    echo "  Platform   $VCS + $TRACKER"
+    echo "  Config     skills-config.yaml"
+    echo "  Docs       docs/prd/  docs/architecture/concepts/  docs/tasks/"
+    echo "  Registries docs/epic-registry.md"
+    echo "             docs/tasks/task-registry.md"
+  fi
+  echo "  Skills     .agents/skills/  (from ${SKILLS_REPO} — tag resolved at install time)"
   echo ""
   echo -e "${BOLD}Verify the install:${NC}"
-  echo "  ls .agents/skills/ | head           # should list installed skills"
-  echo "  cat .claude/settings.json | jq '.hooks'   # should show PreCompact / Stop / PostToolUse"
-  echo "  cat skills-config.yaml              # should reflect the answers you gave"
+  echo "  ls .agents/skills/ | head                  # should list installed skills"
+  echo "  cat .claude/settings.json | jq '.hooks'    # should show PreCompact / Stop / PostToolUse"
+  [[ "$UPDATE_ONLY" == false ]] && \
+  echo "  cat skills-config.yaml                     # should reflect the answers you gave"
   echo ""
   echo -e "${BOLD}Next steps:${NC}"
-  echo "  1. Restart Claude Code in this project directory"
-  echo "  2. Run /create-task to verify skill loading"
-  echo "  3. See docs/concepts/quickstart-task.md for a 10-minute walkthrough"
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    echo "  1. Restart Claude Code to pick up the updated skills"
+  else
+    echo "  1. Fill in docs/architecture/concepts/*.md (or run /document-existing-project)"
+    echo "  2. Restart Claude Code in this project directory"
+    echo "  3. Run /create-task to verify skill loading"
+    echo "  4. See docs/concepts/quickstart-task.md for a 10-minute walkthrough"
+  fi
   echo ""
   echo -e "${BOLD}Something not working?${NC}  See docs/reference/troubleshooting.md"
-  [[ "$DRY_RUN" == true ]] && echo ""  && warn "Dry-run mode — no files were written."
+  [[ "$DRY_RUN" == true ]] && echo "" && warn "Dry-run mode — no files were written."
   echo ""
 }
 
 # ── main ─────────────────────────────────────────────────────────────────────
 main() {
   echo ""
-  echo -e "${BOLD}agent-skills setup wizard${NC}"
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    echo -e "${BOLD}agent-skills — update skills${NC}"
+  else
+    echo -e "${BOLD}agent-skills setup wizard${NC}"
+  fi
   [[ "$DRY_RUN" == true ]] && echo -e "${YELLOW}dry-run mode — no files will be written${NC}"
   echo ""
 
   check_prereqs
+
+  if [[ "$UPDATE_ONLY" == true ]]; then
+    install_skills
+    print_summary
+    return
+  fi
+
   select_platform
   collect_env_vars
   write_env_files
   write_skills_config
   create_registries
+  scaffold_docs
   install_skills
   install_hooks
   print_summary

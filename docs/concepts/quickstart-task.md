@@ -21,7 +21,11 @@ Universal:
 
 - Node ≥ 20 (`node --version`)
 - `git` (`git --version`)
-- Skills installed in your project: `npx skills add https://github.com/Gamaroff/agent-skills --all`
+- Skills installed in your project. First-time setup runs the full wizard (skills + config + hooks + registries + docs scaffold):
+  ```bash
+  bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
+  ```
+  Already configured? Refresh skills with `--update` (skips the wizard).
 - A working terminal where you can invoke this CLI agent
 
 Platform-specific — needed because `/develop-task` opens a PR and (optionally) a tracker issue. Skills auto-detect via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)).
@@ -141,7 +145,7 @@ Then revert the registry commit (or amend it out if you haven't pushed). Note: t
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `npx skills add` hung during install | Slow network or registry outage | Use `--registry https://registry.npmjs.org` |
+| `setup-consumer.sh --update` failed to download | GitHub unreachable or rate-limited | Wait and retry, or pin via `SKILLS_VERSION=vX.Y.Z` |
 | `gh`/Bitbucket/Jira auth failure | Token expired or env vars missing | Re-auth `gh auth login` or re-export env vars (see Prerequisites) |
 | Skill picked wrong platform | Auto-detect mis-fired | Set explicit `tracker:` / `vcs:` in `skills-config.yaml` |
 | Phase 0 prompts not matching table | Agent version differs | Check installed skill version in `.agents/skills/` |

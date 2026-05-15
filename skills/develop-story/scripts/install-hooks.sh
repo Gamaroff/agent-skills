@@ -7,7 +7,7 @@
 # Preserves all existing settings.json content (other hooks, permissions, env).
 #
 # Auto-detects the install path in this order:
-#   1. .agents/skills/develop-story/scripts/   (npx skills add — most common)
+#   1. .agents/skills/develop-story/scripts/   (setup-consumer.sh — most common)
 #   2. .agents/skills/develop-task/scripts/    (only develop-task installed)
 #   3. .claude/skills/develop-story/scripts/   (dev symlink / monorepo)
 #   4. .claude/skills/develop-task/scripts/    (dev symlink / monorepo)
@@ -79,9 +79,8 @@ Searched:
   .claude/skills/develop-story/scripts/
   .claude/skills/develop-task/scripts/
 
-Install at least one of:
-  npx skills add develop-story
-  npx skills add develop-task
+Install skills first (full wizard — sets up skills, config, hooks, registries):
+  bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 
 Then re-run this script.
 EOF

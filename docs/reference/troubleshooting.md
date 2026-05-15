@@ -26,11 +26,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 
 Tokens are revocable — if `curl` confirms the creds are wrong, regenerate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) (Jira) or Bitbucket → Settings → App passwords (Bitbucket). To work offline without fixing this, set `SKIP_TRACKER=1`.
 
-## `npx skills add --all` hangs or fails
+## `setup-consumer.sh` install fails or `.agents/skills/` is empty
 
-**Symptom:** Install command stalls, errors with `ENOTFOUND`, or finishes with `.agents/skills/` empty.
+**Symptom:** Install command errors with `Could not resolve host`, HTTP `404`, or finishes with `.agents/skills/` empty.
 
-**Cause:** Network issue, npm cache corruption, or `.agents/` permission problem.
+**Cause:** Network issue, GitHub rate limit on unauthenticated tarball downloads, or no GitHub releases yet (script falls back to `main`).
 
 **Fix:**
 
@@ -38,12 +38,11 @@ Tokens are revocable — if `curl` confirms the creds are wrong, regenerate at [
 # Verify network reach to GitHub
 curl -fsSL -o /dev/null https://github.com/Gamaroff/agent-skills && echo ok
 
-# Clear npm cache and retry
-npm cache clean --force
-npx --yes skills add https://github.com/Gamaroff/agent-skills --all
+# Pin to a specific tag to bypass the releases API call
+SKILLS_VERSION=v1.0.0 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 
-# Install one skill at a time to isolate the failure
-npx skills add https://github.com/Gamaroff/agent-skills --skill develop-task
+# Fall back to the main branch directly (unpinned)
+SKILLS_VERSION=main bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
 **Offline / locked-down CI:** use the zip path documented in [`../concepts/getting-started.md`](../concepts/getting-started.md#option-c--manual-zip-install-offline--locked-down-ci).
@@ -68,7 +67,11 @@ bash .agents/skills/develop-task/scripts/install-hooks.sh
 bash .agents/skills/develop-task/scripts/install-hooks.sh --dry-run
 ```
 
-If the hook script is missing, your skills aren't installed yet — run `npx skills add --all` first.
+If the hook script is missing, your skills aren't installed yet. Run the full wizard first:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
+```
 
 ## Skills not picking up stories / tasks from the expected location
 

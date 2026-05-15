@@ -6,12 +6,12 @@ Skills ship via two distribution paths:
 
 | Path | How it works | When to use |
 |---|---|---|
-| **In-tree bundle** (`npm run bundle`) | Copies `shared/resources/*` into each skill's `references/` dir in place and rewrites paths. Committed to git. | `npx skills add <repo> --all` — copies skill dirs verbatim from the repo |
+| **In-tree bundle** (`npm run bundle`) | Copies `shared/resources/*` into each skill's `references/` dir in place and rewrites paths. Committed to git. | Tarball install — `setup-consumer.sh` downloads the tagged GitHub release and copies skill dirs verbatim |
 | **Zip package** (`npm run package`) | Same bundling + path rewrite, but inside a `.zip` artefact. Never committed. | Manual installs, release artefacts |
 
 ## In-Tree Bundling (required before push)
 
-`npx skills add` installs skills by copying their directories verbatim from the repo. For skills that reference `shared/resources/`, those references must already be resolved into `skills/<name>/references/` — otherwise the installed skill will have broken paths.
+Tarball installs (via `setup-consumer.sh`) copy skill directories verbatim from the repo. For skills that reference `shared/resources/`, those references must already be resolved into `skills/<name>/references/` — otherwise the installed skill will have broken paths.
 
 Run after any change to `shared/resources/` or a skill's `SKILL.md`:
 

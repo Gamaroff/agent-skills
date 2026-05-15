@@ -53,24 +53,25 @@ If you already have a project set up and just need to add or update skills, use 
 
 ---
 
-**With `npx skills` (recommended for skill-only installs):**
+**Refresh skills in an already-configured project:**
 
-Install a single skill:
 ```bash
-npx skills add https://github.com/Gamaroff/agent-skills --skill <skill-name>
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
-Install every skill in the repo:
-```bash
-npx skills add https://github.com/Gamaroff/agent-skills --all
-```
-`--all` is shorthand for `--skill '*' --agent '*' -y` — installs all skills into every detected agent directory and skips confirmation prompts. Preview without installing with `--list`.
+`--update` assumes the project has already been through the full wizard. It skips platform/credential/config/hook setup and only downloads the latest GitHub release tarball into `.agents/skills/`. Idempotent: re-run to pull a newer release.
 
-**Re-running the same command updates skills** — installs are idempotent and overwrite the existing skill directory with the latest version.
+For a **first-time install** in a fresh project, omit `--update` to get the full wizard (see [Getting Started](./docs/concepts/getting-started.md)).
+
+Pin to a specific version with `SKILLS_VERSION`:
+
+```bash
+SKILLS_VERSION=v1.0.0 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
+```
 
 Each skill is self-contained in-tree (shared resources pre-bundled into `references/`), so installs work without cloning the rest of the repo.
 
-**Single skill, manual:**
+**Single skill, manual (from a local clone):**
 ```bash
 mkdir -p .agents/skills
 cp -r path/to/agent-skills/skills/<skill-name> .agents/skills/
@@ -131,7 +132,7 @@ npm run bundle:skill -- skills/<skill-name>
 
 Packaged `.zip` files are build artifacts (gitignored). Regenerate them any time with `package_skill.py`. The packager auto-bundles shared resources and rewrites paths so installed skills are fully self-contained.
 
-`npm run bundle` does the same rewrite **in-tree**: it copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in source files. Commit the result. This is what makes `npx skills add` installs work without the rest of the repo. The script is idempotent; run it before committing whenever you add or change a `shared/resources/` reference.
+`npm run bundle` does the same rewrite **in-tree**: it copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in source files. Commit the result. This is what makes tarball installs (via `setup-consumer.sh`) work without the rest of the repo. The script is idempotent; run it before committing whenever you add or change a `shared/resources/` reference.
 
 ---
 

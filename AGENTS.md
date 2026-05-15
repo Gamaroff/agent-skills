@@ -59,7 +59,7 @@ npm run bundle              # all skills
 npm run bundle:skill skills/<skill-name>
 ```
 
-Bundling copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in `.md` and `.js` files. This makes each skill directory self-contained, so installers that copy a skill verbatim (e.g. `npx skills add`) produce a working install without needing the rest of the repo. Idempotent — safe to re-run.
+Bundling copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in `.md` and `.js` files. This makes each skill directory self-contained, so installers that copy a skill verbatim (e.g. the tarball extracted by `setup-consumer.sh`) produce a working install without needing the rest of the repo. Idempotent — safe to re-run.
 
 **Validate a skill:**
 
@@ -118,7 +118,7 @@ Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-regis
 `shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. Two distribution paths consume these:
 
 - **`package_skill.py`** (zip distribution) — bundles referenced files under `references/` inside each skill's `.zip` and rewrites paths.
-- **`bundle_skill.py`** (in-tree, for `npx skills add` and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`.
+- **`bundle_skill.py`** (in-tree, for `setup-consumer.sh` tarball installs and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`.
 
 Never use symlinks or relative paths.
 

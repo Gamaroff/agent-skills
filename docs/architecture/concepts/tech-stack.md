@@ -28,7 +28,7 @@ status: draft
 
 ## Distribution
 
-- **In-tree (default for `npx skills add`):** skills are copied verbatim from `skills/<name>/` into a consumer's `.agents/skills/`. The bundler in `skills/create-skill/scripts/bundle_skill.py` makes each skill self-contained by copying `shared/resources/` deps into per-skill `references/` and rewriting paths.
+- **In-tree (default — tarball install via `setup-consumer.sh`):** skills are copied verbatim from `skills/<name>/` in the tagged GitHub release tarball into a consumer's `.agents/skills/`. The bundler in `skills/create-skill/scripts/bundle_skill.py` makes each skill self-contained by copying `shared/resources/` deps into per-skill `references/` and rewriting paths.
 - **Zip artefacts (legacy / alternative):** `python3 skills/create-skill/scripts/package_skill.py skills/<name>` produces `skills/<name>/<name>.zip` (gitignored — never commit). Same path rewriting as the in-tree bundler.
 - **Catalog:** `python3 skills/create-skill/scripts/generate_catalog.py` regenerates `docs/reference/skill-catalog.md` from on-disk `SKILL.md` frontmatter. Run after any skill change.
 

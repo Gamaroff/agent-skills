@@ -128,7 +128,7 @@ git commit
 
 ## Bundling
 
-`npx skills add` installs skills by copying their directories verbatim from the repo. Skills that reference `shared/resources/` files must have those files resolved into their `references/` directory before the commit lands — otherwise installed skills will have broken paths.
+Tarball installs (via `setup-consumer.sh`, which downloads the tagged GitHub release) copy skill directories verbatim from the repo. Skills that reference `shared/resources/` files must have those files resolved into their `references/` directory before the commit lands — otherwise installed skills will have broken paths.
 
 The pre-commit hook handles this automatically. It is wired up via the `prepare` npm script, so a fresh clone just needs:
 
