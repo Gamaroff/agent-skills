@@ -204,7 +204,9 @@ To test your skill changes against a real consumer project without publishing a 
 
 ```bash
 # In your consumer project root:
-# If .agents/skills/ already exists (e.g. from a previous wizard run), remove it first:
+# If .agents/skills/ already exists (e.g. from a previous wizard run), remove it first.
+# WARNING: rm -rf below deletes any local edits inside .agents/skills/. If you have
+# customised any installed skill files, back them up first.
 rm -rf .agents/skills
 ln -s /path/to/agent-skills/skills .agents/skills
 ```

@@ -19,11 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -41,7 +36,8 @@ jobs:
 
       - name: Catalog up-to-date check
         run: |
-          npm run generate-catalog
+          # generate-catalog is a pure Python script — no Node setup needed.
+          python3 skills/create-skill/scripts/generate_catalog.py
           if ! git diff --quiet docs/reference/skill-catalog.md; then
             echo "::error::Skill catalog is out of date."
             echo "Run 'npm run generate-catalog' locally and commit the diff."

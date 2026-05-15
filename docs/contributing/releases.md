@@ -53,7 +53,9 @@ bash scripts/release.sh --minor
 **PR-based** (recommended for teams with branch protection on `main`):
 
 ```bash
-# From develop, open a release-prep PR
+# From develop, open a release-prep PR. Edit the title to include the
+# planned version once you've decided which bump applies — e.g.:
+# --title "Release vX.Y.Z prep"
 gh pr create --base main --head develop \
   --title "Release prep" \
   --body "Promoting develop to main for next release."

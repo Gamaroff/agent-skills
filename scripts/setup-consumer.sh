@@ -3,15 +3,16 @@
 #
 # Documented in: docs/concepts/getting-started.md § "Quick setup (wizard)"
 #
-# Covers:
+# Covers (numbering matches docs/concepts/getting-started.md § "What the wizard does"):
 #   1. Prerequisite checks        (node, git, jq, curl)
 #   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
-#   3. Credential collection      (.env / .env.example, gh auth check)
-#   4. skills-config.yaml         (PRD path, story layout, coding-standards path)
-#   5. Registry creation          (docs/epic-registry.md, docs/tasks/task-registry.md)
-#   6. docs/ scaffold             (docs/prd/, docs/architecture/concepts/, docs/tasks/)
-#   7. Skills install             (latest release from github.com/Gamaroff/agent-skills)
-#   8. Pipeline hook install      (.claude/settings.json via inline jq)
+#   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
+#   4. .env files                 (.env.example always; .env optionally; gitignore)
+#   5. skills-config.yaml         (PRD path, story layout, coding-standards path)
+#   6. Registry creation          (docs/epic-registry.md, docs/tasks/task-registry.md)
+#   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
+#   8. Skills install             (latest release from github.com/Gamaroff/agent-skills)
+#   9. Pipeline hook install      (.claude/settings.json via inline jq)
 #
 # Usage:
 #   bash scripts/setup-consumer.sh               # full wizard
@@ -206,6 +207,7 @@ collect_env_vars() {
   fi
 }
 
+# ── 4. .env files ────────────────────────────────────────────────────────────
 write_env_files() {
   [[ ${#ENV_LINES[@]} -eq 0 ]] && return
 
@@ -253,7 +255,7 @@ write_env_files() {
   fi
 }
 
-# ── 4. skills-config.yaml ────────────────────────────────────────────────────
+# ── 5. skills-config.yaml ────────────────────────────────────────────────────
 # Globals set by write_skills_config — consumed by scaffold_docs so it
 # creates dirs at the *user-chosen* paths, not the hardcoded defaults.
 PRD_DIR="docs/prd"
@@ -332,7 +334,7 @@ ${tracker_block}"
   ok "skills-config.yaml"
 }
 
-# ── 5. registries ────────────────────────────────────────────────────────────
+# ── 6. registries ────────────────────────────────────────────────────────────
 create_registries() {
   heading "Registries"
 
@@ -351,7 +353,7 @@ create_registries() {
   fi
 }
 
-# ── 6. docs scaffold ─────────────────────────────────────────────────────────
+# ── 7. docs scaffold ─────────────────────────────────────────────────────────
 scaffold_docs() {
   heading "Docs scaffold"
   info "Using PRD_DIR=${PRD_DIR} ARCH_DIR=${ARCH_DIR} (from skills-config.yaml)"
@@ -412,7 +414,7 @@ scaffold_docs() {
   fi
 }
 
-# ── 7. install skills ────────────────────────────────────────────────────────
+# ── 8. install skills ────────────────────────────────────────────────────────
 SKILLS_REPO="https://github.com/Gamaroff/agent-skills"
 SKILLS_API="https://api.github.com/repos/Gamaroff/agent-skills/releases/latest"
 
@@ -494,7 +496,7 @@ install_skills() {
   fi
 }
 
-# ── 7. pipeline hooks ────────────────────────────────────────────────────────
+# ── 9. pipeline hooks ────────────────────────────────────────────────────────
 
 # Patch a single hook event into SETTINGS_FILE. Idempotent.
 _patch_hook() {
