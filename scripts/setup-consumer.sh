@@ -48,6 +48,20 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# ── wizard status tracking ───────────────────────────────────────────────────
+# Each entry: "label|status|detail" where status is ok|skipped|warn|fail
+WIZARD_STEPS=()
+WIZARD_WARNINGS=()
+WIZARD_HAS_FAIL=false
+SUMMARY_PRINTED=false
+
+record_step() {
+  WIZARD_STEPS+=("$1|$2|${3:-}")
+  [[ "$2" == "fail" ]] && WIZARD_HAS_FAIL=true
+  return 0
+}
+record_warning() { WIZARD_WARNINGS+=("$1"); }
+
 write_file() {
   local path="$1"; local content="$2"
   if [[ "$DRY_RUN" == true ]]; then
@@ -83,7 +97,7 @@ touch_file() {
 env_get() {
   local key="$1"
   [[ ! -f ".env" ]] && return
-  grep -E "^${key}=" ".env" 2>/dev/null | head -1 | cut -d'=' -f2-
+  grep -E "^${key}=" ".env" 2>/dev/null | head -1 | cut -d'=' -f2- || true
 }
 
 # Prompt helper that shows an existing plain-text value as default.
@@ -137,8 +151,10 @@ check_prereqs() {
     echo ""
     err "Missing tools: ${missing[*]}"
     echo "Install them, then re-run this script."
+    record_step "Prerequisites" "fail" "missing: ${missing[*]}"
     exit 1
   fi
+  record_step "Prerequisites" "ok"
 }
 
 # ── 2. platform ──────────────────────────────────────────────────────────────
@@ -160,6 +176,7 @@ select_platform() {
   esac
 
   ok "Selected: $VCS + $TRACKER"
+  record_step "Platform" "ok" "$VCS + $TRACKER"
 }
 
 # ── 3. credentials ───────────────────────────────────────────────────────────
@@ -205,6 +222,7 @@ collect_env_vars() {
   else
     JIRA_URL=""
   fi
+  record_step "Credentials" "ok" "$VCS + $TRACKER credentials collected"
 }
 
 # ── 4. .env files ────────────────────────────────────────────────────────────
@@ -229,7 +247,11 @@ write_env_files() {
     warn ".env already exists."
     ask "Overwrite? [y/N]:"
     read -r _ow_env
-    [[ ! "${_ow_env:-N}" =~ ^[Yy]$ ]] && { info "Skipped .env — existing file kept"; return; }
+    if [[ ! "${_ow_env:-N}" =~ ^[Yy]$ ]]; then
+      info "Skipped .env — existing file kept"
+      record_step "Env files" "ok" ".env kept (existing)"
+      return
+    fi
   fi
 
   ask "Write live credentials to .env? [Y/n]:"
@@ -250,8 +272,10 @@ write_env_files() {
       write_file ".gitignore" ".env\n"
       ok ".gitignore created with .env"
     fi
+    record_step "Env files" "ok" ".env written"
   else
     info "Skipped .env — fill in .env.example manually"
+    record_step "Env files" "ok" ".env.example only"
   fi
 }
 
@@ -290,6 +314,7 @@ write_skills_config() {
       PRD_DIR=${PRD_DIR:-docs/prd}
       ARCH_DIR=$(_read_config_path architectureShardedLocation)
       ARCH_DIR=${ARCH_DIR:-docs/architecture}
+      record_step "skills-config" "ok" "kept (existing)"
       return
     fi
   fi
@@ -333,24 +358,39 @@ ${tracker_block}"
 
   write_file "skills-config.yaml" "$config"
   ok "skills-config.yaml"
+  record_step "skills-config" "ok" "written"
 }
 
 # ── 6. registries ────────────────────────────────────────────────────────────
 create_registries() {
   heading "Registries"
 
+  local _created=0 _kept=0
+
   if [[ -f "docs/epic-registry.md" ]]; then
     info "docs/epic-registry.md exists — skipped"
+    (( _kept++ )) || true
   else
     touch_file "docs/epic-registry.md"
     ok "docs/epic-registry.md"
+    (( _created++ )) || true
   fi
 
   if [[ -f "docs/tasks/task-registry.md" ]]; then
     info "docs/tasks/task-registry.md exists — skipped"
+    (( _kept++ )) || true
   else
     touch_file "docs/tasks/task-registry.md"
     ok "docs/tasks/task-registry.md"
+    (( _created++ )) || true
+  fi
+
+  if (( _created == 0 )); then
+    record_step "Registries" "ok" "already present"
+  elif (( _kept == 0 )); then
+    record_step "Registries" "ok" "${_created} created"
+  else
+    record_step "Registries" "ok" "${_created} created, ${_kept} kept"
   fi
 }
 
@@ -412,6 +452,10 @@ scaffold_docs() {
   if [[ "$_arch_created" == true ]]; then
     warn "Architecture stubs created — fill them in before running /develop-story or /develop-task"
     info "Tip: run /document-existing-project to auto-generate from your codebase"
+    record_step "Docs scaffold" "ok" "architecture stubs created"
+    record_warning "Fill in ${ARCH_DIR}/concepts/*.md before running /develop-story or /develop-task (or run /document-existing-project)"
+  else
+    record_step "Docs scaffold" "ok" "already present"
   fi
 }
 
@@ -450,8 +494,10 @@ install_skills() {
 
   # Warn loudly when falling back to main — consumers should pin to a tag
   # once releases exist
+  local _unpinned=false
   if [[ "$_version" == "main" && -z "${SKILLS_VERSION:-}" ]]; then
     warn "No GitHub releases found — falling back to the main branch (unpinned, may change at any time)"
+    _unpinned=true
   fi
 
   # --update bypasses install_hooks; warn if hooks may need refreshing
@@ -464,6 +510,7 @@ install_skills() {
   if [[ "${_install:-Y}" =~ ^[Yy]$ ]]; then
     if [[ "$DRY_RUN" == true ]]; then
       echo -e "${YELLOW}[dry-run]${NC} would download ${_tarball} and extract into .agents/skills/"
+      record_step "Skills install" "ok" "${_version} (dry-run)"
     else
       info "Downloading skills ${_version} ..."
       local _tmpdir; _tmpdir=$(mktemp -d)
@@ -477,6 +524,8 @@ install_skills() {
         err "  gh release list -R Gamaroff/agent-skills"
         err "  curl -fsSL ${SKILLS_API}"
         rm -rf "$_tmpdir"
+        record_step "Skills install" "fail" "download failed (${_tarball})"
+        record_warning "Skills download failed — re-run the wizard or run 'bash .agents/skills/develop-task/scripts/install-hooks.sh' after manual install"
         return 1
       fi
       tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
@@ -498,9 +547,17 @@ install_skills() {
       done
       rm -rf "$_tmpdir"
       ok "Skills ${_version} installed into .agents/skills/ (${_installed} new, ${_updated} updated)"
+      if [[ "$_unpinned" == true ]]; then
+        record_step "Skills install" "warn" "${_version} unpinned (${_installed} new, ${_updated} updated)"
+        record_warning "Skills pinned to main — set SKILLS_VERSION=<tag> once a release exists, then re-run --update"
+      else
+        record_step "Skills install" "ok" "${_version} (${_installed} new, ${_updated} updated)"
+      fi
     fi
   else
     info "Skipped — run: SKILLS_VERSION=${_version} bash <(curl -fsSL ${SKILLS_REPO}/raw/main/scripts/setup-consumer.sh)"
+    record_step "Skills install" "skipped" "user declined"
+    record_warning "Skills not installed — re-run the wizard or download manually before using the pipeline"
   fi
 }
 
@@ -560,6 +617,8 @@ install_hooks() {
       warn "Hook scripts not found (skills not installed?) — skipping"
     fi
     info "Run later: bash .agents/skills/develop-task/scripts/install-hooks.sh"
+    record_step "Pipeline hooks" "warn" "hook scripts not found"
+    record_warning "Hooks not installed — run 'bash .agents/skills/develop-task/scripts/install-hooks.sh' after skills are in place"
     return
   fi
 
@@ -569,7 +628,12 @@ install_hooks() {
     ask "Install Claude Code pipeline hooks into .claude/settings.json? [Y/n]:"
   fi
   read -r _hooks
-  [[ ! "${_hooks:-Y}" =~ ^[Yy]$ ]] && { info "Skipped — run later: bash .agents/skills/develop-task/scripts/install-hooks.sh"; return; }
+  if [[ ! "${_hooks:-Y}" =~ ^[Yy]$ ]]; then
+    info "Skipped — run later: bash .agents/skills/develop-task/scripts/install-hooks.sh"
+    record_step "Pipeline hooks" "skipped" "user declined"
+    record_warning "Pipeline hooks not installed — run 'bash .agents/skills/develop-task/scripts/install-hooks.sh' to enable develop-story/develop-task automation"
+    return
+  fi
 
   # Ensure settings file exists and is valid JSON
   HOOKS_SETTINGS_FILE=".claude/settings.json"
@@ -579,6 +643,8 @@ install_hooks() {
     if ! jq -e . "$HOOKS_SETTINGS_FILE" >/dev/null 2>&1; then
       err "${HOOKS_SETTINGS_FILE} is not valid JSON — skipping hook install"
       info "Fix the file manually, then run: bash .agents/skills/develop-task/scripts/install-hooks.sh"
+      record_step "Pipeline hooks" "fail" "${HOOKS_SETTINGS_FILE} is not valid JSON"
+      record_warning "Fix ${HOOKS_SETTINGS_FILE} (invalid JSON), then run 'bash .agents/skills/develop-task/scripts/install-hooks.sh'"
       return
     fi
   fi
@@ -586,28 +652,72 @@ install_hooks() {
   _patch_hook "PreCompact"  "bash ${base}/on-precompact.sh"
   _patch_hook "Stop"        "bash ${base}/on-stop.sh"
   _patch_hook "PostToolUse" "bash ${base}/on-skill-return.sh"
-  [[ "$DRY_RUN" == false ]] && ok "Pipeline hooks registered in ${HOOKS_SETTINGS_FILE}"
+  if [[ "$DRY_RUN" == false ]]; then
+    ok "Pipeline hooks registered in ${HOOKS_SETTINGS_FILE}"
+    record_step "Pipeline hooks" "ok" "3 hooks registered"
+  else
+    record_step "Pipeline hooks" "ok" "dry-run"
+  fi
 }
 
 # ── summary ──────────────────────────────────────────────────────────────────
+
+# Coloured status badge for the status table
+_status_badge() {
+  case "$1" in
+    ok)      echo -e "${GREEN}ok${NC}     " ;;
+    skipped) echo -e "${BLUE}skipped${NC}" ;;
+    warn)    echo -e "${YELLOW}warn${NC}   " ;;
+    fail)    echo -e "${RED}fail${NC}   " ;;
+    *)       echo -e "$1     " ;;
+  esac
+}
+
 print_summary() {
-  heading "Done"
-  echo ""
-  if [[ "$UPDATE_ONLY" == false ]]; then
-    echo "  Platform   $VCS + $TRACKER"
-    echo "  Config     skills-config.yaml"
-    echo "  Docs       docs/prd/  docs/architecture/concepts/  docs/tasks/"
-    echo "  Registries docs/epic-registry.md"
-    echo "             docs/tasks/task-registry.md"
+  SUMMARY_PRINTED=true
+
+  local banner_color banner_icon banner_text
+  if $WIZARD_HAS_FAIL; then
+    banner_color="$RED"; banner_icon="✗"; banner_text="Setup failed"
+  elif [[ ${#WIZARD_WARNINGS[@]} -gt 0 ]]; then
+    banner_color="$YELLOW"; banner_icon="⚠"; banner_text="Setup completed with warnings"
+  else
+    banner_color="$GREEN"; banner_icon="✓"; banner_text="Setup complete"
   fi
-  echo "  Skills     .agents/skills/  (from ${SKILLS_REPO} — tag resolved at install time)"
+
   echo ""
+  echo -e "${banner_color}════════════════════════════════════════════════════════════${NC}"
+  echo -e "${banner_color}${BOLD}  ${banner_icon} ${banner_text}${NC}"
+  echo -e "${banner_color}════════════════════════════════════════════════════════════${NC}"
+  echo ""
+
+  # Status table
+  for entry in "${WIZARD_STEPS[@]}"; do
+    local label="${entry%%|*}"; local rest="${entry#*|}"
+    local status="${rest%%|*}"; local detail="${rest#*|}"
+    [[ "$detail" == "$rest" ]] && detail=""
+    printf "  %-18s %b  %s\n" "$label" "$(_status_badge "$status")" "$detail"
+  done
+  echo ""
+
+  # Warnings block — only if there are any
+  if [[ ${#WIZARD_WARNINGS[@]} -gt 0 ]]; then
+    echo -e "${BOLD}${YELLOW}Warnings (${#WIZARD_WARNINGS[@]}):${NC}"
+    for w in "${WIZARD_WARNINGS[@]}"; do
+      echo -e "  ${YELLOW}⚠${NC} $w"
+    done
+    echo ""
+  fi
+
+  # Verify block
   echo -e "${BOLD}Verify the install:${NC}"
   echo "  ls .agents/skills/ | head                  # should list installed skills"
   echo "  cat .claude/settings.json | jq '.hooks'    # should show PreCompact / Stop / PostToolUse"
   [[ "$UPDATE_ONLY" == false ]] && \
   echo "  cat skills-config.yaml                     # should reflect the answers you gave"
   echo ""
+
+  # Next steps
   echo -e "${BOLD}Next steps:${NC}"
   if [[ "$UPDATE_ONLY" == true ]]; then
     echo "  1. Restart Claude Code to pick up the updated skills"
@@ -623,8 +733,25 @@ print_summary() {
   echo ""
 }
 
+# Ensure summary runs even on premature exit (e.g. set -e from a sub-step).
+_on_exit() {
+  local rc=$?
+  trap - EXIT
+  [[ "$SUMMARY_PRINTED" == true ]] && exit $rc
+  # Skip summary if nothing of substance ran (e.g. --help, prereq fail before recording)
+  [[ ${#WIZARD_STEPS[@]} -eq 0 ]] && exit $rc
+  if (( rc != 0 )); then
+    WIZARD_HAS_FAIL=true
+    record_step "Wizard" "fail" "exited prematurely (code $rc)"
+  fi
+  print_summary
+  exit $rc
+}
+
 # ── main ─────────────────────────────────────────────────────────────────────
 main() {
+  trap '_on_exit' EXIT
+
   echo ""
   if [[ "$UPDATE_ONLY" == true ]]; then
     echo -e "${BOLD}agent-skills — update skills${NC}"
