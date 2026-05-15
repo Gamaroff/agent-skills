@@ -53,44 +53,50 @@ bash scripts/release.sh --minor
 **PR-based** (recommended for teams with branch protection on `main`):
 
 ```bash
-# From develop, open a release-prep PR. Edit the title to include the
-# planned version once you've decided which bump applies — e.g.:
-# --title "Release vX.Y.Z prep"
+# From develop, open a release-prep PR. Replace vX.Y.Z with the version
+# you plan to cut — run `bash scripts/release.sh --dry-run --<bump>` to
+# see what it'll be.
 gh pr create --base main --head develop \
-  --title "Release prep" \
+  --title "Release prep — vX.Y.Z" \
   --body "Promoting develop to main for next release."
 
-# Merge the PR via the GitHub UI (or `gh pr merge --merge`), then locally:
+# Merge the PR via the GitHub UI (or `gh pr merge` — see Merge-type
+# aesthetics below for which flag to use). Then locally:
 git checkout main
 git pull --rebase
 bash scripts/release.sh --minor
 ```
 
-### After a PR-based merge: sync `develop` with `main`
+### Sync `develop` with `main` after release
 
-`gh pr merge --merge` (or "Create a merge commit" in the GitHub UI) creates a merge commit on `main` that `develop` doesn't have. After every PR-based release prep, `develop` is behind `main` by that merge commit. If you skip syncing, the next `develop → main` PR shows surprising diffs or fails the next `--ff-only` merge.
+**Every PR-based merge type** — `--merge`, `--rebase`, or `--squash` — produces commits on `main` with SHAs that differ from develop's commits. Develop and main always need re-syncing afterwards. The merge type only affects how main's history *looks*; it does not eliminate the sync step.
 
-Pick one of:
-
-**Sync after every release** (simplest):
+After `release.sh` finishes, sync develop back to main:
 
 ```bash
 git checkout develop
-git pull --rebase                    # in case anything new landed
-git merge --ff-only main             # bring the merge commit back
+git pull --rebase        # in case anything new landed during the PR
+git merge main           # brings main's commits into develop
 git push
 ```
 
-**Use squash or rebase merges instead** (avoids the merge commit):
+`git merge main` (regular merge, not `--ff-only`) handles both cases:
+- Develop didn't move during the PR → merge fast-forwards (no extra commit on develop)
+- Develop got new commits → merge creates a normal merge commit on develop
 
-```bash
-# When merging the release-prep PR:
-gh pr merge --rebase                 # OR --squash
-```
+If `main` has diverged from `develop` for unrelated reasons (e.g. a hotfix landed directly on `main`), the same `git merge main` brings the hotfix into develop.
 
-Both leave `main` with the same content as `develop` (no extra commit), so no follow-up sync is needed. Choose `--rebase` to preserve develop's commit history on main, or `--squash` for a single commit per release prep.
+### Merge-type aesthetics
 
-If `main` has diverged from `develop` for other reasons (e.g. a hotfix landed directly on `main`), use a regular merge or rebase `develop` first.
+The choice between `gh pr merge` flags affects only what `main`'s history looks like — not whether sync is needed:
+
+| Flag | Result on `main` | When to use |
+|------|------------------|-------------|
+| `--merge` (default) | A merge commit with develop as a parent — preserves both branches' commit history | Default for most teams |
+| `--rebase` | Develop's commits replayed onto main, linear history | Teams that prefer linear main history |
+| `--squash` | A single commit containing all develop changes | Teams that treat each release PR as one logical change |
+
+All three require the same `git merge main` sync on develop afterwards.
 
 ## Cutting a release
 
