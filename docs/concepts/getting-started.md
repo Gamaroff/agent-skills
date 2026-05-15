@@ -189,14 +189,23 @@ bash .agents/skills/develop-task/scripts/install-hooks.sh --dry-run
 
 ### Option B — clone and work in the source repo (skill authors)
 
-If you're authoring or modifying skills in this repo, work directly in `skills/`. The quickstarts also run against this clone:
+If you're authoring or modifying skills, work directly in `skills/<name>/`. You don't need to "install" — the repo's own `skills/` directory is the source of truth. Set up the clone for editing:
 
 ```bash
 git clone git@github.com:Gamaroff/agent-skills.git && cd agent-skills
-npm install                # node deps for catalog generator and evals
-npm run bundle             # ensure shared resources are bundled into each skill's references/
-# Then copy skills/ into your target project's .agents/skills/ as needed
+npm install                # catalog generator, evals, pre-commit hook
+npm run bundle             # propagate shared/resources/ into per-skill references/
+npm test                   # hermetic test suite
 ```
+
+To test your skill changes against a real consumer project without publishing a release, symlink `skills/` into the consumer's `.agents/`:
+
+```bash
+# In your consumer project root:
+ln -s /path/to/agent-skills/skills .agents/skills
+```
+
+The symlink picks up edits live — no re-install needed during development.
 
 ### Option C — manual zip install (offline / locked-down CI)
 

@@ -53,15 +53,17 @@ If you already have a project set up and just need to add or update skills, use 
 
 ---
 
-**Skill-only install or update (recommended):**
+**Refresh skills in an already-configured project:**
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
-`--update` skips the full wizard — it downloads the latest GitHub release tarball and extracts each skill into `.agents/skills/`. Idempotent: re-run to pull a newer release.
+`--update` assumes the project has already been through the full wizard. It skips platform/credential/config/hook setup and only downloads the latest GitHub release tarball into `.agents/skills/`. Idempotent: re-run to pull a newer release.
 
-Pin to a specific version by setting `SKILLS_VERSION`:
+For a **first-time install** in a fresh project, omit `--update` to get the full wizard (see [Getting Started](./docs/concepts/getting-started.md)).
+
+Pin to a specific version with `SKILLS_VERSION`:
 
 ```bash
 SKILLS_VERSION=v1.0.0 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update

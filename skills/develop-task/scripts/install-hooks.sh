@@ -79,8 +79,8 @@ Searched:
   .claude/skills/develop-story/scripts/
   .claude/skills/develop-task/scripts/
 
-Install skills first:
-  bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
+Install skills first (full wizard — sets up skills, config, hooks, registries):
+  bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 
 Then re-run this script.
 EOF

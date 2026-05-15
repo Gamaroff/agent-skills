@@ -67,7 +67,11 @@ bash .agents/skills/develop-task/scripts/install-hooks.sh
 bash .agents/skills/develop-task/scripts/install-hooks.sh --dry-run
 ```
 
-If the hook script is missing, your skills aren't installed yet — run `bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update` first.
+If the hook script is missing, your skills aren't installed yet. Run the full wizard first:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
+```
 
 ## Skills not picking up stories / tasks from the expected location
 
