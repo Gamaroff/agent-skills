@@ -480,16 +480,23 @@ install_skills() {
       fi
       tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
       mkdir -p .agents/skills
+      local _installed=0 _updated=0
       for _skill_dir in "$_tmpdir"/skills/*/; do
         [[ -f "${_skill_dir}SKILL.md" ]] || continue
         local _name; _name=$(basename "$_skill_dir")
-        # Remove existing target so cp -r overwrites cleanly rather than
-        # nesting (cp -r src dest copies *into* dest when dest exists)
-        rm -rf ".agents/skills/${_name}"
-        cp -r "$_skill_dir" ".agents/skills/${_name}"
+        if [[ -d ".agents/skills/${_name}" ]]; then
+          rm -rf ".agents/skills/${_name}"
+          cp -r "$_skill_dir" ".agents/skills/${_name}"
+          info "  updated  ${_name}"
+          (( _updated++ )) || true
+        else
+          cp -r "$_skill_dir" ".agents/skills/${_name}"
+          info "  new      ${_name}"
+          (( _installed++ )) || true
+        fi
       done
       rm -rf "$_tmpdir"
-      ok "Skills ${_version} installed into .agents/skills/"
+      ok "Skills ${_version} installed into .agents/skills/ (${_installed} new, ${_updated} updated)"
     fi
   else
     info "Skipped — run: SKILLS_VERSION=${_version} bash <(curl -fsSL ${SKILLS_REPO}/raw/main/scripts/setup-consumer.sh)"
