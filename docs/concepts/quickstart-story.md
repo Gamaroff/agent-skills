@@ -21,7 +21,7 @@ Universal:
 
 - Node ≥ 20 (`node --version`)
 - `git` (`git --version`)
-- Skills installed in your project: `npx skills add https://github.com/Gamaroff/agent-skills --all`
+- Skills installed in your project: `bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update`
 - A working terminal where you can invoke this CLI agent
 
 Platform-specific — pick the row that matches your project. Skills auto-detect via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)).

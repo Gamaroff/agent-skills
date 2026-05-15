@@ -23,7 +23,7 @@ source_sha: ea106b1521706dc2c710e93996c0554c80a4c528
 
 **Analysis Source:** IDE-based fresh analysis (no prior `document-existing-project` run). Pre-flight exploration recorded in [`~/.claude/plans/i-want-to-dogfood-concurrent-sparkle.md`](../../../.claude/plans/i-want-to-dogfood-concurrent-sparkle.md).
 
-**Current Project State:** `agent-skills` is a library of modular agent skills — self-contained packages (SKILL.md + scripts + references + assets) that extend AI coding agents with domain workflows. Skills are distributed via `.zip` packages and an `npx skills add` installer. The repo dogfoods its own **task** pipeline (`create-task` → `develop-task` → `qa-task` → `finalise`) against itself — see `docs/tasks/` (34 task directories). The **story** pipeline (`create-prd` → `create-epic` → `create-story` → `develop-story`) has never been exercised against this repo.
+**Current Project State:** `agent-skills` is a library of modular agent skills — self-contained packages (SKILL.md + scripts + references + assets) that extend AI coding agents with domain workflows. Skills are distributed via tagged GitHub release tarballs (consumed by `setup-consumer.sh`) and optional `.zip` packages. The repo dogfoods its own **task** pipeline (`create-task` → `develop-task` → `qa-task` → `finalise`) against itself — see `docs/tasks/` (34 task directories). The **story** pipeline (`create-prd` → `create-epic` → `create-story` → `develop-story`) has never been exercised against this repo.
 
 ### 1.2 Available Documentation Analysis
 
@@ -108,7 +108,7 @@ Not applicable — this enhancement targets the documentation surface, not a GUI
 - **Languages:** Markdown (docs), Bash (scripts), Python (`create-skill` scaffolders), Node ≥ 20 (npm scripts, installers).
 - **Frameworks:** None — `agent-skills` is a content library; skills are markdown + bundled assets.
 - **Database:** None.
-- **Infrastructure:** GitHub (repo, CI, issue tracker), npm registry (`npx skills add` installer).
+- **Infrastructure:** GitHub (repo, CI, releases, issue tracker — `setup-consumer.sh` downloads tagged release tarballs).
 - **External Dependencies:** Anthropic API (consumed by skills at runtime in downstream projects), Jira / Bitbucket / GitHub trackers (resolver pattern in `shared/resources/resolve-platform.sh`).
 
 ### 4.2 Integration Approach

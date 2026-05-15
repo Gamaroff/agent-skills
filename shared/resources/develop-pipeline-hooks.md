@@ -14,7 +14,7 @@ This document is the single source of truth for what hooks exist, what they do, 
 ## TL;DR — install both hooks
 
 ```bash
-# After `npx skills add develop-story` (or develop-task):
+# After installing skills (e.g. via `bash setup-consumer.sh` or `--update`):
 bash .agents/skills/develop-story/scripts/install-hooks.sh
 ```
 
@@ -127,7 +127,7 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 
 **Failure modes**:
 - `jq` not on PATH → exit 1 with install hint
-- No hook scripts found in any candidate path → exit 1 with `npx skills add` hint
+- No hook scripts found in any candidate path → exit 1 with `setup-consumer.sh --update` hint
 - Invalid JSON in settings file → exit 1 (refuses to overwrite)
 
 ---

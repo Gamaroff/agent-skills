@@ -16,7 +16,7 @@ created: 2026-05-13
 ## Prerequisites
 
 - Node ≥ 20 (`node --version`)
-- A working agent CLI (e.g. Claude Code with skills installed via `npx skills add --all`)
+- A working agent CLI (e.g. Claude Code with skills installed via `bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update`)
 - A clone of this repo with a clean working tree on `develop`
 
 ---
