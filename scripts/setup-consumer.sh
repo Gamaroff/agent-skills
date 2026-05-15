@@ -273,7 +273,8 @@ _read_config_path() {
     | sed -E "s/^[[:space:]]*${_key}:[[:space:]]*//" \
     | sed -E 's/[[:space:]]*#.*$//' \
     | sed -E 's/^"//; s/"$//; s/^'\''//; s/'\''$//' \
-    | sed -E 's/[[:space:]]+$//'
+    | sed -E 's/[[:space:]]+$//' \
+    || true
 }
 
 write_skills_config() {
