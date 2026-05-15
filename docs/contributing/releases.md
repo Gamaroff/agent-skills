@@ -35,18 +35,36 @@ git checkout develop
 git status            # clean
 git pull --rebase
 git push
+```
 
-# 2. Fast-forward main to develop (or open a develop → main PR)
+Then advance `main`. Two options depending on your branch-protection policy:
+
+**Direct fast-forward** (solo maintainer, no branch protection on `main`):
+
+```bash
 git checkout main
 git pull --rebase
 git merge --ff-only develop
 git push
 
-# 3. Cut the release (see below)
 bash scripts/release.sh --minor
 ```
 
-If main has diverged from develop (e.g. a hotfix landed on main), use a regular merge or rebase develop first.
+**PR-based** (recommended for teams with branch protection on `main`):
+
+```bash
+# From develop, open a release-prep PR
+gh pr create --base main --head develop \
+  --title "Release prep" \
+  --body "Promoting develop to main for next release."
+
+# Merge the PR via the GitHub UI (or `gh pr merge --merge`), then locally:
+git checkout main
+git pull --rebase
+bash scripts/release.sh --minor
+```
+
+If `main` has diverged from `develop` (e.g. a hotfix landed on `main`), use a regular merge or rebase `develop` first.
 
 ## Cutting a release
 

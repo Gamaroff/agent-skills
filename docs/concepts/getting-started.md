@@ -103,6 +103,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 
 ### What the wizard does
 
+The full wizard runs all 9 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
+
 | Step | Action | Skippable? |
 |------|---------|------------|
 | 1 | Checks `node`, `git`, `jq`, `curl` are on PATH — exits if any missing | No |
@@ -202,10 +204,12 @@ To test your skill changes against a real consumer project without publishing a 
 
 ```bash
 # In your consumer project root:
+# If .agents/skills/ already exists (e.g. from a previous wizard run), remove it first:
+rm -rf .agents/skills
 ln -s /path/to/agent-skills/skills .agents/skills
 ```
 
-The symlink picks up edits live — no re-install needed during development.
+The symlink picks up edits live — no re-install needed during development. To switch back to a normal install, remove the symlink and re-run `setup-consumer.sh --update`.
 
 ### Option C — manual zip install (offline / locked-down CI)
 
