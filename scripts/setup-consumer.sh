@@ -320,20 +320,32 @@ create_registries() {
 }
 
 # ── 6. install skills ────────────────────────────────────────────────────────
+SKILLS_REPO="https://github.com/Gamaroff/agent-skills"
+SKILLS_TARBALL="https://github.com/Gamaroff/agent-skills/archive/refs/heads/main.tar.gz"
+
 install_skills() {
   heading "Install skills"
 
-  ask "Install all skills now? (npx skills add --all) [Y/n]:"
+  ask "Install all skills now? (download from ${SKILLS_REPO}) [Y/n]:"
   read -r _install
   if [[ "${_install:-Y}" =~ ^[Yy]$ ]]; then
     if [[ "$DRY_RUN" == true ]]; then
-      echo -e "${YELLOW}[dry-run]${NC} would run: npx skills add --all"
+      echo -e "${YELLOW}[dry-run]${NC} would download ${SKILLS_TARBALL} and extract into .agents/skills/"
     else
-      npx skills add --all
+      info "Downloading skills from ${SKILLS_REPO} ..."
+      local _tmpdir; _tmpdir=$(mktemp -d)
+      curl -fsSL "$SKILLS_TARBALL" | tar -xz -C "$_tmpdir" --strip-components=1
+      mkdir -p .agents/skills
+      for _skill_dir in "$_tmpdir"/skills/*/; do
+        [[ -f "${_skill_dir}SKILL.md" ]] || continue
+        local _name; _name=$(basename "$_skill_dir")
+        cp -r "$_skill_dir" ".agents/skills/${_name}"
+      done
+      rm -rf "$_tmpdir"
       ok "Skills installed into .agents/skills/"
     fi
   else
-    info "Skipped — run 'npx skills add --all' later"
+    info "Skipped — re-run this script or manually: curl -fsSL ${SKILLS_TARBALL} | tar -xz"
   fi
 }
 
@@ -428,7 +440,7 @@ print_summary() {
   echo ""
   echo "  Platform   $VCS + $TRACKER"
   echo "  Config     skills-config.yaml"
-  echo "  Skills     .agents/skills/"
+  echo "  Skills     .agents/skills/  (from ${SKILLS_REPO})"
   echo "  Registries docs/epic-registry.md"
   echo "             docs/tasks/task-registry.md"
   echo ""
