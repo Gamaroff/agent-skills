@@ -27,10 +27,9 @@ Before cutting a repo release:
 
 This repo uses **`develop`** as the integration branch. Feature work and PRs land on `develop`; **`main`** only receives release-ready code. `scripts/release.sh` enforces this: it refuses to run on any branch except `main`.
 
-The promotion path before each release:
+The promotion path before each release. First, make sure develop is clean and pushed:
 
 ```bash
-# 1. Make sure develop is clean and pushed
 git checkout develop
 git status            # clean
 git pull --rebase
@@ -65,7 +64,7 @@ git checkout main
 git pull --rebase
 ```
 
-Now `main` is at the tip you'll release from. Run `release.sh` (see [Cutting a release](#cutting-a-release)), then sync develop forward (see [Sync develop with main after release](#sync-develop-with-main-after-release)).
+In either case (Direct FF or PR-based), `main` is now at the tip you'll release from. Run `release.sh` (see [Cutting a release](#cutting-a-release)), then sync develop forward (see [Sync develop with main after release](#sync-develop-with-main-after-release)).
 
 ### Merge-type aesthetics
 
@@ -117,7 +116,7 @@ Sync develop forward:
 
 ```bash
 git checkout develop
-git pull --rebase        # in case anything new landed during the PR or release
+git pull --rebase        # in case anything new landed on develop while you were running the release
 git merge main           # brings main's commits (and the new tag's commit) into develop
 git push
 ```
