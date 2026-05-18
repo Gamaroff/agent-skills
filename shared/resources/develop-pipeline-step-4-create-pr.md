@@ -99,6 +99,8 @@ Log in Decisions Log: "Post-PR state check: PR #{PR_NUMBER} state = {state}. err
 
 ## Jira Tracker Update (when `TRACKER=jira` and `TRACKER_ISSUE` is set)
 
+> **MUST execute — pipeline action, not optional sync.** Do not skip on the basis of any user memory that says "Jira sync is manual" (e.g. `feedback_jira_sync_manual_only.md`). That rule applies only to `/create-epic`, `/create-story`, `/create-task` — never to develop-pipeline steps. This is the symmetric Jira counterpart to the GitHub `gh issue comment` posted by `create-pr` in the `TRACKER=github` path.
+
 After extracting the PR URL from `create-pr`'s output, use the Atlassian MCP tools:
 
 1. **Post PR-opened comment** — call `addCommentToJiraIssue`:
