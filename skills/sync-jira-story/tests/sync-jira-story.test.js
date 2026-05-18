@@ -388,7 +388,7 @@ test("mapStatus — empty/null returns null", () => {
 // ---------------------------------------------------------------------------
 test("syncLabelFor — derives label from parent dir name", () => {
   assert.equal(
-    lib.syncLabelFor("/abs/docs/prds/x/epics/epic.1.foo/stories/story.1.2.bar/story.1.2.bar.md"),
+    lib.syncLabelFor("/abs/docs/prd/x/epics/epic.1.foo/stories/story.1.2.bar/story.1.2.bar.md"),
     "synced-from-story.1.2.bar"
   );
 });

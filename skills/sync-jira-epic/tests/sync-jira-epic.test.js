@@ -153,7 +153,7 @@ test("resolvePrdPath — null on empty input", () => {
 });
 
 test("resolvePrdPath — non-existent path returns null without throwing", () => {
-  assert.equal(lib.resolvePrdPath("docs/prds/no.md", "/nonexistent-root-xyz"), null);
+  assert.equal(lib.resolvePrdPath("docs/prd/no.md", "/nonexistent-root-xyz"), null);
 });
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ test("mapStatus — strips emoji and maps to Jira canonical status", () => {
 // syncLabelFor
 // ---------------------------------------------------------------------------
 test("syncLabelFor — derives label from epic dir name", () => {
-  const fp = path.resolve("/x/docs/prds/foo/epics/epic.1.foundation/epic.1.foundation.md");
+  const fp = path.resolve("/x/docs/prd/foo/epics/epic.1.foundation/epic.1.foundation.md");
   assert.equal(lib.syncLabelFor(fp), "synced-from-epic.1.foundation");
 });
 
