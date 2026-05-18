@@ -426,6 +426,7 @@ options:
 | Task Subject | Description |
 |---|---|
 | Determine output format | Capture user's report vs action-plan preference |
+| Branch setup | Ensure review runs on a feature branch (Step 0a) |
 | Load config & context | Load skills-config.yaml, locate story + architecture docs |
 | Template compliance | Verify story structure against template |
 | Epic alignment | Check story fits within its parent epic |
@@ -442,6 +443,7 @@ options:
 
 | Task Subject | Description |
 |---|---|
+| Branch setup | Validate-mode short-circuit (no-op when pipeline owns branch) |
 | Load config & context | Load skills-config.yaml, locate story + architecture docs |
 | Template compliance | Verify story structure against template |
 | Epic alignment | Check story fits within its parent epic |
@@ -454,6 +456,25 @@ options:
 | Post tracker comment | Notify linked issue with verdict (non-blocking) |
 
 **Output**: Mode and output format captured; task list initialized
+
+---
+
+### Step 0a: Branch Setup (BEFORE any document mutation)
+
+**Purpose**: Ensure all review artifacts (status updates, Change Log entries, `.review.*.md` reports, Jira/GitHub sync) land on a dedicated feature branch — not on `develop`/`main`.
+
+**Pre-conditions**: `DOC_FILE` (story file path from Input Resolution), `MODE` (from Step 0), `SKILL_NAME=review-story`.
+
+**Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-story** variant throughout:
+- 0a.0 validate-mode short-circuit (skips entirely when `MODE=validate`).
+- 0a.2 extract `EPIC_NUM`, `STORY_NUM`, `EPIC_SLUG`, `EPIC_BRANCH`, `EPIC_BRANCH_EXISTS` from filename + story `epic:` frontmatter.
+- 0a.3 auto-skip when on `feature/story.${EPIC_NUM}.${STORY_NUM}.*` or `feature/epic.${EPIC_NUM}.*`.
+- 0a.4 prompt: when `EPIC_BRANCH_EXISTS=false`, ask Q1.1 (create epic branch) + Q1.2 (story branch base); else ask only Q1.2.
+- 0a.5–0a.8 stash (`git stash create` + `store`) → ensure epic branch (idempotent) → invoke `/create-branch` with resolved `BASE_BRANCH` → pop stash by hash.
+
+**Output**: `BRANCH_NAME`, `BASE_BRANCH`, `EPIC_BRANCH`, `AUTO_SKIPPED` exported. Decisions Log entry (or inline preamble) recorded per 0a.9.
+
+**Failure**: HALT with the exact error; stash recovery instructions surfaced; no document edits attempted.
 
 ---
 
@@ -2031,6 +2052,8 @@ User Can Now: Run `/develop` to begin implementation
 **Purpose**: Notify the linked tracker issue (Jira or GitHub) that a review has been completed, with the outcome, key findings, and a summary of any changes made to the story document.
 
 **When to Execute**: Always — after Step 10 completes (regardless of review outcome or status update decision).
+
+> **MUST execute — not gated by manual-sync user memories.** This auto-post is part of the review workflow itself. The `/create-*` skills' "Jira sync is manual only" rule (if present in user memory, e.g. `feedback_jira_sync_manual_only.md`) applies **only to `/create-epic`, `/create-story`, `/create-task`** — it does NOT apply to `/review-story`, `/review-task`, `/develop-story`, or `/develop-task`. These skills always auto-post review/PR/finalise outcomes to the linked tracker (GitHub or Jira/Bitbucket), symmetric across platforms. Skipping this step on the basis of a manual-sync memory and deferring to `/sync-jira-story` is a misapplication of that rule.
 
 **Actions**:
 

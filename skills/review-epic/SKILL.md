@@ -58,6 +58,48 @@ optional:
 
 ---
 
+## Input Resolution
+
+Before entering the workflow, resolve the input to an absolute file path stored as `DOC_FILE`.
+
+**Step 1 — Detect input type:**
+
+| Pattern | Matches |
+|---|---|
+| Path containing `/` or ending in `.md` | Direct file path |
+| All digits (e.g. `180`) | Epic number |
+| Anything else | Natural-language name |
+
+**Step 2 — Resolve to file:**
+
+```bash
+case "$INPUT" in
+  */*|*.md)
+    DOC_FILE="$INPUT"
+    ;;
+  [0-9]*)
+    DOC_FILE=$(find docs/ -name "epic.${INPUT}.*.md" 2>/dev/null \
+      | grep -v -E '\.(review|gate|implementation)\.' | head -1)
+    ;;
+  *)
+    DOC_FILE=$(find docs/ -name "epic.*.md" 2>/dev/null \
+      | grep -v -E '\.(review|gate|implementation)\.' \
+      | grep -i "$INPUT" | head -1)
+    ;;
+esac
+
+if [ ! -f "$DOC_FILE" ]; then
+  echo "❌ Epic file not found for input: $INPUT"
+  exit 1
+fi
+```
+
+If multiple candidates: list and ask the user to confirm via `AskUserQuestion`.
+
+**Step 3 — Continue with `DOC_FILE` resolved.** This file path is consumed by Step 0a (branch setup) and Step 1.
+
+---
+
 ## 10-Step Workflow
 
 ### Step 0 — Determine Output Mode
@@ -83,6 +125,7 @@ Store choice as `output_mode` for Step 9.
 | Task Subject | Description |
 |---|---|
 | Determine output mode | Capture report vs inline action-plan preference |
+| Branch setup | Ensure review runs on a feature branch (Step 0a) |
 | Load epic & reference docs | Locate epic file, template, registry, architecture docs |
 | Template compliance | Verify epic structure against template |
 | Registry conflict detection | Check for epic number/scope collisions |
@@ -94,6 +137,24 @@ Store choice as `output_mode` for Step 9.
 | Generate output | Produce report file or inline action plan |
 | Post-review status update | Offer to update epic frontmatter with review metadata |
 | Apply findings to epic | Offer to apply recommended fixes directly to epic file |
+
+---
+
+### Step 0a — Branch Setup (BEFORE any document mutation)
+
+**Purpose**: Ensure all review artifacts (status updates, Change Log entries, `.review-report.md`, Jira/GitHub sync) land on a dedicated feature branch — not on `develop`/`main`.
+
+**Pre-conditions**: `DOC_FILE` (epic file path from Input Resolution), `SKILL_NAME=review-epic`. Review-epic has no validate mode — 0a.0 short-circuit does not apply.
+
+**Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-epic** variant throughout:
+- 0a.2 extract `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH` from the epic filename (`epic.{N}.{slug}.md`).
+- 0a.3 auto-skip when on `feature/epic.${EPIC_NUM}.*`.
+- 0a.4 prompt: single question — "Create epic branch `${EPIC_BRANCH}` from `${BASE_DEFAULT}`?" (Recommended Yes / "Other (specify branch)" / "Abort review").
+- 0a.5–0a.8 stash (`git stash create` + `store`) → ensure epic branch exists (guarded local create + push) → pop stash. No `/create-branch` invocation (the epic branch is created inline).
+
+**Output**: `BRANCH_NAME`, `EPIC_BRANCH`, `AUTO_SKIPPED` exported. Decisions Log entry (or inline preamble) recorded per 0a.9.
+
+**Failure**: HALT with the exact error; stash recovery instructions surfaced; no document edits attempted.
 
 ---
 
