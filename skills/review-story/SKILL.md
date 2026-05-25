@@ -478,78 +478,19 @@ options:
 
 ---
 
-### Step 1: Load Configuration and Context
-
-**Purpose**: Establish project structure and locate all relevant documents
-
-**Actions**:
-
-0. **Resolve paths.** Source `references/resolve-paths.sh` (or `references/resolve-paths.sh`) to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). All path operations below use these env vars.
-
-1. Load `skills-config.yaml` from project root
-   - If missing, use fallback defaults and notify user
-   - Extract: `architecture.*`
-
-   PRD and architecture roots are configurable; nested structure under each is fixed. See [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
-
-**Default Configuration Values** (used if `skills-config.yaml` not found):
-
-```yaml
-prd:
-  prdShardedLocation: docs/prd
-architecture:
-  architectureShardedLocation: docs/architecture
-```
-
-2. Load the story document directly using the Read tool — this is the primary artifact and must be in main context.
-   - Locate at `{epicPath}/stories/{epic}.{story}.*.md`
-   - Parse all sections: frontmatter, ACs, Tasks, Dev Notes, Dev Agent Record
-
-3. **Discover supporting documents using Explore subagent:**
-
-   Use the Agent tool with subagent_type="Explore" to find:
-   - The parent epic file (pattern: `epic.{N}.*.md` in the epic directory)
-   - Architecture documents relevant to this story's type (backend/frontend/full-stack/auth/payments)
-   - The previous story in sequence (pattern: `story.{epic}.{story-1}.*.md`)
-   - The story template (`resources/story-tmpl.yaml`)
-
-   Ask the Explore subagent to return: **file paths + 1-line description only** (no file contents).
-
-4. **Selectively load from the Explore results:**
-   - Load the parent epic: read ONLY the "Stories" / "Acceptance Criteria" section (not the full file) — use offset/limit to target the relevant section
-   - Load architecture docs: read at most **2-3 most relevant files** based on story type. For a backend story, prefer `coding-standards.md` and the relevant service architecture doc. Do NOT load all architecture docs.
-   - Load story template: read for structure compliance reference
-   - Previous story: only load if the story explicitly references continuity with it
-
-**Output**: Compact context package — story in full, supporting docs selectively loaded
-
----
-
-### Phase 1.5: Pre-pass (3 Parallel Explore Subagents)
-
-**Purpose**: Front-load conflict detection before interactive Q&A. Three read-only Explore agents run in parallel and return compact YAML summaries. Q&A (Steps 2–8) consumes these summaries to surface high-severity findings as early questions rather than discovering them mid-review.
-
-**Prompt templates**: see `references/review-story-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
-
-**Actions**:
-
-1. **Resolve variables** from Step 1 output:
-   - `{story_path}` — the resolved story file path
-   - `{epic_path}` — the parent epic file path found by Step 1's Explore subagent
-   - `{arch_location}` — from `skills-config.yaml` → `architecture.architectureShardedLocation` (default: `docs/architecture`)
-
-2. **Dispatch all three agents in a single message** (parallel — one tool-call block, three Agent invocations):
-   - **Agent A** (`subagent_type="Explore"`) — epic alignment prompt from `review-story-prepass-prompts.md`
-   - **Agent B** (`subagent_type="Explore"`) — architecture alignment prompt from `review-story-prepass-prompts.md`
-   - **Agent C** (`subagent_type="Explore"`) — codebase already-implemented prompt from `review-story-prepass-prompts.md`
-
-3. **Collect results**: each agent returns a YAML block. Validate the top-level key (`alignment` for A/B; `implementation_status` for C). If a key is missing or an agent fails: log `⚠️ Pre-pass Agent {A/B/C} failed — proceeding without {epic/architecture/codebase} summary` and continue with the remaining summaries.
-
-4. **Store summaries** as `PREPASS_A`, `PREPASS_B`, `PREPASS_C` in active context for use by the Q&A phase.
-
-**Failure handling**: if all three agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback.
-
-**Output**: up to 3 YAML summaries (epic alignment, architecture alignment, implementation status) available for Steps 2–8
+### Step 1: Context Discovery and Parallel Pre-pass Execution
+Purpose: Parallelize file discovery, project structure checks, and core alignment evaluations into a single background turn cycle to minimize latency and context bloat.
+Actions:
+1. Resolve paths: Source references/resolve-paths.sh to populate ${PRD_ROOT} and ${ARCH_ROOT}.
+2. Load skills-config.yaml from the project root (or apply default fallback values).
+3. Load the primary story document in full using the Read tool.
+4. Dispatch Parallel Subagents: Execute one single message to parallelize background analysis. Invoke four subagent operations concurrently:
+   - Subagent 1 (Discovery): Scan directories and find the parent epic file path, the previous story path, the template file, and identify at most 2-3 matching domain-specific architecture files. Return only file paths and 1-line descriptions.
+   - Subagent 2 (Epic Alignment): Evaluate the story's alignment against the parent epic requirements. Return a compact YAML summary (PREPASS_A).
+   - Subagent 3 (Architecture Alignment): Evaluate the story's technical details against core system architecture. Return a compact YAML summary (PREPASS_B).
+   - Subagent 4 (Codebase Scan): Analyze current branch implementation status. Return a compact YAML summary (PREPASS_C).
+5. Handle Failures Gracefully: If any alignment/scan subagents fail or return an unknown status, log a specific warning (e.g., "⚠️ Pre-pass Agent A failed - proceeding via in-line discovery") and fall back to native validation checks in Steps 2-6.
+Output: Up to 3 verified YAML summaries stored in active context; target file paths fully resolved for immediate step execution.
 
 ---
 
@@ -623,6 +564,13 @@ architecture:
       - Search failure → log warning and fall through to create (existing behaviour preserved).
    3. **Frontmatter write-back**: on link-existing, write `jira_key` + `jira_url` (or `github_issue`) before the closing `---` of the frontmatter block (same sed-based pattern as `create-task`). Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
+# Tracker Dedup Fallback Search Addendum (Applies to both Jira and GitHub paths):
+- Pattern Match Search (Primary): Query by string prefix "[Story {epic}.{story}] {title}".
+- Structural Label Search (Fallback - Execute if primary match returns zero results):
+  * For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"`.
+  * For GitHub: Run `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title`.
+- Handling Drift: If a single match is found via the fallback label search but the title has drifted from the local filename/title, link the existing tracker issue, write back the keys to frontmatter, and log a warning: "⚠️ Title drift detected between local file and existing tracker issue. Issue linked via structural label." Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
+
    **Jira path:**
 
    > **Note**: priority drift between local frontmatter and remote Jira is corrected by `/sync-jira-story`, not by review. No analogue of the GitHub Project-board priority helper is needed — Jira priority is a built-in issue field, not a label, and `jira-sync.js` (`normalisePriority` + `diffFields`) already keeps them in sync.
@@ -636,7 +584,8 @@ architecture:
           - Use Atlassian MCP `searchJiraIssuesUsingJql`:
             - `jql`: `summary ~ "[Story {epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
             - Verify story title pattern against what `/create-story` Step 5.2a / `sync-jira-story` actually emits; align if the format differs
-            - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
+             - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
+             - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"` (see Tracker Dedup Fallback Search Addendum for details).
           - **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-jira-issue`):
             - Extract `jira_key` and build `jira_url = ${JIRA_URL}/browse/${jira_key}`
             - Write `jira_key: {jira_key}` and `jira_url: {jira_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
@@ -678,6 +627,7 @@ architecture:
              ```
              Verify story title pattern against what `/create-story` Step 5.2a actually emits; align if the format differs.
              On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to steps 1–4 below
+             - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
           2. **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-github-issue`):
              - Extract `N` (issue number) and `url` from the result
              - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
@@ -770,7 +720,7 @@ architecture:
 
 ---
 
-### QUESTION POINT 1: Epic & Structure Clarifications
+**QUESTION POINT 1: Epic & Structure Clarifications**
 
 **CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to technical review, ask batched questions about:
 
@@ -977,7 +927,7 @@ This prevents the first-phase document load from polluting the technical review 
 
 ---
 
-### QUESTION POINT 2: Technical & Completeness Clarifications
+**QUESTION POINT 2: Technical & Completeness Clarifications**
 
 **CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to consistency review, ask batched questions about:
 
@@ -1117,6 +1067,10 @@ Proceed to Phase 3 (recommendations and output) with a clean context containing 
    - Story describes a stateful UI/component lifecycle → suggest `stateDiagram-v2`
    - Story has non-trivial branching or decision logic → suggest `flowchart`
    Do NOT flag absence as an issue if Dev Notes prose already conveys the flow clearly.
+
+Missing Diagram Proactive Draft Rule:
+If a visual diagram is absent but highly recommended (e.g., the story describes a complex multi-party API request/response loop or stateful UI view lifecycle), do not merely flag its absence. You must generate a highly accurate, syntactically correct sample draft snippet directly within the review report's recommendation section (using markdown code fences for the specified mermaid type). Use the verified component, file, or endpoint naming conventions extracted during the technical accuracy review so the user can easily copy and insert it.
+
 5. **If a diagram is present but adds no value over the prose**: recommend removing it.
 6. **If diagram type is wrong** (e.g., a time-ordered API protocol drawn as a generic flowchart): recommend the correct type.
 
@@ -1335,6 +1289,13 @@ questions:
 **Actions**:
 
 1. Compute the **Implementation Readiness Score** (1–10 weighted average of per-dimension scores).
+
+Critical Scoring Engine Rule (The Floor Gate):
+The Implementation Readiness Score is calculated as a weighted average across all checked dimensions on a 1-10 scale. However, the calculation must respect a strict structural floor rule:
+- If Technical Accuracy is less than 6 OR Completeness is less than 6 due to critical/important blockers, the final weighted Implementation Readiness Score is automatically capped at a maximum value of 5/10.
+- The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
+- Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
+
 2. Determine the **Verdict**:
    - ✅ **GO** — score ≥ 8 AND zero Critical issues
    - ⚠️ **NO-GO (Revision)** — score 5–7, OR Important issues materially blocking confidence
@@ -1451,6 +1412,13 @@ Report:  <path>
 **Actions**:
 
 1. Generate complete review report following the structure below
+
+Critical Scoring Engine Rule (The Floor Gate):
+The Implementation Readiness Score is calculated as a weighted average across all checked dimensions on a 1-10 scale. However, the calculation must respect a strict structural floor rule:
+- If Technical Accuracy is less than 6 OR Completeness is less than 6 due to critical/important blockers, the final weighted Implementation Readiness Score is automatically capped at a maximum value of 5/10.
+- The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
+- Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
+
 2. Save to file: `[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md`
 3. Display summary to user with file location
 
@@ -1931,6 +1899,14 @@ options:
 ```
 
 2. **If "Yes, apply all critical + important fixes"** or **"Yes, critical fixes only"**:
+
+Step 9.5 Execution Guardrails (Atomic Rollback Protocol):
+Before executing any tool calls to apply changes to the story file or review markdown:
+1. Create a transient local snapshot of the unmodified active story document (e.g., cache it in memory or make a hidden `.story_file.bak` copy).
+2. Apply the sequenced Edit tool calls block by block in priority order.
+3. Catch and Remediate Failures: If any individual Edit call fails to match lines, encounters regex/patch conflicts, or throws an error, immediately halt the operation. Revert the entire file back to the transient local snapshot state.
+4. Clean Exit: Wipe the backup file, skip all automatic text adjustments, log the specific error, and surface a graceful recovery prompt: "⚠️ Automated edit failed at fix [issue title] due to a patch conflict. Rolling back all partial edits. Please resolve this section manually."
+
    - Work through each issue in priority order (critical first, then important if selected)
    - For each fix: use the Edit tool to apply the change to the story document
    - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
