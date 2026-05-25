@@ -41,3 +41,6 @@ secrets.yaml
 secrets.yml
 *.sqlite
 *.sqlite3
+
+# Antigravity CLI local state
+.antigravitycli/
