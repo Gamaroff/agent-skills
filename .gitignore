@@ -44,3 +44,6 @@ secrets.yml
 
 # Antigravity CLI local state
 .antigravitycli/
+
+# Obsidian local workspace state (pane layout churns per session)
+.obsidian/workspace*.json
