@@ -26,7 +26,7 @@ Activate when user needs to:
 **Required Files:**
 
 - Epic markdown file following the standard epic format (YAML frontmatter with title, priority, etc.)
-- The script `.scripts/jira-create-epic.js` in the project root
+- The bundled script at `.agents/skills/jira-epic-creator/scripts/jira-create-epic.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-create-epic.js` in the consumer repo root — that path does not exist.
 
 **Required Environment Variables:**
 
@@ -45,7 +45,7 @@ The following Jira environment variables must be available (will prompt if missi
 2. **Execute the script** with the epic file path:
 
 ```bash
-node .scripts/jira-create-epic.js --file "$PRD_ROOT/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md"
+node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file "$PRD_ROOT/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md"
 ```
 
 ### Environment Variable Check
@@ -122,7 +122,7 @@ The script supports these flags:
 To preview before creating:
 
 ```bash
-node .scripts/jira-create-epic.js --file "$PRD_ROOT/.../epic.N.name.md" --dry-run
+node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file "$PRD_ROOT/.../epic.N.name.md" --dry-run
 ```
 
 ## Workflow
@@ -130,7 +130,7 @@ node .scripts/jira-create-epic.js --file "$PRD_ROOT/.../epic.N.name.md" --dry-ru
 1. **Parse epic file** - Extract frontmatter and description sections
 2. **Check environment** - Verify JIRA\_\* variables, prompt if missing
 3. **Validate file exists** - Confirm epic file path is correct
-4. **Run script** - Execute `.scripts/jira-create-epic.js` with file path
+4. **Run script** - Execute `.agents/skills/jira-epic-creator/scripts/jira-create-epic.js` with file path
 5. **Report result** - Display created epic key and URL
 6. **Update epic file** - Add `jira_key` and `jira_url` to frontmatter
 

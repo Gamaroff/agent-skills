@@ -1937,6 +1937,31 @@ Before executing any tool calls to apply changes to the story file or review mar
 
 ---
 
+### Step 9.6: Push Body Changes to Jira (when `TRACKER=jira` and fixes were applied)
+
+**Purpose**: When Step 9.5 applied any Edit to the story body, the local body hash will diverge from `jira_last_body_hash` and the Jira description must be re-rendered. Execute the bundled `sync-jira-story` script directly — do NOT speculate about other paths.
+
+**When to Execute**:
+- `TRACKER=jira` (set by Step 5 resolver) AND
+- At least one fix was applied in Step 9.5 (i.e. `FIXES_APPLIED` is non-empty) OR `jira_last_body_hash` is missing/stale
+
+**Skip when**: `TRACKER=github`, validate mode, or no body edits were made.
+
+**Command**:
+
+```bash
+node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
+  --file "$STORY_FILE_PATH"
+```
+
+> **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-story/scripts/sync-jira-story.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist and never did. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
+
+On success → `sync-jira-story` updates the Jira description, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed body update to Jira {jira_key}`.
+
+On non-zero exit → log warning `⚠️ sync-jira-story failed — Jira description may be stale` and continue to Step 10 (do not halt).
+
+---
+
 ### Step 10: Update Document Status (if applicable)
 
 **Purpose**: Update the story document status based on the review outcome.

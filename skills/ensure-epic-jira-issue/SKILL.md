@@ -75,7 +75,16 @@ Call the Atlassian MCP tool `getJiraIssue`:
 
 ### Step EJ4: Create via sync-jira-epic Delegation
 
-Invoke the `sync-jira-epic` sub-routine, passing `EPIC_FILE_PATH` as its input. `sync-jira-epic` will:
+Invoke the `sync-jira-epic` sub-routine by executing the bundled script directly. Pass `EPIC_FILE_PATH` via `--file`:
+
+```bash
+node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
+  --file "$EPIC_FILE_PATH"
+```
+
+> **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-epic/scripts/sync-jira-epic.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist.
+
+`sync-jira-epic` will:
 - Create the Jira epic if it does not exist
 - Write `jira_key` (and `jira_url` of shape `{JIRA_URL}/browse/{KEY}`) back to the epic frontmatter
 

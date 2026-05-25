@@ -665,6 +665,31 @@ options:
 
 ---
 
+### Step 11.5 — Push Body Changes to Jira (when `TRACKER=jira` and fixes were applied)
+
+**Purpose**: When Step 11 applied any Edit to the epic body, the local body hash will diverge from `jira_last_body_hash` and the Jira description must be re-rendered. Execute the bundled `sync-jira-epic` script directly — do NOT speculate about other paths.
+
+**When to Execute**:
+- `TRACKER=jira` AND
+- At least one fix was applied in Step 11 OR `jira_last_body_hash` is missing/stale
+
+**Skip when**: `TRACKER=github` or no body edits were made.
+
+**Command**:
+
+```bash
+node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
+  --file "$EPIC_FILE_PATH"
+```
+
+> **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-epic/scripts/sync-jira-epic.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
+
+On success → `sync-jira-epic` updates the Jira description, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed body update to Jira {jira_key}`.
+
+On non-zero exit → log warning `⚠️ sync-jira-epic failed — Jira description may be stale` and continue (do not halt).
+
+---
+
 ## Key Anti-Hallucination Rules
 
 1. **Every conflict citation** must reference an actual file path and section header
