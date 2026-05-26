@@ -74,7 +74,7 @@ while :; do
     --arg jql "$JQL" \
     --argjson fields "$FIELDS_JSON" \
     --arg token "$next_token" \
-    '{jql: $jql, fields: $fields, expand: ["changelog"], maxResults: 50}
+    '{jql: $jql, fields: $fields, expand: "changelog", maxResults: 50}
      + (if $token == "" then {} else {nextPageToken: $token} end)')
 
   page=$(http_post "$SEARCH_URL" "$payload")
