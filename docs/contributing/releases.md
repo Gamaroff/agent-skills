@@ -16,8 +16,7 @@ This repository is a **library of skills**, not a single versioned application. 
 
 Before cutting a repo release:
 
-- [ ] `npm test` is green
-- [ ] Hermetic evals pass (`npm run eval:*` non-smoke variants)
+- [ ] `test.yml` CI workflow is green on the release commit — covers `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
 - [ ] Skill catalog is current: `npm run generate-catalog` then commit any diff
 - [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release
 - [ ] No skills have outdated `shared/resources/*` references — `package_skill.py` validation passes for all skills
