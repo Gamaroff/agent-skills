@@ -328,12 +328,7 @@ Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to "In Progress"** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
-   - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {TRACKER_ISSUE}`
-   - Find the transition whose `name` matches "In Progress" (case-insensitive)
-   - If found: call `transitionJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, and `transition: {id: "<matched-id>"}`
-   - If no matching transition: log "⚠️ No 'In Progress' transition available for {TRACKER_ISSUE}" and skip
-   - On failure: log warning and continue (non-blocking)
+2. **Transition to "In Progress"** — follow `references/jira-transition-protocol.md` exactly with `candidates = ["In Progress"]`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
 
 3. **Post-condition verification** — call `getJiraIssue` to confirm the transition worked:
    - Call `getJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, `fields: ["status"]`

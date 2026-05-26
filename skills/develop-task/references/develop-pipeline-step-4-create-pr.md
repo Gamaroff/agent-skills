@@ -111,11 +111,7 @@ After extracting the PR URL from `create-pr`'s output, use the Atlassian MCP too
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to "In Review"** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
-   - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {TRACKER_ISSUE}`
-   - Find a transition matching "In Review", "Code Review", or "Ready for Review" (case-insensitive, try in that order)
-   - If found: call `transitionJiraIssue`; log "✅ Jira issue {TRACKER_ISSUE} moved to {transition name}"
-   - If not found: log "⚠️ No review-phase transition available — issue remains In Progress" (non-blocking)
+2. **Transition to "In Review"** — follow `references/jira-transition-protocol.md` exactly with `candidates = ["In Review", "Code Review", "Ready for Review"]`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to `To Do`, `In Progress`, or any other transition — the issue must remain `In Progress` through QA when no review state exists in the workflow.
 
 Log in Decisions Log: "Jira {TRACKER_ISSUE} — PR comment posted; status: {transition name or 'In Progress (no review transition)'}."
 
