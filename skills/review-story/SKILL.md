@@ -67,7 +67,7 @@ Or via natural language (agent detects intent): "Is this story ready?", "Score t
 |---|---|---|
 | Questions asked | Yes — up to 3 question points | Never |
 | Edits story | Yes (with user approval) | Never |
-| Output artifact | `.review.{n}.{name}.md` | `.validate.{date}.md` |
+| Output artifact | `.review.{n}.{story-name}.md` | `.validate.{date}.md` |
 | Verdict label | READY / NEEDS REVISION / REQUIRES REWORK | GO / NO-GO (Revision) / NO-GO (Rework) |
 | CI exit code | N/A | Non-zero on NO-GO |
 | Batch support | No | Yes |
@@ -410,7 +410,7 @@ question: 'Would you like a comprehensive review report saved to a file, or just
 header: 'Output Format'
 options:
   - label: 'Comprehensive report'
-    description: 'Generate detailed review report saved to story.{epic}.{story}.review.{n}.{descriptive-name}.md with all findings, user decisions, and recommendations documented.'
+    description: 'Generate detailed review report saved to story.{epic}.{story}.review.{n}.{story-name}.md with all findings, user decisions, and recommendations documented. The {story-name} slug MUST match the parent story file''s name slug exactly (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — never a free-form summary of the review focus.'
   - label: 'Action plan only'
     description: 'Provide prioritized list of issues and fixes to action immediately without saving a report file.'
 ```
@@ -1419,7 +1419,10 @@ The Implementation Readiness Score is calculated as a weighted average across al
 - The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
 - Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
 
-2. Save to file: `[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md`
+2. Save to file: `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md`
+   - `{story-name}` MUST be the parent story's own name slug — the hyphenated portion after `story.{epic}.{story}.` in the story filename. Do NOT invent a free-form descriptive slug summarizing the review focus.
+   - Example: story file `story.1.2.configure-typescript-path-mapping.md` → review file `story.1.2.review.1.configure-typescript-path-mapping.md`.
+   - Derive programmatically: strip `.md`, strip the leading `story.{epic}.{story}.` prefix from the basename — the remainder is `{story-name}`.
 3. Display summary to user with file location
 
 **Report Structure**:
@@ -1778,7 +1781,7 @@ The Implementation Readiness Score is calculated as a weighted average across al
 - **Review Duration:** [time]
 ```
 
-**Output**: Save review report to `[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md`
+**Output**: Save review report to `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md` — `{story-name}` is the parent story's own name slug (same hyphenated suffix as the story filename), NOT a free-form review-focus summary.
 
 ---
 
@@ -2383,7 +2386,7 @@ This skill uses:
 
 ## Notes
 
-- Review reports are saved separately as `story.{epic}.{story}.review.{n}.{descriptive-name}.md`. Use DOTS as structural separators and hyphens within the descriptive name. Example: `story.178.8.review.1.example-feature.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
+- Review reports are saved as `story.{epic}.{story}.review.{n}.{story-name}.md`, where `{story-name}` is the parent story file's own name slug (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — NOT a free-form descriptive slug summarizing the review focus. Use DOTS as structural separators. Example: parent story `story.1.2.configure-typescript-path-mapping.md` → review `story.1.2.review.1.configure-typescript-path-mapping.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
 - Story status is updated in-place only when review outcome is READY TO IMPLEMENT and user confirms
 - Can be used at any stage: draft, in progress, completed
 - Use `--validate` flag (or natural language like "is this story ready?") for the automated non-interactive gate. Validate mode is a strict subset of interactive mode — same checks, same scoring, no questions, read-only, CI-friendly exit codes.
