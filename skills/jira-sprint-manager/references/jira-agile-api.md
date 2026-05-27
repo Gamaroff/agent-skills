@@ -12,7 +12,7 @@ No universal ID. Common defaults:
 - Company-managed projects: `customfield_10016` ("Story Points")
 - Team-managed projects: `customfield_10026` ("Story Points estimate")
 
-Discover for your tenant: `./scripts/discover-sp-field.sh` → emits the field ID. Export as `JIRA_SP_FIELD`.
+Discover for your tenant: `bash shared/resources/discover-sp-field.sh` → emits the field ID. Export as `JIRA_SP_FIELD`.
 
 ## Status localization
 

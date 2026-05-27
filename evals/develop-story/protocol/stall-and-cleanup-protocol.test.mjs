@@ -34,6 +34,11 @@ const STORY_ON_STOP  = path.join(REPO_ROOT, "skills", "develop-story", "scripts"
 const TASK_ON_STOP   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "on-stop.sh");
 const STORY_INSTALL  = path.join(REPO_ROOT, "skills", "develop-story", "scripts", "install-hooks.sh");
 const TASK_INSTALL   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "install-hooks.sh");
+// Canonical hook implementations live in shared/resources/ and are bundled into
+// each skill's references/ via `npm run bundle`. scripts/<name>.sh are thin
+// wrappers that exec the bundled copy — content invariants assert on the canonical.
+const SHARED_ON_STOP = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-on-stop.sh");
+const SHARED_INSTALL = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-install-hooks.sh");
 const HOOKS_DOC      = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-hooks.md");
 const STEP0_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-0-resolve-and-prepare.md");
 const STEP3_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-3-develop-loop.md");
@@ -76,8 +81,8 @@ test("#2b — develop-task Setup section names both hooks and points to install 
   assert.match(content, /references\/develop-pipeline-hooks\.md/,      "Setup section must link the canonical hooks doc");
 });
 
-test("#2b — develop-story on-stop.sh exists and honours stop_hook_active loop protection", async () => {
-  const content = await readFile(STORY_ON_STOP, "utf-8");
+test("#2b — canonical on-stop.sh honours stop_hook_active loop protection", async () => {
+  const content = await readFile(SHARED_ON_STOP, "utf-8");
   assert.match(content, /stop_hook_active/,                       "must read stop_hook_active flag");
   assert.match(content, /develop-pipeline\.lock/,                 "must reference pipeline lock file");
   assert.match(content, /current_step/,                           "must check current_step field");
@@ -85,25 +90,30 @@ test("#2b — develop-story on-stop.sh exists and honours stop_hook_active loop 
   assert.match(content, /set -uo pipefail/,                       "must use safe bash defaults");
 });
 
-test("#2b — develop-task on-stop.sh is byte-identical to develop-story on-stop.sh", async () => {
+test("#2b — develop-{story,task} on-stop.sh wrappers are byte-identical and exec the canonical", async () => {
   const storyHook = await readFile(STORY_ON_STOP, "utf-8");
   const taskHook  = await readFile(TASK_ON_STOP,  "utf-8");
-  assert.equal(taskHook, storyHook, "Both on-stop.sh scripts must be identical (the lock's `skill` field selects branch)");
+  assert.equal(taskHook, storyHook, "Both on-stop.sh wrappers must be identical");
+  assert.match(storyHook, /exec .*references\/develop-pipeline-on-stop\.sh/, "wrapper must exec the bundled canonical");
 });
 
-test("#2b — install-hooks.sh exists and is byte-identical between story and task", async () => {
+test("#2b — canonical install-hooks.sh contract", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.match(script, /set -euo pipefail/,                    "must use safe bash defaults");
+  assert.match(script, /command -v jq/,                        "must check for jq prerequisite");
+  assert.match(script, /\.agents\/skills\/develop-story/,      ".agents path candidate (npx skills add)");
+  assert.match(script, /\.claude\/skills\/develop-story/,      ".claude path candidate (symlink/monorepo)");
+  assert.match(script, /already registered/,                   "must be idempotent (skip on duplicate)");
+  assert.match(script, /--dry-run/,                            "must support --dry-run flag");
+  assert.match(script, /PreCompact/,                           "must register PreCompact hook");
+  assert.match(script, /Stop/,                                 "must register Stop hook");
+});
+
+test("#2b — develop-{story,task} install-hooks.sh wrappers are byte-identical and exec the canonical", async () => {
   const storyScript = await readFile(STORY_INSTALL, "utf-8");
   const taskScript  = await readFile(TASK_INSTALL,  "utf-8");
-  assert.equal(taskScript, storyScript, "install-hooks.sh must be byte-identical across develop-{story,task}");
-  // Core contract assertions
-  assert.match(storyScript, /set -euo pipefail/,                    "must use safe bash defaults");
-  assert.match(storyScript, /command -v jq/,                        "must check for jq prerequisite");
-  assert.match(storyScript, /\.agents\/skills\/develop-story/,      ".agents path candidate (npx skills add)");
-  assert.match(storyScript, /\.claude\/skills\/develop-story/,      ".claude path candidate (symlink/monorepo)");
-  assert.match(storyScript, /already registered/,                   "must be idempotent (skip on duplicate)");
-  assert.match(storyScript, /--dry-run/,                            "must support --dry-run flag");
-  assert.match(storyScript, /PreCompact/,                           "must register PreCompact hook");
-  assert.match(storyScript, /Stop/,                                 "must register Stop hook");
+  assert.equal(taskScript, storyScript, "install-hooks.sh wrappers must be byte-identical across develop-{story,task}");
+  assert.match(storyScript, /exec .*references\/develop-pipeline-install-hooks\.sh/, "wrapper must exec the bundled canonical");
 });
 
 test("#2b — SKILL.md Setup section advertises install-hooks.sh and links the canonical hooks doc", async () => {
