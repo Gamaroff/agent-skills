@@ -1,7 +1,9 @@
 #!/bin/bash
-# Shared helpers for jira-sprint-manager scripts.
-# Source from each script AFTER setting `set -euo pipefail`:
-#   source "$(dirname "$0")/_lib.sh"
+# Shared Jira helpers (auth header, paginated GET, ISO-8601 validation, retry).
+# Single source of truth. Hoisted to shared/resources/ and bundled into each
+# consuming skill's references/ via `npm run bundle`. Edit here, then re-bundle.
+# Source from a script under <skill>/scripts/ AFTER `set -euo pipefail`:
+#   source "$(dirname "$0")/../references/jira-sprint-lib.sh"
 #
 # This file deliberately does NOT set shell options — callers control that.
 
@@ -129,12 +131,12 @@ jsm_paginate_issues() {
     fi
     acc=$(jq -nc --argjson a "$acc" --argjson p "$JSM_BODY" '$a + ($p.issues // [])')
     page_len=$(jq -r '.issues | length' <<<"$JSM_BODY")
-    grand_total=$(jq -r '.total // 0' <<<"$JSM_BODY")
+    grand_total=$(jq -r '.total // empty' <<<"$JSM_BODY")
     if [ "$page_len" -eq 0 ]; then
       break
     fi
     start=$(( start + page_len ))
-    if [ "$start" -ge "$grand_total" ]; then
+    if [ -n "$grand_total" ] && [ "$start" -ge "$grand_total" ]; then
       break
     fi
   done

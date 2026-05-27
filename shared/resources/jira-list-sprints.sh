@@ -1,9 +1,11 @@
 #!/bin/bash
 # List sprints for a board, filtered by state.
-# Usage: list-sprints.sh <board_id> [state]
+# Usage: jira-list-sprints.sh <board_id> [state]
 #   state: future | active | closed | "future,active" (default: future,active)
+# Canonical copy lives in shared/resources/. Bundled into each consuming
+# skill's references/ via `npm run bundle`. Edit here, then re-bundle.
 set -euo pipefail
-source "$(dirname "$0")/_lib.sh"
+source "$(dirname "$0")/jira-sprint-lib.sh"
 
 BOARD_ID=${1:-}
 STATE=${2:-future,active}

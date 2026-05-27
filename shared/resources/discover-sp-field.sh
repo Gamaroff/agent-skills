@@ -6,7 +6,7 @@
 # Note: queries /rest/api/3/field (platform REST), not the Agile API — field
 # metadata only exists on the platform side.
 set -euo pipefail
-source "$(dirname "$0")/_lib.sh"
+source "$(dirname "$0")/../references/jira-sprint-lib.sh"
 
 jsm_require_env
 

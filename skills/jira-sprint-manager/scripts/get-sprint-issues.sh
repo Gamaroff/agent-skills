@@ -3,7 +3,7 @@
 # Each element: {key, summary, status, statusCategoryKey, resolution, points}
 # statusCategoryKey is "done" | "indeterminate" | "new" — localization-safe (use this, not .status.name).
 set -euo pipefail
-source "$(dirname "$0")/_lib.sh"
+source "$(dirname "$0")/../references/jira-sprint-lib.sh"
 
 SPRINT_ID=${1:-}
 STORY_POINTS_FIELD=${JIRA_SP_FIELD:-customfield_10026}

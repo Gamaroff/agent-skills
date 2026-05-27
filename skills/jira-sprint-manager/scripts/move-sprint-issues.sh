@@ -2,7 +2,7 @@
 # Move issues to a sprint or backlog. Auto-chunks to Jira's 50-issue limit.
 # Usage: move-sprint-issues.sh <target_sprint_id|backlog> <COMMA_SEPARATED_KEYS> [--dry-run]
 set -euo pipefail
-source "$(dirname "$0")/_lib.sh"
+source "$(dirname "$0")/../references/jira-sprint-lib.sh"
 
 TARGET=${1:-}
 SHIFT_KEYS=${2:-}

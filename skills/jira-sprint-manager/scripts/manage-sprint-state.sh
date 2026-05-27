@@ -5,7 +5,7 @@
 #   manage-sprint-state.sh <sprint_id> closed
 # Dates: ISO-8601 with timezone, e.g. 2026-05-26T09:00:00.000Z
 set -euo pipefail
-source "$(dirname "$0")/_lib.sh"
+source "$(dirname "$0")/../references/jira-sprint-lib.sh"
 
 SPRINT_ID=${1:-}
 STATE=${2:-}

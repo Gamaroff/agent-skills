@@ -2,7 +2,7 @@
 # Verify Jira credentials by calling GET /rest/api/3/myself.
 # Prints accountId + displayName on success; non-zero exit on failure.
 set -euo pipefail
-source "$(dirname "$0")/_lib.sh"
+source "$(dirname "$0")/../references/jira-sprint-lib.sh"
 
 jsm_require_env
 
