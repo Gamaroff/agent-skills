@@ -83,7 +83,11 @@ def package_skill(skill_path, output_dir=None):
 
     # Collect all shared/resources refs across all skill .md and .js files
     shared_to_bundle = {}  # filename -> source Path
-    for src_file in list(skill_path.rglob('*.md')) + list(skill_path.rglob('*.js')):
+    for src_file in (
+        list(skill_path.rglob('*.md'))
+        + list(skill_path.rglob('*.js'))
+        + list(skill_path.rglob('*.sh'))
+    ):
         refs = collect_shared_refs(src_file.read_text())
         for filename in refs:
             if filename in shared_to_bundle:
@@ -104,6 +108,8 @@ def package_skill(skill_path, output_dir=None):
         SHARED_REF_RE = re.compile(r'(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
         # Matches require("...path.../shared/resources/file") and rewrites to require("../references/file")
         JS_SHARED_RE = re.compile(r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)')
+        # Shell scripts under <skill>/scripts/ — rewrite ../…/shared/resources/<name> → ../references/<name>
+        SH_SHARED_RE = re.compile(r'(?:\.\./)+shared/resources/([A-Za-z0-9._-]+)')
 
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
             # Walk through the skill directory; rewrite shared/resources/ paths in .md and .js files
@@ -123,6 +129,10 @@ def package_skill(skill_path, output_dir=None):
                 elif file_path.suffix == '.js' and shared_to_bundle:
                     content = file_path.read_text()
                     rewritten = JS_SHARED_RE.sub(lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})', content)
+                    zipf.writestr(str(arcname), rewritten)
+                elif file_path.suffix == '.sh' and shared_to_bundle:
+                    content = file_path.read_text()
+                    rewritten = SH_SHARED_RE.sub(lambda m: f"../references/{m.group(1)}", content)
                     zipf.writestr(str(arcname), rewritten)
                 else:
                     zipf.write(file_path, arcname)

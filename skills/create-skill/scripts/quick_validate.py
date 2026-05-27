@@ -33,8 +33,13 @@ def find_repo_root(skill_path):
 
 
 def collect_shared_refs(content):
-    """Return list of filenames referenced via shared/resources/<filename>."""
-    return [f.rstrip('.,;:') for f in re.findall(r'shared/resources/([^\s`\'")\]*]+)', content)]
+    """Return list of filenames referenced via shared/resources/<filename>.
+
+    Filters out empty matches (e.g. when the regex captures only a trailing
+    sentence punctuation like 'shared/resources/.' which strips to '').
+    """
+    refs = [f.rstrip('.,;:') for f in re.findall(r'shared/resources/([^\s`\'")\]*]+)', content)]
+    return [r for r in refs if r]
 
 
 def validate_skill(skill_path):
