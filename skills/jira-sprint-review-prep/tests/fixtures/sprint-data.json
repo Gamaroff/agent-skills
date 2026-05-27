@@ -1,0 +1,56 @@
+{
+  "sprint": {
+    "id": 42,
+    "name": "Sprint 7 — Checkout refactor",
+    "goal": "Ship the new checkout flow behind a flag",
+    "startDate": "2026-05-01T09:00:00.000+0000",
+    "endDate": "2026-05-15T17:00:00.000+0000",
+    "state": "closed"
+  },
+  "issues": [
+    {
+      "key": "PROJ-101",
+      "summary": "Wire up new checkout endpoint",
+      "status": "Done",
+      "statusCategoryKey": "done",
+      "resolution": "Done",
+      "points": 5,
+      "qaApproval": "Approved",
+      "addedMidSprint": false,
+      "addedDate": null
+    },
+    {
+      "key": "PROJ-102",
+      "summary": "Migrate legacy tax calculator",
+      "status": "Done",
+      "statusCategoryKey": "done",
+      "resolution": null,
+      "points": 3,
+      "qaApproval": "Not Tracked",
+      "addedMidSprint": false,
+      "addedDate": null
+    },
+    {
+      "key": "PROJ-103",
+      "summary": "Add feature flag UI toggle",
+      "status": "In Progress",
+      "statusCategoryKey": "indeterminate",
+      "resolution": null,
+      "points": 2,
+      "qaApproval": "Not Tracked",
+      "addedMidSprint": false,
+      "addedDate": null
+    },
+    {
+      "key": "PROJ-104",
+      "summary": "Hotfix — payment gateway timeout",
+      "status": "Done",
+      "statusCategoryKey": "done",
+      "resolution": "Done",
+      "points": 2,
+      "qaApproval": "Approved",
+      "addedMidSprint": true,
+      "addedDate": "2026-05-08T14:00:00.000+0000"
+    }
+  ]
+}
