@@ -11,7 +11,7 @@ task-ref: task.8.audit-bug-report-and-epic-registry-manager.md
 
 ## Overview
 
-Two skills weren't deeply inspected during the parity audit. This task reads them, classifies their gap (none / small / large), and either remediates inline or spawns follow-ups. The audit *is* the deliverable — code changes are conditional.
+Two skills weren't deeply inspected during the parity audit. This task reads them, classifies their gap (none / small / large), and either remediates inline or spawns follow-ups. The audit _is_ the deliverable — code changes are conditional.
 
 ## Phase-by-Phase Implementation Guide
 
@@ -43,7 +43,7 @@ grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian|milestone' "$SKILL"
 Read the file end-to-end. Also read the registry file format:
 
 ```bash
-ls docs/epic-registry.md 2>/dev/null
+ls docs/development/epic-registry.md 2>/dev/null
 # (or wherever the registry is conventionally located in target projects — read create-task line ~552 for the path reference)
 ```
 
@@ -66,22 +66,26 @@ Structure:
 ## create-bug-report
 
 ### Surface
+
 - Outputs: ...
 - Tracker side-effects: ...
 - Frontmatter fields: ...
 - Called from: ...
 
 ### Platform calls inventory
-| Line | Snippet | Platform |
-|------|---------|----------|
-| ...  | gh issue create ... | GitHub |
+
+| Line | Snippet             | Platform |
+| ---- | ------------------- | -------- |
+| ...  | gh issue create ... | GitHub   |
 
 ### Gap classification
+
 - [ ] No gap (skill platform-agnostic)
 - [ ] Inline fix (small dual-path patch)
 - [ ] Spawn follow-up task
 
 ### Recommendation
+
 {prose}
 
 ---
@@ -106,7 +110,7 @@ If Phase 3 classified anything as "spawn follow-up": run `/create-task` for each
 ## Key Patterns and References
 
 - **Dual-path pattern**: `skills/create-pr/SKILL.md`, `skills/finalise/SKILL.md` lines 312-329, `skills/create-task/SKILL.md` lines 425-509
-- **Registry path convention**: `skills/create-task/SKILL.md` line ~552 references `docs/epic-registry.md`
+- **Registry path convention**: `skills/create-task/SKILL.md` line ~552 references `docs/development/epic-registry.md`
 
 ## Testing Approach
 

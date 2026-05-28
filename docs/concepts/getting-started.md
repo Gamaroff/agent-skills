@@ -17,11 +17,11 @@ Before starting, confirm you have:
 
 Skills auto-detect your platform via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)). Pick the row that matches your project:
 
-| VCS | Tracker | Auth / env required |
-|---|---|---|
-| GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration |
-| GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
-| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| VCS       | Tracker       | Auth / env required                                                                                      |
+| --------- | ------------- | -------------------------------------------------------------------------------------------------------- |
+| GitHub    | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration              |
+| GitHub    | Jira          | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported                         |
+| Bitbucket | Jira          | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
 ### How to pick a row
 
@@ -46,13 +46,13 @@ gh auth login
 
 **Jira** (GitHub+Jira or Bitbucket+Jira):
 
-| Variable | Required | Description |
-|---|---|---|
-| `JIRA_URL` | ✅ | Jira instance URL, e.g. `https://yourorg.atlassian.net` |
-| `JIRA_USER_EMAIL` | ✅ | Email associated with your Jira account |
-| `JIRA_API_TOKEN` | ✅ | API token — generate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
-| `JIRA_PROJECT_KEY` | ✅ | Project key, e.g. `MYPROJ` — shown in Jira next to the project name |
-| `JIRA_BOARD_ID` | ⚠️ Scrum only | Board ID for backlog placement; skipped silently on Kanban boards |
+| Variable           | Required      | Description                                                                                                                                |
+| ------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `JIRA_URL`         | ✅            | Jira instance URL, e.g. `https://yourorg.atlassian.net`                                                                                    |
+| `JIRA_USER_EMAIL`  | ✅            | Email associated with your Jira account                                                                                                    |
+| `JIRA_API_TOKEN`   | ✅            | API token — generate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `JIRA_PROJECT_KEY` | ✅            | Project key, e.g. `MYPROJ` — shown in Jira next to the project name                                                                        |
+| `JIRA_BOARD_ID`    | ⚠️ Scrum only | Board ID for backlog placement; skipped silently on Kanban boards                                                                          |
 
 ```bash
 export JIRA_URL=https://yourorg.atlassian.net
@@ -64,11 +64,11 @@ export JIRA_BOARD_ID=1          # Scrum boards only
 
 **Bitbucket** (Bitbucket+Jira):
 
-| Variable | Required | Description |
-|---|---|---|
-| `BITBUCKET_USERNAME` | ✅ | Your Bitbucket username |
-| `BITBUCKET_APP_PASSWORD` | ✅ | App password — generate at Bitbucket → Settings → App passwords |
-| `BITBUCKET_REPO_URL` | optional | Override auto-detected repo base URL (rarely needed) |
+| Variable                 | Required | Description                                                     |
+| ------------------------ | -------- | --------------------------------------------------------------- |
+| `BITBUCKET_USERNAME`     | ✅       | Your Bitbucket username                                         |
+| `BITBUCKET_APP_PASSWORD` | ✅       | App password — generate at Bitbucket → Settings → App passwords |
+| `BITBUCKET_REPO_URL`     | optional | Override auto-detected repo base URL (rarely needed)            |
 
 ```bash
 export BITBUCKET_USERNAME=your-username
@@ -77,8 +77,8 @@ export BITBUCKET_APP_PASSWORD=your-app-password
 
 **Escape hatch:**
 
-| Variable | Effect |
-|---|---|
+| Variable         | Effect                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `SKIP_TRACKER=1` | Skip all remote tracker calls (GitHub Issues / Jira). Local files and registries still written. Useful offline or for planning-only runs. |
 
 ## Quick setup (wizard)
@@ -105,17 +105,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 
 The full wizard runs all 9 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
 
-| Step | Action | Skippable? |
-|------|---------|------------|
-| 1 | Checks `node`, `git`, `jq`, `curl` are on PATH — exits if any missing | No |
-| 2 | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira | No |
-| 3 | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input | — |
-| 4 | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore` | Yes |
-| 5 | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path | Yes (skips if file exists and you decline overwrite) |
-| 6 | Creates `docs/epic-registry.md` and `docs/tasks/task-registry.md` if absent | Idempotent |
-| 7 | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/` | Idempotent |
-| 8 | Downloads the latest release from GitHub and extracts skills into `.agents/skills/` | Yes |
-| 9 | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes |
+| Step | Action                                                                                                                             | Skippable?                                           |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 1    | Checks `node`, `git`, `jq`, `curl` are on PATH — exits if any missing                                                              | No                                                   |
+| 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira                                                                 | No                                                   |
+| 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
+| 4    | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore`                                                 | Yes                                                  |
+| 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
+| 6    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md` if absent                                            | Idempotent                                           |
+| 7    | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/`                                             | Idempotent                                           |
+| 8    | Downloads the latest release from GitHub and extracts skills into `.agents/skills/`                                                | Yes                                                  |
+| 9    | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes                                                  |
 
 ### Files produced
 
@@ -123,7 +123,7 @@ The full wizard runs all 9 steps. The `--update` flag runs only steps 1 and 8 �
 .env.example                          # credential keys, no values
 .env                                  # live credentials (if confirmed)
 skills-config.yaml                    # project configuration
-docs/epic-registry.md                 # empty — populated by /create-epic
+docs/development/epic-registry.md                 # empty — populated by /create-epic
 docs/tasks/task-registry.md           # empty — populated by /create-task
 .agents/skills/                       # installed skills
 .claude/settings.json                 # updated with pipeline hooks
@@ -177,10 +177,10 @@ bash .agents/skills/develop-task/scripts/install-hooks.sh
 
 This single script covers both pipelines. It is idempotent (safe to re-run), preserves any existing `settings.json` content, and requires `jq`.
 
-| Hook | Purpose |
-|------|---------|
-| `PreCompact` | Graceful pause before context compaction |
-| `Stop` | Force continuation if pipeline stops mid-run |
+| Hook          | Purpose                                                     |
+| ------------- | ----------------------------------------------------------- |
+| `PreCompact`  | Graceful pause before context compaction                    |
+| `Stop`        | Force continuation if pipeline stops mid-run                |
 | `PostToolUse` | Auto-advance lock + inject next-step banner on Skill return |
 
 Preview what it would change without writing:
@@ -244,7 +244,7 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 ```
 
-PRD and architecture roots are configurable (defaults shown). The *nested* layout under each root (epics, stories, QA artifacts) is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions). Full schema: [`../reference/configuration.md`](../reference/configuration.md).
+PRD and architecture roots are configurable (defaults shown). The _nested_ layout under each root (epics, stories, QA artifacts) is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions). Full schema: [`../reference/configuration.md`](../reference/configuration.md).
 
 ## 3. Create the registries
 
@@ -252,7 +252,7 @@ Stories and tasks need globally unique numbers. If you are working in a **new pr
 
 ```bash
 mkdir -p docs/tasks
-touch docs/epic-registry.md
+touch docs/development/epic-registry.md
 touch docs/tasks/task-registry.md
 ```
 
@@ -264,15 +264,15 @@ The first `/create-epic` and `/create-task` invocations will populate them. See 
 
 Not sure what to run? See [which-path.md](./which-path.md) — a three-question decision tree.
 
-| Goal | Read this |
-|---|---|
-| Greenfield project — no codebase yet | [New Project Setup](../runbooks/new-project-setup.md) |
+| Goal                                    | Read this                                                             |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| Greenfield project — no codebase yet    | [New Project Setup](../runbooks/new-project-setup.md)                 |
 | Existing codebase, no architecture docs | [Document Existing Project](../runbooks/document-existing-project.md) |
-| First user-facing feature | [Story Development](../runbooks/story-development.md) |
-| First refactor / infra task | [Task Development](../runbooks/task-development.md) |
-| Just learning what skills are | [Overview](./overview.md) |
+| First user-facing feature               | [Story Development](../runbooks/story-development.md)                 |
+| First refactor / infra task             | [Task Development](../runbooks/task-development.md)                   |
+| Just learning what skills are           | [Overview](./overview.md)                                             |
 
-**Story work introduces one extra concept:** story branches always target a parent *epic branch* (e.g. `feature/epic.{N}.name`), not `develop` directly. The epic branch is created from `develop` once per epic; story PRs merge into it. `/develop-story` will prompt you for this in Phase 0.
+**Story work introduces one extra concept:** story branches always target a parent _epic branch_ (e.g. `feature/epic.{N}.name`), not `develop` directly. The epic branch is created from `develop` once per epic; story PRs merge into it. `/develop-story` will prompt you for this in Phase 0.
 
 ## 5. Run your first command
 

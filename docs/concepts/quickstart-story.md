@@ -30,11 +30,11 @@ Universal:
 
 Platform-specific — pick the row that matches your project. Skills auto-detect via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)).
 
-| VCS | Tracker | Auth / env required |
-|---|---|---|
-| GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration |
-| GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
-| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| VCS       | Tracker       | Auth / env required                                                                                      |
+| --------- | ------------- | -------------------------------------------------------------------------------------------------------- |
+| GitHub    | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration              |
+| GitHub    | Jira          | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported                         |
+| Bitbucket | Jira          | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
 Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc.
 
@@ -82,7 +82,7 @@ When prompted, answer **No** to sharding (single-epic PRD needs no split).
 
 > `/create-epic docs/prd/footer-link/prd.footer-link.md`
 
-The skill assigns the next epic number from `docs/epic-registry.md` and writes:
+The skill assigns the next epic number from `docs/development/epic-registry.md` and writes:
 
 ```
 docs/prd/footer-link/epics/
@@ -119,12 +119,12 @@ No additional prompts beyond confirming the story title.
 
 Phase 0 of `/develop-story` will ask several questions. Recommended answers for a practice run:
 
-| Prompt | Recommended answer |
-|---|---|
-| Base branch | `develop` (or `main` if your repo has no `develop` branch) |
-| PR target | epic branch — `feature/epic.{N}.footer-link` |
-| Create epic branch from develop? | Yes |
-| Lite mode? | Yes — speeds up a trivial single-file story |
+| Prompt                           | Recommended answer                                         |
+| -------------------------------- | ---------------------------------------------------------- |
+| Base branch                      | `develop` (or `main` if your repo has no `develop` branch) |
+| PR target                        | epic branch — `feature/epic.{N}.footer-link`               |
+| Create epic branch from develop? | Yes                                                        |
+| Lite mode?                       | Yes — speeds up a trivial single-file story                |
 
 > **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). It skips the parallel QA agents and the traceability matrix step, but **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour. Pick `No` for anything with cross-file impact, security implications, or unclear acceptance criteria.
 
@@ -144,18 +144,18 @@ ls docs/prd/footer-link/epics/epic.{N}.footer-link/stories/story.{N}.1.add-foote
 
 You should have all 10 artifact types:
 
-| # | Artifact | What it is |
-|---|---|---|
-| 1 | `prd.footer-link.md` | Practice PRD |
-| 2 | `epic.{N}.footer-link.md` | Parent epic |
-| 3 | `story.{N}.1.add-footer-link.md` | Story spec |
-| 4 | `story.{N}.1.plan.add-footer-link.md` | Co-located implementation plan |
-| 5 | `story.{N}.1.review.1.add-footer-link.md` | Story review report |
-| 6 | `story.{N}.1.implementation.1.add-footer-link.md` | What was built + pipeline log |
-| 7 | PR URL | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
-| 8 | `story.{N}.1.qa.1.add-footer-link.md` | QA findings + traceability matrix |
-| 9 | `story.{N}.1.gate.1.add-footer-link.yml` | PASS / CONCERNS / FAIL gate |
-| 10 | `story.{N}.1.dod.1.add-footer-link.md` | Definition-of-Done checklist + sprint review summary |
+| #   | Artifact                                          | What it is                                                                 |
+| --- | ------------------------------------------------- | -------------------------------------------------------------------------- |
+| 1   | `prd.footer-link.md`                              | Practice PRD                                                               |
+| 2   | `epic.{N}.footer-link.md`                         | Parent epic                                                                |
+| 3   | `story.{N}.1.add-footer-link.md`                  | Story spec                                                                 |
+| 4   | `story.{N}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |
+| 5   | `story.{N}.1.review.1.add-footer-link.md`         | Story review report                                                        |
+| 6   | `story.{N}.1.implementation.1.add-footer-link.md` | What was built + pipeline log                                              |
+| 7   | PR URL                                            | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
+| 8   | `story.{N}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
+| 9   | `story.{N}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
+| 10  | `story.{N}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
 
 For annotated worked examples of the upstream artifacts, see [`examples/prd-example/`](../../examples/prd-example/) (the PRD that drove this onboarding effort) and [`examples/epic-examples/`](../../examples/epic-examples/) (its four epics). For a deliberate FAIL → PASS walkthrough, see [Day 3 — Messy Path](../runbooks/first-week/day-3-messy-path.md).
 
@@ -167,7 +167,7 @@ Pick one:
 
 **A. Keep the artifact as proof (recommended for first-time users).**
 
-Leave the branch as-is. Mark the epic row `CANCELLED` in `docs/epic-registry.md`. Mark the story `status: cancelled` in its frontmatter. Numbers are never recycled — the rows stay forever as records.
+Leave the branch as-is. Mark the epic row `CANCELLED` in `docs/development/epic-registry.md`. Mark the story `status: cancelled` in its frontmatter. Numbers are never recycled — the rows stay forever as records.
 
 > **What a registry row looks like:** epic rows have columns `Epic # | Tracker key | Domain | Folder | Title | Status | Created`. To cancel, change the `Status` cell to `CANCELLED` (or `🚫 Cancelled`) and leave the other cells untouched. Do **not** decrement the **Next Available Epic Number** counter — numbers stay used even when cancelled. Full schemas: [`../standards/epic-registry.md`](../standards/epic-registry.md), [`../standards/task-registry.md`](../standards/task-registry.md).
 
@@ -190,18 +190,18 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 
 ## What slowed you down?
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `gh auth status` not logged in | `gh` not configured | Run `gh auth login` |
-| `BITBUCKET_APP_PASSWORD` rejected | Token expired or missing scopes | Regenerate app password with `repo:write` + `pullrequest:write` scopes |
-| Jira issue creation fails | Wrong `JIRA_URL` or token | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
-| Skill picked wrong platform | Auto-detect mis-fired | Set explicit `tracker:` / `vcs:` in `skills-config.yaml` |
-| Phase 0 prompts differ from table above | Skill version drift | Check `.agents/skills/develop-story/` version |
-| `/develop-story` pauses at QA planning | Expected — test plan generation | Wait 30–60 s |
-| QA loop ran more than once | Practice change touched something non-trivial | Use a simpler story (one-line file change) |
-| Elapsed > 60 min | VCS/tracker API latency | API round-trips are out-of-scope; timer pauses while waiting |
-| Epic registry conflict on merge | Two branches appended the same row | Resolve conflict: increment the number in your branch |
-| Dual registry pollution | Pipeline bug triggered a task lane | Check `docs/tasks/task-registry.md`; mark any spurious row `CANCELLED` |
+| Symptom                                 | Likely cause                                  | Fix                                                                                       |
+| --------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `gh auth status` not logged in          | `gh` not configured                           | Run `gh auth login`                                                                       |
+| `BITBUCKET_APP_PASSWORD` rejected       | Token expired or missing scopes               | Regenerate app password with `repo:write` + `pullrequest:write` scopes                    |
+| Jira issue creation fails               | Wrong `JIRA_URL` or token                     | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
+| Skill picked wrong platform             | Auto-detect mis-fired                         | Set explicit `tracker:` / `vcs:` in `skills-config.yaml`                                  |
+| Phase 0 prompts differ from table above | Skill version drift                           | Check `.agents/skills/develop-story/` version                                             |
+| `/develop-story` pauses at QA planning  | Expected — test plan generation               | Wait 30–60 s                                                                              |
+| QA loop ran more than once              | Practice change touched something non-trivial | Use a simpler story (one-line file change)                                                |
+| Elapsed > 60 min                        | VCS/tracker API latency                       | API round-trips are out-of-scope; timer pauses while waiting                              |
+| Epic registry conflict on merge         | Two branches appended the same row            | Resolve conflict: increment the number in your branch                                     |
+| Dual registry pollution                 | Pipeline bug triggered a task lane            | Check `docs/tasks/task-registry.md`; mark any spurious row `CANCELLED`                    |
 
 ---
 
@@ -219,6 +219,6 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 
 ## Change Log
 
-| Date | Version | Description | Author |
-|---|---|---|---|
-| 2026-05-12 | 0.1.0 | Initial draft | dev-agent |
+| Date       | Version | Description   | Author    |
+| ---------- | ------- | ------------- | --------- |
+| 2026-05-12 | 0.1.0   | Initial draft | dev-agent |

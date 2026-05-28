@@ -9,7 +9,7 @@
 #   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
 #   4. .env files                 (.env.example always; .env optionally; gitignore)
 #   5. skills-config.yaml         (PRD path, story layout, coding-standards path)
-#   6. Registry creation          (docs/epic-registry.md, docs/tasks/task-registry.md)
+#   6. Registry creation          (docs/development/epic-registry.md, docs/tasks/task-registry.md)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
 #   8. Skills install             (latest release from github.com/Gamaroff/agent-skills)
 #   9. Pipeline hook install      (.claude/settings.json via inline jq)
@@ -367,12 +367,12 @@ create_registries() {
 
   local _created=0 _kept=0
 
-  if [[ -f "docs/epic-registry.md" ]]; then
-    info "docs/epic-registry.md exists — skipped"
+  if [[ -f "docs/development/epic-registry.md" ]]; then
+    info "docs/development/epic-registry.md exists — skipped"
     (( _kept++ )) || true
   else
-    touch_file "docs/epic-registry.md"
-    ok "docs/epic-registry.md"
+    touch_file "docs/development/epic-registry.md"
+    ok "docs/development/epic-registry.md"
     (( _created++ )) || true
   fi
 

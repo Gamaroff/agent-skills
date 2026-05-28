@@ -52,7 +52,7 @@ Implementation plans **must** live in-repo, co-located with the work or under `.
 ## Registries
 
 - **Task numbers** are globally unique. Read `docs/tasks/task-registry.md` → "Next Available Task Number" before creating a task. Append a row, increment counter, commit atomically.
-- **Epic numbers** are globally unique. Source of truth: `docs/epic-registry.md`.
+- **Epic numbers** are globally unique. Source of truth: `docs/development/epic-registry.md`.
 
 ## Validation before commit
 

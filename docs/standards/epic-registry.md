@@ -2,7 +2,7 @@
 
 > **Audience:** anyone creating an epic in a project that uses these skills.
 
-**Location:** `/docs/epic-registry.md` (inside the consuming project).
+**Location:** `/docs/development/epic-registry.md` (inside the consuming project).
 
 The epic registry tracks every epic in a project. Epic numbers are **globally unique** across the project and never reused.
 

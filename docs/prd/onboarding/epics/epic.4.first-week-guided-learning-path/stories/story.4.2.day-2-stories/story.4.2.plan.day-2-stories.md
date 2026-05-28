@@ -52,7 +52,7 @@ Pick **one** follow-up story in your working repo. Selection criteria:
 ## End of day — Verify
 
 - [ ] ≥ 1 story PR exists on GitHub for your work.
-- [ ] `docs/epic-registry.md` has the new epic row.
+- [ ] `docs/development/epic-registry.md` has the new epic row.
 - [ ] Story artifact dir has all 6 + finalise artifacts.
 
 ## What you learned
@@ -72,8 +72,8 @@ Per skeleton. Walkthrough verification on macOS.
 
 ## Risk register
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| `quickstart-story.md` not yet landed | Medium | Medium | Sequence 4.2 after 1.2 |
-| Day 2 exceeds 4-hour budget due to GH latency | High | Medium | Acknowledge latency in prereqs as out-of-control |
-| Follow-up story PR clashes with another user's PR | Low | Low | Use a distinct slug per user |
+| Risk                                              | Likelihood | Impact | Mitigation                                       |
+| ------------------------------------------------- | ---------- | ------ | ------------------------------------------------ |
+| `quickstart-story.md` not yet landed              | Medium     | Medium | Sequence 4.2 after 1.2                           |
+| Day 2 exceeds 4-hour budget due to GH latency     | High       | Medium | Acknowledge latency in prereqs as out-of-control |
+| Follow-up story PR clashes with another user's PR | Low        | Low    | Use a distinct slug per user                     |

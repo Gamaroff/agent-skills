@@ -38,9 +38,9 @@ Both `create-bug-report` and `epic-registry-manager` are **platform-agnostic**. 
 
 ### Platform Calls Inventory
 
-| Line | Snippet | Platform |
-|------|---------|----------|
-| (none) | — | — |
+| Line   | Snippet | Platform |
+| ------ | ------- | -------- |
+| (none) | —       | —        |
 
 `grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian|gh issue|gh pr|JIRA_URL|REMOTE_URL|platform'` → **zero matches**
 
@@ -67,10 +67,10 @@ The "Technical Task Bug Reports" Notes section (line 844) mentions "Quality gate
 - **File**: `skills/epic-registry-manager/SKILL.md` (114 lines)
 - **Scripts**: none (`scripts/` directory absent)
 - **Reference files**: `references/epic-registry.md` (sample registry table), `references/epic-template.md` (epic YAML frontmatter template)
-- **Outputs**: 
+- **Outputs**:
   - Epic directory structure under `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/`
   - Epic markdown file with YAML frontmatter
-  - Updated entry in `docs/epic-registry.md`
+  - Updated entry in `docs/development/epic-registry.md`
 - **Tracker side-effects**: **none** — no `gh`, Jira, or Bitbucket API calls
 - **Registry entry format**: `| NUMBER | - | domain/feature | epic.N.name | title | status | date |`
   - Second column is always `-` (unused placeholder — see observation below)
@@ -80,9 +80,9 @@ The "Technical Task Bug Reports" Notes section (line 844) mentions "Quality gate
 
 ### Platform Calls Inventory
 
-| Line | Snippet | Platform |
-|------|---------|----------|
-| 57 | `"domain-name"` (example domain name in text) | None — not a platform call |
+| Line | Snippet                                       | Platform                   |
+| ---- | --------------------------------------------- | -------------------------- |
+| 57   | `"domain-name"` (example domain name in text) | None — not a platform call |
 
 `grep -nE '\bgh |jira|JIRA|bitbucket|curl|atlassian|milestone|gh issue|gh pr|JIRA_URL|REMOTE_URL|platform'` → **one match**, which is the string `"domain-name"` used as an example domain name, not a platform API call.
 
@@ -104,10 +104,10 @@ The registry entry has a second column that is always `-`. This column has no do
 
 ## Summary Table
 
-| Skill | GH calls | Jira calls | BB calls | Gap severity | Classification |
-|-------|----------|------------|----------|--------------|----------------|
-| `create-bug-report` | 0 | 0 | 0 | None | ✅ No gap |
-| `epic-registry-manager` | 0 | 0 | 0 | None | ✅ No gap |
+| Skill                   | GH calls | Jira calls | BB calls | Gap severity | Classification |
+| ----------------------- | -------- | ---------- | -------- | ------------ | -------------- |
+| `create-bug-report`     | 0        | 0          | 0        | None         | ✅ No gap      |
+| `epic-registry-manager` | 0        | 0          | 0        | None         | ✅ No gap      |
 
 ---
 

@@ -61,7 +61,7 @@ The Bitbucket+Jira parity audit (source plan: `~/.claude/plans/how-does-the-crea
 **`skills/epic-registry-manager/`**:
 
 - Per `CLAUDE.md`, lives under "Story/epic lifecycle" but its exact responsibilities aren't documented in the parity plan
-- `skills/create-task/SKILL.md` line ~552 references `docs/epic-registry.md` for milestone lookup — implies registry is a markdown file, GH-flavored (milestones are GH-specific)
+- `skills/create-task/SKILL.md` line ~552 references `docs/development/epic-registry.md` for milestone lookup — implies registry is a markdown file, GH-flavored (milestones are GH-specific)
 - Open question: does the registry have a Jira-aware shape?
 
 ## 4. Scope
@@ -103,7 +103,7 @@ None expected from the audit itself. Any inline remediation must be additive (pr
   - [x] Read full file
   - [x] Same grep
   - [x] Document: registry file shape, what fields it manages, GH-specific vs platform-agnostic
-  - [x] Check: how does it interact with `docs/epic-registry.md`? Is the registry GH-flavored (milestones) or platform-neutral?
+  - [x] Check: how does it interact with `docs/development/epic-registry.md`? Is the registry GH-flavored (milestones) or platform-neutral?
 
 **Phase 3 — Decision and write-up (Low risk)**
 
@@ -206,16 +206,19 @@ None expected from the audit itself. Any inline remediation must be additive (pr
 **Testing Results**: Audit-only deliverable — no tests applicable. Peer review is the appropriate validation (per task testing strategy). `grep -nE` commands serve as the primary evidence mechanism; results documented in findings report.
 
 **Files Modified/Created**:
+
 - `docs/tasks/task.8.audit-bug-report-and-epic-registry-manager/task.8.audit.1.findings.md` — **created** (audit deliverable)
 - `docs/tasks/task.8.audit-bug-report-and-epic-registry-manager/task.8.audit-bug-report-and-epic-registry-manager.md` — **modified** (phase checkboxes, success criteria, status, this record)
 
 **Files Read (audit inputs, not modified)**:
+
 - `skills/create-bug-report/SKILL.md`
 - `skills/epic-registry-manager/SKILL.md`
 - `skills/epic-registry-manager/references/epic-registry.md`
 - `skills/epic-registry-manager/references/epic-template.md`
 
 **Change Log**:
+
 - 2026-05-06: Completed audit of both skills; no platform gaps found; findings report written
 
 **Deferred Work**: None
@@ -233,16 +236,19 @@ None expected from the audit itself. Any inline remediation must be additive (pr
 **Gate Decision**: PASS
 
 ### QA Report
+
 - **Full Report**: [task.8.qa.1.audit-findings-review.md](./task.8.qa.1.audit-findings-review.md)
 - **Gate File**: [task.8.gate.1.audit-findings-review.yml](./task.8.gate.1.audit-findings-review.yml)
 
 ### Test Coverage Summary
+
 - **Tests Executed**: 0 (audit-only; no code tests applicable)
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
+
 No critical issues identified. Both skills confirmed platform-agnostic. Findings report comprehensive and well-evidenced. Parity audit loop closed.
 
 ---
