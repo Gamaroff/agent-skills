@@ -60,6 +60,24 @@ ls {task-directory}/task.{id}.review.*.md 2>/dev/null | sort | tail -1
 - Log in Decisions Log: "review-task skipped — task status is `{status}` and review report exists at `{path}`"
 - Update Pipeline Progress: ✅ review-task (skipped — already reviewed)
 
+**Post skip notice to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 📋 Review — Step 2/8
+
+**Outcome**: Skipped — already reviewed
+**Status**: {status}
+**Review report**: {path}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+On failure: log warning in Issues Log and continue.
+
 Proceed to Step 3.
 
 ---
@@ -129,6 +147,50 @@ Re-read the document file and check the `Status:` field. Apply these autonomous 
 - **Non-blocking suggestions**: Log as "Proceeding despite minor review suggestions: {list}" and continue.
 - **Clean pass**: Log "Task review passed" and continue.
 - **Blocking issues** (missing success criteria, conflicting specs, or status still `Planned` after review): Log each in Issues Log, invoke `/commit-changes` (message: `docs(task.{id}): implementation report — review-task blocking halt`), then HALT: "review-task could not resolve blocking issues — human input required before development can proceed".
+
+---
+
+## Post Review Outcome to Tracker Issue
+
+After detecting outcomes and handling findings (non-blocking — skip if `TRACKER_ISSUE` is empty):
+
+#### develop-story
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 📋 Story Review Complete — Step 2/8
+
+**Outcome**: {Ready for Development / Needs Revision}
+**Review report**: {path, or 'not produced — see Issues Log'}
+**Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+#### develop-task
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 📋 Task Review Complete — Step 2/8
+
+**Outcome**: {Ready for Development / Needs Revision}
+**Review report**: {path, or 'not produced — see Issues Log'}
+**Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+On failure: log warning in Issues Log and continue.
+
+Do NOT post this comment when the path leads to a blocking HALT — commit + halt comes first and no comment is needed.
+
+Log in Decisions Log: "Review outcome comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
 ---
 

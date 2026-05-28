@@ -156,6 +156,46 @@ Main reads only the triage summary (counts + ≤10 failure bullets + `next_file`
 
 Update Pipeline Progress: ✅ develop.
 
+**Post development completion to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty). Execute this before the lock-advance Bash call — it is a tool call, not prose, and does not violate the no-prose-before-lock-advance rule:
+
+#### develop-story
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🛠️ Development Complete — Step 3/8
+
+**Status**: Ready for Review
+**Tasks completed**: {audit.completed}/{audit.total}
+**Tests**: {all passing / {N} failures — see implementation report}
+**Branch**: {branch}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+#### develop-task
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🛠️ Development Complete — Step 3/8
+
+**Status**: Ready for Review
+**Phases completed**: {audit.completed}/{audit.total}
+**Tests**: {all passing / {N} failures — see implementation report}
+**Branch**: {branch}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+Use `audit.completed` / `audit.total` from the final loop-audit result. Use the last `TEST_EXIT` value: `0` → "all passing"; non-zero → "{N} failures — see implementation report". On failure: log warning in Issues Log and continue.
+
+Log in Decisions Log: "Development completion comment posted to {TRACKER} issue {TRACKER_ISSUE}."
+
 **Apply the Step Transition Protocol from the orchestrator SKILL.md immediately.** Concretely, your next assistant turn after `/develop` returns MUST contain — in this order, with no prose between — (1) the Pipeline Progress ✅ update, (2) the Bash lock-update advancing `current_step` to 4, (3) the Step 4 banner, (4) the `/create-pr` invocation. Do NOT print "Returning to pipeline orchestrator", "Development complete", or any summary message before issuing the lock-update Bash tool call. The lock advancement is what proves Step 4 has started; if the model emits a summary instead, the pipeline will stall under context pressure (observed regression in live-github-test runs).
 
 ---

@@ -46,6 +46,7 @@ const STATUS_MAP = {
   "todo": "To Do",
   "to do": "To Do",
   "open": "To Do",
+  "ready-for-development": "To Do",
   "in progress": "In Progress",
   "in-progress": "In Progress",
   "doing": "In Progress",

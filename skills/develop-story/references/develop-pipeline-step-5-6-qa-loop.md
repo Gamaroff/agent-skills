@@ -152,6 +152,24 @@ Log the result in the QA Iteration History section:
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
 ```
 
+**Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
+
+**Issues found**: {count, or 'none'}
+{top 3 issues from gate file top_issues list, or 'No issues — proceeding to finalise'}
+**Action**: {Proceeding to finalise / Running qa-fix (cycle {N} of 5)}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
+
 ### 5b. Run QA Fix (shared)
 
 Invoke the `/qa-fix` skill with the path to the most recent **gate file** (the `.yml` file located using the sort command above). The gate file is the authoritative source of issues for qa-fix.
@@ -195,6 +213,23 @@ After fixes are applied:
    **Fixes Applied**: {brief description of what qa-fix changed}
    **Commit**: `{hash}`
    ```
+
+4a. **Post QA fix summary to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
+
+   ```bash
+   # GitHub
+   tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔧 QA Fix Cycle {N} Applied — Step 6/8
+
+   **Fixes applied**: {brief summary from qa-fix output}
+   **Commit**: \`{hash}\`"
+
+   # Jira — call addCommentToJiraIssue:
+   #   issueIdOrKey: {TRACKER_ISSUE}
+   #   commentBody: same markdown body above
+   #   contentFormat: "markdown"
+   ```
+
+   On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fix cycle {N} comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
 5. **Post-fix PR state check (uses tracker state poller)**: Invoke the tracker state poller (see `references/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty).
 
