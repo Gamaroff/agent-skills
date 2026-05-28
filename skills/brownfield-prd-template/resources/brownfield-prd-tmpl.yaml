@@ -230,7 +230,7 @@ sections:
     instruction: |
       For brownfield projects, favor a single comprehensive epic unless the user is clearly requesting multiple unrelated enhancements. Before presenting the epic structure, confirm: "Based on my analysis of your existing project, I believe this enhancement should be structured as [single epic/multiple epics] because [rationale based on actual project analysis]. Does this align with your understanding of the work required?"
 
-      IMPORTANT NOTE ON EPIC NUMBERING: In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers). When epic files are created, they will be assigned globally unique numbers from the system registry (/docs/epic-registry.md), such as epic.163.md, epic.164.md.
+      IMPORTANT NOTE ON EPIC NUMBERING: In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers). When epic files are created, they will be assigned globally unique numbers from the system registry (/docs/development/epic-registry.md), such as epic.163.md, epic.164.md.
     elicit: true
     sections:
       - id: epic-approach

@@ -15,17 +15,20 @@ Activate this skill when:
 - Want traceability from PRD sections to implementation epics
 
 **Natural activation triggers:**
+
 - "Create epics from the sharded PRD"
 - "Generate epic files from PRD shards"
 - "Convert PRD shards to implementation epics"
 
 **Prerequisites:**
+
 - PRD must be sharded first (using `shard-prd`)
 - Shards exist in PRD root directory (`${PRD_ROOT}/<system-name>/` — `${PRD_ROOT}` resolves to `docs/prd` by default; source `references/resolve-paths.sh` to override)
 - Understanding of system architecture and dependencies
-- **CRITICAL**: Access to epic registry (`/docs/epic-registry.md`) for number allocation
+- **CRITICAL**: Access to epic registry (`/docs/development/epic-registry.md`) for number allocation
 
 **Do NOT use for:**
+
 - PRDs that haven't been sharded (shard first)
 - Single-epic scenarios (brownfield typically uses one epic)
 - Stories without epic structure
@@ -81,12 +84,14 @@ Convert PRD shards into focused implementation epics:
 ### Step 1: Input Validation and Discovery
 
 **Locate PRD Shards:**
+
 - Identify PRD directory (user provides or prompt)
 - Verify sharded files exist
 - Read `index.md` to understand structure
 - List all shard files for processing
 
 **Example structure:**
+
 ```
 docs/prd/chat-system/
 ├── index.md                    # Overview
@@ -101,12 +106,14 @@ docs/prd/chat-system/
 For each shard, analyze:
 
 **Complexity Assessment:**
+
 - Feature scope and complexity level
 - Integration points with other components
 - Technical architecture requirements
 - Development effort (1-3 epics vs single epic)
 
 **Epic Identification:**
+
 - Identify natural boundaries for epic creation
 - Consider development dependencies and sequencing
 - Assess if shard needs multiple epics or single epic
@@ -123,7 +130,7 @@ prd_source: "[shard-filename.md]"
 epic_type: "system_implementation"
 priority: "[high|medium|low]"
 estimated_sprints: "[1-6]"
-dependencies: ["epic.163", "epic.164"]  # Use actual epic numbers from registry
+dependencies: ["epic.163", "epic.164"] # Use actual epic numbers from registry
 ---
 
 # Epic [N]: [Epic Name]
@@ -141,12 +148,15 @@ dependencies: ["epic.163", "epic.164"]  # Use actual epic numbers from registry
 ## Epic Description
 
 ### What We're Building
+
 [Detailed description of features and functionality]
 
 ### Why It Matters
+
 [Business value and user impact]
 
 ### Success Criteria
+
 - [ ] [Measurable outcome 1]
 - [ ] [Measurable outcome 2]
 - [ ] [Measurable outcome 3]
@@ -154,52 +164,63 @@ dependencies: ["epic.163", "epic.164"]  # Use actual epic numbers from registry
 ## Stories Breakdown
 
 ### Story 1: [Story Title]
+
 **As a** [user type]
 **I want** [functionality]
 **So that** [benefit]
 
 **Acceptance Criteria:**
+
 - [ ] [Specific criterion 1]
 - [ ] [Specific criterion 2]
 - [ ] [Specific criterion 3]
 
 **Technical Requirements:**
+
 - [ ] [Technical task 1]
 - [ ] [Technical task 2]
 
 ### Story 2: [Story Title]
+
 [Repeat structure...]
 
 ## Technical Architecture
 
 ### Components Involved
+
 - [Component 1]: [Role/responsibility]
 - [Component 2]: [Role/responsibility]
 
 ### Database Changes
+
 - [ ] [Table/model changes]
 - [ ] [Migration requirements]
 
 ### API Changes
+
 - [ ] [New endpoints]
 - [ ] [Modified endpoints]
 
 ### Integration Points
+
 - [ ] [External system integrations]
 - [ ] [Internal service dependencies]
 
 ## Dependencies
 
 **Depends On:**
+
 - [ ] Epic [N]: [Epic name] - [Reason]
 - [ ] [External dependency] - [Reason]
 
 **Blocks:**
+
 - [ ] Epic [N]: [Epic name] - [Reason]
 
 ## Risks & Mitigation
 
 **Primary Risks:**
+
 - **Risk**: [Description]
   - **Probability**: [High/Medium/Low]
   - **Impact**: [High/Medium/Low]
@@ -237,12 +258,14 @@ dependencies: ["epic.163", "epic.164"]  # Use actual epic numbers from registry
 **CRITICAL - Epic Registry Integration:**
 
 Before creating any epic files, you MUST:
-1. Check `/docs/epic-registry.md` for next available epic number
+
+1. Check `/docs/development/epic-registry.md` for next available epic number
 2. Reserve N sequential numbers in the registry (where N = number of epics you're creating)
 3. Update "Next Available Epic Number" counter in registry
 4. Use the reserved numbers for your epic files
 
 **Example Registry Workflow:**
+
 - Registry shows "Next Available Epic Number: 163"
 - You're creating 3 epics
 - Reserve numbers 163, 164, 165
@@ -250,12 +273,14 @@ Before creating any epic files, you MUST:
 - Use these numbers in filenames below
 
 **File Naming Convention:**
+
 - Format: `epic.[number].[feature-name].md` (NOTE: Use DOTS, not dashes)
 - Use globally unique sequential numbers from registry
 - Lowercase with hyphens for descriptive names only
 - Example: `epic.163.basic-messaging.md` (NOT `epic-163-basic-messaging.md`)
 
 **Epic Directory:**
+
 ```
 ${PRD_ROOT}/[system-name]/epics/
 ├── epic.163.core-infrastructure.md
@@ -268,7 +293,7 @@ ${PRD_ROOT}/[system-name]/epics/
 
 Create `epics/index.md`:
 
-```markdown
+````markdown
 # [System Name] Implementation Epics
 
 ## Overview
@@ -279,13 +304,16 @@ represents focused development phase with clear deliverables.
 ## Epic Roadmap
 
 ### Phase 1: Foundation
+
 - [Epic 163: Core Infrastructure](./epic.163.core-infrastructure.md)
 
 ### Phase 2: Core Features
+
 - [Epic 164: Basic Features](./epic.164.basic-features.md)
 - [Epic 165: Integration Layer](./epic.165.integration-layer.md)
 
 ### Phase 3: Advanced Features
+
 - [Epic 166: Advanced Features](./epic.166.advanced-features.md)
 
 ## Dependencies
@@ -297,6 +325,7 @@ graph TD
     B --> D[Epic 4]
     C --> D
 ```
+````
 
 ## Development Timeline
 
@@ -310,7 +339,8 @@ graph TD
 - [System metric 1]
 - [System metric 2]
 - [User adoption target]
-```
+
+````
 
 ### Step 6: Quality Validation
 
@@ -363,18 +393,21 @@ Epics ready for:
 - Sprint planning and refinement
 - Architecture review
 - Resource allocation
-```
+````
 
 ## Integration with Other Skills
 
 **Called by:**
+
 - `shard-prd` - After sharding completion
 - User request - Direct activation
 
 **Requires:**
+
 - `shard-prd` - Must be run first
 
 **Leads to:**
+
 - Story refinement workshops
 - Sprint planning
 - Architecture review

@@ -2,7 +2,7 @@
 ╔═══════════════════════════════════════════════════════════════╗
 ║ ⚠️  CRITICAL: Check Epic Registry BEFORE Creating This Epic  ║
 ║                                                                ║
-║ 1. Open: /docs/epic-registry.md                  ║
+║ 1. Open: /docs/development/epic-registry.md                  ║
 ║ 2. Use "Next Available Epic Number" for YOUR epic number     ║
 ║ 3. Update registry table with your epic details              ║
 ║ 4. Increment "Next Available Epic Number" counter            ║
@@ -13,6 +13,7 @@
 -->
 
 ---
+
 title: 'Epic [N]: [Epic Name]'
 prd_source: '[source-document].md'
 epic_type: 'system_implementation | feature_enhancement | infrastructure | integration'
@@ -25,6 +26,7 @@ blocked_by: ['epic-X'] # Optional, only if blocked
 team: ['developer-1', 'developer-2', 'designer', 'qa']
 start_date: 'YYYY-MM-DD' # Optional
 target_date: 'YYYY-MM-DD' # Optional
+
 ---
 
 # Epic [N]: [Epic Name]
@@ -347,7 +349,6 @@ Re-render
 **Integrations Required**:
 
 - **[System 1]**: [How this epic integrates]
-
   - Integration type: [API, Event, Direct call]
   - Data flow: [Direction and format]
   - Error handling: [Strategy]
@@ -371,7 +372,6 @@ Re-render
 ### Depends On (Blockers)
 
 - [ ] **Epic [N]**: [Epic Name]
-
   - **Reason**: [Why this is a dependency]
   - **Status**: [Status]
   - **Impact if not complete**: [Impact description]
@@ -384,7 +384,6 @@ Re-render
 ### Blocks (What this epic enables)
 
 - [ ] **Epic [N+1]**: [Epic Name]
-
   - **Reason**: [Why Epic [N+1] depends on this]
   - **Specific requirement**: [What specifically is needed]
 

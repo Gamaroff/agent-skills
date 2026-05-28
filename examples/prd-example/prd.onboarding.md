@@ -9,7 +9,14 @@ version: 0.1.0
 created: 2026-05-11
 author: dogfood-pipeline-run
 source_plan: ~/.claude/plans/i-want-to-dogfood-concurrent-sparkle.md
-stepsCompleted: [intro-analysis, requirements, technical-constraints, epic-structure, epic-details]
+stepsCompleted:
+  [
+    intro-analysis,
+    requirements,
+    technical-constraints,
+    epic-structure,
+    epic-details,
+  ]
 captured_skill_version: 0.1.0
 captured_date: 2026-05-12
 source_sha: ea106b1521706dc2c710e93996c0554c80a4c528
@@ -60,13 +67,13 @@ The repo ships 124+ skills, including the full PRD → epic → story → develo
 
 The repo also has a real product gap: docs are reference-shaped. `docs/concepts/getting-started.md` terminates at "read the runbooks." Anchor runbooks (`story-development.md` at 274 lines) are intimidating cold entry points. Satellite runbooks (51–96 lines) are too lean. The word `tutorial` appears zero times across the docs; `quickstart` appears zero times. `examples/README.md` explicitly states no PRD/epic/story examples exist.
 
-Solving the onboarding gap **by dogfooding the story pipeline** kills both birds: the artifacts produced during the run *become* the worked examples the onboarding work calls for. This is meta-dogfooding — the deliverables of the work prove the pipeline that produced them.
+Solving the onboarding gap **by dogfooding the story pipeline** kills both birds: the artifacts produced during the run _become_ the worked examples the onboarding work calls for. This is meta-dogfooding — the deliverables of the work prove the pipeline that produced them.
 
 ### 1.5 Change Log
 
-| Change | Date | Version | Description | Author |
-|--------|------|---------|-------------|--------|
-| Initial draft | 2026-05-11 | 0.1.0 | First PRD produced by dogfooded `/create-prd` brownfield run | dogfood-pipeline |
+| Change        | Date       | Version | Description                                                  | Author           |
+| ------------- | ---------- | ------- | ------------------------------------------------------------ | ---------------- |
+| Initial draft | 2026-05-11 | 0.1.0   | First PRD produced by dogfooded `/create-prd` brownfield run | dogfood-pipeline |
 
 ## 2. Requirements
 
@@ -93,7 +100,7 @@ Solving the onboarding gap **by dogfooding the story pipeline** kills both birds
 ### 2.3 Compatibility Requirements
 
 - **CR1 (existing API compatibility):** N/A — this PRD adds documentation only; no code APIs, no `SKILL.md` frontmatter contracts, and no slash-command signatures change.
-- **CR2 (database / persistent schema compatibility):** Two registry files are touched: `docs/epic-registry.md` (created during this PRD's pre-flight) and `docs/tasks/task-registry.md` (untouched). Epic registry entries added during this PRD's run follow the exact format documented in `skills/epic-registry-manager/SKILL.md`.
+- **CR2 (database / persistent schema compatibility):** Two registry files are touched: `docs/development/epic-registry.md` (created during this PRD's pre-flight) and `docs/tasks/task-registry.md` (untouched). Epic registry entries added during this PRD's run follow the exact format documented in `skills/epic-registry-manager/SKILL.md`.
 - **CR3 (UI/UX consistency):** New docs match existing tone (terse, file-anchored, link-heavy) and follow markdown conventions present in `docs/concepts/` and `docs/runbooks/`. Frontmatter schemas match neighbours.
 - **CR4 (integration compatibility):** No existing runbook is rewritten — only augmented with prepend/append sections. `examples/README.md` is extended, not replaced. `README.md` gains a callout, not a restructure. The `documentation-standards-validator`, `documentation-status-lifecycle`, `file-naming`, and `epic-registry`/`task-registry` skills/standards are all respected.
 
@@ -116,7 +123,7 @@ Not applicable — this enhancement targets the documentation surface, not a GUI
 - **Database Integration Strategy:** N/A.
 - **API Integration Strategy:** N/A.
 - **Documentation Integration Strategy:** New docs slot into existing directories: `docs/concepts/` (quickstarts, decision tree), `docs/prd/onboarding/` (this PRD + its child epics + stories), `docs/runbooks/` (first-week index), `examples/` (worked artifacts).
-- **Testing Integration Strategy:** Each quickstart walkthrough is verified by *walking it* on a clean clone before its closing story is marked accepted. Each generated artifact passes `documentation-standards-validator`. The `pm-checklist` skill validates this PRD before any epic is created from it.
+- **Testing Integration Strategy:** Each quickstart walkthrough is verified by _walking it_ on a clean clone before its closing story is marked accepted. Each generated artifact passes `documentation-standards-validator`. The `pm-checklist` skill validates this PRD before any epic is created from it.
 
 ### 4.3 Code Organization and Standards
 
@@ -135,16 +142,16 @@ Not applicable — this enhancement targets the documentation surface, not a GUI
 ### 4.5 Risk Assessment and Mitigation
 
 - **Technical Risks:**
-  - *Risk:* Dogfood pipeline surfaces bugs in the story chain mid-run, blocking story completion.
-  - *Mitigation:* Pipeline bugs are filed as tasks (not as new stories in this PRD) and worked through the already-validated task pipeline. The story under development is paused, not abandoned.
+  - _Risk:_ Dogfood pipeline surfaces bugs in the story chain mid-run, blocking story completion.
+  - _Mitigation:_ Pipeline bugs are filed as tasks (not as new stories in this PRD) and worked through the already-validated task pipeline. The story under development is paused, not abandoned.
 
 - **Integration Risks:**
-  - *Risk:* Worked-example artifacts (Epic 2) get out of date as skills evolve, breaking the "verbatim output" guarantee.
-  - *Mitigation:* Each Epic-2 artifact records the skill version that produced it in frontmatter. Stale artifacts are flagged by `documentation-standards-validator` extensions filed as follow-up work.
+  - _Risk:_ Worked-example artifacts (Epic 2) get out of date as skills evolve, breaking the "verbatim output" guarantee.
+  - _Mitigation:_ Each Epic-2 artifact records the skill version that produced it in frontmatter. Stale artifacts are flagged by `documentation-standards-validator` extensions filed as follow-up work.
 
 - **Deployment Risks:**
-  - *Risk:* Scope sprawl — onboarding work invites endless polish.
-  - *Mitigation:* Hard cap: 4 epics, ~18 stories, 4,000 lines total (NFR5). Newly discovered gaps become tasks or future PRDs, not new stories in this PRD.
+  - _Risk:_ Scope sprawl — onboarding work invites endless polish.
+  - _Mitigation:_ Hard cap: 4 epics, ~18 stories, 4,000 lines total (NFR5). Newly discovered gaps become tasks or future PRDs, not new stories in this PRD.
 
 - **Mitigation Strategies (summary):** Strict scope cap; pipeline-bug routing to task lane; frontmatter versioning on worked examples; pre-merge walkthrough validation.
 
@@ -154,14 +161,14 @@ Not applicable — this enhancement targets the documentation surface, not a GUI
 
 Scored against the 6-signal rubric from `create-prd` SKILL.md Section 5:
 
-| Signal | Score | Rationale |
-|--------|:-----:|-----------|
-| Domain breadth | ✅ | 4 distinct functional areas: entry-point UX, worked examples, runbook augmentation, learning path |
-| Parallelism opportunity | ✅ | Epic 1 (entry) and Epic 3 (runbook wrappers) fully parallel; Epic 4 partially parallel after Epic 1 |
-| Story volume | ✅ | ~18 stories planned |
-| Dependency isolation | ➖ | Epic 2 depends on running the pipeline; Epic 4 Day-3 depends on Epic 2 messy-path artifact |
-| Risk isolation | ❌ | No high-risk area |
-| Timeline variance | ✅ | Quickstart (Epic 1) has higher urgency — biggest UX win |
+| Signal                  | Score | Rationale                                                                                           |
+| ----------------------- | :---: | --------------------------------------------------------------------------------------------------- |
+| Domain breadth          |  ✅   | 4 distinct functional areas: entry-point UX, worked examples, runbook augmentation, learning path   |
+| Parallelism opportunity |  ✅   | Epic 1 (entry) and Epic 3 (runbook wrappers) fully parallel; Epic 4 partially parallel after Epic 1 |
+| Story volume            |  ✅   | ~18 stories planned                                                                                 |
+| Dependency isolation    |  ➖   | Epic 2 depends on running the pipeline; Epic 4 Day-3 depends on Epic 2 messy-path artifact          |
+| Risk isolation          |  ❌   | No high-risk area                                                                                   |
+| Timeline variance       |  ✅   | Quickstart (Epic 1) has higher urgency — biggest UX win                                             |
 
 **Score: 4 / 6** → Multiple epics warranted.
 
@@ -184,7 +191,7 @@ Epic 2 (examples — produced by THIS pipeline run) ─→ Epic 4 (Day-3 uses me
 Epic 3 (runbook wrappers) ── independent
 ```
 
-> **Epic numbering note:** This PRD refers to epics as "Epic 1" through "Epic 4" (relative). Actual epic files get globally unique numbers from `docs/epic-registry.md` at creation time (the registry was bootstrapped during this PRD's pre-flight; current next-available number is **1**).
+> **Epic numbering note:** This PRD refers to epics as "Epic 1" through "Epic 4" (relative). Actual epic files get globally unique numbers from `docs/development/epic-registry.md` at creation time (the registry was bootstrapped during this PRD's pre-flight; current next-available number is **1**).
 
 ## 6. Epic Details
 
@@ -295,7 +302,7 @@ Epic 3 (runbook wrappers) ── independent
 
 ### Epic 2: Worked PRD / Epic / Story Examples
 
-**Epic Goal:** Eliminate the "no story/epic/PRD examples live here" caveat from `examples/README.md` by capturing real artifacts produced by *this very dogfood run* as worked examples — meta-dogfooding.
+**Epic Goal:** Eliminate the "no story/epic/PRD examples live here" caveat from `examples/README.md` by capturing real artifacts produced by _this very dogfood run_ as worked examples — meta-dogfooding.
 
 **Integration Requirements:** Add files under `examples/` mirroring PRD/epic/story artifacts produced during this PRD's pipeline run. No artifact is hand-crafted; each is a real pipeline output. Update `examples/README.md` to cross-link.
 
@@ -332,7 +339,7 @@ Epic 3 (runbook wrappers) ── independent
 **Integration Verification**
 
 - **IV1:** Canonical epic docs in `docs/prd/onboarding/epics/` remain the source of truth.
-- **IV2:** `docs/epic-registry.md` rows match the captured epics.
+- **IV2:** `docs/development/epic-registry.md` rows match the captured epics.
 - **IV3:** Validator passes.
 
 #### Story 2.3 — Capture a story with the messy path
@@ -545,12 +552,12 @@ Epic 3 (runbook wrappers) ── independent
 
 ### 7.1 Brownfield Quality Checks
 
-| Check | Result | Notes |
-|-------|:------:|-------|
-| **1. Measurability** | PASS | NFR1–NFR6 all have specific metrics (line counts, time bounds, validator pass). FRs use "step-by-step", "produces", "≤", "verbatim" — concrete. |
-| **2. Implementation Leakage** | PASS | No framework / library / data-structure names prescribe implementation. Skill names (`/create-task`, `/develop-story`) are the capability themselves. |
-| **3. Traceability** | PASS | Every FR traces to a Goal in §1.4 (FR1↔goal-1, FR2↔goal-2, FR3↔goal-3, FR4↔goal-1, FR5↔goal-4, FR6/7/8↔goal-3 & goal-5). |
-| **4. NFR SMART** | PASS | NFR3 specifies platforms; NFR4/5 specify line caps; NFR6 specifies provenance; NFR1/2 specify validators. All are S-M-A-R-T-or-condition-bound. |
+| Check                         | Result | Notes                                                                                                                                                 |
+| ----------------------------- | :----: | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Measurability**          |  PASS  | NFR1–NFR6 all have specific metrics (line counts, time bounds, validator pass). FRs use "step-by-step", "produces", "≤", "verbatim" — concrete.       |
+| **2. Implementation Leakage** |  PASS  | No framework / library / data-structure names prescribe implementation. Skill names (`/create-task`, `/develop-story`) are the capability themselves. |
+| **3. Traceability**           |  PASS  | Every FR traces to a Goal in §1.4 (FR1↔goal-1, FR2↔goal-2, FR3↔goal-3, FR4↔goal-1, FR5↔goal-4, FR6/7/8↔goal-3 & goal-5).                              |
+| **4. NFR SMART**              |  PASS  | NFR3 specifies platforms; NFR4/5 specify line caps; NFR6 specifies provenance; NFR1/2 specify validators. All are S-M-A-R-T-or-condition-bound.       |
 
 **Score: 4 / 4 passed.**
 
@@ -569,13 +576,13 @@ Epic 3 (runbook wrappers) ── independent
 
 ### 8.1 Architect Handoff Prompt
 
-> This brownfield PRD adds documentation (no source code changes), so a full architecture pass is **not required**. If an Architect *is* consulted, focus on:
+> This brownfield PRD adds documentation (no source code changes), so a full architecture pass is **not required**. If an Architect _is_ consulted, focus on:
 >
 > 1. **Doc-IA review:** Is the path `docs/prd/onboarding/` the right home, or should this nest deeper under `docs/prd/onboarding/tutorials/`? Decision: keep flat per pre-flight Q1.
 > 2. **Worked-example provenance pattern:** Should worked examples in `examples/` be symlinks, copies, or include directives? Recommend copies with skill-version frontmatter for stability.
 > 3. **Versioning of captured artifacts (Epic 2):** Confirm the frontmatter contract that records which skill version produced each captured artifact, so staleness can be detected programmatically later.
 >
-> No system topology diagram required — `mermaid-architect` step skipped (no new service boundary, no new external system). One Mermaid diagram lives *inside* Story 1.3 (the decision tree) — that's product content, not architecture.
+> No system topology diagram required — `mermaid-architect` step skipped (no new service boundary, no new external system). One Mermaid diagram lives _inside_ Story 1.3 (the decision tree) — that's product content, not architecture.
 
 ### 8.2 UX Expert Handoff Prompt
 
@@ -583,16 +590,16 @@ Epic 3 (runbook wrappers) ── independent
 
 ### 8.3 Implementation Handoff (recommended next step)
 
-1. Run `/create-epic` four times — one per Epic 1–4 in this PRD. Each call assigns the next number from `docs/epic-registry.md` (currently next-available = 1) and appends a registry row in the same commit.
+1. Run `/create-epic` four times — one per Epic 1–4 in this PRD. Each call assigns the next number from `docs/development/epic-registry.md` (currently next-available = 1) and appends a registry row in the same commit.
 2. Run `/create-story` per epic, starting with Epic 1 (highest priority, lowest deps).
 3. Validate the first story end-to-end with `/develop-story` before fanning out — this proves the dogfood loop closes.
 4. Capture any pipeline bugs surfaced during the run as **tasks** in `docs/tasks/` (not as new stories in this PRD).
-5. Epic 2 stories run *last* — they consume artifacts produced by Epics 1, 3, 4 runs.
+5. Epic 2 stories run _last_ — they consume artifacts produced by Epics 1, 3, 4 runs.
 
 ### 8.4 Integration Testing & Rollback
 
 - **Integration testing:** For each closing story, walk the affected quickstart / runbook on a clean clone before merging. Treat the walkthrough as the integration test.
-- **Rollback:** Pure-doc PRD — rollback = revert the PR. No DB / API / config state to unwind. The `docs/epic-registry.md` rows for cancelled epics keep their numbers (per registry rules) — they get marked `CANCELLED`, not deleted.
+- **Rollback:** Pure-doc PRD — rollback = revert the PR. No DB / API / config state to unwind. The `docs/development/epic-registry.md` rows for cancelled epics keep their numbers (per registry rules) — they get marked `CANCELLED`, not deleted.
 
 ---
 

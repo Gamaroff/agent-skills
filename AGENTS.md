@@ -111,7 +111,7 @@ Canonical rules: [`docs/standards/task-registry.md`](./docs/standards/task-regis
 
 ## Epic Registry
 
-Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/epic-registry.md` is the single source of truth.
+Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/development/epic-registry.md` is the single source of truth.
 
 ## Shared Resources
 

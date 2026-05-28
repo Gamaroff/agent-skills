@@ -51,11 +51,11 @@ The script: bumps version, updates CHANGELOG, commits `chore(release): vX.Y.Z`, 
 
 **Bump type guide:**
 
-| Bump | When |
-|---|---|
+| Bump      | When                                                                    |
+| --------- | ----------------------------------------------------------------------- |
 | `--patch` | Internal refactor, bug fix, doc edits — no user-facing behaviour change |
-| `--minor` | New skill, new optional config key, new shared resource |
-| `--major` | Skill renamed, frontmatter required fields changed, config key removed |
+| `--minor` | New skill, new optional config key, new shared resource                 |
+| `--major` | Skill renamed, frontmatter required fields changed, config key removed  |
 
 ### 4. Sync `develop` forward
 
@@ -89,15 +89,15 @@ bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setu
 
 The wizard sets up:
 
-| Step | What it does |
-|---|---|
-| Platform | Choose GitHub Issues, GitHub+Jira, or Bitbucket+Jira |
-| Credentials | Writes `.env` + `.env.example`; adds `.env` to `.gitignore` |
-| Config | Creates `skills-config.yaml` (PRD path, architecture path, coding-standards path) |
-| Registries | Creates `docs/epic-registry.md` and `docs/tasks/task-registry.md` |
-| Docs scaffold | Creates `docs/prd/` and `docs/architecture/concepts/` stub files |
-| Skills | Downloads latest tagged release → `.agents/skills/` |
-| Hooks | Patches `PreCompact`, `Stop`, `PostToolUse` into `.claude/settings.json` |
+| Step          | What it does                                                                      |
+| ------------- | --------------------------------------------------------------------------------- |
+| Platform      | Choose GitHub Issues, GitHub+Jira, or Bitbucket+Jira                              |
+| Credentials   | Writes `.env` + `.env.example`; adds `.env` to `.gitignore`                       |
+| Config        | Creates `skills-config.yaml` (PRD path, architecture path, coding-standards path) |
+| Registries    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md`     |
+| Docs scaffold | Creates `docs/prd/` and `docs/architecture/concepts/` stub files                  |
+| Skills        | Downloads latest tagged release → `.agents/skills/`                               |
+| Hooks         | Patches `PreCompact`, `Stop`, `PostToolUse` into `.claude/settings.json`          |
 
 ### Update skills only (skip wizard)
 

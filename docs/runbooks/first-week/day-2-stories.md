@@ -70,7 +70,7 @@ Pick **one** follow-up story in your working repo. Selection criteria:
 Run these checks before calling Day 2 done:
 
 - [ ] ≥ 1 story PR exists on GitHub (check with `gh pr list`)
-- [ ] `docs/epic-registry.md` has new epic row(s) for today's work
+- [ ] `docs/development/epic-registry.md` has new epic row(s) for today's work
 - [ ] Each story artifact directory has a full artifact set (≥ 6 files)
 - [ ] `gh auth status` still returns logged-in (confirm session did not expire mid-day)
 

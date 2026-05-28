@@ -10,17 +10,20 @@ Edit epic documents with comprehensive validation, cascade analysis for child st
 ## When to Use This Skill
 
 Use this skill when you need to:
+
 - **Modify epic goals, descriptions, or requirements**
 - **Update epic status, priority, or dependencies**
 - **Add/remove/update success criteria or story breakdowns**
 - **Perform full section rewrites with validation**
 
 Natural language triggers:
+
 - "Edit epic 178 to change priority to high"
 - "Update epic.246.feature-and-interface.md to add new story"
 - "Modify epic 163 success criteria"
 
 **Slash Command Usage:**
+
 ```bash
 # Using epic directory (auto-discovers epic file)
 /edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.178.feature-ui/
@@ -34,6 +37,7 @@ Natural language triggers:
 ```
 
 **Related Skills**:
+
 - `create-epic` - Create new epic documents
 - `create-epics-from-shards` - Generate epics from PRD sections
 - `edit-story` - Edit story documents (use this for story files)
@@ -46,6 +50,7 @@ Natural language triggers:
 **Flexible Invocation:**
 
 You can invoke this skill with either:
+
 - **A specific epic file**: `epic.178.feature-ui.md`
 - **An epic directory**: `epics/epic.178.feature-ui/`
 
@@ -127,6 +132,7 @@ Rejects: story.178.1.search-by-handle.md (if provided)
 4. Store original content for diff generation
 
 **Required Sections to Identify:**
+
 - Epic Goal
 - Background & Context
 - Epic Description
@@ -143,13 +149,13 @@ Rejects: story.178.1.search-by-handle.md (if provided)
 
 After the user describes their desired changes, classify each change into one of these categories:
 
-| Category | Fields / Sections | Cascade Analysis | Diff Approval Gate |
-|---|---|---|---|
-| **Metadata-only** | `title`, `epic_type`, `estimated_sprints`, `prd_source`, `legacy_epic_number`, goal/description/background text | **Skip entirely** | Auto-apply (inline confirmation) |
-| **Status change** | `status` field | Lightweight: check child story completion only (if → `completed`) | Auto-apply (inline confirmation) |
-| **Priority change** | `priority` field | Lightweight: check story priority alignment only | Auto-apply (inline confirmation) |
-| **Dependency change** | `dependencies` array | Targeted: check if stories reference old deps | Full blocking gate |
-| **Structural change** | Stories Breakdown section, story numbers, success criteria | **Full cascade analysis** | Full blocking gate |
+| Category              | Fields / Sections                                                                                               | Cascade Analysis                                                  | Diff Approval Gate               |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------- |
+| **Metadata-only**     | `title`, `epic_type`, `estimated_sprints`, `prd_source`, `legacy_epic_number`, goal/description/background text | **Skip entirely**                                                 | Auto-apply (inline confirmation) |
+| **Status change**     | `status` field                                                                                                  | Lightweight: check child story completion only (if → `completed`) | Auto-apply (inline confirmation) |
+| **Priority change**   | `priority` field                                                                                                | Lightweight: check story priority alignment only                  | Auto-apply (inline confirmation) |
+| **Dependency change** | `dependencies` array                                                                                            | Targeted: check if stories reference old deps                     | Full blocking gate               |
+| **Structural change** | Stories Breakdown section, story numbers, success criteria                                                      | **Full cascade analysis**                                         | Full blocking gate               |
 
 **Rule:** If a single edit spans multiple categories, use the **highest-risk category** in the table.
 
@@ -162,11 +168,13 @@ Store the classification result — it governs Step 4 and Step 5 behaviour.
 **Validate the following before allowing edits:**
 
 **A. YAML Frontmatter Structure**
+
 - Frontmatter exists and is valid YAML
 - Contains required fields (title, epic_type, priority, etc.)
 - Status values are valid: `not-started`, `in-progress`, `ready-for-qa`, `qa-in-progress`, `completed`, `blocked`
 
 **B. File Naming Convention**
+
 - Filename follows pattern: `epic.[number].[name].md`
 - Uses DOTS for number separator (not underscores)
 - Uses hyphens for word separation in descriptive name (not underscores)
@@ -174,6 +182,7 @@ Store the classification result — it governs Step 4 and Step 5 behaviour.
 - Example invalid: `epic_163_account_security.md`
 
 **C. Required Sections Presence**
+
 - Epic Goal section exists
 - Stories Breakdown section exists
 - At least one story is defined
@@ -181,11 +190,13 @@ Store the classification result — it governs Step 4 and Step 5 behaviour.
 **Validation Failures:**
 
 If validation fails, present findings to user:
+
 > "Pre-edit validation found issues:
 >
 > {list of issues}
 >
 > Would you like to:
+>
 > 1. Fix these issues first (recommended)
 > 2. Proceed with edit anyway (may cause problems)
 > 3. Cancel edit operation"
@@ -238,6 +249,7 @@ If validation fails, present findings to user:
 3. **Generate Cascade Conflict Report**:
 
    If conflicts detected:
+
    ```
    CASCADE ANALYSIS REPORT
    =======================
@@ -265,16 +277,19 @@ If validation fails, present findings to user:
 4. **Present Report and Request Guidance**:
 
    If conflicts found:
+
    > "Cascade analysis detected {count} potential conflicts with child stories.
    >
    > {conflict report}
    >
    > Would you like to:
+   >
    > 1. Review and revise the proposed epic changes
    > 2. Proceed with epic edit (you'll need to update stories manually)
    > 3. Cancel edit operation"
 
    If no conflicts:
+
    > "Cascade analysis complete: No conflicts detected with {count} child stories."
 
 ---
@@ -283,10 +298,10 @@ If validation fails, present findings to user:
 
 **Behaviour is determined by the classification from Step 2b and cascade results:**
 
-| Condition | Behaviour |
-|---|---|
-| **Metadata-only or status/priority** AND **no cascade conflicts** | Show inline diff, apply immediately — no blocking gate |
-| **Dependency or structural change** OR **cascade conflicts flagged** | Full blocking approval gate (existing behaviour) |
+| Condition                                                            | Behaviour                                              |
+| -------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Metadata-only or status/priority** AND **no cascade conflicts**    | Show inline diff, apply immediately — no blocking gate |
+| **Dependency or structural change** OR **cascade conflicts flagged** | Full blocking approval gate (existing behaviour)       |
 
 **Actions:**
 
@@ -299,47 +314,52 @@ If validation fails, present findings to user:
 
 3a. **Low-risk path** (metadata-only / status / priority, no cascade conflicts):
 
-   Present inline:
-   ```
-   CHANGE PREVIEW
-   ==============
-   File: {filepath}
+Present inline:
 
-   {unified diff output}
+```
+CHANGE PREVIEW
+==============
+File: {filepath}
 
-   Change classification: {metadata-only | status | priority} — applying directly.
-   ```
-   Proceed to Step 6 without waiting for user approval.
+{unified diff output}
+
+Change classification: {metadata-only | status | priority} — applying directly.
+```
+
+Proceed to Step 6 without waiting for user approval.
 
 3b. **Standard path** (dependency/structural change, or cascade conflicts):
 
-   Present diff to user:
-   ```
-   DIFF PREVIEW
-   ============
+Present diff to user:
 
-   File: {filepath}
+```
+DIFF PREVIEW
+============
 
-   --- Original
-   +++ Proposed
+File: {filepath}
 
-   {unified diff output}
+--- Original
++++ Proposed
 
-   SUMMARY:
-   - Lines added: {count}
-   - Lines removed: {count}
-   - Sections modified: {list}
-   ```
+{unified diff output}
 
-   Request user approval:
-   > "Please review the diff above.
-   >
-   > Would you like to:
-   > 1. Apply these changes
-   > 2. Revise the changes
-   > 3. Cancel edit operation"
+SUMMARY:
+- Lines added: {count}
+- Lines removed: {count}
+- Sections modified: {list}
+```
 
-   **Do NOT proceed to Step 6 without explicit user approval on the standard path.**
+Request user approval:
+
+> "Please review the diff above.
+>
+> Would you like to:
+>
+> 1.  Apply these changes
+> 2.  Revise the changes
+> 3.  Cancel edit operation"
+
+**Do NOT proceed to Step 6 without explicit user approval on the standard path.**
 
 ---
 
@@ -367,13 +387,15 @@ If validation fails, present findings to user:
    >
    > Next steps:
    > {if cascade conflicts were flagged}
+   >
    > - Review and update affected child stories:
    >   {list of affected story files}
-   > {endif}
+   >   {endif}
    > - Consider running validation on the epic
    > - Update epic registry if epic number or name changed"
 
 **If post-edit validation fails:**
+
 > "ERROR: Post-edit validation failed!
 >
 > Issues detected: {list}
@@ -386,17 +408,20 @@ If validation fails, present findings to user:
 ## Key Features
 
 ### 1. File Type Enforcement
+
 - **Rejects story files** immediately with helpful error message
 - Validates epic filename pattern before proceeding
 - Prevents accidental edits to wrong file types
 
 ### 2. Change Impact Classification
+
 - **Classifies every edit before running cascade analysis or diff approval**
 - Five categories: metadata-only, status, priority, dependency, structural
 - Determines which cascade sub-steps to run and whether approval gate is required
 - Eliminates unnecessary file loading and blocking prompts for low-risk changes
 
 ### 3. Cascade Analysis (Conditional)
+
 - **Unique to edit-epic skill**
 - Scope driven by change classification — skipped entirely for metadata-only edits
 - Targeted sub-steps for status/priority/dependency changes (no full story load)
@@ -404,16 +429,19 @@ If validation fails, present findings to user:
 - Provides actionable recommendations when conflicts are found
 
 ### 4. Comprehensive Validation
+
 - **Pre-edit validation**: YAML frontmatter, required sections, naming conventions, status values
 - **Post-edit validation**: File integrity, markdown syntax, frontmatter validity
 
 ### 5. Risk-Proportional Diff Preview
+
 - **All changes shown before (or alongside) applying**
 - Low-risk changes (metadata/status/priority, no cascade conflicts): inline preview, auto-apply
 - Higher-risk changes (dependency/structural, or cascade conflicts): blocking approval gate
 - Prevents accidental destructive edits without adding friction to routine updates
 
 ### 5. Multi-Operation Support
+
 - Add/remove sections
 - Update metadata (status, priority, dependencies)
 - Modify success criteria
@@ -427,16 +455,19 @@ If validation fails, present findings to user:
 ### File Naming Validation
 
 **Valid Patterns:**
+
 - `epic.163.module-security.md` ✓
 - `epic.246.feature-and-interface.md` ✓
 - `epic.178.feature-ui.md` ✓
 
 **Invalid Patterns:**
+
 - `epic_163_account_security.md` ✗ (underscores instead of dots)
 - `epic.163_module-security.md` ✗ (mixed separators)
 - `epic-163.module-security.md` ✗ (hyphen for number separator)
 
 **Rule from Documentation:**
+
 > Use DOTS for numbers: `epic.163.name.md` not `epic_163_name.md`
 > Use hyphens for word separation in descriptive names: `module-security` not `account_security`
 >
@@ -445,6 +476,7 @@ If validation fails, present findings to user:
 ### Status Value Validation
 
 **Valid Status Values:**
+
 - `not-started`
 - `in-progress`
 - `ready-for-qa`
@@ -453,16 +485,19 @@ If validation fails, present findings to user:
 - `blocked`
 
 **Rule from Documentation:**
+
 > Source: `.claude/documentation.md` lines 90-96
 
 ### YAML Frontmatter Requirements
 
 **Required Fields:**
+
 - `title:` - Epic title
 - `epic_type:` - Type classification
 - `priority:` - Priority level (low/medium/high)
 
 **Optional but Common Fields:**
+
 - `legacy_epic_number:` - Original epic number if migrated
 - `prd_source:` - Source PRD sections
 - `estimated_sprints:` - Effort estimate
@@ -506,23 +541,28 @@ If validation fails, present findings to user:
 ### Works Together With:
 
 **create-epic**:
+
 - Use `create-epic` to create new epic files
 - Use `edit-epic` to modify existing epic files
 
 **create-epics-from-shards**:
+
 - Generates epic files from PRD shards
 - Use `edit-epic` to refine generated epics
 
 **edit-story**:
+
 - Use `edit-epic` for epic files
 - Use `edit-story` for story files
 - Never mix - each skill validates file type
 
 **epic-registry-manager**:
+
 - If epic number changes, update registry using this skill
 - `edit-epic` will remind user to update registry
 
 **create-story**:
+
 - Epic edits may require new stories
 - Use `create-story` to generate stories matching updated epic
 
@@ -531,6 +571,7 @@ If validation fails, present findings to user:
 ## Workflow Examples
 
 **Low-risk path (metadata/priority change — no blocking gate):**
+
 ```
 User: /edit-epic epic.178.feature-ui/ "Update priority to high"
 
@@ -551,6 +592,7 @@ Agent:
 ```
 
 **High-risk path (structural change — full gate):**
+
 ```
 User: /edit-epic epic.178.feature-ui/ "Remove story 3 and add dependency on epic-163"
 
@@ -588,7 +630,7 @@ Agent:
 
 ## Notes
 
-- **Epic numbers are globally unique** - Check `/docs/epic-registry.md` if changing epic number
+- **Epic numbers are globally unique** - Check `/docs/development/epic-registry.md` if changing epic number
 - **Story files live in `stories/` subdirectory** - Per documentation structure requirements
 - **YAML frontmatter is critical** - Many systems depend on valid frontmatter
 - **Cascade analysis is unique to this skill** - Story edits don't need cascade checks
