@@ -133,7 +133,7 @@ question: 'How would you like the review output delivered?'
 header: 'Output Mode'
 options:
   - label: 'Co-located report'
-    description: 'Save a review-report.md alongside the PRD file for async review and future reference.'
+    description: 'Save a prd.review.{N}.{name}.md alongside the PRD file for async review and future reference.'
   - label: 'Inline action plan'
     description: 'Present prioritised recommendations immediately as numbered steps to action now.'
 ```
@@ -572,7 +572,9 @@ If flagged: recommend splitting into separate PRDs and suggest scope boundaries.
 
 **Option A — Co-located Report**:
 
-Save to: `${PRD_ROOT}/[domain]/[feature]/prd.[feature]-review-report.md`
+Save to: `${PRD_ROOT}/[domain]/[feature]/prd.review.{N}.{feature}.md`
+
+Determine `{N}` by globbing the PRD directory for existing `prd.review.*.{feature}.md` files and incrementing the highest index found (start at 1 if none exist).
 
 **Report structure**:
 
@@ -752,7 +754,7 @@ options:
 5. Report which fixes were applied and which (if any) were skipped with reason
 6. **Mark recommendations as implemented** — update both documents:
 
-   **In the review report** (`prd.[name]-review-report.md`):
+   **In the review report** (`prd.review.{N}.{name}.md`):
    - Add the following line immediately after the Epic/Story Readiness line in the Executive Summary:
      `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD`
      (or: `> **Implementation Status**: ✅ Critical/Major recommendations implemented — YYYY-MM-DD` if partial)

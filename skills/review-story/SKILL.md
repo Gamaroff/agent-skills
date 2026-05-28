@@ -1940,28 +1940,37 @@ Before executing any tool calls to apply changes to the story file or review mar
 
 ---
 
-### Step 9.6: Push Body Changes to Jira (when `TRACKER=jira` and fixes were applied)
+### Step 9.6: Sync Body Changes to Tracker (when fixes were applied)
 
-**Purpose**: When Step 9.5 applied any Edit to the story body, the local body hash will diverge from `jira_last_body_hash` and the Jira description must be re-rendered. Execute the bundled `sync-jira-story` script directly — do NOT speculate about other paths.
+**Purpose**: When Step 9.5 applied any Edit to the story body, sync the updated content back to the linked tracker issue (Jira or GitHub).
 
 **When to Execute**:
-- `TRACKER=jira` (set by Step 5 resolver) AND
-- At least one fix was applied in Step 9.5 (i.e. `FIXES_APPLIED` is non-empty) OR `jira_last_body_hash` is missing/stale
+- At least one fix was applied in Step 9.5 (i.e. `FIXES_APPLIED` is non-empty) AND
+- Not validate mode
 
-**Skip when**: `TRACKER=github`, validate mode, or no body edits were made.
+**Skip when**: validate mode or no body edits were made.
 
-**Command**:
+**Branch on TRACKER**:
+
+**Jira path** (`TRACKER=jira`):
 
 ```bash
 node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
   --file "$STORY_FILE_PATH"
 ```
 
-> **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-story/scripts/sync-jira-story.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist and never did. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
+> **Path note**: the script is bundled at `.agents/skills/sync-jira-story/scripts/sync-jira-story.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist and never did. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
 
 On success → `sync-jira-story` updates the Jira description, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed body update to Jira {jira_key}`.
 
 On non-zero exit → log warning `⚠️ sync-jira-story failed — Jira description may be stale` and continue to Step 10 (do not halt).
+
+**GitHub path** (`TRACKER=github`):
+
+Invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH={resolved story file path}`. The sub-skill updates the GitHub issue body and Change Log to match the edited story.
+
+On success → confirm: `✅ Pushed body update to GitHub issue #{github_issue}`.
+On failure → log warning `⚠️ sync-github-story failed — GitHub issue body may be stale` and continue to Step 10 (do not halt).
 
 ---
 
@@ -2011,6 +2020,20 @@ On non-zero exit → log warning `⚠️ sync-jira-story failed — Jira descrip
      | [date] | [version] | Review passed - ready for development | Review-Story |
      ```
    - Confirm update to user: "✅ Story status updated to 'Ready for Development'. You can now run `/develop` to begin implementation."
+
+   **After status edit — sync to tracker (non-blocking)**:
+
+   - **Jira path** (`TRACKER=jira`): run `sync-jira-story.js` to push the status transition and updated frontmatter:
+     ```bash
+     node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
+       --file "$STORY_FILE_PATH"
+     ```
+     On success → `✅ Status synced to Jira {jira_key}`.
+     On failure → log `⚠️ sync-jira-story failed after status update — Jira may be stale` and continue.
+
+   - **GitHub path** (`TRACKER=github`): invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH`. This reflects the new status in the GitHub issue body and Change Log.
+     On success → `✅ Status synced to GitHub issue #{github_issue}`.
+     On failure → log `⚠️ sync-github-story failed after status update — GitHub issue may be stale` and continue.
 
    **If "Keep current status"**:
    - Keep status unchanged
