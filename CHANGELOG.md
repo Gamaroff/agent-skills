@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+- **Docs:** reformat markdown tables in contributing and standards docs for improved readability.
+- **`epic-registry`:** fix registry path reference in docs.
+
 ## [v0.7.0] - 2026-05-28
 
 ### Removed
