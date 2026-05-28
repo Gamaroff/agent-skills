@@ -1,6 +1,7 @@
 ---
 name: review-prd
-description: "Deep interactive PRD review that verifies claims against the actual
+description:
+  "Deep interactive PRD review that verifies claims against the actual
   codebase, checks requirements traceability to epics/stories, detects staleness,
   and asks clarifying questions. Produces a co-located review report or inline action
   plan. Use to catch inaccuracies, gaps, and inconsistencies before epic/story work
@@ -91,11 +92,11 @@ Before starting the review, resolve the input to a local file path:
 
 **Step 1 — Detect input type:**
 
-| Pattern | Action |
-|---------|--------|
-| Absolute or relative file path ending in `.md` | Use directly |
-| Directory path containing `prd.` | Look for `prd.*.md` inside it |
-| Name string (e.g. "docker-infrastructure") | Search via Glob |
+| Pattern                                        | Action                        |
+| ---------------------------------------------- | ----------------------------- |
+| Absolute or relative file path ending in `.md` | Use directly                  |
+| Directory path containing `prd.`               | Look for `prd.*.md` inside it |
+| Name string (e.g. "docker-infrastructure")     | Search via Glob               |
 
 **Step 2 — Glob search for PRD by name:**
 
@@ -113,9 +114,11 @@ If the PRD directory contains multiple `.md` files (sharded via shard-prd), iden
 **Step 4 — Verify PRD exists.**
 
 If no match found: HALT with message:
+
 ```
 "No PRD found matching '[input]'. Available PRDs:"
 ```
+
 Then list results of `Glob: ${PRD_ROOT}/**/prd.*.md` and `Glob: ${PRD_ROOT}/**/index.md`.
 
 ---
@@ -129,37 +132,37 @@ Then list results of `Glob: ${PRD_ROOT}/**/prd.*.md` and `Glob: ${PRD_ROOT}/**/i
 Use `AskUserQuestion`:
 
 ```yaml
-question: 'How would you like the review output delivered?'
-header: 'Output Mode'
+question: "How would you like the review output delivered?"
+header: "Output Mode"
 options:
-  - label: 'Co-located report'
-    description: 'Save a prd.review.{N}.{name}.md alongside the PRD file for async review and future reference.'
-  - label: 'Inline action plan'
-    description: 'Present prioritised recommendations immediately as numbered steps to action now.'
+  - label: "Co-located report"
+    description: "Save a prd.review.{N}.{name}.md alongside the PRD file for async review and future reference."
+  - label: "Inline action plan"
+    description: "Present prioritised recommendations immediately as numbered steps to action now."
 ```
 
 Store choice as `output_mode` for Step 11.
 
 **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
 
-| Task Subject | Description |
-|---|---|
-| Determine output mode | Capture report vs inline action-plan preference |
-| Load PRD & references | Locate PRD file, template, architecture docs, child epics/stories |
-| Template/structure compliance | Verify PRD structure against brownfield template |
-| Technical accuracy verification | Grep/Glob codebase for claims made in PRD |
-| Requirements quality | Measurability, leakage, traceability, SMART NFRs |
-| QP1: Structure & accuracy | Ask clarifying questions about structure and accuracy findings |
-| Epic & story alignment | Check child epics/stories match PRD description |
-| Requirements traceability | FR -> epic -> story -> AC mapping |
-| Consistency check | Detect internal contradictions between PRD sections |
-| QP2: Alignment & traceability | Ask clarifying questions about alignment findings |
-| Staleness detection | Compare PRD claims against current code state |
-| Quality & clarity scoring | 6-dimension scorecard |
-| QP3: Quality & final | Ask final clarifying questions |
-| Recommendations | Produce prioritised action list |
-| Generate output | Produce report file or inline action plan |
-| Apply findings | Offer to fix PRD directly |
+| Task Subject                    | Description                                                       |
+| ------------------------------- | ----------------------------------------------------------------- |
+| Determine output mode           | Capture report vs inline action-plan preference                   |
+| Load PRD & references           | Locate PRD file, template, architecture docs, child epics/stories |
+| Template/structure compliance   | Verify PRD structure against brownfield template                  |
+| Technical accuracy verification | Grep/Glob codebase for claims made in PRD                         |
+| Requirements quality            | Measurability, leakage, traceability, SMART NFRs                  |
+| QP1: Structure & accuracy       | Ask clarifying questions about structure and accuracy findings    |
+| Epic & story alignment          | Check child epics/stories match PRD description                   |
+| Requirements traceability       | FR -> epic -> story -> AC mapping                                 |
+| Consistency check               | Detect internal contradictions between PRD sections               |
+| QP2: Alignment & traceability   | Ask clarifying questions about alignment findings                 |
+| Staleness detection             | Compare PRD claims against current code state                     |
+| Quality & clarity scoring       | 6-dimension scorecard                                             |
+| QP3: Quality & final            | Ask final clarifying questions                                    |
+| Recommendations                 | Produce prioritised action list                                   |
+| Generate output                 | Produce report file or inline action plan                         |
+| Apply findings                  | Offer to fix PRD directly                                         |
 
 ---
 
@@ -190,7 +193,7 @@ Store choice as `output_mode` for Step 11.
    - Glob: `${PRD_ROOT}/[domain]/[feature]/epics/epic.*/stories/**/story.*.md`
 
 6. **Load epic registry**:
-   - `docs/epic-registry.md`
+   - `docs/development/epic-registry.md`
 
 **Output**: Full context package ready for analysis.
 
@@ -204,16 +207,16 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 **Required sections to check**:
 
-| Section | Checks |
-|---------|--------|
-| **Intro Project Analysis & Context** | Existing Project Overview, Documentation Analysis, Enhancement Scope (type + description + impact), Goals/Background, Change Log — all present |
-| **Functional Requirements (FR)** | Numbered FR list present, each FR has clear description, integration awareness mentioned |
-| **Non-Functional Requirements (NFR)** | Numbered NFR list present, each NFR has measurable target (not vague adjectives) |
-| **Compatibility Requirements (CR)** | CR1 (API), CR2 (DB), CR3 (UI), CR4 (Integration) — all four present and specific |
-| **UI Enhancement Goals** | Present if enhancement includes UI changes; absent is acceptable if no UI impact stated |
-| **Technical Constraints & Integration** | Tech stack, integration approach, code organization, deployment, risk assessment — all subsections present |
-| **Epic & Story Structure** | (1) 6-signal complexity rubric applied and score documented; (2) single-epic choice is justified with explicit rationale if score is 0–2; (3) multiple epics proposed if score is 3+, each named and mapped to a PRD functional area; (4) cross-epic dependency map present if multiple epics |
-| **Epic Details** | Per-epic: goal stated, stories in user-story format, ACs numbered, IV (Integration Verification) sections present |
+| Section                                 | Checks                                                                                                                                                                                                                                                                                        |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Intro Project Analysis & Context**    | Existing Project Overview, Documentation Analysis, Enhancement Scope (type + description + impact), Goals/Background, Change Log — all present                                                                                                                                                |
+| **Functional Requirements (FR)**        | Numbered FR list present, each FR has clear description, integration awareness mentioned                                                                                                                                                                                                      |
+| **Non-Functional Requirements (NFR)**   | Numbered NFR list present, each NFR has measurable target (not vague adjectives)                                                                                                                                                                                                              |
+| **Compatibility Requirements (CR)**     | CR1 (API), CR2 (DB), CR3 (UI), CR4 (Integration) — all four present and specific                                                                                                                                                                                                              |
+| **UI Enhancement Goals**                | Present if enhancement includes UI changes; absent is acceptable if no UI impact stated                                                                                                                                                                                                       |
+| **Technical Constraints & Integration** | Tech stack, integration approach, code organization, deployment, risk assessment — all subsections present                                                                                                                                                                                    |
+| **Epic & Story Structure**              | (1) 6-signal complexity rubric applied and score documented; (2) single-epic choice is justified with explicit rationale if score is 0–2; (3) multiple epics proposed if score is 3+, each named and mapped to a PRD functional area; (4) cross-epic dependency map present if multiple epics |
+| **Epic Details**                        | Per-epic: goal stated, stories in user-story format, ACs numbered, IV (Integration Verification) sections present                                                                                                                                                                             |
 
 **Also check**:
 
@@ -305,6 +308,7 @@ Report: `[PASS] NFRs are SMART` or `[FAIL] N NFRs are not SMART: [list]`
 **Check 5 — CR Completeness (brownfield-specific):**
 
 Verify all four compatibility requirements are present and specific:
+
 - CR1 (API compatibility): names specific endpoints that must remain unchanged
 - CR2 (DB compatibility): mentions migration strategy
 - CR3 (UI consistency): references design system or existing patterns
@@ -335,14 +339,14 @@ Report: `[PASS] CRs complete and specific` or `[FAIL] N CRs missing or vague: [l
 
 ```yaml
 question: "The PRD references 'PaymentService' and 'POST /api/v1/payments', but neither exists in the codebase. Are these planned features described in the PRD, or should they reference existing implementations?"
-header: 'Unverified Claims'
+header: "Unverified Claims"
 options:
-  - label: 'Planned — these will be built'
-    description: 'The PRD correctly describes features to be implemented. No change needed.'
-  - label: 'Error — should reference existing code'
-    description: 'These are incorrect references. I will flag them for correction.'
-  - label: 'Partially planned'
-    description: 'Some are planned, some are errors. Let me clarify which is which.'
+  - label: "Planned — these will be built"
+    description: "The PRD correctly describes features to be implemented. No change needed."
+  - label: "Error — should reference existing code"
+    description: "These are incorrect references. I will flag them for correction."
+  - label: "Partially planned"
+    description: "Some are planned, some are errors. Let me clarify which is which."
 ```
 
 **After answers**: Update issue severity based on user's clarifications. Proceed to Step 5.
@@ -370,11 +374,11 @@ options:
 
 3. Build an **Epic Coverage Matrix**:
 
-| PRD Deliverable / Requirement | Covered By Epic | Covered By Story | Gap? |
-|-------------------------------|----------------|-----------------|------|
-| [FR1: Feature description] | epic.N.name | story.N.1.name | ✅ |
-| [FR2: Feature description] | — | — | ❌ No epic |
-| [Out of Scope item] | epic.N.name | story.N.3.name | ⚠️ Scope creep |
+| PRD Deliverable / Requirement | Covered By Epic | Covered By Story | Gap?           |
+| ----------------------------- | --------------- | ---------------- | -------------- |
+| [FR1: Feature description]    | epic.N.name     | story.N.1.name   | ✅             |
+| [FR2: Feature description]    | —               | —                | ❌ No epic     |
+| [Out of Scope item]           | epic.N.name     | story.N.3.name   | ⚠️ Scope creep |
 
 **Collect all issues — do NOT ask questions yet. Proceed to Step 6.**
 
@@ -386,12 +390,12 @@ options:
 
 **Build a traceability matrix**:
 
-| Requirement | Epic | Story | AC(s) | IV Present? | Status |
-|-------------|------|-------|-------|-------------|--------|
-| FR1 | epic.3.docker | story.3.1.setup | AC1, AC3 | Yes (IV1-IV3) | ✅ Fully traced |
-| FR2 | — | — | — | — | ❌ NOT TRACED |
-| NFR1 | epic.3.docker | story.3.2.perf | AC2 | Yes (IV3) | ⚠️ Partial |
-| CR1 | — | — | — | — | ❌ NOT TRACED |
+| Requirement | Epic          | Story           | AC(s)    | IV Present?   | Status          |
+| ----------- | ------------- | --------------- | -------- | ------------- | --------------- |
+| FR1         | epic.3.docker | story.3.1.setup | AC1, AC3 | Yes (IV1-IV3) | ✅ Fully traced |
+| FR2         | —             | —               | —        | —             | ❌ NOT TRACED   |
+| NFR1        | epic.3.docker | story.3.2.perf  | AC2      | Yes (IV3)     | ⚠️ Partial      |
+| CR1         | —             | —               | —        | —             | ❌ NOT TRACED   |
 
 **Flag**:
 
@@ -448,7 +452,7 @@ options:
 
 **Actions**:
 
-1. **Detect diagrams**: scan the PRD for fenced ```` ```mermaid ```` blocks. For each, capture: section anchor, diagram type, and whether a YAML metadata header (`<!-- mermaid-architect: ... -->`) precedes it.
+1. **Detect diagrams**: scan the PRD for fenced ` ```mermaid ` blocks. For each, capture: section anchor, diagram type, and whether a YAML metadata header (`<!-- mermaid-architect: ... -->`) precedes it.
 2. **Invoke `mermaid-architect` in review mode** for each block found. Pass: PRD path, the section anchor, and the surrounding prose so the skill can run its consistency check (actor names match prose, diagram type matches the content, no architectural violations such as Client → Database without a Middleware where the project routes through one).
 3. **Collect findings** under one of three verdicts per block: `pass`, `pass with notes`, or `fail`. Treat `fail` as a Major Issue; `pass with notes` as a Minor Issue.
 4. **If no diagram is present**: assess whether one would materially clarify the PRD using the same justification rule as `create-prd` (4+ external systems, new service boundary, >2 integration alternatives worth contrasting, or sibling PRD precedent). If yes, add a Recommendation: "Add a System Topology / C4 Context diagram via `mermaid-architect`." Do NOT flag the absence as an issue if the prose already conveys the structure clearly.
@@ -467,9 +471,11 @@ options:
 1. **Check PRD dates**: Read the `created` and `updated` fields from YAML frontmatter. Also check `git log` for the file's last modification date.
 
 2. **Check codebase changes since PRD date**:
+
    ```bash
    git log --since="[PRD updated date]" --oneline -- [relevant source directories]
    ```
+
    If significant changes in areas the PRD covers (>10 commits), flag staleness risk.
 
 3. **Check for already-implemented requirements**:
@@ -494,14 +500,14 @@ options:
 
 Score each dimension 1–5:
 
-| Dimension | 1 (Poor) | 3 (Adequate) | 5 (Excellent) |
-|-----------|----------|--------------|---------------|
-| **Template Compliance** | Multiple required sections missing | Most sections present, some incomplete | All sections complete, no placeholders, change log current |
-| **Technical Accuracy** | Multiple claims contradict codebase | Minor inaccuracies, most claims verified | Every technical claim verified against codebase with evidence |
-| **Requirements Quality** | Vague FRs, no metrics on NFRs, implementation leakage | FRs testable, NFRs have some metrics | FRs WHAT-focused and testable, NFRs SMART, CRs specific and complete |
-| **Epic/Story Coverage** | Most requirements not traced to stories; epic structure inappropriate for PRD complexity (single epic for high-complexity PRD with no justification) | Partial mapping, some gaps; epic count is plausible but not scored against complexity rubric | All requirements traced: FR -> epic -> story -> AC -> IV; complexity rubric documented and epic count matches score |
-| **Internal Consistency** | Multiple contradictions between sections | Minor inconsistencies | No contradictions, all sections align perfectly |
-| **Staleness/Currency** | PRD significantly out of date, features already implemented | Some staleness, minor drift from codebase | PRD reflects current codebase state, all claims current |
+| Dimension                | 1 (Poor)                                                                                                                                             | 3 (Adequate)                                                                                 | 5 (Excellent)                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Template Compliance**  | Multiple required sections missing                                                                                                                   | Most sections present, some incomplete                                                       | All sections complete, no placeholders, change log current                                                          |
+| **Technical Accuracy**   | Multiple claims contradict codebase                                                                                                                  | Minor inaccuracies, most claims verified                                                     | Every technical claim verified against codebase with evidence                                                       |
+| **Requirements Quality** | Vague FRs, no metrics on NFRs, implementation leakage                                                                                                | FRs testable, NFRs have some metrics                                                         | FRs WHAT-focused and testable, NFRs SMART, CRs specific and complete                                                |
+| **Epic/Story Coverage**  | Most requirements not traced to stories; epic structure inappropriate for PRD complexity (single epic for high-complexity PRD with no justification) | Partial mapping, some gaps; epic count is plausible but not scored against complexity rubric | All requirements traced: FR -> epic -> story -> AC -> IV; complexity rubric documented and epic count matches score |
+| **Internal Consistency** | Multiple contradictions between sections                                                                                                             | Minor inconsistencies                                                                        | No contradictions, all sections align perfectly                                                                     |
+| **Staleness/Currency**   | PRD significantly out of date, features already implemented                                                                                          | Some staleness, minor drift from codebase                                                    | PRD reflects current codebase state, all claims current                                                             |
 
 **Overall score**: Average of 6 dimensions. Interpret as:
 
@@ -551,20 +557,20 @@ If flagged: recommend splitting into separate PRDs and suggest scope boundaries.
 
 **By issue type**:
 
-| Issue Type | Recommendation Approach |
-|-----------|------------------------|
-| Missing section | Quote the template section header and provide example content |
-| Incorrect technical claim | Cite the Grep/Glob result that disproves it, provide correct information |
-| Untraceable requirement | Show the gap in the traceability matrix, suggest epic/story to create |
-| Implementation leakage | Show the FR text, rewrite as WHAT-focused requirement |
-| Vague requirement | Show the text, provide a measurable alternative |
-| Internal contradiction | Show both conflicting statements, propose resolution |
-| Staleness | Show the git log evidence or codebase state, suggest updated text |
-| Missing IV section | Provide IV template (IV1: existing functionality, IV2: integration point, IV3: performance impact) |
-| Missing CR | Provide CR template with brownfield-specific prompts |
+| Issue Type                | Recommendation Approach                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Missing section           | Quote the template section header and provide example content                                                       |
+| Incorrect technical claim | Cite the Grep/Glob result that disproves it, provide correct information                                            |
+| Untraceable requirement   | Show the gap in the traceability matrix, suggest epic/story to create                                               |
+| Implementation leakage    | Show the FR text, rewrite as WHAT-focused requirement                                                               |
+| Vague requirement         | Show the text, provide a measurable alternative                                                                     |
+| Internal contradiction    | Show both conflicting statements, propose resolution                                                                |
+| Staleness                 | Show the git log evidence or codebase state, suggest updated text                                                   |
+| Missing IV section        | Provide IV template (IV1: existing functionality, IV2: integration point, IV3: performance impact)                  |
+| Missing CR                | Provide CR template with brownfield-specific prompts                                                                |
 | Inappropriate single epic | Score PRD against 6-signal rubric, show the score, propose a named multi-epic breakdown aligned to functional areas |
-| Unjustified multi-epic | Show complexity score, explain why the epics could be consolidated, propose consolidation or explicit rationale |
-| PRD split needed | Suggest scope boundaries with requirement assignments per new PRD |
+| Unjustified multi-epic    | Show complexity score, explain why the epics could be consolidated, propose consolidation or explicit rationale     |
+| PRD split needed          | Suggest scope boundaries with requirement assignments per new PRD                                                   |
 
 ---
 
@@ -601,15 +607,15 @@ Determine `{N}` by globbing the PRD directory for existing `prd.review.*.{featur
 
 ## Score Card
 
-| Dimension | Score | Notes |
-|-----------|-------|-------|
-| Template Compliance | [X/5] | [brief note] |
-| Technical Accuracy | [X/5] | [brief note] |
-| Requirements Quality | [X/5] | [brief note] |
-| Epic/Story Coverage | [X/5] | [brief note] |
-| Internal Consistency | [X/5] | [brief note] |
-| Staleness/Currency | [X/5] | [brief note] |
-| **Overall** | **[X.X/5]** | |
+| Dimension            | Score       | Notes        |
+| -------------------- | ----------- | ------------ |
+| Template Compliance  | [X/5]       | [brief note] |
+| Technical Accuracy   | [X/5]       | [brief note] |
+| Requirements Quality | [X/5]       | [brief note] |
+| Epic/Story Coverage  | [X/5]       | [brief note] |
+| Internal Consistency | [X/5]       | [brief note] |
+| Staleness/Currency   | [X/5]       | [brief note] |
+| **Overall**          | **[X.X/5]** |              |
 
 ---
 
@@ -633,38 +639,38 @@ Determine `{N}` by globbing the PRD directory for existing `prd.review.*.{featur
 
 ## Technical Accuracy Audit
 
-| Claim in PRD | Verification Result | Status |
-|-------------|-------------------|--------|
+| Claim in PRD             | Verification Result              | Status                                  |
+| ------------------------ | -------------------------------- | --------------------------------------- |
 | [Service/endpoint/model] | [File path found OR "Not found"] | ✅ Verified / ❌ Not Found / ⚠️ Partial |
 
 ---
 
 ## Requirements Traceability Matrix
 
-| Requirement | Epic | Story | AC(s) | IV? | Status |
-|-------------|------|-------|-------|-----|--------|
-| FR1 | [epic ref] | [story ref] | [AC numbers] | [Yes/No] | [Fully/Partial/Not traced] |
+| Requirement | Epic       | Story       | AC(s)        | IV?      | Status                     |
+| ----------- | ---------- | ----------- | ------------ | -------- | -------------------------- |
+| FR1         | [epic ref] | [story ref] | [AC numbers] | [Yes/No] | [Fully/Partial/Not traced] |
 
 ---
 
 ## Staleness Assessment
 
-| PRD Claim | Current Codebase State | Status |
-|-----------|----------------------|--------|
+| PRD Claim        | Current Codebase State     | Status                             |
+| ---------------- | -------------------------- | ---------------------------------- |
 | [Claim from PRD] | [What actually exists now] | ✅ Current / ⚠️ Drifted / ❌ Stale |
 
 ---
 
 ## Requirements Quality Summary
 
-| Check | Result |
-|-------|--------|
-| Measurability | [PASS/FAIL — details] |
+| Check                  | Result                |
+| ---------------------- | --------------------- |
+| Measurability          | [PASS/FAIL — details] |
 | Implementation Leakage | [PASS/FAIL — details] |
-| Traceability to Goals | [PASS/WARN — details] |
-| NFR SMART Criteria | [PASS/FAIL — details] |
-| CR Completeness | [PASS/FAIL — details] |
-| **Total** | **X/5 passed** |
+| Traceability to Goals  | [PASS/WARN — details] |
+| NFR SMART Criteria     | [PASS/FAIL — details] |
+| CR Completeness        | [PASS/FAIL — details] |
+| **Total**              | **X/5 passed**        |
 
 ---
 
@@ -673,7 +679,7 @@ Determine `{N}` by globbing the PRD directory for existing `prd.review.*.{featur
 1. [Action 1 — Critical]
 2. [Action 2 — Critical]
 3. [Action 3 — Major]
-...
+   ...
 
 ---
 
@@ -734,15 +740,15 @@ Present immediately in conversation as:
 Use `AskUserQuestion`:
 
 ```yaml
-question: 'Would you like the findings from the review to be applied to the PRD file now?'
-header: 'Apply Fixes'
+question: "Would you like the findings from the review to be applied to the PRD file now?"
+header: "Apply Fixes"
 options:
-  - label: 'Yes — apply all fixes'
-    description: 'Apply every Critical and Major fix from the report/plan directly to the PRD file now.'
-  - label: 'Yes — apply critical only'
-    description: 'Apply only Critical fixes now. Leave Major and Minor for a later pass.'
-  - label: 'No — I will apply them manually'
-    description: 'Leave the PRD file unchanged. Use the report/plan as a reference to apply fixes yourself.'
+  - label: "Yes — apply all fixes"
+    description: "Apply every Critical and Major fix from the report/plan directly to the PRD file now."
+  - label: "Yes — apply critical only"
+    description: "Apply only Critical fixes now. Leave Major and Minor for a later pass."
+  - label: "No — I will apply them manually"
+    description: "Leave the PRD file unchanged. Use the report/plan as a reference to apply fixes yourself."
 ```
 
 **If "Yes — apply all fixes" or "Yes — apply critical only"**:
@@ -786,14 +792,14 @@ options:
 
 ## Critical Files Reference
 
-| File | Purpose |
-|------|---------|
-| Brownfield PRD template YAML | Template compliance baseline (section structure) |
-| `docs/epic-registry.md` | Epic alignment verification |
-| `.claude/backend-patterns.md` | Architecture source — NestJS, API, DI |
-| `.claude/database-redis.md` | Architecture source — DB, Redis, safety rules |
-| `.claude/testing.md` | Architecture source — test standards, co-location |
-| `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure |
-| `docs/standards/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
-| `skills/pm-checklist/SKILL.md` | Complementary checklist validation (optional integration) |
-| `skills/review-epic/SKILL.md` | Pattern reference for question batching and scoring |
+| File                                         | Purpose                                                   |
+| -------------------------------------------- | --------------------------------------------------------- |
+| Brownfield PRD template YAML                 | Template compliance baseline (section structure)          |
+| `docs/development/epic-registry.md`          | Epic alignment verification                               |
+| `.claude/backend-patterns.md`                | Architecture source — NestJS, API, DI                     |
+| `.claude/database-redis.md`                  | Architecture source — DB, Redis, safety rules             |
+| `.claude/testing.md`                         | Architecture source — test standards, co-location         |
+| `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure                                |
+| `docs/standards/naming-conventions.md`       | Naming rules (PascalCase, kebab-case, handle)             |
+| `skills/pm-checklist/SKILL.md`               | Complementary checklist validation (optional integration) |
+| `skills/review-epic/SKILL.md`                | Pattern reference for question batching and scoring       |

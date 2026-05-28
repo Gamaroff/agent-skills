@@ -64,11 +64,11 @@ Before entering the workflow, resolve the input to an absolute file path stored 
 
 **Step 1 — Detect input type:**
 
-| Pattern | Matches |
-|---|---|
-| Path containing `/` or ending in `.md` | Direct file path |
-| All digits (e.g. `180`) | Epic number |
-| Anything else | Natural-language name |
+| Pattern                                | Matches               |
+| -------------------------------------- | --------------------- |
+| Path containing `/` or ending in `.md` | Direct file path      |
+| All digits (e.g. `180`)                | Epic number           |
+| Anything else                          | Natural-language name |
 
 **Step 2 — Resolve to file:**
 
@@ -109,34 +109,34 @@ If multiple candidates: list and ask the user to confirm via `AskUserQuestion`.
 Use `AskUserQuestion`:
 
 ```yaml
-question: 'How would you like the review output delivered?'
-header: 'Output Mode'
+question: "How would you like the review output delivered?"
+header: "Output Mode"
 options:
-  - label: 'Co-located report'
-    description: 'Save a review-report.md alongside the epic file for async review and future reference.'
-  - label: 'Inline action plan'
-    description: 'Present prioritised recommendations immediately as numbered steps to action now.'
+  - label: "Co-located report"
+    description: "Save a review-report.md alongside the epic file for async review and future reference."
+  - label: "Inline action plan"
+    description: "Present prioritised recommendations immediately as numbered steps to action now."
 ```
 
 Store choice as `output_mode` for Step 9.
 
 **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
 
-| Task Subject | Description |
-|---|---|
-| Determine output mode | Capture report vs inline action-plan preference |
-| Branch setup | Ensure review runs on a feature branch (Step 0a) |
-| Load epic & reference docs | Locate epic file, template, registry, architecture docs |
-| Template compliance | Verify epic structure against template |
-| Registry conflict detection | Check for epic number/scope collisions |
-| Architecture conflicts | Verify epic aligns with codebase patterns |
-| Existing story drift | Check stories haven't diverged from epic intent |
-| Consistency check | Detect internal contradictions |
-| Quality & clarity | Score epic readability and precision |
-| Conflict recommendations | Produce actionable fix list |
-| Generate output | Produce report file or inline action plan |
-| Post-review status update | Offer to update epic frontmatter with review metadata |
-| Apply findings to epic | Offer to apply recommended fixes directly to epic file |
+| Task Subject                | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| Determine output mode       | Capture report vs inline action-plan preference         |
+| Branch setup                | Ensure review runs on a feature branch (Step 0a)        |
+| Load epic & reference docs  | Locate epic file, template, registry, architecture docs |
+| Template compliance         | Verify epic structure against template                  |
+| Registry conflict detection | Check for epic number/scope collisions                  |
+| Architecture conflicts      | Verify epic aligns with codebase patterns               |
+| Existing story drift        | Check stories haven't diverged from epic intent         |
+| Consistency check           | Detect internal contradictions                          |
+| Quality & clarity           | Score epic readability and precision                    |
+| Conflict recommendations    | Produce actionable fix list                             |
+| Generate output             | Produce report file or inline action plan               |
+| Post-review status update   | Offer to update epic frontmatter with review metadata   |
+| Apply findings to epic      | Offer to apply recommended fixes directly to epic file  |
 
 ---
 
@@ -147,6 +147,7 @@ Store choice as `output_mode` for Step 9.
 **Pre-conditions**: `DOC_FILE` (epic file path from Input Resolution), `SKILL_NAME=review-epic`. Review-epic has no validate mode — 0a.0 short-circuit does not apply.
 
 **Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-epic** variant throughout:
+
 - 0a.2 extract `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH` from the epic filename (`epic.{N}.{slug}.md`).
 - 0a.3 auto-skip when on `feature/epic.${EPIC_NUM}.*`.
 - 0a.4 prompt: single question — "Create epic branch `${EPIC_BRANCH}` from `${BASE_DEFAULT}`?" (Recommended Yes / "Other (specify branch)" / "Abort review").
@@ -173,7 +174,7 @@ Store choice as `output_mode` for Step 9.
 
 2. **Load core references**
    - `docs/templates/epic-template.md` — template compliance baseline
-   - `docs/epic-registry.md` — registry conflict detection
+   - `docs/development/epic-registry.md` — registry conflict detection
 
 3. **Load architecture docs** (all in parallel)
    - `.claude/backend-patterns.md`
@@ -199,21 +200,22 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 **Required sections to check**:
 
-| Section | Checks |
-|---------|--------|
-| YAML Frontmatter | `title`, `prd_source`, `epic_type`, `priority`, `estimated_sprints`, `dependencies`, `status`, `completion_percentage` all present and valid values |
-| Epic Goal | Single clear statement (1-2 sentences), measurable, outcome-focused |
-| Background & Context | PRD source linked, system integration listed, prerequisites with status |
-| Epic Description | Primary deliverables list, Out of Scope explicitly stated, Success Criteria with ≥3 measurable items |
-| Stories Breakdown | ≥1 story defined, user story format ("As a / I want / So that"), ACs present |
-| Technical Architecture | Components, DB changes, API changes sections present |
-| Dependencies | Blocks and Blocked-by with epic references, parallel opportunities |
-| Risks & Mitigation | ≥1 risk with probability, impact, mitigation, and owner |
-| Testing Strategy | Unit, integration, and manual testing sections present |
-| Definition of Done | Story Completion, Code Quality, Testing, Integration, Documentation, Deployment, Acceptance categories |
-| Estimated Timeline | Planning, Development, Testing phases with totals |
+| Section                | Checks                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| YAML Frontmatter       | `title`, `prd_source`, `epic_type`, `priority`, `estimated_sprints`, `dependencies`, `status`, `completion_percentage` all present and valid values |
+| Epic Goal              | Single clear statement (1-2 sentences), measurable, outcome-focused                                                                                 |
+| Background & Context   | PRD source linked, system integration listed, prerequisites with status                                                                             |
+| Epic Description       | Primary deliverables list, Out of Scope explicitly stated, Success Criteria with ≥3 measurable items                                                |
+| Stories Breakdown      | ≥1 story defined, user story format ("As a / I want / So that"), ACs present                                                                        |
+| Technical Architecture | Components, DB changes, API changes sections present                                                                                                |
+| Dependencies           | Blocks and Blocked-by with epic references, parallel opportunities                                                                                  |
+| Risks & Mitigation     | ≥1 risk with probability, impact, mitigation, and owner                                                                                             |
+| Testing Strategy       | Unit, integration, and manual testing sections present                                                                                              |
+| Definition of Done     | Story Completion, Code Quality, Testing, Integration, Documentation, Deployment, Acceptance categories                                              |
+| Estimated Timeline     | Planning, Development, Testing phases with totals                                                                                                   |
 
 **Also check**:
+
 - No unfilled placeholders: `[N]`, `[Epic Name]`, `[Description]`, `YYYY-MM-DD`, `[Team]`
 - YAML `dependencies` list matches `blocked_by` field (if present)
 - Epic number in filename matches `title` field
@@ -229,7 +231,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 **Actions**:
 
-1. Read full `docs/epic-registry.md`
+1. Read full `docs/development/epic-registry.md`
 2. Extract this epic's domain, title, and primary deliverables
 3. For every other epic in the registry:
    - Compare titles for near-duplicates (semantic overlap, not just exact string match)
@@ -239,6 +241,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 5. Verify epic number uniqueness (no two epics share the same number)
 
 **Flag categories**:
+
 - **Exact duplicate**: Same deliverable described identically
 - **Partial overlap**: Overlapping feature domain (e.g., both epics create a "ContactService")
 - **Dependency mismatch**: References an epic number that doesn't exist in registry
@@ -273,16 +276,17 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
    - Verify client/server separation is planned for `logging-lib`, `auth-lib`, `shared-utils`
    - No Node.js deps (bcrypt, winston, jsonwebtoken) referenced for client builds
 
-6. **Naming convention check** against `docs/standards/naming-conventions.md`:
+5. **Naming convention check** against `docs/standards/naming-conventions.md`:
    - Route names: kebab-case
    - Components: PascalCase
    - "handle" not "username" for user identity
 
-7. **Routing/structure check** against `${ARCH_ROOT}/routing-and-file-structure.md`:
+6. **Routing/structure check** against `${ARCH_ROOT}/routing-and-file-structure.md`:
    - Expo Router file conventions
    - Feature-first directory layout
 
 **For each codebase search**:
+
 - State result explicitly: either file path found, or "No existing implementation found for [X]"
 
 **Collect all issues** — do NOT ask questions yet. Proceed to Step 5.
@@ -305,11 +309,11 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 2. Build a **Story Coverage Matrix**:
 
-| Epic Deliverable | Covered By Story | Gap? |
-|-----------------|-----------------|------|
-| [Deliverable 1] | story.N.1.name | ✅ |
-| [Deliverable 2] | — | ❌ No story |
-| [Out of Scope item] | story.N.3.name | ⚠️ Scope creep |
+| Epic Deliverable    | Covered By Story | Gap?           |
+| ------------------- | ---------------- | -------------- |
+| [Deliverable 1]     | story.N.1.name   | ✅             |
+| [Deliverable 2]     | —                | ❌ No story    |
+| [Out of Scope item] | story.N.3.name   | ⚠️ Scope creep |
 
 **Collect all issues** — proceed to QUESTION POINT 1.
 
@@ -320,6 +324,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 **Trigger**: After completing Steps 2–5 analysis.
 
 **Ask questions about**:
+
 - Critical missing sections from Step 2 (if multiple, batch into one multi-select)
 - Ambiguous scope boundaries that need clarification before registry/arch analysis
 - "Out of Scope" items that may be intentional vs. accidental gaps
@@ -336,6 +341,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 **Trigger**: After compiling all findings from Steps 3, 4, 5.
 
 **Ask questions about**:
+
 - Registry overlaps: intentional fork or oversight? (provide the conflicting epic title and number)
 - Codebase duplication: extend existing implementation vs. create separate feature?
 - Architecture violations: confirm intended deviation or needs updating?
@@ -345,14 +351,14 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 ```yaml
 question: "Epic 180 plans to create a ContactService, but Epic 169 already implements ContactValidationService in libs/contact-lib. Should Epic 180 extend that service or create a separate one?"
-header: 'ContactService'
+header: "ContactService"
 options:
-  - label: 'Extend Epic 169 service'
-    description: 'Add new methods to the existing ContactValidationService. Avoids duplication.'
-  - label: 'Create separate service'
-    description: 'New ContactService with distinct responsibility. Requires clear boundary definition.'
-  - label: 'Merge epics'
-    description: 'Epic 180 scope belongs in Epic 169. Fold deliverables there instead.'
+  - label: "Extend Epic 169 service"
+    description: "Add new methods to the existing ContactValidationService. Avoids duplication."
+  - label: "Create separate service"
+    description: "New ContactService with distinct responsibility. Requires clear boundary definition."
+  - label: "Merge epics"
+    description: "Epic 180 scope belongs in Epic 169. Fold deliverables there instead."
 ```
 
 **After answers**: Proceed to Step 6.
@@ -365,7 +371,7 @@ options:
 
 **Actions**:
 
-1. **Detect diagrams**: scan the epic for fenced ```` ```mermaid ```` blocks. Capture each block's section anchor and whether a YAML metadata header (`<!-- mermaid-architect: ... -->`) precedes it.
+1. **Detect diagrams**: scan the epic for fenced ` ```mermaid ` blocks. Capture each block's section anchor and whether a YAML metadata header (`<!-- mermaid-architect: ... -->`) precedes it.
 2. **Invoke `mermaid-architect` in review mode** for each block. Pass: epic file path, the section anchor, and the Stories Breakdown table so the skill can verify each story node in the diagram maps to a real story (and vice versa) and detect drift between the diagram and the table.
 3. **Collect verdicts**: `pass`, `pass with notes`, `fail`. `fail` → Major Issue; `pass with notes` → Minor.
 4. **If absent and the epic has 3+ stories with non-trivial sequencing, parallel tracks, or cross-story dependencies**: add a Recommendation to invoke `create-epic`'s diagram step (or the user can ask `mermaid-architect` directly). Do not flag absence as an issue when the table already conveys the order clearly.
@@ -396,22 +402,24 @@ options:
 
 Score each dimension 1–5:
 
-| Dimension | 1 (Poor) | 3 (Adequate) | 5 (Excellent) |
-|-----------|----------|--------------|---------------|
-| **Template Compliance** | Multiple missing sections | Most sections present | All sections complete, no placeholders |
-| **Registry Integrity** | Not in registry or wrong number | In registry but stale | Registry entry accurate and current |
-| **Architecture Alignment** | Multiple violations | Minor deviations | Fully compliant with all arch docs |
-| **Scope Clarity** | Vague deliverables, no out-of-scope | Deliverables listed, out-of-scope sparse | Crystal clear deliverables and explicit exclusions |
-| **Dependency Accuracy** | Invalid epic references | All exist but direction wrong | All valid, bidirectional, and documented |
-| **Story Coverage** | Deliverables unmapped | Partial mapping | All deliverables mapped to stories |
+| Dimension                  | 1 (Poor)                            | 3 (Adequate)                             | 5 (Excellent)                                      |
+| -------------------------- | ----------------------------------- | ---------------------------------------- | -------------------------------------------------- |
+| **Template Compliance**    | Multiple missing sections           | Most sections present                    | All sections complete, no placeholders             |
+| **Registry Integrity**     | Not in registry or wrong number     | In registry but stale                    | Registry entry accurate and current                |
+| **Architecture Alignment** | Multiple violations                 | Minor deviations                         | Fully compliant with all arch docs                 |
+| **Scope Clarity**          | Vague deliverables, no out-of-scope | Deliverables listed, out-of-scope sparse | Crystal clear deliverables and explicit exclusions |
+| **Dependency Accuracy**    | Invalid epic references             | All exist but direction wrong            | All valid, bidirectional, and documented           |
+| **Story Coverage**         | Deliverables unmapped               | Partial mapping                          | All deliverables mapped to stories                 |
 
 **Overall score**: Average of 6 dimensions. Interpret as:
+
 - 4.5–5.0: Excellent — proceed to story writing
 - 3.5–4.4: Good — minor fixes recommended
 - 2.5–3.4: Fair — significant gaps, fix before stories
 - 1.0–2.4: Poor — major rework needed
 
 **Epic Split Detection** — flag if ANY of:
+
 - More than 8 stories defined
 - `estimated_sprints` > 4
 - Deliverables span more than 2 distinct feature domains (e.g., payments + notifications + UI)
@@ -425,6 +433,7 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 **Trigger**: After Step 7 scoring.
 
 **Ask questions about**:
+
 - Epic split recommendation (confirm if scope is intended to be large or should be divided)
 - Priority/timeline concerns discovered during review
 - Any remaining ambiguities before generating output
@@ -448,14 +457,14 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 **By issue type**:
 
-| Issue Type | Recommendation Approach |
-|-----------|------------------------|
-| Registry overlap | Suggest merge, scope reduction, or explicit differentiation with different wording |
-| Codebase duplication | Reference the existing file path, suggest extend vs. create new with justification |
+| Issue Type             | Recommendation Approach                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| Registry overlap       | Suggest merge, scope reduction, or explicit differentiation with different wording  |
+| Codebase duplication   | Reference the existing file path, suggest extend vs. create new with justification  |
 | Architecture violation | Cite the specific `.claude/*.md` doc and section, provide the compliant alternative |
-| Template gap | Quote the exact template section header and provide example content |
-| Internal contradiction | Show both conflicting statements, propose resolution |
-| Epic split needed | Suggest two or more sub-epic scope boundaries with story assignments |
+| Template gap           | Quote the exact template section header and provide example content                 |
+| Internal contradiction | Show both conflicting statements, propose resolution                                |
+| Epic split needed      | Suggest two or more sub-epic scope boundaries with story assignments                |
 
 ---
 
@@ -490,15 +499,15 @@ Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-r
 
 ## Score Card
 
-| Dimension | Score | Notes |
-|-----------|-------|-------|
-| Template Compliance | [X/5] | [brief note] |
-| Registry Integrity | [X/5] | [brief note] |
-| Architecture Alignment | [X/5] | [brief note] |
-| Scope Clarity | [X/5] | [brief note] |
-| Dependency Accuracy | [X/5] | [brief note] |
-| Story Coverage | [X/5] | [brief note] |
-| **Overall** | **[X/5]** | |
+| Dimension              | Score     | Notes        |
+| ---------------------- | --------- | ------------ |
+| Template Compliance    | [X/5]     | [brief note] |
+| Registry Integrity     | [X/5]     | [brief note] |
+| Architecture Alignment | [X/5]     | [brief note] |
+| Scope Clarity          | [X/5]     | [brief note] |
+| Dependency Accuracy    | [X/5]     | [brief note] |
+| Story Coverage         | [X/5]     | [brief note] |
+| **Overall**            | **[X/5]** |              |
 
 ---
 
@@ -523,34 +532,37 @@ Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-r
 ## Conflict Analysis
 
 ### Registry Conflicts
+
 [Per-conflict findings: quote conflicting epic title, number, and specific deliverable overlap]
 
 ### Codebase Duplication
+
 [Per-duplicate: file path found, what it implements, recommended action]
 
 ### Architecture Violations
+
 [Per-violation: doc cited, section, what the epic proposes vs. what's required]
 
 ---
 
 ## Architecture Audit
 
-| Doc | Status | Notes |
-|-----|--------|-------|
-| `.claude/backend-patterns.md` | ✅/⚠️/❌ | [finding] |
-| `.claude/database-redis.md` | ✅/⚠️/❌ | [finding] |
-| `.claude/testing.md` | ✅/⚠️/❌ | [finding] |
+| Doc                                          | Status   | Notes     |
+| -------------------------------------------- | -------- | --------- |
+| `.claude/backend-patterns.md`                | ✅/⚠️/❌ | [finding] |
+| `.claude/database-redis.md`                  | ✅/⚠️/❌ | [finding] |
+| `.claude/testing.md`                         | ✅/⚠️/❌ | [finding] |
 | `${ARCH_ROOT}/routing-and-file-structure.md` | ✅/⚠️/❌ | [finding] |
-| `docs/standards/naming-conventions.md` | ✅/⚠️/❌ | [finding] |
+| `docs/standards/naming-conventions.md`       | ✅/⚠️/❌ | [finding] |
 
 ---
 
 ## Story Coverage Matrix
 
-| Epic Deliverable | Story | Status |
-|-----------------|-------|--------|
-| [Deliverable 1] | story.[N].1.[name] | ✅ Covered |
-| [Deliverable 2] | — | ❌ No story yet |
+| Epic Deliverable | Story              | Status          |
+| ---------------- | ------------------ | --------------- |
+| [Deliverable 1]  | story.[N].1.[name] | ✅ Covered      |
+| [Deliverable 2]  | —                  | ❌ No story yet |
 
 ---
 
@@ -559,7 +571,7 @@ Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-r
 1. [Action 1 — Critical]
 2. [Action 2 — Critical]
 3. [Action 3 — Major]
-...
+   ...
 
 ---
 
@@ -614,6 +626,7 @@ Ask (inline, no AskUserQuestion needed for this binary choice):
 > "Would you like me to add `last_reviewed: YYYY-MM-DD` to the epic's YAML frontmatter and update the `status` field if it's stale?"
 
 If yes:
+
 - Add/update `last_reviewed` field in YAML with today's date
 - Update `status` if user confirmed a change during the review
 - Do NOT change any other content
@@ -627,15 +640,15 @@ If yes:
 Use `AskUserQuestion`:
 
 ```yaml
-question: 'Would you like the findings from the review to be applied to the epic file now?'
-header: 'Apply Fixes'
+question: "Would you like the findings from the review to be applied to the epic file now?"
+header: "Apply Fixes"
 options:
-  - label: 'Yes — apply all fixes'
-    description: 'Apply every Critical and Major fix from the report/plan directly to the epic file now.'
-  - label: 'Yes — apply critical only'
-    description: 'Apply only Critical fixes now. Leave Major and Minor for a later pass.'
-  - label: 'No — I will apply them manually'
-    description: 'Leave the epic file unchanged. Use the report/plan as a reference to apply fixes yourself.'
+  - label: "Yes — apply all fixes"
+    description: "Apply every Critical and Major fix from the report/plan directly to the epic file now."
+  - label: "Yes — apply critical only"
+    description: "Apply only Critical fixes now. Leave Major and Minor for a later pass."
+  - label: "No — I will apply them manually"
+    description: "Leave the epic file unchanged. Use the report/plan as a reference to apply fixes yourself."
 ```
 
 **If "Yes — apply all fixes" or "Yes — apply critical only"**:
@@ -655,8 +668,7 @@ options:
 
    **In the epic file** (`epic.[N].[name].md`):
    - Add the following line immediately after the `**Last Updated**` status line:
-     `**Review**: ✅ All review recommendations from \`epic.[N].[name]-review-report.md\` implemented YYYY-MM-DD`
-     (or: `**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
+     `**Review**: ✅ All review recommendations from \`epic.[N].[name]-review-report.md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
    - Update the `last_reviewed` YAML frontmatter field to today's date if not already done in Step 10
 
 **If "No — I will apply them manually"**:
@@ -670,6 +682,7 @@ options:
 **Purpose**: When Step 11 applied any Edit to the epic body, the local body hash will diverge from `jira_last_body_hash` and the Jira description must be re-rendered. Execute the bundled `sync-jira-epic` script directly — do NOT speculate about other paths.
 
 **When to Execute**:
+
 - `TRACKER=jira` AND
 - At least one fix was applied in Step 11 OR `jira_last_body_hash` is missing/stale
 
@@ -703,13 +716,13 @@ On non-zero exit → log warning `⚠️ sync-jira-epic failed — Jira descript
 
 ## Critical Files Reference
 
-| File | Purpose |
-|------|---------|
-| `docs/templates/epic-template.md` | Template compliance baseline |
-| `docs/epic-registry.md` | Registry conflict detection |
-| `.claude/backend-patterns.md` | Architecture source — NestJS, API, DI |
-| `.claude/database-redis.md` | Architecture source — DB, Redis, safety rules |
-| `.claude/testing.md` | Architecture source — test standards, co-location |
-| `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure |
-| `docs/standards/naming-conventions.md` | Naming rules (PascalCase, kebab-case, handle) |
-| `.agents/skills/review-story/SKILL.md` | Reference for question batching patterns |
+| File                                         | Purpose                                           |
+| -------------------------------------------- | ------------------------------------------------- |
+| `docs/templates/epic-template.md`            | Template compliance baseline                      |
+| `docs/development/epic-registry.md`          | Registry conflict detection                       |
+| `.claude/backend-patterns.md`                | Architecture source — NestJS, API, DI             |
+| `.claude/database-redis.md`                  | Architecture source — DB, Redis, safety rules     |
+| `.claude/testing.md`                         | Architecture source — test standards, co-location |
+| `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure                        |
+| `docs/standards/naming-conventions.md`       | Naming rules (PascalCase, kebab-case, handle)     |
+| `.agents/skills/review-story/SKILL.md`       | Reference for question batching patterns          |

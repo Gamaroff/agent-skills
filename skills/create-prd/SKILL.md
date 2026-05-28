@@ -39,10 +39,10 @@ This skill supports two modes. The mode determines pre-flight checks, template s
 
 **Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). Output paths below use this env var.
 
-| Mode | Default | Set by | Template | Output path |
-|------|---------|--------|----------|-------------|
-| `brownfield` | yes | direct activation | `brownfield-prd-template` | `${PRD_ROOT}/[domain]/[feature]/prd.[feature].md` |
-| `greenfield` | no | delegated from `new-product-prd` | `prd-template` | `docs/prd.md` (monolithic — sharded into `${PRD_ROOT}` later) |
+| Mode         | Default | Set by                           | Template                  | Output path                                                   |
+| ------------ | ------- | -------------------------------- | ------------------------- | ------------------------------------------------------------- |
+| `brownfield` | yes     | direct activation                | `brownfield-prd-template` | `${PRD_ROOT}/[domain]/[feature]/prd.[feature].md`             |
+| `greenfield` | no      | delegated from `new-product-prd` | `prd-template`            | `docs/prd.md` (monolithic — sharded into `${PRD_ROOT}` later) |
 
 Throughout this skill, sections marked **(brownfield only)** or **(greenfield only)** apply to the respective mode. Sections without a mode tag run in both.
 
@@ -190,6 +190,7 @@ Before anything else, scan for an existing in-progress PRD for this feature:
 - If a PRD is found, determine whether it is incomplete or complete, then report to the user:
 
 **If incomplete:**
+
 ```
 "I found an existing PRD at [path] that appears to cover [topic].
 It looks like [sections X, Y were completed / it was started but not finished].
@@ -203,6 +204,7 @@ What would you like to do?"
 ```
 
 **If complete (all sections present):**
+
 ```
 "I found a completed PRD at [path] covering [topic].
 
@@ -379,6 +381,7 @@ Use create-doc skill with:
 5. Iterate based on feedback
 
 **❌ Do NOT proceed if:**
+
 - Any FR uses vague language without measurable criteria (e.g., "fast", "easy", "intuitive")
 - Any FR prescribes implementation technology (e.g., "use React component X") instead of capability
 - NFRs lack specific metrics
@@ -433,16 +436,17 @@ Present with rationale, STOP for 1-9 elicitation. Document ALL choices with rati
 
 Score the PRD against these 6 signals. Each signal present = 1 point:
 
-| Signal | Description |
-|--------|-------------|
-| **Domain breadth** | PRD spans 2+ distinct functional areas (e.g. auth + notifications + data sync) |
-| **Parallelism opportunity** | Areas can be worked simultaneously by independent streams |
-| **Story volume** | Likely 8+ stories total (target 3–6 stories per epic) |
-| **Dependency isolation** | Areas have minimal cross-dependencies and can ship independently |
-| **Risk isolation** | One area is high-risk and should be isolated to contain impact |
-| **Timeline variance** | Different areas have different urgency or delivery milestones |
+| Signal                      | Description                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| **Domain breadth**          | PRD spans 2+ distinct functional areas (e.g. auth + notifications + data sync) |
+| **Parallelism opportunity** | Areas can be worked simultaneously by independent streams                      |
+| **Story volume**            | Likely 8+ stories total (target 3–6 stories per epic)                          |
+| **Dependency isolation**    | Areas have minimal cross-dependencies and can ship independently               |
+| **Risk isolation**          | One area is high-risk and should be isolated to contain impact                 |
+| **Timeline variance**       | Different areas have different urgency or delivery milestones                  |
 
 **Scoring:**
+
 - **0–2 signals** → Single epic is appropriate; document rationale
 - **3+ signals** → Propose multiple epics, one per functional area
 
@@ -451,11 +455,11 @@ Score the PRD against these 6 signals. Each signal present = 1 point:
 1. Propose a named epic breakdown mapping each epic to a PRD functional area
 2. Show which stories belong to each epic
 3. Identify cross-epic dependencies (if any) and sequencing constraints
-4. Present as: *"I recommend [N] epics because [signal list]. Here is the proposed breakdown: [epic list with rationale]."*
+4. Present as: _"I recommend [N] epics because [signal list]. Here is the proposed breakdown: [epic list with rationale]."_
 
 **Step 3 — For single epic (must justify):**
 
-If 0–2 signals, document explicitly: *"This PRD scores [N]/6 on the complexity rubric. A single epic is appropriate because [reason]."*
+If 0–2 signals, document explicitly: _"This PRD scores [N]/6 on the complexity rubric. A single epic is appropriate because [reason]."_
 
 **Greenfield Epic 1 rule:** Epic 1 = Foundation + initial functionality. Subsequent epics build incrementally. Cross-cutting concerns flow through epics. Epics deliver deployable, testable value.
 
@@ -479,7 +483,7 @@ PRDs grow over time — it is expected and normal to add new epics as scope evol
 - The continuation detection step (1a) must offer an **Extend** option for completed PRDs
 
 **IMPORTANT — Epic Numbering:**
-When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
+When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/development/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
 
 #### Section 6: Epic Details (MANDATORY ELICITATION per epic, REPEATABLE)
 
@@ -523,6 +527,7 @@ So that [benefit].
 5. Refine based on feedback
 
 **❌ Do NOT proceed if:**
+
 - Acceptance criteria are not independently testable
 - **(brownfield)** Any story lacks Integration Verification (IV) criteria
 - **(brownfield)** Story sequence has a step that modifies existing behaviour before verifying current behaviour still works
