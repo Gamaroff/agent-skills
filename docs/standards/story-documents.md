@@ -68,6 +68,23 @@ updated: 2026-01-15
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` — pipeline creates one if tracker is Jira and this is absent |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
 
+## Section ownership
+
+Stories have distinct sections owned by distinct roles. `create-story` writes the planning sections; the developer fills in the implementation record during `develop-story`; QA owns its own section.
+
+| Section | Owner | Notes |
+|---|---|---|
+| Status | `create-story` until `develop-story` takes over | Drives the status lifecycle |
+| Story statement (As a… I want… So that…) | `create-story` | Locked after review |
+| Acceptance Criteria | `create-story` | Locked after review |
+| Tasks / Subtasks | `create-story` | Dev may add subtasks during implementation |
+| Dev Notes (extracted context) | `create-story` | Anti-hallucination: every claim sourced |
+| Testing guidance | `create-story` | |
+| Dev Agent Record (model, completion notes, file list) | `develop-story` (developer) | Append-only during implementation |
+| QA Results | `qa-story` / `qa-gate` | Never modified by dev skills |
+
+The role identifier `scrum-master` appears in legacy template metadata (`owner: scrum-master`) and historical Change Logs — it refers to the story-authoring role now performed by `create-story`. New tooling should reference `create-story` directly.
+
 ## Co-located artifacts
 
 These files are generated automatically by skills during the pipeline. Do not create or modify them manually (gate files are owned exclusively by QA skills):

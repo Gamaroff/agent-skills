@@ -88,7 +88,7 @@ See [Story Development Runbook — Phase B](../runbooks/story-development.md#pha
 ## Parallel development
 
 ```
-scrum-master → create-parallel-stories → epic coordination matrix + worktree setup
+create-parallel-stories → epic coordination matrix + worktree setup
     ↓
 Multiple developers work simultaneously in isolated worktrees
     ↓

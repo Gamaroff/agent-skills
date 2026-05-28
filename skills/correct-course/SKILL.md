@@ -257,8 +257,6 @@ Create consolidated document with:
 
 ## Integration with Other Skills
 
-**Called by**: `scrum-master` - When change triggers occur
-
 **Calls**: `execute-checklist` - Uses change-checklist for structured analysis
 
 **Outputs used by**: Product owners, managers, architects for implementation

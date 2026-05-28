@@ -22,6 +22,12 @@ Natural language triggers:
 - "Prepare the next story in sequence"
 - "Setup story 1.1"
 
+**Looking for a different workflow?**
+
+- Parallel stories for simultaneous worktree development → `create-parallel-stories`
+- Validate a drafted story against the readiness checklist → `execute-checklist` (or `review-story --validate` for the full gate)
+- Project pivot, blocker, or requirement change → `correct-course`
+
 ## Purpose
 
 To identify the next logical story based on project progress and epic definitions, and then to prepare a comprehensive, self-contained, and actionable story file. This skill ensures the story is enriched with all necessary technical context, requirements, and acceptance criteria, making it ready for efficient implementation by a Developer Agent with minimal need for additional research.
@@ -793,10 +799,6 @@ For Simple Stories:
 ---
 
 ## Integration with Other Skills
-
-**Called by**:
-
-- `scrum-master` - Main coordinator skill
 
 **Calls**:
 

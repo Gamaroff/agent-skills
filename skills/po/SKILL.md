@@ -165,7 +165,6 @@ Based on user selection or natural language:
 
 **Called by**:
 
-- `scrum-master` - For PO-specific validations and decisions
 - `develop` - For story readiness assessment
 
 **Outputs used by**:

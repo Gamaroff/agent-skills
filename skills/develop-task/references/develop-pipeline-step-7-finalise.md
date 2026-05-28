@@ -158,9 +158,26 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
 
 1. **Post completion comment** — call `addCommentToJiraIssue`:
    - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`:
-     - develop-story: `"Story development complete — PR: {PR_URL}. Story status: accepted."`
-     - develop-task: `"Task development complete — PR: {PR_URL}. Task status: accepted."`
+   - `commentBody`: Build a structured summary. Locate the DoD summary file and gate file:
+     ```bash
+     DOD_PATH=$(ls {story-or-task-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
+     FINAL_GATE=$(ls {story-or-task-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
+       | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
+     ```
+     Format (story variant shown; substitute "Task" for develop-task):
+
+     ```
+     ## ✅ Story Accepted — Definition of Done Verified
+
+     **PR**: {PR_URL}
+     **QA Gate**: {FINAL_GATE}
+     **Accepted**: {YYYY-MM-DD}
+     **DoD Summary**: `{DOD_PATH}`
+
+     All Definition of Done criteria verified. Story accepted and transitioning to Done.
+     ```
+
+     If `DOD_PATH` is empty (finalise was not run via develop-story — rare), omit the DoD Summary line.
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 

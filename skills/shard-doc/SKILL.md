@@ -216,7 +216,6 @@ Document sharded successfully:
 
 **Called by**:
 - `create-doc` - After creating large documents
-- `scrum-master` - When organizing project documentation
 
 **Outputs used by**:
 - Any skill that needs to read modular documentation

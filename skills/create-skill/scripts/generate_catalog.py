@@ -45,7 +45,7 @@ CATEGORIES = [
         "document-existing-project", "document-existing-project",
     ]),
     ("Product Management & Planning", [
-        "po", "pm-coordinator", "pm-checklist", "scrum-master", "analyst",
+        "po", "pm-coordinator", "pm-checklist", "analyst",
         "new-product-prd", "prd-template", "create-prd", "brownfield-prd-template",
         "shard-prd", "shard-doc", "review-prd",
     ]),

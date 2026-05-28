@@ -291,7 +291,6 @@ Generate comprehensive summary with:
 
 **Called by**:
 
-- `scrum-master` - For story validation
 - `create-story` - Validates story completeness after creation
 - `correct-course` - Uses change-checklist for impact assessment
 - `develop` - Developers run DoD checklist before completion

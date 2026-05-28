@@ -132,7 +132,7 @@ optional:
 Activate **Validate mode** when any of the following are true:
 - `--validate` flag present in the invocation
 - Natural language intent: "validate", "is this story ready?", "score this story", "batch validate", "CI gate", "pre-implementation gate"
-- Called programmatically by `develop-story`, `scrum-master`, or `po` pipeline (these always use validate mode)
+- Called programmatically by `develop-story` or `po` pipeline (these always use validate mode)
 
 Default to **Interactive mode** for all other invocations.
 
@@ -2265,7 +2265,6 @@ User Can Now: Run `/develop` to begin implementation
 **Called by**:
 
 - `develop-story` pipeline — as a pre-implementation gate (validate mode, auto-selected)
-- `scrum-master` — for story quality assurance (validate mode for batch, interactive for single)
 - `po` — for product owner review (validate mode)
 - Manual invocation by user (either mode)
 

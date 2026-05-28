@@ -24,7 +24,7 @@ If stories share files, do not use this runbook — sequence them via the normal
 
 ```mermaid
 flowchart TD
-    A[scrum-master + create-parallel-stories] --> B[Epic coordination matrix]
+    A[create-parallel-stories] --> B[Epic coordination matrix]
     B --> C[Worktree per story]
     C --> D[develop-story per worktree<br/>in parallel]
     D --> E[Merge in any order to epic branch]
@@ -53,6 +53,5 @@ flowchart TD
 ## See also
 
 - [`create-parallel-stories` SKILL.md](../../skills/create-parallel-stories/SKILL.md)
-- [`scrum-master` SKILL.md](../../skills/scrum-master/SKILL.md)
 - [Story Development Runbook](./story-development.md)
 - [Sprint Cycle Runbook](./sprint-cycle.md)

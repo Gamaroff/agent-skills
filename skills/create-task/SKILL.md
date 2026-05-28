@@ -46,7 +46,6 @@ Activate this skill when:
 
 **Related Skills**:
 
-- `scrum-master` - For orchestrating technical task creation in project planning
 - `qa-story` - For QA assessment after task implementation
 - `qa-gate` - For formal quality gate decision on technical tasks
 - `documentation-standards-validator` - Validates file naming conventions, YAML frontmatter, and structural standards after document creation

@@ -659,9 +659,6 @@ Generate comprehensive summary:
 
 ## Integration with Other Skills
 
-**Called by**:
-- `scrum-master` - When parallel development is requested
-
 **Calls**:
 - `create-story` - Reuses story population logic
 - `execute-checklist` - Validates each story after creation

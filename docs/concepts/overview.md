@@ -78,7 +78,7 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 `create-story`, `review-story`, `edit-story`, `create-epic`, `review-epic`, `edit-epic`
 
 **Product management:**
-`new-product-prd`, `create-prd`, `scrum-master`, `po`, `create-task`, `change-management`
+`new-product-prd`, `create-prd`, `po`, `create-task`, `change-management`
 
 **Architecture:**
 `architect`, `create-architecture-doc`, `execute-architect-checklist`, `mermaid-architect`
