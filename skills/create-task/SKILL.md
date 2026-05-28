@@ -434,6 +434,27 @@ Once validated:
    - Confirm: dots used as structural separators, hyphens within names, lowercase, `.md` extension
    - Fix any naming violations before presenting the file to the user
 
+### 4.4 Prompt for Effort Estimate (Optional)
+
+Before creating the tracker issue, propose a default effort estimate and let the user accept or override. The accepted value is written to frontmatter as `estimated_effort_hours: {N}` and is picked up by Jira sync (→ `timetracking.originalEstimate`) and GitHub sync (→ Projects v2 `Estimate` number field).
+
+**Step 1 — compute the recommendation.** Apply the deterministic rubric in `references/effort-estimation-rubric.md`:
+
+- Count Success Criteria items, top-level Implementation Plan tasks, distinct files in Files Summary
+- Read `risk_level` and `category` from frontmatter
+- Scan body for integration keywords (`integration`, `external API`, `third-party`, `webhook`, `migration`, `schema change`)
+- Plug into the formula and snap to the nearest bucket in `[1, 2, 4, 8, 16]`
+
+**Step 2 — prompt.** Use `AskUserQuestion`:
+
+> **Header:** `Effort`
+> **Question:** "Recommended estimate based on {success_criteria_count} success criteria, {task_count} plan tasks, risk={risk_level}: **{snap}h**. Accept or pick a different value."
+> Options: `2 hours`, `4 hours`, `8 hours`, `16 hours` — append `(Recommended)` to the snapped bucket label. The user can also pick "Other" for a custom number or "Skip — leave unestimated" to omit the field.
+
+**Step 3 — write back.** If the user accepts the recommendation or picks any numeric option, write `estimated_effort_hours: {N}` into the frontmatter before invoking the tracker sync sub-routine. If the user picks Skip, omit the field — review-task will flag it as a LOW gap later.
+
+Do **not** silently write a value without prompting. The recommendation is a default for the user's prompt, not an auto-applied estimate.
+
 ### 4.5 Create Tracker Issue
 
 After the task document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `references/platform-detection.md`):

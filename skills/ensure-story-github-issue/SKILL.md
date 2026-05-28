@@ -29,6 +29,7 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
    - `title` — story title
    - `status` — story status
    - `priority` — story priority (lowercase; default `medium` if absent)
+   - `estimated_effort_hours` — story effort estimate in hours (number; absent/empty if not set)
 3. Parse the epic and story numbers from the filename: pattern `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
 4. Strip any leading `"Story {E}.{S}: "` prefix from `title` to get the bare title for display: `STORY_TITLE`.
 5. Set `STORY_RELATIVE_PATH` = the path relative to the repo root.
@@ -101,6 +102,13 @@ STORY_ISSUE_URL=$(gh issue create \
 
 {Acceptance criteria formatted as a GitHub checkbox list}
 
+## Metadata
+
+| Field | Value |
+|-------|-------|
+| Priority | ${priority} |
+| Effort | ${estimated_effort_hours:-—}h |
+
 ## Document
 
 📄 [Story Document](${DOC_URL})
@@ -126,6 +134,12 @@ gh project item-add ${PROJECT_NUM} --owner ${OWNER} --url "${STORY_ISSUE_URL}" 2
 
 ```bash
 bash references/set-github-project-priority.sh "${STORY_ISSUE_NUM}" "${priority}" || true
+```
+
+**Mirror the estimate onto the board's Estimate number field** (no-op if frontmatter has no estimate):
+
+```bash
+bash references/set-github-project-estimate.sh "${STORY_ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
 
 **Link story as sub-issue of parent epic** (only if `EPIC_ISSUE_NUM` is non-empty):

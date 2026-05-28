@@ -140,6 +140,7 @@ TASK_ISSUE_NUM=$(echo "$TASK_ISSUE_URL" | grep -oE '[0-9]+$')
 ```bash
 gh project item-add ${PROJECT_NUM} --owner ${OWNER} --url "${TASK_ISSUE_URL}" 2>/dev/null || true
 bash references/set-github-project-priority.sh "${TASK_ISSUE_NUM}" "${priority}" || true
+bash references/set-github-project-estimate.sh "${TASK_ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
 
 Both operations are non-blocking — log warnings on failure, continue.

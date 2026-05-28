@@ -910,11 +910,17 @@ This prevents the first-phase document load from polluting the technical review 
      - Input validation should be addressed
      - Sensitive data handling should be defined
 
+9. **Effort Estimate**:
+   - Check frontmatter for `estimated_effort_hours` (number).
+   - **Absent or empty**: flag as **Optional** (LOW severity) — "No `estimated_effort_hours` set. PM tooling (Jira Original Estimate, GitHub Projects v2 Estimate field) will show this story as unestimated."
+   - **Present**: recompute the rubric in `references/effort-estimation-rubric.md` against the current document state. If `abs(frontmatter - rubric) / max(frontmatter, rubric) > 0.5` (>2× divergence), flag as **Optional** (LOW severity): "Frontmatter `estimated_effort_hours: {X}` diverges from rubric estimate of **{Y}h** (AC: {n}, tasks: {m}, risk: {r}). Confirm or adjust."
+   - Non-blocking — does **not** affect gate decision or readiness score. In Interactive mode, may offer a single prompt to accept the rubric's number; in Validate mode, observe silently.
+
 **Issues to Flag**:
 
 - **Critical**: ACs with no tasks, missing essential Dev Notes categories, no testing guidance
 - **Important**: Vague file locations, missing error handling, incomplete testing specs
-- **Optional**: Could add more detail, nice-to-have context
+- **Optional**: Could add more detail, nice-to-have context, missing `estimated_effort_hours`
 
 **Output**: Gap analysis report with missing information categorized
 

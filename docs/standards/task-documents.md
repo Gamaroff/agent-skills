@@ -56,7 +56,8 @@ updated: 2026-01-15
 | `created` | ISO date | Yes | `YYYY-MM-DD` |
 | `updated` | ISO date | Yes | `YYYY-MM-DD` — update on every change |
 | `risk_level` | enum | Optional | `high`, `medium`, `low` — triggers the high-risk gate |
-| `effort` | string | Optional | Free text estimate, e.g. `~0.5 day` |
+| `estimated_effort_hours` | number | Optional | Estimated dev hours. Synced to Jira `timetracking.originalEstimate` and the GitHub Projects v2 `Estimate` number field. Captured at create time, surfaced as a LOW review gap if missing |
+| `effort` | string | Optional | Deprecated free-text estimate, e.g. `~0.5 day`. New tasks should use `estimated_effort_hours` instead |
 | `depends_on` | string | Optional | `task.N` — blocks pipeline if the dependency is not `accepted` |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` |

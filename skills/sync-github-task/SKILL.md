@@ -120,6 +120,12 @@ If the priority label changed, also re-mirror the board's Priority field:
 bash references/set-github-project-priority.sh "${ISSUE_NUM}" "${priority}" || true
 ```
 
+Always re-mirror the board's Estimate field from frontmatter (no-op if `estimated_effort_hours` is empty):
+
+```bash
+bash references/set-github-project-estimate.sh "${ISSUE_NUM}" "${estimated_effort_hours}" || true
+```
+
 Append a Change Log row describing what changed:
 
 ```markdown

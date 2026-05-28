@@ -75,7 +75,7 @@ source references/resolve-platform.sh
 
 ### 3. Read Story Frontmatter and Parse Identity
 
-Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if present), `labels`.
+Extract from frontmatter: `title`, `status`, `priority`, `estimated_effort_hours` (number; absent/empty if not set), `github_issue` (if present), `labels`.
 
 Parse the epic/story numbers from the filename: `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
 
@@ -140,12 +140,18 @@ gh issue edit ${ISSUE_NUM} \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
 ```
 
-The body is rebuilt from the story document's `## User Story`, `## Acceptance Criteria`, `## Description` sections — same as the create path.
+The body is rebuilt from the story document's `## User Story`, `## Acceptance Criteria`, `## Description` sections plus a `## Metadata` table (`Priority`, `Effort` from `estimated_effort_hours`) — same as the create path in `ensure-story-github-issue`.
 
 If the priority label changed, also re-mirror the board's Priority field:
 
 ```bash
 bash references/set-github-project-priority.sh "${ISSUE_NUM}" "${priority}" || true
+```
+
+Always re-mirror the board's Estimate field from frontmatter (no-op if `estimated_effort_hours` is empty):
+
+```bash
+bash references/set-github-project-estimate.sh "${ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
 
 Append a Change Log row describing what changed:

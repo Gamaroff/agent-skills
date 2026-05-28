@@ -41,6 +41,18 @@ const ISSUE_TYPE = "Story";
 const SYNC_LABEL_PREFIX = "synced-from-";
 const EPIC_LINK_FIELD = process.env.JIRA_EPIC_LINK_FIELD || "customfield_10014";
 
+const TIMETRACKING_ERROR_RE = /timetracking|time tracking|original.?estimate/i;
+
+// Format an estimate value for Jira timetracking. Numeric input → "Nh".
+// String input is passed through (lets users write "1d 4h" if they want).
+function formatJiraTimeEstimate(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) return `${n}h`;
+  const s = String(value).trim();
+  return s || null;
+}
+
 // ---------------------------------------------------------------------------
 // Description builder (story-specific)
 // ---------------------------------------------------------------------------
@@ -160,6 +172,9 @@ function collectIssueFields({ args, frontmatter, summary, descAdf, includeDescri
     fields.fixVersions = fvs.filter(Boolean).map(name => ({ name: String(name) }));
   }
 
+  const estimate = formatJiraTimeEstimate(frontmatter.estimated_effort_hours);
+  if (estimate) fields.timetracking = { originalEstimate: estimate, remainingEstimate: estimate };
+
   return fields;
 }
 
@@ -173,33 +188,44 @@ async function createStoryWithRetry({ http, auth, fields, output }) {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
+  const attempt = (f) => http(url, { method: "POST", headers, body: JSON.stringify({ fields: f }) });
 
-  let resp = await http(url, { method: "POST", headers, body: JSON.stringify({ fields }) });
+  let current = fields;
+  let resp = await attempt(current);
   if (resp.ok) return resp;
+  if (resp.status !== 400) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+  let errText = await lib.parseJiraError(resp);
 
-  if (resp.status === 400) {
-    const errText = await lib.parseJiraError(resp);
-    if (/parent|epic[ _-]?link|customfield_10014/i.test(errText)) {
-      const flipped = { ...fields };
-      if (flipped.parent) {
-        const parentKey = flipped.parent.key;
-        delete flipped.parent;
-        flipped[EPIC_LINK_FIELD] = parentKey;
-        output.info(`ℹ️  Retrying create with Epic Link customfield (initial parent attempt failed: ${errText.slice(0, 120)})`);
-      } else if (flipped[EPIC_LINK_FIELD]) {
-        flipped.parent = { key: flipped[EPIC_LINK_FIELD] };
-        delete flipped[EPIC_LINK_FIELD];
-        output.info(`ℹ️  Retrying create with parent field (initial Epic Link attempt failed: ${errText.slice(0, 120)})`);
-      } else {
-        throw new Error(`HTTP 400: ${errText}`);
-      }
-      resp = await http(url, { method: "POST", headers, body: JSON.stringify({ fields: flipped }) });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
-      return resp;
-    }
-    throw new Error(`HTTP 400: ${errText}`);
+  // Strip timetracking if time tracking is disabled on the project
+  if (current.timetracking && TIMETRACKING_ERROR_RE.test(errText)) {
+    output.warn(`⚠️  Jira rejected timetracking field — retrying create without estimate (${errText.slice(0, 120)})`);
+    current = { ...current };
+    delete current.timetracking;
+    resp = await attempt(current);
+    if (resp.ok) return resp;
+    if (resp.status !== 400) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+    errText = await lib.parseJiraError(resp);
   }
-  throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+
+  if (/parent|epic[ _-]?link|customfield_10014/i.test(errText)) {
+    const flipped = { ...current };
+    if (flipped.parent) {
+      const parentKey = flipped.parent.key;
+      delete flipped.parent;
+      flipped[EPIC_LINK_FIELD] = parentKey;
+      output.info(`ℹ️  Retrying create with Epic Link customfield (initial parent attempt failed: ${errText.slice(0, 120)})`);
+    } else if (flipped[EPIC_LINK_FIELD]) {
+      flipped.parent = { key: flipped[EPIC_LINK_FIELD] };
+      delete flipped[EPIC_LINK_FIELD];
+      output.info(`ℹ️  Retrying create with parent field (initial Epic Link attempt failed: ${errText.slice(0, 120)})`);
+    } else {
+      throw new Error(`HTTP 400: ${errText}`);
+    }
+    resp = await attempt(flipped);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+    return resp;
+  }
+  throw new Error(`HTTP 400: ${errText}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -448,10 +474,26 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         output.info(`  Changes: ${changeSummary}`);
         result = { issueKey: existingJiraKey, issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`, updated: null };
       } else {
-        const { updated } = await lib.putIssueAtomic({
-          http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-          issueKey: existingJiraKey, fields,
-        });
+        let putResp;
+        try {
+          putResp = await lib.putIssueAtomic({
+            http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+            issueKey: existingJiraKey, fields,
+          });
+        } catch (e) {
+          if (fields.timetracking && TIMETRACKING_ERROR_RE.test(e.message || "")) {
+            output.warn(`⚠️  Jira rejected timetracking field on update — retrying without estimate.`);
+            const stripped = { ...fields };
+            delete stripped.timetracking;
+            putResp = await lib.putIssueAtomic({
+              http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+              issueKey: existingJiraKey, fields: stripped,
+            });
+          } else {
+            throw e;
+          }
+        }
+        const { updated } = putResp;
         const finalUpdated = updated || await lib.fetchUpdatedTimestampStrict({
           http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey: existingJiraKey,
         });

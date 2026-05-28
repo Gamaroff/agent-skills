@@ -729,11 +729,17 @@ options:
    - High-risk phases should have mitigation plans
    - Breaking changes flagged appropriately
 
+6. **Effort Estimate**:
+   - Check frontmatter for `estimated_effort_hours` (number).
+   - **Absent or empty**: flag as **Optional** (LOW severity) — "No `estimated_effort_hours` set. PM tooling (Jira Original Estimate, GitHub Projects v2 Estimate field) will show this task as unestimated."
+   - **Present**: recompute the rubric in `references/effort-estimation-rubric.md` against the current document state. If `abs(frontmatter - rubric) / max(frontmatter, rubric) > 0.5` (>2× divergence), flag as **Optional** (LOW severity): "Frontmatter `estimated_effort_hours: {X}` diverges from rubric estimate of **{Y}h** (success criteria: {n}, plan tasks: {m}, risk: {r}). Confirm or adjust."
+   - Non-blocking — does **not** affect gate decision. In Interactive mode, may offer a single prompt to accept the rubric's number; in Validate mode, observe silently.
+
 **Issues to Flag**:
 
 - **Critical**: Vague changes, missing files, unclear dependencies
 - **Important**: Insufficient detail, no risk assessment
-- **Optional**: Could add more rationale or context
+- **Optional**: Could add more rationale or context, missing `estimated_effort_hours`
 
 **Output**: Implementation plan completeness report
 

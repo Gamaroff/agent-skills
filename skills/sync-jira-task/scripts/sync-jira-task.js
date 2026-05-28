@@ -61,6 +61,18 @@ const STATUS_MAP = {
 const ISSUE_TYPE = "Task";
 const SYNC_LABEL_PREFIX = "synced-from-";
 
+const TIMETRACKING_ERROR_RE = /timetracking|time tracking|original.?estimate/i;
+
+// Format an estimate value for Jira timetracking. Numeric input → "Nh".
+// String input is passed through (lets users write "1d 4h" if they want).
+function formatJiraTimeEstimate(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) return `${n}h`;
+  const s = String(value).trim();
+  return s || null;
+}
+
 // ---------------------------------------------------------------------------
 // Description builder (task-specific)
 // ---------------------------------------------------------------------------
@@ -161,6 +173,9 @@ function collectIssueFields({ args, frontmatter, descAdf, taskTypeId, projectKey
     const fvs = Array.isArray(frontmatter.fix_versions) ? frontmatter.fix_versions : [frontmatter.fix_versions];
     fields.fixVersions = fvs.filter(Boolean).map(name => ({ name: String(name) }));
   }
+
+  const estimate = formatJiraTimeEstimate(frontmatter.estimated_effort_hours);
+  if (estimate) fields.timetracking = { originalEstimate: estimate, remainingEstimate: estimate };
 
   return fields;
 }
@@ -352,10 +367,26 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       output.info(`  Changes: ${changeSummary}`);
       result = { issueKey: existingJiraKey, issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`, updated: null };
     } else {
-      const { updated } = await lib.putIssueAtomic({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-        issueKey: existingJiraKey, fields,
-      });
+      let putResp;
+      try {
+        putResp = await lib.putIssueAtomic({
+          http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+          issueKey: existingJiraKey, fields,
+        });
+      } catch (e) {
+        if (fields.timetracking && TIMETRACKING_ERROR_RE.test(e.message || "")) {
+          output.warn(`⚠️  Jira rejected timetracking field on update — retrying without estimate.`);
+          const stripped = { ...fields };
+          delete stripped.timetracking;
+          putResp = await lib.putIssueAtomic({
+            http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+            issueKey: existingJiraKey, fields: stripped,
+          });
+        } else {
+          throw e;
+        }
+      }
+      const { updated } = putResp;
       const finalUpdated = updated || await lib.fetchUpdatedTimestampStrict({
         http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey: existingJiraKey,
       });
@@ -389,15 +420,26 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       });
       fields.summary = summary;
 
-      const resp = await http(`${auth.baseUrl}/rest/api/3/issue`, {
-        method: "POST",
-        headers: {
-          Authorization: lib.authHeader(auth.email, auth.token),
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ fields }),
+      const postHeaders = {
+        Authorization: lib.authHeader(auth.email, auth.token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
+      const postCreate = (f) => http(`${auth.baseUrl}/rest/api/3/issue`, {
+        method: "POST", headers: postHeaders, body: JSON.stringify({ fields: f }),
       });
+      let resp = await postCreate(fields);
+      if (!resp.ok && resp.status === 400 && fields.timetracking) {
+        const errText = await lib.parseJiraError(resp);
+        if (TIMETRACKING_ERROR_RE.test(errText)) {
+          output.warn(`⚠️  Jira rejected timetracking field — retrying create without estimate.`);
+          const stripped = { ...fields };
+          delete stripped.timetracking;
+          resp = await postCreate(stripped);
+        } else {
+          throw new Error(`HTTP 400: ${errText}`);
+        }
+      }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
       const created = await resp.json();
       const issueKey = created.key;
