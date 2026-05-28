@@ -786,7 +786,30 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    2. **Post completion comment** — call `addCommentToJiraIssue`:
       - `cloudId`: {derived hostname}
       - `issueIdOrKey`: `{jira_key}`
-      - `commentBody`: `"Story accepted — PR: {PR_URL}. All DoD criteria verified."`
+      - `commentBody`: Build from the variables already computed for the PR comment (`FINAL_GATE`, `DOD_PATH`, `CYCLES`) and the per-category `overall_status` values from each DoD agent YAML result. Format:
+
+        ```
+        ## ✅ Story/Task Accepted — Definition of Done Verified
+
+        **PR**: {PR_URL}
+        **QA Gate**: {FINAL_GATE}
+        **Accepted**: {YYYY-MM-DD}
+        **DoD Summary**: `{DOD_PATH}`
+        **QA Cycles**: {CYCLES}    ← omit this line entirely if CYCLES=0
+
+        ### DoD Results
+        | Category | Result |
+        |---|---|
+        | Acceptance Criteria | {ac_overall_status} |
+        | PR Review | {pr_status} |
+        | Security | {security_overall_status} |
+        | Compliance | {compliance_overall_status} |
+        | Documentation | {docs_overall_status} |
+
+        All Definition of Done criteria verified. Story/task accepted and transitioning to Done.
+        ```
+
+        Use ✅ PASS, ❌ FAIL, ⚠️ CONCERNS, or — N/A for each status cell. `{pr_status}` is APPROVED or NOT_APPROVED from the AC agent result.
       - `contentFormat`: `"markdown"`
       - On failure: log warning and continue (non-blocking)
 
