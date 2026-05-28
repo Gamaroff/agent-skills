@@ -218,7 +218,7 @@ Full categorised index below.
 | `ensure-story-jira-issue` | 'Internal sub-routine called from create-story and review-story. Given a story markdown file path and (optionally) a parent epic Jira key, ensures the story has a… |
 | `ensure-task-github-issue` | Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding GitHub issue. Creates the issue if… |
 | `ensure-task-jira-issue` | 'Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing… |
-| `jira-sprint-manager` | Manage Jira sprints via the Agile REST API — start, close, audit velocity, check for unestimated issues, list future/active sprints, and migrate leftover scope to… |
+| `jira-sprint-manager` | Manage Jira sprints via the Agile REST API — start, close, audit velocity, check for unestimated issues, list future/active sprints, migrate leftover scope to backlog… |
 | `jira-sprint-review-prep` | Automate data collection for the Sprint Review ceremony. Collects completed increments, evaluates compliance with the Definition of Done (DoD), highlights scope creep or uncompleted items,… |
 | `jira-standup-auditor` | Audit recent Jira activity and local Git telemetry to compile a precise async daily standup update. Use when the user asks for "standup prep", "daily… |
 | `sync-github-story` | Sync a local story markdown file to GitHub Issues — creates the story issue if it has no github_issue, updates it if github_issue is already… |
