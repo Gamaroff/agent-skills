@@ -47,3 +47,4 @@ secrets.yml
 
 # Obsidian local workspace state (pane layout churns per session)
 .obsidian/workspace*.json
+.obsidian/
