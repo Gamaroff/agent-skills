@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.7.2] - 2026-05-31
+
 ### Fixed
 - **`jira-sync`:** fix issue-type lookup and auto-set Team field on epic create.
 
