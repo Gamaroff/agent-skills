@@ -13,18 +13,19 @@ A PRD frames a feature area. It is the parent of one or more [epics](./epic-docu
 ```
 docs/prd/
 └── {domain}/
-    └── {feature}/
-        ├── prd.md                  # main document
+    └── prd.{feature}/
+        ├── prd.{feature}.md        # main document
         └── epics/
             └── epic.{N}.{name}/    # see epic-documents.md
 ```
 
-When sharded, the body splits across files in `{feature}/` per level-2 section. The pipeline locates epics at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`, where `${PRD_ROOT}` is configurable (default `docs/prd`) — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
+When sharded, the body splits across files in `prd.{feature}/` per level-2 section. The pipeline locates epics at `${PRD_ROOT}/{domain}/prd.{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`, where `${PRD_ROOT}` is configurable (default `docs/prd`) — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 ## File naming
 
-- Top-level PRD: `prd.md` (or sharded section files in the same directory).
-- Directory segments (`{domain}`, `{feature}`) are kebab-case, all lowercase.
+- Directory: `prd.{feature}` — kebab-case, all lowercase, prefixed with `prd.` to match the document file.
+- Main PRD file: `prd.{feature}.md` (same name as the parent directory, with `.md` extension).
+- Directory segments (`{domain}`) are kebab-case, all lowercase.
 
 ## Body sections (greenfield template)
 
@@ -69,7 +70,7 @@ When a PRD exceeds ~5 epics or ~30 stories, shard it for navigability:
 /shard-prd <prd-path>
 ```
 
-`shard-prd` splits the document by level-2 section into separate files in the same `{feature}/` directory. Epic creation then proceeds against the sharded files.
+`shard-prd` splits the document by level-2 section into separate files in the same `prd.{feature}/` directory. Epic creation then proceeds against the sharded files.
 
 ## Prerequisites checklist
 

@@ -41,7 +41,7 @@ This skill supports two modes. The mode determines pre-flight checks, template s
 
 | Mode         | Default | Set by                           | Template                  | Output path                                                   |
 | ------------ | ------- | -------------------------------- | ------------------------- | ------------------------------------------------------------- |
-| `brownfield` | yes     | direct activation                | `brownfield-prd-template` | `${PRD_ROOT}/[domain]/[feature]/prd.[feature].md`             |
+| `brownfield` | yes     | direct activation                | `brownfield-prd-template` | `${PRD_ROOT}/[domain]/prd.[feature]/prd.[feature].md`         |
 | `greenfield` | no      | delegated from `new-product-prd` | `prd-template`            | `docs/prd.md` (monolithic — sharded into `${PRD_ROOT}` later) |
 
 Throughout this skill, sections marked **(brownfield only)** or **(greenfield only)** apply to the respective mode. Sections without a mode tag run in both.
@@ -61,7 +61,7 @@ This skill produces **the PRD document and its associated planning artifacts onl
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The PRD file (`${PRD_ROOT}/[domain]/[feature]/prd.[feature].md` for brownfield, `docs/prd.md` for greenfield) and its directory
+- ✅ The PRD file (`${PRD_ROOT}/[domain]/prd.[feature]/prd.[feature].md` for brownfield, `docs/prd.md` for greenfield) and its directory
 - ✅ Tracker issue creation if the workflow includes it
 - ✅ Handoff prompt files (Architect/UX Expert) emitted as part of Step 4
 
@@ -308,7 +308,7 @@ Use create-doc skill with:
 ```
 Use create-doc skill with:
 - Template: brownfield-prd-template (resources/brownfield-prd-tmpl.yaml)
-- Output: ${PRD_ROOT}/[domain]/[feature]/prd.[feature].md
+- Output: ${PRD_ROOT}/[domain]/prd.[feature]/prd.[feature].md
 - Mode: Interactive (mandatory for brownfield)
 ```
 
