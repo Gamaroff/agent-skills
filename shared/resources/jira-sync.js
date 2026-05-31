@@ -651,11 +651,13 @@ async function getIssueTypeId({ http, baseUrl, email, token, projectKey, typeNam
       const resp = await http(url, { headers: { Authorization: authHeader(email, token), Accept: "application/json" } });
       if (!resp.ok) continue;
       const data = await resp.json();
+      const toArr = v => (Array.isArray(v) ? v : null);
       const types =
-        data.issueTypes ||
-        data.values ||
-        data.projects?.[0]?.issuetypes ||
-        (Array.isArray(data) ? data : []);
+        toArr(data.issueTypes) ||
+        toArr(data.values) ||
+        toArr(data.projects?.[0]?.issuetypes) ||
+        toArr(data) ||
+        [];
       for (const t of types) {
         if (t.name && t.id) collected[t.name.toLowerCase()] = t.id;
       }
