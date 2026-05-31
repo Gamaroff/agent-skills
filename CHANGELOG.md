@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+- **`jira-sync`:** fix issue-type lookup and auto-set Team field on epic create.
+
+### Docs
+- **`prd` directory convention:** rename to `prd.{feature}/` format.
+
 ## [v0.7.1] - 2026-05-28
 
 ### Changed
