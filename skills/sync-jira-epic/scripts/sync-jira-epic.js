@@ -648,6 +648,48 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
         boardId: auth.boardId, issueKey: result.issueKey, output,
       });
+
+      // Set Team field (customfield_10001) so the epic appears on boards filtered by cf[10001].
+      if (auth.boardId) {
+        try {
+          const boardCfgResp = await http(`${auth.baseUrl}/rest/agile/1.0/board/${auth.boardId}/configuration`, {
+            headers: { Authorization: lib.authHeader(auth.email, auth.token), Accept: "application/json" },
+          });
+          if (boardCfgResp.ok) {
+            const boardCfg = await boardCfgResp.json();
+            const filterId = boardCfg?.filter?.id;
+            if (filterId) {
+              const filterResp = await http(`${auth.baseUrl}/rest/api/3/filter/${filterId}`, {
+                headers: { Authorization: lib.authHeader(auth.email, auth.token), Accept: "application/json" },
+              });
+              if (filterResp.ok) {
+                const filter = await filterResp.json();
+                const teamMatch = /cf\[10001\]\s+in\s+\(([^)]+)\)/i.exec(filter.jql || "");
+                if (teamMatch) {
+                  const teamUuid = teamMatch[1].split(",")[0].trim().replace(/^["']|["']$/g, "");
+                  if (teamUuid) {
+                    const teamResp = await http(`${auth.baseUrl}/rest/api/3/issue/${result.issueKey}`, {
+                      method: "PUT",
+                      headers: {
+                        Authorization: lib.authHeader(auth.email, auth.token),
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ fields: { customfield_10001: teamUuid } }),
+                    });
+                    if (teamResp.status === 204) {
+                      output.info(`   Team field set: ${teamUuid}`);
+                    } else {
+                      output.warn(`⚠️  Team field update returned HTTP ${teamResp.status} — epic created but may not appear on board`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (teamErr) {
+          output.warn(`⚠️  Could not set team field: ${teamErr.message} — epic created but may not appear on board`);
+        }
+      }
     }
   }
 
