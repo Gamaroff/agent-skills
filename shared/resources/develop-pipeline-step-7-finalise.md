@@ -145,7 +145,7 @@ On any `gh issue close` failure: `tracker_call_with_retry` retries 3× (1s, 2s, 
 Log in Decisions Log: "Post-close state check (poller): issue #{TRACKER_ISSUE} state = {state}. errors = {error_count}."
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
 
-Then move the project board item to Done using the same GraphQL pattern from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg GitHub path), but with "Done" as the target option (not "In Progress"). If the board move fails, post a comment on the issue warning that the board was not updated.
+Then move the project board item to Done using the same GraphQL pattern from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg GitHub path), but with `ascii_downcase == "done"` as the target option match (not "in progress") — use case-insensitive matching so "Done", "done", etc. all resolve. If the board move fails, post a comment on the issue warning that the board was not updated.
 
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — board: {Done ✅ / ⚠️ not found / ⚠️ mutation failed}."
 

@@ -5,7 +5,6 @@
 # Replaces the inline jq snippet that was duplicated across SKILL.md, on-stop.sh,
 # step-N reference docs, and per-step orchestrator instructions. Centralising the
 # advance logic enables:
-#   • PostToolUse hook (on-skill-return.sh) — automatic advance on sub-skill return
 #   • Sub-skill self-advance — each sub-skill calls this on successful completion
 #   • Stop hook (on-stop.sh) — fallback advance instruction in block reason
 #   • Orchestrator manual advance — same command, no jq one-liner to typo

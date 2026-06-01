@@ -181,7 +181,6 @@ This single script covers both pipelines. It is idempotent (safe to re-run), pre
 | ------------- | ----------------------------------------------------------- |
 | `PreCompact`  | Graceful pause before context compaction                    |
 | `Stop`        | Force continuation if pipeline stops mid-run                |
-| `PostToolUse` | Auto-advance lock + inject next-step banner on Skill return |
 
 Preview what it would change without writing:
 

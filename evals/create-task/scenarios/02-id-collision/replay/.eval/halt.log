@@ -1,0 +1,4 @@
+HALT: task.42 already exists at docs/tasks/task.42.original.md
+Source: skills/create-task/scripts/lib.js#assertUniqueTaskId
+Action: refused to write task.42.cache-lib-simplification.md
+Resolution: pick a different task id, or finalise/cancel task.42.original first.
