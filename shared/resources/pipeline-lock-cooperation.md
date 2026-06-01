@@ -1,6 +1,6 @@
 ---
 name: pipeline-lock-cooperation
-description: Snippet shared by all develop-{story,task} pipeline sub-skills. Each sub-skill, on successful completion, advances the develop-pipeline lock so the orchestrator's next turn doesn't have to rely on model discipline. Defence-in-depth alongside the PostToolUse and Stop hooks.
+description: Snippet shared by all develop-{story,task} pipeline sub-skills. Each sub-skill, on successful completion, advances the develop-pipeline lock so the orchestrator's next turn doesn't have to rely on model discipline. Defence-in-depth alongside the Stop hook.
 ---
 
 # Pipeline Lock Cooperation (sub-skill responsibility)
@@ -38,9 +38,8 @@ The helper lives in `references/advance-pipeline-lock.sh` of the develop-story /
 
 The lock is advanced by **whichever defence runs first**:
 
-1. The sub-skill itself (this snippet) — most reliable, no hook required.
-2. The `PostToolUse` hook (`on-skill-return.sh`) — fires after the Skill tool returns; idempotent with #1.
-3. The orchestrator's manual Bash call — only path that runs when neither hook nor self-advance executed.
-4. The `Stop` hook (`on-stop.sh`) — reactive backstop with re-prompt instructions if all of the above missed.
+1. The sub-skill itself (this snippet) — most reliable, runs inline as the skill's last action.
+2. The orchestrator's manual Bash call — the Step Transition Protocol's action #1; idempotent with #1.
+3. The `Stop` hook (`on-stop.sh`) — reactive backstop with re-prompt instructions if both of the above missed.
 
 Idempotency at every layer means double-advance is safe: the helper noops when target step ≤ current step.

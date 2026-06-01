@@ -20,7 +20,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -114,6 +114,68 @@ test("#2b — develop-{story,task} install-hooks.sh wrappers are byte-identical 
   const taskScript  = await readFile(TASK_INSTALL,  "utf-8");
   assert.equal(taskScript, storyScript, "install-hooks.sh wrappers must be byte-identical across develop-{story,task}");
   assert.match(storyScript, /exec .*references\/develop-pipeline-install-hooks\.sh/, "wrapper must exec the bundled canonical");
+});
+
+// ── Regression #2d: PostToolUse/on-skill-return hook removed (2026-06-01) ──
+// An earlier design shipped a PostToolUse hook (on-skill-return.sh) that advanced
+// the pipeline lock when a sub-skill "returned". But the Skill tool executes
+// INLINE in the orchestrator's context, so PostToolUse:Skill fires at skill-LOAD
+// (before any work runs); Claude Code has no skill-completion hook event. The
+// hook therefore mis-fired on every sub-skill call, advancing the pipeline before
+// the step did any work. It was removed — lock advancement now relies on sub-skill
+// self-advance (inline, after the work) + the Stop hook backstop.
+
+const SETUP_CONSUMER  = path.join(REPO_ROOT, "scripts", "setup-consumer.sh");
+const SHARED_LOCK_COOP = path.join(REPO_ROOT, "shared", "resources", "pipeline-lock-cooperation.md");
+
+async function fileAbsent(p) {
+  try { await access(p); return false; } catch { return true; }
+}
+
+test("#2d — on-skill-return.sh hook scripts are gone (canonical, wrappers, bundled)", async () => {
+  const candidates = [
+    path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-story", "scripts",    "on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-task",  "scripts",    "on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-story", "references",  "develop-pipeline-on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-task",  "references",  "develop-pipeline-on-skill-return.sh"),
+  ];
+  for (const p of candidates) {
+    assert.ok(await fileAbsent(p), `obsolete hook script must not exist: ${path.relative(REPO_ROOT, p)}`);
+  }
+});
+
+test("#2d — canonical install-hooks.sh registers no PostToolUse hook and de-registers the obsolete one", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.doesNotMatch(script, /POSTTOOLUSE_CMD/,                                "must not define a PostToolUse command");
+  assert.match(script, /unpatch_hook "PostToolUse" "on-skill-return/,           "must de-register the obsolete PostToolUse/on-skill-return hook");
+});
+
+test("#2d — setup-consumer.sh registers no PostToolUse hook and de-registers the obsolete one", async () => {
+  const script = await readFile(SETUP_CONSUMER, "utf-8");
+  assert.doesNotMatch(script, /_patch_hook "PostToolUse"/,                      "must not register a PostToolUse hook");
+  assert.match(script, /_unpatch_hook "PostToolUse" "on-skill-return/,          "must de-register the obsolete PostToolUse/on-skill-return hook");
+});
+
+test("#2d — orchestrator SKILL.md files no longer reference PostToolUse/on-skill-return", async () => {
+  for (const [label, skill] of [["story", STORY_SKILL], ["task", TASK_SKILL]]) {
+    const content = await readFile(skill, "utf-8");
+    assert.doesNotMatch(content, /PostToolUse/,     `${label}: SKILL.md must not mention PostToolUse`);
+    assert.doesNotMatch(content, /on-skill-return/, `${label}: SKILL.md must not mention on-skill-return`);
+  }
+});
+
+test("#2d — Step Transition Protocol lists exactly two structural defences (self-advance + Stop)", async () => {
+  for (const [label, skill] of [["story", STORY_SKILL], ["task", TASK_SKILL]]) {
+    const content = await readFile(skill, "utf-8");
+    assert.match(content, /Two structural defences/,         `${label}: must say 'Two structural defences'`);
+    assert.doesNotMatch(content, /Three structural defences/, `${label}: must not claim three structural defences`);
+  }
+});
+
+test("#2d — pipeline-lock-cooperation.md cooperation order omits the PostToolUse hook", async () => {
+  const content = await readFile(SHARED_LOCK_COOP, "utf-8");
+  assert.doesNotMatch(content, /PostToolUse/, "cooperation doc must not reference a PostToolUse hook layer");
 });
 
 test("#2b — SKILL.md Setup section advertises install-hooks.sh and links the canonical hooks doc", async () => {

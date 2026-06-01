@@ -51,14 +51,14 @@ SKILLS_VERSION=main bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff
 
 **Symptom:** `/develop-story` and `/develop-task` don't auto-advance through phases. Pipeline stalls after each skill returns instead of continuing.
 
-**Cause:** Pipeline hooks (`PreCompact`, `Stop`, `PostToolUse`) aren't registered in `.claude/settings.json`.
+**Cause:** Pipeline hooks (`PreCompact`, `Stop`) aren't registered in `.claude/settings.json`.
 
 **Fix:**
 
 ```bash
 # Verify hooks are present
 cat .claude/settings.json | jq '.hooks'
-# Should show keys: PreCompact, Stop, PostToolUse
+# Should show keys: PreCompact, Stop
 
 # Install or re-install (idempotent — preserves other settings)
 bash .agents/skills/develop-task/scripts/install-hooks.sh
