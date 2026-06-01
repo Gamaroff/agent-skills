@@ -60,13 +60,13 @@ Belt-and-suspenders: run **once**, before the first cycle, to ensure the issue i
   }')
 
   CURRENT_STATUS=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
-  if [ "$CURRENT_STATUS" = "In Review" ]; then
+  if [ "$(echo "$CURRENT_STATUS" | tr '[:upper:]' '[:lower:]')" = "in review" ]; then
     echo "✅ Board already In Review — no re-assert needed"
   else
     ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
     PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
     STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
-    IN_REVIEW_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "In Review") | .id // empty')
+    IN_REVIEW_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name | ascii_downcase == "in review") | .id // empty')
 
     if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$IN_REVIEW_OPTION_ID" ]; then
       echo "⚠️  Could not resolve project item or In Review option — skipping QA-start board re-assert"
