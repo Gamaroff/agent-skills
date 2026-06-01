@@ -1,6 +1,9 @@
 .DS_Store
 firebase-debug.log
 *.log
+# …but eval replay fixtures include committed *.log expected-output files (test
+# data the runner copies into the sandbox), not build noise — keep tracking them.
+!evals/**/replay/**/*.log
 node_modules/
 __pycache__/
 *.pyc
