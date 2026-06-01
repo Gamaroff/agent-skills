@@ -588,6 +588,31 @@ _patch_hook() {
   ok "  ${event}: registered"
 }
 
+# Remove any hook entry under `event` whose command matches `pattern` (jq regex),
+# pruning the event array if it becomes empty. Idempotent — heals older installs
+# of the obsolete on-skill-return.sh PostToolUse hook (fired at skill-load, not
+# skill-completion). Lock advancement now uses sub-skill self-advance + Stop hook.
+_unpatch_hook() {
+  local event="$1" pattern="$2"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC}   ${event}: would remove obsolete hook if present (${pattern})"
+    return 0
+  fi
+  [[ -f "$HOOKS_SETTINGS_FILE" ]] || return 0
+  local present
+  present=$(jq --arg event "$event" --arg pat "$pattern" \
+    '[.hooks[$event][]? | select(any(.hooks[]?; .command | test($pat)))] | length' \
+    "$HOOKS_SETTINGS_FILE" 2>/dev/null || echo 0)
+  [[ "${present:-0}" == "0" ]] && return 0
+  local tmp; tmp=$(mktemp)
+  jq --arg event "$event" --arg pat "$pattern" \
+    '(.hooks[$event]) |= map(select(any(.hooks[]?; .command | test($pat)) | not))
+     | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
+    "$HOOKS_SETTINGS_FILE" > "$tmp"
+  mv "$tmp" "$HOOKS_SETTINGS_FILE"
+  ok "  ${event}: removed obsolete on-skill-return.sh hook"
+}
+
 install_hooks() {
   heading "Pipeline hooks"
 
@@ -604,7 +629,7 @@ install_hooks() {
     ".claude/skills/develop-task/scripts"
   )
   for _c in "${_candidates[@]}"; do
-    if [[ -f "$_c/on-stop.sh" ]] && [[ -f "$_c/on-precompact.sh" ]] && [[ -f "$_c/on-skill-return.sh" ]]; then
+    if [[ -f "$_c/on-stop.sh" ]] && [[ -f "$_c/on-precompact.sh" ]]; then
       base="$_c"
       break
     fi
@@ -651,10 +676,11 @@ install_hooks() {
 
   _patch_hook "PreCompact"  "bash ${base}/on-precompact.sh"
   _patch_hook "Stop"        "bash ${base}/on-stop.sh"
-  _patch_hook "PostToolUse" "bash ${base}/on-skill-return.sh"
+  # Migration: strip the obsolete PostToolUse/on-skill-return.sh hook from older installs.
+  _unpatch_hook "PostToolUse" "on-skill-return\\.sh"
   if [[ "$DRY_RUN" == false ]]; then
     ok "Pipeline hooks registered in ${HOOKS_SETTINGS_FILE}"
-    record_step "Pipeline hooks" "ok" "3 hooks registered"
+    record_step "Pipeline hooks" "ok" "2 hooks registered"
   else
     record_step "Pipeline hooks" "ok" "dry-run"
   fi

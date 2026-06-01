@@ -97,7 +97,7 @@ The wizard sets up:
 | Registries    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md`     |
 | Docs scaffold | Creates `docs/prd/` and `docs/architecture/concepts/` stub files                  |
 | Skills        | Downloads latest tagged release → `.agents/skills/`                               |
-| Hooks         | Patches `PreCompact`, `Stop`, `PostToolUse` into `.claude/settings.json`          |
+| Hooks         | Patches `PreCompact`, `Stop` into `.claude/settings.json`          |
 
 ### Update skills only (skip wizard)
 
@@ -121,7 +121,7 @@ SKILLS_VERSION=v1.2.0 bash <(curl -fsSL https://github.com/Gamaroff/agent-skills
 
 ```bash
 ls .agents/skills/ | head               # should list installed skills
-cat .claude/settings.json | jq '.hooks' # should show PreCompact / Stop / PostToolUse
+cat .claude/settings.json | jq '.hooks' # should show PreCompact / Stop
 cat skills-config.yaml                  # should reflect your wizard answers
 ```
 

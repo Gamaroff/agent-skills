@@ -32,6 +32,8 @@ Idempotent. Preserves existing settings. `--dry-run` to preview.
 
 Both scripts are byte-identical across `develop-story` and `develop-task` installs — the lock file's `skill` field selects the orchestrator at runtime.
 
+> **Why no `PostToolUse:Skill` auto-advance hook?** An earlier design shipped a third hook (`on-skill-return.sh`) that advanced the lock and injected a "next step" reminder when a sub-skill "returned." This was removed: the Skill tool executes **inline** in the orchestrator's context, so a `PostToolUse` hook matching the Skill tool fires the instant the skill's instructions are *loaded* — before any of its work runs. Claude Code has **no** hook event for skill *completion*. The hook therefore mis-fired on every sub-skill call, advancing the pipeline before the step did any work. Lock advancement is handled correctly by **sub-skill self-advance** (an instruction inside each sub-skill body, which runs inline *after* the work) plus the **Stop** hook backstop — see [`pipeline-lock-cooperation.md`](pipeline-lock-cooperation.md).
+
 ---
 
 ## 1. PreCompact hook — `on-precompact.sh`
@@ -204,7 +206,7 @@ rm -f .claude/state/develop-pipeline.lock
 
 ## Authoring contract for new hooks
 
-If you add a third hook to this pipeline (e.g., a `SessionStart` resumer or a `PostToolUse` enforcer), follow the same pattern:
+If you add a third hook to this pipeline (e.g., a `SessionStart` resumer), follow the same pattern:
 
 1. **Script lives at** `skills/develop-{story,task}/scripts/on-{event}.sh`, byte-identical across both skills
 2. **Always exits 0** — hooks must not block compaction or stop on infrastructure failure
