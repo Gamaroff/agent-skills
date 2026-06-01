@@ -97,6 +97,77 @@ Log in Decisions Log: "Post-PR state check: PR #{PR_NUMBER} state = {state}. err
 
 ---
 
+## GitHub Board Update (when `TRACKER=github` and `TRACKER_ISSUE` is set)
+
+> **MUST execute — pipeline action, not optional sync.** This is the GitHub Projects counterpart to the Jira "In Review" transition below. `create-pr` already posts the PR-opened `gh issue comment`; this step additionally moves the issue's board column.
+
+After the PR URL is confirmed, move the issue to **"In Review"** on the GitHub Projects board (graceful — warn and continue on any failure):
+
+```bash
+(
+  OWNER=$(gh repo view --json owner -q '.owner.login')
+  REPO_NAME=$(gh repo view --json name -q '.name')
+  BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+
+  RESPONSE=$(gh api graphql -f query='
+  {
+    repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
+      issue(number: {TRACKER_ISSUE}) {
+        projectItems(first: 10) {
+          nodes {
+            id
+            project {
+              id
+              fields(first: 20) {
+                nodes {
+                  ... on ProjectV2SingleSelectField {
+                    id
+                    name
+                    options { id name }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }')
+
+  ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
+  STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
+  IN_REVIEW_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "In Review") | .id // empty')
+
+  if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$IN_REVIEW_OPTION_ID" ]; then
+    echo "⚠️  Could not resolve project item or In Review option — skipping board update"
+    echo "    ITEM_ID=${ITEM_ID} PROJECT_ID=${PROJECT_ID} STATUS_FIELD_ID=${STATUS_FIELD_ID} IN_REVIEW_OPTION_ID=${IN_REVIEW_OPTION_ID}"
+  else
+    gh api graphql -f query='
+    mutation {
+      updateProjectV2ItemFieldValue(
+        input: {
+          projectId: "'"$PROJECT_ID"'"
+          itemId: "'"$ITEM_ID"'"
+          fieldId: "'"$STATUS_FIELD_ID"'"
+          value: { singleSelectOptionId: "'"$IN_REVIEW_OPTION_ID"'" }
+        }
+      ) {
+        projectV2Item { id }
+      }
+    }' \
+      && echo "✅ Issue #{TRACKER_ISSUE} moved to In Review on Projects board" \
+      || echo "⚠️  Board In Review update failed — continuing"
+  fi
+) || echo "⚠️  GitHub board In Review update skipped (gh project unavailable or auth scope missing)"
+```
+
+> The board must have a Status column option named exactly **"In Review"**. If the project uses a different label (e.g. "Review", "Code Review"), the option lookup returns empty and the block logs a skip — update `select(.name == "In Review")` to match the exact option name.
+
+Log in Decisions Log: "GitHub board: issue #{TRACKER_ISSUE} → In Review (or ⚠️ skipped — see output)."
+
+---
+
 ## Jira Tracker Update (when `TRACKER=jira` and `TRACKER_ISSUE` is set)
 
 > **MUST execute — pipeline action, not optional sync.** Do not skip on the basis of any user memory that says "Jira sync is manual" (e.g. `feedback_jira_sync_manual_only.md`). That rule applies only to `/create-epic`, `/create-story`, `/create-task` — never to develop-pipeline steps. This is the symmetric Jira counterpart to the GitHub `gh issue comment` posted by `create-pr` in the `TRACKER=github` path.
