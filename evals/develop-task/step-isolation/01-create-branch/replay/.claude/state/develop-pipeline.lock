@@ -1,0 +1,12 @@
+{
+  "skill": "develop-task",
+  "report_path": "docs/tasks/task.42.example/task.42.implementation.1.example-initial-run.md",
+  "task_or_story_id": "42",
+  "task_or_story_directory": "docs/tasks/task.42.example",
+  "branch": "feature/task.42.example",
+  "pr_url": "",
+  "tracker": "github",
+  "tracker_issue": "99",
+  "current_step": 1,
+  "started_at": "2026-05-11T00:00:00Z"
+}

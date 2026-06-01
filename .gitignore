@@ -1,9 +1,6 @@
 .DS_Store
 firebase-debug.log
 *.log
-# …but eval replay fixtures include committed *.log expected-output files (test
-# data the runner copies into the sandbox), not build noise — keep tracking them.
-!evals/**/replay/**/*.log
 node_modules/
 __pycache__/
 *.pyc
@@ -51,3 +48,15 @@ secrets.yml
 # Obsidian local workspace state (pane layout churns per session)
 .obsidian/workspace*.json
 .obsidian/
+
+# ── Eval replay fixtures (committed test data) ────────────────────────────────
+# The eval runner copies each scenario's replay/ tree verbatim into a sandbox.
+# Those fixtures intentionally include paths matched by the rules above (*.log,
+# .claude/, …), so re-include the entire replay subtree — a fresh clone (CI) must
+# have byte-identical fixtures to a local checkout. MUST stay at the END of this
+# file: a gitignore negation only overrides rules that appear before it, and the
+# directory negation must precede the file negation so git descends into
+# otherwise-ignored fixture dirs (e.g. replay/.claude/).
+!evals/**/replay/
+!evals/**/replay/**/
+!evals/**/replay/**
