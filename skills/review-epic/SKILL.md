@@ -113,7 +113,7 @@ question: "How would you like the review output delivered?"
 header: "Output Mode"
 options:
   - label: "Co-located report"
-    description: "Save a review-report.md alongside the epic file for async review and future reference."
+    description: "Save an epic.[N].review.[n].[name].md report alongside the epic file for async review and future reference."
   - label: "Inline action plan"
     description: "Present prioritised recommendations immediately as numbered steps to action now."
 ```
@@ -472,7 +472,11 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 **Option A — Co-located Report**:
 
-Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name]-review-report.md`
+Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].review.[n].[name].md`
+
+- `[N]` is the epic number; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[N].` in the epic filename) — NOT a free-form summary of the review focus.
+- `[n]` is a sequence number for multiple reviews of the same epic; it starts at 1 and increments on re-reviews (mirrors the QA `qa.{n}` and story `review.{n}` patterns). Use DOTS as structural separators and hyphens within the name slug.
+- Example: epic file `epic.1.mastra-runtime-foundation.md` → review file `epic.1.review.1.mastra-runtime-foundation.md`.
 
 **Report structure**:
 
@@ -660,7 +664,7 @@ options:
 5. Report which fixes were applied and which (if any) were skipped with reason
 6. **Mark recommendations as implemented** — update both documents:
 
-   **In the review report** (`epic.[N].[name]-review-report.md`):
+   **In the review report** (`epic.[N].review.[n].[name].md`):
    - Add the following line immediately after the Story Writing Readiness line in the Executive Summary:
      `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD`
      (or: `> **Implementation Status**: ✅ Critical/Major recommendations implemented — YYYY-MM-DD` if partial)
@@ -668,7 +672,7 @@ options:
 
    **In the epic file** (`epic.[N].[name].md`):
    - Add the following line immediately after the `**Last Updated**` status line:
-     `**Review**: ✅ All review recommendations from \`epic.[N].[name]-review-report.md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
+     `**Review**: ✅ All review recommendations from \`epic.[N].review.[n].[name].md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
    - Update the `last_reviewed` YAML frontmatter field to today's date if not already done in Step 10
 
 **If "No — I will apply them manually"**:

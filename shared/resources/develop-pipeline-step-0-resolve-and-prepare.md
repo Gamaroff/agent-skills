@@ -357,7 +357,9 @@ tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline starte
   BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
 
   # Ensure issue is on the board (idempotent — returns existing item if already present)
-  gh project item-add "$BOARD_NUM" --owner "$OWNER" --url "$REPO_URL/issues/{TRACKER_ISSUE}" 2>/dev/null || true
+  gh project item-add "$BOARD_NUM" --owner "$OWNER" --url "$REPO_URL/issues/{TRACKER_ISSUE}" \
+    && echo "✅ item-add succeeded" || echo "⚠️  item-add may have failed or item already present"
+  sleep 3  # Allow Projects API to propagate before querying
 
   # Query the issue directly for its project items — avoids item-list pagination limits
   RESPONSE=$(gh api graphql -f query='
@@ -389,8 +391,41 @@ tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline starte
     }
   }')
 
-  # Extract IDs from the first project item
+  # Extract IDs from the first project item (retry once if empty — handles Projects API propagation delay after item-add)
   ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  if [ -z "$ITEM_ID" ]; then
+    echo "⚠️  projectItems empty on first query — waiting 5s and retrying"
+    sleep 5
+    RESPONSE=$(gh api graphql -f query='
+    {
+      repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
+        issue(number: {TRACKER_ISSUE}) {
+          projectItems(first: 10) {
+            nodes {
+              id
+              fieldValueByName(name: "Priority") {
+                ... on ProjectV2ItemFieldSingleSelectValue { name }
+              }
+              project {
+                id
+                title
+                fields(first: 20) {
+                  nodes {
+                    ... on ProjectV2SingleSelectField {
+                      id
+                      name
+                      options { id name }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }')
+    ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  fi
   PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
   STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
   OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "In Progress") | .id // empty')
