@@ -497,8 +497,16 @@ options:
    - Check frontmatter for `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This task has no linked Jira issue. Should I create one now?"
-     - If user confirms, create via Jira REST API v2:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-task` step 4.5; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This task has no linked Jira issue. Create and link one now? Detected platform: Jira."
+       > **Options:**
+       > - **Sync to Jira** `(Recommended)` — create the Jira issue and write `jira_key`/`jira_url` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `jira_key` unwritten. The user can run `/sync-jira-task` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-jira-task later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to Jira**, create via Jira REST API v2:
        - **Pre-create dedup search (Tracker dedup)** — run immediately before the create block:
          1. Search for an existing issue via Atlassian MCP `searchJiraIssuesUsingJql`:
             - `jql`: `summary ~ "[Task {id}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — search across all states)
@@ -555,8 +563,16 @@ options:
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This task has no linked GitHub issue. Should I create one now?"
-     - If user confirms, create the issue using the same pattern as `/create-task`:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-task` step 4.5; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This task has no linked GitHub issue. Create and link one now? Detected platform: GitHub."
+       > **Options:**
+       > - **Sync to GitHub** `(Recommended)` — create the GitHub issue, add it to the project board, and write `github_issue` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `github_issue` unwritten. The user can run `/sync-github-task` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-github-task later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to GitHub**, create the issue using the same pattern as `/create-task`:
        - **Pre-create dedup search (Tracker dedup)** — run immediately before the create block:
          1. Search for an existing issue:
             ```bash

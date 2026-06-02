@@ -32,9 +32,9 @@ Natural language triggers:
 
 To identify the next logical story based on project progress and epic definitions, and then to prepare a comprehensive, self-contained, and actionable story file. This skill ensures the story is enriched with all necessary technical context, requirements, and acceptance criteria, making it ready for efficient implementation by a Developer Agent with minimal need for additional research.
 
-## ⚠️ Documentation-Only Scope — Do NOT Implement
+## ⚠️ Scope: Documentation + Opt-in Tracker Sync — Do NOT Implement
 
-This skill produces **the story document and its co-located plan file only**. It MUST NOT begin implementing the story and MUST NOT create tracker issues. Implementation is `develop-story`'s job; Jira sync is `/sync-jira-story`'s job — both invoked separately.
+This skill produces **the story document and its co-located plan file**, and then — **only after explicitly asking the user in Step 5.2a** — may optionally sync the story to an issue tracker (GitHub or Jira). It MUST NOT begin implementing the story; implementation is `develop-story`'s job, invoked separately. Tracker sync is **opt-in**: never create a remote issue without the user's confirmation in this run.
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
@@ -44,7 +44,7 @@ This skill produces **the story document and its co-located plan file only**. It
 - ❌ Installing/removing dependencies or modifying `package.json`
 - ❌ Starting Task 1 of the story's Tasks/Subtasks "to get a head start"
 - ❌ Auto-invoking `develop-story`, `develop`, or any implementation skill on completion
-- ❌ Creating Jira issues, GitHub issues, or any remote tracker issues — use `/sync-jira-story` explicitly
+- ❌ Creating Jira or GitHub issues **without first asking the user** — tracker sync is gated behind the Step 5.2a prompt and must never run unprompted
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
@@ -52,6 +52,7 @@ This skill produces **the story document and its co-located plan file only**. It
 - ✅ `story.{E}.{S}.{name}.md` (story doc)
 - ✅ `story.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
 - ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (Step 6.2)
+- ✅ *(only after the user opts in at Step 5.2a)* Creating the tracker issue(s) and writing `github_issue` / `jira_key` / `jira_url` back into the story frontmatter
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
 
@@ -338,7 +339,7 @@ Populate these sections:
 
 ### 5.2-est Prompt for Effort Estimate (Optional)
 
-Before creating the tracker issue, propose a default effort estimate and let the user accept or override. The accepted value is written to frontmatter as `estimated_effort_hours: {N}` and is picked up by Jira sync (→ `timetracking.originalEstimate`) and GitHub sync (→ Projects v2 `Estimate` number field).
+Before the optional tracker-sync step (5.2a), propose a default effort estimate and let the user accept or override. The accepted value is written to frontmatter as `estimated_effort_hours: {N}` and is picked up by Jira sync (→ `timetracking.originalEstimate`) and GitHub sync (→ Projects v2 `Estimate` number field).
 
 **Step 1 — compute the recommendation.** Apply the deterministic rubric in `references/effort-estimation-rubric.md`:
 
@@ -353,20 +354,41 @@ Before creating the tracker issue, propose a default effort estimate and let the
 > **Question:** "Recommended estimate based on {ac_count} ACs, {task_count} tasks, risk={risk_level}: **{snap}h**. Accept or pick a different value."
 > Options: `1 hour`, `2 hours`, `4 hours`, `8 hours` — append `(Recommended)` to the snapped bucket label. (Tasks: shift to `4`, `8`, `16` if rubric > 8h.) The user can also pick "Other" for a custom number or "Skip — leave unestimated" to omit the field.
 
-**Step 3 — write back.** If the user accepts the recommendation or picks any numeric option, write `estimated_effort_hours: {N}` into the frontmatter before invoking the tracker sync sub-routine. If the user picks Skip, omit the field — review-story will flag it as a LOW gap later.
+**Step 3 — write back.** If the user accepts the recommendation or picks any numeric option, write `estimated_effort_hours: {N}` into the frontmatter before the optional Step 5.2a sync (so the estimate is ready whether the user syncs now or later). If the user picks Skip, omit the field — review-story will flag it as a LOW gap later.
 
 Do **not** silently write a value without prompting. The recommendation is a default for the user's prompt, not an auto-applied estimate.
 
-### 5.2a Create Tracker Issue
+### 5.2a Offer Tracker Sync (opt-in)
 
-After the story document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `references/platform-detection.md`):
+After the story document is fully written, ask the user whether to sync it to an issue tracker. This step never creates a remote issue without explicit confirmation in this run.
+
+**Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
 source references/resolve-platform.sh
-# TRACKER = jira | github
+# TRACKER = jira | github   (empty/unknown if neither is configured)
 ```
 
-#### Jira Path (when `TRACKER=jira`)
+**Step B — prompt** the user with `AskUserQuestion`:
+
+> **Header:** `Tracker sync`
+> **Question:** "Story doc created. Sync it to an issue tracker now? Detected platform: {TRACKER or 'none detected'}."
+> **Options:**
+> - **Sync to GitHub** — append `(Recommended)` when `TRACKER=github`. Creates the epic + story issues, adds them to the project board, links the story as a sub-issue of its epic, and writes `github_issue` to frontmatter.
+> - **Sync to Jira** — append `(Recommended)` when `TRACKER=jira`. Creates/links the epic + story issues, adds to the backlog, and writes `jira_key`/`jira_url` to frontmatter.
+> - **Skip — docs only** — make no remote changes; leave `github_issue`/`jira_key` unwritten. The user can run `/sync-github-story` or `/sync-jira-story` later.
+>
+> The user may also pick "Other" (auto-provided) to skip or explain.
+
+**Step C — act on the answer:**
+
+- **Skip / no tracker chosen** → make no remote changes, log "Tracker sync skipped by user — run /sync-github-story or /sync-jira-story later." and continue to Step 5.3. Do NOT halt.
+- **Sync to Jira** → run the Jira Path below.
+- **Sync to GitHub** → run the GitHub Path below.
+
+> **Note:** If the user picks a platform that isn't actually configured (e.g. Jira while `JIRA_URL` is unset), the corresponding sub-routine logs a warning and returns an empty key — it never halts. Surface the warning and continue to Step 5.3.
+
+#### Jira Path (when the user chose Sync to Jira)
 
 1. Derive the parent epic file path using the grandparent directory rule:
    ```bash
@@ -387,7 +409,7 @@ source references/resolve-platform.sh
 
 **On failure**: the sub-routine logs a warning and returns `STORY_JIRA_KEY=""`. `create-story` leaves `jira_key: null` and continues. Never halt. Users can still run `/sync-jira-story` manually later to retry.
 
-#### GitHub Path (when `TRACKER=github`)
+#### GitHub Path (when the user chose Sync to GitHub)
 
 1. Derive the parent epic file path using the grandparent directory rule:
    ```bash

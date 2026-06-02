@@ -578,8 +578,16 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
    - Frontmatter MUST contain `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This story has no linked Jira issue. Should I create one now?"
-     - If user confirms:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This story has no linked Jira issue. Create and link one now? Detected platform: Jira."
+       > **Options:**
+       > - **Sync to Jira** `(Recommended)` — create the Jira issue, link it to the parent epic, and write `jira_key`/`jira_url` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `jira_key` unwritten. The user can run `/sync-jira-story` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-jira-story later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to Jira**:
        0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
           - Use Atlassian MCP `searchJiraIssuesUsingJql`:
             - `jql`: `summary ~ "[Story {epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
@@ -617,8 +625,16 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This story has no linked GitHub issue. Should I create one now?"
-     - If user confirms:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This story has no linked GitHub issue. Create and link one now? Detected platform: GitHub."
+       > **Options:**
+       > - **Sync to GitHub** `(Recommended)` — create the GitHub issue, link it as a sub-issue of the parent epic, add it to the project board, and write `github_issue` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `github_issue` unwritten. The user can run `/sync-github-story` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-github-story later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to GitHub**:
        0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
           1. Search for an existing issue:
              ```bash
