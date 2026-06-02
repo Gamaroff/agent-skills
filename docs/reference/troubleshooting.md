@@ -24,7 +24,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 | Jira | `curl -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/myself"` — should return your user JSON, not a 401 |
 | Bitbucket | `curl -u "$BITBUCKET_USERNAME:$BITBUCKET_APP_PASSWORD" "https://api.bitbucket.org/2.0/user"` |
 
-Tokens are revocable — if `curl` confirms the creds are wrong, regenerate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) (Jira) or Bitbucket → Settings → App passwords (Bitbucket). To work offline without fixing this, set `SKIP_TRACKER=1`.
+Tokens are revocable — if `curl` confirms the creds are wrong, regenerate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) (Jira) or Bitbucket → Settings → App passwords (Bitbucket). To work offline without fixing this, choose **Skip — docs only** at the tracker prompt — the creation and review skills never sync without it.
 
 ## `setup-consumer.sh` install fails or `.agents/skills/` is empty
 
