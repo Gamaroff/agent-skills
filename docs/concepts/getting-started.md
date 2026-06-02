@@ -27,12 +27,12 @@ Skills auto-detect your platform via `skills-config.yaml` + env vars + git remot
 
 - **Your VCS is fixed.** Use GitHub or Bitbucket depending on where your repo lives — there's no flexibility here.
 - **Your tracker is a choice — pick the one your team already uses.** If your team coordinates on Jira (standups, sprint board, backlog), pick Jira. If issues live alongside the code on GitHub, pick GitHub Issues. The skills push the same artifacts either way; the tracker is just where notifications and board states surface.
-- **No tracker at all?** Set `SKIP_TRACKER=1` for any single run. Useful for offline work, dry runs, or solo projects where the tracker would just be noise.
+- **No tracker at all?** Tracker sync is opt-in — the creation and review skills ask before pushing anything. Choose **Skip — docs only** at the tracker prompt: nothing is sent to a tracker, but your local files and registries are still written. Useful for offline work, dry runs, or solo projects where the tracker would just be noise.
 - **GitHub VCS + Jira tracker is a common combo** in orgs that migrated code to GitHub but kept Jira for product management. It's fully supported.
 
 `project.yml` is GitHub-only — it carries GitHub project-board metadata. Bitbucket/Jira users skip it.
 
-Task quickstart still needs VCS auth (PR creation) but can skip tracker auth via `SKIP_TRACKER=1`. Story quickstart needs all of the above for the platform combo you picked.
+Task quickstart still needs VCS auth (PR creation); tracker auth is only needed if you opt to sync — choose **Skip — docs only** at the tracker prompt to stay local. Story quickstart needs all of the above for the platform combo you picked.
 
 ### Persisting env vars
 
@@ -75,11 +75,9 @@ export BITBUCKET_USERNAME=your-username
 export BITBUCKET_APP_PASSWORD=your-app-password
 ```
 
-**Escape hatch:**
+**Staying local:**
 
-| Variable         | Effect                                                                                                                                    |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `SKIP_TRACKER=1` | Skip all remote tracker calls (GitHub Issues / Jira). Local files and registries still written. Useful offline or for planning-only runs. |
+Tracker sync is **opt-in** — the creation and review skills (`create-story`, `create-task`, `create-epic`, `review-story`, `review-task`, `review-epic`) ask before creating any remote issue. Choose **Skip — docs only** at the prompt to keep everything local; your files and registries are still written. There's nothing to configure ahead of time.
 
 ## Quick setup (wizard)
 

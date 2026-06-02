@@ -90,7 +90,7 @@ docs/prd/footer-link/epics/
     └── epic.{N}.footer-link.md
 ```
 
-When prompted for tracker, choose **Skip** (or set `SKIP_TRACKER=1`) to avoid creating a practice issue in your tracker.
+When prompted for tracker, choose **Skip — docs only** to avoid creating a practice issue in your tracker.
 
 ---
 

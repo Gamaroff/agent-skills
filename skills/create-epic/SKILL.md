@@ -44,7 +44,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 - ✅ The epic file `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md`
 - ✅ `/docs/development/epic-registry.md` (number reservation per the global numbering rule)
-- ✅ Tracker issue creation if the workflow includes it (GitHub/Jira issue for the epic itself)
+- ✅ Tracker issue creation (GitHub/Jira issue for the epic itself) — **only after explicit opt-in** via the prompt in the *Offer Tracker Sync* step; never created unprompted
 
 **If the user asks to "create the epic and start the first story"**: create the epic doc, then STOP and explicitly hand off — tell user to invoke `/create-story` as a separate step. Do not chain.
 
@@ -223,28 +223,37 @@ After drafting the Stories Breakdown, decide whether a Mermaid Value Stream diag
 3. Paste the Mermaid block (with YAML metadata header) into a new "Story Flow" subsection placed between "Stories Breakdown" and "Compatibility Requirements".
 4. Accept `no diagram justified — {reason}` without pushing back; not every epic needs one.
 
-## Create Tracker Issue
+## Offer Tracker Sync (opt-in)
 
-After the epic file is fully written and the registry updated, create a corresponding issue in the remote tracker. Skip this step if `SKIP_TRACKER=1` is set **or** if the epic frontmatter already contains a `github_issue` or `jira_key` (idempotent — no duplicate creation on re-runs).
+After the epic file is fully written and the registry updated, ask the user whether to sync it to an issue tracker. This step **never creates a remote issue without explicit confirmation in this run**. Skip automatically (no prompt) if the epic frontmatter already contains a `github_issue` or `jira_key` — log `"ℹ️  tracker issue already linked — skipping"` and continue (idempotent — no duplicate creation on re-runs).
 
-### Opt-out: docs-only epic
-
-Set env var `SKIP_TRACKER=1` to skip tracker issue creation entirely. The epic file and registry update are still created. Useful for one-off planning epics, migrations, or offline workflows.
-
-### Detect platform and opt-out
+**Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
-if [ "$SKIP_TRACKER" = "1" ]; then
-  echo "ℹ️  SKIP_TRACKER=1 — skipping tracker issue creation"
-else
-  # Platform detection — see references/platform-detection.md
-  source references/resolve-platform.sh
-  # TRACKER = jira | github; VCS = github | bitbucket
-  # proceed to platform branch below
-fi
+source references/resolve-platform.sh
+# TRACKER = jira | github   (empty/unknown if neither is configured)
 ```
 
-### Jira path (when `TRACKER=jira`)
+**Step B — prompt** the user with `AskUserQuestion`:
+
+> **Header:** `Tracker sync`
+> **Question:** "Epic doc created. Sync it to an issue tracker now? Detected platform: {TRACKER or 'none detected'}."
+> **Options:**
+> - **Sync to GitHub** — append `(Recommended)` when `TRACKER=github`. Creates the epic issue, adds it to the project board, and writes `github_issue` to frontmatter.
+> - **Sync to Jira** — append `(Recommended)` when `TRACKER=jira`. Creates/updates the epic issue (idempotent) and writes `jira_key`/`jira_url` to frontmatter.
+> - **Skip — docs only** — make no remote changes; leave `github_issue`/`jira_key` unwritten. The user can sync later (`/sync-jira-epic` for Jira, or re-run `/create-epic` for GitHub).
+>
+> The user may also pick "Other" (auto-provided) to skip or explain.
+
+**Step C — act on the answer:**
+
+- **Skip / no tracker chosen** → make no remote changes, log `"Tracker sync skipped by user — run /sync-jira-epic later (Jira) or re-run /create-epic to sync to GitHub."` and continue to Post-Creation Validation. Do NOT halt.
+- **Sync to Jira** → run the Jira Path below.
+- **Sync to GitHub** → run the GitHub Path below.
+
+> **Note:** If the user picks a platform that isn't actually configured (e.g. Jira while `JIRA_URL` is unset), the corresponding path logs a warning and creates nothing — it never halts. Surface the warning and continue.
+
+### Jira Path (when the user chose Sync to Jira)
 
 Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), handles ADF rendering, writes `jira_key` and `jira_url` back to the epic frontmatter, and guards against concurrent edits. No inline Jira REST in this skill.
 
@@ -254,7 +263,7 @@ Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), 
 
 **On failure**: log warning and continue. Never halt. The epic file already exists; the Jira issue can be synced manually later via `/sync-jira-epic`.
 
-### GitHub path (when `TRACKER=github`)
+### GitHub Path (when the user chose Sync to GitHub)
 
 Idempotency check: if `github_issue` is already set in the epic frontmatter, skip creation and log `"ℹ️  github_issue already set — skipping tracker creation"`.
 
