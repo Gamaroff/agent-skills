@@ -137,6 +137,7 @@ Store choice as `output_mode` for Step 9.
 | Generate output             | Produce report file or inline action plan               |
 | Post-review status update   | Offer to update epic frontmatter with review metadata   |
 | Apply findings to epic      | Offer to apply recommended fixes directly to epic file  |
+| Offer tracker sync          | Opt-in: create a tracker issue if the epic has none      |
 
 ---
 
@@ -704,6 +705,41 @@ node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
 On success → `sync-jira-epic` updates the Jira description, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed body update to Jira {jira_key}`.
 
 On non-zero exit → log warning `⚠️ sync-jira-epic failed — Jira description may be stale` and continue (do not halt).
+
+---
+
+### Step 11.6 — Offer Tracker Sync for Unlinked Epic (opt-in)
+
+**Purpose**: If the epic has no tracker issue yet, offer to create one. Mirrors the opt-in gate in `/create-epic` and `/review-story` — **never creates a remote issue unprompted**. This step and Step 11.5 are mutually exclusive: 11.5 re-syncs an epic that **already** has a `jira_key`; this step creates one for an epic that **doesn't**.
+
+**Detect platform** (if not already sourced this run) using the canonical resolver (see `references/platform-detection.md`):
+
+```bash
+source references/resolve-platform.sh
+# TRACKER = jira | github   (empty/unknown if neither is configured)
+```
+
+**Decision:**
+
+- **Frontmatter already has `github_issue` or `jira_key`** → the epic is already linked. Skip this step (Step 11.5 handles keeping a linked Jira description in sync). Log `"ℹ️  tracker issue already linked — skipping create offer"`.
+- **No tracker key in frontmatter** → prompt with `AskUserQuestion` (same gate as `/create-epic`):
+
+  > **Header:** `Tracker sync`
+  > **Question:** "This epic has no tracker issue. Create one now? Detected platform: {TRACKER or 'none detected'}."
+  > **Options:**
+  > - **Sync to GitHub** — append `(Recommended)` when `TRACKER=github`. Create the epic issue, add it to the project board, and write `github_issue` to frontmatter.
+  > - **Sync to Jira** — append `(Recommended)` when `TRACKER=jira`. Create the epic issue and write `jira_key`/`jira_url` to frontmatter.
+  > - **Skip — leave unlinked** — make no remote changes; leave the missing-issue gap flagged. The user can sync later (`/sync-jira-epic` for Jira, or re-run `/create-epic` for GitHub).
+  >
+  > The user may also pick "Other" (auto-provided) to skip or explain.
+
+**Act on the answer:**
+
+- **Skip / no sync chosen** → make no remote changes, keep the unlinked-epic gap flagged in the review output, log `"Tracker sync skipped by user — run /sync-jira-epic later (Jira) or re-run /create-epic to sync to GitHub."` and continue. Do NOT halt.
+- **Sync to Jira** → invoke the `ensure-epic-jira-issue` sub-routine with the epic file path. On return, `EPIC_JIRA_KEY` is set (e.g. `PROJ-42`) or empty. The sub-routine delegates to `sync-jira-epic` for idempotent create, renders the body via ADF, and writes `jira_key`/`jira_url` back to frontmatter. On failure it logs a warning and returns empty — never halts.
+- **Sync to GitHub** → invoke the `ensure-epic-github-issue` sub-routine with the epic file path. On return, `EPIC_ISSUE_NUM` is set (integer) or empty. The sub-routine creates the issue, adds it to the project board, and writes `github_issue` back to frontmatter. On failure it logs a warning and returns empty — never halts.
+
+> **Note:** If the user picks a platform that isn't actually configured (e.g. Jira while `JIRA_URL` is unset), the sub-routine logs a warning and creates nothing — it never halts. Surface the warning and continue.
 
 ---
 
