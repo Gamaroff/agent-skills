@@ -125,12 +125,18 @@ Continue to Step 6 (status reconciliation).
 ISSUE_NUM={github_issue from frontmatter}
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
+# Resolve the Document-link branch the same way as on create: current branch's
+# remote-tracking branch, falling back to the repo default branch, then `develop`.
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RELATIVE_PATH}"
+
 # Verify the issue still exists
 gh issue view ${ISSUE_NUM} --json state,title,labels,body > /tmp/issue-${ISSUE_NUM}.json \
   || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
 ```
 
-Diff `title`, `body`, `labels` against current GitHub state. If anything changed, run:
+Diff `title`, `body`, `labels` against current GitHub state. The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create, including the `## Document` link block (using `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch. If anything changed, run:
 
 ```bash
 gh issue edit ${ISSUE_NUM} \

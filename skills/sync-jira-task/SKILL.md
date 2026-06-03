@@ -1,6 +1,6 @@
 ---
 name: sync-jira-task
-description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (default-branch refs). Maintains a Change Log in both the local task and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
+description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Maintains a Change Log in both the local task and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
 ---
 
 # sync-jira-task
@@ -26,7 +26,7 @@ One-way sync of a local technical task markdown file to Jira. Auto-detects creat
 - **Live priority resolution** — fetches `/rest/api/3/priority` and matches user input against the actual Jira instance, falling back to a built-in synonym map (`critical`→`Highest`, etc.).
 - **Issue type cache** — Jira `Task` type id is cached to `<repo>/.cache/jira-issuetypes-<PROJECT>.json` for 24h.
 - **Bullet/ordered lists** — body sections containing `- item` or `1. item` lines render as proper ADF lists, not paragraphs with hard-breaks.
-- **Default-branch Bitbucket URLs** — links use the resolved `origin/HEAD` branch (e.g. `main`) instead of `HEAD`, so they survive file moves on detached commits.
+- **Current-branch Bitbucket URLs** — links use the current branch's remote-tracking branch (e.g. `origin/feature/...`), falling back to the default branch (`origin/HEAD`, e.g. `main`) when there is no upstream or HEAD is detached. Since feature branches are deleted post-merge, `finalise` automatically re-points the link to the durable integration branch at acceptance (via `--doc-branch`); you can also re-sync manually from `develop`/`main` after merge.
 - **HTTP retry** — automatic retry with exponential backoff on 5xx and network errors. 4xx responses fail fast.
 - **Backlog placement (Scrum only)** — board type is detected via `/rest/agile/1.0/board/{id}/configuration`. Skipped on Kanban with a warning.
 - **In-place frontmatter updates** — `jira_*` keys are updated where they sit, not stripped and re-appended. Clean diffs.
@@ -150,7 +150,7 @@ node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
 Flow:
 
 1. Parse the task file (frontmatter + body) — safe against `---` horizontal rules in the body.
-2. Resolve auth, Bitbucket repo URL + default branch, and load live Jira priorities.
+2. Resolve auth, Bitbucket repo URL + branch (current branch's upstream, falling back to the default branch), and load live Jira priorities.
 3. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 4. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 5. Diff `summary`, body hash, meta hash, priority, labels.
@@ -272,6 +272,7 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
 | `--summary` | `-s` | Override task summary/title |
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
+| `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Used by `finalise` (passes the durable integration branch) so a closed issue doesn't link to a deleted feature branch. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--force` | | Override the concurrent-edit guard |
 | `--json` | | Suppress human output; emit a single JSON object on completion |
