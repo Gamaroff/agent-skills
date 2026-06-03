@@ -265,61 +265,17 @@ Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), 
 
 ### GitHub Path (when the user chose Sync to GitHub)
 
-Idempotency check: if `github_issue` is already set in the epic frontmatter, skip creation and log `"ℹ️  github_issue already set — skipping tracker creation"`.
+Invoke the `ensure-epic-github-issue` sub-routine with the epic file path. On return, `EPIC_ISSUE_NUM` is set (integer) or empty. The sub-routine is idempotent and handles everything inline:
 
-Read `project.yml` (repo root) to get `github.project_board_name` for the `--project` flag.
+- skips creation and returns the existing number if `github_issue` is already set in frontmatter;
+- auto-creates the milestone (`Epic {N} — {epic_title}`, or the frontmatter `milestone:` value) if absent;
+- creates the issue (`[Epic {N}] {epic_title}`, label `epic`, milestone attached);
+- adds it to the GitHub Project board;
+- writes `github_issue` back to the epic frontmatter.
 
-```bash
-REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-DOC_URL="https://github.com/$REPO/blob/main/{epic-file-relative-path}"
+On failure it logs a warning and returns empty — never halts.
 
-EPIC_ISSUE_URL=$(gh issue create \
-  --title "[Epic {N}] {epic_title}" \
-  --project "{project_board_name}" \
-  --body "## Goal
-
-{epic_goal — 1-2 sentences from the Epic Goal section}
-
-## Description
-
-{Summary from Epic Description — what's being added/changed and how it integrates}
-
-## Stories
-
-| Story | Description |
-|-------|-------------|
-{rows from Stories Overview table, one per story}
-
-## Document
-
-📄 [Epic Document]($DOC_URL)
-📁 \`{epic-file-relative-path}\`" \
-  --label "epic" \
-  --label "priority:{priority}" \
-  --milestone "{milestone_title}")
-```
-
-**Milestone selection** — in this order:
-
-1. If the epic frontmatter has a `milestone:` field, use that value verbatim.
-2. Otherwise default to `"Epic {N} — {epic_title}"`.
-
-Auto-create milestone if it doesn't exist yet:
-
-```bash
-gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="open"
-```
-
-**On success**:
-
-1. Parse the issue URL from the `gh` output.
-2. Add to GitHub Project board:
-   ```bash
-   gh project item-add {project_board_number} --owner {owner} --url "$EPIC_ISSUE_URL"
-   ```
-3. Add `github_issue: {N}` to the epic's YAML frontmatter.
-
-**On failure**: Set `github_issue: null`, log warning, continue. Never halt.
+> **Why delegate?** `ensure-epic-github-issue` is the same primitive `/review-epic`, `/create-story`, `/review-story`, and `/sync-github-epic` all call. Routing every entry point through it means the epic issue (title, body, milestone, board membership) is byte-identical no matter which skill creates it first, so the four paths converge on one issue with no diff churn when they cross.
 
 ## Post-Creation Validation
 

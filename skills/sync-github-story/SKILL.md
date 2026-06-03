@@ -26,7 +26,7 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 ## When NOT to Use
 
 - Story already in Jira tracking workflow → use `/sync-jira-story`.
-- Doc is an epic or task → use `/sync-github-epic` (if available) or `/sync-github-task`.
+- Doc is an epic or task → use `/sync-github-epic` or `/sync-github-task`.
 
 ## Prerequisites
 
