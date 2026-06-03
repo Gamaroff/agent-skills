@@ -176,6 +176,35 @@ function getDefaultBranch() {
   return "main";
 }
 
+// Pure: strip the remote name (first path segment) from an upstream ref.
+// "origin/feature/foo" -> "feature/foo"; "" / "noref" -> null. Remote names
+// cannot contain "/", but branch names can (feature/...), so strip only up to
+// and including the FIRST slash.
+function stripRemotePrefix(upstreamRef) {
+  if (!upstreamRef) return null;
+  const slash = upstreamRef.indexOf("/");
+  return slash === -1 ? null : upstreamRef.slice(slash + 1);
+}
+
+// Resolve the current branch's remote-tracking branch name WITHOUT the remote
+// prefix. E.g. when on `feature/story.5.1.foo` tracking
+// `origin/feature/story.5.1.foo`, returns "feature/story.5.1.foo".
+//
+// Returns null on detached HEAD / no configured upstream / git unavailable —
+// callers fall back to getDefaultBranch(). Remote-name agnostic (works for
+// non-"origin" remotes) and safe for branch names containing "/".
+function getCurrentBranchUpstream() {
+  try {
+    const upstream = execSync(
+      "git rev-parse --abbrev-ref --symbolic-full-name @{u}",
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    return stripRemotePrefix(upstream);
+  } catch (_) {
+    return null; // detached HEAD, no upstream, or git not available
+  }
+}
+
 function getBitbucketRepoBase() {
   const env = process.env.BITBUCKET_REPO_URL;
   if (env) return env.replace(/\/$/, "");
@@ -927,7 +956,7 @@ module.exports = {
   // frontmatter
   parseFrontmatter, rewriteFrontmatter, upsertFrontmatterKeys, formatYamlScalar,
   // git / bb
-  getRepoRoot, getDefaultBranch, getBitbucketRepoBase, buildBitbucketUrl,
+  getRepoRoot, getDefaultBranch, getCurrentBranchUpstream, stripRemotePrefix, getBitbucketRepoBase, buildBitbucketUrl,
   // changelog
   CL_START, CL_END, fmtEntry, buildChangelogBlock, isEntryRow, RE_ENTRY_ROW,
   extractEntries, findHandWrittenChangelog, upsertChangelog,
