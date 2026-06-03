@@ -715,3 +715,27 @@ test("getIssueTypeId — caches type id and avoids second network call", async (
   assert.equal(id2, "10001");
   assert.equal(calls, 1, "second call served from cache");
 });
+
+// ---------------------------------------------------------------------------
+// stripRemotePrefix — pure parse step behind getCurrentBranchUpstream()
+// ---------------------------------------------------------------------------
+test("stripRemotePrefix — strips remote name, preserves slashes in branch", () => {
+  assert.equal(lib.stripRemotePrefix("origin/main"), "main");
+  assert.equal(lib.stripRemotePrefix("origin/feature/story.5.1.foo"), "feature/story.5.1.foo");
+  assert.equal(lib.stripRemotePrefix("upstream/release/1.2"), "release/1.2");
+});
+
+test("stripRemotePrefix — empty or shape-less ref returns null", () => {
+  assert.equal(lib.stripRemotePrefix(""), null);
+  assert.equal(lib.stripRemotePrefix("weirdnoref"), null);
+});
+
+test("parseArgs — --doc-branch overrides the resolved branch", () => {
+  const opts = lib.parseArgs(["node", "script", "--file", "x.md", "--doc-branch", "develop"]);
+  assert.equal(opts.docBranch, "develop");
+});
+
+test("parseArgs — --doc-branch absent defaults to null", () => {
+  const opts = lib.parseArgs(["node", "script", "--file", "x.md"]);
+  assert.equal(opts.docBranch, null);
+});

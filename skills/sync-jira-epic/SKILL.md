@@ -29,7 +29,7 @@ One-way sync of a local epic markdown file to Jira. Auto-detects create vs updat
 - **Stories Breakdown ADF table** — the markdown `## Stories Breakdown` table is rendered as a real ADF table (header row + data rows) in the Jira description, not raw pipes. Inline markdown links (`[label](url)`) inside cells render as ADF link marks. Escaped pipes (`\|`) in cells are preserved.
 - **PRD path resolution** — `prd_source` frontmatter is resolved through multiple path conventions (`${PRD_ROOT}/<domain>/<feature>/prd.<feature>.md`, basename match) before giving up. `${PRD_ROOT}` resolves via `references/resolve-paths.sh` (default: `docs/prd`).
 - **Bullet/ordered lists** — body sections containing `- item` or `1. item` lines render as proper ADF lists, not paragraphs with hard-breaks.
-- **Default-branch Bitbucket URLs** — links use the resolved `origin/HEAD` branch (e.g. `main`) instead of `HEAD`.
+- **Current-branch Bitbucket URLs** — links use the current branch's remote-tracking branch (e.g. `origin/feature/...`), falling back to the default branch (`origin/HEAD`, e.g. `main`) when there is no upstream or HEAD is detached. Feature branches are deleted post-merge, so re-sync from `develop`/`main` (or pass `--doc-branch`) after merge to pin a durable link.
 - **HTTP retry** — automatic retry with exponential backoff on 5xx and network errors. 4xx responses fail fast.
 - **Backlog placement (Scrum only)** — board type is detected via `/rest/agile/1.0/board/{id}/configuration`. Skipped on Kanban with a warning. Single board per env (`JIRA_BOARD_ID`); multi-board projects must run the script per board ID.
 - **In-place frontmatter updates** — `jira_*` keys are updated where they sit, not stripped and re-appended. Clean diffs.
@@ -137,7 +137,7 @@ node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
 Flow:
 
 1. Parse the epic file (frontmatter + body) — safe against `---` horizontal rules in the body.
-2. Resolve auth, Bitbucket repo URL + default branch, and load live Jira priorities.
+2. Resolve auth, Bitbucket repo URL + branch (current branch's upstream, falling back to the default branch), and load live Jira priorities.
 3. Resolve `prd_source` to a Bitbucket URL via the multi-variant lookup; fall back to `prd_bitbucket_url` frontmatter if present.
 4. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 5. Detect create vs update; on update fetch current state and run concurrent-edit guard.
@@ -262,6 +262,7 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
 | `--summary` | `-s` | Override epic summary/title |
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
+| `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Lets a post-merge re-sync point links at the durable integration branch instead of a deleted feature branch. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--force` | | Override the concurrent-edit guard AND the no-change fast path |
 | `--json` | | Suppress human output; emit a single JSON object on completion |

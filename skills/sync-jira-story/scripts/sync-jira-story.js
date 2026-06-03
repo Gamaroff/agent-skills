@@ -299,7 +299,7 @@ function mapStatus(raw) {
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
-    file: null, summary: null, priority: null, labels: null,
+    file: null, summary: null, priority: null, labels: null, docBranch: null,
     dryRun: false, noWrite: false, force: false, json: false, quiet: false,
   };
   for (let i = 0; i < args.length; i++) {
@@ -308,6 +308,7 @@ function parseArgs(argv) {
       case "--summary":  case "-s": opts.summary  = args[++i]; break;
       case "--priority": case "-p": opts.priority = args[++i]; break;
       case "--labels":   case "-l": opts.labels   = args[++i]; break;
+      case "--doc-branch": opts.docBranch = args[++i]; break;
       case "--dry-run":  opts.dryRun  = true; break;
       case "--no-write": opts.noWrite = true; break;
       case "--force":    opts.force   = true; break;
@@ -330,7 +331,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   if (!args.file) {
     output.err("Error: --file is required");
-    output.err("Usage: sync-jira-story --file <story.md> [--dry-run] [--no-write] [--force] [--json] [--quiet]");
+    output.err("Usage: sync-jira-story --file <story.md> [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet]");
     return { exitCode: 1 };
   }
   const filePath = path.resolve(args.file);
@@ -364,7 +365,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const repoRoot = lib.getRepoRoot();
   const bbBase = lib.getBitbucketRepoBase();
   if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
-  const branch = bbBase ? lib.getDefaultBranch() : null;
+  const branch = bbBase ? (args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()) : null;
   const storyBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
 
   let epicBbUrl = null;
@@ -656,6 +657,9 @@ if (require.main === module) {
     hashStable:              lib.hashStable,
     hashDescriptionInput:    ({ body, frontmatter, epicBbUrl, storyBbUrl }) =>
                                hashBody({ body, epicBbUrl, storyBbUrl }),
+    stripRemotePrefix:       lib.stripRemotePrefix,
+    getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
+    getDefaultBranch:        lib.getDefaultBranch,
     CL_START:                lib.CL_START,
     CL_END:                  lib.CL_END,
   };

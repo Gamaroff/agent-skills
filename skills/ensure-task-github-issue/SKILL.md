@@ -94,7 +94,12 @@ OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
 REPO_NAME=$(gh repo view --json name -q '.name')
 PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
 PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)"?/\1/')
-DOC_URL="https://github.com/$REPO/blob/develop/${TASK_RELATIVE_PATH}"
+# Prefer the current branch's remote-tracking branch (strip the remote prefix),
+# so the link points at the branch where the work lives. Fall back to the repo's
+# default branch when there is no upstream / HEAD is detached, then to `develop`.
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${TASK_RELATIVE_PATH}"
 ```
 
 Create the task issue:
