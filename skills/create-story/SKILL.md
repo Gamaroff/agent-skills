@@ -655,6 +655,31 @@ After Dev Notes are populated and the implementation plan exists, decide whether
 3. Paste the returned Mermaid block (with YAML metadata header) into Dev Notes under a "## Flow" or "## Sequence" subheading. Append the 2-sentence "Architectural assumptions" summary directly below the block.
 4. Accept `no diagram justified — {reason}` without pushing back.
 
+### 5.4.6 Check for UI/Wireframe Opportunity (conditional, via `markdown-wireframe`)
+
+After Dev Notes, plan, and diagrams are considered, check to see if the story document describes a user interface (UI) or visual components that could be drawn up in a wireframe.
+
+**Detection Rule**: A story describes a UI that could be wireframed if it:
+- Touches frontend code, UI screens, components, layout, navigation, or styles.
+- Mentions visual elements like buttons, inputs, modals, forms, dashboards, lists, or headers.
+- Has acceptance criteria referencing UI interactions, visual feedback, or layout requirements.
+
+**Process**:
+
+1. **If detection rule matches**, prompt the user using `AskUserQuestion`:
+   - **Header**: `Wireframe`
+   - **Question**: "This story describes a user interface (UI) that can be visualized as a wireframe. Would you like to add a wireframe for this story using the `markdown-wireframe` skill?"
+   - **Options**:
+     - `Yes — Add wireframe (Recommended)`: Create a low-fidelity text/YAML wireframe.
+     - `No — Skip wireframe`: Do not add wireframes.
+
+2. **If the user chooses Yes**:
+   - Invoke the `markdown-wireframe` skill (read its instructions if you haven't already).
+   - Deconstruct the UI requirements into a text/YAML structural map (as shown in `markdown-wireframe`'s `wireframe-examples.md`).
+   - Embed the generated text/YAML wireframe directly into the story document under the **Dev Notes** section under a `## Visual Layout / Wireframe` subheading.
+   - Add a task/subtask to the story's **Tasks / Subtasks** section to Stitch/implement the wireframe:
+     - `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)`
+
 ### 5.5 Add Testing Guidance
 
 In the **Testing** subsection of Dev Notes:
@@ -848,6 +873,7 @@ For Simple Stories:
 - `execute-checklist` - For story validation
 - `documentation-standards-validator` - Validates story file naming, directory structure, and YAML frontmatter after creation
 - `mermaid-architect` - Generates a sequence diagram (API interaction) or state diagram (stateful UI) for the story when a diagram materially clarifies the spec
+- `markdown-wireframe` - For generating low-fidelity, mobile-focused outline wireframes for stories that contain UI/UX elements
 
 **Outputs used by**:
 
@@ -936,6 +962,31 @@ A story is successfully created when:
 ✅ Story passes story-draft-checklist validation
 ✅ File saved to correct location
 ✅ Summary provided to user with next steps
+
+---
+
+## Document Codes and Abbreviations
+
+The following codes and abbreviations are used throughout the project documentation, stories, epics, and tasks:
+
+- **AC**: Acceptance Criteria. Specific, testable conditions that must be met to complete a story.
+- **DoD**: Definition of Done. The standard checklist of requirements (tests, reviews, documentation) that a work item must satisfy before it can be marked as `accepted`.
+- **FR**: Functional Requirement. A requirement that defines what the system should do.
+- **NFR**: Non-Functional Requirement. A requirement that defines system qualities, constraints, or characteristics (e.g., performance, security, reliability, accessibility).
+- **CR**: Compatibility Requirement. A requirement ensuring compatibility, visual consistency, backward compatibility, or localization alignment.
+- **IV**: Integration Verification. A check or test scenario to verify that multiple components, screens, or features integrate correctly.
+- **US**: User Story. A user-focused requirement description following the "As a... I want... So that..." format.
+- **REQ**: Requirement. A system-level requirement key referencing a parent specification or product requirement.
+- **OQ-D**: Open Question - Design / Decision / Dependency. Used to track open design questions, architectural decisions, or external dependencies.
+- **PRD**: Product Requirements Document. A document detailing a product feature area's requirements, serving as the parent for epics.
+- **QA**: Quality Assurance. The process and activities (such as testing) designed to verify that the implementation meets standards and criteria.
+- **SM**: Scrum Master. The role responsible for story creation, workflow coordination, and sprint status management.
+- **TBD**: To Be Determined. Placeholder indicating that a specific detail or technical decision will be finalized later (e.g., during implementation).
+- **UX**: User Experience. Guidelines and specifications regarding the visual design, routing, and user interaction flow.
+- **E2E**: End-to-End (testing). Integration testing that validates the entire software flow from start to finish.
+- **IaC**: Infrastructure as Code. Managing and provisioning infrastructure through code instead of manual processes.
+- **PR**: Pull Request. A submission of code changes for review and merging.
+- **CI/CD**: Continuous Integration / Continuous Deployment. Automated pipelines for building, testing, and deploying code.
 
 ---
 
