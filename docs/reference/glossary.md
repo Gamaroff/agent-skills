@@ -68,6 +68,34 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Status lifecycle** | `draft → planned → ready-for-development → in-progress → ready-for-review → accepted`. `cancelled` from any non-terminal state. See [Status lifecycle](../standards/status-lifecycle.md). |
 | **Sync rule**        | Frontmatter `status:` (`lowercase-kebab-case`) and body `**Status:**` (`Title Case`) must update together.                                                                                |
 
+## Requirement & document codes
+
+Codes used inside PRDs, epics, stories, and tasks. (PRD is in [Work items](#work-items); DoD and NFR are in [QA](#qa).)
+
+| Code      | Definition                                                                                                                                                |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC**    | Acceptance Criteria. Specific, testable conditions that must be met to complete a story.                                                                  |
+| **FR**    | Functional Requirement. Defines what the system should do.                                                                                                |
+| **NFR**   | Non-Functional Requirement. System qualities or constraints (performance, security, reliability, accessibility). See [QA](#qa).                           |
+| **CR**    | Compatibility Requirement. Ensures compatibility, visual consistency, backward compatibility, or localization alignment.                                  |
+| **IV**    | Integration Verification. A check or test scenario verifying that multiple components, screens, or features integrate correctly.                          |
+| **US**    | User Story. A user-focused requirement following the "As a… I want… So that…" format.                                                                     |
+| **REQ**   | Requirement. A system-level requirement key referencing a parent specification or product requirement.                                                    |
+| **OQ-D**  | Open Question — Design / Decision / Dependency. Tracks open design questions, architectural decisions, or external dependencies.                          |
+| **TBD**   | To Be Determined. Placeholder for a detail or technical decision to be finalized later (e.g. during implementation).                                      |
+
+## Workflow abbreviations
+
+| Code       | Definition                                                                                                       |
+| ---------- | --------------------------------------------------------------------------------------------------------------- |
+| **QA**     | Quality Assurance. The process and activities (such as testing) that verify the implementation meets standards. |
+| **SM**     | Scrum Master. Role responsible for story creation, workflow coordination, and sprint status management.         |
+| **UX**     | User Experience. Guidelines and specs for visual design, routing, and user interaction flow.                    |
+| **E2E**    | End-to-End (testing). Integration testing that validates the entire software flow from start to finish.         |
+| **IaC**    | Infrastructure as Code. Provisioning infrastructure through code instead of manual processes.                   |
+| **PR**     | Pull Request. A submission of code changes for review and merging.                                              |
+| **CI/CD**  | Continuous Integration / Continuous Deployment. Automated pipelines for building, testing, and deploying code.  |
+
 ## See also
 
 - [Standards](../standards/README.md)
