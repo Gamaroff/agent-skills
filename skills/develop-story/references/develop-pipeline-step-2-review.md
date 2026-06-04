@@ -85,9 +85,7 @@ Proceed to Step 3.
 ## If Running the Review Skill
 
 #### develop-story
-Invoke the `/review-story` skill with the story file path.
-
-**Output format gate**: `/review-story` Step 0 asks for output format. The pipeline auto-answers "Comprehensive report" (the canonical default lives in `references/develop-pipeline-autonomous-defaults.md`). Log: "review-story output: Comprehensive report — required for pipeline audit trail".
+Invoke the `/review-story` skill with the story file path in **validate-and-apply** mode (`MODE=validate` + `APPLY=true`). This is non-interactive — no output-format question is asked. The variant scores the story, applies critical + important fixes, and promotes `Draft → Ready for Development` on a GO (HALT on NO-GO), then writes a comprehensive `story.{epic}.{story}.review.{n}.{story-name}.md` report for the pipeline audit trail. Log: "review-story invoked in validate-and-apply mode".
 
 After review-story completes, locate the generated review report:
 ```bash

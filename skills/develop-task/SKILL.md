@@ -224,7 +224,7 @@ See `references/develop-pipeline-autonomous-defaults.md` for the full shared aut
 | Situation | Default |
 |-----------|---------|
 | review-task Step 8.5 (implement fixes?) | Auto-answer "Yes, apply all critical + important fixes" — pipeline needs the task fully corrected before Step 3 runs `/develop` |
-| review-task Step 9 (update status?) when status needs updating | Auto-answer "Yes, fixes complete" — pipeline needs `Ready for Development` before Step 3 |
+| review-task Step 9 (update status?) when outcome is READY TO IMPLEMENT | Auto-answer "Yes, fixes complete" — pipeline needs `Ready for Development` before Step 3 |
 | review-task Step 9 (update status?) when outcome is NEEDS REVISION or REQUIRES REWORK | HALT — task is not ready; surface review findings to user before proceeding |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
