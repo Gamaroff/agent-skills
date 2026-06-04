@@ -965,6 +965,31 @@ A story is successfully created when:
 
 ---
 
+## Document Codes and Abbreviations
+
+The following codes and abbreviations are used throughout the project documentation, stories, epics, and tasks:
+
+- **AC**: Acceptance Criteria. Specific, testable conditions that must be met to complete a story.
+- **DoD**: Definition of Done. The standard checklist of requirements (tests, reviews, documentation) that a work item must satisfy before it can be marked as `accepted`.
+- **FR**: Functional Requirement. A requirement that defines what the system should do.
+- **NFR**: Non-Functional Requirement. A requirement that defines system qualities, constraints, or characteristics (e.g., performance, security, reliability, accessibility).
+- **CR**: Compatibility Requirement. A requirement ensuring compatibility, visual consistency, backward compatibility, or localization alignment.
+- **IV**: Integration Verification. A check or test scenario to verify that multiple components, screens, or features integrate correctly.
+- **US**: User Story. A user-focused requirement description following the "As a... I want... So that..." format.
+- **REQ**: Requirement. A system-level requirement key referencing a parent specification or product requirement.
+- **OQ-D**: Open Question - Design / Decision / Dependency. Used to track open design questions, architectural decisions, or external dependencies.
+- **PRD**: Product Requirements Document. A document detailing a product feature area's requirements, serving as the parent for epics.
+- **QA**: Quality Assurance. The process and activities (such as testing) designed to verify that the implementation meets standards and criteria.
+- **SM**: Scrum Master. The role responsible for story creation, workflow coordination, and sprint status management.
+- **TBD**: To Be Determined. Placeholder indicating that a specific detail or technical decision will be finalized later (e.g., during implementation).
+- **UX**: User Experience. Guidelines and specifications regarding the visual design, routing, and user interaction flow.
+- **E2E**: End-to-End (testing). Integration testing that validates the entire software flow from start to finish.
+- **IaC**: Infrastructure as Code. Managing and provisioning infrastructure through code instead of manual processes.
+- **PR**: Pull Request. A submission of code changes for review and merging.
+- **CI/CD**: Continuous Integration / Continuous Deployment. Automated pipelines for building, testing, and deploying code.
+
+---
+
 ## Resources
 
 This skill uses the following resource files:
