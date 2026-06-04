@@ -1100,6 +1100,30 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 
 ---
 
+### Step 6.6: Wireframe Verification (via `markdown-wireframe`)
+
+**Purpose**: Check if the story document describes a user interface (UI) or visual components that could be drawn up in a wireframe. If so, verify if a wireframe is already embedded directly in the story document. If not, recommend adding one.
+
+**Actions**:
+
+1. **Detect UI/Wireframe Opportunity**: A story describes a UI that could be wireframed if it:
+   - Touches frontend code, UI screens, components, layout, navigation, or styles.
+   - Mentions visual elements like buttons, inputs, modals, forms, dashboards, lists, or headers.
+   - Has acceptance criteria referencing UI interactions, visual feedback, or layout requirements.
+
+2. **Verify Existing Wireframes**:
+   - Check if there is an existing wireframe section embedded directly in the story document (e.g. under a `## Visual Layout / Wireframe` subheading in Dev Notes).
+   - Check if the story's Dev Notes or tasks reference this embedded wireframe.
+
+3. **Determine Wireframe Opportunity**:
+   - If UI is detected but no embedded wireframe is present, flag this as an **Optional** issue (or **Important** if the UI is complex/bespoke).
+   - In Interactive mode: collect this finding for **Question Point 3** to ask the user if they want to embed a wireframe.
+   - In Validate mode: record the absence of an embedded wireframe in the validation report (non-blocking).
+
+**Output**: Wireframe verification findings added to the review report/validation report.
+
+---
+
 ### Step 7: Quality and Clarity Assessment
 
 **Purpose**: Evaluate story quality for developer usability
@@ -1241,15 +1265,24 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 3. Quality/clarity issues needing user input
 4. Pattern deviations requiring justification
 5. **Story split recommendations** (if story appears oversized)
+6. **UI wireframe opportunities** (from Step 6.6)
 
 **Action**: Use `AskUserQuestion` with 1-4 questions (max) covering remaining issues from Steps 5-7.
 
-**IMPORTANT**: If scope analysis (Step 7.7) indicates story should be split, ALWAYS ask user whether to split.
+**IMPORTANT**: If scope analysis (Step 7.7) indicates story should be split, ALWAYS ask user whether to split. If Step 6.6 indicates a UI wireframe opportunity exists but no embedded wireframe is present, ask the user if they want to embed one.
 
 **Example Questions**:
 
 ```yaml
 questions:
+  - question: "This story describes a user interface (UI) or visual components, but does not have a wireframe embedded. Would you like to embed a wireframe directly in this story using the `markdown-wireframe` skill?"
+    header: 'UI Wireframe'
+    options:
+      - label: 'Yes — Add wireframe (Recommended)'
+        description: 'Invoke the markdown-wireframe skill to generate a text/YAML wireframe, embed it directly in the story''s Dev Notes section, and add a task to Stitch it.'
+      - label: 'No — Skip wireframe'
+        description: 'Proceed without wireframes.'
+
   - question: "AC #3 says 'fast response time' which is unmeasurable. What specific performance threshold is required?"
     header: 'Performance'
     options:
@@ -1933,6 +1966,8 @@ Before executing any tool calls to apply changes to the story file or review mar
 4. Clean Exit: Wipe the backup file, skip all automatic text adjustments, log the specific error, and surface a graceful recovery prompt: "⚠️ Automated edit failed at fix [issue title] due to a patch conflict. Rolling back all partial edits. Please resolve this section manually."
 
    - Work through each issue in priority order (critical first, then important if selected)
+   - **UI Wireframe Insertion**: If the user selected to add a wireframe during QUESTION POINT 3, generate the wireframe using the `markdown-wireframe` skill instructions, embed it directly into the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the Stitch task:
+     `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)` to the Tasks / Subtasks section.
    - For each fix: use the Edit tool to apply the change to the story document
    - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
    - If a fix requires information the agent doesn't have (e.g., user must decide the value), skip it and note: `⏭ Skipped: [issue title] — requires your input`
@@ -2293,6 +2328,7 @@ User Can Now: Run `/develop` to begin implementation
 **Calls**:
 
 - `mermaid-architect` — validates any embedded Mermaid diagrams (Step 6.5) and recommends a diagram if absent
+- `markdown-wireframe` — checks for UI/wireframe opportunities (Step 6.6) and generates wireframes for UI-focused stories
 
 **Outputs used by**:
 
