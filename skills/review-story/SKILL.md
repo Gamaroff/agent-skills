@@ -65,7 +65,7 @@ Or via natural language (agent detects intent): "Is this story ready?", "Score t
 
 | | Interactive | Validate |
 |---|---|---|
-| Questions asked | Yes — up to 3 question points | Never |
+| Questions asked | Yes — single batched question point | Never |
 | Edits story | Yes (with user approval) | Never |
 | Output artifact | `.review.{n}.{story-name}.md` | `.validate.{date}.md` |
 | Verdict label | READY / NEEDS REVISION / REQUIRES REWORK | GO / NO-GO (Revision) / NO-GO (Rework) |
@@ -368,11 +368,11 @@ questions:
 
 ### Pre-pass Summary Consumption
 
-Before formulating questions in any step, consult the pre-pass summaries from Phase 1.5:
+Before formulating questions in any step, consult the pre-pass summaries from Step 1's pre-pass execution:
 
-- **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the epic alignment review phase (Step 4).
-- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 5).
-- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the story should be scoped down or closed.
+- **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the epic alignment review (Step 3) and carry them to the Unified Question Point.
+- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the technical accuracy review (Step 4) and carry them to the Unified Question Point.
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings during the completeness review (Step 5) and carry them to the Unified Question Point — ask whether the story should be scoped down or closed.
 
 Severity `low` findings from any summary: add to the review report findings list but do not elevate to a user question unless they cluster with other issues.
 
@@ -387,11 +387,15 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 
 ---
 
-## Review Workflow (9 Sequential Steps)
+## Review Workflow (Unified Analysis & Batch Questioning)
 
-**NOTE**: Throughout all steps, collect issues and questions. Ask questions in batches at the end of each major phase (after Step 3, after Step 6) rather than interrupting continuously.
+**CRITICAL Execution Protocol**:
+1. **Zero Intermediate Finding-Clarification:** While running the analysis steps (Steps 2–8), the agent MUST NOT pause to ask the user clarifying questions about review findings — collect every finding silently and defer all finding-clarification to the single Unified Question Point after Step 8. This does **not** suppress the explicit pre-flight and side-effect gates that have their own defined prompts: the Step 0 output-format choice, the Step 0a branch-setup prompts, and the Step 2 tracker-sync opt-in. Those still fire at their defined points.
+2. **Unified Question Batching:** The agent must collect all compliance gaps, epic conflicts, technical inaccuracies, and UI wireframe opportunities into memory.
+3. **Single Prompt Turn:** After completing Step 8, the agent presents a single consolidated `AskUserQuestion` call containing up to 4 high-impact questions covering all findings.
+4. **No Partial Reviews:** If a step requires information from a later step (e.g., assessing whether a wireframe is needed based on screen inventory), it must be done during the initial scan.
 
-**Pre-pass summaries** (`PREPASS_A`, `PREPASS_B`, `PREPASS_C` from Phase 1.5): Before formulating any question in Steps 2–8, check the relevant pre-pass summary first. If a finding has `severity: high` or `severity: medium`, surface it as a clarifying question rather than asking the user to discover it themselves. If a finding has `severity: low`, note it in the review report without necessarily elevating it to a user question. If the relevant pre-pass summary is absent (agent failed), proceed with in-line discovery as usual.
+**Pre-pass summaries** (`PREPASS_A`, `PREPASS_B`, `PREPASS_C` from Step 1's pre-pass execution): Before formulating any question in Steps 2–8, check the relevant pre-pass summary first. If a finding has `severity: high` or `severity: medium`, surface it as a clarifying question rather than asking the user to discover it themselves. If a finding has `severity: low`, note it in the review report without necessarily elevating it to a user question. If the relevant pre-pass summary is absent (agent failed), proceed with in-line discovery as usual.
 
 ### Step 0: Determine Mode and Output Format
 
@@ -400,7 +404,7 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 **Actions**:
 
 1. **Detect mode** (from invocation flags / natural language — see Mode Detection above):
-   - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Auto-select "Comprehensive report" (saved as `.validate.{date}.md`). Skip all Question Points (QP1, QP2, QP3) and Steps 9.5 and 10.
+   - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Auto-select "Comprehensive report" (saved as `.validate.{date}.md`). Skip the Unified Question Point and Steps 9.5 and 10.
    - **Interactive mode**: set `MODE=interactive`. Continue to step 2 below.
 
 2. **Interactive mode only** — use `AskUserQuestion` to ask about desired output format:
@@ -736,55 +740,6 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
 
 ---
 
-**QUESTION POINT 1: Epic & Structure Clarifications**
-
-**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to technical review, ask batched questions about:
-
-1. Template compliance issues (unfilled placeholders, missing sections)
-2. File naming violations
-3. Epic alignment conflicts
-4. Scope clarifications
-
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering high-priority issues from Steps 2-3.
-
-**Example Questions**:
-
-```yaml
-questions:
-  - question: 'Story filename uses underscores (story_2_3.md) instead of required dots (story.2.3.md). Rename the file?'
-    header: 'File Naming'
-    options:
-      - label: 'Yes, rename'
-        description: 'Follow documentation standards with dots for structural separators'
-      - label: 'Keep current'
-        description: 'Underscore format is intentional for this project'
-
-  - question: 'Story has 5 ACs but epic only specifies 3. Are the extra 2 ACs intentional additions?'
-    header: 'AC Count'
-    multiSelect: true
-    options:
-      - label: 'AC 4 is needed'
-        description: 'Necessary addition not in epic. Update epic to include it.'
-      - label: 'AC 5 is needed'
-        description: 'Necessary addition not in epic. Update epic to include it.'
-      - label: 'Remove extras'
-        description: 'Story should match epic exactly. Remove AC 4 and 5.'
-```
-
-**After Questions**: Continue review with user's decisions incorporated.
-
-### Context Hygiene After Phase 1
-
-After receiving user answers to QUESTION POINT 1, consolidate findings before proceeding to technical review:
-
-1. Write a **Phase 1 Summary** (5-10 bullet points) covering: template compliance result, epic alignment result, user decisions from Q1
-2. Release the parent epic and architecture documents from active consideration — they are no longer needed for Steps 4–6
-3. Retain in context: the story document, Phase 1 Summary, and user decisions only
-
-This prevents the first-phase document load from polluting the technical review phases.
-
----
-
 ### Step 4: Technical Accuracy and Anti-Hallucination Review
 
 **Purpose**: Verify all technical claims are accurate and sourced
@@ -949,67 +904,6 @@ This prevents the first-phase document load from polluting the technical review 
 
 ---
 
-**QUESTION POINT 2: Technical & Completeness Clarifications**
-
-**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to consistency review, ask batched questions about:
-
-1. Hallucinated technologies or approaches
-2. Missing technical specifications
-3. Incomplete Dev Notes sections
-4. Unclear testing requirements
-5. File location ambiguities
-
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering technical and completeness issues from Steps 3-4.
-
-**Example Questions**:
-
-```yaml
-questions:
-  - question: "Story mentions 'react-native-super-cache' library not in tech stack. What caching solution should be used?"
-    header: 'Caching Lib'
-    options:
-      - label: 'Use documented lib'
-        description: 'Replace with existing caching solution from architecture docs'
-      - label: 'Add new library'
-        description: 'Install react-native-super-cache and update tech stack docs'
-      - label: 'Clarify approach'
-        description: 'Describe the intended caching approach without assuming library'
-
-  - question: 'Dev Notes missing database schema details. Should this story include schema changes?'
-    header: 'Schema Work'
-    options:
-      - label: 'Yes, add schema'
-        description: 'Story needs schema updates. Specify which models/fields.'
-      - label: 'No schema work'
-        description: 'Story only works with existing schema. No changes needed.'
-      - label: 'Separate story'
-        description: 'Schema changes should be separate story (dependency).'
-
-  - question: "Testing section says 'comprehensive tests' but doesn't specify type. Which tests are needed?"
-    header: 'Test Types'
-    multiSelect: true
-    options:
-      - label: 'Unit tests'
-        description: 'Test individual functions and components in isolation'
-      - label: 'Integration tests'
-        description: 'Test API interactions and service integration'
-      - label: 'E2E tests'
-        description: 'Test complete user flows end-to-end'
-```
-
-**After Questions**: Continue review with technical decisions clarified.
-
-### Context Hygiene After Phase 2
-
-After receiving user answers to QUESTION POINT 2, consolidate:
-1. Write a **Phase 2 Summary**: technical accuracy issues found, user decisions, resolved hallucinations
-2. Release any additional architecture docs loaded during Steps 4–6 from active consideration
-3. Retain: story document, Phase 1 Summary, Phase 2 Summary, user decisions
-
-Proceed to Phase 3 (recommendations and output) with a clean context containing only summaries + story.
-
----
-
 ### Step 6: Consistency and Conflict Detection
 
 **Purpose**: Find contradictions within story or with related documents
@@ -1117,7 +1011,7 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 
 3. **Determine Wireframe Opportunity**:
    - If UI is detected but no embedded wireframe is present, flag this as an **Optional** issue (or **Important** if the UI is complex/bespoke).
-   - In Interactive mode: collect this finding for **Question Point 3** to ask the user if they want to embed a wireframe.
+   - In Interactive mode: collect this finding for the **Unified Question Point** to ask the user if they want to embed a wireframe.
    - In Validate mode: record the absence of an embedded wireframe in the validation report (non-blocking).
 
 **Output**: Wireframe verification findings added to the review report/validation report.
@@ -1256,9 +1150,9 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 
 ---
 
-### QUESTION POINT 3: Quality & Clarity Clarifications (Final)
+### UNIFIED QUESTION POINT: Consolidated Story Clarifications
 
-**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and proceed to Step 9. In Interactive mode: before generating final report, ask batched questions about:
+**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and proceed to Step 9. In Interactive mode: before generating final report or proposing fixes, ask a single batched set of questions (maximum 4) resolving all discovered issues across all categories:
 
 1. Ambiguous requirements or ACs
 2. Conflicting information requiring resolution
@@ -1267,9 +1161,9 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 5. **Story split recommendations** (if story appears oversized)
 6. **UI wireframe opportunities** (from Step 6.6)
 
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering remaining issues from Steps 5-7.
+**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering the highest-impact unresolved issues across all analysis steps (Steps 2–8).
 
-**IMPORTANT**: If scope analysis (Step 7.7) indicates story should be split, ALWAYS ask user whether to split. If Step 6.6 indicates a UI wireframe opportunity exists but no embedded wireframe is present, ask the user if they want to embed one.
+**IMPORTANT**: If the scope and complexity analysis in Step 7 indicates the story should be split, ALWAYS ask the user whether to split. If Step 6.6 indicates a UI wireframe opportunity exists but no embedded wireframe is present, ask the user if they want to embed one. When findings exceed the 4-question budget, prioritise Critical and Important findings — but always reserve a slot for an unresolved split or wireframe decision when one exists, since these cannot be inferred without the user.
 
 **Example Questions**:
 
@@ -1510,7 +1404,9 @@ The Implementation Readiness Score is calculated as a weighted average across al
 
 **IMPORTANT**: This section documents the clarifying questions asked during review and user's decisions. All recommendations below incorporate these decisions.
 
-### Question Point 1: Epic & Structure
+### Unified Question Point: Consolidated Clarifications
+
+_All clarifying questions were asked in a single batch after analysis completed. List each below (one entry per question asked)._
 
 **Q1: [Question asked]**
 
@@ -1522,24 +1418,7 @@ The Implementation Readiness Score is calculated as a weighted average across al
 - **User Decision**: [Answer selected]
 - **Impact**: [How this affects recommendations]
 
-### Question Point 2: Technical & Completeness
-
-**Q3: [Question asked]**
-
-- **User Decision**: [Answer selected]
-- **Impact**: [How this affects recommendations]
-
-**Q4: [Question asked]**
-
-- **User Decision**: [Answer selected]
-- **Impact**: [How this affects recommendations]
-
-### Question Point 3: Quality & Clarity
-
-**Q5: [Question asked]**
-
-- **User Decision**: [Answer selected]
-- **Impact**: [How this affects recommendations]
+_[Add Q3, Q4 as needed — up to the 4-question batch maximum.]_
 
 ---
 
@@ -1563,7 +1442,7 @@ The Implementation Readiness Score is calculated as a weighted average across al
 
 ### Recommendations (Based on User Decisions)
 
-**IMPORTANT**: These recommendations incorporate user clarifications from Question Points above.
+**IMPORTANT**: These recommendations incorporate user clarifications from the Unified Question Point above.
 
 1. **[Action based on user decision]** - _Per user decision on Q[num]_
 2. **[Action aligned with user's vision]** - _Per user decision on Q[num]_
@@ -1966,7 +1845,7 @@ Before executing any tool calls to apply changes to the story file or review mar
 4. Clean Exit: Wipe the backup file, skip all automatic text adjustments, log the specific error, and surface a graceful recovery prompt: "⚠️ Automated edit failed at fix [issue title] due to a patch conflict. Rolling back all partial edits. Please resolve this section manually."
 
    - Work through each issue in priority order (critical first, then important if selected)
-   - **UI Wireframe Insertion**: If the user selected to add a wireframe during QUESTION POINT 3, generate the wireframe using the `markdown-wireframe` skill instructions, embed it directly into the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the Stitch task:
+   - **UI Wireframe Insertion**: If the user selected to add a wireframe during the Unified Question Point, generate the wireframe using the `markdown-wireframe` skill instructions, embed it directly into the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the Stitch task:
      `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)` to the Tasks / Subtasks section.
    - For each fix: use the Edit tool to apply the change to the story document
    - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
