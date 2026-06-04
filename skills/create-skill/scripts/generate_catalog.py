@@ -90,7 +90,7 @@ CATEGORIES = [
         "execute-checklist", "generate-ui-prompt",
     ]),
     ("User Experience", [
-        "ux-expert", "building-components", "browser-use",
+        "ux-expert", "building-components", "browser-use", "markdown-wireframe",
     ]),
     ("Email", [
         "email-best-practices", "resend",

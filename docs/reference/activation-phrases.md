@@ -85,6 +85,13 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Create a backend architecture doc" | `create-architecture-doc` |
 | "Diagram this flow" / "Add a Mermaid sequence diagram" | `mermaid-architect` |
 
+## User Experience & Prototyping
+
+| Say something like… | Activates |
+|---|---|
+| "Create a low-fidelity mobile wireframe for this layout" | `markdown-wireframe` |
+| "Prototype this UI flow using Stitch" / "Design a monochrome grayscale outline" | `markdown-wireframe` |
+
 ## Tips for reliable activation
 
 - **Be specific about the artifact.** "Review story 2.3" beats "review this" — the skill's matcher looks for "story" plus context.
