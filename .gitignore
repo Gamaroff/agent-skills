@@ -18,6 +18,7 @@ CLAUDE.md
 .claude/
 .windsurf/
 .agents/state/
+.agents/skills
 
 # Subagent summary artifacts — runtime-local, see shared/resources/subagent-summary-artifact.md
 .summaries/
