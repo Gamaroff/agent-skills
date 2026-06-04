@@ -107,6 +107,8 @@ This step runs in **both lite and standard modes**. Lite mode skips QA agents (S
 
 ## Tracker Issue Update
 
+> **Note — Document-link re-point (owned by `/finalise`).** As part of acceptance, the `/finalise` skill re-points the tracker issue's `## Document` link to the durable branch (`$DURABLE_BRANCH`) **before** closing/transitioning the issue, so the link survives the feature branch being deleted after merge (GitHub: surgical body rewrite; Jira: re-sync with `--doc-branch`). The close/comment/board-move actions below are the orchestrator-visible effects layered on top — they do not replace the re-point. (`review-story` performs the same re-point on sync; see `finalise/SKILL.md`.)
+
 Branch on `TRACKER`:
 
 ### GitHub (`TRACKER=github`) — shared structure, story/task text differs
@@ -202,6 +204,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] `*.dod.{N}.*.md` file exists in the story/task directory
 - [ ] Story/task `status:` (frontmatter) AND `Status:` (body) both read `accepted` / `Accepted`
 - [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
+- [ ] Tracker issue `## Document` link re-pointed to the durable branch by `/finalise` (before close/transition)
 - [ ] Tracker issue commented (GitHub `gh issue comment` or Jira `addCommentToJiraIssue`)
 - [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
 - [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `references/tracker-state-poller-subagent.md`)

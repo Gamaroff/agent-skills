@@ -212,13 +212,14 @@ If the matrix was not generated (lite mode, no Success Criteria table, or mapper
 
 After completion, find and read the latest gate file:
 - `PASS` with no `top_issues` → exit loop, proceed to Step 7
+- `WAIVED` with `waiver.active: true` and a documented reason/approver → exit loop, proceed to Step 7 (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
 - `CONCERNS`, `FAIL`, or has `top_issues` → proceed to 5b
 
 Log the result in the QA Iteration History section:
 
 ```
 ### QA Cycle {N} — {YYYY-MM-DD}
-**Gate Result**: {PASS / CONCERNS / FAIL}
+**Gate Result**: {PASS / CONCERNS / FAIL / WAIVED}
 **Issues Found**: {count and brief descriptions, or "none"}
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
 ```

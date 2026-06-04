@@ -66,11 +66,13 @@ Or via natural language (agent detects intent): "Is this story ready?", "Score t
 | | Interactive | Validate |
 |---|---|---|
 | Questions asked | Yes — single batched question point | Never |
-| Edits story | Yes (with user approval) | Never |
-| Output artifact | `.review.{n}.{story-name}.md` | `.validate.{date}.md` |
+| Edits story | Yes (with user approval) | Never* |
+| Output artifact | `.review.{n}.{story-name}.md` | `.validate.{date}.md`* |
 | Verdict label | READY / NEEDS REVISION / REQUIRES REWORK | GO / NO-GO (Revision) / NO-GO (Rework) |
 | CI exit code | N/A | Non-zero on NO-GO |
 | Batch support | No | Yes |
+
+\* The **Validate** column describes *standalone* validate (`APPLY=false`, read-only). The orchestrated **validate-and-apply** variant (`APPLY=true`, set by `develop-story`/`po`) still asks no questions but *does* edit the story (applies critical + important fixes, promotes status on a GO) and writes a `.review.{n}.{story-name}.md` report instead. See [Validate Sub-Modes](#validate-sub-modes).
 
 ## Purpose
 
@@ -132,9 +134,16 @@ optional:
 Activate **Validate mode** when any of the following are true:
 - `--validate` flag present in the invocation
 - Natural language intent: "validate", "is this story ready?", "score this story", "batch validate", "CI gate", "pre-implementation gate"
-- Called programmatically by `develop-story` or `po` pipeline (these always use validate mode)
+- Called programmatically by `develop-story` or `po` pipeline (these always use validate mode — specifically the **validate-and-apply** variant; see Validate Sub-Modes below)
 
 Default to **Interactive mode** for all other invocations.
+
+#### Validate Sub-Modes
+
+Validate mode (`MODE=validate`) is always non-interactive. It has two variants, selected by the `APPLY` flag:
+
+- **Standalone validate** (`APPLY=false`, the default) — strictly **read-only**. Runs scoring and renders a GO / NO-GO verdict, skips Steps 9.5 and 10, never modifies the story document, and saves the report as `.validate.{date}.md`. This is the contract for CI gates, batch validation, and direct `--validate` calls.
+- **Validate-and-apply** (`APPLY=true`) — set automatically when invoked by the `develop-story`/`po` orchestrator. Runs the same scoring, then runs the **constrained, non-interactive** forms of Step 9.5 (apply critical + important fixes) and Step 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). Saves a normal review report as `story.{epic}.{story}.review.{n}.{story-name}.md`, so the orchestrator's `…review.*.md` lookup finds it.
 
 ## Input Resolution
 
@@ -404,7 +413,9 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 **Actions**:
 
 1. **Detect mode** (from invocation flags / natural language — see Mode Detection above):
-   - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Auto-select "Comprehensive report" (saved as `.validate.{date}.md`). Skip the Unified Question Point and Steps 9.5 and 10.
+   - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Skip the Unified Question Point. Then branch on the `APPLY` flag (see Validate Sub-Modes above):
+     - **Standalone validate** (`APPLY=false`, default, read-only): save the report as `.validate.{date}.md`. Skip Steps 9.5 and 10 — never modify the story document.
+     - **Validate-and-apply** (`APPLY=true`, set automatically by the `develop-story`/`po` orchestrator): save the report as `story.{epic}.{story}.review.{n}.{story-name}.md`, then run the constrained, non-interactive forms of Steps 9.5 (apply critical + important fixes) and 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). See those steps' Pipeline notes.
    - **Interactive mode**: set `MODE=interactive`. Continue to step 2 below.
 
 2. **Interactive mode only** — use `AskUserQuestion` to ask about desired output format:
@@ -421,7 +432,7 @@ options:
 
 3. Store `MODE` and output format preference for use throughout the workflow.
 
-**Pipeline note**: When invoked by the `develop-story` orchestrator, always use validate mode — set `MODE=validate` and skip the `AskUserQuestion`. Only ask interactively when invoked standalone in interactive mode.
+**Pipeline note**: When invoked by the `develop-story` orchestrator, always use the **validate-and-apply** variant — set `MODE=validate` and `APPLY=true`, and skip the `AskUserQuestion`. This applies critical + important fixes and promotes the story on a GO (Steps 9.5 and 10 run in their constrained, non-interactive forms) and writes the report as `story.{epic}.{story}.review.{n}.{story-name}.md`. Only ask interactively when invoked standalone in interactive mode; standalone validate (`APPLY=false`) stays read-only.
 
 4. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
 
@@ -1249,7 +1260,7 @@ The Implementation Readiness Score is calculated as a weighted average across al
    - ✅ **GO** — score ≥ 8 AND zero Critical issues
    - ⚠️ **NO-GO (Revision)** — score 5–7, OR Important issues materially blocking confidence
    - 🚨 **NO-GO (Rework)** — score < 5 OR any Critical issue present
-3. Write the report to `[story-directory]/[story-name].validate.[date].md`.
+3. Write the report. **Standalone validate** (`APPLY=false`) → `[story-directory]/[story-name].validate.[date].md`. **Validate-and-apply** (`APPLY=true`, orchestrated) → `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md` (the canonical review-report name, so the orchestrator's `…review.*.md` lookup finds it).
 4. Print a concise stdout summary (for CI / pipeline callers):
 
 ```
@@ -1340,7 +1351,7 @@ Report:  <path>
 
 ## Validation Metadata
 
-- **Mode:** validate (automated, read-only)
+- **Mode:** validate (automated; read-only when `APPLY=false`, applies fixes + promotes when `APPLY=true`)
 - **Validation Date:** [ISO date]
 - **Validation Depth:** [Quick/Standard/Thorough]
 - **Story File:** [path]
@@ -1349,10 +1360,10 @@ Report:  <path>
 
 ---
 
-*Generated by /review-story --validate. No changes made to the story document. To apply fixes, run /review-story (interactive).*
+*Generated by /review-story --validate. In standalone validate (`APPLY=false`) no changes are made to the story document — to apply fixes, run /review-story (interactive). Under validate-and-apply (`APPLY=true`, orchestrated) critical + important fixes are applied and the status is promoted on a GO.*
 ```
 
-**Output**: Validation report saved to `.validate.{date}.md`. Stdout summary printed.
+**Output**: Validation report saved (`.validate.{date}.md` for standalone validate; `story.{epic}.{story}.review.{n}.{story-name}.md` for validate-and-apply). Stdout summary printed.
 
 ---
 
@@ -1815,7 +1826,7 @@ _[Add Q3, Q4 as needed — up to the 4-question batch maximum.]_
 
 **Purpose**: Give the user the option to have the agent apply the recommended fixes to the story document immediately.
 
-**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10, **in Interactive mode only**. **Skip entirely in Validate mode** — validate mode is read-only and never modifies the story document.
+**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10, in **Interactive mode** and in **validate-and-apply** (`MODE=validate` + `APPLY=true`, the orchestrated path). **Skip entirely in standalone Validate mode** (`APPLY=false`) — standalone validate is read-only and never modifies the story document.
 
 **Pipeline note**: When invoked by the `develop-story` orchestrator, skip the `AskUserQuestion` and auto-answer **"Yes, apply all critical + important fixes"** — the pipeline proceeds autonomously and needs the story fully corrected before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 9.5 auto-answered: Yes, apply all critical + important fixes — pipeline proceeds autonomously."
 
@@ -1936,7 +1947,7 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
 
 **Purpose**: Update the story document status based on the review outcome.
 
-**CRITICAL**: **Skip entirely in Validate mode** — status transitions are the interactive review's job. In validate mode, proceed directly to Step 11 (post tracker comment).
+**CRITICAL**: **Skip entirely in standalone Validate mode** (`APPLY=false`) — status transitions are the interactive review's job; proceed directly to Step 11 (post tracker comment). In **validate-and-apply** (`APPLY=true`, orchestrated) this step runs in its constrained, non-interactive form per the Pipeline note below: promote `Draft → Ready for Development` on a GO, HALT on NO-GO.
 
 **Pipeline note**: When invoked by the `develop-story` orchestrator and the review outcome is READY TO IMPLEMENT, skip the `AskUserQuestion` and auto-answer **"Yes, update status"** — the pipeline needs the story promoted to `Ready for Development` before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 10 auto-answered: Yes, update status — pipeline proceeds autonomously." If the outcome is NEEDS REVISION or REQUIRES REWORK, do NOT skip the step — HALT the pipeline and surface the review findings to the user; the story is not ready for development.
 
@@ -2207,15 +2218,15 @@ User Can Now: Run `/develop` to begin implementation
 
 **Validate mode** — validation is successfully completed when:
 
-✅ All steps (0–9, 11) systematically executed without user interaction
+✅ All steps systematically executed without user interaction — steps 0–9, 11 in standalone validate; steps 0–11 (including the constrained 9.5 and 10) in validate-and-apply
 ✅ Issues categorized by severity with precise locations
 ✅ Hallucinations identified and documented with evidence
 ✅ Scoring breakdown produced with per-dimension scores
 ✅ Clear GO / NO-GO (Revision) / NO-GO (Rework) verdict rendered with justification
-✅ Validation report saved to `[story-dir]/[story-name].validate.[date].md`
+✅ Report saved — `[story-dir]/[story-name].validate.[date].md` (standalone) or `[story-dir]/story.{epic}.{story}.review.{n}.{story-name}.md` (validate-and-apply)
 ✅ Stdout summary printed for pipeline/CI callers
 ✅ Exit non-zero if verdict is any NO-GO variant
-✅ **Zero modifications** to the story document (besides the `.validate.` report itself)
+✅ **Standalone validate only**: zero modifications to the story document (besides the `.validate.` report itself). Under validate-and-apply, critical + important fixes are applied and status is promoted on a GO.
 ✅ Tracker comment posted with verdict (Step 11 — graceful: skipped if tracker key absent)
 
 ---
@@ -2372,7 +2383,7 @@ This skill uses:
 - Review reports are saved as `story.{epic}.{story}.review.{n}.{story-name}.md`, where `{story-name}` is the parent story file's own name slug (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — NOT a free-form descriptive slug summarizing the review focus. Use DOTS as structural separators. Example: parent story `story.1.2.configure-typescript-path-mapping.md` → review `story.1.2.review.1.configure-typescript-path-mapping.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
 - Story status is updated in-place only when review outcome is READY TO IMPLEMENT and user confirms
 - Can be used at any stage: draft, in progress, completed
-- Use `--validate` flag (or natural language like "is this story ready?") for the automated non-interactive gate. Validate mode is a strict subset of interactive mode — same checks, same scoring, no questions, read-only, CI-friendly exit codes.
+- Use `--validate` flag (or natural language like "is this story ready?") for the automated non-interactive gate. Standalone validate is a strict subset of interactive mode — same checks, same scoring, no questions, read-only, CI-friendly exit codes. The orchestrated **validate-and-apply** variant (`APPLY=true`, set by `develop-story`/`po`) adds the constrained Steps 9.5 and 10: it applies critical + important fixes and promotes the story on a GO.
 - Designed to find problems, not just validate compliance
 
 ```
