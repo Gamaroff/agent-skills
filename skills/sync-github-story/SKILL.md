@@ -16,6 +16,11 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 
 **Difference from `sync-jira-story`:** GitHub Issues are markdown-native, so no ADF translation; auth/retry/rate-limit are handled by `gh` CLI; "status transitions" map to `gh issue close` / `gh issue reopen`, since GitHub only has `open`/`closed`. Labels carry the priority signal.
 
+### Inputs
+
+- `STORY_FILE_PATH` (required) — path to the local story markdown file.
+- `DOC_BRANCH` (optional) — branch to pin the issue's `## Document` link to. When set (e.g. `review-story` and `finalise` pass a durable branch like `develop` so the link survives feature-branch deletion), it is used verbatim. When unset, the link branch resolves to the current branch's remote-tracking branch, then the repo default branch, then `develop`.
+
 ## When to Use
 
 - "Create this story in GitHub"
@@ -125,10 +130,11 @@ Continue to Step 6 (status reconciliation).
 ISSUE_NUM={github_issue from frontmatter}
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
-# Resolve the Document-link branch the same way as on create: current branch's
-# remote-tracking branch, falling back to the repo default branch, then `develop`.
+# Resolve the Document-link branch. If the caller passed `DOC_BRANCH` (e.g. review-story /
+# finalise pinning a durable branch), honor it verbatim. Otherwise fall back to the same
+# resolution as on create: current branch's remote-tracking branch, then repo default, then `develop`.
 DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
-DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
+DOC_BRANCH="${DOC_BRANCH:-$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')}"
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RELATIVE_PATH}"
 
 # Verify the issue still exists

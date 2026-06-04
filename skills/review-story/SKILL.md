@@ -1878,7 +1878,7 @@ Before executing any tool calls to apply changes to the story file or review mar
 
 ### Step 9.6: Sync Body Changes to Tracker (when fixes were applied)
 
-**Purpose**: When Step 9.5 applied any Edit to the story body, sync the updated content back to the linked tracker issue (Jira or GitHub).
+**Purpose**: When Step 9.5 applied any Edit to the story body, sync the updated content back to the linked tracker issue (Jira or GitHub). This syncs **both** the story **Description** *and* the **doc URL** to the story file — `story_bitbucket_url` / `epic_bitbucket_url` plus the body "View on Bitbucket" links (Jira), or the issue's `## Document` link block (GitHub). The doc URL is **pinned to the durable `develop` branch** (when the file already exists there) so it does not 404 once the feature branch is deleted post-merge.
 
 **When to Execute**:
 - At least one fix was applied in Step 9.5 (i.e. `FIXES_APPLIED` is non-empty) AND
@@ -1886,26 +1886,48 @@ Before executing any tool calls to apply changes to the story file or review mar
 
 **Skip when**: validate mode or no body edits were made.
 
+**Resolve the durable doc-link branch** (`PIN_BRANCH`) once, before the tracker split — Step 10 reuses it:
+
+```bash
+# Prefer develop, fall back to repo default branch, then main (same as finalise).
+if git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
+  DURABLE_BRANCH=develop
+else
+  DURABLE_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+  DURABLE_BRANCH="${DURABLE_BRANCH:-main}"
+fi
+# Only pin if the story file already exists on the durable branch — otherwise a story that
+# only exists on the feature branch would 404 on develop right now. Empty PIN_BRANCH => the
+# sync uses its normal current-branch resolution; finalise re-points durably at acceptance.
+DOC_REL=$(git ls-files --full-name -- "$STORY_FILE_PATH")
+if [ -n "$DOC_REL" ] && git cat-file -e "origin/${DURABLE_BRANCH}:${DOC_REL}" 2>/dev/null; then
+  PIN_BRANCH="$DURABLE_BRANCH"
+else
+  PIN_BRANCH=""
+  echo "ℹ️ Story not yet on origin/${DURABLE_BRANCH} — doc URL kept on the current branch; finalise will pin it durably at acceptance."
+fi
+```
+
 **Branch on TRACKER**:
 
 **Jira path** (`TRACKER=jira`):
 
 ```bash
 node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
-  --file "$STORY_FILE_PATH"
+  --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
 ```
 
 > **Path note**: the script is bundled at `.agents/skills/sync-jira-story/scripts/sync-jira-story.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist and never did. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
 
-On success → `sync-jira-story` updates the Jira description, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed body update to Jira {jira_key}`.
+On success → `sync-jira-story` updates the Jira description, re-points `story_bitbucket_url` / `epic_bitbucket_url` and the "View on Bitbucket" links to `${PIN_BRANCH:-current branch}`, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed description + doc URL to Jira {jira_key} (link pinned to ${PIN_BRANCH:-current branch})`.
 
 On non-zero exit → log warning `⚠️ sync-jira-story failed — Jira description may be stale` and continue to Step 10 (do not halt).
 
 **GitHub path** (`TRACKER=github`):
 
-Invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH={resolved story file path}`. The sub-skill updates the GitHub issue body and Change Log to match the edited story.
+Invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH={resolved story file path}` and `DOC_BRANCH={PIN_BRANCH}` (may be empty — the sub-skill then falls back to its current-branch default). The sub-skill updates the GitHub issue body, re-points the `## Document` link to `DOC_BRANCH`, and appends a Change Log entry to match the edited story.
 
-On success → confirm: `✅ Pushed body update to GitHub issue #{github_issue}`.
+On success → confirm: `✅ Pushed description + doc URL to GitHub issue #{github_issue} (link pinned to ${PIN_BRANCH:-current branch})`.
 On failure → log warning `⚠️ sync-github-story failed — GitHub issue body may be stale` and continue to Step 10 (do not halt).
 
 ---
@@ -1959,16 +1981,18 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
 
    **After status edit — sync to tracker (non-blocking)**:
 
+   Reuse the `PIN_BRANCH` resolved in Step 9.6 so the doc URL stays pinned to the durable branch. (If Step 9.6 was skipped — no fixes applied — re-resolve `PIN_BRANCH` using the same snippet from Step 9.6 first.)
+
    - **Jira path** (`TRACKER=jira`): run `sync-jira-story.js` to push the status transition and updated frontmatter:
      ```bash
      node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
-       --file "$STORY_FILE_PATH"
+       --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
      ```
-     On success → `✅ Status synced to Jira {jira_key}`.
+     On success → `✅ Status synced to Jira {jira_key} (doc link pinned to ${PIN_BRANCH:-current branch})`.
      On failure → log `⚠️ sync-jira-story failed after status update — Jira may be stale` and continue.
 
-   - **GitHub path** (`TRACKER=github`): invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH`. This reflects the new status in the GitHub issue body and Change Log.
-     On success → `✅ Status synced to GitHub issue #{github_issue}`.
+   - **GitHub path** (`TRACKER=github`): invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH` and `DOC_BRANCH={PIN_BRANCH}`. This reflects the new status in the GitHub issue body and Change Log, with the `## Document` link pinned to the durable branch.
+     On success → `✅ Status synced to GitHub issue #{github_issue} (doc link pinned to ${PIN_BRANCH:-current branch})`.
      On failure → log `⚠️ sync-github-story failed after status update — GitHub issue may be stale` and continue.
 
    **If "Keep current status"**:
@@ -2331,31 +2355,6 @@ Both roots are configurable; nested structure is fixed (see [docs/reference/conf
 - Stories: nested at `{epic-dir}/stories/`
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.
-
----
-
-## Document Codes and Abbreviations
-
-The following codes and abbreviations are used throughout the project documentation, stories, epics, and tasks:
-
-- **AC**: Acceptance Criteria. Specific, testable conditions that must be met to complete a story.
-- **DoD**: Definition of Done. The standard checklist of requirements (tests, reviews, documentation) that a work item must satisfy before it can be marked as `accepted`.
-- **FR**: Functional Requirement. A requirement that defines what the system should do.
-- **NFR**: Non-Functional Requirement. A requirement that defines system qualities, constraints, or characteristics (e.g., performance, security, reliability, accessibility).
-- **CR**: Compatibility Requirement. A requirement ensuring compatibility, visual consistency, backward compatibility, or localization alignment.
-- **IV**: Integration Verification. A check or test scenario to verify that multiple components, screens, or features integrate correctly.
-- **US**: User Story. A user-focused requirement description following the "As a... I want... So that..." format.
-- **REQ**: Requirement. A system-level requirement key referencing a parent specification or product requirement.
-- **OQ-D**: Open Question - Design / Decision / Dependency. Used to track open design questions, architectural decisions, or external dependencies.
-- **PRD**: Product Requirements Document. A document detailing a product feature area's requirements, serving as the parent for epics.
-- **QA**: Quality Assurance. The process and activities (such as testing) designed to verify that the implementation meets standards and criteria.
-- **SM**: Scrum Master. The role responsible for story creation, workflow coordination, and sprint status management.
-- **TBD**: To Be Determined. Placeholder indicating that a specific detail or technical decision will be finalized later (e.g., during implementation).
-- **UX**: User Experience. Guidelines and specifications regarding the visual design, routing, and user interaction flow.
-- **E2E**: End-to-End (testing). Integration testing that validates the entire software flow from start to finish.
-- **IaC**: Infrastructure as Code. Managing and provisioning infrastructure through code instead of manual processes.
-- **PR**: Pull Request. A submission of code changes for review and merging.
-- **CI/CD**: Continuous Integration / Continuous Deployment. Automated pipelines for building, testing, and deploying code.
 
 ---
 
