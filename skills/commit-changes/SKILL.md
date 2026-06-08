@@ -168,4 +168,4 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
 fi
 ```
 
-Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. It also noops (preserves the lock) when invoked as a **nested helper before the terminal commit** — `commit-changes` runs at Step 4 (via `create-pr`) and Steps 5–6 (via each `qa-fix` cycle), and the helper removes the lock only at the terminal Step 8 commit (`current_step >= 8`). So callers run this cooperation block unconditionally at every step; the nested invocations leave the lock intact for the `PreCompact`/`Stop` hooks. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).
