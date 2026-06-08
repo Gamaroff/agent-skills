@@ -21,7 +21,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "bash shared/resources/resolve-platform.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'tests/*.test.js' 'evals/shared/tests/*.test.mjs' 'evals/develop-task/protocol/*.test.mjs' 'evals/develop-story/protocol/*.test.mjs'",
+    "test": "bash shared/resources/resolve-platform.test.sh && bash shared/resources/advance-pipeline-lock.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'tests/*.test.js' 'evals/shared/tests/*.test.mjs' 'evals/develop-task/protocol/*.test.mjs' 'evals/develop-story/protocol/*.test.mjs'",
     "test:platform": "bash shared/resources/resolve-platform.test.sh",
     "eval:create-task": "node evals/shared/runner.mjs evals/create-task/scenarios/01-happy",
     "eval:create-task:all": "for s in evals/create-task/scenarios/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
