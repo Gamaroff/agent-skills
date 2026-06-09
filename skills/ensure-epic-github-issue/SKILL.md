@@ -28,6 +28,7 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
    - `title` — epic title
    - `status` — epic status
    - `priority` — epic priority (use `—` if absent)
+   - `prd_source` — repo-relative path to the parent PRD (may be absent, or the literal `brownfield-enhancement` for standalone epics)
 3. Parse the epic number from the filename: pattern `epic.{N}.` → `EPIC_N`.
 4. Strip any leading `"Epic {N}: "` prefix from `title` to get the bare title for display: `EPIC_TITLE`.
 5. Set `EPIC_RELATIVE_PATH` = the path relative to the repo root.
@@ -56,6 +57,15 @@ MILESTONE_TITLE="Epic ${EPIC_N} — ${EPIC_TITLE}"
 DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
 DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${EPIC_RELATIVE_PATH}"
+
+# Resolve the parent PRD link the same way (skip the placeholder/standalone sentinel).
+# PRD_LINE is empty for standalone epics, so the Document section simply omits the line.
+PRD_RELATIVE_PATH="${prd_source from frontmatter}"
+PRD_LINE=""
+if [ -n "$PRD_RELATIVE_PATH" ] && [ "$PRD_RELATIVE_PATH" != "brownfield-enhancement" ]; then
+  PRD_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${PRD_RELATIVE_PATH}"
+  PRD_LINE=$'\n'"📋 [Parent PRD](${PRD_URL})"
+fi
 ```
 
 Auto-create the milestone if it doesn't exist yet:
@@ -87,7 +97,7 @@ EPIC_ISSUE_URL=$(gh issue create \
 ## Document
 
 📄 [Epic Document](${DOC_URL})
-📁 \`${EPIC_RELATIVE_PATH}\`")
+📁 \`${EPIC_RELATIVE_PATH}\`${PRD_LINE}")
 
 EPIC_ISSUE_NUM=$(echo "$EPIC_ISSUE_URL" | grep -oE '[0-9]+$')
 ```

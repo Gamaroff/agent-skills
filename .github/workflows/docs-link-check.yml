@@ -54,7 +54,8 @@ jobs:
           echo "Diff range: $RANGE"
           git diff --name-only --diff-filter=ACMR "$RANGE" -- \
             'docs' 'README.md' 'AGENTS.md' 'CONTRIBUTING.md' \
-            | grep -E '\.md$' > changed.txt || true
+            | grep -E '\.md$' \
+            | grep -v '^docs/templates/' > changed.txt || true
           echo "Changed markdown files:"
           cat changed.txt || true
 

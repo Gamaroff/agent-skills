@@ -97,6 +97,18 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 - ✅ Correct: `epic.163.auto-hide`
 - ❌ Wrong: `epic-163-auto-hide` or `epic.1.auto-hide` (number already used)
 
+## Discover Parent PRD
+
+Before writing the epic file, resolve the parent PRD so the epic carries a real, navigable reference back to its source spec (stakeholders open the epic and click straight through to the PRD). Resolve `${PRD_ROOT}` from `references/resolve-paths.sh` first (default `docs/prd`).
+
+Derive `PRD_SOURCE_PATH` in this order:
+
+1. **Canonical location** — check `${PRD_ROOT}/[domain]/[feature]/prd.[feature].md`. If it exists, set `PRD_SOURCE_PATH` to that repo-relative path.
+2. **Glob fallback** — if the canonical name doesn't match, search the feature directory for any PRD: `find ${PRD_ROOT}/[domain]/[feature] -maxdepth 1 -name 'prd.*.md'`. If exactly one matches, use it. If several match, ask the user which is the parent via `AskUserQuestion`.
+3. **No PRD** — if none is found, this is a standalone brownfield enhancement: set `PRD_SOURCE_PATH` to the literal string `brownfield-enhancement`.
+
+Use `PRD_SOURCE_PATH` to populate the `prd_source:` frontmatter field and the **Source PRD** body line (see Epic Structure). Never leave `prd_source` as the `[source-document].md` placeholder — it must be a real path or `brownfield-enhancement`.
+
 ## Epic Structure
 
 ```markdown
@@ -109,7 +121,7 @@ priority: "Critical | High | Medium | Low"
 estimated_stories: N
 created: YYYY-MM-DD
 target_completion: YYYY-MM-DD
-prd_source: "[source-document].md or brownfield-enhancement"
+prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Parent PRD, or "brownfield-enhancement"
 ---
 
 # Epic [N]: {{Enhancement Name}} - Brownfield Enhancement
@@ -119,6 +131,9 @@ prd_source: "[source-document].md or brownfield-enhancement"
 {{1-2 sentences: what accomplishes, why adds value}}
 
 ## Epic Description
+
+**Source PRD**: [View document]({{PRD_SOURCE_PATH}})
+<!-- Omit this line entirely when prd_source is "brownfield-enhancement" (no parent PRD). -->
 
 **Existing System Context:**
 

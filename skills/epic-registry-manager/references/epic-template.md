@@ -15,7 +15,7 @@
 ---
 
 title: 'Epic [N]: [Epic Name]'
-prd_source: '[source-document].md'
+prd_source: '{{PRD_SOURCE_PATH}}' # repo-relative PRD path, or 'brownfield-enhancement'
 epic_type: 'system_implementation | feature_enhancement | infrastructure | integration'
 priority: 'critical | high | medium | low'
 estimated_sprints: N
@@ -47,7 +47,8 @@ target_date: 'YYYY-MM-DD' # Optional
 
 ### Source PRD Section
 
-**Document**: [Product Requirements](../product-requirements.md#section-name)
+**Source PRD**: [View document]({{PRD_SOURCE_PATH}})
+<!-- Repo-relative path matching the prd_source frontmatter field. Omit this line when prd_source is "brownfield-enhancement". -->
 **Related Specs**: [[Specification Name]](../[spec-name].md)
 
 ### System Integration

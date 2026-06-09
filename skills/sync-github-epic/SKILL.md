@@ -77,7 +77,7 @@ source references/resolve-platform.sh
 
 ### 3. Read Epic Frontmatter and Parse Identity
 
-Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if present), `labels`.
+Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if present), `labels`, `prd_source` (repo-relative parent PRD path, may be absent or the literal `brownfield-enhancement`).
 
 Parse the epic number from the filename: `epic.{N}.` → `EPIC_N`.
 
@@ -128,12 +128,22 @@ DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name
 DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${EPIC_RELATIVE_PATH}"
 
+# Resolve the parent PRD link the same way (skip the standalone sentinel).
+# PRD_LINE is empty for standalone epics, so the rebuilt Document block omits the line —
+# matching the create-path shape so create→update stays diff-stable.
+PRD_RELATIVE_PATH="${prd_source from frontmatter}"
+PRD_LINE=""
+if [ -n "$PRD_RELATIVE_PATH" ] && [ "$PRD_RELATIVE_PATH" != "brownfield-enhancement" ]; then
+  PRD_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${PRD_RELATIVE_PATH}"
+  PRD_LINE=$'\n'"📋 [Parent PRD](${PRD_URL})"
+fi
+
 # Verify the issue still exists
 gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue-${ISSUE_NUM}.json \
   || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
 ```
 
-Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt from the epic document's `## Overview` (or the opening paragraph / Epic Goal), a `## Metadata` table (`Status`, `Priority`), and a `## Document` link block (using `DOC_URL` above) — the **same shape** `ensure-epic-github-issue` emits on create, so create→update is diff-stable. Re-syncing from a feature branch refreshes the link to that branch (it changes the body, so the diff is non-empty and the edit runs). At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
+Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt from the epic document's `## Overview` (or the opening paragraph / Epic Goal), a `## Metadata` table (`Status`, `Priority`), and a `## Document` link block (using `DOC_URL` above, plus the `📋 [Parent PRD](…)` line from `${PRD_LINE}` when `prd_source` resolves) — the **same shape** `ensure-epic-github-issue` emits on create, so create→update is diff-stable. Re-syncing from a feature branch refreshes the link to that branch (it changes the body, so the diff is non-empty and the edit runs). At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
 
 If anything changed, run:
 
