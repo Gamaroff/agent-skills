@@ -203,7 +203,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 | Section                | Checks                                                                                                                                              |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| YAML Frontmatter       | `title`, `prd_source`, `epic_type`, `priority`, `estimated_sprints`, `dependencies`, `status`, `completion_percentage` all present and valid values |
+| YAML Frontmatter       | `epic_number`, `title`, `domain`, `status`, `priority`, `estimated_stories`, `created`, `target_completion`, `prd_source` all present and valid values (these are the fields `create-epic` and `docs/templates/epic-template.md` emit) |
 | Epic Goal              | Single clear statement (1-2 sentences), measurable, outcome-focused                                                                                 |
 | Background & Context   | PRD source linked, system integration listed, prerequisites with status                                                                             |
 | Epic Description       | Primary deliverables list, Out of Scope explicitly stated, Success Criteria with ≥3 measurable items                                                |
@@ -221,6 +221,8 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 - YAML `dependencies` list matches `blocked_by` field (if present)
 - Epic number in filename matches `title` field
 - File naming: `epic.[N].[kebab-name]/epic.[N].[kebab-name].md` (DOTS.md convention, directory exactly matches filename)
+- **`prd_source` resolves to a real file** (Critical): unless the value is the standalone sentinel `brownfield-enhancement`, the path must point to an actual file in the repo. Flag as a **Critical** issue if the file is missing, the path is still the `[source-document].md` placeholder, or `prd_source` is absent entirely. Stakeholders cannot navigate to a PRD that isn't linked.
+- **PRD reference visible in the body** (Major): the epic body must contain a clickable PRD reference (a `**Source PRD**:` line or any markdown link to the `prd_source` path), not just the frontmatter field. Flag as a **Major** issue if the path lives only in frontmatter — readers of the rendered markdown won't see it. (Skip both checks when `prd_source` is `brownfield-enhancement`.)
 
 **Collect all issues** — do NOT ask questions yet. Proceed to Step 3.
 
@@ -389,8 +391,8 @@ options:
 **Checks**:
 
 1. **Stories vs. ACs**: Do the stories cover all acceptance criteria in "Success Criteria"? Flag uncovered criteria.
-2. **YAML `dependencies` vs. `blocked_by`**: Must match exactly.
-3. **Timeline vs. `estimated_sprints`**: Does the Development Phase sprint count equal YAML `estimated_sprints`?
+2. **YAML `dependencies` vs. `blocked_by`** _(only if both fields are present — Schema A epics omit them)_: Must match exactly.
+3. **Timeline vs. estimate** _(only if the relevant field is present)_: the Development Phase sprint count should be consistent with `estimated_sprints`, or — for Schema A epics — the story count should be consistent with `estimated_stories`.
 4. **Out of Scope vs. Stories**: Do any existing stories implement items listed as out of scope?
 5. **Deliverables vs. Stories**: Every primary deliverable should map to ≥1 story (or be flagged as unmapped).
 6. **Risk coverage**: Are all high-risk stories in the Stories Breakdown also mentioned in Risks & Mitigation?
@@ -421,8 +423,8 @@ Score each dimension 1–5:
 
 **Epic Split Detection** — flag if ANY of:
 
-- More than 8 stories defined
-- `estimated_sprints` > 4
+- More than 8 stories defined (or `estimated_stories` > 8 for Schema A epics)
+- `estimated_sprints` > 4 (when that field is present)
 - Deliverables span more than 2 distinct feature domains (e.g., payments + notifications + UI)
 
 If flagged: recommend splitting into sub-epics and suggest how to divide the scope.
