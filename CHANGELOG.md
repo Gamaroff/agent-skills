@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+- **Epic body `Source PRD` link is now clickable on GitHub:** the link was written as a bare repo-relative path (`docs/prd/…`), which GitHub resolved relative to the epic file's own directory and 404'd. It now uses an absolute-from-root path (`/docs/prd/…`) so GitHub's markdown renderer navigates correctly. GitHub Issues already used a full `https://github.com/…` URL (built by `ensure-epic-github-issue` / `sync-github-epic`) and are unaffected.
+
 ## [v0.14.0] - 2026-06-09
 
 ### Added

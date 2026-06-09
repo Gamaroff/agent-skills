@@ -47,7 +47,7 @@ target_date: 'YYYY-MM-DD' # Optional
 
 ### Source PRD Section
 
-**Source PRD**: [View document]({{PRD_SOURCE_PATH}})
+**Source PRD**: [View document](/{{PRD_SOURCE_PATH}})
 <!-- Repo-relative path matching the prd_source frontmatter field. Omit this line when prd_source is "brownfield-enhancement". -->
 **Related Specs**: [[Specification Name]](../[spec-name].md)
 

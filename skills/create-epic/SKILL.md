@@ -132,7 +132,7 @@ prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Paren
 
 ## Epic Description
 
-**Source PRD**: [View document]({{PRD_SOURCE_PATH}})
+**Source PRD**: [View document](/{{PRD_SOURCE_PATH}})
 <!-- Omit this line entirely when prd_source is "brownfield-enhancement" (no parent PRD). -->
 
 **Existing System Context:**
