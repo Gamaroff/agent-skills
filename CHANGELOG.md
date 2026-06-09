@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Fixed
-- **Epic body `Source PRD` link is now clickable on GitHub:** the link was written as a bare repo-relative path (`docs/prd/…`), which GitHub resolved relative to the epic file's own directory and 404'd. It now uses an absolute-from-root path (`/docs/prd/…`) so GitHub's markdown renderer navigates correctly. GitHub Issues already used a full `https://github.com/…` URL (built by `ensure-epic-github-issue` / `sync-github-epic`) and are unaffected.
+- **Epic body `Source PRD` link now works in all markdown renderers (GitHub, Bitbucket, VS Code):** `create-epic` previously wrote a bare repo-relative path as the link target, which resolved incorrectly in both GitHub (relative to file directory) and Bitbucket (relative to the domain root). `create-epic` now resolves a full `https://` URL at write-time — using `gh repo view` on GitHub repos or normalising the `git remote get-url origin` on Bitbucket repos — so the link is clickable wherever the epic file is rendered.
 
 ## [v0.14.0] - 2026-06-09
 

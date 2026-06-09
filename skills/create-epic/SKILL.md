@@ -107,7 +107,41 @@ Derive `PRD_SOURCE_PATH` in this order:
 2. **Glob fallback** — if the canonical name doesn't match, search the feature directory for any PRD: `find ${PRD_ROOT}/[domain]/[feature] -maxdepth 1 -name 'prd.*.md'`. If exactly one matches, use it. If several match, ask the user which is the parent via `AskUserQuestion`.
 3. **No PRD** — if none is found, this is a standalone brownfield enhancement: set `PRD_SOURCE_PATH` to the literal string `brownfield-enhancement`.
 
-Use `PRD_SOURCE_PATH` to populate the `prd_source:` frontmatter field and the **Source PRD** body line (see Epic Structure). Never leave `prd_source` as the `[source-document].md` placeholder — it must be a real path or `brownfield-enhancement`.
+Use `PRD_SOURCE_PATH` to populate the `prd_source:` frontmatter field. Never leave `prd_source` as the `[source-document].md` placeholder — it must be a real path or `brownfield-enhancement`.
+
+Then build `PRD_URL` — a full web URL for the body link that works in any markdown renderer (GitHub, Bitbucket, VS Code preview):
+
+```bash
+source references/resolve-platform.sh   # sets VCS=github|bitbucket
+
+# Resolve current branch; fall back to the repo default when HEAD is detached
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ "$CURRENT_BRANCH" = "HEAD" ] || [ -z "$CURRENT_BRANCH" ]; then
+  if [ "$VCS" = "github" ]; then
+    BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+  else
+    BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/{print $NF}' || echo main)
+  fi
+else
+  BRANCH="$CURRENT_BRANCH"
+fi
+
+# Build the full URL
+if [ "$VCS" = "github" ]; then
+  REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)
+  PRD_URL="https://github.com/${REPO}/blob/${BRANCH}/${PRD_SOURCE_PATH}"
+else
+  # Normalise SSH or credentialed HTTPS remote to a plain HTTPS base URL
+  REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+  BB_BASE=$(echo "$REMOTE" \
+    | sed -e 's|git@bitbucket\.org:|https://bitbucket.org/|' \
+          -e 's|https://[^@]*@bitbucket\.org/|https://bitbucket.org/|' \
+          -e 's|\.git$||')
+  PRD_URL="${BB_BASE}/src/${BRANCH}/${PRD_SOURCE_PATH}"
+fi
+```
+
+When `PRD_SOURCE_PATH` is `brownfield-enhancement`, skip URL resolution and omit the **Source PRD** body line entirely.
 
 ## Epic Structure
 
@@ -132,8 +166,8 @@ prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Paren
 
 ## Epic Description
 
-**Source PRD**: [View document](/{{PRD_SOURCE_PATH}})
-<!-- Omit this line entirely when prd_source is "brownfield-enhancement" (no parent PRD). -->
+**Source PRD**: [View document]({{PRD_URL}})
+<!-- PRD_URL is a full https:// URL resolved in Discover Parent PRD. Omit this line entirely when prd_source is "brownfield-enhancement". -->
 
 **Existing System Context:**
 

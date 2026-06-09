@@ -47,8 +47,8 @@ target_date: 'YYYY-MM-DD' # Optional
 
 ### Source PRD Section
 
-**Source PRD**: [View document](/{{PRD_SOURCE_PATH}})
-<!-- Repo-relative path matching the prd_source frontmatter field. Omit this line when prd_source is "brownfield-enhancement". -->
+**Source PRD**: [View document]({{PRD_URL}})
+<!-- Full https:// URL built from prd_source + git remote at epic creation time. Omit this line when prd_source is "brownfield-enhancement". -->
 **Related Specs**: [[Specification Name]](../[spec-name].md)
 
 ### System Integration
