@@ -84,6 +84,8 @@ Extract from frontmatter: `title`, `status`, `priority`, `estimated_effort_hours
 
 Parse the epic/story numbers from the filename: `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
 
+Strip any leading `Story {E}.{S}: ` prefix (or an already-bracketed `[Story {E}.{S}] ` prefix) from `title` to get the bare display title: `STORY_TITLE`. The update path (Step 5b) wraps this once as `[Story {E}.{S}] ${STORY_TITLE}`; stripping first prevents a double prefix like `[Story 1.3] Story 1.3: …`.
+
 Derive the parent epic file path:
 
 ```bash

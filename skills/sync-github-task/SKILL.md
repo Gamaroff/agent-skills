@@ -67,6 +67,8 @@ Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if pres
 
 Parse the task id from the filename: `task.{N}.` → `TASK_N`.
 
+Strip any leading `Task {N}: ` prefix (or an already-bracketed `[Task {N}] ` prefix) from `title` to get the bare display title: `TASK_TITLE`. The update path (Step 4b) wraps this once as `[Task {N}] ${TASK_TITLE}`; stripping first prevents a double prefix like `[Task 5] Task 5: …`.
+
 ### 4. Branch: Create vs Update
 
 #### 4a. Create Path (`github_issue` absent or null)
