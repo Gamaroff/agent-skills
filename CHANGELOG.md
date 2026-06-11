@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+- **Canonical `[Epic N]` / `[Story N.M]` / `[Task N]` bracket form adopted across templates, skill instructions, and tooling:** the bracket form is now the single canonical title form, replacing the colon (`Epic N:`, `Story N.M:`) and hyphen (`Story N-M:`) variants. Templates (`docs/templates/epic-template.md`, the `story-template.yaml` for `create-story`/`review-story`, `prd-template`/`brownfield-prd-template` yaml) and prose examples (`prd-template`, `create-epic`, `create-epics-from-shards`, `change-management`, `qa-story`, `documentation-standards-validator`, `epic-registry-manager`) now emit bracket-form titles. `jira-epic-creator` gains a `normaliseEpicSummary` helper (strips any colon/bracket prefix and re-wraps as `[Epic N]`, with `epic_number` frontmatter taking precedence over an id embedded in the title), and the `ensure-epic/story/task-github-issue` + `sync-github-epic` strip logic now handles both the colon form and an already-bracketed prefix to prevent a double prefix like `[Epic 1] Epic 1: …`.
+
+### Added
+- **`review-epic` and `review-story` flag non-canonical title forms:** `review-epic` adds a Major check flagging colon-form titles (with fix guidance and a Recommendations-table row); `review-story` adds a Title Format check (Major) flagging colon/hyphen/bare prefixes, noting that the hyphen form is not stripped on Jira push.
+
 ## [v0.14.3] - 2026-06-11
 
 ### Fixed
