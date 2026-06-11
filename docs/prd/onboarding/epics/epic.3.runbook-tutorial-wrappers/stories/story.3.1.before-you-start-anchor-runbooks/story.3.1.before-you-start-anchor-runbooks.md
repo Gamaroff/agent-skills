@@ -1,6 +1,6 @@
 ---
 id: story.3.1.before-you-start-anchor-runbooks
-title: "Story 3.1: 'Before you start' for anchor runbooks"
+title: "[Story 3.1] 'Before you start' for anchor runbooks"
 type: story
 status: draft
 priority: high
@@ -15,7 +15,7 @@ created: 2026-05-11
 updated: 2026-05-11
 ---
 
-# Story 3.1: "Before you start" for anchor runbooks
+# [Story 3.1] "Before you start" for anchor runbooks
 
 **Status**: Draft
 

@@ -13,7 +13,7 @@ github_issue: 76
 github_url: "https://github.com/Gamaroff/agent-skills/issues/76"
 ---
 
-# Epic 4: First-Week Guided Learning Path — Brownfield Enhancement
+# [Epic 4] First-Week Guided Learning Path — Brownfield Enhancement
 
 ## Epic Goal
 
@@ -53,7 +53,7 @@ Beyond Hour 1, provide a structured Day 1 → Day 4 path that takes a user from 
 | 4.4   | ❌ Not Started | Medium   | "Day 4: Parallel + change-mgmt" walkthrough                                    |
 | 4.5   | ❌ Not Started | Medium   | First-week index at `docs/runbooks/first-week.md` linking all 4 days           |
 
-### Story 4.1: Day 1 — Tasks
+### [Story 4.1] Day 1 — Tasks
 
 As a new user on Day 1,
 I want a guided checklist that walks me through running 2–3 tasks,
@@ -66,7 +66,7 @@ so that I internalize the task pipeline before tackling the story pipeline.
 3. Completion criteria measurable: by end of Day 1, user should have 3 task artifact sets in their working repo.
 4. Doc ≤ 300 lines.
 
-### Story 4.2: Day 2 — Stories
+### [Story 4.2] Day 2 — Stories
 
 As a new user on Day 2,
 I want a guided story walkthrough,
@@ -79,7 +79,7 @@ so that I shift from task pipeline to story pipeline confidently.
 3. Completion criteria: user has at least 1 fully-developed story PR in their working repo.
 4. Doc ≤ 300 lines.
 
-### Story 4.3: Day 3 — Review concerns and QA gate failures
+### [Story 4.3] Day 3 — Review concerns and QA gate failures
 
 As a new user on Day 3,
 I want to deliberately reproduce a QA-gate failure and recover from it,
@@ -92,7 +92,7 @@ so that the "messy path" stops being scary.
 3. Completion criteria: user has at least one `qa-gate: FAIL` artifact followed by a `qa-gate: PASS` revision in their repo.
 4. Doc ≤ 300 lines.
 
-### Story 4.4: Day 4 — Parallel work + change management
+### [Story 4.4] Day 4 — Parallel work + change management
 
 As a new user on Day 4,
 I want to try parallel stories and the change-management runbook,
@@ -105,7 +105,7 @@ so that I am equipped for week-2+ scenarios.
 3. Completion criteria: user has either (a) two stories in parallel worktrees or (b) one change-management Sprint Change Proposal in their repo.
 4. Doc ≤ 300 lines.
 
-### Story 4.5: First-week index
+### [Story 4.5] First-week index
 
 As a new user planning their onboarding,
 I want a single index page listing the four days with completion criteria,

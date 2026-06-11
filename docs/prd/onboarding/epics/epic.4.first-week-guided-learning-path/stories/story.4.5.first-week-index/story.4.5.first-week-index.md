@@ -1,6 +1,6 @@
 ---
 id: story.4.5.first-week-index
-title: "Story 4.5: First-week index"
+title: "[Story 4.5] First-week index"
 type: story
 status: accepted
 priority: medium
@@ -15,7 +15,7 @@ created: 2026-05-11
 updated: 2026-05-11
 ---
 
-# Story 4.5: First-week index
+# [Story 4.5] First-week index
 
 **Status**: Accepted
 **Review**: ✅ All review recommendations from `story.4.5.review.1.first-week-index.md` implemented 2026-05-13

@@ -14,7 +14,7 @@ github_issue: 74
 github_url: "https://github.com/Gamaroff/agent-skills/issues/74"
 ---
 
-# Epic 2: Worked PRD / Epic / Story Examples — Brownfield Enhancement
+# [Epic 2] Worked PRD / Epic / Story Examples — Brownfield Enhancement
 
 ## Epic Goal
 
@@ -53,7 +53,7 @@ Eliminate the "no story/epic/PRD examples live here" caveat from `examples/READM
 | 2.3   | ❌ Not Started | High     | Capture a real story that failed `qa-gate` and was revised (messy path)              |
 | 2.4   | ❌ Not Started | Medium   | Update `examples/README.md` to cross-link new PRD/epic/story examples; remove caveat |
 
-### Story 2.1: Capture this PRD as the worked PRD example
+### [Story 2.1] Capture this PRD as the worked PRD example
 
 As a future user authoring their first PRD,
 I want to see a real PRD that went through the full pipeline,
@@ -65,7 +65,7 @@ so that I have a concrete reference for tone, depth, and section shape.
 2. `examples/prd-example/README.md` narrates the PRD: what was easy, what required iteration, what `pm-checklist` flagged.
 3. Frontmatter on the captured PRD records the skill version that produced it (so staleness is detectable).
 
-### Story 2.2: Capture each epic doc as worked epic examples
+### [Story 2.2] Capture each epic doc as worked epic examples
 
 As a future user authoring their first epic,
 I want to see four real epic docs side-by-side,
@@ -77,7 +77,7 @@ so that I can pattern-match across them.
 2. A short index `examples/epic-examples/README.md` explains the relationship to the parent PRD and links to each epic's story list.
 3. Frontmatter on each captured epic records skill version + date produced.
 
-### Story 2.3: Capture a story with the messy path
+### [Story 2.3] Capture a story with the messy path
 
 As a future user encountering their first QA-gate FAIL,
 I want to see a real story that failed `qa-gate` and was revised,
@@ -89,7 +89,7 @@ so that the "messy path" is visible, not just the happy path.
 2. A narrative `examples/story-messy-path/README.md` explains what triggered the FAIL and what the revision did.
 3. The story used is one that genuinely failed QA during this PRD's run — do not manufacture a failure.
 
-### Story 2.4: Update `examples/README.md`
+### [Story 2.4] Update `examples/README.md`
 
 As a visitor to `examples/`,
 I want the README to point at PRD, epic, and story examples alongside the existing task examples,

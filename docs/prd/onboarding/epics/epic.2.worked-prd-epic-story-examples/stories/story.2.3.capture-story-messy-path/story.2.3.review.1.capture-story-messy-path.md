@@ -1,6 +1,6 @@
 ---
 id: story.2.3.review.1.capture-story-messy-path
-title: "Story 2.3 Review #1: Capture a story with the messy path"
+title: "[Story 2.3] Review #1: Capture a story with the messy path"
 type: review
 status: complete
 story: story.2.3.capture-story-messy-path

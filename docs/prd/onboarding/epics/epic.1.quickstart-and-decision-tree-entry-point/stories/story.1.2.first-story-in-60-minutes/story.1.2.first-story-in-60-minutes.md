@@ -1,6 +1,6 @@
 ---
 id: story.1.2.first-story-in-60-minutes
-title: "Story 1.2: First story in 60 minutes — quickstart"
+title: "[Story 1.2] First story in 60 minutes — quickstart"
 type: story
 status: accepted
 priority: high
@@ -16,7 +16,7 @@ updated: 2026-05-12
 completed_date: 2026-05-12
 ---
 
-# Story 1.2: First story in 60 minutes — quickstart
+# [Story 1.2] First story in 60 minutes — quickstart
 
 **Status**: Accepted
 **Review**: ✅ Critical/Important recommendations from `story.1.2.review.1.first-story-in-60-minutes.md` implemented 2026-05-12

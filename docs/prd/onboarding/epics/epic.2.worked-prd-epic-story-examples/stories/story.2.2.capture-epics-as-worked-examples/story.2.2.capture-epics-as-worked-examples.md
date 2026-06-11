@@ -1,6 +1,6 @@
 ---
 id: story.2.2.capture-epics-as-worked-examples
-title: "Story 2.2: Capture all 4 epic docs as worked examples"
+title: "[Story 2.2] Capture all 4 epic docs as worked examples"
 type: story
 status: accepted
 completed_date: 2026-05-12
@@ -17,7 +17,7 @@ created: 2026-05-11
 updated: 2026-05-11
 ---
 
-# Story 2.2: Capture all 4 epic docs as worked examples
+# [Story 2.2] Capture all 4 epic docs as worked examples
 
 **Status**: Accepted
 **Review**: ✅ Critical/Important recommendations implemented 2026-05-12 — see [`story.2.2.review.1.capture-epics-as-worked-examples.md`](story.2.2.review.1.capture-epics-as-worked-examples.md)

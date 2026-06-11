@@ -1,6 +1,6 @@
 ---
 id: story.1.3.decision-tree-which-path
-title: "Story 1.3: Decision tree — which path?"
+title: "[Story 1.3] Decision tree — which path?"
 type: story
 status: accepted
 priority: high
@@ -17,7 +17,7 @@ completed_date: 2026-05-12
 pr_number: 96
 ---
 
-# Story 1.3: Decision tree — which path?
+# [Story 1.3] Decision tree — which path?
 
 **Status**: Accepted
 **Review**: ✅ Optional recommendations implemented 2026-05-12 — see `story.1.3.review.1.decision-tree-which-path.md`

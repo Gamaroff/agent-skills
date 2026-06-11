@@ -194,13 +194,13 @@ Epic 3 (runbook wrappers) ── independent
 
 ---
 
-### Epic 1: Quickstart & Decision-Tree Entry Point
+### [Epic 1] Quickstart & Decision-Tree Entry Point
 
 **Epic Goal:** Land a brand-new user in the right pipeline path within 60 seconds of installation, and let them ship a first artifact within 10 minutes.
 
 **Integration Requirements:** Augment `README.md` and `docs/concepts/getting-started.md`; add net-new files under `docs/concepts/`. No skill code touched. All new docs pass `documentation-standards-validator`.
 
-#### Story 1.1 — "First task in 10 minutes" quickstart
+#### [Story 1.1] "First task in 10 minutes" quickstart
 
 > As a new user who just installed agent-skills,
 > I want a step-by-step walkthrough that produces a complete task artifact set in 10 minutes,
@@ -219,7 +219,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** No existing runbook is altered; the quickstart is a new entry point, not a replacement.
 - **IV3:** `documentation-standards-validator` passes; total docs added ≤ 400 lines for this story.
 
-#### Story 1.2 — "First story in 60 minutes" quickstart
+#### [Story 1.2] "First story in 60 minutes" quickstart
 
 > As a new user who has completed the task quickstart,
 > I want a similarly tight walkthrough that produces a story artifact set end-to-end,
@@ -239,7 +239,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Skill invocations referenced (`/create-prd`, `/create-epic`, `/create-story`, `/develop-story`) match current skill names verbatim.
 - **IV3:** Validator passes.
 
-#### Story 1.3 — Decision tree: which path?
+#### [Story 1.3] Decision tree: which path?
 
 > As a new user uncertain whether to use task, story, hotfix, or parallel paths,
 > I want a single page with a decision tree mapping intent to skill,
@@ -259,7 +259,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Mermaid block renders cleanly in GitHub markdown preview.
 - **IV3:** Validator passes.
 
-#### Story 1.4 — Rewrite `getting-started.md` to terminate in quickstarts
+#### [Story 1.4] Rewrite `getting-started.md` to terminate in quickstarts
 
 > As a new user reading `getting-started.md`,
 > I want the doc to end with a concrete next-action ("now follow `quickstart-task.md`"),
@@ -277,7 +277,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Install steps unchanged.
 - **IV3:** Validator passes on the modified file.
 
-#### Story 1.5 — README "Start here" callout
+#### [Story 1.5] README "Start here" callout
 
 > As a visitor on the repo homepage,
 > I want a "Start here" callout near the top of `README.md`,
@@ -297,13 +297,13 @@ Epic 3 (runbook wrappers) ── independent
 
 ---
 
-### Epic 2: Worked PRD / Epic / Story Examples
+### [Epic 2] Worked PRD / Epic / Story Examples
 
 **Epic Goal:** Eliminate the "no story/epic/PRD examples live here" caveat from `examples/README.md` by capturing real artifacts produced by _this very dogfood run_ as worked examples — meta-dogfooding.
 
 **Integration Requirements:** Add files under `examples/` mirroring PRD/epic/story artifacts produced during this PRD's pipeline run. No artifact is hand-crafted; each is a real pipeline output. Update `examples/README.md` to cross-link.
 
-#### Story 2.1 — Capture this PRD as the worked PRD example
+#### [Story 2.1] Capture this PRD as the worked PRD example
 
 > As a future user authoring their first PRD,
 > I want to see a real PRD that went through the full pipeline,
@@ -321,7 +321,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** `examples/README.md` continues to enumerate the existing task examples correctly.
 - **IV3:** Validator passes.
 
-#### Story 2.2 — Capture each epic doc as worked epic examples
+#### [Story 2.2] Capture each epic doc as worked epic examples
 
 > As a future user authoring their first epic,
 > I want to see four real epic docs side-by-side,
@@ -339,7 +339,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** `docs/development/epic-registry.md` rows match the captured epics.
 - **IV3:** Validator passes.
 
-#### Story 2.3 — Capture a story with the messy path
+#### [Story 2.3] Capture a story with the messy path
 
 > As a future user encountering their first QA-gate FAIL,
 > I want to see a real story that failed `qa-gate` and was revised,
@@ -357,7 +357,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** `examples/README.md` cross-links to this directory.
 - **IV3:** Validator passes.
 
-#### Story 2.4 — Update `examples/README.md`
+#### [Story 2.4] Update `examples/README.md`
 
 > As a visitor to `examples/`,
 > I want the README to point at PRD, epic, and story examples alongside the existing task examples,
@@ -377,13 +377,13 @@ Epic 3 (runbook wrappers) ── independent
 
 ---
 
-### Epic 3: Runbook Tutorial Wrappers
+### [Epic 3] Runbook Tutorial Wrappers
 
 **Epic Goal:** Make existing runbooks safer to land in cold — without rewriting them — by adding "Before you start" / "Is this the right runbook?" / "Common first-time errors" sections.
 
 **Integration Requirements:** No runbook body content is replaced. Only prepends/appends. Risk minimal — purely additive.
 
-#### Story 3.1 — "Before you start" for anchor runbooks
+#### [Story 3.1] "Before you start" for anchor runbooks
 
 > As a new user opening `story-development.md` or `task-development.md` cold,
 > I want a prerequisite section at the top telling me what to know first,
@@ -402,7 +402,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** All inbound links to these runbooks still resolve at the same anchors.
 - **IV3:** Validator passes.
 
-#### Story 3.2 — "Is this the right runbook?" callouts for satellites
+#### [Story 3.2] "Is this the right runbook?" callouts for satellites
 
 > As a new user landing on `hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, or `change-management.md`,
 > I want a top-of-page callout that confirms (or redirects) my path,
@@ -421,7 +421,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Inbound links resolve.
 - **IV3:** Validator passes.
 
-#### Story 3.3 — "Common first-time errors" troubleshooting section
+#### [Story 3.3] "Common first-time errors" troubleshooting section
 
 > As a new user hitting a confusing error during a runbook walkthrough,
 > I want a troubleshooting section at the end of the anchor runbooks,
@@ -442,13 +442,13 @@ Epic 3 (runbook wrappers) ── independent
 
 ---
 
-### Epic 4: First-Week Guided Learning Path
+### [Epic 4] First-Week Guided Learning Path
 
 **Epic Goal:** Beyond Hour 1, provide a structured Day 1 → Day 4 path that takes a user from first task through parallel work + change management.
 
 **Integration Requirements:** New files only under `docs/runbooks/first-week/` and an index at `docs/runbooks/first-week.md`. Cross-links to Epic 1 quickstarts and Epic 2 messy-path artifact.
 
-#### Story 4.1 — Day 1: Tasks
+#### [Story 4.1] Day 1: Tasks
 
 > As a new user on Day 1,
 > I want a guided checklist that walks me through running 2–3 tasks,
@@ -467,7 +467,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Validator passes.
 - **IV3:** No content duplicated from `task-development.md` — Day 1 is a guided sequence over it, not a rewrite.
 
-#### Story 4.2 — Day 2: Stories
+#### [Story 4.2] Day 2: Stories
 
 > As a new user on Day 2,
 > I want a guided story walkthrough,
@@ -486,7 +486,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Validator passes.
 - **IV3:** No content duplicated from `story-development.md`.
 
-#### Story 4.3 — Day 3: Review concerns and QA gate failures
+#### [Story 4.3] Day 3: Review concerns and QA gate failures
 
 > As a new user on Day 3,
 > I want to deliberately reproduce a QA-gate failure and recover from it,
@@ -505,7 +505,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Validator passes.
 - **IV3:** Documented failure mode is reproducible on a clean clone.
 
-#### Story 4.4 — Day 4: Parallel work + change management
+#### [Story 4.4] Day 4: Parallel work + change management
 
 > As a new user on Day 4,
 > I want to try parallel stories and the change-management runbook,
@@ -524,7 +524,7 @@ Epic 3 (runbook wrappers) ── independent
 - **IV2:** Validator passes.
 - **IV3:** Day 4 does not require Day 3 to be completed — it's optional after Day 2.
 
-#### Story 4.5 — First-week index
+#### [Story 4.5] First-week index
 
 > As a new user planning their onboarding,
 > I want a single index page listing the four days with completion criteria,

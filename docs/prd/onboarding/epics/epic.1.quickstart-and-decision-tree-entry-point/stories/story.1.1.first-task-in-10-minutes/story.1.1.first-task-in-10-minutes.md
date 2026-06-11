@@ -1,6 +1,6 @@
 ---
 id: story.1.1.first-task-in-10-minutes
-title: "Story 1.1: First task in 10 minutes — quickstart"
+title: "[Story 1.1] First task in 10 minutes — quickstart"
 type: story
 status: accepted
 priority: high
@@ -16,7 +16,7 @@ updated: 2026-05-12
 completed_date: 2026-05-12
 ---
 
-# Story 1.1: First task in 10 minutes — quickstart
+# [Story 1.1] First task in 10 minutes — quickstart
 
 **Status**: Accepted
 

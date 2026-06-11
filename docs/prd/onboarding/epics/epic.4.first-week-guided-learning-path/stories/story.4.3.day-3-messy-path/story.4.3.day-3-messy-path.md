@@ -1,6 +1,6 @@
 ---
 id: story.4.3.day-3-messy-path
-title: "Story 4.3: Day 3 — Review concerns and QA-gate failures"
+title: "[Story 4.3] Day 3 — Review concerns and QA-gate failures"
 type: story
 status: accepted
 priority: medium
@@ -17,7 +17,7 @@ updated: 2026-05-13
 completed_date: 2026-05-13
 ---
 
-# Story 4.3: Day 3 — Messy path
+# [Story 4.3] Day 3 — Messy path
 
 **Status**: Accepted
 **Review**: ✅ Critical/Important recommendations implemented 2026-05-13 — see `story.4.3.review.1.day-3-messy-path.md`

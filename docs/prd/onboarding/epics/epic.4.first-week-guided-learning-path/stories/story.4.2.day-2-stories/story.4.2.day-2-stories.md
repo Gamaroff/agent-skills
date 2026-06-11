@@ -1,6 +1,6 @@
 ---
 id: story.4.2.day-2-stories
-title: "Story 4.2: Day 2 — Stories"
+title: "[Story 4.2] Day 2 — Stories"
 type: story
 status: accepted
 priority: high
@@ -16,7 +16,7 @@ updated: 2026-05-13
 completed_date: 2026-05-13
 ---
 
-# Story 4.2: Day 2 — Stories
+# [Story 4.2] Day 2 — Stories
 
 **Status**: Accepted
 **Review**: ✅ Critical/Important recommendations implemented 2026-05-13 — see `story.4.2.review.1.day-2-stories.md`

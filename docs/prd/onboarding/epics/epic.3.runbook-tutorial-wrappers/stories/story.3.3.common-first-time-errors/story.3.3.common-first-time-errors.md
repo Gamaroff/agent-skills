@@ -1,6 +1,6 @@
 ---
 id: story.3.3.common-first-time-errors
-title: "Story 3.3: 'Common first-time errors' troubleshooting sections"
+title: "[Story 3.3] 'Common first-time errors' troubleshooting sections"
 type: story
 status: draft
 priority: medium
@@ -15,7 +15,7 @@ created: 2026-05-11
 updated: 2026-05-11
 ---
 
-# Story 3.3: "Common first-time errors" troubleshooting sections
+# [Story 3.3] "Common first-time errors" troubleshooting sections
 
 **Status**: Draft
 

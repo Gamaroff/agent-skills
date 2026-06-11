@@ -1,6 +1,6 @@
 ---
 id: story.4.4.day-4-parallel
-title: "Story 4.4: Day 4 — Parallel work + change management"
+title: "[Story 4.4] Day 4 — Parallel work + change management"
 type: story
 status: accepted
 priority: medium
@@ -16,7 +16,7 @@ updated: 2026-05-13
 completed_date: 2026-05-13
 ---
 
-# Story 4.4: Day 4 — Parallel work + change management
+# [Story 4.4] Day 4 — Parallel work + change management
 
 **Status**: Accepted
 **Review**: ✅ Critical/Important recommendations implemented 2026-05-13 — see `story.4.4.review.1.day-4-parallel.md`

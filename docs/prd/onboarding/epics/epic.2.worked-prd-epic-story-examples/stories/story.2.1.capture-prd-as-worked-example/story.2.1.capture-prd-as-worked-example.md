@@ -1,6 +1,6 @@
 ---
 id: story.2.1.capture-prd-as-worked-example
-title: "Story 2.1: Capture this PRD as the worked PRD example"
+title: "[Story 2.1] Capture this PRD as the worked PRD example"
 type: story
 status: accepted
 priority: high
@@ -17,7 +17,7 @@ completed_date: 2026-05-12
 pr_number: 101
 ---
 
-# Story 2.1: Capture this PRD as the worked PRD example
+# [Story 2.1] Capture this PRD as the worked PRD example
 
 **Status**: Accepted
 **Review**: ✅ Important recommendations from `story.2.1.review.1.capture-prd-as-worked-example.md` implemented 2026-05-12

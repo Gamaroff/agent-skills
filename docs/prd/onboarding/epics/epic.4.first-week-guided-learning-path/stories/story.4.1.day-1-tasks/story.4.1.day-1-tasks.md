@@ -1,6 +1,6 @@
 ---
 id: story.4.1.day-1-tasks
-title: "Story 4.1: Day 1 — Tasks"
+title: "[Story 4.1] Day 1 — Tasks"
 type: story
 status: accepted
 priority: high
@@ -16,7 +16,7 @@ updated: 2026-05-13
 completed_date: 2026-05-13
 ---
 
-# Story 4.1: Day 1 — Tasks
+# [Story 4.1] Day 1 — Tasks
 
 **Status**: Accepted
 **Review**: ✅ All review recommendations from `story.4.1.review.1.day-1-tasks.md` implemented 2026-05-13

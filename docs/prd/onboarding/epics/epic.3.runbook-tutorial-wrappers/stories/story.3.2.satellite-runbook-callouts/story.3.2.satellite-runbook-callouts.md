@@ -1,6 +1,6 @@
 ---
 id: story.3.2.satellite-runbook-callouts
-title: "Story 3.2: 'Is this the right runbook?' callouts for satellites"
+title: "[Story 3.2] 'Is this the right runbook?' callouts for satellites"
 type: story
 status: draft
 priority: high
@@ -15,7 +15,7 @@ created: 2026-05-11
 updated: 2026-05-11
 ---
 
-# Story 3.2: "Is this the right runbook?" callouts for satellites
+# [Story 3.2] "Is this the right runbook?" callouts for satellites
 
 **Status**: Draft
 
