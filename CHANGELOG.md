@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+- **`create-prd` warns against artificially collapsing epics:** added a callout block, a worked example table (authentication, notifications, data sync, reporting), and an anti-pattern pitfalls entry to guide authors toward correct epic granularity when a feature naturally spans 4+ functional areas.
+
 ## [v0.14.1] - 2026-06-09
 
 ### Fixed
