@@ -221,6 +221,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 - YAML `dependencies` list matches `blocked_by` field (if present)
 - Epic number in filename matches `title` field
 - File naming: `epic.[N].[kebab-name]/epic.[N].[kebab-name].md` (DOTS.md convention, directory exactly matches filename)
+- **Title format** (Major): if the `title` frontmatter embeds an epic number prefix it **must** use the canonical bracket form `[Epic N] Name` — not the colon form `Epic N: Name`. Detect by matching `^\s*Epic\s+\d+\s*:` against the title value. Flag as a **Major** issue when the colon form is found, because `sync-jira-epic` normalises on push but the local doc title and any manually-created Jira issue will show the wrong format until corrected. The fix is: update `title` in frontmatter to bracket form and re-run `sync-jira-epic` so the Jira issue summary is corrected in the same operation.
 - **`prd_source` resolves to a real file** (Critical): unless the value is the standalone sentinel `brownfield-enhancement`, the path must point to an actual file in the repo. Flag as a **Critical** issue if the file is missing, the path is still the `[source-document].md` placeholder, or `prd_source` is absent entirely. Stakeholders cannot navigate to a PRD that isn't linked.
 - **PRD reference visible in the body** (Major): the epic body must contain a clickable PRD reference (a `**Source PRD**:` line or any markdown link to the `prd_source` path), not just the frontmatter field. Flag as a **Major** issue if the path lives only in frontmatter — readers of the rendered markdown won't see it. (Skip both checks when `prd_source` is `brownfield-enhancement`.)
 
@@ -462,6 +463,7 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 | Issue Type             | Recommendation Approach                                                             |
 | ---------------------- | ----------------------------------------------------------------------------------- |
+| Title format           | Change `title:` frontmatter from `Epic N: Name` → `[Epic N] Name`; then run `sync-jira-epic` to propagate the corrected summary to the Jira issue. Apply this fix in Step 11 before any Jira sync. |
 | Registry overlap       | Suggest merge, scope reduction, or explicit differentiation with different wording  |
 | Codebase duplication   | Reference the existing file path, suggest extend vs. create new with justification  |
 | Architecture violation | Cite the specific `.claude/*.md` doc and section, provide the compliant alternative |

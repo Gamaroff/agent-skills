@@ -196,7 +196,7 @@ Each epic has its own subdirectory containing:
 
 ```yaml
 ---
-title: "Epic [N]: [Epic Name]"
+title: "[Epic N] Epic Name"
 prd_source: "[source-document].md"
 epic_type: "system_implementation | feature_enhancement | infrastructure"
 priority: "critical | high | medium | low"
@@ -439,7 +439,7 @@ See [Epic 164: Core Foundation](./epics/epic.164.core-foundation/epic.164.core-f
 **From Epic to Story** (epic file linking to its stories):
 
 ```markdown
-See [Story 164.1: Core Architecture](./stories/story.164.1.core-architecture.md)
+See [[Story 164.1] Core Architecture](./stories/story.164.1.core-architecture.md)
 ```
 
 **From Story to PRD**:
@@ -461,7 +461,7 @@ Always provide navigation in both directions:
 **Epic → Stories** (from epic file):
 
 ```markdown
-### Story 164-1: [Story Name]
+### [Story 164.1] [Story Name]
 
 [Story details...]
 

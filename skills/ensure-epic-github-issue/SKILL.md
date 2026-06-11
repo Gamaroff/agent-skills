@@ -30,7 +30,7 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
    - `priority` — epic priority (use `—` if absent)
    - `prd_source` — repo-relative path to the parent PRD (may be absent, or the literal `brownfield-enhancement` for standalone epics)
 3. Parse the epic number from the filename: pattern `epic.{N}.` → `EPIC_N`.
-4. Strip any leading `"Epic {N}: "` prefix from `title` to get the bare title for display: `EPIC_TITLE`.
+4. Strip any leading `Epic {N}: ` prefix (or an already-bracketed `[Epic {N}] ` prefix) from `title` to get the bare title for display: `EPIC_TITLE`. (Stripping both forms prevents a double prefix like `[Epic 1] Epic 1: …`.)
 5. Set `EPIC_RELATIVE_PATH` = the path relative to the repo root.
 
 ### Step E2: Check if Epic Issue Already Exists

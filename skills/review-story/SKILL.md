@@ -556,7 +556,13 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
    - Tasks must use checkbox format with subtasks
    - Change Log must be table format
 
-5. **Tracker Issue Linkage**:
+5. **Title Format**:
+   - When the story `title` frontmatter (or the `# ` heading) embeds a story-id prefix, it MUST use the canonical bracket form `[Story N.M] Name` — never the colon form `Story N.M: Name` nor the hyphen form `Story N-M: Name`.
+   - Detect by matching `^\s*Story\s+[\d.\-]+\s*:` against the title/heading value; also flag a bare `Story N.M` / `Story N-M` prefix that lacks the brackets.
+   - Flag as a **Major** issue. `sync-jira-story`'s `normaliseStorySummary` strips the **colon-dot** form on push, but the **hyphen** form (`Story 1-1:`) is NOT stripped and produces a doubled summary (`[Story 1.1] Story 1-1: …`); either way the local doc title shows the wrong format until corrected.
+   - Fix: set `title` to the bracket form `[Story N.M] Name` (or to the bare descriptive name — `sync-jira-story` prepends `[Story {epic}.{story}]` automatically), then re-run `sync-jira-story` so the Jira issue summary is corrected in the same operation. Apply this fix before any tracker sync.
+
+6. **Tracker Issue Linkage**:
 
    Detect tracker platform using the canonical resolver — see `references/platform-detection.md`. Source the helper once per skill invocation:
    ```bash

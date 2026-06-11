@@ -239,7 +239,7 @@ sections:
         template: "**Epic Structure Decision**: {{epic_decision}} with rationale"
 
   - id: epic-details
-    title: "Epic 1: {{enhancement_title}}"
+    title: "[Epic 1] {{enhancement_title}}"
     instruction: |
       Comprehensive epic that delivers the brownfield enhancement while maintaining existing functionality
 
@@ -259,7 +259,7 @@ sections:
       **Integration Requirements**: {{integration_requirements}}
     sections:
       - id: story
-        title: "Story 1.{{story_number}} {{story_title}}"
+        title: "[Story 1.{{story_number}}] {{story_title}}"
         repeatable: true
         template: |
           As a {{user_type}},

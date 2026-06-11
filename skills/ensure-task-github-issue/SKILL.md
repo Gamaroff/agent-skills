@@ -33,7 +33,7 @@ This is an **internal sub-routine** called by `create-task` and `review-task`. D
    - `milestone` — explicit milestone override (optional)
    - `epic` — parent epic number for milestone lookup (optional)
 3. Parse the task id from the filename: pattern `task.{N}.` → `TASK_N`.
-4. Strip any leading `"Task {N}: "` prefix from `title` to get the bare title for display: `TASK_TITLE`.
+4. Strip any leading `Task {N}: ` prefix (or an already-bracketed `[Task {N}] ` prefix) from `title` to get the bare title for display: `TASK_TITLE`. (Stripping both forms prevents a double prefix like `[Task 5] Task 5: …`.)
 5. Set `TASK_RELATIVE_PATH` = the path relative to the repo root.
 
 ### Step T2: Check if Task Issue Already Exists

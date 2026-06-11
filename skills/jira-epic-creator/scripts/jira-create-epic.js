@@ -126,6 +126,15 @@ function extractEpicDescription(body, frontmatter) {
   return sections.join("\n\n");
 }
 
+function normaliseEpicSummary(summary, epicNumber) {
+  const bracket = summary.match(/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i);
+  const colon   = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
+  let epicId = epicNumber != null ? String(epicNumber) : null;
+  if (bracket)    { epicId = epicId || bracket[1]; summary = bracket[2].trim(); }
+  else if (colon) { epicId = epicId || colon[1];   summary = colon[2].trim(); }
+  return epicId != null ? `[Epic ${epicId}] ${summary}` : summary;
+}
+
 function getAuth() {
   const url = process.env.JIRA_URL;
   const token = process.env.JIRA_API_TOKEN;
@@ -356,6 +365,7 @@ async function main() {
 
   let summary, description, priority, labels;
   let filePath = null;
+  let epicNumber = null;
 
   // Parse from file if provided
   if (args.file) {
@@ -368,6 +378,7 @@ async function main() {
     const content = fs.readFileSync(filePath, "utf-8");
     const { frontmatter, body } = await parseFrontmatter(content);
 
+    epicNumber = frontmatter.epic_number != null ? frontmatter.epic_number : null;
     summary = args.summary || frontmatter.summary || frontmatter.title || "";
     // Use the epic-aware description extractor
     const epicDesc = extractEpicDescription(body, frontmatter);
@@ -406,6 +417,8 @@ async function main() {
       process.exit(1);
     }
   }
+
+  summary = normaliseEpicSummary(summary, epicNumber);
 
   // Create the epic
   const issueKey = await createEpic({

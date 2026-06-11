@@ -5,7 +5,7 @@ template:
   output:
     format: markdown
     filename: "{{epic_directory}}/stories/story.{{epic_num}}.{{story_num}}.{{story_title_short}}/story.{{epic_num}}.{{story_num}}.{{story_title_short}}.md"
-    title: "Story {{epic_num}}.{{story_num}}: {{story_title_short}}"
+    title: "[Story {{epic_num}}.{{story_num}}] {{story_title_short}}"
 
 workflow:
   mode: interactive

@@ -125,7 +125,7 @@ For each identified epic, create using this structure:
 
 ```markdown
 ---
-title: "Epic [N]: [Epic Name]"
+title: "[Epic N] Epic Name"
 prd_source: "[shard-filename.md]"
 epic_type: "system_implementation"
 priority: "[high|medium|low]"
@@ -133,7 +133,7 @@ estimated_sprints: "[1-6]"
 dependencies: ["epic.163", "epic.164"] # Use actual epic numbers from registry
 ---
 
-# Epic [N]: [Epic Name]
+# [Epic N] Epic Name
 
 ## Epic Goal
 
@@ -210,12 +210,12 @@ dependencies: ["epic.163", "epic.164"] # Use actual epic numbers from registry
 
 **Depends On:**
 
-- [ ] Epic [N]: [Epic name] - [Reason]
+- [ ] [Epic N] Epic name - [Reason]
 - [ ] [External dependency] - [Reason]
 
 **Blocks:**
 
-- [ ] Epic [N]: [Epic name] - [Reason]
+- [ ] [Epic N] Epic name - [Reason]
 
 ## Risks & Mitigation
 

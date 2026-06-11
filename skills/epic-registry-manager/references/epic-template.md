@@ -14,7 +14,7 @@
 
 ---
 
-title: 'Epic [N]: [Epic Name]'
+title: '[Epic N] Epic Name'
 prd_source: '{{PRD_SOURCE_PATH}}' # repo-relative PRD path, or 'brownfield-enhancement'
 epic_type: 'system_implementation | feature_enhancement | infrastructure | integration'
 priority: 'critical | high | medium | low'
@@ -29,7 +29,7 @@ target_date: 'YYYY-MM-DD' # Optional
 
 ---
 
-# Epic [N]: [Epic Name]
+# [Epic N] Epic Name
 
 **Status**: [Emoji] [Detailed Status Description]
 **Last Updated**: YYYY-MM-DD
@@ -127,7 +127,7 @@ Before starting this epic, the following must exist:
 
 ## Stories Breakdown
 
-### Story [Epic]-1: [Story Name]
+### [Story [Epic].1] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -166,7 +166,7 @@ path/to/file3.spec.ts - [Purpose]
 
 ---
 
-### Story [Epic]-2: [Story Name]
+### [Story [Epic].2] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -202,7 +202,7 @@ path/to/file2.ts - [Purpose]
 
 ---
 
-### Story [Epic]-3: [Story Name]
+### [Story [Epic].3] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -229,7 +229,7 @@ path/to/file2.ts - [Purpose]
 
 ---
 
-### Story [Epic]-[N]: [Additional Stories...]
+### [Story [Epic].N] [Additional Stories...]
 
 [Continue pattern for all stories in epic]
 
@@ -396,13 +396,13 @@ Re-render
 
 **Can be developed in parallel**:
 
-- Story [Epic]-1 and Story [Epic]-3 (no dependencies)
-- Story [Epic]-2 can start after Story [Epic]-1 completes
+- [Story [Epic].1] and [Story [Epic].3] (no dependencies)
+- [Story [Epic].2] can start after [Story [Epic].1] completes
 
 **Must be sequential**:
 
-- Story [Epic]-4 requires Story [Epic]-2 completion
-- Story [Epic]-5 requires all previous stories
+- [Story [Epic].4] requires [Story [Epic].2] completion
+- [Story [Epic].5] requires all previous stories
 
 ---
 
@@ -414,7 +414,7 @@ Re-render
 
 - **Probability**: High | Medium | Low
 - **Impact**: High | Medium | Low
-- **Affected Stories**: Story [Epic]-1, Story [Epic]-2
+- **Affected Stories**: [Story [Epic].1], [Story [Epic].2]
 - **Mitigation Strategy**: [Detailed strategy]
 - **Contingency Plan**: [Backup plan]
 - **Owner**: [Person responsible]
@@ -424,7 +424,7 @@ Re-render
 
 - **Probability**: High | Medium | Low
 - **Impact**: High | Medium | Low
-- **Affected Stories**: Story [Epic]-3
+- **Affected Stories**: [Story [Epic].3]
 - **Mitigation Strategy**: [Detailed strategy]
 - **Contingency Plan**: [Backup plan]
 - **Owner**: [Person responsible]
@@ -588,9 +588,9 @@ Epic [N] is complete when all criteria below are met:
 
 ### Development Phase
 
-- **Sprint 1**: Story [Epic]-1, Story [Epic]-2
-- **Sprint 2**: Story [Epic]-3, Story [Epic]-4
-- **Sprint 3**: Story [Epic]-5, testing
+- **Sprint 1**: [Story [Epic].1], [Story [Epic].2]
+- **Sprint 2**: [Story [Epic].3], [Story [Epic].4]
+- **Sprint 3**: [Story [Epic].5], testing
 - **Total**: [X] sprints ([X] weeks)
 
 ### Testing & Polish Phase
@@ -646,9 +646,9 @@ Epic [N] is complete when all criteria below are met:
 
 ### Story Documentation
 
-- [Story [Epic]-1: [Name]](./stories/story.[epic].1.[name].md)
-- [Story [Epic]-2: [Name]](./stories/story.[epic].2.[name].md)
-- [Story [Epic]-3: [Name]](./stories/story.[epic].3.[name].md)
+- [[Story [Epic].1] Name](./stories/story.[epic].1.[name].md)
+- [[Story [Epic].2] Name](./stories/story.[epic].2.[name].md)
+- [[Story [Epic].3] Name](./stories/story.[epic].3.[name].md)
 - [Additional stories...]
 
 ### Epic Roadmap

@@ -31,9 +31,9 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
    - `priority` — story priority (lowercase; default `medium` if absent)
    - `estimated_effort_hours` — story effort estimate in hours (number; absent/empty if not set)
 3. Parse the epic and story numbers from the filename: pattern `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
-4. Strip any leading `"Story {E}.{S}: "` prefix from `title` to get the bare title for display: `STORY_TITLE`.
+4. Strip any leading `Story {E}.{S}: ` prefix (or an already-bracketed `[Story {E}.{S}] ` prefix) from `title` to get the bare title for display: `STORY_TITLE`. Stripping both forms prevents a double prefix like `[Story 1.3] Story 1.3: …` — local story titles are now authored in bracket form, so the bracket case is the common one.
 5. Set `STORY_RELATIVE_PATH` = the path relative to the repo root.
-6. Derive the parent epic title from the grandparent directory. `EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")`. Read `${EPIC_DIR}/$(basename "$EPIC_DIR").md` and pull `title` from its frontmatter. Strip the `"Epic {E}: "` prefix → `EPIC_TITLE`. On failure, set `EPIC_TITLE=""`.
+6. Derive the parent epic title from the grandparent directory. `EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")`. Read `${EPIC_DIR}/$(basename "$EPIC_DIR").md` and pull `title` from its frontmatter. Strip any leading `Epic {E}: ` prefix (or an already-bracketed `[Epic {E}] ` prefix) → `EPIC_TITLE`. On failure, set `EPIC_TITLE=""`.
 
 ### Step S2: Check if Story Issue Already Exists
 

@@ -81,7 +81,7 @@ Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if pres
 
 Parse the epic number from the filename: `epic.{N}.` → `EPIC_N`.
 
-Strip any leading `"Epic {N}: "` prefix from `title` to get the bare display title: `EPIC_TITLE`.
+Strip any leading `Epic {N}: ` prefix (or an already-bracketed `[Epic {N}] ` prefix) from `title` to get the bare display title: `EPIC_TITLE`. The wrap below adds `[Epic {N}] ` once; stripping both forms prevents a double prefix like `[Epic 1] Epic 1: …`.
 
 Set `EPIC_RELATIVE_PATH` = the epic file path relative to the repo root.
 

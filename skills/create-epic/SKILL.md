@@ -158,7 +158,7 @@ target_completion: YYYY-MM-DD
 prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Parent PRD, or "brownfield-enhancement"
 ---
 
-# Epic [N]: {{Enhancement Name}} - Brownfield Enhancement
+# [Epic N] {{Enhancement Name}} - Brownfield Enhancement
 
 ## Epic Goal
 

@@ -80,7 +80,7 @@ The epic file must follow the standard format with YAML frontmatter:
 
 ```yaml
 ---
-title: "Epic N: Epic Name"
+title: "[Epic N] Epic Name"
 prd_source: "source-document.md"
 epic_type: "feature_enhancement"
 priority: "high"

@@ -1453,7 +1453,7 @@ Use sequential numbering within each story:
 
 ```markdown
 **Bug ID**: story.[epic].[story].bug.[bug-number].[description]
-**Related Story**: [Story [Epic]-[N]: [Story Name]](./story.[epic].[story].[name].md)
+**Related Story**: [[Story [Epic].N] [Story Name]](./story.[epic].[story].[name].md)
 **Status**: 🆕 New
 **Priority**: Critical | High | Medium | Low
 **Severity**: Blocker | Major | Minor | Trivial
