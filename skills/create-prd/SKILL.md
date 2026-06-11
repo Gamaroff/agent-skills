@@ -457,6 +457,21 @@ Score the PRD against these 6 signals. Each signal present = 1 point:
 3. Identify cross-epic dependencies (if any) and sequencing constraints
 4. Present as: _"I recommend [N] epics because [signal list]. Here is the proposed breakdown: [epic list with rationale]."_
 
+> **Do not artificially collapse into 3 epics if 4+ functional areas exist.** Merging distinct functional areas inflates story count beyond the 3–6 target, increases coupling, and eliminates parallelism opportunities.
+
+**Example — 4-epic breakdown:**
+
+A PRD covering authentication, notifications, data sync, and reporting spans 4 distinct functional areas. Collapsing "data sync" and "reporting" into one epic just to stay at 3 epics defeats the purpose of the breakdown. Correct split:
+
+| Epic | Functional Area | Rationale |
+|------|-----------------|-----------|
+| Epic 1 | Authentication & Identity | Foundation; other epics depend on it |
+| Epic 2 | Notifications | Isolated delivery channel; parallel-workable after Epic 1 |
+| Epic 3 | Data Sync | Backend-heavy; independent of notification UI |
+| Epic 4 | Reporting & Analytics | Read-only layer; depends on Epic 3 data model |
+
+Each epic is independent enough for a separate stream, targets 3–6 stories, and delivers testable value on its own.
+
 **Step 3 — For single epic (must justify):**
 
 If 0–2 signals, document explicitly: _"This PRD scores [N]/6 on the complexity rubric. A single epic is appropriate because [reason]."_
@@ -695,6 +710,7 @@ User: "Create a PRD for a new mobile app"
 ❌ **Vague requirements** — "Fast", "easy", "intuitive" are not requirements; replace with measurable criteria
 ❌ **Implementation leakage** — FRs describe capability, not implementation; no technology names in requirements
 ❌ **Defaulting to a single epic** — Always run the complexity assessment; complex PRDs warrant multiple epics
+❌ **Artificially collapsing epics** — If 4+ functional areas exist, do not merge them into 3 epics to appear concise; each distinct functional area warrants its own epic
 
 **Brownfield additional:**
 
