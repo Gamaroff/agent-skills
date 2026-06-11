@@ -128,6 +128,22 @@ function syncLabelFor(filePath) {
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
 }
 
+// Normalise the summary to the canonical "[Story N.N] {title}" form used by
+// create-story, ensure-story-github-issue, and review-story's dedup search.
+// The `title` frontmatter usually embeds a "Story N.N:" prefix, so strip
+// whatever prefix it carries (bracket or colon) and re-wrap in brackets,
+// falling back to the filename-derived id when the title carries none.
+// Idempotent: an already-correct "[Story N.N] …" summary is returned unchanged.
+function normaliseStorySummary(summary, fallbackId) {
+  const bracket = summary.match(/^\s*\[Story\s+([\d.]+)\]\s*(.*)$/i);
+  const colon   = summary.match(/^\s*Story\s+([\d.]+)\s*:\s*(.*)$/i);
+  let storyId = null;
+  if (bracket)    { storyId = bracket[1]; summary = bracket[2].trim(); }
+  else if (colon) { storyId = colon[1];   summary = colon[2].trim(); }
+  storyId = storyId || fallbackId;
+  return storyId ? `[Story ${storyId}] ${summary}` : summary;
+}
+
 // ---------------------------------------------------------------------------
 // Epic source path resolution
 // ---------------------------------------------------------------------------
@@ -381,11 +397,8 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     output.err("Error: Could not determine summary (set frontmatter title or # heading).");
     return { exitCode: 1 };
   }
-  // Prepend "Story N.N: " if not already present — derive from filename
-  if (!summary.match(/^Story\s+[\d.]+\s*:/i)) {
-    const storyIdMatch = path.basename(filePath).match(/^story\.([\d.]+)\./i);
-    if (storyIdMatch) summary = `Story ${storyIdMatch[1]}: ${summary}`;
-  }
+  // Normalise to the canonical "[Story N.N] {title}" bracket form (see helper).
+  summary = normaliseStorySummary(summary, path.basename(filePath).match(/^story\.([\d.]+)\./i)?.[1]);
 
   const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
   const livePriorities = (auth.ok && !args.dryRun)
@@ -627,6 +640,7 @@ if (require.main === module) {
     hashBody,
     hashMeta,
     syncLabelFor,
+    normaliseStorySummary,
     mapStatus,
     collectIssueFields,
     createStoryWithRetry,

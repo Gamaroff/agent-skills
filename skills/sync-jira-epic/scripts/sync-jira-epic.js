@@ -241,6 +241,22 @@ function syncLabelFor(filePath) {
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
 }
 
+// Normalise the summary to the canonical "[Epic N] {title}" bracket form
+// (parity with the story/task skills and the GitHub siblings). The `title`
+// frontmatter usually embeds an "Epic N:" prefix, so strip whatever prefix it
+// carries (bracket or colon) and re-wrap in brackets. `epicNumber` (from
+// frontmatter) takes precedence over any id the title carried; the title's id
+// is only a fallback. Idempotent: an already-correct "[Epic N] …" summary with
+// a matching id is returned unchanged.
+function normaliseEpicSummary(summary, epicNumber) {
+  const bracket = summary.match(/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i);
+  const colon   = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
+  let epicId = epicNumber != null ? String(epicNumber) : null;
+  if (bracket)    { epicId = epicId || bracket[1]; summary = bracket[2].trim(); }
+  else if (colon) { epicId = epicId || colon[1];   summary = colon[2].trim(); }
+  return epicId != null ? `[Epic ${epicId}] ${summary}` : summary;
+}
+
 // ---------------------------------------------------------------------------
 // Field collection
 //
@@ -439,10 +455,8 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     output.err("Error: Could not determine summary (set frontmatter title or # heading).");
     return { exitCode: 1 };
   }
-  // Prepend "Epic N: " if epic_number is set and not already present
-  if (frontmatter.epic_number != null && !summary.match(/^Epic\s+\d+\s*:/i)) {
-    summary = `Epic ${frontmatter.epic_number}: ${summary}`;
-  }
+  // Normalise to the canonical "[Epic N] {title}" bracket form (see helper).
+  summary = normaliseEpicSummary(summary, frontmatter.epic_number);
 
   const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
   const livePriorities = (auth.ok && !args.dryRun)
@@ -765,6 +779,7 @@ if (require.main === module) {
     hashBody,
     hashMeta,
     syncLabelFor,
+    normaliseEpicSummary,
     mapStatus,
     collectIssueFields,
     collectCommonFields,

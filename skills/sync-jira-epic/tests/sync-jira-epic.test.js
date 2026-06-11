@@ -540,3 +540,32 @@ test("parseArgs — --doc-branch absent defaults to null", () => {
   const opts = lib.parseArgs(["node", "script", "--file", "x.md"]);
   assert.equal(opts.docBranch, null);
 });
+
+// ---------------------------------------------------------------------------
+// normaliseEpicSummary — canonical "[Epic N] {title}" bracket form
+// ---------------------------------------------------------------------------
+test("normaliseEpicSummary — already-bracketed is unchanged (idempotent)", () => {
+  assert.equal(lib.normaliseEpicSummary("[Epic 1] Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — colon-prefixed is rewrapped in brackets", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 1: Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — bare title resolves id from epic_number", () => {
+  assert.equal(lib.normaliseEpicSummary("Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — no id resolvable leaves the summary unchanged", () => {
+  assert.equal(lib.normaliseEpicSummary("Foo", null), "Foo");
+  assert.equal(lib.normaliseEpicSummary("Foo", undefined), "Foo");
+});
+
+test("normaliseEpicSummary — epic_number wins over a stale prefix id", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 9: Foo", 1), "[Epic 1] Foo");
+  assert.equal(lib.normaliseEpicSummary("[Epic 9] Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — falls back to the title's prefix id when epic_number is absent", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 7: Foo", null), "[Epic 7] Foo");
+});

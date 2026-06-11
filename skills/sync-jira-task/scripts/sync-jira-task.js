@@ -144,6 +144,22 @@ function syncLabelFor(filePath) {
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
 }
 
+// Normalise the summary to the canonical "[Task N] {title}" bracket form
+// (parity with the story skill and the GitHub siblings). The `title`
+// frontmatter usually embeds a "Task N:" prefix, so strip whatever prefix it
+// carries (bracket or colon) and re-wrap in brackets, falling back to the
+// filename-derived id when the title carries none. Idempotent: an
+// already-correct "[Task N] …" summary is returned unchanged.
+function normaliseTaskSummary(summary, fallbackId) {
+  const bracket = summary.match(/^\s*\[Task\s+([\d.]+)\]\s*(.*)$/i);
+  const colon   = summary.match(/^\s*Task\s+([\d.]+)\s*:\s*(.*)$/i);
+  let taskId = null;
+  if (bracket)    { taskId = bracket[1]; summary = bracket[2].trim(); }
+  else if (colon) { taskId = colon[1];   summary = colon[2].trim(); }
+  taskId = taskId || fallbackId;
+  return taskId ? `[Task ${taskId}] ${summary}` : summary;
+}
+
 // ---------------------------------------------------------------------------
 // Field collection from frontmatter / args
 // ---------------------------------------------------------------------------
@@ -294,11 +310,8 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     output.err("Error: Could not determine summary (set frontmatter title or # heading).");
     return { exitCode: 1 };
   }
-  // Prepend "Task N: " if not already present — derive from filename
-  if (!summary.match(/^Task\s+[\d.]+\s*:/i)) {
-    const taskIdMatch = path.basename(filePath).match(/^task\.([\d.]+)\./i);
-    if (taskIdMatch) summary = `Task ${taskIdMatch[1]}: ${summary}`;
-  }
+  // Normalise to the canonical "[Task N] {title}" bracket form (see helper).
+  summary = normaliseTaskSummary(summary, path.basename(filePath).match(/^task\.([\d.]+)\./i)?.[1]);
 
   const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
   const livePriorities = (auth.ok && !args.dryRun)
@@ -520,6 +533,7 @@ if (require.main === module) {
     hashBody,
     hashMeta,
     syncLabelFor,
+    normaliseTaskSummary,
     mapStatus,
     collectIssueFields,
     TASK_SECTIONS,

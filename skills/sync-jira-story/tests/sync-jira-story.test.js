@@ -726,3 +726,23 @@ test("parseArgs — --doc-branch absent defaults to null", () => {
   const opts = lib.parseArgs(["node", "script", "--file", "x.md"]);
   assert.equal(opts.docBranch, null);
 });
+
+// ---------------------------------------------------------------------------
+// normaliseStorySummary — canonical "[Story N.N] {title}" bracket form
+// ---------------------------------------------------------------------------
+test("normaliseStorySummary — already-bracketed is unchanged (idempotent)", () => {
+  assert.equal(lib.normaliseStorySummary("[Story 1.3] Foo", "9.9"), "[Story 1.3] Foo");
+});
+
+test("normaliseStorySummary — colon-prefixed is rewrapped in brackets", () => {
+  assert.equal(lib.normaliseStorySummary("Story 1.3: Foo", "9.9"), "[Story 1.3] Foo");
+});
+
+test("normaliseStorySummary — bare title resolves id from the filename fallback", () => {
+  assert.equal(lib.normaliseStorySummary("Foo", "1.3"), "[Story 1.3] Foo");
+});
+
+test("normaliseStorySummary — no id resolvable leaves the summary unchanged", () => {
+  assert.equal(lib.normaliseStorySummary("Foo", undefined), "Foo");
+  assert.equal(lib.normaliseStorySummary("Foo", null), "Foo");
+});

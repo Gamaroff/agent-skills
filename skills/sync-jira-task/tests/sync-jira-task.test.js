@@ -739,3 +739,23 @@ test("parseArgs — --doc-branch absent defaults to null", () => {
   const opts = lib.parseArgs(["node", "script", "--file", "x.md"]);
   assert.equal(opts.docBranch, null);
 });
+
+// ---------------------------------------------------------------------------
+// normaliseTaskSummary — canonical "[Task N] {title}" bracket form
+// ---------------------------------------------------------------------------
+test("normaliseTaskSummary — already-bracketed is unchanged (idempotent)", () => {
+  assert.equal(lib.normaliseTaskSummary("[Task 5] Foo", "9"), "[Task 5] Foo");
+});
+
+test("normaliseTaskSummary — colon-prefixed is rewrapped in brackets", () => {
+  assert.equal(lib.normaliseTaskSummary("Task 5: Foo", "9"), "[Task 5] Foo");
+});
+
+test("normaliseTaskSummary — bare title resolves id from the filename fallback", () => {
+  assert.equal(lib.normaliseTaskSummary("Foo", "5"), "[Task 5] Foo");
+});
+
+test("normaliseTaskSummary — no id resolvable leaves the summary unchanged", () => {
+  assert.equal(lib.normaliseTaskSummary("Foo", undefined), "Foo");
+  assert.equal(lib.normaliseTaskSummary("Foo", null), "Foo");
+});
