@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.15.2] - 2026-06-15
+
 ### Fixed
 - **`develop-pipeline` Step 3 high-risk gate no longer references a stale Q3 answer:** the high-risk gate bullets in `develop-pipeline-step-3-develop-loop.md` previously conditioned on a Q3 answer from Upfront Setup that was removed when `qa-planning` was made fully silent/automatic (no user question). Both bullets (develop-story and develop-task) now unconditionally auto-select "Skip" and log `high-risk gate: auto-skipped qa-planning` in the Decisions Log. Bundled copies in `skills/develop-story/references/` and `skills/develop-task/references/` updated to match.
 
