@@ -35,6 +35,11 @@ prd:
 architecture:
   architectureShardedLocation: docs/architecture   # root for architecture docs
 
+jira:
+  statusMap:                          # optional — local status → Jira workflow status name
+    ready-for-development: Selected for Development
+    ready-for-review: In Review
+
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 ```
@@ -48,6 +53,7 @@ devLoadAlwaysFiles:
 | `prd.prdShardedLocation` | path | `docs/prd` | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills. |
 | `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md) |
 | `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
+| `jira.statusMap` | map[string→string] | (built-in defaults) | Maps local document status → the literal Jira workflow status name to transition to. See [Jira status mapping](#jira-status-mapping). |
 
 ## QA artifacts are co-located
 
@@ -62,6 +68,44 @@ story directory:
 ```
 
 Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
+
+## Jira status mapping
+
+The `sync-jira-{story,task,epic}` skills transition the Jira issue to match the local document's
+`status` field. Because Jira workflows use project-specific status names, the skills translate the
+canonical local status (`shared/resources/document-status-lifecycle.md`) to a Jira status name before
+looking for a matching transition.
+
+**Built-in defaults** (used when `jira.statusMap` is absent — suitable for a vanilla Jira workflow):
+
+| Local status (frontmatter) | Default Jira target |
+|---|---|
+| `draft`, `planned`, `ready-for-development` | `To Do` |
+| `in-progress` | `In Progress` |
+| `ready-for-review` | `In Review` |
+| `accepted` | `Done` |
+| `cancelled` | `Cancelled` |
+
+If your Jira workflow uses different vocabulary (e.g. "Selected for Development" instead of "To Do"),
+override the entries you need under `jira.statusMap`. Keys are the lowercase-kebab local statuses; values
+are the **literal Jira workflow status names** (matched case-insensitively against the issue's available
+transitions). Your overrides are merged over the defaults — list only what differs:
+
+```yaml
+jira:
+  statusMap:
+    ready-for-development: Selected for Development
+    ready-for-review: Code Review
+    accepted: Shipped
+```
+
+Notes:
+
+- A local status with no mapping (and no default) passes through verbatim to Jira's transition matcher,
+  so custom statuses still work without configuration.
+- If no available transition matches the resolved target, the sync logs a non-fatal warning listing the
+  available transition names and skips the status change — the rest of the issue still syncs.
+- Matching is **by name only** (per [`jira-transition-protocol.md`](../../shared/resources/jira-transition-protocol.md)); the skills never guess a transition by status category.
 
 ## Worked example — typical project
 

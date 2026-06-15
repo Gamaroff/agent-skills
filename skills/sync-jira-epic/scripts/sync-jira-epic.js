@@ -22,31 +22,6 @@ const VERSION = "1.2.0";
 
 const EPIC_SECTIONS = ["Epic Goal", "Epic Description"];
 
-const STATUS_MAP = {
-  "planned": "To Do",
-  "todo": "To Do",
-  "to do": "To Do",
-  "open": "To Do",
-  "backlog": "To Do",
-  "in progress": "In Progress",
-  "in-progress": "In Progress",
-  "doing": "In Progress",
-  "in review": "In Review",
-  "review": "In Review",
-  "ready for review": "In Review",
-  "ready": "Ready",
-  "done": "Done",
-  "completed": "Done",
-  "complete": "Done",
-  "blocked": "Blocked",
-  "cancelled": "Cancelled",
-  "canceled": "Cancelled",
-  "won't do": "Won't Do",
-  "wont do": "Won't Do",
-  "won't fix": "Won't Do",
-  "wontfix": "Won't Do",
-};
-
 const ISSUE_TYPE = "Epic";
 const SYNC_LABEL_PREFIX = "synced-from-";
 
@@ -347,15 +322,6 @@ function updateEpicFile({ filePath, issueKey, issueUrl, epicBbUrl, prdBbUrl, cha
     output.err(`   jira_key: "${issueKey}"`);
     output.err(`   jira_url: "${issueUrl}"`);
   }
-}
-
-// ---------------------------------------------------------------------------
-// Status mapping
-// ---------------------------------------------------------------------------
-function mapStatus(raw) {
-  if (!raw) return null;
-  const stripped = lib.stripStatusEmoji(raw).toLowerCase();
-  return STATUS_MAP[stripped] || lib.stripStatusEmoji(raw);
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +676,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   // Status transition
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
-    const target = mapStatus(frontmatter.status);
+    const target = lib.mapStatus(frontmatter.status, lib.loadStatusMap());
     const currentStatus = current?.status || null;
     await lib.transitionToStatus({
       http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
@@ -780,7 +746,8 @@ if (require.main === module) {
     hashMeta,
     syncLabelFor,
     normaliseEpicSummary,
-    mapStatus,
+    mapStatus: lib.mapStatus,
+    loadStatusMap: lib.loadStatusMap,
     collectIssueFields,
     collectCommonFields,
     collectCreateFields,
@@ -791,7 +758,7 @@ if (require.main === module) {
     inlineToAdfNodes,
     splitTableRow,
     EPIC_SECTIONS,
-    STATUS_MAP,
+    STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     VERSION,
     CHANGELOG_DESCRIPTION_LIMIT,
     STORY_REQUIREMENTS_TEXT,

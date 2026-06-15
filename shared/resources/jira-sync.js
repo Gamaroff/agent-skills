@@ -764,6 +764,116 @@ async function moveToBacklog({ http, baseUrl, email, token, boardId, issueKey, o
 }
 
 // ---------------------------------------------------------------------------
+// Status mapping (local document status -> Jira workflow status name)
+// ---------------------------------------------------------------------------
+// Single source of truth shared by sync-jira-{story,task,epic}. Covers the full
+// canonical lifecycle (see the document-status-lifecycle spec) plus the
+// historical aliases. Keys are lowercased; values are literal Jira status names
+// matched against transition `to.name`. Projects with custom workflow vocabulary
+// override via skills-config.yaml `jira.statusMap` (see loadStatusMap).
+const DEFAULT_STATUS_MAP = {
+  // canonical lifecycle
+  "draft": "To Do",
+  "planned": "To Do",
+  "ready-for-development": "To Do",
+  "in-progress": "In Progress",
+  "ready-for-review": "In Review",
+  "accepted": "Done",
+  "cancelled": "Cancelled",
+  // aliases
+  "ready for development": "To Do",
+  "todo": "To Do",
+  "to do": "To Do",
+  "open": "To Do",
+  "backlog": "To Do",
+  "in progress": "In Progress",
+  "doing": "In Progress",
+  "ready for review": "In Review",
+  "in review": "In Review",
+  "review": "In Review",
+  "ready": "Ready",
+  "done": "Done",
+  "completed": "Done",
+  "complete": "Done",
+  "blocked": "Blocked",
+  "canceled": "Cancelled",
+  "won't do": "Won't Do",
+  "wont do": "Won't Do",
+  "won't fix": "Won't Do",
+  "wontfix": "Won't Do",
+};
+
+// Parse a `jira:` → `statusMap:` block out of skills-config.yaml text. Kept to
+// a self-contained indentation scanner (no YAML dependency — pyyaml is not
+// reliably installed in consumer environments). Supports the documented block
+// form only; returns {} for anything it can't read.
+//
+//   jira:
+//     statusMap:
+//       ready-for-development: Selected for Development
+//       accepted: "Done"
+function parseStatusMapBlock(text) {
+  const out = {};
+  const lines = String(text || "").split("\n");
+  const indentOf = l => l.length - l.replace(/^\s+/, "").length;
+  let i = 0;
+  // find top-level `jira:`
+  for (; i < lines.length; i++) {
+    if (/^jira:\s*$/.test(lines[i])) { i++; break; }
+  }
+  if (i >= lines.length) return out;
+  const jiraIndent = 0;
+  // find `statusMap:` nested under jira
+  let smIndent = -1;
+  for (; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    if (indentOf(raw) <= jiraIndent) return out; // left the jira block
+    if (/^\s+statusMap:\s*$/.test(raw)) { smIndent = indentOf(raw); i++; break; }
+  }
+  if (smIndent < 0) return out;
+  // collect `key: value` entries indented deeper than statusMap
+  for (; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    if (indentOf(raw) <= smIndent) break; // end of statusMap block
+    const m = raw.trim().match(/^("?[^":]+"?|'[^']+'):\s*(.+?)\s*$/);
+    if (!m) continue;
+    const key = m[1].replace(/^["']|["']$/g, "").trim();
+    const val = m[2].replace(/^["']|["']$/g, "").trim();
+    if (key && val) out[key] = val;
+  }
+  return out;
+}
+
+// Build the effective status map: DEFAULT_STATUS_MAP overlaid with any
+// `jira.statusMap` entries from skills-config.yaml at the repo root. Override
+// keys are lowercased so lookups stay case-insensitive. Any failure (no file,
+// unreadable, parse error) falls back to the defaults unchanged.
+function loadStatusMap(repoRoot) {
+  const map = { ...DEFAULT_STATUS_MAP };
+  try {
+    const root = repoRoot || execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const cfgPath = path.join(root, "skills-config.yaml");
+    if (!fs.existsSync(cfgPath)) return map;
+    const overrides = parseStatusMapBlock(fs.readFileSync(cfgPath, "utf-8"));
+    for (const [k, v] of Object.entries(overrides)) {
+      if (typeof v === "string" && v.trim()) map[String(k).toLowerCase()] = v;
+    }
+  } catch (_) {}
+  return map;
+}
+
+// Map a raw frontmatter status to its Jira target name. Strips emoji,
+// lowercases, looks up in `statusMap`; unmapped values pass through verbatim
+// (emoji-stripped) for custom workflows.
+function mapStatus(raw, statusMap = DEFAULT_STATUS_MAP) {
+  if (!raw) return null;
+  const stripped = stripStatusEmoji(raw);
+  return statusMap[stripped.toLowerCase()] || stripped;
+}
+
+// ---------------------------------------------------------------------------
 // Status transitions
 // ---------------------------------------------------------------------------
 function stripStatusEmoji(s) {
@@ -789,7 +899,12 @@ async function transitionToStatus({ http, baseUrl, email, token, issueKey, targe
   const match = transitions.find(t => (t.to?.name || "").toLowerCase() === target.toLowerCase()) ||
                 transitions.find(t => (t.name || "").toLowerCase() === target.toLowerCase());
   if (!match) {
-    if (output) output.warn(`⚠️  No transition to "${target}" available from "${current}". Skipping status change.`);
+    if (output) {
+      const available = transitions.map(t => t.to?.name || t.name).filter(Boolean);
+      const avail = available.length ? available.join(", ") : "(none)";
+      output.warn(`⚠️  No Jira transition to "${target}" from "${current}". Available: ${avail}.`);
+      output.warn(`    Map your local status to a workflow name in skills-config.yaml under jira.statusMap. Skipping status change.`);
+    }
     return { transitioned: false, reason: "no-transition" };
   }
   const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}/transitions`, {
@@ -973,6 +1088,8 @@ module.exports = {
   fetchIssue, fetchUpdatedTimestampStrict, fetchUpdatedTimestamp, getIssueTypeId, getBoardType, moveToBacklog,
   putIssueAtomic, findExistingByLabel, transitionToStatus, getTransitions, stripStatusEmoji,
   detectProjectStyle,
+  // status mapping
+  DEFAULT_STATUS_MAP, loadStatusMap, mapStatus,
   // cache
   readIssueTypeCache, writeIssueTypeCache, readProjectStyleCache, writeProjectStyleCache,
 };

@@ -311,6 +311,30 @@ test("mapStatus — won't do variants normalise", () => {
   assert.equal(lib.mapStatus("wont do"), "Won't Do");
 });
 
+test("mapStatus — covers the full canonical lifecycle (no passthrough)", () => {
+  assert.equal(lib.mapStatus("draft"), "To Do");
+  assert.equal(lib.mapStatus("ready-for-development"), "To Do");
+  assert.equal(lib.mapStatus("ready-for-review"), "In Review");
+  assert.equal(lib.mapStatus("accepted"), "Done");
+  assert.equal(lib.mapStatus("cancelled"), "Cancelled");
+});
+
+test("mapStatus — honours a project-supplied status map", () => {
+  const custom = { "ready-for-development": "Selected for Development" };
+  assert.equal(lib.mapStatus("ready-for-development", custom), "Selected for Development");
+});
+
+test("loadStatusMap — merges jira.statusMap over defaults", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-epic-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    accepted: Shipped\n");
+  const map = lib.loadStatusMap(dir);
+  assert.equal(map["accepted"], "Shipped");
+  assert.equal(map["in-progress"], "In Progress");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 // ---------------------------------------------------------------------------
 // findExistingByLabel — POST /search/jql shape
 // ---------------------------------------------------------------------------

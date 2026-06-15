@@ -531,6 +531,30 @@ test("mapStatus — strips emoji and maps to Jira canonical status", () => {
   assert.equal(task.mapStatus(null), null);
 });
 
+test("mapStatus — covers the full canonical lifecycle (no passthrough)", () => {
+  assert.equal(task.mapStatus("draft"), "To Do");
+  assert.equal(task.mapStatus("ready-for-development"), "To Do");
+  assert.equal(task.mapStatus("ready-for-review"), "In Review");
+  assert.equal(task.mapStatus("accepted"), "Done");
+  assert.equal(task.mapStatus("cancelled"), "Cancelled");
+});
+
+test("mapStatus — honours a project-supplied status map", () => {
+  const custom = { "ready-for-development": "Selected for Development" };
+  assert.equal(task.mapStatus("ready-for-development", custom), "Selected for Development");
+});
+
+test("loadStatusMap — merges jira.statusMap over defaults", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-task-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    accepted: Shipped\n");
+  const map = task.loadStatusMap(dir);
+  assert.equal(map["accepted"], "Shipped");
+  assert.equal(map["in-progress"], "In Progress");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("syncLabelFor — derives stable label from task dir name", () => {
   const label = task.syncLabelFor("/repo/docs/tasks/task.1.cache-lib/task.1.cache-lib.md");
   assert.equal(label, "synced-from-task.1.cache-lib");

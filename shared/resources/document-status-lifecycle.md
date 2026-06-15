@@ -143,6 +143,27 @@ Both lines change in the same commit.
 
 ---
 
+## External Tracker Mapping (Jira)
+
+These statuses are the **local** vocabulary. When a document is synced to Jira, the
+`sync-jira-{story,task,epic}` skills translate the local status to a Jira workflow status name and
+transition the issue to match.
+
+Default mapping (vanilla Jira workflow):
+
+| Local status | Default Jira status |
+|---|---|
+| `draft`, `planned`, `ready-for-development` | `To Do` |
+| `in-progress` | `In Progress` |
+| `ready-for-review` | `In Review` |
+| `accepted` | `Done` |
+| `cancelled` | `Cancelled` |
+
+Projects whose Jira workflow uses different status names (e.g. "Selected for Development") override the
+mapping under `jira.statusMap` in `skills-config.yaml`. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping) for the full reference. Matching is by name only — see [`jira-transition-protocol.md`](jira-transition-protocol.md).
+
+---
+
 ## Allow-List Validation
 
 Run this snippet to verify every `status:` value written by skills is in the canonical allow-list:

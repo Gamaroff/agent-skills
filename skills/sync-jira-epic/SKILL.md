@@ -171,20 +171,23 @@ Flow:
 
 ## Status Transitions
 
-Frontmatter `status` is normalised by stripping emoji, lower-casing, and mapping through:
+Frontmatter `status` is normalised by stripping emoji and lower-casing, then mapped to a Jira workflow
+status name via the shared default map (overlaid with any `jira.statusMap` overrides from
+`skills-config.yaml`). Defaults for a vanilla Jira workflow:
 
-| Frontmatter status | Jira target |
+| Local status | Default Jira target |
 |---|---|
-| `Planned`, `To Do`, `Open`, `Todo`, `Backlog` | `To Do` |
-| `In Progress`, `Doing`, `In-Progress` | `In Progress` |
-| `In Review`, `Review`, `Ready For Review` | `In Review` |
-| `Ready` | `Ready` |
-| `Done`, `Completed`, `Complete` | `Done` |
-| `Blocked` | `Blocked` |
-| `Cancelled`, `Canceled` | `Cancelled` |
-| `Won't Do`, `Wont Do`, `Won't Fix`, `Wontfix` | `Won't Do` |
+| `draft`, `planned`, `ready-for-development`, `backlog` | `To Do` |
+| `in-progress` | `In Progress` |
+| `ready-for-review`, `in review` | `In Review` |
+| `ready` | `Ready` |
+| `accepted` | `Done` |
+| `cancelled` | `Cancelled` |
+| `won't do` | `Won't Do` |
 
-The script then fetches `/rest/api/3/issue/{key}/transitions` and matches by `to.name` (or `name` as a fallback). If no matching transition is available, a warning is emitted and sync still succeeds.
+The script then fetches `/rest/api/3/issue/{key}/transitions` and matches the resolved target by `to.name` (or `name` as a fallback), case-insensitively. If no matching transition is available, a warning naming the available transitions is emitted and sync still succeeds.
+
+**Custom workflow vocabulary.** If your Jira workflow uses different status names (e.g. "Selected for Development"), map them under `jira.statusMap` in `skills-config.yaml`. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping). Any status with no mapping passes through verbatim to Jira's transition matcher.
 
 ## Idempotent Create
 

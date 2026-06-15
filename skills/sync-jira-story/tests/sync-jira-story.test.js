@@ -383,6 +383,48 @@ test("mapStatus — empty/null returns null", () => {
   assert.equal(lib.mapStatus(undefined), null);
 });
 
+test("mapStatus — covers the full canonical lifecycle (no passthrough)", () => {
+  // Regression: draft/ready-for-review/accepted were previously missing from
+  // the map and leaked through verbatim, producing no Jira transition.
+  assert.equal(lib.mapStatus("draft"), "To Do");
+  assert.equal(lib.mapStatus("planned"), "To Do");
+  assert.equal(lib.mapStatus("ready-for-development"), "To Do");
+  assert.equal(lib.mapStatus("in-progress"), "In Progress");
+  assert.equal(lib.mapStatus("ready-for-review"), "In Review");
+  assert.equal(lib.mapStatus("accepted"), "Done");
+  assert.equal(lib.mapStatus("cancelled"), "Cancelled");
+});
+
+test("mapStatus — honours a project-supplied status map (custom workflow vocab)", () => {
+  // frontmatter status is lowercase-kebab; the map is keyed accordingly
+  const custom = { "ready-for-development": "Selected for Development" };
+  assert.equal(lib.mapStatus("ready-for-development", custom), "Selected for Development");
+  assert.equal(lib.mapStatus("📋 Ready-for-development", custom), "Selected for Development");
+  // unmapped keys still pass through emoji-stripped
+  assert.equal(lib.mapStatus("Code Review", custom), "Code Review");
+});
+
+test("loadStatusMap — merges skills-config.yaml jira.statusMap over defaults", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    ready-for-development: Selected for Development\n    accepted: Shipped\n");
+  const map = lib.loadStatusMap(dir);
+  assert.equal(map["ready-for-development"], "Selected for Development"); // override wins
+  assert.equal(map["accepted"], "Shipped");                              // override wins
+  assert.equal(map["in-progress"], "In Progress");                       // default retained
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadStatusMap — falls back to defaults when no config present", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-none-"));
+  const map = lib.loadStatusMap(dir);
+  assert.equal(map["ready-for-development"], "To Do");
+  assert.equal(map["accepted"], "Done");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 // ---------------------------------------------------------------------------
 // syncLabelFor
 // ---------------------------------------------------------------------------

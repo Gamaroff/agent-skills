@@ -20,23 +20,6 @@ const lib = require("../references/jira-sync.js");
 // ---------------------------------------------------------------------------
 const STORY_SECTIONS = ["User Story", "Acceptance Criteria", "Description"];
 
-const STATUS_MAP = {
-  "planned": "To Do",
-  "todo": "To Do",
-  "to do": "To Do",
-  "open": "To Do",
-  "ready-for-development": "To Do",
-  "in progress": "In Progress",
-  "in-progress": "In Progress",
-  "doing": "In Progress",
-  "done": "Done",
-  "completed": "Done",
-  "complete": "Done",
-  "blocked": "Blocked",
-  "cancelled": "Cancelled",
-  "canceled": "Cancelled",
-};
-
 const ISSUE_TYPE = "Story";
 const SYNC_LABEL_PREFIX = "synced-from-";
 const EPIC_LINK_FIELD = process.env.JIRA_EPIC_LINK_FIELD || "customfield_10014";
@@ -298,15 +281,6 @@ function updateStoryFile({ filePath, issueKey, issueUrl, epicKey, epicBbUrl, sto
   content = lib.upsertChangelog(content, changeEntry);
   fs.writeFileSync(filePath, content, "utf-8");
   output.info(`\n📝 Updated local story file: ${filePath}`);
-}
-
-// ---------------------------------------------------------------------------
-// Status mapping
-// ---------------------------------------------------------------------------
-function mapStatus(raw) {
-  if (!raw) return null;
-  const stripped = lib.stripStatusEmoji(raw).toLowerCase();
-  return STATUS_MAP[stripped] || lib.stripStatusEmoji(raw);
 }
 
 // ---------------------------------------------------------------------------
@@ -574,7 +548,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   // Status transition
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
-    const target = mapStatus(frontmatter.status);
+    const target = lib.mapStatus(frontmatter.status, lib.loadStatusMap());
     const currentStatus = current?.status || postCreateStatus || null;
     await lib.transitionToStatus({
       http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
@@ -641,14 +615,15 @@ if (require.main === module) {
     hashMeta,
     syncLabelFor,
     normaliseStorySummary,
-    mapStatus,
+    mapStatus: lib.mapStatus,
+    loadStatusMap: lib.loadStatusMap,
     collectIssueFields,
     createStoryWithRetry,
     resolveEpicPath,
     upsertInlineLine,
     withCodeBlocksMasked,
     STORY_SECTIONS,
-    STATUS_MAP,
+    STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     EPIC_LINK_FIELD,
     // Re-export lib pieces for tests
     parseFrontmatter:        lib.parseFrontmatter,

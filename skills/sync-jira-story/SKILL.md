@@ -183,19 +183,21 @@ Flow:
 
 ## Status Transitions
 
-Frontmatter `status` is normalised by stripping emoji, lower-casing, and mapping through:
+Frontmatter `status` is normalised by stripping emoji and lower-casing, then mapped to a Jira workflow
+status name via the shared default map (overlaid with any `jira.statusMap` overrides from
+`skills-config.yaml`). Defaults for a vanilla Jira workflow:
 
-| Frontmatter status | Jira target |
+| Local status | Default Jira target |
 |---|---|
-| `Planned`, `To Do`, `Open`, `Todo` | `To Do` |
-| `In Progress`, `Doing`, `In-Progress` | `In Progress` |
-| `Done`, `Completed`, `Complete` | `Done` |
-| `Blocked` | `Blocked` |
-| `Cancelled`, `Canceled` | `Cancelled` |
+| `draft`, `planned`, `ready-for-development` | `To Do` |
+| `in-progress` | `In Progress` |
+| `ready-for-review` | `In Review` |
+| `accepted` | `Done` |
+| `cancelled` | `Cancelled` |
 
-The script then fetches `/rest/api/3/issue/{key}/transitions` and matches by `to.name` (or `name` as a fallback). If no matching transition is available, a warning is emitted and sync still succeeds.
+The script then fetches `/rest/api/3/issue/{key}/transitions` and matches the resolved target by `to.name` (or `name` as a fallback), case-insensitively. If no matching transition is available, a warning naming the available transitions is emitted and sync still succeeds.
 
-**Custom workflow passthrough.** Statuses not in the table above (e.g. `Code Review`, `In Review`, `Ready`) are stripped of emoji and passed through verbatim to Jira's transition matcher. So a frontmatter `status: "🔍 Code Review"` will resolve to whatever transition Jira exposes named `Code Review`, if your workflow defines one. Values are matched case-insensitively against `to.name` first, then `name`. This lets the skill drive non-default workflows without code changes.
+**Custom workflow vocabulary.** If your Jira workflow uses different status names (e.g. "Selected for Development"), map them under `jira.statusMap` in `skills-config.yaml` — keys are the lowercase-kebab local statuses, values are the literal Jira status names. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping). Any status with no mapping passes through verbatim to Jira's transition matcher, so custom statuses still work without configuration.
 
 ## Idempotent Create
 
