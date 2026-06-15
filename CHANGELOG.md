@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.15.1] - 2026-06-15
+
 ### Fixed
 - **`sync-jira-{story,task,epic}` status mapping consolidated and made configurable:** three defects addressed. (1) `draft`, `ready-for-review`, and `accepted` were absent from all per-skill `STATUS_MAP` constants and leaked verbatim to Jira's transition matcher, causing failures on any Jira workflow. The three maps had also drifted (epic was a superset of story/task). (2) Transition target names were hardcoded (`To Do` / `In Progress` / `Done`), preventing projects using custom workflow names (e.g. `Selected for Development`) from overriding them. Fixed by adding a `DEFAULT_STATUS_MAP` (full-lifecycle superset covering all canonical statuses and historical aliases), a `loadStatusMap()` function (reads `jira.statusMap` from `skills-config.yaml` and merges with the default), and a shared `mapStatus()` helper in `shared/resources/jira-sync.js`; per-skill duplicate `STATUS_MAP` consts and `mapStatus()` copies removed. The no-match warning now lists available Jira transition names and points at `jira.statusMap`. `docs/reference/configuration.md` documents the new `jira.statusMap` key with a defaults table, override example, and behaviour notes; `shared/resources/document-status-lifecycle.md` gains an "External Tracker Mapping (Jira)" section.
 
