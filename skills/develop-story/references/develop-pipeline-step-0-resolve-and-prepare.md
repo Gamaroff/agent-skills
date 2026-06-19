@@ -149,30 +149,39 @@ Prompt template (pass verbatim to Explore subagent):
 ```
 Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{epic}.{story}.*.md under docs/).
 
-Evaluate the three lite-mode conditions (all three must be true for PIPELINE_MODE=lite):
-  1. risk_level: frontmatter field is "low" or absent
-  2. Fewer than 3 Tasks defined (for stories) or fewer than 3 implementation phases (for tasks) in the body
-  3. Document mentions a single module / app (scope restricted to one lib or app)
+RUN the lite-mode CLI — do NOT re-evaluate the FR3/FR17 conditions in prose. The CLI calls the
+production parsers (`parseLiteModeInputs` / `decideLiteMode` / `parseSuccessCriteria`), so its decision
+is byte-identical to the running pipeline's:
+
+  npm run lite-mode -- {file_path}
+    (or, if npm scripts are unavailable: node --experimental-strip-types scripts/lite-mode.ts {file_path})
+
+It prints one compact JSON line:
+  { "risk_level", "phase_count", "single_module", "pipeline_mode", "has_success_criteria_table", "ac_count" }
+
+If the CLI cannot be run (missing script / non-zero exit), fall back to evaluating the three lite-mode
+conditions in prose (risk_level low/absent; fewer than 3 Tasks/phases; single module) and log the fallback.
 
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
   - Source `references/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
-Detect whether the doc has a structured criteria table that the QA traceability mapper can consume:
-  - For stories: a "## Acceptance Criteria" section with at least one numbered item or AC sub-heading.
-  - For tasks: a "## Success Criteria" section with at least one table row or numbered item.
-  - Return `has_success_criteria_table: true` if either is present, else false.
+MERGE the CLI's JSON fields with your own skills-config discovery into the return shape below — do NOT
+return the CLI JSON verbatim (that would drop `skills_config_exists` / `always_load_files` and break
+always-load resolution). `has_success_criteria_table` and `ac_count` come from the CLI; the structured-
+criteria meaning is unchanged (## Acceptance Criteria for stories, ## Success Criteria for tasks).
 
-Return compact JSON:
+Return compact JSON (CLI fields + your discovery):
 {
   "risk_level": "low|medium|high|absent",
   "phase_count": <integer>,
   "single_module": true|false,
   "pipeline_mode": "lite|standard",
+  "has_success_criteria_table": true|false,
+  "ac_count": <integer>,
   "skills_config_exists": true|false,
-  "always_load_files": ["path1", "path2"],
-  "has_success_criteria_table": true|false
+  "always_load_files": ["path1", "path2"]
 }
 ```
 
@@ -187,13 +196,23 @@ LITEMODE_RESULT  ← Agent 3 result (compact JSON)
 
 TASK_FILE      = RESOLVER_RESULT.absolute_file_path   (or already known from inline resolution)
 TASK_DIR       = RESOLVER_RESULT.task_or_story_directory
-PIPELINE_MODE  = LITEMODE_RESULT.pipeline_mode          (default: "standard" on failure)
+# Defence-in-depth: RECOMPUTE PIPELINE_MODE from the CLI's already-computed booleans rather than
+# trusting the free-form `pipeline_mode` string. This mechanical boolean AND of pre-computed values is
+# NOT a prose re-derivation of FR3 — it cannot drift, and a malformed `pipeline_mode` field can never
+# override the rule. `risk_ok` is SET MEMBERSHIP — accept ONLY {"low", "absent"}; reject "medium" /
+# "high" / anything else (matching production decideLiteMode's low/undefined-only semantics). Do NOT use
+# a truthy or substring check.
+risk_ok        = LITEMODE_RESULT.risk_level ∈ {"low", "absent"}
+PIPELINE_MODE  = (risk_ok AND LITEMODE_RESULT.phase_count < 3 AND LITEMODE_RESULT.single_module)
+                   ? "lite" : "standard"        (default: "standard" on Agent-3 failure)
+                 # If this recompute disagrees with LITEMODE_RESULT.pipeline_mode, prefer the recompute
+                 # and log the discrepancy in the Issues Log.
 ALWAYS_LOAD_FILES = LITEMODE_RESULT.always_load_files   (default: [] on failure)
 HAS_SUCCESS_CRITERIA_TABLE = LITEMODE_RESULT.has_success_criteria_table   (default: false on failure)
 TRACKER_STATE  = TRACKER_RESULT                         (null fields on failure)
 ```
 
-Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE and ALWAYS_LOAD_FILES determined.
+Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE (and whether the boolean recompute disagreed with the CLI's `pipeline_mode`) and ALWAYS_LOAD_FILES determined.
 
 ### Failure handling
 
@@ -305,7 +324,7 @@ fi
 
 **Note (tasks only)**: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations.
 
-**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3). Use `LITEMODE_RESULT.pipeline_mode` directly — do not re-evaluate conditions inline. See `references/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
+**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3), which **runs the production lite-mode CLI**. The Aggregation block then recomputes `PIPELINE_MODE` from the CLI's already-computed booleans (`risk_ok ∈ {low,absent} AND phase_count < 3 AND single_module`) as defence-in-depth. This mechanical boolean AND of pre-computed values is permitted — it is **not** the forbidden prose re-derivation of the FR3 rule from the document (which the CLI now owns). Do **not** re-parse the document's headings yourself. See `references/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
 
 ---
 

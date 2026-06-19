@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- **`develop-task` SKILL.md gains an "Execution Surfaces" section (task.16 / M2):** documents that the skill (Claude Code orchestrator) and the Mastra `developTaskWorkflow` are two surfaces of the same 8-stage pipeline, lists the four opt-in approval gates (`review-clarifications`, `qa-clarifications`, `pre-finalise`, `on-halt`) and their default-off/autonomous semantics, and states the inactive-`on-halt` HALT-artifact difference (the workflow emits a terminal `halt` without the skill's report-entry / tracker-comment / lock-snapshot artifacts).
+
+### Changed
+- **`develop-pipeline` Phase-0 lite-mode detector (Agent 3) now runs a deterministic CLI instead of re-deriving the FR3 rule in prose (task.16 / M3):** the detector shells out to the consumer's `npm run lite-mode -- <doc>` (a pure CLI wrapping the production `parseLiteModeInputs` / `decideLiteMode` / `parseSuccessCriteria`), merges the result with its own skills-config discovery (adding `ac_count`, preserving `skills_config_exists` / `always_load_files`), and the Aggregation block recomputes `PIPELINE_MODE` from the returned booleans (`risk_level ∈ {low,absent} AND phase_count < 3 AND single_module`) as defence-in-depth. The "do not re-evaluate conditions inline" guidance is revised to permit this mechanical boolean AND of pre-computed values (distinct from the forbidden prose re-derivation of the rule from the document). A prose fallback remains if the CLI is unavailable. Bundled copies in all four `develop-*`/`qa-*` skills updated to match.
+
 ## [v0.15.2] - 2026-06-15
 
 ### Fixed
