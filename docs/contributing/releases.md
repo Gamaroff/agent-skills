@@ -17,10 +17,10 @@ This repository is a **library of skills**, not a single versioned application. 
 Before cutting a repo release:
 
 - [ ] `test.yml` CI workflow is green on the release commit — covers `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
-- [ ] Skill catalog is current: `npm run generate-catalog` then commit any diff
 - [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release
-- [ ] No skills have outdated `shared/resources/*` references — `package_skill.py` validation passes for all skills
 - [ ] `validate.yml` CI workflow is green on the release commit
+
+> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed.
 
 ## Branch flow
 
@@ -96,14 +96,18 @@ bash scripts/release.sh --major   # breaking changes
 
 # Preview without writing anything:
 bash scripts/release.sh --dry-run --minor
+
+# Skip the automatic develop sync:
+bash scripts/release.sh --patch --no-sync-develop
 ```
 
 The script:
 1. Confirms you're on `main` with a clean, up-to-date working tree
-2. Runs `npm test`, `npm run validate:all`, and `npm run generate-catalog` — fails fast on any red
+2. Runs `npm test`, `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files
 3. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
 4. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
 5. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
+6. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
 
 The GitHub Actions workflow then handles release creation. No manual `gh release create` needed.
 
@@ -111,7 +115,7 @@ The GitHub Actions workflow then handles release creation. No manual `gh release
 
 `release.sh` adds a `chore(release): vX.Y.Z` commit and an annotated tag on `main`, then pushes both. **Develop is now behind `main`** by the chore(release) commit (and, for the PR-based path, also by the PR merge commit — whichever artefact `--merge`, `--rebase`, or `--squash` produced). This is true regardless of which branch-flow variant you used to advance `main`.
 
-Sync develop forward:
+`release.sh` handles this automatically at the end of every fresh release — it checks out `develop`, rebases, merges `main`, pushes, and returns to `main`. Pass `--no-sync-develop` to skip and run it manually:
 
 ```bash
 git checkout develop

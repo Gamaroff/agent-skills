@@ -7,15 +7,18 @@
 #   bash scripts/release.sh --major          # breaking changes
 #   bash scripts/release.sh --dry-run --minor      # preview without writing
 #   bash scripts/release.sh --retry [<tag>]        # re-run CI for an orphaned tag
+#   bash scripts/release.sh --patch --no-sync-develop  # skip the develop sync step
 #
 # What it does (fresh release):
 #   1. Confirms working tree is clean and on main
-#   2. Runs pre-release checks (npm test, validate:all, generate-catalog)
+#   2. Runs pre-release checks (npm test, validate:all, generate-catalog, bundle)
+#      — auto-commits stale catalog or bundled-reference files
 #   3. Calculates next version from latest git tag
 #   4. Moves CHANGELOG [Unreleased] → [vX.Y.Z] - DATE
 #   5. Commits chore(release): vX.Y.Z
 #   6. Creates annotated tag vX.Y.Z
 #   7. Pushes main + tag  →  triggers .github/workflows/release.yml
+#   8. Syncs develop with main (merge + push); skip with --no-sync-develop
 #
 # What --retry does:
 #   Recovers from an "orphan tag" — a vX.Y.Z tag exists on origin but the
@@ -42,6 +45,7 @@ BUMP=""
 DRY_RUN=false
 RETRY=false
 RETRY_TAG=""
+SYNC_DEVELOP=true
 REPO_SLUG="Gamaroff/agent-skills"
 
 while [[ $# -gt 0 ]]; do
@@ -50,6 +54,7 @@ while [[ $# -gt 0 ]]; do
     --minor) BUMP=minor; shift ;;
     --patch) BUMP=patch; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
+    --no-sync-develop) SYNC_DEVELOP=false; shift ;;
     --retry)
       RETRY=true; shift
       # Optional positional tag argument — consume it only if it looks like a tag
@@ -176,6 +181,21 @@ else
   fi
 fi
 
+info "Checking bundled references are current ..."
+if [[ "$DRY_RUN" == true ]]; then
+  echo -e "${YELLOW}[dry-run]${NC} would run: npm run bundle"
+else
+  npm run bundle
+  if [[ -n "$(git status --porcelain -- skills/)" ]]; then
+    warn "Bundled references were out of date — regenerated. Committing ..."
+    git add skills/
+    git commit -m "chore(bundle): sync references before release"
+    ok "Bundle committed"
+  else
+    ok "Bundled references up to date"
+  fi
+fi
+
 # ── 3. calculate next version (or resolve retry tag) ─────────────────────────
 heading "Version"
 
@@ -287,13 +307,13 @@ if [[ "$RETRY" == true ]]; then
     echo "  git tag -d ${NEXT_VERSION}"
     echo "  git push origin :refs/tags/${NEXT_VERSION}"
     echo "  git tag -a ${NEXT_VERSION} -m 'Release ${NEXT_VERSION}'"
-    echo "  git push origin ${NEXT_VERSION}"
+    echo "  git push origin main ${NEXT_VERSION}"
   else
     # Local delete is best-effort — the tag may already be gone
     git tag -d "${NEXT_VERSION}" 2>/dev/null || true
     git push origin ":refs/tags/${NEXT_VERSION}"
     git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
-    git push origin "${NEXT_VERSION}"
+    git push origin main "${NEXT_VERSION}"
     ok "Re-pushed tag ${NEXT_VERSION}"
   fi
 elif [[ "$DRY_RUN" == true ]]; then
@@ -304,13 +324,33 @@ elif [[ "$DRY_RUN" == true ]]; then
   echo "  git push origin main ${NEXT_VERSION}"
 else
   git add "$CHANGELOG"
-  # Only commit if there are staged changes (catalog update may have already committed)
+  # Only commit if there are staged changes (catalog/bundle auto-commits may have already committed)
   if [[ -n "$(git diff --cached --name-only)" ]]; then
     git commit -m "chore(release): ${NEXT_VERSION}"
   fi
   git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
   git push origin main "${NEXT_VERSION}"
   ok "Pushed main + tag ${NEXT_VERSION}"
+fi
+
+# ── 6. sync develop ───────────────────────────────────────────────────────────
+if [[ "$RETRY" == false && "$SYNC_DEVELOP" == true ]]; then
+  heading "Sync develop"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC} would run:"
+    echo "  git checkout develop"
+    echo "  git pull --rebase"
+    echo "  git merge main"
+    echo "  git push"
+    echo "  git checkout main"
+  else
+    git checkout develop
+    git pull --rebase
+    git merge main
+    git push
+    git checkout main
+    ok "develop synced with main"
+  fi
 fi
 
 # ── summary ───────────────────────────────────────────────────────────────────
@@ -322,6 +362,9 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "  Would have retried: ${NEXT_VERSION}"
   else
     echo "  Would have released: ${NEXT_VERSION}"
+    if [[ "$SYNC_DEVELOP" == true ]]; then
+      echo "  Would have synced develop with main"
+    fi
   fi
 else
   if [[ "$RETRY" == true ]]; then
