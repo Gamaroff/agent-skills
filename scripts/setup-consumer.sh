@@ -8,7 +8,7 @@
 #   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
 #   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
 #   4. .env files                 (.env.example always; .env optionally; gitignore)
-#   5. skills-config.yaml         (PRD path, story layout, coding-standards path)
+#   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
 #   6. Registry creation          (docs/development/epic-registry.md, docs/tasks/task-registry.md)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
 #   8. Skills install             (latest release from github.com/Gamaroff/agent-skills)
@@ -354,6 +354,8 @@ architecture:
 
 devLoadAlwaysFiles:
   - ${_cs_path}
+  - ${_arch_loc}/concepts/tech-stack.md
+  - ${_arch_loc}/concepts/source-tree.md
 ${tracker_block}"
 
   write_file "skills-config.yaml" "$config"
@@ -738,7 +740,7 @@ print_summary() {
   # Verify block
   echo -e "${BOLD}Verify the install:${NC}"
   echo "  ls .agents/skills/ | head                  # should list installed skills"
-  echo "  cat .claude/settings.json | jq '.hooks'    # should show PreCompact / Stop / PostToolUse"
+  echo "  cat .claude/settings.json | jq '.hooks'    # should show PreCompact / Stop"
   [[ "$UPDATE_ONLY" == false ]] && \
   echo "  cat skills-config.yaml                     # should reflect the answers you gave"
   echo ""
