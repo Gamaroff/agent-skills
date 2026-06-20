@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+- **`develop-pipeline` Steps 4 and 8 no longer sweep unrelated untracked files into the PR (PR #207 root cause):** pipeline-mode commit staging previously used `git add -A -- '.' ':(exclude){report}'` — a denylist that staged every untracked path except the implementation report. Sibling task dirs and stray `.plans/` artifacts scaffolded in the same batch were pulled into the work item's PR (reproduced in PR #207). Step 4 now builds `SCOPE = {work-item-dir} ∪ {top-level dirs from git diff --name-only {base}...HEAD}` and passes the paths as `--scope` flags to `/create-pr`, which forwards them to `/commit-changes`; Step 8 passes `--scope {work-item-dir}` for the final commit. A pre-flight guard (`git status --porcelain`) detects any untracked path outside the scope set, moves it to a temporary hold dir before the PR, and restores it after — automating the manual hold-aside workaround from PR #207. Bundled copies in `skills/develop-story/references/` and `skills/develop-task/references/` updated to match.
+
+### Added
+- **`commit-changes` gains a repeatable `--scope <path>` allowlist flag:** when one or more `--scope` paths are passed, staging uses `git add -u` (tracked modifications, any path) plus `git add -- <scope-paths>` (explicitly named new-artifact dirs); `git add -A` is never invoked in scope mode. `--scope` and `--exclude` coexist — the scope set is staged first, then `git restore --staged -- <exclude-path>` removes excluded paths from within it ("exclude wins inside scope"). New untracked files outside the named scope dirs must be listed explicitly; `git add -u` will not pick them up. Standalone invocation without `--scope` is byte-identical to prior behaviour.
+- **`create-pr` gains a matching repeatable `--scope <path>` flag:** values are collected into `SCOPE_PATHS` and forwarded to `/commit-changes --scope p1 --scope p2 …` when uncommitted changes are present. Silently ignored (with a log line) when no uncommitted changes exist, mirroring `--exclude` behaviour.
+
 ## [v0.15.3] - 2026-06-19
 
 ### Added

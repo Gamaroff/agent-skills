@@ -24,8 +24,11 @@ Make commits that are easy to review and safe to ship:
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--exclude <path>` | Exclude a file from staging (repeatable). Switches from patch staging to full-tree staging with explicit pathspec exclusion. | `--exclude docs/task.14.impl.md` |
+| `--scope <path>` | Allowlist paths for staging (repeatable). Switches to `git add -u` plus explicit `git add -- <paths>`; `git add -A` is never called in scope mode. | `--scope docs/tasks/task.5/` |
 
-When one or more `--exclude <path>` flags are passed, collect all values into an array and use full-tree staging in step 3 instead of patch staging:
+### `--exclude` mode
+
+When one or more `--exclude <path>` flags are passed (and no `--scope`), collect all values into an array and use full-tree staging in step 3 instead of patch staging:
 
 ```bash
 git add -A -- '.' ':(exclude)path/one' ':(exclude)path/two'
@@ -38,6 +41,34 @@ This is the **enforced form** of the advisory rule in step 3a — the flag conve
 **Smoke test** (verify the excluded file is absent from staged set):
 ```bash
 git add -A -- '.' ':(exclude)path/to/file.md' && git diff --cached --name-only | grep -c 'file.md' | grep -q '^0$' && echo "OK" || echo "LEAK"
+```
+
+### `--scope` mode
+
+When one or more `--scope <path>` flags are passed, collect all values into an array and use allowlist-mode staging in step 3 instead of patch staging:
+
+```bash
+git add -u                              # tracked modifications (any path) — safe
+git add -- "scope/one" "scope/two" ... # explicit new artifacts / work-item dirs
+# git add -A is NEVER called in scope mode
+```
+
+`git add -u` picks up tracked modifications across the whole tree. The explicit `git add -- <path>` calls add any new untracked files inside the named dirs. New untracked files outside the named scope dirs are NOT staged — the caller must list them explicitly via additional `--scope` flags.
+
+**Precedence with `--exclude`** — the two flags coexist. Stage the scope set first, then remove any `--exclude` path from within it ("exclude wins inside scope"):
+
+```bash
+git restore --staged -- "<exclude-path>" 2>/dev/null || true
+```
+
+If a path appears in both `--scope` and `--exclude`, it is staged by the scope pass then immediately removed by the exclude pass; the net result is unstaged.
+
+**With neither `--scope` nor `--exclude`**: behaviour unchanged (patch staging / existing advisory rule).
+
+**Smoke test** (an unrelated sibling must NOT be staged under `--scope`):
+```bash
+git add -u && git add -- docs/tasks/task.X/
+git diff --cached --name-only | grep -q 'task.Y' && echo "LEAK" || echo "OK"
 ```
 
 ## Workflow (checklist)
