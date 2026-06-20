@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-4-create-pr
-description: Step 4 (create-PR) shared by develop-story and develop-task. Covers /create-pr invocation with --base, --exclude (report path), and tracker-conditional --issue flag, implementation report exclusion via pathspec magic, leak verification, post-PR steps (Decisions Log, lock pr_url update), Jira tracker update (PR-opened comment + In Review transition), pipeline continuation banner, and failure handling. Story vs task variants called out where they differ.
+description: Step 4 (create-PR) shared by develop-story and develop-task. Covers scope-based staging (build SCOPE from work-item dir + changed-code paths, pre-flight guard for out-of-scope untracked files, --scope flags passed to /create-pr → /commit-changes), tracker-conditional --issue flag, leak verification, restore of held files, post-PR steps (Decisions Log, lock pr_url update), Jira tracker update (PR-opened comment + In Review transition), pipeline continuation banner, and failure handling. Story vs task variants called out where they differ.
 ---
 
 # Develop Pipeline — Step 4: Create PR
@@ -24,9 +24,65 @@ The PR base branch (`--base {Q2_answer}`) is derived in Phase 0d and differs by 
 
 ---
 
+## Build Staging Scope
+
+Before invoking `/create-pr`, build the set of paths that should be staged in the auto-commit. Start with the work-item dir, then add the top-level dirs of any new or changed code files since the base branch:
+
+```bash
+# SCOPE_PATHS: always include the work-item dir
+SCOPE_PATHS=("{work-item-dir}")
+
+# Add top-level dirs of files changed/added since the base branch
+# (the pre-develop surface map provides these; fall back to git diff)
+CHANGED_DIRS=$(git diff --name-only "{Q2_answer}...HEAD" \
+  | xargs -I{} dirname {} \
+  | sort -u)
+while IFS= read -r dir; do
+  [[ -z "$dir" || "$dir" == "." ]] && continue
+  # avoid adding a dir that is already under {work-item-dir}
+  case "$dir" in "{work-item-dir}"*) continue;; esac
+  SCOPE_PATHS+=("$dir")
+done <<< "$CHANGED_DIRS"
+```
+
+Log the final `SCOPE_PATHS` array in the Decisions Log before proceeding.
+
+---
+
+## Pre-flight Guard
+
+With the scope set determined, detect any untracked paths in the working tree that fall outside every scope dir. Move them to a temporary hold dir before the PR so they are not accidentally staged; restore them after.
+
+```bash
+HOLD_DIR=$(mktemp -d /tmp/pipeline-hold-XXXXXX)
+HELD=()
+
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  IN_SCOPE=false
+  for sp in "${SCOPE_PATHS[@]}"; do
+    case "$f" in "${sp}"*) IN_SCOPE=true; break;; esac
+  done
+  if [ "$IN_SCOPE" = false ]; then
+    mkdir -p "$HOLD_DIR/$(dirname "$f")"
+    mv "$f" "$HOLD_DIR/$f"
+    HELD+=("$f")
+  fi
+done < <(git status --porcelain | grep '^??' | awk '{print $2}')
+
+if [ ${#HELD[@]} -gt 0 ]; then
+  echo "Pre-flight: ${#HELD[@]} out-of-scope file(s) held in $HOLD_DIR" | tee -a Issues Log
+  printf '  - %s\n' "${HELD[@]}" | tee -a Issues Log
+fi
+```
+
+> **Alternative (halt-and-ask):** Replace the `mv` block with a HALT if you prefer to prompt the user to move out-of-scope files manually before resuming, rather than holding them automatically.
+
+---
+
 ## Invoke /create-pr
 
-Invoke the `/create-pr` skill passing `--base {Q2_answer}`, `--exclude {implementation-report-path}`, and conditionally `--issue`. The exact invocation commands are in the Implementation Report Exclusion section below. Branch on tracker platform for the `--issue` flag:
+Invoke the `/create-pr` skill passing `--base {Q2_answer}`, one `--scope` flag per entry in `SCOPE_PATHS`, and conditionally `--issue`. Branch on tracker platform for the `--issue` flag:
 
 - **GitHub** (`TRACKER=github`): also pass `--issue {TRACKER_ISSUE}` — `create-pr` will add `Closes #N` to the PR body and comment on the GitHub issue.
 - **Jira** (`TRACKER=jira`): omit `--issue` — `create-pr` handles Bitbucket PR creation natively; Bitbucket Issues are not enabled for this project, so passing `--issue` would cause a failed comment attempt.
@@ -39,37 +95,50 @@ The PR body will reference the task file which contains `jira_key`.
 
 This pre-supplies the target branch via create-pr's Step 0, skipping the interactive prompt entirely. Do not wait for create-pr to ask — Q2 is already resolved.
 
----
-
-## Implementation Report Exclusion
-
-`create-pr` will automatically commit any uncommitted code changes before opening the PR. At this point the implementation report is partially complete (Steps 1–3 documented). **CRITICAL**: The implementation report file must NOT be included in create-pr's auto-commit.
-
-Pass `--exclude {implementation-report-path}` to `/create-pr` so it forwards the flag to `/commit-changes`, which switches to full-tree staging with explicit pathspec exclusion (`git add -A -- '.' ':(exclude){report-path}'`). This is deterministic exclusion — not timing-dependent unstaging.
-
 #### develop-story invocation
 
 ```
-/create-pr --base {Q2_answer} --issue {TRACKER_ISSUE} --exclude {implementation-report-path}
+/create-pr --base {Q2_answer} --issue {TRACKER_ISSUE} --scope {work-item-dir} --scope {code-dir-1} ...
 ```
 
 #### develop-task invocation
 
 ```
-/create-pr --base {Q2_answer} --issue {TRACKER_ISSUE} --exclude {implementation-report-path}
+/create-pr --base {Q2_answer} --issue {TRACKER_ISSUE} --scope {work-item-dir} --scope {code-dir-1} ...
 ```
 
-(Omit `--issue` when `TRACKER=jira` per the rule above.)
+(Omit `--issue` when `TRACKER=jira` per the rule above. Omit extra `--scope` entries when no changed-code dirs were identified — `--scope {work-item-dir}` alone is always the minimum.)
 
-After create-pr completes, verify the report was not committed using an exact-path match (avoids false positives from other `.implementation.*.md` files):
+After create-pr completes, verify no out-of-scope path leaked into the commit:
 
 ```bash
-git log -1 --name-only HEAD | grep -Fxq "{implementation-report-path}" && echo "LEAK DETECTED" || echo "OK"
+git log -1 --name-only HEAD | tail -n +3 | while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  IN_SCOPE=false
+  for sp in "${SCOPE_PATHS[@]}"; do
+    case "$f" in "${sp}"*) IN_SCOPE=true; break;; esac
+  done
+  [ "$IN_SCOPE" = false ] && echo "LEAK: $f"
+done | grep -q 'LEAK' && echo "LEAK DETECTED" || echo "OK"
 ```
 
-If the verification prints `LEAK DETECTED`, note this in the Issues Log (does not warrant a halt — the report will be updated again in Step 8 with a superseding commit). A leak here means the `--exclude` pathspec did not take effect; investigate before the next pipeline run.
+If the verification prints any LEAK lines, note them in the Issues Log (does not warrant a halt — investigate before the next pipeline run).
 
-The report will continue to be updated through Steps 5–8, and its final state will be captured in the dedicated Step 8 commit.
+The implementation report will continue to be updated through Steps 5–8; its final state is captured in the dedicated Step 8 commit.
+
+---
+
+## Restore Held Files
+
+After PR creation (and the leak check above), restore any files the pre-flight guard moved aside:
+
+```bash
+if [ -d "$HOLD_DIR" ] && [ -n "$(ls -A "$HOLD_DIR" 2>/dev/null)" ]; then
+  cp -r "$HOLD_DIR"/. .
+  rm -rf "$HOLD_DIR"
+  echo "Restored held files from $HOLD_DIR" | tee -a Issues Log
+fi
+```
 
 ---
 

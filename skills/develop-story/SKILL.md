@@ -35,6 +35,8 @@ Hooks noop outside pipeline runs — zero overhead when no `.claude/state/develo
 
 See `references/develop-pipeline-step-0-resolve-and-prepare.md` for the full resolve-and-prepare protocol: file/issue resolution (0a), pipeline state check (0b), upfront context reading including status handling and lite-mode detection (0c), tracker signal/board update procedure (0c-reg — **defined in step-0 but invoked from Step 1** after the lock is written; see step-1 §"Signal Work Started"), upfront prompts via AskUserQuestion (0d — Q1 base + Q2 PR target with auto-derived recommended option; qa-planning silent skip, no Q3), implementation report creation with templates (0e), and pre-flight summary (0f).
 
+> Phase 0 parallel dispatch (resolver + tracker poller + lite-mode detector) is defined in the shared resource above — do not duplicate the dispatch logic here. Modifications belong in `references/develop-pipeline-step-0-resolve-and-prepare.md`.
+
 ---
 
 ## Phase 1: Pipeline Execution
@@ -213,6 +215,24 @@ Implementation Report: {report file path}
 
 The implementation report has a full account of what was completed and what needs attention.
 ```
+
+---
+
+## Execution Surfaces
+
+This pipeline has **two execution surfaces of the same 8-stage logic** — read one, and this section tells you the other exists:
+
+- **This skill** — the Claude Code orchestrator (you, now). Human-in-the-loop = autonomous defaults + `AskUserQuestion` (Phase 0d Q1/Q2; review/develop auto-answers). On **HALT** it produces *rich artifacts*: an implementation-report entry, a tracker comment, and a lock snapshot to `.claude/state/develop-pipeline.last-halt.json`.
+- **The Mastra `developStoryWorkflow`** (`src/mastra/pipelines/develop-story/`, assembled by `src/mastra/pipeline/factory/create-develop-pipeline.ts`) — the programmatic pipeline. Human-in-the-loop = **four opt-in approval gates** in `state.approvalGates` (`src/mastra/pipeline/gates/approval-gates.ts`). The default is an **empty** gate set = fully autonomous, matching this skill's defaults:
+
+  | Gate | Fires at (stage) | Purpose when active |
+  |------|------------------|---------------------|
+  | `review-clarifications` | review-story | restore the review clarifying-question interview |
+  | `qa-clarifications` | qa-loop body | restore the QA interview / waiver prompt |
+  | `pre-finalise` | finalise | approve before the irreversible accept |
+  | `on-halt` | any HALT (cross-cutting, stage `*`) | turn a terminal HALT into continue / override / abort |
+
+**HALT-artifact difference (important — do not assume parity).** When the `on-halt` gate is **inactive** (the default), the workflow emits a *terminal* halt (`terminalReason: 'halt'`) and does **NOT** produce this skill's rich HALT artifacts (no report entry, no tracker comment, no lock snapshot). The two surfaces agree on the autonomous happy path; their **halt-time behaviour differs**. A reader of this skill should not expect the workflow to write those artifacts on every halt, and a reader of the factory should map the skill's `AskUserQuestion` prompts onto the four gates above.
 
 ---
 
