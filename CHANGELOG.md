@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.16.0] - 2026-06-25
+
 ### Added
 - **`qa-story` and `qa-task` gain an adversarial diff code-review pass (`qa-story` Phase 1.6 / `qa-task` Step 3b):** a read-only Explore subagent reviews the change-set diff for correctness bugs (logic/null/async/race, API misuse, broken invariants) and cleanups (reuse, simplification, efficiency) — the lens the document-anchored QA checks don't provide. The reviewer persona, scope, and YAML output contract live in a new single-source-of-truth shared resource `shared/resources/qa-code-review-prompt.md` (bundled into both skills' `references/`) and are dispatched verbatim by both skills. Findings are **advisory by default** and always recorded in the QA report `## Code Review` section and the PR comment. A story/task opts into gate-blocking by setting `code_review_blocking: true` in its frontmatter — then `category: bug` + `confidence: high` findings are appended to the gate `top_issues[]` (keyed `finding:`, matching the ingester / `qa-gate` schema) and the existing deterministic gate rules apply unchanged. The diff is scoped to the PR base (resolved via `gh pr view --json baseRefName`, defaulting to `develop`), and on re-review to files changed since the last gate; raw diff bytes are kept out of main context via a temp patch file. Lite mode runs exactly one light code-review pass (the sole exception to "skip parallel agents"). New optional `code_review_blocking` frontmatter field documented in `docs/standards/story-documents.md` and `docs/standards/task-documents.md`.
 
