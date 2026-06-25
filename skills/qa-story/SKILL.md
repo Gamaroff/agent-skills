@@ -20,6 +20,7 @@ When invoked from the `/develop-story` orchestrator, the call may be prefixed wi
 **Effect on this skill**:
 
 - Skip parallel agents in the Adaptive Review Strategy decision — use the **Lite mode** rule (rule 0 in the decision tree, direct tools only) regardless of story size or risk.
+- **Phase 1.6 (Diff Code Review) still runs** — as a single read-only Explore subagent. It is the one exception to "skip parallel agents": it is not part of the Phase 1.5 parallel-agent set, and lite mode runs exactly one light code-review pass.
 - All other phases (NFR, traceability, gate decision) run unchanged.
 - Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
 
@@ -111,6 +112,7 @@ Creates: story.178.8.gate.1.initial-review.yml
 | Check for existing QA artifacts | Detect re-review vs fresh review; read prior gate/report         |
 | Locate and read story/task      | Read story/task file, extract ACs, identify implementation files |
 | Run test architecture review    | Assess test coverage, co-location, co-coverage                   |
+| Run diff code review            | Adversarially review the change-set diff for bugs + cleanups (Phase 1.6) |
 | Run NFR validation              | Evaluate security, performance, reliability, maintainability     |
 | Run requirements traceability   | Map ACs to test evidence; identify gaps                          |
 | Write QA report                 | Create co-located `.qa.N.*.md` report file                       |
@@ -422,7 +424,7 @@ Before running independent NFR and risk analysis, check the story directory for 
 **Step 1a: Map changed files using Explore subagent (CRITICAL — do this first)**
 
 Before reading any implementation files, use the Agent tool with subagent_type="Explore" to:
-- Find all files changed in this PR: run `git diff --name-only origin/develop...HEAD` (or target branch)
+- Find all files changed in this PR: resolve the PR base first — `BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"` — then run `git diff --name-only "$BASE...HEAD"` (story PRs target the epic branch, not `develop`, so do not hardcode `origin/develop`)
 - For each changed file, return: file path + module it belongs to + whether a co-located `.spec.ts` exists
 - Return as a compact table (max 30 rows): `file | module | has_test`
 
@@ -725,6 +727,42 @@ If any parallel agent fails to complete or reports critical errors:
 - **Traceability**: Clear agent outputs feed into unified report
 - **Scalability**: Easy to add new quality checks as additional agents
 
+#### Phase 1.6: Diff Code Review
+
+Adversarially review the story's change set **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the Phase 1.5 agents (coverage / TS-strict / a11y / DoD) and the document-anchored checks do **not** provide. Effort follows the **Phase 1.5 Adaptive decision tree**: a single light pass for lite/small/re-review; run it alongside the parallel agents for large/high-risk stories; skip entirely when the diff touches no reviewable code.
+
+1. **Scope the diff** (reuse the Phase 1 changed-file map; on a re-review, scope to files changed since the last gate's `updated:` date) and write it to a patch file (keeps diff bytes out of main context):
+
+   ```bash
+   BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # story PRs target the epic branch
+   BASE="origin/${BASE_REF:-develop}"
+   DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
+   LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   if [ -n "$LAST_GATE_DATE" ]; then                # re-review — scope to files changed since last gate
+     FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
+     [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
+   else
+     git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
+   fi
+   ```
+
+2. **Dispatch a read-only Explore subagent** with the prompt from `references/qa-code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
+
+3. **Record — always (advisory):** every finding (bugs + cleanups, with `file:line`) goes into the QA report `## Code Review` section and the PR comment.
+
+4. **Gate mapping — opt-in only:** check the opt-in flag in the story frontmatter (see the **Opt-in to blocking** section of `references/qa-code-review-prompt.md`):
+
+   ```bash
+   CR_BLOCKING=$(grep -Eq '^code_review_blocking:[[:space:]]*true' "$STORY_FILE" && echo true || echo false)
+   ```
+
+   When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }`; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — flag absent/false, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+
+5. `rm -f "$DIFF_FILE"`.
+
+This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug on an opted-in story can trigger a fix cycle.
+
 #### Phase 2: Comprehensive Analysis
 
 **A. Requirements Traceability**
@@ -737,14 +775,12 @@ If any parallel agent fails to complete or reports critical errors:
 
 **B. Code Quality Review**
 
-- Architecture and design patterns
-- Refactoring opportunities (and perform them when safe)
-- Code duplication or inefficiencies
-- Performance optimizations
-- Security vulnerabilities
-- Best practices adherence
-- **Leverage findings from TypeScript Compliance Agent (Phase 1.5)** for type safety review
-- **Leverage findings from Accessibility Agent (Phase 1.5)** for component quality
+The diff-level code review is performed once in **Phase 1.6** (correctness bugs + reuse/simplification/efficiency cleanups, via `references/qa-code-review-prompt.md`) — do **not** re-review the diff here. In this phase only:
+
+- Consolidate the Phase 1.6 findings into the overall assessment (architecture / design-pattern concerns surfaced as bugs or cleanups).
+- **Leverage findings from TypeScript Compliance Agent (Phase 1.5)** for type safety review.
+- **Leverage findings from Accessibility Agent (Phase 1.5)** for component quality.
+- Perform a safe refactor only if Phase 1.6 flagged a cleanup AND tests cover it (Phase 3) — otherwise record it as advisory.
 
 **C. Test Architecture Assessment**
 
@@ -989,6 +1025,20 @@ stories/
 
 **Gate Recommendation**: [PASS/CONCERNS/FAIL]
 
+## Code Review
+
+[From Phase 1.6 — advisory unless the story opted in via `code_review_blocking: true`. Omit if the diff had no reviewable code.]
+
+**Correctness bugs ([count]):**
+[for each bug finding:]
+- [[severity]/[confidence]] `[file_line]` — [finding] → [suggested_action]
+
+**Cleanups ([count]):**
+[for each cleanup finding (reuse / simplification / efficiency):]
+- `[file_line]` — [finding] → [suggested_action]
+
+[If any finding was promoted to a gate `top_issues` entry (opt-in blocking), note its id here.]
+
 ## Performance Results
 
 ### [Performance Category] ✅
@@ -1165,6 +1215,8 @@ If risk_summary exists, apply its thresholds first (≥9 → FAIL, ≥6 → CONC
 
 - **WAIVED** only when waiver.active: true with reason/approver
 
+> **Code-review findings (Phase 1.6):** by default these do NOT enter `top_issues` and do NOT affect the gate. Only when the story opts in via `code_review_blocking: true` in its frontmatter are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point the top_issues severity rules above apply unchanged. Cleanups and non-high-confidence findings are always advisory.
+
 **Detailed criteria:**
 
 - **PASS**: All critical requirements met, no blocking issues
@@ -1291,6 +1343,11 @@ After review:
      - **NFR Status**: Security: [PASS/CONCERNS/FAIL], Performance: [PASS/CONCERNS/FAIL], Reliability: [PASS/CONCERNS/FAIL], Maintainability: [PASS/CONCERNS/FAIL]
      - **Critical Issues**: [count]
      - **Coverage Gaps**: [count]
+     - **Code Review** (Phase 1.6): [B] bug(s), [C] cleanup(s) — [advisory, or '[N] promoted to gate (code_review_blocking)']
+
+     ### 🔎 Code Review Findings
+
+     [Top correctness bugs + notable cleanups from Phase 1.6, each \`file:line — finding\`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
 
      ### 🎯 Critical Issues
 

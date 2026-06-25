@@ -24,6 +24,7 @@ When invoked from the `/develop-task` orchestrator, the call may be prefixed wit
 **Effect on this skill**:
 
 - Skip parallel agents in the Adaptive Review Strategy decision — use the **Lite mode** rule (direct tools only) regardless of phase count or risk.
+- **Step 3b (Diff Code Review) still runs** — as a single read-only Explore subagent. It is the one exception to "skip parallel agents": it is not part of the parallel-agent set, and lite mode runs exactly one light code-review pass.
 - All other phases (success criteria, breaking changes, NFR, gate decision) run unchanged.
 - Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
 
@@ -81,6 +82,7 @@ Activate this skill when:
 | Read task document              | Read task file, extract success criteria, phases, breaking changes           |
 | Run test suite                  | Execute tests, lint, build; capture coverage output                          |
 | Verify implementation phases    | Check each phase checkbox; confirm changes match plan via git diff           |
+| Run diff code review            | Adversarially review the change-set diff for bugs + cleanups (Step 3b)        |
 | Verify success criteria         | Check functional, performance, code quality criteria against actual results  |
 | Validate breaking changes       | Verify migration paths documented and consumer code updated                  |
 | Run NFR assessment              | Evaluate performance, reliability, security, maintainability                 |
@@ -233,7 +235,7 @@ Thoroughly read the task document to understand:
 
 For each phase in the implementation plan:
 1. Verify checkboxes are marked complete
-2. Review files changed (`git diff origin/develop...HEAD -- {files}`)
+2. Review files changed — resolve the PR base first: `BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"`, then `git diff "$BASE...HEAD" -- {files}`
 3. Confirm changes match the plan
 4. Look for potential issues
 
@@ -246,6 +248,42 @@ For each phase in the implementation plan:
 | Phase 3: {Name} | CONCERNS    | Partial     | {Issues found} |
 
 **Overall Phase Completion**: {X/Y phases passed}
+
+### Step 3b: Diff Code Review
+
+Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code.
+
+1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). On a re-review (Phase 0 found a prior gate), scope to files changed since that gate's `updated:` date; otherwise review the whole branch diff:
+
+   ```bash
+   BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # standalone tasks usually target develop
+   BASE="origin/${BASE_REF:-develop}"
+   DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
+   LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   if [ -n "$LAST_GATE_DATE" ]; then                       # re-review (cycle ≥ 2) — scope to files changed since last gate
+     FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
+     [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
+   else
+     git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
+   fi
+   ```
+
+2. **Dispatch a read-only Explore subagent** with the prompt from `references/qa-code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
+
+3. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
+
+4. **Gate mapping — opt-in only:** check the opt-in flag in the task frontmatter (see the **Opt-in to blocking** section of `references/qa-code-review-prompt.md`):
+
+   ```bash
+   CR_BLOCKING=$(grep -Eq '^code_review_blocking:[[:space:]]*true' "$TASK_FILE" && echo true || echo false)
+   ```
+
+   When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }` (Step 10's deterministic rules then decide). Otherwise — flag absent/false, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+
+5. `rm -f "$DIFF_FILE"`.
+
+This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug on an opted-in doc can trigger a fix cycle; cleanups and uncertain findings stay advisory.
 
 ### Step 4: Run Tests
 
@@ -454,6 +492,8 @@ deployment_readiness:
 
 **WAIVED** only when `waiver.active: true` with documented reason and approver.
 
+> **Code-review findings (Step 3b):** by default these do NOT enter `top_issues` and do NOT affect the gate. Only when the task doc opts in via `code_review_blocking: true` in its frontmatter are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point rules 1–2 above apply unchanged. Cleanups and non-high-confidence findings are always advisory.
+
 ### Step 11: Write QA Report
 
 Create QA report co-located with the task document:
@@ -562,6 +602,22 @@ Create QA report co-located with the task document:
 
 ### Maintainability — PASS/CONCERNS/FAIL
 {Criteria evaluated, findings, recommendations}
+
+---
+
+## Code Review
+
+{From Step 3b — advisory unless the doc opted in via `code_review_blocking: true`. Omit the section if the diff had no reviewable code.}
+
+**Correctness bugs ({count}):**
+{for each bug finding:}
+- [{severity}/{confidence}] `{file_line}` — {finding} → {suggested_action}
+
+**Cleanups ({count}):**
+{for each cleanup finding (reuse / simplification / efficiency):}
+- `{file_line}` — {finding} → {suggested_action}
+
+{If any finding was promoted to a gate `top_issues` entry (opt-in blocking), note its id here.}
 
 ---
 
@@ -680,6 +736,11 @@ tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECI
 - **Phases Verified**: {X/Y}
 - **NFR Status**: Security: {STATUS}, Performance: {STATUS}, Reliability: {STATUS}, Maintainability: {STATUS}
 - **Issues Found**: HIGH: {X}, MEDIUM: {Y}, LOW: {Z}
+- **Code Review** (Step 3b): {B} bug(s), {C} cleanup(s) — {advisory, or '{N} promoted to gate (code_review_blocking)'}
+
+### Code Review Findings
+
+{Top correctness bugs + notable cleanups from Step 3b, each `file:line — finding`. 'None identified' if empty. Advisory unless the doc opted in via code_review_blocking.}
 
 ### Critical Issues
 
