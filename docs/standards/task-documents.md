@@ -56,6 +56,7 @@ updated: 2026-01-15
 | `created` | ISO date | Yes | `YYYY-MM-DD` |
 | `updated` | ISO date | Yes | `YYYY-MM-DD` — update on every change |
 | `risk_level` | enum | Optional | `high`, `medium`, `low` — triggers the high-risk gate |
+| `code_review_blocking` | boolean | Optional | `true` makes high-confidence correctness bugs from the QA diff code review gate-blocking (appended to the QA gate's `top_issues[]`). Absent / `false`: code-review findings stay advisory. See [`qa-task`](../../skills/qa-task/SKILL.md) Step 3b |
 | `estimated_effort_hours` | number | Optional | Estimated dev hours. Synced to Jira `timetracking.originalEstimate` and the GitHub Projects v2 `Estimate` number field. Captured at create time, surfaced as a LOW review gap if missing |
 | `effort` | string | Optional | Deprecated free-text estimate, e.g. `~0.5 day`. New tasks should use `estimated_effort_hours` instead |
 | `depends_on` | string | Optional | `task.N` — blocks pipeline if the dependency is not `accepted` |
