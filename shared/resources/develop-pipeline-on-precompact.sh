@@ -3,6 +3,10 @@
 #
 # Runs when Claude Code is about to compact the conversation. If a develop-task
 # or develop-story pipeline is active (lock file present), this hook:
+#   0. Writes a develop-pipeline.last-halt.json resume snapshot (a lock superset,
+#      pause_reason: "precompact") BEFORE any lock removal, so even a hook run killed
+#      mid-flow by the harness (SIGTERM/timeout) leaves recoverable resume state for
+#      the Phase 0b resume detector
 #   1. Appends a "Paused — Context Compaction" entry to the implementation report
 #   2. Commits the report and pushes to remote (best-effort)
 #   3. Posts a pause comment to the PR (best-effort)
@@ -18,30 +22,61 @@
 
 set -uo pipefail
 
-LOCK=".claude/state/develop-pipeline.lock"
-
-# Always-run cleanup: ensure lock is removed regardless of which exit path is
-# taken (including SIGTERM/timeout from the harness, jq-missing degraded mode,
-# or unexpected errors). A leftover lock would block the next pipeline
-# invocation with a collision halt — so removing it on any exit is safer than
-# leaving it. Idempotent — `rm -f` on success path is a noop.
-trap 'rm -f "$LOCK"' EXIT
+# Lock path — env-overridable for test isolation (mirrors advance-pipeline-lock.sh).
+LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"
+# Resume snapshot, co-located with the lock. Written BEFORE any lock removal so a
+# killed/partial hook run always leaves a recoverable artifact (see write_pause_snapshot).
+SNAPSHOT="$(dirname "$LOCK")/develop-pipeline.last-halt.json"
+NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 emit_empty() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreCompact","additionalContext":""}}'
   exit 0
 }
 
-# No lock = no active pipeline = noop
+# write_pause_snapshot — persist a resume snapshot (a superset of the lock) to
+# $SNAPSHOT. Tagged pause_reason: "precompact" + paused_at, and aliases the lock's
+# current_step to halt_step — the field the Phase 0b resume detector maps to LOCK_STEP.
+# This MUST run before the EXIT trap is armed and before any rm of the lock, so every
+# exit path — success OR harness-kill (SIGTERM/timeout) — leaves a recoverable artifact.
+# Degrades to a verbatim cp when jq is unavailable (current_step is still preserved in
+# the copied lock). Guarded with || true: a snapshot failure must never abort the hook
+# or block compaction.
+write_pause_snapshot() {
+  if command -v jq >/dev/null 2>&1; then
+    jq --arg ts "$NOW" \
+       '. + {paused_at: $ts, pause_reason: "precompact", halt_step: .current_step}' \
+       "$LOCK" > "$SNAPSHOT" 2>/dev/null || cp -f "$LOCK" "$SNAPSHOT" 2>/dev/null || true
+  else
+    cp -f "$LOCK" "$SNAPSHOT" 2>/dev/null || true
+  fi
+}
+
+# No lock = no active pipeline = noop. Return BEFORE writing a snapshot or arming the
+# EXIT trap, so a stray re-fire neither clobbers an existing snapshot nor touches a
+# lock that isn't there (idempotence).
 if [ ! -f "$LOCK" ]; then
   emit_empty
 fi
 
+# Lock confirmed present — write the resume snapshot NOW, before the EXIT trap that
+# removes the lock is even armed. This closes the "lock removed, no snapshot" window
+# that a mid-run harness kill would otherwise open.
+write_pause_snapshot
+
+# Always-run cleanup: ensure lock is removed regardless of which exit path is
+# taken (including SIGTERM/timeout from the harness, jq-missing degraded mode,
+# or unexpected errors). A leftover lock would block the next pipeline
+# invocation with a collision halt — so removing it on any exit is safer than
+# leaving it. Safe because write_pause_snapshot already persisted resume state.
+# Idempotent — `rm -f` on success path is a noop.
+trap 'rm -f "$LOCK"' EXIT
+
 # jq is required for safe parsing — degrade gracefully if missing.
-# The EXIT trap will remove the lock so the next invocation can recover via
-# Phase 0b post-compaction artifact verification.
+# The EXIT trap will remove the lock; the cp-fallback snapshot above already
+# preserved resume state so the next invocation can recover via Phase 0b.
 if ! command -v jq >/dev/null 2>&1; then
-  echo "on-precompact: jq not found, skipping pause processing (lock will be removed by EXIT trap)" >&2
+  echo "on-precompact: jq not found, skipping pause processing (lock removed by EXIT trap; resume snapshot preserved at $SNAPSHOT)" >&2
   emit_empty
 fi
 
@@ -53,7 +88,7 @@ PR_URL=$(jq -r '.pr_url // ""' "$LOCK" 2>/dev/null)
 TRACKER=$(jq -r '.tracker // ""' "$LOCK" 2>/dev/null)
 TRACKER_ISSUE=$(jq -r '.tracker_issue // ""' "$LOCK" 2>/dev/null)
 CURRENT_STEP=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
-NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# NOW is set once near the top (used by both write_pause_snapshot and the report entry).
 
 # Sanity: if we don't even know which skill, bail gracefully
 if [ -z "$SKILL" ]; then
