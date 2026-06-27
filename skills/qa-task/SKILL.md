@@ -30,6 +30,17 @@ When invoked from the `/develop-task` orchestrator, the call may be prefixed wit
 
 If invoked outside the pipeline (no lite directive), the normal Adaptive Review Strategy applies.
 
+## Pipeline Skill args (Pipeline Contract)
+
+When invoked from the `/develop-task` orchestrator, the Skill `args` field may carry `key=value` tokens:
+
+```
+Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true")
+```
+
+- `traceability_matrix=<path>` — a pre-built traceability matrix (see Step 5 / traceability handling); absent → internal mapping.
+- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 4** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter.
+
 ## When to Use This Skill
 
 Activate this skill when:
@@ -269,21 +280,28 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    fi
    ```
 
-2. **Dispatch a read-only Explore subagent** with the prompt from `references/qa-code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
+2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
 
 3. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
 
-4. **Gate mapping — opt-in only:** check the opt-in flag in the task frontmatter (see the **Opt-in to blocking** section of `references/qa-code-review-prompt.md`):
+4. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the task frontmatter flag; an explicit per-doc `false` is the escape hatch:
 
    ```bash
-   CR_BLOCKING=$(grep -Eq '^code_review_blocking:[[:space:]]*true' "$TASK_FILE" && echo true || echo false)
+   # CR_OVERRIDE=true when the develop-task pipeline passed code_review_blocking=true in Skill args
+   # (empty for standalone qa-task runs).
+   CR_OVERRIDE=$([ "$CODE_REVIEW_BLOCKING_ARG" = "true" ] && echo true || echo "")
+   DOC_FLAG=$(grep -E '^code_review_blocking:[[:space:]]*(true|false)\b' "$TASK_FILE" \
+                | head -1 | grep -Eo '(true|false)' || true)
+   if [ "$DOC_FLAG" = "false" ]; then CR_BLOCKING=false
+   elif [ "$CR_OVERRIDE" = "true" ] || [ "$DOC_FLAG" = "true" ]; then CR_BLOCKING=true
+   else CR_BLOCKING=false; fi
    ```
 
-   When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }` (Step 10's deterministic rules then decide). Otherwise — flag absent/false, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }` (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
 5. `rm -f "$DIFF_FILE"`.
 
-This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug on an opted-in doc can trigger a fix cycle; cleanups and uncertain findings stay advisory.
+This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle; cleanups and uncertain findings stay advisory. Under the develop-task pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the task opts in via frontmatter.
 
 ### Step 4: Run Tests
 

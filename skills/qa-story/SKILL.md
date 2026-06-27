@@ -69,6 +69,16 @@ When `traceability_matrix=<path>` is present in `args`:
 
 When `traceability_matrix` arg is absent or the file at the path is unreadable: fall back to the existing internal traceability mapping (Steps 1–4 run in main context as before). Log: "No caller-supplied traceability matrix — performing internal mapping."
 
+**Optional Skill arg — `code_review_blocking` run-level override:**
+
+When invoked by the `develop-story` orchestrator (pipeline-wide default), the call may pass:
+
+```
+Skill(qa-story, args="traceability_matrix=<path> code_review_blocking=true")
+```
+
+Set `CODE_REVIEW_BLOCKING_ARG` from the `code_review_blocking=` token in `args` (default empty when absent). It feeds the canonical resolution in **Phase 1.6 step 4** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-story frontmatter. A story still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the story opts in via frontmatter.
+
 **File Discovery Logic:**
 
 When given a directory path:
@@ -747,21 +757,28 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    fi
    ```
 
-2. **Dispatch a read-only Explore subagent** with the prompt from `references/qa-code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
+2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
 
 3. **Record — always (advisory):** every finding (bugs + cleanups, with `file:line`) goes into the QA report `## Code Review` section and the PR comment.
 
-4. **Gate mapping — opt-in only:** check the opt-in flag in the story frontmatter (see the **Opt-in to blocking** section of `references/qa-code-review-prompt.md`):
+4. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the story frontmatter flag; an explicit per-doc `false` is the escape hatch:
 
    ```bash
-   CR_BLOCKING=$(grep -Eq '^code_review_blocking:[[:space:]]*true' "$STORY_FILE" && echo true || echo false)
+   # CR_OVERRIDE=true when the develop-story pipeline passed code_review_blocking=true in Skill args
+   # (empty for standalone qa-story runs).
+   CR_OVERRIDE=$([ "$CODE_REVIEW_BLOCKING_ARG" = "true" ] && echo true || echo "")
+   DOC_FLAG=$(grep -E '^code_review_blocking:[[:space:]]*(true|false)\b' "$STORY_FILE" \
+                | head -1 | grep -Eo '(true|false)' || true)
+   if [ "$DOC_FLAG" = "false" ]; then CR_BLOCKING=false
+   elif [ "$CR_OVERRIDE" = "true" ] || [ "$DOC_FLAG" = "true" ]; then CR_BLOCKING=true
+   else CR_BLOCKING=false; fi
    ```
 
-   When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }`; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — flag absent/false, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }`; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
 5. `rm -f "$DIFF_FILE"`.
 
-This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug on an opted-in story can trigger a fix cycle.
+This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle. Under the develop-story pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the story opts in via frontmatter.
 
 #### Phase 2: Comprehensive Analysis
 
@@ -775,7 +792,7 @@ This is the single diff-aware code reviewer for the story; Phase 2B below defers
 
 **B. Code Quality Review**
 
-The diff-level code review is performed once in **Phase 1.6** (correctness bugs + reuse/simplification/efficiency cleanups, via `references/qa-code-review-prompt.md`) — do **not** re-review the diff here. In this phase only:
+The diff-level code review is performed once in **Phase 1.6** (correctness bugs + reuse/simplification/efficiency cleanups, via `references/code-review-prompt.md`) — do **not** re-review the diff here. In this phase only:
 
 - Consolidate the Phase 1.6 findings into the overall assessment (architecture / design-pattern concerns surfaced as bugs or cleanups).
 - **Leverage findings from TypeScript Compliance Agent (Phase 1.5)** for type safety review.
