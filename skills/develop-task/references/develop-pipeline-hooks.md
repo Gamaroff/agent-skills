@@ -46,11 +46,14 @@ Both scripts are byte-identical across `develop-story` and `develop-task` instal
 
 **Side effects** (best-effort, all wrapped in `... || true`):
 
+0. **Write a resume snapshot first** — `develop-pipeline.last-halt.json` (co-located with the lock) as a **superset of the lock** plus `paused_at`, `pause_reason: "precompact"`, and `halt_step` (aliasing the lock's `current_step`). This is written **before the EXIT trap is armed and before any `rm`**, so even a hook run killed mid-flow (SIGTERM/timeout) leaves recoverable resume state. Degrades to a verbatim `cp` of the lock when `jq` is unavailable (`current_step` is still preserved). The Phase 0b resume detector reads this snapshot when no active lock is present.
 1. Append a `## Pipeline Paused — {timestamp}` block to the implementation report named in the lock
 2. `git add <report> && git commit -m "docs(<skill>): pipeline paused at step <N> — context compaction imminent" && git push origin HEAD`
 3. `gh pr comment <pr_url>` if `pr_url` is set and `gh` is on PATH
 4. `gh issue comment <tracker_issue>` if `tracker=github` and `tracker_issue` is set
 5. `rm -f .claude/state/develop-pipeline.lock`
+
+> **Operator note — `pause_reason` vs `halt_reason`.** A PreCompact snapshot is tagged `pause_reason: "precompact"` (with `paused_at`); the orchestrator's terminal-HALT path in SKILL.md instead writes `halt_reason` + `halted_at`. Inspect **`pause_reason`** to identify a snapshot left by an interrupted compaction. Both carry `halt_step`, so Phase 0b resumes from the same field either way.
 
 **Output**: a single JSON object on stdout carrying `additionalContext`:
 ```json
@@ -61,9 +64,9 @@ The orchestrator sees the signal in its next turn, emits the user-facing pause b
 **Resume**: re-invoke `/develop-{story,task} <path>`. Phase 0b artifact verification skips completed steps and re-runs the paused step from scratch — sub-skills are required to be re-run-safe (see the pause doc's "Re-run-safety contract").
 
 **Escape valves**:
-- No lock file → exit 0 with empty `additionalContext`
-- `jq` missing → exit 0 with empty `additionalContext` (degrades to no-pause; resume still works via post-compaction recovery in SKILL.md)
-- Hook timeout / SIGTERM → `trap 'rm -f "$LOCK"' EXIT` ensures the lock is removed regardless
+- No lock file → exit 0 with empty `additionalContext` (and a pre-existing snapshot is left untouched — the snapshot write is skipped before the lock-existence check)
+- `jq` missing → exit 0 with empty `additionalContext` (degrades to no-pause), but the cp-fallback resume snapshot is still written first, so resume works via Phase 0b
+- Hook timeout / SIGTERM → `trap 'rm -f "$LOCK"' EXIT` ensures the lock is removed regardless. The snapshot is written **before** this trap is armed, so a kill can never leave the pipeline both unlocked **and** un-resumable.
 
 **Jira limitation**: the hook does NOT post to Jira issues — Jira requires authenticated MCP calls unavailable from a shell context. Pause is visible via PR comment + implementation report; the orchestrator surfaces a "Jira not commented" note in the user-facing summary.
 
