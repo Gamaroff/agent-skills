@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- **New `review-code` skill (`/review-code`):** a standalone, self-hosted alternative to the built-in `/code-review`. Runs the same adversarial diff reviewer the QA skills use, but against any diff (working tree, a `<base>...<head>` range, `--staged`, or a PR) with no work-item document or quality gate required. Advisory by default; `--comment` posts findings as inline PR comments, `--fix` applies them to the working tree (no commit). `--effort low|medium|high|max` scales coverage. The reviewer subagent stays read-only — commenting/fixing are orchestration decisions the skill makes from the returned findings.
+
+### Changed
+- **`/develop-story` and `/develop-task` now run a code-review-and-fix loop by default.** The diff code review that `qa-story` (Phase 1.6) / `qa-task` (Step 3b) already perform each QA cycle is now **gate-blocking by default within the pipelines**: the QA-loop step passes a run-level `code_review_blocking=true` override, so high-confidence (`confidence: high`) correctness bugs (`category: bug`) are appended to the gate `top_issues[]`, fixed by `qa-fix`, and re-reviewed on the next cycle — until clean or the 5-cycle limit. Cleanups and uncertain findings stay advisory. A story/task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch; an explicit `false` always wins over the run-level override). Standalone `/qa-story`/`/qa-task` behaviour is unchanged (advisory unless the doc sets `code_review_blocking: true`). The blocking decision is now a single **canonical resolution** (run-level override + per-doc flag, with a resolution matrix) documented in `shared/resources/code-review-prompt.md` and implemented verbatim by both QA skills. `code_review_blocking` field docs in `docs/standards/{story,task}-documents.md` updated for the new default.
+- **Renamed shared resource `qa-code-review-prompt.md` → `code-review-prompt.md`** and reframed it as the tool-neutral single source of truth shared by `/review-code`, `/qa-story` (Phase 1.6), and `/qa-task` (Step 3b). The prompt template is now caller-agnostic; QA-specific behaviour (gate `top_issues[]` mapping, `code_review_blocking` opt-in) and standalone behaviour (`--comment`/`--fix`) are documented as separate caller-responsibility sections. `qa-story` and `qa-task` references updated to the new filename; no behaviour change to the QA gate. Customise the reviewer for all three skills by editing the one shared source and running `npm run bundle`.
+
 ## [v0.16.0] - 2026-06-25
 
 ### Added

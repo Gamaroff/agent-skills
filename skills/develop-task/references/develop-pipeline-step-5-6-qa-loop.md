@@ -160,13 +160,19 @@ Log the bypass reason in the Decisions Log (`Traceability mapper skipped: {reaso
 
 Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
 
-When the traceability matrix was successfully generated, pass its path via Skill args:
+**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-story already runs (Phase 1.6) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A story opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `references/code-review-prompt.md`.
+
+Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
 ```
-Skill(qa-story, args="traceability_matrix={story-directory}/.summaries/qa-traceability-matrix.md")
+Skill(qa-story, args="traceability_matrix={story-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true")
 ```
 
-If the matrix was not generated (lite mode or mapper failure), invoke without the `traceability_matrix` arg — qa-story performs internal mapping as before.
+If the matrix was not generated (lite mode or mapper failure), omit only the `traceability_matrix` token — still pass `code_review_blocking=true` so the code-review-and-fix loop stays active:
+
+```
+Skill(qa-story, args="code_review_blocking=true")
+```
 
 #### develop-task
 
@@ -200,13 +206,19 @@ Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=fals
 
 Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
 
-When the traceability matrix was successfully generated, pass its path via Skill args:
+**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-task already runs (Step 3b) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `references/code-review-prompt.md`.
+
+Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
 ```
-Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md")
+Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true")
 ```
 
-If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), invoke without the `traceability_matrix` arg.
+If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), omit only the `traceability_matrix` token — still pass `code_review_blocking=true` so the code-review-and-fix loop stays active:
+
+```
+Skill(qa-task, args="code_review_blocking=true")
+```
 
 ### Outcome branching (shared)
 

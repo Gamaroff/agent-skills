@@ -1,0 +1,134 @@
+---
+name: review-code
+description: 'Standalone adversarial diff code review of the working tree or a pull request — surfaces correctness bugs (logic, null/async/race, API misuse, broken invariants) and reuse/simplification/efficiency cleanups. Advisory by default; `--comment` posts findings as inline PR comments, `--fix` applies them to the working tree. Use when the user wants a code review of their current changes, a diff, or a PR without running the full QA gate. Triggers: review my changes, review this diff, review code, review PR 123, /review-code.'
+---
+
+> **Platform detection**: see [`references/platform-detection.md`](references/platform-detection.md) and [`references/resolve-platform.sh`](references/resolve-platform.sh)
+
+# Review Code
+
+## Overview
+
+`/review-code` runs an adversarial, diff-level code review and reports correctness bugs and quality cleanups. It is the standalone sibling of the diff-review pass embedded in `/qa-story` (Phase 1.6) and `/qa-task` (Step 3b): all three dispatch the **same** reviewer prompt — the single source of truth at [`references/code-review-prompt.md`](references/code-review-prompt.md). The difference is orchestration, not the reviewer:
+
+- `/review-code` works on **any diff** (working tree or a PR), needs **no work-item document and no quality gate**, and can act on findings (`--comment`, `--fix`).
+- The QA skills review a diff scoped to a tracked story/task and feed findings into the QA gate.
+
+The reviewer subagent is **always read-only**. Posting comments and applying fixes are decisions this skill makes from the returned findings — never the subagent.
+
+## When to Use This Skill
+
+- "Review my changes" / "review this diff" / "code review my branch"
+- "Review PR 123" / "review this pull request"
+- Before opening a PR, to catch bugs and cleanups in the working tree
+- As a customizable, self-hosted alternative to the built-in `/code-review` skill
+
+Do **not** use this for a full QA gate against a story/task — use `/qa-story` or `/qa-task` (which already include this review as one phase).
+
+## Arguments
+
+Invoke as `/review-code [target] [--effort LEVEL] [--comment] [--fix]`.
+
+| Arg | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| `target` | _(none)_ \| `<PR-number>` \| `<base>...<head>` \| `--staged` | working-tree changes vs `HEAD` | What to review |
+| `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision (see below) |
+| `--comment` | flag | off | Post findings as inline PR comments |
+| `--fix` | flag | off | Apply findings to the working tree (no commit) |
+
+**Effort** scales coverage, not the output contract:
+
+- `low` / `medium` — few, high-confidence findings (favour precision).
+- `high` / `max` — broader coverage; may surface `confidence: low` candidates, clearly labelled as uncertain.
+
+`--comment` and `--fix` are independent and may be combined. With neither, the review is advisory — findings are printed only.
+
+## Workflow
+
+### Step 1 — Resolve scope and build the diff patch file
+
+Keep raw diff bytes out of main context by writing the diff to a temp patch file (in the session scratchpad, not the repo). Pick the scope from `target`:
+
+```bash
+DIFF_FILE="$(mktemp -t review-code.XXXXXX.patch)"
+
+# Default: uncommitted working changes
+git diff HEAD > "$DIFF_FILE"
+
+# --staged: staged changes only
+# git diff --staged > "$DIFF_FILE"
+
+# <base>...<head>: an explicit range
+# git diff "$BASE"...HEAD > "$DIFF_FILE"
+
+# <PR-number>: resolve the PR base, then diff against it
+# BASE=$(gh pr view "$PR" --json baseRefName -q .baseRefName)   # GitHub
+# git fetch -q origin "$BASE" && git diff "origin/$BASE"...HEAD > "$DIFF_FILE"
+```
+
+If the diff is empty, report "no changes to review" and stop.
+
+### Step 2 — Dispatch the reviewer subagent (read-only)
+
+Dispatch **one read-only Explore subagent** with the prompt from [`references/code-review-prompt.md`](references/code-review-prompt.md) — the single source of truth. Pass the **Prompt Template** verbatim, substituting `<DIFF_FILE>` with the patch path and `<WORKING_DIR>` with the repo root. Fold the resolved `--effort` level into the dispatch (more agents / broader instruction at `high`/`max`; one focused pass at `low`/`medium`). Never read the raw diff into main context.
+
+The subagent returns a `code_review:` YAML findings block (schema defined in the prompt). Parse it; do not invent or augment findings.
+
+### Step 3 — Render findings (always)
+
+Print findings to the user, sorted bugs-before-cleanups then by severity, each as:
+
+```
+[CR-1] bug · high · confidence: high — src/x/y.ts:42
+  what is wrong
+  → suggested action
+```
+
+If `truncated_count > 0`, note that N additional lower-severity findings were omitted. If there are no findings, say so plainly.
+
+### Step 4 — `--comment` (optional)
+
+Only if `--comment` is set and a PR exists for the current branch (or `target` named one):
+
+1. Source the platform helper and resolve the tracker:
+   ```bash
+   # shellcheck source=references/resolve-platform.sh
+   . "$(dirname "$0")/references/resolve-platform.sh"   # adjust to the bundled path in this install
+   ```
+2. **GitHub** (`TRACKER=github`): post each finding as an inline review comment at its `file_line`; fall back to a single summary comment via `tracker_call_with_retry gh pr comment "$PR_URL"` when line anchoring fails or there is no PR.
+3. **Bitbucket / Jira**: post a summary comment via the platform's PR-comment path (mirror `/qa-story` step 6).
+
+Wrap every remote call in `tracker_call_with_retry` (3× exponential backoff) — see [`references/resolve-platform.sh`](references/resolve-platform.sh). Both bugs and cleanups post; commenting never gates anything.
+
+### Step 5 — `--fix` (optional)
+
+Only if `--fix` is set:
+
+1. Apply each finding's `suggested_action` to the working tree. **Do not commit** — leave changes for the user to review.
+2. Apply **bugs** by default; apply **cleanups** only when the user explicitly opts in (e.g. `--fix=all`), since cleanups are quality-of-life and may be subjective.
+3. After applying, re-render which findings were applied vs. skipped (and why), so the user can audit the edits against the diff.
+
+For a fix-and-simplify pass focused purely on quality (no bug hunting), prefer the `/simplify` skill.
+
+### Step 6 — Cleanup
+
+```bash
+rm -f "$DIFF_FILE"
+```
+
+## Customization
+
+Because this skill and the QA passes share one prompt, customise the reviewer in **one place** — the source prompt `code-review-prompt.md` under the repo's `shared/resources/` directory, **not** the bundled `references/` copy beside this skill (that copy carries an `AUTO-GENERATED — DO NOT EDIT` header and is overwritten by the bundler). After editing the source, run `npm run bundle`; the change propagates to `/review-code`, `/qa-story`, and `/qa-task` together. Add or reword the "What to look for" categories, tighten the discipline rules, or extend the output contract there.
+
+Orchestration that is specific to standalone review — argument parsing, scoping, the `--comment`/`--fix` behaviour — lives in this SKILL.md and does not affect the QA skills.
+
+## Relationship to Other Skills
+
+- **`/code-review`** (built-in) — `/review-code` is the self-hosted, customizable replacement.
+- **`/qa-story`, `/qa-task`** — run the same reviewer as one phase of the QA gate; use those when you have a tracked work item.
+- **`/simplify`** — quality-only fix pass (reuse/simplification/efficiency); use when you do not want bug hunting.
+- **`/qa-fix`** — consumes gate `top_issues[]`; the QA path (not `/review-code`) feeds it.
+
+## Relationship to the develop pipelines
+
+`/develop-story` and `/develop-task` do **not** call `/review-code`. They get the code-review-and-fix loop through their QA step: `qa-story`/`qa-task` already run this same reviewer prompt every cycle, and the pipeline passes `code_review_blocking=true` so high-confidence bugs gate the build and get fixed by `qa-fix` on the next cycle (a story/task opts out with `code_review_blocking: false`). Use `/review-code` for ad-hoc, human-in-the-loop reviews **outside** that automated loop — e.g. a quick sweep (and optional `--fix`) of the working tree before opening a PR.
