@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.17.0] - 2026-06-27
+
 ### Added
 - **New `review-code` skill (`/review-code`):** a standalone, self-hosted alternative to the built-in `/code-review`. Runs the same adversarial diff reviewer the QA skills use, but against any diff (working tree, a `<base>...<head>` range, `--staged`, or a PR) with no work-item document or quality gate required. Advisory by default; `--comment` posts findings as inline PR comments, `--fix` applies them to the working tree (no commit). `--effort low|medium|high|max` scales coverage. The reviewer subagent stays read-only — commenting/fixing are orchestration decisions the skill makes from the returned findings.
 
