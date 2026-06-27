@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.17.1] - 2026-06-27
+
 ### Fixed
 - **`develop-pipeline` PreCompact hook now snapshots resume state before it removes the pipeline lock (task.48):** the `develop-pipeline-on-precompact.sh` hook removed the lock via an unconditional `trap 'rm -f "$LOCK"' EXIT`. A harness kill (SIGTERM/timeout) before the graceful-pause flow completed still fired the trap, deleting the lock with **no resume artifact** — leaving the pipeline both unlocked *and* un-resumable (no lock, no `last-halt.json` for Phase 0b; observed live in the task.46 run). The hook now writes `develop-pipeline.last-halt.json` (a lock superset tagged `pause_reason: "precompact"`, `paused_at`, `halt_step = current_step`) **once, early** — before the EXIT trap is armed and before any `rm` — with a `cp` fallback that still preserves `current_step` when `jq` is absent. `LOCK` is parameterised via `PIPELINE_LOCK` (mirroring `advance-pipeline-lock.sh`) so the hook can be sandboxed in tests. New regression test `develop-pipeline-on-precompact.test.sh` (wired into `npm test`) covers the jq-absent mid-run kill, the success path (snapshot tagged, `PIPELINE-PAUSE-SIGNAL` still emitted), and the no-lock re-fire noop. Docs (`develop-pipeline-hooks.md`, `develop-pipeline-pause.md`, `pipeline-resume-detector-prompt.md`) note the snapshot-before-removal guarantee and that the resume detector reads `pause_reason` for precompact snapshots. Bundled per-skill `references/` copies updated to match.
 
