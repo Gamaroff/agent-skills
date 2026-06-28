@@ -74,6 +74,8 @@ Load and parse:
 - Section structure (including nested sections)
 - Section properties (instruction, elicit, repeatable, conditions, agent permissions)
 
+> **OKF frontmatter (v0.1):** the generated document's YAML frontmatter must carry a non-empty `type` (OKF's one hard requirement — e.g. `prd`, `epic`, `architecture`) and should carry a one-sentence `description` (OKF-recommended); `tags` is optional. Derive `type` from the template's domain when the template metadata does not specify it. See [OKF conformance](references/open-knowledge-format.md).
+
 ### 3. Set Preferences
 
 - Show current mode: **Interactive** (default) or **YOLO** (user can toggle with `#yolo`)

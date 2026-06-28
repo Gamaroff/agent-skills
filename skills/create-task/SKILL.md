@@ -414,8 +414,8 @@ Once validated:
 2. **Generate Markdown File**
    - Populate with all user-provided content
    - Format with proper markdown structure
-   - Add status: `📋 Planned`
-   - Set creation date to today
+   - Emit a YAML frontmatter block (per `resources/task-template.md`) with: `id`, `title`, `type: task`, `description` (a one-sentence summary — recommended), optional `tags`, `category`, `status`, `priority`, `created`, `updated`, `assignee`. `type` is OKF's one hard requirement; `description` is OKF-recommended. See [OKF conformance](references/open-knowledge-format.md).
+   - Set frontmatter `status: planned` (body `**Status:** Planned`) and both `created`/`updated` to today
    - Initialize empty progress tracking checkboxes
 
 3. **Create Placeholder Notes**

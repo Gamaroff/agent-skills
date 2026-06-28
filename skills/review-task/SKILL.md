@@ -464,6 +464,11 @@ options:
    - Effort: Should have estimate
    - Dependencies: Should list other tasks if applicable
 
+3a. **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)):
+   - `type: task` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement; also flag a legacy bold-line `**Task ID**:` header with no YAML frontmatter block as Critical — the task must use a YAML frontmatter block).
+   - `description` (one-sentence summary) present → **Important** if missing.
+   - `tags` is a YAML list (when present); `resource` is a URI (when present) → **Optional** if malformed. `updated` ≡ OKF `timestamp`; the tracker URL (derived from `github_issue`, or `jira_url`) ≡ OKF `resource` — absence of an explicit `resource` is not a finding.
+
 4. **Placeholder Detection**:
    - Search for: `[TBD]`, `[TODO]`, `[PLACEHOLDER]`, `???`, `[Description]`
    - Each unfilled placeholder is a gap

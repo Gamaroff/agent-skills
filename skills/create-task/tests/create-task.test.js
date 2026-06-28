@@ -154,14 +154,18 @@ test("populateTaskTemplate — fills title, id, date, metadata", () => {
     created: "2026-05-10",
     priority: "High",
     assignee: "platform-team",
-    estimated_effort: "3 days",
+    estimated_effort_hours: 24,
   });
   assert.match(out, /# Technical Task Template: Cache-lib Simplification/);
-  assert.match(out, /\*\*Task ID\*\*: TASK-42/);
-  assert.match(out, /\*\*Created\*\*: 2026-05-10/);
-  assert.match(out, /\*\*Priority\*\*: High/);
-  assert.match(out, /\*\*Assignee\*\*: platform-team/);
-  assert.match(out, /\*\*Estimated Effort\*\*: 3 days/);
+  // OKF v0.1 YAML frontmatter (replaces the legacy bold-line header).
+  assert.match(out, /^id: task\.42$/m);
+  assert.match(out, /^title: "Cache-lib Simplification"$/m);
+  assert.match(out, /^type: task$/m);
+  assert.match(out, /^created: 2026-05-10$/m);
+  assert.match(out, /^updated: 2026-05-10$/m);
+  assert.match(out, /^priority: High$/m);
+  assert.match(out, /^assignee: platform-team$/m);
+  assert.match(out, /^estimated_effort_hours: 24$/m);
   // Untouched body placeholders remain so caller knows what's still missing.
   assert.match(out, /\[2-3 sentence description/);
 });

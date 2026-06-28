@@ -225,6 +225,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 - Directory follows `prd.[kebab-name]/` convention
 - Change Log exists and has at least one entry
 - YAML frontmatter present with `status`, `version`, `created`, `updated` fields
+- **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)): `type: prd` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement); `description` (one-sentence summary) present → **Important** if missing; `tags` is a list / `resource` is a URI when present → **Optional** if malformed
 
 **Optional pm-checklist integration**: If `run_pm_checklist` is true, invoke the pm-checklist skill here and incorporate its 9-category findings into this step. Otherwise, perform the lighter structural check above.
 

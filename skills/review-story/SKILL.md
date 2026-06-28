@@ -546,6 +546,11 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
      - ❌ `story-2-1-auto-hide.md`
      - ❌ `2.1-auto-hide.md`
 
+2a. **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)):
+   - `type: story` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement).
+   - `description` (one-sentence summary) present → **Important** if missing.
+   - `tags` is a YAML list (when present); `resource` is a URI (when present) → **Optional** if malformed. `updated` ≡ OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) ≡ OKF `resource` — absence of an explicit `resource` is not a finding.
+
 3. **Placeholder Detection**:
    - Search for: `{{...}}`, `_TBD_`, `[TODO]`, `[PLACEHOLDER]`, `???`
    - Each unfilled placeholder is a gap

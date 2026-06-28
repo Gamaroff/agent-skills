@@ -69,6 +69,8 @@ epic.165.chat-encryption.md
 
 epic_number: 163
 title: Account Security Enhancement
+type: epic
+description: One-sentence summary of the epic
 domain: Account
 status: 🔄 In Progress
 priority: High
@@ -80,7 +82,7 @@ target_completion: 2026-01-15
 
 \`\`\`
 
-**Required Fields**: epic_number, title, domain, status, priority, estimated_stories, created, target_completion
+**Required Fields**: epic_number, title, type, domain, status, priority, estimated_stories, created, target_completion (`description` recommended; `tags`/`resource` optional — see [OKF](#open-knowledge-format-okf-conformance))
 
 ### Story Frontmatter
 
@@ -89,6 +91,8 @@ target_completion: 2026-01-15
 epic_number: 163
 story_number: 1
 title: Implement Mnemonic Encryption Service
+type: story
+description: One-sentence summary of the story
 status: ✅ Complete
 priority: High
 estimated_effort: 5
@@ -99,7 +103,15 @@ completed: 2026-01-05
 
 \`\`\`
 
-**Required Fields**: epic_number, story_number, title, status, priority, estimated_effort, created
+**Required Fields**: epic_number, story_number, title, type, status, priority, estimated_effort, created (`description` recommended; `tags`/`resource` optional — see [OKF](#open-knowledge-format-okf-conformance))
+
+## Open Knowledge Format (OKF) conformance
+
+All document frontmatter targets [OKF v0.1](references/open-knowledge-format.md). Apply these severities when validating any epic, story, task, or PRD:
+
+- **`type` present and non-empty → Critical.** OKF's one hard requirement; flag a missing or empty `type` as a Critical finding (this is the gate that `documentation-standards-validator` must now enforce).
+- **`description` present (one-sentence summary) → Important.** Flag a missing `description` as Important.
+- **`tags` is a YAML list (when present); `resource` is a valid URI (when present) → Optional.** Flag only when malformed. Absence is not a finding (`updated` ≡ OKF `timestamp`; tracker URL ≡ OKF `resource`).
 
 ## Status Indicators
 
@@ -140,6 +152,9 @@ completed: 2026-01-05
 
 - [ ] All required fields present
 - [ ] Correct field names (epic_number not epicNumber)
+- [ ] `type` present and non-empty (OKF — Critical when missing)
+- [ ] `description` present (OKF — Important when missing)
+- [ ] `tags` (if present) is a list; `resource` (if present) is a URI (OKF — Optional)
 - [ ] Valid status indicator
 - [ ] ISO dates (YYYY-MM-DD)
 - [ ] Proper YAML syntax
