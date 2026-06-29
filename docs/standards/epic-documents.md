@@ -33,6 +33,8 @@ See [file naming](./file-naming.md). Pattern: `epic.{N}.{name}.md`. Directory st
 epic_number: 178
 title: "Feature UI"
 type: epic
+description: "One-sentence summary of what this epic delivers."
+tags: [auth, ui]
 domain: auth
 status: in-progress
 priority: High
@@ -45,7 +47,9 @@ updated: 2026-01-15
 |---|---|---|---|
 | `epic_number` | integer | Yes | Globally unique — register in [epic registry](./epic-registry.md) |
 | `title` | string | Yes | Human-readable title |
-| `type` | literal | Yes | Must be exactly `epic` |
+| `type` | literal | Yes | Must be exactly `epic` (OKF `type` — the one hard requirement) |
+| `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
+| `tags` | list | Optional | Short strings for cross-cutting categorization (OKF `tags`) |
 | `domain` | string | Yes | Path segment matching the directory (e.g. `auth`, `billing`) |
 | `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
 | `priority` | enum | Yes | `Critical`, `High`, `Medium`, `Low` |
@@ -56,6 +60,9 @@ updated: 2026-01-15
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
+| `resource` | string | Optional | Canonical URI (OKF `resource`). For epics, `github_url`/`jira_url` already serve this; set explicitly only to override |
+
+> **OKF mapping:** `updated` (ISO 8601) is this repo's OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) is OKF `resource`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
 
 ## Status lifecycle
 

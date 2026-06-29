@@ -16,6 +16,9 @@
 
 epic_number: N
 title: "[Epic Name]"
+type: epic
+description: "[One-sentence summary of what this epic delivers]"
+tags: []
 domain: "[Domain]"
 status: "📋 Planned"
 priority: "Critical | High | Medium | Low"

@@ -149,6 +149,9 @@ When `PRD_SOURCE_PATH` is `brownfield-enhancement`, skip URL resolution and omit
 ---
 epic_number: N
 title: "[Enhancement Name]"
+type: epic
+description: "[One-sentence summary of what this epic delivers]"
+tags: []
 domain: "[Domain]"
 status: "📋 Planned"
 priority: "Critical | High | Medium | Low"
@@ -331,7 +334,7 @@ On failure it logs a warning and returns empty — never halts.
 After generating the epic file, invoke `documentation-standards-validator` to confirm:
 
 - Filename uses dots as separators (`epic.NUMBER.descriptive-name.md`)
-- All required YAML frontmatter fields are present (epic_number, title, domain, status, priority, estimated_stories, created, target_completion)
+- All required YAML frontmatter fields are present (epic_number, title, `type: epic`, domain, status, priority, estimated_stories, created, target_completion; `description` recommended, `tags` optional — see [OKF conformance](references/open-knowledge-format.md))
 - Status indicator uses the standard icon (✅ 🔄 ⚠️ ❌ 📋)
 - File placed in correct location (`${PRD_ROOT}/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
 

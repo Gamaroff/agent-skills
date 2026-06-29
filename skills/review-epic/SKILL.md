@@ -203,7 +203,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 | Section                | Checks                                                                                                                                              |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| YAML Frontmatter       | `epic_number`, `title`, `domain`, `status`, `priority`, `estimated_stories`, `created`, `target_completion`, `prd_source` all present and valid values (these are the fields `create-epic` and `docs/templates/epic-template.md` emit) |
+| YAML Frontmatter       | `epic_number`, `title`, `type`, `domain`, `status`, `priority`, `estimated_stories`, `created`, `target_completion`, `prd_source` all present and valid values (these are the fields `create-epic` and `docs/templates/epic-template.md` emit). See the OKF frontmatter check below for `type`/`description`/`tags`/`resource` severities |
 | Epic Goal              | Single clear statement (1-2 sentences), measurable, outcome-focused                                                                                 |
 | Background & Context   | PRD source linked, system integration listed, prerequisites with status                                                                             |
 | Epic Description       | Primary deliverables list, Out of Scope explicitly stated, Success Criteria with ≥3 measurable items                                                |
@@ -224,6 +224,10 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 - **Title format** (Major): if the `title` frontmatter embeds an epic number prefix it **must** use the canonical bracket form `[Epic N] Name` — not the colon form `Epic N: Name`. Detect by matching `^\s*Epic\s+\d+\s*:` against the title value. Flag as a **Major** issue when the colon form is found, because `sync-jira-epic` normalises on push but the local doc title and any manually-created Jira issue will show the wrong format until corrected. The fix is: update `title` in frontmatter to bracket form and re-run `sync-jira-epic` so the Jira issue summary is corrected in the same operation.
 - **`prd_source` resolves to a real file** (Critical): unless the value is the standalone sentinel `brownfield-enhancement`, the path must point to an actual file in the repo. Flag as a **Critical** issue if the file is missing, the path is still the `[source-document].md` placeholder, or `prd_source` is absent entirely. Stakeholders cannot navigate to a PRD that isn't linked.
 - **PRD reference visible in the body** (Major): the epic body must contain a clickable PRD reference (a `**Source PRD**:` line or any markdown link to the `prd_source` path), not just the frontmatter field. Flag as a **Major** issue if the path lives only in frontmatter — readers of the rendered markdown won't see it. (Skip both checks when `prd_source` is `brownfield-enhancement`.)
+- **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)):
+  - `type: epic` present and non-empty → **Critical** if missing or empty (OKF's one hard requirement).
+  - `description` present (one-sentence summary) → **Important** if missing.
+  - `tags` is a YAML list (when present) and `resource` is a valid URI (when present) → **Optional** if malformed. Absence is not a finding.
 
 **Collect all issues** — do NOT ask questions yet. Proceed to Step 3.
 

@@ -146,6 +146,10 @@ If Project Brief is missing, the template will guide gathering this during the G
    └─ (brownfield) Integration testing & rollback guidance
 ```
 
+## PRD Frontmatter (OKF conformance)
+
+The PRD's YAML frontmatter (written during "Interactive PRD Creation") must include OKF v0.1 fields: a non-empty `type: prd` (OKF's one hard requirement), a one-sentence `description` (OKF-recommended), and optional `tags`. These sit alongside the existing `name`, `title`, `mode`, `status`, `version`, `created` fields. See [prd-documents.md](../../docs/standards/prd-documents.md) and [OKF conformance](references/open-knowledge-format.md).
+
 ## Detailed Execution Steps
 
 ### Step 1: Pre-Flight Check & Analysis

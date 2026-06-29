@@ -48,7 +48,9 @@ updated: 2026-01-15
 |---|---|---|---|
 | `id` | string | Yes | `task.N` — integer ID unique across the project |
 | `title` | string | Yes | Human-readable title |
-| `type` | literal | Yes | Must be exactly `task` |
+| `type` | literal | Yes | Must be exactly `task` (OKF `type` — the one hard requirement) |
+| `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
+| `tags` | list | Optional | Short strings for cross-cutting categorization (OKF `tags`) |
 | `category` | enum | Yes | `refactoring`, `infrastructure`, `documentation`, `testing`, `other` |
 | `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
 | `priority` | enum | Yes | `Critical`, `High`, `Medium`, `Low` |
@@ -66,6 +68,9 @@ updated: 2026-01-15
 | `pr_number` | integer | Optional | Set by pipeline after PR creation — do not set manually |
 | `completed_date` | ISO date | Optional | Set by `finalise` when status reaches `accepted` |
 | `source_plan` | string | Optional | Path to an upstream plan file, for traceability |
+| `resource` | string | Optional | Canonical URI (OKF `resource`). Tasks carry a bare `github_issue` number → derive `{repo_url}/issues/{github_issue}`; set `resource` explicitly only to override |
+
+> **OKF mapping:** `updated` (ISO 8601) is this repo's OKF `timestamp`; the tracker URL is OKF `resource` — for tasks, derived from `github_issue` (`{repo_url}/issues/{github_issue}`) or taken from `jira_url`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
 
 ## Required body sections
 

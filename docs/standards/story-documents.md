@@ -57,7 +57,9 @@ updated: 2026-01-15
 |---|---|---|---|
 | `epic` | string | **YES — HARD GATE** | Must match the parent epic's directory stem, e.g. `epic.178.feature-ui`. Pipeline **HALTS** immediately if absent |
 | `title` | string | Yes | Human-readable title |
-| `type` | literal | Yes | Must be exactly `story` |
+| `type` | literal | Yes | Must be exactly `story` (OKF `type` — the one hard requirement) |
+| `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
+| `tags` | list | Optional | Short strings for cross-cutting categorization (OKF `tags`) |
 | `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
 | `priority` | enum | Yes | `High`, `Medium`, `Low` |
 | `assignee` | string | Yes | `TBD` or a name |
@@ -69,6 +71,9 @@ updated: 2026-01-15
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` — pipeline creates one if tracker is Jira and this is absent |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
+| `resource` | string | Optional | Canonical URI (OKF `resource`). For stories, `github_url`/`jira_url` already serve this; set explicitly only to override |
+
+> **OKF mapping:** `updated` (ISO 8601) is this repo's OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) is OKF `resource`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
 
 ## Section ownership
 

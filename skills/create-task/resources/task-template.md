@@ -1,12 +1,21 @@
+---
+id: task.[ID]
+title: "[TASK_TITLE]"
+type: task
+description: "[One-sentence summary of what this task accomplishes]"
+tags: []
+category: refactoring # refactoring | infrastructure | documentation | testing | other
+status: planned
+priority: Medium # Critical | High | Medium | Low
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+assignee: TBD
+estimated_effort_hours: 0
+---
+
 # Technical Task Template: [TASK_TITLE]
 
-**Task ID**: TASK-[ID]
-**Created**: YYYY-MM-DD
-**Status**: 📋 Planned | 🔄 In Progress | ⏸️ Paused | ✅ Completed | ❌ Cancelled
-**Priority**: Critical | High | Medium | Low
-**Assignee**: [Developer or team name]
-**Estimated Effort**: [Hours or days]
-**Completed**: [When applicable]
+**Status:** Planned
 
 ---
 
@@ -396,7 +405,7 @@
 
 ---
 
-**Status**: 📋 Planned
+**Status:** Planned
 
 **Next Steps**:
 1. Implement according to implementation plan

@@ -27,6 +27,41 @@ When sharded, the body splits across files in `prd.{feature}/` per level-2 secti
 - Main PRD file: `prd.{feature}.md` (same name as the parent directory, with `.md` extension).
 - Directory segments (`{domain}`) are kebab-case, all lowercase.
 
+## Frontmatter schema
+
+```yaml
+---
+name: prd.onboarding
+title: "agent-skills Onboarding & Tutorials"
+type: prd
+description: "One-sentence summary of the feature area this PRD frames."
+mode: brownfield
+status: draft
+version: 0.1.0
+created: 2026-05-11
+tags: [onboarding, docs]
+---
+```
+
+| Field | Type | Required | Values / Notes |
+|---|---|---|---|
+| `name` | string | Yes | `prd.{feature}` — matches the directory and file stem |
+| `title` | string | Yes | Human-readable title |
+| `type` | literal | Yes | Must be exactly `prd` (OKF `type` — the one hard requirement) |
+| `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
+| `mode` | literal | Yes | `greenfield` or `brownfield` |
+| `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
+| `version` | string | Recommended | SemVer of the PRD (e.g. `0.1.0`) |
+| `created` | ISO date | Yes | `YYYY-MM-DD` |
+| `updated` | ISO date | Optional | `YYYY-MM-DD` — update on every change (this repo's OKF `timestamp`) |
+| `tags` | list | Optional | Short strings for cross-cutting categorization (OKF `tags`) |
+| `resource` | string | Optional | Canonical URI (OKF `resource`); set explicitly when the PRD maps to an external asset |
+| `author` | string | Optional | Authoring role or person |
+| `source_plan` | string | Optional | Path to an upstream plan file, for traceability |
+| `stepsCompleted` | list | Optional | Elicitation steps completed (set by `create-prd`/`new-product-prd`) |
+
+> **OKF mapping:** `updated` (or `created` when `updated` is absent) is this repo's OKF `timestamp`; an explicit `resource` is OKF `resource`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
+
 ## Body sections (greenfield template)
 
 `create-prd` / `new-product-prd` produces a document with these eight level-2 sections:

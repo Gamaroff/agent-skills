@@ -319,6 +319,25 @@ Recommend following Project Structure Guide for consistency.
 
 ### 5.2 Fill Basic Story Information
 
+**Emit YAML frontmatter** conforming to [story-documents.md](../../docs/standards/story-documents.md) and [OKF v0.1](references/open-knowledge-format.md). Required/recommended fields:
+
+```yaml
+---
+epic: epic.{epicNum}.{epic-name}
+title: "{story title}"
+type: story            # OKF's one hard requirement — must be exactly `story`
+description: "{one-sentence summary of the story}"   # OKF-recommended
+tags: []               # optional — short cross-cutting labels
+status: draft
+priority: Medium
+assignee: TBD
+created: {today}
+updated: {today}
+---
+```
+
+`type` and `description` are mandatory to emit (`type` is OKF-required, `description` OKF-recommended); `tags` is optional. Tracker fields (`github_issue`/`jira_key`/`jira_url`) and `estimated_effort_hours` are written later by the optional sync/estimate steps.
+
 Populate these sections:
 
 **Status**: `Draft`

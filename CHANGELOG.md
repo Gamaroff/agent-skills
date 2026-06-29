@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- **Open Knowledge Format (OKF) v0.1 conformance for document tooling (task.35):** a new single-source-of-truth mapping doc `shared/resources/open-knowledge-format.md` documents the repo's conformance (`okf_version: "0.1"`), the `updated` ≡ OKF `timestamp` and tracker-URL (`github_url`/`jira_url`, or derived from `github_issue`) ≡ OKF `resource` mappings, the validation severities, the migration path for existing docs, and the intentionally out-of-scope OKF features. Linked from `AGENTS.md` and all four `docs/standards/{epic,story,task,prd}-documents.md` schemas, and bundled into the ten consuming `create-*`/`review-*`/`documentation-standards-validator` skills.
+
+### Changed
+- **Document templates and skills now emit OKF recommended fields (task.35, additive, going-forward only):** every document template emits a non-empty `type` (OKF's one hard requirement). `skills/create-task/resources/task-template.md` was converted from a bold-line header to a YAML frontmatter block (`id`, `title`, `type: task`, `description`, optional `tags`, `category`, `status`, `priority`, `created`, `updated`, `assignee`). `docs/templates/epic-template.md` and the `create-task`/`create-epic`/`create-story`/`create-prd`/`create-doc` skills now emit `type`, a recommended `description`, and optional `tags`. `docs/standards/{epic,story,task}-documents.md` gained `description`/`tags`/`resource` schema rows + the `updated`≡`timestamp` mapping note; `docs/standards/prd-documents.md` gained a full frontmatter schema table (it previously had none). No existing `docs/` document was retrofitted.
+- **Review tooling enforces OKF `type` (task.35):** `review-epic`, `review-story`, `review-task`, `review-prd`, and `documentation-standards-validator` now flag a missing/empty `type` as **Critical**, a missing `description` as **Important**, and malformed `tags`/`resource` as **Optional**. Previously `review-epic` and `documentation-standards-validator` did not enforce `type`. Existing docs are not retrofitted — the gate applies to docs created/edited under the updated skills (a one-line `type:` fix on next review).
+
 ## [v0.17.1] - 2026-06-27
 
 ### Fixed

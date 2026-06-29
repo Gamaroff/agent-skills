@@ -1,0 +1,53 @@
+schema: 1
+task: 'task.35.okf-conformance-document-skills'
+task_title: 'Conform document skills, templates, and standards to OKF v0.1'
+gate: PASS
+status_reason: 'All 11 success criteria met; 183/183 tests pass; bundle idempotent; 10/10 skills validate; no existing docs retrofitted. Code review found no correctness bugs.'
+reviewer: 'QA Engineer'
+updated: '2026-06-28T00:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 183
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+  success_criteria: '11/11 mapped (see .summaries/qa-traceability-matrix.md)'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Documentation/skills task — no auth, secrets, or runtime code paths touched. Additive frontmatter fields only.'
+  performance:
+    status: PASS
+    notes: 'No runtime impact. Bundle is idempotent (second run = no diff); catalog regenerated with no diff.'
+  reliability:
+    status: PASS
+    notes: 'Rollback plan documented (git revert + re-bundle). Additive-only change; consumers tolerate unknown/missing OKF fields by spec.'
+  maintainability:
+    status: PASS
+    notes: 'Single-source OKF mapping doc; standards/templates/skills aligned to it. populateTaskTemplate + unit test updated for the new YAML frontmatter.'
+
+code_review:
+  bugs: 0
+  cleanups: 2
+  blocking: false
+  note: 'code_review_blocking=true override active, but no category:bug + confidence:high finding — gate unaffected. Two low cleanups are advisory (lib.js timestamp/regex comments).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Optionally add an inline comment in populateTaskTemplate noting created/updated are synced at creation and that `[^\n]+` intentionally strips trailing template comments.'
+      refs: ['skills/create-task/scripts/lib.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
