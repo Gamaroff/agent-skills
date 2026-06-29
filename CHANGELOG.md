@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.18.0] - 2026-06-29
+
 ### Added
 - **Open Knowledge Format (OKF) v0.1 conformance for document tooling (task.35):** a new single-source-of-truth mapping doc `shared/resources/open-knowledge-format.md` documents the repo's conformance (`okf_version: "0.1"`), the `updated` ≡ OKF `timestamp` and tracker-URL (`github_url`/`jira_url`, or derived from `github_issue`) ≡ OKF `resource` mappings, the validation severities, the migration path for existing docs, and the intentionally out-of-scope OKF features. Linked from `AGENTS.md` and all four `docs/standards/{epic,story,task,prd}-documents.md` schemas, and bundled into the ten consuming `create-*`/`review-*`/`documentation-standards-validator` skills.
 
