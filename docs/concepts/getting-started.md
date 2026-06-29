@@ -221,7 +221,7 @@ python3 skills/create-skill/scripts/package_skill.py skills/develop-story
 # In your target project:
 mkdir -p .agents/skills
 cp /path/to/agent-skills/skills/develop-story/develop-story.zip .agents/skills/
-unzip .agents/skills/develop-story.zip -d .agents/skills/develop-story/
+unzip .agents/skills/develop-story.zip -d .agents/skills/
 ```
 
 Repeat for each skill you want. The packager auto-bundles shared resources, so each zip is self-contained.
