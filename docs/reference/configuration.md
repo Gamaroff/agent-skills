@@ -124,6 +124,18 @@ prd:
 architecture:
   architectureShardedLocation: docs/architecture
 
+# Local document status -> this project's Jira workflow status names.
+# Values shown are the built-in defaults; edit the right-hand names to match your workflow.
+jira:
+  statusMap:
+    draft: To Do
+    planned: To Do
+    ready-for-development: To Do
+    in-progress: In Progress
+    ready-for-review: In Review
+    accepted: Done
+    cancelled: Cancelled
+
 # Loaded into every pipeline run
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
