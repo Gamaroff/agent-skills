@@ -804,6 +804,26 @@ const DEFAULT_STATUS_MAP = {
   "wontfix": "Won't Do",
 };
 
+// Strip a YAML-style inline trailing comment from a scalar value. A `#` starts
+// a comment only at the start of the token or when preceded by whitespace, and
+// never inside single/double quotes. Trailing whitespace is removed; any
+// surrounding quotes are left for the caller to strip.
+function stripInlineComment(s) {
+  const str = String(s == null ? "" : s);
+  let quote = null;
+  for (let j = 0; j < str.length; j++) {
+    const ch = str[j];
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === "#" && (j === 0 || /\s/.test(str[j - 1]))) {
+      return str.slice(0, j).replace(/\s+$/, "");
+    }
+  }
+  return str.replace(/\s+$/, "");
+}
+
 // Parse a `jira:` → `statusMap:` block out of skills-config.yaml text. Kept to
 // a self-contained indentation scanner (no YAML dependency — pyyaml is not
 // reliably installed in consumer environments). Supports the documented block
@@ -820,7 +840,7 @@ function parseStatusMapBlock(text) {
   let i = 0;
   // find top-level `jira:`
   for (; i < lines.length; i++) {
-    if (/^jira:\s*$/.test(lines[i])) { i++; break; }
+    if (/^jira:\s*(#.*)?$/.test(lines[i])) { i++; break; }
   }
   if (i >= lines.length) return out;
   const jiraIndent = 0;
@@ -830,7 +850,7 @@ function parseStatusMapBlock(text) {
     const raw = lines[i];
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
     if (indentOf(raw) <= jiraIndent) return out; // left the jira block
-    if (/^\s+statusMap:\s*$/.test(raw)) { smIndent = indentOf(raw); i++; break; }
+    if (/^\s+statusMap:\s*(#.*)?$/.test(raw)) { smIndent = indentOf(raw); i++; break; }
   }
   if (smIndent < 0) return out;
   // collect `key: value` entries indented deeper than statusMap
@@ -841,7 +861,7 @@ function parseStatusMapBlock(text) {
     const m = raw.trim().match(/^("?[^":]+"?|'[^']+'):\s*(.+?)\s*$/);
     if (!m) continue;
     const key = m[1].replace(/^["']|["']$/g, "").trim();
-    const val = m[2].replace(/^["']|["']$/g, "").trim();
+    const val = stripInlineComment(m[2]).replace(/^["']|["']$/g, "").trim();
     if (key && val) out[key] = val;
   }
   return out;
@@ -892,7 +912,7 @@ function parseJiraScalar(text, key) {
   let i = 0;
   // find top-level `jira:`
   for (; i < lines.length; i++) {
-    if (/^jira:\s*$/.test(lines[i])) { i++; break; }
+    if (/^jira:\s*(#.*)?$/.test(lines[i])) { i++; break; }
   }
   if (i >= lines.length) return "";
   // scan entries inside the jira block. Only consider DIRECT children (the
@@ -907,7 +927,7 @@ function parseJiraScalar(text, key) {
     if (childIndent < 0) childIndent = ind;  // first child fixes the direct-child level
     if (ind !== childIndent) continue;       // skip deeper nested entries
     const m = raw.trim().match(keyRe);
-    if (m) return m[1].replace(/^["']|["']$/g, "").trim();
+    if (m) return stripInlineComment(m[1]).replace(/^["']|["']$/g, "").trim();
   }
   return "";
 }

@@ -335,6 +335,17 @@ test("loadStatusMap — merges jira.statusMap over defaults", () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("loadStatusMap — tolerates inline comments on the statusMap opener and value lines", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-epic-comment-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n");
+  const map = lib.loadStatusMap(dir);
+  assert.equal(map["accepted"], "Shipped");
+  assert.equal(map["in-progress"], "In Progress");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 // ---------------------------------------------------------------------------
 // findExistingByLabel — POST /search/jql shape
 // ---------------------------------------------------------------------------

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+- **`skills-config.yaml` Jira parser now strips YAML inline `#` comments:** the hand-rolled scalar/status-map parser in `shared/resources/jira-sync.js` captured everything after the colon verbatim, so a value carrying a trailing comment — e.g. `devEstimateField: customfield_10594 # optional — ...` — was passed to Jira including the comment text, which Jira rejected on issue creation. This was self-inflicted: `setup-consumer.sh` scaffolds exactly that shape (a commented `devEstimateField` hint plus a `statusMap:` opener with a trailing `# local document status -> ...` comment). The `statusMap:` opener regex also required nothing after the colon, so the scaffolded `statusMap` block was **silently dropped** whenever the trailing comment was present. New quote-aware `stripInlineComment()` helper (a `#` starts a comment only at the start of the token or when preceded by whitespace, never inside quotes — matching YAML) is applied to `parseJiraScalar()` and `parseStatusMapBlock()` value captures; the `jira:` and `statusMap:` block-opener regexes now tolerate a trailing comment. A `#` that is part of a value (`abc#def`) or inside quotes is preserved. The `.env` loader is intentionally left unchanged (secrets can contain `#`). Regression tests added to the `sync-jira-story`/`sync-jira-task`/`sync-jira-epic` suites; bundled `references/` copies regenerated.
+
 ## [v0.19.1] - 2026-06-30
 
 ### Changed

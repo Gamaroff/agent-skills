@@ -443,6 +443,30 @@ test("parseJiraScalar — strips quotes and returns '' when absent", () => {
   assert.equal(lib.parseJiraScalar("prd:\n  prdShardedLocation: docs/prd\n", "devEstimateField"), "");
 });
 
+test("parseJiraScalar — strips a trailing inline comment, preserves in-value '#'", () => {
+  // the reported bug: scaffolded config carries a trailing comment
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594  # optional — Jira field id\n", "devEstimateField"), "customfield_10594");
+  // quoted value with a trailing comment
+  assert.equal(lib.parseJiraScalar('jira:\n  devEstimateField: "customfield_10594"  # c\n', "devEstimateField"), "customfield_10594");
+  // a '#' that is part of the value (no preceding space) is preserved
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: abc#def\n", "devEstimateField"), "abc#def");
+  // a comment-only value collapses to ''
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField:  # nothing set\n", "devEstimateField"), "");
+});
+
+test("loadStatusMap — tolerates inline comments on the statusMap opener and value lines", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-comment-"));
+  // mirrors the setup-consumer scaffold shape (trailing comment after `statusMap:`)
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:  # tracker block\n  statusMap:                          # local document status -> Jira status\n    ready-for-development: Selected for Development  # dev queue\n    accepted: Done\n");
+  const map = lib.loadStatusMap(dir);
+  assert.equal(map["ready-for-development"], "Selected for Development");
+  assert.equal(map["accepted"], "Done");
+  assert.equal(map["in-progress"], "In Progress"); // default retained
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("loadDevEstimateField — reads jira.devEstimateField from skills-config.yaml", () => {
   const fs = require("fs"), os = require("os"), path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-"));
