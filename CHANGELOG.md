@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.19.0] - 2026-06-30
+
 ### Added
 - **`jira.devEstimateField` config key mirrors a story/task's `estimated_effort_hours` onto a Jira numeric custom field:** in addition to the built-in `timetracking.originalEstimate`, `sync-jira-story` and `sync-jira-task` now optionally write the numeric estimate to a configured custom field (e.g. `customfield_xxxxx` backing a "Dev Estimate (hour)" field). The field id is resolved from the `JIRA_DEV_ESTIMATE_FIELD` env var (precedence) or `jira.devEstimateField` in `skills-config.yaml`; unset → the field is skipped (no behaviour change). Numeric `estimated_effort_hours` is written as a raw number; non-numeric values are skipped. Create and update are resilient — if Jira rejects the configured field (wrong id, not on the screen), the sync warns, drops just that field, and retries, so a misconfigured field can never block the sync (the existing single-field timetracking strip path was generalised to drop multiple rejected fields from one 400). Implemented via two new pure, unit-tested helpers in `shared/resources/jira-sync.js` — `parseJiraScalar()` (a no-YAML-dependency indentation scanner for direct children of the `jira:` block) and `loadDevEstimateField()` — bundled into the `create-story`, `create-task`, `sync-jira-epic`, `sync-jira-story`, and `sync-jira-task` `references/`. `setup-consumer.sh` scaffolds a commented `devEstimateField` hint in the generated Jira config block; `docs/reference/configuration.md` documents the key (table row + "Jira estimate field" section + worked example), cross-linked from `docs/standards/{story,task}-documents.md` and both SKILL.md files.
 
