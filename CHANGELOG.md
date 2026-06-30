@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+- **`develop-pipeline` reference docs document the Stop-hook re-prompt-on-pause as expected behaviour (not a bug):** `shared/resources/develop-pipeline-hooks.md` now explains that `stop_hook_active` only suppresses a *second* block within the **same** stop attempt, so every mid-step pause (most commonly while waiting on background subagents, or any pause while `current_step` is in `[1, 7]`) is a *fresh* stop attempt that re-fires the continue-prompt — the hook has no signal for "background work is in flight." The correct response is to ignore the re-prompt and keep working, performing the Bash → Edit → banner → invoke transition only once the step's own work and gates have completed; advancing early is the actual failure mode. A new troubleshooting-table row captures the same guidance. Bundled per-skill `references/` copies (`develop-story`, `develop-task`) updated to match.
+
 ## [v0.19.0] - 2026-06-30
 
 ### Added
