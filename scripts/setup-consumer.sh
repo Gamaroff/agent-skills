@@ -334,7 +334,7 @@ write_skills_config() {
 
   local tracker_block=""
   if [[ "$TRACKER" == "jira" ]]; then
-    tracker_block=$'\ntracker: jira\n\njira:\n  statusMap:                          # local document status -> your Jira workflow status name\n    draft: To Do\n    planned: To Do\n    ready-for-development: To Do\n    in-progress: In Progress\n    ready-for-review: In Review\n    accepted: Done\n    cancelled: Cancelled'
+    tracker_block=$'\ntracker: jira\n\njira:\n  # devEstimateField: customfield_10594  # optional — Jira numeric custom field id for estimated dev hours\n  statusMap:                          # local document status -> your Jira workflow status name\n    draft: To Do\n    planned: To Do\n    ready-for-development: To Do\n    in-progress: In Progress\n    ready-for-review: In Review\n    accepted: Done\n    cancelled: Cancelled'
   fi
 
   local config

@@ -426,6 +426,85 @@ test("loadStatusMap — falls back to defaults when no config present", () => {
 });
 
 // ---------------------------------------------------------------------------
+// parseJiraScalar / loadDevEstimateField — Jira custom field id config
+// ---------------------------------------------------------------------------
+test("parseJiraScalar — reads a scalar key under jira:", () => {
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594\n", "devEstimateField"), "customfield_10594");
+});
+
+test("parseJiraScalar — does not collide with deeper statusMap children", () => {
+  const cfg = "jira:\n  statusMap:\n    devEstimateField: NotThis\n  devEstimateField: customfield_42\n";
+  assert.equal(lib.parseJiraScalar(cfg, "devEstimateField"), "customfield_42");
+});
+
+test("parseJiraScalar — strips quotes and returns '' when absent", () => {
+  assert.equal(lib.parseJiraScalar('jira:\n  devEstimateField: "customfield_99"\n', "devEstimateField"), "customfield_99");
+  assert.equal(lib.parseJiraScalar("jira:\n  statusMap:\n    accepted: Done\n", "devEstimateField"), "");
+  assert.equal(lib.parseJiraScalar("prd:\n  prdShardedLocation: docs/prd\n", "devEstimateField"), "");
+});
+
+test("loadDevEstimateField — reads jira.devEstimateField from skills-config.yaml", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"), "jira:\n  devEstimateField: customfield_10594\n  statusMap:\n    accepted: Done\n");
+  assert.equal(lib.loadDevEstimateField(dir), "customfield_10594");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadDevEstimateField — returns '' when config or key absent", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-none-"));
+  assert.equal(lib.loadDevEstimateField(dir), "");
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"), "jira:\n  statusMap:\n    accepted: Done\n");
+  assert.equal(lib.loadDevEstimateField(dir), "");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("collectIssueFields — writes the dev-estimate custom field when configured (numeric only)", () => {
+  const modPath = require.resolve("../scripts/sync-jira-story.js");
+  const prev = process.env.JIRA_DEV_ESTIMATE_FIELD;
+  process.env.JIRA_DEV_ESTIMATE_FIELD = "customfield_10594";
+  delete require.cache[modPath];
+  const freshLib = require(modPath);
+  try {
+    const numeric = freshLib.collectIssueFields({
+      args: {}, frontmatter: { title: "S", estimated_effort_hours: 4 },
+      descAdf: { type: "doc", content: [] },
+      storyTypeId: null, projectKey: null,
+      livePriorities: null, output: { warn() {}, info() {} },
+      syncLabel: "synced-from-foo", epicKey: null, useEpicLink: false,
+    });
+    assert.equal(numeric.customfield_10594, 4);
+    assert.deepEqual(numeric.timetracking, { originalEstimate: "4h", remainingEstimate: "4h" });
+
+    const nonNumeric = freshLib.collectIssueFields({
+      args: {}, frontmatter: { title: "S", estimated_effort_hours: "1d 4h" },
+      descAdf: { type: "doc", content: [] },
+      storyTypeId: null, projectKey: null,
+      livePriorities: null, output: { warn() {}, info() {} },
+      syncLabel: "synced-from-foo", epicKey: null, useEpicLink: false,
+    });
+    assert.equal(nonNumeric.customfield_10594, undefined); // non-numeric → custom field skipped
+  } finally {
+    if (prev === undefined) delete process.env.JIRA_DEV_ESTIMATE_FIELD;
+    else process.env.JIRA_DEV_ESTIMATE_FIELD = prev;
+    delete require.cache[modPath];
+  }
+});
+
+test("collectIssueFields — omits the dev-estimate custom field when unconfigured", () => {
+  const fields = lib.collectIssueFields({
+    args: {}, frontmatter: { title: "S", estimated_effort_hours: 4 },
+    descAdf: { type: "doc", content: [] },
+    storyTypeId: null, projectKey: null,
+    livePriorities: null, output: { warn() {}, info() {} },
+    syncLabel: "synced-from-foo", epicKey: null, useEpicLink: false,
+  });
+  assert.equal(fields.customfield_10594, undefined);
+  assert.deepEqual(fields.timetracking, { originalEstimate: "4h", remainingEstimate: "4h" });
+});
+
+// ---------------------------------------------------------------------------
 // syncLabelFor
 // ---------------------------------------------------------------------------
 test("syncLabelFor — derives label from parent dir name", () => {

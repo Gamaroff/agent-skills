@@ -36,6 +36,7 @@ architecture:
   architectureShardedLocation: docs/architecture   # root for architecture docs
 
 jira:
+  devEstimateField: customfield_10594  # optional — Jira custom field id for estimated dev hours
   statusMap:                          # optional — local status → Jira workflow status name
     ready-for-development: Selected for Development
     ready-for-review: In Review
@@ -54,6 +55,7 @@ devLoadAlwaysFiles:
 | `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md) |
 | `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
 | `jira.statusMap` | map[string→string] | (built-in defaults) | Maps local document status → the literal Jira workflow status name to transition to. See [Jira status mapping](#jira-status-mapping). |
+| `jira.devEstimateField` | string (custom field id) | (unset → skipped) | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field). |
 
 ## QA artifacts are co-located
 
@@ -107,6 +109,30 @@ Notes:
   available transition names and skips the status change — the rest of the issue still syncs.
 - Matching is **by name only** (per [`jira-transition-protocol.md`](../../shared/resources/jira-transition-protocol.md)); the skills never guess a transition by status category.
 
+## Jira estimate field
+
+The `sync-jira-{story,task}` skills always write the story/task `estimated_effort_hours` frontmatter
+value to Jira's built-in time-tracking field (`timetracking.originalEstimate`). If your project also
+tracks estimates in a **custom field** — e.g. "Dev Estimate (hour)" — set its field id under
+`jira.devEstimateField` and the same hours value is mirrored there too:
+
+```yaml
+jira:
+  devEstimateField: customfield_10594
+```
+
+Notes:
+
+- The custom-field id is **project-specific** — find it in your Jira admin (Settings → Issues → Custom
+  fields) or via `GET /rest/api/3/field`. It is *not* guaranteed to be `customfield_10594` on every tenant.
+- The field is treated as **numeric**: the integer hours are sent as a raw number (no `"4h"` suffix).
+  Non-numeric `estimated_effort_hours` values are skipped for the custom field.
+- Override per-run with the `JIRA_DEV_ESTIMATE_FIELD` environment variable, which takes precedence over
+  the config key.
+- Unset (the default) → the custom field is not written; only the built-in time-tracking field is set.
+- Resilient by design: if Jira rejects the configured id (wrong id, or not on the issue's screen), the
+  sync logs a warning, drops just that field, and retries — the rest of the issue still syncs.
+
 ## Worked example — typical project
 
 Complete `skills-config.yaml` for an NX-style monorepo with NestJS + Expo:
@@ -127,6 +153,7 @@ architecture:
 # Local document status -> this project's Jira workflow status names.
 # Values shown are the built-in defaults; edit the right-hand names to match your workflow.
 jira:
+  devEstimateField: customfield_10594   # optional — mirror estimated_effort_hours to this custom field
   statusMap:
     draft: To Do
     planned: To Do

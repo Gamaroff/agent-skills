@@ -783,3 +783,60 @@ test("normaliseTaskSummary — no id resolvable leaves the summary unchanged", (
   assert.equal(lib.normaliseTaskSummary("Foo", undefined), "Foo");
   assert.equal(lib.normaliseTaskSummary("Foo", null), "Foo");
 });
+
+// ---------------------------------------------------------------------------
+// parseJiraScalar / loadDevEstimateField — Jira custom field id config
+// ---------------------------------------------------------------------------
+test("parseJiraScalar — reads a scalar key under jira:, ignores statusMap children", () => {
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594\n", "devEstimateField"), "customfield_10594");
+  const cfg = "jira:\n  statusMap:\n    devEstimateField: NotThis\n  devEstimateField: customfield_42\n";
+  assert.equal(lib.parseJiraScalar(cfg, "devEstimateField"), "customfield_42");
+  assert.equal(lib.parseJiraScalar("jira:\n  statusMap:\n    accepted: Done\n", "devEstimateField"), "");
+});
+
+test("loadDevEstimateField — reads jira.devEstimateField, '' when absent", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-task-"));
+  assert.equal(lib.loadDevEstimateField(dir), "");
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"), "jira:\n  devEstimateField: customfield_10594\n");
+  assert.equal(lib.loadDevEstimateField(dir), "customfield_10594");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("collectIssueFields — writes dev-estimate custom field when configured (numeric only)", () => {
+  const modPath = require.resolve("../scripts/sync-jira-task.js");
+  const prev = process.env.JIRA_DEV_ESTIMATE_FIELD;
+  process.env.JIRA_DEV_ESTIMATE_FIELD = "customfield_10594";
+  delete require.cache[modPath];
+  const freshLib = require(modPath);
+  try {
+    const numeric = freshLib.collectIssueFields({
+      args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
+      descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
+      livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+    });
+    assert.equal(numeric.customfield_10594, 24);
+    assert.deepEqual(numeric.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
+
+    const nonNumeric = freshLib.collectIssueFields({
+      args: {}, frontmatter: { title: "T", estimated_effort_hours: "~1 day" },
+      descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
+      livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+    });
+    assert.equal(nonNumeric.customfield_10594, undefined);
+  } finally {
+    if (prev === undefined) delete process.env.JIRA_DEV_ESTIMATE_FIELD;
+    else process.env.JIRA_DEV_ESTIMATE_FIELD = prev;
+    delete require.cache[modPath];
+  }
+});
+
+test("collectIssueFields — omits dev-estimate custom field when unconfigured", () => {
+  const fields = lib.collectIssueFields({
+    args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
+    descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
+    livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+  });
+  assert.equal(fields.customfield_10594, undefined);
+  assert.deepEqual(fields.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
+});

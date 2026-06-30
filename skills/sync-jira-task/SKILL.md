@@ -71,6 +71,7 @@ The script auto-loads `<repo-root>/.env`. Shell exports take precedence.
 | Variable | Description |
 |---|---|
 | `BITBUCKET_REPO_URL` | Override Bitbucket base URL (auto-detected from git remote) |
+| `JIRA_DEV_ESTIMATE_FIELD` | Custom field id to mirror `estimated_effort_hours` into (e.g. `customfield_10594`). Takes precedence over `jira.devEstimateField` in `skills-config.yaml`. Unset → not written. |
 
 ### Finding Your Board ID
 
@@ -100,7 +101,7 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 title: 'Task 1: Cache-lib Architecture Simplification'
 priority: 'High'                    # mapped to live Jira priorities
 category: 'refactoring'
-estimated_effort_hours: 24
+estimated_effort_hours: 24          # → timetracking.originalEstimate (+ jira.devEstimateField if configured)
 status: '🚧 In Progress'             # emoji stripped, mapped to Jira transition
 labels: ['cache', 'refactor']       # synced-from-* label appended automatically
 assignee: '5b10a2844c20165700ede21g' # Jira accountId (optional)
@@ -197,6 +198,8 @@ status name via the shared default map (overlaid with any `jira.statusMap` overr
 The script then fetches `/rest/api/3/issue/{key}/transitions` and matches the resolved target by `to.name` (or `name` as a fallback), case-insensitively. If no matching transition is available, a warning naming the available transitions is emitted and sync still succeeds.
 
 **Custom workflow vocabulary.** If your Jira workflow uses different status names (e.g. "Selected for Development"), map them under `jira.statusMap` in `skills-config.yaml`. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping). Any status with no mapping passes through verbatim to Jira's transition matcher.
+
+**Estimated hours.** `estimated_effort_hours` is always written to Jira's built-in `timetracking.originalEstimate`. To also mirror it into a custom field (e.g. "Dev Estimate (hour)"), set its id under `jira.devEstimateField` in `skills-config.yaml` (or the `JIRA_DEV_ESTIMATE_FIELD` env var). The value is sent as a raw number. If Jira rejects the configured id, the sync warns, drops just that field, and retries. See [Jira estimate field](../../docs/reference/configuration.md#jira-estimate-field).
 
 ## Idempotent Create
 

@@ -77,6 +77,7 @@ The script auto-loads `<repo-root>/.env`. Shell exports take precedence.
 |---|---|
 | `BITBUCKET_REPO_URL` | Override Bitbucket base URL (auto-detected from git remote) |
 | `JIRA_EPIC_LINK_FIELD` | Custom field id for the classic "Epic Link" field. Defaults to `customfield_10014`. Only used on classic projects. |
+| `JIRA_DEV_ESTIMATE_FIELD` | Custom field id to mirror `estimated_effort_hours` into (e.g. `customfield_10594`). Takes precedence over `jira.devEstimateField` in `skills-config.yaml`. Unset → not written. |
 
 ### Frontmatter constraints (non-full-YAML parser)
 
@@ -97,7 +98,7 @@ epic_source: '${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<nam
 jira_epic: "PROJ-14"                 # REQUIRED
 story_type: 'feature_enhancement'
 priority: 'high'
-estimated_effort_hours: 4
+estimated_effort_hours: 4          # → timetracking.originalEstimate (+ jira.devEstimateField if configured)
 status: '📋 Planned'                # emoji stripped, mapped to Jira transition
 labels: ['auth']                   # synced-from-* label appended automatically
 assignee: '5b10a2844c20165700ede21g'
@@ -198,6 +199,8 @@ status name via the shared default map (overlaid with any `jira.statusMap` overr
 The script then fetches `/rest/api/3/issue/{key}/transitions` and matches the resolved target by `to.name` (or `name` as a fallback), case-insensitively. If no matching transition is available, a warning naming the available transitions is emitted and sync still succeeds.
 
 **Custom workflow vocabulary.** If your Jira workflow uses different status names (e.g. "Selected for Development"), map them under `jira.statusMap` in `skills-config.yaml` — keys are the lowercase-kebab local statuses, values are the literal Jira status names. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping). Any status with no mapping passes through verbatim to Jira's transition matcher, so custom statuses still work without configuration.
+
+**Estimated hours.** `estimated_effort_hours` is always written to Jira's built-in `timetracking.originalEstimate`. To also mirror it into a custom field (e.g. "Dev Estimate (hour)"), set its id under `jira.devEstimateField` in `skills-config.yaml` (or the `JIRA_DEV_ESTIMATE_FIELD` env var). The value is sent as a raw number. If Jira rejects the configured id, the sync warns, drops just that field, and retries. See [Jira estimate field](../../docs/reference/configuration.md#jira-estimate-field).
 
 ## Idempotent Create
 

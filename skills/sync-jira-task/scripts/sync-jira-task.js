@@ -44,6 +44,11 @@ const TASK_SECTIONS = [
 const ISSUE_TYPE = "Task";
 const SYNC_LABEL_PREFIX = "synced-from-";
 
+// Optional Jira custom field id for estimated dev hours (e.g. "Dev Estimate
+// (hour)"). Resolved from JIRA_DEV_ESTIMATE_FIELD env var, else
+// `jira.devEstimateField` in skills-config.yaml. Empty → the field is skipped.
+const DEV_ESTIMATE_FIELD = process.env.JIRA_DEV_ESTIMATE_FIELD || lib.loadDevEstimateField();
+
 const TIMETRACKING_ERROR_RE = /timetracking|time tracking|original.?estimate/i;
 
 // Format an estimate value for Jira timetracking. Numeric input → "Nh".
@@ -175,6 +180,13 @@ function collectIssueFields({ args, frontmatter, descAdf, taskTypeId, projectKey
 
   const estimate = formatJiraTimeEstimate(frontmatter.estimated_effort_hours);
   if (estimate) fields.timetracking = { originalEstimate: estimate, remainingEstimate: estimate };
+
+  // Mirror the numeric estimate onto a configured custom field (e.g. "Dev
+  // Estimate (hour)"). Numeric field → raw number; non-numeric values skipped.
+  if (DEV_ESTIMATE_FIELD) {
+    const hours = Number(frontmatter.estimated_effort_hours);
+    if (Number.isFinite(hours)) fields[DEV_ESTIMATE_FIELD] = hours;
+  }
 
   return fields;
 }
@@ -362,17 +374,26 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
           issueKey: existingJiraKey, fields,
         });
       } catch (e) {
-        if (fields.timetracking && TIMETRACKING_ERROR_RE.test(e.message || "")) {
+        // Strip whichever optional field Jira rejected, then retry once. A
+        // single 400 typically lists all rejected fields together.
+        const msg = e.message || "";
+        const stripped = { ...fields };
+        let retry = false;
+        if (stripped.timetracking && TIMETRACKING_ERROR_RE.test(msg)) {
           output.warn(`⚠️  Jira rejected timetracking field on update — retrying without estimate.`);
-          const stripped = { ...fields };
           delete stripped.timetracking;
-          putResp = await lib.putIssueAtomic({
-            http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-            issueKey: existingJiraKey, fields: stripped,
-          });
-        } else {
-          throw e;
+          retry = true;
         }
+        if (DEV_ESTIMATE_FIELD && stripped[DEV_ESTIMATE_FIELD] !== undefined && msg.includes(DEV_ESTIMATE_FIELD)) {
+          output.warn(`⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} on update — retrying without the dev-estimate field.`);
+          delete stripped[DEV_ESTIMATE_FIELD];
+          retry = true;
+        }
+        if (!retry) throw e;
+        putResp = await lib.putIssueAtomic({
+          http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+          issueKey: existingJiraKey, fields: stripped,
+        });
       }
       const { updated } = putResp;
       const finalUpdated = updated || await lib.fetchUpdatedTimestampStrict({
@@ -417,16 +438,26 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         method: "POST", headers: postHeaders, body: JSON.stringify({ fields: f }),
       });
       let resp = await postCreate(fields);
-      if (!resp.ok && resp.status === 400 && fields.timetracking) {
-        const errText = await lib.parseJiraError(resp);
-        if (TIMETRACKING_ERROR_RE.test(errText)) {
+      if (!resp.ok && resp.status === 400) {
+        // Strip whichever optional field Jira rejected and retry. `current`
+        // carries forward so both strips can compound on the same payload.
+        let current = fields;
+        let errText = await lib.parseJiraError(resp);
+        if (current.timetracking && TIMETRACKING_ERROR_RE.test(errText)) {
           output.warn(`⚠️  Jira rejected timetracking field — retrying create without estimate.`);
-          const stripped = { ...fields };
-          delete stripped.timetracking;
-          resp = await postCreate(stripped);
-        } else {
-          throw new Error(`HTTP 400: ${errText}`);
+          current = { ...current };
+          delete current.timetracking;
+          resp = await postCreate(current);
+          if (!resp.ok) errText = await lib.parseJiraError(resp);
         }
+        if (!resp.ok && DEV_ESTIMATE_FIELD && current[DEV_ESTIMATE_FIELD] !== undefined && errText.includes(DEV_ESTIMATE_FIELD)) {
+          output.warn(`⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} — retrying create without the dev-estimate field.`);
+          current = { ...current };
+          delete current[DEV_ESTIMATE_FIELD];
+          resp = await postCreate(current);
+          if (!resp.ok) errText = await lib.parseJiraError(resp);
+        }
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${errText}`);
       }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
       const created = await resp.json();
@@ -510,6 +541,8 @@ if (require.main === module) {
     normaliseTaskSummary,
     mapStatus: lib.mapStatus,
     loadStatusMap: lib.loadStatusMap,
+    loadDevEstimateField: lib.loadDevEstimateField,
+    parseJiraScalar: lib.parseJiraScalar,
     collectIssueFields,
     TASK_SECTIONS,
     STATUS_MAP: lib.DEFAULT_STATUS_MAP,

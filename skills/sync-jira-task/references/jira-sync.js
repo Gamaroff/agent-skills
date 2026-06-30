@@ -875,6 +875,58 @@ function mapStatus(raw, statusMap = DEFAULT_STATUS_MAP) {
 }
 
 // ---------------------------------------------------------------------------
+// Jira scalar config keys (e.g. custom-field ids under `jira:`)
+// ---------------------------------------------------------------------------
+// Read a single scalar `<key>: <value>` declared directly under the top-level
+// `jira:` block in skills-config.yaml. Same self-contained indentation scanner
+// philosophy as parseStatusMapBlock (no YAML dependency). Matching the literal
+// key name means deeper nested entries (e.g. statusMap children) never collide.
+// Returns "" when the key is absent.
+//
+//   jira:
+//     devEstimateField: customfield_10594
+function parseJiraScalar(text, key) {
+  const lines = String(text || "").split("\n");
+  const indentOf = l => l.length - l.replace(/^\s+/, "").length;
+  const keyRe = new RegExp("^" + escapeRe(key) + ":\\s*(.+?)\\s*$");
+  let i = 0;
+  // find top-level `jira:`
+  for (; i < lines.length; i++) {
+    if (/^jira:\s*$/.test(lines[i])) { i++; break; }
+  }
+  if (i >= lines.length) return "";
+  // scan entries inside the jira block. Only consider DIRECT children (the
+  // indent of the first child), so deeper nested keys — e.g. a statusMap entry
+  // that happens to share the name — never match.
+  let childIndent = -1;
+  for (; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    const ind = indentOf(raw);
+    if (ind <= 0) break;                     // left the jira block
+    if (childIndent < 0) childIndent = ind;  // first child fixes the direct-child level
+    if (ind !== childIndent) continue;       // skip deeper nested entries
+    const m = raw.trim().match(keyRe);
+    if (m) return m[1].replace(/^["']|["']$/g, "").trim();
+  }
+  return "";
+}
+
+// Resolve the configured Jira custom-field id for estimated dev hours from
+// `jira.devEstimateField` in skills-config.yaml at the repo root. Returns "" on
+// any failure (no file, unreadable, key absent) so callers skip the field.
+function loadDevEstimateField(repoRoot) {
+  try {
+    const root = repoRoot || execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const cfgPath = path.join(root, "skills-config.yaml");
+    if (!fs.existsSync(cfgPath)) return "";
+    return parseJiraScalar(fs.readFileSync(cfgPath, "utf-8"), "devEstimateField");
+  } catch (_) {
+    return "";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Status transitions
 // ---------------------------------------------------------------------------
 function stripStatusEmoji(s) {
@@ -1091,6 +1143,8 @@ module.exports = {
   detectProjectStyle,
   // status mapping
   DEFAULT_STATUS_MAP, loadStatusMap, mapStatus,
+  // jira scalar config
+  parseJiraScalar, loadDevEstimateField,
   // cache
   readIssueTypeCache, writeIssueTypeCache, readProjectStyleCache, writeProjectStyleCache,
 };
