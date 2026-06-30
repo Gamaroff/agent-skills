@@ -103,6 +103,8 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 
 **Loop protection in practice**: Claude Code passes `stop_hook_active: true` to the hook on the second consecutive block within a single stop attempt. The hook honours this and exits 0. If the orchestrator genuinely cannot continue, the documented terminal-HALT protocol removes the lock, satisfying the hook permanently.
 
+> **Expected behaviour — the hook re-prompts on every pause; this is not a bug.** `stop_hook_active` only suppresses a *second* block within the **same** stop attempt — it does **not** persist across separate stops. So every time the orchestrator genuinely yields the turn mid-step (most commonly while **waiting on background subagents**, or pausing for any reason while `current_step` is still in `[1, 7]`), that is a *fresh* stop attempt: the lock is unchanged, so the hook fires again and re-issues its "advance the lock now, no prose" block. During a single long step you will therefore see the same continue-prompt **several times**, once per pause. This is the hook doing its job — it has no signal for "background work is in flight," so it cannot tell a premature yield apart from a legitimate mid-step wait, and it treats both as premature. **The correct response is to ignore the re-prompt and hold the step until its own work and gates have genuinely completed** — only then perform the Bash → Edit → banner → invoke transition. Do not let the repeated prompt stampede you into advancing early; advancing before the step's work lands is the actual failure mode (see [`pipeline-lock-cooperation.md`](pipeline-lock-cooperation.md)). The prompt never *forces* the wrong action — it cannot advance the lock itself — so a step that needs more time is safe to keep working.
+
 **Output**: either empty stdout (allow stop) or JSON:
 ```json
 {"decision": "block", "reason": "🔁 PIPELINE-CONTINUE-REQUIRED — DO NOT STOP\n..."}
@@ -173,6 +175,7 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Stop hook seems to loop forever | `stop_hook_active` not honoured | Update to latest `on-stop.sh` (must read stdin and check the flag) |
+| Stop hook re-prompts to advance several times during one step | Orchestrator yielded the turn more than once mid-step (e.g. waiting on background subagents) — each pause is a fresh stop attempt | **Expected, not a bug.** Ignore the re-prompt and keep working; only do the Bash → Edit → banner → invoke transition once the step's work and gates have completed (see the "Expected behaviour" note under the Stop hook section) |
 | Hook never fires | Not registered in settings.json | Run `bash .agents/skills/develop-story/scripts/install-hooks.sh` |
 | Hook fires but nothing happens | No lock file (correct noop) | Confirm a `/develop-*` pipeline is active — lock is created at end of Step 1 |
 | Stop hook blocks but orchestrator stops anyway | Hook returned invalid JSON, or Claude Code rejected the block | Check stderr of the hook; verify `jq` produces valid output |
