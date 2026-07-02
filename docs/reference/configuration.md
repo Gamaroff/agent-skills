@@ -41,6 +41,9 @@ jira:
     ready-for-development: Selected for Development
     ready-for-review: In Review
 
+github:
+  projectEstimateField: Estimate      # optional — GitHub Projects v2 number field name for estimated dev hours
+
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 ```
@@ -56,6 +59,7 @@ devLoadAlwaysFiles:
 | `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
 | `jira.statusMap` | map[string→string] | (built-in defaults) | Maps local document status → the literal Jira workflow status name to transition to. See [Jira status mapping](#jira-status-mapping). |
 | `jira.devEstimateField` | string (custom field id) | (unset → skipped) | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field). |
+| `github.projectEstimateField` | string (project field name) | `Estimate` | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field). |
 
 ## QA artifacts are co-located
 
@@ -132,6 +136,29 @@ Notes:
 - Unset (the default) → the custom field is not written; only the built-in time-tracking field is set.
 - Resilient by design: if Jira rejects the configured id (wrong id, or not on the issue's screen), the
   sync logs a warning, drops just that field, and retries — the rest of the issue still syncs.
+
+## GitHub estimate field
+
+The `sync-github-{story,task}` skills (and their internal `ensure-{story,task}-github-issue`
+sub-routines) always mirror the story/task `estimated_effort_hours` frontmatter value onto a GitHub
+Projects v2 **Number** field, on every board the issue belongs to. By default the field is looked up by
+the name `"Estimate"`. If your project board uses a different field name — e.g. "Dev Hours" — set it
+under `github.projectEstimateField`:
+
+```yaml
+github:
+  projectEstimateField: Dev Hours
+```
+
+Notes:
+
+- The field must **already exist** on the project board as a `Number`-type field — this is a lookup by
+  name + type, not a field-creation step.
+- Override per-run with the `GH_PROJECT_ESTIMATE_FIELD` environment variable, which takes precedence over
+  the config key.
+- Unset (the default) → the field is looked up by the built-in name `"Estimate"`.
+- Resilient by design: if the named field isn't found on a board (wrong name, wrong type, or issue not on
+  that board), the sync logs a warning and skips that board — the rest of the issue still syncs.
 
 ## Worked example — typical project
 

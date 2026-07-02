@@ -13,8 +13,10 @@
 #                 string to skip silently (caller uses this when frontmatter
 #                 has no estimate).
 #
-# Field name override:
-#   GH_PROJECT_ESTIMATE_FIELD  Field name to look up. Default: "Estimate".
+# Field name resolution order:
+#   1. GH_PROJECT_ESTIMATE_FIELD env var
+#   2. github.projectEstimateField in skills-config.yaml at repo root
+#   3. "Estimate" (default)
 #
 # Exit code: always 0. Never fails the caller. Logs status to stdout.
 #
@@ -24,7 +26,42 @@ set -u
 
 ISSUE_NUM="${1:-}"
 HOURS_IN="${2:-}"
-FIELD_NAME="${GH_PROJECT_ESTIMATE_FIELD:-Estimate}"
+
+resolve_field_name() {
+  if [ -n "${GH_PROJECT_ESTIMATE_FIELD:-}" ]; then
+    echo "$GH_PROJECT_ESTIMATE_FIELD"
+    return
+  fi
+  local val=""
+  if [ -f skills-config.yaml ]; then
+    val=$(python -c "
+import yaml
+try:
+    with open('skills-config.yaml') as f:
+        data = yaml.safe_load(f) or {}
+        v = (data.get('github') or {}).get('projectEstimateField', '')
+        print(v if v is not None else '')
+except Exception:
+    print('')
+" 2>/dev/null) || val=""
+    if [ -z "$val" ]; then
+      val=$(awk '
+        /^github:/ { in_block=1; next }
+        in_block && /^[^[:space:]]/ { in_block=0 }
+        in_block && /^[[:space:]]+projectEstimateField:/ {
+          sub("^[[:space:]]+projectEstimateField:[[:space:]]*", "")
+          gsub(/[[:space:]]+$/, "")
+          gsub(/^["\x27]|["\x27]$/, "")
+          print
+          exit
+        }
+      ' skills-config.yaml 2>/dev/null)
+    fi
+  fi
+  echo "${val:-Estimate}"
+}
+
+FIELD_NAME=$(resolve_field_name)
 
 if [ -z "$ISSUE_NUM" ]; then
   echo "⚠️  set-github-project-estimate: missing <issue_number> — skipped" >&2
