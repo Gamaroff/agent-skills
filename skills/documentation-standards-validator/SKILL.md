@@ -52,6 +52,12 @@ epic.165.chat-encryption.md
 
 **Rule**: Each story MUST be placed in its own self-named subdirectory within the epic's `stories` folder.
 
+### Story Plan Filename Format
+
+**Pattern**: `story.EPIC.STORY.plan.descriptive-name.md`
+
+**Rule**: The plan file (if present) must be co-located in the story's subdirectory.
+
 ```
 📁 epic.163.module-security/
   📁 stories/
@@ -147,6 +153,7 @@ All document frontmatter targets [OKF v0.1](references/open-knowledge-format.md)
 - [ ] Correct pattern (epic.N.name.md or story.E.S.name.md)
 - [ ] .md extension
 - [ ] Stories are placed in self-named subdirectories (e.g., `story.1.1.name/story.1.1.name.md`)
+- [ ] Correct pattern for plan files (story.E.S.plan.name.md) if present
 
 ### YAML Frontmatter
 
