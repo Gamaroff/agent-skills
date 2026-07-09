@@ -151,8 +151,7 @@ function normaliseTaskSummary(summary, fallbackId) {
 // ---------------------------------------------------------------------------
 // Field collection from frontmatter / args
 // ---------------------------------------------------------------------------
-function collectIssueFields({ args, frontmatter, descAdf, taskTypeId, projectKey, livePriorities, output, syncLabel }) {
-  const summary = args.summary || frontmatter.summary || frontmatter.title;
+function collectIssueFields({ summary, args, frontmatter, descAdf, taskTypeId, projectKey, livePriorities, output, syncLabel }) {
   const priority = lib.normalisePriority(args.priority || frontmatter.priority, livePriorities, output);
   const labelInput = args.labels || frontmatter.labels;
   const cleanLabels = lib.sanitiseLabels(labelInput) || [];
@@ -359,7 +358,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     const allEntries = [...lib.extractEntries(content), changeEntry];
     const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, changelogEntries: allEntries });
     const fields = collectIssueFields({
-      args, frontmatter, descAdf, taskTypeId: null, projectKey: null, livePriorities, output, syncLabel,
+      summary, args, frontmatter, descAdf, taskTypeId: null, projectKey: null, livePriorities, output, syncLabel,
     });
 
     if (args.dryRun) {
@@ -425,9 +424,8 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         projectKey: auth.project, typeName: ISSUE_TYPE, repoRoot,
       });
       const fields = collectIssueFields({
-        args, frontmatter, descAdf, taskTypeId, projectKey: auth.project, livePriorities, output, syncLabel,
+        summary, args, frontmatter, descAdf, taskTypeId, projectKey: auth.project, livePriorities, output, syncLabel,
       });
-      fields.summary = summary;
 
       const postHeaders = {
         Authorization: lib.authHeader(auth.email, auth.token),

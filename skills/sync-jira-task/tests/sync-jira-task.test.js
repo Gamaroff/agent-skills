@@ -828,7 +828,7 @@ test("collectIssueFields — writes dev-estimate custom field when configured (n
   const freshLib = require(modPath);
   try {
     const numeric = freshLib.collectIssueFields({
-      args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
+      summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
       descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
       livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
     });
@@ -836,7 +836,7 @@ test("collectIssueFields — writes dev-estimate custom field when configured (n
     assert.deepEqual(numeric.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
 
     const nonNumeric = freshLib.collectIssueFields({
-      args: {}, frontmatter: { title: "T", estimated_effort_hours: "~1 day" },
+      summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: "~1 day" },
       descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
       livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
     });
@@ -850,7 +850,7 @@ test("collectIssueFields — writes dev-estimate custom field when configured (n
 
 test("collectIssueFields — omits dev-estimate custom field when unconfigured", () => {
   const fields = lib.collectIssueFields({
-    args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
+    summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
     descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
     livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
   });
