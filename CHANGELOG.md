@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.20.0] - 2026-07-09
+
 ### Added
 - **`github.projectEstimateField` config key resolves the GitHub Projects estimate field name:** `shared/resources/set-github-project-estimate.sh` now resolves the estimate field name from the `GH_PROJECT_ESTIMATE_FIELD` env var (precedence), then `github.projectEstimateField` in `skills-config.yaml` (parsed via Python `yaml` with an `awk` fallback), falling back to the built-in default `"Estimate"`. This lets projects whose GitHub Projects board names the field something other than "Estimate" mirror story/task estimates without patching the script. Consumed by `ensure-story-github-issue`, `ensure-task-github-issue`, `sync-github-story`, and `sync-github-task` (bundled `references/` copies updated). The new key is documented in `docs/reference/configuration.md` with a worked example and resolution/failure-mode notes.
 
