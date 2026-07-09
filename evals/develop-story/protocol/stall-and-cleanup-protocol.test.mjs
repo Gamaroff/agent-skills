@@ -157,6 +157,43 @@ test("#2d — setup-consumer.sh registers no PostToolUse hook and de-registers t
   assert.match(script, /_unpatch_hook "PostToolUse" "on-skill-return/,          "must de-register the obsolete PostToolUse/on-skill-return hook");
 });
 
+// ── Regression #2e: hook commands are cwd-independent (${CLAUDE_PROJECT_DIR}) ──
+// The Stop/PreCompact hook `command` was previously a bare relative path
+// (`bash .agents/skills/.../on-stop.sh`), which Claude Code resolves against the
+// shell's cwd at hook-fire time — so it broke with "No such file or directory"
+// the moment any command in the session had `cd`'d into a subdirectory, even
+// though the script existed. Both installers now emit `${CLAUDE_PROJECT_DIR}`-
+// prefixed commands (expanded to the project root regardless of cwd) and migrate
+// legacy bare-relative entries via an exact-match de-registration step so a
+// re-run replaces the broken entry instead of stacking a second one alongside it.
+
+test("#2e — canonical install-hooks.sh emits ${CLAUDE_PROJECT_DIR}-prefixed commands, not bare relative paths", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.match(script, /CLAUDE_PROJECT_DIR/,                                    "must build the hook command with ${CLAUDE_PROJECT_DIR}");
+  assert.match(script, /PRECOMPACT_CMD=.*CLAUDE_PROJECT_DIR.*on-precompact\.sh/, "PreCompact command must be cwd-independent");
+  assert.match(script, /STOP_CMD=.*CLAUDE_PROJECT_DIR.*on-stop\.sh/,            "Stop command must be cwd-independent");
+});
+
+test("#2e — canonical install-hooks.sh migrates legacy bare-relative hook entries", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.match(script, /unpatch_hook_exact\s*\(\)/,                            "must define an exact-match de-registration helper");
+  assert.match(script, /unpatch_hook_exact "PreCompact" "bash \$\{c\}\/on-precompact\.sh"/, "must strip the legacy bare-relative PreCompact command");
+  assert.match(script, /unpatch_hook_exact "Stop"\s+"bash \$\{c\}\/on-stop\.sh"/,           "must strip the legacy bare-relative Stop command");
+});
+
+test("#2e — setup-consumer.sh emits ${CLAUDE_PROJECT_DIR}-prefixed commands and migrates legacy entries", async () => {
+  const script = await readFile(SETUP_CONSUMER, "utf-8");
+  assert.match(script, /_patch_hook "PreCompact".*CLAUDE_PROJECT_DIR.*on-precompact\.sh/, "PreCompact command must be cwd-independent");
+  assert.match(script, /_patch_hook "Stop".*CLAUDE_PROJECT_DIR.*on-stop\.sh/,             "Stop command must be cwd-independent");
+  assert.match(script, /_unpatch_hook_exact\s*\(\)/,                                       "must define an exact-match de-registration helper");
+});
+
+test("#2e — pause doc example commands use ${CLAUDE_PROJECT_DIR}, not a bare relative path", async () => {
+  const content = await readFile(path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-pause.md"), "utf-8");
+  assert.match(content, /"command":\s*"bash \\"\$\{CLAUDE_PROJECT_DIR\}\//, "settings.json example must model the cwd-independent form");
+  assert.doesNotMatch(content, /"command":\s*"bash \.agents\/skills/,        "settings.json example must not show a bare relative command");
+});
+
 test("#2d — orchestrator SKILL.md files no longer reference PostToolUse/on-skill-return", async () => {
   for (const [label, skill] of [["story", STORY_SKILL], ["task", TASK_SKILL]]) {
     const content = await readFile(skill, "utf-8");

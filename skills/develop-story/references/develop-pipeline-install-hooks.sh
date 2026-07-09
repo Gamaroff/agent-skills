@@ -94,8 +94,10 @@ EOF
   exit 1
 fi
 
-PRECOMPACT_CMD="bash ${BASE}/on-precompact.sh"
-STOP_CMD="bash ${BASE}/on-stop.sh"
+# ${CLAUDE_PROJECT_DIR} is kept literal here (escaped) so Claude Code expands it
+# at hook-fire time, resolving to the project root regardless of the shell's cwd.
+PRECOMPACT_CMD="bash \"\${CLAUDE_PROJECT_DIR}/${BASE}/on-precompact.sh\""
+STOP_CMD="bash \"\${CLAUDE_PROJECT_DIR}/${BASE}/on-stop.sh\""
 
 # --- ensure settings file exists and is valid JSON ---------------------------
 
@@ -183,6 +185,41 @@ unpatch_hook() {
   fi
 }
 
+# Removes any hook entry under `event` whose `hooks[].command` exactly equals
+# `cmd` (no regex, so no escaping needed for literal path strings). Idempotent.
+# Used to migrate installs from the pre-CLAUDE_PROJECT_DIR bare-relative-path
+# commands, which would otherwise sit alongside the fixed entry and keep firing.
+unpatch_hook_exact() {
+  local event="$1"
+  local cmd="$2"
+
+  local present
+  present=$(jq --arg event "$event" --arg cmd "$cmd" \
+    '[.hooks[$event][]? | select(any(.hooks[]?; .command == $cmd))] | length' \
+    "$SETTINGS_FILE" 2>/dev/null || echo 0)
+
+  if [ "${present:-0}" = "0" ]; then
+    return 0
+  fi
+
+  echo "  - ${event}: removing legacy pre-CLAUDE_PROJECT_DIR hook (${cmd})"
+
+  local tmp
+  tmp=$(mktemp)
+  jq --arg event "$event" --arg cmd "$cmd" \
+    '(.hooks[$event]) |= map(select(any(.hooks[]?; .command == $cmd) | not))
+     | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
+    "$SETTINGS_FILE" > "$tmp"
+
+  if $DRY_RUN; then
+    echo "    (dry-run diff:)"
+    diff -u "$SETTINGS_FILE" "$tmp" | sed 's/^/    /' || true
+    rm -f "$tmp"
+  else
+    mv "$tmp" "$SETTINGS_FILE"
+  fi
+}
+
 # --- run ---------------------------------------------------------------------
 
 echo "Installing develop-pipeline hooks"
@@ -190,6 +227,14 @@ echo "  Settings file: ${SETTINGS_FILE}"
 echo "  Hook base:     ${BASE}"
 $DRY_RUN && echo "  Mode:          DRY RUN (no writes)"
 echo ""
+
+# Migration: strip legacy bare-relative-path hook commands (pre-CLAUDE_PROJECT_DIR
+# fix) for every candidate base, so re-running this installer replaces the old
+# broken entry instead of adding a second one that keeps erroring alongside it.
+for c in "${CANDIDATES[@]}"; do
+  unpatch_hook_exact "PreCompact" "bash ${c}/on-precompact.sh"
+  unpatch_hook_exact "Stop"       "bash ${c}/on-stop.sh"
+done
 
 patch_hook "PreCompact"  "$PRECOMPACT_CMD"
 patch_hook "Stop"        "$STOP_CMD"

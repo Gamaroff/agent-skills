@@ -182,6 +182,7 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | PR comment / git commit missing after pause | PR not set in lock, or `gh`/`git` not on PATH | All side effects are best-effort — implementation report is the durable record |
 | Hook crashes future pipeline runs | Stale lock file left over | `rm -f .claude/state/develop-pipeline.lock` |
 | Installer refuses to write | Existing `settings.json` is invalid JSON | Fix or back up, re-run installer |
+| Hook fails with `No such file or directory` though the script exists | Legacy bare-relative `command` from a pre-`${CLAUDE_PROJECT_DIR}` install — resolved against the shell's cwd at hook-fire time, which breaks after any `cd` into a subdirectory | Re-run `bash .agents/skills/develop-story/scripts/install-hooks.sh` — it migrates the old entry to the cwd-independent `${CLAUDE_PROJECT_DIR}` form automatically |
 
 ---
 
@@ -220,8 +221,9 @@ If you add a third hook to this pipeline (e.g., a `SessionStart` resumer), follo
 4. **Honours Claude Code's anti-loop flags** (`stop_hook_active`, equivalents for other events)
 5. **Documented here** — add a new section to this file plus a row in the catalog table
 6. **Installable via `install-hooks.sh`** — extend the script's hook list rather than creating a parallel installer. Exception: `setup-consumer.sh` patches inline to avoid a chicken-and-egg dependency on skills being installed first; it is not a general precedent.
-7. **Test coverage** — add protocol assertions to `evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs`
-8. **Update both SKILL.md Setup sections** — but keep them short; this doc is the canonical reference
+7. **Registered `command` uses `${CLAUDE_PROJECT_DIR}`** — write the hook command as `bash "${CLAUDE_PROJECT_DIR}/<base>/on-{event}.sh"`, never a bare relative path. Claude Code expands `${CLAUDE_PROJECT_DIR}` to the project root at hook-fire time; a bare relative path (e.g. `bash .agents/skills/.../on-{event}.sh`) is resolved against the shell's cwd instead, so it breaks the moment any command in the session has `cd`'d into a subdirectory. When you change the emitted form, also add an exact-match de-registration step (see `unpatch_hook_exact`) so re-running the installer migrates old entries instead of stacking a second, still-broken one alongside the fix.
+8. **Test coverage** — add protocol assertions to `evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs`
+9. **Update both SKILL.md Setup sections** — but keep them short; this doc is the canonical reference
 
 ---
 

@@ -156,7 +156,7 @@ Each project that uses `/develop-task` or `/develop-story` registers the hook in
         "hooks": [
           {
             "type": "command",
-            "command": "bash .agents/skills/develop-story/scripts/on-precompact.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-story/scripts/on-precompact.sh\""
           }
         ]
       }
@@ -175,7 +175,7 @@ Each project that uses `/develop-task` or `/develop-story` registers the hook in
         "hooks": [
           {
             "type": "command",
-            "command": "bash .agents/skills/develop-task/scripts/on-precompact.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-task/scripts/on-precompact.sh\""
           }
         ]
       }

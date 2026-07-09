@@ -615,6 +615,31 @@ _unpatch_hook() {
   ok "  ${event}: removed obsolete on-skill-return.sh hook"
 }
 
+# Removes any hook entry under `event` whose command exactly equals `cmd` (no
+# regex, so no escaping needed for literal path strings). Idempotent — heals
+# installs from the pre-CLAUDE_PROJECT_DIR bare-relative-path commands, which
+# would otherwise sit alongside the fixed entry and keep firing.
+_unpatch_hook_exact() {
+  local event="$1" cmd="$2"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC}   ${event}: would remove legacy hook if present (${cmd})"
+    return 0
+  fi
+  [[ -f "$HOOKS_SETTINGS_FILE" ]] || return 0
+  local present
+  present=$(jq --arg event "$event" --arg cmd "$cmd" \
+    '[.hooks[$event][]? | select(any(.hooks[]?; .command == $cmd))] | length' \
+    "$HOOKS_SETTINGS_FILE" 2>/dev/null || echo 0)
+  [[ "${present:-0}" == "0" ]] && return 0
+  local tmp; tmp=$(mktemp)
+  jq --arg event "$event" --arg cmd "$cmd" \
+    '(.hooks[$event]) |= map(select(any(.hooks[]?; .command == $cmd) | not))
+     | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
+    "$HOOKS_SETTINGS_FILE" > "$tmp"
+  mv "$tmp" "$HOOKS_SETTINGS_FILE"
+  ok "  ${event}: removed legacy pre-CLAUDE_PROJECT_DIR hook"
+}
+
 install_hooks() {
   heading "Pipeline hooks"
 
@@ -676,8 +701,18 @@ install_hooks() {
     fi
   fi
 
-  _patch_hook "PreCompact"  "bash ${base}/on-precompact.sh"
-  _patch_hook "Stop"        "bash ${base}/on-stop.sh"
+  # Migration: strip legacy bare-relative-path hook commands (pre-CLAUDE_PROJECT_DIR
+  # fix) for every candidate base, so re-running this installer replaces the old
+  # broken entry instead of adding a second one that keeps erroring alongside it.
+  for _c in "${_candidates[@]}"; do
+    _unpatch_hook_exact "PreCompact" "bash ${_c}/on-precompact.sh"
+    _unpatch_hook_exact "Stop"       "bash ${_c}/on-stop.sh"
+  done
+
+  # ${CLAUDE_PROJECT_DIR} is kept literal here (escaped) so Claude Code expands
+  # it at hook-fire time, resolving to the project root regardless of cwd.
+  _patch_hook "PreCompact"  "bash \"\${CLAUDE_PROJECT_DIR}/${base}/on-precompact.sh\""
+  _patch_hook "Stop"        "bash \"\${CLAUDE_PROJECT_DIR}/${base}/on-stop.sh\""
   # Migration: strip the obsolete PostToolUse/on-skill-return.sh hook from older installs.
   _unpatch_hook "PostToolUse" "on-skill-return\\.sh"
   if [[ "$DRY_RUN" == false ]]; then
