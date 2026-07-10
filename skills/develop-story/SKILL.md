@@ -166,6 +166,8 @@ See `references/develop-pipeline-step-2-review.md` for the full Step 2 protocol:
 
 See `references/develop-pipeline-step-3-develop-loop.md` for the full Step 3 protocol: pre-develop codebase mapping (Explore subagent), plan file discovery, internal gate handling (draft/planned, high-risk, alignment), bounded develop loop with stall detection, Remaining Work Status banner, halt protocol, and **test-failure triage** (capture test output to `.claude/state/test-output-${ITER}-*.log`, dispatch Explore with `references/test-failure-triage-prompt.md`, main consumes summary only).
 
+> **Pre-develop staleness re-validation (Review 4 R-15a).** Before invoking `/develop`, if the story's **upstream epic merged code after this story was authored** (compare the story's `created`/`updated` frontmatter against the epic branch's merge history), re-run `review-story --validate` on the story first. A story authored against an earlier codebase can cite symbols/paths that moved once its epic landed — the `--validate` pass re-checks the story against current `develop` and flags drift before implementation begins. Skip only when the story was authored/updated after its epic's last code merge.
+
 ### Step 4: Create PR
 
 See `references/develop-pipeline-step-4-create-pr.md` for the full Step 4 protocol: `/create-pr` invocation with `--base` and tracker-conditional `--issue`, implementation report exclusion, post-PR steps, Jira tracker update (PR-opened comment + In Review transition), failure handling, and the mandatory pipeline continuation banner.
