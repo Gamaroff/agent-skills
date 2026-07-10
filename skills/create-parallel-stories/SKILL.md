@@ -209,6 +209,28 @@ For stories with dependencies:
 
 ---
 
+#### 2.3 Sync the Parent Epic in the Same Commit (MANDATORY)
+
+**Rule (Review 4 §9.2 / R-15d):** whenever a split creates new sub-stories or supersedes a parent story, the **parent epic file MUST be updated in the same commit** as the new/renamed story files — never in a follow-up. Three Review-3 splits (epics 13/17/21) forgot this and left the epic and its stories disagreeing (R4:CN-02).
+
+For every split, in one commit, update the parent epic's:
+
+1. `estimated_stories` frontmatter count → the new active (non-superseded) story count.
+2. The **Stories Breakdown / Overview** table row(s) — add the new sub-stories, mark the superseded parent.
+3. The **mermaid** diagram (if present) — new nodes + dependency edges.
+4. **Dependency** notes and **Definition of Done** counts.
+5. The superseded parent story → `status: superseded` + a "Superseded by X/Y" banner on its main, plan, and any validate/review companion files (canon §3).
+
+**Verify before committing:** run the docs linter — check #6 (`estimated_stories` == active story dirs) must pass:
+
+```bash
+node docs/tasks/task.12.documentation-conventions-normalization-validator/scripts/lint-docs.mjs --only=6
+```
+
+Reference example: Epic 14's 14.7 split. Canon: [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §2.
+
+---
+
 ### Step 3: Git Worktree Setup
 
 **Purpose**: Create isolated development environments for parallel stories
