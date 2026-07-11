@@ -63,7 +63,7 @@ Full categorised index with descriptions (auto-generated): [`docs/reference/skil
 
 Featured starting points:
 
-- **Development orchestrators:** [`develop-story`](./skills/develop-story/SKILL.md), [`develop-task`](./skills/develop-task/SKILL.md)
+- **Development orchestrators:** [`develop-next`](./skills/develop-next/SKILL.md), [`develop-story`](./skills/develop-story/SKILL.md), [`develop-task`](./skills/develop-task/SKILL.md)
 - **Authoring:** [`create-story`](./skills/create-story/SKILL.md), [`create-task`](./skills/create-task/SKILL.md), [`create-epic`](./skills/create-epic/SKILL.md), [`create-prd`](./skills/create-prd/SKILL.md)
 - **Review:** [`review-story`](./skills/review-story/SKILL.md), [`review-task`](./skills/review-task/SKILL.md), [`review-epic`](./skills/review-epic/SKILL.md), [`review-prd`](./skills/review-prd/SKILL.md)
 - **QA:** [`qa-story`](./skills/qa-story/SKILL.md), [`qa-task`](./skills/qa-task/SKILL.md), [`qa-fix`](./skills/qa-fix/SKILL.md)

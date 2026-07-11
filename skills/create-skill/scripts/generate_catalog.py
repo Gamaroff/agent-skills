@@ -27,7 +27,7 @@ from datetime import date
 
 CATEGORIES = [
     ("Development — Orchestration", [
-        "develop-story", "develop-task", "develop",
+        "develop-story", "develop-task", "develop", "develop-next",
     ]),
     ("Development — Implementation", [
         "commit-changes", "create-branch", "create-pr", "git-time-travel",
