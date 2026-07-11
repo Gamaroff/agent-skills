@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.21.0] - 2026-07-11
+
 ### Added
 - **New `develop-next` skill — roadmap loop orchestrator:** selects the next unblocked item from the consumer project's `docs/development/project-completion-roadmap.md` (deterministic selection rules in `references/roadmap-selection.md`: phase boundaries, `deps:` vs ship-`gate:` vs `flag:`, `manual`/`⛔`/`🚧` skips, `→`/`‖` flow), dispatches `/develop-story`/`/develop-task` with an AUTONOMOUS RUN directive that auto-answers the Phase 0d Upfront Setup prompt with the auto-derived recommended options (recorded in the Decisions Log), verifies green (QA gate PASS + local lint/typecheck/test — consumer CI on PRs may not exist yet), merges the PR (`env gh pr merge --merge`; story→epic, and epic→develop when the epic's last story lands), ticks the roadmap `[x]` + Change Log, and reports. Stops (with a push notification) at epic boundaries, `manual`/ops/legal-gated items, authoring items (`/create-story`/`/create-epic`), any pipeline HALT, or a merge/quality-gate failure. Supports `--dry-run` (selection rationale only) and continuous runs via `/loop /develop-next` (self-paced; one item per iteration). Re-enters a live `develop-pipeline.lock` run's resume path instead of selecting a new item. One-time consumer setup (pipeline hooks, permission allowlist incl. `env gh pr merge`, acceptEdits mode) documented in the skill README. No shared-resource references — bundling is a no-op. Catalog category: Development — Orchestration.
 
