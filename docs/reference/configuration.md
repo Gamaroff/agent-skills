@@ -46,6 +46,12 @@ github:
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
+
+developNext:                          # optional — develop-next roadmap orchestrator
+  roadmapPath: docs/development/project-completion-roadmap.md
+  baseBranch: develop
+  qualityGateCommand: npm test        # merge gate run on every branch before gh pr merge
+  mergeStrategy: merge                # merge | squash | rebase
 ```
 
 ## Key reference
@@ -60,6 +66,10 @@ devLoadAlwaysFiles:
 | `jira.statusMap` | map[string→string] | (built-in defaults) | Maps local document status → the literal Jira workflow status name to transition to. See [Jira status mapping](#jira-status-mapping). |
 | `jira.devEstimateField` | string (custom field id) | (unset → skipped) | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field). |
 | `github.projectEstimateField` | string (project field name) | `Estimate` | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field). |
+| `developNext.roadmapPath` | path | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`). |
+| `developNext.baseBranch` | branch name | `develop` | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to. |
+| `developNext.qualityGateCommand` | shell command | `npm test` | Local merge gate `develop-next` runs on every branch before `gh pr merge` (the whole gate for projects without PR CI). |
+| `developNext.mergeStrategy` | `merge` \| `squash` \| `rebase` | `merge` | Strategy passed to `gh pr merge`. |
 
 ## QA artifacts are co-located
 
