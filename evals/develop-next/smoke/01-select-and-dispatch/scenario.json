@@ -1,0 +1,13 @@
+{
+  "name": "develop-next-smoke-select-and-dispatch",
+  "skill": "develop-next",
+  "description": "End-to-end smoke: develop-next selects the single eligible roadmap task, dispatches /develop-task with the autonomous directive, and ticks the roadmap after the pipeline completes. Requires a live driver.",
+  "prompt": "Run /develop-next in this repository.",
+  "requiresLiveDriver": true,
+  "assertions": [
+    { "fn": "pipelineStepsRan", "args": ["$SANDBOX/.eval/pipeline-events.json", ["develop-task"]] },
+    { "fn": "fileMatches",      "args": ["$SANDBOX/docs/development/project-completion-roadmap.md", "- \\[x\\] \\*\\*42\\.1\\*\\*"] },
+    { "fn": "fileAbsent",       "args": ["$SANDBOX/.claude/state/develop-next.state.json"] },
+    { "fn": "noLockFilesLeft",  "args": ["$SANDBOX"] }
+  ]
+}

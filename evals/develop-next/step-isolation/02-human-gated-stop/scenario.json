@@ -1,0 +1,12 @@
+{
+  "name": "develop-next-step-02-human-gated-stop",
+  "skill": "develop-next",
+  "description": "A manual row at the phase frontier stops the run: no state file is written, no pipeline dispatched, and the manual row stays unticked — even though a later phase has an eligible item.",
+  "prompt": "Run /develop-next in this repository.",
+  "assertions": [
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/development/project-completion-roadmap.md", "- \\[ \\] \\*\\*5\\.7\\*\\*.*manual"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/development/project-completion-roadmap.md", "- \\[ \\] \\*\\*17\\.1\\*\\*"] },
+    { "fn": "fileAbsent",  "args": ["$SANDBOX/.claude/state/develop-next.state.json"] },
+    { "fn": "fileAbsent",  "args": ["$SANDBOX/.claude/state/develop-pipeline.lock"] }
+  ]
+}

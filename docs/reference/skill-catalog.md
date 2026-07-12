@@ -34,7 +34,7 @@ Full categorised index below.
 | Skill | Description |
 | ----- | ----------- |
 | `develop` | Provides guidance for implementing features and technical tasks. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns.… |
-| `develop-next` | 'Roadmap orchestrator: selects the next unblocked item from docs/development/project-completion-roadmap.md, runs its named pipeline (/develop-story or /develop-task) fully autonomously (Upfront Setup auto-answered with the recommended options),… |
+| `develop-next` | 'Roadmap orchestrator: deterministically selects the next unblocked item from the project completion roadmap (via scripts/select-next.mjs), runs its named pipeline (/develop-story or /develop-task) fully autonomously (Upfront… |
 | `develop-story` | 'Automates the full end-to-end story development lifecycle: create-epic-branch (if needed) → create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to… |
 | `develop-task` | 'Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise… |
 
