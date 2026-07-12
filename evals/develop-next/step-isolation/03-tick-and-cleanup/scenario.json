@@ -1,0 +1,12 @@
+{
+  "name": "develop-next-step-03-tick-and-cleanup",
+  "skill": "develop-next",
+  "description": "Recovery + tick: a run interrupted after merge (state file merged:true, ticked:false) resumes at Step 4 — the item is ticked in the accepted-row format, a Change Log row is added, and the run-state file is deleted in Step 5. The item must NOT be re-dispatched.",
+  "prompt": "Run /develop-next in this repository. A previous run was interrupted after the merge: .claude/state/develop-next.state.json shows item 5.1a with merged: true and ticked: false. PR #7 for 5.1a is already merged.",
+  "assertions": [
+    { "fn": "fileMatches",     "args": ["$SANDBOX/docs/development/project-completion-roadmap.md", "- \\[x\\] \\*\\*5\\.1a\\*\\*.*✅ \\*\\*accepted \\+ merged\\*\\*.*PR #7"] },
+    { "fn": "fileMatches",     "args": ["$SANDBOX/docs/development/project-completion-roadmap.md", "\\| Claude \\|"] },
+    { "fn": "fileAbsent",      "args": ["$SANDBOX/.claude/state/develop-next.state.json"] },
+    { "fn": "noLockFilesLeft", "args": ["$SANDBOX"] }
+  ]
+}
