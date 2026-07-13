@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.22.0] - 2026-07-13
+
+### Changed
+- **`develop-next` reworked around a deterministic roadmap selector:** item selection moved from SKILL.md prose to `scripts/select-next.mjs` (parser + algorithm + linter, JSON output) — the unattended loop's highest-stakes decision is now unit-tested code. Parsing is tolerant (a roadmap is a living backlog: a dep naming no current row means "shipped", not error; only a file with no parseable rows halts) and models the real marker vocabulary: `⏭️ SKIP` (non-blocking defer), epic-level and slash-group deps, strikethrough recaps, `-NFR`-suffixed ids, `gate:`/`flag:`, `⛔ BLOCKED`, and story paths from `[story](…)` links. `--dry-run` is now genuinely read-only (fetch only); a run-state file makes merge→tick crash-safe and idempotent; epic promotion uses `--assume-ticked` (decoupled from tick ordering); the merge gate verifies the PR `headRefOid` against local HEAD plus `gh pr checks`; `/create-*` rows stop the loop before authoring; a missing roadmap offers to scaffold from `assets/project-completion-roadmap.template.md` rather than fabricating work.
+- **`develop-next` consumer-specific facts moved to config:** roadmap path, base branch, quality-gate command, and merge strategy are now `developNext.*` keys in `skills-config.yaml` (`docs/reference/configuration.md`), replacing values hard-coded into the library skill.
+
+### Added
+- **Four-layer eval suite for `develop-next`** (previously none): unit tests over the selector (one fixture per rule, both sides of each boundary, plus a synthetic real-world-shaped roadmap), protocol tests for SKILL.md invariants incl. a no-consumer-facts guard, replay/CI step-isolation scenarios, and a live smoke. The two riskiest rules (SKIP-non-blocking, archived-dep tolerance) are sabotage-verified. Wired into `npm test` and `npm run eval:develop-next[:smoke]`.
+
 ## [v0.21.0] - 2026-07-11
 
 ### Added
