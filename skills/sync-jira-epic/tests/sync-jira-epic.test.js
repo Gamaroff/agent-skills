@@ -604,3 +604,70 @@ test("normaliseEpicSummary — epic_number wins over a stale prefix id", () => {
 test("normaliseEpicSummary — falls back to the title's prefix id when epic_number is absent", () => {
   assert.equal(lib.normaliseEpicSummary("Epic 7: Foo", null), "[Epic 7] Foo");
 });
+
+// ---------------------------------------------------------------------------
+// findChildStories — an epic's related docs are its child story cards
+// ---------------------------------------------------------------------------
+function makeEpicDir(stories, { withStoriesDir = true } = {}) {
+  const fs = require("fs"), os = require("os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "child-stories-"));
+  const epicDir = path.join(dir, "epic.2.demo");
+  fs.mkdirSync(epicDir);
+  fs.writeFileSync(path.join(epicDir, "epic.2.demo.md"), "# Epic");
+  if (withStoriesDir) {
+    const storiesDir = path.join(epicDir, "stories");
+    fs.mkdirSync(storiesDir);
+    for (const [name, files] of Object.entries(stories)) {
+      const sd = path.join(storiesDir, name);
+      fs.mkdirSync(sd);
+      for (const [f, content] of Object.entries(files)) fs.writeFileSync(path.join(sd, f), content);
+    }
+  }
+  return path.join(epicDir, "epic.2.demo.md");
+}
+
+test("findChildStories — links each story card and ignores its sibling artifacts", () => {
+  const epicFile = makeEpicDir({
+    "story.2.1.alpha": {
+      "story.2.1.alpha.md": "# Alpha story",
+      "story.2.1.plan.alpha.md": "# plan",   // artifact — must not be linked
+      "story.2.1.qa.1.alpha.md": "# qa",     // artifact — must not be linked
+    },
+  });
+  const found = lib.findChildStories(epicFile);
+  assert.equal(found.length, 1);
+  assert.equal(path.basename(found[0].file), "story.2.1.alpha.md");
+});
+
+test("findChildStories — orders numerically, not lexicographically", () => {
+  const epicFile = makeEpicDir({
+    "story.2.10.j": { "story.2.10.j.md": "# J" },
+    "story.2.2.b":  { "story.2.2.b.md": "# B" },
+    "story.2.1.a":  { "story.2.1.a.md": "# A" },
+  });
+  assert.deepEqual(
+    lib.findChildStories(epicFile).map(s => s.label),
+    ["Story 2.1 — A", "Story 2.2 — B", "Story 2.10 — J"],
+  );
+});
+
+test("findChildStories — an epic with no stories/ directory yields no links", () => {
+  assert.deepEqual(lib.findChildStories(makeEpicDir({}, { withStoriesDir: false })), []);
+});
+
+test("findChildStories — a story dir without its matching card is skipped", () => {
+  const epicFile = makeEpicDir({ "story.2.1.alpha": { "story.2.1.plan.alpha.md": "# orphan plan" } });
+  assert.deepEqual(lib.findChildStories(epicFile), []);
+});
+
+test("labelForChildStory — an already-prefixed title is not repeated", () => {
+  const epicFile = makeEpicDir({
+    "story.2.1.alpha": { "story.2.1.alpha.md": "# [Story 2.1] Alpha thing" },
+  });
+  assert.equal(lib.findChildStories(epicFile)[0].label, "Story 2.1 — Alpha thing");
+});
+
+test("labelForChildStory — an untitled card still gets a numbered label", () => {
+  const epicFile = makeEpicDir({ "story.2.1.alpha": { "story.2.1.alpha.md": "no heading here" } });
+  assert.equal(lib.findChildStories(epicFile)[0].label, "Story 2.1");
+});

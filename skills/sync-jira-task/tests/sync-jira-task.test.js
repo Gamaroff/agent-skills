@@ -857,3 +857,147 @@ test("collectIssueFields — omits dev-estimate custom field when unconfigured",
   assert.equal(fields.customfield_10594, undefined);
   assert.deepEqual(fields.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
 });
+
+// ---------------------------------------------------------------------------
+// resolveRelativeLink / makeRelativeLinkResolver — relative doc links must
+// become absolute Bitbucket URLs, since Jira has no "relative to this file"
+// base path once the markdown is copied into a description.
+// ---------------------------------------------------------------------------
+test("resolveRelativeLink — rewrites an existing sibling-file link to an absolute Bitbucket URL", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "relative-link-"));
+  const filePath = path.join(dir, "task.9.card.md");
+  const siblingPath = path.join(dir, "task.9.runbook.md");
+  fs.writeFileSync(filePath, "# card\n");
+  fs.writeFileSync(siblingPath, "# runbook\n");
+
+  const href = lib.resolveRelativeLink("task.9.runbook.md", {
+    filePath, repoRoot: dir, bbBase: "https://bitbucket.org/org/repo", branch: "develop",
+  });
+  assert.equal(href, "https://bitbucket.org/org/repo/src/develop/task.9.runbook.md");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveRelativeLink — preserves a #fragment after resolving the path part", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "relative-link-frag-"));
+  const filePath = path.join(dir, "task.4.card.md");
+  const siblingPath = path.join(dir, "task.4.runbook.md");
+  fs.writeFileSync(filePath, "# card\n");
+  fs.writeFileSync(siblingPath, "# runbook\n");
+
+  const href = lib.resolveRelativeLink("task.4.runbook.md#step-0", {
+    filePath, repoRoot: dir, bbBase: "https://bitbucket.org/org/repo", branch: "HEAD",
+  });
+  assert.equal(href, "https://bitbucket.org/org/repo/src/HEAD/task.4.runbook.md#step-0");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveRelativeLink — leaves absolute URLs, mailto:, and in-page anchors unchanged", () => {
+  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: "https://bitbucket.org/org/repo", branch: "HEAD" };
+  assert.equal(lib.resolveRelativeLink("https://mediastreamag.atlassian.net/browse/RAPP-540", ctx),
+    "https://mediastreamag.atlassian.net/browse/RAPP-540");
+  assert.equal(lib.resolveRelativeLink("mailto:someone@example.com", ctx), "mailto:someone@example.com");
+  assert.equal(lib.resolveRelativeLink("#success-criteria", ctx), "#success-criteria");
+});
+
+test("resolveRelativeLink — a broken/typo'd relative link is left as-authored, not masked", () => {
+  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: "https://bitbucket.org/org/repo", branch: "HEAD" };
+  assert.equal(lib.resolveRelativeLink("task.4.runbok.md", ctx), "task.4.runbok.md");
+});
+
+test("resolveRelativeLink — no bbBase (Bitbucket base undetected) is a no-op", () => {
+  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: null, branch: "HEAD" };
+  assert.equal(lib.resolveRelativeLink("task.4.runbook.md", ctx), "task.4.runbook.md");
+});
+
+test("makeRelativeLinkResolver — returns null when bbBase is unset (Bitbucket base undetected)", () => {
+  assert.equal(lib.makeRelativeLinkResolver({ filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: null }), null);
+});
+
+// ---------------------------------------------------------------------------
+// findRelatedDocs / labelForRelatedDoc — co-located sibling docs (runbooks,
+// scan reports) are discovered structurally so a synced Jira issue always
+// links them, without anyone remembering a frontmatter field.
+// ---------------------------------------------------------------------------
+test("findRelatedDocs — lists sibling .md files, excludes the task file itself and non-.md files", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-"));
+  const filePath = path.join(dir, "task.4.containerize-framework-runtime.md");
+  fs.writeFileSync(filePath, "# card\n");
+  fs.writeFileSync(path.join(dir, "task.4.runbook.md"), "# runbook\n");
+  fs.writeFileSync(path.join(dir, "task.4.trivy-scan-2026-07-14.md"), "# scan\n");
+  fs.writeFileSync(path.join(dir, "notes.txt"), "not markdown\n");
+
+  const related = lib.findRelatedDocs(filePath).map(p => path.basename(p));
+  assert.deepEqual(related, ["task.4.runbook.md", "task.4.trivy-scan-2026-07-14.md"]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("findRelatedDocs — a task with no siblings returns an empty list", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-empty-"));
+  const filePath = path.join(dir, "task.13.card.md");
+  fs.writeFileSync(filePath, "# card\n");
+
+  assert.deepEqual(lib.findRelatedDocs(filePath), []);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("labelForRelatedDoc — special-cases runbook filenames, backtick-quotes everything else", () => {
+  assert.equal(lib.labelForRelatedDoc("task.13.runbook.md"), "Execution runbook on Bitbucket");
+  assert.equal(lib.labelForRelatedDoc("task.4.trivy-scan-2026-07-14.md"), "`task.4.trivy-scan-2026-07-14.md` on Bitbucket");
+});
+
+// ---------------------------------------------------------------------------
+// buildDescriptionAdf — Source Documents section now includes related docs
+// and renders relative in-body links through the resolver.
+// ---------------------------------------------------------------------------
+test("buildDescriptionAdf — Source Documents lists the task file plus each related doc", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nSee runbook.\n",
+    frontmatter: {},
+    taskBbUrl: "https://bitbucket.org/org/repo/src/HEAD/task.13.card.md",
+    relatedDocLinks: [
+      { label: "Execution runbook on Bitbucket", href: "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md" },
+    ],
+    changelogEntries: [],
+  });
+  const bullet = doc.content.find(n => n.type === "bulletList");
+  assert.ok(bullet, "Source Documents bullet list present");
+  assert.equal(bullet.content.length, 2, "task file + 1 related doc");
+  const hrefs = bullet.content.map(li => li.content[0].content[0].marks[0].attrs.href);
+  assert.deepEqual(hrefs, [
+    "https://bitbucket.org/org/repo/src/HEAD/task.13.card.md",
+    "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md",
+  ]);
+});
+
+test("buildDescriptionAdf — with no taskBbUrl and no related docs, omits the Source Documents section", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nNothing to link.\n",
+    frontmatter: {},
+    taskBbUrl: null,
+    relatedDocLinks: [],
+    changelogEntries: [],
+  });
+  const headings = doc.content.filter(n => n.type === "heading").map(n => n.content[0].text);
+  assert.ok(!headings.includes("Source Documents"));
+});
+
+test("buildDescriptionAdf — rewrites a relative in-body link via linkResolver", () => {
+  const resolver = href => href === "task.13.runbook.md"
+    ? "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md"
+    : href;
+  const doc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nSee the [runbook](task.13.runbook.md) for detail.\n",
+    frontmatter: {},
+    taskBbUrl: null,
+    relatedDocLinks: [],
+    changelogEntries: [],
+    linkResolver: resolver,
+  });
+  const overview = doc.content.find(n => n.type === "paragraph");
+  const linkNode = overview.content.find(n => n.marks && n.marks[0].type === "link");
+  assert.equal(linkNode.marks[0].attrs.href, "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md");
+});

@@ -225,6 +225,32 @@ function buildBitbucketUrl(absPath, repoRoot, bbBase, branch) {
 }
 
 // ---------------------------------------------------------------------------
+// Relative-link resolution
+// ---------------------------------------------------------------------------
+// Local markdown links relative to a doc's own directory (e.g.
+// `[runbook](task.4.runbook.md)`) resolve fine in a Bitbucket file viewer but
+// are dead once that same prose is copied into a Jira description -- Jira has
+// no "relative to this file" base path. Rewrite them to absolute Bitbucket
+// URLs at ADF-render time so a link that works locally also works in Jira.
+function resolveRelativeLink(href, { filePath, repoRoot, bbBase, branch }) {
+  if (!href || !bbBase) return href;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href)) return href; // has a scheme (http:, mailto:, ...)
+  if (href.startsWith("#")) return href; // in-page anchor
+  const hashIdx = href.indexOf("#");
+  const pathPart = hashIdx === -1 ? href : href.slice(0, hashIdx);
+  const fragment = hashIdx === -1 ? "" : href.slice(hashIdx);
+  if (!pathPart) return href;
+  const resolved = path.resolve(path.dirname(filePath), pathPart);
+  if (!fs.existsSync(resolved)) return href; // don't mask a broken link -- leave it as-authored
+  return buildBitbucketUrl(resolved, repoRoot, bbBase, branch) + fragment;
+}
+
+function makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch }) {
+  if (!bbBase) return null;
+  return href => resolveRelativeLink(href, { filePath, repoRoot, bbBase, branch });
+}
+
+// ---------------------------------------------------------------------------
 // Changelog
 // ---------------------------------------------------------------------------
 const CL_START = "<!-- jira-sync-changelog-start -->";
@@ -315,7 +341,7 @@ const RE_ORDERED = /^\s*\d+\.\s+(.*)$/;
 // ---------------------------------------------------------------------------
 // Inline markdown parser — **bold**, `code`, [link](url)
 // ---------------------------------------------------------------------------
-function inlineMarkdownToAdf(text) {
+function inlineMarkdownToAdf(text, linkResolver) {
   if (text == null || text === "") return [adf.text("")];
   // Build a fresh regex each call to reset lastIndex safely across re-entrant use.
   const re = /(\*\*([^*\n]+)\*\*)|(`([^`\n]+)`)|(\[([^\]]+)\]\(([^)]+)\))/g;
@@ -326,7 +352,7 @@ function inlineMarkdownToAdf(text) {
     if (m.index > lastIdx) out.push(adf.text(text.slice(lastIdx, m.index)));
     if (m[1])      out.push({ type: "text", text: m[2], marks: [{ type: "strong" }] });
     else if (m[3]) out.push({ type: "text", text: m[4], marks: [{ type: "code" }] });
-    else if (m[5]) out.push(adf.link(m[6], m[7]));
+    else if (m[5]) out.push(adf.link(m[6], linkResolver ? linkResolver(m[7]) : m[7]));
     lastIdx = re.lastIndex;
   }
   if (lastIdx < text.length) out.push(adf.text(text.slice(lastIdx)));
@@ -344,7 +370,7 @@ function isTableSepLine(l) {
   return /^\|?[\s\-:|]+\|?$/.test(l.trim()) && /-/.test(l);
 }
 
-function tableLinesToAdf(lines) {
+function tableLinesToAdf(lines, linkResolver) {
   const dataLines = lines.filter(l => l.trim() && !isTableSepLine(l));
   if (!dataLines.length) return null;
   const PH = "\x01";
@@ -359,8 +385,8 @@ function tableLinesToAdf(lines) {
   const [header, ...body] = rows;
   if (!header || !header.length) return null;
   return adf.table([
-    adf.tableRow(...header.map(h => adf.tableHeader(adf.paragraph(...inlineMarkdownToAdf(h))))),
-    ...body.map(r => adf.tableRow(...r.map(c => adf.tableCell(adf.paragraph(...inlineMarkdownToAdf(c)))))),
+    adf.tableRow(...header.map(h => adf.tableHeader(adf.paragraph(...inlineMarkdownToAdf(h, linkResolver))))),
+    ...body.map(r => adf.tableRow(...r.map(c => adf.tableCell(adf.paragraph(...inlineMarkdownToAdf(c, linkResolver)))))),
   ]);
 }
 
@@ -372,7 +398,7 @@ function tableLinesToAdf(lines) {
  * - bullet/ordered lists → proper ADF list nodes
  * - **bold**, `code`, [link](url) → inline marks
  */
-function textToAdfNodes(text) {
+function textToAdfNodes(text, linkResolver) {
   if (!text) return [];
   const nodes = [];
   const lines = text.split("\n");
@@ -383,11 +409,11 @@ function textToAdfNodes(text) {
     if (!buf.length) return;
     const blockText = buf.join("\n").trim();
     buf = [];
-    if (blockText) nodes.push(...blockToAdf(blockText));
+    if (blockText) nodes.push(...blockToAdf(blockText, linkResolver));
   };
   const flushTable = () => {
     if (!tableBuf.length) return;
-    const node = tableLinesToAdf(tableBuf);
+    const node = tableLinesToAdf(tableBuf, linkResolver);
     tableBuf = [];
     if (node) nodes.push(node);
   };
@@ -417,26 +443,26 @@ function textToAdfNodes(text) {
   return nodes.filter(Boolean);
 }
 
-function blockToAdf(block) {
+function blockToAdf(block, linkResolver) {
   const lines = block.split("\n").filter(l => l.length > 0);
   if (lines.length === 0) return [];
 
   if (lines.every(l => RE_BULLET.test(l))) {
     return [adf.bulletList(...lines.map(l => {
       const m = l.match(RE_BULLET);
-      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1])));
+      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)));
     }))];
   }
   if (lines.every(l => RE_ORDERED.test(l))) {
     return [adf.orderedList(...lines.map(l => {
       const m = l.match(RE_ORDERED);
-      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1])));
+      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)));
     }))];
   }
 
   const inline = [];
   lines.forEach((l, i) => {
-    if (l.length) inline.push(...inlineMarkdownToAdf(l));
+    if (l.length) inline.push(...inlineMarkdownToAdf(l, linkResolver));
     if (i < lines.length - 1) inline.push(adf.hardBreak());
   });
   return inline.length ? [adf.paragraph(...inline)] : [];
@@ -1144,6 +1170,7 @@ module.exports = {
   parseFrontmatter, rewriteFrontmatter, upsertFrontmatterKeys, formatYamlScalar,
   // git / bb
   getRepoRoot, getDefaultBranch, getCurrentBranchUpstream, stripRemotePrefix, getBitbucketRepoBase, buildBitbucketUrl,
+  resolveRelativeLink, makeRelativeLinkResolver,
   // changelog
   CL_START, CL_END, fmtEntry, buildChangelogBlock, isEntryRow, RE_ENTRY_ROW,
   extractEntries, findHandWrittenChangelog, upsertChangelog,

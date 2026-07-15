@@ -64,7 +64,7 @@ function formatJiraTimeEstimate(value) {
 // ---------------------------------------------------------------------------
 // Description builder (task-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, taskBbUrl, changelogEntries }) {
+function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries, linkResolver }) {
   const content = [];
 
   if (changelogEntries && changelogEntries.length) {
@@ -84,16 +84,18 @@ function buildDescriptionAdf({ body, frontmatter, taskBbUrl, changelogEntries })
     ]));
   }
 
-  if (taskBbUrl) {
-    content.push(lib.adf.heading(3, "Source Document"));
-    content.push(lib.adf.bulletList(
-      lib.adf.listItem(lib.adf.paragraph(lib.adf.link("Task file on Bitbucket", taskBbUrl))),
-    ));
+  const sourceLinks = [];
+  if (taskBbUrl) sourceLinks.push({ label: "Task file on Bitbucket", href: taskBbUrl });
+  if (relatedDocLinks && relatedDocLinks.length) sourceLinks.push(...relatedDocLinks);
+  if (sourceLinks.length) {
+    content.push(lib.adf.heading(3, "Source Documents"));
+    content.push(lib.adf.bulletList(...sourceLinks.map(l =>
+      lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
   }
 
   for (const sec of lib.extractBodySections(body, TASK_SECTIONS)) {
     content.push(lib.adf.heading(3, sec.name));
-    content.push(...lib.textToAdfNodes(sec.content));
+    content.push(...lib.textToAdfNodes(sec.content, linkResolver));
   }
 
   const meta = [];
@@ -108,12 +110,12 @@ function buildDescriptionAdf({ body, frontmatter, taskBbUrl, changelogEntries })
   return lib.adf.doc(...content);
 }
 
-function hashBody({ body, taskBbUrl }) {
+function hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver }) {
   const sections = lib.extractBodySections(body, TASK_SECTIONS).map(s => ({
     name: s.name,
-    nodes: lib.textToAdfNodes(s.content),
+    nodes: lib.textToAdfNodes(s.content, linkResolver),
   }));
-  return lib.hashStable({ sections, taskBbUrl });
+  return lib.hashStable({ sections, taskBbUrl, relatedDocLinks: (relatedDocLinks || []).map(l => l.href) });
 }
 
 function hashMeta(frontmatter) {
@@ -122,6 +124,29 @@ function hashMeta(frontmatter) {
     estimated_effort_hours: frontmatter.estimated_effort_hours || "",
     status: frontmatter.status || "",
   });
+}
+
+// ---------------------------------------------------------------------------
+// Related docs (co-located siblings — runbooks, scan reports, etc.)
+// ---------------------------------------------------------------------------
+// Task folders (docs/tasks/task.N.name/) commonly hold more than the card
+// itself: an execution runbook, interim scan/audit reports, etc. These are
+// easy to link from the card but easy to forget linking from Jira — so
+// discover them structurally instead of relying on anyone remembering a
+// frontmatter field. New sibling files are picked up automatically on the
+// next sync, no manual step required.
+function labelForRelatedDoc(filename) {
+  if (/runbook/i.test(filename)) return "Execution runbook on Bitbucket";
+  return `\`${filename}\` on Bitbucket`;
+}
+
+function findRelatedDocs(filePath) {
+  const dir = path.dirname(filePath);
+  const self = path.basename(filePath);
+  return fs.readdirSync(dir)
+    .filter(f => f.toLowerCase().endsWith(".md") && f !== self)
+    .sort()
+    .map(f => path.join(dir, f));
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +311,13 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
   const branch = bbBase ? (args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()) : null;
   const taskBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
+  const linkResolver = lib.makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch });
+  const relatedDocLinks = bbBase
+    ? findRelatedDocs(filePath).map(p => ({
+        label: labelForRelatedDoc(path.basename(p)),
+        href: lib.buildBitbucketUrl(p, repoRoot, bbBase, branch),
+      }))
+    : [];
 
   const content = fs.readFileSync(filePath, "utf-8");
   const { frontmatter, body } = lib.parseFrontmatter(content);
@@ -304,7 +336,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     : null;
 
   const syncLabel = syncLabelFor(filePath);
-  const newBodyHash = hashBody({ body, taskBbUrl });
+  const newBodyHash = hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver });
   const newMetaHash = hashMeta(frontmatter);
 
   let existingJiraKey = frontmatter.jira_key;
@@ -356,7 +388,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     changeEntry = lib.fmtEntry(changeSummary);
 
     const allEntries = [...lib.extractEntries(content), changeEntry];
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, changelogEntries: allEntries });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver });
     const fields = collectIssueFields({
       summary, args, frontmatter, descAdf, taskTypeId: null, projectKey: null, livePriorities, output, syncLabel,
     });
@@ -410,7 +442,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira task created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, changelogEntries: [changeEntry] });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira task ===`);
@@ -542,6 +574,8 @@ if (require.main === module) {
     loadDevEstimateField: lib.loadDevEstimateField,
     parseJiraScalar: lib.parseJiraScalar,
     collectIssueFields,
+    findRelatedDocs,
+    labelForRelatedDoc,
     TASK_SECTIONS,
     STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     // Re-export lib pieces used by existing tests
@@ -563,8 +597,11 @@ if (require.main === module) {
     guardConcurrentEdit:     lib.guardConcurrentEdit,
     parseJiraError:          lib.parseJiraError,
     hashStable:              lib.hashStable,
-    hashDescriptionInput:    ({ body, frontmatter, taskBbUrl }) => hashBody({ body, taskBbUrl }),
+    hashDescriptionInput:    ({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver }) =>
+                               hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver }),
     stripRemotePrefix:       lib.stripRemotePrefix,
+    resolveRelativeLink:      lib.resolveRelativeLink,
+    makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
     getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
     getDefaultBranch:        lib.getDefaultBranch,
     CL_START:                lib.CL_START,
