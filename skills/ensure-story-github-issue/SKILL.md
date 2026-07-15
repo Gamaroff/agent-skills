@@ -11,7 +11,7 @@ type: internal
 This is an **internal sub-routine** called by `create-story` and `review-story`. Do not invoke directly.
 
 **Inputs (set by the calling skill before invoking):**
-- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `docs/prd/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`)
+- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `${PRD_ROOT}/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 - `EPIC_ISSUE_NUM` — parent epic GitHub issue number (integer string, or empty if no parent epic issue exists)
 
 **Output (set by this sub-routine, available to the calling skill):**
@@ -29,10 +29,11 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
    - `title` — story title
    - `status` — story status
    - `priority` — story priority (lowercase; default `medium` if absent)
+   - `estimated_effort_hours` — story effort estimate in hours (number; absent/empty if not set)
 3. Parse the epic and story numbers from the filename: pattern `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
-4. Strip any leading `"Story {E}.{S}: "` prefix from `title` to get the bare title for display: `STORY_TITLE`.
+4. Strip any leading `Story {E}.{S}: ` prefix (or an already-bracketed `[Story {E}.{S}] ` prefix) from `title` to get the bare title for display: `STORY_TITLE`. Stripping both forms prevents a double prefix like `[Story 1.3] Story 1.3: …` — local story titles are now authored in bracket form, so the bracket case is the common one.
 5. Set `STORY_RELATIVE_PATH` = the path relative to the repo root.
-6. Derive the parent epic title from the grandparent directory. `EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")`. Read `${EPIC_DIR}/$(basename "$EPIC_DIR").md` and pull `title` from its frontmatter. Strip the `"Epic {E}: "` prefix → `EPIC_TITLE`. On failure, set `EPIC_TITLE=""`.
+6. Derive the parent epic title from the grandparent directory. `EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")`. Read `${EPIC_DIR}/$(basename "$EPIC_DIR").md` and pull `title` from its frontmatter. Strip any leading `Epic {E}: ` prefix (or an already-bracketed `[Epic {E}] ` prefix) → `EPIC_TITLE`. On failure, set `EPIC_TITLE=""`.
 
 ### Step S2: Check if Story Issue Already Exists
 
@@ -73,7 +74,12 @@ OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
 PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
 PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)"?/\1/')
 MILESTONE_TITLE="Epic ${STORY_E} — ${EPIC_TITLE}"
-DOC_URL="https://github.com/$REPO/blob/develop/${STORY_RELATIVE_PATH}"
+# Prefer the current branch's remote-tracking branch (strip the remote prefix),
+# so the link points at the branch where the work lives. Fall back to the repo's
+# default branch when there is no upstream / HEAD is detached, then to `develop`.
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RELATIVE_PATH}"
 ```
 
 Auto-create the milestone if it doesn't exist yet:
@@ -101,6 +107,13 @@ STORY_ISSUE_URL=$(gh issue create \
 
 {Acceptance criteria formatted as a GitHub checkbox list}
 
+## Metadata
+
+| Field | Value |
+|-------|-------|
+| Priority | ${priority} |
+| Effort | ${estimated_effort_hours:-—}h |
+
 ## Document
 
 📄 [Story Document](${DOC_URL})
@@ -126,6 +139,12 @@ gh project item-add ${PROJECT_NUM} --owner ${OWNER} --url "${STORY_ISSUE_URL}" 2
 
 ```bash
 bash references/set-github-project-priority.sh "${STORY_ISSUE_NUM}" "${priority}" || true
+```
+
+**Mirror the estimate onto the board's Estimate number field** (no-op if frontmatter has no estimate):
+
+```bash
+bash references/set-github-project-estimate.sh "${STORY_ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
 
 **Link story as sub-issue of parent epic** (only if `EPIC_ISSUE_NUM` is non-empty):

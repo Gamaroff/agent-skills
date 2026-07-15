@@ -1,6 +1,6 @@
 ---
 id: story.2.4.update-examples-readme
-title: "Story 2.4: Update examples/README.md — remove caveat, cross-link PRD/epic/story examples"
+title: "[Story 2.4] Update examples/README.md — remove caveat, cross-link PRD/epic/story examples"
 type: story
 status: accepted
 priority: medium
@@ -16,7 +16,7 @@ updated: 2026-05-13
 completed_date: 2026-05-13
 ---
 
-# Story 2.4: Update examples/README.md
+# [Story 2.4] Update examples/README.md
 
 **Status**: Accepted
 **Review**: ✅ Important recommendations from `story.2.4.review.1.update-examples-readme.md` implemented 2026-05-13

@@ -531,6 +531,30 @@ test("mapStatus — strips emoji and maps to Jira canonical status", () => {
   assert.equal(task.mapStatus(null), null);
 });
 
+test("mapStatus — covers the full canonical lifecycle (no passthrough)", () => {
+  assert.equal(task.mapStatus("draft"), "To Do");
+  assert.equal(task.mapStatus("ready-for-development"), "To Do");
+  assert.equal(task.mapStatus("ready-for-review"), "In Review");
+  assert.equal(task.mapStatus("accepted"), "Done");
+  assert.equal(task.mapStatus("cancelled"), "Cancelled");
+});
+
+test("mapStatus — honours a project-supplied status map", () => {
+  const custom = { "ready-for-development": "Selected for Development" };
+  assert.equal(task.mapStatus("ready-for-development", custom), "Selected for Development");
+});
+
+test("loadStatusMap — merges jira.statusMap over defaults", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-task-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    accepted: Shipped\n");
+  const map = task.loadStatusMap(dir);
+  assert.equal(map["accepted"], "Shipped");
+  assert.equal(map["in-progress"], "In Progress");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("syncLabelFor — derives stable label from task dir name", () => {
   const label = task.syncLabelFor("/repo/docs/tasks/task.1.cache-lib/task.1.cache-lib.md");
   assert.equal(label, "synced-from-task.1.cache-lib");
@@ -714,4 +738,266 @@ test("getIssueTypeId — caches type id and avoids second network call", async (
   assert.equal(id1, "10001");
   assert.equal(id2, "10001");
   assert.equal(calls, 1, "second call served from cache");
+});
+
+// ---------------------------------------------------------------------------
+// stripRemotePrefix — pure parse step behind getCurrentBranchUpstream()
+// ---------------------------------------------------------------------------
+test("stripRemotePrefix — strips remote name, preserves slashes in branch", () => {
+  assert.equal(lib.stripRemotePrefix("origin/main"), "main");
+  assert.equal(lib.stripRemotePrefix("origin/feature/story.5.1.foo"), "feature/story.5.1.foo");
+  assert.equal(lib.stripRemotePrefix("upstream/release/1.2"), "release/1.2");
+});
+
+test("stripRemotePrefix — empty or shape-less ref returns null", () => {
+  assert.equal(lib.stripRemotePrefix(""), null);
+  assert.equal(lib.stripRemotePrefix("weirdnoref"), null);
+});
+
+test("parseArgs — --doc-branch overrides the resolved branch", () => {
+  const opts = lib.parseArgs(["node", "script", "--file", "x.md", "--doc-branch", "develop"]);
+  assert.equal(opts.docBranch, "develop");
+});
+
+test("parseArgs — --doc-branch absent defaults to null", () => {
+  const opts = lib.parseArgs(["node", "script", "--file", "x.md"]);
+  assert.equal(opts.docBranch, null);
+});
+
+// ---------------------------------------------------------------------------
+// normaliseTaskSummary — canonical "[Task N] {title}" bracket form
+// ---------------------------------------------------------------------------
+test("normaliseTaskSummary — already-bracketed is unchanged (idempotent)", () => {
+  assert.equal(lib.normaliseTaskSummary("[Task 5] Foo", "9"), "[Task 5] Foo");
+});
+
+test("normaliseTaskSummary — colon-prefixed is rewrapped in brackets", () => {
+  assert.equal(lib.normaliseTaskSummary("Task 5: Foo", "9"), "[Task 5] Foo");
+});
+
+test("normaliseTaskSummary — bare title resolves id from the filename fallback", () => {
+  assert.equal(lib.normaliseTaskSummary("Foo", "5"), "[Task 5] Foo");
+});
+
+test("normaliseTaskSummary — no id resolvable leaves the summary unchanged", () => {
+  assert.equal(lib.normaliseTaskSummary("Foo", undefined), "Foo");
+  assert.equal(lib.normaliseTaskSummary("Foo", null), "Foo");
+});
+
+// ---------------------------------------------------------------------------
+// parseJiraScalar / loadDevEstimateField — Jira custom field id config
+// ---------------------------------------------------------------------------
+test("parseJiraScalar — reads a scalar key under jira:, ignores statusMap children", () => {
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594\n", "devEstimateField"), "customfield_10594");
+  const cfg = "jira:\n  statusMap:\n    devEstimateField: NotThis\n  devEstimateField: customfield_42\n";
+  assert.equal(lib.parseJiraScalar(cfg, "devEstimateField"), "customfield_42");
+  assert.equal(lib.parseJiraScalar("jira:\n  statusMap:\n    accepted: Done\n", "devEstimateField"), "");
+});
+
+test("parseJiraScalar — strips a trailing inline comment, preserves in-value '#'", () => {
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594  # optional — Jira field id\n", "devEstimateField"), "customfield_10594");
+  assert.equal(lib.parseJiraScalar('jira:\n  devEstimateField: "customfield_10594"  # c\n', "devEstimateField"), "customfield_10594");
+  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: abc#def\n", "devEstimateField"), "abc#def");
+});
+
+test("loadStatusMap — tolerates inline comments on the statusMap opener and value lines", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-task-comment-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n");
+  const map = task.loadStatusMap(dir);
+  assert.equal(map["accepted"], "Shipped");
+  assert.equal(map["in-progress"], "In Progress");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadDevEstimateField — reads jira.devEstimateField, '' when absent", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-task-"));
+  assert.equal(lib.loadDevEstimateField(dir), "");
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"), "jira:\n  devEstimateField: customfield_10594\n");
+  assert.equal(lib.loadDevEstimateField(dir), "customfield_10594");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("collectIssueFields — writes dev-estimate custom field when configured (numeric only)", () => {
+  const modPath = require.resolve("../scripts/sync-jira-task.js");
+  const prev = process.env.JIRA_DEV_ESTIMATE_FIELD;
+  process.env.JIRA_DEV_ESTIMATE_FIELD = "customfield_10594";
+  delete require.cache[modPath];
+  const freshLib = require(modPath);
+  try {
+    const numeric = freshLib.collectIssueFields({
+      summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
+      descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
+      livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+    });
+    assert.equal(numeric.customfield_10594, 24);
+    assert.deepEqual(numeric.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
+
+    const nonNumeric = freshLib.collectIssueFields({
+      summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: "~1 day" },
+      descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
+      livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+    });
+    assert.equal(nonNumeric.customfield_10594, undefined);
+  } finally {
+    if (prev === undefined) delete process.env.JIRA_DEV_ESTIMATE_FIELD;
+    else process.env.JIRA_DEV_ESTIMATE_FIELD = prev;
+    delete require.cache[modPath];
+  }
+});
+
+test("collectIssueFields — omits dev-estimate custom field when unconfigured", () => {
+  const fields = lib.collectIssueFields({
+    summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
+    descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
+    livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+  });
+  assert.equal(fields.customfield_10594, undefined);
+  assert.deepEqual(fields.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
+});
+
+// ---------------------------------------------------------------------------
+// resolveRelativeLink / makeRelativeLinkResolver — relative doc links must
+// become absolute Bitbucket URLs, since Jira has no "relative to this file"
+// base path once the markdown is copied into a description.
+// ---------------------------------------------------------------------------
+test("resolveRelativeLink — rewrites an existing sibling-file link to an absolute Bitbucket URL", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "relative-link-"));
+  const filePath = path.join(dir, "task.9.card.md");
+  const siblingPath = path.join(dir, "task.9.runbook.md");
+  fs.writeFileSync(filePath, "# card\n");
+  fs.writeFileSync(siblingPath, "# runbook\n");
+
+  const href = lib.resolveRelativeLink("task.9.runbook.md", {
+    filePath, repoRoot: dir, bbBase: "https://bitbucket.org/org/repo", branch: "develop",
+  });
+  assert.equal(href, "https://bitbucket.org/org/repo/src/develop/task.9.runbook.md");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveRelativeLink — preserves a #fragment after resolving the path part", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "relative-link-frag-"));
+  const filePath = path.join(dir, "task.4.card.md");
+  const siblingPath = path.join(dir, "task.4.runbook.md");
+  fs.writeFileSync(filePath, "# card\n");
+  fs.writeFileSync(siblingPath, "# runbook\n");
+
+  const href = lib.resolveRelativeLink("task.4.runbook.md#step-0", {
+    filePath, repoRoot: dir, bbBase: "https://bitbucket.org/org/repo", branch: "HEAD",
+  });
+  assert.equal(href, "https://bitbucket.org/org/repo/src/HEAD/task.4.runbook.md#step-0");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveRelativeLink — leaves absolute URLs, mailto:, and in-page anchors unchanged", () => {
+  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: "https://bitbucket.org/org/repo", branch: "HEAD" };
+  assert.equal(lib.resolveRelativeLink("https://mediastreamag.atlassian.net/browse/RAPP-540", ctx),
+    "https://mediastreamag.atlassian.net/browse/RAPP-540");
+  assert.equal(lib.resolveRelativeLink("mailto:someone@example.com", ctx), "mailto:someone@example.com");
+  assert.equal(lib.resolveRelativeLink("#success-criteria", ctx), "#success-criteria");
+});
+
+test("resolveRelativeLink — a broken/typo'd relative link is left as-authored, not masked", () => {
+  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: "https://bitbucket.org/org/repo", branch: "HEAD" };
+  assert.equal(lib.resolveRelativeLink("task.4.runbok.md", ctx), "task.4.runbok.md");
+});
+
+test("resolveRelativeLink — no bbBase (Bitbucket base undetected) is a no-op", () => {
+  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: null, branch: "HEAD" };
+  assert.equal(lib.resolveRelativeLink("task.4.runbook.md", ctx), "task.4.runbook.md");
+});
+
+test("makeRelativeLinkResolver — returns null when bbBase is unset (Bitbucket base undetected)", () => {
+  assert.equal(lib.makeRelativeLinkResolver({ filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: null }), null);
+});
+
+// ---------------------------------------------------------------------------
+// findRelatedDocs / labelForRelatedDoc — co-located sibling docs (runbooks,
+// scan reports) are discovered structurally so a synced Jira issue always
+// links them, without anyone remembering a frontmatter field.
+// ---------------------------------------------------------------------------
+test("findRelatedDocs — lists sibling .md files, excludes the task file itself and non-.md files", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-"));
+  const filePath = path.join(dir, "task.4.containerize-framework-runtime.md");
+  fs.writeFileSync(filePath, "# card\n");
+  fs.writeFileSync(path.join(dir, "task.4.runbook.md"), "# runbook\n");
+  fs.writeFileSync(path.join(dir, "task.4.trivy-scan-2026-07-14.md"), "# scan\n");
+  fs.writeFileSync(path.join(dir, "notes.txt"), "not markdown\n");
+
+  const related = lib.findRelatedDocs(filePath).map(p => path.basename(p));
+  assert.deepEqual(related, ["task.4.runbook.md", "task.4.trivy-scan-2026-07-14.md"]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("findRelatedDocs — a task with no siblings returns an empty list", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-empty-"));
+  const filePath = path.join(dir, "task.13.card.md");
+  fs.writeFileSync(filePath, "# card\n");
+
+  assert.deepEqual(lib.findRelatedDocs(filePath), []);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("labelForRelatedDoc — special-cases runbook filenames, backtick-quotes everything else", () => {
+  assert.equal(lib.labelForRelatedDoc("task.13.runbook.md"), "Execution runbook on Bitbucket");
+  assert.equal(lib.labelForRelatedDoc("task.4.trivy-scan-2026-07-14.md"), "`task.4.trivy-scan-2026-07-14.md` on Bitbucket");
+});
+
+// ---------------------------------------------------------------------------
+// buildDescriptionAdf — Source Documents section now includes related docs
+// and renders relative in-body links through the resolver.
+// ---------------------------------------------------------------------------
+test("buildDescriptionAdf — Source Documents lists the task file plus each related doc", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nSee runbook.\n",
+    frontmatter: {},
+    taskBbUrl: "https://bitbucket.org/org/repo/src/HEAD/task.13.card.md",
+    relatedDocLinks: [
+      { label: "Execution runbook on Bitbucket", href: "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md" },
+    ],
+    changelogEntries: [],
+  });
+  const bullet = doc.content.find(n => n.type === "bulletList");
+  assert.ok(bullet, "Source Documents bullet list present");
+  assert.equal(bullet.content.length, 2, "task file + 1 related doc");
+  const hrefs = bullet.content.map(li => li.content[0].content[0].marks[0].attrs.href);
+  assert.deepEqual(hrefs, [
+    "https://bitbucket.org/org/repo/src/HEAD/task.13.card.md",
+    "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md",
+  ]);
+});
+
+test("buildDescriptionAdf — with no taskBbUrl and no related docs, omits the Source Documents section", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nNothing to link.\n",
+    frontmatter: {},
+    taskBbUrl: null,
+    relatedDocLinks: [],
+    changelogEntries: [],
+  });
+  const headings = doc.content.filter(n => n.type === "heading").map(n => n.content[0].text);
+  assert.ok(!headings.includes("Source Documents"));
+});
+
+test("buildDescriptionAdf — rewrites a relative in-body link via linkResolver", () => {
+  const resolver = href => href === "task.13.runbook.md"
+    ? "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md"
+    : href;
+  const doc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nSee the [runbook](task.13.runbook.md) for detail.\n",
+    frontmatter: {},
+    taskBbUrl: null,
+    relatedDocLinks: [],
+    changelogEntries: [],
+    linkResolver: resolver,
+  });
+  const overview = doc.content.find(n => n.type === "paragraph");
+  const linkNode = overview.content.find(n => n.marks && n.marks[0].type === "link");
+  assert.equal(linkNode.marks[0].attrs.href, "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md");
 });

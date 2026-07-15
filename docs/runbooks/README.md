@@ -14,8 +14,17 @@ If you want **API-style reference** instead of a walkthrough, see:
 
 ## Available Runbooks
 
+**New to agent-skills? Start here:**
+
+- 🚀 **Brand-new project** (no codebase yet) → [New Project Setup](./new-project-setup.md)
+- 🏗️ **Existing codebase** (adopting agent-skills onto something you already have) → [Document Existing Project](./document-existing-project.md)
+- 📚 **Want a structured walkthrough first** → [First-Week Onboarding](./first-week.md)
+
+After those, pick a runbook from the table below as the work in front of you demands.
+
 | Runbook | Use it when… |
 |---|---|
+| [First-Week Onboarding](./first-week.md) | Starting fresh with agent-skills. Four structured days covering the task pipeline, story pipeline, QA recovery, and parallel development. |
 | [Story Development](./story-development.md) | Shipping a user-facing feature that fits inside a PRD → epic → story hierarchy. Covers `create-prd` → `review-prd` → `create-epic` → `review-epic` → `create-story` → `review-story` → `develop-story`. |
 | [Task Development](./task-development.md) | Standalone technical work (refactor, infra, cleanup, tooling) that doesn't need a PRD or epic. Covers `create-task` → `review-task` → `develop-task`. |
 | [QA Flow](./qa-flow.md) | Running QA without the full develop-story / develop-task orchestrator — pre-implementation planning, manual review, or rework on findings. |
@@ -28,6 +37,7 @@ If you want **API-style reference** instead of a walkthrough, see:
 | [Parallel Stories](./create-parallel-stories.md) | Developing multiple stories under one epic in parallel via Git worktrees. |
 | [Change Management](./change-management.md) | Responding to pivots, blockers, or scope changes mid-project. |
 | [Document Existing Project](./document-existing-project.md) | Generating brownfield architecture docs before adopting the library on an existing codebase. |
+| [Release & Install](./release-and-install.md) | Cutting a versioned release (maintainers) and running the consumer setup wizard to install skills into a project. |
 
 ## Runbook conventions
 
@@ -50,4 +60,4 @@ If a satellite outgrows ~200 lines, consider promoting it or splitting out a sat
 
 ### Mermaid diagrams
 
-Runbooks use Mermaid. GitHub renders Mermaid natively; some other viewers (older IDE extensions, plain text viewers) do not. If you're authoring a new diagram, validate it with [`mermaid-architect`](../../skills/mermaid-architect/SKILL.md) before committing.
+Runbooks use Mermaid. GitHub renders Mermaid natively; Bitbucket needs a plugin or a Mermaid-aware viewer; Jira/Confluence renders via the official Mermaid macro. Older IDE extensions and plain text viewers will show raw fenced blocks. If you're authoring a new diagram, validate it with [`mermaid-architect`](../../skills/mermaid-architect/SKILL.md) before committing.

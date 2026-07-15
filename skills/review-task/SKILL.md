@@ -322,7 +322,7 @@ question: "Would you like a comprehensive review report saved to a file, or just
 header: "Output Format"
 options:
   - label: "Comprehensive report"
-    description: "Generate detailed review report saved to task.{n}.review.{descriptive-name}.md with all findings, user decisions, and recommendations documented."
+    description: "Generate detailed review report saved to task.{n}.review.{N}.{descriptive-name}.md with all findings, user decisions, and recommendations documented."
   - label: "Action plan only"
     description: "Provide prioritized list of issues and fixes to action immediately without saving a report file."
 ```
@@ -336,6 +336,7 @@ options:
 | Task Subject | Description |
 |---|---|
 | Determine output format | Capture user's report vs action-plan preference |
+| Branch setup | Ensure review runs on a feature branch (Step 0a) |
 | Load config & context | Locate task document, template, architecture docs |
 | Template compliance | Verify task structure against template |
 | Technical accuracy | Anti-hallucination review of implementation details |
@@ -347,6 +348,25 @@ options:
 | Update document status | Offer status update based on review outcome |
 
 **Output**: User's output format preference captured; task list initialized
+
+---
+
+### Step 0a: Branch Setup (BEFORE any document mutation)
+
+**Purpose**: Ensure all review artifacts (status updates, Change Log entries, `.review.*.md` reports, Jira/GitHub sync) land on a dedicated feature branch — not on `develop`/`main`.
+
+**Pre-conditions**: `DOC_FILE` (task file path from Input Resolution), `MODE` (from Step 0), `SKILL_NAME=review-task`.
+
+**Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-task** variant throughout:
+- 0a.0 validate-mode short-circuit (skips entirely when `MODE=validate`).
+- 0a.2 extract `TASK_ID` from the filename (`task.{id}.{name}.md`).
+- 0a.3 auto-skip when on `feature/task.${TASK_ID}.*`.
+- 0a.4 prompt: single question for base branch (current `feature/*` recommended when already on one, else `${BASE_DEFAULT}` recommended).
+- 0a.5–0a.8 stash (`git stash create` + `store`) → invoke `/create-branch` with resolved `BASE_BRANCH` → pop stash by hash.
+
+**Output**: `BRANCH_NAME`, `BASE_BRANCH`, `AUTO_SKIPPED` exported. Decisions Log entry (or inline preamble) recorded per 0a.9.
+
+**Failure**: HALT with the exact error; stash recovery instructions surfaced; no document edits attempted.
 
 ---
 
@@ -444,6 +464,11 @@ options:
    - Effort: Should have estimate
    - Dependencies: Should list other tasks if applicable
 
+3a. **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)):
+   - `type: task` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement; also flag a legacy bold-line `**Task ID**:` header with no YAML frontmatter block as Critical — the task must use a YAML frontmatter block).
+   - `description` (one-sentence summary) present → **Important** if missing.
+   - `tags` is a YAML list (when present); `resource` is a URI (when present) → **Optional** if malformed. `updated` ≡ OKF `timestamp`; the tracker URL (derived from `github_issue`, or `jira_url`) ≡ OKF `resource` — absence of an explicit `resource` is not a finding.
+
 4. **Placeholder Detection**:
    - Search for: `[TBD]`, `[TODO]`, `[PLACEHOLDER]`, `???`, `[Description]`
    - Each unfilled placeholder is a gap
@@ -477,8 +502,16 @@ options:
    - Check frontmatter for `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This task has no linked Jira issue. Should I create one now?"
-     - If user confirms, create via Jira REST API v2:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-task` step 4.5; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This task has no linked Jira issue. Create and link one now? Detected platform: Jira."
+       > **Options:**
+       > - **Sync to Jira** `(Recommended)` — create the Jira issue and write `jira_key`/`jira_url` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `jira_key` unwritten. The user can run `/sync-jira-task` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-jira-task later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to Jira**, create via Jira REST API v2:
        - **Pre-create dedup search (Tracker dedup)** — run immediately before the create block:
          1. Search for an existing issue via Atlassian MCP `searchJiraIssuesUsingJql`:
             - `jql`: `summary ~ "[Task {id}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — search across all states)
@@ -535,8 +568,16 @@ options:
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This task has no linked GitHub issue. Should I create one now?"
-     - If user confirms, create the issue using the same pattern as `/create-task`:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-task` step 4.5; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This task has no linked GitHub issue. Create and link one now? Detected platform: GitHub."
+       > **Options:**
+       > - **Sync to GitHub** `(Recommended)` — create the GitHub issue, add it to the project board, and write `github_issue` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `github_issue` unwritten. The user can run `/sync-github-task` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-github-task later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to GitHub**, create the issue using the same pattern as `/create-task`:
        - **Pre-create dedup search (Tracker dedup)** — run immediately before the create block:
          1. Search for an existing issue:
             ```bash
@@ -709,11 +750,17 @@ options:
    - High-risk phases should have mitigation plans
    - Breaking changes flagged appropriately
 
+6. **Effort Estimate**:
+   - Check frontmatter for `estimated_effort_hours` (number).
+   - **Absent or empty**: flag as **Optional** (LOW severity) — "No `estimated_effort_hours` set. PM tooling (Jira Original Estimate, GitHub Projects v2 Estimate field) will show this task as unestimated."
+   - **Present**: recompute the rubric in `references/effort-estimation-rubric.md` against the current document state. If `abs(frontmatter - rubric) / max(frontmatter, rubric) > 0.5` (>2× divergence), flag as **Optional** (LOW severity): "Frontmatter `estimated_effort_hours: {X}` diverges from rubric estimate of **{Y}h** (success criteria: {n}, plan tasks: {m}, risk: {r}). Confirm or adjust."
+   - Non-blocking — does **not** affect gate decision. In Interactive mode, may offer a single prompt to accept the rubric's number; in Validate mode, observe silently.
+
 **Issues to Flag**:
 
 - **Critical**: Vague changes, missing files, unclear dependencies
 - **Important**: Insufficient detail, no risk assessment
-- **Optional**: Could add more rationale or context
+- **Optional**: Could add more rationale or context, missing `estimated_effort_hours`
 
 **Output**: Implementation plan completeness report
 
@@ -942,7 +989,7 @@ questions:
 **Actions**:
 
 1. Generate complete review report following the structure below
-2. Save to file: `[task-directory]/task.{n}.review.{descriptive-name}.md`
+2. Save to file: `[task-directory]/task.{n}.review.{N}.{descriptive-name}.md`
 3. Display summary to user with file location
 
 **Report Structure**:
@@ -1177,7 +1224,7 @@ questions:
 - **Review Duration:** [time]
 ```
 
-**Output**: Save review report to `[task-directory]/task.{n}.review.{descriptive-name}.md`
+**Output**: Save review report to `[task-directory]/task.{n}.review.{N}.{descriptive-name}.md`
 
 ---
 
@@ -1312,6 +1359,31 @@ options:
 
 ---
 
+### Step 8.6: Push Body Changes to Jira (when `TRACKER=jira` and fixes were applied)
+
+**Purpose**: When Step 8.5 applied any Edit to the task body, the local body hash will diverge from `jira_last_body_hash` and the Jira description must be re-rendered. Execute the bundled `sync-jira-task` script directly — do NOT speculate about other paths.
+
+**When to Execute**:
+- `TRACKER=jira` (set by Step 1 resolver) AND
+- At least one fix was applied in Step 8.5 OR `jira_last_body_hash` is missing/stale
+
+**Skip when**: `TRACKER=github`, validate mode, or no body edits were made.
+
+**Command**:
+
+```bash
+node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
+  --file "$TASK_FILE_PATH"
+```
+
+> **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-task/scripts/sync-jira-task.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
+
+On success → `sync-jira-task` updates the Jira description, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed body update to Jira {jira_key}`.
+
+On non-zero exit → log warning `⚠️ sync-jira-task failed — Jira description may be stale` and continue to Step 9 (do not halt).
+
+---
+
 ### Step 9: Update Document Status (if applicable)
 
 **Purpose**: Update the task document status after review and fixes are complete
@@ -1408,6 +1480,8 @@ User Can Now: Run `/develop` to begin implementation
 **Purpose**: Notify the linked tracker issue (Jira or GitHub) that a review has been completed, with the outcome, key findings, and a summary of any changes made to the task document.
 
 **When to Execute**: Always — after Step 9 completes (regardless of review outcome or status update decision).
+
+> **MUST execute — not gated by manual-sync user memories.** This auto-post is part of the review workflow itself. The `/create-*` skills' "Jira sync is manual only" rule (if present in user memory, e.g. `feedback_jira_sync_manual_only.md`) applies **only to `/create-epic`, `/create-story`, `/create-task`** — it does NOT apply to `/review-story`, `/review-task`, `/develop-story`, or `/develop-task`. These skills always auto-post review/PR/finalise outcomes to the linked tracker (GitHub or Jira/Bitbucket), symmetric across platforms. Skipping this step on the basis of a manual-sync memory and deferring to `/sync-jira-task` is a misapplication of that rule.
 
 **Detection**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `references/platform-detection.md`.
 
@@ -1647,7 +1721,7 @@ This skill uses:
 
 ## Notes
 
-- The review report (`task.{n}.review.{descriptive-name}.md`) is the primary output and is always saved separately. Use DOTS as structural separators and hyphens within the descriptive name. Example: `task.29.review.develop-task-loop-test-failure-triage-subagent.md`. If multiple reviews are needed, append a sequence: `task.29.review.2.{name}.md`.
+- The review report (`task.{n}.review.{N}.{descriptive-name}.md`) is the primary output and is always saved separately. Use DOTS as structural separators and hyphens within the descriptive name. `{N}` starts at 1 and increments on re-reviews. Example: `task.29.review.1.subagent-triage.md`, `task.29.review.2.subagent-triage.md`.
 - Steps 8.5 and 9 may modify the task document (apply fixes; update `Status:` field) — both are gated on user consent (or pipeline auto-answer)
 - Can be used at any stage: planned, in progress, completed
 - Designed to find problems through collaborative user input

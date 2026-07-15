@@ -52,7 +52,7 @@ Implementation plans **must** live in-repo, co-located with the work or under `.
 ## Registries
 
 - **Task numbers** are globally unique. Read `docs/tasks/task-registry.md` → "Next Available Task Number" before creating a task. Append a row, increment counter, commit atomically.
-- **Epic numbers** are globally unique. Source of truth: `docs/epic-registry.md`.
+- **Epic numbers** are globally unique. Source of truth: `docs/development/epic-registry.md`.
 
 ## Validation before commit
 
@@ -61,7 +61,7 @@ Run these locally when you touch a skill or shared resource:
 - `npm run validate -- skills/<changed-skill>/` — checks `SKILL.md` frontmatter.
 - `npm run bundle` — required after `shared/resources/` edits.
 - `npm run generate-catalog` — required after adding/editing skills.
-- `npm test` — Node 20+ test runner suite (skill unit tests + eval protocol tests).
+- `npm test` — Node 22+ test runner suite (skill unit tests + eval protocol tests; relies on `node --test` glob expansion).
 
 ## Do not
 

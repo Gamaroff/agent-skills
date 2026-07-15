@@ -67,11 +67,11 @@ Given a story directory, these skills auto-discover:
 
 ### Supported Skills
 
-| Skill | Accepts Directory | Accepts Story File | Accepts QA/Gate/Bug Files |
-|-------|------------------|-------------------|--------------------------|
-| `develop` | Yes | Yes | No |
-| `qa-story` | Yes | Yes | No |
-| `qa-fix` | Yes | Yes | Yes (QA, Gate, Bug) |
+| Skill      | Accepts Directory | Accepts Story File | Accepts QA/Gate/Bug Files |
+| ---------- | ----------------- | ------------------ | ------------------------- |
+| `develop`  | Yes               | Yes                | No                        |
+| `qa-story` | Yes               | Yes                | No                        |
+| `qa-fix`   | Yes               | Yes                | Yes (QA, Gate, Bug)       |
 
 QA/Gate files are numbered (e.g., `.qa.1.`, `.gate.1.`).
 
@@ -142,6 +142,7 @@ Outputs: architecture docs, technology stack with versions, data models, API spe
 ```
 
 Slash form:
+
 ```bash
 /qa-story docs/prd/.../stories/story.178.8.example-feature/
 /qa-story story.178.8.example-feature.md
@@ -150,6 +151,7 @@ Slash form:
 Process: risk assessment → requirements traceability → code quality review → test architecture → NFR validation → active refactoring (when safe) → standards compliance.
 
 Outputs:
+
 - `story.[epic].[story].qa.[number].[name].md`
 - `story.[epic].[story].gate.[number].[name].yml`
 - Bug reports if issues found
@@ -204,7 +206,7 @@ Modes: interactive (section-by-section, user confirms) or YOLO (one pass, compre
 
 Use when: 1-3 stories, follows existing patterns, low risk, minimal architectural changes.
 
-File naming: `epic.[number].[descriptive-name].md`. Check `/docs/epic-registry.md` for unique numbers.
+File naming: `epic.[number].[descriptive-name].md`. Check `/docs/development/epic-registry.md` for unique numbers.
 
 ## Configuration
 
@@ -212,17 +214,14 @@ Projects place `skills-config.yaml` at the project root. Key settings:
 
 ```yaml
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-devStoryLocation: nested   # stories nested inside epic directories
-devDebugLog: .ai/debug-log.md
 ```
+
+Both roots are configurable (defaults shown). Nested layout under each root is fixed — see [Configurable roots and fixed conventions](./configuration.md#configurable-roots-and-fixed-conventions).
 
 Platform detection (tracker and VCS) resolves from `skills-config.yaml` → env vars (`JIRA_URL`) → git remote → defaults to GitHub.
 

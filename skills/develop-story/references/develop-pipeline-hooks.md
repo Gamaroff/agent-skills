@@ -15,7 +15,7 @@ This document is the single source of truth for what hooks exist, what they do, 
 ## TL;DR — install both hooks
 
 ```bash
-# After `npx skills add develop-story` (or develop-task):
+# After installing skills (e.g. via `bash setup-consumer.sh` or `--update`):
 bash .agents/skills/develop-story/scripts/install-hooks.sh
 ```
 
@@ -32,6 +32,8 @@ Idempotent. Preserves existing settings. `--dry-run` to preview.
 
 Both scripts are byte-identical across `develop-story` and `develop-task` installs — the lock file's `skill` field selects the orchestrator at runtime.
 
+> **Why no `PostToolUse:Skill` auto-advance hook?** An earlier design shipped a third hook (`on-skill-return.sh`) that advanced the lock and injected a "next step" reminder when a sub-skill "returned." This was removed: the Skill tool executes **inline** in the orchestrator's context, so a `PostToolUse` hook matching the Skill tool fires the instant the skill's instructions are *loaded* — before any of its work runs. Claude Code has **no** hook event for skill *completion*. The hook therefore mis-fired on every sub-skill call, advancing the pipeline before the step did any work. Lock advancement is handled correctly by **sub-skill self-advance** (an instruction inside each sub-skill body, which runs inline *after* the work) plus the **Stop** hook backstop — see [`pipeline-lock-cooperation.md`](pipeline-lock-cooperation.md).
+
 ---
 
 ## 1. PreCompact hook — `on-precompact.sh`
@@ -44,11 +46,14 @@ Both scripts are byte-identical across `develop-story` and `develop-task` instal
 
 **Side effects** (best-effort, all wrapped in `... || true`):
 
+0. **Write a resume snapshot first** — `develop-pipeline.last-halt.json` (co-located with the lock) as a **superset of the lock** plus `paused_at`, `pause_reason: "precompact"`, and `halt_step` (aliasing the lock's `current_step`). This is written **before the EXIT trap is armed and before any `rm`**, so even a hook run killed mid-flow (SIGTERM/timeout) leaves recoverable resume state. Degrades to a verbatim `cp` of the lock when `jq` is unavailable (`current_step` is still preserved). The Phase 0b resume detector reads this snapshot when no active lock is present.
 1. Append a `## Pipeline Paused — {timestamp}` block to the implementation report named in the lock
 2. `git add <report> && git commit -m "docs(<skill>): pipeline paused at step <N> — context compaction imminent" && git push origin HEAD`
 3. `gh pr comment <pr_url>` if `pr_url` is set and `gh` is on PATH
 4. `gh issue comment <tracker_issue>` if `tracker=github` and `tracker_issue` is set
 5. `rm -f .claude/state/develop-pipeline.lock`
+
+> **Operator note — `pause_reason` vs `halt_reason`.** A PreCompact snapshot is tagged `pause_reason: "precompact"` (with `paused_at`); the orchestrator's terminal-HALT path in SKILL.md instead writes `halt_reason` + `halted_at`. Inspect **`pause_reason`** to identify a snapshot left by an interrupted compaction. Both carry `halt_step`, so Phase 0b resumes from the same field either way.
 
 **Output**: a single JSON object on stdout carrying `additionalContext`:
 ```json
@@ -59,9 +64,9 @@ The orchestrator sees the signal in its next turn, emits the user-facing pause b
 **Resume**: re-invoke `/develop-{story,task} <path>`. Phase 0b artifact verification skips completed steps and re-runs the paused step from scratch — sub-skills are required to be re-run-safe (see the pause doc's "Re-run-safety contract").
 
 **Escape valves**:
-- No lock file → exit 0 with empty `additionalContext`
-- `jq` missing → exit 0 with empty `additionalContext` (degrades to no-pause; resume still works via post-compaction recovery in SKILL.md)
-- Hook timeout / SIGTERM → `trap 'rm -f "$LOCK"' EXIT` ensures the lock is removed regardless
+- No lock file → exit 0 with empty `additionalContext` (and a pre-existing snapshot is left untouched — the snapshot write is skipped before the lock-existence check)
+- `jq` missing → exit 0 with empty `additionalContext` (degrades to no-pause), but the cp-fallback resume snapshot is still written first, so resume works via Phase 0b
+- Hook timeout / SIGTERM → `trap 'rm -f "$LOCK"' EXIT` ensures the lock is removed regardless. The snapshot is written **before** this trap is armed, so a kill can never leave the pipeline both unlocked **and** un-resumable.
 
 **Jira limitation**: the hook does NOT post to Jira issues — Jira requires authenticated MCP calls unavailable from a shell context. Pause is visible via PR comment + implementation report; the orchestrator surfaces a "Jira not commented" note in the user-facing summary.
 
@@ -98,6 +103,8 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 
 **Loop protection in practice**: Claude Code passes `stop_hook_active: true` to the hook on the second consecutive block within a single stop attempt. The hook honours this and exits 0. If the orchestrator genuinely cannot continue, the documented terminal-HALT protocol removes the lock, satisfying the hook permanently.
 
+> **Expected behaviour — the hook re-prompts on every pause; this is not a bug.** `stop_hook_active` only suppresses a *second* block within the **same** stop attempt — it does **not** persist across separate stops. So every time the orchestrator genuinely yields the turn mid-step (most commonly while **waiting on background subagents**, or pausing for any reason while `current_step` is still in `[1, 7]`), that is a *fresh* stop attempt: the lock is unchanged, so the hook fires again and re-issues its "advance the lock now, no prose" block. During a single long step you will therefore see the same continue-prompt **several times**, once per pause. This is the hook doing its job — it has no signal for "background work is in flight," so it cannot tell a premature yield apart from a legitimate mid-step wait, and it treats both as premature. **The correct response is to ignore the re-prompt and hold the step until its own work and gates have genuinely completed** — only then perform the Bash → Edit → banner → invoke transition. Do not let the repeated prompt stampede you into advancing early; advancing before the step's work lands is the actual failure mode (see [`pipeline-lock-cooperation.md`](pipeline-lock-cooperation.md)). The prompt never *forces* the wrong action — it cannot advance the lock itself — so a step that needs more time is safe to keep working.
+
 **Output**: either empty stdout (allow stop) or JSON:
 ```json
 {"decision": "block", "reason": "🔁 PIPELINE-CONTINUE-REQUIRED — DO NOT STOP\n..."}
@@ -128,7 +135,7 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 
 **Failure modes**:
 - `jq` not on PATH → exit 1 with install hint
-- No hook scripts found in any candidate path → exit 1 with `npx skills add` hint
+- No hook scripts found in any candidate path → exit 1 with `setup-consumer.sh --update` hint
 - Invalid JSON in settings file → exit 1 (refuses to overwrite)
 
 ---
@@ -168,12 +175,14 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Stop hook seems to loop forever | `stop_hook_active` not honoured | Update to latest `on-stop.sh` (must read stdin and check the flag) |
+| Stop hook re-prompts to advance several times during one step | Orchestrator yielded the turn more than once mid-step (e.g. waiting on background subagents) — each pause is a fresh stop attempt | **Expected, not a bug.** Ignore the re-prompt and keep working; only do the Bash → Edit → banner → invoke transition once the step's work and gates have completed (see the "Expected behaviour" note under the Stop hook section) |
 | Hook never fires | Not registered in settings.json | Run `bash .agents/skills/develop-story/scripts/install-hooks.sh` |
 | Hook fires but nothing happens | No lock file (correct noop) | Confirm a `/develop-*` pipeline is active — lock is created at end of Step 1 |
 | Stop hook blocks but orchestrator stops anyway | Hook returned invalid JSON, or Claude Code rejected the block | Check stderr of the hook; verify `jq` produces valid output |
 | PR comment / git commit missing after pause | PR not set in lock, or `gh`/`git` not on PATH | All side effects are best-effort — implementation report is the durable record |
 | Hook crashes future pipeline runs | Stale lock file left over | `rm -f .claude/state/develop-pipeline.lock` |
 | Installer refuses to write | Existing `settings.json` is invalid JSON | Fix or back up, re-run installer |
+| Hook fails with `No such file or directory` though the script exists | Legacy bare-relative `command` from a pre-`${CLAUDE_PROJECT_DIR}` install — resolved against the shell's cwd at hook-fire time, which breaks after any `cd` into a subdirectory | Re-run `bash .agents/skills/develop-story/scripts/install-hooks.sh` — it migrates the old entry to the cwd-independent `${CLAUDE_PROJECT_DIR}` form automatically |
 
 ---
 
@@ -204,16 +213,17 @@ rm -f .claude/state/develop-pipeline.lock
 
 ## Authoring contract for new hooks
 
-If you add a third hook to this pipeline (e.g., a `SessionStart` resumer or a `PostToolUse` enforcer), follow the same pattern:
+If you add a third hook to this pipeline (e.g., a `SessionStart` resumer), follow the same pattern:
 
 1. **Script lives at** `skills/develop-{story,task}/scripts/on-{event}.sh`, byte-identical across both skills
 2. **Always exits 0** — hooks must not block compaction or stop on infrastructure failure
 3. **Reads `.claude/state/develop-pipeline.lock`** for state — never invents new lock files
 4. **Honours Claude Code's anti-loop flags** (`stop_hook_active`, equivalents for other events)
 5. **Documented here** — add a new section to this file plus a row in the catalog table
-6. **Installable via `install-hooks.sh`** — extend the script's hook list rather than creating a parallel installer
-7. **Test coverage** — add protocol assertions to `evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs`
-8. **Update both SKILL.md Setup sections** — but keep them short; this doc is the canonical reference
+6. **Installable via `install-hooks.sh`** — extend the script's hook list rather than creating a parallel installer. Exception: `setup-consumer.sh` patches inline to avoid a chicken-and-egg dependency on skills being installed first; it is not a general precedent.
+7. **Registered `command` uses `${CLAUDE_PROJECT_DIR}`** — write the hook command as `bash "${CLAUDE_PROJECT_DIR}/<base>/on-{event}.sh"`, never a bare relative path. Claude Code expands `${CLAUDE_PROJECT_DIR}` to the project root at hook-fire time; a bare relative path (e.g. `bash .agents/skills/.../on-{event}.sh`) is resolved against the shell's cwd instead, so it breaks the moment any command in the session has `cd`'d into a subdirectory. When you change the emitted form, also add an exact-match de-registration step (see `unpatch_hook_exact`) so re-running the installer migrates old entries instead of stacking a second, still-broken one alongside the fix.
+8. **Test coverage** — add protocol assertions to `evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs`
+9. **Update both SKILL.md Setup sections** — but keep them short; this doc is the canonical reference
 
 ---
 

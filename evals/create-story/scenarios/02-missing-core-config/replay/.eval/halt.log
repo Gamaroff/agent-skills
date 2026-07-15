@@ -1,0 +1,4 @@
+HALT: core-config.yaml not found at sandbox root
+Source: skills/create-story/SKILL.md Phase 0 preflight
+Action: refused to write docs/stories/story.178.8.example-feature.md
+Resolution: create a core-config.yaml (see shared/resources/) or run create-story from a project that already has one.

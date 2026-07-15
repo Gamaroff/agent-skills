@@ -67,6 +67,8 @@ Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if pres
 
 Parse the task id from the filename: `task.{N}.` → `TASK_N`.
 
+Strip any leading `Task {N}: ` prefix (or an already-bracketed `[Task {N}] ` prefix) from `title` to get the bare display title: `TASK_TITLE`. The update path (Step 4b) wraps this once as `[Task {N}] ${TASK_TITLE}`; stripping first prevents a double prefix like `[Task 5] Task 5: …`.
+
 ### 4. Branch: Create vs Update
 
 #### 4a. Create Path (`github_issue` absent or null)
@@ -96,12 +98,18 @@ Continue to Step 5 (status reconciliation).
 ISSUE_NUM={github_issue from frontmatter}
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
+# Resolve the Document-link branch the same way as on create: current branch's
+# remote-tracking branch, falling back to the repo default branch, then `develop`.
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${TASK_RELATIVE_PATH}"
+
 # Verify the issue still exists
 gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue-${ISSUE_NUM}.json \
   || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
 ```
 
-Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt from the task document's Overview / Key Deliverables / Success Criteria / Metadata / Document sections.
+Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt from the task document's Overview / Key Deliverables / Success Criteria / Metadata / Document sections (the `## Document` link uses `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
 
 If anything changed, run:
 
@@ -118,6 +126,12 @@ If the priority label changed, also re-mirror the board's Priority field:
 
 ```bash
 bash references/set-github-project-priority.sh "${ISSUE_NUM}" "${priority}" || true
+```
+
+Always re-mirror the board's Estimate field from frontmatter (no-op if `estimated_effort_hours` is empty):
+
+```bash
+bash references/set-github-project-estimate.sh "${ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
 
 Append a Change Log row describing what changed:

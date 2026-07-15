@@ -1,6 +1,6 @@
 ---
 id: story.3.2.satellite-runbook-callouts
-title: "Story 3.2: 'Is this the right runbook?' callouts for satellites"
+title: "[Story 3.2] 'Is this the right runbook?' callouts for satellites"
 type: story
 status: accepted
 priority: high
@@ -16,7 +16,7 @@ updated: 2026-05-13
 completed_date: 2026-05-13
 ---
 
-# Story 3.2: "Is this the right runbook?" callouts for satellites
+# [Story 3.2] "Is this the right runbook?" callouts for satellites
 
 **Status**: Accepted
 **Review**: ✅ All review recommendations from `story.3.2.review.1.satellite-runbook-callouts.md` implemented 2026-05-13

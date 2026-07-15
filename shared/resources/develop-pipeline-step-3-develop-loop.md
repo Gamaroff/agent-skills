@@ -74,13 +74,13 @@ If a prior plan file is being reused from a previous session, verify its freshne
 #### develop-story internal gates
 
 - **Draft status gate**: If develop asks "is this draft ready?", answer **Yes** and automatically select "Yes, ready to implement". Rationale: `/review-story` already validated and promoted the story in Step 2 — the draft gate in `/develop` is redundant when called from this pipeline. Log in Decisions Log: "Draft gate auto-answered: Yes — review-story validation in Step 2 is sufficient."
-- **High-risk gate** (`risk_level: high`): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond to the develop prompt interactively. Note: develop also offers a third option "Skip, low actual risk" — if develop presents this option in the context where Q3 = "Skip qa-planning", treat it as equivalent to "Skip, I've already planned" and select it; do not surface the distinction to the user.
+- **High-risk gate** (`risk_level: high`): qa-planning skip is silent — the pipeline always auto-skips it (see `references/develop-pipeline-step-0-resolve-and-prepare.md`; there is **no** Q3 in Upfront Setup). The `/develop` skill presents up to three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". Always automatically select **"Skip, I've already planned"** (treat "Skip, low actual risk" as equivalent if that is what develop offers) and log `"high-risk gate: auto-skipped qa-planning"` in the Decisions Log. Never pause for the user at this gate.
 - **Alignment mismatch gate**: If develop finds existing code that differs from the story, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
 
 #### develop-task internal gates
 
 - **Draft/Planned status gate**: If develop asks "is this ready?", answer **Yes** and automatically select "Yes, ready to implement". Rationale: `/review-task` already validated the task in Step 2. Log in Decisions Log: "Planned/Draft gate auto-answered: Yes — review-task validation in Step 2 is sufficient."
-- **High-risk gate** (`risk_level: high`): Use the Q3 answer from Upfront Setup. The `/develop` skill presents three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". If Q3 = "Skip qa-planning", automatically select **"Skip, I've already planned"** and log it. If Q3 = "Pause at that gate", let the user respond interactively.
+- **High-risk gate** (`risk_level: high`): qa-planning skip is silent — the pipeline always auto-skips it (see `references/develop-pipeline-step-0-resolve-and-prepare.md`; there is **no** Q3 in Upfront Setup). The `/develop` skill presents up to three options: "Run `/qa-planning` now", "Skip, I've already planned", "Skip, low actual risk". Always automatically select **"Skip, I've already planned"** (treat "Skip, low actual risk" as equivalent) and log `"high-risk gate: auto-skipped qa-planning"` in the Decisions Log. Never pause for the user at this gate.
 - **Alignment mismatch gate**: If develop finds existing code that differs from the task, automatically select "Align code to document" — the document is the source of truth. Log this in Decisions Log.
 
 ---
@@ -154,6 +154,46 @@ Main reads only the triage summary (counts + ≤10 failure bullets + `next_file`
 ### After loop exits (both orchestrators)
 
 Update Pipeline Progress: ✅ develop.
+
+**Post development completion to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty). Execute this before the lock-advance Bash call — it is a tool call, not prose, and does not violate the no-prose-before-lock-advance rule:
+
+#### develop-story
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🛠️ Development Complete — Step 3/8
+
+**Status**: Ready for Review
+**Tasks completed**: {audit.completed}/{audit.total}
+**Tests**: {all passing / {N} failures — see implementation report}
+**Branch**: {branch}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+#### develop-task
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🛠️ Development Complete — Step 3/8
+
+**Status**: Ready for Review
+**Phases completed**: {audit.completed}/{audit.total}
+**Tests**: {all passing / {N} failures — see implementation report}
+**Branch**: {branch}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+Use `audit.completed` / `audit.total` from the final loop-audit result. Use the last `TEST_EXIT` value: `0` → "all passing"; non-zero → "{N} failures — see implementation report". On failure: log warning in Issues Log and continue.
+
+Log in Decisions Log: "Development completion comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
 **Apply the Step Transition Protocol from the orchestrator SKILL.md immediately.** Concretely, your next assistant turn after `/develop` returns MUST contain — in this order, with no prose between — (1) the Pipeline Progress ✅ update, (2) the Bash lock-update advancing `current_step` to 4, (3) the Step 4 banner, (4) the `/create-pr` invocation. Do NOT print "Returning to pipeline orchestrator", "Development complete", or any summary message before issuing the lock-update Bash tool call. The lock advancement is what proves Step 4 has started; if the model emits a summary instead, the pipeline will stall under context pressure (observed regression in live-github-test runs).
 

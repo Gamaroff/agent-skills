@@ -42,9 +42,9 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The epic file `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md`
-- ✅ `/docs/epic-registry.md` (number reservation per the global numbering rule)
-- ✅ Tracker issue creation if the workflow includes it (GitHub/Jira issue for the epic itself)
+- ✅ The epic file `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md`
+- ✅ `/docs/development/epic-registry.md` (number reservation per the global numbering rule)
+- ✅ Tracker issue creation (GitHub/Jira issue for the epic itself) — **only after explicit opt-in** via the prompt in the *Offer Tracker Sync* step; never created unprompted
 
 **If the user asks to "create the epic and start the first story"**: create the epic doc, then STOP and explicitly hand off — tell user to invoke `/create-story` as a separate step. Do not chain.
 
@@ -66,7 +66,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **Epic Numbering (CRITICAL):**
 
-- Check `/docs/epic-registry.md` for next available epic number
+- Check `/docs/development/epic-registry.md` for next available epic number
 - Epic numbers are globally unique across entire system
 - Reserve your number before creating epic file
 
@@ -76,7 +76,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **CRITICAL - Global Epic Numbering**:
 
-1. Check `/docs/epic-registry.md` for next available number
+1. Check `/docs/development/epic-registry.md` for next available number
 2. Add your epic to registry table
 3. Increment "Next Available Epic Number" counter
 4. Use that number in your epic filename
@@ -88,7 +88,7 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 - `epic.164.payment-integration.md` (incremented)
 - `epic.163.5.settings-enhancement.md` (use decimals for intermediate epics)
 
-**Location**: `docs/prd/[domain]/[feature]/epics/epic.[number].[descriptive-name]/` (Directory name must exactly match file name)
+**Location**: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[number].[descriptive-name]/` (Directory name must exactly match file name). Resolve `${PRD_ROOT}` from `skills-config.yaml` via `references/resolve-paths.sh` (default: `docs/prd`).
 
 **Naming Rules**:
 
@@ -97,28 +97,80 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 - ✅ Correct: `epic.163.auto-hide`
 - ❌ Wrong: `epic-163-auto-hide` or `epic.1.auto-hide` (number already used)
 
+## Discover Parent PRD
+
+Before writing the epic file, resolve the parent PRD so the epic carries a real, navigable reference back to its source spec (stakeholders open the epic and click straight through to the PRD). Resolve `${PRD_ROOT}` from `references/resolve-paths.sh` first (default `docs/prd`).
+
+Derive `PRD_SOURCE_PATH` in this order:
+
+1. **Canonical location** — check `${PRD_ROOT}/[domain]/[feature]/prd.[feature].md`. If it exists, set `PRD_SOURCE_PATH` to that repo-relative path.
+2. **Glob fallback** — if the canonical name doesn't match, search the feature directory for any PRD: `find ${PRD_ROOT}/[domain]/[feature] -maxdepth 1 -name 'prd.*.md'`. If exactly one matches, use it. If several match, ask the user which is the parent via `AskUserQuestion`.
+3. **No PRD** — if none is found, this is a standalone brownfield enhancement: set `PRD_SOURCE_PATH` to the literal string `brownfield-enhancement`.
+
+Use `PRD_SOURCE_PATH` to populate the `prd_source:` frontmatter field. Never leave `prd_source` as the `[source-document].md` placeholder — it must be a real path or `brownfield-enhancement`.
+
+Then build `PRD_URL` — a full web URL for the body link that works in any markdown renderer (GitHub, Bitbucket, VS Code preview):
+
+```bash
+source references/resolve-platform.sh   # sets VCS=github|bitbucket
+
+# Resolve current branch; fall back to the repo default when HEAD is detached
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ "$CURRENT_BRANCH" = "HEAD" ] || [ -z "$CURRENT_BRANCH" ]; then
+  if [ "$VCS" = "github" ]; then
+    BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+  else
+    BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/{print $NF}' || echo main)
+  fi
+else
+  BRANCH="$CURRENT_BRANCH"
+fi
+
+# Build the full URL
+if [ "$VCS" = "github" ]; then
+  REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)
+  PRD_URL="https://github.com/${REPO}/blob/${BRANCH}/${PRD_SOURCE_PATH}"
+else
+  # Normalise SSH or credentialed HTTPS remote to a plain HTTPS base URL
+  REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+  BB_BASE=$(echo "$REMOTE" \
+    | sed -e 's|git@bitbucket\.org:|https://bitbucket.org/|' \
+          -e 's|https://[^@]*@bitbucket\.org/|https://bitbucket.org/|' \
+          -e 's|\.git$||')
+  PRD_URL="${BB_BASE}/src/${BRANCH}/${PRD_SOURCE_PATH}"
+fi
+```
+
+When `PRD_SOURCE_PATH` is `brownfield-enhancement`, skip URL resolution and omit the **Source PRD** body line entirely.
+
 ## Epic Structure
 
 ```markdown
 ---
 epic_number: N
 title: "[Enhancement Name]"
+type: epic
+description: "[One-sentence summary of what this epic delivers]"
+tags: []
 domain: "[Domain]"
 status: "📋 Planned"
 priority: "Critical | High | Medium | Low"
 estimated_stories: N
 created: YYYY-MM-DD
 target_completion: YYYY-MM-DD
-prd_source: "[source-document].md or brownfield-enhancement"
+prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Parent PRD, or "brownfield-enhancement"
 ---
 
-# Epic [N]: {{Enhancement Name}} - Brownfield Enhancement
+# [Epic N] {{Enhancement Name}} - Brownfield Enhancement
 
 ## Epic Goal
 
 {{1-2 sentences: what accomplishes, why adds value}}
 
 ## Epic Description
+
+**Source PRD**: [View document]({{PRD_URL}})
+<!-- PRD_URL is a full https:// URL resolved in Discover Parent PRD. Omit this line entirely when prd_source is "brownfield-enhancement". -->
 
 **Existing System Context:**
 
@@ -223,28 +275,37 @@ After drafting the Stories Breakdown, decide whether a Mermaid Value Stream diag
 3. Paste the Mermaid block (with YAML metadata header) into a new "Story Flow" subsection placed between "Stories Breakdown" and "Compatibility Requirements".
 4. Accept `no diagram justified — {reason}` without pushing back; not every epic needs one.
 
-## Create Tracker Issue
+## Offer Tracker Sync (opt-in)
 
-After the epic file is fully written and the registry updated, create a corresponding issue in the remote tracker. Skip this step if `SKIP_TRACKER=1` is set **or** if the epic frontmatter already contains a `github_issue` or `jira_key` (idempotent — no duplicate creation on re-runs).
+After the epic file is fully written and the registry updated, ask the user whether to sync it to an issue tracker. This step **never creates a remote issue without explicit confirmation in this run**. Skip automatically (no prompt) if the epic frontmatter already contains a `github_issue` or `jira_key` — log `"ℹ️  tracker issue already linked — skipping"` and continue (idempotent — no duplicate creation on re-runs).
 
-### Opt-out: docs-only epic
-
-Set env var `SKIP_TRACKER=1` to skip tracker issue creation entirely. The epic file and registry update are still created. Useful for one-off planning epics, migrations, or offline workflows.
-
-### Detect platform and opt-out
+**Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
-if [ "$SKIP_TRACKER" = "1" ]; then
-  echo "ℹ️  SKIP_TRACKER=1 — skipping tracker issue creation"
-else
-  # Platform detection — see references/platform-detection.md
-  source references/resolve-platform.sh
-  # TRACKER = jira | github; VCS = github | bitbucket
-  # proceed to platform branch below
-fi
+source references/resolve-platform.sh
+# TRACKER = jira | github   (empty/unknown if neither is configured)
 ```
 
-### Jira path (when `TRACKER=jira`)
+**Step B — prompt** the user with `AskUserQuestion`:
+
+> **Header:** `Tracker sync`
+> **Question:** "Epic doc created. Sync it to an issue tracker now? Detected platform: {TRACKER or 'none detected'}."
+> **Options:**
+> - **Sync to GitHub** — append `(Recommended)` when `TRACKER=github`. Creates the epic issue, adds it to the project board, and writes `github_issue` to frontmatter.
+> - **Sync to Jira** — append `(Recommended)` when `TRACKER=jira`. Creates/updates the epic issue (idempotent) and writes `jira_key`/`jira_url` to frontmatter.
+> - **Skip — docs only** — make no remote changes; leave `github_issue`/`jira_key` unwritten. The user can sync later (`/sync-jira-epic` for Jira, or re-run `/create-epic` for GitHub).
+>
+> The user may also pick "Other" (auto-provided) to skip or explain.
+
+**Step C — act on the answer:**
+
+- **Skip / no tracker chosen** → make no remote changes, log `"Tracker sync skipped by user — run /sync-jira-epic later (Jira) or re-run /create-epic to sync to GitHub."` and continue to Post-Creation Validation. Do NOT halt.
+- **Sync to Jira** → run the Jira Path below.
+- **Sync to GitHub** → run the GitHub Path below.
+
+> **Note:** If the user picks a platform that isn't actually configured (e.g. Jira while `JIRA_URL` is unset), the corresponding path logs a warning and creates nothing — it never halts. Surface the warning and continue.
+
+### Jira Path (when the user chose Sync to Jira)
 
 Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), handles ADF rendering, writes `jira_key` and `jira_url` back to the epic frontmatter, and guards against concurrent edits. No inline Jira REST in this skill.
 
@@ -254,72 +315,28 @@ Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), 
 
 **On failure**: log warning and continue. Never halt. The epic file already exists; the Jira issue can be synced manually later via `/sync-jira-epic`.
 
-### GitHub path (when `TRACKER=github`)
+### GitHub Path (when the user chose Sync to GitHub)
 
-Idempotency check: if `github_issue` is already set in the epic frontmatter, skip creation and log `"ℹ️  github_issue already set — skipping tracker creation"`.
+Invoke the `ensure-epic-github-issue` sub-routine with the epic file path. On return, `EPIC_ISSUE_NUM` is set (integer) or empty. The sub-routine is idempotent and handles everything inline:
 
-Read `project.yml` (repo root) to get `github.project_board_name` for the `--project` flag.
+- skips creation and returns the existing number if `github_issue` is already set in frontmatter;
+- auto-creates the milestone (`Epic {N} — {epic_title}`, or the frontmatter `milestone:` value) if absent;
+- creates the issue (`[Epic {N}] {epic_title}`, label `epic`, milestone attached);
+- adds it to the GitHub Project board;
+- writes `github_issue` back to the epic frontmatter.
 
-```bash
-REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-DOC_URL="https://github.com/$REPO/blob/main/{epic-file-relative-path}"
+On failure it logs a warning and returns empty — never halts.
 
-EPIC_ISSUE_URL=$(gh issue create \
-  --title "[Epic {N}] {epic_title}" \
-  --project "{project_board_name}" \
-  --body "## Goal
-
-{epic_goal — 1-2 sentences from the Epic Goal section}
-
-## Description
-
-{Summary from Epic Description — what's being added/changed and how it integrates}
-
-## Stories
-
-| Story | Description |
-|-------|-------------|
-{rows from Stories Overview table, one per story}
-
-## Document
-
-📄 [Epic Document]($DOC_URL)
-📁 \`{epic-file-relative-path}\`" \
-  --label "epic" \
-  --label "priority:{priority}" \
-  --milestone "{milestone_title}")
-```
-
-**Milestone selection** — in this order:
-
-1. If the epic frontmatter has a `milestone:` field, use that value verbatim.
-2. Otherwise default to `"Epic {N} — {epic_title}"`.
-
-Auto-create milestone if it doesn't exist yet:
-
-```bash
-gh api repos/{owner}/{repo}/milestones -f title="{milestone_title}" -f state="open"
-```
-
-**On success**:
-
-1. Parse the issue URL from the `gh` output.
-2. Add to GitHub Project board:
-   ```bash
-   gh project item-add {project_board_number} --owner {owner} --url "$EPIC_ISSUE_URL"
-   ```
-3. Add `github_issue: {N}` to the epic's YAML frontmatter.
-
-**On failure**: Set `github_issue: null`, log warning, continue. Never halt.
+> **Why delegate?** `ensure-epic-github-issue` is the same primitive `/review-epic`, `/create-story`, `/review-story`, and `/sync-github-epic` all call. Routing every entry point through it means the epic issue (title, body, milestone, board membership) is byte-identical no matter which skill creates it first, so the four paths converge on one issue with no diff churn when they cross.
 
 ## Post-Creation Validation
 
 After generating the epic file, invoke `documentation-standards-validator` to confirm:
 
 - Filename uses dots as separators (`epic.NUMBER.descriptive-name.md`)
-- All required YAML frontmatter fields are present (epic_number, title, domain, status, priority, estimated_stories, created, target_completion)
+- All required YAML frontmatter fields are present (epic_number, title, `type: epic`, domain, status, priority, estimated_stories, created, target_completion; `description` recommended, `tags` optional — see [OKF conformance](references/open-knowledge-format.md))
 - Status indicator uses the standard icon (✅ 🔄 ⚠️ ❌ 📋)
-- File placed in correct location (`docs/prd/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
+- File placed in correct location (`${PRD_ROOT}/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
 
 ## Key Principles
 

@@ -1,6 +1,6 @@
 ---
 id: story.1.4.rewrite-getting-started-terminus
-title: "Story 1.4: Rewrite getting-started.md terminus to link to quickstarts"
+title: "[Story 1.4] Rewrite getting-started.md terminus to link to quickstarts"
 type: story
 status: accepted
 priority: medium
@@ -17,7 +17,7 @@ completed_date: 2026-05-12
 pr_number: 97
 ---
 
-# Story 1.4: Rewrite getting-started.md to terminate in quickstarts
+# [Story 1.4] Rewrite getting-started.md to terminate in quickstarts
 
 **Status**: Accepted
 **Review**: ✅ All review recommendations from `story.1.4.review.1.rewrite-getting-started-terminus.md` implemented 2026-05-12 (no critical/important issues; 2 optional notes deferred to implementation)

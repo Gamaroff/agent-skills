@@ -20,30 +20,31 @@ const lib = require("../references/jira-sync.js");
 // ---------------------------------------------------------------------------
 const STORY_SECTIONS = ["User Story", "Acceptance Criteria", "Description"];
 
-const STATUS_MAP = {
-  "planned": "To Do",
-  "todo": "To Do",
-  "to do": "To Do",
-  "open": "To Do",
-  "in progress": "In Progress",
-  "in-progress": "In Progress",
-  "doing": "In Progress",
-  "done": "Done",
-  "completed": "Done",
-  "complete": "Done",
-  "blocked": "Blocked",
-  "cancelled": "Cancelled",
-  "canceled": "Cancelled",
-};
-
 const ISSUE_TYPE = "Story";
 const SYNC_LABEL_PREFIX = "synced-from-";
 const EPIC_LINK_FIELD = process.env.JIRA_EPIC_LINK_FIELD || "customfield_10014";
 
+// Optional Jira custom field id for estimated dev hours (e.g. "Dev Estimate
+// (hour)"). Resolved from JIRA_DEV_ESTIMATE_FIELD env var, else
+// `jira.devEstimateField` in skills-config.yaml. Empty → the field is skipped.
+const DEV_ESTIMATE_FIELD = process.env.JIRA_DEV_ESTIMATE_FIELD || lib.loadDevEstimateField();
+
+const TIMETRACKING_ERROR_RE = /timetracking|time tracking|original.?estimate/i;
+
+// Format an estimate value for Jira timetracking. Numeric input → "Nh".
+// String input is passed through (lets users write "1d 4h" if they want).
+function formatJiraTimeEstimate(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) return `${n}h`;
+  const s = String(value).trim();
+  return s || null;
+}
+
 // ---------------------------------------------------------------------------
 // Description builder (story-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changelogEntries }) {
+function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries, linkResolver }) {
   const content = [];
 
   if (changelogEntries && changelogEntries.length) {
@@ -66,6 +67,7 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changel
   const links = [];
   if (epicBbUrl)  links.push({ label: "Parent Epic on Bitbucket", href: epicBbUrl });
   if (storyBbUrl) links.push({ label: "Story file on Bitbucket", href: storyBbUrl });
+  if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
   if (links.length) {
     content.push(lib.adf.heading(3, "Source Documents"));
     content.push(lib.adf.bulletList(...links.map(l =>
@@ -74,7 +76,7 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changel
 
   for (const sec of lib.extractBodySections(body, STORY_SECTIONS)) {
     content.push(lib.adf.heading(3, sec.name));
-    content.push(...lib.textToAdfNodes(sec.content));
+    content.push(...lib.textToAdfNodes(sec.content, linkResolver));
   }
 
   const meta = [];
@@ -90,12 +92,15 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changel
   return lib.adf.doc(...content);
 }
 
-function hashBody({ body, epicBbUrl, storyBbUrl }) {
+function hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }) {
   const sections = lib.extractBodySections(body, STORY_SECTIONS).map(s => ({
     name: s.name,
-    nodes: lib.textToAdfNodes(s.content),
+    nodes: lib.textToAdfNodes(s.content, linkResolver),
   }));
-  return lib.hashStable({ sections, epicBbUrl, storyBbUrl });
+  return lib.hashStable({
+    sections, epicBbUrl, storyBbUrl,
+    relatedDocLinks: (relatedDocLinks || []).map(l => l.href),
+  });
 }
 
 function hashMeta(frontmatter) {
@@ -108,11 +113,74 @@ function hashMeta(frontmatter) {
 }
 
 // ---------------------------------------------------------------------------
+// Related docs (co-located story artifacts — plan, review, QA, etc.)
+// ---------------------------------------------------------------------------
+// A story folder accumulates companions alongside the card itself: the
+// implementation plan, review and QA write-ups, the DoD checklist. Those are
+// the docs a Jira reader reaches for next, and nobody remembers to link them
+// by hand — so discover them structurally and they appear on the next sync.
+//
+// Only durable artifacts are listed. Point-in-time ones (dated validate runs,
+// sprint-review summaries) are deliberately skipped: they go stale, and a
+// confidently-wrong link is worse than no link. Order here is display order.
+const RELATED_DOC_TYPES = [
+  { key: "plan",           label: "Implementation plan" },
+  { key: "review",         label: "Story review" },
+  { key: "qa",             label: "QA assessment" },
+  { key: "implementation", label: "Implementation report" },
+  { key: "dod",            label: "Definition of Done" },
+];
+
+// story.2.4.review.1.update-examples-readme.md → { label: "Story review", instance: "1" }
+function relatedDocInfo(filename) {
+  const m = filename.match(/^story\.[\d.]+?\.([a-z]+)\.(?:(\d+)\.)?.*\.md$/i);
+  if (!m) return null;
+  const type = RELATED_DOC_TYPES.find(t => t.key === m[1].toLowerCase());
+  return type ? { label: type.label, instance: m[2] || null, order: RELATED_DOC_TYPES.indexOf(type) } : null;
+}
+
+function findRelatedDocs(filePath) {
+  const dir = path.dirname(filePath);
+  const self = path.basename(filePath);
+  const found = [];
+  for (const f of fs.readdirSync(dir)) {
+    if (f === self || !f.toLowerCase().endsWith(".md")) continue;
+    const info = relatedDocInfo(f);
+    if (info) found.push({ ...info, file: path.join(dir, f) });
+  }
+  found.sort((a, b) => a.order - b.order || String(a.instance).localeCompare(String(b.instance)));
+  // Several artifacts of one type (review.1, review.2) would otherwise render
+  // as identical link labels — qualify those with the instance number.
+  const perLabel = {};
+  found.forEach(d => { perLabel[d.label] = (perLabel[d.label] || 0) + 1; });
+  return found.map(d => ({
+    file: d.file,
+    label: perLabel[d.label] > 1 && d.instance ? `${d.label} ${d.instance}` : d.label,
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Sync label
 // ---------------------------------------------------------------------------
 function syncLabelFor(filePath) {
   const dir = path.basename(path.dirname(filePath));
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
+}
+
+// Normalise the summary to the canonical "[Story N.N] {title}" form used by
+// create-story, ensure-story-github-issue, and review-story's dedup search.
+// The `title` frontmatter usually embeds a "Story N.N:" prefix, so strip
+// whatever prefix it carries (bracket or colon) and re-wrap in brackets,
+// falling back to the filename-derived id when the title carries none.
+// Idempotent: an already-correct "[Story N.N] …" summary is returned unchanged.
+function normaliseStorySummary(summary, fallbackId) {
+  const bracket = summary.match(/^\s*\[Story\s+([\d.]+)\]\s*(.*)$/i);
+  const colon   = summary.match(/^\s*Story\s+([\d.]+)\s*:\s*(.*)$/i);
+  let storyId = null;
+  if (bracket)    { storyId = bracket[1]; summary = bracket[2].trim(); }
+  else if (colon) { storyId = colon[1];   summary = colon[2].trim(); }
+  storyId = storyId || fallbackId;
+  return storyId ? `[Story ${storyId}] ${summary}` : summary;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +227,16 @@ function collectIssueFields({ args, frontmatter, summary, descAdf, includeDescri
     fields.fixVersions = fvs.filter(Boolean).map(name => ({ name: String(name) }));
   }
 
+  const estimate = formatJiraTimeEstimate(frontmatter.estimated_effort_hours);
+  if (estimate) fields.timetracking = { originalEstimate: estimate, remainingEstimate: estimate };
+
+  // Mirror the numeric estimate onto a configured custom field (e.g. "Dev
+  // Estimate (hour)"). Numeric field → raw number; non-numeric values skipped.
+  if (DEV_ESTIMATE_FIELD) {
+    const hours = Number(frontmatter.estimated_effort_hours);
+    if (Number.isFinite(hours)) fields[DEV_ESTIMATE_FIELD] = hours;
+  }
+
   return fields;
 }
 
@@ -172,33 +250,56 @@ async function createStoryWithRetry({ http, auth, fields, output }) {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
+  const attempt = (f) => http(url, { method: "POST", headers, body: JSON.stringify({ fields: f }) });
 
-  let resp = await http(url, { method: "POST", headers, body: JSON.stringify({ fields }) });
+  let current = fields;
+  let resp = await attempt(current);
   if (resp.ok) return resp;
+  if (resp.status !== 400) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+  let errText = await lib.parseJiraError(resp);
 
-  if (resp.status === 400) {
-    const errText = await lib.parseJiraError(resp);
-    if (/parent|epic[ _-]?link|customfield_10014/i.test(errText)) {
-      const flipped = { ...fields };
-      if (flipped.parent) {
-        const parentKey = flipped.parent.key;
-        delete flipped.parent;
-        flipped[EPIC_LINK_FIELD] = parentKey;
-        output.info(`ℹ️  Retrying create with Epic Link customfield (initial parent attempt failed: ${errText.slice(0, 120)})`);
-      } else if (flipped[EPIC_LINK_FIELD]) {
-        flipped.parent = { key: flipped[EPIC_LINK_FIELD] };
-        delete flipped[EPIC_LINK_FIELD];
-        output.info(`ℹ️  Retrying create with parent field (initial Epic Link attempt failed: ${errText.slice(0, 120)})`);
-      } else {
-        throw new Error(`HTTP 400: ${errText}`);
-      }
-      resp = await http(url, { method: "POST", headers, body: JSON.stringify({ fields: flipped }) });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
-      return resp;
-    }
-    throw new Error(`HTTP 400: ${errText}`);
+  // Strip timetracking if time tracking is disabled on the project
+  if (current.timetracking && TIMETRACKING_ERROR_RE.test(errText)) {
+    output.warn(`⚠️  Jira rejected timetracking field — retrying create without estimate (${errText.slice(0, 120)})`);
+    current = { ...current };
+    delete current.timetracking;
+    resp = await attempt(current);
+    if (resp.ok) return resp;
+    if (resp.status !== 400) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+    errText = await lib.parseJiraError(resp);
   }
-  throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+
+  // Strip the dev-estimate custom field if Jira rejects it (wrong id, not on
+  // the create screen, etc.) — a misconfigured field must not block the sync.
+  if (DEV_ESTIMATE_FIELD && current[DEV_ESTIMATE_FIELD] !== undefined && errText.includes(DEV_ESTIMATE_FIELD)) {
+    output.warn(`⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} — retrying create without the dev-estimate field (${errText.slice(0, 120)})`);
+    current = { ...current };
+    delete current[DEV_ESTIMATE_FIELD];
+    resp = await attempt(current);
+    if (resp.ok) return resp;
+    if (resp.status !== 400) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+    errText = await lib.parseJiraError(resp);
+  }
+
+  if (/parent|epic[ _-]?link|customfield_10014/i.test(errText)) {
+    const flipped = { ...current };
+    if (flipped.parent) {
+      const parentKey = flipped.parent.key;
+      delete flipped.parent;
+      flipped[EPIC_LINK_FIELD] = parentKey;
+      output.info(`ℹ️  Retrying create with Epic Link customfield (initial parent attempt failed: ${errText.slice(0, 120)})`);
+    } else if (flipped[EPIC_LINK_FIELD]) {
+      flipped.parent = { key: flipped[EPIC_LINK_FIELD] };
+      delete flipped[EPIC_LINK_FIELD];
+      output.info(`ℹ️  Retrying create with parent field (initial Epic Link attempt failed: ${errText.slice(0, 120)})`);
+    } else {
+      throw new Error(`HTTP 400: ${errText}`);
+    }
+    resp = await attempt(flipped);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+    return resp;
+  }
+  throw new Error(`HTTP 400: ${errText}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,10 +315,10 @@ function withCodeBlocksMasked(text, fn) {
   const masked = text.replace(/```[\s\S]*?```/g, m => {
     const idx = blocks.length;
     blocks.push(m);
-    return ` CODEBLOCK_${idx} `;
+    return `\x01CODEBLOCK_${idx}\x01`;
   });
   const result = fn(masked);
-  return result.replace(/ CODEBLOCK_(\d+) /g, (_, i) => blocks[Number(i)]);
+  return result.replace(/\x01CODEBLOCK_(\d+)\x01/g, (_, i) => blocks[Number(i)]);
 }
 
 function upsertInlineLine(text, pattern, newLine) {
@@ -258,21 +359,12 @@ function updateStoryFile({ filePath, issueKey, issueUrl, epicKey, epicBbUrl, sto
 }
 
 // ---------------------------------------------------------------------------
-// Status mapping
-// ---------------------------------------------------------------------------
-function mapStatus(raw) {
-  if (!raw) return null;
-  const stripped = lib.stripStatusEmoji(raw).toLowerCase();
-  return STATUS_MAP[stripped] || lib.stripStatusEmoji(raw);
-}
-
-// ---------------------------------------------------------------------------
 // Args
 // ---------------------------------------------------------------------------
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
-    file: null, summary: null, priority: null, labels: null,
+    file: null, summary: null, priority: null, labels: null, docBranch: null,
     dryRun: false, noWrite: false, force: false, json: false, quiet: false,
   };
   for (let i = 0; i < args.length; i++) {
@@ -281,6 +373,7 @@ function parseArgs(argv) {
       case "--summary":  case "-s": opts.summary  = args[++i]; break;
       case "--priority": case "-p": opts.priority = args[++i]; break;
       case "--labels":   case "-l": opts.labels   = args[++i]; break;
+      case "--doc-branch": opts.docBranch = args[++i]; break;
       case "--dry-run":  opts.dryRun  = true; break;
       case "--no-write": opts.noWrite = true; break;
       case "--force":    opts.force   = true; break;
@@ -303,7 +396,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   if (!args.file) {
     output.err("Error: --file is required");
-    output.err("Usage: sync-jira-story --file <story.md> [--dry-run] [--no-write] [--force] [--json] [--quiet]");
+    output.err("Usage: sync-jira-story --file <story.md> [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet]");
     return { exitCode: 1 };
   }
   const filePath = path.resolve(args.file);
@@ -337,8 +430,15 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const repoRoot = lib.getRepoRoot();
   const bbBase = lib.getBitbucketRepoBase();
   if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
-  const branch = bbBase ? lib.getDefaultBranch() : null;
+  const branch = bbBase ? (args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()) : null;
   const storyBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
+  const linkResolver = lib.makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch });
+  const relatedDocLinks = bbBase
+    ? findRelatedDocs(filePath).map(d => ({
+        label: d.label,
+        href: lib.buildBitbucketUrl(d.file, repoRoot, bbBase, branch),
+      }))
+    : [];
 
   let epicBbUrl = null;
   if (bbBase) {
@@ -353,11 +453,8 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     output.err("Error: Could not determine summary (set frontmatter title or # heading).");
     return { exitCode: 1 };
   }
-  // Prepend "Story N.N: " if not already present — derive from filename
-  if (!summary.match(/^Story\s+[\d.]+\s*:/i)) {
-    const storyIdMatch = path.basename(filePath).match(/^story\.([\d.]+)\./i);
-    if (storyIdMatch) summary = `Story ${storyIdMatch[1]}: ${summary}`;
-  }
+  // Normalise to the canonical "[Story N.N] {title}" bracket form (see helper).
+  summary = normaliseStorySummary(summary, path.basename(filePath).match(/^story\.([\d.]+)\./i)?.[1]);
 
   const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
   const livePriorities = (auth.ok && !args.dryRun)
@@ -365,7 +462,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     : null;
 
   const syncLabel = syncLabelFor(filePath);
-  const newBodyHash = hashBody({ body, epicBbUrl, storyBbUrl });
+  const newBodyHash = hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver });
   const newMetaHash = hashMeta(frontmatter);
 
   let existingJiraKey = frontmatter.jira_key;
@@ -431,7 +528,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       changeEntry = lib.fmtEntry(changeSummary);
 
       const allEntries = [...lib.extractEntries(content), changeEntry];
-      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changelogEntries: allEntries });
+      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver });
       // Send `description` only when body or metadata actually changed, to avoid
       // pointless edits in Jira's history.
       const includeDescription = changedFields.includes("description") || changedFields.includes("metadata");
@@ -447,10 +544,35 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         output.info(`  Changes: ${changeSummary}`);
         result = { issueKey: existingJiraKey, issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`, updated: null };
       } else {
-        const { updated } = await lib.putIssueAtomic({
-          http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-          issueKey: existingJiraKey, fields,
-        });
+        let putResp;
+        try {
+          putResp = await lib.putIssueAtomic({
+            http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+            issueKey: existingJiraKey, fields,
+          });
+        } catch (e) {
+          // Strip whichever optional field Jira rejected, then retry once. A
+          // single 400 typically lists all rejected fields together.
+          const msg = e.message || "";
+          const stripped = { ...fields };
+          let retry = false;
+          if (stripped.timetracking && TIMETRACKING_ERROR_RE.test(msg)) {
+            output.warn(`⚠️  Jira rejected timetracking field on update — retrying without estimate.`);
+            delete stripped.timetracking;
+            retry = true;
+          }
+          if (DEV_ESTIMATE_FIELD && stripped[DEV_ESTIMATE_FIELD] !== undefined && msg.includes(DEV_ESTIMATE_FIELD)) {
+            output.warn(`⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} on update — retrying without the dev-estimate field.`);
+            delete stripped[DEV_ESTIMATE_FIELD];
+            retry = true;
+          }
+          if (!retry) throw e;
+          putResp = await lib.putIssueAtomic({
+            http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+            issueKey: existingJiraKey, fields: stripped,
+          });
+        }
+        const { updated } = putResp;
         const finalUpdated = updated || await lib.fetchUpdatedTimestampStrict({
           http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey: existingJiraKey,
         });
@@ -467,7 +589,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira story created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changelogEntries: [changeEntry] });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira story ===`);
@@ -517,7 +639,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   // Status transition
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
-    const target = mapStatus(frontmatter.status);
+    const target = lib.mapStatus(frontmatter.status, lib.loadStatusMap());
     const currentStatus = current?.status || postCreateStatus || null;
     await lib.transitionToStatus({
       http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
@@ -583,14 +705,20 @@ if (require.main === module) {
     hashBody,
     hashMeta,
     syncLabelFor,
-    mapStatus,
+    findRelatedDocs,
+    relatedDocInfo,
+    normaliseStorySummary,
+    mapStatus: lib.mapStatus,
+    loadStatusMap: lib.loadStatusMap,
+    loadDevEstimateField: lib.loadDevEstimateField,
+    parseJiraScalar: lib.parseJiraScalar,
     collectIssueFields,
     createStoryWithRetry,
     resolveEpicPath,
     upsertInlineLine,
     withCodeBlocksMasked,
     STORY_SECTIONS,
-    STATUS_MAP,
+    STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     EPIC_LINK_FIELD,
     // Re-export lib pieces for tests
     parseFrontmatter:        lib.parseFrontmatter,
@@ -611,8 +739,13 @@ if (require.main === module) {
     guardConcurrentEdit:     lib.guardConcurrentEdit,
     parseJiraError:          lib.parseJiraError,
     hashStable:              lib.hashStable,
-    hashDescriptionInput:    ({ body, frontmatter, epicBbUrl, storyBbUrl }) =>
-                               hashBody({ body, epicBbUrl, storyBbUrl }),
+    hashDescriptionInput:    ({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }) =>
+                               hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }),
+    stripRemotePrefix:       lib.stripRemotePrefix,
+    resolveRelativeLink:      lib.resolveRelativeLink,
+    makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
+    getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
+    getDefaultBranch:        lib.getDefaultBranch,
     CL_START:                lib.CL_START,
     CL_END:                  lib.CL_END,
   };

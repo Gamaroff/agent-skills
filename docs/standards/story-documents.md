@@ -20,7 +20,7 @@ docs/prd/
                     └── story.{E}.{S}.{name}/
                         ├── story.{E}.{S}.{name}.md                      # main document (human-authored)
                         ├── story.{E}.{S}.plan.{name}.md                 # story plan
-                        ├── story.{E}.{S}.review.{YYYY-MM-DD}.md         # review report (auto)
+                        ├── story.{E}.{S}.review.{N}.{name}.md           # review report (auto)
                         ├── story.{E}.{S}.implementation.{N}.{name}.md   # pipeline report (auto)
                         ├── story.{E}.{S}.qa.{N}.{name}.md               # QA assessment (auto)
                         ├── story.{E}.{S}.dod.{N}.{name}.md              # definition of done (auto)
@@ -32,7 +32,7 @@ docs/prd/
 docs/prd/auth/login-flow/epics/epic.178.feature-ui/stories/story.178.1.login-form/story.178.1.login-form.md
 ```
 
-This layout requires `devStoryLocation: nested` in `skills-config.yaml`. For flat layout see [Configuration](../reference/configuration.md#story-layout-modes).
+Nested story layout under `${PRD_ROOT}` is a [fixed convention](../reference/configuration.md#configurable-roots-and-fixed-conventions) — flat layouts are not supported. The PRD root itself is configurable (default `docs/prd`).
 
 ## File naming
 
@@ -57,16 +57,40 @@ updated: 2026-01-15
 |---|---|---|---|
 | `epic` | string | **YES — HARD GATE** | Must match the parent epic's directory stem, e.g. `epic.178.feature-ui`. Pipeline **HALTS** immediately if absent |
 | `title` | string | Yes | Human-readable title |
-| `type` | literal | Yes | Must be exactly `story` |
+| `type` | literal | Yes | Must be exactly `story` (OKF `type` — the one hard requirement) |
+| `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
+| `tags` | list | Optional | Short strings for cross-cutting categorization (OKF `tags`) |
 | `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
 | `priority` | enum | Yes | `High`, `Medium`, `Low` |
 | `assignee` | string | Yes | `TBD` or a name |
 | `created` | ISO date | Yes | `YYYY-MM-DD` |
 | `updated` | ISO date | Yes | `YYYY-MM-DD` — update on every change |
 | `risk_level` | enum | Optional | `high`, `medium`, `low` — triggers the high-risk gate |
+| `code_review_blocking` | boolean | Optional | Controls whether high-confidence correctness bugs from the QA diff code review gate the build (appended to the QA gate's `top_issues[]` → fixed in the qa-fix loop). **Under `/develop-story` this is ON by default** (the pipeline passes a run-level override); set `false` to opt this story **out** (escape hatch). Standalone `/qa-story`: absent → advisory, `true` → blocking. See [`qa-story`](../../skills/qa-story/SKILL.md) Phase 1.6 |
+| `estimated_effort_hours` | number | Optional | Estimated dev hours. Synced to Jira `timetracking.originalEstimate` (and, when configured via [`jira.devEstimateField`](../reference/configuration.md#jira-estimate-field), a Jira custom field) and the GitHub Projects v2 `Estimate` number field. Captured at create time, surfaced as a LOW review gap if missing |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` — pipeline creates one if tracker is Jira and this is absent |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
+| `resource` | string | Optional | Canonical URI (OKF `resource`). For stories, `github_url`/`jira_url` already serve this; set explicitly only to override |
+
+> **OKF mapping:** `updated` (ISO 8601) is this repo's OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) is OKF `resource`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
+
+## Section ownership
+
+Stories have distinct sections owned by distinct roles. `create-story` writes the planning sections; the developer fills in the implementation record during `develop-story`; QA owns its own section.
+
+| Section | Owner | Notes |
+|---|---|---|
+| Status | `create-story` until `develop-story` takes over | Drives the status lifecycle |
+| Story statement (As a… I want… So that…) | `create-story` | Locked after review |
+| Acceptance Criteria | `create-story` | Locked after review |
+| Tasks / Subtasks | `create-story` | Dev may add subtasks during implementation |
+| Dev Notes (extracted context) | `create-story` | Anti-hallucination: every claim sourced |
+| Testing guidance | `create-story` | |
+| Dev Agent Record (model, completion notes, file list) | `develop-story` (developer) | Append-only during implementation |
+| QA Results | `qa-story` / `qa-gate` | Never modified by dev skills |
+
+The role identifier `scrum-master` appears in legacy template metadata (`owner: scrum-master`) and historical Change Logs — it refers to the story-authoring role now performed by `create-story`. New tooling should reference `create-story` directly.
 
 ## Co-located artifacts
 
@@ -75,7 +99,7 @@ These files are generated automatically by skills during the pipeline. Do not cr
 | Artifact | Pattern | Written by | Purpose |
 |---|---|---|---|
 | Plan file | `story.{E}.{S}.plan.{name}.md` | `create-story` | Story implementation guide |
-| Review report | `story.{E}.{S}.review.{YYYY-MM-DD}.md` | `review-story` (Step 2) | Review findings |
+| Review report | `story.{E}.{S}.review.{N}.{name}.md` | `review-story` (Step 2) | Review findings |
 | Implementation report | `story.{E}.{S}.implementation.{N}.{name}.md` | `develop-story` pipeline | Pipeline run record |
 | QA report | `story.{E}.{S}.qa.{N}.{name}.md` | `qa-story` (Step 5) | QA assessment narrative |
 | Definition of Done | `story.{E}.{S}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |
@@ -111,7 +135,7 @@ Before running `develop-story`, verify:
 - [ ] Story file exists at the correct nested path under `docs/prd/`
 - [ ] `epic:` frontmatter is set and matches an actual epic directory stem
 - [ ] Parent epic file exists
-- [ ] `prd.prdSharded: true` and `prd.prdShardedLocation` are set in `skills-config.yaml`
+- [ ] Story lives at the nested path under `${PRD_ROOT}` (default `docs/prd/`; configurable)
 - [ ] `status:` is `draft`, `planned`, or `ready-for-development`
 - [ ] Frontmatter `status:` and body `**Status:**` are in sync
 

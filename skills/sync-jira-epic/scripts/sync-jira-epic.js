@@ -22,31 +22,6 @@ const VERSION = "1.2.0";
 
 const EPIC_SECTIONS = ["Epic Goal", "Epic Description"];
 
-const STATUS_MAP = {
-  "planned": "To Do",
-  "todo": "To Do",
-  "to do": "To Do",
-  "open": "To Do",
-  "backlog": "To Do",
-  "in progress": "In Progress",
-  "in-progress": "In Progress",
-  "doing": "In Progress",
-  "in review": "In Review",
-  "review": "In Review",
-  "ready for review": "In Review",
-  "ready": "Ready",
-  "done": "Done",
-  "completed": "Done",
-  "complete": "Done",
-  "blocked": "Blocked",
-  "cancelled": "Cancelled",
-  "canceled": "Cancelled",
-  "won't do": "Won't Do",
-  "wont do": "Won't Do",
-  "won't fix": "Won't Do",
-  "wontfix": "Won't Do",
-};
-
 const ISSUE_TYPE = "Epic";
 const SYNC_LABEL_PREFIX = "synced-from-";
 
@@ -149,7 +124,7 @@ function storiesTableToAdf(rows) {
 // ---------------------------------------------------------------------------
 // Description builder (epic-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, changelogEntries }) {
+function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDocLinks, changelogEntries, linkResolver }) {
   const content = [];
 
   if (changelogEntries && changelogEntries.length) {
@@ -173,6 +148,7 @@ function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, changelog
   const links = [];
   if (prdBbUrl)  links.push({ label: "Parent PRD on Bitbucket", href: prdBbUrl });
   if (epicBbUrl) links.push({ label: "Epic file on Bitbucket", href: epicBbUrl });
+  if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
   if (links.length) {
     content.push(lib.adf.heading(3, "Source Documents"));
     content.push(lib.adf.bulletList(...links.map(l =>
@@ -185,7 +161,7 @@ function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, changelog
     // to plain `Label:`. ADF can't render mid-paragraph bold headings well, so
     // this preserves the label as a leading text run that ADF will render cleanly.
     const cleaned = sec.content.replace(/\*\*([^*\n]+):\*\*/g, "$1:");
-    content.push(...lib.textToAdfNodes(cleaned));
+    content.push(...lib.textToAdfNodes(cleaned, linkResolver));
   }
 
   const meta = [];
@@ -205,7 +181,7 @@ function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, changelog
   const storiesSections = lib.extractBodySections(body, ["Stories Breakdown"]);
   if (storiesSections.length && storiesSections[0].content.trim()) {
     content.push(lib.adf.heading(3, "Stories Breakdown"));
-    content.push(...lib.textToAdfNodes(storiesSections[0].content));
+    content.push(...lib.textToAdfNodes(storiesSections[0].content, linkResolver));
   }
 
   content.push(lib.adf.heading(3, "Story Requirements"));
@@ -214,14 +190,17 @@ function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, changelog
   return lib.adf.doc(...content);
 }
 
-function hashBody({ body, prdBbUrl, epicBbUrl }) {
+function hashBody({ body, prdBbUrl, epicBbUrl, relatedDocLinks, linkResolver }) {
   const sections = lib.extractBodySections(body, EPIC_SECTIONS).map(s => ({
     name: s.name,
-    nodes: lib.textToAdfNodes(s.content),
+    nodes: lib.textToAdfNodes(s.content, linkResolver),
   }));
   const storiesSections = lib.extractBodySections(body, ["Stories Breakdown"]);
   const storiesContent = storiesSections.length ? storiesSections[0].content : null;
-  return lib.hashStable({ sections, storiesContent, prdBbUrl, epicBbUrl });
+  return lib.hashStable({
+    sections, storiesContent, prdBbUrl, epicBbUrl,
+    relatedDocLinks: (relatedDocLinks || []).map(l => `${l.label}|${l.href}`),
+  });
 }
 
 function hashMeta(frontmatter) {
@@ -234,11 +213,63 @@ function hashMeta(frontmatter) {
 }
 
 // ---------------------------------------------------------------------------
+// Child stories
+// ---------------------------------------------------------------------------
+// Unlike task folders, an epic folder holds no sibling docs — its related
+// documents are the child stories under `stories/<story-dir>/`. The Stories
+// Breakdown table names them but can't link them (it's authored prose), so
+// resolve the files structurally and link them from Source Documents instead.
+//
+// A story dir contains the card plus its artifacts (plan, review, QA...). The
+// card is the file named after its own directory — that convention is what
+// distinguishes it, rather than a blocklist of artifact types that would rot
+// as new artifact kinds appear.
+function findChildStories(filePath) {
+  const storiesDir = path.join(path.dirname(filePath), "stories");
+  if (!fs.existsSync(storiesDir)) return [];
+  return fs.readdirSync(storiesDir)
+    .map(d => ({ dir: d, card: path.join(storiesDir, d, `${d}.md`) }))
+    .filter(s => fs.existsSync(s.card))
+    .map(s => ({ ...s, num: s.dir.match(/^story\.(\d+)\.(\d+)\./i) }))
+    .filter(s => s.num)
+    // Lexicographic sort puts story.2.10 before story.2.2 — order numerically.
+    .sort((a, b) => Number(a.num[1]) - Number(b.num[1]) || Number(a.num[2]) - Number(b.num[2]))
+    .map(s => ({ file: s.card, label: labelForChildStory(s.card, `${s.num[1]}.${s.num[2]}`) }));
+}
+
+function labelForChildStory(file, num) {
+  let title = null;
+  try {
+    const { frontmatter, body } = lib.parseFrontmatter(fs.readFileSync(file, "utf-8"));
+    title = frontmatter.title || body.match(/^# (.+)$/m)?.[1] || null;
+  } catch (_) { /* unreadable child — fall back to the number alone */ }
+  // Titles are commonly already prefixed "[Story 2.4] ..." — don't repeat it.
+  if (title) title = title.replace(/^\[?story\s*[\d.]+\]?[\s:—-]*/i, "").trim();
+  return title ? `Story ${num} — ${title}` : `Story ${num}`;
+}
+
+// ---------------------------------------------------------------------------
 // Sync label
 // ---------------------------------------------------------------------------
 function syncLabelFor(filePath) {
   const dir = path.basename(path.dirname(filePath));
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
+}
+
+// Normalise the summary to the canonical "[Epic N] {title}" bracket form
+// (parity with the story/task skills and the GitHub siblings). The `title`
+// frontmatter usually embeds an "Epic N:" prefix, so strip whatever prefix it
+// carries (bracket or colon) and re-wrap in brackets. `epicNumber` (from
+// frontmatter) takes precedence over any id the title carried; the title's id
+// is only a fallback. Idempotent: an already-correct "[Epic N] …" summary with
+// a matching id is returned unchanged.
+function normaliseEpicSummary(summary, epicNumber) {
+  const bracket = summary.match(/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i);
+  const colon   = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
+  let epicId = epicNumber != null ? String(epicNumber) : null;
+  if (bracket)    { epicId = epicId || bracket[1]; summary = bracket[2].trim(); }
+  else if (colon) { epicId = epicId || colon[1];   summary = colon[2].trim(); }
+  return epicId != null ? `[Epic ${epicId}] ${summary}` : summary;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,21 +365,12 @@ function updateEpicFile({ filePath, issueKey, issueUrl, epicBbUrl, prdBbUrl, cha
 }
 
 // ---------------------------------------------------------------------------
-// Status mapping
-// ---------------------------------------------------------------------------
-function mapStatus(raw) {
-  if (!raw) return null;
-  const stripped = lib.stripStatusEmoji(raw).toLowerCase();
-  return STATUS_MAP[stripped] || lib.stripStatusEmoji(raw);
-}
-
-// ---------------------------------------------------------------------------
 // Args
 // ---------------------------------------------------------------------------
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
-    file: null, summary: null, priority: null, labels: null,
+    file: null, summary: null, priority: null, labels: null, docBranch: null,
     dryRun: false, force: false, json: false, quiet: false,
     verbose: false, version: false,
   };
@@ -358,6 +380,7 @@ function parseArgs(argv) {
       case "--summary":  case "-s": opts.summary  = args[++i]; break;
       case "--priority": case "-p": opts.priority = args[++i]; break;
       case "--labels":   case "-l": opts.labels   = args[++i]; break;
+      case "--doc-branch": opts.docBranch = args[++i]; break;
       case "--dry-run":  opts.dryRun = true; break;
       case "--force":    opts.force  = true; break;
       case "--json":     opts.json   = true; break;
@@ -393,7 +416,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   if (!args.file) {
     output.err("Error: --file is required");
-    output.err("Usage: sync-jira-epic --file <epic.md> [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]");
+    output.err("Usage: sync-jira-epic --file <epic.md> [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]");
     return { exitCode: 1 };
   }
   const filePath = path.resolve(args.file);
@@ -416,8 +439,15 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const repoRoot = lib.getRepoRoot();
   const bbBase = lib.getBitbucketRepoBase();
   if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
-  const branch = bbBase ? lib.getDefaultBranch() : null;
+  const branch = bbBase ? (args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()) : null;
   const epicBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
+  const linkResolver = lib.makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch });
+  const relatedDocLinks = bbBase
+    ? findChildStories(filePath).map(s => ({
+        label: s.label,
+        href: lib.buildBitbucketUrl(s.file, repoRoot, bbBase, branch),
+      }))
+    : [];
 
   const content = fs.readFileSync(filePath, "utf-8");
   const { frontmatter, body } = lib.parseFrontmatter(content);
@@ -438,10 +468,8 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     output.err("Error: Could not determine summary (set frontmatter title or # heading).");
     return { exitCode: 1 };
   }
-  // Prepend "Epic N: " if epic_number is set and not already present
-  if (frontmatter.epic_number != null && !summary.match(/^Epic\s+\d+\s*:/i)) {
-    summary = `Epic ${frontmatter.epic_number}: ${summary}`;
-  }
+  // Normalise to the canonical "[Epic N] {title}" bracket form (see helper).
+  summary = normaliseEpicSummary(summary, frontmatter.epic_number);
 
   const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
   const livePriorities = (auth.ok && !args.dryRun)
@@ -449,7 +477,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     : null;
 
   const syncLabel = syncLabelFor(filePath);
-  const newBodyHash = hashBody({ body, prdBbUrl, epicBbUrl });
+  const newBodyHash = hashBody({ body, prdBbUrl, epicBbUrl, relatedDocLinks, linkResolver });
   const newMetaHash = hashMeta(frontmatter);
 
   let existingJiraKey = frontmatter.jira_key;
@@ -526,7 +554,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     }
 
     const allEntries = [...lib.extractEntries(content), changeEntry];
-    const descAdf = buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, changelogEntries: allEntries });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver });
     const fields = collectUpdateFields({
       args, frontmatter, descAdf,
       livePriorities, output, syncLabel, summary,
@@ -558,7 +586,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira epic created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, changelogEntries: [changeEntry] });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira epic ===`);
@@ -648,12 +676,54 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
         boardId: auth.boardId, issueKey: result.issueKey, output,
       });
+
+      // Set Team field (customfield_10001) so the epic appears on boards filtered by cf[10001].
+      if (auth.boardId) {
+        try {
+          const boardCfgResp = await http(`${auth.baseUrl}/rest/agile/1.0/board/${auth.boardId}/configuration`, {
+            headers: { Authorization: lib.authHeader(auth.email, auth.token), Accept: "application/json" },
+          });
+          if (boardCfgResp.ok) {
+            const boardCfg = await boardCfgResp.json();
+            const filterId = boardCfg?.filter?.id;
+            if (filterId) {
+              const filterResp = await http(`${auth.baseUrl}/rest/api/3/filter/${filterId}`, {
+                headers: { Authorization: lib.authHeader(auth.email, auth.token), Accept: "application/json" },
+              });
+              if (filterResp.ok) {
+                const filter = await filterResp.json();
+                const teamMatch = /cf\[10001\]\s+in\s+\(([^)]+)\)/i.exec(filter.jql || "");
+                if (teamMatch) {
+                  const teamUuid = teamMatch[1].split(",")[0].trim().replace(/^["']|["']$/g, "");
+                  if (teamUuid) {
+                    const teamResp = await http(`${auth.baseUrl}/rest/api/3/issue/${result.issueKey}`, {
+                      method: "PUT",
+                      headers: {
+                        Authorization: lib.authHeader(auth.email, auth.token),
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ fields: { customfield_10001: teamUuid } }),
+                    });
+                    if (teamResp.status === 204) {
+                      output.info(`   Team field set: ${teamUuid}`);
+                    } else {
+                      output.warn(`⚠️  Team field update returned HTTP ${teamResp.status} — epic created but may not appear on board`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (teamErr) {
+          output.warn(`⚠️  Could not set team field: ${teamErr.message} — epic created but may not appear on board`);
+        }
+      }
     }
   }
 
   // Status transition
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
-    const target = mapStatus(frontmatter.status);
+    const target = lib.mapStatus(frontmatter.status, lib.loadStatusMap());
     const currentStatus = current?.status || null;
     await lib.transitionToStatus({
       http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
@@ -719,10 +789,14 @@ if (require.main === module) {
     run,
     parseArgs,
     buildDescriptionAdf,
+    findChildStories,
+    labelForChildStory,
     hashBody,
     hashMeta,
     syncLabelFor,
-    mapStatus,
+    normaliseEpicSummary,
+    mapStatus: lib.mapStatus,
+    loadStatusMap: lib.loadStatusMap,
     collectIssueFields,
     collectCommonFields,
     collectCreateFields,
@@ -733,7 +807,7 @@ if (require.main === module) {
     inlineToAdfNodes,
     splitTableRow,
     EPIC_SECTIONS,
-    STATUS_MAP,
+    STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     VERSION,
     CHANGELOG_DESCRIPTION_LIMIT,
     STORY_REQUIREMENTS_TEXT,
@@ -760,6 +834,11 @@ if (require.main === module) {
     findExistingByLabel:     lib.findExistingByLabel,
     fetchUpdatedTimestamp:   lib.fetchUpdatedTimestamp,
     escapeRe:                lib.escapeRe,
+    stripRemotePrefix:       lib.stripRemotePrefix,
+    resolveRelativeLink:      lib.resolveRelativeLink,
+    makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
+    getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
+    getDefaultBranch:        lib.getDefaultBranch,
     CL_START:                lib.CL_START,
     CL_END:                  lib.CL_END,
   };

@@ -12,7 +12,7 @@ github_issue: 75
 github_url: "https://github.com/Gamaroff/agent-skills/issues/75"
 ---
 
-# Epic 3: Runbook Tutorial Wrappers — Brownfield Enhancement
+# [Epic 3] Runbook Tutorial Wrappers — Brownfield Enhancement
 
 ## Epic Goal
 
@@ -50,7 +50,7 @@ Make existing runbooks safer to land in cold — without rewriting them — by a
 | 3.2   | ❌ Not Started | High     | "Is this the right runbook?" callouts at top of satellite runbooks                           |
 | 3.3   | ❌ Not Started | Medium   | "Common first-time errors" troubleshooting sections at end of anchor runbooks                |
 
-### Story 3.1: "Before you start" for anchor runbooks
+### [Story 3.1] "Before you start" for anchor runbooks
 
 As a new user opening `story-development.md` or `task-development.md` cold,
 I want a prerequisite section at the top telling me what to know first,
@@ -63,7 +63,7 @@ so that I don't bounce off the 274-line body.
 3. Each section ≤ 30 lines.
 4. Existing body content character-identical to pre-change.
 
-### Story 3.2: "Is this the right runbook?" callouts for satellites
+### [Story 3.2] "Is this the right runbook?" callouts for satellites
 
 As a new user landing on `hotfix.md`, `bug-fix.md`, `create-parallel-stories.md`, or `change-management.md`,
 I want a top-of-page callout that confirms (or redirects) my path,
@@ -76,7 +76,7 @@ so that I don't follow a runbook that does not match my situation.
 3. Each callout ≤ 10 lines.
 4. Existing body untouched.
 
-### Story 3.3: "Common first-time errors" troubleshooting section
+### [Story 3.3] "Common first-time errors" troubleshooting section
 
 As a new user hitting a confusing error during a runbook walkthrough,
 I want a troubleshooting section at the end of the anchor runbooks,

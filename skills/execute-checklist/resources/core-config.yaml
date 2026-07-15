@@ -1,21 +1,13 @@
-markdownExploder: true
-qa:
-  qaLocation: docs/qa
+# PRD and architecture roots are configurable; nested structure under each
+# root is fixed. Resolve via: source shared/resources/resolve-paths.sh
+
 prd:
-  prdFile: docs/prd.md
-  prdVersion: v4
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: "**/epics/epic.{n}.*/epic.{n}.*.md"
+  prdShardedLocation: docs/prd  # ${PRD_ROOT}
+
 architecture:
-  architectureFile: docs/architecture.md
-  architectureVersion: v4
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
-customTechnicalDocuments: null
+  architectureShardedLocation: docs/architecture  # ${ARCH_ROOT}
+
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
-devDebugLog: .ai/debug-log.md
-devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/

@@ -75,7 +75,16 @@ Call the Atlassian MCP tool `getJiraIssue`:
 
 ### Step TJ4: Create via sync-jira-task Delegation
 
-Invoke the `sync-jira-task` sub-routine, passing `TASK_FILE_PATH` as its input. `sync-jira-task` will:
+Invoke the `sync-jira-task` sub-routine by executing the bundled script directly. Pass `TASK_FILE_PATH` via `--file`:
+
+```bash
+node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
+  --file "$TASK_FILE_PATH"
+```
+
+> **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-task/scripts/sync-jira-task.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist.
+
+`sync-jira-task` will:
 - Create the Jira task if it does not exist (idempotent — searches by `synced-from-*` label first)
 - Add the task to the project backlog (Scrum boards only)
 - Embed Bitbucket links rendered via ADF (default-branch refs)

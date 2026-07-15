@@ -21,6 +21,77 @@ Each cycle = one `/qa-story` + one `/qa-fix`. A clean PASS on any qa-story exits
 #### develop-task
 Each cycle = one `/qa-task` + one `/qa-fix`. A clean PASS on any qa-task review exits the loop immediately.
 
+### Re-assert board status at QA start (when `TRACKER=github` and `TRACKER_ISSUE` is set)
+
+Belt-and-suspenders: run **once**, before the first cycle, to ensure the issue is in **"In Review"** on entering QA. Step 4 (create-pr) already performs this move; this re-assertion corrects the board if that move was skipped (e.g. transient API error). Idempotent — re-setting the same option is a no-op. Skip silently if `TRACKER` is not `github` or `TRACKER_ISSUE` is empty. Do **not** repeat this per cycle.
+
+```bash
+(
+  OWNER=$(gh repo view --json owner -q '.owner.login')
+  REPO_NAME=$(gh repo view --json name -q '.name')
+
+  RESPONSE=$(gh api graphql -f query='
+  {
+    repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
+      issue(number: {TRACKER_ISSUE}) {
+        projectItems(first: 10) {
+          nodes {
+            id
+            fieldValueByName(name: "Status") {
+              ... on ProjectV2ItemFieldSingleSelectValue { name }
+            }
+            project {
+              id
+              fields(first: 20) {
+                nodes {
+                  ... on ProjectV2SingleSelectField {
+                    id
+                    name
+                    options { id name }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }')
+
+  CURRENT_STATUS=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
+  if [ "$(echo "$CURRENT_STATUS" | tr '[:upper:]' '[:lower:]')" = "in review" ]; then
+    echo "✅ Board already In Review — no re-assert needed"
+  else
+    ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+    PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
+    STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
+    IN_REVIEW_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name | ascii_downcase == "in review") | .id // empty')
+
+    if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$IN_REVIEW_OPTION_ID" ]; then
+      echo "⚠️  Could not resolve project item or In Review option — skipping QA-start board re-assert"
+    else
+      gh api graphql -f query='
+      mutation {
+        updateProjectV2ItemFieldValue(
+          input: {
+            projectId: "'"$PROJECT_ID"'"
+            itemId: "'"$ITEM_ID"'"
+            fieldId: "'"$STATUS_FIELD_ID"'"
+            value: { singleSelectOptionId: "'"$IN_REVIEW_OPTION_ID"'" }
+          }
+        ) {
+          projectV2Item { id }
+        }
+      }' \
+        && echo "✅ Issue #{TRACKER_ISSUE} re-asserted to In Review at QA start (was '${CURRENT_STATUS:-unknown}')" \
+        || echo "⚠️  QA-start board re-assert failed — continuing"
+    fi
+  fi
+) || echo "⚠️  QA-start board re-assert skipped (gh project unavailable or auth scope missing)"
+```
+
+Log in Decisions Log: "GitHub board: QA-start re-assert → In Review (or ✅ already In Review / ⚠️ skipped)."
+
 ---
 
 ## Finding the Latest Gate File
@@ -88,13 +159,19 @@ Log the bypass reason in the Decisions Log (`Traceability mapper skipped: {reaso
 
 Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
 
-When the traceability matrix was successfully generated, pass its path via Skill args:
+**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-story already runs (Phase 1.6) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A story opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
+
+Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
 ```
-Skill(qa-story, args="traceability_matrix={story-directory}/.summaries/qa-traceability-matrix.md")
+Skill(qa-story, args="traceability_matrix={story-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true")
 ```
 
-If the matrix was not generated (lite mode or mapper failure), invoke without the `traceability_matrix` arg — qa-story performs internal mapping as before.
+If the matrix was not generated (lite mode or mapper failure), omit only the `traceability_matrix` token — still pass `code_review_blocking=true` so the code-review-and-fix loop stays active:
+
+```
+Skill(qa-story, args="code_review_blocking=true")
+```
 
 #### develop-task
 
@@ -128,28 +205,53 @@ Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=fals
 
 Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
 
-When the traceability matrix was successfully generated, pass its path via Skill args:
+**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-task already runs (Step 3b) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
+
+Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
 ```
-Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md")
+Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true")
 ```
 
-If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), invoke without the `traceability_matrix` arg.
+If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), omit only the `traceability_matrix` token — still pass `code_review_blocking=true` so the code-review-and-fix loop stays active:
+
+```
+Skill(qa-task, args="code_review_blocking=true")
+```
 
 ### Outcome branching (shared)
 
 After completion, find and read the latest gate file:
 - `PASS` with no `top_issues` → exit loop, proceed to Step 7
+- `WAIVED` with `waiver.active: true` and a documented reason/approver → exit loop, proceed to Step 7 (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
 - `CONCERNS`, `FAIL`, or has `top_issues` → proceed to 5b
 
 Log the result in the QA Iteration History section:
 
 ```
 ### QA Cycle {N} — {YYYY-MM-DD}
-**Gate Result**: {PASS / CONCERNS / FAIL}
+**Gate Result**: {PASS / CONCERNS / FAIL / WAIVED}
 **Issues Found**: {count and brief descriptions, or "none"}
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
 ```
+
+**Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
+
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
+
+**Issues found**: {count, or 'none'}
+{top 3 issues from gate file top_issues list, or 'No issues — proceeding to finalise'}
+**Action**: {Proceeding to finalise / Running qa-fix (cycle {N} of 5)}"
+
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
+
+On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
 ### 5b. Run QA Fix (shared)
 
@@ -194,6 +296,23 @@ After fixes are applied:
    **Fixes Applied**: {brief description of what qa-fix changed}
    **Commit**: `{hash}`
    ```
+
+4a. **Post QA fix summary to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
+
+   ```bash
+   # GitHub
+   tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔧 QA Fix Cycle {N} Applied — Step 6/8
+
+   **Fixes applied**: {brief summary from qa-fix output}
+   **Commit**: \`{hash}\`"
+
+   # Jira — call addCommentToJiraIssue:
+   #   issueIdOrKey: {TRACKER_ISSUE}
+   #   commentBody: same markdown body above
+   #   contentFormat: "markdown"
+   ```
+
+   On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fix cycle {N} comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
 5. **Post-fix PR state check (uses tracker state poller)**: Invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty).
 

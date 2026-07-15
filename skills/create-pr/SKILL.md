@@ -80,6 +80,13 @@ Before asking the user, check whether parameters were supplied:
 - When invoking `/commit-changes` in Step 2 (uncommitted changes present): forward all values as repeated flags — `/commit-changes --exclude path1 --exclude path2 ...`
 - When there are NO uncommitted changes (commit-changes is not invoked): silently ignore all `--exclude` values and log `"--exclude received but no commit needed — ignored"`
 
+**`--scope <path>`** (repeatable):
+- The caller may pass one or more `--scope <path>` flags (e.g., `/create-pr --scope docs/tasks/task.5/`)
+- When invoked by the `develop-story` or `develop-task` orchestrator, the work-item dir and changed code paths are passed so only in-scope files are staged in the auto-commit
+- Collect all values into a `SCOPE_PATHS` array
+- When invoking `/commit-changes` in Step 2 (uncommitted changes present): forward all values as repeated flags — `/commit-changes --scope p1 --scope p2 ...` (alongside any `--exclude` flags)
+- When there are NO uncommitted changes (commit-changes is not invoked): silently ignore all `--scope` values and log `"--scope received but no commit needed — ignored"`
+
 ### Step 0.5: Detect Platform
 
 Before interacting with any remote hosting service, detect the platform using the canonical resolver. See `references/platform-detection.md` for the full resolver spec.
@@ -154,7 +161,7 @@ AUTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
 
 If there are uncommitted changes:
 
-1. **Automatically invoke the `/commit-changes` skill** to commit all changes
+1. **Automatically invoke the `/commit-changes` skill** to commit all changes, forwarding any `--scope` and `--exclude` flags — e.g. `/commit-changes --scope p1 --scope p2 --exclude e1`
 2. **After commits are complete, IMMEDIATELY CONTINUE with Step 3** - Do not stop after committing
 
 **CRITICAL**: The commit step is just preparation. After `/commit-changes` completes successfully, you MUST continue with Steps 3-7 to actually create the PR. Do not stop after committing - that's only the first part of this skill's job.
@@ -586,6 +593,7 @@ If non-empty, report to the user and offer the same options.
 | `--base`     | Pre-supply target branch (skip prompt) | `/create-pr --base develop`         |
 | `--issue`    | Pre-supply GitHub issue number (skip auto-detection) | `/create-pr --issue 42`  |
 | `--exclude`  | Exclude path from auto-commit staging (repeatable; forwarded to `/commit-changes`) | `/create-pr --exclude path/to/report.md` |
+| `--scope`    | Allowlist paths for auto-commit staging (repeatable; forwarded to `/commit-changes`) | `/create-pr --scope docs/tasks/task.5/` |
 | `--draft`    | Create as draft PR | `/create-pr --draft`                |
 | `--title`    | Override PR title  | `/create-pr --title "custom title"` |
 | `--body`     | Override PR body   | `/create-pr --body "custom body"`   |
@@ -666,4 +674,4 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
 fi
 ```
 
-Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `PostToolUse` and `Stop` hooks: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

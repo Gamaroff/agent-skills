@@ -28,7 +28,13 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 
 ## Invoke /commit-changes
 
-Then invoke the `/commit-changes` skill. The implementation report must be staged and included in this commit alongside any remaining uncommitted changes.
+Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This stages tracked modifications across the whole tree (`git add -u`) plus any remaining new artifacts inside the work-item dir (including the finalised implementation report), without sweeping unrelated untracked paths:
+
+```
+/commit-changes --scope {work-item-dir}
+```
+
+The implementation report and all other work-item artifacts must be staged and included in this commit.
 
 After `/commit-changes` completes, run `git log --oneline -1` to capture the final commit hash. Update the Pipeline Progress Notes for Step 8: `Committed in \`{hash}\`` (and note the PR reference if applicable, e.g. `Committed in \`{hash}\`, merged via PR #{N}`).
 

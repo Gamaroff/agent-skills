@@ -1,6 +1,6 @@
 ---
 name: review-story
-description: Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements or you need user input. Validate mode (--validate flag or "is this story ready?"): automated non-interactive GO/NO-GO gate with 1–10 readiness score — use for pre-implementation gates, batch validation across multiple stories, CI pipelines, or quick sanity checks without user interaction.
+description: 'Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements or you need user input. Validate mode (--validate flag or "is this story ready?"): automated non-interactive GO/NO-GO gate with 1–10 readiness score — use for pre-implementation gates, batch validation across multiple stories, CI pipelines, or quick sanity checks without user interaction.'
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -65,12 +65,14 @@ Or via natural language (agent detects intent): "Is this story ready?", "Score t
 
 | | Interactive | Validate |
 |---|---|---|
-| Questions asked | Yes — up to 3 question points | Never |
-| Edits story | Yes (with user approval) | Never |
-| Output artifact | `.review.{n}.{name}.md` | `.validate.{date}.md` |
+| Questions asked | Yes — single batched question point | Never |
+| Edits story | Yes (with user approval) | Never* |
+| Output artifact | `.review.{n}.{story-name}.md` | `.validate.{date}.md`* |
 | Verdict label | READY / NEEDS REVISION / REQUIRES REWORK | GO / NO-GO (Revision) / NO-GO (Rework) |
 | CI exit code | N/A | Non-zero on NO-GO |
 | Batch support | No | Yes |
+
+\* The **Validate** column describes *standalone* validate (`APPLY=false`, read-only). The orchestrated **validate-and-apply** variant (`APPLY=true`, set by `develop-story`/`po`) still asks no questions but *does* edit the story (applies critical + important fixes, promotes status on a GO) and writes a `.review.{n}.{story-name}.md` report instead. See [Validate Sub-Modes](#validate-sub-modes).
 
 ## Purpose
 
@@ -132,9 +134,16 @@ optional:
 Activate **Validate mode** when any of the following are true:
 - `--validate` flag present in the invocation
 - Natural language intent: "validate", "is this story ready?", "score this story", "batch validate", "CI gate", "pre-implementation gate"
-- Called programmatically by `develop-story`, `scrum-master`, or `po` pipeline (these always use validate mode)
+- Called programmatically by `develop-story` or `po` pipeline (these always use validate mode — specifically the **validate-and-apply** variant; see Validate Sub-Modes below)
 
 Default to **Interactive mode** for all other invocations.
+
+#### Validate Sub-Modes
+
+Validate mode (`MODE=validate`) is always non-interactive. It has two variants, selected by the `APPLY` flag:
+
+- **Standalone validate** (`APPLY=false`, the default) — strictly **read-only**. Runs scoring and renders a GO / NO-GO verdict, skips Steps 9.5 and 10, never modifies the story document, and saves the report as `.validate.{date}.md`. This is the contract for CI gates, batch validation, and direct `--validate` calls.
+- **Validate-and-apply** (`APPLY=true`) — set automatically when invoked by the `develop-story`/`po` orchestrator. Runs the same scoring, then runs the **constrained, non-interactive** forms of Step 9.5 (apply critical + important fixes) and Step 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). Saves a normal review report as `story.{epic}.{story}.review.{n}.{story-name}.md`, so the orchestrator's `…review.*.md` lookup finds it.
 
 ## Input Resolution
 
@@ -368,11 +377,11 @@ questions:
 
 ### Pre-pass Summary Consumption
 
-Before formulating questions in any step, consult the pre-pass summaries from Phase 1.5:
+Before formulating questions in any step, consult the pre-pass summaries from Step 1's pre-pass execution:
 
-- **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the epic alignment review phase (Step 4).
-- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 5).
-- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the story should be scoped down or closed.
+- **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the epic alignment review (Step 3) and carry them to the Unified Question Point.
+- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the technical accuracy review (Step 4) and carry them to the Unified Question Point.
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings during the completeness review (Step 5) and carry them to the Unified Question Point — ask whether the story should be scoped down or closed.
 
 Severity `low` findings from any summary: add to the review report findings list but do not elevate to a user question unless they cluster with other issues.
 
@@ -387,11 +396,15 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 
 ---
 
-## Review Workflow (9 Sequential Steps)
+## Review Workflow (Unified Analysis & Batch Questioning)
 
-**NOTE**: Throughout all steps, collect issues and questions. Ask questions in batches at the end of each major phase (after Step 3, after Step 6) rather than interrupting continuously.
+**CRITICAL Execution Protocol**:
+1. **Zero Intermediate Finding-Clarification:** While running the analysis steps (Steps 2–8), the agent MUST NOT pause to ask the user clarifying questions about review findings — collect every finding silently and defer all finding-clarification to the single Unified Question Point after Step 8. This does **not** suppress the explicit pre-flight and side-effect gates that have their own defined prompts: the Step 0 output-format choice, the Step 0a branch-setup prompts, and the Step 2 tracker-sync opt-in. Those still fire at their defined points.
+2. **Unified Question Batching:** The agent must collect all compliance gaps, epic conflicts, technical inaccuracies, and UI wireframe opportunities into memory.
+3. **Single Prompt Turn:** After completing Step 8, the agent presents a single consolidated `AskUserQuestion` call containing up to 4 high-impact questions covering all findings.
+4. **No Partial Reviews:** If a step requires information from a later step (e.g., assessing whether a wireframe is needed based on screen inventory), it must be done during the initial scan.
 
-**Pre-pass summaries** (`PREPASS_A`, `PREPASS_B`, `PREPASS_C` from Phase 1.5): Before formulating any question in Steps 2–8, check the relevant pre-pass summary first. If a finding has `severity: high` or `severity: medium`, surface it as a clarifying question rather than asking the user to discover it themselves. If a finding has `severity: low`, note it in the review report without necessarily elevating it to a user question. If the relevant pre-pass summary is absent (agent failed), proceed with in-line discovery as usual.
+**Pre-pass summaries** (`PREPASS_A`, `PREPASS_B`, `PREPASS_C` from Step 1's pre-pass execution): Before formulating any question in Steps 2–8, check the relevant pre-pass summary first. If a finding has `severity: high` or `severity: medium`, surface it as a clarifying question rather than asking the user to discover it themselves. If a finding has `severity: low`, note it in the review report without necessarily elevating it to a user question. If the relevant pre-pass summary is absent (agent failed), proceed with in-line discovery as usual.
 
 ### Step 0: Determine Mode and Output Format
 
@@ -400,7 +413,9 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 **Actions**:
 
 1. **Detect mode** (from invocation flags / natural language — see Mode Detection above):
-   - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Auto-select "Comprehensive report" (saved as `.validate.{date}.md`). Skip all Question Points (QP1, QP2, QP3) and Steps 9.5 and 10.
+   - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Skip the Unified Question Point. Then branch on the `APPLY` flag (see Validate Sub-Modes above):
+     - **Standalone validate** (`APPLY=false`, default, read-only): save the report as `.validate.{date}.md`. Skip Steps 9.5 and 10 — never modify the story document.
+     - **Validate-and-apply** (`APPLY=true`, set automatically by the `develop-story`/`po` orchestrator): save the report as `story.{epic}.{story}.review.{n}.{story-name}.md`, then run the constrained, non-interactive forms of Steps 9.5 (apply critical + important fixes) and 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). See those steps' Pipeline notes.
    - **Interactive mode**: set `MODE=interactive`. Continue to step 2 below.
 
 2. **Interactive mode only** — use `AskUserQuestion` to ask about desired output format:
@@ -410,14 +425,14 @@ question: 'Would you like a comprehensive review report saved to a file, or just
 header: 'Output Format'
 options:
   - label: 'Comprehensive report'
-    description: 'Generate detailed review report saved to story.{epic}.{story}.review.{n}.{descriptive-name}.md with all findings, user decisions, and recommendations documented.'
+    description: 'Generate detailed review report saved to story.{epic}.{story}.review.{n}.{story-name}.md with all findings, user decisions, and recommendations documented. The {story-name} slug MUST match the parent story file''s name slug exactly (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — never a free-form summary of the review focus.'
   - label: 'Action plan only'
     description: 'Provide prioritized list of issues and fixes to action immediately without saving a report file.'
 ```
 
 3. Store `MODE` and output format preference for use throughout the workflow.
 
-**Pipeline note**: When invoked by the `develop-story` orchestrator, always use validate mode — set `MODE=validate` and skip the `AskUserQuestion`. Only ask interactively when invoked standalone in interactive mode.
+**Pipeline note**: When invoked by the `develop-story` orchestrator, always use the **validate-and-apply** variant — set `MODE=validate` and `APPLY=true`, and skip the `AskUserQuestion`. This applies critical + important fixes and promotes the story on a GO (Steps 9.5 and 10 run in their constrained, non-interactive forms) and writes the report as `story.{epic}.{story}.review.{n}.{story-name}.md`. Only ask interactively when invoked standalone in interactive mode; standalone validate (`APPLY=false`) stays read-only.
 
 4. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
 
@@ -426,6 +441,7 @@ options:
 | Task Subject | Description |
 |---|---|
 | Determine output format | Capture user's report vs action-plan preference |
+| Branch setup | Ensure review runs on a feature branch (Step 0a) |
 | Load config & context | Load skills-config.yaml, locate story + architecture docs |
 | Template compliance | Verify story structure against template |
 | Epic alignment | Check story fits within its parent epic |
@@ -442,6 +458,7 @@ options:
 
 | Task Subject | Description |
 |---|---|
+| Branch setup | Validate-mode short-circuit (no-op when pipeline owns branch) |
 | Load config & context | Load skills-config.yaml, locate story + architecture docs |
 | Template compliance | Verify story structure against template |
 | Epic alignment | Check story fits within its parent epic |
@@ -457,84 +474,38 @@ options:
 
 ---
 
-### Step 1: Load Configuration and Context
+### Step 0a: Branch Setup (BEFORE any document mutation)
 
-**Purpose**: Establish project structure and locate all relevant documents
+**Purpose**: Ensure all review artifacts (status updates, Change Log entries, `.review.*.md` reports, Jira/GitHub sync) land on a dedicated feature branch — not on `develop`/`main`.
 
-**Actions**:
+**Pre-conditions**: `DOC_FILE` (story file path from Input Resolution), `MODE` (from Step 0), `SKILL_NAME=review-story`.
 
-1. Load `skills-config.yaml` from project root
-   - If missing, use fallback defaults and notify user
-   - Extract: `devStoryLocation` (default: `nested`), `prd.*`, `architecture.*`
+**Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-story** variant throughout:
+- 0a.0 validate-mode short-circuit (skips entirely when `MODE=validate`).
+- 0a.2 extract `EPIC_NUM`, `STORY_NUM`, `EPIC_SLUG`, `EPIC_BRANCH`, `EPIC_BRANCH_EXISTS` from filename + story `epic:` frontmatter.
+- 0a.3 auto-skip when on `feature/story.${EPIC_NUM}.${STORY_NUM}.*` or `feature/epic.${EPIC_NUM}.*`.
+- 0a.4 prompt: when `EPIC_BRANCH_EXISTS=false`, ask Q1.1 (create epic branch) + Q1.2 (story branch base); else ask only Q1.2.
+- 0a.5–0a.8 stash (`git stash create` + `store`) → ensure epic branch (idempotent) → invoke `/create-branch` with resolved `BASE_BRANCH` → pop stash by hash.
 
-**Default Configuration Values** (used if `skills-config.yaml` not found):
+**Output**: `BRANCH_NAME`, `BASE_BRANCH`, `EPIC_BRANCH`, `AUTO_SKIPPED` exported. Decisions Log entry (or inline preamble) recorded per 0a.9.
 
-```yaml
-markdownExploder: true
-qa:
-  qaLocation: docs/qa
-prd:
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
-architecture:
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
-# Stories stored within epic directories
-devStoryLocation: nested
-devStoryNestedPattern: "docs/prd/**/epics/*/stories"
-devDebugLog: .ai/debug-log.md
-```
-
-2. Load the story document directly using the Read tool — this is the primary artifact and must be in main context.
-   - Locate at `{epicPath}/stories/{epic}.{story}.*.md`
-   - Parse all sections: frontmatter, ACs, Tasks, Dev Notes, Dev Agent Record
-
-3. **Discover supporting documents using Explore subagent:**
-
-   Use the Agent tool with subagent_type="Explore" to find:
-   - The parent epic file (pattern: `epic.{N}.*.md` in the epic directory)
-   - Architecture documents relevant to this story's type (backend/frontend/full-stack/auth/payments)
-   - The previous story in sequence (pattern: `story.{epic}.{story-1}.*.md`)
-   - The story template (`resources/story-tmpl.yaml`)
-
-   Ask the Explore subagent to return: **file paths + 1-line description only** (no file contents).
-
-4. **Selectively load from the Explore results:**
-   - Load the parent epic: read ONLY the "Stories" / "Acceptance Criteria" section (not the full file) — use offset/limit to target the relevant section
-   - Load architecture docs: read at most **2-3 most relevant files** based on story type. For a backend story, prefer `coding-standards.md` and the relevant service architecture doc. Do NOT load all architecture docs.
-   - Load story template: read for structure compliance reference
-   - Previous story: only load if the story explicitly references continuity with it
-
-**Output**: Compact context package — story in full, supporting docs selectively loaded
+**Failure**: HALT with the exact error; stash recovery instructions surfaced; no document edits attempted.
 
 ---
 
-### Phase 1.5: Pre-pass (3 Parallel Explore Subagents)
-
-**Purpose**: Front-load conflict detection before interactive Q&A. Three read-only Explore agents run in parallel and return compact YAML summaries. Q&A (Steps 2–8) consumes these summaries to surface high-severity findings as early questions rather than discovering them mid-review.
-
-**Prompt templates**: see `references/review-story-prepass-prompts.md` for the full prompt text and dispatch instructions for each agent.
-
-**Actions**:
-
-1. **Resolve variables** from Step 1 output:
-   - `{story_path}` — the resolved story file path
-   - `{epic_path}` — the parent epic file path found by Step 1's Explore subagent
-   - `{arch_location}` — from `skills-config.yaml` → `architecture.architectureShardedLocation` (default: `docs/architecture`)
-
-2. **Dispatch all three agents in a single message** (parallel — one tool-call block, three Agent invocations):
-   - **Agent A** (`subagent_type="Explore"`) — epic alignment prompt from `review-story-prepass-prompts.md`
-   - **Agent B** (`subagent_type="Explore"`) — architecture alignment prompt from `review-story-prepass-prompts.md`
-   - **Agent C** (`subagent_type="Explore"`) — codebase already-implemented prompt from `review-story-prepass-prompts.md`
-
-3. **Collect results**: each agent returns a YAML block. Validate the top-level key (`alignment` for A/B; `implementation_status` for C). If a key is missing or an agent fails: log `⚠️ Pre-pass Agent {A/B/C} failed — proceeding without {epic/architecture/codebase} summary` and continue with the remaining summaries.
-
-4. **Store summaries** as `PREPASS_A`, `PREPASS_B`, `PREPASS_C` in active context for use by the Q&A phase.
-
-**Failure handling**: if all three agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback.
-
-**Output**: up to 3 YAML summaries (epic alignment, architecture alignment, implementation status) available for Steps 2–8
+### Step 1: Context Discovery and Parallel Pre-pass Execution
+Purpose: Parallelize file discovery, project structure checks, and core alignment evaluations into a single background turn cycle to minimize latency and context bloat.
+Actions:
+1. Resolve paths: Source references/resolve-paths.sh to populate ${PRD_ROOT} and ${ARCH_ROOT}.
+2. Load skills-config.yaml from the project root (or apply default fallback values).
+3. Load the primary story document in full using the Read tool.
+4. Dispatch Parallel Subagents: Execute one single message to parallelize background analysis. Invoke four subagent operations concurrently:
+   - Subagent 1 (Discovery): Scan directories and find the parent epic file path, the previous story path, the template file, and identify at most 2-3 matching domain-specific architecture files. Return only file paths and 1-line descriptions.
+   - Subagent 2 (Epic Alignment): Evaluate the story's alignment against the parent epic requirements. Return a compact YAML summary (PREPASS_A).
+   - Subagent 3 (Architecture Alignment): Evaluate the story's technical details against core system architecture. Return a compact YAML summary (PREPASS_B).
+   - Subagent 4 (Codebase Scan): Analyze current branch implementation status. Return a compact YAML summary (PREPASS_C).
+5. Handle Failures Gracefully: If any alignment/scan subagents fail or return an unknown status, log a specific warning (e.g., "⚠️ Pre-pass Agent A failed - proceeding via in-line discovery") and fall back to native validation checks in Steps 2-6.
+Output: Up to 3 verified YAML summaries stored in active context; target file paths fully resolved for immediate step execution.
 
 ---
 
@@ -575,6 +546,11 @@ devDebugLog: .ai/debug-log.md
      - ❌ `story-2-1-auto-hide.md`
      - ❌ `2.1-auto-hide.md`
 
+2a. **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)):
+   - `type: story` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement).
+   - `description` (one-sentence summary) present → **Important** if missing.
+   - `tags` is a YAML list (when present); `resource` is a URI (when present) → **Optional** if malformed. `updated` ≡ OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) ≡ OKF `resource` — absence of an explicit `resource` is not a finding.
+
 3. **Placeholder Detection**:
    - Search for: `{{...}}`, `_TBD_`, `[TODO]`, `[PLACEHOLDER]`, `???`
    - Each unfilled placeholder is a gap
@@ -585,7 +561,13 @@ devDebugLog: .ai/debug-log.md
    - Tasks must use checkbox format with subtasks
    - Change Log must be table format
 
-5. **Tracker Issue Linkage**:
+5. **Title Format**:
+   - When the story `title` frontmatter (or the `# ` heading) embeds a story-id prefix, it MUST use the canonical bracket form `[Story N.M] Name` — never the colon form `Story N.M: Name` nor the hyphen form `Story N-M: Name`.
+   - Detect by matching `^\s*Story\s+[\d.\-]+\s*:` against the title/heading value; also flag a bare `Story N.M` / `Story N-M` prefix that lacks the brackets.
+   - Flag as a **Major** issue. `sync-jira-story`'s `normaliseStorySummary` strips the **colon-dot** form on push, but the **hyphen** form (`Story 1-1:`) is NOT stripped and produces a doubled summary (`[Story 1.1] Story 1-1: …`); either way the local doc title shows the wrong format until corrected.
+   - Fix: set `title` to the bracket form `[Story N.M] Name` (or to the bare descriptive name — `sync-jira-story` prepends `[Story {epic}.{story}]` automatically), then re-run `sync-jira-story` so the Jira issue summary is corrected in the same operation. Apply this fix before any tracker sync.
+
+6. **Tracker Issue Linkage**:
 
    Detect tracker platform using the canonical resolver — see `references/platform-detection.md`. Source the helper once per skill invocation:
    ```bash
@@ -608,6 +590,13 @@ devDebugLog: .ai/debug-log.md
       - Search failure → log warning and fall through to create (existing behaviour preserved).
    3. **Frontmatter write-back**: on link-existing, write `jira_key` + `jira_url` (or `github_issue`) before the closing `---` of the frontmatter block (same sed-based pattern as `create-task`). Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
+# Tracker Dedup Fallback Search Addendum (Applies to both Jira and GitHub paths):
+- Pattern Match Search (Primary): Query by string prefix "[Story {epic}.{story}] {title}".
+- Structural Label Search (Fallback - Execute if primary match returns zero results):
+  * For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"`.
+  * For GitHub: Run `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title`.
+- Handling Drift: If a single match is found via the fallback label search but the title has drifted from the local filename/title, link the existing tracker issue, write back the keys to frontmatter, and log a warning: "⚠️ Title drift detected between local file and existing tracker issue. Issue linked via structural label." Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
+
    **Jira path:**
 
    > **Note**: priority drift between local frontmatter and remote Jira is corrected by `/sync-jira-story`, not by review. No analogue of the GitHub Project-board priority helper is needed — Jira priority is a built-in issue field, not a label, and `jira-sync.js` (`normalisePriority` + `diffFields`) already keeps them in sync.
@@ -615,13 +604,22 @@ devDebugLog: .ai/debug-log.md
    - Frontmatter MUST contain `jira_key:` field
    - If `jira_key:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This story has no linked Jira issue. Should I create one now?"
-     - If user confirms:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This story has no linked Jira issue. Create and link one now? Detected platform: Jira."
+       > **Options:**
+       > - **Sync to Jira** `(Recommended)` — create the Jira issue, link it to the parent epic, and write `jira_key`/`jira_url` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `jira_key` unwritten. The user can run `/sync-jira-story` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-jira-story later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to Jira**:
        0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
           - Use Atlassian MCP `searchJiraIssuesUsingJql`:
             - `jql`: `summary ~ "[Story {epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
             - Verify story title pattern against what `/create-story` Step 5.2a / `sync-jira-story` actually emits; align if the format differs
-            - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
+             - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
+             - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"` (see Tracker Dedup Fallback Search Addendum for details).
           - **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-jira-issue`):
             - Extract `jira_key` and build `jira_url = ${JIRA_URL}/browse/${jira_key}`
             - Write `jira_key: {jira_key}` and `jira_url: {jira_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
@@ -653,8 +651,16 @@ devDebugLog: .ai/debug-log.md
    - Frontmatter MUST contain `github_issue:` field
    - If `github_issue:` is missing or `null`:
      - Flag as **Important** gap
-     - Ask: "This story has no linked GitHub issue. Should I create one now?"
-     - If user confirms:
+     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
+       > **Header:** `Tracker sync`
+       > **Question:** "This story has no linked GitHub issue. Create and link one now? Detected platform: GitHub."
+       > **Options:**
+       > - **Sync to GitHub** `(Recommended)` — create the GitHub issue, link it as a sub-issue of the parent epic, add it to the project board, and write `github_issue` to frontmatter.
+       > - **Skip — leave unlinked** — make no remote changes; leave `github_issue` unwritten. The user can run `/sync-github-story` later.
+       >
+       > The user may also pick "Other" (auto-provided) to skip or explain.
+     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-github-story later."` and continue the review. Do NOT halt.
+     - If the user chooses **Sync to GitHub**:
        0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
           1. Search for an existing issue:
              ```bash
@@ -663,6 +669,7 @@ devDebugLog: .ai/debug-log.md
              ```
              Verify story title pattern against what `/create-story` Step 5.2a actually emits; align if the format differs.
              On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to steps 1–4 below
+             - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
           2. **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-github-issue`):
              - Extract `N` (issue number) and `url` from the result
              - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
@@ -752,55 +759,6 @@ devDebugLog: .ai/debug-log.md
 - When AC deviations found: Intentional change or mistake?
 - When scope differs: Update story or update epic?
 - When dependencies missing: Which dependencies are required?
-
----
-
-### QUESTION POINT 1: Epic & Structure Clarifications
-
-**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to technical review, ask batched questions about:
-
-1. Template compliance issues (unfilled placeholders, missing sections)
-2. File naming violations
-3. Epic alignment conflicts
-4. Scope clarifications
-
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering high-priority issues from Steps 2-3.
-
-**Example Questions**:
-
-```yaml
-questions:
-  - question: 'Story filename uses underscores (story_2_3.md) instead of required dots (story.2.3.md). Rename the file?'
-    header: 'File Naming'
-    options:
-      - label: 'Yes, rename'
-        description: 'Follow documentation standards with dots for structural separators'
-      - label: 'Keep current'
-        description: 'Underscore format is intentional for this project'
-
-  - question: 'Story has 5 ACs but epic only specifies 3. Are the extra 2 ACs intentional additions?'
-    header: 'AC Count'
-    multiSelect: true
-    options:
-      - label: 'AC 4 is needed'
-        description: 'Necessary addition not in epic. Update epic to include it.'
-      - label: 'AC 5 is needed'
-        description: 'Necessary addition not in epic. Update epic to include it.'
-      - label: 'Remove extras'
-        description: 'Story should match epic exactly. Remove AC 4 and 5.'
-```
-
-**After Questions**: Continue review with user's decisions incorporated.
-
-### Context Hygiene After Phase 1
-
-After receiving user answers to QUESTION POINT 1, consolidate findings before proceeding to technical review:
-
-1. Write a **Phase 1 Summary** (5-10 bullet points) covering: template compliance result, epic alignment result, user decisions from Q1
-2. Release the parent epic and architecture documents from active consideration — they are no longer needed for Steps 4–6
-3. Retain in context: the story document, Phase 1 Summary, and user decisions only
-
-This prevents the first-phase document load from polluting the technical review phases.
 
 ---
 
@@ -945,11 +903,17 @@ This prevents the first-phase document load from polluting the technical review 
      - Input validation should be addressed
      - Sensitive data handling should be defined
 
+9. **Effort Estimate**:
+   - Check frontmatter for `estimated_effort_hours` (number).
+   - **Absent or empty**: flag as **Optional** (LOW severity) — "No `estimated_effort_hours` set. PM tooling (Jira Original Estimate, GitHub Projects v2 Estimate field) will show this story as unestimated."
+   - **Present**: recompute the rubric in `references/effort-estimation-rubric.md` against the current document state. If `abs(frontmatter - rubric) / max(frontmatter, rubric) > 0.5` (>2× divergence), flag as **Optional** (LOW severity): "Frontmatter `estimated_effort_hours: {X}` diverges from rubric estimate of **{Y}h** (AC: {n}, tasks: {m}, risk: {r}). Confirm or adjust."
+   - Non-blocking — does **not** affect gate decision or readiness score. In Interactive mode, may offer a single prompt to accept the rubric's number; in Validate mode, observe silently.
+
 **Issues to Flag**:
 
 - **Critical**: ACs with no tasks, missing essential Dev Notes categories, no testing guidance
 - **Important**: Vague file locations, missing error handling, incomplete testing specs
-- **Optional**: Could add more detail, nice-to-have context
+- **Optional**: Could add more detail, nice-to-have context, missing `estimated_effort_hours`
 
 **Output**: Gap analysis report with missing information categorized
 
@@ -959,67 +923,6 @@ This prevents the first-phase document load from polluting the technical review 
 - When technical approach unclear: Which approach to use?
 - When multiple valid options: User's preference?
 - When testing scope undefined: What level of testing?
-
----
-
-### QUESTION POINT 2: Technical & Completeness Clarifications
-
-**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and continue. In Interactive mode: before continuing to consistency review, ask batched questions about:
-
-1. Hallucinated technologies or approaches
-2. Missing technical specifications
-3. Incomplete Dev Notes sections
-4. Unclear testing requirements
-5. File location ambiguities
-
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering technical and completeness issues from Steps 3-4.
-
-**Example Questions**:
-
-```yaml
-questions:
-  - question: "Story mentions 'react-native-super-cache' library not in tech stack. What caching solution should be used?"
-    header: 'Caching Lib'
-    options:
-      - label: 'Use documented lib'
-        description: 'Replace with existing caching solution from architecture docs'
-      - label: 'Add new library'
-        description: 'Install react-native-super-cache and update tech stack docs'
-      - label: 'Clarify approach'
-        description: 'Describe the intended caching approach without assuming library'
-
-  - question: 'Dev Notes missing database schema details. Should this story include schema changes?'
-    header: 'Schema Work'
-    options:
-      - label: 'Yes, add schema'
-        description: 'Story needs schema updates. Specify which models/fields.'
-      - label: 'No schema work'
-        description: 'Story only works with existing schema. No changes needed.'
-      - label: 'Separate story'
-        description: 'Schema changes should be separate story (dependency).'
-
-  - question: "Testing section says 'comprehensive tests' but doesn't specify type. Which tests are needed?"
-    header: 'Test Types'
-    multiSelect: true
-    options:
-      - label: 'Unit tests'
-        description: 'Test individual functions and components in isolation'
-      - label: 'Integration tests'
-        description: 'Test API interactions and service integration'
-      - label: 'E2E tests'
-        description: 'Test complete user flows end-to-end'
-```
-
-**After Questions**: Continue review with technical decisions clarified.
-
-### Context Hygiene After Phase 2
-
-After receiving user answers to QUESTION POINT 2, consolidate:
-1. Write a **Phase 2 Summary**: technical accuracy issues found, user decisions, resolved hallucinations
-2. Release any additional architecture docs loaded during Steps 4–6 from active consideration
-3. Retain: story document, Phase 1 Summary, Phase 2 Summary, user decisions
-
-Proceed to Phase 3 (recommendations and output) with a clean context containing only summaries + story.
 
 ---
 
@@ -1102,10 +1005,38 @@ Proceed to Phase 3 (recommendations and output) with a clean context containing 
    - Story describes a stateful UI/component lifecycle → suggest `stateDiagram-v2`
    - Story has non-trivial branching or decision logic → suggest `flowchart`
    Do NOT flag absence as an issue if Dev Notes prose already conveys the flow clearly.
+
+Missing Diagram Proactive Draft Rule:
+If a visual diagram is absent but highly recommended (e.g., the story describes a complex multi-party API request/response loop or stateful UI view lifecycle), do not merely flag its absence. You must generate a highly accurate, syntactically correct sample draft snippet directly within the review report's recommendation section (using markdown code fences for the specified mermaid type). Use the verified component, file, or endpoint naming conventions extracted during the technical accuracy review so the user can easily copy and insert it.
+
 5. **If a diagram is present but adds no value over the prose**: recommend removing it.
 6. **If diagram type is wrong** (e.g., a time-ordered API protocol drawn as a generic flowchart): recommend the correct type.
 
 **Output**: append findings to Critical/Important/Optional buckets used by Steps 6–7.
+
+---
+
+### Step 6.6: Wireframe Verification (via `markdown-wireframe`)
+
+**Purpose**: Check if the story document describes a user interface (UI) or visual components that could be drawn up in a wireframe. If so, verify if a wireframe is already embedded directly in the story document. If not, recommend adding one.
+
+**Actions**:
+
+1. **Detect UI/Wireframe Opportunity**: A story describes a UI that could be wireframed if it:
+   - Touches frontend code, UI screens, components, layout, navigation, or styles.
+   - Mentions visual elements like buttons, inputs, modals, forms, dashboards, lists, or headers.
+   - Has acceptance criteria referencing UI interactions, visual feedback, or layout requirements.
+
+2. **Verify Existing Wireframes**:
+   - Check if there is an existing wireframe section embedded directly in the story document (e.g. under a `## Visual Layout / Wireframe` subheading in Dev Notes).
+   - Check if the story's Dev Notes or tasks reference this embedded wireframe.
+
+3. **Determine Wireframe Opportunity**:
+   - If UI is detected but no embedded wireframe is present, flag this as an **Optional** issue (or **Important** if the UI is complex/bespoke).
+   - In Interactive mode: collect this finding for the **Unified Question Point** to ask the user if they want to embed a wireframe.
+   - In Validate mode: record the absence of an embedded wireframe in the validation report (non-blocking).
+
+**Output**: Wireframe verification findings added to the review report/validation report.
 
 ---
 
@@ -1241,24 +1172,33 @@ Proceed to Phase 3 (recommendations and output) with a clean context containing 
 
 ---
 
-### QUESTION POINT 3: Quality & Clarity Clarifications (Final)
+### UNIFIED QUESTION POINT: Consolidated Story Clarifications
 
-**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and proceed to Step 9. In Interactive mode: before generating final report, ask batched questions about:
+**CRITICAL**: **Skip entirely in Validate mode** — collect findings silently and proceed to Step 9. In Interactive mode: before generating final report or proposing fixes, ask a single batched set of questions (maximum 4) resolving all discovered issues across all categories:
 
 1. Ambiguous requirements or ACs
 2. Conflicting information requiring resolution
 3. Quality/clarity issues needing user input
 4. Pattern deviations requiring justification
 5. **Story split recommendations** (if story appears oversized)
+6. **UI wireframe opportunities** (from Step 6.6)
 
-**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering remaining issues from Steps 5-7.
+**Action**: Use `AskUserQuestion` with 1-4 questions (max) covering the highest-impact unresolved issues across all analysis steps (Steps 2–8).
 
-**IMPORTANT**: If scope analysis (Step 7.7) indicates story should be split, ALWAYS ask user whether to split.
+**IMPORTANT**: If the scope and complexity analysis in Step 7 indicates the story should be split, ALWAYS ask the user whether to split. If Step 6.6 indicates a UI wireframe opportunity exists but no embedded wireframe is present, ask the user if they want to embed one. When findings exceed the 4-question budget, prioritise Critical and Important findings — but always reserve a slot for an unresolved split or wireframe decision when one exists, since these cannot be inferred without the user.
 
 **Example Questions**:
 
 ```yaml
 questions:
+  - question: "This story describes a user interface (UI) or visual components, but does not have a wireframe embedded. Would you like to embed a wireframe directly in this story using the `markdown-wireframe` skill?"
+    header: 'UI Wireframe'
+    options:
+      - label: 'Yes — Add wireframe (Recommended)'
+        description: 'Invoke the markdown-wireframe skill to generate a text/YAML wireframe, embed it directly in the story''s Dev Notes section, and add a task to Stitch it.'
+      - label: 'No — Skip wireframe'
+        description: 'Proceed without wireframes.'
+
   - question: "AC #3 says 'fast response time' which is unmeasurable. What specific performance threshold is required?"
     header: 'Performance'
     options:
@@ -1320,11 +1260,18 @@ questions:
 **Actions**:
 
 1. Compute the **Implementation Readiness Score** (1–10 weighted average of per-dimension scores).
+
+Critical Scoring Engine Rule (The Floor Gate):
+The Implementation Readiness Score is calculated as a weighted average across all checked dimensions on a 1-10 scale. However, the calculation must respect a strict structural floor rule:
+- If Technical Accuracy is less than 6 OR Completeness is less than 6 due to critical/important blockers, the final weighted Implementation Readiness Score is automatically capped at a maximum value of 5/10.
+- The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
+- Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
+
 2. Determine the **Verdict**:
    - ✅ **GO** — score ≥ 8 AND zero Critical issues
    - ⚠️ **NO-GO (Revision)** — score 5–7, OR Important issues materially blocking confidence
    - 🚨 **NO-GO (Rework)** — score < 5 OR any Critical issue present
-3. Write the report to `[story-directory]/[story-name].validate.[date].md`.
+3. Write the report. **Standalone validate** (`APPLY=false`) → `[story-directory]/[story-name].validate.[date].md`. **Validate-and-apply** (`APPLY=true`, orchestrated) → `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md` (the canonical review-report name, so the orchestrator's `…review.*.md` lookup finds it).
 4. Print a concise stdout summary (for CI / pipeline callers):
 
 ```
@@ -1415,7 +1362,7 @@ Report:  <path>
 
 ## Validation Metadata
 
-- **Mode:** validate (automated, read-only)
+- **Mode:** validate (automated; read-only when `APPLY=false`, applies fixes + promotes when `APPLY=true`)
 - **Validation Date:** [ISO date]
 - **Validation Depth:** [Quick/Standard/Thorough]
 - **Story File:** [path]
@@ -1424,10 +1371,10 @@ Report:  <path>
 
 ---
 
-*Generated by /review-story --validate. No changes made to the story document. To apply fixes, run /review-story (interactive).*
+*Generated by /review-story --validate. In standalone validate (`APPLY=false`) no changes are made to the story document — to apply fixes, run /review-story (interactive). Under validate-and-apply (`APPLY=true`, orchestrated) critical + important fixes are applied and the status is promoted on a GO.*
 ```
 
-**Output**: Validation report saved to `.validate.{date}.md`. Stdout summary printed.
+**Output**: Validation report saved (`.validate.{date}.md` for standalone validate; `story.{epic}.{story}.review.{n}.{story-name}.md` for validate-and-apply). Stdout summary printed.
 
 ---
 
@@ -1436,7 +1383,17 @@ Report:  <path>
 **Actions**:
 
 1. Generate complete review report following the structure below
-2. Save to file: `[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md`
+
+Critical Scoring Engine Rule (The Floor Gate):
+The Implementation Readiness Score is calculated as a weighted average across all checked dimensions on a 1-10 scale. However, the calculation must respect a strict structural floor rule:
+- If Technical Accuracy is less than 6 OR Completeness is less than 6 due to critical/important blockers, the final weighted Implementation Readiness Score is automatically capped at a maximum value of 5/10.
+- The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
+- Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
+
+2. Save to file: `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md`
+   - `{story-name}` MUST be the parent story's own name slug — the hyphenated portion after `story.{epic}.{story}.` in the story filename. Do NOT invent a free-form descriptive slug summarizing the review focus.
+   - Example: story file `story.1.2.configure-typescript-path-mapping.md` → review file `story.1.2.review.1.configure-typescript-path-mapping.md`.
+   - Derive programmatically: strip `.md`, strip the leading `story.{epic}.{story}.` prefix from the basename — the remainder is `{story-name}`.
 3. Display summary to user with file location
 
 **Report Structure**:
@@ -1469,7 +1426,9 @@ Report:  <path>
 
 **IMPORTANT**: This section documents the clarifying questions asked during review and user's decisions. All recommendations below incorporate these decisions.
 
-### Question Point 1: Epic & Structure
+### Unified Question Point: Consolidated Clarifications
+
+_All clarifying questions were asked in a single batch after analysis completed. List each below (one entry per question asked)._
 
 **Q1: [Question asked]**
 
@@ -1481,24 +1440,7 @@ Report:  <path>
 - **User Decision**: [Answer selected]
 - **Impact**: [How this affects recommendations]
 
-### Question Point 2: Technical & Completeness
-
-**Q3: [Question asked]**
-
-- **User Decision**: [Answer selected]
-- **Impact**: [How this affects recommendations]
-
-**Q4: [Question asked]**
-
-- **User Decision**: [Answer selected]
-- **Impact**: [How this affects recommendations]
-
-### Question Point 3: Quality & Clarity
-
-**Q5: [Question asked]**
-
-- **User Decision**: [Answer selected]
-- **Impact**: [How this affects recommendations]
+_[Add Q3, Q4 as needed — up to the 4-question batch maximum.]_
 
 ---
 
@@ -1522,7 +1464,7 @@ Report:  <path>
 
 ### Recommendations (Based on User Decisions)
 
-**IMPORTANT**: These recommendations incorporate user clarifications from Question Points above.
+**IMPORTANT**: These recommendations incorporate user clarifications from the Unified Question Point above.
 
 1. **[Action based on user decision]** - _Per user decision on Q[num]_
 2. **[Action aligned with user's vision]** - _Per user decision on Q[num]_
@@ -1795,7 +1737,7 @@ Report:  <path>
 - **Review Duration:** [time]
 ```
 
-**Output**: Save review report to `[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md`
+**Output**: Save review report to `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md` — `{story-name}` is the parent story's own name slug (same hyphenated suffix as the story filename), NOT a free-form review-focus summary.
 
 ---
 
@@ -1895,7 +1837,7 @@ Report:  <path>
 
 **Purpose**: Give the user the option to have the agent apply the recommended fixes to the story document immediately.
 
-**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10, **in Interactive mode only**. **Skip entirely in Validate mode** — validate mode is read-only and never modifies the story document.
+**When to Execute**: **CRITICAL / BLOCKING** — Always execute after Step 9, before Step 10, in **Interactive mode** and in **validate-and-apply** (`MODE=validate` + `APPLY=true`, the orchestrated path). **Skip entirely in standalone Validate mode** (`APPLY=false`) — standalone validate is read-only and never modifies the story document.
 
 **Pipeline note**: When invoked by the `develop-story` orchestrator, skip the `AskUserQuestion` and auto-answer **"Yes, apply all critical + important fixes"** — the pipeline proceeds autonomously and needs the story fully corrected before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 9.5 auto-answered: Yes, apply all critical + important fixes — pipeline proceeds autonomously."
 
@@ -1916,7 +1858,17 @@ options:
 ```
 
 2. **If "Yes, apply all critical + important fixes"** or **"Yes, critical fixes only"**:
+
+Step 9.5 Execution Guardrails (Atomic Rollback Protocol):
+Before executing any tool calls to apply changes to the story file or review markdown:
+1. Create a transient local snapshot of the unmodified active story document (e.g., cache it in memory or make a hidden `.story_file.bak` copy).
+2. Apply the sequenced Edit tool calls block by block in priority order.
+3. Catch and Remediate Failures: If any individual Edit call fails to match lines, encounters regex/patch conflicts, or throws an error, immediately halt the operation. Revert the entire file back to the transient local snapshot state.
+4. Clean Exit: Wipe the backup file, skip all automatic text adjustments, log the specific error, and surface a graceful recovery prompt: "⚠️ Automated edit failed at fix [issue title] due to a patch conflict. Rolling back all partial edits. Please resolve this section manually."
+
    - Work through each issue in priority order (critical first, then important if selected)
+   - **UI Wireframe Insertion**: If the user selected to add a wireframe during the Unified Question Point, generate the wireframe using the `markdown-wireframe` skill instructions, embed it directly into the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the Stitch task:
+     `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)` to the Tasks / Subtasks section.
    - For each fix: use the Edit tool to apply the change to the story document
    - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
    - If a fix requires information the agent doesn't have (e.g., user must decide the value), skip it and note: `⏭ Skipped: [issue title] — requires your input`
@@ -1946,11 +1898,67 @@ options:
 
 ---
 
+### Step 9.6: Sync Body Changes to Tracker (when fixes were applied)
+
+**Purpose**: When Step 9.5 applied any Edit to the story body, sync the updated content back to the linked tracker issue (Jira or GitHub). This syncs **both** the story **Description** *and* the **doc URL** to the story file — `story_bitbucket_url` / `epic_bitbucket_url` plus the body "View on Bitbucket" links (Jira), or the issue's `## Document` link block (GitHub). The doc URL is **pinned to the durable `develop` branch** (when the file already exists there) so it does not 404 once the feature branch is deleted post-merge.
+
+**When to Execute**:
+- At least one fix was applied in Step 9.5 (i.e. `FIXES_APPLIED` is non-empty) AND
+- Not validate mode
+
+**Skip when**: validate mode or no body edits were made.
+
+**Resolve the durable doc-link branch** (`PIN_BRANCH`) once, before the tracker split — Step 10 reuses it:
+
+```bash
+# Prefer develop, fall back to repo default branch, then main (same as finalise).
+if git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
+  DURABLE_BRANCH=develop
+else
+  DURABLE_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+  DURABLE_BRANCH="${DURABLE_BRANCH:-main}"
+fi
+# Only pin if the story file already exists on the durable branch — otherwise a story that
+# only exists on the feature branch would 404 on develop right now. Empty PIN_BRANCH => the
+# sync uses its normal current-branch resolution; finalise re-points durably at acceptance.
+DOC_REL=$(git ls-files --full-name -- "$STORY_FILE_PATH")
+if [ -n "$DOC_REL" ] && git cat-file -e "origin/${DURABLE_BRANCH}:${DOC_REL}" 2>/dev/null; then
+  PIN_BRANCH="$DURABLE_BRANCH"
+else
+  PIN_BRANCH=""
+  echo "ℹ️ Story not yet on origin/${DURABLE_BRANCH} — doc URL kept on the current branch; finalise will pin it durably at acceptance."
+fi
+```
+
+**Branch on TRACKER**:
+
+**Jira path** (`TRACKER=jira`):
+
+```bash
+node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
+  --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
+```
+
+> **Path note**: the script is bundled at `.agents/skills/sync-jira-story/scripts/sync-jira-story.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist and never did. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
+
+On success → `sync-jira-story` updates the Jira description, re-points `story_bitbucket_url` / `epic_bitbucket_url` and the "View on Bitbucket" links to `${PIN_BRANCH:-current branch}`, refreshes `jira_last_body_hash` in frontmatter, and appends a Change Log entry. Confirm: `✅ Pushed description + doc URL to Jira {jira_key} (link pinned to ${PIN_BRANCH:-current branch})`.
+
+On non-zero exit → log warning `⚠️ sync-jira-story failed — Jira description may be stale` and continue to Step 10 (do not halt).
+
+**GitHub path** (`TRACKER=github`):
+
+Invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH={resolved story file path}` and `DOC_BRANCH={PIN_BRANCH}` (may be empty — the sub-skill then falls back to its current-branch default). The sub-skill updates the GitHub issue body, re-points the `## Document` link to `DOC_BRANCH`, and appends a Change Log entry to match the edited story.
+
+On success → confirm: `✅ Pushed description + doc URL to GitHub issue #{github_issue} (link pinned to ${PIN_BRANCH:-current branch})`.
+On failure → log warning `⚠️ sync-github-story failed — GitHub issue body may be stale` and continue to Step 10 (do not halt).
+
+---
+
 ### Step 10: Update Document Status (if applicable)
 
 **Purpose**: Update the story document status based on the review outcome.
 
-**CRITICAL**: **Skip entirely in Validate mode** — status transitions are the interactive review's job. In validate mode, proceed directly to Step 11 (post tracker comment).
+**CRITICAL**: **Skip entirely in standalone Validate mode** (`APPLY=false`) — status transitions are the interactive review's job; proceed directly to Step 11 (post tracker comment). In **validate-and-apply** (`APPLY=true`, orchestrated) this step runs in its constrained, non-interactive form per the Pipeline note below: promote `Draft → Ready for Development` on a GO, HALT on NO-GO.
 
 **Pipeline note**: When invoked by the `develop-story` orchestrator and the review outcome is READY TO IMPLEMENT, skip the `AskUserQuestion` and auto-answer **"Yes, update status"** — the pipeline needs the story promoted to `Ready for Development` before `/develop` runs in Step 3. Log in Decisions Log: "review-story Step 10 auto-answered: Yes, update status — pipeline proceeds autonomously." If the outcome is NEEDS REVISION or REQUIRES REWORK, do NOT skip the step — HALT the pipeline and surface the review findings to the user; the story is not ready for development.
 
@@ -1992,6 +2000,22 @@ options:
      | [date] | [version] | Review passed - ready for development | Review-Story |
      ```
    - Confirm update to user: "✅ Story status updated to 'Ready for Development'. You can now run `/develop` to begin implementation."
+
+   **After status edit — sync to tracker (non-blocking)**:
+
+   Reuse the `PIN_BRANCH` resolved in Step 9.6 so the doc URL stays pinned to the durable branch. (If Step 9.6 was skipped — no fixes applied — re-resolve `PIN_BRANCH` using the same snippet from Step 9.6 first.)
+
+   - **Jira path** (`TRACKER=jira`): run `sync-jira-story.js` to push the status transition and updated frontmatter:
+     ```bash
+     node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
+       --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
+     ```
+     On success → `✅ Status synced to Jira {jira_key} (doc link pinned to ${PIN_BRANCH:-current branch})`.
+     On failure → log `⚠️ sync-jira-story failed after status update — Jira may be stale` and continue.
+
+   - **GitHub path** (`TRACKER=github`): invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH` and `DOC_BRANCH={PIN_BRANCH}`. This reflects the new status in the GitHub issue body and Change Log, with the `## Document` link pinned to the durable branch.
+     On success → `✅ Status synced to GitHub issue #{github_issue} (doc link pinned to ${PIN_BRANCH:-current branch})`.
+     On failure → log `⚠️ sync-github-story failed after status update — GitHub issue may be stale` and continue.
 
    **If "Keep current status"**:
    - Keep status unchanged
@@ -2037,6 +2061,8 @@ User Can Now: Run `/develop` to begin implementation
 **Purpose**: Notify the linked tracker issue (Jira or GitHub) that a review has been completed, with the outcome, key findings, and a summary of any changes made to the story document.
 
 **When to Execute**: Always — after Step 10 completes (regardless of review outcome or status update decision).
+
+> **MUST execute — not gated by manual-sync user memories.** This auto-post is part of the review workflow itself. The `/create-*` skills' "Jira sync is manual only" rule (if present in user memory, e.g. `feedback_jira_sync_manual_only.md`) applies **only to `/create-epic`, `/create-story`, `/create-task`** — it does NOT apply to `/review-story`, `/review-task`, `/develop-story`, or `/develop-task`. These skills always auto-post review/PR/finalise outcomes to the linked tracker (GitHub or Jira/Bitbucket), symmetric across platforms. Skipping this step on the basis of a manual-sync memory and deferring to `/sync-jira-story` is a misapplication of that rule.
 
 **Actions**:
 
@@ -2203,15 +2229,15 @@ User Can Now: Run `/develop` to begin implementation
 
 **Validate mode** — validation is successfully completed when:
 
-✅ All steps (0–9, 11) systematically executed without user interaction
+✅ All steps systematically executed without user interaction — steps 0–9, 11 in standalone validate; steps 0–11 (including the constrained 9.5 and 10) in validate-and-apply
 ✅ Issues categorized by severity with precise locations
 ✅ Hallucinations identified and documented with evidence
 ✅ Scoring breakdown produced with per-dimension scores
 ✅ Clear GO / NO-GO (Revision) / NO-GO (Rework) verdict rendered with justification
-✅ Validation report saved to `[story-dir]/[story-name].validate.[date].md`
+✅ Report saved — `[story-dir]/[story-name].validate.[date].md` (standalone) or `[story-dir]/story.{epic}.{story}.review.{n}.{story-name}.md` (validate-and-apply)
 ✅ Stdout summary printed for pipeline/CI callers
 ✅ Exit non-zero if verdict is any NO-GO variant
-✅ **Zero modifications** to the story document (besides the `.validate.` report itself)
+✅ **Standalone validate only**: zero modifications to the story document (besides the `.validate.` report itself). Under validate-and-apply, critical + important fixes are applied and status is promoted on a GO.
 ✅ Tracker comment posted with verdict (Step 11 — graceful: skipped if tracker key absent)
 
 ---
@@ -2221,13 +2247,13 @@ User Can Now: Run `/develop` to begin implementation
 **Called by**:
 
 - `develop-story` pipeline — as a pre-implementation gate (validate mode, auto-selected)
-- `scrum-master` — for story quality assurance (validate mode for batch, interactive for single)
 - `po` — for product owner review (validate mode)
 - Manual invocation by user (either mode)
 
 **Calls**:
 
 - `mermaid-architect` — validates any embedded Mermaid diagrams (Step 6.5) and recommends a diagram if absent
+- `markdown-wireframe` — checks for UI/wireframe opportunities (Step 6.6) and generates wireframes for UI-focused stories
 
 **Outputs used by**:
 
@@ -2338,20 +2364,17 @@ For each technical claim in story:
 Expected configuration in `skills-config.yaml`:
 
 ```yaml
-# Project structure
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
-
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-
-# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
-devStoryLocation: nested
-devStoryNestedPattern: "docs/prd/**/epics/*/stories"
 ```
+
+Both roots are configurable; nested structure is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
+
+- PRDs live under `${PRD_ROOT}/`
+- Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+- Stories: nested at `{epic-dir}/stories/`
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.
 
@@ -2368,10 +2391,10 @@ This skill uses:
 
 ## Notes
 
-- Review reports are saved separately as `story.{epic}.{story}.review.{n}.{descriptive-name}.md`. Use DOTS as structural separators and hyphens within the descriptive name. Example: `story.178.8.review.1.example-feature.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
+- Review reports are saved as `story.{epic}.{story}.review.{n}.{story-name}.md`, where `{story-name}` is the parent story file's own name slug (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — NOT a free-form descriptive slug summarizing the review focus. Use DOTS as structural separators. Example: parent story `story.1.2.configure-typescript-path-mapping.md` → review `story.1.2.review.1.configure-typescript-path-mapping.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
 - Story status is updated in-place only when review outcome is READY TO IMPLEMENT and user confirms
 - Can be used at any stage: draft, in progress, completed
-- Use `--validate` flag (or natural language like "is this story ready?") for the automated non-interactive gate. Validate mode is a strict subset of interactive mode — same checks, same scoring, no questions, read-only, CI-friendly exit codes.
+- Use `--validate` flag (or natural language like "is this story ready?") for the automated non-interactive gate. Standalone validate is a strict subset of interactive mode — same checks, same scoring, no questions, read-only, CI-friendly exit codes. The orchestrated **validate-and-apply** variant (`APPLY=true`, set by `develop-story`/`po`) adds the constrained Steps 9.5 and 10: it applies critical + important fixes and promotes the story on a GO.
 - Designed to find problems, not just validate compliance
 
 ```
@@ -2390,4 +2413,4 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
 fi
 ```
 
-Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `PostToolUse` and `Stop` hooks: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

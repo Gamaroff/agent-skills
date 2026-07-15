@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-05-11
-**Next Available Task Number:** **35**
+**Last Updated:** 2026-06-28
+**Next Available Task Number:** **36**
 
 ## How to use
 
@@ -74,6 +74,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 32 | [Reorganize evals/ from full-flow/ into per-skill structure](task.32.evals-reorganize-per-skill/task.32.evals-reorganize-per-skill.md) | draft | refactoring | Medium | 2026-05-11 | [#67](https://github.com/Gamaroff/agent-skills/issues/67) | — |
 | 33 | [Build evals for develop-task pipeline (protocol + step-isolation + smoke)](task.33.develop-task-evals/task.33.develop-task-evals.md) | draft | testing | Medium | 2026-05-11 | [#68](https://github.com/Gamaroff/agent-skills/issues/68) | task.32 |
 | 34 | [Build evals for develop-story pipeline (mirrors develop-task + epic-branch + resume coverage)](task.34.develop-story-evals/task.34.develop-story-evals.md) | draft | testing | Medium | 2026-05-11 | [#69](https://github.com/Gamaroff/agent-skills/issues/69) | task.33 |
+| 35 | [Conform document skills, templates, and standards to the Open Knowledge Format (OKF) v0.1](task.35.okf-conformance-document-skills/task.35.okf-conformance-document-skills.md) | draft | documentation | Medium | 2026-06-28 | [#162](https://github.com/Gamaroff/agent-skills/issues/162) | — |
 
 ---
 

@@ -1,0 +1,42 @@
+schema: 1
+story: '4.3'
+story_title: 'Day 3 — Messy path'
+gate: PASS
+status_reason: 'All 4 ACs met via static checks. 84 lines (≤300). Descoped disclaimer explicit. FAIL→PASS recipe mechanically reproducible. One LOW finding (field name typo) — non-blocking.'
+reviewer: 'QA Engineer'
+updated: '2026-05-13T00:00:00Z'
+
+top_issues:
+  - issue: 'Gate YAML field name incorrect in recipe examples (decision: vs gate:)'
+    severity: low
+    suggested_owner: dev
+
+quality_score: 95
+expires: '2026-05-27T00:00:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Doc-only story — no code'
+  performance:
+    status: PASS
+    notes: 'Doc-only story — no code'
+  reliability:
+    status: PASS
+    notes: 'Recipe uses wc -l — deterministic and mechanically reproducible'
+  maintainability:
+    status: PASS
+    notes: '84 lines, clear structure, follows Day 1/2 pattern'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Correct "Expected artifact" field name: decision: FAIL/PASS → gate: FAIL/PASS (lines 50, 61 of day-3-messy-path.md)'
+      refs: ['docs/runbooks/first-week/day-3-messy-path.md']

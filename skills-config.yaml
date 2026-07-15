@@ -3,22 +3,19 @@
 # This is the consumer-side config for agent-skills *as it dogfoods itself*.
 # Schema: docs/reference/configuration.md
 # Architecture layout spec: docs/standards/architecture-docs.md
+#
+# PRD and architecture roots are configurable. The *nested* structure under
+# each root is fixed:
+#   ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/
+#   ${ARCH_ROOT}/concepts/{coding-standards,tech-stack,source-tree}.md
 
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
 
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-  architectureVersion: v4
-
-devStoryLocation: nested
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
-
-devDebugLog: .ai/debug-log.md

@@ -30,10 +30,10 @@ flowchart TD
 /qa-planning <story-or-task-path>
 ```
 
-Outputs:
+Outputs (co-located with the story or task):
 
-- `risk-{YYYY-MM-DD}.md` + `risk_summary` YAML
-- `test-design-{YYYY-MM-DD}.md` + `test_design` YAML
+- `story.{E}.{S}.risk.{N}.{name}.md` / `task.{id}.risk.{N}.{name}.md`
+- `story.{E}.{S}.test-design.{N}.{name}.md` / `task.{id}.test-design.{N}.{name}.md`
 
 These feed into the gate decision later (risk score ≥9 → FAIL, ≥6 → CONCERNS).
 
@@ -44,12 +44,10 @@ These feed into the gate decision later (risk score ≥9 → FAIL, ≥6 → CONC
 /qa-task <task-path>       # for tasks
 ```
 
-Produces:
+Produces (co-located with the story or task):
 
-- QA narrative report — `*.qa.{N}.{name}.md` (co-located)
-- NFR assessment — `nfr-{YYYY-MM-DD}.md` + `nfr_validation` YAML
-- Requirements traceability — `trace-{YYYY-MM-DD}.md` + `trace` YAML
-- Gate file — `*.gate.{N}.{name}.yml` (**owned by QA skills — never edit from dev**)
+- QA narrative report (includes NFR + traceability) — `story.{E}.{S}.qa.{N}.{name}.md` / `task.{id}.qa.{N}.{name}.md`
+- Gate file — `story.{E}.{S}.gate.{N}.{name}.yml` / `task.{id}.gate.{N}.{name}.yml` (**owned by QA skills — never edit from dev**)
 
 ## Phase 3 — Fix cycle
 

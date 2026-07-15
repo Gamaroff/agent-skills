@@ -29,9 +29,11 @@ Higher-level live wrappers in `evals/develop-story/assertions.mjs`:
 
 ```
 evals/develop-story/protocol/
-  pipeline-shape.test.mjs    # SKILL.md: 9 sub-skills in order, step file refs, compression recovery, hands-free
-  epic-branch-rules.test.mjs # step-1 only-if-missing, base=develop, naming pattern; step-4 EPIC_BRANCH not hardcoded
-  step-contract.test.mjs     # all step files exist with required keywords; SKILL.md step banners 1-8
+  pipeline-shape.test.mjs         # SKILL.md: 9 sub-skills in order, step file refs, compression recovery, hands-free
+  epic-branch-rules.test.mjs      # step-1 only-if-missing, base=develop, naming pattern; step-4 EPIC_BRANCH not hardcoded
+  step-contract.test.mjs          # all step files exist with required keywords; SKILL.md step banners 1-8
+  stall-and-cleanup-protocol.test.mjs # stall/finalise regressions; hook install contract; #2e static ${CLAUDE_PROJECT_DIR} guards
+  install-hooks-behavior.test.mjs # runs the real installer: migration replaces legacy entry, cwd-independent command resolves from a subdir
 ```
 
 ## Step-isolation scenarios

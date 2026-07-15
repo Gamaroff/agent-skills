@@ -1,38 +1,24 @@
 # Core Configuration Reference
 # This is a reference showing the structure and purpose of each configuration key.
-# Always read the actual configuration from skill resources or explicit file references to get current values.
-
-markdownExploder: true # Markdown processing flag
-
-qa:
-  qaLocation: docs/qa # QA artifacts root directory (gates/, assessments/)
+# Always read the actual configuration from skills-config.yaml at project root.
+#
+# Resolve paths first:
+#   source shared/resources/resolve-paths.sh
+#   # exports PRD_ROOT (default: docs/prd) and ARCH_ROOT (default: docs/architecture)
 
 prd:
-  prdFile: docs/prd.md # Monolithic PRD file path
-  prdVersion: v4 # PRD schema version
-  prdSharded: true # PRD uses sharded structure
-  prdShardedLocation: docs/prd # Directory containing epic files
-  epicFilePattern: "**/epics/epic.{n}.*/epic.{n}.*.md" # Pattern for finding epics
+  prdShardedLocation: docs/prd  # ${PRD_ROOT} — configurable
 
 architecture:
-  architectureFile: docs/architecture.md # Monolithic architecture file
-  architectureVersion: v4 # Architecture schema version
-  architectureSharded: true # Architecture is sharded
-  architectureShardedLocation: docs/architecture # Directory containing architecture docs
-
-customTechnicalDocuments: null # Custom doc references (optional)
+  architectureShardedLocation: docs/architecture  # ${ARCH_ROOT} — configurable
 
 devLoadAlwaysFiles: # Files to load on dev agent activation
   - docs/architecture/concepts/coding-standards.md
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
 
-devDebugLog: .ai/debug-log.md # Dev debug log location
-devStoryLocation: nested # Stories co-located inside epic dirs at {epic-directory}/stories/
 
-
-# Usage Examples:
-# - Story files: {epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md
-# - QA gate files: {qa.qaLocation}/gates/{epic}.{story}-*.yml
-# - QA assessments: {qa.qaLocation}/assessments/{epic}.{story}-*.md
-# - Epic files: {prd.prdShardedLocation}/{domain}/{feature}/epics/epic.{n}.{name}/epic.{n}.{name}.md
+# Usage Examples (substitute ${PRD_ROOT} / ${ARCH_ROOT} for the literals shown):
+# - Epic files:  ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
+# - Story files: {epic-directory}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md
+# - QA artifacts: co-located with the story file (no qa.qaLocation key)

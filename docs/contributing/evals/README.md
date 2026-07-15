@@ -24,7 +24,7 @@ If `npm test` is green, every push will stay green in CI. Live drivers are opt-i
 ## Contents
 
 - [Recipes](./recipes.md) — task-oriented "I want to…" recipes
-- [Secrets](./secrets.md) — token sources for live drivers
+- [Token sources](./token-sources.md) — where to obtain tokens for live drivers
 - [Reference](./reference.md) — four-layer architecture, drivers, scenarios, scripts
 
 ## See also

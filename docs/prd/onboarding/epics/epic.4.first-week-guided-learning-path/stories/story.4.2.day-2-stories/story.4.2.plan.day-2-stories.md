@@ -36,7 +36,12 @@ New file at `docs/runbooks/first-week/day-2-stories.md`. Same pattern as Day 1, 
 
 ## Hour 2–3 — Follow-up story (~90 min)
 
-**Story:** "Add a 'See also' subsection at the bottom of `docs/runbooks/README.md` linking the first-week index."
+Pick **one** follow-up story in your working repo. Selection criteria:
+
+- Small, well-bounded — finishable in ~90 min including QA cycle.
+- Docs-only or single-file code change preferred (avoids needing design review).
+- Net-new content, not a refactor — easier to scope.
+- Example shapes: a new "See also" section, a new short concept doc, a small README cross-link, a single new fixture.
 
 - [ ] `/create-prd` (brownfield, single epic, single story scope).
 - [ ] `/create-epic` (1 epic).
@@ -47,7 +52,7 @@ New file at `docs/runbooks/first-week/day-2-stories.md`. Same pattern as Day 1, 
 ## End of day — Verify
 
 - [ ] ≥ 1 story PR exists on GitHub for your work.
-- [ ] `docs/epic-registry.md` has the new epic row.
+- [ ] `docs/development/epic-registry.md` has the new epic row.
 - [ ] Story artifact dir has all 6 + finalise artifacts.
 
 ## What you learned
@@ -67,8 +72,8 @@ Per skeleton. Walkthrough verification on macOS.
 
 ## Risk register
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| `quickstart-story.md` not yet landed | Medium | Medium | Sequence 4.2 after 1.2 |
-| Day 2 exceeds 4-hour budget due to GH latency | High | Medium | Acknowledge latency in prereqs as out-of-control |
-| Follow-up story PR clashes with another user's PR | Low | Low | Use a distinct slug per user |
+| Risk                                              | Likelihood | Impact | Mitigation                                       |
+| ------------------------------------------------- | ---------- | ------ | ------------------------------------------------ |
+| `quickstart-story.md` not yet landed              | Medium     | Medium | Sequence 4.2 after 1.2                           |
+| Day 2 exceeds 4-hour budget due to GH latency     | High       | Medium | Acknowledge latency in prereqs as out-of-control |
+| Follow-up story PR clashes with another user's PR | Low        | Low    | Use a distinct slug per user                     |

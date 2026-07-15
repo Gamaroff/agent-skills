@@ -20,7 +20,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +34,11 @@ const STORY_ON_STOP  = path.join(REPO_ROOT, "skills", "develop-story", "scripts"
 const TASK_ON_STOP   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "on-stop.sh");
 const STORY_INSTALL  = path.join(REPO_ROOT, "skills", "develop-story", "scripts", "install-hooks.sh");
 const TASK_INSTALL   = path.join(REPO_ROOT, "skills", "develop-task",  "scripts", "install-hooks.sh");
+// Canonical hook implementations live in shared/resources/ and are bundled into
+// each skill's references/ via `npm run bundle`. scripts/<name>.sh are thin
+// wrappers that exec the bundled copy — content invariants assert on the canonical.
+const SHARED_ON_STOP = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-on-stop.sh");
+const SHARED_INSTALL = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-install-hooks.sh");
 const HOOKS_DOC      = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-hooks.md");
 const STEP0_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-0-resolve-and-prepare.md");
 const STEP3_SHARED   = path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-step-3-develop-loop.md");
@@ -76,8 +81,8 @@ test("#2b — develop-task Setup section names both hooks and points to install 
   assert.match(content, /references\/develop-pipeline-hooks\.md/,      "Setup section must link the canonical hooks doc");
 });
 
-test("#2b — develop-story on-stop.sh exists and honours stop_hook_active loop protection", async () => {
-  const content = await readFile(STORY_ON_STOP, "utf-8");
+test("#2b — canonical on-stop.sh honours stop_hook_active loop protection", async () => {
+  const content = await readFile(SHARED_ON_STOP, "utf-8");
   assert.match(content, /stop_hook_active/,                       "must read stop_hook_active flag");
   assert.match(content, /develop-pipeline\.lock/,                 "must reference pipeline lock file");
   assert.match(content, /current_step/,                           "must check current_step field");
@@ -85,25 +90,129 @@ test("#2b — develop-story on-stop.sh exists and honours stop_hook_active loop 
   assert.match(content, /set -uo pipefail/,                       "must use safe bash defaults");
 });
 
-test("#2b — develop-task on-stop.sh is byte-identical to develop-story on-stop.sh", async () => {
+test("#2b — develop-{story,task} on-stop.sh wrappers are byte-identical and exec the canonical", async () => {
   const storyHook = await readFile(STORY_ON_STOP, "utf-8");
   const taskHook  = await readFile(TASK_ON_STOP,  "utf-8");
-  assert.equal(taskHook, storyHook, "Both on-stop.sh scripts must be identical (the lock's `skill` field selects branch)");
+  assert.equal(taskHook, storyHook, "Both on-stop.sh wrappers must be identical");
+  assert.match(storyHook, /exec .*references\/develop-pipeline-on-stop\.sh/, "wrapper must exec the bundled canonical");
 });
 
-test("#2b — install-hooks.sh exists and is byte-identical between story and task", async () => {
+test("#2b — canonical install-hooks.sh contract", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.match(script, /set -euo pipefail/,                    "must use safe bash defaults");
+  assert.match(script, /command -v jq/,                        "must check for jq prerequisite");
+  assert.match(script, /\.agents\/skills\/develop-story/,      ".agents path candidate (npx skills add)");
+  assert.match(script, /\.claude\/skills\/develop-story/,      ".claude path candidate (symlink/monorepo)");
+  assert.match(script, /already registered/,                   "must be idempotent (skip on duplicate)");
+  assert.match(script, /--dry-run/,                            "must support --dry-run flag");
+  assert.match(script, /PreCompact/,                           "must register PreCompact hook");
+  assert.match(script, /Stop/,                                 "must register Stop hook");
+});
+
+test("#2b — develop-{story,task} install-hooks.sh wrappers are byte-identical and exec the canonical", async () => {
   const storyScript = await readFile(STORY_INSTALL, "utf-8");
   const taskScript  = await readFile(TASK_INSTALL,  "utf-8");
-  assert.equal(taskScript, storyScript, "install-hooks.sh must be byte-identical across develop-{story,task}");
-  // Core contract assertions
-  assert.match(storyScript, /set -euo pipefail/,                    "must use safe bash defaults");
-  assert.match(storyScript, /command -v jq/,                        "must check for jq prerequisite");
-  assert.match(storyScript, /\.agents\/skills\/develop-story/,      ".agents path candidate (npx skills add)");
-  assert.match(storyScript, /\.claude\/skills\/develop-story/,      ".claude path candidate (symlink/monorepo)");
-  assert.match(storyScript, /already registered/,                   "must be idempotent (skip on duplicate)");
-  assert.match(storyScript, /--dry-run/,                            "must support --dry-run flag");
-  assert.match(storyScript, /PreCompact/,                           "must register PreCompact hook");
-  assert.match(storyScript, /Stop/,                                 "must register Stop hook");
+  assert.equal(taskScript, storyScript, "install-hooks.sh wrappers must be byte-identical across develop-{story,task}");
+  assert.match(storyScript, /exec .*references\/develop-pipeline-install-hooks\.sh/, "wrapper must exec the bundled canonical");
+});
+
+// ── Regression #2d: PostToolUse/on-skill-return hook removed (2026-06-01) ──
+// An earlier design shipped a PostToolUse hook (on-skill-return.sh) that advanced
+// the pipeline lock when a sub-skill "returned". But the Skill tool executes
+// INLINE in the orchestrator's context, so PostToolUse:Skill fires at skill-LOAD
+// (before any work runs); Claude Code has no skill-completion hook event. The
+// hook therefore mis-fired on every sub-skill call, advancing the pipeline before
+// the step did any work. It was removed — lock advancement now relies on sub-skill
+// self-advance (inline, after the work) + the Stop hook backstop.
+
+const SETUP_CONSUMER  = path.join(REPO_ROOT, "scripts", "setup-consumer.sh");
+const SHARED_LOCK_COOP = path.join(REPO_ROOT, "shared", "resources", "pipeline-lock-cooperation.md");
+
+async function fileAbsent(p) {
+  try { await access(p); return false; } catch { return true; }
+}
+
+test("#2d — on-skill-return.sh hook scripts are gone (canonical, wrappers, bundled)", async () => {
+  const candidates = [
+    path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-story", "scripts",    "on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-task",  "scripts",    "on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-story", "references",  "develop-pipeline-on-skill-return.sh"),
+    path.join(REPO_ROOT, "skills", "develop-task",  "references",  "develop-pipeline-on-skill-return.sh"),
+  ];
+  for (const p of candidates) {
+    assert.ok(await fileAbsent(p), `obsolete hook script must not exist: ${path.relative(REPO_ROOT, p)}`);
+  }
+});
+
+test("#2d — canonical install-hooks.sh registers no PostToolUse hook and de-registers the obsolete one", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.doesNotMatch(script, /POSTTOOLUSE_CMD/,                                "must not define a PostToolUse command");
+  assert.match(script, /unpatch_hook "PostToolUse" "on-skill-return/,           "must de-register the obsolete PostToolUse/on-skill-return hook");
+});
+
+test("#2d — setup-consumer.sh registers no PostToolUse hook and de-registers the obsolete one", async () => {
+  const script = await readFile(SETUP_CONSUMER, "utf-8");
+  assert.doesNotMatch(script, /_patch_hook "PostToolUse"/,                      "must not register a PostToolUse hook");
+  assert.match(script, /_unpatch_hook "PostToolUse" "on-skill-return/,          "must de-register the obsolete PostToolUse/on-skill-return hook");
+});
+
+// ── Regression #2e: hook commands are cwd-independent (${CLAUDE_PROJECT_DIR}) ──
+// The Stop/PreCompact hook `command` was previously a bare relative path
+// (`bash .agents/skills/.../on-stop.sh`), which Claude Code resolves against the
+// shell's cwd at hook-fire time — so it broke with "No such file or directory"
+// the moment any command in the session had `cd`'d into a subdirectory, even
+// though the script existed. Both installers now emit `${CLAUDE_PROJECT_DIR}`-
+// prefixed commands (expanded to the project root regardless of cwd) and migrate
+// legacy bare-relative entries via an exact-match de-registration step so a
+// re-run replaces the broken entry instead of stacking a second one alongside it.
+
+test("#2e — canonical install-hooks.sh emits ${CLAUDE_PROJECT_DIR}-prefixed commands, not bare relative paths", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.match(script, /CLAUDE_PROJECT_DIR/,                                    "must build the hook command with ${CLAUDE_PROJECT_DIR}");
+  assert.match(script, /PRECOMPACT_CMD=.*CLAUDE_PROJECT_DIR.*on-precompact\.sh/, "PreCompact command must be cwd-independent");
+  assert.match(script, /STOP_CMD=.*CLAUDE_PROJECT_DIR.*on-stop\.sh/,            "Stop command must be cwd-independent");
+});
+
+test("#2e — canonical install-hooks.sh migrates legacy bare-relative hook entries", async () => {
+  const script = await readFile(SHARED_INSTALL, "utf-8");
+  assert.match(script, /unpatch_hook_exact\s*\(\)/,                            "must define an exact-match de-registration helper");
+  assert.match(script, /unpatch_hook_exact "PreCompact" "bash \$\{c\}\/on-precompact\.sh"/, "must strip the legacy bare-relative PreCompact command");
+  assert.match(script, /unpatch_hook_exact "Stop"\s+"bash \$\{c\}\/on-stop\.sh"/,           "must strip the legacy bare-relative Stop command");
+});
+
+test("#2e — setup-consumer.sh emits ${CLAUDE_PROJECT_DIR}-prefixed commands and migrates legacy entries", async () => {
+  const script = await readFile(SETUP_CONSUMER, "utf-8");
+  assert.match(script, /_patch_hook "PreCompact".*CLAUDE_PROJECT_DIR.*on-precompact\.sh/, "PreCompact command must be cwd-independent");
+  assert.match(script, /_patch_hook "Stop".*CLAUDE_PROJECT_DIR.*on-stop\.sh/,             "Stop command must be cwd-independent");
+  assert.match(script, /_unpatch_hook_exact\s*\(\)/,                                       "must define an exact-match de-registration helper");
+});
+
+test("#2e — pause doc example commands use ${CLAUDE_PROJECT_DIR}, not a bare relative path", async () => {
+  const content = await readFile(path.join(REPO_ROOT, "shared", "resources", "develop-pipeline-pause.md"), "utf-8");
+  assert.match(content, /"command":\s*"bash \\"\$\{CLAUDE_PROJECT_DIR\}\//, "settings.json example must model the cwd-independent form");
+  assert.doesNotMatch(content, /"command":\s*"bash \.agents\/skills/,        "settings.json example must not show a bare relative command");
+});
+
+test("#2d — orchestrator SKILL.md files no longer reference PostToolUse/on-skill-return", async () => {
+  for (const [label, skill] of [["story", STORY_SKILL], ["task", TASK_SKILL]]) {
+    const content = await readFile(skill, "utf-8");
+    assert.doesNotMatch(content, /PostToolUse/,     `${label}: SKILL.md must not mention PostToolUse`);
+    assert.doesNotMatch(content, /on-skill-return/, `${label}: SKILL.md must not mention on-skill-return`);
+  }
+});
+
+test("#2d — Step Transition Protocol lists exactly two structural defences (self-advance + Stop)", async () => {
+  for (const [label, skill] of [["story", STORY_SKILL], ["task", TASK_SKILL]]) {
+    const content = await readFile(skill, "utf-8");
+    assert.match(content, /Two structural defences/,         `${label}: must say 'Two structural defences'`);
+    assert.doesNotMatch(content, /Three structural defences/, `${label}: must not claim three structural defences`);
+  }
+});
+
+test("#2d — pipeline-lock-cooperation.md cooperation order omits the PostToolUse hook", async () => {
+  const content = await readFile(SHARED_LOCK_COOP, "utf-8");
+  assert.doesNotMatch(content, /PostToolUse/, "cooperation doc must not reference a PostToolUse hook layer");
 });
 
 test("#2b — SKILL.md Setup section advertises install-hooks.sh and links the canonical hooks doc", async () => {

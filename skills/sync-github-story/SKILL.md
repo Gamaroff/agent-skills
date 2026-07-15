@@ -16,6 +16,11 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 
 **Difference from `sync-jira-story`:** GitHub Issues are markdown-native, so no ADF translation; auth/retry/rate-limit are handled by `gh` CLI; "status transitions" map to `gh issue close` / `gh issue reopen`, since GitHub only has `open`/`closed`. Labels carry the priority signal.
 
+### Inputs
+
+- `STORY_FILE_PATH` (required) — path to the local story markdown file.
+- `DOC_BRANCH` (optional) — branch to pin the issue's `## Document` link to. When set (e.g. `review-story` and `finalise` pass a durable branch like `develop` so the link survives feature-branch deletion), it is used verbatim. When unset, the link branch resolves to the current branch's remote-tracking branch, then the repo default branch, then `develop`.
+
 ## When to Use
 
 - "Create this story in GitHub"
@@ -26,14 +31,18 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 ## When NOT to Use
 
 - Story already in Jira tracking workflow → use `/sync-jira-story`.
-- Doc is an epic or task → use `/sync-github-epic` (if available) or `/sync-github-task`.
+- Doc is an epic or task → use `/sync-github-epic` or `/sync-github-task`.
 
 ## Prerequisites
+
+### Resolve paths
+
+Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). All path operations below use this env var.
 
 ### Required Files
 
 - A story markdown file at:
-  `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
+  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
 - `project.yml` at the repo root with:
   ```yaml
   github:
@@ -53,13 +62,13 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 ### 1. Identify the Story File
 
 ```
-docs/prd/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
+${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
 ```
 
 To find stories that have **not yet been synced** (no `github_issue`):
 
 ```bash
-grep -L 'github_issue:' $(find docs/prd -path '*/stories/*/story.*.md')
+grep -L 'github_issue:' $(find "$PRD_ROOT" -path '*/stories/*/story.*.md')
 ```
 
 ### 2. Source the Platform Resolver and Confirm GitHub
@@ -71,9 +80,11 @@ source references/resolve-platform.sh
 
 ### 3. Read Story Frontmatter and Parse Identity
 
-Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if present), `labels`.
+Extract from frontmatter: `title`, `status`, `priority`, `estimated_effort_hours` (number; absent/empty if not set), `github_issue` (if present), `labels`.
 
 Parse the epic/story numbers from the filename: `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
+
+Strip any leading `Story {E}.{S}: ` prefix (or an already-bracketed `[Story {E}.{S}] ` prefix) from `title` to get the bare display title: `STORY_TITLE`. The update path (Step 5b) wraps this once as `[Story {E}.{S}] ${STORY_TITLE}`; stripping first prevents a double prefix like `[Story 1.3] Story 1.3: …`.
 
 Derive the parent epic file path:
 
@@ -121,12 +132,19 @@ Continue to Step 6 (status reconciliation).
 ISSUE_NUM={github_issue from frontmatter}
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
+# Resolve the Document-link branch. If the caller passed `DOC_BRANCH` (e.g. review-story /
+# finalise pinning a durable branch), honor it verbatim. Otherwise fall back to the same
+# resolution as on create: current branch's remote-tracking branch, then repo default, then `develop`.
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+DOC_BRANCH="${DOC_BRANCH:-$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')}"
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RELATIVE_PATH}"
+
 # Verify the issue still exists
 gh issue view ${ISSUE_NUM} --json state,title,labels,body > /tmp/issue-${ISSUE_NUM}.json \
   || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
 ```
 
-Diff `title`, `body`, `labels` against current GitHub state. If anything changed, run:
+Diff `title`, `body`, `labels` against current GitHub state. The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create, including the `## Document` link block (using `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch. If anything changed, run:
 
 ```bash
 gh issue edit ${ISSUE_NUM} \
@@ -136,12 +154,18 @@ gh issue edit ${ISSUE_NUM} \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
 ```
 
-The body is rebuilt from the story document's `## User Story`, `## Acceptance Criteria`, `## Description` sections — same as the create path.
+The body is rebuilt from the story document's `## User Story`, `## Acceptance Criteria`, `## Description` sections plus a `## Metadata` table (`Priority`, `Effort` from `estimated_effort_hours`) — same as the create path in `ensure-story-github-issue`.
 
 If the priority label changed, also re-mirror the board's Priority field:
 
 ```bash
 bash references/set-github-project-priority.sh "${ISSUE_NUM}" "${priority}" || true
+```
+
+Always re-mirror the board's Estimate field from frontmatter (no-op if `estimated_effort_hours` is empty):
+
+```bash
+bash references/set-github-project-estimate.sh "${ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
 
 Append a Change Log row describing what changed:
@@ -231,4 +255,4 @@ The full URL is reconstructable from `project.yml` (`owner` + `repo`) and the is
 - GitHub Issues is treated as a **read-only mirror** of the markdown — edit the story file and re-sync; do not edit the issue directly. The skill does not detect or guard against concurrent remote edits (there is no Jira-style `updated` timestamp to anchor against).
 - Status reconciliation is **lossy** going GitHub → markdown: `closed` only tells us the issue is done, not which terminal status (`accepted` vs `cancelled`) the story is in. The frontmatter is authoritative; the skill never writes status back from GitHub.
 - The skill assumes a one-to-one mapping between story files and GitHub issues. If two stories somehow point at the same `github_issue`, both will edit the same issue in turn — clean up manually.
-- For bulk re-sync: iterate over `find docs/prd -path '*/stories/*/story.*.md'` and invoke the skill once per file.
+- For bulk re-sync: iterate over `find "$PRD_ROOT" -path '*/stories/*/story.*.md'` and invoke the skill once per file.

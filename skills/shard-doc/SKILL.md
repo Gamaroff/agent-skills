@@ -216,7 +216,6 @@ Document sharded successfully:
 
 **Called by**:
 - `create-doc` - After creating large documents
-- `scrum-master` - When organizing project documentation
 
 **Outputs used by**:
 - Any skill that needs to read modular documentation
@@ -227,18 +226,18 @@ Document sharded successfully:
 ## Common Sharding Scenarios
 
 ### PRD Sharding
-**Source**: `docs/prd.md`
-**Destination**: `docs/prd/`
+**Source**: `docs/prd.md` (monolithic file at repo root)
+**Destination**: `${PRD_ROOT}/` (default `docs/prd/`)
 **Typical sections**: Overview, Goals, Tech Stack, Architecture, etc.
 
 ### Architecture Sharding
-**Source**: `docs/architecture.md`
-**Destination**: `docs/architecture/`
+**Source**: `docs/architecture.md` (monolithic file at repo root)
+**Destination**: `${ARCH_ROOT}/` (default `docs/architecture/`)
 **Typical sections**: System Design, Data Models, API Endpoints, etc.
 
 ### Large Epic Sharding
-**Source**: `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
-**Destination**: `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/shards/`
+**Source**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
+**Destination**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/shards/`
 **Typical sections**: Multiple user stories, acceptance criteria lists
 
 ---

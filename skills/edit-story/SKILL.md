@@ -26,10 +26,10 @@ Natural language triggers:
 
 ```bash
 # Using story directory (auto-discovers story file)
-/edit-story docs/prd/.../stories/story.323.2.emergency-recovery-unlock/
+/edit-story ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/
 
 # Using specific story file
-/edit-story docs/prd/.../stories/story.323.2.emergency-recovery-unlock/story.323.2.emergency-recovery-unlock.md
+/edit-story ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/story.323.2.emergency-recovery-unlock.md
 
 # Natural language
 "Edit story 323.2 to update priority"
@@ -84,7 +84,7 @@ When given a file path:
 **Example:**
 
 ```
-Input: docs/prd/.../stories/story.323.2.emergency-recovery-unlock/
+Input: ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/
 Discovers: story.323.2.emergency-recovery-unlock.md
 Rejects: epic.323.pin-advanced-security.md (if provided)
 ```
@@ -489,7 +489,7 @@ Agent:
 ## Workflow Example
 
 ```
-User: /edit-story docs/prd/.../stories/story.323.2.emergency-recovery-unlock/
+User: /edit-story ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/
 
 Agent:
 1. Discovers: story.323.2.emergency-recovery-unlock.md

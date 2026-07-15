@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0). Must already exist on origin.'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install npm deps
+        run: npm ci || npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Catalog up-to-date check
+        run: |
+          npm run generate-catalog
+          if ! git diff --quiet docs/reference/skill-catalog.md; then
+            echo "::error::Skill catalog is out of date for this tag."
+            echo "Run 'npm run generate-catalog' locally, commit the diff, and re-tag."
+            git --no-pager diff docs/reference/skill-catalog.md | head -100
+            exit 1
+          fi
+
+      - name: Validate all skills
+        run: |
+          failed=0
+          for skill_dir in skills/*/; do
+            [ -d "$skill_dir" ] || continue
+            echo "Validating $skill_dir..."
+            python skills/create-skill/scripts/quick_validate.py "$skill_dir" || failed=1
+          done
+          exit $failed
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --title "$RELEASE_TAG" \
+            --generate-notes

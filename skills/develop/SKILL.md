@@ -11,7 +11,7 @@ description: Provides guidance for implementing features and technical tasks. Us
 
 Use this skill when:
 
-- Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/`)
+- Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/`)
 - Executing technical tasks from `docs/tasks/`
 - Starting new feature development
 - Need guidance on development workflow
@@ -36,7 +36,7 @@ You can invoke this skill with:
    - If detected: Invoke epic handling workflow (see Epic File Handling section)
 
 2. **Story File Detection** - Matches pattern: `story.{epic}.{story}.{name}.md`
-   - Location: co-located within epic directories (`docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/`) or as provided by the caller
+   - Location: co-located within epic directories (`${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/`) or as provided by the caller
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 3. **Task File Detection** - Matches pattern: `task.{id}.{name}.md`
@@ -121,7 +121,7 @@ Epic files cannot be developed directly. You must create individual
 stories or tasks from this epic first.
 
 Epic: epic.178.feature-management.md
-Location: docs/prd/ui-domain/module-name/epics/epic.178.feature-management/epic.178.feature-management.md
+Location: ${PRD_ROOT}/ui-domain/module-name/epics/epic.178.feature-management/epic.178.feature-management.md
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
@@ -257,7 +257,7 @@ This document has "draft" status and may not be ready for development.
 
 Document: story.178.8.example-feature.md
 Status: draft
-Location: docs/prd/<domain>/<feature>/epics/epic.178.<name>/stories/story.178.8.example-feature/
+Location: ${PRD_ROOT}/<domain>/<feature>/epics/epic.178.<name>/stories/story.178.8.example-feature/
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
@@ -546,7 +546,7 @@ This skill works best with the following conventions in your project (adapt as n
 ### 1. Develop Story Workflow
 
 **File Pattern**: `story.{epic}.{story}.{name}.md`
-**Location**: co-located inside the epic dir: `{epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md` (epic-directory = `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/`). Never a global `docs/stories/`.
+**Location**: co-located inside the epic dir: `{epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md` (epic-directory = `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/`). Never a global `docs/stories/`.
 
 **Starting Development**:
 
@@ -810,11 +810,11 @@ Teach what and why you did in detail, as if training a junior engineer.
 
 **Key Paths**:
 
-- Stories: `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/` (co-located within epics)
+- Stories: `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/` (co-located within epics)
 - Tasks: `docs/tasks/`
 - QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{N}.{M}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
-- PRD: `docs/prd/` (sharded)
-- Architecture: `docs/architecture/` (sharded)
+- PRD: `${PRD_ROOT}/` (sharded; default `docs/prd/`, configurable)
+- Architecture: `${ARCH_ROOT}/` (sharded; default `docs/architecture/`, configurable)
 - Debug Log: `.ai/debug-log.md`
 
 **Always-Loaded Files**: resolved by the `develop-task`/`develop-story` orchestrator during Phase 0c-load from `skills-config.yaml devLoadAlwaysFiles`, falling back to `coding-standards.md`, `tech-stack.md`, and `source-tree.md` if the key is absent. Files are pre-loaded and passed as caller-supplied context before `/develop` is invoked — do not re-read them independently.
@@ -824,7 +824,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 Each story has its own subdirectory containing all related files:
 
 ```
-docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/
+${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/
 └── story.{epic}.{story}.{story-name}/
     ├── story.{epic}.{story}.{story-name}.md           # Story file (source of truth)
     ├── story.{epic}.{story}.qa.{number}.{descriptive-name}.md  # QA report (created by QA)
@@ -1093,4 +1093,4 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
 fi
 ```
 
-Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `PostToolUse` and `Stop` hooks: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

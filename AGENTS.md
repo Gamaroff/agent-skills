@@ -59,7 +59,7 @@ npm run bundle              # all skills
 npm run bundle:skill skills/<skill-name>
 ```
 
-Bundling copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in `.md` and `.js` files. This makes each skill directory self-contained, so installers that copy a skill verbatim (e.g. `npx skills add`) produce a working install without needing the rest of the repo. Idempotent — safe to re-run.
+Bundling copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in `.md` and `.js` files. This makes each skill directory self-contained, so installers that copy a skill verbatim (e.g. the tarball extracted by `setup-consumer.sh`) produce a working install without needing the rest of the repo. Idempotent — safe to re-run.
 
 **Validate a skill:**
 
@@ -93,6 +93,10 @@ Canonical patterns: [`docs/standards/file-naming.md`](./docs/standards/file-nami
 
 Canonical spec: [`shared/resources/document-status-lifecycle.md`](./shared/resources/document-status-lifecycle.md). TL;DR: `draft → planned → ready-for-development → in-progress → ready-for-review → accepted`, with `cancelled` reachable from any non-terminal state. Frontmatter `status:` uses `lowercase-kebab-case`; body `**Status:**` uses `Title Case`. Update both in the same edit.
 
+## Open Knowledge Format
+
+Document frontmatter targets **OKF v0.1**. Canonical mapping + conformance statement: [`shared/resources/open-knowledge-format.md`](./shared/resources/open-knowledge-format.md). TL;DR: every document carries a non-empty `type` (OKF's one hard requirement); `description` is recommended and `tags` optional; `updated` ≡ OKF `timestamp`; the tracker URL (`github_url`/`jira_url`, or derived from `github_issue`) ≡ OKF `resource`. Adoption is additive and going-forward only — `review-*` enforce a missing `type` as Critical.
+
 ## Architecture Documents
 
 Canonical spec: [`docs/standards/architecture-docs.md`](./docs/standards/architecture-docs.md). TL;DR: a consumer project must put architecture docs under `docs/architecture/` (sharded, default) with required files `concepts/coding-standards.md`, `concepts/tech-stack.md`, and `concepts/source-tree.md` — these are loaded into every pipeline run via `devLoadAlwaysFiles`. Copy-paste skeleton: [`docs/examples/architecture/`](./docs/examples/architecture/). Generate from an existing codebase with `/document-existing-project`.
@@ -111,14 +115,14 @@ Canonical rules: [`docs/standards/task-registry.md`](./docs/standards/task-regis
 
 ## Epic Registry
 
-Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/epic-registry.md` is the single source of truth.
+Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/development/epic-registry.md` is the single source of truth.
 
 ## Shared Resources
 
 `shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. Two distribution paths consume these:
 
 - **`package_skill.py`** (zip distribution) — bundles referenced files under `references/` inside each skill's `.zip` and rewrites paths.
-- **`bundle_skill.py`** (in-tree, for `npx skills add` and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`.
+- **`bundle_skill.py`** (in-tree, for `setup-consumer.sh` tarball installs and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`.
 
 Never use symlinks or relative paths.
 

@@ -1,8 +1,8 @@
 ---
 id: story.4.2.day-2-stories
-title: "Story 4.2: Day 2 — Stories"
+title: "[Story 4.2] Day 2 — Stories"
 type: story
-status: draft
+status: accepted
 priority: high
 epic: 4
 epic_file: ../../epic.4.first-week-guided-learning-path.md
@@ -12,12 +12,14 @@ jira_url: null
 github_issue: 88
 github_url: https://github.com/Gamaroff/agent-skills/issues/88
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-13
+completed_date: 2026-05-13
 ---
 
-# Story 4.2: Day 2 — Stories
+# [Story 4.2] Day 2 — Stories
 
-**Status**: Draft
+**Status**: Accepted
+**Review**: ✅ Critical/Important recommendations implemented 2026-05-13 — see `story.4.2.review.1.day-2-stories.md`
 
 ## Story Statement
 
@@ -68,12 +70,12 @@ Mirror Story 4.1's structure. 300-line cap, walkthrough as integration test, sim
 
 > Detailed implementation guide: [story.4.2.plan.day-2-stories.md](story.4.2.plan.day-2-stories.md)
 
-- [ ] **Task 1**: File skeleton (AC: 1)
-- [ ] **Task 2**: "Hour 1: quickstart" section refs Story 1.2 (AC: 2)
-- [ ] **Task 3**: "Hour 2–3: follow-up story" with concrete story description (AC: 2)
-- [ ] **Task 4**: "End of day: verify ≥ 1 story PR" checklist (AC: 3)
-- [ ] **Task 5**: Walkthrough verification (AC: 3)
-- [ ] **Task 6**: Static validation + status flip (AC: 1, 4)
+- [x] **Task 1**: File skeleton (AC: 1)
+- [x] **Task 2**: "Hour 1: quickstart" section refs Story 1.2 (AC: 2)
+- [x] **Task 3**: "Hour 2–3: follow-up story" with concrete story description (AC: 2)
+- [x] **Task 4**: "End of day: verify ≥ 1 story PR" checklist (AC: 3)
+- [x] **Task 5**: Walkthrough verification (AC: 3)
+- [x] **Task 6**: Static validation + status flip (AC: 1, 4)
 
 ## Testing
 
@@ -84,15 +86,58 @@ Walkthrough + static + link check.
 | Date       | Version | Description                          | Author        |
 |------------|---------|--------------------------------------|---------------|
 | 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
+| 2026-05-13 | 1.1     | Review passed (9/10) — ready for development; plan follow-up story rewritten generic | review-story  |
+| 2026-05-13 | 1.2     | Implementation complete — day-2-stories.md created (87 lines); status → ready-for-review | develop-story |
+| 2026-05-13 | 1.3     | DoD verified (95/100, 4/4 ACs); status → accepted | finalise |
 
 ## Dev Agent Record / QA Handoff / QA Report / Bug Reports
 
-_(Populated downstream.)_
+### QA Testing Results
+
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-05-13
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+#### QA Report
+
+- **Full Report**: [story.4.2.qa.1.day-2-stories.md](./story.4.2.qa.1.day-2-stories.md)
+- **Gate File**: [story.4.2.gate.1.day-2-stories.yml](./story.4.2.gate.1.day-2-stories.yml)
+
+#### Test Coverage Summary
+
+- **Acceptance Criteria Tested**: 4/4
+- **Tests Executed**: 5 static verification checks
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+#### Key Findings
+
+No critical issues identified. One LOW finding: forward link to `day-3-messy-path.md` is a non-existent forward ref — expected per epic sequencing, non-blocking.
 
 ### QA Prerequisites Checklist
 
-- [ ] Doc exists with checkpoints
-- [ ] Day completes in ≤ 4 hours
-- [ ] User has ≥ 1 story PR after completion
-- [ ] Doc ≤ 300 lines
-- [ ] `gh auth status` enforced in prereqs
+- [x] Doc exists with checkpoints
+- [x] Day completes in ≤ 4 hours
+- [x] User has ≥ 1 story PR after completion
+- [x] Doc ≤ 300 lines
+- [x] `gh auth status` enforced in prereqs
+
+## Definition of Done — PASSED ✅
+
+**Accepted:** 2026-05-13
+**DoD Report:** [story.4.2.dod.1.day-2-stories.md](./story.4.2.dod.1.day-2-stories.md)
+**Final QA Score:** 95/100
+**QA Iterations:** 1
+
+### Verification Summary
+
+| Domain | Status | Notes |
+|---|---|---|
+| Acceptance Criteria | ✅ PASS | 4/4 ACs verified |
+| Security | ✅ PASS | Static markdown — no security surface |
+| Compliance | ✅ PASS | Doc standards met; no regulatory scope |
+| Docs & Changelog | ✅ PASS | All artifacts present, 6/6 tasks done |
+
+**Gate Decision:** ACCEPTED — all DoD criteria met. Story merged to epic branch via PR #111.

@@ -13,6 +13,8 @@
 
 > **Audience:** teams developing multiple stories of one epic simultaneously without merge conflicts.
 
+> ⚠️ **Epic 3.2 pending:** An advanced multi-team and cross-epic coordination guide will link here once Epic 3.2 lands. The steps below cover single-repo parallel stories within one epic; Epic 3.2 will extend this to larger-scale parallel patterns.
+
 When several stories under the same epic can be implemented in parallel — different files, different concerns — use Git worktrees to isolate them and let multiple developers (or multiple agent sessions) work at the same time.
 
 ## When to use this runbook
@@ -33,7 +35,7 @@ If stories share files, do not use this runbook — sequence them via the normal
 
 ```mermaid
 flowchart TD
-    A[scrum-master + create-parallel-stories] --> B[Epic coordination matrix]
+    A[create-parallel-stories] --> B[Epic coordination matrix]
     B --> C[Worktree per story]
     C --> D[develop-story per worktree<br/>in parallel]
     D --> E[Merge in any order to epic branch]
@@ -62,6 +64,5 @@ flowchart TD
 ## See also
 
 - [`create-parallel-stories` SKILL.md](../../skills/create-parallel-stories/SKILL.md)
-- [`scrum-master` SKILL.md](../../skills/scrum-master/SKILL.md)
 - [Story Development Runbook](./story-development.md)
 - [Sprint Cycle Runbook](./sprint-cycle.md)

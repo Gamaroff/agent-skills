@@ -71,7 +71,7 @@ Active lock first:
 cat .claude/state/develop-pipeline.lock
 ```
 
-If absent, fall back to the **halt snapshot** written by terminal HALTs:
+If absent, fall back to the **halt snapshot** written by terminal HALTs **or by the PreCompact hook** (an interrupted compaction):
 ```bash
 cat .claude/state/develop-pipeline.last-halt.json
 ```
@@ -82,8 +82,10 @@ Extract from whichever is present:
 - `branch` → verify it exists: `git branch --list "{branch}"`
 
 Snapshot-specific fields (when reading `last-halt.json`):
-- `halt_reason` → human-readable cause (include in `deltas_since_pause` for the user surface)
-- `halted_at` → ISO-8601 timestamp of the halt
+- `halt_reason` (terminal HALT) **or** `pause_reason` (PreCompact, value `"precompact"`) → human-readable cause (include in `deltas_since_pause` for the user surface)
+- `halted_at` (terminal HALT) **or** `paused_at` (PreCompact) → ISO-8601 timestamp of the halt/pause
+
+> A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
 
 Set an output field `source: "lock" | "halt_snapshot" | "none"` so the orchestrator can prompt the user appropriately ("resume the active pipeline?" vs. "resume from the prior halt at step X?").
 

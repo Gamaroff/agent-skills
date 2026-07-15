@@ -17,7 +17,7 @@ The pipeline runs hands-free when two Claude Code hooks (`PreCompact` for gracef
 bash .agents/skills/develop-task/scripts/install-hooks.sh
 ```
 
-**Full reference** — every hook in this pipeline, what each does, escape valves, interaction diagram, troubleshooting, and authoring contract for new hooks: [`references/develop-pipeline-hooks.md`](references/develop-pipeline-hooks.md). For the deep PreCompact pause/resume semantics specifically: [`references/develop-pipeline-pause.md`](references/develop-pipeline-pause.md). For the lock-advance helper used by all three hooks and by the orchestrator's manual fallback path: [`references/advance-pipeline-lock.sh`](references/advance-pipeline-lock.sh) (sourced from `references/advance-pipeline-lock.sh`).
+**Full reference** — every hook in this pipeline, what each does, escape valves, interaction diagram, troubleshooting, and authoring contract for new hooks: [`references/develop-pipeline-hooks.md`](references/develop-pipeline-hooks.md). For the deep PreCompact pause/resume semantics specifically: [`references/develop-pipeline-pause.md`](references/develop-pipeline-pause.md). For the lock-advance helper used by both hooks and by the orchestrator's manual fallback path: [`references/advance-pipeline-lock.sh`](references/advance-pipeline-lock.sh) (sourced from `references/advance-pipeline-lock.sh`).
 
 Hooks noop outside pipeline runs — zero overhead when no `.claude/state/develop-pipeline.lock` is present.
 
@@ -115,12 +115,10 @@ This prevents context accumulation across the 8-step pipeline.
 >                          ↑
 >                FIRST. ALWAYS. NO PROSE BEFORE.
 > ```
->
-> When the `PostToolUse` hook (`on-skill-return.sh`) is installed, **action 1 (Bash advance) is performed automatically** by the hook the moment the sub-skill's Skill tool call returns. The hook also injects an `additionalContext` system reminder containing the next-step banner and the next sub-skill to invoke. In that mode the orchestrator only needs to perform actions 2–4. Without the hook, the orchestrator must perform all four actions itself.
 
 Every step ends with the same four actions, executed *in order, with no text output between them*:
 
-1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, use `--complete` instead, which removes the lock. **Skip this action when the `PostToolUse` hook is installed — the hook already advanced the lock before this turn began.**
+1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, use `--complete` instead, which removes the lock. (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`).
 3. **Emit the Step {N+1} banner** (or the Phase 2 Completion banner if N=8):
    ```
@@ -130,11 +128,10 @@ Every step ends with the same four actions, executed *in order, with no text out
 
 Failure mode this defends against: a sub-skill returns control with a "complete" message and the orchestrator emits a natural-language summary before issuing the lock-update Bash call. Under context pressure the model may then yield to the user. **The lock-update Bash call must come FIRST** — emit it the moment the sub-skill returns, before any prose. The lock-update Bash call is the binding signal that the next step has started; without it the pipeline is considered stalled.
 
-Three structural defences back this up (in order of which fires first):
+Two structural defences back this up (in order of which fires first):
 
-1. **`PostToolUse` hook (`on-skill-return.sh`)** — proactive: fires the moment the sub-skill returns, advances the lock automatically, injects banner + next-skill instruction as additionalContext.
-2. **Sub-skill self-advance** — defence-in-depth: each pipeline sub-skill calls `advance-pipeline-lock.sh --skill <own-name>` on successful completion, so the lock advances even when the hook is not installed.
-3. **`Stop` hook (`on-stop.sh`)** — reactive backstop: if the orchestrator nonetheless tries to stop mid-pipeline, the hook reads the lock and returns a `decision: "block"` reason that re-prompts the orchestrator to run actions 1–4 above.
+1. **Sub-skill self-advance** — each pipeline sub-skill calls `advance-pipeline-lock.sh --skill <own-name>` as the last inline action of its body, so the lock advances the moment the sub-skill's work completes — before control returns to the orchestrator.
+2. **`Stop` hook (`on-stop.sh`)** — reactive backstop: if the orchestrator nonetheless tries to stop mid-pipeline, the hook reads the lock and returns a `decision: "block"` reason that re-prompts the orchestrator to run actions 1–4 above.
 
 **Step banners (required).** Before starting each step, output a visible banner:
 ```
@@ -147,8 +144,6 @@ This creates persistent checkpoints that survive context compression and make th
 bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}
 ```
 For Step 8 → completion: `... advance-pipeline-lock.sh --complete` (removes the lock).
-
-**When the `PostToolUse` hook is installed**, this Bash call is performed automatically the moment the sub-skill's Skill tool returns — you do NOT need to issue it yourself. In hook-installed mode, the orchestrator's first tool call after a Skill return is the **Edit** for action #2, not Bash.
 
 Skip this for Step 1 (the lock is created at the *end* of Step 1, after the feature branch exists — see Step 1 below).
 
@@ -218,6 +213,24 @@ The implementation report has a full account of what was completed and what need
 
 ---
 
+## Execution Surfaces
+
+This pipeline has **two execution surfaces of the same 8-stage logic** — read one, and this section tells you the other exists:
+
+- **This skill** — the Claude Code orchestrator (you, now). Human-in-the-loop = autonomous defaults + `AskUserQuestion` (Phase 0d Q1/Q2; review/develop auto-answers). On **HALT** it produces *rich artifacts*: an implementation-report entry, a tracker comment, and a lock snapshot to `.claude/state/develop-pipeline.last-halt.json`.
+- **The Mastra `developTaskWorkflow`** (`src/mastra/pipelines/develop-task/`, assembled by `src/mastra/pipeline/factory/create-develop-pipeline.ts`) — the programmatic pipeline. Human-in-the-loop = **four opt-in approval gates** in `state.approvalGates` (`src/mastra/pipeline/gates/approval-gates.ts`). The default is an **empty** gate set = fully autonomous, matching this skill's defaults:
+
+  | Gate | Fires at (stage) | Purpose when active |
+  |------|------------------|---------------------|
+  | `review-clarifications` | review-task | restore the review clarifying-question interview |
+  | `qa-clarifications` | qa-loop body | restore the QA interview / waiver prompt |
+  | `pre-finalise` | finalise | approve before the irreversible accept |
+  | `on-halt` | any HALT (cross-cutting, stage `*`) | turn a terminal HALT into continue / override / abort |
+
+**HALT-artifact difference (important — do not assume parity).** When the `on-halt` gate is **inactive** (the default), the workflow emits a *terminal* halt (`terminalReason: 'halt'`) and does **NOT** produce this skill's rich HALT artifacts (no report entry, no tracker comment, no lock snapshot). The two surfaces agree on the autonomous happy path; their **halt-time behaviour differs**. A reader of this skill should not expect the workflow to write those artifacts on every halt, and a reader of the factory should map the skill's `AskUserQuestion` prompts onto the four gates above.
+
+---
+
 ## Autonomous Decision Defaults
 
 Every default applied must be recorded in the Decisions Log.
@@ -229,7 +242,7 @@ See `references/develop-pipeline-autonomous-defaults.md` for the full shared aut
 | Situation | Default |
 |-----------|---------|
 | review-task Step 8.5 (implement fixes?) | Auto-answer "Yes, apply all critical + important fixes" — pipeline needs the task fully corrected before Step 3 runs `/develop` |
-| review-task Step 9 (update status?) when status needs updating | Auto-answer "Yes, fixes complete" — pipeline needs `Ready for Development` before Step 3 |
+| review-task Step 9 (update status?) when outcome is READY TO IMPLEMENT | Auto-answer "Yes, fixes complete" — pipeline needs `Ready for Development` before Step 3 |
 | review-task Step 9 (update status?) when outcome is NEEDS REVISION or REQUIRES REWORK | HALT — task is not ready; surface review findings to user before proceeding |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
@@ -264,7 +277,7 @@ If a situation arises that is not in this table or the shared defaults table and
 - Tasks: `docs/tasks/task.{id}.{name}/`
 - Task file: `task.{id}.{name}.md`
 - Implementation report: `task.{id}.implementation.{N}.{descriptive-name}.md`
-- Review report: `task.{id}.review.{YYYY-MM-DD}.md` (generated by Step 2 `/review-task`)
+- Review report: `task.{id}.review.{N}.{name}.md` (generated by Step 2 `/review-task`)
 - QA gate: `task.{id}.gate.{N}.{name}.yml` (co-located in task directory; `docs/qa/gates/tasks/` path is legacy and removed)
 - QA report: `task.{id}.qa.{N}.{name}.md` (co-located in task directory)
 - DoD summary: `task.{id}.dod.{N}.{name}.md`

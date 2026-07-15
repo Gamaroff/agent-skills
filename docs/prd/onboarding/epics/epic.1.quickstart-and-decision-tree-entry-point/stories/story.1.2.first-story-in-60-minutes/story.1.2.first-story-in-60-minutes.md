@@ -1,6 +1,6 @@
 ---
 id: story.1.2.first-story-in-60-minutes
-title: "Story 1.2: First story in 60 minutes — quickstart"
+title: "[Story 1.2] First story in 60 minutes — quickstart"
 type: story
 status: accepted
 priority: high
@@ -16,7 +16,7 @@ updated: 2026-05-12
 completed_date: 2026-05-12
 ---
 
-# Story 1.2: First story in 60 minutes — quickstart
+# [Story 1.2] First story in 60 minutes — quickstart
 
 **Status**: Accepted
 **Review**: ✅ Critical/Important recommendations from `story.1.2.review.1.first-story-in-60-minutes.md` implemented 2026-05-12
@@ -65,6 +65,7 @@ N/A — pure documentation story.
 **Navigation path:** doc-only. Walk top-to-bottom.
 
 **Verification steps:**
+
 - **AC1:** `ls docs/concepts/quickstart-story.md`; `head -15` shows valid frontmatter; `documentation-standards-validator` PASS.
 - **AC2:** Section heads appear in stated order; each non-empty.
 - **AC3:** Stopwatched walk produces all 10 artifact types under their canonical paths; elapsed ≤ 60 min.
@@ -72,8 +73,9 @@ N/A — pure documentation story.
 - **AC5:** `wc -l ≤ 400`.
 
 **Edge cases:**
+
 - `/develop-story` chain emits more AskUserQuestion prompts than `/develop-task` (Phase 0 base/PR-target/epic-branch). Doc must pre-warn ALL of them with recommended defaults — bare minimum: base=develop, PR target=epic branch, epic branch=Yes if creating fresh.
-- Registry pollution risk doubles: both `docs/epic-registry.md` AND `docs/tasks/task-registry.md` (if a pipeline bug triggers a task lane) may get rows. Cleanup section must address both.
+- Registry pollution risk doubles: both `docs/development/epic-registry.md` AND `docs/tasks/task-registry.md` (if a pipeline bug triggers a task lane) may get rows. Cleanup section must address both.
 - 60-min budget is brittle. Recommend the example story produce a single trivial PR (1-line file change) to keep develop-story chain short.
 
 ### Rollback Plan
@@ -123,17 +125,18 @@ No conflicts. Story file follows Story 1.1's directory shape under epic 1.
 
 ## Change Log
 
-| Date       | Version | Description                          | Author        |
-|------------|---------|--------------------------------------|---------------|
-| 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story` | scrum-master  |
-| 2026-05-12 | 1.1     | Review passed (9/10) — AC4 terminology fix; status → ready-for-development | review-story |
-| 2026-05-12 | 1.2     | Implementation complete — `quickstart-story.md` created; all tasks done; status → ready-for-review | dev-agent |
+| Date       | Version | Description                                                                                        | Author       |
+| ---------- | ------- | -------------------------------------------------------------------------------------------------- | ------------ |
+| 2026-05-11 | 1.0     | Initial draft via dogfood `/create-story`                                                          | scrum-master |
+| 2026-05-12 | 1.1     | Review passed (9/10) — AC4 terminology fix; status → ready-for-development                         | review-story |
+| 2026-05-12 | 1.2     | Implementation complete — `quickstart-story.md` created; all tasks done; status → ready-for-review | dev-agent    |
 
 ## Dev Agent Record
 
 **Completed**: 2026-05-12 **Developer**: dev-agent (Claude) **Branch**: feature/story.1.2.first-story-in-60-minutes
 
 **Key decisions:**
+
 - Practice PRD example: "Add footer link to `docs/runbooks/README.md` pointing at `CONTRIBUTING.md`" — minimal scope per plan recommendation
 - `examples/story-walkthrough/` linked with `(pending Epic 2)` per AC4 fix from review
 - `docs/standards/status-lifecycle.md` confirmed as correct path (not `document-status-lifecycle.md`)
@@ -196,6 +199,7 @@ New file `docs/concepts/quickstart-story.md` (192 lines) — mirrors `quickstart
 ### Key Findings
 
 Two LOW findings, no blocking issues:
+
 1. Section time budgets sum to 62 min (exceeds 60-min promise by 2 min) — reduce §2 budget from ≤5 to ≤3 min
 2. task-registry cleanup not explicit in §7 — add one bullet
 

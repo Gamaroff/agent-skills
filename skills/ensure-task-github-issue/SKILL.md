@@ -11,9 +11,11 @@ type: internal
 This is an **internal sub-routine** called by `create-task` and `review-task`. Do not invoke directly.
 
 **Inputs (set by the calling skill before invoking):**
+
 - `TASK_FILE_PATH` — repo-relative path to the task markdown file (e.g. `docs/tasks/task.5.cache-lib-refactor/task.5.cache-lib-refactor.md`)
 
 **Output (set by this sub-routine, available to the calling skill):**
+
 - `TASK_ISSUE_NUM` — the GitHub issue number for the task (integer string), or empty string on failure
 
 ---
@@ -31,16 +33,18 @@ This is an **internal sub-routine** called by `create-task` and `review-task`. D
    - `milestone` — explicit milestone override (optional)
    - `epic` — parent epic number for milestone lookup (optional)
 3. Parse the task id from the filename: pattern `task.{N}.` → `TASK_N`.
-4. Strip any leading `"Task {N}: "` prefix from `title` to get the bare title for display: `TASK_TITLE`.
+4. Strip any leading `Task {N}: ` prefix (or an already-bracketed `[Task {N}] ` prefix) from `title` to get the bare title for display: `TASK_TITLE`. (Stripping both forms prevents a double prefix like `[Task 5] Task 5: …`.)
 5. Set `TASK_RELATIVE_PATH` = the path relative to the repo root.
 
 ### Step T2: Check if Task Issue Already Exists
 
 If `github_issue` is a positive integer in the frontmatter:
+
 - Set `TASK_ISSUE_NUM={github_issue value}`.
 - **Return immediately** — nothing to do (idempotent).
 
 If `github_issue` is absent, null, or empty:
+
 - Continue to Step T3.
 
 ### Step T3: Resolve Milestone Title
@@ -48,7 +52,7 @@ If `github_issue` is absent, null, or empty:
 Determine `MILESTONE_TITLE` in this order:
 
 1. If `milestone` frontmatter field is set → use it verbatim.
-2. Else if `epic` frontmatter field is set → look up `Epic {N}` in `docs/epic-registry.md` and use `"Epic {N} — {Epic Title}"`.
+2. Else if `epic` frontmatter field is set → look up `Epic {N}` in `docs/development/epic-registry.md` and use `"Epic {N} — {Epic Title}"`.
 3. Else → default to `"Technical Tasks (standalone)"`.
 
 If the chosen milestone does not yet exist on the repo, auto-create it (idempotent):
@@ -69,6 +73,7 @@ DEDUP=$(gh issue list --search "in:title \"[Task ${TASK_N}]\"" --state all \
 ```
 
 Behaviour:
+
 - **Search failure** (non-zero exit) → log `⚠️ GitHub dedup search failed — proceeding to create` and continue to Step T5.
 - **Exactly one match** → adopt it:
   - Extract `N` (issue number) and `url`.
@@ -89,7 +94,12 @@ OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
 REPO_NAME=$(gh repo view --json name -q '.name')
 PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
 PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)"?/\1/')
-DOC_URL="https://github.com/$REPO/blob/develop/${TASK_RELATIVE_PATH}"
+# Prefer the current branch's remote-tracking branch (strip the remote prefix),
+# so the link points at the branch where the work lives. Fall back to the repo's
+# default branch when there is no upstream / HEAD is detached, then to `develop`.
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
+DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${TASK_RELATIVE_PATH}"
 ```
 
 Create the task issue:
@@ -131,6 +141,7 @@ TASK_ISSUE_NUM=$(echo "$TASK_ISSUE_URL" | grep -oE '[0-9]+$')
 ```
 
 **On failure** (`gh` exits non-zero or `TASK_ISSUE_NUM` is empty):
+
 - Log: `⚠️ Failed to create GitHub issue for task — proceeding without task issue linkage`
 - Set `TASK_ISSUE_NUM=""`
 - **Return to the calling skill** — do NOT halt the calling skill.
@@ -140,6 +151,7 @@ TASK_ISSUE_NUM=$(echo "$TASK_ISSUE_URL" | grep -oE '[0-9]+$')
 ```bash
 gh project item-add ${PROJECT_NUM} --owner ${OWNER} --url "${TASK_ISSUE_URL}" 2>/dev/null || true
 bash references/set-github-project-priority.sh "${TASK_ISSUE_NUM}" "${priority}" || true
+bash references/set-github-project-estimate.sh "${TASK_ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
 
 Both operations are non-blocking — log warnings on failure, continue.
@@ -149,6 +161,7 @@ Tasks are **standalone** — no sub-issue linking step. If a task happens to als
 ### Step T7: Write `github_issue` to Task Frontmatter and Insert Body Link
 
 Write `github_issue: {TASK_ISSUE_NUM}` to the task file's YAML frontmatter:
+
 - Locate the closing `---` of the frontmatter block.
 - Append `github_issue: {TASK_ISSUE_NUM}` as the last field before the closing `---`.
 - Do not modify anything outside the frontmatter block.

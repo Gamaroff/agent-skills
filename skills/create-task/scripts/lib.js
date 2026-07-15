@@ -118,23 +118,24 @@ function countMandatorySections(markdown) {
 function populateTaskTemplate(template, answers) {
   if (typeof template !== "string") throw new TypeError("template must be string");
   if (!answers || typeof answers !== "object") throw new TypeError("answers must be object");
-  const required = ["task_title", "task_id", "created", "priority", "assignee", "estimated_effort"];
+  const required = ["task_title", "task_id", "created", "priority", "assignee", "estimated_effort_hours"];
   for (const k of required) {
     if (answers[k] === undefined || answers[k] === null || answers[k] === "") {
       throw new Error(`populateTaskTemplate: missing required answer "${k}"`);
     }
   }
   let out = template;
-  // Bracketed placeholders.
+  // `[TASK_TITLE]` appears in the YAML frontmatter `title:` and the H1.
   out = out.split("[TASK_TITLE]").join(String(answers.task_title));
-  // `YYYY-MM-DD` is a bare placeholder (no brackets) in the template's Created line.
-  out = out.replace(/\*\*Created\*\*: YYYY-MM-DD/, `**Created**: ${answers.created}`);
-  // `TASK-[ID]` is a literal token in the template — `[ID]` is the only bracketed part.
+  // `id: task.[ID]` — `[ID]` is the only bracketed token (also used in the footer cross-refs).
   out = out.split("[ID]").join(String(answers.task_id));
-  // Priority/Assignee/Estimated Effort are written as labeled bullets near the top.
-  out = out.replace(/\*\*Priority\*\*: [^\n]+/, `**Priority**: ${answers.priority}`);
-  out = out.replace(/\*\*Assignee\*\*: \[[^\]]+\]/, `**Assignee**: ${answers.assignee}`);
-  out = out.replace(/\*\*Estimated Effort\*\*: \[[^\]]+\]/, `**Estimated Effort**: ${answers.estimated_effort}`);
+  // `created`/`updated` are bare `YYYY-MM-DD` placeholders in the frontmatter; stamp both at creation.
+  out = out.replace(/^created: YYYY-MM-DD/m, `created: ${answers.created}`);
+  out = out.replace(/^updated: YYYY-MM-DD/m, `updated: ${answers.created}`);
+  // priority / assignee / estimated_effort_hours are frontmatter keys (default values + trailing comments).
+  out = out.replace(/^priority: [^\n]+/m, `priority: ${answers.priority}`);
+  out = out.replace(/^assignee: [^\n]+/m, `assignee: ${answers.assignee}`);
+  out = out.replace(/^estimated_effort_hours: [^\n]+/m, `estimated_effort_hours: ${answers.estimated_effort_hours}`);
   return out;
 }
 

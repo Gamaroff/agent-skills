@@ -153,7 +153,7 @@ test("resolvePrdPath — null on empty input", () => {
 });
 
 test("resolvePrdPath — non-existent path returns null without throwing", () => {
-  assert.equal(lib.resolvePrdPath("docs/prds/no.md", "/nonexistent-root-xyz"), null);
+  assert.equal(lib.resolvePrdPath("docs/prd/no.md", "/nonexistent-root-xyz"), null);
 });
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ test("mapStatus — strips emoji and maps to Jira canonical status", () => {
 // syncLabelFor
 // ---------------------------------------------------------------------------
 test("syncLabelFor — derives label from epic dir name", () => {
-  const fp = path.resolve("/x/docs/prds/foo/epics/epic.1.foundation/epic.1.foundation.md");
+  const fp = path.resolve("/x/docs/prd/foo/epics/epic.1.foundation/epic.1.foundation.md");
   assert.equal(lib.syncLabelFor(fp), "synced-from-epic.1.foundation");
 });
 
@@ -309,6 +309,41 @@ test("mapStatus — backlog and review variants", () => {
 test("mapStatus — won't do variants normalise", () => {
   assert.equal(lib.mapStatus("won't do"), "Won't Do");
   assert.equal(lib.mapStatus("wont do"), "Won't Do");
+});
+
+test("mapStatus — covers the full canonical lifecycle (no passthrough)", () => {
+  assert.equal(lib.mapStatus("draft"), "To Do");
+  assert.equal(lib.mapStatus("ready-for-development"), "To Do");
+  assert.equal(lib.mapStatus("ready-for-review"), "In Review");
+  assert.equal(lib.mapStatus("accepted"), "Done");
+  assert.equal(lib.mapStatus("cancelled"), "Cancelled");
+});
+
+test("mapStatus — honours a project-supplied status map", () => {
+  const custom = { "ready-for-development": "Selected for Development" };
+  assert.equal(lib.mapStatus("ready-for-development", custom), "Selected for Development");
+});
+
+test("loadStatusMap — merges jira.statusMap over defaults", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-epic-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    accepted: Shipped\n");
+  const map = lib.loadStatusMap(dir);
+  assert.equal(map["accepted"], "Shipped");
+  assert.equal(map["in-progress"], "In Progress");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadStatusMap — tolerates inline comments on the statusMap opener and value lines", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-epic-comment-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n");
+  const map = lib.loadStatusMap(dir);
+  assert.equal(map["accepted"], "Shipped");
+  assert.equal(map["in-progress"], "In Progress");
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -515,4 +550,124 @@ test("parseArgs — --verbose flag set", () => {
 test("parseArgs — -v short form sets verbose", () => {
   const args = lib.parseArgs(["node", "sync-jira-epic.js", "-v"]);
   assert.equal(args.verbose, true);
+});
+
+// ---------------------------------------------------------------------------
+// stripRemotePrefix — pure parse step behind getCurrentBranchUpstream()
+// ---------------------------------------------------------------------------
+test("stripRemotePrefix — strips remote name, preserves slashes in branch", () => {
+  assert.equal(lib.stripRemotePrefix("origin/main"), "main");
+  assert.equal(lib.stripRemotePrefix("origin/feature/story.5.1.foo"), "feature/story.5.1.foo");
+  assert.equal(lib.stripRemotePrefix("upstream/release/1.2"), "release/1.2");
+});
+
+test("stripRemotePrefix — empty or shape-less ref returns null", () => {
+  assert.equal(lib.stripRemotePrefix(""), null);
+  assert.equal(lib.stripRemotePrefix("weirdnoref"), null);
+});
+
+test("parseArgs — --doc-branch overrides the resolved branch", () => {
+  const opts = lib.parseArgs(["node", "script", "--file", "x.md", "--doc-branch", "develop"]);
+  assert.equal(opts.docBranch, "develop");
+});
+
+test("parseArgs — --doc-branch absent defaults to null", () => {
+  const opts = lib.parseArgs(["node", "script", "--file", "x.md"]);
+  assert.equal(opts.docBranch, null);
+});
+
+// ---------------------------------------------------------------------------
+// normaliseEpicSummary — canonical "[Epic N] {title}" bracket form
+// ---------------------------------------------------------------------------
+test("normaliseEpicSummary — already-bracketed is unchanged (idempotent)", () => {
+  assert.equal(lib.normaliseEpicSummary("[Epic 1] Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — colon-prefixed is rewrapped in brackets", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 1: Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — bare title resolves id from epic_number", () => {
+  assert.equal(lib.normaliseEpicSummary("Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — no id resolvable leaves the summary unchanged", () => {
+  assert.equal(lib.normaliseEpicSummary("Foo", null), "Foo");
+  assert.equal(lib.normaliseEpicSummary("Foo", undefined), "Foo");
+});
+
+test("normaliseEpicSummary — epic_number wins over a stale prefix id", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 9: Foo", 1), "[Epic 1] Foo");
+  assert.equal(lib.normaliseEpicSummary("[Epic 9] Foo", 1), "[Epic 1] Foo");
+});
+
+test("normaliseEpicSummary — falls back to the title's prefix id when epic_number is absent", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 7: Foo", null), "[Epic 7] Foo");
+});
+
+// ---------------------------------------------------------------------------
+// findChildStories — an epic's related docs are its child story cards
+// ---------------------------------------------------------------------------
+function makeEpicDir(stories, { withStoriesDir = true } = {}) {
+  const fs = require("fs"), os = require("os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "child-stories-"));
+  const epicDir = path.join(dir, "epic.2.demo");
+  fs.mkdirSync(epicDir);
+  fs.writeFileSync(path.join(epicDir, "epic.2.demo.md"), "# Epic");
+  if (withStoriesDir) {
+    const storiesDir = path.join(epicDir, "stories");
+    fs.mkdirSync(storiesDir);
+    for (const [name, files] of Object.entries(stories)) {
+      const sd = path.join(storiesDir, name);
+      fs.mkdirSync(sd);
+      for (const [f, content] of Object.entries(files)) fs.writeFileSync(path.join(sd, f), content);
+    }
+  }
+  return path.join(epicDir, "epic.2.demo.md");
+}
+
+test("findChildStories — links each story card and ignores its sibling artifacts", () => {
+  const epicFile = makeEpicDir({
+    "story.2.1.alpha": {
+      "story.2.1.alpha.md": "# Alpha story",
+      "story.2.1.plan.alpha.md": "# plan",   // artifact — must not be linked
+      "story.2.1.qa.1.alpha.md": "# qa",     // artifact — must not be linked
+    },
+  });
+  const found = lib.findChildStories(epicFile);
+  assert.equal(found.length, 1);
+  assert.equal(path.basename(found[0].file), "story.2.1.alpha.md");
+});
+
+test("findChildStories — orders numerically, not lexicographically", () => {
+  const epicFile = makeEpicDir({
+    "story.2.10.j": { "story.2.10.j.md": "# J" },
+    "story.2.2.b":  { "story.2.2.b.md": "# B" },
+    "story.2.1.a":  { "story.2.1.a.md": "# A" },
+  });
+  assert.deepEqual(
+    lib.findChildStories(epicFile).map(s => s.label),
+    ["Story 2.1 — A", "Story 2.2 — B", "Story 2.10 — J"],
+  );
+});
+
+test("findChildStories — an epic with no stories/ directory yields no links", () => {
+  assert.deepEqual(lib.findChildStories(makeEpicDir({}, { withStoriesDir: false })), []);
+});
+
+test("findChildStories — a story dir without its matching card is skipped", () => {
+  const epicFile = makeEpicDir({ "story.2.1.alpha": { "story.2.1.plan.alpha.md": "# orphan plan" } });
+  assert.deepEqual(lib.findChildStories(epicFile), []);
+});
+
+test("labelForChildStory — an already-prefixed title is not repeated", () => {
+  const epicFile = makeEpicDir({
+    "story.2.1.alpha": { "story.2.1.alpha.md": "# [Story 2.1] Alpha thing" },
+  });
+  assert.equal(lib.findChildStories(epicFile)[0].label, "Story 2.1 — Alpha thing");
+});
+
+test("labelForChildStory — an untitled card still gets a numbered label", () => {
+  const epicFile = makeEpicDir({ "story.2.1.alpha": { "story.2.1.alpha.md": "no heading here" } });
+  assert.equal(lib.findChildStories(epicFile)[0].label, "Story 2.1");
 });

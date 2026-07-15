@@ -1,5 +1,13 @@
 name: Docs link check
 
+# Checks markdown links only in files changed by the PR (or push), not the whole
+# docs tree. The repo deliberately commits pipeline artifacts under docs/prd/** and
+# docs/tasks/** whose links are relative to a *consumer* project layout and never
+# resolve here; whole-tree checking flagged those on every unrelated docs edit. The
+# previous gaurav-nelson action diffed against a single `base-branch` (default
+# `master`), which doesn't fit this repo's gitflow (PRs target develop, sometimes
+# main), so we compute the changed set against the actual base ourselves.
+
 on:
   pull_request:
     paths:
@@ -7,6 +15,7 @@ on:
       - 'README.md'
       - 'AGENTS.md'
       - 'CONTRIBUTING.md'
+      - '.github/markdown-link-check.json'
       - '.github/workflows/docs-link-check.yml'
   push:
     branches: [main, develop]
@@ -21,12 +30,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check markdown links
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
-          use-quiet-mode: 'yes'
-          use-verbose-mode: 'yes'
-          config-file: '.github/markdown-link-check.json'
-          folder-path: 'docs'
-          file-path: './README.md, ./AGENTS.md, ./CONTRIBUTING.md'
-          file-extension: '.md'
+          fetch-depth: 0 # full history so the merge-base (3-dot) diff resolves
+
+      - name: Determine changed markdown files
+        id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --no-tags origin "$BASE_REF"
+            RANGE="origin/${BASE_REF}...HEAD"   # 3-dot: changes on the PR since branch point
+          else
+            if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+              RANGE="HEAD~1...HEAD"
+            else
+              RANGE="${BEFORE_SHA}...HEAD"
+            fi
+          fi
+          echo "Diff range: $RANGE"
+          git diff --name-only --diff-filter=ACMR "$RANGE" -- \
+            'docs' 'README.md' 'AGENTS.md' 'CONTRIBUTING.md' \
+            | grep -E '\.md$' \
+            | grep -v '^docs/templates/' > changed.txt || true
+          echo "Changed markdown files:"
+          cat changed.txt || true
+
+      - name: Check links in changed files
+        run: |
+          set -uo pipefail
+          if [ ! -s changed.txt ]; then
+            echo "No changed markdown files — nothing to link-check."
+            exit 0
+          fi
+          npm install -g markdown-link-check@3
+          status=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ -f "$f" ] || continue   # skip files deleted/renamed away
+            echo "::group::$f"
+            markdown-link-check --quiet --config .github/markdown-link-check.json "$f" || status=1
+            echo "::endgroup::"
+          done < changed.txt
+          if [ "$status" -ne 0 ]; then
+            echo "::error::Dead links found in changed markdown files."
+          fi
+          exit $status

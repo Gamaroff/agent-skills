@@ -118,7 +118,7 @@ The review-story skill performs an 8-step comprehensive analysis:
 Generates a comprehensive review report:
 
 ```
-[story-directory]/story.{epic}.{story}.review.{n}.{descriptive-name}.md
+[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md
 ```
 
 Report includes:

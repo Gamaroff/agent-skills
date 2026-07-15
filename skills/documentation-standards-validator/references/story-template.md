@@ -1,7 +1,7 @@
-# Story [Epic]-[N]: [Story Name]
+# [Story [Epic].N] [Story Name]
 
-**Epic**: [Epic [N]: [Epic Name]](../epics/epic.[n].[name].md)
-**Story ID**: Story [Epic]-[N]
+**Epic**: [[Epic N] Epic Name](../epics/epic.[n].[name].md)
+**Story ID**: [Story [Epic].N]
 **Branch Name**: `feature/story.[epic].[story].[name]`
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -417,7 +417,7 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 ## Definition of Done
 
-Story [Epic]-[N] is complete when:
+[Story [Epic].N] is complete when:
 
 ### Implementation
 
@@ -538,13 +538,13 @@ Story [Epic]-[N] is complete when:
 
 **Depends On** (must complete first):
 
-- [ ] Story [Epic]-[N-1]: [Story Name]
+- [ ] [Story [Epic].N-1] [Story Name]
   - **Reason**: [Why this is a dependency]
   - **Status**: [Status]
 
 **Blocks** (this story blocks):
 
-- [ ] Story [Epic]-[N+1]: [Story Name]
+- [ ] [Story [Epic].N+1] [Story Name]
   - **Reason**: [Why this story blocks it]
 
 ### External Dependencies
@@ -597,13 +597,13 @@ Story [Epic]-[N] is complete when:
 
 ### Epic Documentation
 
-- [Epic [N]: [Name]](../epics/epic-[n]-[name].md) - Parent epic
+- [[Epic N] Name](../epics/epic-[n]-[name].md) - Parent epic
 - [Epic [N] Roadmap](../epics/EPIC-[N]-ROADMAP.md) - Weekly plan
 
 ### Related Stories
 
-- [Story [Epic]-[N-1]: [Name]](./[epic]-[n-1].story.[name].md) - Previous story
-- [Story [Epic]-[N+1]: [Name]](./[epic]-[n+1].story.[name].md) - Next story
+- [[Story [Epic].N-1] Name](./[epic]-[n-1].story.[name].md) - Previous story
+- [[Story [Epic].N+1] Name](./[epic]-[n+1].story.[name].md) - Next story
 
 ### Technical Documentation
 

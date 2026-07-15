@@ -12,7 +12,7 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
 
 ## Inputs (set by the calling skill before invoking)
 
-- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `docs/prd/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`)
+- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `${PRD_ROOT}/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 - `EPIC_JIRA_KEY` — parent epic Jira key (e.g. `PROJ-42`), or empty string if no parent epic Jira issue exists yet. The caller should run `ensure-epic-jira-issue` first to populate this.
 - `TRACKER` — set by `references/resolve-platform.sh` in the calling skill (must be `jira` for this sub-routine to act)
 - Env: `JIRA_URL`, plus Atlassian MCP credentials (cloudId derived from `JIRA_URL` hostname)
@@ -82,7 +82,16 @@ Before delegating, ensure the parent-epic link is available so `sync-jira-story`
 - If `EPIC_JIRA_KEY` (the input parameter) is non-empty AND the story frontmatter `jira_epic_key` is absent or empty, write `jira_epic_key: {EPIC_JIRA_KEY}` into the frontmatter (insert before the closing `---`). This is idempotent — skip if already present and matching.
 - If `EPIC_JIRA_KEY` is empty and `jira_epic_key` is also empty, log `⚠️ No parent-epic Jira key available — story will be created without epic linkage` and continue. `sync-jira-story` will handle this gracefully.
 
-Invoke the `sync-jira-story` sub-routine, passing `STORY_FILE_PATH` as its input. `sync-jira-story` will:
+Invoke the `sync-jira-story` sub-routine by executing the bundled script directly. Pass `STORY_FILE_PATH` via `--file`:
+
+```bash
+node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
+  --file "$STORY_FILE_PATH"
+```
+
+> **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-story/scripts/sync-jira-story.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist.
+
+`sync-jira-story` will:
 - Create the Jira story if it does not exist (idempotent — searches by title/labels first)
 - Link the new issue to the parent epic via `parent` field (team-managed) or the Epic Link customfield (classic)
 - Add the story to the project backlog (Scrum boards only)

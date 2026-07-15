@@ -4,7 +4,6 @@
 # Replaces the inline jq snippet that was duplicated across SKILL.md, on-stop.sh,
 # step-N reference docs, and per-step orchestrator instructions. Centralising the
 # advance logic enables:
-#   • PostToolUse hook (on-skill-return.sh) — automatic advance on sub-skill return
 #   • Sub-skill self-advance — each sub-skill calls this on successful completion
 #   • Stop hook (on-stop.sh) — fallback advance instruction in block reason
 #   • Orchestrator manual advance — same command, no jq one-liner to typo
@@ -35,7 +34,8 @@
 #   qa-task         → noop (loop)
 #   qa-fix          → noop (loop)
 #   finalise        → 8   (Step 7 done)
-#   commit-changes  → --complete (Step 8 done; lock removed)
+#   commit-changes  → remove lock ONLY when current_step >= 8 (terminal commit);
+#                     nested invocations (create-pr Step 4, qa-fix Steps 5–6) preserve the lock
 #
 # Always exits 0 on safe paths. Non-zero only on argument error or jq failure.
 
@@ -80,8 +80,21 @@ case "$1" in
       qa-story|qa-task|qa-fix)    exit 0 ;;  # iterative loop, orchestrator manages
       finalise)                   NEXT=8 ;;
       commit-changes)
-        rm -f "$LOCK"
-        echo "advance-pipeline-lock: pipeline complete (commit-changes), lock removed"
+        # commit-changes is the ONLY pipeline sub-skill invoked at more than one step:
+        #   - Step 4 (create-pr commits code before opening the PR)
+        #   - Steps 5–6 (each qa-fix cycle commits fixes)
+        #   - Step 8 (terminal commit)
+        # Only the Step 8 invocation means "pipeline complete". For the nested
+        # invocations the lock MUST be preserved so the PreCompact/Stop hooks keep
+        # working through the back half of the run.
+        CUR=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
+        case "$CUR" in ''|null) CUR=0 ;; esac
+        if [ "$CUR" -ge 8 ] 2>/dev/null; then
+          rm -f "$LOCK"
+          echo "advance-pipeline-lock: pipeline complete (commit-changes at step $CUR), lock removed"
+        else
+          echo "advance-pipeline-lock: commit-changes nested at step $CUR — lock preserved" >&2
+        fi
         exit 0
         ;;
       *)

@@ -35,26 +35,31 @@ Task 8 is a well-scoped audit-then-remediate task. Premise is sound and verifiab
 ### Question Point 1: Structure & Scope
 
 **Q1: Frontmatter has no `github_issue:` / `jira_key:`. Add tracker link?**
+
 - **User Decision:** Yes, create GitHub issue
 - **Impact:** Created issue #14; added `github_issue: 14` to frontmatter and body cross-reference link
 
 **Q2: Status field is `📋 Planned` (with emoji). Normalise?**
+
 - **User Decision:** Keep emoji
 - **Impact:** Project convention prefers emoji prefix — leave as-is; not a gap
 
 **Q3: Skills already grep-clean. Tighten scope?**
+
 - **User Decision:** Keep as written
 - **Impact:** Audit-then-remediate workflow stays open; findings report still produced
 
 ### Question Point 2: Technical & Implementation
 
 **Q4: Testing Strategy cross-refs task 3 — acceptable?**
+
 - **User Decision:** Keep ref to task 3
 - **Impact:** No change; reader follows the reference
 
 ### Question Point 3: Apply fixes
 
 **Q5: Apply fixes now?**
+
 - **User Decision:** Yes, all critical + important
 - **Impact:** Fixes applied inline (see Step 8.5 summary below)
 
@@ -67,13 +72,16 @@ Task 8 is a well-scoped audit-then-remediate task. Premise is sound and verifiab
 ### Issues
 
 #### Critical
+
 - None
 
 #### Important
+
 - **Missing tracker linkage** — frontmatter had no `github_issue:` field. Default GH path (no `JIRA_URL`) requires it per `review-task` spec.
   - **Fix applied**: created GH issue #14 and added `github_issue: 14` + body link.
 
 #### Optional
+
 - `depends_on: —` uses em-dash. Conventional null/empty also acceptable.
 - Effort field is `1 day (audit) + variable (remediation)` — variable portion not bounded; OK because Phase 5 spawns follow-ups for large gaps.
 
@@ -86,7 +94,7 @@ Task 8 is a well-scoped audit-then-remediate task. Premise is sound and verifiab
 
 ### Verification
 
-- `skills/create-task/SKILL.md` line 558 references `docs/epic-registry.md` — task says "~552", close enough. ✅
+- `skills/create-task/SKILL.md` line 558 references `docs/development/epic-registry.md` — task says "~552", close enough. ✅
 - Both target skills exist on disk (`SKILL.md` present, no `scripts/` dir). ✅
 - `grep -nE 'gh|jira|bitbucket|curl|atlassian'` on both skills returns zero platform calls — only matches are unrelated literals (e.g., `Critical | High`). ✅
 - Dual-path pattern references (`create-pr`, `finalise`, `create-task` lines 425-509) are real anchors used in prior tasks. ✅
@@ -100,6 +108,7 @@ No invented technologies, libraries, or paths.
 **Status:** COMPLETE
 
 ### Strengths
+
 - 5 phases with clear risk levels and conditional gating (Phase 4/5 fire only if Phase 3 classifies as such)
 - Concrete grep commands in plan file
 - Findings report structure pre-specified
@@ -107,6 +116,7 @@ No invented technologies, libraries, or paths.
 ### Issues
 
 #### Optional
+
 - Phase 4 risk listed as "variable" without per-skill specifics. Acceptable because the actual scope only known after Phase 3.
 - Plan file's testing approach inherits from task 3 — fine but reader must follow the link.
 
@@ -117,6 +127,7 @@ No invented technologies, libraries, or paths.
 **Status:** CONSISTENT
 
 ### Notes
+
 - Files Summary aligns with phases: 1 audit deliverable, 2 conditional skill modifications, conditional follow-up task docs.
 - Success criteria cover functional, code quality, migration aspects.
 - No internal contradictions.
@@ -132,6 +143,7 @@ No invented technologies, libraries, or paths.
 - Rollback plan covers all three deliverable types (audit-only, inline patches, follow-up tasks).
 
 ### Optional
+
 - Rollback plan could mention regenerating zips after revert for inline patches (already implied).
 
 ---

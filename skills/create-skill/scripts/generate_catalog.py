@@ -27,7 +27,7 @@ from datetime import date
 
 CATEGORIES = [
     ("Development — Orchestration", [
-        "develop-story", "develop-task", "develop",
+        "develop-story", "develop-task", "develop", "develop-next",
     ]),
     ("Development — Implementation", [
         "commit-changes", "create-branch", "create-pr", "git-time-travel",
@@ -45,7 +45,7 @@ CATEGORIES = [
         "document-existing-project", "document-existing-project",
     ]),
     ("Product Management & Planning", [
-        "po", "pm-coordinator", "pm-checklist", "scrum-master", "analyst",
+        "po", "pm-coordinator", "pm-checklist", "analyst",
         "new-product-prd", "prd-template", "create-prd", "brownfield-prd-template",
         "shard-prd", "shard-doc", "review-prd",
     ]),
@@ -90,7 +90,7 @@ CATEGORIES = [
         "execute-checklist", "generate-ui-prompt",
     ]),
     ("User Experience", [
-        "ux-expert", "building-components", "browser-use",
+        "ux-expert", "building-components", "browser-use", "markdown-wireframe",
     ]),
     ("Email", [
         "email-best-practices", "resend",

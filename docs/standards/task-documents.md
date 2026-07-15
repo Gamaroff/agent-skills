@@ -15,7 +15,7 @@ docs/tasks/
 └── task.{N}.{name}/
     ├── task.{N}.{name}.md                       # main document (human-authored)
     ├── task.{N}.plan.{name}.md                  # implementation plan
-    ├── task.{N}.review.{YYYY-MM-DD}.md          # review report (auto)
+    ├── task.{N}.review.{N}.{name}.md            # review report (auto)
     ├── task.{N}.implementation.{N}.{name}.md    # pipeline report (auto)
     ├── task.{N}.qa.{N}.{name}.md                # QA assessment (auto)
     ├── task.{N}.dod.{N}.{name}.md               # definition of done (auto)
@@ -48,7 +48,9 @@ updated: 2026-01-15
 |---|---|---|---|
 | `id` | string | Yes | `task.N` — integer ID unique across the project |
 | `title` | string | Yes | Human-readable title |
-| `type` | literal | Yes | Must be exactly `task` |
+| `type` | literal | Yes | Must be exactly `task` (OKF `type` — the one hard requirement) |
+| `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
+| `tags` | list | Optional | Short strings for cross-cutting categorization (OKF `tags`) |
 | `category` | enum | Yes | `refactoring`, `infrastructure`, `documentation`, `testing`, `other` |
 | `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
 | `priority` | enum | Yes | `Critical`, `High`, `Medium`, `Low` |
@@ -56,7 +58,9 @@ updated: 2026-01-15
 | `created` | ISO date | Yes | `YYYY-MM-DD` |
 | `updated` | ISO date | Yes | `YYYY-MM-DD` — update on every change |
 | `risk_level` | enum | Optional | `high`, `medium`, `low` — triggers the high-risk gate |
-| `effort` | string | Optional | Free text estimate, e.g. `~0.5 day` |
+| `code_review_blocking` | boolean | Optional | Controls whether high-confidence correctness bugs from the QA diff code review gate the build (appended to the QA gate's `top_issues[]` → fixed in the qa-fix loop). **Under `/develop-task` this is ON by default** (the pipeline passes a run-level override); set `false` to opt this task **out** (escape hatch). Standalone `/qa-task`: absent → advisory, `true` → blocking. See [`qa-task`](../../skills/qa-task/SKILL.md) Step 3b |
+| `estimated_effort_hours` | number | Optional | Estimated dev hours. Synced to Jira `timetracking.originalEstimate` (and, when configured via [`jira.devEstimateField`](../reference/configuration.md#jira-estimate-field), a Jira custom field) and the GitHub Projects v2 `Estimate` number field. Captured at create time, surfaced as a LOW review gap if missing |
+| `effort` | string | Optional | Deprecated free-text estimate, e.g. `~0.5 day`. New tasks should use `estimated_effort_hours` instead |
 | `depends_on` | string | Optional | `task.N` — blocks pipeline if the dependency is not `accepted` |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` |
@@ -64,6 +68,9 @@ updated: 2026-01-15
 | `pr_number` | integer | Optional | Set by pipeline after PR creation — do not set manually |
 | `completed_date` | ISO date | Optional | Set by `finalise` when status reaches `accepted` |
 | `source_plan` | string | Optional | Path to an upstream plan file, for traceability |
+| `resource` | string | Optional | Canonical URI (OKF `resource`). Tasks carry a bare `github_issue` number → derive `{repo_url}/issues/{github_issue}`; set `resource` explicitly only to override |
+
+> **OKF mapping:** `updated` (ISO 8601) is this repo's OKF `timestamp`; the tracker URL is OKF `resource` — for tasks, derived from `github_issue` (`{repo_url}/issues/{github_issue}`) or taken from `jira_url`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
 
 ## Required body sections
 
@@ -88,7 +95,7 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 | Artifact | Pattern | Written by | Purpose |
 |---|---|---|---|
 | Plan file | `task.{N}.plan.{name}.md` | `create-task` | Detailed implementation guide |
-| Review report | `task.{N}.review.{YYYY-MM-DD}.md` | `review-task` (Step 2) | Review findings |
+| Review report | `task.{N}.review.{N}.{name}.md` | `review-task` (Step 2) | Review findings |
 | Implementation report | `task.{N}.implementation.{N}.{name}.md` | `develop-task` pipeline | Pipeline run record |
 | QA report | `task.{N}.qa.{N}.{name}.md` | `qa-task` (Step 5) | QA assessment narrative |
 | Definition of Done | `task.{N}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |

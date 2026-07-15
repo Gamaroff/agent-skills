@@ -193,9 +193,10 @@ Each epic has its own subdirectory containing:
 3. **EPIC-CREATION-SUMMARY.md** - Epic overview (at `epics/` level)
 
 **Epic File YAML Structure**:
+
 ```yaml
 ---
-title: "Epic [N]: [Epic Name]"
+title: "[Epic N] Epic Name"
 prd_source: "[source-document].md"
 epic_type: "system_implementation | feature_enhancement | infrastructure"
 priority: "critical | high | medium | low"
@@ -207,6 +208,7 @@ completion_percentage: 0-100
 ```
 
 **File Locations**:
+
 ```
 docs/prd/{domain}/{feature}/epics/
 ├── epic.[N].[name]/
@@ -228,6 +230,7 @@ docs/prd/{domain}/{feature}/epics/
 4. **EPIC-[N]-STORIES-INDEX.md** - Index for large epics (optional, UPPERCASE)
 
 **File Locations**:
+
 ```
 docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 ├── story.[N].1.[name].md
@@ -250,12 +253,14 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 **Format**: `[descriptive-name].md`
 
 **Examples**:
+
 - `executive-summary.md`
 - `product-requirements.md`
 - `morphing-animation-specification.md`
 - `api-specification.md`
 
 **Rules**:
+
 - Use kebab-case
 - Be descriptive but concise
 - Avoid abbreviations unless widely understood
@@ -265,19 +270,22 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 **Format**: `epic.[number].[descriptive-name].md`
 
 **CRITICAL - Global Epic Numbering**:
+
 - Epic numbers are **globally unique** across the entire your project
 - Numbers are assigned system-wide, NOT per-feature
-- Check `/docs/epic-registry.md` for next available number
+- Check `/docs/development/epic-registry.md` for next available number
 - Update registry when creating new epics
 - See [Epic Numbering System in CLAUDE.md](../../CLAUDE.md#epic-numbering-system)
 
 **Numbering Rules**:
+
 - Whole numbers for major epics: `epic.163.`, `epic.164.`, `epic.165.`
 - Decimal numbers for intermediate epics: `epic.163.5.`, `epic.164.5.`
 - Starting from epic 163, all numbers are globally unique
 - Legacy epics (1-162) contain duplicates from feature-scoped numbering (technical debt)
 
 **Examples**:
+
 - `epic.163.core-foundation.md` (first new epic using registry)
 - `epic.163.5.settings-integration.md` (intermediate epic)
 - `epic.164.auto-compact-system.md` (next sequential epic)
@@ -287,6 +295,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 **Format**: `EPIC-[N]-ROADMAP.md`
 
 **Examples**:
+
 - `EPIC-1.5-ROADMAP.md`
 - `EPIC-3-ROADMAP.md`
 
@@ -295,12 +304,14 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 **Format**: `story.[epic].[story].[descriptive-name].md`
 
 **Epic Numbering Patterns**:
+
 - `story.1.1.1` - Epic 1, Sub-epic 1, Story 1
 - `story.1.5.1` - Epic 1.5, Story 1
 - `story.2.1` - Epic 2, Story 1
 - `story.2.1.1` - Epic 2, Sub-epic 1, Story 1
 
 **Examples**:
+
 - `story.1.1.1.core-architecture.md`
 - `story.1.5.1.settings-screen.md`
 - `story.2.1.visibility-mode-config.md`
@@ -310,10 +321,12 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 **Format**: `[story-filename].[type].md`
 
 **Completion Files**: Documents story implementation results
+
 - Format: `story.[epic].[story].[name].completion.md`
 - Example: `story.1.1.1.core-architecture.completion.md`
 
 **Technical Addendums**: Supplementary technical documentation
+
 - Format: `story.[epic].[story].[name].[type].md`
 - Examples:
   - `story.2.2.reverse-morphing.worklet-fix.md`
@@ -335,6 +348,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 ### Phase 1: Requirements Gathering (Week 0)
 
 **Create**:
+
 - [ ] `executive-summary.md` - Start here, get alignment
 - [ ] `goals-and-objectives.md` - Define success
 - [ ] `product-requirements.md` - Detail requirements
@@ -344,6 +358,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 ### Phase 2: Technical Planning (Week 0-1)
 
 **Create**:
+
 - [ ] `technical-implementation.md` - Architecture and design
 - [ ] `uiux-design-specifications.md` - UI/UX details (if UI-heavy)
 - [ ] `[feature]-specification.md` - Specialized specs as needed
@@ -353,6 +368,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 ### Phase 3: Implementation Planning (Week 1)
 
 **Create**:
+
 - [ ] `epics/index.md` - Epic roadmap
 - [ ] `epics/epic.1.[name].md` - First epic
 - [ ] `epics/epic.2.[name].md` - Subsequent epics
@@ -363,6 +379,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 ### Phase 4: Story Creation (Week 1-2)
 
 **Create**:
+
 - [ ] `epics/epic.[N].[name]/stories/story.[epic].1.[name].md` - Individual stories
 - [ ] `epics/epic.[N].[name]/stories/story.[epic].2.[name].md` - More stories
 - [ ] `epics/epic.[N].[name]/stories/EPIC-[N]-STORIES-INDEX.md` - Index if >10 stories (optional)
@@ -372,6 +389,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 ### Phase 5: Developer Onboarding (Week 2)
 
 **Create**:
+
 - [ ] `DEVELOPER-QUICK-START.md` - Developer guide
 - [ ] `CROSS-REFERENCE-GUIDE.md` - Navigation help
 - [ ] `IMPLEMENTATION-STATUS.md` - Progress tracking
@@ -381,6 +399,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 ### Phase 6: Complex Epic Planning (As Needed)
 
 **Create**:
+
 - [ ] `epics/EPIC-[N]-ROADMAP.md` - Week-by-week plan for complex epics
 
 **Why**: Provide detailed execution guidance for critical epics
@@ -412,21 +431,25 @@ Developer Quick Start (code examples)
 ### Cross-References
 
 **From PRD to Epic**:
+
 ```markdown
 See [Epic 164: Core Foundation](./epics/epic.164.core-foundation/epic.164.core-foundation.md)
 ```
 
 **From Epic to Story** (epic file linking to its stories):
+
 ```markdown
-See [Story 164.1: Core Architecture](./stories/story.164.1.core-architecture.md)
+See [[Story 164.1] Core Architecture](./stories/story.164.1.core-architecture.md)
 ```
 
 **From Story to PRD**:
+
 ```markdown
 **Source PRD**: [Product Requirements](../../../product-requirements.md#fr1-button-customization)
 ```
 
 **From Story to Epic** (story linking to its parent epic):
+
 ```markdown
 **Epic**: [Epic 164: Core Foundation](../epic.164.core-foundation.md)
 ```
@@ -436,14 +459,17 @@ See [Story 164.1: Core Architecture](./stories/story.164.1.core-architecture.md)
 Always provide navigation in both directions:
 
 **Epic → Stories** (from epic file):
+
 ```markdown
-### Story 164-1: [Story Name]
+### [Story 164.1] [Story Name]
+
 [Story details...]
 
 See full story: [Story 164-1](./stories/story.164.1.[name].md)
 ```
 
 **Story → Epic** (from story file):
+
 ```markdown
 **Epic**: [Epic 164: Core Foundation](../epic.164.core-foundation.md)
 ```
@@ -540,19 +566,19 @@ Do we need progress tracking?
 
 ## Templates Quick Reference
 
-| Document Type | Template | When to Use |
-|--------------|----------|-------------|
-| Executive Summary | `prd-epic-story-reference.md` | Starting new feature |
-| Goals & Objectives | `prd-epic-story-reference.md` | Defining success criteria |
-| Product Requirements | `prd-epic-story-reference.md` | Detailing requirements |
-| Technical Implementation | `prd-epic-story-reference.md` | Architecture planning |
-| Epic | `epic-template.md` | Breaking down feature into work chunks |
-| Epic Roadmap | `epic-roadmap-template.md` | Complex epic execution plan |
-| Story | `story-template.md` | Individual task details |
-| Implementation Status | `implementation-status-template.md` | Progress tracking |
-| Cross-Reference Guide | `cross-reference-guide-template.md` | Navigation help |
-| Developer Quick Start | `developer-quick-start-template.md` | Developer onboarding |
-| Implementation Phases | `implementation-phases-template.md` | High-level roadmap |
+| Document Type            | Template                            | When to Use                            |
+| ------------------------ | ----------------------------------- | -------------------------------------- |
+| Executive Summary        | `prd-epic-story-reference.md`       | Starting new feature                   |
+| Goals & Objectives       | `prd-epic-story-reference.md`       | Defining success criteria              |
+| Product Requirements     | `prd-epic-story-reference.md`       | Detailing requirements                 |
+| Technical Implementation | `prd-epic-story-reference.md`       | Architecture planning                  |
+| Epic                     | `epic-template.md`                  | Breaking down feature into work chunks |
+| Epic Roadmap             | `epic-roadmap-template.md`          | Complex epic execution plan            |
+| Story                    | `story-template.md`                 | Individual task details                |
+| Implementation Status    | `implementation-status-template.md` | Progress tracking                      |
+| Cross-Reference Guide    | `cross-reference-guide-template.md` | Navigation help                        |
+| Developer Quick Start    | `developer-quick-start-template.md` | Developer onboarding                   |
+| Implementation Phases    | `implementation-phases-template.md` | High-level roadmap                     |
 
 ---
 
@@ -603,6 +629,7 @@ docs/prd/ui-domain/example-component/
 ```
 
 **Key Insights**:
+
 - 15+ PRD documents
 - 5 epics with clear progression
 - 20+ stories with detailed implementation
@@ -614,6 +641,7 @@ docs/prd/ui-domain/example-component/
 ## Checklist for New Feature Documentation
 
 ### Requirements Phase
+
 - [ ] Create feature directory: `docs/prd/[domain]/[feature]/`
 - [ ] Write executive-summary.md
 - [ ] Write goals-and-objectives.md
@@ -623,6 +651,7 @@ docs/prd/ui-domain/example-component/
 - [ ] Review and approve PRDs
 
 ### Planning Phase
+
 - [ ] Create `epics/` subdirectory
 - [ ] Write epics/index.md
 - [ ] Write epic.1.[name].md
@@ -631,6 +660,7 @@ docs/prd/ui-domain/example-component/
 - [ ] Define epic dependencies
 
 ### Story Phase
+
 - [ ] Create `stories/` subdirectory
 - [ ] Write stories for Epic 1
 - [ ] Write stories for Epic 2+
@@ -638,12 +668,14 @@ docs/prd/ui-domain/example-component/
 - [ ] Create EPIC-[N]-ROADMAP.md for complex epics
 
 ### Development Phase
+
 - [ ] Create DEVELOPER-QUICK-START.md
 - [ ] Create CROSS-REFERENCE-GUIDE.md
 - [ ] Create IMPLEMENTATION-STATUS.md
 - [ ] Update status as work progresses
 
 ### Maintenance Phase
+
 - [ ] Update story statuses
 - [ ] Create story.[epic].[story].[name].completion.md
 - [ ] Update epic completion percentages

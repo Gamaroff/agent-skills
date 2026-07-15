@@ -1,6 +1,6 @@
 ---
 id: story.3.1.before-you-start-anchor-runbooks
-title: "Story 3.1: 'Before you start' for anchor runbooks"
+title: "[Story 3.1] 'Before you start' for anchor runbooks"
 type: story
 status: accepted
 priority: high
@@ -17,7 +17,7 @@ updated: 2026-05-13
 completed_date: 2026-05-13
 ---
 
-# Story 3.1: "Before you start" for anchor runbooks
+# [Story 3.1] "Before you start" for anchor runbooks
 
 **Status**: Accepted
 **Review**: ✅ All review recommendations from `story.3.1.review.1.before-you-start-anchor-runbooks.md` implemented 2026-05-13

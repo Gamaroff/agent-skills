@@ -78,7 +78,7 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 `create-story`, `review-story`, `edit-story`, `create-epic`, `review-epic`, `edit-epic`
 
 **Product management:**
-`new-product-prd`, `create-prd`, `scrum-master`, `po`, `create-task`, `change-management`
+`new-product-prd`, `create-prd`, `po`, `create-task`, `change-management`
 
 **Architecture:**
 `architect`, `create-architecture-doc`, `execute-architect-checklist`, `mermaid-architect`
@@ -151,23 +151,20 @@ Projects place a `skills-config.yaml` at their root to tune skill behaviour:
 
 ```yaml
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: "*/epics/epic.{n}.*.md"
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
-devStoryLocation: nested # stories nested inside epic directories
-devDebugLog: .ai/debug-log.md
 tracker: jira # explicit platform override
 vcs: bitbucket
 ```
 
-QA artifacts (review reports, gate files, DoD) are co-located with their story/task — no `qa.qaLocation` config is needed.
+PRD and architecture roots are configurable (defaults shown). The nested structure under each root (epics, stories, QA co-location) is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 ## Further Reading
+
+**If you're new, read [Getting Started](./getting-started.md) next** — it takes you from "I cloned the repo" to "I ran my first command" in under ten minutes, including the setup wizard. Everything below is reference material you'll come back to.
 
 - [Invocation](../reference/invocation.md) — invocation patterns and file discovery
 - [Skill Catalog](../reference/skill-catalog.md) — full index of all skills

@@ -1,6 +1,6 @@
 ---
 id: story.3.3.common-first-time-errors
-title: "Story 3.3: 'Common first-time errors' troubleshooting sections"
+title: "[Story 3.3] 'Common first-time errors' troubleshooting sections"
 type: story
 status: accepted
 priority: medium
@@ -17,7 +17,7 @@ completed_date: 2026-05-13
 pr_number: 109
 ---
 
-# Story 3.3: "Common first-time errors" troubleshooting sections
+# [Story 3.3] "Common first-time errors" troubleshooting sections
 
 **Status**: Accepted
 **GitHub Issue**: [#80](https://github.com/Gamaroff/agent-skills/issues/80)

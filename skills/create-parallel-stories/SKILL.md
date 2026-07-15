@@ -62,38 +62,35 @@ Epic 1: User Authentication
 
 **Configuration File**: `skills-config.yaml` (in project root)
 
+0. **Resolve paths.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). All path operations below use these env vars.
+
 1. Attempt to load `skills-config.yaml` from project root
 2. If file does not exist, **notify user**:
 
    > "`skills-config.yaml` not found. Create this file to customize story locations, or continue with default settings."
 
-3. Extract configurations (with defaults if file missing):
-   - `devStoryLocation` - Story storage mode: `nested` (default) means stories are stored within epic directories
-   - `prd.*` - PRD structure and locations (default: `prdSharded: true`, `prdShardedLocation: docs/prd`)
-   - `architecture.*` - Architecture document settings (default: `architectureSharded: true`, `architectureShardedLocation: docs/architecture`)
+3. Extract configurations:
+   - `prd.prdShardedLocation` — resolved into `${PRD_ROOT}` (default `docs/prd`)
+   - `architecture.architectureShardedLocation` — resolved into `${ARCH_ROOT}` (default `docs/architecture`)
+
+   Nested structure under each root is fixed (see docs/reference/configuration.md):
+   - Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+   - Stories: nested at `{epic-dir}/stories/`
+   - QA artifacts: co-located with the story.
 
 **Default Configuration Values** (used if `skills-config.yaml` not found):
 
 ```yaml
-markdownExploder: true
-qa:
-  qaLocation: docs/qa
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-# Stories stored within epic directories: {prdShardedLocation}/{category}/{component}/epics/{epic}/stories/
-devStoryLocation: nested
-devDebugLog: .ai/debug-log.md
 ```
 
 #### 0.2 Read PRD and Architecture
 
-1. Read `docs/prd.md` or sharded epic files
-2. Read `docs/architecture.md` or sharded architecture docs
+1. Read PRD shard files under `${PRD_ROOT}/`
+2. Read architecture docs under `${ARCH_ROOT}/`
 3. Understand:
    - Epic structure and requirements
    - Component/module organization
@@ -109,7 +106,7 @@ devDebugLog: .ai/debug-log.md
 #### 1.1 Identify Current Epic and Story Dependencies
 
 1. **Locate Epic Files**
-   - Based on `prdSharded` configuration
+   - Look under `${PRD_ROOT}/{domain}/{feature}/epics/`
    - Identify the target epic for parallel story creation
 
 2. **Analyze Epic Requirements**
@@ -209,6 +206,28 @@ For stories with dependencies:
    - "Integrates components from parallel stories"
    - "Requires combined functionality from 1-1 and 1-2"
    - "Database migrations depend on schema changes from 1-X stories"
+
+---
+
+#### 2.3 Sync the Parent Epic in the Same Commit (MANDATORY)
+
+**Rule (Review 4 §9.2 / R-15d):** whenever a split creates new sub-stories or supersedes a parent story, the **parent epic file MUST be updated in the same commit** as the new/renamed story files — never in a follow-up. Three Review-3 splits (epics 13/17/21) forgot this and left the epic and its stories disagreeing (R4:CN-02).
+
+For every split, in one commit, update the parent epic's:
+
+1. `estimated_stories` frontmatter count → the new active (non-superseded) story count.
+2. The **Stories Breakdown / Overview** table row(s) — add the new sub-stories, mark the superseded parent.
+3. The **mermaid** diagram (if present) — new nodes + dependency edges.
+4. **Dependency** notes and **Definition of Done** counts.
+5. The superseded parent story → `status: superseded` + a "Superseded by X/Y" banner on its main, plan, and any validate/review companion files (canon §3).
+
+**Verify before committing:** run the docs linter — check #6 (`estimated_stories` == active story dirs) must pass:
+
+```bash
+node docs/tasks/task.12.documentation-conventions-normalization-validator/scripts/lint-docs.mjs --only=6
+```
+
+Reference example: Epic 14's 14.7 split. Canon: [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §2.
 
 ---
 
@@ -661,9 +680,6 @@ Generate comprehensive summary:
 ---
 
 ## Integration with Other Skills
-
-**Called by**:
-- `scrum-master` - When parallel development is requested
 
 **Calls**:
 - `create-story` - Reuses story population logic

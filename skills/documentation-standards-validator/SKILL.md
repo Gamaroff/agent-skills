@@ -18,6 +18,18 @@ Activate this skill when:
 5. **Migrating documentation** - Rename to proper format
 6. **Auditing docs** - Find naming violations
 
+## Runnable lint/census (run this first)
+
+This skill is a guidance checklist, but a **runnable** lint/census script now backs the mechanical checks. Run it to detect the defect classes below on demand (it is not a hard git-hook/CI gate — it surfaces failures for the agent to fix):
+
+```bash
+node docs/tasks/task.12.documentation-conventions-normalization-validator/scripts/lint-docs.mjs
+```
+
+It emits 7 findings against [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md): (1) status vocabulary, (2) frontmatter key completeness, (3) Change Log header, (4) FR-tag presence (warn), (5) registry⇔PRD Epic-List parity, (6) epic `estimated_stories` vs active story dirs, (7) stray `PROGRESS*.md` under epics. Exit non-zero on any error-level finding. Fixture tests: `node …/scripts/lint-docs.test.mjs`. Each check is independently toggleable (`--skip=4,7`).
+
+When creating or reviewing a story/epic/task, run the linter on the corpus and fix any error it reports before finishing.
+
 ## File Naming Standards
 
 ### Use DOTS Not Underscores
@@ -52,6 +64,12 @@ epic.165.chat-encryption.md
 
 **Rule**: Each story MUST be placed in its own self-named subdirectory within the epic's `stories` folder.
 
+### Story Plan Filename Format
+
+**Pattern**: `story.EPIC.STORY.plan.descriptive-name.md`
+
+**Rule**: The plan file (if present) must be co-located in the story's subdirectory.
+
 ```
 📁 epic.163.module-security/
   📁 stories/
@@ -69,6 +87,8 @@ epic.165.chat-encryption.md
 
 epic_number: 163
 title: Account Security Enhancement
+type: epic
+description: One-sentence summary of the epic
 domain: Account
 status: 🔄 In Progress
 priority: High
@@ -80,26 +100,44 @@ target_completion: 2026-01-15
 
 \`\`\`
 
-**Required Fields**: epic_number, title, domain, status, priority, estimated_stories, created, target_completion
+**Required Fields**: epic_number, title, type, domain, status, priority, estimated_stories, created, target_completion (`description` recommended; `tags`/`resource` optional — see [OKF](#open-knowledge-format-okf-conformance))
 
 ### Story Frontmatter
 
+> **Canonical schema:** see [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §4 + Appendix B. Story `status` is **kebab-case** (not emoji — emoji status is epics only), effort is `estimated_effort_hours`, and both `created` and `updated` are required.
+
 ## \`\`\`yaml
 
+epic: epic.163.module-security
 epic_number: 163
 story_number: 1
 title: Implement Mnemonic Encryption Service
-status: ✅ Complete
+type: story
+description: One-sentence summary of the story
+tags: [security, backend]
+status: ready-for-development
 priority: High
-estimated_effort: 5
+story_type: backend
+risk_level: high
+assignee: TBD
+estimated_effort_hours: 5
 created: 2025-12-31
-completed: 2026-01-05
+updated: 2026-01-05
+github_issue: 1234
 
 ---
 
 \`\`\`
 
-**Required Fields**: epic_number, story_number, title, status, priority, estimated_effort, created
+**Required Fields** (canon §4): epic, epic_number, story_number, title, type, description, tags, status (kebab-case: `draft`/`planned`/`ready-for-development`/`in-progress`/`ready-for-review`/`accepted`/`superseded`/`cancelled`), priority, story_type (`full-stack`/`backend`/`frontend`/`infra`/`engine`), risk_level, assignee, estimated_effort_hours, created, updated, github_issue (`tags`/`resource` per [OKF](#open-knowledge-format-okf-conformance))
+
+## Open Knowledge Format (OKF) conformance
+
+All document frontmatter targets [OKF v0.1](references/open-knowledge-format.md). Apply these severities when validating any epic, story, task, or PRD:
+
+- **`type` present and non-empty → Critical.** OKF's one hard requirement; flag a missing or empty `type` as a Critical finding (this is the gate that `documentation-standards-validator` must now enforce).
+- **`description` present (one-sentence summary) → Important.** Flag a missing `description` as Important.
+- **`tags` is a YAML list (when present); `resource` is a valid URI (when present) → Optional.** Flag only when malformed. Absence is not a finding (`updated` ≡ OKF `timestamp`; tracker URL ≡ OKF `resource`).
 
 ## Status Indicators
 
@@ -135,11 +173,15 @@ completed: 2026-01-05
 - [ ] Correct pattern (epic.N.name.md or story.E.S.name.md)
 - [ ] .md extension
 - [ ] Stories are placed in self-named subdirectories (e.g., `story.1.1.name/story.1.1.name.md`)
+- [ ] Correct pattern for plan files (story.E.S.plan.name.md) if present
 
 ### YAML Frontmatter
 
 - [ ] All required fields present
 - [ ] Correct field names (epic_number not epicNumber)
+- [ ] `type` present and non-empty (OKF — Critical when missing)
+- [ ] `description` present (OKF — Important when missing)
+- [ ] `tags` (if present) is a list; `resource` (if present) is a URI (OKF — Optional)
 - [ ] Valid status indicator
 - [ ] ISO dates (YYYY-MM-DD)
 - [ ] Proper YAML syntax

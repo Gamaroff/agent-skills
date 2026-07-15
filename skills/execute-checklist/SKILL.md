@@ -86,9 +86,9 @@ This skill uses **interactive mode** for thorough, collaborative validation:
 1. Each checklist specifies required documents/artifacts at the beginning
 2. Follow checklist-specific instructions for what to gather
 3. Common document locations:
-   - Stories: `{epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md` (co-located inside epic dir, e.g. `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/`)
-   - Epics: `docs/prd/{domain}/{feature}/epics/epic.{n}.{name}/epic.{n}.{name}.md`
-   - Architecture: `docs/architecture/`
+   - Stories: `{epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md` (co-located inside epic dir, e.g. `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/`)
+   - Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{n}.{name}/epic.{n}.{name}.md`
+   - Architecture: `${ARCH_ROOT}/`
    - Previous stories for context
 
 **If document location unclear**:
@@ -291,7 +291,6 @@ Generate comprehensive summary with:
 
 **Called by**:
 
-- `scrum-master` - For story validation
 - `create-story` - Validates story completeness after creation
 - `correct-course` - Uses change-checklist for impact assessment
 - `develop` - Developers run DoD checklist before completion

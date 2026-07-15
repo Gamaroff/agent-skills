@@ -1,6 +1,6 @@
 ---
 id: story.1.3.review.1.decision-tree-which-path
-title: "Story 1.3 Review #1: Decision tree — which path?"
+title: "[Story 1.3] Review #1: Decision tree — which path?"
 type: review
 status: complete
 story: story.1.3.decision-tree-which-path

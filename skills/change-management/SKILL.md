@@ -177,7 +177,7 @@ Create comprehensive proposal:
 
 ### Epic Changes
 
-**Epic [N]: [Name]**
+**[Epic N] Name**
 
 - **Change:** [Description]
 - **From:** [Old content]

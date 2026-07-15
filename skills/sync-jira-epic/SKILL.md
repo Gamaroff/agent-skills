@@ -27,9 +27,9 @@ One-way sync of a local epic markdown file to Jira. Auto-detects create vs updat
 - **Live priority resolution** — fetches `/rest/api/3/priority` and matches user input against the actual Jira instance, falling back to a built-in synonym map (`critical`→`Highest`, etc.).
 - **Issue type cache** — Jira `Epic` type id is cached to `<repo>/.cache/jira-issuetypes-<PROJECT>.json` for 24h.
 - **Stories Breakdown ADF table** — the markdown `## Stories Breakdown` table is rendered as a real ADF table (header row + data rows) in the Jira description, not raw pipes. Inline markdown links (`[label](url)`) inside cells render as ADF link marks. Escaped pipes (`\|`) in cells are preserved.
-- **PRD path resolution** — `prd_source` frontmatter is resolved through multiple path conventions (`docs/prd/<domain>/<feature>/prd.<feature>.md`, basename match) before giving up.
+- **PRD path resolution** — `prd_source` frontmatter is resolved through multiple path conventions (`${PRD_ROOT}/<domain>/<feature>/prd.<feature>.md`, basename match) before giving up. `${PRD_ROOT}` resolves via `references/resolve-paths.sh` (default: `docs/prd`).
 - **Bullet/ordered lists** — body sections containing `- item` or `1. item` lines render as proper ADF lists, not paragraphs with hard-breaks.
-- **Default-branch Bitbucket URLs** — links use the resolved `origin/HEAD` branch (e.g. `main`) instead of `HEAD`.
+- **Current-branch Bitbucket URLs** — links use the current branch's remote-tracking branch (e.g. `origin/feature/...`), falling back to the default branch (`origin/HEAD`, e.g. `main`) when there is no upstream or HEAD is detached. Feature branches are deleted post-merge, so re-sync from `develop`/`main` (or pass `--doc-branch`) after merge to pin a durable link.
 - **HTTP retry** — automatic retry with exponential backoff on 5xx and network errors. 4xx responses fail fast.
 - **Backlog placement (Scrum only)** — board type is detected via `/rest/agile/1.0/board/{id}/configuration`. Skipped on Kanban with a warning. Single board per env (`JIRA_BOARD_ID`); multi-board projects must run the script per board ID.
 - **In-place frontmatter updates** — `jira_*` keys are updated where they sit, not stripped and re-appended. Clean diffs.
@@ -47,10 +47,14 @@ One-way sync of a local epic markdown file to Jira. Auto-detects create vs updat
 
 ## Prerequisites
 
+### Resolve paths
+
+Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). Path references below substitute this env var.
+
 ### Required Files
 
 - An epic markdown file at:
-  `docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
+  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
 - Optionally: `prd_source` pointing to the parent PRD file for Bitbucket link generation.
 
 ### Required Environment Variables
@@ -87,7 +91,7 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 
 ```yaml
 title: 'Epic 1: NX Workspace Foundation'
-prd_source: 'docs/prd/build/setup-nx-monorepo/prd.setup-nx-monorepo.md'
+prd_source: 'docs/prd/build/setup-nx-monorepo/prd.setup-nx-monorepo.md'  # literal repo path (substitute ${PRD_ROOT} if custom)
 epic_type: 'foundation'
 priority: 'high'
 estimated_sprints: 2
@@ -104,13 +108,13 @@ due_date: '2026-05-15'
 ### 1. Identify the Epic File
 
 ```
-docs/prd/<domain>/<feature>/epics/epic.<N>.<slug>/epic.<N>.<slug>.md
+${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/epic.<N>.<slug>.md
 ```
 
 To find epics that have **not yet been synced** (no `jira_key`):
 
 ```bash
-grep -L 'jira_key:' $(find docs/prd -path '*/epics/*/epic.*.md' -not -path '*/stories/*')
+grep -L 'jira_key:' $(find "$PRD_ROOT" -path '*/epics/*/epic.*.md' -not -path '*/stories/*')
 ```
 
 ### 2. Optional — Dry Run
@@ -133,7 +137,7 @@ node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
 Flow:
 
 1. Parse the epic file (frontmatter + body) — safe against `---` horizontal rules in the body.
-2. Resolve auth, Bitbucket repo URL + default branch, and load live Jira priorities.
+2. Resolve auth, Bitbucket repo URL + branch (current branch's upstream, falling back to the default branch), and load live Jira priorities.
 3. Resolve `prd_source` to a Bitbucket URL via the multi-variant lookup; fall back to `prd_bitbucket_url` frontmatter if present.
 4. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 5. Detect create vs update; on update fetch current state and run concurrent-edit guard.
@@ -167,20 +171,23 @@ Flow:
 
 ## Status Transitions
 
-Frontmatter `status` is normalised by stripping emoji, lower-casing, and mapping through:
+Frontmatter `status` is normalised by stripping emoji and lower-casing, then mapped to a Jira workflow
+status name via the shared default map (overlaid with any `jira.statusMap` overrides from
+`skills-config.yaml`). Defaults for a vanilla Jira workflow:
 
-| Frontmatter status | Jira target |
+| Local status | Default Jira target |
 |---|---|
-| `Planned`, `To Do`, `Open`, `Todo`, `Backlog` | `To Do` |
-| `In Progress`, `Doing`, `In-Progress` | `In Progress` |
-| `In Review`, `Review`, `Ready For Review` | `In Review` |
-| `Ready` | `Ready` |
-| `Done`, `Completed`, `Complete` | `Done` |
-| `Blocked` | `Blocked` |
-| `Cancelled`, `Canceled` | `Cancelled` |
-| `Won't Do`, `Wont Do`, `Won't Fix`, `Wontfix` | `Won't Do` |
+| `draft`, `planned`, `ready-for-development`, `backlog` | `To Do` |
+| `in-progress` | `In Progress` |
+| `ready-for-review`, `in review` | `In Review` |
+| `ready` | `Ready` |
+| `accepted` | `Done` |
+| `cancelled` | `Cancelled` |
+| `won't do` | `Won't Do` |
 
-The script then fetches `/rest/api/3/issue/{key}/transitions` and matches by `to.name` (or `name` as a fallback). If no matching transition is available, a warning is emitted and sync still succeeds.
+The script then fetches `/rest/api/3/issue/{key}/transitions` and matches the resolved target by `to.name` (or `name` as a fallback), case-insensitively. If no matching transition is available, a warning naming the available transitions is emitted and sync still succeeds.
+
+**Custom workflow vocabulary.** If your Jira workflow uses different status names (e.g. "Selected for Development"), map them under `jira.statusMap` in `skills-config.yaml`. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping). Any status with no mapping passes through verbatim to Jira's transition matcher.
 
 ## Idempotent Create
 
@@ -258,6 +265,7 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
 | `--summary` | `-s` | Override epic summary/title |
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
+| `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Lets a post-merge re-sync point links at the durable integration branch instead of a deleted feature branch. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--force` | | Override the concurrent-edit guard AND the no-change fast path |
 | `--json` | | Suppress human output; emit a single JSON object on completion |

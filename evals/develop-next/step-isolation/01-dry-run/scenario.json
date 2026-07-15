@@ -1,0 +1,11 @@
+{
+  "name": "develop-next-step-01-dry-run",
+  "skill": "develop-next",
+  "description": "--dry-run is read-only: reports the selection (5.1a) without creating a run-state file, taking the pipeline lock, or mutating the roadmap.",
+  "prompt": "Run /develop-next --dry-run in this repository.",
+  "assertions": [
+    { "fn": "fileAbsent",  "args": ["$SANDBOX/.claude/state/develop-next.state.json"] },
+    { "fn": "fileAbsent",  "args": ["$SANDBOX/.claude/state/develop-pipeline.lock"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/development/project-completion-roadmap.md", "- \\[ \\] \\*\\*5\\.1a\\*\\*"] }
+  ]
+}

@@ -37,10 +37,12 @@ Activate this skill directly for **brownfield enhancements** to existing project
 
 This skill supports two modes. The mode determines pre-flight checks, template selection, validation depth, and which PRD sections are emitted.
 
-| Mode | Default | Set by | Template | Output path |
-|------|---------|--------|----------|-------------|
-| `brownfield` | yes | direct activation | `brownfield-prd-template` | `docs/prd/[domain]/[feature]/prd.[feature].md` |
-| `greenfield` | no | delegated from `new-product-prd` | `prd-template` | `docs/prd.md` |
+**Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). Output paths below use this env var.
+
+| Mode         | Default | Set by                           | Template                  | Output path                                                   |
+| ------------ | ------- | -------------------------------- | ------------------------- | ------------------------------------------------------------- |
+| `brownfield` | yes     | direct activation                | `brownfield-prd-template` | `${PRD_ROOT}/[domain]/prd.[feature]/prd.[feature].md`         |
+| `greenfield` | no      | delegated from `new-product-prd` | `prd-template`            | `docs/prd.md` (monolithic — sharded into `${PRD_ROOT}` later) |
 
 Throughout this skill, sections marked **(brownfield only)** or **(greenfield only)** apply to the respective mode. Sections without a mode tag run in both.
 
@@ -50,7 +52,7 @@ This skill produces **the PRD document and its associated planning artifacts onl
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
-- ❌ Editing, creating, or deleting any source file outside `docs/prd/` or `docs/prd.md` (and the tracker-issue side effect)
+- ❌ Editing, creating, or deleting any source file outside `${PRD_ROOT}/` or `docs/prd.md` (and the tracker-issue side effect)
 - ❌ Running migrations, codegen, build, lint-fix, or refactor commands
 - ❌ Creating branches, committing, or pushing code changes
 - ❌ Installing/removing dependencies or modifying `package.json`
@@ -59,7 +61,7 @@ This skill produces **the PRD document and its associated planning artifacts onl
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The PRD file (`docs/prd/[domain]/[feature]/prd.[feature].md` for brownfield, `docs/prd.md` for greenfield) and its directory
+- ✅ The PRD file (`${PRD_ROOT}/[domain]/prd.[feature]/prd.[feature].md` for brownfield, `docs/prd.md` for greenfield) and its directory
 - ✅ Tracker issue creation if the workflow includes it
 - ✅ Handoff prompt files (Architect/UX Expert) emitted as part of Step 4
 
@@ -144,6 +146,10 @@ If Project Brief is missing, the template will guide gathering this during the G
    └─ (brownfield) Integration testing & rollback guidance
 ```
 
+## PRD Frontmatter (OKF conformance)
+
+The PRD's YAML frontmatter (written during "Interactive PRD Creation") must include OKF v0.1 fields: a non-empty `type: prd` (OKF's one hard requirement), a one-sentence `description` (OKF-recommended), and optional `tags`. These sit alongside the existing `name`, `title`, `mode`, `status`, `version`, `created` fields. See [prd-documents.md](../../docs/standards/prd-documents.md) and [OKF conformance](references/open-knowledge-format.md).
+
 ## Detailed Execution Steps
 
 ### Step 1: Pre-Flight Check & Analysis
@@ -183,11 +189,12 @@ Skip to Step 2 once pre-flight complete.
 
 Before anything else, scan for an existing in-progress PRD for this feature:
 
-- Check `docs/prd/` and subdirectories for any PRD file related to the enhancement being discussed
+- Check `${PRD_ROOT}/` and subdirectories for any PRD file related to the enhancement being discussed
 - If found, read it and check its `stepsCompleted` frontmatter field (or infer completion from section headings)
 - If a PRD is found, determine whether it is incomplete or complete, then report to the user:
 
 **If incomplete:**
+
 ```
 "I found an existing PRD at [path] that appears to cover [topic].
 It looks like [sections X, Y were completed / it was started but not finished].
@@ -201,6 +208,7 @@ What would you like to do?"
 ```
 
 **If complete (all sections present):**
+
 ```
 "I found a completed PRD at [path] covering [topic].
 
@@ -221,9 +229,9 @@ Scan the project for existing reference documents before asking the user for any
 
 - `*brief*.md` — Product or feature briefs
 - `*research*.md` — Research or analysis documents
-- `docs/prd/**` — Prior PRD artefacts
+- `${PRD_ROOT}/**` — Prior PRD artefacts
 - `docs/project-context.md` — Project context (loaded automatically)
-- `docs/architecture/**` — Architecture documentation
+- `${ARCH_ROOT}/**` — Architecture documentation
 
 Report findings:
 
@@ -304,7 +312,7 @@ Use create-doc skill with:
 ```
 Use create-doc skill with:
 - Template: brownfield-prd-template (resources/brownfield-prd-tmpl.yaml)
-- Output: docs/prd/[domain]/[feature]/prd.[feature].md
+- Output: ${PRD_ROOT}/[domain]/prd.[feature]/prd.[feature].md
 - Mode: Interactive (mandatory for brownfield)
 ```
 
@@ -377,6 +385,7 @@ Use create-doc skill with:
 5. Iterate based on feedback
 
 **❌ Do NOT proceed if:**
+
 - Any FR uses vague language without measurable criteria (e.g., "fast", "easy", "intuitive")
 - Any FR prescribes implementation technology (e.g., "use React component X") instead of capability
 - NFRs lack specific metrics
@@ -431,16 +440,17 @@ Present with rationale, STOP for 1-9 elicitation. Document ALL choices with rati
 
 Score the PRD against these 6 signals. Each signal present = 1 point:
 
-| Signal | Description |
-|--------|-------------|
-| **Domain breadth** | PRD spans 2+ distinct functional areas (e.g. auth + notifications + data sync) |
-| **Parallelism opportunity** | Areas can be worked simultaneously by independent streams |
-| **Story volume** | Likely 8+ stories total (target 3–6 stories per epic) |
-| **Dependency isolation** | Areas have minimal cross-dependencies and can ship independently |
-| **Risk isolation** | One area is high-risk and should be isolated to contain impact |
-| **Timeline variance** | Different areas have different urgency or delivery milestones |
+| Signal                      | Description                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| **Domain breadth**          | PRD spans 2+ distinct functional areas (e.g. auth + notifications + data sync) |
+| **Parallelism opportunity** | Areas can be worked simultaneously by independent streams                      |
+| **Story volume**            | Likely 8+ stories total (target 3–6 stories per epic)                          |
+| **Dependency isolation**    | Areas have minimal cross-dependencies and can ship independently               |
+| **Risk isolation**          | One area is high-risk and should be isolated to contain impact                 |
+| **Timeline variance**       | Different areas have different urgency or delivery milestones                  |
 
 **Scoring:**
+
 - **0–2 signals** → Single epic is appropriate; document rationale
 - **3+ signals** → Propose multiple epics, one per functional area
 
@@ -449,11 +459,26 @@ Score the PRD against these 6 signals. Each signal present = 1 point:
 1. Propose a named epic breakdown mapping each epic to a PRD functional area
 2. Show which stories belong to each epic
 3. Identify cross-epic dependencies (if any) and sequencing constraints
-4. Present as: *"I recommend [N] epics because [signal list]. Here is the proposed breakdown: [epic list with rationale]."*
+4. Present as: _"I recommend [N] epics because [signal list]. Here is the proposed breakdown: [epic list with rationale]."_
+
+> **Do not artificially collapse into 3 epics if 4+ functional areas exist.** Merging distinct functional areas inflates story count beyond the 3–6 target, increases coupling, and eliminates parallelism opportunities.
+
+**Example — 4-epic breakdown:**
+
+A PRD covering authentication, notifications, data sync, and reporting spans 4 distinct functional areas. Collapsing "data sync" and "reporting" into one epic just to stay at 3 epics defeats the purpose of the breakdown. Correct split:
+
+| Epic | Functional Area | Rationale |
+|------|-----------------|-----------|
+| Epic 1 | Authentication & Identity | Foundation; other epics depend on it |
+| Epic 2 | Notifications | Isolated delivery channel; parallel-workable after Epic 1 |
+| Epic 3 | Data Sync | Backend-heavy; independent of notification UI |
+| Epic 4 | Reporting & Analytics | Read-only layer; depends on Epic 3 data model |
+
+Each epic is independent enough for a separate stream, targets 3–6 stories, and delivers testable value on its own.
 
 **Step 3 — For single epic (must justify):**
 
-If 0–2 signals, document explicitly: *"This PRD scores [N]/6 on the complexity rubric. A single epic is appropriate because [reason]."*
+If 0–2 signals, document explicitly: _"This PRD scores [N]/6 on the complexity rubric. A single epic is appropriate because [reason]."_
 
 **Greenfield Epic 1 rule:** Epic 1 = Foundation + initial functionality. Subsequent epics build incrementally. Cross-cutting concerns flow through epics. Epics deliver deployable, testable value.
 
@@ -477,7 +502,7 @@ PRDs grow over time — it is expected and normal to add new epics as scope evol
 - The continuation detection step (1a) must offer an **Extend** option for completed PRDs
 
 **IMPORTANT — Epic Numbering:**
-When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
+When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/development/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.
 
 #### Section 6: Epic Details (MANDATORY ELICITATION per epic, REPEATABLE)
 
@@ -521,6 +546,7 @@ So that [benefit].
 5. Refine based on feedback
 
 **❌ Do NOT proceed if:**
+
 - Acceptance criteria are not independently testable
 - **(brownfield)** Any story lacks Integration Verification (IV) criteria
 - **(brownfield)** Story sequence has a step that modifies existing behaviour before verifying current behaviour still works
@@ -688,6 +714,7 @@ User: "Create a PRD for a new mobile app"
 ❌ **Vague requirements** — "Fast", "easy", "intuitive" are not requirements; replace with measurable criteria
 ❌ **Implementation leakage** — FRs describe capability, not implementation; no technology names in requirements
 ❌ **Defaulting to a single epic** — Always run the complexity assessment; complex PRDs warrant multiple epics
+❌ **Artificially collapsing epics** — If 4+ functional areas exist, do not merge them into 3 epics to appear concise; each distinct functional area warrants its own epic
 
 **Brownfield additional:**
 

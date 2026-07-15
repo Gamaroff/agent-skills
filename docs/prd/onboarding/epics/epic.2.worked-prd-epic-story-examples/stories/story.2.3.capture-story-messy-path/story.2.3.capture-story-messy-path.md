@@ -1,6 +1,6 @@
 ---
 id: story.2.3.capture-story-messy-path
-title: "Story 2.3: Capture a story with the messy path (real QA-gate FAIL → PASS)"
+title: "[Story 2.3] Capture a story with the messy path (real QA-gate FAIL → PASS)"
 type: story
 status: cancelled
 priority: high
@@ -15,7 +15,7 @@ created: 2026-05-11
 updated: 2026-05-13
 ---
 
-# Story 2.3: Capture a story with the messy path
+# [Story 2.3] Capture a story with the messy path
 
 **Status**: Cancelled
 **Review**: ✅ Critical/Important recommendations from `story.2.3.review.1.capture-story-messy-path.md` implemented 2026-05-13

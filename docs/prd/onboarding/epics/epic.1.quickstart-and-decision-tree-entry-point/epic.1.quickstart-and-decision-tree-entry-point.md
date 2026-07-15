@@ -2,17 +2,18 @@
 epic_number: 1
 title: "Quickstart & Decision-Tree Entry Point"
 domain: "onboarding"
-status: "📋 Planned"
+status: "✅ Accepted"
 priority: "High"
 estimated_stories: 5
 created: 2026-05-11
 target_completion: 2026-06-08
+accepted: 2026-05-14
 prd_source: "docs/prd/onboarding/prd.onboarding.md"
 github_issue: 73
 github_url: "https://github.com/Gamaroff/agent-skills/issues/73"
 ---
 
-# Epic 1: Quickstart & Decision-Tree Entry Point — Brownfield Enhancement
+# [Epic 1] Quickstart & Decision-Tree Entry Point — Brownfield Enhancement
 
 ## Epic Goal
 
@@ -50,7 +51,7 @@ Land a brand-new agent-skills user in the right pipeline path within 60 seconds 
 | 1.4   | ❌ Not Started | Medium   | Rewrite `getting-started.md` terminus to link to quickstarts                |
 | 1.5   | ❌ Not Started | Medium   | `README.md` "Start here" callout pointing at decision tree                  |
 
-### Story 1.1: "First task in 10 minutes" quickstart
+### [Story 1.1] "First task in 10 minutes" quickstart
 
 As a new user who just installed agent-skills,
 I want a step-by-step walkthrough that produces a complete task artifact set in 10 minutes,
@@ -63,7 +64,7 @@ so that I can confirm the toolkit works on my machine without reading reference 
 3. Walking the doc verbatim on a clean clone produces task spec, plan, implementation report, QA report, gate file, and DoD checklist in ≤ 10 min wall time.
 4. Doc ≤ 400 lines.
 
-### Story 1.2: "First story in 60 minutes" quickstart
+### [Story 1.2] "First story in 60 minutes" quickstart
 
 As a new user who has completed the task quickstart,
 I want a similarly tight walkthrough that produces a story artifact set end-to-end,
@@ -77,7 +78,7 @@ so that I can see the full PRD → epic → story → develop-story chain withou
 4. Cross-links to `examples/` worked artifacts (Epic 2 outputs) — pending until Epic 2 lands.
 5. Doc ≤ 400 lines.
 
-### Story 1.3: Decision tree — which path?
+### [Story 1.3] Decision tree — which path?
 
 As a new user uncertain whether to use task, story, hotfix, or parallel paths,
 I want a single page with a decision tree mapping intent to skill,
@@ -91,7 +92,7 @@ so that I land in the right runbook without trial-and-error.
 4. Format: Mermaid flowchart + prose fallback for accessibility.
 5. Doc ≤ 250 lines.
 
-### Story 1.4: Rewrite `getting-started.md` to terminate in quickstarts
+### [Story 1.4] Rewrite `getting-started.md` to terminate in quickstarts
 
 As a new user reading `getting-started.md`,
 I want the doc to end with a concrete next-action ("now follow `quickstart-task.md`"),
@@ -103,7 +104,7 @@ so that I do not bounce off the open-ended "read the runbooks" terminus.
 2. Diff is small — install checklist body preserved verbatim.
 3. Closing prose ≤ 20 lines.
 
-### Story 1.5: README "Start here" callout
+### [Story 1.5] README "Start here" callout
 
 As a visitor on the repo homepage,
 I want a "Start here" callout near the top of `README.md`,

@@ -46,7 +46,6 @@ Activate this skill when:
 
 **Related Skills**:
 
-- `scrum-master` - For orchestrating technical task creation in project planning
 - `qa-story` - For QA assessment after task implementation
 - `qa-gate` - For formal quality gate decision on technical tasks
 - `documentation-standards-validator` - Validates file naming conventions, YAML frontmatter, and structural standards after document creation
@@ -65,26 +64,31 @@ Activate this skill when:
 
 ## ⚠️ CRITICAL EXECUTION RULES ⚠️
 
-### Documentation-Only Scope — Do NOT Implement
+### Resolve paths first
 
-This skill produces **task documentation and the co-located plan file only**. It MUST NOT perform, begin, or scaffold the implementation work that the task describes.
+Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). The `sprint-status.yaml` update step below uses `${PRD_ROOT}`; task locations under `docs/tasks/` are fixed.
+
+### Scope: Documentation + Opt-in Tracker Sync — Do NOT Implement
+
+This skill produces **task documentation and the co-located plan file**, and then — **only after explicitly asking the user in step 4.5** — may optionally sync the task to an issue tracker (GitHub or Jira). It MUST NOT perform, begin, or scaffold the implementation work that the task describes. Tracker sync is **opt-in**: never create a remote issue without the user's confirmation in this run.
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
-- ❌ Editing, creating, or deleting any source file outside `docs/tasks/task.[ID].[name]/` (and the tracker-issue side effect in step 4.5)
+- ❌ Editing, creating, or deleting any source file outside `docs/tasks/task.[ID].[name]/` (and, only after the user opts in at step 4.5, the tracker issue)
 - ❌ Running migrations, codegen, build, lint-fix, or refactor commands
 - ❌ Creating branches, committing, or pushing code changes
 - ❌ Installing/removing dependencies or modifying `package.json`
 - ❌ Starting Phase 1 of the Implementation Plan "to get a head start"
 - ❌ Auto-invoking `develop-task`, `develop-story`, or any implementation skill on completion
+- ❌ Creating Jira or GitHub issues **without first asking the user** — tracker sync is gated behind the step 4.5 prompt and must never run unprompted
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
 - ✅ The task directory `docs/tasks/task.[ID].[name]/`
 - ✅ `task.[ID].[name].md` (task doc)
 - ✅ `task.[ID].plan.[name].md` (plan doc — MUST be co-located in the task directory above)
-- ✅ `docs/prd/sprint-status.yaml` status field update (step 5)
-- ✅ Tracker issue creation via `gh` / Jira API (step 4.5)
+- ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (step 5)
+- ✅ *(only after the user opts in at step 4.5)* Creating the tracker issue via `gh` / Jira API and writing `github_issue` / `jira_key` / `jira_url` back into the task frontmatter
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
 
@@ -102,7 +106,7 @@ When this skill is activated:
 2. **STEP-BY-STEP SECTION BUILDING** - Process each of 11 sections sequentially
 3. **VALIDATION REQUIRED** - Verify completeness before generating final document
 4. **FILE CREATION** - Create proper directory structure with correct naming
-5. **NO IMPLEMENTATION** - Stop after document + tracker issue created (see "Documentation-Only Scope" above)
+5. **NO IMPLEMENTATION** - Stop after document created (and the tracker issue, only if the user opts in at step 4.5) — see "Scope" above
 
 ### Mandatory Sections (11)
 
@@ -410,8 +414,8 @@ Once validated:
 2. **Generate Markdown File**
    - Populate with all user-provided content
    - Format with proper markdown structure
-   - Add status: `📋 Planned`
-   - Set creation date to today
+   - Emit a YAML frontmatter block (per `resources/task-template.md`) with: `id`, `title`, `type: task`, `description` (a one-sentence summary — recommended), optional `tags`, `category`, `status`, `priority`, `created`, `updated`, `assignee`. `type` is OKF's one hard requirement; `description` is OKF-recommended. See [OKF conformance](references/open-knowledge-format.md).
+   - Set frontmatter `status: planned` (body `**Status:** Planned`) and both `created`/`updated` to today
    - Initialize empty progress tracking checkboxes
 
 3. **Create Placeholder Notes**
@@ -431,18 +435,60 @@ Once validated:
    - Confirm: dots used as structural separators, hyphens within names, lowercase, `.md` extension
    - Fix any naming violations before presenting the file to the user
 
-### 4.5 Create Tracker Issue
+### 4.4 Prompt for Effort Estimate (Optional)
 
-After the task document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `references/platform-detection.md`):
+Before the optional tracker-sync step (4.5), propose a default effort estimate and let the user accept or override. The accepted value is written to frontmatter as `estimated_effort_hours: {N}` and is picked up by Jira sync (→ `timetracking.originalEstimate`) and GitHub sync (→ Projects v2 `Estimate` number field).
+
+**Step 1 — compute the recommendation.** Apply the deterministic rubric in `references/effort-estimation-rubric.md`:
+
+- Count Success Criteria items, top-level Implementation Plan tasks, distinct files in Files Summary
+- Read `risk_level` and `category` from frontmatter
+- Scan body for integration keywords (`integration`, `external API`, `third-party`, `webhook`, `migration`, `schema change`)
+- Plug into the formula and snap to the nearest bucket in `[1, 2, 4, 8, 16]`
+
+**Step 2 — prompt.** Use `AskUserQuestion`:
+
+> **Header:** `Effort`
+> **Question:** "Recommended estimate based on {success_criteria_count} success criteria, {task_count} plan tasks, risk={risk_level}: **{snap}h**. Accept or pick a different value."
+> Options: `2 hours`, `4 hours`, `8 hours`, `16 hours` — append `(Recommended)` to the snapped bucket label. The user can also pick "Other" for a custom number or "Skip — leave unestimated" to omit the field.
+
+**Step 3 — write back.** If the user accepts the recommendation or picks any numeric option, write `estimated_effort_hours: {N}` into the frontmatter before the optional Step 4.5 sync (so the estimate is ready whether the user syncs now or later). If the user picks Skip, omit the field — review-task will flag it as a LOW gap later.
+
+Do **not** silently write a value without prompting. The recommendation is a default for the user's prompt, not an auto-applied estimate.
+
+### 4.5 Offer Tracker Sync (opt-in)
+
+After the task document is fully written, ask the user whether to sync it to an issue tracker. This step never creates a remote issue without explicit confirmation in this run.
+
+**Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
 source references/resolve-platform.sh
-# TRACKER = jira | github; VCS = github | bitbucket
+# TRACKER = jira | github; VCS = github | bitbucket   (TRACKER empty/unknown if neither is configured)
 ```
+
+**Step B — prompt** the user with `AskUserQuestion`:
+
+> **Header:** `Tracker sync`
+> **Question:** "Task doc created. Sync it to an issue tracker now? Detected platform: {TRACKER or 'none detected'}."
+> **Options:**
+> - **Sync to GitHub** — append `(Recommended)` when `TRACKER=github`. Creates the task issue, adds it to the project board, and writes `github_issue` to frontmatter.
+> - **Sync to Jira** — append `(Recommended)` when `TRACKER=jira`. Creates the task issue (standalone — tasks are not linked to a Jira epic), adds it to the backlog, and writes `jira_key`/`jira_url` to frontmatter.
+> - **Skip — docs only** — make no remote changes; leave `github_issue`/`jira_key` unwritten. The user can run `/sync-github-task` or `/sync-jira-task` later.
+>
+> The user may also pick "Other" (auto-provided) to skip or explain.
+
+**Step C — act on the answer:**
+
+- **Skip / no tracker chosen** → make no remote changes, log "Tracker sync skipped by user — run /sync-github-task or /sync-jira-task later." and continue to Step 5. Do NOT halt.
+- **Sync to Jira** → run the Jira Path below.
+- **Sync to GitHub** → run the GitHub Path below.
+
+> **Note:** If the user picks a platform that isn't actually configured (e.g. Jira while `JIRA_URL` is unset), the corresponding sub-routine logs a warning and returns an empty key — it never halts. Surface the warning and continue to Step 5.
 
 ---
 
-#### Jira Path (when `TRACKER=jira`)
+#### Jira Path (when the user chose Sync to Jira)
 
 > **Note**: Tasks are NOT linked to a Jira epic — they are standalone work items.
 >
@@ -462,7 +508,7 @@ On return, `TASK_JIRA_KEY` is set (e.g. `PROJ-15`) or empty (on failure).
 
 ---
 
-#### GitHub Path (when `TRACKER=github`)
+#### GitHub Path (when the user chose Sync to GitHub)
 
 Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={path to the task file just created}`. The sub-routine handles:
 
@@ -484,7 +530,7 @@ Actions:
 
 1. Task document created at `docs/tasks/task.[ID].[name]/task.[ID].[name].md`
 2. Plan file created at `docs/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
-3. If `docs/prd/sprint-status.yaml` exists, update it:
+3. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this task's ID/key
    - Update its status to `ready-for-dev`

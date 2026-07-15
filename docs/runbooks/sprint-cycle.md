@@ -70,5 +70,4 @@ Use [`autoskill`](../../skills/autoskill/SKILL.md) to extract lessons from the s
 - [Story Development Runbook](./story-development.md)
 - [QA Flow Runbook](./qa-flow.md)
 - [Jira Publish Runbook](./jira-publish.md)
-- [`scrum-master` SKILL.md](../../skills/scrum-master/SKILL.md)
 - [`create-parallel-stories` SKILL.md](../../skills/create-parallel-stories/SKILL.md) — when stories can run in parallel worktrees

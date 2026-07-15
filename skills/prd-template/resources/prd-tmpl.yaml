@@ -135,7 +135,7 @@ sections:
       - Err on the side of less epics, but let the user know your rationale and offer options for splitting them if it seems some are too large or focused on disparate things.
       - Cross Cutting Concerns should flow through epics and stories and not be final stories. For example, adding a logging framework as a last story of an epic, or at the end of a project as a final epic or story would be terrible as we would not have logging from the beginning.
 
-      IMPORTANT NOTE ON EPIC NUMBERING: In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers within the PRD). When these are later converted to epic files, they will be assigned globally unique numbers from the system registry (/docs/epic-registry.md), such as epic.163.md, epic.164.md, etc.
+      IMPORTANT NOTE ON EPIC NUMBERING: In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers within the PRD). When these are later converted to epic files, they will be assigned globally unique numbers from the system registry (/docs/development/epic-registry.md), such as epic.163.md, epic.164.md, etc.
     elicit: true
     examples:
       - "Epic 1: Foundation & Core Infrastructure: Establish project setup, authentication, and basic user management"
@@ -144,7 +144,7 @@ sections:
       - "Epic 4: Reporting & Analytics: Provide insights and data visualization for users"
 
   - id: epic-details
-    title: Epic {{epic_number}} {{epic_title}}
+    title: "[Epic {{epic_number}}] {{epic_title}}"
     repeatable: true
     instruction: |
       After the epic list is approved, present each epic with all its stories and acceptance criteria as a complete review unit.
@@ -166,7 +166,7 @@ sections:
     template: "{{epic_goal}}"
     sections:
       - id: story
-        title: Story {{epic_number}}.{{story_number}} {{story_title}}
+        title: "[Story {{epic_number}}.{{story_number}}] {{story_title}}"
         repeatable: true
         template: |
           As a {{user_type}},

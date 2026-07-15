@@ -106,6 +106,8 @@ This step runs in **both lite and standard modes**. Lite mode skips QA agents (S
 
 ## Tracker Issue Update
 
+> **Note — Document-link re-point (owned by `/finalise`).** As part of acceptance, the `/finalise` skill re-points the tracker issue's `## Document` link to the durable branch (`$DURABLE_BRANCH`) **before** closing/transitioning the issue, so the link survives the feature branch being deleted after merge (GitHub: surgical body rewrite; Jira: re-sync with `--doc-branch`). The close/comment/board-move actions below are the orchestrator-visible effects layered on top — they do not replace the re-point. (`review-story` performs the same re-point on sync; see `finalise/SKILL.md`.)
+
 Branch on `TRACKER`:
 
 ### GitHub (`TRACKER=github`) — shared structure, story/task text differs
@@ -145,27 +147,42 @@ On any `gh issue close` failure: `tracker_call_with_retry` retries 3× (1s, 2s, 
 Log in Decisions Log: "Post-close state check (poller): issue #{TRACKER_ISSUE} state = {state}. errors = {error_count}."
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
 
-Then move the project board item to Done using the same GraphQL pattern from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg GitHub path), but with "Done" as the target option (not "In Progress"). If the board move fails, post a comment on the issue warning that the board was not updated.
+Then move the project board item to Done using the same GraphQL pattern from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg GitHub path), but with `ascii_downcase == "done"` as the target option match (not "in progress") — use case-insensitive matching so "Done", "done", etc. all resolve. If the board move fails, post a comment on the issue warning that the board was not updated.
 
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — board: {Done ✅ / ⚠️ not found / ⚠️ mutation failed}."
 
 ### Jira (`TRACKER=jira`) — shared structure, story/task text differs
 
+> **MUST execute — pipeline action, not optional sync.** Do not skip on the basis of any user memory that says "Jira sync is manual" (e.g. `feedback_jira_sync_manual_only.md`). That rule applies only to `/create-epic`, `/create-story`, `/create-task` — never to develop-pipeline steps. This is the symmetric Jira counterpart to the GitHub close + board-move block above.
+
 If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comment and transition to Done (`cloudId` derived from `JIRA_URL` hostname):
 
 1. **Post completion comment** — call `addCommentToJiraIssue`:
    - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`:
-     - develop-story: `"Story development complete — PR: {PR_URL}. Story status: accepted."`
-     - develop-task: `"Task development complete — PR: {PR_URL}. Task status: accepted."`
+   - `commentBody`: Build a structured summary. Locate the DoD summary file and gate file:
+     ```bash
+     DOD_PATH=$(ls {story-or-task-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
+     FINAL_GATE=$(ls {story-or-task-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
+       | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
+     ```
+     Format (story variant shown; substitute "Task" for develop-task):
+
+     ```
+     ## ✅ Story Accepted — Definition of Done Verified
+
+     **PR**: {PR_URL}
+     **QA Gate**: {FINAL_GATE}
+     **Accepted**: {YYYY-MM-DD}
+     **DoD Summary**: `{DOD_PATH}`
+
+     All Definition of Done criteria verified. Story accepted and transitioning to Done.
+     ```
+
+     If `DOD_PATH` is empty (finalise was not run via develop-story — rare), omit the DoD Summary line.
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to Done** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
-   - Find transition matching "Done" (case-insensitive); fallbacks: "Closed", "Resolved"
-   - If found: call `transitionJiraIssue`; log "✅ Jira issue {TRACKER_ISSUE} transitioned to Done"
-   - If not found: log "⚠️ No done-state transition available for {TRACKER_ISSUE}" (non-blocking)
-   - On failure: log warning and continue
+2. **Transition to Done** — follow `shared/resources/jira-transition-protocol.md` exactly with `candidates = ["Done", "Closed", "Resolved"]`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to any other transition (e.g. `To Do`) — leaving the issue in its current state is the correct behaviour when no done-state transition exists.
 
 3. **Post-transition state verification** — invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) with `PR_NUMBER=` (empty) and `ISSUE_KEY={TRACKER_ISSUE}`:
    - `result.issue.state` matches "Done", "Closed", or "Resolved" (case-insensitive) → log "✅ Jira issue {TRACKER_ISSUE} confirmed Done via poller"
@@ -186,6 +203,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] `*.dod.{N}.*.md` file exists in the story/task directory
 - [ ] Story/task `status:` (frontmatter) AND `Status:` (body) both read `accepted` / `Accepted`
 - [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
+- [ ] Tracker issue `## Document` link re-pointed to the durable branch by `/finalise` (before close/transition)
 - [ ] Tracker issue commented (GitHub `gh issue comment` or Jira `addCommentToJiraIssue`)
 - [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
 - [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `shared/resources/tracker-state-poller-subagent.md`)

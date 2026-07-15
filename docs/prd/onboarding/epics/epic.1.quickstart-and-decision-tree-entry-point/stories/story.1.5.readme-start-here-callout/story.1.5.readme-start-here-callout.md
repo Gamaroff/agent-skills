@@ -1,6 +1,6 @@
 ---
 id: story.1.5.readme-start-here-callout
-title: "Story 1.5: README Start-here callout"
+title: "[Story 1.5] README Start-here callout"
 type: story
 status: accepted
 priority: medium
@@ -17,7 +17,7 @@ completed_date: 2026-05-12
 pr_number: 98
 ---
 
-# Story 1.5: README "Start here" callout
+# [Story 1.5] README "Start here" callout
 
 **Status**: Accepted
 **Review**: ✅ All review recommendations from `story.1.5.review.1.readme-start-here-callout.md` implemented 2026-05-12

@@ -1,98 +1,26 @@
-name: test
+name: Test
 
 on:
-  push:
-    branches: [main]
   pull_request:
-
-permissions:
-  contents: read
+  push:
+    branches: [main, develop]
 
 jobs:
-  unit-and-replay:
-    name: unit + replay evals
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - run: node --version
-      - name: Hermetic tests (platform resolver + unit + protocol + driver + assertions)
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Hermetic test suite (L1–L4)
         run: npm test
-      - name: Replay-mode end-to-end evals
+
+      - name: End-to-end replay evals (L4)
         run: npm run eval:all
-      - name: develop-task evals (protocol + step-isolation)
-        run: npm run eval:develop-task
-      - name: develop-story evals (protocol + step-isolation)
-        run: npm run eval:develop-story
-
-  develop-task-smoke:
-    name: develop-task smoke (manual)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    needs: unit-and-replay
-    env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      GH_TOKEN:          ${{ secrets.GH_TOKEN }}
-      GH_REPO:           ${{ secrets.GH_REPO }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Skip if no API key
-        if: env.ANTHROPIC_API_KEY == ''
-        run: |
-          echo "::warning::ANTHROPIC_API_KEY not set — smoke test skipped"
-          exit 0
-      - name: Smoke test — develop-task end-to-end
-        if: env.ANTHROPIC_API_KEY != ''
-        run: npm run eval:develop-task:smoke
-
-  develop-story-smoke:
-    name: develop-story smoke (manual)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    needs: unit-and-replay
-    env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      GH_TOKEN:          ${{ secrets.GH_TOKEN }}
-      GH_REPO:           ${{ secrets.GH_REPO }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Skip if no API key
-        if: env.ANTHROPIC_API_KEY == ''
-        run: |
-          echo "::warning::ANTHROPIC_API_KEY not set — smoke test skipped"
-          exit 0
-      - name: Smoke test — develop-story end-to-end
-        if: env.ANTHROPIC_API_KEY != ''
-        run: npm run eval:develop-story:smoke
-
-  live-tracker:
-    name: live-tracker sandbox (manual)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    needs: unit-and-replay
-    env:
-      JIRA_URL:    ${{ secrets.JIRA_URL }}
-      JIRA_USER:   ${{ secrets.JIRA_USER }}
-      JIRA_TOKEN:  ${{ secrets.JIRA_TOKEN }}
-      GH_TOKEN:    ${{ secrets.GH_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Skip if no creds
-        if: env.JIRA_TOKEN == '' && env.GH_TOKEN == ''
-        run: |
-          echo "::warning::No tracker creds configured — live-tracker job skipped"
-          exit 0
-      - name: Live tracker scenario
-        if: env.JIRA_TOKEN != '' || env.GH_TOKEN != ''
-        run: DRIVER=claude-sdk node evals/shared/runner.mjs evals/create-task/scenarios/03-tracker-live

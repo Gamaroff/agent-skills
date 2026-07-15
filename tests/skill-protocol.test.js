@@ -155,18 +155,18 @@ test("create-story — naming convention examples are accepted by validator", ()
 });
 
 // ===========================================================================
-// create-story — references core-config.yaml HALT condition
+// create-story — references skills-config.yaml HALT condition
 // ===========================================================================
-test("create-story — HALTs when core-config.yaml missing", () => {
+test("create-story — HALTs when skills-config.yaml missing", () => {
   const { content } = loadSkill("create-story");
-  assert.match(content, /core-config\.yaml/);
+  assert.match(content, /skills-config\.yaml/);
   // The HALT clause and the config name must co-occur within the same 500-char window.
   const haltIdx = content.indexOf("HALT");
-  const configIdx = content.indexOf("core-config.yaml");
+  const configIdx = content.indexOf("skills-config.yaml");
   assert.ok(haltIdx >= 0 && configIdx >= 0);
   assert.ok(
     Math.abs(haltIdx - configIdx) < 500,
-    "HALT clause and core-config.yaml reference should be near each other",
+    "HALT clause and skills-config.yaml reference should be near each other",
   );
 });
 

@@ -12,7 +12,7 @@ flowchart TB
         SC[skills-config.yaml]
         AS[.agents/skills/<br/>installed zips]
         PJD[docs/prd/<br/>docs/tasks/]
-        ER[docs/epic-registry.md]
+        ER[docs/development/epic-registry.md]
         TR[docs/tasks/task-registry.md]
     end
 
@@ -48,7 +48,7 @@ flowchart TB
 
 **Three boundaries:**
 
-- **This repo (`agent-skills`)** authors and packages skills. It is *not* installed into target projects.
+- **This repo (`agent-skills`)** authors and packages skills. It is _not_ installed into target projects.
 - **Consuming project** has a `skills-config.yaml`, an `.agents/skills/` directory of installed zips, and project docs the skills read/write.
 - **Agent runtime** loads the skills' progressive-disclosure tiers as needed.
 

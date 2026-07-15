@@ -128,11 +128,14 @@ If no lock file exists, `additionalContext` is `""` (empty). If a lock exists, `
 
 **Side effects** (all best-effort, all wrapped in `... || true`):
 
+0. **Snapshot-before-removal (resume guarantee).** As soon as the lock is confirmed present — *before* the `trap 'rm -f "$LOCK"' EXIT` is armed and before any explicit `rm` — write `develop-pipeline.last-halt.json` (co-located with the lock). It is a **superset of the lock** with `paused_at`, `pause_reason: "precompact"`, and `halt_step` (= the lock's `current_step`). When `jq` is unavailable this degrades to a verbatim `cp` of the lock (still preserving `current_step`). This single guarantee is what makes a *killed* hook recoverable: every exit path — clean finish OR harness SIGTERM/timeout mid-flow — leaves the snapshot on disk, so the pipeline can never end up both unlocked **and** un-resumable. Phase 0b's resume detector consumes this snapshot when no active lock is present.
 1. Append a "Pipeline Paused — {timestamp}" block to `report_path` with skill, branch, last step boundary, PR URL, tracker info, and resume instructions.
 2. `git add <report> && git commit -m "docs(<skill>): pipeline paused at step <N> — context compaction imminent" && git push origin HEAD`.
 3. `gh pr comment <pr_url> --body "<paused notice>"` if `pr_url` is non-empty and `gh` is on PATH.
 4. `gh issue comment <tracker_issue> --body "<paused notice>"` if `tracker=github`, `tracker_issue` is set, and `gh` is on PATH.
 5. `rm -f .claude/state/develop-pipeline.lock`.
+
+> The snapshot is a **superset** of the lock — it differs from the orchestrator's terminal-HALT snapshot (SKILL.md) only in the reason fields: PreCompact writes `pause_reason: "precompact"` + `paused_at`, the terminal path writes `halt_reason` + `halted_at`. Both write `halt_step`, so the resume detector locates the resume point identically. The `LOCK` path is `PIPELINE_LOCK`-overridable (default `.claude/state/develop-pipeline.lock`) so the hook can be sandboxed in regression tests; the snapshot path is derived from it.
 
 **Exit code**: always `0`. Failures log to stderr but never block compaction.
 
@@ -154,7 +157,7 @@ Each project that uses `/develop-task` or `/develop-story` registers the hook in
         "hooks": [
           {
             "type": "command",
-            "command": "bash .agents/skills/develop-story/scripts/on-precompact.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-story/scripts/on-precompact.sh\""
           }
         ]
       }
@@ -173,7 +176,7 @@ Each project that uses `/develop-task` or `/develop-story` registers the hook in
         "hooks": [
           {
             "type": "command",
-            "command": "bash .agents/skills/develop-task/scripts/on-precompact.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-task/scripts/on-precompact.sh\""
           }
         ]
       }

@@ -13,24 +13,50 @@ created: 2026-05-12
 
 > Promise: by the end of this page you will have a real task — spec, plan, implementation report, QA report, gate file, DoD checklist — sitting in `docs/tasks/` on a branch you can delete.
 
+> **Haven't set up agent-skills in this project yet?** Run the [setup wizard](./getting-started.md#quick-setup-wizard) first — it installs skills, writes `skills-config.yaml`, creates the registries, and registers the pipeline hooks. The prerequisites below assume that's done.
+
 ## Prerequisites
+
+Universal:
 
 - Node ≥ 20 (`node --version`)
 - `git` (`git --version`)
-- A clone of this repo: `git clone git@github.com:Gamaroff/agent-skills.git && cd agent-skills`
+- Skills installed in your project. First-time setup runs the full wizard (skills + config + hooks + registries + docs scaffold):
+  ```bash
+  bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
+  ```
+  Already configured? Refresh skills with `--update` (skips the wizard).
 - A working terminal where you can invoke this CLI agent
+
+Platform-specific — needed because `/develop-task` opens a PR and (optionally) a tracker issue. Skills auto-detect via `skills-config.yaml` + env vars + git remote (see [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md)).
+
+| VCS | Tracker | Auth / env required |
+|---|---|---|
+| GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`) |
+| GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+
+Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc. To skip tracker integration entirely (PR-only), choose **Skip — docs only** at the tracker prompt.
 
 ⏱ Set a 10-minute timer. If you blow through it, your walkthrough is your bug report.
 
 ---
 
-## 1. Verify install (≤ 30 s)
+## 1. Verify prerequisites (≤ 30 s)
 
 ```bash
-npx skills add --all
+node --version
+git --version
+
+# VCS auth — pick your platform:
+gh auth status                                                              # GitHub
+[ -n "$BITBUCKET_USERNAME" ] && [ -n "$BITBUCKET_APP_PASSWORD" ] && echo ok  # Bitbucket
+
+# Jira (only if tracker is Jira):
+[ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo ok
 ```
 
-Expected: a short list of skill names with `installed` or `up-to-date` next to each. Re-running is safe — the installer is idempotent. If you see `command not found: npx`, install Node ≥ 20 first.
+Expected: Node ≥ 20, git present, VCS auth confirmed, Jira auth confirmed if applicable.
 
 ---
 
@@ -83,7 +109,7 @@ You should see:
 |---|---|
 | `task.{N}.readme-contributor-footnote.md` | Original task spec |
 | `task.{N}.plan.readme-contributor-footnote.md` | Co-located implementation plan |
-| `task.{N}.implementation.1.readme-contributor-footnote*.md` | What was built |
+| `task.{N}.implementation.1.readme-contributor-footnote.md` | What was built |
 | `task.{N}.qa.1.readme-contributor-footnote.md` | QA findings + traceability |
 | `task.{N}.gate.1.readme-contributor-footnote.yml` | PASS/CONCERNS/FAIL gate |
 | `task.{N}.dod.1.readme-contributor-footnote.md` | Definition-of-Done checklist |
@@ -99,6 +125,8 @@ Pick one:
 **A. You want to keep the artifact as proof you ran the quickstart (recommended for first-time users).**
 
 Leave the branch as-is. Mark the registry row `CANCELLED` in `docs/tasks/task-registry.md`. Task numbers are never recycled — this row stays forever as a record. Do NOT delete the row.
+
+> **What a registry row looks like:** one markdown table line per task — columns are `Task # | Title link | Status | Type | Priority | Date | Issue | Depends on`. To cancel, change the `Status` cell from `accepted` / `in-progress` / `draft` to `CANCELLED` and leave the other cells untouched. Do **not** decrement the **Next Available Task Number** counter — numbers stay used even when cancelled. Full schema: [`../standards/task-registry.md`](../standards/task-registry.md).
 
 **B. You want a perfectly clean repo.**
 
@@ -117,7 +145,9 @@ Then revert the registry commit (or amend it out if you haven't pushed). Note: t
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `npx skills add` hung | Slow network or registry outage | Use `--registry https://registry.npmjs.org` |
+| `setup-consumer.sh --update` failed to download | GitHub unreachable or rate-limited | Wait and retry, or pin via `SKILLS_VERSION=vX.Y.Z` |
+| `gh`/Bitbucket/Jira auth failure | Token expired or env vars missing | Re-auth `gh auth login` or re-export env vars (see Prerequisites) |
+| Skill picked wrong platform | Auto-detect mis-fired | Set explicit `tracker:` / `vcs:` in `skills-config.yaml` |
 | Phase 0 prompts not matching table | Agent version differs | Check installed skill version in `.agents/skills/` |
 | QA loop iterated more than once | Practice task touched something non-trivial | Use a simpler task (one-line doc change) |
 | Elapsed > 10 min | Slow machine + large model context | The chain itself is fast; thinking time doesn't count |

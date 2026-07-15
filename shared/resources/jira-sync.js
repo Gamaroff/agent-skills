@@ -176,6 +176,35 @@ function getDefaultBranch() {
   return "main";
 }
 
+// Pure: strip the remote name (first path segment) from an upstream ref.
+// "origin/feature/foo" -> "feature/foo"; "" / "noref" -> null. Remote names
+// cannot contain "/", but branch names can (feature/...), so strip only up to
+// and including the FIRST slash.
+function stripRemotePrefix(upstreamRef) {
+  if (!upstreamRef) return null;
+  const slash = upstreamRef.indexOf("/");
+  return slash === -1 ? null : upstreamRef.slice(slash + 1);
+}
+
+// Resolve the current branch's remote-tracking branch name WITHOUT the remote
+// prefix. E.g. when on `feature/story.5.1.foo` tracking
+// `origin/feature/story.5.1.foo`, returns "feature/story.5.1.foo".
+//
+// Returns null on detached HEAD / no configured upstream / git unavailable —
+// callers fall back to getDefaultBranch(). Remote-name agnostic (works for
+// non-"origin" remotes) and safe for branch names containing "/".
+function getCurrentBranchUpstream() {
+  try {
+    const upstream = execSync(
+      "git rev-parse --abbrev-ref --symbolic-full-name @{u}",
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    return stripRemotePrefix(upstream);
+  } catch (_) {
+    return null; // detached HEAD, no upstream, or git not available
+  }
+}
+
 function getBitbucketRepoBase() {
   const env = process.env.BITBUCKET_REPO_URL;
   if (env) return env.replace(/\/$/, "");
@@ -193,6 +222,32 @@ function buildBitbucketUrl(absPath, repoRoot, bbBase, branch) {
   const rel = path.relative(repoRoot, absPath).replace(/\\/g, "/");
   const ref = branch || "HEAD";
   return `${bbBase}/src/${ref}/${rel}`;
+}
+
+// ---------------------------------------------------------------------------
+// Relative-link resolution
+// ---------------------------------------------------------------------------
+// Local markdown links relative to a doc's own directory (e.g.
+// `[runbook](task.4.runbook.md)`) resolve fine in a Bitbucket file viewer but
+// are dead once that same prose is copied into a Jira description -- Jira has
+// no "relative to this file" base path. Rewrite them to absolute Bitbucket
+// URLs at ADF-render time so a link that works locally also works in Jira.
+function resolveRelativeLink(href, { filePath, repoRoot, bbBase, branch }) {
+  if (!href || !bbBase) return href;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href)) return href; // has a scheme (http:, mailto:, ...)
+  if (href.startsWith("#")) return href; // in-page anchor
+  const hashIdx = href.indexOf("#");
+  const pathPart = hashIdx === -1 ? href : href.slice(0, hashIdx);
+  const fragment = hashIdx === -1 ? "" : href.slice(hashIdx);
+  if (!pathPart) return href;
+  const resolved = path.resolve(path.dirname(filePath), pathPart);
+  if (!fs.existsSync(resolved)) return href; // don't mask a broken link -- leave it as-authored
+  return buildBitbucketUrl(resolved, repoRoot, bbBase, branch) + fragment;
+}
+
+function makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch }) {
+  if (!bbBase) return null;
+  return href => resolveRelativeLink(href, { filePath, repoRoot, bbBase, branch });
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +341,7 @@ const RE_ORDERED = /^\s*\d+\.\s+(.*)$/;
 // ---------------------------------------------------------------------------
 // Inline markdown parser — **bold**, `code`, [link](url)
 // ---------------------------------------------------------------------------
-function inlineMarkdownToAdf(text) {
+function inlineMarkdownToAdf(text, linkResolver) {
   if (text == null || text === "") return [adf.text("")];
   // Build a fresh regex each call to reset lastIndex safely across re-entrant use.
   const re = /(\*\*([^*\n]+)\*\*)|(`([^`\n]+)`)|(\[([^\]]+)\]\(([^)]+)\))/g;
@@ -297,7 +352,7 @@ function inlineMarkdownToAdf(text) {
     if (m.index > lastIdx) out.push(adf.text(text.slice(lastIdx, m.index)));
     if (m[1])      out.push({ type: "text", text: m[2], marks: [{ type: "strong" }] });
     else if (m[3]) out.push({ type: "text", text: m[4], marks: [{ type: "code" }] });
-    else if (m[5]) out.push(adf.link(m[6], m[7]));
+    else if (m[5]) out.push(adf.link(m[6], linkResolver ? linkResolver(m[7]) : m[7]));
     lastIdx = re.lastIndex;
   }
   if (lastIdx < text.length) out.push(adf.text(text.slice(lastIdx)));
@@ -315,7 +370,7 @@ function isTableSepLine(l) {
   return /^\|?[\s\-:|]+\|?$/.test(l.trim()) && /-/.test(l);
 }
 
-function tableLinesToAdf(lines) {
+function tableLinesToAdf(lines, linkResolver) {
   const dataLines = lines.filter(l => l.trim() && !isTableSepLine(l));
   if (!dataLines.length) return null;
   const PH = "\x01";
@@ -330,8 +385,8 @@ function tableLinesToAdf(lines) {
   const [header, ...body] = rows;
   if (!header || !header.length) return null;
   return adf.table([
-    adf.tableRow(...header.map(h => adf.tableHeader(adf.paragraph(...inlineMarkdownToAdf(h))))),
-    ...body.map(r => adf.tableRow(...r.map(c => adf.tableCell(adf.paragraph(...inlineMarkdownToAdf(c)))))),
+    adf.tableRow(...header.map(h => adf.tableHeader(adf.paragraph(...inlineMarkdownToAdf(h, linkResolver))))),
+    ...body.map(r => adf.tableRow(...r.map(c => adf.tableCell(adf.paragraph(...inlineMarkdownToAdf(c, linkResolver)))))),
   ]);
 }
 
@@ -343,7 +398,7 @@ function tableLinesToAdf(lines) {
  * - bullet/ordered lists → proper ADF list nodes
  * - **bold**, `code`, [link](url) → inline marks
  */
-function textToAdfNodes(text) {
+function textToAdfNodes(text, linkResolver) {
   if (!text) return [];
   const nodes = [];
   const lines = text.split("\n");
@@ -354,11 +409,11 @@ function textToAdfNodes(text) {
     if (!buf.length) return;
     const blockText = buf.join("\n").trim();
     buf = [];
-    if (blockText) nodes.push(...blockToAdf(blockText));
+    if (blockText) nodes.push(...blockToAdf(blockText, linkResolver));
   };
   const flushTable = () => {
     if (!tableBuf.length) return;
-    const node = tableLinesToAdf(tableBuf);
+    const node = tableLinesToAdf(tableBuf, linkResolver);
     tableBuf = [];
     if (node) nodes.push(node);
   };
@@ -388,26 +443,26 @@ function textToAdfNodes(text) {
   return nodes.filter(Boolean);
 }
 
-function blockToAdf(block) {
+function blockToAdf(block, linkResolver) {
   const lines = block.split("\n").filter(l => l.length > 0);
   if (lines.length === 0) return [];
 
   if (lines.every(l => RE_BULLET.test(l))) {
     return [adf.bulletList(...lines.map(l => {
       const m = l.match(RE_BULLET);
-      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1])));
+      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)));
     }))];
   }
   if (lines.every(l => RE_ORDERED.test(l))) {
     return [adf.orderedList(...lines.map(l => {
       const m = l.match(RE_ORDERED);
-      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1])));
+      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)));
     }))];
   }
 
   const inline = [];
   lines.forEach((l, i) => {
-    if (l.length) inline.push(...inlineMarkdownToAdf(l));
+    if (l.length) inline.push(...inlineMarkdownToAdf(l, linkResolver));
     if (i < lines.length - 1) inline.push(adf.hardBreak());
   });
   return inline.length ? [adf.paragraph(...inline)] : [];
@@ -651,11 +706,13 @@ async function getIssueTypeId({ http, baseUrl, email, token, projectKey, typeNam
       const resp = await http(url, { headers: { Authorization: authHeader(email, token), Accept: "application/json" } });
       if (!resp.ok) continue;
       const data = await resp.json();
+      const toArr = v => (Array.isArray(v) ? v : null);
       const types =
-        data.issueTypes ||
-        data.values ||
-        data.projects?.[0]?.issuetypes ||
-        (Array.isArray(data) ? data : []);
+        toArr(data.issueTypes) ||
+        toArr(data.values) ||
+        toArr(data.projects?.[0]?.issuetypes) ||
+        toArr(data) ||
+        [];
       for (const t of types) {
         if (t.name && t.id) collected[t.name.toLowerCase()] = t.id;
       }
@@ -733,6 +790,188 @@ async function moveToBacklog({ http, baseUrl, email, token, boardId, issueKey, o
 }
 
 // ---------------------------------------------------------------------------
+// Status mapping (local document status -> Jira workflow status name)
+// ---------------------------------------------------------------------------
+// Single source of truth shared by sync-jira-{story,task,epic}. Covers the full
+// canonical lifecycle (see the document-status-lifecycle spec) plus the
+// historical aliases. Keys are lowercased; values are literal Jira status names
+// matched against transition `to.name`. Projects with custom workflow vocabulary
+// override via skills-config.yaml `jira.statusMap` (see loadStatusMap).
+const DEFAULT_STATUS_MAP = {
+  // canonical lifecycle
+  "draft": "To Do",
+  "planned": "To Do",
+  "ready-for-development": "To Do",
+  "in-progress": "In Progress",
+  "ready-for-review": "In Review",
+  "accepted": "Done",
+  "cancelled": "Cancelled",
+  // aliases
+  "ready for development": "To Do",
+  "todo": "To Do",
+  "to do": "To Do",
+  "open": "To Do",
+  "backlog": "To Do",
+  "in progress": "In Progress",
+  "doing": "In Progress",
+  "ready for review": "In Review",
+  "in review": "In Review",
+  "review": "In Review",
+  "ready": "Ready",
+  "done": "Done",
+  "completed": "Done",
+  "complete": "Done",
+  "blocked": "Blocked",
+  "canceled": "Cancelled",
+  "won't do": "Won't Do",
+  "wont do": "Won't Do",
+  "won't fix": "Won't Do",
+  "wontfix": "Won't Do",
+};
+
+// Strip a YAML-style inline trailing comment from a scalar value. A `#` starts
+// a comment only at the start of the token or when preceded by whitespace, and
+// never inside single/double quotes. Trailing whitespace is removed; any
+// surrounding quotes are left for the caller to strip.
+function stripInlineComment(s) {
+  const str = String(s == null ? "" : s);
+  let quote = null;
+  for (let j = 0; j < str.length; j++) {
+    const ch = str[j];
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === "#" && (j === 0 || /\s/.test(str[j - 1]))) {
+      return str.slice(0, j).replace(/\s+$/, "");
+    }
+  }
+  return str.replace(/\s+$/, "");
+}
+
+// Parse a `jira:` → `statusMap:` block out of skills-config.yaml text. Kept to
+// a self-contained indentation scanner (no YAML dependency — pyyaml is not
+// reliably installed in consumer environments). Supports the documented block
+// form only; returns {} for anything it can't read.
+//
+//   jira:
+//     statusMap:
+//       ready-for-development: Selected for Development
+//       accepted: "Done"
+function parseStatusMapBlock(text) {
+  const out = {};
+  const lines = String(text || "").split("\n");
+  const indentOf = l => l.length - l.replace(/^\s+/, "").length;
+  let i = 0;
+  // find top-level `jira:`
+  for (; i < lines.length; i++) {
+    if (/^jira:\s*(#.*)?$/.test(lines[i])) { i++; break; }
+  }
+  if (i >= lines.length) return out;
+  const jiraIndent = 0;
+  // find `statusMap:` nested under jira
+  let smIndent = -1;
+  for (; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    if (indentOf(raw) <= jiraIndent) return out; // left the jira block
+    if (/^\s+statusMap:\s*(#.*)?$/.test(raw)) { smIndent = indentOf(raw); i++; break; }
+  }
+  if (smIndent < 0) return out;
+  // collect `key: value` entries indented deeper than statusMap
+  for (; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    if (indentOf(raw) <= smIndent) break; // end of statusMap block
+    const m = raw.trim().match(/^("?[^":]+"?|'[^']+'):\s*(.+?)\s*$/);
+    if (!m) continue;
+    const key = m[1].replace(/^["']|["']$/g, "").trim();
+    const val = stripInlineComment(m[2]).replace(/^["']|["']$/g, "").trim();
+    if (key && val) out[key] = val;
+  }
+  return out;
+}
+
+// Build the effective status map: DEFAULT_STATUS_MAP overlaid with any
+// `jira.statusMap` entries from skills-config.yaml at the repo root. Override
+// keys are lowercased so lookups stay case-insensitive. Any failure (no file,
+// unreadable, parse error) falls back to the defaults unchanged.
+function loadStatusMap(repoRoot) {
+  const map = { ...DEFAULT_STATUS_MAP };
+  try {
+    const root = repoRoot || execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const cfgPath = path.join(root, "skills-config.yaml");
+    if (!fs.existsSync(cfgPath)) return map;
+    const overrides = parseStatusMapBlock(fs.readFileSync(cfgPath, "utf-8"));
+    for (const [k, v] of Object.entries(overrides)) {
+      if (typeof v === "string" && v.trim()) map[String(k).toLowerCase()] = v;
+    }
+  } catch (_) {}
+  return map;
+}
+
+// Map a raw frontmatter status to its Jira target name. Strips emoji,
+// lowercases, looks up in `statusMap`; unmapped values pass through verbatim
+// (emoji-stripped) for custom workflows.
+function mapStatus(raw, statusMap = DEFAULT_STATUS_MAP) {
+  if (!raw) return null;
+  const stripped = stripStatusEmoji(raw);
+  return statusMap[stripped.toLowerCase()] || stripped;
+}
+
+// ---------------------------------------------------------------------------
+// Jira scalar config keys (e.g. custom-field ids under `jira:`)
+// ---------------------------------------------------------------------------
+// Read a single scalar `<key>: <value>` declared directly under the top-level
+// `jira:` block in skills-config.yaml. Same self-contained indentation scanner
+// philosophy as parseStatusMapBlock (no YAML dependency). Matching the literal
+// key name means deeper nested entries (e.g. statusMap children) never collide.
+// Returns "" when the key is absent.
+//
+//   jira:
+//     devEstimateField: customfield_10594
+function parseJiraScalar(text, key) {
+  const lines = String(text || "").split("\n");
+  const indentOf = l => l.length - l.replace(/^\s+/, "").length;
+  const keyRe = new RegExp("^" + escapeRe(key) + ":\\s*(.+?)\\s*$");
+  let i = 0;
+  // find top-level `jira:`
+  for (; i < lines.length; i++) {
+    if (/^jira:\s*(#.*)?$/.test(lines[i])) { i++; break; }
+  }
+  if (i >= lines.length) return "";
+  // scan entries inside the jira block. Only consider DIRECT children (the
+  // indent of the first child), so deeper nested keys — e.g. a statusMap entry
+  // that happens to share the name — never match.
+  let childIndent = -1;
+  for (; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    const ind = indentOf(raw);
+    if (ind <= 0) break;                     // left the jira block
+    if (childIndent < 0) childIndent = ind;  // first child fixes the direct-child level
+    if (ind !== childIndent) continue;       // skip deeper nested entries
+    const m = raw.trim().match(keyRe);
+    if (m) return stripInlineComment(m[1]).replace(/^["']|["']$/g, "").trim();
+  }
+  return "";
+}
+
+// Resolve the configured Jira custom-field id for estimated dev hours from
+// `jira.devEstimateField` in skills-config.yaml at the repo root. Returns "" on
+// any failure (no file, unreadable, key absent) so callers skip the field.
+function loadDevEstimateField(repoRoot) {
+  try {
+    const root = repoRoot || execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const cfgPath = path.join(root, "skills-config.yaml");
+    if (!fs.existsSync(cfgPath)) return "";
+    return parseJiraScalar(fs.readFileSync(cfgPath, "utf-8"), "devEstimateField");
+  } catch (_) {
+    return "";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Status transitions
 // ---------------------------------------------------------------------------
 function stripStatusEmoji(s) {
@@ -758,7 +997,12 @@ async function transitionToStatus({ http, baseUrl, email, token, issueKey, targe
   const match = transitions.find(t => (t.to?.name || "").toLowerCase() === target.toLowerCase()) ||
                 transitions.find(t => (t.name || "").toLowerCase() === target.toLowerCase());
   if (!match) {
-    if (output) output.warn(`⚠️  No transition to "${target}" available from "${current}". Skipping status change.`);
+    if (output) {
+      const available = transitions.map(t => t.to?.name || t.name).filter(Boolean);
+      const avail = available.length ? available.join(", ") : "(none)";
+      output.warn(`⚠️  No Jira transition to "${target}" from "${current}". Available: ${avail}.`);
+      output.warn(`    Map your local status to a workflow name in skills-config.yaml under jira.statusMap. Skipping status change.`);
+    }
     return { transitioned: false, reason: "no-transition" };
   }
   const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}/transitions`, {
@@ -925,7 +1169,8 @@ module.exports = {
   // frontmatter
   parseFrontmatter, rewriteFrontmatter, upsertFrontmatterKeys, formatYamlScalar,
   // git / bb
-  getRepoRoot, getDefaultBranch, getBitbucketRepoBase, buildBitbucketUrl,
+  getRepoRoot, getDefaultBranch, getCurrentBranchUpstream, stripRemotePrefix, getBitbucketRepoBase, buildBitbucketUrl,
+  resolveRelativeLink, makeRelativeLinkResolver,
   // changelog
   CL_START, CL_END, fmtEntry, buildChangelogBlock, isEntryRow, RE_ENTRY_ROW,
   extractEntries, findHandWrittenChangelog, upsertChangelog,
@@ -942,6 +1187,10 @@ module.exports = {
   fetchIssue, fetchUpdatedTimestampStrict, fetchUpdatedTimestamp, getIssueTypeId, getBoardType, moveToBacklog,
   putIssueAtomic, findExistingByLabel, transitionToStatus, getTransitions, stripStatusEmoji,
   detectProjectStyle,
+  // status mapping
+  DEFAULT_STATUS_MAP, loadStatusMap, mapStatus,
+  // jira scalar config
+  parseJiraScalar, loadDevEstimateField,
   // cache
   readIssueTypeCache, writeIssueTypeCache, readProjectStyleCache, writeProjectStyleCache,
 };

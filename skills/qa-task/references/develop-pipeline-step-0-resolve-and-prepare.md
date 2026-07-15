@@ -149,29 +149,39 @@ Prompt template (pass verbatim to Explore subagent):
 ```
 Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{epic}.{story}.*.md under docs/).
 
-Evaluate the three lite-mode conditions (all three must be true for PIPELINE_MODE=lite):
-  1. risk_level: frontmatter field is "low" or absent
-  2. Fewer than 3 Tasks defined (for stories) or fewer than 3 implementation phases (for tasks) in the body
-  3. Document mentions a single module / app (scope restricted to one lib or app)
+RUN the lite-mode CLI — do NOT re-evaluate the FR3/FR17 conditions in prose. The CLI calls the
+production parsers (`parseLiteModeInputs` / `decideLiteMode` / `parseSuccessCriteria`), so its decision
+is byte-identical to the running pipeline's:
+
+  npm run lite-mode -- {file_path}
+    (or, if npm scripts are unavailable: node --experimental-strip-types scripts/lite-mode.ts {file_path})
+
+It prints one compact JSON line:
+  { "risk_level", "phase_count", "single_module", "pipeline_mode", "has_success_criteria_table", "ac_count" }
+
+If the CLI cannot be run (missing script / non-zero exit), fall back to evaluating the three lite-mode
+conditions in prose (risk_level low/absent; fewer than 3 Tasks/phases; single module) and log the fallback.
 
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
+  - Source `references/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
-Detect whether the doc has a structured criteria table that the QA traceability mapper can consume:
-  - For stories: a "## Acceptance Criteria" section with at least one numbered item or AC sub-heading.
-  - For tasks: a "## Success Criteria" section with at least one table row or numbered item.
-  - Return `has_success_criteria_table: true` if either is present, else false.
+MERGE the CLI's JSON fields with your own skills-config discovery into the return shape below — do NOT
+return the CLI JSON verbatim (that would drop `skills_config_exists` / `always_load_files` and break
+always-load resolution). `has_success_criteria_table` and `ac_count` come from the CLI; the structured-
+criteria meaning is unchanged (## Acceptance Criteria for stories, ## Success Criteria for tasks).
 
-Return compact JSON:
+Return compact JSON (CLI fields + your discovery):
 {
   "risk_level": "low|medium|high|absent",
   "phase_count": <integer>,
   "single_module": true|false,
   "pipeline_mode": "lite|standard",
+  "has_success_criteria_table": true|false,
+  "ac_count": <integer>,
   "skills_config_exists": true|false,
-  "always_load_files": ["path1", "path2"],
-  "has_success_criteria_table": true|false
+  "always_load_files": ["path1", "path2"]
 }
 ```
 
@@ -186,13 +196,23 @@ LITEMODE_RESULT  ← Agent 3 result (compact JSON)
 
 TASK_FILE      = RESOLVER_RESULT.absolute_file_path   (or already known from inline resolution)
 TASK_DIR       = RESOLVER_RESULT.task_or_story_directory
-PIPELINE_MODE  = LITEMODE_RESULT.pipeline_mode          (default: "standard" on failure)
+# Defence-in-depth: RECOMPUTE PIPELINE_MODE from the CLI's already-computed booleans rather than
+# trusting the free-form `pipeline_mode` string. This mechanical boolean AND of pre-computed values is
+# NOT a prose re-derivation of FR3 — it cannot drift, and a malformed `pipeline_mode` field can never
+# override the rule. `risk_ok` is SET MEMBERSHIP — accept ONLY {"low", "absent"}; reject "medium" /
+# "high" / anything else (matching production decideLiteMode's low/undefined-only semantics). Do NOT use
+# a truthy or substring check.
+risk_ok        = LITEMODE_RESULT.risk_level ∈ {"low", "absent"}
+PIPELINE_MODE  = (risk_ok AND LITEMODE_RESULT.phase_count < 3 AND LITEMODE_RESULT.single_module)
+                   ? "lite" : "standard"        (default: "standard" on Agent-3 failure)
+                 # If this recompute disagrees with LITEMODE_RESULT.pipeline_mode, prefer the recompute
+                 # and log the discrepancy in the Issues Log.
 ALWAYS_LOAD_FILES = LITEMODE_RESULT.always_load_files   (default: [] on failure)
 HAS_SUCCESS_CRITERIA_TABLE = LITEMODE_RESULT.has_success_criteria_table   (default: false on failure)
 TRACKER_STATE  = TRACKER_RESULT                         (null fields on failure)
 ```
 
-Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE and ALWAYS_LOAD_FILES determined.
+Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE (and whether the boolean recompute disagreed with the CLI's `pipeline_mode`) and ALWAYS_LOAD_FILES determined.
 
 ### Failure handling
 
@@ -304,7 +324,7 @@ fi
 
 **Note (tasks only)**: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations.
 
-**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3). Use `LITEMODE_RESULT.pipeline_mode` directly — do not re-evaluate conditions inline. See `references/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
+**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3), which **runs the production lite-mode CLI**. The Aggregation block then recomputes `PIPELINE_MODE` from the CLI's already-computed booleans (`risk_ok ∈ {low,absent} AND phase_count < 3 AND single_module`) as defence-in-depth. This mechanical boolean AND of pre-computed values is permitted — it is **not** the forbidden prose re-derivation of the FR3 rule from the document (which the CLI now owns). Do **not** re-parse the document's headings yourself. See `references/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
 
 ---
 
@@ -327,12 +347,7 @@ Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to "In Progress"** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
-   - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {TRACKER_ISSUE}`
-   - Find the transition whose `name` matches "In Progress" (case-insensitive)
-   - If found: call `transitionJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, and `transition: {id: "<matched-id>"}`
-   - If no matching transition: log "⚠️ No 'In Progress' transition available for {TRACKER_ISSUE}" and skip
-   - On failure: log warning and continue (non-blocking)
+2. **Transition to "In Progress"** — follow `references/jira-transition-protocol.md` exactly with `candidates = ["In Progress"]`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
 
 3. **Post-condition verification** — call `getJiraIssue` to confirm the transition worked:
    - Call `getJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, `fields: ["status"]`
@@ -362,7 +377,9 @@ tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline starte
   BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
 
   # Ensure issue is on the board (idempotent — returns existing item if already present)
-  gh project item-add "$BOARD_NUM" --owner "$OWNER" --url "$REPO_URL/issues/{TRACKER_ISSUE}" 2>/dev/null || true
+  gh project item-add "$BOARD_NUM" --owner "$OWNER" --url "$REPO_URL/issues/{TRACKER_ISSUE}" \
+    && echo "✅ item-add succeeded" || echo "⚠️  item-add may have failed or item already present"
+  sleep 3  # Allow Projects API to propagate before querying
 
   # Query the issue directly for its project items — avoids item-list pagination limits
   RESPONSE=$(gh api graphql -f query='
@@ -394,11 +411,44 @@ tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline starte
     }
   }')
 
-  # Extract IDs from the first project item
+  # Extract IDs from the first project item (retry once if empty — handles Projects API propagation delay after item-add)
   ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  if [ -z "$ITEM_ID" ]; then
+    echo "⚠️  projectItems empty on first query — waiting 5s and retrying"
+    sleep 5
+    RESPONSE=$(gh api graphql -f query='
+    {
+      repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
+        issue(number: {TRACKER_ISSUE}) {
+          projectItems(first: 10) {
+            nodes {
+              id
+              fieldValueByName(name: "Priority") {
+                ... on ProjectV2ItemFieldSingleSelectValue { name }
+              }
+              project {
+                id
+                title
+                fields(first: 20) {
+                  nodes {
+                    ... on ProjectV2SingleSelectField {
+                      id
+                      name
+                      options { id name }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }')
+    ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  fi
   PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
   STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
-  OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "In Progress") | .id // empty')
+  OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name | ascii_downcase == "in progress") | .id // empty')
 
   # Extract Priority field details (for auto-set when unset)
   PRIORITY_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
@@ -477,10 +527,10 @@ Determine the list of files to pre-load as context for `/develop`. This section 
    - If `LITEMODE_RESULT.skills_config_exists = true` but `always_load_files` is empty: skills-config.yaml has no `devLoadAlwaysFiles` key — fall back to defaults.
    - If `LITEMODE_RESULT.skills_config_exists = false` or Agent 3 failed: use defaults.
 
-2. **Defaults** (when skills-config.yaml absent or Agent 3 failed):
-   - `docs/architecture/concepts/coding-standards.md`
-   - `docs/architecture/concepts/tech-stack.md`
-   - `docs/architecture/concepts/source-tree.md`
+2. **Defaults** (when skills-config.yaml absent or Agent 3 failed) — anchored to `${ARCH_ROOT}` (default `docs/architecture`):
+   - `${ARCH_ROOT}/concepts/coding-standards.md`
+   - `${ARCH_ROOT}/concepts/tech-stack.md`
+   - `${ARCH_ROOT}/concepts/source-tree.md`
 
 3. **For each file in `ALWAYS_LOAD_FILES`**: verify it exists on disk. If missing, log a warning — `"⚠️ Always-load file not found: <path> — skipping"` — and remove it from the list.
 
@@ -602,7 +652,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | ---- | ------ | ------------------ | ----- | -------------------- |
 | 1a. create-epic-branch      | ⏳ Pending | Branch `feature/epic.{N}.*` exists in git | | — |
 | 1b. create-story-branch     | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | | — |
-| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{date}.md` exists (or skip logged) | | — |
+| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged) | | — |
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | | — |
 | 4. create-pr                | ⏳ Pending | PR URL targets `{EPIC_BRANCH}`; issue/tracker comment posted | | — |
 | 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | | — |
@@ -685,7 +735,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 | Step | Status | Required Artifacts | Notes | Subagent summary ref |
 |------|--------|--------------------|-------|----------------------|
 | 1. create-branch | ⏳ Pending | Branch `feature/task.{id}.*` exists in git | | — |
-| 2. review-task | ⏳ Pending | `task.{id}.review.{date}.md` exists (or skip logged) | | — |
+| 2. review-task | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged) | | — |
 | 3. develop | ⏳ Pending | Task status == `Ready for Review` | | — |
 | 4. create-pr | ⏳ Pending | PR URL; issue comment posted | | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted | | — |

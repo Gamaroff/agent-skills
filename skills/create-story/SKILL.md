@@ -22,13 +22,19 @@ Natural language triggers:
 - "Prepare the next story in sequence"
 - "Setup story 1.1"
 
+**Looking for a different workflow?**
+
+- Parallel stories for simultaneous worktree development → `create-parallel-stories`
+- Validate a drafted story against the readiness checklist → `execute-checklist` (or `review-story --validate` for the full gate)
+- Project pivot, blocker, or requirement change → `correct-course`
+
 ## Purpose
 
 To identify the next logical story based on project progress and epic definitions, and then to prepare a comprehensive, self-contained, and actionable story file. This skill ensures the story is enriched with all necessary technical context, requirements, and acceptance criteria, making it ready for efficient implementation by a Developer Agent with minimal need for additional research.
 
-## ⚠️ Documentation-Only Scope — Do NOT Implement
+## ⚠️ Scope: Documentation + Opt-in Tracker Sync — Do NOT Implement
 
-This skill produces **the story document and its co-located plan file only**. It MUST NOT begin implementing the story and MUST NOT create tracker issues. Implementation is `develop-story`'s job; Jira sync is `/sync-jira-story`'s job — both invoked separately.
+This skill produces **the story document and its co-located plan file**, and then — **only after explicitly asking the user in Step 5.2a** — may optionally sync the story to an issue tracker (GitHub or Jira). It MUST NOT begin implementing the story; implementation is `develop-story`'s job, invoked separately. Tracker sync is **opt-in**: never create a remote issue without the user's confirmation in this run.
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
@@ -38,14 +44,15 @@ This skill produces **the story document and its co-located plan file only**. It
 - ❌ Installing/removing dependencies or modifying `package.json`
 - ❌ Starting Task 1 of the story's Tasks/Subtasks "to get a head start"
 - ❌ Auto-invoking `develop-story`, `develop`, or any implementation skill on completion
-- ❌ Creating Jira issues, GitHub issues, or any remote tracker issues — use `/sync-jira-story` explicitly
+- ❌ Creating Jira or GitHub issues **without first asking the user** — tracker sync is gated behind the Step 5.2a prompt and must never run unprompted
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
 - ✅ The story directory `{epic-directory}/stories/story.{E}.{S}.{name}/`
 - ✅ `story.{E}.{S}.{name}.md` (story doc)
 - ✅ `story.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
-- ✅ `docs/prd/sprint-status.yaml` status field update (Step 6.2)
+- ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (Step 6.2)
+- ✅ *(only after the user opts in at Step 5.2a)* Creating the tracker issue(s) and writing `github_issue` / `jira_key` / `jira_url` back into the story frontmatter
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
 
@@ -69,34 +76,30 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 
 **Actions**:
 
+0. **Resolve paths.** Run `source references/resolve-paths.sh` (or its bundled copy at `references/resolve-paths.sh`). This exports `PRD_ROOT` (default `docs/prd`) and `ARCH_ROOT` (default `docs/architecture`). Use these for every path operation below — examples in this skill show `docs/prd/...` but you must substitute `${PRD_ROOT}/...` against the actual project. Same for architecture paths.
 
-1. Load configuration from skill resources or explicit file references
+1. Load configuration from skills-config.yaml
 2. If configuration does not exist, **HALT** and inform user:
 
-   > "core-config.yaml not found. This file is required for story creation. You can either:
+   > "skills-config.yaml not found. This file is required for story creation. You can either:
    >
    > 1. Copy it from project templates and configure it for your project
    > 2. Create the configuration manually based on the reference structure
-   >    Please add and configure core-config.yaml before proceeding."
+   >    Please add and configure skills-config.yaml before proceeding."
 
 3. Extract key configurations:
-   - `devStoryLocation` - Where to save story files
-   - `prd.*` - PRD structure and location settings
    - `architecture.*` - Architecture document settings
    - `workflow.*` - Workflow preferences
+
+   PRD and architecture roots are configurable via `prd.prdShardedLocation` and `architecture.architectureShardedLocation` — resolved into `${PRD_ROOT}` / `${ARCH_ROOT}` in Step 0.0. Nested structure under each root is fixed. See [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 **Fallback Defaults** (if config file doesn't exist but user approves proceeding):
 
 ```yaml
-devStoryLocation: nested  # Stories are saved inside the epic's own stories/ subdirectory
 prd:
-  prdSharded: true
   prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
 architecture:
-  architectureSharded: true
   architectureShardedLocation: docs/architecture
-  architectureVersion: v4
 ```
 
 > **CRITICAL — Story File Location**: Stories are **always** saved inside the `stories/` subdirectory of the epic directory that was provided as input (or identified in Step 1). The path is:
@@ -115,9 +118,7 @@ architecture:
 
 ### 1.1 Locate Epic Files and Review Existing Stories
 
-1. Based on `prdSharded` from config, locate epic files:
-   - **Sharded**: Use `prdShardedLocation` + `epicFilePattern`
-   - **Monolithic**: Parse sections from main PRD file
+1. Locate epic files at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.*/epic.{N}.*.md`.
 
 2. Look for existing story files inside the epic's `stories/` subdirectory (i.e. `{epic-directory}/stories/`). Load the highest-numbered `story.{epicNum}.{storyNum}.*` file found there.
 
@@ -155,7 +156,7 @@ architecture:
 
 ### 2.1 Extract Story Requirements
 
-1. Read the identified epic file (from `prdShardedLocation` or PRD sections)
+1. Read the identified epic file (at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`)
 2. Extract for this specific story:
    - Story title and description
    - Acceptance criteria (numbered list)
@@ -204,12 +205,7 @@ If a previous story exists (e.g., creating 2.3, so 2.2 exists):
 
 ### 3.1 Determine Architecture Reading Strategy
 
-- **If `architectureVersion: >= v4` and `architectureSharded: true`**:
-  - Read `{architectureShardedLocation}/index.md` first
-  - Follow structured reading order based on story type (see 3.2)
-
-- **Else** (monolithic architecture):
-  - Use `architectureFile` and read relevant sections
+Read `${ARCH_ROOT}/index.md` (or `${ARCH_ROOT}/README.md`) first if present, then follow the structured reading order below.
 
 ### 3.2 Read Architecture Documents Based on Story Type
 
@@ -281,7 +277,7 @@ Extract and document:
 
 ### 4.1 Cross-Reference with Project Structure
 
-1. Review `docs/architecture/unified-project-structure.md` (or equivalent)
+1. Review `${ARCH_ROOT}/unified-project-structure.md` (or equivalent)
 2. Verify that story requirements align with:
    - Defined file paths and directories
    - Component location conventions
@@ -323,6 +319,25 @@ Recommend following Project Structure Guide for consistency.
 
 ### 5.2 Fill Basic Story Information
 
+**Emit YAML frontmatter** conforming to [story-documents.md](../../docs/standards/story-documents.md) and [OKF v0.1](references/open-knowledge-format.md). Required/recommended fields:
+
+```yaml
+---
+epic: epic.{epicNum}.{epic-name}
+title: "{story title}"
+type: story            # OKF's one hard requirement — must be exactly `story`
+description: "{one-sentence summary of the story}"   # OKF-recommended
+tags: []               # optional — short cross-cutting labels
+status: draft
+priority: Medium
+assignee: TBD
+created: {today}
+updated: {today}
+---
+```
+
+`type` and `description` are mandatory to emit (`type` is OKF-required, `description` OKF-recommended); `tags` is optional. Tracker fields (`github_issue`/`jira_key`/`jira_url`) and `estimated_effort_hours` are written later by the optional sync/estimate steps.
+
 Populate these sections:
 
 **Status**: `Draft`
@@ -341,16 +356,58 @@ Populate these sections:
 2. Second acceptance criterion
 3. etc.
 
-### 5.2a Create Tracker Issue
+### 5.2-est Prompt for Effort Estimate (Optional)
 
-After the story document is fully written, create a corresponding issue in the remote tracker. Detect platform first using the canonical resolver (see `references/platform-detection.md`):
+Before the optional tracker-sync step (5.2a), propose a default effort estimate and let the user accept or override. The accepted value is written to frontmatter as `estimated_effort_hours: {N}` and is picked up by Jira sync (→ `timetracking.originalEstimate`) and GitHub sync (→ Projects v2 `Estimate` number field).
+
+**Step 1 — compute the recommendation.** Apply the deterministic rubric in `references/effort-estimation-rubric.md`:
+
+- Count ACs, top-level tasks, distinct files mentioned in Dev Notes
+- Read `risk_level` and `story_type` from frontmatter
+- Scan body for integration keywords (`integration`, `external API`, `third-party`, `webhook`, `migration`, `schema change`)
+- Plug into the formula and snap to the nearest bucket in `[1, 2, 4, 8, 16]`
+
+**Step 2 — prompt.** Use `AskUserQuestion`:
+
+> **Header:** `Effort`
+> **Question:** "Recommended estimate based on {ac_count} ACs, {task_count} tasks, risk={risk_level}: **{snap}h**. Accept or pick a different value."
+> Options: `1 hour`, `2 hours`, `4 hours`, `8 hours` — append `(Recommended)` to the snapped bucket label. (Tasks: shift to `4`, `8`, `16` if rubric > 8h.) The user can also pick "Other" for a custom number or "Skip — leave unestimated" to omit the field.
+
+**Step 3 — write back.** If the user accepts the recommendation or picks any numeric option, write `estimated_effort_hours: {N}` into the frontmatter before the optional Step 5.2a sync (so the estimate is ready whether the user syncs now or later). If the user picks Skip, omit the field — review-story will flag it as a LOW gap later.
+
+Do **not** silently write a value without prompting. The recommendation is a default for the user's prompt, not an auto-applied estimate.
+
+### 5.2a Offer Tracker Sync (opt-in)
+
+After the story document is fully written, ask the user whether to sync it to an issue tracker. This step never creates a remote issue without explicit confirmation in this run.
+
+**Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
 source references/resolve-platform.sh
-# TRACKER = jira | github
+# TRACKER = jira | github   (empty/unknown if neither is configured)
 ```
 
-#### Jira Path (when `TRACKER=jira`)
+**Step B — prompt** the user with `AskUserQuestion`:
+
+> **Header:** `Tracker sync`
+> **Question:** "Story doc created. Sync it to an issue tracker now? Detected platform: {TRACKER or 'none detected'}."
+> **Options:**
+> - **Sync to GitHub** — append `(Recommended)` when `TRACKER=github`. Creates the epic + story issues, adds them to the project board, links the story as a sub-issue of its epic, and writes `github_issue` to frontmatter.
+> - **Sync to Jira** — append `(Recommended)` when `TRACKER=jira`. Creates/links the epic + story issues, adds to the backlog, and writes `jira_key`/`jira_url` to frontmatter.
+> - **Skip — docs only** — make no remote changes; leave `github_issue`/`jira_key` unwritten. The user can run `/sync-github-story` or `/sync-jira-story` later.
+>
+> The user may also pick "Other" (auto-provided) to skip or explain.
+
+**Step C — act on the answer:**
+
+- **Skip / no tracker chosen** → make no remote changes, log "Tracker sync skipped by user — run /sync-github-story or /sync-jira-story later." and continue to Step 5.3. Do NOT halt.
+- **Sync to Jira** → run the Jira Path below.
+- **Sync to GitHub** → run the GitHub Path below.
+
+> **Note:** If the user picks a platform that isn't actually configured (e.g. Jira while `JIRA_URL` is unset), the corresponding sub-routine logs a warning and returns an empty key — it never halts. Surface the warning and continue to Step 5.3.
+
+#### Jira Path (when the user chose Sync to Jira)
 
 1. Derive the parent epic file path using the grandparent directory rule:
    ```bash
@@ -371,7 +428,7 @@ source references/resolve-platform.sh
 
 **On failure**: the sub-routine logs a warning and returns `STORY_JIRA_KEY=""`. `create-story` leaves `jira_key: null` and continues. Never halt. Users can still run `/sync-jira-story` manually later to retry.
 
-#### GitHub Path (when `TRACKER=github`)
+#### GitHub Path (when the user chose Sync to GitHub)
 
 1. Derive the parent epic file path using the grandparent directory rule:
    ```bash
@@ -442,8 +499,8 @@ Organize Dev Notes by these categories:
 Generate a concrete, step-by-step walkthrough for verifying this story in the running app. This is distinct from automated test design — it is a human-readable smoke test guide.
 
 **Sources to consult** (in priority order):
-1. `docs/architecture/routing-and-file-structure.md` — for navigation paths and screen names
-2. `docs/architecture/concepts/core-workflows.md` — for user flows
+1. `${ARCH_ROOT}/routing-and-file-structure.md` — for navigation paths and screen names
+2. `${ARCH_ROOT}/concepts/core-workflows.md` — for user flows
 3. The story's own acceptance criteria — one verification step per AC
 4. Integration notes in the story (what parent component or screen triggers this feature)
 
@@ -539,7 +596,7 @@ After collecting tasks/subtasks and dev notes, generate a co-located implementat
 
 **File**: `story.[N].[M].plan.[descriptive-name].md` — same directory as the story document.
 
-**CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, per `devStoryLocation` config — typically nested under the parent epic directory).**
+**CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, nested under the parent epic directory).**
 
 - ❌ NEVER write the plan to `~/.claude/plans/`, `~/.agents/plans/`, `/tmp/`, the repo root, or any other shared/agent-scratch location.
 - ❌ NEVER leave a plan in `~/.claude/plans/` (Claude Code plan-mode default) and link to it from the story — it is outside the repo, invisible to teammates, and not version-controlled.
@@ -616,6 +673,31 @@ After Dev Notes are populated and the implementation plan exists, decide whether
 2. The skill will halt with clarifying questions if error states, actors, or transition triggers are missing — answer them before continuing. These answers may also surface gaps in the story itself; if so, update the relevant section.
 3. Paste the returned Mermaid block (with YAML metadata header) into Dev Notes under a "## Flow" or "## Sequence" subheading. Append the 2-sentence "Architectural assumptions" summary directly below the block.
 4. Accept `no diagram justified — {reason}` without pushing back.
+
+### 5.4.6 Check for UI/Wireframe Opportunity (conditional, via `markdown-wireframe`)
+
+After Dev Notes, plan, and diagrams are considered, check to see if the story document describes a user interface (UI) or visual components that could be drawn up in a wireframe.
+
+**Detection Rule**: A story describes a UI that could be wireframed if it:
+- Touches frontend code, UI screens, components, layout, navigation, or styles.
+- Mentions visual elements like buttons, inputs, modals, forms, dashboards, lists, or headers.
+- Has acceptance criteria referencing UI interactions, visual feedback, or layout requirements.
+
+**Process**:
+
+1. **If detection rule matches**, prompt the user using `AskUserQuestion`:
+   - **Header**: `Wireframe`
+   - **Question**: "This story describes a user interface (UI) that can be visualized as a wireframe. Would you like to add a wireframe for this story using the `markdown-wireframe` skill?"
+   - **Options**:
+     - `Yes — Add wireframe (Recommended)`: Create a low-fidelity text/YAML wireframe.
+     - `No — Skip wireframe`: Do not add wireframes.
+
+2. **If the user chooses Yes**:
+   - Invoke the `markdown-wireframe` skill (read its instructions if you haven't already).
+   - Deconstruct the UI requirements into a text/YAML structural map (as shown in `markdown-wireframe`'s `wireframe-examples.md`).
+   - Embed the generated text/YAML wireframe directly into the story document under the **Dev Notes** section under a `## Visual Layout / Wireframe` subheading.
+   - Add a task/subtask to the story's **Tasks / Subtasks** section to Stitch/implement the wireframe:
+     - `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)`
 
 ### 5.5 Add Testing Guidance
 
@@ -706,7 +788,7 @@ Review all sections for:
    | 2025-10-30 | 1.0 | Initial draft created by Scrum Master | SM Agent |
    ```
 3. Save the story file to the self-named subdirectory inside the epic's `stories/` folder: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
-4. If `docs/prd/sprint-status.yaml` exists, update it:
+4. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this story's key
    - Update its status from `backlog` → `ready-for-dev`
@@ -805,15 +887,12 @@ For Simple Stories:
 
 ## Integration with Other Skills
 
-**Called by**:
-
-- `scrum-master` - Main coordinator skill
-
 **Calls**:
 
 - `execute-checklist` - For story validation
 - `documentation-standards-validator` - Validates story file naming, directory structure, and YAML frontmatter after creation
 - `mermaid-architect` - Generates a sequence diagram (API interaction) or state diagram (stateful UI) for the story when a diagram materially clarifies the spec
+- `markdown-wireframe` - For generating low-fidelity, mobile-focused outline wireframes for stories that contain UI/UX elements
 
 **Outputs used by**:
 
@@ -856,26 +935,17 @@ This skill implements rigorous safeguards against AI hallucination:
 Expected configuration structure:
 
 ```yaml
-# Project structure
-# Stories are saved inside each epic's own stories/ subdirectory — NOT in a global docs/stories/ folder.
-# Path pattern: {epic-directory}/stories/story.{N}.{M}.{title}/story.{N}.{M}.{title}.md
-devStoryLocation: nested
-devDebugLog: .ai/debug-log.md
+# PRD/epic/story locations are fixed conventions (see docs/reference/configuration.md):
+#   PRDs:    docs/prd/
+#   Epics:   ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
+#   Stories: nested at {epic-dir}/stories/story.{E}.{S}.{title}/story.{E}.{S}.{title}.md
+# PRD and architecture roots are configurable; the nested structure is fixed.
 
-# PRD configuration
 prd:
-  prdFile: docs/prd.md
-  prdVersion: v4
-  prdSharded: true
-  prdShardedLocation: docs/prd
-  epicFilePattern: '**/epics/epic.{n}.*/epic.{n}.*.md'
+  prdShardedLocation: docs/prd        # ${PRD_ROOT}
 
-# Architecture configuration
 architecture:
-  architectureFile: docs/architecture.md
-  architectureVersion: v4
-  architectureSharded: true
-  architectureShardedLocation: docs/architecture
+  architectureShardedLocation: docs/architecture  # ${ARCH_ROOT}
 
 # Always-load files for developers
 devLoadAlwaysFiles:

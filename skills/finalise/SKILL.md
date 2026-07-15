@@ -76,7 +76,7 @@ Before starting any verification, also create a co-located running summary file 
 
 1. **Determine story/task directory:**
    - Extract directory path from the story/task file path provided
-   - Example: `docs/prd/.../story.311.1.example-system/`
+   - Example: `${PRD_ROOT}/.../story.311.1.example-system/`
 
 2. **Create running summary file:**
    - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` starts at 1, increment if re-running finalise
@@ -106,9 +106,9 @@ Before starting any verification, also create a co-located running summary file 
 
 **Example:**
 
-If verifying `docs/prd/.../story.311.1.example-system/story.311.1.example-system.md`, create:
+If verifying `${PRD_ROOT}/.../story.311.1.example-system/story.311.1.example-system.md`, create:
 
-`docs/prd/.../story.311.1.example-system/story.311.1.dod.1.example-system.md`
+`${PRD_ROOT}/.../story.311.1.example-system/story.311.1.dod.1.example-system.md`
 
 ### Step 1: Locate and Read the Story/Task Document
 
@@ -117,13 +117,13 @@ Accept the story/task document path in one of these formats:
 **Full path to markdown file:**
 
 ```
-docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/story.311.1.example-system.md
+${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/story.311.1.example-system.md
 ```
 
 **Directory path (skill will find the .md file):**
 
 ```
-docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/
+${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/
 ```
 
 **Task path examples:**
@@ -769,7 +769,42 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - When `TRACKER=jira` → **Jira path**
    - When `TRACKER=github` → **GitHub path**
 
+   **Re-point the Document link to a durable branch (do this first, before closing/transitioning):**
+
+   The tracker issue embeds a link to the source document on a git branch. During development that link points at the **feature branch**, which is **deleted after merge** — so a closed issue would link to a dead branch. At acceptance the work is about to merge into the long-lived integration branch, so re-point the link there now. (The doc lands on that branch only when the PR merges; if the PR is abandoned, re-sync later.)
+
+   Resolve the durable branch once (git-only, works for both platforms) — prefer `develop` when it exists on the remote, else the repo's default branch:
+
+   ```bash
+   DOC_PATH="{path to the story/task document being finalised}"
+   if git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
+     DURABLE_BRANCH=develop
+   else
+     DURABLE_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+     DURABLE_BRANCH="${DURABLE_BRANCH:-main}"
+   fi
+   # Repo-relative path of the document (robust whether DOC_PATH is absolute or relative):
+   DOC_REL=$(git ls-files --full-name -- "$DOC_PATH")
+   ```
+
    **Jira path** (when `TRACKER=jira`):
+
+   **Re-point the Jira Document link** — the description is ADF (can't be patched in place), so re-run the sync with the durable branch pinned. This is best-effort and additive; it also drives the status transition from frontmatter (`accepted` → Done), so the MCP transition below becomes a no-op when it succeeds:
+
+   ```bash
+   WORKITEM=story   # set to "task" when finalising a task
+   if [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ]; then
+     # sync-jira-{story|task} (same script the create/sync flow uses)
+     node .agents/skills/sync-jira-${WORKITEM}/scripts/sync-jira-${WORKITEM}.js \
+       -f "$DOC_PATH" --doc-branch "$DURABLE_BRANCH" --quiet \
+       && echo "✅ Jira Document link re-pointed to ${DURABLE_BRANCH} (status transition handled by sync)" \
+       || echo "⚠️ sync-jira re-link failed — the MCP transition below still runs; re-sync from develop after merge"
+   else
+     echo "ℹ️ JIRA_* env not set — skipping Document-link refresh; re-sync from develop after merge to pin a durable link"
+   fi
+   ```
+
+   `${WORKITEM}` is `story` or `task` depending on the document being finalised. If the re-link succeeded, the issue is already in Done; the steps below are then idempotent.
 
    Extract `jira_key` from story/task frontmatter. If absent or null, skip this step silently.
 
@@ -786,7 +821,30 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    2. **Post completion comment** — call `addCommentToJiraIssue`:
       - `cloudId`: {derived hostname}
       - `issueIdOrKey`: `{jira_key}`
-      - `commentBody`: `"Story accepted — PR: {PR_URL}. All DoD criteria verified."`
+      - `commentBody`: Build from the variables already computed for the PR comment (`FINAL_GATE`, `DOD_PATH`, `CYCLES`) and the per-category `overall_status` values from each DoD agent YAML result. Format:
+
+        ```
+        ## ✅ Story/Task Accepted — Definition of Done Verified
+
+        **PR**: {PR_URL}
+        **QA Gate**: {FINAL_GATE}
+        **Accepted**: {YYYY-MM-DD}
+        **DoD Summary**: `{DOD_PATH}`
+        **QA Cycles**: {CYCLES}    ← omit this line entirely if CYCLES=0
+
+        ### DoD Results
+        | Category | Result |
+        |---|---|
+        | Acceptance Criteria | {ac_overall_status} |
+        | PR Review | {pr_status} |
+        | Security | {security_overall_status} |
+        | Compliance | {compliance_overall_status} |
+        | Documentation | {docs_overall_status} |
+
+        All Definition of Done criteria verified. Story/task accepted and transitioning to Done.
+        ```
+
+        Use ✅ PASS, ❌ FAIL, ⚠️ CONCERNS, or — N/A for each status cell. `{pr_status}` is APPROVED or NOT_APPROVED from the AC agent result.
       - `contentFormat`: `"markdown"`
       - On failure: log warning and continue (non-blocking)
 
@@ -797,6 +855,21 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Extract `github_issue` number from story/task frontmatter
    - Get the repository owner (org) via: `gh repo view --json owner --jq '.owner.login'`
    - Get the repository name via: `gh repo view --json name --jq '.name'`
+   - **Re-point the `## Document` link to `$DURABLE_BRANCH`** — surgically swap just the branch segment of the link (anchored on the doc's repo-relative path, so nothing else in the body changes):
+
+   ```bash
+   CUR_BODY=$(gh issue view {github_issue} --json body -q '.body')
+   # Escape regex metacharacters in the path, then rewrite blob/<any-branch>/<path> → blob/$DURABLE_BRANCH/<path>.
+   # The branch segment uses [^) ]+ (not [^/]+) so multi-segment branch names like feature/story.5.1.foo match.
+   DOC_REL_RE=$(printf '%s' "$DOC_REL" | sed 's/[.[\*^$/]/\\&/g')
+   NEW_BODY=$(printf '%s' "$CUR_BODY" | sed -E "s#blob/[^) ]+/(${DOC_REL_RE})#blob/${DURABLE_BRANCH}/\1#g")
+   if [ "$NEW_BODY" != "$CUR_BODY" ]; then
+     gh issue edit {github_issue} --body-file <(printf '%s' "$NEW_BODY") \
+       && echo "✅ Document link re-pointed to ${DURABLE_BRANCH}" \
+       || echo "⚠️ Document-link re-point failed — non-blocking; re-sync from develop after merge"
+   fi
+   ```
+
    - Close the issue and verify closure:
 
    ```bash
@@ -1098,7 +1171,7 @@ Mark story.311.1.example-system as complete
 
 **Skill Actions:**
 
-1. Read story document from `docs/prd/.../story.311.1.example-system.md`
+1. Read story document from `${PRD_ROOT}/.../story.311.1.example-system.md`
 2. Check for QA reports - found `story.311.1.qa.1.initial-review.md` ✅
 3. Review QA gate file - `story.311.1.gate.1.initial-review.yml` shows PASS ✅
 4. Verify all acceptance criteria are checked (cross-reference with QA report) ✅
@@ -1132,12 +1205,12 @@ All Definition of Done criteria verified:
 - ✅ Maintainability review passed (QA verified)
 
 **QA Reports:**
-- QA Report: docs/prd/.../story.311.1.../story.311.1.qa.1.initial-review.md
-- Gate File: docs/prd/.../story.311.1.../story.311.1.gate.1.initial-review.yml
+- QA Report: ${PRD_ROOT}/.../story.311.1.../story.311.1.qa.1.initial-review.md
+- Gate File: ${PRD_ROOT}/.../story.311.1.../story.311.1.gate.1.initial-review.yml
 
 **Artifacts Generated:**
-- Updated: docs/prd/.../story.311.1.../story.311.1...md
-- Created: docs/prd/.../story.311.1.../sprint-review-summary.md
+- Updated: ${PRD_ROOT}/.../story.311.1.../story.311.1...md
+- Created: ${PRD_ROOT}/.../story.311.1.../sprint-review-summary.md
 - PR Comment: https://github.com/org/repo/pull/789#comment-xyz
 ```
 
@@ -1199,15 +1272,15 @@ Check if task.90.swagger-cli-plugin-enablement is ready for acceptance
 **User Request:**
 
 ```
-Verify DoD for docs/prd/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.2.example-notifications/
+Verify DoD for ${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.2.example-notifications/
 ```
 
 **Skill Actions:**
 
-1. Use Glob to find `.md` file in directory: `docs/prd/.../story.311.2.example-notifications/*.md`
+1. Use Glob to find `.md` file in directory: `${PRD_ROOT}/.../story.311.2.example-notifications/*.md`
 2. Found: `story.311.2.example-notifications.md`
-3. Check for QA reports: `docs/prd/.../story.311.2.example-notifications/*.qa.*.md`
-4. Check for gate files: `docs/prd/.../story.311.2.example-notifications/*.gate.*.yml`
+3. Check for QA reports: `${PRD_ROOT}/.../story.311.2.example-notifications/*.qa.*.md`
+4. Check for gate files: `${PRD_ROOT}/.../story.311.2.example-notifications/*.gate.*.yml`
 5. Proceed with DoD verification workflow (Steps 3-8)...
 
 ## Resources
@@ -1285,4 +1358,4 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
 fi
 ```
 
-Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `PostToolUse` and `Stop` hooks: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

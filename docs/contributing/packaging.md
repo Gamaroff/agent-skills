@@ -2,9 +2,33 @@
 
 > **Audience:** contributors authoring or releasing skills in this repo.
 
-Skills are distributed as `.zip` files. Each zip is self-contained — shared documentation is bundled in automatically.
+Skills ship via two distribution paths:
 
-## Quick Start
+| Path | How it works | When to use |
+|---|---|---|
+| **In-tree bundle** (`npm run bundle`) | Copies `shared/resources/*` into each skill's `references/` dir in place and rewrites paths. Committed to git. | Tarball install — `setup-consumer.sh` downloads the tagged GitHub release and copies skill dirs verbatim |
+| **Zip package** (`npm run package`) | Same bundling + path rewrite, but inside a `.zip` artefact. Never committed. | Manual installs, release artefacts |
+
+## In-Tree Bundling (required before push)
+
+Tarball installs (via `setup-consumer.sh`) copy skill directories verbatim from the repo. For skills that reference `shared/resources/`, those references must already be resolved into `skills/<name>/references/` — otherwise the installed skill will have broken paths.
+
+Run after any change to `shared/resources/` or a skill's `SKILL.md`:
+
+```bash
+npm run bundle          # all skills
+npm run bundle:skill skills/<skill-name>   # one skill
+```
+
+Then commit the `references/` changes alongside your other edits. The bundled files are committed to git — this is intentional.
+
+**Pre-commit hook (automatic):** the hook lives at `.githooks/pre-commit` (committed to git) and runs `npm run bundle` whenever `shared/resources/` or a `SKILL.md` is staged, then re-stages the `references/` diffs. It is wired up automatically via the `prepare` npm script — no manual step needed after a fresh clone:
+
+```bash
+npm install   # runs `git config core.hooksPath .githooks` via prepare script
+```
+
+## Zip Distribution
 
 ```bash
 # Validate a skill

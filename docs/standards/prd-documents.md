@@ -13,18 +13,54 @@ A PRD frames a feature area. It is the parent of one or more [epics](./epic-docu
 ```
 docs/prd/
 └── {domain}/
-    └── {feature}/
-        ├── prd.md                  # main document
+    └── prd.{feature}/
+        ├── prd.{feature}.md        # main document
         └── epics/
             └── epic.{N}.{name}/    # see epic-documents.md
 ```
 
-When sharded, the body splits across files in `{feature}/` per level-2 section. The packager / pipeline locates epics via the `prd.epicFilePattern` glob in [Configuration](../reference/configuration.md).
+When sharded, the body splits across files in `prd.{feature}/` per level-2 section. The pipeline locates epics at `${PRD_ROOT}/{domain}/prd.{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`, where `${PRD_ROOT}` is configurable (default `docs/prd`) — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 ## File naming
 
-- Top-level PRD: `prd.md` (or sharded section files in the same directory).
-- Directory segments (`{domain}`, `{feature}`) are kebab-case, all lowercase.
+- Directory: `prd.{feature}` — kebab-case, all lowercase, prefixed with `prd.` to match the document file.
+- Main PRD file: `prd.{feature}.md` (same name as the parent directory, with `.md` extension).
+- Directory segments (`{domain}`) are kebab-case, all lowercase.
+
+## Frontmatter schema
+
+```yaml
+---
+name: prd.onboarding
+title: "agent-skills Onboarding & Tutorials"
+type: prd
+description: "One-sentence summary of the feature area this PRD frames."
+mode: brownfield
+status: draft
+version: 0.1.0
+created: 2026-05-11
+tags: [onboarding, docs]
+---
+```
+
+| Field | Type | Required | Values / Notes |
+|---|---|---|---|
+| `name` | string | Yes | `prd.{feature}` — matches the directory and file stem |
+| `title` | string | Yes | Human-readable title |
+| `type` | literal | Yes | Must be exactly `prd` (OKF `type` — the one hard requirement) |
+| `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
+| `mode` | literal | Yes | `greenfield` or `brownfield` |
+| `status` | enum | Yes | See [status lifecycle](./status-lifecycle.md) |
+| `version` | string | Recommended | SemVer of the PRD (e.g. `0.1.0`) |
+| `created` | ISO date | Yes | `YYYY-MM-DD` |
+| `updated` | ISO date | Optional | `YYYY-MM-DD` — update on every change (this repo's OKF `timestamp`) |
+| `tags` | list | Optional | Short strings for cross-cutting categorization (OKF `tags`) |
+| `resource` | string | Optional | Canonical URI (OKF `resource`); set explicitly when the PRD maps to an external asset |
+| `author` | string | Optional | Authoring role or person |
+| `source_plan` | string | Optional | Path to an upstream plan file, for traceability |
+| `stepsCompleted` | list | Optional | Elicitation steps completed (set by `create-prd`/`new-product-prd`) |
+
+> **OKF mapping:** `updated` (or `created` when `updated` is absent) is this repo's OKF `timestamp`; an explicit `resource` is OKF `resource`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
 
 ## Body sections (greenfield template)
 
@@ -69,13 +105,13 @@ When a PRD exceeds ~5 epics or ~30 stories, shard it for navigability:
 /shard-prd <prd-path>
 ```
 
-`shard-prd` splits the document by level-2 section into separate files in the same `{feature}/` directory. Epic creation then proceeds against the sharded files.
+`shard-prd` splits the document by level-2 section into separate files in the same `prd.{feature}/` directory. Epic creation then proceeds against the sharded files.
 
 ## Prerequisites checklist
 
 Before running `create-prd` / `new-product-prd`:
 
-- [ ] `prd.prdSharded` and `prd.prdShardedLocation` are set in `skills-config.yaml`
+- [ ] PRD lives under `${PRD_ROOT}` (default `docs/prd/`; configurable via `prd.prdShardedLocation` — see [Configuration](../reference/configuration.md#configurable-roots-and-fixed-conventions))
 - [ ] (Brownfield only) project architecture is documented — see `document-existing-project` SKILL
 - [ ] Stakeholder input gathered for goals, requirements, success criteria
 

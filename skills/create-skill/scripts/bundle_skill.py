@@ -27,11 +27,23 @@ SHARED_REF_RE = re.compile(r'(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
 JS_SHARED_RE = re.compile(
     r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)'
 )
+# Shell scripts under <skill>/scripts/ source shared libs via a relative path.
+# Rewrite any `../…/shared/resources/<name>` to `../references/<name>` (the
+# bundled location, one level up from scripts/).
+SH_SHARED_RE = re.compile(r'(?:\.\./)+shared/resources/([A-Za-z0-9._-]+)')
 # Matches already-rewritten in-tree references (so re-runs and partial states work).
 REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:md|sh|js|py))')
 # Sibling require/import in JS — `require("./foo.js")` — used to follow transitive
 # deps inside bundled shared .js files.
 JS_SIBLING_RE = re.compile(r'require\(["\']\./([A-Za-z0-9._/-]+\.js)["\']\)')
+# Sibling source/exec in shell — for transitive deps inside bundled shared .sh
+# files. Matches:
+#   source "$(dirname "$0")/foo.sh"   |   exec "$(dirname "$0")/foo.sh" "$@"
+#   source ./foo.sh                   |   . ./foo.sh
+#   source foo.sh
+SH_SIBLING_RE = re.compile(
+    r'(?:source|exec|\.)\s+["\']?(?:\$\(dirname[^)]*\)/|\./)?([A-Za-z0-9._-]+\.sh)["\']?'
+)
 EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
 AUTOGEN_MARKER = "AUTO-GENERATED — DO NOT EDIT"
 
@@ -94,10 +106,16 @@ def bundle_skill(skill_path):
                 lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})',
                 content,
             )
+        if suffix == '.sh':
+            return SH_SHARED_RE.sub(lambda m: f"../references/{m.group(1)}", content)
         return content
 
     # Pass 1: walk skill files (excluding references/) and shared files transitively.
-    skill_files = list(skill_path.rglob('*.md')) + list(skill_path.rglob('*.js'))
+    skill_files = (
+        list(skill_path.rglob('*.md'))
+        + list(skill_path.rglob('*.js'))
+        + list(skill_path.rglob('*.sh'))
+    )
     skill_files = [
         f for f in skill_files
         if not any(p in EXCLUDE_DIRS for p in f.parts)
@@ -137,6 +155,8 @@ def bundle_skill(skill_path):
         pending.extend(collect_shared_refs(text))
         if src.suffix == '.js':
             pending.extend(m.group(1) for m in JS_SIBLING_RE.finditer(text))
+        if src.suffix == '.sh':
+            pending.extend(m.group(1) for m in SH_SIBLING_RE.finditer(text))
 
     if not needed:
         # Skill may have stale references/ dir but no shared refs anymore — leave it.
@@ -157,8 +177,16 @@ def bundle_skill(skill_path):
         except UnicodeDecodeError:
             new_bytes = src.read_bytes()
         if dst.exists() and dst.read_bytes() == new_bytes:
+            # Content unchanged — still re-sync mode for .sh in case the bit was lost.
+            if Path(name).suffix == '.sh':
+                src_mode = src.stat().st_mode & 0o777
+                if (dst.stat().st_mode & 0o777) != src_mode:
+                    dst.chmod(src_mode)
             continue
         dst.write_bytes(new_bytes)
+        # Preserve executable bit for shell scripts (matches source file mode).
+        if Path(name).suffix == '.sh':
+            dst.chmod(src.stat().st_mode & 0o777)
         bundled += 1
         print(f"  bundled references/{name}")
 

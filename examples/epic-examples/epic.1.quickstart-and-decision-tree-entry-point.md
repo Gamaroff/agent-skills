@@ -27,7 +27,7 @@ Land a brand-new agent-skills user in the right pipeline path within 60 seconds 
 **Existing System Context:**
 
 - Current relevant functionality: `docs/concepts/getting-started.md` (6-step install checklist), `README.md` (skill catalog + install), `docs/runbooks/` (reference-shaped guides averaging 51–274 lines).
-- Technology stack: Markdown docs, Mermaid for diagrams, Bash/Node-based installers (`npx skills add`).
+- Technology stack: Markdown docs, Mermaid for diagrams, Bash-based installer (`setup-consumer.sh` downloading tagged GitHub release tarballs).
 - Integration points: README → getting-started → runbooks (current flow); needs a guided entry that pre-dates runbook reading.
 
 **Enhancement Details:**
