@@ -89,7 +89,7 @@ Callout pattern follows the Story 3.1 diff-inspection gate approach. Each callou
 
 ### Documentation Links
 
-- [which-path.md decision tree](../../../../../concepts/which-path.md)
+- [which-path.md decision tree](../../../../../../concepts/which-path.md)
 - [Story 3.2 QA Report](story.3.2.qa.1.satellite-runbook-callouts.md)
 
 ---

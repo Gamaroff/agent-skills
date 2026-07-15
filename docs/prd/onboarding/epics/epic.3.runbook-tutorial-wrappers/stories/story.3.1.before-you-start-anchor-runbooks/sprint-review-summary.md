@@ -98,8 +98,8 @@ Added "Before you start" prerequisite sections to both anchor runbooks (`story-d
 
 ### Documentation Links
 
-- [story-development.md](../../../../../runbooks/story-development.md)
-- [task-development.md](../../../../../runbooks/task-development.md)
+- [story-development.md](../../../../../../runbooks/story-development.md)
+- [task-development.md](../../../../../../runbooks/task-development.md)
 
 ---
 
