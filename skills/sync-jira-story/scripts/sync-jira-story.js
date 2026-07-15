@@ -44,7 +44,7 @@ function formatJiraTimeEstimate(value) {
 // ---------------------------------------------------------------------------
 // Description builder (story-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changelogEntries }) {
+function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries, linkResolver }) {
   const content = [];
 
   if (changelogEntries && changelogEntries.length) {
@@ -67,6 +67,7 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changel
   const links = [];
   if (epicBbUrl)  links.push({ label: "Parent Epic on Bitbucket", href: epicBbUrl });
   if (storyBbUrl) links.push({ label: "Story file on Bitbucket", href: storyBbUrl });
+  if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
   if (links.length) {
     content.push(lib.adf.heading(3, "Source Documents"));
     content.push(lib.adf.bulletList(...links.map(l =>
@@ -75,7 +76,7 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changel
 
   for (const sec of lib.extractBodySections(body, STORY_SECTIONS)) {
     content.push(lib.adf.heading(3, sec.name));
-    content.push(...lib.textToAdfNodes(sec.content));
+    content.push(...lib.textToAdfNodes(sec.content, linkResolver));
   }
 
   const meta = [];
@@ -91,12 +92,15 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changel
   return lib.adf.doc(...content);
 }
 
-function hashBody({ body, epicBbUrl, storyBbUrl }) {
+function hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }) {
   const sections = lib.extractBodySections(body, STORY_SECTIONS).map(s => ({
     name: s.name,
-    nodes: lib.textToAdfNodes(s.content),
+    nodes: lib.textToAdfNodes(s.content, linkResolver),
   }));
-  return lib.hashStable({ sections, epicBbUrl, storyBbUrl });
+  return lib.hashStable({
+    sections, epicBbUrl, storyBbUrl,
+    relatedDocLinks: (relatedDocLinks || []).map(l => l.href),
+  });
 }
 
 function hashMeta(frontmatter) {
@@ -106,6 +110,53 @@ function hashMeta(frontmatter) {
     jira_epic: frontmatter.jira_epic || "",
     status: frontmatter.status || "",
   });
+}
+
+// ---------------------------------------------------------------------------
+// Related docs (co-located story artifacts — plan, review, QA, etc.)
+// ---------------------------------------------------------------------------
+// A story folder accumulates companions alongside the card itself: the
+// implementation plan, review and QA write-ups, the DoD checklist. Those are
+// the docs a Jira reader reaches for next, and nobody remembers to link them
+// by hand — so discover them structurally and they appear on the next sync.
+//
+// Only durable artifacts are listed. Point-in-time ones (dated validate runs,
+// sprint-review summaries) are deliberately skipped: they go stale, and a
+// confidently-wrong link is worse than no link. Order here is display order.
+const RELATED_DOC_TYPES = [
+  { key: "plan",           label: "Implementation plan" },
+  { key: "review",         label: "Story review" },
+  { key: "qa",             label: "QA assessment" },
+  { key: "implementation", label: "Implementation report" },
+  { key: "dod",            label: "Definition of Done" },
+];
+
+// story.2.4.review.1.update-examples-readme.md → { label: "Story review", instance: "1" }
+function relatedDocInfo(filename) {
+  const m = filename.match(/^story\.[\d.]+?\.([a-z]+)\.(?:(\d+)\.)?.*\.md$/i);
+  if (!m) return null;
+  const type = RELATED_DOC_TYPES.find(t => t.key === m[1].toLowerCase());
+  return type ? { label: type.label, instance: m[2] || null, order: RELATED_DOC_TYPES.indexOf(type) } : null;
+}
+
+function findRelatedDocs(filePath) {
+  const dir = path.dirname(filePath);
+  const self = path.basename(filePath);
+  const found = [];
+  for (const f of fs.readdirSync(dir)) {
+    if (f === self || !f.toLowerCase().endsWith(".md")) continue;
+    const info = relatedDocInfo(f);
+    if (info) found.push({ ...info, file: path.join(dir, f) });
+  }
+  found.sort((a, b) => a.order - b.order || String(a.instance).localeCompare(String(b.instance)));
+  // Several artifacts of one type (review.1, review.2) would otherwise render
+  // as identical link labels — qualify those with the instance number.
+  const perLabel = {};
+  found.forEach(d => { perLabel[d.label] = (perLabel[d.label] || 0) + 1; });
+  return found.map(d => ({
+    file: d.file,
+    label: perLabel[d.label] > 1 && d.instance ? `${d.label} ${d.instance}` : d.label,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +432,13 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
   const branch = bbBase ? (args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()) : null;
   const storyBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
+  const linkResolver = lib.makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch });
+  const relatedDocLinks = bbBase
+    ? findRelatedDocs(filePath).map(d => ({
+        label: d.label,
+        href: lib.buildBitbucketUrl(d.file, repoRoot, bbBase, branch),
+      }))
+    : [];
 
   let epicBbUrl = null;
   if (bbBase) {
@@ -404,7 +462,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     : null;
 
   const syncLabel = syncLabelFor(filePath);
-  const newBodyHash = hashBody({ body, epicBbUrl, storyBbUrl });
+  const newBodyHash = hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver });
   const newMetaHash = hashMeta(frontmatter);
 
   let existingJiraKey = frontmatter.jira_key;
@@ -470,7 +528,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       changeEntry = lib.fmtEntry(changeSummary);
 
       const allEntries = [...lib.extractEntries(content), changeEntry];
-      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changelogEntries: allEntries });
+      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver });
       // Send `description` only when body or metadata actually changed, to avoid
       // pointless edits in Jira's history.
       const includeDescription = changedFields.includes("description") || changedFields.includes("metadata");
@@ -531,7 +589,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira story created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, changelogEntries: [changeEntry] });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira story ===`);
@@ -647,6 +705,8 @@ if (require.main === module) {
     hashBody,
     hashMeta,
     syncLabelFor,
+    findRelatedDocs,
+    relatedDocInfo,
     normaliseStorySummary,
     mapStatus: lib.mapStatus,
     loadStatusMap: lib.loadStatusMap,
@@ -679,9 +739,11 @@ if (require.main === module) {
     guardConcurrentEdit:     lib.guardConcurrentEdit,
     parseJiraError:          lib.parseJiraError,
     hashStable:              lib.hashStable,
-    hashDescriptionInput:    ({ body, frontmatter, epicBbUrl, storyBbUrl }) =>
-                               hashBody({ body, epicBbUrl, storyBbUrl }),
+    hashDescriptionInput:    ({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }) =>
+                               hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }),
     stripRemotePrefix:       lib.stripRemotePrefix,
+    resolveRelativeLink:      lib.resolveRelativeLink,
+    makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
     getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
     getDefaultBranch:        lib.getDefaultBranch,
     CL_START:                lib.CL_START,

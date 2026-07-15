@@ -891,3 +891,58 @@ test("normaliseStorySummary — no id resolvable leaves the summary unchanged", 
   assert.equal(lib.normaliseStorySummary("Foo", undefined), "Foo");
   assert.equal(lib.normaliseStorySummary("Foo", null), "Foo");
 });
+
+// ---------------------------------------------------------------------------
+// findRelatedDocs — co-located story artifacts
+// ---------------------------------------------------------------------------
+function makeStoryDir(files) {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-"));
+  const storyDir = path.join(dir, "story.2.4.demo");
+  fs.mkdirSync(storyDir);
+  files.forEach(f => fs.writeFileSync(path.join(storyDir, f), "x"));
+  return path.join(storyDir, "story.2.4.demo.md");
+}
+
+test("findRelatedDocs — links durable artifacts and skips point-in-time ones", () => {
+  const path = require("path");
+  const card = makeStoryDir([
+    "story.2.4.demo.md",
+    "story.2.4.plan.demo.md",
+    "story.2.4.review.1.demo.md",
+    "story.2.4.qa.1.demo.md",
+    "story.2.4.implementation.1.demo.md",
+    "story.2.4.dod.1.demo.md",
+    "story.2.4.validate.2026-05-13.md", // dated run — excluded
+    "sprint-review-summary.md",         // point-in-time — excluded
+    "story.2.4.gate.1.demo.yml",        // not markdown — excluded
+  ]);
+  const found = lib.findRelatedDocs(card);
+  assert.deepEqual(found.map(d => d.label), [
+    "Implementation plan", "Story review", "QA assessment",
+    "Implementation report", "Definition of Done",
+  ]);
+  // the card itself is never listed as its own related doc
+  assert.ok(!found.some(d => path.basename(d.file) === "story.2.4.demo.md"));
+});
+
+test("findRelatedDocs — qualifies repeated artifact types with their instance number", () => {
+  const card = makeStoryDir([
+    "story.2.4.demo.md",
+    "story.2.4.review.1.demo.md",
+    "story.2.4.review.2.demo.md",
+    "story.2.4.qa.1.demo.md",
+  ]);
+  const labels = lib.findRelatedDocs(card).map(d => d.label);
+  assert.deepEqual(labels, ["Story review 1", "Story review 2", "QA assessment"]);
+});
+
+test("findRelatedDocs — a story folder with no companions yields no links", () => {
+  assert.deepEqual(lib.findRelatedDocs(makeStoryDir(["story.2.4.demo.md"])), []);
+});
+
+test("relatedDocInfo — unknown artifact types are not linked", () => {
+  assert.equal(lib.relatedDocInfo("story.2.4.validate.2026-05-13.md"), null);
+  assert.equal(lib.relatedDocInfo("sprint-review-summary.md"), null);
+  assert.equal(lib.relatedDocInfo("story.2.4.plan.demo.md").label, "Implementation plan");
+});
