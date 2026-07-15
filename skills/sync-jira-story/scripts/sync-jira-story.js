@@ -264,10 +264,10 @@ function withCodeBlocksMasked(text, fn) {
   const masked = text.replace(/```[\s\S]*?```/g, m => {
     const idx = blocks.length;
     blocks.push(m);
-    return ` CODEBLOCK_${idx} `;
+    return `\x01CODEBLOCK_${idx}\x01`;
   });
   const result = fn(masked);
-  return result.replace(/ CODEBLOCK_(\d+) /g, (_, i) => blocks[Number(i)]);
+  return result.replace(/\x01CODEBLOCK_(\d+)\x01/g, (_, i) => blocks[Number(i)]);
 }
 
 function upsertInlineLine(text, pattern, newLine) {
