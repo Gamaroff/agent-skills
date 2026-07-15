@@ -340,3 +340,86 @@ test("CLI: --epic-status --assume-ticked round-trips", () => {
   const s = JSON.parse(out);
   assert.equal(s.complete, true);
 });
+
+// ── 11: `T`-prefixed standalone-task ids ─────────────────────────────────────
+
+test("11: a T-row parses as an item id, not an id-less annotation", () => {
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  assert.ok(m.byId.has("T22"), "T22 must resolve for dependency lookups");
+  assert.ok(m.byId.has("T26"));
+  assert.equal(
+    m.warnings.filter(w => /no item id/.test(w)).length, 0,
+    `T-rows must not be reported as id-less; got ${JSON.stringify(m.warnings)}`,
+  );
+});
+
+test("11: an unticked T-dep BLOCKS its dependent", () => {
+  // The bug this fixture exists for: `deps: T22` was dropped (the id grammar was
+  // digit-anchored), so 28.2 looked eligible on 28.1 alone and would be dispatched
+  // before the runtime migration it is explicitly sequenced after.
+  const r = select(fixture("11-task-ids.md"));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T22", "T22 must be built before its dependent");
+  assert.equal(r.item.command, "/develop-task");
+  assert.equal(r.item.commandArg, "docs/tasks/task.22.runtime-migration/task.22.runtime-migration.md");
+  assert.ok(
+    r.skipped.some(s => s.id === "28.2" && /deps unsatisfied: T22/.test(s.reason)),
+    `28.2 must be skipped for the unsatisfied T22 dep; got ${JSON.stringify(r.skipped)}`,
+  );
+});
+
+test("11: ticking the T-dep unblocks its dependent", () => {
+  const r = select(tick(fixture("11-task-ids.md"), "T22"));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "28.2");
+});
+
+test("11: a T-row does not block its host epic's promotion", () => {
+  // T-rows sit in their *consumer* epic's section for readability but are not
+  // stories of it — counting them would strand the epic forever.
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  assert.deepEqual(m.epicSections["28"].rowIds, ["28.1", "28.2"], "T22 must be excluded from Epic 28");
+  assert.deepEqual(m.epicSections["20"].rowIds, ["20.8"], "T26 must be excluded from Epic 20");
+  assert.equal(epicStatus(m, "28").complete, false, "28.2 is still outstanding");
+
+  // Tick only the story; T22 stays unticked. The epic must still complete.
+  const storiesDone = parseRoadmap(tick(fixture("11-task-ids.md"), "28.2"));
+  assert.equal(storiesDone.byId.get("T22").ticked, false, "guard: T22 is still open");
+  assert.equal(
+    epicStatus(storiesDone, "28").complete, true,
+    "Epic 28 completes on its stories alone — an unticked T22 must not hold it open",
+  );
+});
+
+test("11: a SKIP'd T-row is stepped past, never selected", () => {
+  const text = tick(tick(fixture("11-task-ids.md"), "T22"), "28.2");
+  const r = select(text);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "20.8", "T26 is ⏭️ SKIP — the loop must step past it to 20.8");
+});
+
+test("11: depending on a SKIP'd row warns — the dep is silently satisfied", () => {
+  // idDone() counts an all-SKIP id as done, so `deps: T26` resolves satisfied while
+  // T26 is deferred. Intended (a SKIP block must not stall the loop) but a footgun:
+  // 20.8 can build with its prerequisite unbuilt. Say so.
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  const w = m.warnings.filter(x => /is ⏭️ SKIP/.test(x));
+  assert.equal(w.length, 1, `expected one SKIP-dep warning; got ${JSON.stringify(m.warnings)}`);
+  assert.match(w[0], /20\.8 dep T26/);
+});
+
+test("11: `deps: —` is recognised as no-deps, not an unparseable dep", () => {
+  // `\b` cannot follow a dash, so the old `…|-)\b` never matched an em-dash and every
+  // `deps: —` row emitted a spurious "has no item id — ignored".
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  assert.deepEqual(m.byId.get("T22").deps, []);
+  assert.equal(m.warnings.filter(w => /has no item id/.test(w)).length, 0);
+});
+
+test("11: `T` requires a following digit — 'Task 22' is not the id T22", () => {
+  const m = parseRoadmap([
+    "# Roadmap", "", "## PHASE 1", "",
+    "- [ ] **9.9** X · deps: Task 22 · /develop-story docs/prd/p/s/story.9.9.x/story.9.9.x.md", "",
+  ].join("\n"));
+  assert.deepEqual(m.byId.get("9.9").deps.map(d => d.id), ["22"], "'Task 22' must still read as 22");
+});

@@ -35,7 +35,13 @@ import { fileURLToPath } from "node:url";
 export const DEFAULT_ROADMAP = "docs/development/project-completion-roadmap.md";
 
 // Item ids: 5.1a, 8.4-2, 17.3-1, 13.1-1, 21.2a, 7.11-NFR2 …
-const ID_RE_SRC = "\\d+(?:\\.\\d+)*[a-z]?(?:-[A-Za-z0-9]+)*";
+// …plus `T`-prefixed standalone-task ids: T22, T26. The prefix is load-bearing:
+// task and epic numbers share this namespace (Task 22 / Epic 22, Task 26 / Epic 26
+// can all exist), so a bare `22` would be ambiguous. Without the `T` alternative
+// these rows parsed as id-less and — worse — `deps: T22` was silently dropped,
+// letting a dependent be selected while its hard prerequisite was unbuilt.
+// `T` must be followed by a digit, so prose like "Task 22" still yields only `22`.
+const ID_RE_SRC = "T?\\d+(?:\\.\\d+)*[a-z]?(?:-[A-Za-z0-9]+)*";
 const ID_RE = new RegExp(ID_RE_SRC);
 const ID_TOKEN_RE = new RegExp(`(?<![\\w.-])(${ID_RE_SRC})`, "g");
 const ROW_RE = /^(\s*)[-*]\s*\[([ xX])\]\s*(.*)$/;
@@ -52,6 +58,11 @@ function undecorate(s) {
 
 function idTokens(text) {
   return [...text.matchAll(ID_TOKEN_RE)].map(m => m[1]);
+}
+
+/** `T22`/`T26` — a standalone task row, as opposed to an epic story row. */
+function isTaskId(id) {
+  return /^T\d/.test(id);
 }
 
 /** First markdown-link href that points at a story/task file, else null. */
@@ -139,7 +150,12 @@ export function parseRoadmap(text) {
     if (dm) {
       for (const seg of dm[1].split(",")) {
         const s = seg.trim();
-        if (!s || /^(none|n\/a|—|–|-)\b/i.test(s)) continue;
+        // "no deps" markers. `\b` cannot follow a dash (both sides non-word), so
+        // the previous `…|-)\b` never matched `deps: —` and it fell through to the
+        // "has no item id — ignored" warning: harmless but noisy, and noise in this
+        // channel is what hid the dropped `deps: T22`. `(?![\w-])` matches the bare
+        // marker while still rejecting "-foo".
+        if (!s || /^(?:none|n\/a|[—–-])(?![\w-])/i.test(s)) continue;
         const shipped = /shipped/i.test(s);
         const ids = idTokens(s);
         if (!ids.length) {
@@ -175,7 +191,11 @@ export function parseRoadmap(text) {
       raw: rest.trim(),
     };
     model.rows.push(row);
-    if (epic) model.epicSections[epic.num].rowIds.push(id);
+    // A `T`-row is a cross-cutting standalone task that lives in its *consumer*
+    // epic's section for readability — it is not a story of that epic, so epic
+    // completion must not wait on it (otherwise a task row would strand its host
+    // epic). It stays in `byId`/`idInstances`, so deps on it still resolve.
+    if (epic && !isTaskId(id)) model.epicSections[epic.num].rowIds.push(id);
     if (sawPhaseHeading() && phaseIdx === null && !ticked) {
       model.warnings.push(`line ${ln}: outstanding row ${id} appears before the first PHASE heading — ignored`);
     }
@@ -222,6 +242,15 @@ function lintModel(model) {
     for (const d of r.deps) {
       if (!d.shipped && !model.byId.has(d.id) && !model.epicSections[d.id]) {
         model.warnings.push(`line ${r.line}: ${r.id} dep ${d.id} not in the current backlog — assumed shipped/archived`);
+        continue;
+      }
+      // `idDone` treats an all-SKIP id as done, so this dep resolves as satisfied
+      // while its target is explicitly deferred. That is intended (a SKIP block must
+      // not stall the loop), but it means `r` can be built with `d` unbuilt and
+      // nothing else says so — surface it rather than letting it pass mute.
+      const targets = model.idInstances.get(d.id);
+      if (!d.shipped && targets && targets.length && targets.every(t => t.skip)) {
+        model.warnings.push(`line ${r.line}: ${r.id} dep ${d.id} is ⏭️ SKIP — dep treated as satisfied; ${r.id} may build before ${d.id} exists`);
       }
     }
     for (const b of r.blockedUntil) {
