@@ -148,35 +148,33 @@ Prompt template (pass verbatim to Explore subagent):
 ```
 Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{epic}.{story}.*.md under docs/).
 
-RUN the lite-mode CLI — do NOT re-evaluate the FR3/FR17 conditions in prose. The CLI calls the
-production parsers (`parseLiteModeInputs` / `decideLiteMode` / `parseSuccessCriteria`), so its decision
-is byte-identical to the running pipeline's:
+DETERMINE the lite-mode inputs by reading the document. This is the normal path — evaluate each
+condition from what the document actually says, and report the three inputs as separate fields. Do NOT
+decide `pipeline_mode` by impression: the Aggregation block below recomputes it from your booleans, so
+your job is to report the inputs accurately, not to judge the outcome.
 
-  npm run lite-mode -- {file_path}
-    (or, if npm scripts are unavailable: node --experimental-strip-types scripts/lite-mode.ts {file_path})
-
-It prints one compact JSON line:
-  { "risk_level", "phase_count", "single_module", "pipeline_mode", "has_success_criteria_table", "ac_count" }
-
-If the CLI cannot be run (missing script / non-zero exit), fall back to evaluating the three lite-mode
-conditions in prose (risk_level low/absent; fewer than 3 Tasks/phases; single module) and log the fallback.
+Extract, per shared/resources/develop-pipeline-lite-mode.md (the canonical contract):
+  - risk_level: from frontmatter `risk_level:`. Use "absent" if the field is missing — do not infer a
+    level from the document's tone or subject matter.
+  - phase_count: count of `## Tasks` subsections (stories) or implementation phases (tasks).
+  - single_module: true only if the document's scope touches ONE app or lib. When the module boundary is
+    genuinely arguable, answer false — `standard` is the safe default, and lite mode shortens QA.
+  - has_success_criteria_table / ac_count: from the structured-criteria section
+    (## Acceptance Criteria for stories, ## Success Criteria for tasks).
 
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
   - Source `shared/resources/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
-MERGE the CLI's JSON fields with your own skills-config discovery into the return shape below — do NOT
-return the CLI JSON verbatim (that would drop `skills_config_exists` / `always_load_files` and break
-always-load resolution). `has_success_criteria_table` and `ac_count` come from the CLI; the structured-
-criteria meaning is unchanged (## Acceptance Criteria for stories, ## Success Criteria for tasks).
+MERGE the document-derived fields with your skills-config discovery into the return shape below — every
+field is required. Omitting `skills_config_exists` / `always_load_files` breaks always-load resolution.
 
-Return compact JSON (CLI fields + your discovery):
+Return compact JSON:
 {
   "risk_level": "low|medium|high|absent",
   "phase_count": <integer>,
   "single_module": true|false,
-  "pipeline_mode": "lite|standard",
   "has_success_criteria_table": true|false,
   "ac_count": <integer>,
   "skills_config_exists": true|false,
@@ -195,23 +193,20 @@ LITEMODE_RESULT  ← Agent 3 result (compact JSON)
 
 TASK_FILE      = RESOLVER_RESULT.absolute_file_path   (or already known from inline resolution)
 TASK_DIR       = RESOLVER_RESULT.task_or_story_directory
-# Defence-in-depth: RECOMPUTE PIPELINE_MODE from the CLI's already-computed booleans rather than
-# trusting the free-form `pipeline_mode` string. This mechanical boolean AND of pre-computed values is
-# NOT a prose re-derivation of FR3 — it cannot drift, and a malformed `pipeline_mode` field can never
-# override the rule. `risk_ok` is SET MEMBERSHIP — accept ONLY {"low", "absent"}; reject "medium" /
-# "high" / anything else (matching production decideLiteMode's low/undefined-only semantics). Do NOT use
-# a truthy or substring check.
+# COMPUTE PIPELINE_MODE here, from the three booleans Agent 3 reported. Agent 3 does not return a
+# `pipeline_mode` field: the decision belongs to this mechanical boolean AND, not to a subagent's
+# judgement, so there is no free-form mode string that could drift from the rule.
+# `risk_ok` is SET MEMBERSHIP — accept ONLY {"low", "absent"}; reject "medium" / "high" / anything else.
+# Do NOT use a truthy or substring check.
 risk_ok        = LITEMODE_RESULT.risk_level ∈ {"low", "absent"}
 PIPELINE_MODE  = (risk_ok AND LITEMODE_RESULT.phase_count < 3 AND LITEMODE_RESULT.single_module)
                    ? "lite" : "standard"        (default: "standard" on Agent-3 failure)
-                 # If this recompute disagrees with LITEMODE_RESULT.pipeline_mode, prefer the recompute
-                 # and log the discrepancy in the Issues Log.
 ALWAYS_LOAD_FILES = LITEMODE_RESULT.always_load_files   (default: [] on failure)
 HAS_SUCCESS_CRITERIA_TABLE = LITEMODE_RESULT.has_success_criteria_table   (default: false on failure)
 TRACKER_STATE  = TRACKER_RESULT                         (null fields on failure)
 ```
 
-Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE (and whether the boolean recompute disagreed with the CLI's `pipeline_mode`) and ALWAYS_LOAD_FILES determined.
+Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE (with the three booleans it was computed from) and ALWAYS_LOAD_FILES determined.
 
 ### Failure handling
 
@@ -600,7 +595,7 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 Resume cases skip any question whose answer is already recorded in the Decisions Log (typical resume: 0 questions).
 
-If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `references/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
+If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `shared/resources/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
 
 Decisions Log entry after the call must list every question that was asked and its answer, so reviewers can verify the count matches the table above.
 

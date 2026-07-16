@@ -220,24 +220,6 @@ The implementation report has a full account of what was completed and what need
 
 ---
 
-## Execution Surfaces
-
-This pipeline has **two execution surfaces of the same 8-stage logic** — read one, and this section tells you the other exists:
-
-- **This skill** — the Claude Code orchestrator (you, now). Human-in-the-loop = autonomous defaults + `AskUserQuestion` (Phase 0d Q1/Q2; review/develop auto-answers). On **HALT** it produces *rich artifacts*: an implementation-report entry, a tracker comment, and a lock snapshot to `.claude/state/develop-pipeline.last-halt.json`.
-- **The Mastra `developStoryWorkflow`** (`src/mastra/pipelines/develop-story/`, assembled by `src/mastra/pipeline/factory/create-develop-pipeline.ts`) — the programmatic pipeline. Human-in-the-loop = **four opt-in approval gates** in `state.approvalGates` (`src/mastra/pipeline/gates/approval-gates.ts`). The default is an **empty** gate set = fully autonomous, matching this skill's defaults:
-
-  | Gate | Fires at (stage) | Purpose when active |
-  |------|------------------|---------------------|
-  | `review-clarifications` | review-story | restore the review clarifying-question interview |
-  | `qa-clarifications` | qa-loop body | restore the QA interview / waiver prompt |
-  | `pre-finalise` | finalise | approve before the irreversible accept |
-  | `on-halt` | any HALT (cross-cutting, stage `*`) | turn a terminal HALT into continue / override / abort |
-
-**HALT-artifact difference (important — do not assume parity).** When the `on-halt` gate is **inactive** (the default), the workflow emits a *terminal* halt (`terminalReason: 'halt'`) and does **NOT** produce this skill's rich HALT artifacts (no report entry, no tracker comment, no lock snapshot). The two surfaces agree on the autonomous happy path; their **halt-time behaviour differs**. A reader of this skill should not expect the workflow to write those artifacts on every halt, and a reader of the factory should map the skill's `AskUserQuestion` prompts onto the four gates above.
-
----
-
 ## Autonomous Decision Defaults
 
 Every default applied must be recorded in the Decisions Log.
