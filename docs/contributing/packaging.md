@@ -22,11 +22,16 @@ npm run bundle:skill skills/<skill-name>   # one skill
 
 Then commit the `references/` changes alongside your other edits. The bundled files are committed to git — this is intentional.
 
-**Pre-commit hook (automatic):** the hook lives at `.githooks/pre-commit` (committed to git) and runs `npm run bundle` whenever `shared/resources/` or a `SKILL.md` is staged, then re-stages the `references/` diffs. It is wired up automatically via the `prepare` npm script — no manual step needed after a fresh clone:
+**Pre-commit hook (automatic):** the hook lives at `.githooks/pre-commit` (committed to git) and runs `npm run bundle` whenever `shared/resources/` or a `SKILL.md` is staged, then stages the `references/` files **that run changed**. It is wired up automatically via the `prepare` npm script — no manual step needed after a fresh clone:
 
 ```bash
 npm install   # runs `git config core.hooksPath .githooks` via prepare script
 ```
+
+Two behaviours are worth knowing, both there to keep a commit's bundled copies matching the source it carries:
+
+- **Pre-existing bundle changes are left alone**, and reported. If `references/` was already dirty before you committed — say you ran `npm run bundle` yourself, or you are splitting one batch of work into several commits — those files are not swept into a commit that happens to touch an unrelated `SKILL.md`. Stage them yourself if they belong in it.
+- **The hook refuses to commit bundles built from unstaged source.** `npm run bundle` reads `shared/resources/` from the working tree, but your commit carries the index. If bundling changes `references/` while a shared source has unstaged edits, the bundled copies would embed source the commit does not include — so the hook fails and asks you to stage or stash that source first.
 
 ## Zip Distribution
 
