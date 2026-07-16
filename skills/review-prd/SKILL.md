@@ -183,7 +183,7 @@ Store choice as `output_mode` for Step 11.
    - `.claude/database-redis.md`
    - `.claude/testing.md`
    - `${ARCH_ROOT}/routing-and-file-structure.md`
-   - `docs/standards/naming-conventions.md`
+   - `docs/standards/file-naming.md`
    - `.claude/notifications.md` (if PRD touches notifications)
 
 4. **Scan for child epics**:
@@ -801,6 +801,6 @@ options:
 | `.claude/database-redis.md`                  | Architecture source — DB, Redis, safety rules             |
 | `.claude/testing.md`                         | Architecture source — test standards, co-location         |
 | `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure                                |
-| `docs/standards/naming-conventions.md`       | Naming rules (PascalCase, kebab-case, handle)             |
+| `docs/standards/file-naming.md`       | Naming rules (PascalCase, kebab-case, handle)             |
 | `skills/pm-checklist/SKILL.md`               | Complementary checklist validation (optional integration) |
 | `skills/review-epic/SKILL.md`                | Pattern reference for question batching and scoring       |

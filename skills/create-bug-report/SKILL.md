@@ -30,7 +30,7 @@ Use this skill when:
 - **Location**: Co-located with story file in story directory
 - **Used For**: Bugs found during user-facing feature testing
 - **Example**: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
-- **Reference**: Follows `docs/standards/naming-conventions.md`
+- **Reference**: Follows `docs/standards/file-naming.md`
 
 ### Technical Task Bug Reports
 
@@ -122,7 +122,7 @@ optional:
 
 **Format**: `story.{epic}.{story}.bug.{bug-number}.{descriptive-name}.md`
 
-**Reference**: Follow the naming convention as specified in `docs/standards/naming-conventions.md`
+**Reference**: Follow the naming convention as specified in `docs/standards/file-naming.md`
 
 **Descriptive Name**:
 
