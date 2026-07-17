@@ -5,10 +5,26 @@
   "prompt": "Run the full develop-story pipeline for story.5.1.example. Epic: epic.5.example. Use dry-run/sandbox mode.",
   "mode": "smoke",
   "assertions": [
-    { "fn": "epicBranchExists",    "args": ["$SANDBOX", 5] },
-    { "fn": "branchExists",        "args": ["$SANDBOX", "^feature/story\\.5\\.1"] },
-    { "fn": "pipelineStepsRan",    "args": ["$SANDBOX/.eval/pipeline-events.json", ["create-epic-branch", "create-story-branch", "review-story", "develop", "create-pr", "qa-story", "finalise", "commit-changes"]] },
-    { "fn": "prTargetsEpicBranch", "args": ["$SANDBOX/.eval/gh-receipt.json", 5] },
-    { "fn": "noLockFilesLeft",     "args": ["$SANDBOX"] }
+    { "fn": "branchExists", "args": ["$SANDBOX", "^feature/story\\.5\\.1"] },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "create-story-branch",
+          "review-story",
+          "develop",
+          "create-pr",
+          "qa-story",
+          "finalise",
+          "commit-changes"
+        ]
+      ]
+    },
+    {
+      "fn": "prTargetsBranch",
+      "args": ["$SANDBOX/.eval/gh-receipt.json", "develop"]
+    },
+    { "fn": "noLockFilesLeft", "args": ["$SANDBOX"] }
   ]
 }

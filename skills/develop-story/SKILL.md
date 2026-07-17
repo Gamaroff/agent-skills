@@ -1,6 +1,6 @@
 ---
 name: develop-story
-description: 'Automates the full end-to-end story development lifecycle: create-epic-branch (if needed) → create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Story branches are always created from their parent epic branch (`feature/epic.{n}.{name}`), which is created from `develop` on first use. Story PRs target the epic branch; the epic branch is merged to `develop` manually once all stories are complete. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume with per-step artifact verification; bounded develop loop (MAX_ITER=5); `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".'
+description: 'Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Story branches are cut from `develop` and PR back to `develop` (short-lived feature branches — standard Gitflow); epics are an organisational construct only, never a git integration branch. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume with per-step artifact verification; bounded develop loop (MAX_ITER=5); `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".'
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -46,12 +46,14 @@ See `references/develop-pipeline-step-0-resolve-and-prepare.md` for the full res
 If context was compressed while this pipeline was running (i.e., the conversation was summarized and you are now resuming), follow this sequence exactly — do not improvise:
 
 **Step 0 — Re-read the full skill file before anything else:**
+
 ```bash
 # The skill instructions in the system reminder are TRUNCATED after compression.
 # Improvising steps from memory produces wrong artifacts and misses required invocations.
 # Always read the full skill first:
 cat .agents/skills/develop-story/SKILL.md
 ```
+
 Output: "⚠️ Context recovery — re-reading full skill file before resuming."
 
 **Step 0a — Dispatch stale-context detector (Phase 0a):**
@@ -63,6 +65,7 @@ Surface the detector output to the user and wait for confirmation. If `blocking_
 See `references/develop-pipeline-resume-contract.md` — Phase 0a for the full dispatch, output validation, and blocking-issues protocol.
 
 **Step 1 — Recover pipeline state from the implementation report:**
+
 ```bash
 ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null | sort | tail -1
 ```
@@ -89,7 +92,7 @@ This complements the post-compaction recovery above. **Pre**-compaction graceful
    ```
    ═══ DEVELOP-STORY PIPELINE: PAUSED — CONTEXT COMPACTION IMMINENT ═══
    ```
-3. **Output the user-facing summary** using the template provided in the signal's `additionalContext`. If the signal indicates `tracker=jira`, add a single-line note that the Jira issue was *not* commented on (Jira pause is silent by design).
+3. **Output the user-facing summary** using the template provided in the signal's `additionalContext`. If the signal indicates `tracker=jira`, add a single-line note that the Jira issue was _not_ commented on (Jira pause is silent by design).
 4. **HALT.** Do not proceed to any further step. The lock file has been removed by the hook; on next user invocation of `/develop-story <path>`, Phase 0b will detect the existing run, read the report, and resume cleanly.
 
 **No additional report edits, no additional commits, no additional comments** — the hook already did all of that, and you have very little budget left before compaction proceeds. Spending it on duplicate work risks losing the user-facing summary entirely.
@@ -113,13 +116,14 @@ This prevents context accumulation across the 8-step pipeline.
 **Step Transition Protocol (mandatory — prevents orchestrator stalls).**
 
 > Visual mnemonic:
+>
 > ```
 > SUB-SKILL RETURNS → [Bash advance] → [Edit ✅] → [Banner] → [Skill]
 >                          ↑
 >                FIRST. ALWAYS. NO PROSE BEFORE.
 > ```
 
-Every step ends with the same four actions, executed *in order, with no text output between them*:
+Every step ends with the same four actions, executed _in order, with no text output between them_:
 
 1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-story/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, use `--complete` instead, which removes the lock. (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`).
@@ -145,12 +149,14 @@ Two structural defences back this up (in order of which fires first):
 This creates persistent checkpoints that survive context compression and make the pipeline position unambiguous.
 
 **Lock file `current_step` update (required, Steps 2–8).** Per the Step Transition Protocol above, this is **action #1** — the first tool call after a sub-skill returns, before the row update or banner. Both the `PreCompact` and `Stop` hooks read this field to know where the pipeline is. Use the helper script (idempotent, atomic, single source of truth):
+
 ```bash
 bash .agents/skills/develop-story/references/advance-pipeline-lock.sh {N+1}
 ```
+
 For Step 8 → completion: `... advance-pipeline-lock.sh --complete` (removes the lock).
 
-Skip this for Step 1 (the lock is created at the *end* of Step 1, after the feature branch exists — see Step 1 below).
+Skip this for Step 1 (the lock is created at the _end_ of Step 1, after the feature branch exists — see Step 1 below).
 
 After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention / ⏸️ Paused — see Graceful Pause section) and log any decisions or issues before moving on.
 
@@ -166,7 +172,7 @@ See `references/develop-pipeline-step-2-review.md` for the full Step 2 protocol:
 
 See `references/develop-pipeline-step-3-develop-loop.md` for the full Step 3 protocol: pre-develop codebase mapping (Explore subagent), plan file discovery, internal gate handling (draft/planned, high-risk, alignment), bounded develop loop with stall detection, Remaining Work Status banner, halt protocol, and **test-failure triage** (capture test output to `.claude/state/test-output-${ITER}-*.log`, dispatch Explore with `references/test-failure-triage-prompt.md`, main consumes summary only).
 
-> **Pre-develop staleness re-validation (Review 4 R-15a).** Before invoking `/develop`, if the story's **upstream epic merged code after this story was authored** (compare the story's `created`/`updated` frontmatter against the epic branch's merge history), re-run `review-story --validate` on the story first. A story authored against an earlier codebase can cite symbols/paths that moved once its epic landed — the `--validate` pass re-checks the story against current `develop` and flags drift before implementation begins. Skip only when the story was authored/updated after its epic's last code merge.
+> **Pre-develop staleness re-validation (Review 4 R-15a).** Before invoking `/develop`, if **sibling stories in the same epic merged code to `develop` after this story was authored** (compare the story's `created`/`updated` frontmatter against recent `develop` history), re-run `review-story --validate` on the story first. A story authored against an earlier codebase can cite symbols/paths that moved once sibling work landed — the `--validate` pass re-checks the story against current `develop` and flags drift before implementation begins. Skip only when the story was authored/updated after the epic's most recent code merge to `develop`.
 
 ### Step 4: Create PR
 
@@ -187,7 +193,6 @@ See `references/develop-pipeline-step-7-finalise.md` for the full Step 7 protoco
 See `references/develop-pipeline-step-8-commit.md` for the full Step 8 protocol: final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary), `/commit-changes` invocation, final push, Pipeline Progress update, and pipeline lock file removal.
 
 ---
-
 
 ## Phase 2: Completion
 
@@ -228,12 +233,12 @@ See `references/develop-pipeline-autonomous-defaults.md` for the full shared aut
 
 ### Skill-specific defaults (develop-story only)
 
-| Situation | Default |
-|-----------|---------|
-| review-story invocation mode | Always **validate-and-apply** (`MODE=validate` + `APPLY=true`) — non-interactive, no questions asked. This variant runs the constrained forms of Steps 9.5 and 10 below and writes a `story.{epic}.{story}.review.{n}.{story-name}.md` report |
-| review-story Step 9.5 (implement fixes) | Apply all critical + important fixes automatically — the pipeline needs the story fully corrected before Step 3 runs `/develop` |
-| review-story Step 10 (update status) when GO / READY TO IMPLEMENT | Promote `Draft → Ready for Development` automatically — the pipeline needs that status before Step 3 |
-| review-story Step 10 when NO-GO (NEEDS REVISION or REQUIRES REWORK) | HALT — story is not ready; surface review findings to user before proceeding |
+| Situation                                                           | Default                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| review-story invocation mode                                        | Always **validate-and-apply** (`MODE=validate` + `APPLY=true`) — non-interactive, no questions asked. This variant runs the constrained forms of Steps 9.5 and 10 below and writes a `story.{epic}.{story}.review.{n}.{story-name}.md` report |
+| review-story Step 9.5 (implement fixes)                             | Apply all critical + important fixes automatically — the pipeline needs the story fully corrected before Step 3 runs `/develop`                                                                                                               |
+| review-story Step 10 (update status) when GO / READY TO IMPLEMENT   | Promote `Draft → Ready for Development` automatically — the pipeline needs that status before Step 3                                                                                                                                          |
+| review-story Step 10 when NO-GO (NEEDS REVISION or REQUIRES REWORK) | HALT — story is not ready; surface review findings to user before proceeding                                                                                                                                                                  |
 
 If a situation arises that is not in the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
 
@@ -258,6 +263,7 @@ If a situation arises that is not in the shared defaults table and the stakes ar
   ```
 
   Removing the active lock prevents a future PreCompact firing in this same session from re-running the pause flow, and stops accumulation of transient Step 3 test logs. The **halt snapshot** (`develop-pipeline.last-halt.json`) preserves resume context so the next `/develop-story` invocation can re-enter Phase 0b artifact verification: the resume detector subagent reads the snapshot when no active lock is present, surfaces it to the user, and offers "Resume from {halt_step}" or "Start fresh" (latter deletes the snapshot). The graceful-pause hook also removes the active lock itself if it runs — this rule covers the non-hook halt paths.
+
 - If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.agents/skills/`.
 
 ---

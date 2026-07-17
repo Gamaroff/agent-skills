@@ -16,10 +16,10 @@ Loaded by `/develop-story` and `/develop-task` during Step 4. Story/task variant
 
 The PR base branch (`--base {Q2_answer}`) is derived in Phase 0d and differs by skill:
 
-| Skill | Q2 source | Default | Why |
-|---|---|---|---|
-| `develop-story` | Auto-set (never asked) | `{EPIC_BRANCH}` (`feature/epic.{n}.{name}`) | Story PRs always target their parent epic branch; the epic branch is merged to `develop` manually once all stories complete. See Phase 0d in `develop-pipeline-step-0-resolve-and-prepare.md`. |
-| `develop-task`  | Asked via `AskUserQuestion` | `develop` | Tasks are standalone; user picks the base (typically `develop`, sometimes `main` for hotfixes). |
+| Skill           | Q2 source                   | Default   | Why                                                                                                                                                                                                                       |
+| --------------- | --------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `develop-story` | Asked via `AskUserQuestion` | `develop` | Story branches are cut from `develop` and PR back to `develop` (standard Gitflow feature branches); user may redirect (e.g. `main` for a hotfix story). See Phase 0d in `develop-pipeline-step-0-resolve-and-prepare.md`. |
+| `develop-task`  | Asked via `AskUserQuestion` | `develop` | Tasks are standalone; user picks the base (typically `develop`, sometimes `main` for hotfixes).                                                                                                                           |
 
 `{Q2_answer}` is resolved before Step 4 runs — Step 4 just consumes the variable. If `{Q2_answer}` is empty here, that is a Phase 0d bug; HALT with `Step 4: missing Q2_answer (PR base branch)`.
 
@@ -89,9 +89,11 @@ Invoke the `/create-pr` skill passing `--base {Q2_answer}`, one `--scope` flag p
 - **Jira** (`TRACKER=jira`): omit `--issue` — `create-pr` handles Bitbucket PR creation natively; Bitbucket Issues are not enabled for this project, so passing `--issue` would cause a failed comment attempt.
 
 #### develop-story (Jira note)
+
 The PR body will reference the story file which contains `jira_key`.
 
 #### develop-task (Jira note)
+
 The PR body will reference the task file which contains `jira_key`.
 
 This pre-supplies the target branch via create-pr's Step 0, skipping the interactive prompt entirely. Do not wait for create-pr to ask — Q2 is already resolved.
@@ -146,6 +148,7 @@ fi
 ## Post-PR Steps (shared)
 
 After the PR is created:
+
 - Record the PR URL in the Decisions Log and in the **PR** field of the Completion section
 - Update Pipeline Progress Notes: `PR #{N}: {url}` — e.g. `PR #42: https://github.com/org/repo/pull/42`
 - Update Pipeline Progress: ✅ create-pr
@@ -260,15 +263,17 @@ Log in Decisions Log: "Jira {TRACKER_ISSUE} — PR comment posted; status: {tran
 ## On Failure
 
 #### develop-story
+
 Log in Issues Log. Invoke the `/commit-changes` skill to commit the report (suggested message: `docs(story.{epic}.{story}): implementation report — create-pr failure`), push, then HALT.
 
 #### develop-task
+
 Log in Issues Log. Invoke the `/commit-changes` skill to commit the report (suggested message: `docs(task.{id}): implementation report — create-pr failure`), push, then HALT.
 
 ---
 
 ## Pipeline Continuation (CRITICAL — PIPELINE DOES NOT END HERE)
 
-Steps 5–8 are mandatory. Do NOT emit a "Step 4 COMPLETE" banner here — that competes with the Step Transition Protocol banner in SKILL.md and creates ambiguity at the boundary. The single banner emitted at this transition is the Step 5 banner from the Step Transition Protocol (`═══ DEVELOP-{STORY,TASK} PIPELINE: STEP 5/8 — QA REVIEW ═══`), output by the orchestrator *after* the lock-advance Bash call.
+Steps 5–8 are mandatory. Do NOT emit a "Step 4 COMPLETE" banner here — that competes with the Step Transition Protocol banner in SKILL.md and creates ambiguity at the boundary. The single banner emitted at this transition is the Step 5 banner from the Step Transition Protocol (`═══ DEVELOP-{STORY,TASK} PIPELINE: STEP 5/8 — QA REVIEW ═══`), output by the orchestrator _after_ the lock-advance Bash call.
 
 Record `PR created: {PR URL}` in the implementation report's Decisions Log only — not as a user-facing banner.

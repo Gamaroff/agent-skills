@@ -21,7 +21,10 @@ const require = createRequire(import.meta.url);
 const sharedLib = require("../../shared/resources/create-skills-lib.js");
 
 export function fileExists(p) {
-  return { ok: fs.existsSync(p), reason: fs.existsSync(p) ? "" : `missing file: ${p}` };
+  return {
+    ok: fs.existsSync(p),
+    reason: fs.existsSync(p) ? "" : `missing file: ${p}`,
+  };
 }
 
 export function fileAbsent(p) {
@@ -40,10 +43,13 @@ export function frontmatterHas(p, expectedKeys) {
   if (!fs.existsSync(p)) return { ok: false, reason: `missing file: ${p}` };
   const content = fs.readFileSync(p, "utf-8");
   const { frontmatter } = sharedLib.parseFrontmatter(content);
-  const missing = expectedKeys.filter(k => !(k in frontmatter));
+  const missing = expectedKeys.filter((k) => !(k in frontmatter));
   return {
     ok: missing.length === 0,
-    reason: missing.length === 0 ? "" : `${p} missing frontmatter keys: ${missing.join(", ")}`,
+    reason:
+      missing.length === 0
+        ? ""
+        : `${p} missing frontmatter keys: ${missing.join(", ")}`,
   };
 }
 
@@ -68,9 +74,10 @@ export function hasAtLeastNSourceCitations(p, n) {
   const citations = sharedLib.extractSourceCitations(content);
   return {
     ok: citations.length >= n,
-    reason: citations.length >= n
-      ? ""
-      : `${p}: expected >= ${n} [Source: …] citations, got ${citations.length}`,
+    reason:
+      citations.length >= n
+        ? ""
+        : `${p}: expected >= ${n} [Source: …] citations, got ${citations.length}`,
   };
 }
 
@@ -82,40 +89,54 @@ export function trackerPayloadMatches(payloadPath, expectedShape) {
   try {
     payload = JSON.parse(fs.readFileSync(payloadPath, "utf-8"));
   } catch (e) {
-    return { ok: false, reason: `tracker payload not valid JSON: ${e.message}` };
+    return {
+      ok: false,
+      reason: `tracker payload not valid JSON: ${e.message}`,
+    };
   }
   for (const [k, expected] of Object.entries(expectedShape)) {
     const actual = getByPath(payload, k);
-    const reMatch = typeof expected === "string" && expected.match(/^\/(.+)\/([gimsuy]*)$/);
+    const reMatch =
+      typeof expected === "string" && expected.match(/^\/(.+)\/([gimsuy]*)$/);
     if (reMatch) {
       const re = new RegExp(reMatch[1], reMatch[2]);
       if (typeof actual !== "string" || !re.test(actual)) {
-        return { ok: false, reason: `payload.${k}: expected match ${expected}, got ${JSON.stringify(actual)}` };
+        return {
+          ok: false,
+          reason: `payload.${k}: expected match ${expected}, got ${JSON.stringify(actual)}`,
+        };
       }
     } else if (actual !== expected) {
-      return { ok: false, reason: `payload.${k}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}` };
+      return {
+        ok: false,
+        reason: `payload.${k}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+      };
     }
   }
   return { ok: true, reason: "" };
 }
 
 function getByPath(obj, dotted) {
-  return dotted.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  return dotted
+    .split(".")
+    .reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
 export function answerQueueDrained(remainingAnswers) {
   return {
     ok: remainingAnswers.length === 0,
-    reason: remainingAnswers.length === 0
-      ? ""
-      : `answer queue not drained — ${remainingAnswers.length} unused entries: ${
-          remainingAnswers.slice(0, 3).map(a => a.matches).join(", ")
-        }${remainingAnswers.length > 3 ? "…" : ""}`,
+    reason:
+      remainingAnswers.length === 0
+        ? ""
+        : `answer queue not drained — ${remainingAnswers.length} unused entries: ${remainingAnswers
+            .slice(0, 3)
+            .map((a) => a.matches)
+            .join(", ")}${remainingAnswers.length > 3 ? "…" : ""}`,
   };
 }
 
 export function aggregate(results) {
-  const failures = results.filter(r => !r.ok);
+  const failures = results.filter((r) => !r.ok);
   return {
     ok: failures.length === 0,
     total: results.length,
@@ -149,22 +170,36 @@ export function branchExists(repoPath, namePattern) {
     try {
       branches = JSON.parse(fs.readFileSync(branchesFile, "utf-8"));
     } catch (e) {
-      return { ok: false, reason: `branchExists: could not parse ${branchesFile}: ${e.message}` };
+      return {
+        ok: false,
+        reason: `branchExists: could not parse ${branchesFile}: ${e.message}`,
+      };
     }
   } else {
     // Live mode — actually run git
     const { spawnSync } = require("node:child_process");
-    const result = spawnSync("git", ["branch", "--list"], { cwd: repoPath, encoding: "utf-8" });
+    const result = spawnSync("git", ["branch", "--list"], {
+      cwd: repoPath,
+      encoding: "utf-8",
+    });
     if (result.error || result.status !== 0) {
-      return { ok: false, reason: `branchExists: git branch --list failed in ${repoPath}` };
+      return {
+        ok: false,
+        reason: `branchExists: git branch --list failed in ${repoPath}`,
+      };
     }
-    branches = result.stdout.split("\n").map(s => s.replace(/^[* ]+/, "").trim()).filter(Boolean);
+    branches = result.stdout
+      .split("\n")
+      .map((s) => s.replace(/^[* ]+/, "").trim())
+      .filter(Boolean);
   }
 
-  const matched = branches.some(b => re.test(b));
+  const matched = branches.some((b) => re.test(b));
   return {
     ok: matched,
-    reason: matched ? "" : `no branch matching ${namePattern} found in ${repoPath} (branches: ${branches.join(", ") || "(none)"})`,
+    reason: matched
+      ? ""
+      : `no branch matching ${namePattern} found in ${repoPath} (branches: ${branches.join(", ") || "(none)"})`,
   };
 }
 
@@ -180,20 +215,31 @@ export function branchExists(repoPath, namePattern) {
  */
 export function pipelineStepsRan(eventsPath, expectedSteps) {
   if (!fs.existsSync(eventsPath)) {
-    return { ok: false, reason: `pipelineStepsRan: events file not found: ${eventsPath}` };
+    return {
+      ok: false,
+      reason: `pipelineStepsRan: events file not found: ${eventsPath}`,
+    };
   }
   let events;
   try {
     events = JSON.parse(fs.readFileSync(eventsPath, "utf-8"));
   } catch (e) {
-    return { ok: false, reason: `pipelineStepsRan: could not parse ${eventsPath}: ${e.message}` };
+    return {
+      ok: false,
+      reason: `pipelineStepsRan: could not parse ${eventsPath}: ${e.message}`,
+    };
   }
-  const actual = events.filter(e => e.status === "started").map(e => e.skill);
+  const actual = events
+    .filter((e) => e.status === "started")
+    .map((e) => e.skill);
   let i = 0;
   for (const expected of expectedSteps) {
     const found = actual.indexOf(expected, i);
     if (found === -1) {
-      return { ok: false, reason: `pipelineStepsRan: step "${expected}" missing or out of order (actual: ${actual.join(", ")})` };
+      return {
+        ok: false,
+        reason: `pipelineStepsRan: step "${expected}" missing or out of order (actual: ${actual.join(", ")})`,
+      };
     }
     i = found + 1;
   }
@@ -211,18 +257,29 @@ export function pipelineStepsRan(eventsPath, expectedSteps) {
  */
 export function loopBoundedAt(eventsPath, skill, maxIter) {
   if (!fs.existsSync(eventsPath)) {
-    return { ok: false, reason: `loopBoundedAt: events file not found: ${eventsPath}` };
+    return {
+      ok: false,
+      reason: `loopBoundedAt: events file not found: ${eventsPath}`,
+    };
   }
   let events;
   try {
     events = JSON.parse(fs.readFileSync(eventsPath, "utf-8"));
   } catch (e) {
-    return { ok: false, reason: `loopBoundedAt: could not parse ${eventsPath}: ${e.message}` };
+    return {
+      ok: false,
+      reason: `loopBoundedAt: could not parse ${eventsPath}: ${e.message}`,
+    };
   }
-  const count = events.filter(e => e.skill === skill && e.status === "started").length;
+  const count = events.filter(
+    (e) => e.skill === skill && e.status === "started",
+  ).length;
   return {
     ok: count <= maxIter,
-    reason: count <= maxIter ? "" : `loopBoundedAt: skill "${skill}" ran ${count} times (max ${maxIter})`,
+    reason:
+      count <= maxIter
+        ? ""
+        : `loopBoundedAt: skill "${skill}" ran ${count} times (max ${maxIter})`,
   };
 }
 
@@ -240,13 +297,19 @@ export function loopBoundedAt(eventsPath, skill, maxIter) {
  */
 export function prCreated(receiptPath, opts = {}) {
   if (!fs.existsSync(receiptPath)) {
-    return { ok: false, reason: `prCreated: receipt file not found: ${receiptPath}` };
+    return {
+      ok: false,
+      reason: `prCreated: receipt file not found: ${receiptPath}`,
+    };
   }
   let receipt;
   try {
     receipt = JSON.parse(fs.readFileSync(receiptPath, "utf-8"));
   } catch (e) {
-    return { ok: false, reason: `prCreated: could not parse ${receiptPath}: ${e.message}` };
+    return {
+      ok: false,
+      reason: `prCreated: could not parse ${receiptPath}: ${e.message}`,
+    };
   }
   if (receipt.skipped) {
     // Skip, not fail — GH_TOKEN absent is an acceptable CI condition
@@ -256,12 +319,18 @@ export function prCreated(receiptPath, opts = {}) {
     return { ok: false, reason: `prCreated: receipt has no pr field` };
   }
   if (opts.base && receipt.pr.baseRefName !== opts.base) {
-    return { ok: false, reason: `prCreated: expected base "${opts.base}", got "${receipt.pr.baseRefName}"` };
+    return {
+      ok: false,
+      reason: `prCreated: expected base "${opts.base}", got "${receipt.pr.baseRefName}"`,
+    };
   }
   if (opts.titlePattern) {
     const re = new RegExp(opts.titlePattern);
     if (!re.test(receipt.pr.title ?? "")) {
-      return { ok: false, reason: `prCreated: title "${receipt.pr.title}" does not match ${opts.titlePattern}` };
+      return {
+        ok: false,
+        reason: `prCreated: title "${receipt.pr.title}" does not match ${opts.titlePattern}`,
+      };
     }
   }
   return { ok: true, reason: "" };
@@ -277,12 +346,18 @@ export function prCreated(receiptPath, opts = {}) {
  */
 export function noLockFilesLeft(dirPath) {
   if (!fs.existsSync(dirPath)) {
-    return { ok: false, reason: `noLockFilesLeft: directory not found: ${dirPath}` };
+    return {
+      ok: false,
+      reason: `noLockFilesLeft: directory not found: ${dirPath}`,
+    };
   }
   const lockFiles = findFiles(dirPath, ".lock");
   return {
     ok: lockFiles.length === 0,
-    reason: lockFiles.length === 0 ? "" : `noLockFilesLeft: found ${lockFiles.length} lock file(s): ${lockFiles.slice(0, 3).join(", ")}`,
+    reason:
+      lockFiles.length === 0
+        ? ""
+        : `noLockFilesLeft: found ${lockFiles.length} lock file(s): ${lockFiles.slice(0, 3).join(", ")}`,
   };
 }
 
@@ -291,49 +366,44 @@ export function noLockFilesLeft(dirPath) {
 // ---------------------------------------------------------------------------
 
 /**
- * Assert a GitHub PR receipt shows the PR targets an epic branch (not develop).
+ * Assert a GitHub PR receipt shows the PR targets the expected base branch.
  *
  * Reads a JSON receipt file at receiptPath (shape: { skipped, pr: { baseRefName, ... } }).
  * Skipped receipts pass — GH_TOKEN absent is acceptable in CI.
  *
- * @param {string} receiptPath  Path to a JSON GhReceipt file
- * @param {number} epicNum      Epic number (e.g. 5 → base must match /^feature\/epic\.5\./)
+ * Story branches are cut from `develop` and PR back to `develop` (flat Gitflow),
+ * so the default expected base is "develop"; pass "main" to override.
+ *
+ * @param {string} receiptPath   Path to a JSON GhReceipt file
+ * @param {string} [expectedBase] Expected base branch name (default "develop")
  */
-export function prTargetsEpicBranch(receiptPath, epicNum) {
+export function prTargetsBranch(receiptPath, expectedBase = "develop") {
   if (!fs.existsSync(receiptPath)) {
-    return { ok: false, reason: `prTargetsEpicBranch: receipt file not found: ${receiptPath}` };
+    return {
+      ok: false,
+      reason: `prTargetsBranch: receipt file not found: ${receiptPath}`,
+    };
   }
   let receipt;
   try {
     receipt = JSON.parse(fs.readFileSync(receiptPath, "utf-8"));
   } catch (e) {
-    return { ok: false, reason: `prTargetsEpicBranch: could not parse ${receiptPath}: ${e.message}` };
+    return {
+      ok: false,
+      reason: `prTargetsBranch: could not parse ${receiptPath}: ${e.message}`,
+    };
   }
   if (receipt.skipped) return { ok: true, reason: "" };
-  if (!receipt.pr) return { ok: false, reason: "prTargetsEpicBranch: receipt has no pr field" };
-  const expected = new RegExp(`^feature/epic\\.${epicNum}\\.`);
+  if (!receipt.pr)
+    return { ok: false, reason: "prTargetsBranch: receipt has no pr field" };
   const actual = receipt.pr.baseRefName ?? "";
-  if (actual === "develop") {
-    return { ok: false, reason: `prTargetsEpicBranch: PR targets develop — expected epic branch matching ${expected}` };
-  }
-  const ok = expected.test(actual);
+  const ok = actual === expectedBase;
   return {
     ok,
-    reason: ok ? "" : `prTargetsEpicBranch: base "${actual}" does not match ${expected}`,
+    reason: ok
+      ? ""
+      : `prTargetsBranch: expected base "${expectedBase}", got "${actual}"`,
   };
-}
-
-/**
- * Assert that a branch matching the epic pattern exists in a git repo at repoPath.
- *
- * In replay mode, reads `.eval/branches.json`. In live mode, runs `git branch --list`.
- *
- * @param {string} repoPath  Path to a git repo or replay sandbox
- * @param {number} epicNum   Epic number (e.g. 5 → matches /^feature\/epic\.5\./)
- */
-export function epicBranchExists(repoPath, epicNum) {
-  const namePattern = `^feature/epic\\.${epicNum}\\.`;
-  return branchExists(repoPath, namePattern);
 }
 
 /**
@@ -346,23 +416,33 @@ export function epicBranchExists(repoPath, epicNum) {
  */
 export function resumeRehydrated(eventsPath, opts = {}) {
   if (!fs.existsSync(eventsPath)) {
-    return { ok: false, reason: `resumeRehydrated: events file not found: ${eventsPath}` };
+    return {
+      ok: false,
+      reason: `resumeRehydrated: events file not found: ${eventsPath}`,
+    };
   }
   let events;
   try {
     events = JSON.parse(fs.readFileSync(eventsPath, "utf-8"));
   } catch (e) {
-    return { ok: false, reason: `resumeRehydrated: could not parse ${eventsPath}: ${e.message}` };
+    return {
+      ok: false,
+      reason: `resumeRehydrated: could not parse ${eventsPath}: ${e.message}`,
+    };
   }
   const resumeEvent = events.find(
-    e => e.skill === "resume-detector" || /resume/i.test(String(e.skill ?? "")),
+    (e) =>
+      e.skill === "resume-detector" || /resume/i.test(String(e.skill ?? "")),
   );
   if (!resumeEvent) {
-    return { ok: false, reason: "resumeRehydrated: no resume detection event found in events" };
+    return {
+      ok: false,
+      reason: "resumeRehydrated: no resume detection event found in events",
+    };
   }
   if (opts.expectedStep && opts.expectedIter != null) {
     const stepCount = events.filter(
-      e => e.skill === opts.expectedStep && e.status === "started",
+      (e) => e.skill === opts.expectedStep && e.status === "started",
     ).length;
     if (stepCount < opts.expectedIter) {
       return {

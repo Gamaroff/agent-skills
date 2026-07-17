@@ -63,16 +63,16 @@ Or via natural language (agent detects intent): "Is this story ready?", "Score t
 
 **Key differences between modes:**
 
-| | Interactive | Validate |
-|---|---|---|
-| Questions asked | Yes — single batched question point | Never |
-| Edits story | Yes (with user approval) | Never* |
-| Output artifact | `.review.{n}.{story-name}.md` | `.validate.{date}.md`* |
-| Verdict label | READY / NEEDS REVISION / REQUIRES REWORK | GO / NO-GO (Revision) / NO-GO (Rework) |
-| CI exit code | N/A | Non-zero on NO-GO |
-| Batch support | No | Yes |
+|                 | Interactive                              | Validate                               |
+| --------------- | ---------------------------------------- | -------------------------------------- |
+| Questions asked | Yes — single batched question point      | Never                                  |
+| Edits story     | Yes (with user approval)                 | Never*                                 |
+| Output artifact | `.review.{n}.{story-name}.md`            | `.validate.{date}.md`*                 |
+| Verdict label   | READY / NEEDS REVISION / REQUIRES REWORK | GO / NO-GO (Revision) / NO-GO (Rework) |
+| CI exit code    | N/A                                      | Non-zero on NO-GO                      |
+| Batch support   | No                                       | Yes                                    |
 
-\* The **Validate** column describes *standalone* validate (`APPLY=false`, read-only). The orchestrated **validate-and-apply** variant (`APPLY=true`, set by `develop-story`/`po`) still asks no questions but *does* edit the story (applies critical + important fixes, promotes status on a GO) and writes a `.review.{n}.{story-name}.md` report instead. See [Validate Sub-Modes](#validate-sub-modes).
+\* The **Validate** column describes _standalone_ validate (`APPLY=false`, read-only). The orchestrated **validate-and-apply** variant (`APPLY=true`, set by `develop-story`/`po`) still asks no questions but _does_ edit the story (applies critical + important fixes, promotes status on a GO) and writes a `.review.{n}.{story-name}.md` report instead. See [Validate Sub-Modes](#validate-sub-modes).
 
 ## Purpose
 
@@ -132,6 +132,7 @@ optional:
 ### Mode Detection
 
 Activate **Validate mode** when any of the following are true:
+
 - `--validate` flag present in the invocation
 - Natural language intent: "validate", "is this story ready?", "score this story", "batch validate", "CI gate", "pre-implementation gate"
 - Called programmatically by `develop-story` or `po` pipeline (these always use validate mode — specifically the **validate-and-apply** variant; see Validate Sub-Modes below)
@@ -151,11 +152,11 @@ Before loading the story document, resolve the input to a local file path:
 
 **Step 1 — Detect input type.** If the argument looks like a file path, skip to Step 4.
 
-| Pattern | Matches |
-|---------|---------|
-| Contains `github.com` | GitHub URL (direct issue or project board) |
-| Starts with `#` followed by digits | Hash notation |
-| All digits | Bare issue number |
+| Pattern                            | Matches                                    |
+| ---------------------------------- | ------------------------------------------ |
+| Contains `github.com`              | GitHub URL (direct issue or project board) |
+| Starts with `#` followed by digits | Hash notation                              |
+| All digits                         | Bare issue number                          |
 
 **Step 2 — Extract the issue number** from whichever pattern matched:
 
@@ -248,15 +249,15 @@ Use `AskUserQuestion` tool with:
 **Question Format**:
 
 ```yaml
-question: '[Specific question about the issue]'
-header: '[Short label, max 12 chars]'
+question: "[Specific question about the issue]"
+header: "[Short label, max 12 chars]"
 options:
-  - label: '[Option 1]'
-    description: '[What this means and implications]'
-  - label: '[Option 2]'
-    description: '[What this means and implications]'
-  - label: '[Option 3 if applicable]'
-    description: '[What this means and implications]'
+  - label: "[Option 1]"
+    description: "[What this means and implications]"
+  - label: "[Option 2]"
+    description: "[What this means and implications]"
+  - label: "[Option 3 if applicable]"
+    description: "[What this means and implications]"
 ```
 
 **Question Quality Guidelines**:
@@ -273,77 +274,77 @@ options:
 
 ```yaml
 question: "Story AC #2 says 'provide fast response times' but doesn't specify a measurable threshold. What is the acceptable response time?"
-header: 'Response Time'
+header: "Response Time"
 options:
-  - label: '< 100ms (p95)'
-    description: 'Very fast, requires caching and optimization. Standard for real-time features.'
-  - label: '< 500ms (p95)'
-    description: 'Fast enough for most user interactions. Easier to achieve.'
-  - label: '< 2 seconds (p95)'
-    description: 'Acceptable for non-critical operations. Minimal optimization needed.'
-  - label: 'Not performance-critical'
-    description: 'Remove specific timing requirement, rely on general performance standards.'
+  - label: "< 100ms (p95)"
+    description: "Very fast, requires caching and optimization. Standard for real-time features."
+  - label: "< 500ms (p95)"
+    description: "Fast enough for most user interactions. Easier to achieve."
+  - label: "< 2 seconds (p95)"
+    description: "Acceptable for non-critical operations. Minimal optimization needed."
+  - label: "Not performance-critical"
+    description: "Remove specific timing requirement, rely on general performance standards."
 ```
 
 #### Example 2: Technical Conflict
 
 ```yaml
 question: "Story Dev Notes mention using 'WebSocket' but architecture docs specify Socket.IO for real-time communication. Which should be used?"
-header: 'Real-time Tech'
+header: "Real-time Tech"
 options:
-  - label: 'Socket.IO (Recommended)'
-    description: 'Matches architecture standard. Auto-fallback, rooms, namespaces. Already in use for chat.'
-  - label: 'Native WebSocket'
-    description: 'Lower-level, more control. Requires custom reconnection logic. Deviates from standard.'
-  - label: 'Update architecture docs'
-    description: 'Keep WebSocket in story, update architecture to allow native WebSocket for specific use cases.'
+  - label: "Socket.IO (Recommended)"
+    description: "Matches architecture standard. Auto-fallback, rooms, namespaces. Already in use for chat."
+  - label: "Native WebSocket"
+    description: "Lower-level, more control. Requires custom reconnection logic. Deviates from standard."
+  - label: "Update architecture docs"
+    description: "Keep WebSocket in story, update architecture to allow native WebSocket for specific use cases."
 ```
 
 #### Example 3: Missing Information
 
 ```yaml
 question: "Task 3 mentions 'implement error handling' but doesn't specify what errors to handle. What error scenarios should be covered?"
-header: 'Error Cases'
+header: "Error Cases"
 multiSelect: true
 options:
-  - label: 'Network errors'
-    description: 'Connection failures, timeouts, DNS errors'
-  - label: 'Authentication errors'
-    description: 'Invalid tokens, expired sessions, unauthorized access'
-  - label: 'Validation errors'
-    description: 'Invalid input, malformed data, constraint violations'
-  - label: 'Server errors'
-    description: '500 errors, database failures, external service failures'
+  - label: "Network errors"
+    description: "Connection failures, timeouts, DNS errors"
+  - label: "Authentication errors"
+    description: "Invalid tokens, expired sessions, unauthorized access"
+  - label: "Validation errors"
+    description: "Invalid input, malformed data, constraint violations"
+  - label: "Server errors"
+    description: "500 errors, database failures, external service failures"
 ```
 
 #### Example 4: Scope Clarification
 
 ```yaml
 question: "Story includes tasks for 'comprehensive testing' but epic only requires unit tests. Should integration/e2e tests be included?"
-header: 'Test Scope'
+header: "Test Scope"
 options:
-  - label: 'Unit tests only'
-    description: 'Match epic requirement. Faster, simpler. Align with original scope.'
-  - label: 'Unit + Integration'
-    description: 'More thorough. Tests API interactions. Adds time but better quality.'
-  - label: 'Full test suite'
-    description: 'Unit + Integration + E2E. Maximum coverage. Significant time investment.'
-  - label: 'Update epic'
-    description: 'Comprehensive testing is the right approach. Update epic to match story scope.'
+  - label: "Unit tests only"
+    description: "Match epic requirement. Faster, simpler. Align with original scope."
+  - label: "Unit + Integration"
+    description: "More thorough. Tests API interactions. Adds time but better quality."
+  - label: "Full test suite"
+    description: "Unit + Integration + E2E. Maximum coverage. Significant time investment."
+  - label: "Update epic"
+    description: "Comprehensive testing is the right approach. Update epic to match story scope."
 ```
 
 #### Example 5: Hallucination Resolution
 
 ```yaml
 question: "Story mentions using 'react-query-plus' library which is not in tech-stack.md or package.json. How should data fetching be handled?"
-header: 'Data Fetching'
+header: "Data Fetching"
 options:
-  - label: 'Use documented library'
-    description: 'Replace with existing solution from architecture docs (specify which one)'
-  - label: 'Add new library'
-    description: 'react-query-plus is correct choice. Update tech stack docs and install it.'
-  - label: 'Clarify intent'
-    description: 'Story author meant something else. What was the intended approach?'
+  - label: "Use documented library"
+    description: "Replace with existing solution from architecture docs (specify which one)"
+  - label: "Add new library"
+    description: "react-query-plus is correct choice. Update tech stack docs and install it."
+  - label: "Clarify intent"
+    description: "Story author meant something else. What was the intended approach?"
 ```
 
 ### Batching Questions
@@ -354,9 +355,9 @@ options:
 
 ```yaml
 questions:
-  - question: 'Three ACs have ambiguous criteria. Should all be made measurable?'
+  - question: "Three ACs have ambiguous criteria. Should all be made measurable?"
     # ... options
-  - question: 'Two tasks mention undefined file paths. Use standard locations?'
+  - question: "Two tasks mention undefined file paths. Use standard locations?"
     # ... options
 ```
 
@@ -399,6 +400,7 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 ## Review Workflow (Unified Analysis & Batch Questioning)
 
 **CRITICAL Execution Protocol**:
+
 1. **Zero Intermediate Finding-Clarification:** While running the analysis steps (Steps 2–8), the agent MUST NOT pause to ask the user clarifying questions about review findings — collect every finding silently and defer all finding-clarification to the single Unified Question Point after Step 8. This does **not** suppress the explicit pre-flight and side-effect gates that have their own defined prompts: the Step 0 output-format choice, the Step 0a branch-setup prompts, and the Step 2 tracker-sync opt-in. Those still fire at their defined points.
 2. **Unified Question Batching:** The agent must collect all compliance gaps, epic conflicts, technical inaccuracies, and UI wireframe opportunities into memory.
 3. **Single Prompt Turn:** After completing Step 8, the agent presents a single consolidated `AskUserQuestion` call containing up to 4 high-impact questions covering all findings.
@@ -421,13 +423,13 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 2. **Interactive mode only** — use `AskUserQuestion` to ask about desired output format:
 
 ```yaml
-question: 'Would you like a comprehensive review report saved to a file, or just an actionable plan for immediate fixes?'
-header: 'Output Format'
+question: "Would you like a comprehensive review report saved to a file, or just an actionable plan for immediate fixes?"
+header: "Output Format"
 options:
-  - label: 'Comprehensive report'
-    description: 'Generate detailed review report saved to story.{epic}.{story}.review.{n}.{story-name}.md with all findings, user decisions, and recommendations documented. The {story-name} slug MUST match the parent story file''s name slug exactly (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — never a free-form summary of the review focus.'
-  - label: 'Action plan only'
-    description: 'Provide prioritized list of issues and fixes to action immediately without saving a report file.'
+  - label: "Comprehensive report"
+    description: "Generate detailed review report saved to story.{epic}.{story}.review.{n}.{story-name}.md with all findings, user decisions, and recommendations documented. The {story-name} slug MUST match the parent story file's name slug exactly (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — never a free-form summary of the review focus."
+  - label: "Action plan only"
+    description: "Provide prioritized list of issues and fixes to action immediately without saving a report file."
 ```
 
 3. Store `MODE` and output format preference for use throughout the workflow.
@@ -438,37 +440,37 @@ options:
 
 **Interactive mode task list:**
 
-| Task Subject | Description |
-|---|---|
-| Determine output format | Capture user's report vs action-plan preference |
-| Branch setup | Ensure review runs on a feature branch (Step 0a) |
-| Load config & context | Load skills-config.yaml, locate story + architecture docs |
-| Template compliance | Verify story structure against template |
-| Epic alignment | Check story fits within its parent epic |
-| Technical accuracy | Anti-hallucination review of implementation details |
-| Completeness & gap analysis | Identify missing ACs, tasks, NFRs |
-| Consistency & conflicts | Detect internal contradictions |
-| Quality & clarity | Score story readability and precision |
-| Previous story context | Review predecessor story if applicable |
-| Generate output | Produce report file or action plan |
-| Offer to implement fixes | Ask user if fixes should be applied now (Step 9.5 — always execute) |
-| Update document status | Offer status update based on review outcome |
+| Task Subject                | Description                                                         |
+| --------------------------- | ------------------------------------------------------------------- |
+| Determine output format     | Capture user's report vs action-plan preference                     |
+| Branch setup                | Ensure review runs on a feature branch (Step 0a)                    |
+| Load config & context       | Load skills-config.yaml, locate story + architecture docs           |
+| Template compliance         | Verify story structure against template                             |
+| Epic alignment              | Check story fits within its parent epic                             |
+| Technical accuracy          | Anti-hallucination review of implementation details                 |
+| Completeness & gap analysis | Identify missing ACs, tasks, NFRs                                   |
+| Consistency & conflicts     | Detect internal contradictions                                      |
+| Quality & clarity           | Score story readability and precision                               |
+| Previous story context      | Review predecessor story if applicable                              |
+| Generate output             | Produce report file or action plan                                  |
+| Offer to implement fixes    | Ask user if fixes should be applied now (Step 9.5 — always execute) |
+| Update document status      | Offer status update based on review outcome                         |
 
 **Validate mode task list:**
 
-| Task Subject | Description |
-|---|---|
-| Branch setup | Validate-mode short-circuit (no-op when pipeline owns branch) |
-| Load config & context | Load skills-config.yaml, locate story + architecture docs |
-| Template compliance | Verify story structure against template |
-| Epic alignment | Check story fits within its parent epic |
-| Technical accuracy | Anti-hallucination check of implementation details |
-| Completeness & gap analysis | Identify missing ACs, tasks, NFRs |
-| Consistency & conflicts | Detect internal contradictions |
-| Quality & clarity | Score story readability and precision |
-| Previous story context | Review predecessor story if applicable |
-| Generate validation report | Write verdict + findings to `.validate.{date}.md` |
-| Post tracker comment | Notify linked issue with verdict (non-blocking) |
+| Task Subject                | Description                                                   |
+| --------------------------- | ------------------------------------------------------------- |
+| Branch setup                | Validate-mode short-circuit (no-op when pipeline owns branch) |
+| Load config & context       | Load skills-config.yaml, locate story + architecture docs     |
+| Template compliance         | Verify story structure against template                       |
+| Epic alignment              | Check story fits within its parent epic                       |
+| Technical accuracy          | Anti-hallucination check of implementation details            |
+| Completeness & gap analysis | Identify missing ACs, tasks, NFRs                             |
+| Consistency & conflicts     | Detect internal contradictions                                |
+| Quality & clarity           | Score story readability and precision                         |
+| Previous story context      | Review predecessor story if applicable                        |
+| Generate validation report  | Write verdict + findings to `.validate.{date}.md`             |
+| Post tracker comment        | Notify linked issue with verdict (non-blocking)               |
 
 **Output**: Mode and output format captured; task list initialized
 
@@ -481,21 +483,24 @@ options:
 **Pre-conditions**: `DOC_FILE` (story file path from Input Resolution), `MODE` (from Step 0), `SKILL_NAME=review-story`.
 
 **Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-story** variant throughout:
-- 0a.0 validate-mode short-circuit (skips entirely when `MODE=validate`).
-- 0a.2 extract `EPIC_NUM`, `STORY_NUM`, `EPIC_SLUG`, `EPIC_BRANCH`, `EPIC_BRANCH_EXISTS` from filename + story `epic:` frontmatter.
-- 0a.3 auto-skip when on `feature/story.${EPIC_NUM}.${STORY_NUM}.*` or `feature/epic.${EPIC_NUM}.*`.
-- 0a.4 prompt: when `EPIC_BRANCH_EXISTS=false`, ask Q1.1 (create epic branch) + Q1.2 (story branch base); else ask only Q1.2.
-- 0a.5–0a.8 stash (`git stash create` + `store`) → ensure epic branch (idempotent) → invoke `/create-branch` with resolved `BASE_BRANCH` → pop stash by hash.
 
-**Output**: `BRANCH_NAME`, `BASE_BRANCH`, `EPIC_BRANCH`, `AUTO_SKIPPED` exported. Decisions Log entry (or inline preamble) recorded per 0a.9.
+- 0a.0 validate-mode short-circuit (skips entirely when `MODE=validate`).
+- 0a.2 extract `EPIC_NUM`, `STORY_NUM` from filename + validate story `epic:` frontmatter is present.
+- 0a.3 auto-skip when on `feature/story.${EPIC_NUM}.${STORY_NUM}.*`.
+- 0a.4 prompt: single question — story branch base (default `${BASE_DEFAULT}`, i.e. `develop`; overridable). No epic branch is created.
+- 0a.5–0a.8 stash (`git stash create` + `store`) → invoke `/create-branch` with resolved `BASE_BRANCH` → pop stash by hash.
+
+**Output**: `BRANCH_NAME`, `BASE_BRANCH`, `AUTO_SKIPPED` exported. Decisions Log entry (or inline preamble) recorded per 0a.9.
 
 **Failure**: HALT with the exact error; stash recovery instructions surfaced; no document edits attempted.
 
 ---
 
 ### Step 1: Context Discovery and Parallel Pre-pass Execution
+
 Purpose: Parallelize file discovery, project structure checks, and core alignment evaluations into a single background turn cycle to minimize latency and context bloat.
 Actions:
+
 1. Resolve paths: Source references/resolve-paths.sh to populate ${PRD_ROOT} and ${ARCH_ROOT}.
 2. Load skills-config.yaml from the project root (or apply default fallback values).
 3. Load the primary story document in full using the Read tool.
@@ -505,7 +510,7 @@ Actions:
    - Subagent 3 (Architecture Alignment): Evaluate the story's technical details against core system architecture. Return a compact YAML summary (PREPASS_B).
    - Subagent 4 (Codebase Scan): Analyze current branch implementation status. Return a compact YAML summary (PREPASS_C).
 5. Handle Failures Gracefully: If any alignment/scan subagents fail or return an unknown status, log a specific warning (e.g., "⚠️ Pre-pass Agent A failed - proceeding via in-line discovery") and fall back to native validation checks in Steps 2-6.
-Output: Up to 3 verified YAML summaries stored in active context; target file paths fully resolved for immediate step execution.
+   Output: Up to 3 verified YAML summaries stored in active context; target file paths fully resolved for immediate step execution.
 
 ---
 
@@ -547,9 +552,10 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
      - ❌ `2.1-auto-hide.md`
 
 2a. **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)):
-   - `type: story` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement).
-   - `description` (one-sentence summary) present → **Important** if missing.
-   - `tags` is a YAML list (when present); `resource` is a URI (when present) → **Optional** if malformed. `updated` ≡ OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) ≡ OKF `resource` — absence of an explicit `resource` is not a finding.
+
+- `type: story` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement).
+- `description` (one-sentence summary) present → **Important** if missing.
+- `tags` is a YAML list (when present); `resource` is a URI (when present) → **Optional** if malformed. `updated` ≡ OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) ≡ OKF `resource` — absence of an explicit `resource` is not a finding.
 
 3. **Placeholder Detection**:
    - Search for: `{{...}}`, `_TBD_`, `[TODO]`, `[PLACEHOLDER]`, `???`
@@ -570,6 +576,7 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
 6. **Tracker Issue Linkage**:
 
    Detect tracker platform using the canonical resolver — see `references/platform-detection.md`. Source the helper once per skill invocation:
+
    ```bash
    source references/resolve-platform.sh
    # TRACKER = jira | github
@@ -591,117 +598,117 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
    3. **Frontmatter write-back**: on link-existing, write `jira_key` + `jira_url` (or `github_issue`) before the closing `---` of the frontmatter block (same sed-based pattern as `create-task`). Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
 # Tracker Dedup Fallback Search Addendum (Applies to both Jira and GitHub paths):
+
 - Pattern Match Search (Primary): Query by string prefix "[Story {epic}.{story}] {title}".
 - Structural Label Search (Fallback - Execute if primary match returns zero results):
-  * For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"`.
-  * For GitHub: Run `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title`.
+  - For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"`.
+  - For GitHub: Run `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title`.
 - Handling Drift: If a single match is found via the fallback label search but the title has drifted from the local filename/title, link the existing tracker issue, write back the keys to frontmatter, and log a warning: "⚠️ Title drift detected between local file and existing tracker issue. Issue linked via structural label." Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
-   **Jira path:**
+  **Jira path:**
 
-   > **Note**: priority drift between local frontmatter and remote Jira is corrected by `/sync-jira-story`, not by review. No analogue of the GitHub Project-board priority helper is needed — Jira priority is a built-in issue field, not a label, and `jira-sync.js` (`normalisePriority` + `diffFields`) already keeps them in sync.
-
-   - Frontmatter MUST contain `jira_key:` field
-   - If `jira_key:` is missing or `null`:
-     - Flag as **Important** gap
-     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
-       > **Header:** `Tracker sync`
-       > **Question:** "This story has no linked Jira issue. Create and link one now? Detected platform: Jira."
-       > **Options:**
-       > - **Sync to Jira** `(Recommended)` — create the Jira issue, link it to the parent epic, and write `jira_key`/`jira_url` to frontmatter.
-       > - **Skip — leave unlinked** — make no remote changes; leave `jira_key` unwritten. The user can run `/sync-jira-story` later.
-       >
-       > The user may also pick "Other" (auto-provided) to skip or explain.
-     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-jira-story later."` and continue the review. Do NOT halt.
-     - If the user chooses **Sync to Jira**:
-       0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
-          - Use Atlassian MCP `searchJiraIssuesUsingJql`:
-            - `jql`: `summary ~ "[Story {epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
-            - Verify story title pattern against what `/create-story` Step 5.2a / `sync-jira-story` actually emits; align if the format differs
-             - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
-             - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"` (see Tracker Dedup Fallback Search Addendum for details).
-          - **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-jira-issue`):
-            - Extract `jira_key` and build `jira_url = ${JIRA_URL}/browse/${jira_key}`
-            - Write `jira_key: {jira_key}` and `jira_url: {jira_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
-            - Insert or repair body cross-reference link: `**Jira Issue**: [{jira_key}]({jira_url})`
-            - Existing issue is assumed to already have its parent epic linkage — do NOT re-invoke `ensure-epic-jira-issue`
-            - If matched issue status is `Closed` or `Done`: log `"⚠️  Linked existing CLOSED tracker issue {jira_key} — verify intent before continuing."`
-            - Log `"Linked existing tracker issue {jira_key} (skipped create)"` and **skip steps 1–4 below**
-          - **Zero matches** → fall through to steps 1–4 below
-          - **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Story {epic}.{story}]\": {key1}, {key2}, … — proceeding to create"` and fall through to steps 1–4 below
-       1. Derive the epic file path using the grandparent directory rule:
+  > **Note**: priority drift between local frontmatter and remote Jira is corrected by `/sync-jira-story`, not by review. No analogue of the GitHub Project-board priority helper is needed — Jira priority is a built-in issue field, not a label, and `jira-sync.js` (`normalisePriority` + `diffFields`) already keeps them in sync.
+  - Frontmatter MUST contain `jira_key:` field
+  - If `jira_key:` is missing or `null`:
+    - Flag as **Important** gap
+    - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
+      > **Header:** `Tracker sync`
+      > **Question:** "This story has no linked Jira issue. Create and link one now? Detected platform: Jira."
+      > **Options:**
+      >
+      > - **Sync to Jira** `(Recommended)` — create the Jira issue, link it to the parent epic, and write `jira_key`/`jira_url` to frontmatter.
+      > - **Skip — leave unlinked** — make no remote changes; leave `jira_key` unwritten. The user can run `/sync-jira-story` later.
+      >
+      > The user may also pick "Other" (auto-provided) to skip or explain.
+    - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-jira-story later."` and continue the review. Do NOT halt.
+    - If the user chooses **Sync to Jira**: 0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
+      - Use Atlassian MCP `searchJiraIssuesUsingJql`:
+        - `jql`: `summary ~ "[Story {epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
+        - Verify story title pattern against what `/create-story` Step 5.2a / `sync-jira-story` actually emits; align if the format differs
+        - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
+        - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"` (see Tracker Dedup Fallback Search Addendum for details).
+      - **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-jira-issue`):
+        - Extract `jira_key` and build `jira_url = ${JIRA_URL}/browse/${jira_key}`
+        - Write `jira_key: {jira_key}` and `jira_url: {jira_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
+        - Insert or repair body cross-reference link: `**Jira Issue**: [{jira_key}]({jira_url})`
+        - Existing issue is assumed to already have its parent epic linkage — do NOT re-invoke `ensure-epic-jira-issue`
+        - If matched issue status is `Closed` or `Done`: log `"⚠️  Linked existing CLOSED tracker issue {jira_key} — verify intent before continuing."`
+        - Log `"Linked existing tracker issue {jira_key} (skipped create)"` and **skip steps 1–4 below**
+      - **Zero matches** → fall through to steps 1–4 below
+      - **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Story {epic}.{story}]\": {key1}, {key2}, … — proceeding to create"` and fall through to steps 1–4 below
+      1.  Derive the epic file path using the grandparent directory rule:
           ```bash
           STORY_DIR=$(dirname "{resolved story file path}")
           EPIC_DIR=$(dirname "$(dirname "$STORY_DIR")")
           EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
           ```
           If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_JIRA_KEY=""`.
-       2. If the file exists, invoke the `ensure-epic-jira-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_JIRA_KEY` is set or empty. Set `EPIC_TRACKER_KIND="jira"`.
-       3. Create the Jira Story using the same pattern as `/create-story` Step 5.2a (Jira path), using `EPIC_JIRA_KEY` for `jira_epic_key` linkage
-       4. Write `jira_key`, `jira_epic_key`, `jira_url` into frontmatter and Story Information table
-   - If `jira_key:` has a value, verify the issue exists using the `getJiraIssue` Atlassian MCP tool with `issueIdOrKey: {jira_key}` and `fields: ["status", "summary"]`.
-     - If the tool returns a valid issue object → issue exists, continue.
-     - If the tool returns an error or null/empty result → flag as **Critical**: "Jira issue `{jira_key}` not found — it may have been deleted". Do NOT halt — record the finding and continue the review.
-   - **URL consistency check** (when `jira_key` is present and valid):
-     - If `jira_url:` is also in frontmatter: verify it equals `{JIRA_URL}/browse/{jira_key}`. Any mismatch → flag as **Important**: "`jira_url` does not match `jira_key`"
-     - Look for a `**Jira Epic**: [KEY](url)` or `**Jira Issue**: [KEY](url)` line in the story body. If found: verify the KEY matches `jira_key` and the URL ends with `/browse/{jira_key}`. Any mismatch → flag as **Important**: "Body cross-reference link does not match `jira_key`"
-     - If no body link is found: flag as **Important** — add one (e.g., `**Jira Issue**: [{jira_key}]({jira_url})`)
+      2.  If the file exists, invoke the `ensure-epic-jira-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_JIRA_KEY` is set or empty. Set `EPIC_TRACKER_KIND="jira"`.
+      3.  Create the Jira Story using the same pattern as `/create-story` Step 5.2a (Jira path), using `EPIC_JIRA_KEY` for `jira_epic_key` linkage
+      4.  Write `jira_key`, `jira_epic_key`, `jira_url` into frontmatter and Story Information table
+  - If `jira_key:` has a value, verify the issue exists using the `getJiraIssue` Atlassian MCP tool with `issueIdOrKey: {jira_key}` and `fields: ["status", "summary"]`.
+    - If the tool returns a valid issue object → issue exists, continue.
+    - If the tool returns an error or null/empty result → flag as **Critical**: "Jira issue `{jira_key}` not found — it may have been deleted". Do NOT halt — record the finding and continue the review.
+  - **URL consistency check** (when `jira_key` is present and valid):
+    - If `jira_url:` is also in frontmatter: verify it equals `{JIRA_URL}/browse/{jira_key}`. Any mismatch → flag as **Important**: "`jira_url` does not match `jira_key`"
+    - Look for a `**Jira Epic**: [KEY](url)` or `**Jira Issue**: [KEY](url)` line in the story body. If found: verify the KEY matches `jira_key` and the URL ends with `/browse/{jira_key}`. Any mismatch → flag as **Important**: "Body cross-reference link does not match `jira_key`"
+    - If no body link is found: flag as **Important** — add one (e.g., `**Jira Issue**: [{jira_key}]({jira_url})`)
 
-   **GitHub path** (when `TRACKER=github`):
-   - Frontmatter MUST contain `github_issue:` field
-   - If `github_issue:` is missing or `null`:
-     - Flag as **Important** gap
-     - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
-       > **Header:** `Tracker sync`
-       > **Question:** "This story has no linked GitHub issue. Create and link one now? Detected platform: GitHub."
-       > **Options:**
-       > - **Sync to GitHub** `(Recommended)` — create the GitHub issue, link it as a sub-issue of the parent epic, add it to the project board, and write `github_issue` to frontmatter.
-       > - **Skip — leave unlinked** — make no remote changes; leave `github_issue` unwritten. The user can run `/sync-github-story` later.
-       >
-       > The user may also pick "Other" (auto-provided) to skip or explain.
-     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-github-story later."` and continue the review. Do NOT halt.
-     - If the user chooses **Sync to GitHub**:
-       0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
-          1. Search for an existing issue:
-             ```bash
-             gh issue list --search "in:title \"[Story {epic}.{story}]\"" --state all \
-               --json number,url,state,title
-             ```
-             Verify story title pattern against what `/create-story` Step 5.2a actually emits; align if the format differs.
-             On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to steps 1–4 below
-             - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
-          2. **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-github-issue`):
-             - Extract `N` (issue number) and `url` from the result
-             - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
-             - Insert or repair body cross-reference link: `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`
-             - Existing issue is assumed to already have its parent epic linkage — do NOT re-invoke `ensure-epic-github-issue`
-             - If matched issue `state` is `CLOSED`: log `"⚠️  Linked existing CLOSED tracker issue #{N} — verify intent before continuing."`
-             - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip steps 1–4 below**
-          3. **Zero matches** → fall through to steps 1–4 below
-          4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Story {epic}.{story}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to steps 1–4 below
-       1. Derive the epic file path using the grandparent directory rule:
-          ```bash
-          STORY_DIR=$(dirname "{resolved story file path}")
-          EPIC_DIR=$(dirname "$(dirname "$STORY_DIR")")
-          EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
-          ```
-          If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_ISSUE_NUM=""`.
-       2. If the file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set or empty. Set `EPIC_TRACKER_KIND="github"`.
-       3. Invoke the `ensure-story-github-issue` sub-routine with `STORY_FILE_PATH={resolved story file path}` and `EPIC_ISSUE_NUM={value returned by ensure-epic-github-issue}`. The sub-routine handles:
-          - creating the issue (with title `[Story {epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {epic} — {epic_title}`)
-          - adding it to the GitHub Project board
-          - mirroring the priority label onto the board's Priority single-select field
-          - linking the new issue as a sub-issue of the parent epic issue (only if `EPIC_ISSUE_NUM` is non-empty)
-          - writing `github_issue: {N}` into the story frontmatter and adding/repairing the Story Information table row.
+  **GitHub path** (when `TRACKER=github`):
+  - Frontmatter MUST contain `github_issue:` field
+  - If `github_issue:` is missing or `null`:
+    - Flag as **Important** gap
+    - **Offer tracker sync (opt-in)** — prompt with `AskUserQuestion` (same gate as `/create-story` Step 5.2a; never create a remote issue unprompted):
+      > **Header:** `Tracker sync`
+      > **Question:** "This story has no linked GitHub issue. Create and link one now? Detected platform: GitHub."
+      > **Options:**
+      >
+      > - **Sync to GitHub** `(Recommended)` — create the GitHub issue, link it as a sub-issue of the parent epic, add it to the project board, and write `github_issue` to frontmatter.
+      > - **Skip — leave unlinked** — make no remote changes; leave `github_issue` unwritten. The user can run `/sync-github-story` later.
+      >
+      > The user may also pick "Other" (auto-provided) to skip or explain.
+    - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-github-story later."` and continue the review. Do NOT halt.
+    - If the user chooses **Sync to GitHub**: 0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
+      1. Search for an existing issue:
+         ```bash
+         gh issue list --search "in:title \"[Story {epic}.{story}]\"" --state all \
+           --json number,url,state,title
+         ```
+         Verify story title pattern against what `/create-story` Step 5.2a actually emits; align if the format differs.
+         On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to steps 1–4 below
+         - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
+      2. **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-github-issue`):
+         - Extract `N` (issue number) and `url` from the result
+         - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
+         - Insert or repair body cross-reference link: `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`
+         - Existing issue is assumed to already have its parent epic linkage — do NOT re-invoke `ensure-epic-github-issue`
+         - If matched issue `state` is `CLOSED`: log `"⚠️  Linked existing CLOSED tracker issue #{N} — verify intent before continuing."`
+         - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip steps 1–4 below**
+      3. **Zero matches** → fall through to steps 1–4 below
+      4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Story {epic}.{story}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to steps 1–4 below
+      5. Derive the epic file path using the grandparent directory rule:
+         ```bash
+         STORY_DIR=$(dirname "{resolved story file path}")
+         EPIC_DIR=$(dirname "$(dirname "$STORY_DIR")")
+         EPIC_FILE_PATH="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
+         ```
+         If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_ISSUE_NUM=""`.
+      6. If the file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set or empty. Set `EPIC_TRACKER_KIND="github"`.
+      7. Invoke the `ensure-story-github-issue` sub-routine with `STORY_FILE_PATH={resolved story file path}` and `EPIC_ISSUE_NUM={value returned by ensure-epic-github-issue}`. The sub-routine handles:
+         - creating the issue (with title `[Story {epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {epic} — {epic_title}`)
+         - adding it to the GitHub Project board
+         - mirroring the priority label onto the board's Priority single-select field
+         - linking the new issue as a sub-issue of the parent epic issue (only if `EPIC_ISSUE_NUM` is non-empty)
+         - writing `github_issue: {N}` into the story frontmatter and adding/repairing the Story Information table row.
 
-          On return, `STORY_ISSUE_NUM` is set (integer) or empty (on failure). Failure is non-blocking — review continues with a flagged Important gap.
-   - If `github_issue:` has a numeric value:
-     - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
-       - If the issue doesn't exist (command errors), flag as **Critical**
-     - **URL consistency check** — verify the cross-reference link in the story body is correct:
-       - Look for any markdown link of the form `[#N](url)` or `[#N](https://github.com/...)` in the story body
-       - If found: confirm the issue number in the link matches `github_issue:` in frontmatter; and confirm the URL path ends with `/issues/{N}`. Any mismatch → flag as **Important**: "Body link `[#X](url)` does not match frontmatter `github_issue: {N}`"
-       - If no body link found: flag as **Important** — add one (e.g., `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`)
+         On return, `STORY_ISSUE_NUM` is set (integer) or empty (on failure). Failure is non-blocking — review continues with a flagged Important gap.
+  - If `github_issue:` has a numeric value:
+    - Verify the issue exists: `gh issue view {N} --json state -q '.state'`
+      - If the issue doesn't exist (command errors), flag as **Critical**
+    - **URL consistency check** — verify the cross-reference link in the story body is correct:
+      - Look for any markdown link of the form `[#N](url)` or `[#N](https://github.com/...)` in the story body
+      - If found: confirm the issue number in the link matches `github_issue:` in frontmatter; and confirm the URL path ends with `/issues/{N}`. Any mismatch → flag as **Important**: "Body link `[#X](url)` does not match frontmatter `github_issue: {N}`"
+      - If no body link found: flag as **Important** — add one (e.g., `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`)
 
 **Issues to Flag**:
 
@@ -872,13 +879,14 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
    - Should not just say "write tests"
 
 4a. **Manual Testing Steps** (UI/navigation stories only):
-   - Must be present when story touches screens, modals, navigation, or user-visible interactions
-   - Must include: Prerequisites, Navigation Path, Verification Steps (one per AC), Edge Cases
-   - Navigation Path must name actual screens/buttons (not vague descriptions)
-   - Every AC must map to at least one verification step
-   - Acceptable placeholder: "To be confirmed during implementation" — but only for unknown screen names, not for the entire section
-   - Flag as **Important** if section is absent on a UI story
-   - Flag as **Optional** if present but navigation path uses vague language
+
+- Must be present when story touches screens, modals, navigation, or user-visible interactions
+- Must include: Prerequisites, Navigation Path, Verification Steps (one per AC), Edge Cases
+- Navigation Path must name actual screens/buttons (not vague descriptions)
+- Every AC must map to at least one verification step
+- Acceptable placeholder: "To be confirmed during implementation" — but only for unknown screen names, not for the entire section
+- Flag as **Important** if section is absent on a UI story
+- Flag as **Optional** if present but navigation path uses vague language
 
 5. **File Location Specification**:
    - New files should have specific paths
@@ -997,14 +1005,14 @@ Output: Up to 3 verified YAML summaries stored in active context; target file pa
 
 **Actions**:
 
-1. **Detect diagrams**: scan the story (and its co-located plan file if present) for fenced ```` ```mermaid ```` blocks. For each, capture: section anchor, diagram type, presence of YAML metadata header (`<!-- mermaid-architect: ... -->`).
+1. **Detect diagrams**: scan the story (and its co-located plan file if present) for fenced ` ```mermaid ` blocks. For each, capture: section anchor, diagram type, presence of YAML metadata header (`<!-- mermaid-architect: ... -->`).
 2. **Invoke `mermaid-architect` in review mode** for each block. Pass: story file path, the section anchor, the API spec ref (if applicable), and the actor/component names already in the story so the skill can verify naming consistency, time-order correctness for sequences, and that no architectural violations are encoded (e.g., a Client talking directly to a Database).
 3. **Collect verdicts**: `pass`, `pass with notes`, `fail`. Map `fail` → Important (or Critical if it encodes an architectural violation); `pass with notes` → Optional.
 4. **If absent**: assess whether one would materially clarify the story:
    - Story describes a request/response or multi-service interaction → suggest `sequenceDiagram`
    - Story describes a stateful UI/component lifecycle → suggest `stateDiagram-v2`
    - Story has non-trivial branching or decision logic → suggest `flowchart`
-   Do NOT flag absence as an issue if Dev Notes prose already conveys the flow clearly.
+     Do NOT flag absence as an issue if Dev Notes prose already conveys the flow clearly.
 
 Missing Diagram Proactive Draft Rule:
 If a visual diagram is absent but highly recommended (e.g., the story describes a complex multi-party API request/response loop or stateful UI view lifecycle), do not merely flag its absence. You must generate a highly accurate, syntactically correct sample draft snippet directly within the review report's recommendation section (using markdown code fences for the specified mermaid type). Use the verified component, file, or endpoint naming conventions extracted during the technical accuracy review so the user can easily copy and insert it.
@@ -1192,52 +1200,52 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 ```yaml
 questions:
   - question: "This story describes a user interface (UI) or visual components, but does not have a wireframe embedded. Would you like to embed a wireframe directly in this story using the `markdown-wireframe` skill?"
-    header: 'UI Wireframe'
+    header: "UI Wireframe"
     options:
-      - label: 'Yes — Add wireframe (Recommended)'
-        description: 'Invoke the markdown-wireframe skill to generate a text/YAML wireframe, embed it directly in the story''s Dev Notes section, and add a task to Stitch it.'
-      - label: 'No — Skip wireframe'
-        description: 'Proceed without wireframes.'
+      - label: "Yes — Add wireframe (Recommended)"
+        description: "Invoke the markdown-wireframe skill to generate a text/YAML wireframe, embed it directly in the story's Dev Notes section, and add a task to Stitch it."
+      - label: "No — Skip wireframe"
+        description: "Proceed without wireframes."
 
   - question: "AC #3 says 'fast response time' which is unmeasurable. What specific performance threshold is required?"
-    header: 'Performance'
+    header: "Performance"
     options:
-      - label: '< 100ms (p95)'
-        description: 'Very fast, requires caching/optimization'
-      - label: '< 500ms (p95)'
-        description: 'Fast enough for most interactions'
-      - label: '< 2s (p95)'
-        description: 'Acceptable for non-critical operations'
-      - label: 'Remove threshold'
-        description: 'No specific requirement, general standards apply'
+      - label: "< 100ms (p95)"
+        description: "Very fast, requires caching/optimization"
+      - label: "< 500ms (p95)"
+        description: "Fast enough for most interactions"
+      - label: "< 2s (p95)"
+        description: "Acceptable for non-critical operations"
+      - label: "Remove threshold"
+        description: "No specific requirement, general standards apply"
 
   - question: "Tasks reference both '/api/v1/users' and '/api/users' endpoints. Which version is correct?"
-    header: 'API Version'
+    header: "API Version"
     options:
-      - label: 'Use v1 (/api/v1/users)'
-        description: 'Versioned endpoints as per architecture standard'
-      - label: 'Use unversioned (/api/users)'
-        description: 'Unversioned for this specific case'
-      - label: 'Consistency error'
-        description: 'Should all be same. Correct tasks to use consistent version.'
+      - label: "Use v1 (/api/v1/users)"
+        description: "Versioned endpoints as per architecture standard"
+      - label: "Use unversioned (/api/users)"
+        description: "Unversioned for this specific case"
+      - label: "Consistency error"
+        description: "Should all be same. Correct tasks to use consistent version."
 
-  - question: 'Story uses different error handling pattern than previous story 2.2. Is this intentional?'
-    header: 'Error Pattern'
+  - question: "Story uses different error handling pattern than previous story 2.2. Is this intentional?"
+    header: "Error Pattern"
     options:
-      - label: 'Follow 2.2 pattern'
-        description: 'Maintain consistency with established approach'
-      - label: 'New pattern correct'
-        description: 'This story requires different approach (explain why in Dev Notes)'
+      - label: "Follow 2.2 pattern"
+        description: "Maintain consistency with established approach"
+      - label: "New pattern correct"
+        description: "This story requires different approach (explain why in Dev Notes)"
 
-  - question: 'Story has 15 tasks across 3 distinct feature areas (database, API, frontend). This appears too large for one story. Should it be split into sub-stories?'
-    header: 'Split Story'
+  - question: "Story has 15 tasks across 3 distinct feature areas (database, API, frontend). This appears too large for one story. Should it be split into sub-stories?"
+    header: "Split Story"
     options:
-      - label: 'Keep as one story'
-        description: 'All tasks are tightly coupled and must ship together. Scope is acceptable.'
-      - label: 'Split into sub-stories'
-        description: 'Create sub-stories for parallel development. Provide suggested split structure in recommendations.'
-      - label: 'Reduce scope'
-        description: 'Some tasks should be moved to future stories. Identify which tasks to defer.'
+      - label: "Keep as one story"
+        description: "All tasks are tightly coupled and must ship together. Scope is acceptable."
+      - label: "Split into sub-stories"
+        description: "Create sub-stories for parallel development. Provide suggested split structure in recommendations."
+      - label: "Reduce scope"
+        description: "Some tasks should be moved to future stories. Identify which tasks to defer."
 ```
 
 **After Questions**: Generate final report incorporating all user decisions and clarifications.
@@ -1263,6 +1271,7 @@ questions:
 
 Critical Scoring Engine Rule (The Floor Gate):
 The Implementation Readiness Score is calculated as a weighted average across all checked dimensions on a 1-10 scale. However, the calculation must respect a strict structural floor rule:
+
 - If Technical Accuracy is less than 6 OR Completeness is less than 6 due to critical/important blockers, the final weighted Implementation Readiness Score is automatically capped at a maximum value of 5/10.
 - The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
 - Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
@@ -1316,14 +1325,14 @@ Report:  <path>
 
 ## Scoring Breakdown
 
-| Dimension | Score | Notes |
-|-----------|-------|-------|
-| Template Compliance | [1-10]/10 | [1-line note] |
-| Epic Alignment | [1-10]/10 | [1-line note] |
-| Technical Accuracy | [1-10]/10 | [1-line note] |
-| Completeness | [1-10]/10 | [1-line note] |
-| Consistency | [1-10]/10 | [1-line note] |
-| Quality & Clarity | [1-10]/10 | [1-line note] |
+| Dimension                 | Score            | Notes         |
+| ------------------------- | ---------------- | ------------- |
+| Template Compliance       | [1-10]/10        | [1-line note] |
+| Epic Alignment            | [1-10]/10        | [1-line note] |
+| Technical Accuracy        | [1-10]/10        | [1-line note] |
+| Completeness              | [1-10]/10        | [1-line note] |
+| Consistency               | [1-10]/10        | [1-line note] |
+| Quality & Clarity         | [1-10]/10        | [1-line note] |
 | Previous Story Continuity | [1-10]/10 or N/A | [1-line note] |
 
 **Overall:** [weighted average]/10
@@ -1331,11 +1340,17 @@ Report:  <path>
 ---
 
 ## 1. Template Structure Compliance — [PASS / ISSUES FOUND]
+
 ## 2. Epic Alignment — [ALIGNED / DEVIATIONS FOUND]
+
 ## 3. Technical Accuracy — [ACCURATE / ISSUES FOUND]
+
 ## 4. Completeness & Gaps — [COMPLETE / GAPS FOUND]
+
 ## 5. Consistency & Conflicts — [CONSISTENT / CONFLICTS FOUND]
+
 ## 6. Quality & Clarity
+
 ## 7. Previous Story Context — [CONSISTENT / ISSUES FOUND / N/A]
 
 (Each section: Critical / Important / Optional sub-buckets. Same format as Interactive Comprehensive Report sections.)
@@ -1345,7 +1360,9 @@ Report:  <path>
 ## Summary of Findings
 
 ### Must Fix (Critical) — [count]
+
 ### Should Fix (Important) — [count]
+
 ### Consider (Optional) — [count]
 
 ---
@@ -1371,7 +1388,7 @@ Report:  <path>
 
 ---
 
-*Generated by /review-story --validate. In standalone validate (`APPLY=false`) no changes are made to the story document — to apply fixes, run /review-story (interactive). Under validate-and-apply (`APPLY=true`, orchestrated) critical + important fixes are applied and the status is promoted on a GO.*
+_Generated by /review-story --validate. In standalone validate (`APPLY=false`) no changes are made to the story document — to apply fixes, run /review-story (interactive). Under validate-and-apply (`APPLY=true`, orchestrated) critical + important fixes are applied and the status is promoted on a GO._
 ```
 
 **Output**: Validation report saved (`.validate.{date}.md` for standalone validate; `story.{epic}.{story}.review.{n}.{story-name}.md` for validate-and-apply). Stdout summary printed.
@@ -1386,6 +1403,7 @@ Report:  <path>
 
 Critical Scoring Engine Rule (The Floor Gate):
 The Implementation Readiness Score is calculated as a weighted average across all checked dimensions on a 1-10 scale. However, the calculation must respect a strict structural floor rule:
+
 - If Technical Accuracy is less than 6 OR Completeness is less than 6 due to critical/important blockers, the final weighted Implementation Readiness Score is automatically capped at a maximum value of 5/10.
 - The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
 - Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
@@ -1846,21 +1864,22 @@ _[Add Q3, Q4 as needed — up to the 4-question batch maximum.]_
 1. Use `AskUserQuestion` to ask:
 
 ```yaml
-question: 'Would you like me to implement the recommended fixes to the story document now?'
-header: 'Apply Fixes'
+question: "Would you like me to implement the recommended fixes to the story document now?"
+header: "Apply Fixes"
 options:
-  - label: 'Yes, apply all critical + important fixes'
-    description: 'I will edit the story document to address all critical and important issues identified in the review.'
-  - label: 'Yes, critical fixes only'
-    description: 'I will apply only the must-fix (critical) changes to unblock implementation.'
-  - label: 'No, I will fix manually'
-    description: 'Skip automatic fixes. I will update the story document myself.'
+  - label: "Yes, apply all critical + important fixes"
+    description: "I will edit the story document to address all critical and important issues identified in the review."
+  - label: "Yes, critical fixes only"
+    description: "I will apply only the must-fix (critical) changes to unblock implementation."
+  - label: "No, I will fix manually"
+    description: "Skip automatic fixes. I will update the story document myself."
 ```
 
 2. **If "Yes, apply all critical + important fixes"** or **"Yes, critical fixes only"**:
 
 Step 9.5 Execution Guardrails (Atomic Rollback Protocol):
 Before executing any tool calls to apply changes to the story file or review markdown:
+
 1. Create a transient local snapshot of the unmodified active story document (e.g., cache it in memory or make a hidden `.story_file.bak` copy).
 2. Apply the sequenced Edit tool calls block by block in priority order.
 3. Catch and Remediate Failures: If any individual Edit call fails to match lines, encounters regex/patch conflicts, or throws an error, immediately halt the operation. Revert the entire file back to the transient local snapshot state.
@@ -1887,10 +1906,9 @@ Before executing any tool calls to apply changes to the story file or review mar
 
      **In the story file**:
      - Add the following line immediately after the `**Status**:` line at the top of the story:
-       `**Review**: ✅ All review recommendations from \`[report-filename]\` implemented YYYY-MM-DD`
-       (or: `**Review**: ✅ Critical/Important recommendations implemented YYYY-MM-DD — see review report for details` if partial)
+       `**Review**: ✅ All review recommendations from \`[report-filename]\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Important recommendations implemented YYYY-MM-DD — see review report for details` if partial)
 
-3. **If "No, I will fix manually"**:
+5. **If "No, I will fix manually"**:
    - Acknowledge and proceed to Step 10
    - Remind user: "The full issue list is in the report above. Run `/review-story` again after making changes."
 
@@ -1900,9 +1918,10 @@ Before executing any tool calls to apply changes to the story file or review mar
 
 ### Step 9.6: Sync Body Changes to Tracker (when fixes were applied)
 
-**Purpose**: When Step 9.5 applied any Edit to the story body, sync the updated content back to the linked tracker issue (Jira or GitHub). This syncs **both** the story **Description** *and* the **doc URL** to the story file — `story_bitbucket_url` / `epic_bitbucket_url` plus the body "View on Bitbucket" links (Jira), or the issue's `## Document` link block (GitHub). The doc URL is **pinned to the durable `develop` branch** (when the file already exists there) so it does not 404 once the feature branch is deleted post-merge.
+**Purpose**: When Step 9.5 applied any Edit to the story body, sync the updated content back to the linked tracker issue (Jira or GitHub). This syncs **both** the story **Description** _and_ the **doc URL** to the story file — `story_bitbucket_url` / `epic_bitbucket_url` plus the body "View on Bitbucket" links (Jira), or the issue's `## Document` link block (GitHub). The doc URL is **pinned to the durable `develop` branch** (when the file already exists there) so it does not 404 once the feature branch is deleted post-merge.
 
 **When to Execute**:
+
 - At least one fix was applied in Step 9.5 (i.e. `FIXES_APPLIED` is non-empty) AND
 - Not validate mode
 
@@ -1979,11 +1998,11 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
 
    ```yaml
    question: "Review result is READY TO IMPLEMENT with readiness score [X]/10. Update story status to 'Ready for Development'?"
-   header: 'Update Status'
+   header: "Update Status"
    options:
-     - label: 'Yes, update status'
+     - label: "Yes, update status"
        description: "Update status to 'Ready for Development'. Story can be handed off to /develop."
-     - label: 'Keep current status'
+     - label: "Keep current status"
        description: "Leave status as '[current status]'. I'll update manually when ready."
    ```
 
@@ -2006,10 +2025,12 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
    Reuse the `PIN_BRANCH` resolved in Step 9.6 so the doc URL stays pinned to the durable branch. (If Step 9.6 was skipped — no fixes applied — re-resolve `PIN_BRANCH` using the same snippet from Step 9.6 first.)
 
    - **Jira path** (`TRACKER=jira`): run `sync-jira-story.js` to push the status transition and updated frontmatter:
+
      ```bash
      node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
        --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
      ```
+
      On success → `✅ Status synced to Jira {jira_key} (doc link pinned to ${PIN_BRANCH:-current branch})`.
      On failure → log `⚠️ sync-jira-story failed after status update — Jira may be stale` and continue.
 
@@ -2027,8 +2048,8 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
 
    ```yaml
    file_path: [story-file-path]
-   old_string: 'Status:** Draft'
-   new_string: 'Status:** Ready for Development'
+   old_string: "Status:** Draft"
+   new_string: "Status:** Ready for Development"
    ```
 
 **Status Transition Rules**:
@@ -2068,7 +2089,7 @@ User Can Now: Run `/develop` to begin implementation
 
 1. **Detect tracker platform**: use `TRACKER` already set by the resolver (sourced in Step 5). When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path. See `references/platform-detection.md`.
 
-3. **Collect context from previous steps**:
+2. **Collect context from previous steps**:
 
    - `SCORE` — readiness score from Step 9
    - `RECOMMENDATION` — READY TO IMPLEMENT | NEEDS REVISION | REQUIRES REWORK
@@ -2078,7 +2099,7 @@ User Can Now: Run `/develop` to begin implementation
    - `FIXES_SKIPPED` — list of skipped fix titles from Step 9.5, or empty string
    - `STATUS_CHANGE` — transition string if Step 10 updated status (e.g. `"Draft → Ready for Development"`), or empty string
 
-4. **Build the CHANGES_SECTION** (shared between both paths):
+3. **Build the CHANGES_SECTION** (shared between both paths):
 
    ```bash
    CHANGES_SECTION=""
@@ -2100,9 +2121,9 @@ User Can Now: Run `/develop` to begin implementation
    fi
    ```
 
-5. **Post comment — branch on TRACKER:**
+4. **Post comment — branch on TRACKER:**
 
-   ---
+   ***
 
    **Jira path** (when `TRACKER=jira`):
 
@@ -2131,7 +2152,7 @@ User Can Now: Run `/develop` to begin implementation
    On success → confirm: "✅ Review summary posted to Jira issue {jira_key}."
    On failure → log warning "⚠️ Jira comment failed — continuing", do NOT halt.
 
-   ---
+   ***
 
    **GitHub path** (when `TRACKER=github`):
 

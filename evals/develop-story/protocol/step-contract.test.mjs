@@ -32,10 +32,10 @@ const STEP_FILES = {
 
 // Keywords each step file must contain (evidence the contract is documented)
 const STEP_KEYWORDS = {
-  1: ["branch", "lock", "epic"],
+  1: ["branch", "lock", "story"],
   2: ["review", "skip"],
   3: ["develop", "loop", "MAX_ITER"],
-  4: ["create-pr", "EPIC_BRANCH"],
+  4: ["create-pr", "Q2_answer"],
   "5-6": ["qa-story", "qa-fix", "gate"],
   7: ["finalise", "DoD"],
   8: ["commit", "push"],
@@ -70,7 +70,9 @@ test("SKILL.md references step banners for steps 1-8", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   for (let n = 1; n <= 8; n++) {
     assert.ok(
-      content.includes(`Step ${n}`) || content.includes(`STEP ${n}`) || content.includes(`Step ${n}/8`),
+      content.includes(`Step ${n}`) ||
+        content.includes(`STEP ${n}`) ||
+        content.includes(`Step ${n}/8`),
       `SKILL.md does not reference Step ${n}`,
     );
   }
@@ -80,16 +82,21 @@ test("SKILL.md has autonomous-defaults reference", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   assert.ok(
     content.includes("develop-pipeline-autonomous-defaults") ||
-    content.includes("Autonomous Decision Defaults"),
+      content.includes("Autonomous Decision Defaults"),
     "SKILL.md missing autonomous-defaults reference",
   );
 });
 
-test("step-4 documents that story PR targets epic branch", async () => {
+test("step-4 documents that story PR base is the resolved Q2 answer (default develop)", async () => {
   const content = await readFile(path.join(STEP_DIR, STEP_FILES[4]), "utf-8");
   assert.match(
     content,
-    /EPIC_BRANCH|epic.branch/i,
-    "step-4 must reference EPIC_BRANCH as PR target for develop-story",
+    /--base \{Q2_answer\}/,
+    "step-4 must pass the resolved Q2 answer as the PR base",
+  );
+  assert.doesNotMatch(
+    content,
+    /EPIC_BRANCH|feature\/epic/,
+    "step-4 must NOT target an epic branch",
   );
 });
