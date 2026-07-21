@@ -1090,6 +1090,7 @@ This executes full QA process and updates original QA artifacts.
 
 ## Related Skills
 
+- **develop-bug**: End-to-end bug-fix orchestrator — invokes qa-fix as the fix engine inside its verify loop, then closes the bug with a Resolution Summary (qa-fix itself stops at "Ready for QA")
 - **develop**: Main development workflow
 - **execute-checklist**: Run Definition of Done validation
 - **review-story --validate**: Pre-implementation story validation (automated GO/NO-GO, non-interactive)

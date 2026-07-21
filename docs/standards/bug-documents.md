@@ -81,6 +81,18 @@ description: 'One-line summary of the bug'
 7. Status History
 8. Resolution Summary
 
+Before a bug is worked, [`review-bug`](../../skills/review-bug/SKILL.md) checks its **fix-readiness**
+(sections 1–5): completeness, reproducibility *from the report*, severity/priority correctness, and
+mode/linkage — plus read-only duplicate and already-fixed scans. It never mutates the bug lifecycle
+`status`; it may edit the report to add missing detail. It is also `develop-bug`'s Step 2 gate.
+
+`create-bug-report` writes sections 1–5 and leaves 6–8 as stubs. The **fix-executing** skills fill them:
+[`develop-bug`](../../skills/develop-bug/SKILL.md) is the end-to-end orchestrator — it takes an open bug
+report and runs it to a **closed, verified, documented** fix, writing sections 6–8 (Developer Fix Cycle,
+Status History, and the `## Resolution Summary` that closes the bug). [`qa-fix`](../../skills/qa-fix/SKILL.md)
+writes the interim fix record (sections 6–7, stopping at `ready-for-qa`) and is also the fix engine inside
+develop-bug's verify loop.
+
 ## Bug registry
 
 `docs/bugs/bug-registry.md` is the single source of truth for general-bug numbering and status. Rules:
@@ -97,4 +109,6 @@ Full rules: [bug registry](./bug-registry.md).
 - [File naming](./file-naming.md)
 - [Story documents](./story-documents.md) — story bug artifacts
 - [Task documents](./task-documents.md) — task bug artifacts
-- [`create-bug-report` SKILL.md](../../skills/create-bug-report/SKILL.md)
+- [`create-bug-report` SKILL.md](../../skills/create-bug-report/SKILL.md) — files bug reports
+- [`review-bug` SKILL.md](../../skills/review-bug/SKILL.md) — fix-readiness review (completeness, reproducibility, duplicate/stale scans)
+- [`develop-bug` SKILL.md](../../skills/develop-bug/SKILL.md) — end-to-end bug-fix orchestrator (review → fix → verify → close)

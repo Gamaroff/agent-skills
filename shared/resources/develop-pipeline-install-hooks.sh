@@ -63,8 +63,10 @@ fi
 CANDIDATES=(
   ".agents/skills/develop-story/scripts"
   ".agents/skills/develop-task/scripts"
+  ".agents/skills/develop-bug/scripts"
   ".claude/skills/develop-story/scripts"
   ".claude/skills/develop-task/scripts"
+  ".claude/skills/develop-bug/scripts"
 )
 
 BASE=""
@@ -77,13 +79,15 @@ done
 
 if [ -z "$BASE" ]; then
   cat >&2 <<EOF
-Error: Could not find develop-story or develop-task hook scripts.
+Error: Could not find develop-story, develop-task, or develop-bug hook scripts.
 
 Searched:
   .agents/skills/develop-story/scripts/
   .agents/skills/develop-task/scripts/
+  .agents/skills/develop-bug/scripts/
   .claude/skills/develop-story/scripts/
   .claude/skills/develop-task/scripts/
+  .claude/skills/develop-bug/scripts/
 
 Install skills first (full wizard — sets up skills, config, hooks, registries):
   bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)

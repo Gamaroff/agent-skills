@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`review-bug` skill** — bug-report review, the bug-side sibling of `review-story`/`review-task`. Dual-mode (interactive default + `--validate` GO/NO-GO with a 1–10 fix-readiness score). Checks template/frontmatter compliance, reproducibility *from the report*, severity/priority correctness, and mode/linkage; runs two read-only pre-pass Explore scans — a **duplicate scan** (sibling bugs + `bug-registry`) and an **already-fixed/stale scan** of the root-cause area. Emits READY TO FIX / NEEDS DETAIL / DUPLICATE / STALE. Never mutates the bug lifecycle `status`; may edit the report to add missing detail. Slots into `develop-bug` as its Step 2 gate (validate-and-apply). Handles story / task / general bugs.
+- **`develop-bug` skill** — end-to-end bug-fix lifecycle orchestrator. Takes an existing bug report (story / task / general mode) and runs it from open to a closed, verified, documented fix: create-branch → reproduce & triage → investigate & fix → create-pr → verify & fix loop (bounded, up to 5 cycles) → finalise & close → commit-changes. Researches the root cause, implements the fix plus a regression test, and writes the fix record (Investigation, Fix Implementation, QA Verification, and the `## Resolution Summary` that closes the bug) back into the bug file. Supports both bugfix (off `develop`) and production-hotfix (off `main`) branch models. Reuses the shared develop-pipeline hooks / lock / resume / autonomous-defaults infrastructure with bug-specific step docs. Fills the gap between `create-bug-report` (creates the file) and `qa-fix` (interim fix record, stops at `ready-for-qa`). Includes a docs contract test suite wired into `npm test`.
+
+### Changed
+
+- **`develop-bug` Step 2 is now `/review-bug`** (validate-and-apply), replacing the previous bespoke "reproduce & triage" step — full symmetry with `develop-story`/`develop-task` Step 2. The actual reproduce folds into Step 3 (investigate & fix). The pipeline now HALTs on a duplicate, already-fixed, or under-specified bug before any fix work.
+- **`review-pipeline-step-0a-branch-setup.md`** gains a `review-bug` variant (validate-mode short-circuit, bug-branch auto-skip, base default `develop`) — additive; review-story/task/epic behaviour unchanged.
+- **`develop-pipeline-install-hooks.sh`** now also discovers `develop-bug` hook script dirs; **`develop-pipeline-on-stop.sh`** gains a `develop-bug` arm with its own step-name map (Step 2 = REVIEW BUG) — additive, story/task behaviour unchanged.
+- Cross-linked `review-bug` + `develop-bug` from `create-bug-report`, `qa-fix`, `docs/standards/bug-documents.md`, and `docs/operations/workflows.md` (Bug pipeline: `create-bug-report → review-bug → develop-bug`).
+
 ## [v0.24.0] - 2026-07-21
 
 ### Added

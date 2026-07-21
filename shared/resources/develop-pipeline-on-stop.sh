@@ -73,23 +73,39 @@ SKILL=$(jq -r '.skill // "develop-story"' "$LOCK")
 REPORT=$(jq -r '.report_path // .report // "<implementation report>"' "$LOCK")
 NEXT=$((CURRENT_STEP + 1))
 
-case "$NEXT" in
-  2) NEXT_NAME="REVIEW";          NEXT_SKILL_STORY="/review-story";  NEXT_SKILL_TASK="/review-task" ;;
-  3) NEXT_NAME="DEVELOP";         NEXT_SKILL_STORY="/develop";       NEXT_SKILL_TASK="/develop" ;;
-  4) NEXT_NAME="CREATE PR";       NEXT_SKILL_STORY="/create-pr";     NEXT_SKILL_TASK="/create-pr" ;;
-  5) NEXT_NAME="QA REVIEW";       NEXT_SKILL_STORY="/qa-story";      NEXT_SKILL_TASK="/qa-task" ;;
-  6) NEXT_NAME="QA FIX (if needed)"; NEXT_SKILL_STORY="/qa-fix";     NEXT_SKILL_TASK="/qa-fix" ;;
-  7) NEXT_NAME="FINALISE";        NEXT_SKILL_STORY="/finalise";      NEXT_SKILL_TASK="/finalise" ;;
-  8) NEXT_NAME="COMMIT CHANGES";  NEXT_SKILL_STORY="/commit-changes"; NEXT_SKILL_TASK="/commit-changes" ;;
-  *) emit_allow ;;
-esac
-
-if [ "$SKILL" = "develop-task" ]; then
-  NEXT_SKILL="$NEXT_SKILL_TASK"
-  BANNER_PREFIX="DEVELOP-TASK"
+if [ "$SKILL" = "develop-bug" ]; then
+  # develop-bug has its own step sequence; several steps are internal (no distinct
+  # sub-skill), so the "next skill" hint points back to the SKILL.md step for those.
+  BANNER_PREFIX="DEVELOP-BUG"
+  case "$NEXT" in
+    2) NEXT_NAME="REVIEW BUG";         NEXT_SKILL="/review-bug" ;;
+    3) NEXT_NAME="INVESTIGATE & FIX";  NEXT_SKILL="Step 3 per develop-bug SKILL.md (investigate-fix)" ;;
+    4) NEXT_NAME="CREATE PR";          NEXT_SKILL="/create-pr" ;;
+    5) NEXT_NAME="VERIFY";             NEXT_SKILL="Step 5 per develop-bug SKILL.md (verify)" ;;
+    6) NEXT_NAME="FIX (if needed)";    NEXT_SKILL="/qa-fix" ;;
+    7) NEXT_NAME="FINALISE & CLOSE";   NEXT_SKILL="/finalise" ;;
+    8) NEXT_NAME="COMMIT CHANGES";     NEXT_SKILL="/commit-changes" ;;
+    *) emit_allow ;;
+  esac
 else
-  NEXT_SKILL="$NEXT_SKILL_STORY"
-  BANNER_PREFIX="DEVELOP-STORY"
+  case "$NEXT" in
+    2) NEXT_NAME="REVIEW";          NEXT_SKILL_STORY="/review-story";  NEXT_SKILL_TASK="/review-task" ;;
+    3) NEXT_NAME="DEVELOP";         NEXT_SKILL_STORY="/develop";       NEXT_SKILL_TASK="/develop" ;;
+    4) NEXT_NAME="CREATE PR";       NEXT_SKILL_STORY="/create-pr";     NEXT_SKILL_TASK="/create-pr" ;;
+    5) NEXT_NAME="QA REVIEW";       NEXT_SKILL_STORY="/qa-story";      NEXT_SKILL_TASK="/qa-task" ;;
+    6) NEXT_NAME="QA FIX (if needed)"; NEXT_SKILL_STORY="/qa-fix";     NEXT_SKILL_TASK="/qa-fix" ;;
+    7) NEXT_NAME="FINALISE";        NEXT_SKILL_STORY="/finalise";      NEXT_SKILL_TASK="/finalise" ;;
+    8) NEXT_NAME="COMMIT CHANGES";  NEXT_SKILL_STORY="/commit-changes"; NEXT_SKILL_TASK="/commit-changes" ;;
+    *) emit_allow ;;
+  esac
+
+  if [ "$SKILL" = "develop-task" ]; then
+    NEXT_SKILL="$NEXT_SKILL_TASK"
+    BANNER_PREFIX="DEVELOP-TASK"
+  else
+    NEXT_SKILL="$NEXT_SKILL_STORY"
+    BANNER_PREFIX="DEVELOP-STORY"
+  fi
 fi
 
 REASON=$(cat <<EOF

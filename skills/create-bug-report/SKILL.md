@@ -503,8 +503,10 @@ registry, with no parent coupling.
 
 ## Related Skills
 
+- **review-bug**: reviews a bug report for fix-readiness (completeness, reproducibility, duplicate/stale scans) — run it before fixing; also develop-bug's Step 2 gate
+- **develop-bug**: end-to-end bug-fix orchestrator — consumes the file this skill creates and runs it from open to closed (review → research → fix → verify → Resolution Summary → close)
 - **qa-story** / **qa-task**: reviews that create bug reports
-- **qa-fix**: developer workflow for fixing bugs
+- **qa-fix**: developer workflow for fixing bugs (also the fix engine inside develop-bug's verify loop)
 - **create-task**: the structural model for global registry numbering + self-named directories
 - **develop**: main development workflow
 
