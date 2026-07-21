@@ -1,3 +1,2 @@
 {"matches": "base branch", "answer": "develop"}
-{"matches": "epic branch", "answer": "yes"}
-{"matches": "PR target", "answer": "feature/epic.5.example"}
+{"matches": "PR target", "answer": "develop"}

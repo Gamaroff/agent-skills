@@ -63,6 +63,7 @@ Skill(qa-story, args="traceability_matrix=<story-dir>/.summaries/qa-traceability
 ```
 
 When `traceability_matrix=<path>` is present in `args`:
+
 1. Read the matrix file from `<path>`.
 2. **Skip the Requirements Traceability Steps 1–4** (AC extraction, grep for spec/src files, coverage analysis, gap identification) — those were already performed by the Explore subagent.
 3. Use the matrix table directly for coverage assessment and gap identification in the QA report and gate file.
@@ -116,21 +117,21 @@ Creates: story.178.8.gate.1.initial-review.yml
 
 **CRITICAL**: Before starting the review, use `TaskCreate` to register every phase as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
 
-| Task Subject                    | Description                                                      |
-| ------------------------------- | ---------------------------------------------------------------- |
-| PR existence check              | Validate PR exists for current branch; store PR metadata         |
-| Check for existing QA artifacts | Detect re-review vs fresh review; read prior gate/report         |
-| Locate and read story/task      | Read story/task file, extract ACs, identify implementation files |
-| Run test architecture review    | Assess test coverage, co-location, co-coverage                   |
+| Task Subject                    | Description                                                              |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| PR existence check              | Validate PR exists for current branch; store PR metadata                 |
+| Check for existing QA artifacts | Detect re-review vs fresh review; read prior gate/report                 |
+| Locate and read story/task      | Read story/task file, extract ACs, identify implementation files         |
+| Run test architecture review    | Assess test coverage, co-location, co-coverage                           |
 | Run diff code review            | Adversarially review the change-set diff for bugs + cleanups (Phase 1.6) |
-| Run NFR validation              | Evaluate security, performance, reliability, maintainability     |
-| Run requirements traceability   | Map ACs to test evidence; identify gaps                          |
-| Write QA report                 | Create co-located `.qa.N.*.md` report file                       |
-| Write gate YAML                 | Create co-located `.gate.N.*.yml` file                           |
-| Update story/task file          | Add QA Results section, update status, link artifacts            |
-| Create bug reports              | Create `.bug.N.*.md` files for HIGH/MEDIUM issues (if any)       |
-| Post PR comment                 | Post QA summary to PR via `gh pr comment`                        |
-| Communicate to user             | Output final summary with gate decision and next steps           |
+| Run NFR validation              | Evaluate security, performance, reliability, maintainability             |
+| Run requirements traceability   | Map ACs to test evidence; identify gaps                                  |
+| Write QA report                 | Create co-located `.qa.N.*.md` report file                               |
+| Write gate YAML                 | Create co-located `.gate.N.*.yml` file                                   |
+| Update story/task file          | Add QA Results section, update status, link artifacts                    |
+| Create bug reports              | Create `.bug.N.*.md` files for HIGH/MEDIUM issues (if any)               |
+| Post PR comment                 | Post QA summary to PR via `gh pr comment`                                |
+| Communicate to user             | Output final summary with gate decision and next steps                   |
 
 ---
 
@@ -327,7 +328,7 @@ Action: Display message and skip re-review.
 # Previous gate file
 gate: PASS
 top_issues:
-  - issue: 'Task 2 checkboxes not marked'
+  - issue: "Task 2 checkboxes not marked"
     severity: medium
 ```
 
@@ -339,9 +340,9 @@ Action: Perform re-review to check if checkboxes are now marked.
 # Previous gate file
 gate: CONCERNS
 top_issues:
-  - issue: 'Integration tests missing'
+  - issue: "Integration tests missing"
     severity: medium
-  - issue: 'No retry logic'
+  - issue: "No retry logic"
     severity: medium
 ```
 
@@ -434,11 +435,13 @@ Before running independent NFR and risk analysis, check the story directory for 
 **Step 1a: Map changed files using Explore subagent (CRITICAL — do this first)**
 
 Before reading any implementation files, use the Agent tool with subagent_type="Explore" to:
-- Find all files changed in this PR: resolve the PR base first — `BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"` — then run `git diff --name-only "$BASE...HEAD"` (story PRs target the epic branch, not `develop`, so do not hardcode `origin/develop`)
+
+- Find all files changed in this PR: resolve the PR base first — `BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"` — then run `git diff --name-only "$BASE...HEAD"` (resolve the PR's actual base branch rather than hardcoding `origin/develop`, in case a story PR targets a non-default base such as `main`)
 - For each changed file, return: file path + module it belongs to + whether a co-located `.spec.ts` exists
 - Return as a compact table (max 30 rows): `file | module | has_test`
 
 Use this table to:
+
 1. Determine review depth (see auto-escalate rules below)
 2. Inform the adaptive strategy decision (Phase 1.5)
 3. Pass as context to parallel agents — they do NOT need to re-discover changed files
@@ -465,6 +468,7 @@ Use AskUserQuestion to clarify:
 #### Phase 1 Context Hygiene
 
 After completing risk assessment and before launching agents:
+
 1. Summarize Phase 1 findings: changed file count, modules affected, escalation decision, risk flags
 2. Store the Explore file table as a variable to pass to agents — do not re-read changed files in main context
 3. Release any implementation files read during risk assessment from active consideration
@@ -522,7 +526,7 @@ Take the Explore output from Phase 1 Step 1a (the `file | module | has_test` tab
 
 1. **Test Coverage Analysis Agent**
    - Agent Type: `general-purpose`
-   - Task: "Analyze test coverage for your project PR. Changed files (from Explore map): {EXPLORE_FILE_TABLE}. For each changed file: (a) check if a co-located .spec.ts file exists in the same directory, (b) run `npx nx test <project> --coverage --testPathPattern=<file>` for affected NX projects, (c) verify coverage meets targets: 80%+ overall, 95%+ for any file in critical business logic paths (payments, auth, transactions). Flag any changed file with 0% coverage as FAIL. Check test co-location (tests MUST be next to source, never in __tests__/ directories). Generate a report with: per-file coverage %, missing test files, co-location violations, critical path coverage shortfalls."
+   - Task: "Analyze test coverage for your project PR. Changed files (from Explore map): {EXPLORE_FILE_TABLE}. For each changed file: (a) check if a co-located .spec.ts file exists in the same directory, (b) run `npx nx test <project> --coverage --testPathPattern=<file>` for affected NX projects, (c) verify coverage meets targets: 80%+ overall, 95%+ for any file in critical business logic paths (payments, auth, transactions). Flag any changed file with 0% coverage as FAIL. Check test co-location (tests MUST be next to source, never in **tests**/ directories). Generate a report with: per-file coverage %, missing test files, co-location violations, critical path coverage shortfalls."
    - Output: Test coverage report with project-specific coverage targets
 
 2. **TypeScript Strict Mode Compliance Agent**
@@ -548,30 +552,30 @@ Take the Explore output from Phase 1 Step 1a (the `file | module | has_test` tab
 
 // Task Call 1: Test Coverage Analysis
 Task({
-  subagent_type: 'general-purpose',
-  description: 'Analyze test coverage',
-  prompt: '[Full coverage analysis task description]'
+  subagent_type: "general-purpose",
+  description: "Analyze test coverage",
+  prompt: "[Full coverage analysis task description]",
 });
 
 // Task Call 2: TypeScript Strict Mode
 Task({
-  subagent_type: 'general-purpose',
-  description: 'Check TypeScript compliance',
-  prompt: '[Full TypeScript compliance task description]'
+  subagent_type: "general-purpose",
+  description: "Check TypeScript compliance",
+  prompt: "[Full TypeScript compliance task description]",
 });
 
 // Task Call 3: Accessibility Requirements
 Task({
-  subagent_type: 'general-purpose',
-  description: 'Audit accessibility',
-  prompt: '[Full accessibility audit task description]'
+  subagent_type: "general-purpose",
+  description: "Audit accessibility",
+  prompt: "[Full accessibility audit task description]",
 });
 
 // Task Call 4: Definition of Done
 Task({
-  subagent_type: 'general-purpose',
-  description: 'Verify Definition of Done',
-  prompt: '[Full DoD verification task description]'
+  subagent_type: "general-purpose",
+  description: "Verify Definition of Done",
+  prompt: "[Full DoD verification task description]",
 });
 
 // All 4 agents run concurrently
@@ -744,7 +748,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
 1. **Scope the diff** (reuse the Phase 1 changed-file map; on a re-review, scope to files changed since the last gate's `updated:` date) and write it to a patch file (keeps diff bytes out of main context):
 
    ```bash
-   BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # story PRs target the epic branch
+   BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # resolve the PR's actual base (default develop)
    BASE="origin/${BASE_REF:-develop}"
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
    # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
@@ -778,7 +782,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
 
 5. `rm -f "$DIFF_FILE"`.
 
-This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle. Under the develop-story pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the story opts in via frontmatter.
+This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle. Under the develop-story pipeline (which sets the run-level override) this _is_ the code-review-and-fix loop; standalone, behaviour is unchanged unless the story opts in via frontmatter.
 
 #### Phase 2: Comprehensive Analysis
 
@@ -1048,10 +1052,12 @@ stories/
 
 **Correctness bugs ([count]):**
 [for each bug finding:]
+
 - [[severity]/[confidence]] `[file_line]` — [finding] → [suggested_action]
 
 **Cleanups ([count]):**
 [for each cleanup finding (reuse / simplification / efficiency):]
+
 - `[file_line]` — [finding] → [suggested_action]
 
 [If any finding was promoted to a gate `top_issues` entry (opt-in blocking), note its id here.]
@@ -1333,94 +1339,94 @@ After review:
 
    Use the PR metadata stored in Prerequisites. Source the retry helper, then post the comment wrapped in `tracker_call_with_retry` (3× exponential backoff: 1s, 2s, 4s — see `references/resolve-platform.sh`). Transient GitHub API / Anthropic API errors are common on long QA runs; retry transparently before reporting failure:
 
-     ```bash
-     # shellcheck source=references/resolve-platform.sh
-     . "$(dirname "$0")/references/resolve-platform.sh"  # adjust path to wherever the bundled helper lives in this skill install
+   ```bash
+   # shellcheck source=references/resolve-platform.sh
+   . "$(dirname "$0")/references/resolve-platform.sh"  # adjust path to wherever the bundled helper lives in this skill install
 
-     tracker_call_with_retry gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
+   tracker_call_with_retry gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
 
-     **Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
-     **Quality Score**: [score]/100
-     **Reviewer**: QA Engineer
-     **Date**: [date]
-     **PR**: #$PR_NUMBER - $PR_TITLE
-     **PR State**: $PR_STATE
+   **Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
+   **Quality Score**: [score]/100
+   **Reviewer**: QA Engineer
+   **Date**: [date]
+   **PR**: #$PR_NUMBER - $PR_TITLE
+   **PR State**: $PR_STATE
 
-     ---
+   ---
 
-     ### 📋 QA Artifacts
+   ### 📋 QA Artifacts
 
-     - **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
-     - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
+   - **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
+   - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
 
-     ### ✅ Summary
+   ### ✅ Summary
 
-     - **Tests Executed**: [Count]
-     - **AC Coverage**: [X/Y covered]
-     - **NFR Status**: Security: [PASS/CONCERNS/FAIL], Performance: [PASS/CONCERNS/FAIL], Reliability: [PASS/CONCERNS/FAIL], Maintainability: [PASS/CONCERNS/FAIL]
-     - **Critical Issues**: [count]
-     - **Coverage Gaps**: [count]
-     - **Code Review** (Phase 1.6): [B] bug(s), [C] cleanup(s) — [advisory, or '[N] promoted to gate (code_review_blocking)']
+   - **Tests Executed**: [Count]
+   - **AC Coverage**: [X/Y covered]
+   - **NFR Status**: Security: [PASS/CONCERNS/FAIL], Performance: [PASS/CONCERNS/FAIL], Reliability: [PASS/CONCERNS/FAIL], Maintainability: [PASS/CONCERNS/FAIL]
+   - **Critical Issues**: [count]
+   - **Coverage Gaps**: [count]
+   - **Code Review** (Phase 1.6): [B] bug(s), [C] cleanup(s) — [advisory, or '[N] promoted to gate (code_review_blocking)']
 
-     ### 🔎 Code Review Findings
+   ### 🔎 Code Review Findings
 
-     [Top correctness bugs + notable cleanups from Phase 1.6, each \`file:line — finding\`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
+   [Top correctness bugs + notable cleanups from Phase 1.6, each \`file:line — finding\`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
 
-     ### 🎯 Critical Issues
+   ### 🎯 Critical Issues
 
-     [List critical issues if any, or "None identified"]
+   [List critical issues if any, or "None identified"]
 
-     ### 🚀 Deployment Recommendation
+   ### 🚀 Deployment Recommendation
 
-     **Status**: ✅/⚠️/❌ [APPROVED/APPROVED WITH CONCERNS/BLOCKED]
+   **Status**: ✅/⚠️/❌ [APPROVED/APPROVED WITH CONCERNS/BLOCKED]
 
-     **Conditions**: [Any conditions for deployment]
+   **Conditions**: [Any conditions for deployment]
 
-     ### 📝 Next Steps
+   ### 📝 Next Steps
 
-     1. [Step 1]
-     2. [Step 2]
+   1. [Step 1]
+   2. [Step 2]
 
-     ---
-     "
-     ```
+   ---
+   "
+   ```
 
    **Verify the comment was posted**: Confirm `tracker_call_with_retry` exited with code 0. The helper retries 3× on transient failure (GitHub 5xx, rate limit, Anthropic API blip). If all 3 attempts fail, report the error to the user and provide the comment body for manual posting. Do NOT proceed to step 6b until the comment is confirmed posted.
 
 6b. **Comment on Tracker Issue (graceful — non-blocking)**
 
-   Branch on the tracker resolved by `source references/resolve-platform.sh` (which sets `TRACKER=github|jira`).
+Branch on the tracker resolved by `source references/resolve-platform.sh` (which sets `TRACKER=github|jira`).
 
-   **GitHub path** (when `TRACKER=github`) — extract `github_issue` from the story/task document YAML frontmatter (read in Prerequisites). If present, post a summary comment to the linked Issue (also wrapped in `tracker_call_with_retry`):
+**GitHub path** (when `TRACKER=github`) — extract `github_issue` from the story/task document YAML frontmatter (read in Prerequisites). If present, post a summary comment to the linked Issue (also wrapped in `tracker_call_with_retry`):
 
-   ```bash
-   if [ -n "$GITHUB_ISSUE_QA" ]; then
-     tracker_call_with_retry gh issue comment "$GITHUB_ISSUE_QA" \
-       --body "QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}" \
-       || echo "⚠️  Issue comment failed after 3 retries — continuing"
-   fi
-   ```
+```bash
+if [ -n "$GITHUB_ISSUE_QA" ]; then
+  tracker_call_with_retry gh issue comment "$GITHUB_ISSUE_QA" \
+    --body "QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}" \
+    || echo "⚠️  Issue comment failed after 3 retries — continuing"
+fi
+```
 
-   If `github_issue` is absent from the frontmatter, skip silently. Failure does NOT halt the skill.
+If `github_issue` is absent from the frontmatter, skip silently. Failure does NOT halt the skill.
 
-   **Jira path** (when `TRACKER=jira`) — extract `jira_key` from the story/task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue via the Atlassian MCP tool (mirrors the pattern in `qa-fix` Step "Jira tracker comment"):
+**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the story/task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue via the Atlassian MCP tool (mirrors the pattern in `qa-fix` Step "Jira tracker comment"):
 
-   ```bash
-   JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
-   ```
+```bash
+JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+```
 
-   If `TRACKER=jira` and `JIRA_KEY` is non-empty and not `null`:
+If `TRACKER=jira` and `JIRA_KEY` is non-empty and not `null`:
 
-   1. Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
-   2. Call `addCommentToJiraIssue` MCP tool:
-      - `cloudId`: {derived hostname}
-      - `issueIdOrKey`: `{JIRA_KEY}`
-      - `commentBody`: `"QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}"`
-      - `contentFormat`: `"markdown"`
-   3. On success: log `📨 QA summary posted to Jira issue ${JIRA_KEY}`.
-   4. On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-story).
+1.  Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
+2.  Call `addCommentToJiraIssue` MCP tool:
+    - `cloudId`: {derived hostname}
+    - `issueIdOrKey`: `{JIRA_KEY}`
+    - `commentBody`: `"QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}"`
+    - `contentFormat`: `"markdown"`
+3.  On success: log `📨 QA summary posted to Jira issue ${JIRA_KEY}`.
+4.  On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-story).
 
-   If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` uses the same MCP call shape and `finalise` uses `contentFormat: "markdown"`.
+If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` uses the same MCP call shape and `finalise` uses `contentFormat: "markdown"`.
 
 7. **Communicate to user** — **CRITICAL / BLOCKING**: Provide constructive feedback and actionable recommendations. This step is required — do not end the skill silently. Always output:
    - Gate decision and quality score
@@ -1726,9 +1732,9 @@ Include bug count in gate file:
 
 ```yaml
 top_issues:
-  - issue: 'Cache cleanup memory leak'
+  - issue: "Cache cleanup memory leak"
     severity: high
-    bug_ref: 'story.8.5.3.bug.1.cache-cleanup-memory-leak.md'
+    bug_ref: "story.8.5.3.bug.1.cache-cleanup-memory-leak.md"
     suggested_owner: dev
 ```
 
@@ -1904,16 +1910,16 @@ nfr_validation:
   _assessed: [security, performance, reliability, maintainability]
   security:
     status: CONCERNS
-    notes: 'No rate limiting on auth endpoints'
+    notes: "No rate limiting on auth endpoints"
   performance:
     status: PASS
-    notes: 'Response times < 200ms verified'
+    notes: "Response times < 200ms verified"
   reliability:
     status: PASS
-    notes: 'Error handling and retries implemented'
+    notes: "Error handling and retries implemented"
   maintainability:
     status: CONCERNS
-    notes: 'Test coverage at 65%, target is 80%'
+    notes: "Test coverage at 65%, target is 80%"
 ```
 
 #### Deterministic Status Rules
@@ -2050,21 +2056,21 @@ Identify all testable requirements from:
 For each requirement, document which tests validate it. Use Given-When-Then to describe what the test validates (not how it's written):
 
 ```yaml
-requirement: 'AC1: User can login with valid credentials'
+requirement: "AC1: User can login with valid credentials"
 test_mappings:
-  - test_file: 'auth/login.test.ts'
-    test_case: 'should successfully login with valid email and password'
+  - test_file: "auth/login.test.ts"
+    test_case: "should successfully login with valid email and password"
     # Given-When-Then describes WHAT the test validates, not HOW it's coded
-    given: 'A registered user with valid credentials'
-    when: 'They submit the login form'
-    then: 'They are redirected to dashboard and session is created'
+    given: "A registered user with valid credentials"
+    when: "They submit the login form"
+    then: "They are redirected to dashboard and session is created"
     coverage: full
 
-  - test_file: 'e2e/auth-flow.test.ts'
-    test_case: 'complete login flow'
-    given: 'User on login page'
-    when: 'Entering valid credentials and submitting'
-    then: 'Dashboard loads with user data'
+  - test_file: "e2e/auth-flow.test.ts"
+    test_case: "complete login flow"
+    given: "User on login page"
+    when: "Entering valid credentials and submitting"
+    then: "Dashboard loads with user data"
     coverage: integration
 ```
 
@@ -2086,19 +2092,19 @@ Document any gaps found:
 
 ```yaml
 coverage_gaps:
-  - requirement: 'AC3: Password reset email sent within 60 seconds'
-    gap: 'No test for email delivery timing'
+  - requirement: "AC3: Password reset email sent within 60 seconds"
+    gap: "No test for email delivery timing"
     severity: medium
     suggested_test:
       type: integration
-      description: 'Test email service SLA compliance'
+      description: "Test email service SLA compliance"
 
-  - requirement: 'AC5: Support 1000 concurrent users'
-    gap: 'No load testing implemented'
+  - requirement: "AC5: Support 1000 concurrent users"
+    gap: "No load testing implemented"
     severity: high
     suggested_test:
       type: performance
-      description: 'Load test with 1000 concurrent connections'
+      description: "Load test with 1000 concurrent connections"
 ```
 
 ### Traceability Outputs
@@ -2114,11 +2120,11 @@ trace:
     full: 3
     partial: 1
     none: 1
-  planning_ref: '{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md'
+  planning_ref: "{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md"
   uncovered:
-    - ac: 'AC3'
-      reason: 'No test found for password reset timing'
-  notes: 'See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md'
+    - ac: "AC3"
+      reason: "No test found for password reset timing"
+  notes: "See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md"
 ```
 
 #### Output 2: Traceability Report
@@ -2309,7 +2315,6 @@ This traceability feeds into quality gates:
 ## Configuration and File Locations
 
 ### Expected Configuration
-
 
 **Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) — the PRD root is configurable. The nested structure under it (and QA artifact co-location) is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 

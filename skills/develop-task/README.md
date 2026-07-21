@@ -15,14 +15,14 @@ This document is structured for two audiences:
 
 ### External touchpoints
 
-| Surface | Operations |
-|---|---|
-| **Filesystem** | task file (read/append `[x]`), implementation report (`task.{id}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<task-dir>/.summaries/step-*.json`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
-| **Git** | branch create, stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits |
-| **GitHub** | `gh issue comment/close/view`, `gh pr view/comment`, GraphQL project-board mutations (Todo→In Progress→Done + auto-set Priority), PR creation via `/create-pr` |
-| **Jira** (Atlassian MCP) | `getJiraIssue`, `addCommentToJiraIssue`, `getTransitionsForJiraIssue`, `transitionJiraIssue` (In Progress → In Review → Done) |
-| **Subagents (Explore)** | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, post-fix tracker state poller |
-| **Hooks** | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission) |
+| Surface                  | Operations                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Filesystem**           | task file (read/append `[x]`), implementation report (`task.{id}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<task-dir>/.summaries/step-*.json`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
+| **Git**                  | branch create, stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits                                                                                                                                                                                       |
+| **GitHub**               | `gh issue comment/close/view`, `gh pr view/comment`, GraphQL project-board mutations (Todo→In Progress→Done + auto-set Priority), PR creation via `/create-pr`                                                                                                                                                                       |
+| **Jira** (Atlassian MCP) | `getJiraIssue`, `addCommentToJiraIssue`, `getTransitionsForJiraIssue`, `transitionJiraIssue` (In Progress → In Review → Done)                                                                                                                                                                                                        |
+| **Subagents (Explore)**  | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, post-fix tracker state poller                                                                                                  |
+| **Hooks**                | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission)                                                                                                                                                                         |
 
 ### State changes
 
@@ -36,7 +36,7 @@ This document is structured for two audiences:
 - All commits go through `/commit-changes` (never raw `git commit`) → consistent Conventional Commits.
 - Gate files are read-only to dev skills; only QA skills mutate them.
 - Step banners + lock `current_step` updates create checkpoints that survive context compression.
-- Resume verifies each ✅ step's *artifact* on disk — does not trust the report alone. The stale-context detector subagent narrows the verification scope so resume is fast.
+- Resume verifies each ✅ step's _artifact_ on disk — does not trust the report alone. The stale-context detector subagent narrows the verification scope so resume is fast.
 - `review-task` auto-answers "apply all critical + important fixes" and "yes, fixes complete" in pipeline mode — task must be `Ready for Development` before Step 3 runs.
 - Test logs are **never read into main context** — only the triage subagent's structured summary is consumed.
 - Phase 0 fan-out dispatches 3 Explore subagents in a single message — sequential dispatch is forbidden (drift guard added in task.31).
@@ -48,7 +48,7 @@ This document is structured for two audiences:
 ### Compared to `develop-story`
 
 - **No QA traceability mapper subagent.** `develop-story` runs a traceability mapper before `/qa-story` in standard mode (Step 5 pre-step); `develop-task` invokes `/qa-task` directly.
-- **No epic-branch concept.** `develop-task` Q1 prompts for base (`develop` default); `develop-story` Q1 also prompts for base but with `EPIC_BRANCH` as the recommended option, and additionally confirms epic-branch creation when absent.
+- **No epic-branch concept.** Both `develop-task` and `develop-story` Q1 prompt for the base branch with `develop` as the recommended option; neither creates or targets an epic branch.
 - All other subagent dispatches and the full 8-step skeleton are identical — both share the same shared/resources protocol files.
 
 ---
@@ -392,16 +392,16 @@ sequenceDiagram
 
 Every Explore subagent dispatched by `develop-task`. Each row is meant to anchor an output-schema assertion in the eval suite.
 
-| # | Subagent | Dispatch point | Input prompt source | Output schema (key fields) | Persistence | Failure semantics |
-|---|---|---|---|---|---|---|
-| 1 | **Resolver** | Phase 0a-parallel (file/dir/bare-filename inputs only) | inline prompt in `develop-pipeline-step-0-resolve-and-prepare.md` §0a-parallel Agent 1 | `{ absolute_file_path: string, task_directory: string, task_id: string }` or `{ error: string }` | none (in-memory only) | HALT — cannot continue without file path |
-| 2 | **Tracker state poller** | Phase 0a-parallel + Step 5b post-fix | `references/tracker-state-poller-subagent.md` | compact JSON `{ pr: { state, number }, issue: { state, labels, board_status }, errors: [] }` | optional `step-5-post-fix-tracker.json` (Step 5b) | log warning, set fields null, continue (non-blocking) |
-| 3 | **Lite-mode + always-load detector** | Phase 0a-parallel | inline prompt in step-0 §0a-parallel Agent 3. Sets `pipeline_mode=lite` only when **all three** are true: (a) `risk_level ∈ {low, absent}`, (b) `phase_count ≤ 2`, (c) `single_module = true`. Any false ⇒ standard. | `{ risk_level: low\|medium\|high\|absent, phase_count: int, single_module: bool, pipeline_mode: lite\|standard, skills_config_exists: bool, always_load_files: string[], has_success_criteria_table: bool }` | none | log warning, default `pipeline_mode=standard`, `always_load_files=[]` |
-| 4 | **Pipeline-resume stale-context detector** | Phase 0a (resume only — when lock exists) | `references/pipeline-resume-detector-prompt.md` | `{ schema_version: 1, recommended_step: int, current_step_in_lock: int, summaries_seen: string[], deltas_since_pause: object[], blocking_issues: string[] }` | none (transient) | invalid JSON → fall back to full Phase 0b verification using `current_step` as upper bound |
-| 5 | **Pre-develop surface map** | Step 3 pre-develop (skipped on resume if Decisions Log has cached entry) | inline prompt in `develop-pipeline-step-3-develop-loop.md` "Pre-develop Codebase Mapping" | unstructured: `<path> — <1-line description>` × N (max 20) | `step-3-pre-develop-map.json` (per `subagent-summary-artifact.md` schema) | log warning, proceed without surface map |
-| 6 | **Initial loop audit** | Step 3, before iteration 1 | `references/loop-audit-prompt.md` (substitute `<DOC_TYPE>=task`, `<TASKS_SECTION>=## Implementation Plan`) | JSON `{ status: string, completed: int, total: int, last_commit_hash: string }` | `step-3-iteration-audit-0.json` | retry once on JSON parse failure; then inline shell fallback (`grep -cE '\[x\]'`) |
-| 7 | **Per-iteration loop audit** | Step 3, after every `/develop` return | `references/loop-audit-prompt.md` (same substitutions as #6) | same as #6 | `step-3-iteration-audit-{ITER}.json` | retry once; on second failure HALT with "Audit JSON parse failure" |
-| 8 | **Test-failure triage** | Step 3 develop loop, on `TEST_EXIT != 0` | `references/test-failure-triage-prompt.md` | YAML `{ counts: {real, flaky, unrelated}, failures: [{ name, classification, file, line, reason }] (≤10), next_file: string, truncated_count: int, cap: 10 }` | `step-3-test-triage-{ITER}.json` with `raw_artifact_paths: [<test-log>]` | bias rule: "if unsure between real and flaky, classify as real" — agent always returns YAML |
+| #   | Subagent                                   | Dispatch point                                                           | Input prompt source                                                                                                                                                                                                  | Output schema (key fields)                                                                                                                                                                                   | Persistence                                                               | Failure semantics                                                                           |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 1   | **Resolver**                               | Phase 0a-parallel (file/dir/bare-filename inputs only)                   | inline prompt in `develop-pipeline-step-0-resolve-and-prepare.md` §0a-parallel Agent 1                                                                                                                               | `{ absolute_file_path: string, task_directory: string, task_id: string }` or `{ error: string }`                                                                                                             | none (in-memory only)                                                     | HALT — cannot continue without file path                                                    |
+| 2   | **Tracker state poller**                   | Phase 0a-parallel + Step 5b post-fix                                     | `references/tracker-state-poller-subagent.md`                                                                                                                                                                        | compact JSON `{ pr: { state, number }, issue: { state, labels, board_status }, errors: [] }`                                                                                                                 | optional `step-5-post-fix-tracker.json` (Step 5b)                         | log warning, set fields null, continue (non-blocking)                                       |
+| 3   | **Lite-mode + always-load detector**       | Phase 0a-parallel                                                        | inline prompt in step-0 §0a-parallel Agent 3. Sets `pipeline_mode=lite` only when **all three** are true: (a) `risk_level ∈ {low, absent}`, (b) `phase_count ≤ 2`, (c) `single_module = true`. Any false ⇒ standard. | `{ risk_level: low\|medium\|high\|absent, phase_count: int, single_module: bool, pipeline_mode: lite\|standard, skills_config_exists: bool, always_load_files: string[], has_success_criteria_table: bool }` | none                                                                      | log warning, default `pipeline_mode=standard`, `always_load_files=[]`                       |
+| 4   | **Pipeline-resume stale-context detector** | Phase 0a (resume only — when lock exists)                                | `references/pipeline-resume-detector-prompt.md`                                                                                                                                                                      | `{ schema_version: 1, recommended_step: int, current_step_in_lock: int, summaries_seen: string[], deltas_since_pause: object[], blocking_issues: string[] }`                                                 | none (transient)                                                          | invalid JSON → fall back to full Phase 0b verification using `current_step` as upper bound  |
+| 5   | **Pre-develop surface map**                | Step 3 pre-develop (skipped on resume if Decisions Log has cached entry) | inline prompt in `develop-pipeline-step-3-develop-loop.md` "Pre-develop Codebase Mapping"                                                                                                                            | unstructured: `<path> — <1-line description>` × N (max 20)                                                                                                                                                   | `step-3-pre-develop-map.json` (per `subagent-summary-artifact.md` schema) | log warning, proceed without surface map                                                    |
+| 6   | **Initial loop audit**                     | Step 3, before iteration 1                                               | `references/loop-audit-prompt.md` (substitute `<DOC_TYPE>=task`, `<TASKS_SECTION>=## Implementation Plan`)                                                                                                           | JSON `{ status: string, completed: int, total: int, last_commit_hash: string }`                                                                                                                              | `step-3-iteration-audit-0.json`                                           | retry once on JSON parse failure; then inline shell fallback (`grep -cE '\[x\]'`)           |
+| 7   | **Per-iteration loop audit**               | Step 3, after every `/develop` return                                    | `references/loop-audit-prompt.md` (same substitutions as #6)                                                                                                                                                         | same as #6                                                                                                                                                                                                   | `step-3-iteration-audit-{ITER}.json`                                      | retry once; on second failure HALT with "Audit JSON parse failure"                          |
+| 8   | **Test-failure triage**                    | Step 3 develop loop, on `TEST_EXIT != 0`                                 | `references/test-failure-triage-prompt.md`                                                                                                                                                                           | YAML `{ counts: {real, flaky, unrelated}, failures: [{ name, classification, file, line, reason }] (≤10), next_file: string, truncated_count: int, cap: 10 }`                                                | `step-3-test-triage-{ITER}.json` with `raw_artifact_paths: [<test-log>]`  | bias rule: "if unsure between real and flaky, classify as real" — agent always returns YAML |
 
 ### Bias / canon rules cross-reference
 
@@ -416,23 +416,23 @@ Every Explore subagent dispatched by `develop-task`. Each row is meant to anchor
 
 Every file the harness creates or mutates, with its lifecycle. Anchor for "did the pipeline produce the expected artifacts?" evals.
 
-| Artifact | Path pattern | Created by | Mutated by | Terminal state | Resume verification |
-|---|---|---|---|---|---|
-| Pipeline lock | `.claude/state/develop-pipeline.lock` | Step 1 (end of) | Steps 2–8 banners (`current_step`), Step 4 (`pr_url`), PreCompact hook (rm), Step 8 (rm), terminal HALT (snapshot then rm) | absent at Step 8 success or HALT | `cat ... \| jq` — read by resume detector |
-| Halt snapshot | `.claude/state/develop-pipeline.last-halt.json` | terminal HALT (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on subsequent terminal HALT; deleted by user choosing "Start fresh" on resume | persists until next resume choice | resume detector reads when active lock absent (`source: "halt_snapshot"`) |
-| Implementation report | `task.{id}.implementation.{N}.{name}.md` | Phase 0e | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref) | committed in Step 8 | read for resume + last ✅ step |
-| Feature branch | `feature/task.{id}.*` | Step 1 via `/create-branch` | dev commits, qa-fix commits, final commit | pushed in Step 8 | `git branch --list` |
-| Review report | `task.{id}.review.{YYYY-MM-DD}.md` | Step 2 via `/review-task` | — | committed in Step 8 | optional (only if review ran) |
-| Plan file | `task.{id}.plan.*.md` | upstream (created by `/plan` or manual) | — | unchanged by pipeline | mtime check vs task file (Plan Freshness) |
-| Pre-develop summary | `.summaries/step-3-pre-develop-map.json` | Step 3 pre-develop | — | retained on disk (gitignored) | replayed instead of re-dispatching subagent |
-| Test-output log | `.claude/state/test-output-{ITER}-*.log` | `/develop` inside Step 3 | triage subagent reads | `rm -f` on `TEST_EXIT==0`; retained on failure | none (transient) |
-| Test-triage summary | `.summaries/step-3-test-triage-{ITER}.json` | Step 3, on test failure | — | retained on disk | replayed |
-| QA report | `task.{id}.qa.{N}.{name}.md` | Step 5 via `/qa-task` | — | committed in Step 8 | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅ |
-| Gate file | `task.{id}.gate.{N}.{name}.yml` | Step 5 via `/qa-task` | only QA skills (read-only to dev) | committed in Step 8 | latest gate sorted by `-t. -k4 -n` |
-| QA traceability matrix | (not produced by `develop-task`) | — | — | — | — (this subagent is `develop-story`-only) |
-| Post-fix tracker summary | `.summaries/step-5-post-fix-tracker-{N}.json` | Step 5b after every qa-fix push (one file per cycle N) | — | retained on disk (per cycle, never overwritten) | replayed |
-| DoD summary | `task.{id}.dod.{N}.{name}.md` | Step 7 via `/finalise` | — | committed in Step 8 | required for ✅; `grep -iE '^status:\s*accepted'` on task file + `gh pr view --comments \| grep -i accepted` |
-| PR | github.com/.../pull/{N} | Step 4 via `/create-pr` | qa-fix pushes, finalise comment | merged manually post-pipeline | `gh pr view --json state` |
+| Artifact                 | Path pattern                                    | Created by                                                               | Mutated by                                                                                                                 | Terminal state                                  | Resume verification                                                                                          |
+| ------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Pipeline lock            | `.claude/state/develop-pipeline.lock`           | Step 1 (end of)                                                          | Steps 2–8 banners (`current_step`), Step 4 (`pr_url`), PreCompact hook (rm), Step 8 (rm), terminal HALT (snapshot then rm) | absent at Step 8 success or HALT                | `cat ... \| jq` — read by resume detector                                                                    |
+| Halt snapshot            | `.claude/state/develop-pipeline.last-halt.json` | terminal HALT (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on subsequent terminal HALT; deleted by user choosing "Start fresh" on resume                                  | persists until next resume choice               | resume detector reads when active lock absent (`source: "halt_snapshot"`)                                    |
+| Implementation report    | `task.{id}.implementation.{N}.{name}.md`        | Phase 0e                                                                 | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref)                      | committed in Step 8                             | read for resume + last ✅ step                                                                               |
+| Feature branch           | `feature/task.{id}.*`                           | Step 1 via `/create-branch`                                              | dev commits, qa-fix commits, final commit                                                                                  | pushed in Step 8                                | `git branch --list`                                                                                          |
+| Review report            | `task.{id}.review.{YYYY-MM-DD}.md`              | Step 2 via `/review-task`                                                | —                                                                                                                          | committed in Step 8                             | optional (only if review ran)                                                                                |
+| Plan file                | `task.{id}.plan.*.md`                           | upstream (created by `/plan` or manual)                                  | —                                                                                                                          | unchanged by pipeline                           | mtime check vs task file (Plan Freshness)                                                                    |
+| Pre-develop summary      | `.summaries/step-3-pre-develop-map.json`        | Step 3 pre-develop                                                       | —                                                                                                                          | retained on disk (gitignored)                   | replayed instead of re-dispatching subagent                                                                  |
+| Test-output log          | `.claude/state/test-output-{ITER}-*.log`        | `/develop` inside Step 3                                                 | triage subagent reads                                                                                                      | `rm -f` on `TEST_EXIT==0`; retained on failure  | none (transient)                                                                                             |
+| Test-triage summary      | `.summaries/step-3-test-triage-{ITER}.json`     | Step 3, on test failure                                                  | —                                                                                                                          | retained on disk                                | replayed                                                                                                     |
+| QA report                | `task.{id}.qa.{N}.{name}.md`                    | Step 5 via `/qa-task`                                                    | —                                                                                                                          | committed in Step 8                             | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅                              |
+| Gate file                | `task.{id}.gate.{N}.{name}.yml`                 | Step 5 via `/qa-task`                                                    | only QA skills (read-only to dev)                                                                                          | committed in Step 8                             | latest gate sorted by `-t. -k4 -n`                                                                           |
+| QA traceability matrix   | (not produced by `develop-task`)                | —                                                                        | —                                                                                                                          | —                                               | — (this subagent is `develop-story`-only)                                                                    |
+| Post-fix tracker summary | `.summaries/step-5-post-fix-tracker-{N}.json`   | Step 5b after every qa-fix push (one file per cycle N)                   | —                                                                                                                          | retained on disk (per cycle, never overwritten) | replayed                                                                                                     |
+| DoD summary              | `task.{id}.dod.{N}.{name}.md`                   | Step 7 via `/finalise`                                                   | —                                                                                                                          | committed in Step 8                             | required for ✅; `grep -iE '^status:\s*accepted'` on task file + `gh pr view --comments \| grep -i accepted` |
+| PR                       | github.com/.../pull/{N}                         | Step 4 via `/create-pr`                                                  | qa-fix pushes, finalise comment                                                                                            | merged manually post-pipeline                   | `gh pr view --json state`                                                                                    |
 
 `.summaries/` is gitignored — these are runtime-local artifacts. Resume tolerates absence (in-flight pipelines started before the convention existed).
 
@@ -442,23 +442,23 @@ Every file the harness creates or mutates, with its lifecycle. Anchor for "did t
 
 ### GitHub (default — when `JIRA_URL` is unset)
 
-| Pipeline event | Operation |
-|---|---|
+| Pipeline event              | Operation                                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Phase 0c-reg (Work Started) | `gh issue comment` ("Pipeline started — branch:") + GraphQL `updateProjectV2ItemFieldValue` (Status → In Progress, Priority → P2 if unset) + post-condition verify |
-| Step 4 (PR opened) | `/create-pr` passes `--issue {N}`; PR description links the issue |
-| Step 5b (post qa-fix push) | tracker state poller checks `pr.state` is OPEN |
-| Step 7 (finalise) | `gh issue close {N}` + GraphQL board mutation Status → Done + DoD body posted as PR comment |
-| Pause hook | `gh pr comment` + `gh issue comment` (best-effort) |
+| Step 4 (PR opened)          | `/create-pr` passes `--issue {N}`; PR description links the issue                                                                                                  |
+| Step 5b (post qa-fix push)  | tracker state poller checks `pr.state` is OPEN                                                                                                                     |
+| Step 7 (finalise)           | `gh issue close {N}` + GraphQL board mutation Status → Done + DoD body posted as PR comment                                                                        |
+| Pause hook                  | `gh pr comment` + `gh issue comment` (best-effort)                                                                                                                 |
 
 ### Jira (when `JIRA_URL` is set; uses Atlassian MCP)
 
-| Pipeline event | Operation |
-|---|---|
-| Phase 0c-reg | `addCommentToJiraIssue` ("Pipeline started — branch:") + `getTransitionsForJiraIssue` → `transitionJiraIssue` (In Progress) + `getJiraIssue` post-condition |
-| Step 4 | `addCommentToJiraIssue` ("PR opened: …") + `transitionJiraIssue` (In Review) |
-| Step 5b | tracker state poller (Jira branch — board status read) |
-| Step 7 | `addCommentToJiraIssue` (DoD body) + `transitionJiraIssue` (Done) |
-| Pause hook | **silent** — Jira posting requires authenticated MCP, unavailable from shell context |
+| Pipeline event | Operation                                                                                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 0c-reg   | `addCommentToJiraIssue` ("Pipeline started — branch:") + `getTransitionsForJiraIssue` → `transitionJiraIssue` (In Progress) + `getJiraIssue` post-condition |
+| Step 4         | `addCommentToJiraIssue` ("PR opened: …") + `transitionJiraIssue` (In Review)                                                                                |
+| Step 5b        | tracker state poller (Jira branch — board status read)                                                                                                      |
+| Step 7         | `addCommentToJiraIssue` (DoD body) + `transitionJiraIssue` (Done)                                                                                           |
+| Pause hook     | **silent** — Jira posting requires authenticated MCP, unavailable from shell context                                                                        |
 
 ---
 
@@ -477,23 +477,23 @@ When updating this document, verify:
 
 ## Source-of-Truth Index
 
-| Concern | Authoritative file |
-|---|---|
-| Orchestrator skeleton | `skills/develop-task/SKILL.md` |
-| Phase 0 (resolve, fan-out, status, Q&A) | `references/develop-pipeline-step-0-resolve-and-prepare.md` |
-| Step 1 (create-branch + lock) | `references/develop-pipeline-step-1-create-branch.md` |
-| Step 2 (review-task gate) | `references/develop-pipeline-step-2-review.md` |
-| Step 3 (develop loop + triage) | `references/develop-pipeline-step-3-develop-loop.md` |
-| Step 4 (create-pr) | `references/develop-pipeline-step-4-create-pr.md` |
-| Steps 5–6 (QA loop) | `references/develop-pipeline-step-5-6-qa-loop.md` |
-| Step 7 (finalise) | `references/develop-pipeline-step-7-finalise.md` |
-| Step 8 (commit) | `references/develop-pipeline-step-8-commit.md` |
-| Resume contract (artifact verify, MAX_ITER, plan freshness) | `references/develop-pipeline-resume-contract.md` |
-| Resume detector prompt | `references/pipeline-resume-detector-prompt.md` |
-| Test-triage prompt | `references/test-failure-triage-prompt.md` |
-| Loop-audit prompt (Step 3 initial + per-iteration) | `references/loop-audit-prompt.md` |
-| Mermaid theme (README diagrams) | `references/develop-pipeline-readme-mermaid-theme.md` |
-| Subagent summary persistence | `references/subagent-summary-artifact.md` |
-| Lite mode | `references/develop-pipeline-lite-mode.md` |
-| Graceful pause (lock + hook) | `references/develop-pipeline-pause.md` + `skills/develop-task/scripts/on-precompact.sh` |
-| Autonomous defaults | `references/develop-pipeline-autonomous-defaults.md` |
+| Concern                                                     | Authoritative file                                                                      |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Orchestrator skeleton                                       | `skills/develop-task/SKILL.md`                                                          |
+| Phase 0 (resolve, fan-out, status, Q&A)                     | `references/develop-pipeline-step-0-resolve-and-prepare.md`                             |
+| Step 1 (create-branch + lock)                               | `references/develop-pipeline-step-1-create-branch.md`                                   |
+| Step 2 (review-task gate)                                   | `references/develop-pipeline-step-2-review.md`                                          |
+| Step 3 (develop loop + triage)                              | `references/develop-pipeline-step-3-develop-loop.md`                                    |
+| Step 4 (create-pr)                                          | `references/develop-pipeline-step-4-create-pr.md`                                       |
+| Steps 5–6 (QA loop)                                         | `references/develop-pipeline-step-5-6-qa-loop.md`                                       |
+| Step 7 (finalise)                                           | `references/develop-pipeline-step-7-finalise.md`                                        |
+| Step 8 (commit)                                             | `references/develop-pipeline-step-8-commit.md`                                          |
+| Resume contract (artifact verify, MAX_ITER, plan freshness) | `references/develop-pipeline-resume-contract.md`                                        |
+| Resume detector prompt                                      | `references/pipeline-resume-detector-prompt.md`                                         |
+| Test-triage prompt                                          | `references/test-failure-triage-prompt.md`                                              |
+| Loop-audit prompt (Step 3 initial + per-iteration)          | `references/loop-audit-prompt.md`                                                       |
+| Mermaid theme (README diagrams)                             | `references/develop-pipeline-readme-mermaid-theme.md`                                   |
+| Subagent summary persistence                                | `references/subagent-summary-artifact.md`                                               |
+| Lite mode                                                   | `references/develop-pipeline-lite-mode.md`                                              |
+| Graceful pause (lock + hook)                                | `references/develop-pipeline-pause.md` + `skills/develop-task/scripts/on-precompact.sh` |
+| Autonomous defaults                                         | `references/develop-pipeline-autonomous-defaults.md`                                    |

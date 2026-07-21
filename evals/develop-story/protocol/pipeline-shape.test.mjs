@@ -24,10 +24,9 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const SKILL_PATH = path.join(REPO_ROOT, "skills", "develop-story", "SKILL.md");
 const STEP_RESOURCES_DIR = path.join(REPO_ROOT, "shared", "resources");
 
-// The 9 sub-skill names that must appear in order in SKILL.md.
-// Step 1 has two sub-steps: create-epic-branch and create-story-branch.
+// The 8 sub-skill names that must appear in order in SKILL.md.
+// Step 1 cuts the story branch from develop (no epic integration branch).
 const EXPECTED_STEPS = [
-  "create-epic-branch",
   "create-story-branch",
   "review-story",
   "develop",
@@ -69,14 +68,18 @@ test("SKILL.md: references develop-pipeline-step-*.md for each shared resource",
     "develop-pipeline-step-8-commit.md",
   ];
   for (const ref of stepFileRefs) {
-    assert.ok(content.includes(ref), `SKILL.md does not reference step file: ${ref}`);
+    assert.ok(
+      content.includes(ref),
+      `SKILL.md does not reference step file: ${ref}`,
+    );
   }
 });
 
 test("SKILL.md: has context compression recovery section", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   assert.ok(
-    content.includes("Context Compression Recovery") || content.includes("context was compressed"),
+    content.includes("Context Compression Recovery") ||
+      content.includes("context was compressed"),
     "SKILL.md is missing context compression recovery instructions",
   );
 });
@@ -92,19 +95,24 @@ test("SKILL.md: has graceful pause / pipeline lock section", async () => {
 test("SKILL.md: never stop between steps — hands-free guarantee mentioned", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   assert.ok(
-    content.includes("hands-free") || content.includes("Never stop between steps"),
+    content.includes("hands-free") ||
+      content.includes("Never stop between steps"),
     "SKILL.md missing hands-free / never-stop guarantee",
   );
 });
 
-test("SKILL.md: description mentions create-epic-branch", async () => {
+test("SKILL.md: description mentions create-story-branch, not create-epic-branch", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   // Description is in the frontmatter
   const descMatch = content.match(/^description:\s*.+/m);
   assert.ok(descMatch, "SKILL.md frontmatter missing description field");
   assert.ok(
-    content.includes("create-epic-branch"),
-    "SKILL.md does not mention create-epic-branch anywhere",
+    content.includes("create-story-branch"),
+    "SKILL.md does not mention create-story-branch anywhere",
+  );
+  assert.ok(
+    !content.includes("create-epic-branch"),
+    "SKILL.md must not mention create-epic-branch (flat develop flow)",
   );
 });
 
@@ -112,7 +120,7 @@ test("develop-pipeline-step-*.md files 1-7 have a HALT terminator", async () => 
   const files = await readdir(STEP_RESOURCES_DIR);
   // Step 8 is the terminal success step — HALT not required.
   const stepFiles = files.filter(
-    f => /^develop-pipeline-step-.*\.md$/.test(f) && !f.includes("step-8"),
+    (f) => /^develop-pipeline-step-.*\.md$/.test(f) && !f.includes("step-8"),
   );
 
   assert.ok(
@@ -121,7 +129,10 @@ test("develop-pipeline-step-*.md files 1-7 have a HALT terminator", async () => 
   );
 
   for (const file of stepFiles) {
-    const content = await readFile(path.join(STEP_RESOURCES_DIR, file), "utf-8");
+    const content = await readFile(
+      path.join(STEP_RESOURCES_DIR, file),
+      "utf-8",
+    );
     assert.ok(
       /\bHALT\b|\bSTOP\b/i.test(content),
       `${file} is missing a HALT/STOP terminator`,

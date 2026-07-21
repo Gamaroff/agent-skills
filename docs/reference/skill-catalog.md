@@ -34,8 +34,8 @@ Full categorised index below.
 | Skill | Description |
 | ----- | ----------- |
 | `develop` | Provides guidance for implementing features and technical tasks. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns.… |
-| `develop-next` | 'Roadmap orchestrator: deterministically selects the next unblocked item from the project completion roadmap (via scripts/select-next.mjs), runs its named pipeline (/develop-story or /develop-task) fully autonomously (Upfront… |
-| `develop-story` | 'Automates the full end-to-end story development lifecycle: create-epic-branch (if needed) → create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to… |
+| `develop-next` | Roadmap orchestrator: deterministically selects the next unblocked item from the project completion roadmap (via scripts/select-next.mjs), runs its named pipeline (/develop-story or /develop-task) fully autonomously (Upfront… |
+| `develop-story` | 'Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise… |
 | `develop-task` | 'Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise… |
 
 ## Development — Implementation
@@ -98,7 +98,7 @@ Full categorised index below.
 
 | Skill | Description |
 | ----- | ----------- |
-| `create-bug-report` | Create bug report files for issues found during QA testing. Use when QA identifies bugs during story testing. Implements sequential numbering, uses bug report template,… |
+| `create-bug-report` | Create bug report files for issues found during QA or code sweeps. Use when QA identifies bugs during story/task testing, or when a cross-cutting bug… |
 | `create-epic` | Create single epic for medium-sized brownfield enhancements (1-3 stories). Use when enhancement follows existing patterns, has minimal architectural changes, and manageable integration complexity. |
 | `create-epics-from-shards` | Convert PRD shards into implementation epic files. Use after shard-prd to generate focused epic documents in epics/ subdirectory following standard epic structure. |
 | `create-issue` | 'Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development.… |
