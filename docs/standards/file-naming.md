@@ -21,6 +21,9 @@ Canonical filename patterns used across the library. Skills enforce these patter
 | Epic | `epic.{number}.{name}.md` | `epic.163.feature-notifications.md` |
 | Story | `story.{epic}.{story}.{name}.md` | `story.2.3.user-authentication.md` |
 | Technical task | `task.{number}.{name}.md` | `task.44.database-migration.md` |
+| General bug | `bug.{number}.{name}.md` | `bug.7.login-timeout.md` |
+
+> A **general bug** is a cross-cutting bug with no single story/task owner. It lives in its own self-named subdirectory `docs/bugs/bug.{number}.{name}/`, matching the filename stem. Distinct from the *story/task bug artifacts* below (which are co-located with a parent and prefixed `story.`/`task.`); the leading `bug.` + number keeps the general pattern unambiguous.
 
 ### Story artifacts
 
@@ -59,12 +62,13 @@ Canonical filename patterns used across the library. Skills enforce these patter
 |---|---|---|
 | Sprint Change Proposal | `change.{n}.{name}.md` | `change.1.auth-pivot.md` |
 
-Epic numbers are **globally unique** — see [`epic-registry.md`](./epic-registry.md). Task numbers are **globally unique and never reused** — see `AGENTS.md` § "Task Registry".
+Epic numbers are **globally unique** — see [`epic-registry.md`](./epic-registry.md). Task numbers are **globally unique and never reused** — see `AGENTS.md` § "Task Registry". General bug numbers are **globally unique and never reused** — see [`bug-registry.md`](./bug-registry.md) and `AGENTS.md` § "Bug Registry".
 
 ## See also
 
 - [Story documents](./story-documents.md) — full schema and directory layout
 - [Task documents](./task-documents.md) — full schema and directory layout
+- [Bug documents](./bug-documents.md) — general-bug schema and directory layout
 - [Epic documents](./epic-documents.md) — full schema
 - [Configuration](../reference/configuration.md) — `skills-config.yaml` keys
 - [Status lifecycle](./status-lifecycle.md) — frontmatter `status:` values

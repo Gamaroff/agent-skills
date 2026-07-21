@@ -117,6 +117,10 @@ Canonical rules: [`docs/standards/task-registry.md`](./docs/standards/task-regis
 
 Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/development/epic-registry.md` is the single source of truth.
 
+## Bug Registry
+
+Canonical rules: [`docs/standards/bug-registry.md`](./docs/standards/bug-registry.md). TL;DR: `docs/bugs/bug-registry.md` owns **general (cross-cutting) bug** numbering. Read **Next Available Bug Number** before filing a general bug with `/create-bug-report`, append a row, increment the counter, commit atomically with the new bug files. General bug numbers are globally unique and never reused. Story/task bugs are numbered per-parent instead — see [`docs/standards/bug-documents.md`](./docs/standards/bug-documents.md).
+
 ## Shared Resources
 
 `shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. Two distribution paths consume these:
