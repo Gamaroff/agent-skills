@@ -1,6 +1,6 @@
 ---
 name: review-pipeline-step-0a-branch-setup
-description: Step 0a (branch setup) shared by review-story, review-task, and review-epic. Resolves doc context, short-circuits in validate mode, auto-skips when already on a matching feature branch, and prompts the user to create a feature branch from the base branch (default develop). review-story and review-task cut a story/task feature branch from develop; review-epic cuts an epic-document feature branch from develop. Mirrors the methodology used by develop-pipeline Phase 0d + Step 1 so consumers stay consistent.
+description: Step 0a (branch setup) shared by review-story, review-task, review-bug, and review-epic. Resolves doc context, short-circuits in validate mode, auto-skips when already on a matching feature branch, and prompts the user to create a feature branch from the base branch (default develop). review-story / review-task / review-bug cut a story/task/bug feature branch from develop; review-epic cuts an epic-document feature branch from develop. Mirrors the methodology used by develop-pipeline Phase 0d + Step 1 so consumers stay consistent.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/review-pipeline-step-0a-branch-setup.md. Regenerate via `npm run bundle`. -->
 
@@ -8,7 +8,7 @@ description: Step 0a (branch setup) shared by review-story, review-task, and rev
 
 ## When This Document Applies
 
-Loaded by `/review-story`, `/review-task`, and `/review-epic` as the **first executable step in the workflow**, after Step 0 (output-format / mode detection) but **before** any document mutation, frontmatter edit, tracker (Jira/GitHub) sync, or review-report write. Skill-specific variants are called out in labeled sub-sections where they differ.
+Loaded by `/review-story`, `/review-task`, `/review-bug`, and `/review-epic` as the **first executable step in the workflow**, after Step 0 (output-format / mode detection) but **before** any document mutation, frontmatter edit, tracker (Jira/GitHub) sync, or review-report write. Skill-specific variants are called out in labeled sub-sections where they differ.
 
 Goal: ensure review artifacts (frontmatter status changes, Change Log entries, `.review.*.md` reports, Jira/GitHub syncs) land on a dedicated feature branch — not on `develop` or `main`.
 
@@ -19,12 +19,12 @@ This protocol intentionally mirrors the methodology used by the develop pipeline
 The calling skill MUST have already resolved:
 
 - `DOC_FILE` — absolute path to the document being reviewed (set by Input Resolution; review-epic gets this from the new "Locate epic file" pre-workflow step).
-- `MODE` — `interactive` or `validate` (review-story / review-task only; review-epic has no validate mode).
-- `SKILL_NAME` — one of `review-story`, `review-task`, `review-epic` (used as the stash tag).
+- `MODE` — `interactive` or `validate` (review-story / review-task / review-bug only; review-epic has no validate mode).
+- `SKILL_NAME` — one of `review-story`, `review-task`, `review-bug`, `review-epic` (used as the stash tag).
 
 ---
 
-## 0a.0 Validate-mode short-circuit (review-story + review-task only)
+## 0a.0 Validate-mode short-circuit (review-story + review-task + review-bug only)
 
 ```bash
 if [ "$MODE" = "validate" ]; then
@@ -33,7 +33,7 @@ if [ "$MODE" = "validate" ]; then
 fi
 ```
 
-Rationale: validate mode is invoked from `/develop-story` or `/develop-task` Step 2, where Step 1 has already created and checked out the feature branch.
+Rationale: validate mode is invoked from `/develop-story`, `/develop-task`, or `/develop-bug` Step 2, where Step 1 has already created and checked out the feature branch.
 
 Review-epic has no validate mode — skip this section.
 
@@ -87,6 +87,13 @@ TASK_BASENAME=$(basename "$DOC_FILE" .md)            # e.g. task.2.home-page-con
 TASK_ID=$(echo "$TASK_BASENAME" | awk -F. '{print $2}')
 ```
 
+#### review-bug
+
+```bash
+BUG_BASENAME=$(basename "$DOC_FILE" .md)             # e.g. bug.7.stale-token OR story.8.5.3.bug.1.cache-leak
+BUG_PREFIX="$BUG_BASENAME"                            # the full stem; used for branch matching
+```
+
 #### review-epic
 
 ```bash
@@ -116,6 +123,17 @@ esac
 ```bash
 case "$CURRENT_BRANCH" in
   feature/task.${TASK_ID}.*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
+esac
+```
+
+#### review-bug
+
+Generous match so pipeline re-entry (already on the `develop-bug` branch, whatever `/create-branch` named it — `feature/*`, `bugfix/*`, or a `hotfix/*`) always short-circuits:
+
+```bash
+case "$CURRENT_BRANCH" in
+  feature/*"${BUG_PREFIX}"*|bugfix/*"${BUG_PREFIX}"*|feature/*bug*|hotfix/*)
+    BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
 
@@ -152,6 +170,15 @@ Detect current branch family for the recommended option:
 - On any `feature/*` branch: options `feature/{current}` (Recommended) / `${BASE_DEFAULT}` / `Other`
 
 **Header:** `Task branch` — **Question:** "Which branch should `feature/task.${TASK_ID}.*` be based on?"
+
+#### review-bug
+
+Bug review edits land on a bug feature branch cut from `${BASE_DEFAULT}` (same convention `develop-bug` uses). Detect current branch family for the recommended option:
+
+- On `${BASE_DEFAULT}` or `main`: options `${BASE_DEFAULT}` (Recommended) / `main` / `Other`
+- On any `feature/*`/`bugfix/*` branch: options `feature/{current}` (Recommended) / `${BASE_DEFAULT}` / `Other`
+
+**Header:** `Bug branch` — **Question:** "Which branch should the review of `${BUG_PREFIX}` be based on?"
 
 #### review-epic
 
@@ -234,7 +261,7 @@ For **review-epic**: this is the final branch. Set `BRANCH_NAME="${EPIC_BRANCH}"
 
 ---
 
-## 0a.7 Invoke /create-branch (review-story + review-task)
+## 0a.7 Invoke /create-branch (review-story + review-task + review-bug)
 
 Invoke the `/create-branch` skill with `DOC_FILE`. When `create-branch` asks for the base branch, supply the resolved `BASE_BRANCH` — **do not let the user be re-prompted**.
 
@@ -244,7 +271,7 @@ After `/create-branch` returns:
 BRANCH_NAME=$(git branch --show-current)
 ```
 
-Verify `BRANCH_NAME` is non-empty and matches the expected pattern (`feature/story.*` or `feature/task.*`); HALT if not.
+Verify `BRANCH_NAME` is non-empty and matches the expected pattern (`feature/story.*`, `feature/task.*`, or — for review-bug — any `feature/*`/`bugfix/*` branch carrying the bug stem); HALT if not.
 
 ---
 
