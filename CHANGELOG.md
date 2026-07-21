@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.25.0] - 2026-07-21
+
 ### Added
 
 - **`review-bug` skill** — bug-report review, the bug-side sibling of `review-story`/`review-task`. Dual-mode (interactive default + `--validate` GO/NO-GO with a 1–10 fix-readiness score). Checks template/frontmatter compliance, reproducibility *from the report*, severity/priority correctness, and mode/linkage; runs two read-only pre-pass Explore scans — a **duplicate scan** (sibling bugs + `bug-registry`) and an **already-fixed/stale scan** of the root-cause area. Emits READY TO FIX / NEEDS DETAIL / DUPLICATE / STALE. Never mutates the bug lifecycle `status`; may edit the report to add missing detail. Slots into `develop-bug` as its Step 2 gate (validate-and-apply). Handles story / task / general bugs.
