@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.24.0] - 2026-07-21
+
 ### Added
 
 - **`create-bug-report` gains a third mode for general (ownerless) bugs** — cross-cutting sweep bugs with no single story or task owner. General bugs live in `docs/bugs/bug.{N}.{name}/` with global, never-reused numbering allocated from `docs/bugs/bug-registry.md` (bootstrapped on first use), mirroring the task-registry mechanics. The skill now opens with a 3-mode type decision (story / task / general). The previously-duplicated inline bug template is consolidated into a single bundled `assets/bug-report-template.md` (now carrying OKF `type: bug` frontmatter), shared across all three modes, and the dangling `docs/templates/bug-report-template.md` reference is removed. New schema and rules docs land at `docs/standards/bug-documents.md` and `docs/standards/bug-registry.md`, with a Bug Registry TL;DR added to `AGENTS.md` and the `file-naming.md` core-document table.
