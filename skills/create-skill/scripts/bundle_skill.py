@@ -32,7 +32,7 @@ JS_SHARED_RE = re.compile(
 # bundled location, one level up from scripts/).
 SH_SHARED_RE = re.compile(r'(?:\.\./)+shared/resources/([A-Za-z0-9._-]+)')
 # Matches already-rewritten in-tree references (so re-runs and partial states work).
-REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:md|sh|js|py))')
+REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:md|sh|js|mjs|py))')
 # Sibling require/import in JS — `require("./foo.js")` — used to follow transitive
 # deps inside bundled shared .js files.
 JS_SIBLING_RE = re.compile(r'require\(["\']\./([A-Za-z0-9._/-]+\.js)["\']\)')
@@ -58,7 +58,7 @@ def autogen_header(filename, suffix):
         return f"<!-- {msg} -->\n"
     if suffix in ('.sh', '.py'):
         return f"# {msg}\n"
-    if suffix == '.js':
+    if suffix in ('.js', '.mjs'):
         return f"// {msg}\n"
     return ""
 
@@ -76,8 +76,8 @@ def inject_header(content, filename, suffix):
         if end != -1:
             cut = end + len('\n---\n')
             return content[:cut] + header + content[cut:]
-    # .sh: insert after shebang
-    if suffix == '.sh' and content.startswith('#!'):
+    # .sh/.js/.mjs: insert after shebang (e.g. #!/usr/bin/env node) if present
+    if suffix in ('.sh', '.js', '.mjs') and content.startswith('#!'):
         nl = content.find('\n')
         if nl != -1:
             return content[:nl + 1] + header + content[nl + 1:]
