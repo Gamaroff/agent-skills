@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.26.0] - 2026-07-22
+
 ### Added
 
 - **`shared/resources/generate-prd-epic-index.mjs`** — the epic-creating skills now emit and refresh a PRD→epic index automatically, so a consumer's `docs:epic-index:check` never fails in normal flow. The generator injects a marker-delimited `## Epics` table (`<!-- epics-index-start --> … <!-- epics-index-end -->`) into each sharded sub-PRD (`prd.<feature>.md`), linking down to its child epic files with each epic's status — closing the PRD↔epic loop (the reverse `prd_source` link already existed). Promoted verbatim from the `rebirth-wallet` consumer copy (byte-for-byte output preserved — same markers, table header, auto-generated line, H1 placement, numeric sort) with two generalizations: the PRD root is no longer hardcoded (resolves `--prd-root` → `prd.prdShardedLocation` in `skills-config.yaml` → default `docs/prd`), and a new `--strict` flag turns a canonical epic file missing `epic_number` into a hard error instead of a silent skip. Keeps `--check` (CI drift gate) and `*.review.*.md` exclusion. Dependency-free (Node stdlib only). Covered by a new `shared/resources/tests/generate-prd-epic-index.test.mjs` suite (idempotency, review exclusion, relative-link shape, `--check` exit codes, `--strict`, and PRD-root resolution) wired into `npm test`.
