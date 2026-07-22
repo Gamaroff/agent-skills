@@ -160,6 +160,24 @@ Flow:
 - ✅ Epic frontmatter updated (incl. `jira_last_synced_at` + body/meta hashes)
 - 📌 Story reminder: `jira_epic` + `epic_bitbucket_url` to copy into stories
 
+### 5. Regenerate the PRD Epic Index
+
+The sync above may transition the epic's `status`. The parent PRD's epic index shows each
+epic's status, so refresh it after the sync completes so PRD→epic statuses stay current. This
+is an agent post-step — the sync script itself does not touch the PRD index. Idempotent and
+low-cost: it rewrites only PRD files whose index actually changed.
+
+With `${PRD_ROOT}` resolved (source `references/resolve-paths.sh` if not already — see
+Prerequisites), run the generator from this skill's bundled reference:
+
+```bash
+node references/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}"
+```
+
+In a consumer repo the same logic is vendored at `scripts/generate-prd-epic-index.mjs`
+(what the consumer's `docs:epic-index` CI uses); running either produces identical output.
+If any `prd.*.md` changed, stage it in the same commit as the epic-frontmatter updates.
+
 ## Concurrent-Edit Guard
 
 | Situation | Behaviour |

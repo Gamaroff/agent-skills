@@ -547,6 +547,18 @@ install_skills() {
           (( _installed++ )) || true
         fi
       done
+      # Vendor the PRD epic-index generator to the consumer's canonical
+      # scripts/ path so the CI script (docs:epic-index) and the epic skills'
+      # bundled logic are the SAME file, kept in sync on every --update.
+      # Sourced from the release's shared/resources/ (clean source, no bundler
+      # header). This file is vendor-managed — do NOT hand-edit it downstream;
+      # change it in agent-skills' shared/resources/ and re-run --update.
+      local _gen_src="${_tmpdir}/shared/resources/generate-prd-epic-index.mjs"
+      if [[ -f "$_gen_src" ]]; then
+        mkdir -p scripts
+        cp "$_gen_src" scripts/generate-prd-epic-index.mjs
+        info "  vendored scripts/generate-prd-epic-index.mjs (vendor-managed — do not hand-edit)"
+      fi
       rm -rf "$_tmpdir"
       ok "Skills ${_version} installed into .agents/skills/ (${_installed} new, ${_updated} updated)"
       if [[ "$_unpinned" == true ]]; then

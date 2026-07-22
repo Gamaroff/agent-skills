@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`shared/resources/generate-prd-epic-index.mjs`** — the epic-creating skills now emit and refresh a PRD→epic index automatically, so a consumer's `docs:epic-index:check` never fails in normal flow. The generator injects a marker-delimited `## Epics` table (`<!-- epics-index-start --> … <!-- epics-index-end -->`) into each sharded sub-PRD (`prd.<feature>.md`), linking down to its child epic files with each epic's status — closing the PRD↔epic loop (the reverse `prd_source` link already existed). Promoted verbatim from the `rebirth-wallet` consumer copy (byte-for-byte output preserved — same markers, table header, auto-generated line, H1 placement, numeric sort) with two generalizations: the PRD root is no longer hardcoded (resolves `--prd-root` → `prd.prdShardedLocation` in `skills-config.yaml` → default `docs/prd`), and a new `--strict` flag turns a canonical epic file missing `epic_number` into a hard error instead of a silent skip. Keeps `--check` (CI drift gate) and `*.review.*.md` exclusion. Dependency-free (Node stdlib only). Covered by a new `shared/resources/tests/generate-prd-epic-index.test.mjs` suite (idempotency, review exclusion, relative-link shape, `--check` exit codes, `--strict`, and PRD-root resolution) wired into `npm test`.
+- **`create-epics-from-shards`, `create-epic`, and `sync-jira-epic` regenerate the PRD epic index** after they write/update epics and the epic-registry. New final step in each runs the vendored `scripts/generate-prd-epic-index.mjs` (falling back to the skill's bundled `references/` copy), then stages the changed `prd.*.md` in the same commit. `sync-jira-epic` runs it post-sync so a status transition is reflected in the index.
+
+### Changed
+
+- **`create-epics-from-shards` now writes `epic_number` into new epic frontmatter.** It previously embedded the number only in the `title`/filename, so the index generator (which keys off `epic_number`) would silently skip those epics — the exact gap `--strict` now guards. Aligns with the required-field schema in `docs/standards/epic-documents.md` and with `create-epic` (which already wrote it).
+- **The bundler/packager understand `.mjs`.** `bundle_skill.py` maps `.mjs` to the `//` auto-generated header comment and inserts it after a `#!/usr/bin/env node` shebang; `REFS_REF_RE` now discovers already-bundled `references/*.mjs` on re-runs. `package_skill.py` already zips `.mjs` verbatim.
+- **`setup-consumer.sh` vendors the generator to the consumer's canonical `scripts/generate-prd-epic-index.mjs`** on install and `--update`, sourced from the release's `shared/resources/`, so the CI script and the skills' logic are one vendor-managed file. **Consumer note:** this file is now vendor-managed — do not hand-edit it downstream (it is currently hand-authored in `rebirth-wallet`); change it in agent-skills and re-run `--update`.
+
 ## [v0.25.0] - 2026-07-21
 
 ### Added

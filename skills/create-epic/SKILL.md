@@ -338,6 +338,29 @@ After generating the epic file, invoke `documentation-standards-validator` to co
 - Status indicator uses the standard icon (✅ 🔄 ⚠️ ❌ 📋)
 - File placed in correct location (`${PRD_ROOT}/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
 
+## Regenerate the PRD Epic Index
+
+After the epic file is written **and** the epic-registry update is committed, refresh the
+parent PRD's linked epic index so PRD→epic links stay complete and statuses current.
+
+Skip this when `PRD_SOURCE_PATH` is `brownfield-enhancement` (there is no parent PRD to update).
+Otherwise, with `${PRD_ROOT}` already resolved (see [Discover Parent PRD](#discover-parent-prd)):
+
+```bash
+node scripts/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}" \
+  || node references/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}"
+```
+
+The generator prefers the consumer's vendored `scripts/` copy and falls back to this skill's
+bundled `references/generate-prd-epic-index.mjs`. It is idempotent — only PRD files whose index
+actually changed are rewritten. The new epic **must** carry `epic_number` in its frontmatter
+(the Epic Structure template already requires it); the generator silently skips any epic that
+lacks it, so a missing `epic_number` means the epic will not appear in the index. Pass `--strict`
+to turn that into a hard error when you want to fail loudly.
+
+Stage the changed `prd.*.md` alongside the epic file in the **same** commit so the downstream
+`docs:epic-index:check` never sees drift.
+
 ## Key Principles
 
 1. **Scope constraint** - Maximum 3 stories
