@@ -593,3 +593,92 @@ test("12: selectNext is unchanged by the presence of touches: (parity)", () => {
   assert.equal(r.status, "selected");
   assert.equal(r.item.id, "8.1", "single-item selection ignores touches:");
 });
+
+// ── 13: un-annotated (+own-default) rows — warn + optional requireTouches ─────
+//
+// A row with NO `touches:` field defaults to `+own` and never hard-conflicts, so
+// the planner can co-schedule several of them while silently assuming they are
+// write-disjoint. These fixtures cover the warn signal, the parse-distinction
+// guard (`touches: +own` is deliberate, not a forgotten field), and the
+// requireTouches downgrade that defers all but one un-annotated row.
+
+const UNANNOTATED_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "## Epic 9",
+  // 9.1 and 9.2 have no touches: field at all → un-annotated (+own default).
+  "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
+  "- [ ] **9.2** Ready B · deps: — · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
+  // 9.3 explicitly declares +own → annotated, must NOT be flagged.
+  "- [ ] **9.3** Ready C · deps: — · touches: +own · /develop-story docs/p/s/story.9.3.c/story.9.3.c.md",
+  "",
+].join("\n");
+
+test("13: touchesAnnotated distinguishes a missing field from an explicit +own", () => {
+  const m = parseRoadmap(UNANNOTATED_ROADMAP);
+  assert.equal(m.byId.get("9.1").touchesAnnotated, false, "no field → un-annotated");
+  assert.equal(m.byId.get("9.3").touchesAnnotated, true, "+own is a deliberate annotation");
+  // both still parse to an empty touches[] — the flag is the only signal
+  assert.deepEqual(m.byId.get("9.1").touches, []);
+  assert.deepEqual(m.byId.get("9.3").touches, []);
+});
+
+test("13: --batch warns when ≥2 un-annotated rows are co-scheduled", () => {
+  const b = selectBatch(parseRoadmap(UNANNOTATED_ROADMAP));
+  assert.equal(b.status, "batch");
+  // all three are ready and none hard-conflict, so all are batched
+  assert.deepEqual(b.batch.map((r) => r.id), ["9.1", "9.2", "9.3"]);
+  // only the two field-less rows are reported un-annotated; +own 9.3 is excluded
+  assert.deepEqual(b.unannotated.map((u) => u.id), ["9.1", "9.2"]);
+  const warn = b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w));
+  assert.equal(warn.length, 1, `expected one co-schedule warning; got ${JSON.stringify(b.lint.warnings)}`);
+  assert.match(warn[0], /9\.1, 9\.2/);
+});
+
+test("13: a single un-annotated row does not warn", () => {
+  const m = parseRoadmap(
+    [
+      "# PHASE 1",
+      "## Epic 9",
+      "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
+      "- [ ] **9.3** Ready C · deps: — · touches: +own · /develop-story docs/p/s/story.9.3.c/story.9.3.c.md",
+      "",
+    ].join("\n"),
+  );
+  const b = selectBatch(m);
+  assert.deepEqual(b.unannotated.map((u) => u.id), ["9.1"]);
+  assert.equal(
+    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w)).length,
+    0,
+    "one un-annotated row is not a co-scheduling risk",
+  );
+});
+
+test("13: requireTouches keeps one un-annotated row, defers the rest", () => {
+  const b = selectBatch(parseRoadmap(UNANNOTATED_ROADMAP), { requireTouches: true });
+  // 9.1 (first un-annotated) + 9.3 (annotated) batched; 9.2 deferred
+  assert.deepEqual(b.batch.map((r) => r.id), ["9.1", "9.3"]);
+  const dropped = b.excluded.find((e) => e.id === "9.2");
+  assert.ok(dropped, "9.2 must be deferred");
+  assert.match(dropped.reason, /unannotated-touches \(requireTouches\)/);
+  // the downgrade resolves the risk → no residual co-schedule warning
+  assert.equal(
+    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w)).length,
+    0,
+    "deferring the extra row clears the warning",
+  );
+});
+
+test("13: CLI --batch --require-touches defers un-annotated rows", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "roadmap-"));
+  const file = path.join(dir, "roadmap.md");
+  writeFileSync(file, UNANNOTATED_ROADMAP);
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--require-touches", "--roadmap", file],
+    { encoding: "utf-8" },
+  );
+  const r = JSON.parse(out);
+  assert.equal(r.status, "batch");
+  assert.deepEqual(r.batch.map((b) => b.id), ["9.1", "9.3"]);
+  assert.ok(r.excluded.some((e) => e.id === "9.2" && /requireTouches/.test(e.reason)));
+});

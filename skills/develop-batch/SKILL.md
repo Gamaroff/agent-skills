@@ -48,9 +48,14 @@ batch runs never diverge), plus one batch-only key. Every key has a default:
 | `developNext.qualityGateCommand` | `npm test`                                       | Step 3 merge gate |
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
 | `developBatch.maxParallel`       | `4`                                              | Step 2            |
+| `developBatch.requireTouches`    | `false`                                          | Step 1            |
 
 `maxParallel` caps how many pipelines run concurrently; a larger batch is processed in
-waves of that size. Apply any project-wide command conventions from the consumer
+waves of that size. `requireTouches` (default off, non-breaking) hardens the write-footprint
+assumption: when `true`, the selector is invoked with `--require-touches` so it defers all but
+one un-annotated (`+own`-default) row per batch instead of merely warning — for teams that
+want write-conflicts impossible by construction rather than caught at merge. Apply any
+project-wide command conventions from the consumer
 project's own `CLAUDE.md`/`AGENTS.md` when running these (e.g. a required prefix for
 `gh`, or a Node version shim) — this skill writes the bare commands.
 
@@ -102,7 +107,8 @@ independently via its own Phase 0b machinery.
    pending batch and stop.
 2. **Dry-run short-circuit.** In `--dry-run` mode, run `git fetch origin <baseBranch>`
    (fetch only — never checkout or pull), then go straight to Step 1's selector call and
-   print its JSON verbatim (batch / excluded / softOverlaps / worktrees / skippedPhases).
+   print its JSON verbatim (batch / excluded / softOverlaps / unannotated / worktrees /
+   skippedPhases), including any `lint.warnings`.
    Create no worktrees, write no state file, dispatch nothing. Stop.
 3. `git status --porcelain` on the main tree — if it is dirty: **HALT**, list the dirty
    paths. Never stash or discard.
@@ -118,9 +124,13 @@ Run the deterministic selector — **never eyeball the roadmap**:
 
 ```bash
 node <skillsDir>/develop-next/scripts/select-next.mjs --batch --roadmap <roadmapPath>
+# append --require-touches when developBatch.requireTouches is true
 ```
 
 (`--batch` is implemented by the `develop-next` selector; this skill consumes it.)
+When `developBatch.requireTouches` is `true`, append `--require-touches` so the selector
+defers un-annotated rows itself; the emitted `batch[]`/`excluded[]`/`worktrees[]` already
+reflect the downgrade.
 Selection rules, the two batching axes, and marker vocabulary:
 [`develop-next/references/roadmap-selection.md`](../develop-next/references/roadmap-selection.md)
 §"Parallel batch". Act on the JSON `status`:
@@ -140,6 +150,12 @@ Selection rules, the two batching axes, and marker vocabulary:
   `batch[]` item (a 1-item batch is fine — it degrades to a single worktree). Surface
   `softOverlaps[]` explicitly: these are the `~` tags whose second merger will rebase, and
   `excluded[]`: ready rows held back by a hard `!` conflict, deferred to the next batch.
+  Also surface `unannotated[]` (and the matching `lint.warnings` line): rows batched with
+  no `touches:` field, whose write-disjointness is **assumed, not verified**. Two or more
+  together is a co-scheduling risk — report it in both `--dry-run` and live runs, and advise
+  annotating those rows (or enabling `developBatch.requireTouches`). Under `requireTouches`
+  the selector has already deferred the extras, so `unannotated[]` holds at most one and no
+  warning fires.
 - **`batch` with an empty `batch[]`** → the frontier has no dependency-ready,
   conflict-free rows right now (only blocked/gated/manual rows remain). **STOP**: report
   `excluded[]` + `skippedPhases[]` so the operator sees why, send a push notification.

@@ -17,6 +17,7 @@
  * Usage:
  *   select-next.mjs [--roadmap <path>]                      # selection (default)
  *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
+ *   select-next.mjs --batch --require-touches [...]         # defer un-annotated rows
  *   select-next.mjs --lint [--roadmap <path>]               # format lint only
  *
  * Output: JSON on stdout, always.
@@ -231,6 +232,12 @@ export function parseRoadmap(text) {
       // Path may be inline after the command, or in a [story](…)/[task](…) link.
       commandArg: (cm && cm[2]) || workItemPath(rest),
       touches: parseTouches(rest),
+      // Whether a `touches:` field was written at all — true even for `+own`/`-`
+      // (author explicitly confirmed no shared resource), false when the field is
+      // absent (author forgot). `parseTouches` erases this distinction (both yield
+      // `[]`), so the batch planner needs the raw presence flag to warn on the
+      // un-annotated case without penalising a deliberate `+own`.
+      touchesAnnotated: TOUCHES_RE.test(rest),
       deps,
       blockedUntil,
       raw: rest.trim(),
@@ -585,9 +592,21 @@ function worktreeFor(row) {
  * Greedily pack a maximal conflict-free batch from the earliest actionable phase.
  * Document order is the tie-breaker, so the batch always leads with the row
  * `selectNext` would have picked. Advisory: emits a plan, runs nothing.
+ *
+ * Write-disjointness rests on each row's `touches:` annotation. A row with no
+ * `touches:` field defaults to `+own` (assumed to share nothing) and so never
+ * hard-conflicts — a silent authoring failure mode. When two or more such rows
+ * land in the same batch the planner cannot vouch for disjointness, so it warns.
+ * With `opts.requireTouches`, it additionally downgrades: at most one un-annotated
+ * row is kept, the rest deferred to `excluded` (belt-and-suspenders for teams that
+ * want conflicts impossible by construction). Default is warn-only (non-breaking).
+ *
+ * @param {object} model
+ * @param {{requireTouches?: boolean}} [opts]
  * @returns {{status:"batch"|"halt", ...}}
  */
-export function selectBatch(model) {
+export function selectBatch(model, opts = {}) {
+  const requireTouches = opts.requireTouches === true;
   const lint = { errors: model.errors, warnings: model.warnings };
   if (model.errors.length)
     return { status: "halt", haltReason: model.errors[0], batch: [], lint };
@@ -621,14 +640,39 @@ export function selectBatch(model) {
           break;
         }
       }
-      if (clash)
+      if (clash) {
         excluded.push({
           id: row.id,
           line: row.line,
           reason: `hard-conflict on '${clash.tag}' with ${clash.with}`,
         });
-      else batch.push(row);
+        continue;
+      }
+      // requireTouches: keep at most one un-annotated (+own-default) row per batch;
+      // defer the rest so an un-verified write footprint can never over-parallelize.
+      if (requireTouches && !row.touchesAnnotated && batch.some((r) => !r.touchesAnnotated)) {
+        excluded.push({
+          id: row.id,
+          line: row.line,
+          reason: "unannotated-touches (requireTouches)",
+        });
+        continue;
+      }
+      batch.push(row);
     }
+
+    // Rows batched without a `touches:` field — their write-disjointness is assumed,
+    // not verified. Two or more together means the planner can't vouch for the batch.
+    const unannotated = batch
+      .filter((r) => !r.touchesAnnotated)
+      .map((r) => ({ id: r.id, line: r.line }));
+    if (unannotated.length >= 2)
+      model.warnings.push(
+        `${unannotated.length} un-annotated (+own-default) rows co-scheduled: ` +
+          `${unannotated.map((r) => r.id).join(", ")} — write-disjointness is assumed, ` +
+          `not verified; add \`touches:\` to these rows` +
+          (requireTouches ? "" : " (or run with requireTouches to defer them)"),
+      );
 
     // Surface the soft overlaps the operator is accepting (rebase-on-merge points).
     const softOverlaps = [];
@@ -655,6 +699,7 @@ export function selectBatch(model) {
       })),
       excluded,
       softOverlaps,
+      unannotated,
       worktrees: batch.map(worktreeFor),
       lint,
     };
@@ -668,6 +713,7 @@ export function selectBatch(model) {
     batch: [],
     excluded: [],
     softOverlaps: [],
+    unannotated: [],
     worktrees: [],
     lint,
   };
@@ -680,6 +726,7 @@ function parseArgs(argv) {
     roadmap: DEFAULT_ROADMAP,
     lint: false,
     batch: false,
+    requireTouches: false,
   };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
@@ -691,6 +738,9 @@ function parseArgs(argv) {
         break;
       case "--batch":
         args.batch = true;
+        break;
+      case "--require-touches":
+        args.requireTouches = true;
         break;
       default:
         process.stderr.write(`select-next: unknown argument ${argv[i]}\n`);
@@ -740,7 +790,10 @@ function main() {
     process.exit(model.errors.length ? 1 : 0);
   }
   const result = args.batch
-    ? { roadmap: args.roadmap, ...selectBatch(model) }
+    ? {
+        roadmap: args.roadmap,
+        ...selectBatch(model, { requireTouches: args.requireTouches }),
+      }
     : { roadmap: args.roadmap, ...selectNext(model) };
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");
   process.exit(result.status === "halt" ? 1 : 0);

@@ -173,11 +173,21 @@ test("config keys documented in SKILL.md and configuration reference", async () 
     "developNext.qualityGateCommand",
     "developNext.mergeStrategy",
     "developBatch.maxParallel",
+    "developBatch.requireTouches",
   ]) {
     assert.ok(skill.includes(key), `SKILL.md missing ${key}`);
   }
-  assert.ok(
-    configDoc.includes("developBatch.maxParallel"),
-    "configuration.md missing developBatch.maxParallel",
-  );
+  for (const key of ["developBatch.maxParallel", "developBatch.requireTouches"]) {
+    assert.ok(configDoc.includes(key), `configuration.md missing ${key}`);
+  }
+});
+
+test("SKILL.md: un-annotated (+own-default) rows are warned on and deferrable", () => {
+  // The batch's write-disjointness rests on touches: annotations; a missing field
+  // defaults to +own and could silently over-parallelize. SKILL.md must document
+  // both the warning and the requireTouches downgrade.
+  assert.match(flat, /unannotated/);
+  assert.match(flat, /assumed, not verified/i);
+  assert.match(flat, /--require-touches/);
+  assert.match(flat, /requireTouches/);
 });

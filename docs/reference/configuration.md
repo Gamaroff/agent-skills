@@ -56,11 +56,12 @@ developNext:                          # optional — develop-next roadmap orches
 
 developBatch:                         # optional — develop-batch parallel fan-out
   maxParallel: 4                      # max concurrent worktree pipelines (else waves)
+  requireTouches: false               # true → defer un-annotated (+own-default) rows
 ```
 
 `develop-batch` reuses the `developNext:` keys above (same roadmap, base branch, merge
-gate, and strategy — single-item and batch runs never diverge) and adds only
-`developBatch.maxParallel`.
+gate, and strategy — single-item and batch runs never diverge) and adds
+`developBatch.maxParallel` and `developBatch.requireTouches`.
 
 ## Key reference
 
@@ -79,6 +80,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds only
 | `developNext.qualityGateCommand` | shell command | `npm test` | Local merge gate `develop-next` runs on every branch before `gh pr merge` (the whole gate for projects without PR CI). |
 | `developNext.mergeStrategy` | `merge` \| `squash` \| `rebase` | `merge` | Strategy passed to `gh pr merge`. |
 | `developBatch.maxParallel` | integer | `4` | Max concurrent worktree pipelines `develop-batch` fans out before processing the remainder in waves. Batch reuses all `developNext.*` keys for roadmap/base/gate/strategy. |
+| `developBatch.requireTouches` | boolean | `false` | When `true`, the `--batch` selector defers all but one un-annotated (`touches:`-less, `+own`-default) row per batch instead of only warning — makes write-conflicts impossible by construction rather than caught at merge. Default off is non-breaking. |
 
 ## QA artifacts are co-located
 
