@@ -16,11 +16,13 @@
  *
  * Usage:
  *   select-next.mjs [--roadmap <path>]                      # selection (default)
+ *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
  *   select-next.mjs --lint [--roadmap <path>]               # format lint only
  *
  * Output: JSON on stdout, always.
  * Exit codes:
  *   selection    0 = status "selected" or "stop"; 1 = status "halt" or I/O error
+ *   --batch      0 = status "batch"; 1 = status "halt" or I/O error
  *   --lint       0 = no errors (warnings allowed); 1 = errors
  *
  * No dependencies. Node >= 22. Pure functions are exported for unit tests
@@ -49,10 +51,31 @@ const COMMAND_RE =
   /\/(develop-story|develop-task|create-story|create-epic|create-task)(?:\s+`?([^\s`)]+\.md))?/;
 const MD_LINK_RE = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const SKIP_RE = /⏭️|⏭|\bSKIP\b/;
+// `touches:` — the write-footprint field (see references/roadmap-selection.md and
+// the roadmap's "Conflict footprint" legend). Comma-separated resource tags, each
+// optionally suffixed `!` (hard/exclusive — serialize) or `~`/unmarked (soft/additive
+// — parallel OK, second-merger rebases). `+own` / `-` mean "no shared resource".
+// Terminated by ` · ` like deps:/gate:/flag:, so it never disturbs their captures.
+const TOUCHES_RE = /touches:\s*([^·|]+?)(?=·|\bgate:|\bflag:|$)/i;
 
 /** Strip leading markdown decoration (strikethrough, bold, emphasis) so ids parse. */
 function undecorate(s) {
   return s.replace(/^\s*(?:~~|\*\*|\*|_)+\s*/, "");
+}
+
+/** Parse a `touches:` field into [{tag, hard}]. `!`=hard, `~`/unmarked=soft, `+own`/`-`=dropped. */
+export function parseTouches(rest) {
+  const m = rest.match(TOUCHES_RE);
+  if (!m) return [];
+  const out = [];
+  for (const seg of m[1].split(",")) {
+    let s = seg.trim();
+    if (!s || s === "+own" || s === "-") continue;
+    const hard = /!$/.test(s);
+    s = s.replace(/[~!]+$/, "").trim();
+    if (s) out.push({ tag: s, hard });
+  }
+  return out;
 }
 
 function idTokens(text) {
@@ -207,6 +230,7 @@ export function parseRoadmap(text) {
       command: cm ? `/${cm[1]}` : null,
       // Path may be inline after the command, or in a [story](…)/[task](…) link.
       commandArg: (cm && cm[2]) || workItemPath(rest),
+      touches: parseTouches(rest),
       deps,
       blockedUntil,
       raw: rest.trim(),
@@ -509,12 +533,153 @@ function buildRationale(model, row, phase, skipped, phaseNotes) {
   return parts.join("; ");
 }
 
+// ── Parallel batch (worktree fan-out) ─────────────────────────────────────────
+//
+// `selectNext` returns the *single* next item. `selectBatch` instead returns a
+// maximal set of ready rows that can be developed concurrently in separate git
+// worktrees without hard merge conflicts. Two axes gate a row here:
+//   1. Dependency-ready — same test as selection (deps/⛔/flow all satisfied,
+//      directly /develop-* runnable). Reuses the selection predicates verbatim.
+//   2. Conflict-free — no two batched rows share a `touches:` tag that either
+//      side marks hard (`!`). Shared soft (`~`) tags are allowed — that is the
+//      "minor conflict, second-merger-rebases" tolerance the roadmap already runs.
+// Phase discipline is preserved: the batch is drawn from the first phase that
+// has any actionable row (never straddling a hard phase boundary).
+
+/** Ready = actionable and directly auto-runnable with every gate satisfied. */
+function isReady(model, r) {
+  if (r.ticked || r.skip || r.manual || r.gated) return false;
+  if (!r.command || !/^\/develop-(story|task)$/.test(r.command)) return false;
+  if (!r.commandArg) return false;
+  if (r.blockedUntil.some((b) => b === "<unparsed>" || idDone(model, b) !== true))
+    return false;
+  if (flowBlockers(model, r).length) return false;
+  if (r.deps.some((d) => !depSatisfied(model, d))) return false;
+  return true;
+}
+
+/** First shared tag marked hard by either row, else null. */
+function hardConflict(a, b) {
+  for (const ta of a.touches)
+    for (const tb of b.touches)
+      if (ta.tag === tb.tag && (ta.hard || tb.hard)) return ta.tag;
+  return null;
+}
+
+function worktreeFor(row) {
+  const slug = row.id.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const kind = row.command === "/develop-task" ? "task" : "story";
+  const branch = `${kind}/${slug}`;
+  const dir = `../tc-wt-${slug}`;
+  return {
+    id: row.id,
+    dir,
+    branch,
+    base: "develop",
+    run: `${row.command} ${row.commandArg}`,
+    shell: `git worktree add ${dir} -b ${branch} develop`,
+  };
+}
+
+/**
+ * Greedily pack a maximal conflict-free batch from the earliest actionable phase.
+ * Document order is the tie-breaker, so the batch always leads with the row
+ * `selectNext` would have picked. Advisory: emits a plan, runs nothing.
+ * @returns {{status:"batch"|"halt", ...}}
+ */
+export function selectBatch(model) {
+  const lint = { errors: model.errors, warnings: model.warnings };
+  if (model.errors.length)
+    return { status: "halt", haltReason: model.errors[0], batch: [], lint };
+
+  // Unlike selectNext, the planner advances past a phase whose ready frontier is
+  // empty (only blocked/gated rows remain), recording it — a human fanning out
+  // worktrees wants the next doable batch, not a phase-boundary STOP. The bias to
+  // finish earlier phases first is preserved: a phase with ANY ready row wins.
+  const skippedPhases = [];
+  for (const phase of model.phases) {
+    const rows = model.rows.filter((r) => r.phase === phase.index);
+    const actionable = rows.filter((r) => !r.ticked && !r.skip);
+    if (!actionable.length) continue; // nothing here at all — advance a phase
+
+    const ready = actionable.filter((r) => isReady(model, r));
+    if (!ready.length) {
+      skippedPhases.push({
+        phase: phase.name,
+        reason: `${actionable.length} actionable row(s), none ready (all blocked/gated)`,
+      });
+      continue;
+    }
+    const batch = [];
+    const excluded = [];
+    for (const row of ready) {
+      let clash = null;
+      for (const picked of batch) {
+        const tag = hardConflict(row, picked);
+        if (tag) {
+          clash = { with: picked.id, tag };
+          break;
+        }
+      }
+      if (clash)
+        excluded.push({
+          id: row.id,
+          line: row.line,
+          reason: `hard-conflict on '${clash.tag}' with ${clash.with}`,
+        });
+      else batch.push(row);
+    }
+
+    // Surface the soft overlaps the operator is accepting (rebase-on-merge points).
+    const softOverlaps = [];
+    for (let i = 0; i < batch.length; i++)
+      for (let j = i + 1; j < batch.length; j++)
+        for (const ta of batch[i].touches)
+          for (const tb of batch[j].touches)
+            if (ta.tag === tb.tag)
+              softOverlaps.push({ tag: ta.tag, between: [batch[i].id, batch[j].id] });
+
+    return {
+      status: "batch",
+      phase: phase.name,
+      detail: `${batch.length} row(s) can develop in parallel; ${excluded.length} held back by hard conflicts`,
+      skippedPhases,
+      batch: batch.map((r) => ({
+        id: r.id,
+        line: r.line,
+        epic: r.epic,
+        command: r.command,
+        commandArg: r.commandArg,
+        touches: r.touches,
+        raw: r.raw,
+      })),
+      excluded,
+      softOverlaps,
+      worktrees: batch.map(worktreeFor),
+      lint,
+    };
+  }
+
+  return {
+    status: "batch",
+    phase: null,
+    detail: "no ready rows in any phase",
+    skippedPhases,
+    batch: [],
+    excluded: [],
+    softOverlaps: [],
+    worktrees: [],
+    lint,
+  };
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
   const args = {
     roadmap: DEFAULT_ROADMAP,
     lint: false,
+    batch: false,
   };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
@@ -523,6 +688,9 @@ function parseArgs(argv) {
         break;
       case "--lint":
         args.lint = true;
+        break;
+      case "--batch":
+        args.batch = true;
         break;
       default:
         process.stderr.write(`select-next: unknown argument ${argv[i]}\n`);
@@ -571,7 +739,9 @@ function main() {
     );
     process.exit(model.errors.length ? 1 : 0);
   }
-  const result = { roadmap: args.roadmap, ...selectNext(model) };
+  const result = args.batch
+    ? { roadmap: args.roadmap, ...selectBatch(model) }
+    : { roadmap: args.roadmap, ...selectNext(model) };
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");
   process.exit(result.status === "halt" ? 1 : 0);
 }

@@ -27,7 +27,9 @@ const SCRIPT = path.join(
   "select-next.mjs",
 );
 
-const { parseRoadmap, selectNext } = await import(pathToFileURL(SCRIPT).href);
+const { parseRoadmap, selectNext, selectBatch, parseTouches } = await import(
+  pathToFileURL(SCRIPT).href
+);
 
 function fixture(name) {
   return readFileSync(path.join(__dirname, "fixtures", name), "utf-8");
@@ -491,4 +493,103 @@ test("11: `T` requires a following digit — 'Task 22' is not the id T22", () =>
     ["22"],
     "'Task 22' must still read as 22",
   );
+});
+
+// ── 12: `touches:` parsing + `--batch` parallel worktree packing ─────────────
+
+test("12: parseTouches reads severity marks; +own and - are dropped", () => {
+  assert.deepEqual(parseTouches("x · touches: schema~, leaderboard!, +own · y"), [
+    { tag: "schema", hard: false },
+    { tag: "leaderboard", hard: true },
+  ]);
+  assert.deepEqual(parseTouches("x · touches: routes · y"), [
+    { tag: "routes", hard: false },
+    // unmarked defaults to soft
+  ]);
+  assert.deepEqual(parseTouches("no touches field here"), []);
+});
+
+test("12: touches: does not disturb the deps: capture beside it", () => {
+  const m = parseRoadmap(
+    [
+      "# PHASE 1",
+      "## Epic 9",
+      "- [ ] **9.1** A · deps: — · touches: schema~ · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
+      "- [ ] **9.2** B · deps: 9.1 · touches: leaderboard! · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(m.byId.get("9.1").deps, [], "9.1 has no deps");
+  assert.deepEqual(
+    m.byId.get("9.2").deps.map((d) => d.id),
+    ["9.1"],
+    "9.2 dep still parses with touches: present",
+  );
+  assert.deepEqual(m.byId.get("9.1").touches, [{ tag: "schema", hard: false }]);
+});
+
+const BATCH_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "## Epic 8",
+  "- [ ] **8.1** Ready A · deps: — · touches: schema~, +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
+  "- [ ] **8.2** Ready B (soft-shares schema) · deps: — · touches: schema~ · /develop-story docs/p/s/story.8.2.b/story.8.2.b.md",
+  "- [ ] **8.3** Ready C (hard leaderboard) · deps: — · touches: leaderboard! · /develop-story docs/p/s/story.8.3.c/story.8.3.c.md",
+  "- [ ] **8.4** Ready D (hard leaderboard) · deps: — · touches: leaderboard! · /develop-story docs/p/s/story.8.4.d/story.8.4.d.md",
+  // deps: 8.1 — an in-backlog, still-unticked row → genuinely blocked (an absent
+  // dep id would be treated as archived/shipped and 8.5 would count as ready).
+  "- [ ] **8.5** Blocked E · deps: 8.1 · touches: +own · /develop-story docs/p/s/story.8.5.e/story.8.5.e.md",
+  "",
+].join("\n");
+
+test("12: --batch packs soft-overlapping ready rows, excludes hard conflicts", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(b.status, "batch");
+  const ids = b.batch.map((r) => r.id);
+  assert.deepEqual(ids, ["8.1", "8.2", "8.3"], "8.1+8.2 soft-share schema (ok); 8.3 first leaderboard wins");
+  assert.equal(b.excluded.length, 1);
+  assert.equal(b.excluded[0].id, "8.4");
+  assert.match(b.excluded[0].reason, /hard-conflict on 'leaderboard' with 8\.3/);
+  // 8.5 is dep-blocked, so it never reaches the batch (not an exclusion).
+  assert.ok(!ids.includes("8.5") && !b.excluded.some((e) => e.id === "8.5"));
+  // the accepted soft overlap is surfaced for the operator
+  assert.ok(
+    b.softOverlaps.some(
+      (o) => o.tag === "schema" && o.between.includes("8.1") && o.between.includes("8.2"),
+    ),
+  );
+});
+
+test("12: --batch emits a worktree command per batched row, based off develop", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(b.worktrees.length, b.batch.length);
+  const w = b.worktrees.find((x) => x.id === "8.1");
+  assert.equal(w.base, "develop");
+  assert.match(w.shell, /^git worktree add .* -b story\/8-1 develop$/);
+  assert.match(w.run, /^\/develop-story docs\/p\/s\/story\.8\.1\.a\/story\.8\.1\.a\.md$/);
+});
+
+test("12: --batch advances past a fully-blocked phase, recording it", () => {
+  const m = parseRoadmap(
+    [
+      "# PHASE 1 — blocked",
+      "## Epic 7",
+      // ⛔ with no parseable blocker id (a legal/ops gate) → never ready, but actionable.
+      "- [ ] **7.1** Gated · deps: — · **⛔ legal-gate** — blocked on counsel · touches: +own · /develop-story docs/p/s/story.7.1.g/story.7.1.g.md",
+      "# PHASE 2 — ready",
+      "## Epic 8",
+      "- [ ] **8.1** Ready · deps: — · touches: +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
+      "",
+    ].join("\n"),
+  );
+  const b = selectBatch(m);
+  assert.match(b.phase, /PHASE 2/);
+  assert.deepEqual(b.batch.map((r) => r.id), ["8.1"]);
+  assert.equal(b.skippedPhases.length, 1);
+  assert.match(b.skippedPhases[0].phase, /PHASE 1/);
+});
+
+test("12: selectNext is unchanged by the presence of touches: (parity)", () => {
+  const r = selectNext(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "8.1", "single-item selection ignores touches:");
 });

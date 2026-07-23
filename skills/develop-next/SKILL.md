@@ -14,6 +14,7 @@ Policy baseline (user-ratified 2026-07-11): auto-merge everything green; auto-an
 - User says `/develop-next` (one item) or `/loop /develop-next` (continuous).
 - User says "do the next roadmap item", "keep the roadmap rolling", "what's next — build it".
 - `--dry-run`: report which item would be selected and why, then stop. **Read-only** — no checkout, no pull, no state file, no pipeline actions.
+- `--batch` (planning aid, not a loop mode): `node .agents/skills/develop-next/scripts/select-next.mjs --batch` prints a **maximal set of ready rows that can be developed concurrently in separate git worktrees** — dependency-ready (same predicate as selection) **and** write-disjoint (no two share a `touches:` tag either marks `!`). Emits the batch, the soft overlaps accepted, rows held back by hard conflicts, and `git worktree add … develop` commands. Requires rows to carry `touches:` annotations (see [references/roadmap-selection.md](references/roadmap-selection.md) §Parallel batch). Advisory — runs nothing; the operator fans out worktrees and **merges to `develop` serially**.
 
 ## Configuration
 
