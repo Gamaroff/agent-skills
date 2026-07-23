@@ -203,6 +203,26 @@ git checkout <selected-base-branch>  # e.g., develop or feature/story.309.2.3
 git pull origin <selected-base-branch>
 ```
 
+**Exception — linked worktree**: When this skill runs inside a **linked git worktree**
+(e.g. dispatched by a parallel batch orchestrator), the base branch is already checked out
+in the main worktree, so `git checkout <base>` fails with
+`fatal: '<base>' is already checked out at …`. Detect this case —
+
+```bash
+[ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ]  # true ⇒ linked worktree
+```
+
+— and instead **create the feature branch directly from the freshly-fetched base ref,
+never making the base the active branch** (this replaces both Step 5's checkout/pull and
+Step 6):
+
+```bash
+git fetch origin
+git checkout -b feature/story.178.8.example-feature "origin/<selected-base-branch>"
+```
+
+The normal single-tree path (Step 5 checkout/pull + Step 6 below) is unchanged.
+
 ### Step 6: Create and Switch to New Branch
 
 ```bash
