@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.27.0] - 2026-07-23
+
 ### Added
 
 - **`develop-next` gains a `--batch` parallel-worktree planning mode.** `node .agents/skills/develop-next/scripts/select-next.mjs --batch` returns the maximal set of roadmap rows that are both dependency-ready (the exact predicate single-item selection uses) **and** write-disjoint, for fanning work out across git worktrees. It's a planning aid orthogonal to selection — selection answers "what's next", batch answers "what can N agents safely do at once" — and is advisory only: it emits a plan (`batch[]`, `excluded[]` hard conflicts, `softOverlaps[]` accepted rebase points, `skippedPhases[]`, and `git worktree add … develop` commands) and runs nothing. Reads a new optional `touches:` write-footprint field on roadmap rows (comma-separated resource tags, each `!` hard/exclusive or `~`/unmarked soft/additive; `+own`/`-` = no shared resource), terminated by ` · ` so it never disturbs the `deps:`/`gate:`/`flag:` captures beside it. Two rows hard-conflict when they share a tag either side marks `!`; soft overlaps are allowed and surfaced. Phase discipline is relaxed for planning — batch advances past a phase whose ready frontier is empty (recording it) rather than STOPping like the autonomous loop. Single-item selection is unchanged (pinned by a parity test). Documented in `references/roadmap-selection.md` §Parallel batch, with 6 new unit tests (suite 12).
