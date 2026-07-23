@@ -21,7 +21,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "bash shared/resources/resolve-platform.test.sh && bash shared/resources/advance-pipeline-lock.test.sh && bash shared/resources/develop-pipeline-on-precompact.test.sh && bash skills/jira-sprint-review-prep/tests/fixture.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'skills/develop-bug/tests/*.test.js' 'skills/review-bug/tests/*.test.js' 'skills/sync-jira-epic/tests/*.test.js' 'skills/sync-jira-story/tests/*.test.js' 'skills/sync-jira-task/tests/*.test.js' 'tests/*.test.js' 'shared/resources/tests/*.test.mjs' 'evals/shared/tests/*.test.mjs' 'evals/develop-task/protocol/*.test.mjs' 'evals/develop-story/protocol/*.test.mjs' 'evals/develop-next/protocol/*.test.mjs' 'evals/develop-next/unit/*.test.mjs'",
+    "test": "bash shared/resources/resolve-platform.test.sh && bash shared/resources/advance-pipeline-lock.test.sh && bash shared/resources/develop-pipeline-on-precompact.test.sh && bash skills/jira-sprint-review-prep/tests/fixture.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'skills/develop-bug/tests/*.test.js' 'skills/review-bug/tests/*.test.js' 'skills/sync-jira-epic/tests/*.test.js' 'skills/sync-jira-story/tests/*.test.js' 'skills/sync-jira-task/tests/*.test.js' 'tests/*.test.js' 'shared/resources/tests/*.test.mjs' 'evals/shared/tests/*.test.mjs' 'evals/develop-task/protocol/*.test.mjs' 'evals/develop-story/protocol/*.test.mjs' 'evals/develop-next/protocol/*.test.mjs' 'evals/develop-next/unit/*.test.mjs' 'evals/develop-batch/protocol/*.test.mjs'",
     "test:platform": "bash shared/resources/resolve-platform.test.sh",
     "eval:create-task": "node evals/shared/runner.mjs evals/create-task/scenarios/01-happy",
     "eval:create-task:all": "for s in evals/create-task/scenarios/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
@@ -38,6 +38,7 @@
     "eval:develop-story:resume": "node evals/shared/runner.mjs evals/develop-story/smoke/02-resume-mid-loop",
     "eval:develop-next": "node --test 'evals/develop-next/protocol/*.test.mjs' 'evals/develop-next/unit/*.test.mjs' && for s in evals/develop-next/step-isolation/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
     "eval:develop-next:smoke": "node evals/shared/runner.mjs evals/develop-next/smoke/01-select-and-dispatch",
+    "eval:develop-batch": "node --test 'evals/develop-batch/protocol/*.test.mjs'",
     "eval:all": "for s in evals/create-task/scenarios/*/ evals/create-story/scenarios/*/ evals/develop-task/step-isolation/*/ evals/develop-story/step-isolation/*/ evals/develop-next/step-isolation/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
     "validate": "python3 skills/create-skill/scripts/quick_validate.py",
     "validate:all": "printf '\\033[1mValidating skills\u2026\\033[0m\\n\\n'; pass=0; fail=0; for d in skills/*/; do if [ -f \"${d}SKILL.md\" ]; then if python3 skills/create-skill/scripts/quick_validate.py \"$d\"; then pass=$((pass+1)); else fail=$((fail+1)); fi; fi; done; echo ''; if [ $fail -eq 0 ]; then printf \"  \\033[32m\u25cf\\033[0m \\033[1m%d\\033[0m passed  \\033[2m0 failed\\033[0m\\n\" $pass; else printf \"  \\033[32m\u25cf\\033[0m \\033[1m%d\\033[0m passed  \\033[31m\u25cf\\033[0m \\033[1m%d\\033[0m failed\\n\" $pass $fail; fi; echo ''; [ $fail -eq 0 ]",

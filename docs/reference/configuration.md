@@ -53,7 +53,14 @@ developNext:                          # optional — develop-next roadmap orches
   baseBranch: develop
   qualityGateCommand: npm test        # merge gate run on every branch before gh pr merge
   mergeStrategy: merge                # merge | squash | rebase
+
+developBatch:                         # optional — develop-batch parallel fan-out
+  maxParallel: 4                      # max concurrent worktree pipelines (else waves)
 ```
+
+`develop-batch` reuses the `developNext:` keys above (same roadmap, base branch, merge
+gate, and strategy — single-item and batch runs never diverge) and adds only
+`developBatch.maxParallel`.
 
 ## Key reference
 
@@ -71,6 +78,7 @@ developNext:                          # optional — develop-next roadmap orches
 | `developNext.baseBranch` | branch name | `develop` | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to. |
 | `developNext.qualityGateCommand` | shell command | `npm test` | Local merge gate `develop-next` runs on every branch before `gh pr merge` (the whole gate for projects without PR CI). |
 | `developNext.mergeStrategy` | `merge` \| `squash` \| `rebase` | `merge` | Strategy passed to `gh pr merge`. |
+| `developBatch.maxParallel` | integer | `4` | Max concurrent worktree pipelines `develop-batch` fans out before processing the remainder in waves. Batch reuses all `developNext.*` keys for roadmap/base/gate/strategy. |
 
 ## QA artifacts are co-located
 
