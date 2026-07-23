@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.28.0] - 2026-07-23
+
 ### Added
 
 - **`develop-batch` skill** — parallel roadmap orchestrator, the fan-out sibling of `develop-next` (which builds one item at a time). Selects the maximal set of unblocked, **write-disjoint** roadmap items (via `select-next.mjs --batch`), fans each into its own git worktree, runs their `/develop-story` or `/develop-task` pipelines concurrently and fully autonomously, then merges the green PRs **serially** — rebasing each on the new base tip — and ticks the roadmap + Change Log per item. Develop in parallel, merge serially. Crash-safe via a batch run-state file (`.claude/state/develop-batch.state.json`), so re-running resumes where the last run stopped and a crash between any item's merge and tick can never re-select or re-dispatch it. Stops at an empty frontier, manual/blocked rows, planning gaps, or any pipeline HALT. Invoke with `/develop-batch`, `/develop-batch --dry-run` (read-only batch preview — fetch only, no worktrees/state), or wrap in `/loop /develop-batch` for continuous runs. Adds one batch-only config key `developBatch.maxParallel` (default `4`, waves beyond it) and otherwise reuses every `developNext.*` key (roadmap, base branch, merge gate, strategy) so single-item and batch runs never diverge. `create-branch` gains a linked-worktree-safe exception (branches from the base ref without checking it out). Ships a protocol test suite (`evals/develop-batch/`).
