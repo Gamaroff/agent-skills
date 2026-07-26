@@ -55,13 +55,27 @@ developNext:                          # optional — develop-next roadmap orches
   mergeStrategy: merge                # merge | squash | rebase
 
 developBatch:                         # optional — develop-batch parallel fan-out
-  maxParallel: 4                      # max concurrent worktree pipelines (else waves)
+  maxParallel: 4                      # GLOBAL ceiling on concurrent pipelines
   requireTouches: false               # true → defer un-annotated (+own-default) rows
+  maxResumeAttempts: 2                # re-dispatch budget for an interrupted item
+  maxRebatches: 3                     # Step 5.5 re-selection cap per invocation
+  worktreeSeedPaths: []               # gitignored files to copy into each worktree
+  resources:                          # optional — named execution resources
+    - name: local
+      capacity: 1                     # per-resource cap (1 = runs are not isolated)
+      testCommand: "npm test"
+    - name: build-box
+      capacity: 3
+      testCommand: "ssh build-box make test"
+      probe:                          # optional capacity probe (see the skill reference)
+        command: "curl -fsS --max-time 5 $PROBE_URL/health"
+        intervalSec: 60
+        timeoutSec: 10
 ```
 
 `develop-batch` reuses the `developNext:` keys above (same roadmap, base branch, merge
 gate, and strategy — single-item and batch runs never diverge) and adds
-`developBatch.maxParallel` and `developBatch.requireTouches`.
+`developBatch.maxParallel`, `developBatch.requireTouches`, `developBatch.resources`, `developBatch.worktreeSeedPaths`, `developBatch.maxResumeAttempts` and `developBatch.maxRebatches`.
 
 ## Key reference
 
@@ -79,8 +93,12 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `developNext.baseBranch` | branch name | `develop` | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to. |
 | `developNext.qualityGateCommand` | shell command | `npm test` | Local merge gate `develop-next` runs on every branch before `gh pr merge` (the whole gate for projects without PR CI). |
 | `developNext.mergeStrategy` | `merge` \| `squash` \| `rebase` | `merge` | Strategy passed to `gh pr merge`. |
-| `developBatch.maxParallel` | integer | `4` | Max concurrent worktree pipelines `develop-batch` fans out before processing the remainder in waves. Batch reuses all `developNext.*` keys for roadmap/base/gate/strategy. |
+| `developBatch.maxParallel` | integer | `4` | **Global** ceiling on concurrent worktree pipelines across all resources. Admission is rolling — a freed slot is refilled immediately, not at a wave boundary. With `resources` set, the effective cap is `min(maxParallel, sum(capacity))`. Batch reuses all `developNext.*` keys for roadmap/base/gate/strategy. |
 | `developBatch.requireTouches` | boolean | `false` | When `true`, the `--batch` selector defers all but one un-annotated (`touches:`-less, `+own`-default) row per batch instead of only warning — makes write-conflicts impossible by construction rather than caught at merge. Default off is non-breaking. |
+| `developBatch.resources` | array | *(unset)* | Named execution resources, each with `name`, `capacity`, optional `testCommand`, `env` and `probe`. Array order is the placement tiebreak. **Unset = one implicit resource at `maxParallel`**, i.e. exactly the pre-existing single-lane behaviour. See the skill's `references/execution-resources.md` for the probe contract. |
+| `developBatch.worktreeSeedPaths` | array | `[]` | Gitignored paths copied from the main tree into each fresh worktree. A `git worktree add` carries no gitignored files, and a missing runner config usually degrades *silently* rather than failing. |
+| `developBatch.maxResumeAttempts` | integer | `2` | How many times an **externally interrupted** item (plan mode, permission denial, compaction) may be re-dispatched before it becomes `haltKind: "interrupted-exhausted"`. Does not apply to genuine pipeline HALTs, which are never re-dispatched. |
+| `developBatch.maxRebatches` | integer | `3` | Cap on Step 5.5 re-selections within one invocation. Re-batching also requires that the previous batch ticked at least one roadmap row, which is the real anti-spin guard. |
 
 ## QA artifacts are co-located
 

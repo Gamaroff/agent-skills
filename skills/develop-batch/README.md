@@ -58,6 +58,62 @@ project-specific and lives in the roadmap's Legend. An **un-annotated row is tre
    [`develop-next/assets/project-completion-roadmap.template.md`](../develop-next/assets/project-completion-roadmap.template.md)
    and stops for you to fill it in (and to add `touches:` annotations so batching is safe).
 
+## Execution resources (optional)
+
+By default `develop-batch` treats every pipeline as interchangeable and caps concurrency at
+`developBatch.maxParallel`. If your pipelines actually run on **different machines** — a
+laptop and a build box, say — declare them and the scheduler will place work by rule instead
+of by whoever is driving:
+
+```yaml
+developBatch:
+  maxParallel: 4              # global ceiling
+  worktreeSeedPaths: [".testrunner.env"]
+  resources:
+    - name: local
+      capacity: 1             # runs share fixed ports → strictly one at a time
+      testCommand: "npm test"
+    - name: build-box
+      capacity: 3             # runs are isolated → several can coexist
+      testCommand: "ssh build-box make test"
+      probe:
+        command: "curl -fsS --max-time 5 $PROBE_URL/health"
+        intervalSec: 60
+```
+
+**Set `capacity` from isolation, not speed.** A resource whose runs share host ports or one
+database is `capacity: 1` — two concurrent runs there corrupt each other rather than merely
+queueing.
+
+**`worktreeSeedPaths` matters more than it looks.** A fresh `git worktree add` carries no
+gitignored files, so a runner config that lives outside git is simply absent — and runners
+typically respond by *silently* falling back to a local run rather than failing. That is how
+a batch item reports green having never touched the machine it was assigned.
+
+### Capacity probes
+
+A probe answers "can this resource take more work *right now*". The contract is exit-code
+first, so one line of shell is enough:
+
+- exit 0, no output → available (static `capacity` governs)
+- exit 0, `{"freeSlots": N}` → effective capacity is `min(capacity, inflight + N)`
+- non-zero exit → **saturated**, withhold; first stdout line is logged as the reason
+- timeout or spawn failure → **treated as available** (a flaky probe must never stall a batch)
+
+A probe can only ever *subtract* capacity, never grant it — so a probe bug slows a batch but
+cannot overload a host. Probes must be permission-allowlisted, or an unattended run stalls on
+an approval prompt. Full contract and worked examples:
+[`references/execution-resources.md`](references/execution-resources.md).
+
+### Two things that will bite you
+
+- **Dispatch in the background.** Rolling admission needs *individual* completions. Dispatch a
+  group and await the group and you get wave barriers back under a different name — a freed
+  slot sits idle until its slowest sibling finishes.
+- **Never start a batch in plan mode.** Plan mode forbids writes, so every dispatched pipeline
+  stops mid-flight quoting the plan-mode directive instead of failing its own gate. They are
+  all resumable, but you will lose the run.
+
 ## What "green" means
 
 Identical to `develop-next` — the per-item merge gate is layered, and all must hold before

@@ -144,16 +144,26 @@ test("SKILL.md: requires the linked-worktree-safe create-branch", () => {
   assert.match(flat, /without checking out the base/i);
 });
 
-test("no consumer-project facts leak into the library skill", () => {
+test("no consumer-project facts leak into the library skill", async () => {
   const banned = [
     /\benv gh\b/, // a consumer CLAUDE.md command prefix
     /tinker[\s-]?city/i, // consumer project name
     /tc-wt/, // consumer-specific worktree prefix
     /npm run lint && npm run typecheck && npm test/, // hardcoded gate
+    // Execution-resource docs are the easiest place to leak a real host: the
+    // worked examples are one careless copy-paste away from a LAN IP.
+    /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, // any literal IP
+    /npm run test:(remote|auto|local)\b/, // consumer-specific runner scripts
+    /\bdanger[-\s]?server\b/i, // consumer's host nickname
   ];
+  const reference = await readFile(
+    path.join(SKILL_DIR, "references", "execution-resources.md"),
+    "utf-8",
+  );
   for (const [name, content] of [
     ["SKILL.md", skill],
     ["README.md", readme],
+    ["references/execution-resources.md", reference],
   ]) {
     for (const re of banned) {
       assert.doesNotMatch(content, re, `${name} still contains consumer-specific fact ${re}`);
@@ -174,6 +184,10 @@ test("config keys documented in SKILL.md and configuration reference", async () 
     "developNext.mergeStrategy",
     "developBatch.maxParallel",
     "developBatch.requireTouches",
+    "developBatch.resources",
+    "developBatch.worktreeSeedPaths",
+    "developBatch.maxResumeAttempts",
+    "developBatch.maxRebatches",
   ]) {
     assert.ok(skill.includes(key), `SKILL.md missing ${key}`);
   }
@@ -190,4 +204,91 @@ test("SKILL.md: un-annotated (+own-default) rows are warned on and deferrable", 
   assert.match(flat, /assumed, not verified/i);
   assert.match(flat, /--require-touches/);
   assert.match(flat, /requireTouches/);
+});
+
+// ── scheduler contract (capacity-aware rolling admission) ────────────────────
+
+test("schedule.mjs exists and is executable", async () => {
+  const p = path.join(SKILL_DIR, "scripts", "schedule.mjs");
+  await access(p, constants.X_OK);
+});
+
+test("placement is delegated to the planner, never hand-picked", () => {
+  assert.match(flat, /schedule\.mjs plan/);
+  assert.match(flat, /Placement is never hand-picked/i);
+});
+
+test("admission is rolling, not wave-barriered", () => {
+  // The old wave language must be gone — it is what made a freed slot sit idle.
+  assert.doesNotMatch(flat, /in waves of that size/i);
+  assert.doesNotMatch(flat, /process the remainder in waves/i);
+  assert.match(flat, /WAIT for the NEXT pipeline to report — not all of them/i);
+});
+
+test("background dispatch is mandated, with the degraded fallback spelled out", () => {
+  // Awaiting a whole group silently reinstates waves; this is the #1 way the
+  // rolling design reverts in practice.
+  assert.match(flat, /Dispatch in the background/i);
+  assert.match(flat, /Degraded fallback/i);
+});
+
+test("the dispatch directive carries the resource and its test command", () => {
+  assert.match(flat, /<resourceName>/);
+  assert.match(flat, /<testCommand>/);
+  assert.match(flat, /<seedPaths>/);
+});
+
+test("a silent runner fallback is not accepted as a pass", () => {
+  assert.match(flat, /a silent fallback is not a pass/i);
+  assert.match(flat, /placement failure/i);
+});
+
+test("gate steps run foreground with a Monitor-style hold, and CI is not polled", () => {
+  assert.match(flat, /foreground/i);
+  assert.match(flat, /Monitor-style/i);
+  assert.match(flat, /Do \*\*not\*\* poll CI|do not poll CI/i);
+});
+
+test("interrupted is distinguished from halted, and fails safe to halt", () => {
+  assert.match(flat, /interrupted-exhausted/);
+  assert.match(flat, /re-place/i);
+  assert.match(flat, /fails safe to `halt`/i);
+});
+
+test("plan mode is called out as a preflight stop", () => {
+  assert.match(flat, /Do not run this skill in plan mode/i);
+});
+
+test("state schema carries the new fields and drops the ad-hoc ones", () => {
+  for (const key of ['"resource"', '"testCommand"', '"attempts"', '"interrupted"', '"haltKind"']) {
+    assert.match(skill, new RegExp(key.replace(/["]/g, '"')), `state schema missing ${key}`);
+  }
+  // `wave` and `lane` were operator improvisation that never had semantics.
+  assert.doesNotMatch(skill, /"wave"\s*:/);
+  assert.doesNotMatch(skill, /"lane"\s*:/);
+});
+
+test("in-flight is derived, never persisted as a counter", () => {
+  assert.match(flat, /Never persist a slot counter/i);
+});
+
+test("the merge lane stays serial AND deferred until development finishes", () => {
+  assert.match(flat, /Never parallelize this lane/i);
+  assert.match(flat, /Step 3 begins only once the pending queue is empty/i);
+});
+
+test("Step 5.5 re-batches only on real progress", () => {
+  assert.match(flat, /Step 5\.5/);
+  assert.match(flat, /ticked \*\*zero\*\* roadmap rows|the previous batch ticked/i);
+  // Mid-Step-2 top-up of hard-excluded rows is unsafe and must be refused.
+  assert.match(flat, /Do not attempt this mid-Step-2/i);
+});
+
+test("execution-resources reference exists and documents the probe contract", async () => {
+  const ref = await readFile(path.join(SKILL_DIR, "references", "execution-resources.md"), "utf-8");
+  assert.match(ref, /freeSlots/);
+  assert.match(ref, /can only ever subtract/i);
+  assert.match(ref, /never stalls a batch/i);
+  assert.match(ref, /Rejected alternative/i);
+  assert.match(ref, /rolling merges/i);
 });
