@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.29.0] - 2026-07-26
+
 ### Added
 
 - **`develop-batch` gains a capacity-aware rolling scheduler (`scripts/schedule.mjs`)** — placement and admission move out of operator improvisation and into deterministic code. Previously the skill had **no routing seam at all**: the Step 2 dispatch directive carried exactly two placeholders (`<dir>`, `<baseBranch>`), so on a multi-machine setup *which host ran which suite* had to be hand-injected into every sub-agent prompt; Step 2 was wave-barriered, so a freed lane sat idle until its slowest sibling finished; and `maxParallel` was read as a global cap by the skill while at least one consumer's config described it as a per-host cap. New optional `developBatch.resources` declares named execution resources (`name`, `capacity`, `testCommand`, optional `env` and `probe`), with `maxParallel` now unambiguously the **global** ceiling and `capacity` the per-resource one (`min(maxParallel, sum(capacity))` when both are set). `schedule.mjs plan` returns `{admit[], hold[], inflight, globalCap}`; `resources` and `probe` are diagnostics. Placement filters to resources under static capacity, under probe-effective capacity and not saturated, then spreads by utilisation ratio with declaration order as the tiebreak. **Zero-config projects are byte-identical to before** — no `resources` yields one implicit resource at `maxParallel` and the four new directive paragraphs are omitted entirely. Exports 8 pure functions with 41 unit tests (`evals/develop-batch/unit/schedule.test.mjs`); `select-next.mjs` is deliberately untouched, since selection answers *what can run together* and scheduling answers *where and when*.
