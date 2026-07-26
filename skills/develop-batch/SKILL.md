@@ -49,9 +49,23 @@ batch runs never diverge), plus one batch-only key. Every key has a default:
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
 | `developBatch.maxParallel`       | `4`                                              | Step 2            |
 | `developBatch.requireTouches`    | `false`                                          | Step 1            |
+| `developBatch.resources`         | *(unset — one implicit resource)*                | Step 2            |
+| `developBatch.worktreeSeedPaths` | `[]`                                             | Step 2            |
+| `developBatch.maxResumeAttempts` | `2`                                              | Steps 0, 2        |
+| `developBatch.maxRebatches`      | `3`                                              | Step 5.5          |
 
-`maxParallel` caps how many pipelines run concurrently; a larger batch is processed in
-waves of that size. `requireTouches` (default off, non-breaking) hardens the write-footprint
+`maxParallel` is the **global** ceiling on concurrent pipelines across all resources.
+`resources` (optional) declares named execution resources with their own per-resource
+capacity, test command and optional capacity probe — see
+[`references/execution-resources.md`](references/execution-resources.md). **With no
+`resources` declared, behaviour is unchanged from a single-lane project**: one implicit
+resource at `maxParallel` capacity, and the dispatch directive renders exactly as before.
+`worktreeSeedPaths` lists gitignored files to copy from the main tree into each fresh
+worktree (a fresh `git worktree add` carries none, which silently changes how a
+runner behaves). `maxResumeAttempts` bounds re-dispatch of an externally-interrupted item;
+`maxRebatches` bounds Step 5.5.
+
+`requireTouches` (default off, non-breaking) hardens the write-footprint
 assumption: when `true`, the selector is invoked with `--require-touches` so it defers all but
 one un-annotated (`+own`-default) row per batch instead of merely warning — for teams that
 want write-conflicts impossible by construction rather than caught at merge. Apply any
@@ -68,6 +82,12 @@ project's own `CLAUDE.md`/`AGENTS.md` when running these (e.g. a required prefix
 ```json
 {
   "startedAt": "<iso>",
+  "schemaVersion": 2,
+  "globalCap": 4,
+  "resources": [{ "name": "local", "capacity": 1 }, { "name": "box", "capacity": 3 }],
+  "probeCache": {},
+  "rebatches": 0,
+  "lastSelectorSignature": "",
   "items": [
     {
       "id": "T40",
@@ -75,6 +95,11 @@ project's own `CLAUDE.md`/`AGENTS.md` when running these (e.g. a required prefix
       "commandArg": "<path>",
       "dir": "../wt-t40",
       "branch": "task/t40",
+      "resource": "box",
+      "testCommand": "ssh build-box make test",
+      "attempts": 0,
+      "interrupted": false,
+      "haltKind": null,
       "worktreeCreated": false,
       "dispatched": false,
       "prNumber": null,
@@ -88,6 +113,12 @@ project's own `CLAUDE.md`/`AGENTS.md` when running these (e.g. a required prefix
 }
 ```
 
+The booleans remain the source of truth — `resource`/`testCommand`/`attempts`/`interrupted`/
+`haltKind` are additive, and a v1 state file (no `schemaVersion`, no `resource`) resumes without
+migration: a missing `resource` attributes to the first configured resource, never a HALT.
+**Never persist a slot counter** — in-flight is always *derived* from the item flags
+(`schedule.mjs computeInflight`), which is what makes slot accounting crash-safe.
+
 Written at batch selection, updated as each item advances, **deleted only in Step 5** once
 every item is terminal (`ticked` or `halted`). This makes the parallel-develop →
 serial-merge → tick sequence recoverable: a crash between any item's merge and tick can
@@ -98,13 +129,20 @@ independently via its own Phase 0b machinery.
 
 ## Step 0 — Preflight
 
+0. **Do not run this skill in plan mode.** Plan mode forbids writes, so every dispatched
+   pipeline stops mid-flight quoting the plan-mode directive rather than failing its own
+   gate. If plan mode is active, STOP and say so — do not dispatch. (This is observed, not
+   hypothetical: it killed 4 of 5 running pipelines in a live batch.)
 1. **Run-state check.** If `.claude/state/develop-batch.state.json` exists, a prior batch
    did not finish — do **not** select a new batch. **Resume**: skip items already
    `ticked`; for each non-terminal item, resume from its recorded flags exactly as the
    per-item lane below would (`merged: true, ticked: false` → tick it; `dispatched: true,
-   pipelineDone: false` → re-enter that worktree's pipeline via its own lock/resume;
-   `worktreeCreated: true, dispatched: false` → dispatch it). In `--dry-run`: report the
-   pending batch and stop.
+   pipelineDone: false` → treat as **interrupted** and re-admit it via Step 2's planner —
+   the pipeline's own lock/resume picks up where it stopped; `worktreeCreated: true,
+   dispatched: false` → dispatch it). An interrupted item is **re-placed, not pinned** to
+   its previous resource — a different resource may now be idle, which is the point.
+   Rebuild in-flight counts from the item flags; never trust a persisted counter. In
+   `--dry-run`: report the pending batch and stop.
 2. **Dry-run short-circuit.** In `--dry-run` mode, run `git fetch origin <baseBranch>`
    (fetch only — never checkout or pull), then go straight to Step 1's selector call and
    print its JSON verbatim (batch / excluded / softOverlaps / unannotated / worktrees /
@@ -166,10 +204,30 @@ Selection rules, the two batching axes, and marker vocabulary:
 The dispatched command and path for each item both come from the selector's
 `worktrees[].run` / `batch[].command` — never hand-picked.
 
-## Step 2 — Fan out worktrees and dispatch the pipelines (parallel)
+## Step 2 — Rolling admission (dispatch as slots free, never in waves)
 
-For each item in `batch[]`, in `worktrees[]` order, up to `developBatch.maxParallel` at a
-time (process the remainder in waves):
+**Placement is never hand-picked.** Ask the planner where each item goes and whether a slot
+is free right now:
+
+```bash
+node <skillsDir>/develop-batch/scripts/schedule.mjs plan --state <statePath> --config <configPath>
+```
+
+It returns `{admit[], hold[], inflight, globalCap, probeCache, notes}`. Loop until every item
+is terminal:
+
+```
+while (pending items remain) or (anything is still in flight):
+  1. ADMIT — run `schedule.mjs plan`. For each entry in admit[]: create the worktree,
+     seed it, dispatch it (below), and record resource/testCommand/attempts/dispatched.
+     Re-run the planner until admit[] comes back empty.
+  2. WAIT for the NEXT pipeline to report — not all of them.
+  3. Classify and record that report, then go straight back to 1.
+```
+
+Invariants the planner enforces: `sum(inflight) ≤ globalCap`; `inflight[r] ≤ capacity(r)`;
+and `inflight[r] ≤` a probe's effective capacity when one is configured. In-flight is
+**derived** from item flags every tick, never persisted.
 
 1. **Create the worktree** from the selector's ready-made command (`worktrees[].shell`):
 
@@ -178,12 +236,21 @@ time (process the remainder in waves):
    ```
 
    Mark `worktreeCreated: true`. This is an isolated checkout on its own scratch branch off
-   the base — the pipeline cuts its own `feature/…` branch inside it.
+   the base — the pipeline cuts its own `feature/…` branch inside it. Then **seed it**: copy
+   every `developBatch.worktreeSeedPaths` entry from the main tree into `<dir>`. A fresh
+   worktree carries no gitignored files, and a missing runner config typically degrades
+   *silently* rather than failing.
 
-2. **Dispatch one agent per worktree.** Run the item's named command (`worktrees[].run`,
-   e.g. `/develop-task <path>`) **with its working directory set to `<dir>`**, prepending
-   the directive below (same mechanism as `develop-next` Step 2). Run the agents
-   concurrently — one per worktree — and mark each `dispatched: true`.
+2. **Dispatch one agent per admitted worktree.** Run the item's named command
+   (`worktrees[].run`, e.g. `/develop-task <path>`) **with its working directory set to
+   `<dir>`**, prepending the directive below. Mark `dispatched: true`.
+
+   **Dispatch in the background** so individual completions can be observed. This is what
+   makes admission rolling rather than wave-barriered: dispatching a group and waiting on
+   the group returns only when *all* of them finish, which silently reinstates waves.
+   *Degraded fallback:* if individual completions genuinely cannot be observed, re-run
+   `schedule.mjs plan` immediately after every returned group and never hold a freed slot
+   waiting for a sibling.
 
    > **AUTONOMOUS RUN (develop-batch):** You are running this pipeline inside the git
    > worktree at `<dir>` — set your working directory to `<dir>` for all git and file
@@ -195,18 +262,58 @@ time (process the remainder in waves):
    > an open, green, `accepted` PR and report back the PR number and final QA status.
    > Do **not** merge the PR — the batch orchestrator owns merging. All existing HALT
    > conditions remain HALTs.
+   >
+   > **Execution resource.** This pipeline is scheduled on `<resourceName>`. Run every
+   > test, QA and gate command as `<testCommand>` — do not substitute the project default
+   > and do not run the suite anywhere else.
+   >
+   > **Verify placement — a silent fallback is not a pass.** The suite's own output must
+   > confirm it ran on `<resourceName>`. If the runner falls back to a different execution
+   > path for any reason, that run does **not** count as green: report it as a placement
+   > failure with the runner's output verbatim and stop. Do not claim a pass you did not
+   > observe on the resource you were given.
+   >
+   > **Gate execution.** Run gate commands in the **foreground** and hold the turn with a
+   > Monitor-style wait rather than a fixed watchdog — a CPU-contended suite can
+   > legitimately run long, and a fixed timeout kills healthy runs. Do **not** poll CI in a
+   > loop; the orchestrator owns CI-gating and merging. Stop and report once your gate is
+   > green and the PR is `accepted`.
+   >
+   > **Worktree seeding.** This worktree is a fresh checkout and contains no gitignored
+   > files. Before the first gate run, copy `<seedPaths>` from the main working tree.
+
+   Omit the last four paragraphs entirely when no `resources` are configured — with a
+   single implicit resource the directive renders byte-identical to a single-lane project.
 
    Requires the linked-worktree-safe `create-branch` (it must create `feature/…` from the
    base **ref** without checking out the base branch, which is already held in the main
    tree — see `create-branch` SKILL.md §"Exception — linked worktree").
 
-3. **Barrier — wait for all dispatched pipelines.** Record each item's `prNumber` and
-   `pipelineDone: true`. If a pipeline **HALTs** (review NO-GO, develop stall, 5 QA cycles
-   without PASS, qa-fix with no changes, DoD gaps): mark that item `halted: true`, do
-   **not** merge it, leave its worktree in place for inspection, and continue — one item's
-   HALT must not sink the rest of the batch. Surface every HALT report verbatim in Step 5.
+3. **On each report, classify it and free the slot.** Do not wait for siblings.
+
+   | Report | Action | Slot |
+   | ------ | ------ | ---- |
+   | Green (PR number, `accepted`) | record `prNumber`, `pipelineDone: true` | freed |
+   | **HALT** — its own gate failed (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, rebase/merge conflict) | `halted: true` + `haltKind` + the report verbatim; the worktree is **left in place for inspection**; one item's HALT **must not sink the rest of the batch** | freed |
+   | **Interrupted** — something *external* stopped it mid-flight (plan mode, permission denial, compaction, user interrupt, tool outage) | `interrupted: true`, `attempts++`; re-queue at the tail and **re-place** it | freed |
+   | Interrupted past `maxResumeAttempts` | `halted: true`, `haltKind: "interrupted-exhausted"` | freed |
+
+   The halt-vs-interrupt call is `schedule.mjs`'s `classifyStop`, not a judgement call: a
+   report is **interrupted** only when it stopped *without* emitting one of the pipeline's
+   own HALT reports. Tiebreak on the worktree's `develop-pipeline.lock` — live and
+   non-terminal means resumable. Ambiguous with no lock **fails safe to `halt`**: wrongly
+   halting costs one manual resume, wrongly resuming can re-run a pipeline that had already
+   decided to stop.
 
 ## Step 3 — Serial finalize lane (merge → tick, one item at a time)
+
+**Precondition: development is finished.** Step 3 begins only once the pending queue is
+empty and nothing is in flight. Merging is deliberately *not* interleaved with development —
+the merge gate runs `<qualityGateCommand>` per item, so it is itself a heavy scheduled
+workload. Interleaving it either lets it contend silently for the very resources the
+scheduler is protecting, or makes it take a slot and compete with development for throughput.
+See [`references/execution-resources.md`](references/execution-resources.md) §"Rejected
+alternative — rolling merges" before re-litigating this under time pressure.
 
 The discipline that makes soft overlaps harmless: **merge one PR at a time.** For each item
 with `pipelineDone: true` and not `halted`, in `batch[]` order, reusing `develop-next`'s
@@ -269,6 +376,28 @@ Mark `worktreeRemoved: true`. Then `git worktree prune` and `git worktree list` 
 check. **Leave the worktrees of `halted` items in place** for the operator to inspect and
 finish or discard.
 
+## Step 5.5 — Immediate re-batch (admit rows the merges just unblocked)
+
+Once every item is terminal and **at least one roadmap row was ticked**, re-run the selector
+*inside this invocation*. If it returns a non-empty `batch[]`, loop back to Step 1.
+
+Rows previously in `excluded[]` are now safe to take: they were held back because they
+hard-conflict on a `touches:` tag with a batched row, and that row's work is now on
+`<baseBranch>`. **Do not attempt this mid-Step-2.** While a conflicting PR is open but
+unmerged, a newly-admitted item branches from a base that lacks it and is guaranteed to
+collide at merge — `excluded[]` exists precisely to prevent that. Rows held back only by
+*capacity* need no re-selection at all; the rolling queue already admits them as slots free.
+
+Gate the decision on `schedule.mjs`'s `shouldRebatch`:
+
+| Guard | Stop when |
+| ----- | --------- |
+| Progress | the previous batch ticked **zero** roadmap rows (the real anti-spin guard — progress must be monotonic against the roadmap) |
+| Signature | the new `batch[]` id set equals `lastSelectorSignature` — the roadmap did not move |
+| Cap | `rebatches` has reached `developBatch.maxRebatches` |
+
+Record `rebatches` and `lastSelectorSignature` in the run state.
+
 ## Step 5 — Report + continue/stop
 
 Delete the run-state file **iff** every item is terminal (`ticked` or `halted`); otherwise
@@ -293,6 +422,8 @@ retain it for resume. Then end every run with a report:
 | Any item `halted` (pipeline / gate / rebase HALT)  | Fail loudly; leave its worktree for the operator    |
 | Selector returned `halt` (roadmap parse/lint)      | Don't guess on sequencing                           |
 | A tick push failed after rebase-retry              | Roadmap could not be advanced — operator decides    |
+| An item hit `haltKind: "interrupted-exhausted"`    | It kept being externally interrupted — a human should see why |
+| Step 5.5 declined to re-batch (no progress / same signature / cap) | The frontier is not moving; looping again cannot help |
 
 ## Continuous mode
 
