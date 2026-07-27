@@ -152,12 +152,12 @@ if [ -n "$JIRA_URL" ]; then
 elif echo "$REMOTE_URL" | grep -qi "github\.com"; then
   PLATFORM="github"
   REPO_SLUG=$(echo "$REMOTE_URL" \
-    | sed -E 's|.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+    | sed -E 's|.*github\.com[:/]||; s|\.git$||')
 
 elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
   PLATFORM="bitbucket"
   BB_PATH=$(echo "$REMOTE_URL" \
-    | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+    | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
