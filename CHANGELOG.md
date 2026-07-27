@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.29.2] - 2026-07-27
+
 ### Fixed
 
 - **`develop-next` can now merge on Bitbucket — Step 3 was GitHub-only, making the skill inoperable on Bitbucket repos.** All four hosting calls (`gh pr merge`, `gh pr view --json headRefOid`, `gh pr checks`, and the Step 1 already-done `gh pr list`) were unconditional `gh` invocations with no platform detection, unlike `create-pr`/`qa-fix`/`create-issue` which already branch on `resolve-platform.sh`. `gh` cannot address a Bitbucket remote at all (`gh repo view` fails with *"none of the git remotes … point to a known GitHub host"*), so this was not a graceful degrade: the loop would select an item, run its full pipeline, open the PR — then halt at the merge, defeating one of the three manual gaps `develop-next` exists to close, and leaving a run-state file mid-flight on every item. Step 0 now resolves `VCS` once via the shared resolver (auto-bundled into `references/`) and Steps 1 and 3 branch on it; the GitHub path is byte-identical to before.
