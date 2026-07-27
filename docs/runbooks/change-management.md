@@ -1,5 +1,16 @@
 # Runbook — Change Management
 
+> ### Is this the right runbook?
+>
+> **Use this if** mid-pipeline conditions changed and the current PRD/epic/story plan no longer fits — pivots, missing reqs, blocked stories.
+>
+> **Use a different runbook if:**
+> - You're starting fresh, not changing course → [`story-development.md`](./story-development.md)
+> - The change is a routine bug → [`bug-fix.md`](./bug-fix.md)
+> - You're not sure → [decision tree](../concepts/which-path.md)
+
+---
+
 > **Audience:** anyone responding to a pivot, blocker, or scope change mid-project.
 
 > ⚠️ **Epic 3.2 pending:** A proactive change-risk assessment guide (preventing pivots before they happen) will link here once Epic 3.2 lands. This runbook covers reactive response; Epic 3.2 will add the preventive layer.

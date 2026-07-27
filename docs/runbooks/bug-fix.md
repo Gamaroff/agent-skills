@@ -1,5 +1,16 @@
 # Runbook — Bug Fix
 
+> ### Is this the right runbook?
+>
+> **Use this if** you're tracking down a bug in your local development cycle (not a live production incident).
+>
+> **Use a different runbook if:**
+> - The bug is in production right now → [`hotfix.md`](./hotfix.md)
+> - The bug fix needs PRD/epic-level planning (architectural change) → [`story-development.md`](./story-development.md)
+> - You're not sure → [decision tree](../concepts/which-path.md)
+
+---
+
 > **Audience:** developers responding to a QA finding or a reported bug inside the normal pipeline.
 
 When QA identifies a bug — during story review or after deployment — record it as a structured bug report, fix it, and retest. This runbook covers the loop without re-running a full `develop-story` cycle.

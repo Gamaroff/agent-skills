@@ -1,5 +1,16 @@
 # Runbook — Parallel Story Development
 
+> ### Is this the right runbook?
+>
+> **Use this if** you have 2+ developers (or 2+ agent sessions) shipping interdependent stories simultaneously.
+>
+> **Use a different runbook if:**
+> - You're alone, shipping one story end-to-end → [`story-development.md`](./story-development.md)
+> - The work is internal and not user-facing → [`task-development.md`](./task-development.md)
+> - You're not sure → [decision tree](../concepts/which-path.md)
+
+---
+
 > **Audience:** teams developing multiple stories of one epic simultaneously without merge conflicts.
 
 > ⚠️ **Epic 3.2 pending:** An advanced multi-team and cross-epic coordination guide will link here once Epic 3.2 lands. The steps below cover single-repo parallel stories within one epic; Epic 3.2 will extend this to larger-scale parallel patterns.

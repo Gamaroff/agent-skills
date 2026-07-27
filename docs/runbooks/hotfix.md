@@ -1,5 +1,16 @@
 # Runbook — Hotfix
 
+> ### Is this the right runbook?
+>
+> **Use this if** something is broken in production *right now* and a normal story-cycle is too slow.
+>
+> **Use a different runbook if:**
+> - The work is internal (refactor, infra) → [`task-development.md`](./task-development.md)
+> - The work is a user-facing feature/bug that is NOT live-broken → [`story-development.md`](./story-development.md)
+> - You're not sure → [decision tree](../concepts/which-path.md)
+
+---
+
 > **Audience:** developers shipping an emergency production fix outside the normal develop-story / develop-task flow.
 
 A hotfix branches from `main` (not `develop`), ships a minimal targeted change, and is propagated back to `develop` after merge. Use this runbook only when production is broken and you cannot wait for the regular pipeline.
