@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`develop-batch` worktree seeding now specifies a path-preserving copy.** Step 2 said only "copy every `developBatch.worktreeSeedPaths` entry from the main tree into `<dir>`", which reads naturally as `cp "$p" "$dir/"` — correct for every entry that is a repo-root basename, and silently wrong for any that is not. Two entries sharing a basename both land at the same flattened destination: the second clobbers the first, *and* the nested location that actually needed the file is never created. Nothing fails; the seed step reports success and the worktree looks configured, so the defect surfaces much later as whatever the missing file was supposed to prevent. Found downstream by a consumer that seeds both a repo-root `.env` and a per-workspace `apps/<svc>/.env` — only the nested one carried the database URL its test run needed, so a flattening copy would have re-created the exact worktree failure the entry was added to fix. Step 2 and `docs/reference/configuration.md` now state that entries are **repo-relative paths**, show the `mkdir -p "$dir/$(dirname "$p")" && cp "$p" "$dir/$p"` form (with `rsync -R` as the one-liner), and name the clobber as the failure mode rather than leaving it to be rediscovered.
+
 ## [v0.29.3] - 2026-07-27
 
 ### Added
