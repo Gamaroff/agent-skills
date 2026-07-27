@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.29.3] - 2026-07-27
+
 ### Added
 
 - **Runbook tutorial wrappers (epic 3) — "Before you start" anchors, satellite callouts, and a first-time-errors section.** The runbooks were written as reference material and read as such: correct, dense, and hostile to anyone arriving without the shape of the pipeline already in their head. `story-development.md` and `task-development.md` now open with a **Before you start** block that says plainly what the page assumes, points first-timers at the 60-minute quickstart instead, lists the three standards worth skimming (file-naming, status-lifecycle, epic-registry), and — most useful when someone has landed in the wrong place — enumerates the conditions under which a *different* runbook is the right one, with the decision tree as the fallback. The four satellite runbooks (`bug-fix`, `hotfix`, `change-management`, `create-parallel-stories`) get the short form of the same callout, so no runbook is now an entry point without saying so.
