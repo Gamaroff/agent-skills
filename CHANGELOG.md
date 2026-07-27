@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.29.1] - 2026-07-27
+
 ### Fixed
 
 - **`finalise` granted acceptance without ever looking at CI.** It verified the PR *review* decision (`pr_review_decision == APPROVED`) and stopped there — grepping the skill for `gh pr checks` or `statusCheckRollup` returned nothing — so an approved-but-red or approved-but-still-running PR passed the gate either way. Observed live: a task was marked `accepted` while its Playwright lane was still `queued`; the job then failed and the acceptance had to be withdrawn by hand. **Approval is a human judgement about the diff; the rollup is a machine result about the code**, and the skill was reading only the first. Adds a CI column to the decision matrix and a resolver that maps the rollup to `SUCCESS` / `FAILURE` / `PENDING` / `NONE` / `UNKNOWN`, with the raw per-job conclusions recorded in the DoD running summary so the decision stays auditable. Only `SUCCESS` accepts. `PENDING` is explicitly non-acceptance — *waiting is the correct action, assuming is not* — and `UNKNOWN` (a failed query) degrades to `PENDING` rather than to success, so the resolver cannot fail open. `NONE` is recorded in the DoD summary as *unverified by CI* instead of being silently rounded up. A green rollup on an ancestor commit is likewise called out as evidence about *that* commit.
