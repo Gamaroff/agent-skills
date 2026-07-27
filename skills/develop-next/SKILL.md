@@ -27,7 +27,11 @@ Read once per run from the consumer project's `skills-config.yaml` (`developNext
 | `developNext.qualityGateCommand` | `npm test`                                       | Step 3 merge gate |
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
 
+`mergeStrategy` is always written in `gh` vocabulary regardless of host; Step 3 translates it for Bitbucket (`merge` → `merge_commit`, `rebase` → `fast_forward`). Do not put Bitbucket strategy names in `skills-config.yaml`.
+
 Apply any project-wide command conventions from the consumer project's own CLAUDE.md when running these (e.g. a required `env` prefix for `gh`).
+
+**Hosting platform.** Steps 1 and 3 support **GitHub** (via `gh`) and **Bitbucket** (via the REST API), resolved per-run by `references/resolve-platform.sh` in Step 0. Bitbucket requires `BITBUCKET_USERNAME` and `BITBUCKET_APP_PASSWORD` in the environment, plus `curl` and `jq`.
 
 ## Run state (crash safety + single-flight)
 
@@ -54,6 +58,27 @@ Written at selection, updated after each of Steps 2–4, **deleted only in Step 
 3. **Dry-run short-circuit.** In `--dry-run` mode, run `git fetch origin <baseBranch>` (fetch only — never checkout or pull), then go straight to Step 1 against the working tree's roadmap. Skip 4–5.
 4. `git status --porcelain` — if the working tree is dirty: **HALT**, list the dirty paths. Never stash or discard.
 5. `git checkout <baseBranch> && git pull --ff-only origin <baseBranch>` — on non-ff or conflict: **HALT** with the git output.
+6. **Resolve the platform.** Steps 1 and 3 talk to the hosting service; resolve `VCS` once here so both branch on the same value. See `references/platform-detection.md` for the full resolver spec.
+
+   ```bash
+   source references/resolve-platform.sh
+   # VCS = github | bitbucket; TRACKER = jira | github
+
+   if [ "$VCS" = "bitbucket" ]; then
+     # Portable across GNU and BSD sed — strip the host prefix and the .git
+     # suffix in two passes rather than one lazy-quantified capture (`[^/]+?`
+     # is a GNU extension; BSD sed rejects it with "repetition-operator
+     # operand invalid").
+     BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+     BB_WORKSPACE=${BB_PATH%%/*}
+     BB_REPO=${BB_PATH##*/}
+     BB_API="https://api.bitbucket.org/2.0"
+     [ -n "$BITBUCKET_USERNAME" ] && [ -n "$BITBUCKET_APP_PASSWORD" ] || {
+       echo "BITBUCKET_USERNAME / BITBUCKET_APP_PASSWORD not set — Step 3 cannot merge"; HALT; }
+   fi
+   ```
+
+   > **Do not verify Bitbucket credentials with `GET /2.0/user`.** That endpoint requires the `read:user` scope, which app passwords scoped for PR work commonly lack — it returns 403 while PR and repository calls succeed. Verify against the repository instead (`GET ${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}` → 200) if a preflight check is wanted at all.
 
 ## Step 1 — Select the next item
 
@@ -69,7 +94,17 @@ Act on the JSON `status`:
 
 - **`halt` with `missing: true`** (no roadmap file at `roadmapPath`) → this project has no completion roadmap yet. **Do not fabricate one.** In an interactive/one-shot run, offer to scaffold a starter from [`assets/project-completion-roadmap.template.md`](assets/project-completion-roadmap.template.md) at `roadmapPath` (create parent dirs), then **STOP** for the user to populate it with real items — an empty roadmap has nothing to build. In a `/loop` run, **STOP** and notify (no one is present to author it). Never auto-create-and-proceed.
 - **`selected`** → record the `item`, `rationale`, and `skipped[]` for the run report; write the run-state file. In `--dry-run`: print them and **stop here**.
-  - **Already-done guard:** if the item's document frontmatter is already `status: accepted` and its PR is merged (`gh pr list --state merged --head <branch>` or the document's PR link), the roadmap tick was lost — skip straight to **Step 4**.
+  - **Already-done guard:** if the item's document frontmatter is already `status: accepted` and its PR is merged, the roadmap tick was lost — skip straight to **Step 4**. Query per `VCS` (resolved in Step 0), or fall back to the document's own PR link:
+
+    ```bash
+    if [ "$VCS" = "bitbucket" ]; then
+      curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" --get \
+        --data-urlencode 'q=source.branch.name="<branch>" AND state="MERGED"' \
+        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests" | jq -r '.values[0].id // empty'
+    else
+      gh pr list --state merged --head "<branch>" --json number --jq '.[0].number // empty'
+    fi
+    ```
 - **`stop`** → **STOP**: report `stopReason` + `detail`, send a push notification, end the loop. Reasons: `human-gated` (`manual`/🚧 frontier), `planning-gap` (a `/create-story` / `/create-epic` row — authoring is interactive and its output needs human review, so it is never run unattended), `manual-checkpoint` (the next item names no runnable command or no resolvable path — e.g. a "run `/review-prd`" checkpoint), `phase-blocked`, `roadmap-complete`.
 - **`halt`** (no parseable roadmap content, exit 1) → **HALT**: surface `lint.errors` verbatim. The selector is deliberately tolerant (archived deps, recap rows, and annotation rows are non-fatal warnings — see [`references/roadmap-selection.md`](references/roadmap-selection.md)); a halt means the file could not be parsed as a roadmap at all. `⏭️`/`SKIP` rows are stepped past automatically and never stop the loop. The dispatched command and its story/task path both come from the selector's `item.command` / `item.commandArg`.
 
@@ -85,18 +120,74 @@ If the pipeline HALTs (review NO-GO, develop stall, 5 QA cycles without PASS, qa
 
 Runs only after the pipeline completes Step 8 with the PR open and the item `accepted`.
 
+Every command below branches on `VCS` (resolved in Step 0). The GitHub path is unchanged; the Bitbucket path uses the REST API because `gh` cannot address a Bitbucket remote at all (`gh repo view` fails outright — it is not a fallback, it is inoperable).
+
 1. **Verify green:**
    - QA gate file decision is `PASS` and the document frontmatter is `accepted` (finalise output).
-   - **Head-SHA check:** `gh pr view <PR#> --json headRefOid,state` must match `git rev-parse HEAD` on the local PR branch. Mismatch means the branch moved since it was tested → **HALT** (never gate one commit and merge another).
-   - If the PR has CI checks, `gh pr checks <PR#>` must be all green. Additionally (and always, since not every project runs CI on PRs), run `<qualityGateCommand>` on the PR branch.
-   - Any failure → **HALT**: report the failing command's output, do not merge, do not tick.
-2. **Merge** with the configured strategy:
+   - **Head-SHA check** — the PR's source commit must equal `git rev-parse HEAD` on the local PR branch. Mismatch means the branch moved since it was tested → **HALT** (never gate one commit and merge another).
+
+     ```bash
+     if [ "$VCS" = "bitbucket" ]; then
+       PR_HEAD=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+         "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}" \
+         | jq -r '.source.commit.hash')
+       PR_STATE=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+         "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}" \
+         | jq -r '.state')
+     else
+       PR_HEAD=$(gh pr view "$PR_ID" --json headRefOid --jq '.headRefOid')
+       PR_STATE=$(gh pr view "$PR_ID" --json state --jq '.state')
+     fi
+     # Bitbucket returns the full 40-char hash; compare on the common prefix.
+     [ "${PR_HEAD:0:12}" = "$(git rev-parse HEAD | cut -c1-12)" ] || HALT
+     ```
+
+   - **CI checks** — if the PR has them, all must be green.
+     - **GitHub:** `gh pr checks <PR#>`.
+     - **Bitbucket:** `GET ${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/commit/${PR_HEAD}/statuses` — every `values[].state` must be `SUCCESSFUL`. An **empty** `values[]` means no CI reported (Pipelines disabled, or the run has not posted yet) → treat as _no checks_, not as failure.
+     - **Best-effort on Bitbucket:** this call needs the app password's `read:pipeline` scope. A `403 "Your credentials lack one or more required privilege scopes"` is **not** a merge blocker — log a warning and continue to the quality gate. Bitbucket app passwords are commonly scoped to PR + repository access only, and failing the merge on a _missing read permission_ would block every merge on an otherwise-green PR.
+   - **Always**, on both platforms and regardless of CI: run `<qualityGateCommand>` on the PR branch. This is the real gate — not every project runs CI on PRs, and on Bitbucket the CI read may be unavailable per the note above.
+   - Any failure other than the tolerated 403 → **HALT**: report the failing command's output, do not merge, do not tick.
+
+2. **Merge** with the configured strategy.
+
+   `mergeStrategy` is expressed in `gh` vocabulary (`merge` / `squash` / `rebase`) and **must be translated** for Bitbucket, whose API accepts a different, non-overlapping set. Passing `merge` straight through is rejected:
+
+   | `developNext.mergeStrategy` | GitHub (`gh pr merge`) | Bitbucket (`merge_strategy`) |
+   | --------------------------- | ---------------------- | ---------------------------- |
+   | `merge` (default)           | `--merge`              | `merge_commit`               |
+   | `squash`                    | `--squash`             | `squash`                     |
+   | `rebase`                    | `--rebase`             | `fast_forward`               |
 
    ```bash
-   gh pr merge <PR#> --<mergeStrategy> --delete-branch
+   if [ "$VCS" = "bitbucket" ]; then
+     case "$mergeStrategy" in
+       merge)  BB_STRATEGY=merge_commit ;;
+       squash) BB_STRATEGY=squash ;;
+       rebase) BB_STRATEGY=fast_forward ;;
+       *)      echo "unknown mergeStrategy: $mergeStrategy" && HALT ;;
+     esac
+     # close_source_branch is Bitbucket's equivalent of gh's --delete-branch.
+     jq -n --arg m "Merge PR #${PR_ID}: ${PR_TITLE}" --arg s "$BB_STRATEGY" \
+       '{type:"pullrequest",message:$m,merge_strategy:$s,close_source_branch:true}' \
+       > /tmp/dn-merge.json
+     MERGE_RESULT=$(curl -s -X POST \
+       -H "Content-Type: application/json" \
+       -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+       --data-binary @/tmp/dn-merge.json \
+       "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/merge")
+     rm -f /tmp/dn-merge.json
+     # MERGED is the only success state; anything else (conflict, protection,
+     # scope error) carries an `error.message` — surface it verbatim.
+     [ "$(echo "$MERGE_RESULT" | jq -r '.state')" = "MERGED" ] || HALT
+   else
+     gh pr merge "$PR_ID" --"$mergeStrategy" --delete-branch
+   fi
    ```
 
-   On merge failure (conflict, protection): **HALT** with the `gh` output. Mark `merged: true` in the run state.
+   On merge failure (conflict, protection): **HALT** with the platform's output verbatim. Mark `merged: true` in the run state only on success.
+
+   > **Parsing note (Bitbucket):** the merge response embeds rendered HTML that can contain raw control characters, which makes some `jq` invocations fail on the _response_ even though the merge itself succeeded. **Never retry a merge on a parse error** — re-query `GET …/pullrequests/${PR_ID}` and check `.state` first, or you risk a duplicate merge attempt against an already-merged PR.
 
    Story PRs target `<baseBranch>` (default `develop`) directly — there is no epic integration branch to promote. Epics are an organisational construct only; nothing special happens when an epic's last story merges.
 

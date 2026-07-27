@@ -93,6 +93,53 @@ test("SKILL.md: merge gate verifies PR head SHA and uses configured gate/strateg
   assert.match(skill, /gh pr checks/);
 });
 
+test("SKILL.md: merge path supports Bitbucket, not GitHub only", () => {
+  // `gh` cannot address a Bitbucket remote at all, so a gh-only Step 3 makes
+  // the skill inoperable on Bitbucket repos — it selects and dispatches, then
+  // halts at the merge, defeating one of the three gaps it exists to close.
+  assert.match(skill, /resolve-platform\.sh/);
+  assert.match(skill, /\$VCS.*=.*"bitbucket"|VCS.*bitbucket/s);
+  // Every gh call site must have a Bitbucket counterpart.
+  assert.match(skill, /pullrequests\/\$\{PR_ID\}\/merge/); // merge
+  assert.match(skill, /\.source\.commit\.hash/); // head-SHA check
+  assert.match(skill, /commit\/\$\{PR_HEAD\}\/statuses/); // CI checks
+  assert.match(skill, /state="MERGED"/); // already-done guard
+});
+
+test("SKILL.md: mergeStrategy is translated for Bitbucket, not passed through", () => {
+  // Bitbucket's merge_strategy vocabulary does not overlap gh's: passing
+  // `merge`/`rebase` straight through is rejected by the API.
+  assert.match(skill, /merge_commit/);
+  assert.match(skill, /fast_forward/);
+  assert.match(skill, /close_source_branch/); // gh's --delete-branch equivalent
+});
+
+// Executable content only. Prose deliberately *names* these anti-patterns in
+// order to warn against them, so matching the whole document would fire on the
+// warnings themselves.
+// Shell comments are stripped too: the in-block comments explain *why* an
+// anti-pattern is avoided, and naming it there must not trip the check.
+const skillCode = [...skill.matchAll(/```(?:bash|sh)\n([\s\S]*?)```/g)]
+  .map((m) => m[1])
+  .join("\n")
+  .split("\n")
+  .filter((line) => !/^\s*#/.test(line))
+  .join("\n");
+
+test("SKILL.md: does not preflight Bitbucket auth against /2.0/user", () => {
+  // That endpoint needs the read:user scope, which PR-scoped app passwords
+  // commonly lack — it 403s while PR/repo calls succeed, so using it as a
+  // preflight produces a false negative that blocks every run.
+  assert.ok(skillCode.length > 0, "no bash blocks found to check");
+  assert.doesNotMatch(skillCode, /2\.0\/user|\$\{BB_API\}\/user/);
+});
+
+test("SKILL.md: shell is portable — no BSD-incompatible lazy quantifier", () => {
+  // `[^/]+?` is a GNU sed extension; BSD sed (macOS default) rejects it with
+  // "repetition-operator operand invalid", silently yielding an empty repo path.
+  assert.doesNotMatch(skillCode, /\[\^\/\]\+\?/);
+});
+
 test("SKILL.md: autonomous dispatch directive present verbatim", () => {
   assert.match(skill, /AUTONOMOUS RUN \(develop-next\)/);
   assert.match(skill, /Phase 0d Upfront Setup/);
