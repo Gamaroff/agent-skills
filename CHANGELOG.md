@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Runbook tutorial wrappers (epic 3) — "Before you start" anchors, satellite callouts, and a first-time-errors section.** The runbooks were written as reference material and read as such: correct, dense, and hostile to anyone arriving without the shape of the pipeline already in their head. `story-development.md` and `task-development.md` now open with a **Before you start** block that says plainly what the page assumes, points first-timers at the 60-minute quickstart instead, lists the three standards worth skimming (file-naming, status-lifecycle, epic-registry), and — most useful when someone has landed in the wrong place — enumerates the conditions under which a *different* runbook is the right one, with the decision tree as the fallback. The four satellite runbooks (`bug-fix`, `hotfix`, `change-management`, `create-parallel-stories`) get the short form of the same callout, so no runbook is now an entry point without saying so.
+- **`docs/runbooks/{story,task}-development.md` gain a "Common first-time errors" section** — five friction events **actually hit** during this PRD's dogfood run of epics 1–3, not a hypothetical list. Each entry is written in symptom-first order (`You see:` / `Cause:` / `Fix:`) so it is greppable from the error text a reader is staring at: the `PIPELINE-PAUSED` compaction banner, a Phase-0 base prompt with no `develop` option (repo initialised from `main` without one), a stale `develop-pipeline.lock` blocking a fresh run, Step 4 marked done with an empty PR URL after an interrupt, and `/finalise` flagging a missing CHANGELOG entry on work `/develop` judged docs-only. Every entry carries a `_Provenance:_` line naming the implementation report it was observed in, so each claim is traceable to the run that produced it rather than to someone's recollection.
+- **`docs/reference/configuration.md` documents Claude Code hooks and environment variables** — the `.claude/settings.json` hook surface, the Jira / Bitbucket / GitHub environment variables, and the platform resolution order that decides between them.
+
 ## [v0.29.2] - 2026-07-27
 
 ### Fixed
