@@ -13,44 +13,44 @@ This document is structured for two audiences:
 
 `develop-story` is a thin **orchestrator** for product stories within an epic. Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the durable source of truth for state and audit trail. Stories live under `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/story.{epic}.{story}.<name>/`.
 
-Story branches are always created from their parent **epic branch** (`feature/epic.{n}.{name}`); the epic branch is created from `develop` on first use. PRs target the epic branch — the epic branch is merged to `develop` manually once all stories complete.
+Story branches are cut from **`develop`** and PR back to `develop` — short-lived feature branches, standard Gitflow. Epics are an organisational construct (Jira/docs) only; there is no epic integration branch, and a story branch is never cut from one.
 
 ### External touchpoints
 
-| Surface | Operations |
-|---|---|
-| **Filesystem** | story file (read/append `[x]`), epic file, implementation report (`story.{epic}.{story}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<story-dir>/.summaries/step-*.json`, traceability matrix `<story-dir>/.summaries/qa-traceability-matrix.md`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
-| **Git** | epic branch create (idempotent), story branch create, stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits |
-| **GitHub** | `gh issue comment/close/view`, `gh pr view/comment`, GraphQL project-board mutations (Todo→In Progress→Done + auto-set Priority), PR creation via `/create-pr` targeting epic branch |
-| **Jira** (Atlassian MCP) | `getJiraIssue`, `addCommentToJiraIssue`, `getTransitionsForJiraIssue`, `transitionJiraIssue` (In Progress → In Review → Done) |
-| **Subagents (Explore)** | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, **QA traceability mapper** (story-only), post-fix tracker state poller |
-| **Hooks** | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission) |
+| Surface                  | Operations                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Filesystem**           | story file (read/append `[x]`), epic file, implementation report (`story.{epic}.{story}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<story-dir>/.summaries/step-*.json`, traceability matrix `<story-dir>/.summaries/qa-traceability-matrix.md`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
+| **Git**                  | story branch create (from `develop`), stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits                                                                                                                                                                                                                                                                |
+| **GitHub**               | `gh issue comment/close/view`, `gh pr view/comment`, GraphQL project-board mutations (Todo→In Progress→Done + auto-set Priority), PR creation via `/create-pr` targeting `develop`                                                                                                                                                                                                                                                   |
+| **Jira** (Atlassian MCP) | `getJiraIssue`, `addCommentToJiraIssue`, `getTransitionsForJiraIssue`, `transitionJiraIssue` (In Progress → In Review → Done)                                                                                                                                                                                                                                                                                                        |
+| **Subagents (Explore)**  | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, **QA traceability mapper** (story-only), post-fix tracker state poller                                                                                                                                                         |
+| **Hooks**                | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission)                                                                                                                                                                                                                                                                         |
 
 ### State changes
 
-- **Files created**: epic branch (if absent), story branch, implementation report, lock file, review report, plan file (optional), gate `.yml`, QA report, DoD summary file, PR, `.summaries/step-*.json` artifacts, traceability matrix, test-output logs (transient)
+- **Files created**: story branch, implementation report, lock file, review report, plan file (optional), gate `.yml`, QA report, DoD summary file, PR, `.summaries/step-*.json` artifacts, traceability matrix, test-output logs (transient)
 - **Files mutated**: story file (status frontmatter, `[x]` ticks), implementation report (Pipeline Progress + `Subagent summary ref` column, Decisions Log, Issues Log, QA Iteration History), lock file (`current_step`, `pr_url`)
 - **Tracker fields**: GitHub issue state (open→closed), Projects v2 board (Todo→In Progress→Done + Priority auto-set when unset); Jira `status` transitions + comments
-- **Git refs**: epic branch HEAD (occasionally), story branch HEAD, remote branches, PR HEAD
+- **Git refs**: story branch HEAD, remote branches, PR HEAD
 
 ### Notable design choices
 
 - All commits go through `/commit-changes` (never raw `git commit`) → consistent Conventional Commits.
 - Gate files are read-only to dev skills; only QA skills mutate them.
 - Step banners + lock `current_step` updates create checkpoints that survive context compression.
-- Resume verifies each ✅ step's *artifact* on disk — does not trust the report alone. The stale-context detector subagent narrows the verification scope so resume is fast.
+- Resume verifies each ✅ step's _artifact_ on disk — does not trust the report alone. The stale-context detector subagent narrows the verification scope so resume is fast.
 - `review-story` auto-answers "apply all critical + important fixes" and "yes, update status" in pipeline mode — story must be `Ready for Development` before Step 3 runs.
 - Test logs are **never read into main context** — only the triage subagent's structured summary is consumed.
 - Phase 0 fan-out dispatches 3 Explore subagents in a single message — sequential dispatch is forbidden (drift guard added in task.31).
 - Subagent summaries are persisted as JSON under `.summaries/` so main context can release verbose subagent output and resume can replay without re-dispatching.
-- **Phase 0d prompts the user** for base branch (Q1) and PR target (Q2) — auto-derived `{EPIC_BRANCH}` is the recommended/first option, not a silent default. Epic-branch creation is also confirmed when `EPIC_BRANCH_EXISTS=false`. qa-planning is always silently skipped (no Q3).
+- **Phase 0d prompts the user** for base branch (Q1) and PR target (Q2) — `develop` is the recommended/first option for both, overridable (e.g. `main` for a hotfix story). qa-planning is always silently skipped (no Q3).
 - **Tracker "Work Started" signal fires after Step 1**, not in Phase 0c-reg. The signal is defined in step-0 but invoked from step-1 §"Signal Work Started" so a failed branch creation does not leave the tracker stuck `In Progress`.
 - **qa-fix commits exclude the implementation report** — the report is unstaged before each `/commit-changes` in cycle. Step 8 owns the sole report commit (`docs(...)`).
 
 ### Compared to `develop-task`
 
 - **Adds the QA traceability mapper subagent** — runs as a Step 5 pre-step in standard mode (skipped in lite mode). Writes `qa-traceability-matrix.md`; `/qa-story` consumes it via the `traceability_matrix=` Skill arg.
-- **Epic branch resolution + creation** — Phase 0a extracts `epic:` frontmatter, derives `EPIC_BRANCH`. Phase 0d prompts the user to confirm Q1 (base) and Q2 (PR target), with `EPIC_BRANCH` as the recommended option for both. When `EPIC_BRANCH_EXISTS=false`, an additional confirmation prompt asks before creating the epic branch from `develop`.
+- **Epic context resolution** — Phase 0a extracts `epic:` frontmatter and locates the parent epic **file** (`EPIC_FILE`, `EPIC_NUM`, `EPIC_SLUG`) for context and a HALT if the epic doc is missing. No epic branch is created — story branches are cut from `develop` (Q1) and PR to `develop` (Q2), same as `develop-task`.
 - All other subagent dispatches and the full 8-step skeleton are identical — both share the same shared/resources protocol files.
 
 ---
@@ -69,7 +69,7 @@ Pipeline state machine. Branches show every halt path and every loop bound.
 flowchart TD
     U([User: /develop-story &lt;path&gt;]) --> P0[Phase 0: Resolve & Prepare]
 
-    P0 --> P0a[0a inline resolution<br/>URL/Jira-key/file/dir<br/>+ extract EPIC_REF, EPIC_BRANCH]
+    P0 --> P0a[0a inline resolution<br/>URL/Jira-key/file/dir<br/>+ extract EPIC_REF, EPIC_FILE]
     P0a --> P0p{Lock file exists?}
     P0p -- yes --> RES[Phase 0a: Resume detector subagent]
     P0p -- no --> FAN[Phase 0a-parallel fan-out:<br/>resolver + tracker poller + lite-mode detector]
@@ -79,13 +79,10 @@ flowchart TD
     P0b --> S1
     FAN --> P0c[0c read doc + status check]
     P0c --> P0load[0c-load resolve ALWAYS_LOAD_FILES]
-    P0load --> P0d{EPIC_BRANCH_EXISTS?}
-    P0d -- no --> P0dconf[0d AskUserQuestion:<br/>create epic branch? + Q1 base + Q2 PR target<br/>recommended = EPIC_BRANCH]
-    P0d -- yes --> P0dq[0d AskUserQuestion:<br/>Q1 base + Q2 PR target<br/>recommended = EPIC_BRANCH]
-    P0dconf --> P0e[0e create implementation report]
-    P0dq --> P0e
+    P0load --> P0dq[0d AskUserQuestion:<br/>Q1 base + Q2 PR target<br/>recommended = develop]
+    P0dq --> P0e[0e create implementation report]
     P0e --> P0f[0f preflight summary]
-    P0f --> S1[Step 1: create-branch<br/>1a create-epic-branch if needed<br/>1b create-story-branch from epic]
+    P0f --> S1[Step 1: create-branch<br/>create-story-branch from develop]
 
     S1 --> S1lock[(write lock<br/>current_step=1)]
     S1lock --> S1reg[Step 1 post: signal Work Started<br/>tracker In Progress + board move<br/>relocated from Phase 0c-reg]
@@ -112,7 +109,7 @@ flowchart TD
     S3iter -- no --> HALTMAX[HALT: MAX_ITER reached]
     S3iter -- yes --> S3body
 
-    S4[Step 4: create-pr<br/>--base EPIC_BRANCH / --issue / --exclude report] --> S5pre
+    S4[Step 4: create-pr<br/>--base develop / --issue / --exclude report] --> S5pre
 
     S5pre{PIPELINE_MODE?}
     S5pre -- standard --> S5map[Step 5 pre: QA traceability mapper subagent]
@@ -161,7 +158,7 @@ sequenceDiagram
     participant GH as GitHub / Jira
 
     U->>H: /develop-story <input>
-    H->>H: 0a inline resolve<br/>(URL / Jira-key shortcut)<br/>extract epic_number + EPIC_BRANCH
+    H->>H: 0a inline resolve<br/>(URL / Jira-key shortcut)<br/>extract epic_number + EPIC_FILE
 
     note over H,A3: Single-message dispatch (par block)<br/>Skip resolver if input was inline-resolved
     par
@@ -410,17 +407,17 @@ sequenceDiagram
 
 Every Explore subagent dispatched by `develop-story`. Each row is meant to anchor an output-schema assertion in the eval suite.
 
-| # | Subagent | Dispatch point | Input prompt source | Output schema (key fields) | Persistence | Failure semantics |
-|---|---|---|---|---|---|---|
-| 1 | **Resolver** | Phase 0a-parallel (file/dir/bare-filename inputs only) | inline prompt in `develop-pipeline-step-0-resolve-and-prepare.md` §0a-parallel Agent 1 | `{ absolute_file_path: string, story_directory: string, story_id: string }` or `{ error: string }` | none (in-memory only) | HALT — cannot continue without file path |
-| 2 | **Tracker state poller** | Phase 0a-parallel + Step 5b post-fix | `references/tracker-state-poller-subagent.md` | compact JSON `{ pr: { state, number }, issue: { state, labels, board_status }, errors: [] }` | optional `step-5-post-fix-tracker.json` (Step 5b) | log warning, set fields null, continue (non-blocking) |
-| 3 | **Lite-mode + always-load detector** | Phase 0a-parallel | inline prompt in step-0 §0a-parallel Agent 3. Sets `pipeline_mode=lite` only when **all three** are true: (a) `risk_level ∈ {low, absent}`, (b) `phase_count ≤ 2`, (c) `single_module = true`. Any false ⇒ standard. | `{ risk_level: low\|medium\|high\|absent, phase_count: int, single_module: bool, pipeline_mode: lite\|standard, skills_config_exists: bool, always_load_files: string[] }` | none | log warning, default `pipeline_mode=standard`, `always_load_files=[]` |
-| 4 | **Pipeline-resume stale-context detector** | Phase 0a (resume only — when lock exists) | `references/pipeline-resume-detector-prompt.md` | `{ schema_version: 1, recommended_step: int, current_step_in_lock: int, summaries_seen: string[], deltas_since_pause: object[], blocking_issues: string[] }` | none (transient) | invalid JSON → fall back to full Phase 0b verification using `current_step` as upper bound |
-| 5 | **Pre-develop surface map** | Step 3 pre-develop (skipped on resume if Decisions Log has cached entry) | inline prompt in `develop-pipeline-step-3-develop-loop.md` "Pre-develop Codebase Mapping" | unstructured: `<path> — <1-line description>` × N (max 20) | `step-3-pre-develop-map.json` (per `subagent-summary-artifact.md` schema) | log warning, proceed without surface map |
-| 6 | **Initial loop audit** | Step 3, before iteration 1 | `references/loop-audit-prompt.md` (substitute `<DOC_TYPE>=story`, `<TASKS_SECTION>=## Tasks`) | JSON `{ status: string, completed: int, total: int, last_commit_hash: string }` | `step-3-iteration-audit-0.json` | retry once on JSON parse failure; then inline shell fallback (`grep -cE '\[x\]'`) |
-| 7 | **Per-iteration loop audit** | Step 3, after every `/develop` return | `references/loop-audit-prompt.md` (same substitutions as #6) | same as #6 | `step-3-iteration-audit-{ITER}.json` | retry once; on second failure HALT with "Audit JSON parse failure" |
-| 8 | **Test-failure triage** | Step 3 develop loop, on `TEST_EXIT != 0` | `references/test-failure-triage-prompt.md` | YAML `{ counts: {real, flaky, unrelated}, failures: [{ name, classification, file, line, reason }] (≤10), next_file: string, truncated_count: int, cap: 10 }` | `step-3-test-triage-{ITER}.json` with `raw_artifact_paths: [<test-log>]` | bias rule: "if unsure between real and flaky, classify as real" — agent always returns YAML |
-| 9 | **QA traceability mapper** *(story-only)* | Step 5 pre-step (standard mode only) | `references/qa-traceability-mapper-prompt.md` | markdown matrix `<story-dir>/.summaries/qa-traceability-matrix.md` (≤30 rows: AC \| Spec \| Src \| Coverage \| Uncertainty); subagent returns one-line confirmation | `step-5-traceability-mapper.json` | log warning, proceed without matrix; `/qa-story` falls back to internal mapping |
+| #   | Subagent                                   | Dispatch point                                                           | Input prompt source                                                                                                                                                                                                  | Output schema (key fields)                                                                                                                                                 | Persistence                                                               | Failure semantics                                                                           |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 1   | **Resolver**                               | Phase 0a-parallel (file/dir/bare-filename inputs only)                   | inline prompt in `develop-pipeline-step-0-resolve-and-prepare.md` §0a-parallel Agent 1                                                                                                                               | `{ absolute_file_path: string, story_directory: string, story_id: string }` or `{ error: string }`                                                                         | none (in-memory only)                                                     | HALT — cannot continue without file path                                                    |
+| 2   | **Tracker state poller**                   | Phase 0a-parallel + Step 5b post-fix                                     | `references/tracker-state-poller-subagent.md`                                                                                                                                                                        | compact JSON `{ pr: { state, number }, issue: { state, labels, board_status }, errors: [] }`                                                                               | optional `step-5-post-fix-tracker.json` (Step 5b)                         | log warning, set fields null, continue (non-blocking)                                       |
+| 3   | **Lite-mode + always-load detector**       | Phase 0a-parallel                                                        | inline prompt in step-0 §0a-parallel Agent 3. Sets `pipeline_mode=lite` only when **all three** are true: (a) `risk_level ∈ {low, absent}`, (b) `phase_count ≤ 2`, (c) `single_module = true`. Any false ⇒ standard. | `{ risk_level: low\|medium\|high\|absent, phase_count: int, single_module: bool, pipeline_mode: lite\|standard, skills_config_exists: bool, always_load_files: string[] }` | none                                                                      | log warning, default `pipeline_mode=standard`, `always_load_files=[]`                       |
+| 4   | **Pipeline-resume stale-context detector** | Phase 0a (resume only — when lock exists)                                | `references/pipeline-resume-detector-prompt.md`                                                                                                                                                                      | `{ schema_version: 1, recommended_step: int, current_step_in_lock: int, summaries_seen: string[], deltas_since_pause: object[], blocking_issues: string[] }`               | none (transient)                                                          | invalid JSON → fall back to full Phase 0b verification using `current_step` as upper bound  |
+| 5   | **Pre-develop surface map**                | Step 3 pre-develop (skipped on resume if Decisions Log has cached entry) | inline prompt in `develop-pipeline-step-3-develop-loop.md` "Pre-develop Codebase Mapping"                                                                                                                            | unstructured: `<path> — <1-line description>` × N (max 20)                                                                                                                 | `step-3-pre-develop-map.json` (per `subagent-summary-artifact.md` schema) | log warning, proceed without surface map                                                    |
+| 6   | **Initial loop audit**                     | Step 3, before iteration 1                                               | `references/loop-audit-prompt.md` (substitute `<DOC_TYPE>=story`, `<TASKS_SECTION>=## Tasks`)                                                                                                                        | JSON `{ status: string, completed: int, total: int, last_commit_hash: string }`                                                                                            | `step-3-iteration-audit-0.json`                                           | retry once on JSON parse failure; then inline shell fallback (`grep -cE '\[x\]'`)           |
+| 7   | **Per-iteration loop audit**               | Step 3, after every `/develop` return                                    | `references/loop-audit-prompt.md` (same substitutions as #6)                                                                                                                                                         | same as #6                                                                                                                                                                 | `step-3-iteration-audit-{ITER}.json`                                      | retry once; on second failure HALT with "Audit JSON parse failure"                          |
+| 8   | **Test-failure triage**                    | Step 3 develop loop, on `TEST_EXIT != 0`                                 | `references/test-failure-triage-prompt.md`                                                                                                                                                                           | YAML `{ counts: {real, flaky, unrelated}, failures: [{ name, classification, file, line, reason }] (≤10), next_file: string, truncated_count: int, cap: 10 }`              | `step-3-test-triage-{ITER}.json` with `raw_artifact_paths: [<test-log>]`  | bias rule: "if unsure between real and flaky, classify as real" — agent always returns YAML |
+| 9   | **QA traceability mapper** _(story-only)_  | Step 5 pre-step (standard mode only)                                     | `references/qa-traceability-mapper-prompt.md`                                                                                                                                                                        | markdown matrix `<story-dir>/.summaries/qa-traceability-matrix.md` (≤30 rows: AC \| Spec \| Src \| Coverage \| Uncertainty); subagent returns one-line confirmation        | `step-5-traceability-mapper.json`                                         | log warning, proceed without matrix; `/qa-story` falls back to internal mapping             |
 
 ### Bias / canon rules cross-reference
 
@@ -436,25 +433,24 @@ Every Explore subagent dispatched by `develop-story`. Each row is meant to ancho
 
 Every file the harness creates or mutates, with its lifecycle. Anchor for "did the pipeline produce the expected artifacts?" evals.
 
-| Artifact | Path pattern | Created by | Mutated by | Terminal state | Resume verification |
-|---|---|---|---|---|---|
-| Pipeline lock | `.claude/state/develop-pipeline.lock` | Step 1 (end of) | Steps 2–8 banners (`current_step`), Step 4 (`pr_url`), PreCompact hook (rm), Step 8 (rm), terminal HALT (snapshot then rm) | absent at Step 8 success or HALT | `cat ... \| jq` — read by resume detector |
-| Halt snapshot | `.claude/state/develop-pipeline.last-halt.json` | terminal HALT (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on subsequent terminal HALT; deleted by user choosing "Start fresh" on resume | persists until next resume choice | resume detector reads when active lock absent (`source: "halt_snapshot"`) |
-| Implementation report | `story.{epic}.{story}.implementation.{N}.{name}.md` | Phase 0e | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref) | committed in Step 8 | read for resume + last ✅ step |
-| Epic branch | `feature/epic.{n}.{name}` | Step 1a (idempotent — created on first story) | dev commits (across all stories in epic) | not deleted by pipeline; merged to develop manually | `git branch --list "feature/epic.{n}.*"` |
-| Story branch | `feature/story.{epic}.{story}.*` | Step 1b via `/create-branch` | dev commits, qa-fix commits, final commit | pushed in Step 8 | `git branch --list` |
-| Review report | `story.{epic}.{story}.review.{YYYY-MM-DD}.md` | Step 2 via `/review-story` | — | committed in Step 8 | optional (only if review ran) |
-| Plan file | `story.{epic}.{story}.plan.*.md` | upstream (created by `/plan` or manual) | — | unchanged by pipeline | mtime check vs story file (Plan Freshness) |
-| Pre-develop summary | `.summaries/step-3-pre-develop-map.json` | Step 3 pre-develop | — | retained on disk (gitignored) | replayed instead of re-dispatching subagent |
-| Test-output log | `.claude/state/test-output-{ITER}-*.log` | `/develop` inside Step 3 | triage subagent reads | `rm -f` on `TEST_EXIT==0`; retained on failure | none (transient) |
-| Test-triage summary | `.summaries/step-3-test-triage-{ITER}.json` | Step 3, on test failure | — | retained on disk | replayed |
-| QA traceability matrix | `.summaries/qa-traceability-matrix.md` | Step 5 pre-step (standard mode only) | overwritten on each cycle | retained on disk | regenerated per cycle |
-| Traceability mapper summary | `.summaries/step-5-traceability-mapper.json` | Step 5 pre-step | — | retained on disk | replayed |
-| QA report | `story.{epic}.{story}.qa.{N}.{name}.md` | Step 5 via `/qa-story` | — | committed in Step 8 | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅ |
-| Gate file | `story.{epic}.{story}.gate.{N}.{name}.yml` | Step 5 via `/qa-story` | only QA skills (read-only to dev) | committed in Step 8 | latest gate sorted by `-t. -k5 -n` |
-| Post-fix tracker summary | `.summaries/step-5-post-fix-tracker-{N}.json` | Step 5b after every qa-fix push (one file per cycle N) | — | retained on disk (per cycle, never overwritten) | replayed |
-| DoD summary | `story.{epic}.{story}.dod.{N}.{name}.md` | Step 7 via `/finalise` | — | committed in Step 8 | required for ✅; `grep -iE '^status:\s*accepted'` on story file + `gh pr view --comments \| grep -i accepted` |
-| PR | github.com/.../pull/{N}, base = epic branch | Step 4 via `/create-pr --base {EPIC_BRANCH}` | qa-fix pushes, finalise comment | merged manually post-pipeline | `gh pr view --json state` |
+| Artifact                    | Path pattern                                        | Created by                                                               | Mutated by                                                                                                                 | Terminal state                                  | Resume verification                                                                                           |
+| --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Pipeline lock               | `.claude/state/develop-pipeline.lock`               | Step 1 (end of)                                                          | Steps 2–8 banners (`current_step`), Step 4 (`pr_url`), PreCompact hook (rm), Step 8 (rm), terminal HALT (snapshot then rm) | absent at Step 8 success or HALT                | `cat ... \| jq` — read by resume detector                                                                     |
+| Halt snapshot               | `.claude/state/develop-pipeline.last-halt.json`     | terminal HALT (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on subsequent terminal HALT; deleted by user choosing "Start fresh" on resume                                  | persists until next resume choice               | resume detector reads when active lock absent (`source: "halt_snapshot"`)                                     |
+| Implementation report       | `story.{epic}.{story}.implementation.{N}.{name}.md` | Phase 0e                                                                 | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref)                      | committed in Step 8                             | read for resume + last ✅ step                                                                                |
+| Story branch                | `feature/story.{epic}.{story}.*`                    | Step 1 via `/create-branch` (from `develop`)                             | dev commits, qa-fix commits, final commit                                                                                  | pushed in Step 8                                | `git branch --list`                                                                                           |
+| Review report               | `story.{epic}.{story}.review.{YYYY-MM-DD}.md`       | Step 2 via `/review-story`                                               | —                                                                                                                          | committed in Step 8                             | optional (only if review ran)                                                                                 |
+| Plan file                   | `story.{epic}.{story}.plan.*.md`                    | upstream (created by `/plan` or manual)                                  | —                                                                                                                          | unchanged by pipeline                           | mtime check vs story file (Plan Freshness)                                                                    |
+| Pre-develop summary         | `.summaries/step-3-pre-develop-map.json`            | Step 3 pre-develop                                                       | —                                                                                                                          | retained on disk (gitignored)                   | replayed instead of re-dispatching subagent                                                                   |
+| Test-output log             | `.claude/state/test-output-{ITER}-*.log`            | `/develop` inside Step 3                                                 | triage subagent reads                                                                                                      | `rm -f` on `TEST_EXIT==0`; retained on failure  | none (transient)                                                                                              |
+| Test-triage summary         | `.summaries/step-3-test-triage-{ITER}.json`         | Step 3, on test failure                                                  | —                                                                                                                          | retained on disk                                | replayed                                                                                                      |
+| QA traceability matrix      | `.summaries/qa-traceability-matrix.md`              | Step 5 pre-step (standard mode only)                                     | overwritten on each cycle                                                                                                  | retained on disk                                | regenerated per cycle                                                                                         |
+| Traceability mapper summary | `.summaries/step-5-traceability-mapper.json`        | Step 5 pre-step                                                          | —                                                                                                                          | retained on disk                                | replayed                                                                                                      |
+| QA report                   | `story.{epic}.{story}.qa.{N}.{name}.md`             | Step 5 via `/qa-story`                                                   | —                                                                                                                          | committed in Step 8                             | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅                               |
+| Gate file                   | `story.{epic}.{story}.gate.{N}.{name}.yml`          | Step 5 via `/qa-story`                                                   | only QA skills (read-only to dev)                                                                                          | committed in Step 8                             | latest gate sorted by `-t. -k5 -n`                                                                            |
+| Post-fix tracker summary    | `.summaries/step-5-post-fix-tracker-{N}.json`       | Step 5b after every qa-fix push (one file per cycle N)                   | —                                                                                                                          | retained on disk (per cycle, never overwritten) | replayed                                                                                                      |
+| DoD summary                 | `story.{epic}.{story}.dod.{N}.{name}.md`            | Step 7 via `/finalise`                                                   | —                                                                                                                          | committed in Step 8                             | required for ✅; `grep -iE '^status:\s*accepted'` on story file + `gh pr view --comments \| grep -i accepted` |
+| PR                          | github.com/.../pull/{N}, base = `develop`           | Step 4 via `/create-pr --base develop`                                   | qa-fix pushes, finalise comment                                                                                            | merged to `develop`                             | `gh pr view --json state`                                                                                     |
 
 `.summaries/` is gitignored — these are runtime-local artifacts. Resume tolerates absence (in-flight pipelines started before the convention existed).
 
@@ -464,23 +460,23 @@ Every file the harness creates or mutates, with its lifecycle. Anchor for "did t
 
 ### GitHub (default — when `JIRA_URL` is unset)
 
-| Pipeline event | Operation |
-|---|---|
+| Pipeline event              | Operation                                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Phase 0c-reg (Work Started) | `gh issue comment` ("Pipeline started — branch:") + GraphQL `updateProjectV2ItemFieldValue` (Status → In Progress, Priority → P2 if unset) + post-condition verify |
-| Step 4 (PR opened) | `/create-pr` passes `--base {EPIC_BRANCH}` and `--issue {N}`; PR description links the issue |
-| Step 5b (post qa-fix push) | tracker state poller checks `pr.state` is OPEN |
-| Step 7 (finalise) | `gh issue close {N}` + GraphQL board mutation Status → Done + DoD body posted as PR comment |
-| Pause hook | `gh pr comment` + `gh issue comment` (best-effort) |
+| Step 4 (PR opened)          | `/create-pr` passes `--base develop` and `--issue {N}`; PR description links the issue                                                                             |
+| Step 5b (post qa-fix push)  | tracker state poller checks `pr.state` is OPEN                                                                                                                     |
+| Step 7 (finalise)           | `gh issue close {N}` + GraphQL board mutation Status → Done + DoD body posted as PR comment                                                                        |
+| Pause hook                  | `gh pr comment` + `gh issue comment` (best-effort)                                                                                                                 |
 
 ### Jira (when `JIRA_URL` is set; uses Atlassian MCP)
 
-| Pipeline event | Operation |
-|---|---|
-| Phase 0c-reg | `addCommentToJiraIssue` ("Pipeline started — branch:") + `getTransitionsForJiraIssue` → `transitionJiraIssue` (In Progress) + `getJiraIssue` post-condition |
-| Step 4 | `addCommentToJiraIssue` ("PR opened: …") + `transitionJiraIssue` (In Review) |
-| Step 5b | tracker state poller (Jira branch — board status read) |
-| Step 7 | `addCommentToJiraIssue` (DoD body) + `transitionJiraIssue` (Done) |
-| Pause hook | **silent** — Jira posting requires authenticated MCP, unavailable from shell context |
+| Pipeline event | Operation                                                                                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 0c-reg   | `addCommentToJiraIssue` ("Pipeline started — branch:") + `getTransitionsForJiraIssue` → `transitionJiraIssue` (In Progress) + `getJiraIssue` post-condition |
+| Step 4         | `addCommentToJiraIssue` ("PR opened: …") + `transitionJiraIssue` (In Review)                                                                                |
+| Step 5b        | tracker state poller (Jira branch — board status read)                                                                                                      |
+| Step 7         | `addCommentToJiraIssue` (DoD body) + `transitionJiraIssue` (Done)                                                                                           |
+| Pause hook     | **silent** — Jira posting requires authenticated MCP, unavailable from shell context                                                                        |
 
 ---
 
@@ -499,24 +495,24 @@ When updating this document, verify:
 
 ## Source-of-Truth Index
 
-| Concern | Authoritative file |
-|---|---|
-| Orchestrator skeleton | `skills/develop-story/SKILL.md` |
-| Phase 0 (resolve, fan-out, status, Q&A) | `references/develop-pipeline-step-0-resolve-and-prepare.md` |
-| Step 1 (epic + story branch + lock) | `references/develop-pipeline-step-1-create-branch.md` |
-| Step 2 (review-story gate) | `references/develop-pipeline-step-2-review.md` |
-| Step 3 (develop loop + triage) | `references/develop-pipeline-step-3-develop-loop.md` |
-| Step 4 (create-pr targeting epic branch) | `references/develop-pipeline-step-4-create-pr.md` |
-| Steps 5–6 (QA loop + traceability mapper) | `references/develop-pipeline-step-5-6-qa-loop.md` |
-| Step 7 (finalise) | `references/develop-pipeline-step-7-finalise.md` |
-| Step 8 (commit) | `references/develop-pipeline-step-8-commit.md` |
-| Resume contract (artifact verify, MAX_ITER, plan freshness) | `references/develop-pipeline-resume-contract.md` |
-| Resume detector prompt | `references/pipeline-resume-detector-prompt.md` |
-| Test-triage prompt | `references/test-failure-triage-prompt.md` |
-| Loop-audit prompt (Step 3 initial + per-iteration) | `references/loop-audit-prompt.md` |
-| Mermaid theme (README diagrams) | `references/develop-pipeline-readme-mermaid-theme.md` |
-| QA traceability mapper prompt | `references/qa-traceability-mapper-prompt.md` |
-| Subagent summary persistence | `references/subagent-summary-artifact.md` |
-| Lite mode | `references/develop-pipeline-lite-mode.md` |
-| Graceful pause (lock + hook) | `references/develop-pipeline-pause.md` + `skills/develop-story/scripts/on-precompact.sh` |
-| Autonomous defaults | `references/develop-pipeline-autonomous-defaults.md` |
+| Concern                                                     | Authoritative file                                                                       |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Orchestrator skeleton                                       | `skills/develop-story/SKILL.md`                                                          |
+| Phase 0 (resolve, fan-out, status, Q&A)                     | `references/develop-pipeline-step-0-resolve-and-prepare.md`                              |
+| Step 1 (epic + story branch + lock)                         | `references/develop-pipeline-step-1-create-branch.md`                                    |
+| Step 2 (review-story gate)                                  | `references/develop-pipeline-step-2-review.md`                                           |
+| Step 3 (develop loop + triage)                              | `references/develop-pipeline-step-3-develop-loop.md`                                     |
+| Step 4 (create-pr targeting develop)                        | `references/develop-pipeline-step-4-create-pr.md`                                        |
+| Steps 5–6 (QA loop + traceability mapper)                   | `references/develop-pipeline-step-5-6-qa-loop.md`                                        |
+| Step 7 (finalise)                                           | `references/develop-pipeline-step-7-finalise.md`                                         |
+| Step 8 (commit)                                             | `references/develop-pipeline-step-8-commit.md`                                           |
+| Resume contract (artifact verify, MAX_ITER, plan freshness) | `references/develop-pipeline-resume-contract.md`                                         |
+| Resume detector prompt                                      | `references/pipeline-resume-detector-prompt.md`                                          |
+| Test-triage prompt                                          | `references/test-failure-triage-prompt.md`                                               |
+| Loop-audit prompt (Step 3 initial + per-iteration)          | `references/loop-audit-prompt.md`                                                        |
+| Mermaid theme (README diagrams)                             | `references/develop-pipeline-readme-mermaid-theme.md`                                    |
+| QA traceability mapper prompt                               | `references/qa-traceability-mapper-prompt.md`                                            |
+| Subagent summary persistence                                | `references/subagent-summary-artifact.md`                                                |
+| Lite mode                                                   | `references/develop-pipeline-lite-mode.md`                                               |
+| Graceful pause (lock + hook)                                | `references/develop-pipeline-pause.md` + `skills/develop-story/scripts/on-precompact.sh` |
+| Autonomous defaults                                         | `references/develop-pipeline-autonomous-defaults.md`                                     |

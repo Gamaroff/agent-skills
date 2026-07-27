@@ -1,9 +1,12 @@
 {
   "name": "develop-story-step-04-create-pr",
   "skill": "develop-story",
-  "description": "Step 4: create-pr targets epic branch (feature/epic.5.example) NOT develop.",
+  "description": "Step 4: create-pr targets develop.",
   "prompt": "Run step 4 (create-pr) of the develop-story pipeline for story.5.1.example.",
   "assertions": [
-    { "fn": "prTargetsEpicBranch", "args": ["$SANDBOX/.eval/gh-receipt.json", 5] }
+    {
+      "fn": "prTargetsBranch",
+      "args": ["$SANDBOX/.eval/gh-receipt.json", "develop"]
+    }
   ]
 }

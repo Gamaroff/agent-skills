@@ -1,28 +1,29 @@
 ---
 name: review-pipeline-step-0a-branch-setup
-description: Step 0a (branch setup) shared by review-story, review-task, and review-epic. Resolves doc context, short-circuits in validate mode, auto-skips when already on a matching feature branch, prompts the user to create a feature branch from the appropriate base, and (for review-story / review-epic) ensures the parent epic branch exists. Mirrors the methodology used by develop-pipeline Phase 0d + Step 1 so consumers stay consistent.
+description: Step 0a (branch setup) shared by review-story, review-task, review-bug, and review-epic. Resolves doc context, short-circuits in validate mode, auto-skips when already on a matching feature branch, and prompts the user to create a feature branch from the base branch (default develop). review-story / review-task / review-bug cut a story/task/bug feature branch from develop; review-epic cuts an epic-document feature branch from develop. Mirrors the methodology used by develop-pipeline Phase 0d + Step 1 so consumers stay consistent.
 ---
 
 # Review Pipeline — Step 0a: Branch Setup
 
 ## When This Document Applies
 
-Loaded by `/review-story`, `/review-task`, and `/review-epic` as the **first executable step in the workflow**, after Step 0 (output-format / mode detection) but **before** any document mutation, frontmatter edit, tracker (Jira/GitHub) sync, or review-report write. Skill-specific variants are called out in labeled sub-sections where they differ.
+Loaded by `/review-story`, `/review-task`, `/review-bug`, and `/review-epic` as the **first executable step in the workflow**, after Step 0 (output-format / mode detection) but **before** any document mutation, frontmatter edit, tracker (Jira/GitHub) sync, or review-report write. Skill-specific variants are called out in labeled sub-sections where they differ.
 
 Goal: ensure review artifacts (frontmatter status changes, Change Log entries, `.review.*.md` reports, Jira/GitHub syncs) land on a dedicated feature branch — not on `develop` or `main`.
 
-This protocol intentionally mirrors the methodology used by the develop pipeline (Phase 0d + Step 1a/1b) so the user sees the same prompts and branch names regardless of entry point. Cross-references in this doc use plain prose, not file paths, to avoid bundler auto-pickup of unrelated develop-pipeline references.
+This protocol intentionally mirrors the methodology used by the develop pipeline (Phase 0d + Step 1) so the user sees the same prompts and branch names regardless of entry point. Cross-references in this doc use plain prose, not file paths, to avoid bundler auto-pickup of unrelated develop-pipeline references.
 
 ## Caller pre-conditions
 
 The calling skill MUST have already resolved:
+
 - `DOC_FILE` — absolute path to the document being reviewed (set by Input Resolution; review-epic gets this from the new "Locate epic file" pre-workflow step).
-- `MODE` — `interactive` or `validate` (review-story / review-task only; review-epic has no validate mode).
-- `SKILL_NAME` — one of `review-story`, `review-task`, `review-epic` (used as the stash tag).
+- `MODE` — `interactive` or `validate` (review-story / review-task / review-bug only; review-epic has no validate mode).
+- `SKILL_NAME` — one of `review-story`, `review-task`, `review-bug`, `review-epic` (used as the stash tag).
 
 ---
 
-## 0a.0 Validate-mode short-circuit (review-story + review-task only)
+## 0a.0 Validate-mode short-circuit (review-story + review-task + review-bug only)
 
 ```bash
 if [ "$MODE" = "validate" ]; then
@@ -31,7 +32,7 @@ if [ "$MODE" = "validate" ]; then
 fi
 ```
 
-Rationale: validate mode is invoked from `/develop-story` or `/develop-task` Step 2, where Step 1 has already created and checked out the feature branch.
+Rationale: validate mode is invoked from `/develop-story`, `/develop-task`, or `/develop-bug` Step 2, where Step 1 has already created and checked out the feature branch.
 
 Review-epic has no validate mode — skip this section.
 
@@ -76,13 +77,6 @@ if [ -z "$EPIC_REF" ]; then
   echo "❌ Story must have an 'epic:' frontmatter field (e.g. epic: epic.178.feature-ui)."
   exit 1
 fi
-EPIC_SLUG=$(echo "$EPIC_REF" | sed 's/epic\.[0-9]*\.//')
-EPIC_BRANCH="feature/epic.${EPIC_NUM}.${EPIC_SLUG}"
-
-EPIC_BRANCH_LOCAL=$(git branch --list "feature/epic.${EPIC_NUM}.*" | tr -d ' *' | head -1)
-EPIC_BRANCH_REMOTE=$(git ls-remote --heads origin "feature/epic.${EPIC_NUM}.*" 2>/dev/null \
-  | awk '{print $2}' | sed 's|refs/heads/||' | head -1)
-[ -n "$EPIC_BRANCH_LOCAL$EPIC_BRANCH_REMOTE" ] && EPIC_BRANCH_EXISTS=true || EPIC_BRANCH_EXISTS=false
 ```
 
 #### review-task
@@ -90,6 +84,13 @@ EPIC_BRANCH_REMOTE=$(git ls-remote --heads origin "feature/epic.${EPIC_NUM}.*" 2
 ```bash
 TASK_BASENAME=$(basename "$DOC_FILE" .md)            # e.g. task.2.home-page-content-realignment
 TASK_ID=$(echo "$TASK_BASENAME" | awk -F. '{print $2}')
+```
+
+#### review-bug
+
+```bash
+BUG_BASENAME=$(basename "$DOC_FILE" .md)             # e.g. bug.7.stale-token OR story.8.5.3.bug.1.cache-leak
+BUG_PREFIX="$BUG_BASENAME"                            # the full stem; used for branch matching
 ```
 
 #### review-epic
@@ -108,21 +109,35 @@ EPIC_BRANCH="feature/epic.${EPIC_NUM}.${EPIC_SLUG}"
 If `CURRENT_BRANCH` already matches the doc's expected feature-branch pattern, set `BRANCH_NAME="$CURRENT_BRANCH"`, set `AUTO_SKIPPED=true`, **and fall through to 0a.9 for logging** (skip 0a.4–0a.8).
 
 #### review-story
+
 ```bash
 case "$CURRENT_BRANCH" in
-  feature/story.${EPIC_NUM}.${STORY_NUM}.*|feature/epic.${EPIC_NUM}.*)
+  feature/story.${EPIC_NUM}.${STORY_NUM}.*)
     BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
 
 #### review-task
+
 ```bash
 case "$CURRENT_BRANCH" in
   feature/task.${TASK_ID}.*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
 
+#### review-bug
+
+Generous match so pipeline re-entry (already on the `develop-bug` branch, whatever `/create-branch` named it — `feature/*`, `bugfix/*`, or a `hotfix/*`) always short-circuits:
+
+```bash
+case "$CURRENT_BRANCH" in
+  feature/*"${BUG_PREFIX}"*|bugfix/*"${BUG_PREFIX}"*|feature/*bug*|hotfix/*)
+    BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
+esac
+```
+
 #### review-epic
+
 ```bash
 case "$CURRENT_BRANCH" in
   feature/epic.${EPIC_NUM}.*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
@@ -139,29 +154,35 @@ Use the `AskUserQuestion` tool. The recommended option is always **first** (one-
 
 #### review-story
 
-If `EPIC_BRANCH_EXISTS=false`, ask **two** questions in one call:
+Story branches are cut from `${BASE_DEFAULT}` (standard Gitflow feature branches). Detect current branch family for the recommended option:
 
-1. **Header:** `Epic branch` — **Question:** "Epic branch `{EPIC_BRANCH}` does not exist yet. Create it from `${BASE_DEFAULT}`?"
-   - "Create epic branch from ${BASE_DEFAULT}" (Recommended)
-   - "Abort review"
-2. **Header:** `Story branch` — **Question:** "Confirm story branch base?"
-   - "`{EPIC_BRANCH}` (epic branch — recommended)"
-   - "${BASE_DEFAULT}"
-   - "Other"
+- On `${BASE_DEFAULT}` or `main`: options `${BASE_DEFAULT}` (Recommended) / `main` / `Other`
+- On any `feature/*` branch: options `${BASE_DEFAULT}` (Recommended) / `feature/{current}` / `Other`
 
-If `EPIC_BRANCH_EXISTS=true`, ask only Q2.
+**Header:** `Story branch` — **Question:** "Which branch should `feature/story.${EPIC_NUM}.${STORY_NUM}.*` be based on?"
 
 #### review-task
 
 Detect current branch family for the recommended option:
+
 - On `${BASE_DEFAULT}` or `main`: options `${BASE_DEFAULT}` (Recommended) / `main` / `Other`
 - On any `feature/*` branch: options `feature/{current}` (Recommended) / `${BASE_DEFAULT}` / `Other`
 
 **Header:** `Task branch` — **Question:** "Which branch should `feature/task.${TASK_ID}.*` be based on?"
 
+#### review-bug
+
+Bug review edits land on a bug feature branch cut from `${BASE_DEFAULT}` (same convention `develop-bug` uses). Detect current branch family for the recommended option:
+
+- On `${BASE_DEFAULT}` or `main`: options `${BASE_DEFAULT}` (Recommended) / `main` / `Other`
+- On any `feature/*`/`bugfix/*` branch: options `feature/{current}` (Recommended) / `${BASE_DEFAULT}` / `Other`
+
+**Header:** `Bug branch` — **Question:** "Which branch should the review of `${BUG_PREFIX}` be based on?"
+
 #### review-epic
 
 **Header:** `Epic branch` — **Question:** "Create epic branch `{EPIC_BRANCH}` from `${BASE_DEFAULT}` for this review?"
+
 - "Create from ${BASE_DEFAULT}" (Recommended)
 - "Other (specify branch)"
 - "Abort review"
@@ -178,8 +199,8 @@ HALT cleanly. No edits made, no stash created (we haven't reached 0a.5 yet).
 
 ### Storing answers
 
-- `BASE_BRANCH` ← Q2 answer (review-story) or single-question answer (review-task) or "Other" plain-text input.
-- `CREATE_EPIC_BRANCH=true|false` ← review-story Q1.1 / review-epic answer.
+- `BASE_BRANCH` ← branch answer (review-story / review-task) or "Other" plain-text input.
+- `CREATE_EPIC_BRANCH=true|false` ← review-epic answer (review-epic only).
 
 ---
 
@@ -209,9 +230,11 @@ Save the stash ref for 0a.8:
 
 ---
 
-## 0a.6 Ensure epic branch exists (review-story when `EPIC_BRANCH_EXISTS=false`, review-epic when `CREATE_EPIC_BRANCH=true`)
+## 0a.6 Create the epic-document branch (review-epic only, when `CREATE_EPIC_BRANCH=true`)
 
 > **Idempotence**: re-check immediately before each mutation — the branch may have appeared on remote between detection and creation.
+>
+> This creates an ordinary epic-**document** feature branch (`feature/epic.{n}.{name}`) from `${BASE_DEFAULT}` for reviewing/editing the epic doc — it is **not** a long-lived integration branch. review-story and review-task never reach this section; they branch a story/task feature branch from `${BASE_DEFAULT}` in 0a.7.
 
 ```bash
 git fetch origin
@@ -235,11 +258,9 @@ Log: `"✅ Epic branch ready: ${EPIC_BRANCH}"`.
 
 For **review-epic**: this is the final branch. Set `BRANCH_NAME="${EPIC_BRANCH}"` and skip to 0a.8.
 
-For **review-story**: continue to 0a.7 with `${EPIC_BRANCH}` as the resolved base (overrides `BASE_BRANCH` if user picked epic branch in Q2).
-
 ---
 
-## 0a.7 Invoke /create-branch (review-story + review-task)
+## 0a.7 Invoke /create-branch (review-story + review-task + review-bug)
 
 Invoke the `/create-branch` skill with `DOC_FILE`. When `create-branch` asks for the base branch, supply the resolved `BASE_BRANCH` — **do not let the user be re-prompted**.
 
@@ -249,7 +270,7 @@ After `/create-branch` returns:
 BRANCH_NAME=$(git branch --show-current)
 ```
 
-Verify `BRANCH_NAME` is non-empty and matches the expected pattern (`feature/story.*` or `feature/task.*`); HALT if not.
+Verify `BRANCH_NAME` is non-empty and matches the expected pattern (`feature/story.*`, `feature/task.*`, or — for review-bug — any `feature/*`/`bugfix/*` branch carrying the bug stem); HALT if not.
 
 ---
 
@@ -272,17 +293,18 @@ HALT on conflict — do not mutate documents on a broken tree.
 ## 0a.9 Post-conditions & logging
 
 Variables exported to subsequent steps:
+
 - `BRANCH_NAME` — branch the review runs on
 - `BASE_BRANCH` — base used (empty when `AUTO_SKIPPED=true`)
-- `EPIC_BRANCH` — set for review-story + review-epic; empty for review-task
+- `EPIC_BRANCH` — set for review-epic (its epic-document branch); empty for review-story + review-task
 - `AUTO_SKIPPED` — `true` when 0a.3 short-circuited
 
 ### Logging destination
 
-| Output mode | Destination |
-|---|---|
-| Comprehensive report | Decisions Log section in the review report (add before saving the report file) |
-| Inline action plan / Validate mode | One-line preamble before the action plan / verdict |
+| Output mode                        | Destination                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| Comprehensive report               | Decisions Log section in the review report (add before saving the report file) |
+| Inline action plan / Validate mode | One-line preamble before the action plan / verdict                             |
 
 Decisions Log entry format:
 
@@ -306,6 +328,7 @@ Inline preamble (one line):
 ## On Failure
 
 Any `git` or `/create-branch` error in 0a.5–0a.8:
+
 1. Attempt to restore the stash via `git stash pop` (when `STASH_PUSHED=true`); if pop also fails, surface `STASH_REF` to the user for manual recovery.
 2. HALT with the exact error.
 3. Do **not** proceed to any document mutation — the review can be re-run cleanly once branch state is fixed.

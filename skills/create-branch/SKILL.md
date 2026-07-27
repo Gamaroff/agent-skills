@@ -33,14 +33,14 @@ Invoke this skill with any of:
 
 ### Automatic Detection
 
-| Context                             | Branch Type | Base Branch                    |
-| ----------------------------------- | ----------- | ------------------------------ |
-| Story file (`story.*`)              | `feature`   | User choice (see below)        |
-| Epic file (`epic.*`)                | `feature`   | `develop` (fixed — no prompt)  |
-| Task file (`task.*`)                | `feature`   | User choice (see below)        |
-| `--hotfix` flag or "hotfix" keyword | `hotfix`    | `main`                         |
-| `--release` flag or version pattern | `release`   | `develop`                      |
-| Default (raw description)           | `feature`   | User choice (see below)        |
+| Context                             | Branch Type | Base Branch                   |
+| ----------------------------------- | ----------- | ----------------------------- |
+| Story file (`story.*`)              | `feature`   | User choice (see below)       |
+| Epic file (`epic.*`)                | `feature`   | `develop` (fixed — no prompt) |
+| Task file (`task.*`)                | `feature`   | User choice (see below)       |
+| `--hotfix` flag or "hotfix" keyword | `hotfix`    | `main`                        |
+| `--release` flag or version pattern | `release`   | `develop`                     |
+| Default (raw description)           | `feature`   | User choice (see below)       |
 
 ### Base Branch Selection for Features
 
@@ -75,6 +75,7 @@ Options:
 **Sub-story Detection:**
 
 A branch is likely a sub-story if:
+
 - Current branch: `feature/story.X.Y.name`
 - New branch: `feature/story.X.Y.Z.name` (where Z extends X.Y)
 
@@ -202,6 +203,26 @@ git checkout <selected-base-branch>  # e.g., develop or feature/story.309.2.3
 git pull origin <selected-base-branch>
 ```
 
+**Exception — linked worktree**: When this skill runs inside a **linked git worktree**
+(e.g. dispatched by a parallel batch orchestrator), the base branch is already checked out
+in the main worktree, so `git checkout <base>` fails with
+`fatal: '<base>' is already checked out at …`. Detect this case —
+
+```bash
+[ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ]  # true ⇒ linked worktree
+```
+
+— and instead **create the feature branch directly from the freshly-fetched base ref,
+never making the base the active branch** (this replaces both Step 5's checkout/pull and
+Step 6):
+
+```bash
+git fetch origin
+git checkout -b feature/story.178.8.example-feature "origin/<selected-base-branch>"
+```
+
+The normal single-tree path (Step 5 checkout/pull + Step 6 below) is unchanged.
+
 ### Step 6: Create and Switch to New Branch
 
 ```bash
@@ -240,19 +261,19 @@ Ready to start development on sub-story!
 
 ## Quick Reference: Gitflow Rules
 
-| Branch Type        | Created From     | Merges Into              | Purpose                        |
-| ------------------ | ---------------- | ------------------------ | ------------------------------ |
-| **Feature (epic)** | `develop`        | `develop`                | Epic-level grouping of stories |
-| **Feature (story)**| epic branch      | epic branch (via PR)     | Story implementation           |
-| **Feature (task)** | user choice      | user choice (via PR)     | Technical task implementation  |
-| **Release**        | `develop`        | `main` & `develop`       | Release prep & bug fixes       |
-| **Hotfix**         | `main`           | `main` & `develop`       | Emergency prod fixes           |
+| Branch Type         | Created From | Merges Into          | Purpose                                        |
+| ------------------- | ------------ | -------------------- | ---------------------------------------------- |
+| **Feature (epic)**  | `develop`    | `develop`            | Epic-document work (not an integration branch) |
+| **Feature (story)** | `develop`    | `develop` (via PR)   | Story implementation                           |
+| **Feature (task)**  | user choice  | user choice (via PR) | Technical task implementation                  |
+| **Release**         | `develop`    | `main` & `develop`   | Release prep & bug fixes                       |
+| **Hotfix**          | `main`       | `main` & `develop`   | Emergency prod fixes                           |
 
 > [!IMPORTANT]
 >
 > - Feature branches **never** interact directly with `main`
-> - Story branches are always created from their parent epic branch and PR back to it
-> - Epic branches are created from `develop` and merged back to `develop` when all stories are complete (manually)
+> - Story branches are created from `develop` and PR back to `develop` (short-lived feature branches — standard Gitflow). Epics are an organisational construct (Jira/docs), **not** a git integration branch; a story branch is never cut from an epic branch.
+> - Epic branches (`feature/epic.*`) exist only for epic-**document** work and are ordinary feature branches: created from `develop`, PR back to `develop`.
 > - Hotfix branches **must** be merged back to both `main` AND `develop`
 > - Every merge to `main` triggers a version tag
 
@@ -360,7 +381,6 @@ Output:
 - `/commit-changes` - Stage and commit changes with conventional commit messages
 - `/create-pr` - Create a pull request for the current branch
 - `/develop` - Full story implementation workflow
-
 
 ---
 

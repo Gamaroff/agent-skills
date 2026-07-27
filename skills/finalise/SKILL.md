@@ -151,6 +151,32 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    - Use Glob to find gate files: `{story-directory}/*.gate.*.yml`
    - If multiple reports exist, review the most recent one (highest number in filename)
 
+3. **Ignore prior-run acceptance blocks in the document body — they are history, not evidence.**
+
+   A story/task that was accepted once and later reopened still carries its previous
+   `## Definition of Done - PASSED ✅` / `**Status:** ACCEPTED` section verbatim in the body. This
+   skill reads those sections, so unless they are explicitly discounted, the previous run's verdict
+   is silently re-used as though it were this run's.
+
+   ```bash
+   # How many acceptance blocks does the body already contain?
+   PRIOR_DOD=$(grep -cE '^## Definition of Done.*(PASSED|✅)' "$DOC_FILE" 2>/dev/null || echo 0)
+   ```
+
+   If `PRIOR_DOD` is greater than zero **and** the document's current `status:` is not `accepted`
+   (i.e. it was reopened), then:
+   - Treat **every** existing DoD/ACCEPTED block as **superseded**. Verify each criterion afresh
+     against the code — do not inherit a single ✅ from it.
+   - Confirm the block is visibly marked as historical (e.g. retitled `— run N (historical,
+     superseded)`). If it is not, that is itself a finding: an unmarked stale PASS banner is a trap
+     for the next reader and for the next `/finalise` run.
+   - Scope this run's verdict to a **new** `dod.{N}` file. Never edit a previous run's DoD summary.
+
+   > Observed live: task.52 was accepted (DoD 7/7), reopened the same day with an eighth criterion,
+   > and its run-1 `PASSED ✅ / ACCEPTED` banner was still sitting in the body. Criteria counts differ
+   > between runs, so inheriting the old block would have declared 7/7 complete against a bar that
+   > now had 8 items — and the eighth was the entire reason for the reopen.
+
 2. **Read and Analyze QA Reports (if found):**
    - Read the QA report markdown file
    - Extract key information:
@@ -460,7 +486,8 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 
 | All Acceptance Criteria Met? | Tests & PR Approved? | Docs Updated? | Security Passed? | Compliance Passed? | QA Gate Status? | **Decision**                     |
 | ---------------------------- | -------------------- | ------------- | ---------------- | ------------------ | --------------- | -------------------------------- |
-| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ✅ PASS or N/A  | **ACCEPTED** ✅                  |
+| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ✅ PASS or N/A  | **ACCEPTED** ✅ — *only if `CI_ROLLUP` is `SUCCESS`; see "CI status is a DoD gate" below* |
+| -                            | -                    | -             | -                | -                  | -               | **IN PROGRESS** if `CI_ROLLUP` is `FAILURE` or `PENDING` |
 | ❌ No                        | -                    | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
 | ✅ Yes                       | ❌ No                | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
 | ✅ Yes                       | ✅ Yes               | ❌ No         | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
@@ -483,14 +510,47 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 |---|---|
 | All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL) |
 | Tests & PR Approved? | `ac_result.pr_review_decision` (APPROVED) |
+| **CI green?** | **`CI_ROLLUP` (see below) — a hard blocker** |
 | Docs Updated? | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
 | Security Passed? | `SEC_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
 | Compliance Passed? | `COMP_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
 
+### CI status is a DoD gate — check it, do not assume it
+
+**A PR being *approved* is not the same as a PR being *green*.** Review approval is a human
+judgement about the diff; the check rollup is a machine result about the code. This skill used to
+read the first and never the second, which meant it could — and did — mark work `accepted` while its
+CI was still running, on a job that then failed. Acceptance had to be withdrawn by hand afterwards.
+
+Read the rollup before deciding:
+
+```bash
+# Prefer the rollup (covers checks AND commit statuses); fall back to `gh pr checks`.
+CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
+  -q '[.statusCheckRollup[] | .conclusion // .state] | if length == 0 then "NONE"
+       elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ERROR") then "FAILURE"
+       elif any(. == null or . == "PENDING" or . == "IN_PROGRESS" or . == "QUEUED") then "PENDING"
+       else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
+```
+
+| `CI_ROLLUP` | Decision |
+| ----------- | -------- |
+| `SUCCESS` | Proceed — CI column passes |
+| `FAILURE` | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." |
+| `PENDING` | **Do NOT accept.** Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.** |
+| `NONE` | No checks configured for this PR. Record it explicitly in the DoD summary as *unverified by CI* rather than silently treating absence as success. |
+| `UNKNOWN` | Query failed. Treat as `PENDING` — never as success. |
+
+> **The failure mode this exists to stop** is a *pending* rollup being read as "nothing wrong yet"
+> and rounded up to acceptance. `PENDING` and `FAILURE` are both non-acceptance; only `SUCCESS`
+> passes. If the rollup is green but the newest commit is docs-only on top of untested code, say so
+> in the DoD summary — a green on an ancestor commit is evidence about that commit, not this one.
+
 **Actions:**
 
 1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
-2. **Determine pass/fail** for each decision matrix column using the mapping above
+2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable
+3. **Determine pass/fail** for each decision matrix column using the mapping above
 3. **Write the acceptance decision to the running summary:**
 
    **Example decision append (all criteria met):**

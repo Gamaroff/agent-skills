@@ -99,13 +99,13 @@ PLATFORM="$VCS"   # PLATFORM keeps backward compat with downstream branches
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 if [ "$PLATFORM" = "bitbucket" ]; then
   BB_PATH=$(echo "$REMOTE_URL" \
-    | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+    | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
 elif [ "$PLATFORM" = "github" ]; then
   REPO_SLUG=$(echo "$REMOTE_URL" \
-    | sed -E 's|.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+    | sed -E 's|.*github\.com[:/]||; s|\.git$||')
 fi
 ```
 

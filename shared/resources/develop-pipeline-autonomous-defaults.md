@@ -29,9 +29,9 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 | Implementation report in create-pr commit | EXCLUDE — unstage before create-pr commits; Step 8 commits it |
 | Pre-develop codebase mapping | Always run Explore subagent; pass summary to `/develop`, do not re-read files |
 | qa-fix with no file changes | HALT — do not increment cycle; log as unfixable and surface to user |
-| Resume state validation | Per-step artifact verification AND branch + PR cross-check before skipping any ✅ step — full contract in `references/develop-pipeline-resume-contract.md` |
+| Resume state validation | Per-step artifact verification AND branch + PR cross-check before skipping any ✅ step — full contract in `shared/resources/develop-pipeline-resume-contract.md` |
 | Completion status (story or task) | `accepted` (lowercase, matches finalise canonical YAML schema). Note: document `Status:` fields use Title Case (`Draft`, `Planned`, `In Progress`, `Ready for Review`) — `accepted` is the YAML frontmatter value only. |
-| Pipeline mode (lite vs standard) | See `references/develop-pipeline-lite-mode.md` for trigger conditions and behaviour. Default to `standard` if any condition fails. |
+| Pipeline mode (lite vs standard) | See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions and behaviour. Default to `standard` if any condition fails. |
 | qa-story / qa-task invocation in lite mode | Prepend the lite-mode directive (see lite-mode contract) to the invocation context |
 | Final commit push (Step 8) | Always push after Step 8 commit so PR reflects completed report |
 | Tracker mutation retry policy | 3× exponential backoff (1s, 2s, 4s). Shell calls (`gh`) wrap with `tracker_call_with_retry` from `shared/resources/resolve-platform.sh`. Atlassian MCP calls retry inline with the same schedule. All tracker mutations are non-blocking — final failure logs a warning in Issues Log and continues. |

@@ -40,6 +40,24 @@ develop-task [task-file-path]
 Reference: [`skills/develop-task/README.md`](../../skills/develop-task/README.md).
 Walkthrough: [Task Development Runbook](../runbooks/task-development.md).
 
+### Bug pipeline
+
+```
+create-bug-report → review-bug → develop-bug → closed, verified, documented fix
+```
+
+`review-bug` reviews a bug report for fix-readiness (completeness, reproducibility-from-report, severity/priority, duplicate + already-fixed scans) — dual-mode like `review-story`/`review-task` (interactive default + `--validate` GO/NO-GO). Automated orchestrator (preferred), taking an existing bug report from open to closed:
+
+```
+develop-bug [bug-file-path]
+  └── create-branch → review-bug → investigate & fix (reproduce + fix) → create-pr
+        → verify & fix loop (up to 5 cycles) → finalise & close → commit-changes
+```
+
+Step 2 is `/review-bug` (validate-and-apply) — a fix-readiness gate that HALTs on a duplicate, already-fixed, or under-specified bug, mirroring how `develop-task` Step 2 gates on `review-task`. Verification (Step 5) is anchored on a regression test rather than an AC gate, and Step 7 writes the bug's `## Resolution Summary` and sets `status: closed`. Handles story / task / general bugs and both bugfix (off `develop`) and hotfix (off `main`) branch models. `qa-fix` is the fix engine inside the verify loop.
+
+References: [`skills/review-bug/SKILL.md`](../../skills/review-bug/SKILL.md), [`skills/develop-bug/README.md`](../../skills/develop-bug/README.md).
+
 QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills — **dev skills never modify gate files**.
 
 ## Lifecycle phases (reference)

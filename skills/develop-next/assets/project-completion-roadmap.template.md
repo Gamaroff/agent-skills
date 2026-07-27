@@ -32,7 +32,13 @@ milestones are done you may archive them out to a `roadmap-history.md`.
   soft dep · `‖` parallel · `→` sequential · `⏭️ SKIP` deferred & non-blocking
   (the loop steps past it) · `manual`/`🚧` operator-gated (the loop stops) ·
   `⛔ BLOCKED until X` skip until X is accepted.
-- Item format: `- [ ] **<id>** <title> — [story](<path>) · deps: … · \`/develop-story\``
+- **touches:** write-footprint for `/develop-batch` worktree fan-out — comma-separated
+  resource tags, each `!` (hard/exclusive — serialize) or `~`/unmarked (soft/additive —
+  parallel-OK, second merger rebases); `+own` = self-contained, no shared file.
+  `--batch` only; ignored by single-item selection. Two rows may run concurrently only if
+  they share no `!` tag. Tag vocabulary is project-specific — define a **Conflict-footprint
+  registry** in this Legend (tag → path/region) once you start annotating.
+- Item format: `- [ ] **<id>** <title> — [story](<path>) · deps: … · touches: … · \`/develop-story\``
 
 ---
 

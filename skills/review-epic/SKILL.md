@@ -182,7 +182,7 @@ Store choice as `output_mode` for Step 9.
    - `.claude/database-redis.md`
    - `.claude/testing.md`
    - `${ARCH_ROOT}/routing-and-file-structure.md`
-   - `docs/standards/naming-conventions.md`
+   - `docs/standards/file-naming.md`
    - `.claude/notifications.md` (if epic touches notifications)
 
 4. **Scan for existing stories**
@@ -284,7 +284,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
    - Verify client/server separation is planned for `logging-lib`, `auth-lib`, `shared-utils`
    - No Node.js deps (bcrypt, winston, jsonwebtoken) referenced for client builds
 
-5. **Naming convention check** against `docs/standards/naming-conventions.md`:
+5. **Naming convention check** against `docs/standards/file-naming.md`:
    - Route names: kebab-case
    - Components: PascalCase
    - "handle" not "username" for user identity
@@ -566,7 +566,7 @@ Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].review.[
 | `.claude/database-redis.md`                  | ✅/⚠️/❌ | [finding] |
 | `.claude/testing.md`                         | ✅/⚠️/❌ | [finding] |
 | `${ARCH_ROOT}/routing-and-file-structure.md` | ✅/⚠️/❌ | [finding] |
-| `docs/standards/naming-conventions.md`       | ✅/⚠️/❌ | [finding] |
+| `docs/standards/file-naming.md`       | ✅/⚠️/❌ | [finding] |
 
 ---
 
@@ -772,5 +772,5 @@ source references/resolve-platform.sh
 | `.claude/database-redis.md`                  | Architecture source — DB, Redis, safety rules     |
 | `.claude/testing.md`                         | Architecture source — test standards, co-location |
 | `${ARCH_ROOT}/routing-and-file-structure.md` | Routing and file structure                        |
-| `docs/standards/naming-conventions.md`       | Naming rules (PascalCase, kebab-case, handle)     |
+| `docs/standards/file-naming.md`       | Naming rules (PascalCase, kebab-case, handle)     |
 | `.agents/skills/review-story/SKILL.md`       | Reference for question batching patterns          |

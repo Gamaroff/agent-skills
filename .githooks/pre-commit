@@ -1,15 +1,80 @@
 #!/usr/bin/env bash
-# Runs npm run bundle when shared/resources or any SKILL.md is staged,
-# then re-stages the resulting references/ changes.
+# Bundles shared resources into skills/*/references/ when a SKILL.md or a
+# shared resource is staged, then stages ONLY the references/ that THIS run
+# changed.
+#
+# Why the delta rather than `git add skills/*/references/`: the blanket add
+# staged every pending bundle change, so any commit touching a SKILL.md
+# absorbed unrelated bundled copies. Worse, `npm run bundle` regenerates from
+# the WORKING TREE while the commit carries the INDEX, so the blanket add could
+# stage bundled copies built from shared/resources edits that were deliberately
+# left unstaged — commits whose bundled copies had no corresponding source.
+# Splitting work into logical commits silently produced incoherent history.
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
 
-if git diff --cached --name-only | grep -qE '^(shared/resources/|skills/[^/]+/SKILL\.md)'; then
-  echo "▶ Bundling shared resources into skills/*/references/ ..."
-  cd "$REPO_ROOT"
-  npm run bundle --silent
-  git add skills/*/references/
-  echo "✓ Bundle complete — references/ changes staged."
+git diff --cached --name-only \
+  | grep -qE '^(shared/resources/|skills/[^/]+/SKILL\.md)' || exit 0
+
+# Bundle-owned files dirty in the working tree (unstaged edits + untracked
+# additions). Anything already here before we run is pre-existing work — not
+# ours to stage.
+# Note the trailing `*`: as a git pathspec, 'skills/*/references/' matches
+# NOTHING (unlike the shell glob `skills/*/references/` this hook used to pass
+# to `git add`, which the shell expanded to real directories first). Getting
+# this wrong makes every set below silently empty, so the hook stages nothing
+# and source lands without its bundled copies.
+REFS_PATHSPEC='skills/*/references/*'
+
+dirty_refs() {
+  {
+    git diff --name-only -- "$REFS_PATHSPEC"
+    git ls-files --others --exclude-standard -- "$REFS_PATHSPEC"
+  } | sort -u
+}
+
+PRE_FILE="$(mktemp)"
+POST_FILE="$(mktemp)"
+trap 'rm -f "$PRE_FILE" "$POST_FILE"' EXIT
+
+dirty_refs >"$PRE_FILE"
+
+echo "▶ Bundling shared resources into skills/*/references/ ..."
+npm run bundle --silent
+dirty_refs >"$POST_FILE"
+
+NEW="$(comm -13 "$PRE_FILE" "$POST_FILE")"
+
+if [ -n "$NEW" ]; then
+  # Bundling changed references/, so it read shared/resources from the working
+  # tree. If any of that source is unstaged, the copies we are about to stage
+  # would embed source this commit does not carry. Refuse rather than commit
+  # the mismatch — that is the drift this hook exists to prevent.
+  UNSTAGED_SHARED="$(git diff --name-only -- shared/resources/)"
+  if [ -n "$UNSTAGED_SHARED" ]; then
+    {
+      echo ""
+      echo "✗ Bundling changed skills/*/references/, but these shared sources have unstaged edits:"
+      printf '%s\n' "$UNSTAGED_SHARED" | sed 's/^/      /'
+      echo ""
+      echo "  The bundled copies would embed source this commit does not carry."
+      echo "  Stage them (git add shared/resources/...), or stash them, then retry."
+    } >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$NEW" | tr '\n' '\0' | xargs -0 git add --
+  echo "✓ Staged $(printf '%s\n' "$NEW" | wc -l | tr -d ' ') bundled file(s) produced by this run."
+fi
+
+# Pre-existing drift is left alone, but never silently: an unmentioned dirty
+# bundle is how source and its bundled copies drift apart in the first place.
+LEFT="$(comm -12 "$PRE_FILE" "$POST_FILE")"
+if [ -n "$LEFT" ]; then
+  echo "⚠ $(printf '%s\n' "$LEFT" | wc -l | tr -d ' ') pre-existing bundle change(s) left unstaged:"
+  printf '%s\n' "$LEFT" | head -5 | sed 's/^/      /'
+  echo "  Not caused by this commit — stage them explicitly if they belong in it."
 fi

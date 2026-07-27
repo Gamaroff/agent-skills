@@ -178,7 +178,7 @@ PLATFORM="$VCS"
 
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 if [ "$PLATFORM" = "bitbucket" ]; then
-  BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+  BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
@@ -1090,6 +1090,7 @@ This executes full QA process and updates original QA artifacts.
 
 ## Related Skills
 
+- **develop-bug**: End-to-end bug-fix orchestrator — invokes qa-fix as the fix engine inside its verify loop, then closes the bug with a Resolution Summary (qa-fix itself stops at "Ready for QA")
 - **develop**: Main development workflow
 - **execute-checklist**: Run Definition of Done validation
 - **review-story --validate**: Pre-implementation story validation (automated GO/NO-GO, non-interactive)

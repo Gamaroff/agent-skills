@@ -1,6 +1,6 @@
 ---
 name: create-bug-report
-description: Create bug report files for issues found during QA testing. Use when QA identifies bugs during story testing. Implements sequential numbering, uses bug report template, and co-locates with story files.
+description: Create bug report files for issues found during QA or code sweeps. Use when QA identifies bugs during story/task testing, or when a cross-cutting bug with no single story/task owner needs filing. Supports three modes — story bugs (co-located with the story), task bugs (co-located in the task subdirectory), and general bugs (docs/bugs/ with a global bug-registry). Implements sequential numbering and a shared bug report template.
 ---
 
 # Create Bug Report
@@ -9,7 +9,8 @@ description: Create bug report files for issues found during QA testing. Use whe
 
 Use this skill when:
 
-- QA testing identifies bugs during story implementation review
+- QA testing identifies bugs during story or task implementation review
+- A cross-cutting bug is found during a code sweep (lint, security, dependency audit) with **no single story/task owner**
 - Issues are found that require developer investigation and fixes
 - Creating individual bug reports for HIGH or MEDIUM severity issues
 - Need to track bug fix iterations separately from QA reports
@@ -22,27 +23,22 @@ Use this skill when:
 
 ## Bug Report Type Decision
 
-**CRITICAL**: Determine bug report type before proceeding
+**CRITICAL**: Determine the bug report type before proceeding. There are **three** modes.
 
-### Story Bug Reports
-
-- **Pattern**: `story.{epic}.{story}.bug.{number}.{name}.md`
-- **Location**: Co-located with story file in story directory
-- **Used For**: Bugs found during user-facing feature testing
-- **Example**: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
-- **Reference**: Follows `docs/standards/naming-conventions.md`
-
-### Technical Task Bug Reports
-
-- **Pattern**: `task.{id}.bug.{number}.{name}.md`
-- **Location**: Co-located in task subdirectory `docs/tasks/task.{id}.{name}/`
-- **Used For**: Bugs found during technical task QA (refactoring, infrastructure, technical debt)
-- **Example**: `docs/tasks/task.1.cache-lib-simplification/task.1.bug.1.memory-leak.md`
+| Mode             | When to use                                                                                      | Location                                              | Filename                             | Numbering                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------ | -------------------------------------------- |
+| **Story bug**    | Bug found during user-facing feature (story) testing                                             | Co-located with the story file                       | `story.{epic}.{story}.bug.{n}.{name}.md` | Per-story (scan story dir, max + 1)          |
+| **Task bug**     | Bug found during technical-task QA (refactoring, infrastructure, technical debt)                 | `docs/tasks/task.{id}.{name}/`                        | `task.{id}.bug.{n}.{name}.md`        | Per-task (scan task dir, max + 1)            |
+| **General bug**  | Cross-cutting / sweep bug with **no single story or task owner** (lint, security, deps, drift)   | `docs/bugs/bug.{N}.{name}/` (own self-named subdir)   | `bug.{N}.{name}.md`                  | **Global** (via `docs/bugs/bug-registry.md`) |
 
 **Decision Rule**:
 
-- If bug found during **story testing** → Use Story Bug Report workflow (Step 1-7 below)
-- If bug found during **technical task QA** → Use Technical Task Bug Report workflow (see "Technical Task Bug Report Workflow" section)
+- Bug found during **story testing** → **Story Bug** workflow (below)
+- Bug found during **technical task QA** → **Task Bug** workflow (see "Technical Task Bug Report Workflow")
+- Bug has **no single story/task owner** → **General Bug** workflow (see "General Bug Report Workflow")
+
+**Reference**: All three follow `docs/standards/file-naming.md`. The general bug is a first-class
+core document (like a task) — see `docs/standards/bug-documents.md` and `docs/standards/bug-registry.md`.
 
 ---
 
@@ -50,18 +46,17 @@ Use this skill when:
 
 Create structured, trackable bug reports that:
 
-- Use standardized bug report template
-- Follow sequential numbering within each story/task
-- Co-locate with story/task files for easy access
+- Use a single, standardized bug report template (`assets/bug-report-template.md`)
+- Follow sequential numbering (per-parent for story/task bugs; global for general bugs)
+- Live in a predictable location (co-located with story/task, or under `docs/bugs/`)
 - Track iterative fix cycles
-- Link bidirectionally with story/task files
+- Link bidirectionally with the parent story/task (story/task modes only)
 - Integrate with QA workflow (Happy Path vs Unhappy Path)
 
 ## Required Inputs
 
 ```yaml
 required:
-  - story_id: '{epic}.{story}' # e.g., "8.5.3"
   - bug_description: Brief description of the bug
   - severity: 'Blocker | Major | Minor | Trivial'
   - priority: 'Critical | High | Medium | Low'
@@ -69,14 +64,42 @@ required:
   - actual_behavior: What actually happens
   - reproduction_steps: List of steps to reproduce
 
+conditionally_required:
+  - story_id: '{epic}.{story}' # Story Bug mode only, e.g. "8.5.3"
+  - task_id: '{id}'            # Task Bug mode only, e.g. "44"
+
 optional:
   - screenshots: Links or paths to screenshots
   - logs: Relevant log output
-  - ac_violation: Which AC failed
+  - ac_violation: Which AC / success criterion failed
   - environment: OS, browser, device details
 ```
 
-## Bug Report Creation Workflow
+> General Bug mode requires **no parent id** — it is not anchored to a story or task.
+
+## The Shared Bug Report Template
+
+All three modes create the file from the **same** template:
+
+**Template**: `assets/bug-report-template.md` (bundled with this skill)
+
+Populate it, then adjust these per-mode fields:
+
+| Field / heading                     | Story bug                                            | Task bug                                       | General bug                                       |
+| ----------------------------------- | --------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| `Bug ID`                            | `story.{epic}.{story}.bug.{n}.{name}`               | `task.{id}.bug.{n}.{name}`                     | `bug.{N}.{name}`                                  |
+| `Related` line / frontmatter        | `[Story {Epic}-{N}: {Title}](./story.{e}.{s}.{name}.md)` | `[Task {id}: {Title}](./task.{id}.{name}.md)` | `None — cross-cutting bug (no single owner)`      |
+| `## {Criteria Violation Heading}`   | `## Acceptance Criteria Violation`                  | `## Success Criteria Violation`                | `## Scope & Impact`                               |
+
+Everything else in the template (Description, Reproduction, Evidence, Developer Fix Cycle, Status
+History, Resolution Summary) is identical across modes. The bug lifecycle in frontmatter
+(`new → in-progress → ready-for-qa → closed | reopened`) is **distinct** from the document status
+lifecycle (`draft → … → accepted`); do not conflate them. OKF only mandates a non-empty `type` — the
+template sets `type: bug`.
+
+---
+
+## Story Bug Report Workflow
 
 ### Step 1: Locate Story File
 
@@ -85,194 +108,34 @@ optional:
 - Pattern: `story.{epic}.{story}.*.md`
 - Example: `story.8.5.3.cache-first-cleanup-testing.md`
 
-**Extract Story Information**:
-
-- Story title
-- Epic reference
-- Story location (directory path)
+**Extract Story Information**: story title, epic reference, story location (directory path).
 
 **HALT if story not found**: "Story {epic}.{story} not found. Please provide correct story ID."
 
----
-
 ### Step 2: Determine Next Bug Number
 
-**Sequential Numbering Logic**:
+1. Search the story directory for `story.{epic}.{story}.bug.*.md`.
+2. Highest existing number + 1 (no bugs → 1).
+3. Assign the number.
 
-1. Search for existing bug reports in story directory
-   - Pattern: `story.{epic}.{story}.bug.*.md`
-   - Example: `story.8.5.3.bug.1.*.md`, `story.8.5.3.bug.2.*.md`
+**Rules**: start at 1 per story, increment sequentially, never reuse, per-story namespace.
 
-2. Find highest bug number
-   - If `story.8.5.3.bug.2.*.md` exists → next number is 3
-   - If no bugs exist → next number is 1
+### Step 3: Generate Filename
 
-3. Assign bug number to new report
+`story.{epic}.{story}.bug.{bug-number}.{descriptive-name}.md` — `{descriptive-name}` = 2–4 words
+from the bug description, lowercase with hyphens, no special characters (per `docs/standards/file-naming.md`).
 
-**Numbering Rules**:
-
-- Start at 1 for each story
-- Increment sequentially (1, 2, 3, ...)
-- Never reuse numbers even if bugs are closed
-- Numbers are specific to the story
-
----
-
-### Step 3: Generate Bug Report Filename
-
-**Format**: `story.{epic}.{story}.bug.{bug-number}.{descriptive-name}.md`
-
-**Reference**: Follow the naming convention as specified in `docs/standards/naming-conventions.md`
-
-**Descriptive Name**:
-
-- Use 2-4 words from bug description
-- Lowercase with hyphens
-- No special characters
-
-**Examples**:
-
-- `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
-- `story.8.5.3.bug.2.offline-mode-regression.md`
-- `story.2.1.1.bug.1.validation-error-handling.md`
-
----
+Examples: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`, `story.2.1.1.bug.1.validation-error-handling.md`.
 
 ### Step 4: Create Bug Report File
 
-**Template Location**: `docs/templates/bug-report-template.md`
-
-**File Location**: Same directory as story file (co-location)
-
-**Initial Bug Report Content**:
-
-```markdown
-**Bug ID**: story.{epic}.{story}.bug.{bug-number}.{description}
-**Related Story**: [Story {Epic}-{N}: {Story Title}](./story.{epic}.{story}.{name}.md)
-**Status**: 🆕 New
-**Priority**: {Critical | High | Medium | Low}
-**Severity**: {Blocker | Major | Minor | Trivial}
-**Created**: {YYYY-MM-DD}
-**Assigned To**: {Developer Name}
-**QA Engineer**: {QA Engineer Name}
-
----
-
-## Bug Description
-
-**Summary**: {1-2 sentence description}
-
-**Expected Behavior**: {What should happen}
-
-**Actual Behavior**: {What actually happens}
-
-**Impact**: {How this affects users/system/business}
-
----
-
-## Reproduction Steps
-
-**Environment**: {OS, browser, device, etc.}
-
-**Steps to Reproduce**:
-
-1. {Step 1}
-2. {Step 2}
-3. {Step 3}
-
-**Frequency**: {Always | Sometimes | Rarely}
-**Reproducible**: {Yes | No | Intermittent}
-
----
-
-## Evidence
-
-**Screenshots/Videos**: {Link or embed}
-
-**Logs and Stack Traces**:
-```
-
-{Paste relevant logs}
-
-```
-
-**Related Files**: {List files involved}
-
----
-
-## Acceptance Criteria Violation
-
-**AC Reference**: AC{N} - {AC description}
-
-**How AC Failed**: {Specific explanation}
-
----
-
-## Developer Fix Cycle
-
-[This section will be filled by developer during fix process]
-
-### Iteration 1
-
-#### Investigation (New → In Progress)
-**Date**: [Date]
-**Developer**: [Name]
-
-[Investigation notes, root cause analysis]
-
-#### Fix Implementation (In Progress → Ready for QA)
-**Date**: [Date]
-
-**Root Cause**: [Explanation]
-
-**Fix Description**: [What was changed]
-
-**Files Modified**:
-- [file1.ts]
-- [file2.ts]
-
-**Testing**: [How the fix was tested]
-
-#### QA Verification (Ready for QA → Closed/Reopened)
-**Date**: [Date]
-**QA Engineer**: [Name]
-
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
-
-**Notes**: [Testing notes]
-
-**Decision**: Closed | Reopened
-
----
-
-## Status History
-
-| Date | Status | Changed By | Notes |
-|------|--------|------------|-------|
-| {created_date} | New | {QA Name} | Bug created |
-
----
-
-## Resolution Summary
-
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
-```
-
----
+Create the file from `assets/bug-report-template.md` in the **same directory as the story file**
+(co-location). Set the story-mode fields per "The Shared Bug Report Template" (Related → story link;
+heading → **Acceptance Criteria Violation**).
 
 ### Step 5: Update Story File Bug Reports Section
 
-**Locate Bug Reports Section**:
-
-If `## Bug Reports` section doesn't exist in story file, add it after the "QA Report" section.
-
-**Add Bug Link to Story**:
+If a `## Bug Reports` section doesn't exist, add it after the "QA Report" section.
 
 ```markdown
 ## Bug Reports
@@ -290,15 +153,11 @@ If `## Bug Reports` section doesn't exist in story file, add it after the "QA Re
 [No closed bugs]
 ```
 
-**Update Existing Section**:
-
-If bugs already exist, add new bug to appropriate subsection based on status.
-
----
+If bugs already exist, add the new bug to the appropriate subsection based on status.
 
 ### Step 6: Link in QA Report (if applicable)
 
-If QA report exists (`story.{epic}.{story}.qa.*.md`), reference the bug report:
+If a QA report exists (`story.{epic}.{story}.qa.*.md`), reference the bug report:
 
 ```markdown
 ## Issues Found
@@ -312,15 +171,11 @@ If QA report exists (`story.{epic}.{story}.qa.*.md`), reference the bug report:
 {Issue details from QA report}
 ```
 
----
-
 ### Step 7: Update Story Status (if first bug)
 
 If this is the first bug for the story:
 
 **Status Transition**: "Ready for QA" → "Reopened"
-
-Update story metadata:
 
 ```markdown
 **Status**: ⚠️ Reopened
@@ -406,218 +261,46 @@ Use these guidelines to assign priority:
 
 ### Step 1: Locate Task Document
 
-**Find Task Document**:
-
 - Pattern: `docs/tasks/task.{id}.{name}/task.{id}.{name}.md`
-- Example: `docs/tasks/task.1.cache-lib-simplification/task.1.cache-lib-simplification.md`
-
-**Extract Task Information**:
-
-- Task ID
-- Task title
-- Task subdirectory path
+- Extract: task ID, task title, task subdirectory path.
 
 **HALT if task not found**: "Task {id} not found. Please provide correct task ID."
 
----
-
 ### Step 2: Determine Next Bug Number
 
-**Sequential Numbering Logic**:
+1. Search the task subdirectory (`docs/tasks/task.{id}.{name}/`) for `task.{id}.bug.*.md`.
+2. Highest existing number + 1 (no bugs → 1).
+3. Assign the number.
 
-1. Search for existing bug reports in task subdirectory
-   - Pattern: `task.{id}.bug.*.md`
-   - Location: `docs/tasks/task.{id}.{name}/`
-   - Example: `task.1.bug.1.*.md`, `task.1.bug.2.*.md`
+**Rules**: start at 1 per task, increment sequentially, never reuse, per-task namespace.
 
-2. Find highest bug number
-   - If `task.1.bug.2.*.md` exists → next number is 3
-   - If no bugs exist → next number is 1
+### Step 3: Generate Filename
 
-3. Assign bug number to new report
+`task.{id}.bug.{number}.{descriptive-name}.md` — descriptive name rule as above.
 
-**Numbering Rules**:
-
-- Start at 1 for each task
-- Increment sequentially (1, 2, 3, ...)
-- Never reuse numbers even if bugs are closed
-- Numbers are specific to the task
-
----
-
-### Step 3: Generate Bug Report Filename
-
-**Format**: `task.{id}.bug.{number}.{descriptive-name}.md`
-
-**Descriptive Name**:
-
-- Use 2-4 words from bug description
-- Lowercase with hyphens
-- No special characters
-
-**Examples**:
-
-- `task.1.bug.1.test-expects-l3-tier.md`
-- `task.1.bug.2.lint-ts-ignore-violations.md`
-- `task.2.bug.1.performance-regression.md`
-
----
+Examples: `task.1.bug.1.test-expects-l3-tier.md`, `task.2.bug.1.performance-regression.md`.
 
 ### Step 4: Create Bug Report File
 
-**Template Location**: Use same bug report template as story bugs
-
-**File Location**: Task subdirectory (co-located with task document)
-
-- Full path: `docs/tasks/task.{id}.{name}/task.{id}.bug.{number}.{name}.md`
-
-**Initial Bug Report Content**:
-
-```markdown
-**Bug ID**: task.{id}.bug.{number}.{description}
-**Related Task**: [Technical Task {ID}: {Task Title}](./task.{id}.{name}.md)
-**Status**: 🆕 New
-**Priority**: {Critical | High | Medium | Low}
-**Severity**: {Blocker | Major | Minor | Trivial}
-**Created**: {YYYY-MM-DD}
-**Assigned To**: {Developer Name}
-**QA Engineer**: {QA Engineer Name}
-
----
-
-## Bug Description
-
-**Summary**: {1-2 sentence description}
-
-**Expected Behavior**: {What should happen based on success criteria}
-
-**Actual Behavior**: {What actually happens}
-
-**Impact**: {How this affects deployment/system/quality}
-
----
-
-## Reproduction Steps
-
-**Environment**: {Node version, dependencies, test environment, etc.}
-
-**Steps to Reproduce**:
-
-1. {Step 1}
-2. {Step 2}
-3. {Step 3}
-
-**Frequency**: {Always | Sometimes | Rarely}
-**Reproducible**: {Yes | No | Intermittent}
-
----
-
-## Evidence
-
-**Test Output**: {Command output showing failure}
-
-**Logs and Stack Traces**:
-```
-
-{Paste relevant logs}
-
-```
-
-**Related Files**: {List files involved}
-
----
-
-## Success Criteria Violation
-
-**Success Criterion**: {Which criterion from task document failed}
-
-**How Criterion Failed**: {Specific explanation}
-
----
-
-## Developer Fix Cycle
-
-[This section will be filled by developer during fix process]
-
-### Iteration 1
-
-#### Investigation (New → In Progress)
-**Date**: [Date]
-**Developer**: [Name]
-
-[Investigation notes, root cause analysis]
-
-#### Fix Implementation (In Progress → Ready for QA)
-**Date**: [Date]
-
-**Root Cause**: [Explanation]
-
-**Fix Description**: [What was changed]
-
-**Files Modified**:
-- [file1.ts]
-- [file2.ts]
-
-**Testing**: [How the fix was tested]
-
-#### QA Verification (Ready for QA → Closed/Reopened)
-**Date**: [Date]
-**QA Engineer**: [Name]
-
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
-
-**Notes**: [Testing notes]
-
-**Decision**: Closed | Reopened
-
----
-
-## Status History
-
-| Date | Status | Changed By | Notes |
-|------|--------|------------|-------|
-| {created_date} | New | {QA Name} | Bug created |
-
----
-
-## Resolution Summary
-
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
-```
-
----
+Create the file from `assets/bug-report-template.md` in the **task subdirectory**
+(`docs/tasks/task.{id}.{name}/task.{id}.bug.{number}.{name}.md`). Set the task-mode fields per "The
+Shared Bug Report Template" (Related → task link; heading → **Success Criteria Violation**).
 
 ### Step 5: Update Task File Bug Reports Section
 
-**Locate Bug Reports Section**:
-
-If `## Bug Reports` section doesn't exist in task file, add it in the QA & Quality Assurance section.
-
-**Add Bug Link to Task**:
+If a `## Bug Reports` section doesn't exist, add it in the QA & Quality Assurance section.
 
 ```markdown
 ### Bug Reports
 
-[Bug reports will be added here if issues found]
-
 - [task.{id}.bug.{n}.{description}.md](./task.{id}.bug.{n}.{description}.md) - 🆕 New - Priority: {Priority} - {Date}
 ```
 
-**Update Existing Section**:
-
-If bugs already exist, add new bug to the list.
-
----
+If bugs already exist, add the new bug to the list.
 
 ### Step 6: Link in QA Report
 
-If QA report exists (`task.{id}.qa.{name}.md`), reference the bug report in the "Issues Found" section:
+If a QA report exists (`task.{id}.qa.{name}.md`), reference the bug report in the "Issues Found" section:
 
 ```markdown
 ## Issues Found
@@ -635,15 +318,108 @@ If QA report exists (`task.{id}.qa.{name}.md`), reference the bug report in the 
 - **Priority**: P0/P1
 ```
 
----
-
 ### Step 7: Update Task Status (if blocking bug)
 
-If bug is Critical/High severity and blocks deployment:
+If the bug is Critical/High severity and blocks deployment, note it in the task document's status
+field / progress tracking. Technical tasks don't use the "Reopened" status like stories.
 
-**Status Transition**: Track in task document's status field
+---
 
-**Note**: Technical tasks don't use "Reopened" status like stories. Blocking bugs should be noted in the task's progress tracking or success criteria sections.
+## General Bug Report Workflow
+
+**Use this workflow for cross-cutting / sweep bugs with no single story or task owner.** General bugs
+are first-class, globally-numbered documents living under `docs/bugs/`, each in its own self-named
+subdirectory. There is **no parent** — none of the parent back-link / parent-status steps apply.
+
+### Step 1: Locate (or Bootstrap) the Bug Registry
+
+- Read `docs/bugs/bug-registry.md` — the single source of truth for general-bug numbering.
+- **If it does not exist, bootstrap it**: create the `docs/bugs/` directory and write the registry
+  skeleton (mirrors `docs/tasks/task-registry.md`):
+
+  ```markdown
+  # Bug Registry
+
+  **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
+  **Last Updated:** {YYYY-MM-DD}
+  **Next Available Bug Number:** **1**
+
+  ## How to use
+
+  ### Filing a new general bug
+  1. Read **Next Available Bug Number** above — that's your `bug.{N}`.
+  2. Run `/create-bug-report` (General Bug mode). It will create:
+     - `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md`
+  3. Add a row to the table below for the new bug.
+  4. Increment **Next Available Bug Number**.
+  5. Commit the registry update **in the same commit** as the new bug files (atomic).
+
+  ### Rules
+  - Bug numbers are globally unique. Never reuse a number, even for a closed/cancelled bug.
+  - If a merge conflict on the next-number occurs, the higher number wins; the loser bumps to the next free slot.
+  - General bugs have no parent story/task (that's what story/task bug reports are for).
+
+  ---
+
+  ## Registry
+
+  | #   | Title | Status | Severity | Priority | Created | Area |
+  | --- | ----- | ------ | -------- | -------- | ------- | ---- |
+
+  ---
+
+  ## Notes
+  ```
+
+### Step 2: Determine Next Bug Number
+
+- `N` = **Next Available Bug Number** from the registry.
+- Fallback (registry just bootstrapped or missing the field): highest existing `docs/bugs/bug.*`
+  directory number + 1, else 1.
+
+**Rules**: global namespace, sequential, never reused.
+
+### Step 3: Generate Directory + Filename
+
+- Directory: `docs/bugs/bug.{N}.{name}/`
+- File: `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md`
+- `{name}` = 2–4 words from the bug description, lowercase with hyphens, no special characters. The
+  directory stem matches the filename stem exactly (per `docs/standards/file-naming.md`).
+
+Examples: `docs/bugs/bug.1.login-timeout/bug.1.login-timeout.md`,
+`docs/bugs/bug.7.stale-token-refresh/bug.7.stale-token-refresh.md`.
+
+### Step 4: Create Bug Report File
+
+Create the file from `assets/bug-report-template.md`. Set the general-mode fields per "The Shared Bug
+Report Template":
+
+- `Bug ID` → `bug.{N}.{name}`
+- `Related` (line + frontmatter) → `None — cross-cutting bug (no single owner)`
+- `## {Criteria Violation Heading}` → `## Scope & Impact` (record which areas the bug cuts across and
+  why it has no single owner)
+
+### Step 5: Update the Bug Registry
+
+- Append a row to the `## Registry` table:
+
+  ```markdown
+  | {N} | [{Title}](bug.{N}.{name}/bug.{N}.{name}.md) | new | {Severity} | {Priority} | {YYYY-MM-DD} | {Area} |
+  ```
+
+- Increment **Next Available Bug Number** and update **Last Updated**.
+- Commit the registry bump **in the same commit** as the new bug files (atomic). On a merge conflict
+  over the next number, the higher number wins; the loser bumps to the next free slot.
+
+### Step 6: (No Parent Back-link / No Parent Status)
+
+General bugs have no parent story/task, so there is **no** parent Bug-Reports-section update and
+**no** parent status transition. The registry row is the index entry.
+
+### Step 7: Validate
+
+Run `documentation-standards-validator` on the new `bug.{N}.{name}.md` (confirm `type: bug`
+frontmatter present and DOTS-not-underscores naming), as `create-task` does.
 
 ---
 
@@ -671,61 +447,23 @@ If bug is Critical/High severity and blocks deployment:
 
 After bug reports are created:
 
-1. **Developer Investigation** (New → In Progress)
-   - Developer reads bug report
-   - Investigates root cause
-   - Documents findings in bug report
-
-2. **Developer Fix** (In Progress → Ready for QA)
-   - Implements fix
-   - Updates bug report with fix details
-   - Changes bug status to "Ready for QA"
-
-3. **QA Verification** (Ready for QA → Closed/Reopened)
-   - QA retests the bug
-   - If fixed → Closes bug
-   - If still failing → Reopens bug, starts new iteration
-
-4. **Iteration** (if Reopened)
-   - Add new "Iteration 2" section
-   - Repeat cycle until closed
-
-5. **Story Re-test**
-   - Once all bugs closed
-   - QA performs full story re-test
-   - If pass → Story to "Done"
+1. **Developer Investigation** (New → In Progress) — read bug report, investigate root cause, document findings.
+2. **Developer Fix** (In Progress → Ready for QA) — implement fix, update bug report, change status to "Ready for QA".
+3. **QA Verification** (Ready for QA → Closed/Reopened) — retest; if fixed → close, if still failing → reopen and start a new iteration.
+4. **Iteration** (if Reopened) — add a new "Iteration 2" section; repeat until closed.
+5. **Re-test** — once all bugs closed, perform a full re-test; if pass → Done.
 
 ---
 
 ## Bug Report Best Practices
 
-**Clear Descriptions**:
+**Clear Descriptions**: be specific about what's broken; use concrete examples; avoid vague language; include exact error messages.
 
-- Be specific about what's broken
-- Use concrete examples
-- Avoid vague language
-- Include exact error messages
+**Complete Reproduction Steps**: numbered, sequential steps; include all preconditions; specify exact data/inputs; note environment details.
 
-**Complete Reproduction Steps**:
+**Evidence Quality**: annotated screenshots (highlight issues); relevant log excerpts only; stack traces with context; video for complex workflows.
 
-- Numbered, sequential steps
-- Include all preconditions
-- Specify exact data/inputs used
-- Note environment details
-
-**Evidence Quality**:
-
-- Annotated screenshots (highlight issues)
-- Relevant log excerpts only
-- Stack traces with context
-- Video for complex workflows
-
-**AC Violation Clarity**:
-
-- Quote the specific AC
-- Explain exactly how it failed
-- Reference test case if applicable
-- Note expected vs actual outcome
+**Criteria / Scope Clarity**: quote the specific AC or success criterion (story/task bugs); for general bugs, name the areas the bug cuts across and why no single story/task owns it.
 
 ---
 
@@ -733,87 +471,63 @@ After bug reports are created:
 
 Before finalizing bug report creation:
 
-- ✅ Bug number is sequentially assigned
-- ✅ Filename follows naming convention
-- ✅ Bug report file created with all required sections
-- ✅ Initial status set to "New"
-- ✅ All required fields populated
-- ✅ Reproduction steps are complete and clear
-- ✅ Evidence attached (screenshots, logs)
-- ✅ AC violation documented
-- ✅ Story file Bug Reports section updated
-- ✅ Bug linked in story file
-- ✅ Story status updated to "Reopened" (if first bug)
-- ✅ QA report references bug (if QA report exists)
+- ✅ Correct mode chosen (story / task / general)
+- ✅ Bug number sequentially assigned (per-parent for story/task; from `bug-registry.md` for general)
+- ✅ Filename (and directory, for general bugs) follows the naming convention
+- ✅ Bug report file created from `assets/bug-report-template.md` with all required sections
+- ✅ `type: bug` frontmatter present; initial status "New"
+- ✅ All required fields populated; reproduction steps complete; evidence attached
+- ✅ Criteria/scope violation documented
+- ✅ **Story/Task modes**: parent Bug Reports section updated, bug linked, parent status updated (if first/blocking), QA report references bug
+- ✅ **General mode**: `bug-registry.md` row appended and **Next Available Bug Number** incremented (committed atomically)
 
 ---
 
-## Example: Creating Bug Report
+## Example: General Bug Report
 
-**Scenario**: QA finds cache cleanup memory leak in Story 8.5.3
-
-**Input**:
-
-```yaml
-story_id: '8.5.3'
-bug_description: 'Cache cleanup causes memory leak'
-severity: 'Major'
-priority: 'High'
-expected_behavior: 'Cache cleanup should free all memory references'
-actual_behavior: 'Memory usage grows after each cleanup cycle'
-reproduction_steps:
-  - 'Run cache cleanup 100 times'
-  - 'Monitor memory usage'
-  - 'Observe memory growth over iterations'
-```
+**Scenario**: A dependency-audit sweep finds that the auth token isn't refreshed before expiry across
+several screens — no single story or task owns it.
 
 **Workflow**:
 
-1. **Locate Story**: `story.8.5.3.cache-first-cleanup-testing.md`
-2. **Determine Bug Number**: No existing bugs → assign number 1
-3. **Generate Filename**: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`
-4. **Create Bug Report**: Use template, populate all fields
-5. **Update Story**: Add to Bug Reports section:
+1. **Registry**: read `docs/bugs/bug-registry.md` (bootstrap if missing) → Next Available Bug Number = 7.
+2. **Filename/dir**: `docs/bugs/bug.7.stale-token-refresh/bug.7.stale-token-refresh.md`.
+3. **Create file** from `assets/bug-report-template.md`; Related = `None — cross-cutting bug (no single owner)`; heading = `## Scope & Impact`.
+4. **Registry**: append row `| 7 | [Stale token refresh across screens](bug.7.stale-token-refresh/bug.7.stale-token-refresh.md) | new | Major | High | {date} | auth |`; bump Next Available Bug Number → 8.
+5. **Validate** with `documentation-standards-validator`.
 
-   ```markdown
-   ### Open Bugs
-
-   - [Bug 8.5.3.1: Cache cleanup memory leak](story.8.5.3.bug.1.cache-cleanup-memory-leak.md) - 🆕 New - Priority: High
-   ```
-
-6. **Update Story Status**: "Ready for QA" → "Reopened"
-
-**Result**:
-
-- Bug report file created and populated
-- Story file updated with bug link
-- Story status changed to Reopened
-- QA workflow continues with iterative fix cycle
+**Result**: a self-contained general bug at `docs/bugs/bug.7.stale-token-refresh/`, indexed in the
+registry, with no parent coupling.
 
 ---
 
 ## Related Skills
 
-- **qa-story**: Comprehensive story review that creates bug reports
-- **fix-qa**: Developer workflow for fixing bugs
-- **develop**: Main development workflow
+- **review-bug**: reviews a bug report for fix-readiness (completeness, reproducibility, duplicate/stale scans) — run it before fixing; also develop-bug's Step 2 gate
+- **develop-bug**: end-to-end bug-fix orchestrator — consumes the file this skill creates and runs it from open to closed (review → research → fix → verify → Resolution Summary → close)
+- **qa-story** / **qa-task**: reviews that create bug reports
+- **qa-fix**: developer workflow for fixing bugs (also the fix engine inside develop-bug's verify loop)
+- **create-task**: the structural model for global registry numbering + self-named directories
+- **develop**: main development workflow
 
 ---
 
 ## Key Principles
 
-1. **Type Decision**: Determine if bug is for story or technical task first
-2. **Sequential Numbering**: Always increment from highest existing number (per story/task)
-3. **Co-location**:
-   - Story bugs → Same directory as story file
-   - Task bugs → Task subdirectory (`docs/tasks/task.{id}.{name}/`)
-4. **Template-Based**: Use bug report template for consistency (same template for both types)
-5. **Bidirectional Links**: Link bug in story/task, link story/task in bug
-6. **Initial Status**: Always start with "New" status
-7. **Severity-Driven**: HIGH/MEDIUM → Create bug report, LOW → QA report only
-8. **Naming Convention**:
+1. **Type Decision**: choose story / task / general **before** proceeding.
+2. **Sequential Numbering**: per-parent for story/task bugs (scan + 1); **global** for general bugs (via `bug-registry.md`, never reused).
+3. **Location**:
+   - Story bugs → same directory as the story file
+   - Task bugs → task subdirectory (`docs/tasks/task.{id}.{name}/`)
+   - General bugs → own self-named subdirectory under `docs/bugs/`
+4. **One Template**: all modes use `assets/bug-report-template.md`.
+5. **Bidirectional Links**: story/task modes link bug ↔ parent; general bugs are indexed by the registry only.
+6. **Initial Status**: always start with "New".
+7. **Severity-Driven**: HIGH/MEDIUM → create bug report; LOW → QA report only.
+8. **Naming Convention** (per `docs/standards/file-naming.md`):
    - Story bugs: `story.{epic}.{story}.bug.{n}.{name}.md`
    - Task bugs: `task.{id}.bug.{n}.{name}.md`
+   - General bugs: `bug.{N}.{name}.md` in `docs/bugs/bug.{N}.{name}/`
 
 ---
 
@@ -821,22 +535,13 @@ reproduction_steps:
 
 **General**:
 
-- Bug reports are only created for HIGH and MEDIUM severity issues
-- LOW severity issues are documented in QA report only, not separate bug files
-- Bug numbering is per-story or per-task, not global
-- Once a bug number is assigned, it's never reused
-- Bug reports track iterative fix cycles in the same file
-- Bug status flow: New → In Progress → Ready for QA → Closed (or Reopened)
+- Bug reports are only created for HIGH and MEDIUM severity issues; LOW severity goes in the QA report only.
+- Once a bug number is assigned, it's never reused.
+- Bug reports track iterative fix cycles in the same file.
+- Bug status flow: New → In Progress → Ready for QA → Closed (or Reopened) — distinct from the document status lifecycle.
 
-**Story Bugs**:
+**Story Bugs**: `story.{epic}.{story}.bug.{number}.{name}.md`, co-located with the story; per-story numbering.
 
-- Pattern: `story.{epic}.{story}.bug.{number}.{name}.md`
-- Location: Co-located with story file in story directory
-- Numbering resets for each story (story 8.5.3 has story.8.5.3.bug.1, story.8.5.3.bug.2, etc.)
+**Technical Task Bugs**: `task.{id}.bug.{number}.{name}.md`, co-located in the task subdirectory; per-task numbering. Quality gates are co-located in the task subdirectory (`task.{id}.gate.{number}.{name}.yml`).
 
-**Technical Task Bugs**:
-
-- Pattern: `task.{id}.bug.{number}.{name}.md`
-- Location: Co-located in task subdirectory (`docs/tasks/task.{id}.{name}/`)
-- Numbering resets for each task (task 1 has task.1.bug.1, task.1.bug.2, etc.)
-- Quality gates are co-located in the task subdirectory (`task.{id}.gate.{number}.{name}.yml`)
+**General Bugs**: `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md`; global numbering via `docs/bugs/bug-registry.md`; no parent. See `docs/standards/bug-documents.md` and `docs/standards/bug-registry.md`.

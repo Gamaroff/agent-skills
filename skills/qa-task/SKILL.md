@@ -166,16 +166,47 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
 
 3. **Decide whether to re-review:**
 
-   **Skip re-review (exit with success message) when:**
+   **A prior gate only speaks for the code and the document it was written against.** Before the skip
+   branch can apply, establish that neither has moved since. Gather both freshness signals:
+
+   ```bash
+   GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   DOC_DATE=$(grep -E '^updated:' "$TASK_FILE"  | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $2}')
+   # Any commit touching source since the gate was written?
+   CODE_MOVED=$(git log --since="$GATE_DATE" --name-only --format="" -- \
+     apps packages 2>/dev/null | sort -u | head -1)
+   ```
+
+   **Skip re-review (exit with success message) ONLY when ALL of:**
    - Gate status is `PASS`
    - AND `top_issues` list is empty
-   - Message: "Task already has clean PASS gate with no concerns. Re-review not needed."
+   - AND `CODE_MOVED` is empty — no source commit since the gate
+   - AND `DOC_DATE` is not newer than `GATE_DATE` — the task document has not been edited since
+   - AND `DOC_STATUS` is not one of `in-progress` / `ready-for-development` / `planned` — a status
+     that moved *backwards* from `accepted` means the work was reopened
+   - Message: "Task already has clean PASS gate with no concerns, and neither the code nor the
+     document has changed since. Re-review not needed."
 
    **Perform re-review when ANY of:**
    - Gate status is `CONCERNS`, `FAIL`, or `WAIVED`
    - OR `top_issues` has items (even if gate is PASS)
    - OR no gate file exists (first review)
-   - Message: "Performing QA re-review (previous gate: {status} with {count} issues)"
+   - OR **source changed since the gate** (`CODE_MOVED` non-empty)
+   - OR **the document changed since the gate** (`DOC_DATE` > `GATE_DATE`)
+   - OR **the document was reopened** (status moved backwards from `accepted`)
+   - Message: "Performing QA re-review (previous gate: {status} with {count} issues; {reason})"
+
+   > **Why the extra conditions.** The skip branch as originally written keys only on the *content*
+   > of the last gate, never on whether that gate is still *about* the current state. A reopened task
+   > carries its old `PASS` forward, so the one situation most in need of QA — work that was accepted
+   > and then found wanting — is precisely the one that skips it. Observed live: task.52 was accepted
+   > at PASS 92/100 with its Playwright lane red, reopened with a new criterion, and its stale PASS
+   > gate would have short-circuited the re-review that then found **seven** further defects.
+   >
+   > **A green gate is a statement about a commit, not a property of the task.** When in doubt,
+   > re-review — the cost is one QA cycle, and the cost of the alternative is shipping on evidence
+   > that has expired.
 
 4. **For re-reviews, determine next QA artifact number:**
 

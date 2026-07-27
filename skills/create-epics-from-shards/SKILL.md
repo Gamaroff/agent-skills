@@ -67,7 +67,8 @@ Convert PRD shards into focused implementation epics:
    ├─ Create epics/index.md
    ├─ Roadmap with phases
    ├─ Dependency diagram
-   └─ Timeline estimates
+   ├─ Timeline estimates
+   └─ Regenerate the parent PRD's epic index (prd.<feature>.md)
 
 5. Quality Validation
    ├─ Verify all shards covered
@@ -125,6 +126,7 @@ For each identified epic, create using this structure:
 
 ```markdown
 ---
+epic_number: N # REQUIRED — the globally-unique integer reserved in Step 4. Drives the PRD epic index.
 title: "[Epic N] Epic Name"
 prd_source: "[shard-filename.md]"
 epic_type: "system_implementation"
@@ -342,7 +344,35 @@ graph TD
 
 ````
 
-### Step 6: Quality Validation
+### Step 6: Regenerate the PRD Epic Index
+
+After all epic files are written (Step 3) **and** the epic-registry update is committed
+(Step 4), refresh the parent PRD's linked epic index so PRD→epic links stay complete and
+statuses current. This is the PRD-level index injected into `prd.<feature>.md` — distinct
+from the epic roadmap `epics/index.md` created in Step 5; keep both.
+
+1. Ensure `${PRD_ROOT}` is set — source the resolver if you have not already:
+
+   ```bash
+   source references/resolve-paths.sh   # sets PRD_ROOT (default docs/prd)
+   ```
+
+2. Run the generator, preferring the consumer's vendored copy and falling back to the
+   skill's bundled reference when it is absent:
+
+   ```bash
+   node scripts/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}" \
+     || node references/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}"
+   ```
+
+   Every new epic MUST carry `epic_number` in its frontmatter (Step 3) — the generator
+   silently skips any epic that lacks it. Add `--strict` to turn a missing `epic_number`
+   into a hard error when you want to fail loudly instead.
+
+3. Stage the changed `prd.*.md` alongside the epic files in the **same** commit, so the
+   downstream `docs:epic-index:check` never sees drift.
+
+### Step 7: Quality Validation
 
 **Epic Quality Checklist:**
 - [ ] Epic has clear, measurable goal
@@ -361,7 +391,7 @@ graph TD
 - [ ] Epic scope balanced
 - [ ] Total timeline realistic
 
-### Step 7: Handoff Documentation
+### Step 8: Handoff Documentation
 
 Create handoff summary:
 

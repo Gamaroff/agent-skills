@@ -12,16 +12,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-const SCRIPT = path.join(REPO_ROOT, "skills", "develop-next", "scripts", "select-next.mjs");
+const SCRIPT = path.join(
+  REPO_ROOT,
+  "skills",
+  "develop-next",
+  "scripts",
+  "select-next.mjs",
+);
 
-const { parseRoadmap, selectNext, epicStatus } = await import(pathToFileURL(SCRIPT).href);
+const { parseRoadmap, selectNext, selectBatch, parseTouches } = await import(
+  pathToFileURL(SCRIPT).href
+);
 
 function fixture(name) {
   return readFileSync(path.join(__dirname, "fixtures", name), "utf-8");
@@ -32,7 +40,9 @@ function select(text) {
 }
 
 function tick(text, id) {
-  const re = new RegExp(`- \\[ \\] \\*\\*${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\*\\*`);
+  const re = new RegExp(
+    `- \\[ \\] \\*\\*${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\*\\*`,
+  );
   assert.match(text, re, `fixture has no unticked row ${id}`);
   return text.replace(re, `- [x] **${id}**`);
 }
@@ -60,7 +70,11 @@ test("01: manual row at the phase frontier stops the run — even with an eligib
 test("02: unsatisfied dep skips the row; gate:/flag: do not block", () => {
   const r = select(fixture("02-deps-and-markers.md"));
   assert.equal(r.status, "selected");
-  assert.equal(r.item.id, "8.3", "8.3 must be selected despite gate: and flag: markers");
+  assert.equal(
+    r.item.id,
+    "8.3",
+    "8.3 must be selected despite gate: and flag: markers",
+  );
   assert.equal(r.skipped.length, 1);
   assert.equal(r.skipped[0].id, "8.2");
   assert.match(r.skipped[0].reason, /deps unsatisfied: 8\.9/);
@@ -126,7 +140,11 @@ test("07: Deferred/Housekeeping/Change Log rows are ignored entirely", () => {
   const r = select(fixture("07-excluded-sections.md"));
   assert.equal(r.status, "selected");
   assert.equal(r.item.id, "3.1");
-  assert.equal(r.lint.errors.length, 0, "id-less rows in excluded sections must not lint-error");
+  assert.equal(
+    r.lint.errors.length,
+    0,
+    "id-less rows in excluded sections must not lint-error",
+  );
 });
 
 test("07: roadmap completes when only excluded rows remain outstanding", () => {
@@ -155,9 +173,16 @@ test("09: /create-* row stops the run (authoring is attended work)", () => {
 // ── tolerant parsing (living-backlog semantics) ──────────────────────────────
 
 test("tolerant: a dep not in the current backlog is assumed shipped/archived, not an error", () => {
-  const text = fixture("01-first-item.md").replace("deps: staging *(shipped)*", "deps: 99.9");
+  const text = fixture("01-first-item.md").replace(
+    "deps: staging *(shipped)*",
+    "deps: 99.9",
+  );
   const r = select(text);
-  assert.equal(r.status, "selected", "an archived-out dep must not block or halt");
+  assert.equal(
+    r.status,
+    "selected",
+    "an archived-out dep must not block or halt",
+  );
   assert.equal(r.item.id, "5.1a");
   assert.equal(r.lint.errors.length, 0);
   assert.match(r.lint.warnings.join("\n"), /99\.9 not in the current backlog/);
@@ -166,7 +191,8 @@ test("tolerant: a dep not in the current backlog is assumed shipped/archived, no
 test("tolerant: a duplicate id that is a recap of a done item is a warning, not a halt", () => {
   // 8.9 already exists ticked-less; add a ticked recap of it → recap, not ambiguity.
   const text = fixture("02-deps-and-markers.md").replace(
-    "- [ ] **8.9**", "- [x] **8.9** recap done\n- [ ] **8.9**",
+    "- [ ] **8.9**",
+    "- [x] **8.9** recap done\n- [ ] **8.9**",
   );
   const r = select(text);
   assert.notEqual(r.status, "halt");
@@ -174,7 +200,10 @@ test("tolerant: a duplicate id that is a recap of a done item is a warning, not 
 });
 
 test("halt: two live, buildable rows sharing an id is a real ambiguity", () => {
-  const text = fixture("08-no-phase-headings.md").replace("- [x] **1.1**", "- [ ] **1.2** dup");
+  const text = fixture("08-no-phase-headings.md").replace(
+    "- [x] **1.1**",
+    "- [ ] **1.2** dup",
+  );
   const r = select(text);
   assert.equal(r.status, "halt");
   assert.match(r.lint.errors.join("\n"), /duplicate outstanding id 1\.2/);
@@ -182,7 +211,8 @@ test("halt: two live, buildable rows sharing an id is a real ambiguity", () => {
 
 test("stop: an eligible row with no runnable command pauses for the operator (manual-checkpoint)", () => {
   const text = fixture("08-no-phase-headings.md").replace(
-    "· /develop-task docs/tasks/task.2.next/task.2.next.md", "· run /review-prd first",
+    "· /develop-task docs/tasks/task.2.next/task.2.next.md",
+    "· run /review-prd first",
   );
   const r = select(text);
   assert.equal(r.status, "stop");
@@ -192,7 +222,8 @@ test("stop: an eligible row with no runnable command pauses for the operator (ma
 
 test("tolerant: a checkbox row with no item id is skipped with a warning, never halts", () => {
   const text = fixture("08-no-phase-headings.md").replace(
-    "- [ ] **1.2**", "- [ ] a stray annotation row\n- [ ] **1.2**",
+    "- [ ] **1.2**",
+    "- [ ] a stray annotation row\n- [ ] **1.2**",
   );
   const r = select(text);
   assert.equal(r.status, "selected");
@@ -210,13 +241,25 @@ test("halt: a roadmap with no parseable rows at all", () => {
 
 test("10: lints clean against a real-world-shaped roadmap", () => {
   const r = select(fixture("10-real-world.md"));
-  assert.equal(r.lint.errors.length, 0, `unexpected errors: ${r.lint.errors.join("; ")}`);
+  assert.equal(
+    r.lint.errors.length,
+    0,
+    `unexpected errors: ${r.lint.errors.join("; ")}`,
+  );
 });
 
 test("10: ⏭️ SKIP rows are non-blocking — Phase 1 is stepped past, not stopped", () => {
   const r = select(fixture("10-real-world.md"));
-  assert.equal(r.status, "selected", "must not stop at the manual+SKIP 5.7 row");
-  assert.equal(r.item.id, "12.1", "15/17 done, 12.1 is the first actionable item");
+  assert.equal(
+    r.status,
+    "selected",
+    "must not stop at the manual+SKIP 5.7 row",
+  );
+  assert.equal(
+    r.item.id,
+    "12.1",
+    "15/17 done, 12.1 is the first actionable item",
+  );
 });
 
 test("10: the story path is resolved from the [story](…) link, command from backticks", () => {
@@ -235,20 +278,26 @@ test("10: -NFR suffix ids are distinct from their base id (7.11 ≠ 7.11-NFR2)",
   const model = parseRoadmap(fixture("10-real-world.md"));
   assert.ok(model.byId.has("7.11"));
   assert.ok(model.byId.has("7.11-NFR2"));
-  assert.equal(model.errors.length, 0, "distinct suffixed ids must not read as duplicates");
-});
-
-test("10: epic-status sees Epic 17 complete and Epic 12 outstanding", () => {
-  const model = parseRoadmap(fixture("10-real-world.md"));
-  assert.equal(epicStatus(model, "17").complete, true);
-  const e12 = epicStatus(model, "12");
-  assert.equal(e12.complete, false);
-  assert.deepEqual(e12.outstanding, ["12.1", "12.2", "12.3", "12.4"]);
+  assert.equal(
+    model.errors.length,
+    0,
+    "distinct suffixed ids must not read as duplicates",
+  );
 });
 
 test("10: once 15/17/12/13 clear, the 🚧-gated Epic 25 row stops the run", () => {
   let text = fixture("10-real-world.md");
-  for (const id of ["12.1", "12.2", "12.3", "12.4", "13.1-1", "13.2", "13.4", "7.11", "7.11-NFR2"]) {
+  for (const id of [
+    "12.1",
+    "12.2",
+    "12.3",
+    "12.4",
+    "13.1-1",
+    "13.2",
+    "13.4",
+    "7.11",
+    "7.11-NFR2",
+  ]) {
     text = tick(text, id);
   }
   const r = select(text);
@@ -257,35 +306,35 @@ test("10: once 15/17/12/13 clear, the 🚧-gated Epic 25 row stops the run", () 
   assert.equal(r.item.id, "25.1");
 });
 
-// ── epic-status mode (--assume-ticked decouples promotion from tick order) ───
-
-test("epic-status: incomplete without assume-ticked", () => {
-  const model = parseRoadmap(tick(tick(fixture("03-flow-chain.md"), "17.2"), "17.4"));
-  const s = epicStatus(model, "17");
-  assert.equal(s.found, true);
-  assert.equal(s.complete, false);
-  assert.deepEqual(s.outstanding, ["17.3-1"]);
-});
-
-test("epic-status: complete when the just-merged item is assumed ticked", () => {
-  const model = parseRoadmap(tick(tick(fixture("03-flow-chain.md"), "17.2"), "17.4"));
-  const s = epicStatus(model, "17", ["17.3-1"]);
-  assert.equal(s.complete, true);
-  assert.equal(s.ticked, 4);
-});
-
-test("epic-status: unknown epic reports found=false", () => {
-  const model = parseRoadmap(fixture("03-flow-chain.md"));
-  assert.equal(epicStatus(model, "99").found, false);
-});
-
 // ── CLI contract ─────────────────────────────────────────────────────────────
 
 test("CLI: emits JSON and exit 0 on selection", () => {
-  const out = execFileSync(process.execPath, [
-    SCRIPT, "--roadmap", path.join(__dirname, "fixtures", "01-first-item.md"),
-  ], { encoding: "utf-8" });
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--roadmap", path.join(__dirname, "fixtures", "01-first-item.md")],
+    { encoding: "utf-8" },
+  );
   const r = JSON.parse(out);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "5.1a");
+});
+
+test("CLI: runs when invoked through a symlinked path", () => {
+  // Consumer projects symlink `.claude/skills` -> `.agents/skills`, so argv[1]
+  // arrives symlinked while import.meta.url is already real. Comparing them
+  // without realpath makes the direct-invocation guard false and main() never
+  // runs: exit 0, no output. That reads as "no item selected" rather than as a
+  // failure, so the loop silently does nothing. Both sides must be realpath'd.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "select-next-symlink-"));
+  const link = path.join(dir, "select-next-link.mjs");
+  symlinkSync(SCRIPT, link);
+
+  const out = execFileSync(
+    process.execPath,
+    [link, "--roadmap", path.join(__dirname, "fixtures", "01-first-item.md")],
+    { encoding: "utf-8" },
+  );
+  const r = JSON.parse(out); // throws if the guard silently no-opped
   assert.equal(r.status, "selected");
   assert.equal(r.item.id, "5.1a");
 });
@@ -294,21 +343,38 @@ test("CLI: --lint exits 1 on a broken roadmap, 0 on a clean one", () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "select-next-lint-"));
   const broken = path.join(dir, "broken.md");
   // Two live rows sharing an id — a genuine ambiguity error.
-  writeFileSync(broken, "# R\n\n## PHASE 1\n\n- [ ] **1.1** a · /develop-task x/task.1.a.md\n- [ ] **1.1** b · /develop-task x/task.1.b.md\n");
+  writeFileSync(
+    broken,
+    "# R\n\n## PHASE 1\n\n- [ ] **1.1** a · /develop-task x/task.1.a.md\n- [ ] **1.1** b · /develop-task x/task.1.b.md\n",
+  );
   assert.throws(
-    () => execFileSync(process.execPath, [SCRIPT, "--lint", "--roadmap", broken], { encoding: "utf-8" }),
+    () =>
+      execFileSync(process.execPath, [SCRIPT, "--lint", "--roadmap", broken], {
+        encoding: "utf-8",
+      }),
     /Command failed|duplicate outstanding/s,
   );
-  const clean = execFileSync(process.execPath, [
-    SCRIPT, "--lint", "--roadmap", path.join(__dirname, "fixtures", "10-real-world.md"),
-  ], { encoding: "utf-8" });
+  const clean = execFileSync(
+    process.execPath,
+    [
+      SCRIPT,
+      "--lint",
+      "--roadmap",
+      path.join(__dirname, "fixtures", "10-real-world.md"),
+    ],
+    { encoding: "utf-8" },
+  );
   assert.equal(JSON.parse(clean).errors.length, 0);
 });
 
 test("CLI: a missing roadmap halts with missing:true (skill offers to scaffold)", () => {
   let out = "";
   try {
-    out = execFileSync(process.execPath, [SCRIPT, "--roadmap", "/no/such/roadmap.md"], { encoding: "utf-8" });
+    out = execFileSync(
+      process.execPath,
+      [SCRIPT, "--roadmap", "/no/such/roadmap.md"],
+      { encoding: "utf-8" },
+    );
     assert.fail("expected non-zero exit");
   } catch (e) {
     out = e.stdout;
@@ -320,9 +386,22 @@ test("CLI: a missing roadmap halts with missing:true (skill offers to scaffold)"
 });
 
 test("template: the scaffold asset is a valid, lint-clean starter roadmap", () => {
-  const tmpl = readFileSync(path.join(REPO_ROOT, "skills", "develop-next", "assets", "project-completion-roadmap.template.md"), "utf-8");
+  const tmpl = readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills",
+      "develop-next",
+      "assets",
+      "project-completion-roadmap.template.md",
+    ),
+    "utf-8",
+  );
   const model = parseRoadmap(tmpl);
-  assert.equal(model.errors.length, 0, `template must lint clean: ${model.errors.join("; ")}`);
+  assert.equal(
+    model.errors.length,
+    0,
+    `template must lint clean: ${model.errors.join("; ")}`,
+  );
   const r = selectNext(model);
   // A scaffold parses and reaches its first item; it won't be "selected" until
   // the placeholder <path> is replaced with a real story/task link.
@@ -330,13 +409,296 @@ test("template: the scaffold asset is a valid, lint-clean starter roadmap", () =
   assert.equal(r.item.id, "1.1");
 });
 
-test("CLI: --epic-status --assume-ticked round-trips", () => {
-  const out = execFileSync(process.execPath, [
-    SCRIPT,
-    "--roadmap", path.join(__dirname, "fixtures", "03-flow-chain.md"),
-    "--epic-status", "17",
-    "--assume-ticked", "17.2", "--assume-ticked", "17.4", "--assume-ticked", "17.3-1",
-  ], { encoding: "utf-8" });
-  const s = JSON.parse(out);
-  assert.equal(s.complete, true);
+// ── 11: `T`-prefixed standalone-task ids ─────────────────────────────────────
+
+test("11: a T-row parses as an item id, not an id-less annotation", () => {
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  assert.ok(m.byId.has("T22"), "T22 must resolve for dependency lookups");
+  assert.ok(m.byId.has("T26"));
+  assert.equal(
+    m.warnings.filter((w) => /no item id/.test(w)).length,
+    0,
+    `T-rows must not be reported as id-less; got ${JSON.stringify(m.warnings)}`,
+  );
+});
+
+test("11: an unticked T-dep BLOCKS its dependent", () => {
+  // The bug this fixture exists for: `deps: T22` was dropped (the id grammar was
+  // digit-anchored), so 28.2 looked eligible on 28.1 alone and would be dispatched
+  // before the runtime migration it is explicitly sequenced after.
+  const r = select(fixture("11-task-ids.md"));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T22", "T22 must be built before its dependent");
+  assert.equal(r.item.command, "/develop-task");
+  assert.equal(
+    r.item.commandArg,
+    "docs/tasks/task.22.runtime-migration/task.22.runtime-migration.md",
+  );
+  assert.ok(
+    r.skipped.some(
+      (s) => s.id === "28.2" && /deps unsatisfied: T22/.test(s.reason),
+    ),
+    `28.2 must be skipped for the unsatisfied T22 dep; got ${JSON.stringify(r.skipped)}`,
+  );
+});
+
+test("11: ticking the T-dep unblocks its dependent", () => {
+  const r = select(tick(fixture("11-task-ids.md"), "T22"));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "28.2");
+});
+
+test("11: a T-row is excluded from its host epic's section rows", () => {
+  // T-rows sit in their *consumer* epic's section for readability but are not
+  // stories of it — counting them would strand the epic forever.
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  assert.deepEqual(
+    m.epicSections["28"].rowIds,
+    ["28.1", "28.2"],
+    "T22 must be excluded from Epic 28",
+  );
+  assert.deepEqual(
+    m.epicSections["20"].rowIds,
+    ["20.8"],
+    "T26 must be excluded from Epic 20",
+  );
+});
+
+test("11: a SKIP'd T-row is stepped past, never selected", () => {
+  const text = tick(tick(fixture("11-task-ids.md"), "T22"), "28.2");
+  const r = select(text);
+  assert.equal(r.status, "selected");
+  assert.equal(
+    r.item.id,
+    "20.8",
+    "T26 is ⏭️ SKIP — the loop must step past it to 20.8",
+  );
+});
+
+test("11: depending on a SKIP'd row warns — the dep is silently satisfied", () => {
+  // idDone() counts an all-SKIP id as done, so `deps: T26` resolves satisfied while
+  // T26 is deferred. Intended (a SKIP block must not stall the loop) but a footgun:
+  // 20.8 can build with its prerequisite unbuilt. Say so.
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  const w = m.warnings.filter((x) => /is ⏭️ SKIP/.test(x));
+  assert.equal(
+    w.length,
+    1,
+    `expected one SKIP-dep warning; got ${JSON.stringify(m.warnings)}`,
+  );
+  assert.match(w[0], /20\.8 dep T26/);
+});
+
+test("11: `deps: —` is recognised as no-deps, not an unparseable dep", () => {
+  // `\b` cannot follow a dash, so the old `…|-)\b` never matched an em-dash and every
+  // `deps: —` row emitted a spurious "has no item id — ignored".
+  const m = parseRoadmap(fixture("11-task-ids.md"));
+  assert.deepEqual(m.byId.get("T22").deps, []);
+  assert.equal(m.warnings.filter((w) => /has no item id/.test(w)).length, 0);
+});
+
+test("11: `T` requires a following digit — 'Task 22' is not the id T22", () => {
+  const m = parseRoadmap(
+    [
+      "# Roadmap",
+      "",
+      "## PHASE 1",
+      "",
+      "- [ ] **9.9** X · deps: Task 22 · /develop-story docs/prd/p/s/story.9.9.x/story.9.9.x.md",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(
+    m.byId.get("9.9").deps.map((d) => d.id),
+    ["22"],
+    "'Task 22' must still read as 22",
+  );
+});
+
+// ── 12: `touches:` parsing + `--batch` parallel worktree packing ─────────────
+
+test("12: parseTouches reads severity marks; +own and - are dropped", () => {
+  assert.deepEqual(parseTouches("x · touches: schema~, leaderboard!, +own · y"), [
+    { tag: "schema", hard: false },
+    { tag: "leaderboard", hard: true },
+  ]);
+  assert.deepEqual(parseTouches("x · touches: routes · y"), [
+    { tag: "routes", hard: false },
+    // unmarked defaults to soft
+  ]);
+  assert.deepEqual(parseTouches("no touches field here"), []);
+});
+
+test("12: touches: does not disturb the deps: capture beside it", () => {
+  const m = parseRoadmap(
+    [
+      "# PHASE 1",
+      "## Epic 9",
+      "- [ ] **9.1** A · deps: — · touches: schema~ · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
+      "- [ ] **9.2** B · deps: 9.1 · touches: leaderboard! · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(m.byId.get("9.1").deps, [], "9.1 has no deps");
+  assert.deepEqual(
+    m.byId.get("9.2").deps.map((d) => d.id),
+    ["9.1"],
+    "9.2 dep still parses with touches: present",
+  );
+  assert.deepEqual(m.byId.get("9.1").touches, [{ tag: "schema", hard: false }]);
+});
+
+const BATCH_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "## Epic 8",
+  "- [ ] **8.1** Ready A · deps: — · touches: schema~, +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
+  "- [ ] **8.2** Ready B (soft-shares schema) · deps: — · touches: schema~ · /develop-story docs/p/s/story.8.2.b/story.8.2.b.md",
+  "- [ ] **8.3** Ready C (hard leaderboard) · deps: — · touches: leaderboard! · /develop-story docs/p/s/story.8.3.c/story.8.3.c.md",
+  "- [ ] **8.4** Ready D (hard leaderboard) · deps: — · touches: leaderboard! · /develop-story docs/p/s/story.8.4.d/story.8.4.d.md",
+  // deps: 8.1 — an in-backlog, still-unticked row → genuinely blocked (an absent
+  // dep id would be treated as archived/shipped and 8.5 would count as ready).
+  "- [ ] **8.5** Blocked E · deps: 8.1 · touches: +own · /develop-story docs/p/s/story.8.5.e/story.8.5.e.md",
+  "",
+].join("\n");
+
+test("12: --batch packs soft-overlapping ready rows, excludes hard conflicts", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(b.status, "batch");
+  const ids = b.batch.map((r) => r.id);
+  assert.deepEqual(ids, ["8.1", "8.2", "8.3"], "8.1+8.2 soft-share schema (ok); 8.3 first leaderboard wins");
+  assert.equal(b.excluded.length, 1);
+  assert.equal(b.excluded[0].id, "8.4");
+  assert.match(b.excluded[0].reason, /hard-conflict on 'leaderboard' with 8\.3/);
+  // 8.5 is dep-blocked, so it never reaches the batch (not an exclusion).
+  assert.ok(!ids.includes("8.5") && !b.excluded.some((e) => e.id === "8.5"));
+  // the accepted soft overlap is surfaced for the operator
+  assert.ok(
+    b.softOverlaps.some(
+      (o) => o.tag === "schema" && o.between.includes("8.1") && o.between.includes("8.2"),
+    ),
+  );
+});
+
+test("12: --batch emits a worktree command per batched row, based off develop", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(b.worktrees.length, b.batch.length);
+  const w = b.worktrees.find((x) => x.id === "8.1");
+  assert.equal(w.base, "develop");
+  assert.match(w.shell, /^git worktree add .* -b story\/8-1 develop$/);
+  assert.match(w.run, /^\/develop-story docs\/p\/s\/story\.8\.1\.a\/story\.8\.1\.a\.md$/);
+});
+
+test("12: --batch advances past a fully-blocked phase, recording it", () => {
+  const m = parseRoadmap(
+    [
+      "# PHASE 1 — blocked",
+      "## Epic 7",
+      // ⛔ with no parseable blocker id (a legal/ops gate) → never ready, but actionable.
+      "- [ ] **7.1** Gated · deps: — · **⛔ legal-gate** — blocked on counsel · touches: +own · /develop-story docs/p/s/story.7.1.g/story.7.1.g.md",
+      "# PHASE 2 — ready",
+      "## Epic 8",
+      "- [ ] **8.1** Ready · deps: — · touches: +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
+      "",
+    ].join("\n"),
+  );
+  const b = selectBatch(m);
+  assert.match(b.phase, /PHASE 2/);
+  assert.deepEqual(b.batch.map((r) => r.id), ["8.1"]);
+  assert.equal(b.skippedPhases.length, 1);
+  assert.match(b.skippedPhases[0].phase, /PHASE 1/);
+});
+
+test("12: selectNext is unchanged by the presence of touches: (parity)", () => {
+  const r = selectNext(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "8.1", "single-item selection ignores touches:");
+});
+
+// ── 13: un-annotated (+own-default) rows — warn + optional requireTouches ─────
+//
+// A row with NO `touches:` field defaults to `+own` and never hard-conflicts, so
+// the planner can co-schedule several of them while silently assuming they are
+// write-disjoint. These fixtures cover the warn signal, the parse-distinction
+// guard (`touches: +own` is deliberate, not a forgotten field), and the
+// requireTouches downgrade that defers all but one un-annotated row.
+
+const UNANNOTATED_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "## Epic 9",
+  // 9.1 and 9.2 have no touches: field at all → un-annotated (+own default).
+  "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
+  "- [ ] **9.2** Ready B · deps: — · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
+  // 9.3 explicitly declares +own → annotated, must NOT be flagged.
+  "- [ ] **9.3** Ready C · deps: — · touches: +own · /develop-story docs/p/s/story.9.3.c/story.9.3.c.md",
+  "",
+].join("\n");
+
+test("13: touchesAnnotated distinguishes a missing field from an explicit +own", () => {
+  const m = parseRoadmap(UNANNOTATED_ROADMAP);
+  assert.equal(m.byId.get("9.1").touchesAnnotated, false, "no field → un-annotated");
+  assert.equal(m.byId.get("9.3").touchesAnnotated, true, "+own is a deliberate annotation");
+  // both still parse to an empty touches[] — the flag is the only signal
+  assert.deepEqual(m.byId.get("9.1").touches, []);
+  assert.deepEqual(m.byId.get("9.3").touches, []);
+});
+
+test("13: --batch warns when ≥2 un-annotated rows are co-scheduled", () => {
+  const b = selectBatch(parseRoadmap(UNANNOTATED_ROADMAP));
+  assert.equal(b.status, "batch");
+  // all three are ready and none hard-conflict, so all are batched
+  assert.deepEqual(b.batch.map((r) => r.id), ["9.1", "9.2", "9.3"]);
+  // only the two field-less rows are reported un-annotated; +own 9.3 is excluded
+  assert.deepEqual(b.unannotated.map((u) => u.id), ["9.1", "9.2"]);
+  const warn = b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w));
+  assert.equal(warn.length, 1, `expected one co-schedule warning; got ${JSON.stringify(b.lint.warnings)}`);
+  assert.match(warn[0], /9\.1, 9\.2/);
+});
+
+test("13: a single un-annotated row does not warn", () => {
+  const m = parseRoadmap(
+    [
+      "# PHASE 1",
+      "## Epic 9",
+      "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
+      "- [ ] **9.3** Ready C · deps: — · touches: +own · /develop-story docs/p/s/story.9.3.c/story.9.3.c.md",
+      "",
+    ].join("\n"),
+  );
+  const b = selectBatch(m);
+  assert.deepEqual(b.unannotated.map((u) => u.id), ["9.1"]);
+  assert.equal(
+    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w)).length,
+    0,
+    "one un-annotated row is not a co-scheduling risk",
+  );
+});
+
+test("13: requireTouches keeps one un-annotated row, defers the rest", () => {
+  const b = selectBatch(parseRoadmap(UNANNOTATED_ROADMAP), { requireTouches: true });
+  // 9.1 (first un-annotated) + 9.3 (annotated) batched; 9.2 deferred
+  assert.deepEqual(b.batch.map((r) => r.id), ["9.1", "9.3"]);
+  const dropped = b.excluded.find((e) => e.id === "9.2");
+  assert.ok(dropped, "9.2 must be deferred");
+  assert.match(dropped.reason, /unannotated-touches \(requireTouches\)/);
+  // the downgrade resolves the risk → no residual co-schedule warning
+  assert.equal(
+    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w)).length,
+    0,
+    "deferring the extra row clears the warning",
+  );
+});
+
+test("13: CLI --batch --require-touches defers un-annotated rows", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "roadmap-"));
+  const file = path.join(dir, "roadmap.md");
+  writeFileSync(file, UNANNOTATED_ROADMAP);
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--require-touches", "--roadmap", file],
+    { encoding: "utf-8" },
+  );
+  const r = JSON.parse(out);
+  assert.equal(r.status, "batch");
+  assert.deepEqual(r.batch.map((b) => b.id), ["9.1", "9.3"]);
+  assert.ok(r.excluded.some((e) => e.id === "9.2" && /requireTouches/.test(e.reason)));
 });

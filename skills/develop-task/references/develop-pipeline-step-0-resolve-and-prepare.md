@@ -17,6 +17,7 @@ Loaded by `/develop-story` and `/develop-task` during Phase 0. Where story and t
 #### develop-story
 
 Accept any of:
+
 - **Story file**: `docs/stories/story.8.2.configure-validation-pipe/story.8.2.configure-validation-pipe.md`
 - **Story directory**: `docs/stories/story.8.2.configure-validation-pipe/`
 - **Bare filename**: `story.8.2.configure-validation-pipe.md`
@@ -32,7 +33,7 @@ Explore subagent (file/directory/bare-filename inputs): find file matching `stor
 
 Extract `{epic_number}` and `{story_number}` from the pattern `story.{epic}.{story}.{name}.md`.
 
-**Epic branch resolution** — immediately after extracting epic_number/story_number:
+**Epic resolution** — immediately after extracting epic_number/story_number:
 
 ```bash
 EPIC_REF=$(grep '^epic:' {story-file} | awk '{print $2}')
@@ -43,10 +44,10 @@ If `EPIC_REF` is empty or missing: **HALT** — "Story must have an `epic:` fron
 ```bash
 EPIC_NUM=$(echo "$EPIC_REF" | grep -oE '[0-9]+' | head -1)
 EPIC_SLUG=$(echo "$EPIC_REF" | sed 's/epic\.[0-9]*\.//')
-EPIC_BRANCH="feature/epic.${EPIC_NUM}.${EPIC_SLUG}"
 ```
 
 Locate the epic file (required):
+
 ```bash
 EPIC_FILE=$(find docs/ -name "epic.${EPIC_NUM}.*.md" 2>/dev/null \
   | grep -v '\.review\.' | grep -v '\.gate\.' | grep -v '\.implementation\.' | head -1)
@@ -54,11 +55,12 @@ EPIC_FILE=$(find docs/ -name "epic.${EPIC_NUM}.*.md" 2>/dev/null \
 
 If `EPIC_FILE` is empty: **HALT** — "Epic file `epic.{EPIC_NUM}.*` not found in `docs/`. Ensure the epic document exists before running develop-story."
 
-Store `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH`, and `EPIC_FILE` as pipeline-wide variables.
+Store `EPIC_NUM`, `EPIC_SLUG`, and `EPIC_FILE` as pipeline-wide variables.
 
 #### develop-task
 
 Accept any of:
+
 - **Task file**: `docs/tasks/task.2.home-page-content-realignment/task.2.home-page-content-realignment.md`
 - **Task directory**: `docs/tasks/task.2.home-page-content-realignment/`
 - **Bare filename**: `task.2.home-page-content-realignment.md`
@@ -77,11 +79,13 @@ Extract `{task_id}` from the pattern `task.{id}.{name}.md`.
 ### Inline Resolution — Shared Logic
 
 **Jira URL / issue key** (when `JIRA_URL` is set):
+
 ```bash
 JIRA_KEY=$(echo "$INPUT" | grep -oE '[A-Z]+-[0-9]+' | tail -1)
 ```
 
 **GitHub URL / issue number** (when `JIRA_URL` is NOT set):
+
 ```bash
 # Direct issue URL:
 ISSUE_NUM=$(echo "$INPUT" | grep -oE '(?<=/issues/)[0-9]+')
@@ -103,10 +107,10 @@ After 0a completes file path resolution, dispatch setup queries in a **single pa
 
 ### Which agents to dispatch
 
-| Input form | Resolver | Tracker poller | Lite-mode + board detector |
-|---|---|---|---|
-| Inline-resolved (URL / Jira key) | ❌ (already resolved) | ✅ (ISSUE_KEY from inline step) | ✅ |
-| File / directory / bare-filename | ✅ | ✅ (agent finds ISSUE_KEY itself) | ✅ (agent finds file itself) |
+| Input form                       | Resolver              | Tracker poller                    | Lite-mode + board detector   |
+| -------------------------------- | --------------------- | --------------------------------- | ---------------------------- |
+| Inline-resolved (URL / Jira key) | ❌ (already resolved) | ✅ (ISSUE_KEY from inline step)   | ✅                           |
+| File / directory / bare-filename | ✅                    | ✅ (agent finds ISSUE_KEY itself) | ✅ (agent finds file itself) |
 
 ### Agent 1 — Resolver (file/directory/bare-filename inputs only)
 
@@ -149,35 +153,33 @@ Prompt template (pass verbatim to Explore subagent):
 ```
 Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{epic}.{story}.*.md under docs/).
 
-RUN the lite-mode CLI — do NOT re-evaluate the FR3/FR17 conditions in prose. The CLI calls the
-production parsers (`parseLiteModeInputs` / `decideLiteMode` / `parseSuccessCriteria`), so its decision
-is byte-identical to the running pipeline's:
+DETERMINE the lite-mode inputs by reading the document. This is the normal path — evaluate each
+condition from what the document actually says, and report the three inputs as separate fields. Do NOT
+decide `pipeline_mode` by impression: the Aggregation block below recomputes it from your booleans, so
+your job is to report the inputs accurately, not to judge the outcome.
 
-  npm run lite-mode -- {file_path}
-    (or, if npm scripts are unavailable: node --experimental-strip-types scripts/lite-mode.ts {file_path})
-
-It prints one compact JSON line:
-  { "risk_level", "phase_count", "single_module", "pipeline_mode", "has_success_criteria_table", "ac_count" }
-
-If the CLI cannot be run (missing script / non-zero exit), fall back to evaluating the three lite-mode
-conditions in prose (risk_level low/absent; fewer than 3 Tasks/phases; single module) and log the fallback.
+Extract, per references/develop-pipeline-lite-mode.md (the canonical contract):
+  - risk_level: from frontmatter `risk_level:`. Use "absent" if the field is missing — do not infer a
+    level from the document's tone or subject matter.
+  - phase_count: count of `## Tasks` subsections (stories) or implementation phases (tasks).
+  - single_module: true only if the document's scope touches ONE app or lib. When the module boundary is
+    genuinely arguable, answer false — `standard` is the safe default, and lite mode shortens QA.
+  - has_success_criteria_table / ac_count: from the structured-criteria section
+    (## Acceptance Criteria for stories, ## Success Criteria for tasks).
 
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
   - Source `references/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
-MERGE the CLI's JSON fields with your own skills-config discovery into the return shape below — do NOT
-return the CLI JSON verbatim (that would drop `skills_config_exists` / `always_load_files` and break
-always-load resolution). `has_success_criteria_table` and `ac_count` come from the CLI; the structured-
-criteria meaning is unchanged (## Acceptance Criteria for stories, ## Success Criteria for tasks).
+MERGE the document-derived fields with your skills-config discovery into the return shape below — every
+field is required. Omitting `skills_config_exists` / `always_load_files` breaks always-load resolution.
 
-Return compact JSON (CLI fields + your discovery):
+Return compact JSON:
 {
   "risk_level": "low|medium|high|absent",
   "phase_count": <integer>,
   "single_module": true|false,
-  "pipeline_mode": "lite|standard",
   "has_success_criteria_table": true|false,
   "ac_count": <integer>,
   "skills_config_exists": true|false,
@@ -196,30 +198,27 @@ LITEMODE_RESULT  ← Agent 3 result (compact JSON)
 
 TASK_FILE      = RESOLVER_RESULT.absolute_file_path   (or already known from inline resolution)
 TASK_DIR       = RESOLVER_RESULT.task_or_story_directory
-# Defence-in-depth: RECOMPUTE PIPELINE_MODE from the CLI's already-computed booleans rather than
-# trusting the free-form `pipeline_mode` string. This mechanical boolean AND of pre-computed values is
-# NOT a prose re-derivation of FR3 — it cannot drift, and a malformed `pipeline_mode` field can never
-# override the rule. `risk_ok` is SET MEMBERSHIP — accept ONLY {"low", "absent"}; reject "medium" /
-# "high" / anything else (matching production decideLiteMode's low/undefined-only semantics). Do NOT use
-# a truthy or substring check.
+# COMPUTE PIPELINE_MODE here, from the three booleans Agent 3 reported. Agent 3 does not return a
+# `pipeline_mode` field: the decision belongs to this mechanical boolean AND, not to a subagent's
+# judgement, so there is no free-form mode string that could drift from the rule.
+# `risk_ok` is SET MEMBERSHIP — accept ONLY {"low", "absent"}; reject "medium" / "high" / anything else.
+# Do NOT use a truthy or substring check.
 risk_ok        = LITEMODE_RESULT.risk_level ∈ {"low", "absent"}
 PIPELINE_MODE  = (risk_ok AND LITEMODE_RESULT.phase_count < 3 AND LITEMODE_RESULT.single_module)
                    ? "lite" : "standard"        (default: "standard" on Agent-3 failure)
-                 # If this recompute disagrees with LITEMODE_RESULT.pipeline_mode, prefer the recompute
-                 # and log the discrepancy in the Issues Log.
 ALWAYS_LOAD_FILES = LITEMODE_RESULT.always_load_files   (default: [] on failure)
 HAS_SUCCESS_CRITERIA_TABLE = LITEMODE_RESULT.has_success_criteria_table   (default: false on failure)
 TRACKER_STATE  = TRACKER_RESULT                         (null fields on failure)
 ```
 
-Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE (and whether the boolean recompute disagreed with the CLI's `pipeline_mode`) and ALWAYS_LOAD_FILES determined.
+Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE_MODE (with the three booleans it was computed from) and ALWAYS_LOAD_FILES determined.
 
 ### Failure handling
 
-| Agent | Failure response |
-|---|---|
-| Resolver | **HALT** — cannot continue without file path. Surface error to user. |
-| Tracker poller | Log warning in Issues Log. Set tracker fields to null. Continue. |
+| Agent              | Failure response                                                                 |
+| ------------------ | -------------------------------------------------------------------------------- |
+| Resolver           | **HALT** — cannot continue without file path. Surface error to user.             |
+| Tracker poller     | Log warning in Issues Log. Set tracker fields to null. Continue.                 |
 | Lite-mode detector | Log warning. Default `PIPELINE_MODE=standard`, `ALWAYS_LOAD_FILES=[]`. Continue. |
 
 ---
@@ -229,6 +228,7 @@ Log in Decisions Log: which agents were dispatched, whether any failed, PIPELINE
 Before asking any questions, check whether a previous run was started:
 
 #### develop-story
+
 ```bash
 git branch --list "feature/story.{epic}.{story}.*"
 gh pr list --head "feature/story.{epic}.{story}.*" --json number,url,state 2>/dev/null
@@ -237,22 +237,8 @@ ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null
 
 **If a previous run is detected**: ask "A previous pipeline run exists for this story. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
 
-Also detect whether the epic branch already exists:
-
-```bash
-EPIC_BRANCH_LOCAL=$(git branch --list "feature/epic.${EPIC_NUM}.*" | tr -d ' *')
-EPIC_BRANCH_REMOTE=$(git ls-remote --heads origin "feature/epic.${EPIC_NUM}.*" 2>/dev/null \
-  | awk '{print $2}' | sed 's|refs/heads/||')
-if [ -n "$EPIC_BRANCH_LOCAL" ] || [ -n "$EPIC_BRANCH_REMOTE" ]; then
-  EPIC_BRANCH_EXISTS=true
-else
-  EPIC_BRANCH_EXISTS=false
-fi
-```
-
-Store `EPIC_BRANCH_EXISTS` as a pipeline-wide variable.
-
 #### develop-task
+
 ```bash
 git branch --list "feature/task.{id}.*"
 gh pr list --head "feature/task.{id}.*" --json number,url,state 2>/dev/null
@@ -303,24 +289,24 @@ fi
 
 #### develop-story
 
-| Status | Action |
-|--------|--------|
-| `Ready for Development` | Proceed normally |
-| `In Progress` | Proceed normally |
-| `Draft` | Note in the implementation report. Proceed — Step 2 (`/review-story`) will validate and update the status autonomously. Do NOT ask the user. |
-| `Ready for Review` / `accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path. |
-| Any other status | HALT — status is unexpected. Report to user before proceeding. |
+| Status                          | Action                                                                                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Ready for Development`         | Proceed normally                                                                                                                             |
+| `In Progress`                   | Proceed normally                                                                                                                             |
+| `Draft`                         | Note in the implementation report. Proceed — Step 2 (`/review-story`) will validate and update the status autonomously. Do NOT ask the user. |
+| `Ready for Review` / `accepted` | HALT — story is already past development. Ask the user if they want to re-run or check the wrong story path.                                 |
+| Any other status                | HALT — status is unexpected. Report to user before proceeding.                                                                               |
 
 #### develop-task
 
-| Status | Action |
-|--------|--------|
-| `Planned` | Note in the implementation report. Proceed — Step 2 (`/review-task`) will validate and update the status autonomously. Do NOT ask the user. |
-| `Ready for Development` | Proceed normally |
-| `In Progress` | Proceed normally |
-| `Ready for Review` / `accepted` | HALT — task is already past development. Ask the user if they want to re-run or check the wrong task path. |
-| `Cancelled` | HALT — task is cancelled. Report to user before proceeding. |
-| Any other status | HALT — status is unexpected. Report to user before proceeding. |
+| Status                          | Action                                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Planned`                       | Note in the implementation report. Proceed — Step 2 (`/review-task`) will validate and update the status autonomously. Do NOT ask the user. |
+| `Ready for Development`         | Proceed normally                                                                                                                            |
+| `In Progress`                   | Proceed normally                                                                                                                            |
+| `Ready for Review` / `accepted` | HALT — task is already past development. Ask the user if they want to re-run or check the wrong task path.                                  |
+| `Cancelled`                     | HALT — task is cancelled. Report to user before proceeding.                                                                                 |
+| Any other status                | HALT — status is unexpected. Report to user before proceeding.                                                                              |
 
 **Note (tasks only)**: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations.
 
@@ -543,6 +529,7 @@ Store `ALWAYS_LOAD_FILES` as a pipeline-wide variable — it is consumed in Step
 ## 0d. Upfront Setup — Gather All Decisions Before Execution
 
 Check the current branch:
+
 ```bash
 git branch --show-current
 ```
@@ -555,21 +542,17 @@ Use the `AskUserQuestion` tool to ask all applicable questions in a single call.
 
 #### develop-story Q1 options
 
-If `EPIC_BRANCH_EXISTS=false`, ask **two** questions in the same `AskUserQuestion` call:
+Story branches are cut from `develop` (standard Gitflow feature branches). Ask "Which branch should `feature/story.{epic}.{story}.{name}` be based on?"
 
-1. "Epic branch `{EPIC_BRANCH}` does not exist yet. Create it from `develop`?"
-   Options: "Create epic branch from develop" (Recommended) / "Abort pipeline"
-   - "Abort" → HALT cleanly, do not create any branches.
-2. "Confirm story branch base?"
-   Options: "`{EPIC_BRANCH}` (epic branch — recommended)" / "develop" / "Other"
+- On `develop` or `main`: Options: "develop" (Recommended) / "main" / "Other"
+- On any `feature/*` branch: Options: "develop" (Recommended) / "`feature/{current}`" / "Other"
 
-If `EPIC_BRANCH_EXISTS=true`, ask only Q1.2 (skip the creation prompt).
-
-Store: Feature branch base = answer to Q1.2.
+Store: Feature branch base = the answer.
 
 #### develop-task Q1 options
 
 Ask "Which branch should `feature/task.{id}.{name}` be based on?"
+
 - On `develop` or `main`: Options: "develop" (Recommended) / "main" / "Other"
 - On any `feature/*` branch: Options: "`feature/{current}`" (Recommended) / "develop" / "Other"
 
@@ -577,10 +560,10 @@ Ask "Which branch should `feature/task.{id}.{name}` be based on?"
 
 #### develop-story Q2
 
-Ask "Confirm PR target branch?"
-Options: "`{EPIC_BRANCH}` (epic branch — recommended)" / "develop" / "Other"
+Ask "Which branch should the pull request target?"
+Options: "develop" (Recommended) / "main" / "Other"
 
-> Default Yes preserves the epic-branch flow; "develop" or "Other" let the user redirect (e.g. for a hotfix story that should land directly on develop).
+> Story PRs target `develop` by default; "main" or "Other" let the user redirect (e.g. a hotfix story that should land directly on `main`).
 
 #### develop-task Q2
 
@@ -593,11 +576,10 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 **Required-question count check (mandatory — prevents silent prompt drops).** Before issuing the `AskUserQuestion` tool call, count the questions you are about to send and verify against this table:
 
-| Scenario | Required questions in the call | Count |
-|---|---|---|
-| `develop-story`, `EPIC_BRANCH_EXISTS=false` | Q1.1 (create epic branch) + Q1.2 (story branch base) + Q2 (PR target) | **3** |
-| `develop-story`, `EPIC_BRANCH_EXISTS=true` | Q1.2 (story branch base) + Q2 (PR target) | **2** |
-| `develop-task` | Q1 (branch base) + Q2 (PR target) | **2** |
+| Scenario        | Required questions in the call    | Count |
+| --------------- | --------------------------------- | ----- |
+| `develop-story` | Q1 (branch base) + Q2 (PR target) | **2** |
+| `develop-task`  | Q1 (branch base) + Q2 (PR target) | **2** |
 
 Resume cases skip any question whose answer is already recorded in the Decisions Log (typical resume: 0 questions).
 
@@ -633,31 +615,29 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 
 ## Pipeline Configuration
 
-| Setting             | Value                         |
-| ------------------- | ----------------------------- |
-| Epic branch         | {EPIC_BRANCH} (exists / will be created) |
-| Feature branch base | {EPIC_BRANCH}                 |
-| PR target           | {EPIC_BRANCH}                 |
-| qa-planning gate    | skipped (auto)                |
-| Story risk level    | {risk_level value or not set} |
-| Pipeline mode       | {lite / standard}             |
+| Setting             | Value                                                                      |
+| ------------------- | -------------------------------------------------------------------------- |
+| Feature branch base | {feature branch base — default `develop`}                                  |
+| PR target           | {PR target — default `develop`}                                            |
+| qa-planning gate    | skipped (auto)                                                             |
+| Story risk level    | {risk_level value or not set}                                              |
+| Pipeline mode       | {lite / standard}                                                          |
 | Always-load files   | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
-| Board status        | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)} |
+| Board status        | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)}                |
 
 ---
 
 ## Pipeline Progress
 
-| Step | Status | Required Artifacts | Notes | Subagent summary ref |
-| ---- | ------ | ------------------ | ----- | -------------------- |
-| 1a. create-epic-branch      | ⏳ Pending | Branch `feature/epic.{N}.*` exists in git | | — |
-| 1b. create-story-branch     | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git | | — |
-| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged) | | — |
-| 3. develop                  | ⏳ Pending | Story status == `Ready for Review` | | — |
-| 4. create-pr                | ⏳ Pending | PR URL targets `{EPIC_BRANCH}`; issue/tracker comment posted | | — |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted | | — |
-| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted` | | — |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed | | — |
+| Step                        | Status     | Required Artifacts                                                                           | Notes | Subagent summary ref |
+| --------------------------- | ---------- | -------------------------------------------------------------------------------------------- | ----- | -------------------- |
+| 1. create-story-branch      | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git                                        |       | —                    |
+| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |
+| 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |
+| 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted |       | —                    |
+| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |
+| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -667,9 +647,8 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 
 ### Pipeline Startup — {YYYY-MM-DD}
 
-- Epic branch: {EPIC_BRANCH} — {exists / created from develop}
-- Feature branch base: {EPIC_BRANCH} — epic branch (auto)
-- PR target branch: {EPIC_BRANCH} — epic branch (auto)
+- Feature branch base: {answer} — default `develop`
+- PR target branch: {answer} — default `develop`
 - qa-planning gate: skipped (auto — no prompt)
 
 ---
@@ -718,29 +697,29 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 
 ## Pipeline Configuration
 
-| Setting | Value |
-|---------|-------|
-| Feature branch base | {Q1 answer} |
-| PR target | {Q2 answer} |
-| qa-planning gate | skipped (auto) |
-| Task risk level | {risk_level value or not set} |
-| Pipeline mode | {lite / standard} |
-| Always-load files | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
-| Board status | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)} |
+| Setting             | Value                                                                      |
+| ------------------- | -------------------------------------------------------------------------- |
+| Feature branch base | {Q1 answer}                                                                |
+| PR target           | {Q2 answer}                                                                |
+| qa-planning gate    | skipped (auto)                                                             |
+| Task risk level     | {risk_level value or not set}                                              |
+| Pipeline mode       | {lite / standard}                                                          |
+| Always-load files   | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
+| Board status        | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)}                |
 
 ---
 
 ## Pipeline Progress
 
-| Step | Status | Required Artifacts | Notes | Subagent summary ref |
-|------|--------|--------------------|-------|----------------------|
-| 1. create-branch | ⏳ Pending | Branch `feature/task.{id}.*` exists in git | | — |
-| 2. review-task | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged) | | — |
-| 3. develop | ⏳ Pending | Task status == `Ready for Review` | | — |
-| 4. create-pr | ⏳ Pending | PR URL; issue comment posted | | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted | | — |
-| 7. finalise | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted` | | — |
-| 8. commit-changes | ⏳ Pending | All artifacts committed and pushed | | — |
+| Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref |
+| -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
+| 1. create-branch           | ⏳ Pending | Branch `feature/task.{id}.*` exists in git                             |       | —                    |
+| 2. review-task             | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               |       | —                    |
+| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
+| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted |       | —                    |
+| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -749,6 +728,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 ## Decisions Log
 
 ### Pipeline Startup — {YYYY-MM-DD}
+
 - Feature branch base: {Q1 answer} — {rationale}
 - PR target branch: {Q2 answer} — {rationale}
 - qa-planning gate: skipped (auto — no prompt)
@@ -757,13 +737,13 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 
 ## Issues Log
 
-*Problems encountered and how they were resolved or escalated.*
+_Problems encountered and how they were resolved or escalated._
 
 ---
 
 ## QA Iteration History
 
-*Track each QA review/fix cycle.*
+_Track each QA review/fix cycle._
 
 ---
 
@@ -789,11 +769,8 @@ Print this to the user before any irreversible action:
 🚀 Starting automated story pipeline
 
 Story:        {story filename}
-Epic branch:  {EPIC_BRANCH} ← develop  [will be created]
-              OR
-Epic branch:  {EPIC_BRANCH}  [already exists]
-Branch:       feature/story.{epic}.{story}.{name} ← {EPIC_BRANCH}
-PR target:    {EPIC_BRANCH}
+Branch:       feature/story.{epic}.{story}.{name} ← {Q1 base branch}
+PR target:    {Q2 answer}
 Report:       {report file path}
 
 Pipeline will now run hands-free.
