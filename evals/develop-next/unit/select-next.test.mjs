@@ -12,7 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -315,6 +315,26 @@ test("CLI: emits JSON and exit 0 on selection", () => {
     { encoding: "utf-8" },
   );
   const r = JSON.parse(out);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "5.1a");
+});
+
+test("CLI: runs when invoked through a symlinked path", () => {
+  // Consumer projects symlink `.claude/skills` -> `.agents/skills`, so argv[1]
+  // arrives symlinked while import.meta.url is already real. Comparing them
+  // without realpath makes the direct-invocation guard false and main() never
+  // runs: exit 0, no output. That reads as "no item selected" rather than as a
+  // failure, so the loop silently does nothing. Both sides must be realpath'd.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "select-next-symlink-"));
+  const link = path.join(dir, "select-next-link.mjs");
+  symlinkSync(SCRIPT, link);
+
+  const out = execFileSync(
+    process.execPath,
+    [link, "--roadmap", path.join(__dirname, "fixtures", "01-first-item.md")],
+    { encoding: "utf-8" },
+  );
+  const r = JSON.parse(out); // throws if the guard silently no-opped
   assert.equal(r.status, "selected");
   assert.equal(r.item.id, "5.1a");
 });

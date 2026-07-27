@@ -799,7 +799,21 @@ function main() {
   process.exit(result.status === "halt" ? 1 : 0);
 }
 
-const invokedDirectly =
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (invokedDirectly) main();
+// Resolve BOTH sides through realpath: consumer projects symlink
+// `.claude/skills` -> `.agents/skills`, so argv[1] arrives symlinked while
+// import.meta.url is already real. Comparing them raw makes this guard false
+// and main() never runs: exit 0, no output. That reads as "no item selected"
+// rather than as a failure, so the loop silently does nothing. Falls back to
+// the plain comparison if realpath throws (deleted/unreadable path).
+function isInvokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      fs.realpathSync(process.argv[1]) ===
+      fs.realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+if (isInvokedDirectly()) main();

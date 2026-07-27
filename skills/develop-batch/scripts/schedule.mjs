@@ -628,7 +628,7 @@ function main() {
 // Resolve BOTH sides through realpath: consumer projects symlink
 // `.claude/skills` -> `.agents/skills`, and comparing a symlinked argv[1]
 // against the realpath'd module URL silently no-ops the CLI (exit 0, no
-// output). select-next.mjs has this bug; do not reintroduce it here.
+// output). select-next.mjs carries the same guard; keep the two in step.
 function isInvokedDirectly() {
   if (!process.argv[1]) return false;
   try {
