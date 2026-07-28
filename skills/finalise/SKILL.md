@@ -526,12 +526,36 @@ Read the rollup before deciding:
 
 ```bash
 # Prefer the rollup (covers checks AND commit statuses); fall back to `gh pr checks`.
+#
+# The rollup mixes two node types with DIFFERENT field sets, and normalising them is
+# the whole difficulty:
+#   • CheckRun (GitHub Actions job) — `.status` (QUEUED|IN_PROGRESS|COMPLETED) + `.conclusion`
+#   • StatusContext (commit status)  — `.state` only, no `.status`/`.conclusion`
+#
+# DO NOT write `.conclusion // .state`. While a CheckRun is running GitHub returns
+# `conclusion: ""` — an EMPTY STRING, not null — and jq's `//` only falls through on
+# `null`/`false`. So `""` is taken as a real value, matches none of the PENDING tokens,
+# and drops to `else "SUCCESS"`: a still-running job is reported as green. That is the
+# exact bug this block previously had, verified live against a queued `portal-e2e`.
+#
+# The reliable discriminator is `.status`: a CheckRun is only decided at COMPLETED.
 CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
-  -q '[.statusCheckRollup[] | .conclusion // .state] | if length == 0 then "NONE"
-       elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ERROR") then "FAILURE"
-       elif any(. == null or . == "PENDING" or . == "IN_PROGRESS" or . == "QUEUED") then "PENDING"
-       else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
+  -q '[ .statusCheckRollup[]
+        | (.status // "") as $st
+        | (if   $st == ""          then (.state // "")        # StatusContext
+           elif $st == "COMPLETED" then (.conclusion // "")   # finished CheckRun
+           else "PENDING" end)                                 # QUEUED/IN_PROGRESS/WAITING
+        | if . == "" then "PENDING" else . end ]               # empty ⇒ undecided, never green
+      | if length == 0 then "NONE"
+        elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ERROR"
+                 or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "FAILURE"
+        elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
+                 or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
+        else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
 ```
+
+`SKIPPED` and `NEUTRAL` conclusions intentionally fall into the `SUCCESS` bucket — a skipped job
+(e.g. a `paths:`-filtered `smoke`) is not a failure and never becomes one.
 
 | `CI_ROLLUP` | Decision |
 | ----------- | -------- |
@@ -545,6 +569,16 @@ CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
 > and rounded up to acceptance. `PENDING` and `FAILURE` are both non-acceptance; only `SUCCESS`
 > passes. If the rollup is green but the newest commit is docs-only on top of untested code, say so
 > in the DoD summary — a green on an ancestor commit is evidence about that commit, not this one.
+
+> **Verify the query, not just the table.** The first version of this gate had the table above
+> exactly right and still accepted on pending CI, because the *query* silently never produced
+> `PENDING` (see the empty-string note above). If you change this jq, test it against a rollup with
+> a running check — `{"status":"IN_PROGRESS","conclusion":""}` must yield `PENDING`. A gate whose
+> logic is correct but whose input is mis-parsed is worse than no gate, because it reports success.
+>
+> Do not substitute `gh pr checks` output parsing for this: it prints `pending` for a job that is
+> merely *queued behind another job on a serial runner*, which is indistinguishable in its output
+> from one that is running. The rollup's `.status` is the field that actually distinguishes states.
 
 **Actions:**
 
