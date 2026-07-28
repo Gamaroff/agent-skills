@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.29.4] - 2026-07-28
+
 ### Fixed
 
 - **`finalise`'s CI gate accepted work while CI was still running — a *pending* rollup was computed as `SUCCESS`.** The gate's decision table was already correct (`PENDING` and `FAILURE` both block; only `SUCCESS` passes) and the surrounding prose already warned against exactly this failure, but the jq feeding it could never *produce* `PENDING` for a GitHub Actions job. The query normalised nodes with `.conclusion // .state`, and while a `CheckRun` is in flight GitHub returns `conclusion: ""` — an **empty string**, not `null`. jq's `//` only falls through on `null`/`false`, so `""` was taken as a real value, matched none of the `PENDING` tokens, and dropped to `else "SUCCESS"`. A `portal-e2e` job that had not started yet therefore read as green, and `/finalise` could mark a story `accepted` on CI that later failed. Verified live against a queued job, then reproduced in isolation: `{"status":"IN_PROGRESS","conclusion":""}` returned `SUCCESS` before the fix and `PENDING` after. The rollup mixes two node types with different field sets (`CheckRun` has `.status`/`.conclusion`; `StatusContext` has only `.state`), so the query now discriminates on `.status` — a `CheckRun` is only decided at `COMPLETED` — and treats an empty normalised value as `PENDING` rather than green. `SKIPPED`/`NEUTRAL` still count as passing (a `paths:`-filtered job is not a failure), and `FAILURE` still wins over a concurrent `PENDING`. Adds a standing note that any future change to this jq must be tested against a running check, since a gate whose logic is right but whose input is mis-parsed is worse than no gate — it reports success.
