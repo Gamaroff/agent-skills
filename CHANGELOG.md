@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.31.0] - 2026-07-29
+
 ### Changed
 
 - **Jira status transitions are now workflow-agnostic — they adapt to the board instead of assuming one vocabulary.** A local status no longer maps to a single hardcoded Jira status name; it resolves against an ordered list of candidates (`In Review` / `Code Review` / `Waiting for Review` / …) matched against the transitions the issue actually offers. Any board whose workflow used different words was previously having *every* status change silently skipped while the sync still reported success. Resolution order is: already-in-a-candidate → `to.name` across all candidates → transition `name` (catching workflows that name the action, e.g. an `Implemented` transition leading to `Waiting for Review`) → for `accepted`/`cancelled` only, the single transition into the `done` category. Most projects can now delete their `jira.statusMap` entirely; `mapStatus()` still returns the primary candidate, so existing callers are unaffected.
