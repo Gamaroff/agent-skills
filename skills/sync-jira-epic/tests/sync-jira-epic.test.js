@@ -331,7 +331,7 @@ test("loadStatusMap — merges jira.statusMap over defaults", () => {
     "jira:\n  statusMap:\n    accepted: Shipped\n");
   const map = lib.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
-  assert.equal(map["in-progress"], "In Progress");
+  assert.equal(map["in-progress"][0], "In Progress");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -342,7 +342,7 @@ test("loadStatusMap — tolerates inline comments on the statusMap opener and va
     "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n");
   const map = lib.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
-  assert.equal(map["in-progress"], "In Progress");
+  assert.equal(map["in-progress"][0], "In Progress");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

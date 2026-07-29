@@ -412,7 +412,7 @@ test("loadStatusMap — merges skills-config.yaml jira.statusMap over defaults",
   const map = lib.loadStatusMap(dir);
   assert.equal(map["ready-for-development"], "Selected for Development"); // override wins
   assert.equal(map["accepted"], "Shipped");                              // override wins
-  assert.equal(map["in-progress"], "In Progress");                       // default retained
+  assert.equal(map["in-progress"][0], "In Progress");                       // default retained
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -420,8 +420,8 @@ test("loadStatusMap — falls back to defaults when no config present", () => {
   const fs = require("fs"), os = require("os"), path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-none-"));
   const map = lib.loadStatusMap(dir);
-  assert.equal(map["ready-for-development"], "To Do");
-  assert.equal(map["accepted"], "Done");
+  assert.equal(map["ready-for-development"][0], "To Do");
+  assert.equal(map["accepted"][0], "Done");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -462,8 +462,8 @@ test("loadStatusMap — tolerates inline comments on the statusMap opener and va
     "jira:  # tracker block\n  statusMap:                          # local document status -> Jira status\n    ready-for-development: Selected for Development  # dev queue\n    accepted: Done\n");
   const map = lib.loadStatusMap(dir);
   assert.equal(map["ready-for-development"], "Selected for Development");
-  assert.equal(map["accepted"], "Done");
-  assert.equal(map["in-progress"], "In Progress"); // default retained
+  assert.equal(map["accepted"], "Done"); // config override -> stays a scalar
+  assert.equal(map["in-progress"][0], "In Progress"); // default retained
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -945,4 +945,79 @@ test("relatedDocInfo — unknown artifact types are not linked", () => {
   assert.equal(lib.relatedDocInfo("story.2.4.validate.2026-05-13.md"), null);
   assert.equal(lib.relatedDocInfo("sprint-review-summary.md"), null);
   assert.equal(lib.relatedDocInfo("story.2.4.plan.demo.md").label, "Implementation plan");
+});
+
+// ---------------------------------------------------------------------------
+// mapStatusCandidates / statusMap config forms
+// ---------------------------------------------------------------------------
+const libx = require("../references/jira-sync.js");
+
+test("mapStatusCandidates — a local status yields an ordered candidate list", () => {
+  const c = libx.mapStatusCandidates("ready-for-review");
+  assert.equal(c[0], "In Review", "primary candidate is the historical single value");
+  assert.ok(c.includes("Waiting for Review"), "covers the other common review vocabularies");
+  assert.ok(c.includes("Code Review"));
+});
+
+test("mapStatusCandidates — mapStatus stays the primary candidate (back-compat)", () => {
+  for (const s of ["planned", "in-progress", "ready-for-review", "accepted", "cancelled"])
+    assert.equal(libx.mapStatus(s), libx.mapStatusCandidates(s)[0]);
+});
+
+test("mapStatusCandidates — a scalar override narrows to exactly that name", () => {
+  const c = libx.mapStatusCandidates("accepted", { accepted: "Shipped" });
+  assert.deepEqual(c, ["Shipped"]);
+});
+
+test("mapStatusCandidates — unmapped values pass through as a single candidate", () => {
+  assert.deepEqual(libx.mapStatusCandidates("🔍 Code Review", {}), ["Code Review"]);
+  assert.equal(libx.mapStatusCandidates(""), null);
+});
+
+test("isTerminalLocalStatus — only finished states may use the category fallback", () => {
+  for (const s of ["accepted", "cancelled", "done", "Won't Do"])
+    assert.equal(libx.isTerminalLocalStatus(s), true, s);
+  for (const s of ["draft", "planned", "in-progress", "ready-for-review"])
+    assert.equal(libx.isTerminalLocalStatus(s), false, s);
+  assert.equal(libx.isNegativeLocalStatus("cancelled"), true);
+  assert.equal(libx.isNegativeLocalStatus("accepted"), false);
+});
+
+function withConfig(yaml, fn) {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-forms-"));
+  fs.writeFileSync(path.join(dir, "skills-config.yaml"), yaml);
+  try { return fn(dir); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+test("loadStatusMap — accepts a flow-sequence candidate list", () => {
+  withConfig('jira:\n  statusMap:\n    ready-for-review: [Waiting for Review, "In Review"]  # ours\n', (dir) => {
+    assert.deepEqual(libx.loadStatusMap(dir)["ready-for-review"], ["Waiting for Review", "In Review"]);
+  });
+});
+
+test("loadStatusMap — accepts a block-sequence candidate list", () => {
+  withConfig("jira:\n  statusMap:\n    accepted:\n      - Shipped\n      - Done\n    in-progress: Doing\n", (dir) => {
+    const map = libx.loadStatusMap(dir);
+    assert.deepEqual(map["accepted"], ["Shipped", "Done"]);
+    assert.equal(map["in-progress"], "Doing", "sibling scalars still parse after a block list");
+  });
+});
+
+test("loadStatusMap — per-issue-type overrides layer over the flat map", () => {
+  const yaml = "jira:\n  statusMap:\n    accepted: Done\n    epic:\n      accepted: Closed\n      planned: Open\n";
+  withConfig(yaml, (dir) => {
+    assert.equal(libx.loadStatusMap(dir)["accepted"], "Done", "no type -> flat map only");
+    assert.equal(libx.loadStatusMap(dir, "epic")["accepted"], "Closed", "type layer wins");
+    assert.equal(libx.loadStatusMap(dir, "epic")["planned"], "Open");
+    assert.equal(libx.loadStatusMap(dir, "story")["accepted"], "Done", "unknown type falls back");
+    // the nested block must not leak in as if it were a status key
+    assert.equal(libx.loadStatusMap(dir)["epic"], undefined);
+  });
+});
+
+test("loadStatusMap — a malformed config falls back to defaults rather than throwing", () => {
+  withConfig("jira:\n  statusMap:\n    : : :\n", (dir) => {
+    assert.equal(libx.loadStatusMap(dir)["in-progress"][0], "In Progress");
+  });
 });

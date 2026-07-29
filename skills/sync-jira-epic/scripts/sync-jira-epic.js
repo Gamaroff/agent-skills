@@ -503,6 +503,8 @@ function parseArgs(argv) {
     quiet: false,
     verbose: false,
     version: false,
+    failOnStatusSkip: false,
+    probeWorkflow: false,
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -533,6 +535,12 @@ function parseArgs(argv) {
         break;
       case "--json":
         opts.json = true;
+        break;
+      case "--fail-on-status-skip":
+        opts.failOnStatusSkip = true;
+        break;
+      case "--probe-workflow":
+        opts.probeWorkflow = true;
         break;
       case "--quiet":
         opts.quiet = true;
@@ -577,6 +585,20 @@ async function run({
       typeof value === "string" ? value : JSON.stringify(value, null, 2),
     );
   };
+
+  if (args.probeWorkflow) {
+    const auth = lib.getAuth();
+    if (!auth.ok) {
+      output.err(`Error: Missing required environment variables: ${auth.missing.join(", ")}`);
+      return { exitCode: 1 };
+    }
+    const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
+    await lib.probeWorkflow({
+      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+      projectKey: auth.project, docKind: "epic", output,
+    });
+    return { exitCode: 0 };
+  }
 
   if (!args.file) {
     output.err("Error: --file is required");
@@ -1079,17 +1101,17 @@ async function run({
   }
 
   // Status transition
+  let statusOutcome = null;
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
-    const target = lib.mapStatus(frontmatter.status, lib.loadStatusMap());
-    const currentStatus = current?.status || null;
-    await lib.transitionToStatus({
+    statusOutcome = await lib.syncDocumentStatus({
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,
       token: auth.token,
       issueKey: result.issueKey,
-      targetStatus: target,
-      currentStatus,
+      localStatus: frontmatter.status,
+      currentStatus: current?.status || null,
+      docKind: "epic",
       output,
     });
   }
@@ -1135,7 +1157,20 @@ async function run({
     });
   }
 
-  return { exitCode: 0, result, changeSummary, isUpdate, epicBbUrl, prdBbUrl };
+  const statusExit = lib.summariseStatusOutcome(statusOutcome, {
+    output,
+    failOnSkip: args.failOnStatusSkip,
+  });
+
+  return {
+    exitCode: statusExit,
+    result,
+    changeSummary,
+    isUpdate,
+    epicBbUrl,
+    prdBbUrl,
+    statusOutcome,
+  };
 }
 
 // ---------------------------------------------------------------------------

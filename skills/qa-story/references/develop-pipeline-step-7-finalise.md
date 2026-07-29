@@ -183,10 +183,10 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to Done** — follow `references/jira-transition-protocol.md` exactly with `candidates = ["Done", "Closed", "Resolved"]`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to any other transition (e.g. `To Do`) — leaving the issue in its current state is the correct behaviour when no done-state transition exists.
+2. **Transition to Done** — follow `references/jira-transition-protocol.md` exactly with `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true` (which permits the protocol's narrow single-done-transition fallback, and fills a required `resolution` from the transition's own `allowedValues`). The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to any other transition (e.g. `To Do`) — leaving the issue in its current state is the correct behaviour when no done-state transition exists.
 
 3. **Post-transition state verification** — invoke the tracker state poller (see `references/tracker-state-poller-subagent.md`) with `PR_NUMBER=` (empty) and `ISSUE_KEY={TRACKER_ISSUE}`:
-   - `result.issue.state` matches "Done", "Closed", or "Resolved" (case-insensitive) → log "✅ Jira issue {TRACKER_ISSUE} confirmed Done via poller"
+   - `result.issue.state` is in the done **status category**, or matches "Done", "Closed", "Resolved", "Complete" or "Completed" (case-insensitive) → log "✅ Jira issue {TRACKER_ISSUE} confirmed Done via poller"
    - Any other state → log "⚠️ Jira issue {TRACKER_ISSUE} still showing {state} — transition may not have taken effect"
    - `result.errors | length > 0` → log each error in Issues Log; proceed (non-blocking)
 

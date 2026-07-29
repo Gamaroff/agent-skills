@@ -714,7 +714,7 @@ test("loadStatusMap — merges jira.statusMap over defaults", () => {
   );
   const map = task.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
-  assert.equal(map["in-progress"], "In Progress");
+  assert.equal(map["in-progress"][0], "In Progress");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -803,7 +803,7 @@ test("transitionToStatus — finds matching transition by to.name", async () => 
   const fakeFetch = async (url, opts) => {
     calls.push({ url, method: opts?.method || "GET" });
     if (
-      url.endsWith("/transitions") &&
+      url.includes("/transitions") &&
       (!opts || !opts.method || opts.method === "GET")
     ) {
       return {
@@ -1153,7 +1153,7 @@ test("loadStatusMap — tolerates inline comments on the statusMap opener and va
   );
   const map = task.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
-  assert.equal(map["in-progress"], "In Progress");
+  assert.equal(map["in-progress"][0], "In Progress");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -1459,4 +1459,276 @@ test("buildDescriptionAdf — rewrites a relative in-body link via linkResolver"
     linkNode.marks[0].attrs.href,
     "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md",
   );
+});
+
+// ---------------------------------------------------------------------------
+// Workflow-agnostic transition resolution
+// ---------------------------------------------------------------------------
+const TR = {
+  start:      { id: "11",  name: "In Progress", to: { name: "In Progress", statusCategory: { key: "indeterminate" } } },
+  implemented:{ id: "21",  name: "Implemented", to: { name: "Waiting for Review", statusCategory: { key: "indeterminate" } } },
+  backToDev:  { id: "101", name: "Selected for Development", to: { name: "Selected for Development", statusCategory: { key: "new" } } },
+  done:       { id: "161", name: "Done", to: { name: "Done", statusCategory: { key: "done" } } },
+  readyTest:  { id: "341", name: "Ready for Testing", to: { name: "Ready for Testing", statusCategory: { key: "indeterminate" } } },
+  cancelled:  { id: "171", name: "Cancel", to: { name: "Cancelled", statusCategory: { key: "done" } } },
+};
+
+test("resolveTransition — matches to.name, candidates in order", () => {
+  const r = lib_inner.resolveTransition({
+    transitions: [TR.start, TR.done],
+    candidates: ["In Progress", "Doing"],
+    currentStatus: "Selected for Development",
+  });
+  assert.equal(r.match.id, "11");
+  assert.match(r.rule, /to\.name="In Progress"/);
+});
+
+test("resolveTransition — falls back to the transition NAME when no to.name matches", () => {
+  // The real-world shape this was built for: the action is called "Implemented"
+  // and the destination is "Waiting for Review". Matching only to.name misses it
+  // unless "Waiting for Review" is itself a candidate.
+  const r = lib_inner.resolveTransition({
+    transitions: [TR.implemented, TR.backToDev],
+    candidates: ["In Review", "Implemented"],
+    currentStatus: "In Progress",
+  });
+  assert.equal(r.match.id, "21");
+  assert.match(r.rule, /name="Implemented"/);
+});
+
+test("resolveTransition — to.name across ALL candidates beats a name match", () => {
+  // "Implemented" (a name match, candidate #1) must lose to "Waiting for Review"
+  // (a to.name match, candidate #2) — destinations are more reliable than actions.
+  const r = lib_inner.resolveTransition({
+    transitions: [TR.implemented],
+    candidates: ["Implemented", "Waiting for Review"],
+    currentStatus: "In Progress",
+  });
+  assert.match(r.rule, /to\.name="Waiting for Review"/);
+});
+
+test("resolveTransition — 'already' when the current status is any candidate", () => {
+  const r = lib_inner.resolveTransition({
+    transitions: [TR.start, TR.done],
+    candidates: ["To Do", "Selected for Development"],
+    currentStatus: "Selected for Development",
+  });
+  assert.equal(r.match, null);
+  assert.equal(r.reason, "already");
+});
+
+test("resolveTransition — terminal status falls back to the unique done-category transition", () => {
+  // "Cancelled" exists in no workflow here, but the local status is terminal and
+  // exactly one transition leads to a done status.
+  const r = lib_inner.resolveTransition({
+    transitions: [TR.start, TR.done],
+    candidates: ["Cancelled", "Rejected"],
+    currentStatus: "In Progress",
+    terminal: true,
+  });
+  assert.equal(r.match.id, "161");
+  assert.match(r.rule, /statusCategory=done/);
+});
+
+test("resolveTransition — REGRESSION: never infers a non-terminal target from statusCategory", () => {
+  // Guard for a bug caught by dry-running against a live board: allowing a
+  // statusCategory fallback for "indeterminate" made `ready-for-review` resolve
+  // to "In Progress" and `in-progress` resolve to "Waiting for Review". A wrong
+  // transition is worse than none, so non-terminal statuses must skip instead.
+  const r = lib_inner.resolveTransition({
+    transitions: [TR.start],            // sole indeterminate transition
+    candidates: ["In Review", "Code Review"],
+    currentStatus: "Selected for Development",
+    terminal: false,
+  });
+  assert.equal(r.match, null, "must not fall back to the lone In Progress transition");
+  assert.equal(r.reason, "no-transition");
+});
+
+test("resolveTransition — ambiguous terminal is reported, not guessed", () => {
+  const r = lib_inner.resolveTransition({
+    transitions: [TR.done, TR.cancelled],
+    candidates: ["Shipped"],
+    currentStatus: "In Progress",
+    terminal: true,
+  });
+  assert.equal(r.match, null);
+  assert.equal(r.reason, "ambiguous-terminal");
+});
+
+// ---------------------------------------------------------------------------
+// buildTransitionFields — satisfying required transition screens
+// ---------------------------------------------------------------------------
+const RESOLUTION_FIELD = {
+  resolution: {
+    required: true,
+    allowedValues: [
+      { id: "10000", name: "Done" },
+      { id: "10001", name: "Won't Do" },
+      { id: "10002", name: "Duplicate" },
+    ],
+  },
+};
+
+test("buildTransitionFields — no required fields leaves the payload untouched", () => {
+  const out = lib_inner.buildTransitionFields({ id: "11", name: "Start" });
+  assert.equal(out.fields, null);
+  assert.deepEqual(out.unfillable, []);
+});
+
+test("buildTransitionFields — fills a required resolution from allowedValues", () => {
+  const out = lib_inner.buildTransitionFields({ id: "161", fields: RESOLUTION_FIELD });
+  assert.deepEqual(out.fields, { resolution: { id: "10000" } });
+  assert.deepEqual(out.unfillable, []);
+});
+
+test("buildTransitionFields — a negative local status picks a negative resolution", () => {
+  const out = lib_inner.buildTransitionFields({ id: "161", fields: RESOLUTION_FIELD }, { negative: true });
+  assert.deepEqual(out.fields, { resolution: { id: "10001" } }); // Won't Do
+});
+
+test("buildTransitionFields — an explicit preference wins", () => {
+  const out = lib_inner.buildTransitionFields(
+    { id: "161", fields: RESOLUTION_FIELD }, { resolutionPref: "Duplicate" });
+  assert.deepEqual(out.fields, { resolution: { id: "10002" } });
+});
+
+test("buildTransitionFields — unknown preference falls back to what the workflow offers", () => {
+  const out = lib_inner.buildTransitionFields(
+    { id: "161", fields: RESOLUTION_FIELD }, { resolutionPref: "Not A Real Resolution" });
+  assert.deepEqual(out.fields, { resolution: { id: "10000" } });
+});
+
+test("buildTransitionFields — a required field it cannot fill is reported, not invented", () => {
+  const out = lib_inner.buildTransitionFields({
+    id: "161",
+    fields: { ...RESOLUTION_FIELD, customfield_10050: { required: true, allowedValues: [] } },
+  });
+  assert.deepEqual(out.unfillable, ["customfield_10050"]);
+});
+
+// ---------------------------------------------------------------------------
+// transitionToStatus — end-to-end payload behaviour
+// ---------------------------------------------------------------------------
+function transitionHarness(transitions, { postStatus = 204 } = {}) {
+  const calls = [];
+  const fetchImpl = async (url, opts) => {
+    calls.push({ url, method: (opts && opts.method) || "GET", body: opts && opts.body });
+    if (!opts || !opts.method || opts.method === "GET")
+      return { ok: true, status: 200, json: async () => ({ transitions }) };
+    return {
+      ok: postStatus < 400, status: postStatus,
+      json: async () => ({ errorMessages: ["Field 'resolution' is required"] }),
+      text: async () => "",
+    };
+  };
+  return { calls, http: lib_inner.makeHttp({ fetchImpl }) };
+}
+
+const BASE = { baseUrl: "https://j", email: "e", token: "t", issueKey: "PROJ-1" };
+
+test("transitionToStatus — asks Jira for the transition field schema", async () => {
+  const { calls, http } = transitionHarness([TR.start]);
+  await lib_inner.transitionToStatus({ ...BASE, http, targetStatus: ["In Progress"], currentStatus: "To Do" });
+  assert.match(calls[0].url, /expand=transitions\.fields/,
+    "without the expand, required fields are invisible and the POST 400s blind");
+});
+
+test("transitionToStatus — sends a resolution when the transition requires one", async () => {
+  const { calls, http } = transitionHarness([{ ...TR.done, fields: RESOLUTION_FIELD }]);
+  const out = await lib_inner.transitionToStatus({
+    ...BASE, http, targetStatus: ["Done"], currentStatus: "In Progress", localStatus: "accepted",
+  });
+  assert.equal(out.transitioned, true);
+  const post = calls.find((c) => c.method === "POST");
+  assert.deepEqual(JSON.parse(post.body), { transition: { id: "161" }, fields: { resolution: { id: "10000" } } });
+});
+
+test("transitionToStatus — omits `fields` entirely when nothing is required", async () => {
+  // Boards without required fields must keep the exact payload they always had.
+  const { calls, http } = transitionHarness([TR.start]);
+  await lib_inner.transitionToStatus({
+    ...BASE, http, targetStatus: ["In Progress"], currentStatus: "To Do", localStatus: "in-progress",
+  });
+  const post = calls.find((c) => c.method === "POST");
+  assert.deepEqual(JSON.parse(post.body), { transition: { id: "11" } });
+});
+
+test("transitionToStatus — refuses to POST when a required field cannot be filled", async () => {
+  const { calls, http } = transitionHarness([
+    { ...TR.done, fields: { approver: { required: true, allowedValues: [] } } },
+  ]);
+  const out = await lib_inner.transitionToStatus({
+    ...BASE, http, targetStatus: ["Done"], currentStatus: "In Progress", localStatus: "accepted",
+  });
+  assert.equal(out.transitioned, false);
+  assert.equal(out.reason, "required-fields");
+  assert.deepEqual(out.unfillable, ["approver"]);
+  assert.equal(calls.filter((c) => c.method === "POST").length, 0, "must not fire a request known to fail");
+});
+
+test("transitionToStatus — makes no network call at all when already in a candidate status", async () => {
+  const http = lib_inner.makeHttp({ fetchImpl: async () => { throw new Error("should not call fetch"); } });
+  const out = await lib_inner.transitionToStatus({
+    ...BASE, http, targetStatus: ["To Do", "Selected for Development"],
+    currentStatus: "Selected for Development", localStatus: "planned",
+  });
+  assert.equal(out.transitioned, false);
+  assert.equal(out.reason, "already");
+});
+
+test("transitionToStatus — a failed POST is reported, never thrown", async () => {
+  const { http } = transitionHarness([{ ...TR.done, fields: RESOLUTION_FIELD }], { postStatus: 400 });
+  const out = await lib_inner.transitionToStatus({
+    ...BASE, http, targetStatus: ["Done"], currentStatus: "In Progress", localStatus: "accepted",
+  });
+  assert.equal(out.transitioned, false);
+  assert.equal(out.reason, "http-400");
+});
+
+// ---------------------------------------------------------------------------
+// summariseStatusOutcome — the sync must not report success on a silent skip
+// ---------------------------------------------------------------------------
+test("summariseStatusOutcome — a skip warns and, under --fail-on-status-skip, exits non-zero", () => {
+  const warnings = [];
+  const output = { warn: (m) => warnings.push(m), info: () => {} };
+  const outcome = { transitioned: false, reason: "no-transition", issueKey: "PROJ-1", localStatus: "accepted", from: "In Progress" };
+
+  assert.equal(lib_inner.summariseStatusOutcome(outcome, { output }), 0, "advisory by default");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Status NOT synced for PROJ-1/);
+
+  assert.equal(lib_inner.summariseStatusOutcome(outcome, { output, failOnSkip: true }), 1);
+});
+
+test("summariseStatusOutcome — success, 'already' and 'no-target' are silent and zero", () => {
+  const warnings = [];
+  const output = { warn: (m) => warnings.push(m), info: () => {} };
+  for (const o of [{ transitioned: true }, { reason: "already" }, { reason: "no-target" }, null]) {
+    assert.equal(lib_inner.summariseStatusOutcome(o, { output, failOnSkip: true }), 0);
+  }
+  assert.deepEqual(warnings, []);
+});
+
+test("transitionToStatus — resolves the current status on create before deciding", async () => {
+  // A freshly created issue has no prior status for the caller to pass. Without
+  // looking it up, the already-check cannot fire and the sync hunts for a
+  // transition into the status the issue is already in — which Jira never offers
+  // as a self-transition — warning loudly about a non-problem.
+  const calls = [];
+  const fetchImpl = async (url, opts) => {
+    calls.push(url);
+    if (url.includes("?fields=status"))
+      return { ok: true, status: 200, json: async () => ({ fields: { status: { name: "Selected for Development" } } }) };
+    if (url.includes("/transitions"))
+      return { ok: true, status: 200, json: async () => ({ transitions: [TR.start, TR.done] }) };
+    return { ok: true, status: 204, json: async () => ({}), text: async () => "" };
+  };
+  const out = await lib_inner.transitionToStatus({
+    ...BASE, http: lib_inner.makeHttp({ fetchImpl }),
+    targetStatus: ["To Do", "Backlog", "Selected for Development"],
+    currentStatus: null, localStatus: "planned",
+  });
+  assert.equal(out.reason, "already");
+  assert.equal(calls.filter((u) => u.includes("/transitions")).length, 0, "no transition fetch needed");
 });
