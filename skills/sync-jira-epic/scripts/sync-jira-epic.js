@@ -92,18 +92,21 @@ function splitTableRow(line) {
   const cells = masked.split("|");
   if (cells.length && cells[0].trim() === "") cells.shift();
   if (cells.length && cells[cells.length - 1].trim() === "") cells.pop();
-  return cells.map(c => c.split(PIPE_PLACEHOLDER).join("|").trim());
+  return cells.map((c) => c.split(PIPE_PLACEHOLDER).join("|").trim());
 }
 
 function extractStoriesTable(body) {
-  const m = body.match(/## Stories Breakdown\s*\n+([\s\S]*?)(?=\n## |\n# |$)/);
+  // Use the shared helper rather than an inlined copy of the same pattern — the
+  // duplicate here silently kept the pre-fix behaviour (no numbering tolerated,
+  // not line-anchored) after the canonical one was corrected.
+  const m = body.match(lib.sectionRe("Stories Breakdown"));
   if (!m) return null;
   const raw = m[1].trim();
   if (!raw.includes("|")) return null;
 
   // Separator rows: optional leading/trailing pipe surrounding only `-`, `:`, ` `, `|`.
-  const isSeparator = l => /^\|?[\s\-:|]+\|?$/.test(l.trim()) && /-/.test(l);
-  const rows = raw.split("\n").filter(l => l.trim() && !isSeparator(l));
+  const isSeparator = (l) => /^\|?[\s\-:|]+\|?$/.test(l.trim()) && /-/.test(l);
+  const rows = raw.split("\n").filter((l) => l.trim() && !isSeparator(l));
   if (!rows.length) return null;
 
   return rows.map(splitTableRow);
@@ -114,48 +117,78 @@ function storiesTableToAdf(rows) {
   const header = rows[0];
   const body = rows.slice(1);
   return lib.adf.table([
-    lib.adf.tableRow(...header.map(h =>
-      lib.adf.tableHeader(lib.adf.paragraph(...inlineToAdfNodes(h))))),
-    ...body.map(r => lib.adf.tableRow(...r.map(c =>
-      lib.adf.tableCell(lib.adf.paragraph(...inlineToAdfNodes(c)))))),
+    lib.adf.tableRow(
+      ...header.map((h) =>
+        lib.adf.tableHeader(lib.adf.paragraph(...inlineToAdfNodes(h))),
+      ),
+    ),
+    ...body.map((r) =>
+      lib.adf.tableRow(
+        ...r.map((c) =>
+          lib.adf.tableCell(lib.adf.paragraph(...inlineToAdfNodes(c))),
+        ),
+      ),
+    ),
   ]);
 }
 
 // ---------------------------------------------------------------------------
 // Description builder (epic-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDocLinks, changelogEntries, linkResolver }) {
+function buildDescriptionAdf({
+  body,
+  frontmatter,
+  prdBbUrl,
+  epicBbUrl,
+  relatedDocLinks,
+  changelogEntries,
+  linkResolver,
+  output = null,
+}) {
   const content = [];
 
   if (changelogEntries && changelogEntries.length) {
     const recent = changelogEntries.slice(-CHANGELOG_DESCRIPTION_LIMIT);
     content.push(lib.adf.heading(3, "Change Log"));
-    content.push(lib.adf.table([
-      lib.adf.tableRow(
-        lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Date (UTC)"))),
-        lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Change"))),
-      ),
-      ...recent.map(row => {
-        const [date = "", change = ""] = row.replace(/^\|/, "").replace(/\|$/, "").split("|").map(s => s.trim());
-        return lib.adf.tableRow(
-          lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(date))),
-          lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(change))),
-        );
-      }),
-    ]));
+    content.push(
+      lib.adf.table([
+        lib.adf.tableRow(
+          lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Date (UTC)"))),
+          lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Change"))),
+        ),
+        ...recent.map((row) => {
+          const [date = "", change = ""] = row
+            .replace(/^\|/, "")
+            .replace(/\|$/, "")
+            .split("|")
+            .map((s) => s.trim());
+          return lib.adf.tableRow(
+            lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(date))),
+            lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(change))),
+          );
+        }),
+      ]),
+    );
   }
 
   const links = [];
-  if (prdBbUrl)  links.push({ label: "Parent PRD on Bitbucket", href: prdBbUrl });
-  if (epicBbUrl) links.push({ label: "Epic file on Bitbucket", href: epicBbUrl });
+  if (prdBbUrl)
+    links.push({ label: "Parent PRD on Bitbucket", href: prdBbUrl });
+  if (epicBbUrl)
+    links.push({ label: "Epic file on Bitbucket", href: epicBbUrl });
   if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
   if (links.length) {
     content.push(lib.adf.heading(3, "Source Documents"));
-    content.push(lib.adf.bulletList(...links.map(l =>
-      lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
+    content.push(
+      lib.adf.bulletList(
+        ...links.map((l) =>
+          lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))),
+        ),
+      ),
+    );
   }
 
-  for (const sec of lib.extractBodySections(body, EPIC_SECTIONS)) {
+  for (const sec of lib.extractBodySections(body, EPIC_SECTIONS, output)) {
     content.push(lib.adf.heading(3, sec.name));
     // Flatten any inline `**Label:**` heading (e.g. `**Existing System Context:**`)
     // to plain `Label:`. ADF can't render mid-paragraph bold headings well, so
@@ -165,10 +198,11 @@ function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDo
   }
 
   const meta = [];
-  if (frontmatter.epic_type)         meta.push(`Type: ${frontmatter.epic_type}`);
-  if (frontmatter.prd_source)        meta.push(`PRD: ${frontmatter.prd_source}`);
-  if (frontmatter.estimated_sprints) meta.push(`Estimated Sprints: ${frontmatter.estimated_sprints}`);
-  if (frontmatter.status)            meta.push(`Status: ${frontmatter.status}`);
+  if (frontmatter.epic_type) meta.push(`Type: ${frontmatter.epic_type}`);
+  if (frontmatter.prd_source) meta.push(`PRD: ${frontmatter.prd_source}`);
+  if (frontmatter.estimated_sprints)
+    meta.push(`Estimated Sprints: ${frontmatter.estimated_sprints}`);
+  if (frontmatter.status) meta.push(`Status: ${frontmatter.status}`);
   if (meta.length) {
     content.push(lib.adf.heading(3, "Metadata"));
     content.push(lib.adf.paragraph(lib.adf.text(meta.join(" | "))));
@@ -181,7 +215,9 @@ function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDo
   const storiesSections = lib.extractBodySections(body, ["Stories Breakdown"]);
   if (storiesSections.length && storiesSections[0].content.trim()) {
     content.push(lib.adf.heading(3, "Stories Breakdown"));
-    content.push(...lib.textToAdfNodes(storiesSections[0].content, linkResolver));
+    content.push(
+      ...lib.textToAdfNodes(storiesSections[0].content, linkResolver),
+    );
   }
 
   content.push(lib.adf.heading(3, "Story Requirements"));
@@ -190,16 +226,27 @@ function buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDo
   return lib.adf.doc(...content);
 }
 
-function hashBody({ body, prdBbUrl, epicBbUrl, relatedDocLinks, linkResolver }) {
-  const sections = lib.extractBodySections(body, EPIC_SECTIONS).map(s => ({
+function hashBody({
+  body,
+  prdBbUrl,
+  epicBbUrl,
+  relatedDocLinks,
+  linkResolver,
+}) {
+  const sections = lib.extractBodySections(body, EPIC_SECTIONS).map((s) => ({
     name: s.name,
     nodes: lib.textToAdfNodes(s.content, linkResolver),
   }));
   const storiesSections = lib.extractBodySections(body, ["Stories Breakdown"]);
-  const storiesContent = storiesSections.length ? storiesSections[0].content : null;
+  const storiesContent = storiesSections.length
+    ? storiesSections[0].content
+    : null;
   return lib.hashStable({
-    sections, storiesContent, prdBbUrl, epicBbUrl,
-    relatedDocLinks: (relatedDocLinks || []).map(l => `${l.label}|${l.href}`),
+    sections,
+    storiesContent,
+    prdBbUrl,
+    epicBbUrl,
+    relatedDocLinks: (relatedDocLinks || []).map((l) => `${l.label}|${l.href}`),
   });
 }
 
@@ -227,22 +274,36 @@ function hashMeta(frontmatter) {
 function findChildStories(filePath) {
   const storiesDir = path.join(path.dirname(filePath), "stories");
   if (!fs.existsSync(storiesDir)) return [];
-  return fs.readdirSync(storiesDir)
-    .map(d => ({ dir: d, card: path.join(storiesDir, d, `${d}.md`) }))
-    .filter(s => fs.existsSync(s.card))
-    .map(s => ({ ...s, num: s.dir.match(/^story\.(\d+)\.(\d+)\./i) }))
-    .filter(s => s.num)
-    // Lexicographic sort puts story.2.10 before story.2.2 — order numerically.
-    .sort((a, b) => Number(a.num[1]) - Number(b.num[1]) || Number(a.num[2]) - Number(b.num[2]))
-    .map(s => ({ file: s.card, label: labelForChildStory(s.card, `${s.num[1]}.${s.num[2]}`) }));
+  return (
+    fs
+      .readdirSync(storiesDir)
+      .map((d) => ({ dir: d, card: path.join(storiesDir, d, `${d}.md`) }))
+      .filter((s) => fs.existsSync(s.card))
+      .map((s) => ({ ...s, num: s.dir.match(/^story\.(\d+)\.(\d+)\./i) }))
+      .filter((s) => s.num)
+      // Lexicographic sort puts story.2.10 before story.2.2 — order numerically.
+      .sort(
+        (a, b) =>
+          Number(a.num[1]) - Number(b.num[1]) ||
+          Number(a.num[2]) - Number(b.num[2]),
+      )
+      .map((s) => ({
+        file: s.card,
+        label: labelForChildStory(s.card, `${s.num[1]}.${s.num[2]}`),
+      }))
+  );
 }
 
 function labelForChildStory(file, num) {
   let title = null;
   try {
-    const { frontmatter, body } = lib.parseFrontmatter(fs.readFileSync(file, "utf-8"));
+    const { frontmatter, body } = lib.parseFrontmatter(
+      fs.readFileSync(file, "utf-8"),
+    );
     title = frontmatter.title || body.match(/^# (.+)$/m)?.[1] || null;
-  } catch (_) { /* unreadable child — fall back to the number alone */ }
+  } catch (_) {
+    /* unreadable child — fall back to the number alone */
+  }
   // Titles are commonly already prefixed "[Story 2.4] ..." — don't repeat it.
   if (title) title = title.replace(/^\[?story\s*[\d.]+\]?[\s:—-]*/i, "").trim();
   return title ? `Story ${num} — ${title}` : `Story ${num}`;
@@ -265,10 +326,15 @@ function syncLabelFor(filePath) {
 // a matching id is returned unchanged.
 function normaliseEpicSummary(summary, epicNumber) {
   const bracket = summary.match(/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i);
-  const colon   = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
+  const colon = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
   let epicId = epicNumber != null ? String(epicNumber) : null;
-  if (bracket)    { epicId = epicId || bracket[1]; summary = bracket[2].trim(); }
-  else if (colon) { epicId = epicId || colon[1];   summary = colon[2].trim(); }
+  if (bracket) {
+    epicId = epicId || bracket[1];
+    summary = bracket[2].trim();
+  } else if (colon) {
+    epicId = epicId || colon[1];
+    summary = colon[2].trim();
+  }
   return epicId != null ? `[Epic ${epicId}] ${summary}` : summary;
 }
 
@@ -279,8 +345,20 @@ function normaliseEpicSummary(summary, epicNumber) {
 // PUT (update). Project + issuetype only go on create — Jira refuses to change
 // those on PUT — so the create wrapper layers them on top.
 // ---------------------------------------------------------------------------
-function collectCommonFields({ args, frontmatter, descAdf, livePriorities, output, syncLabel, summary }) {
-  const priority = lib.normalisePriority(args.priority || frontmatter.priority, livePriorities, output);
+function collectCommonFields({
+  args,
+  frontmatter,
+  descAdf,
+  livePriorities,
+  output,
+  syncLabel,
+  summary,
+}) {
+  const priority = lib.normalisePriority(
+    args.priority || frontmatter.priority,
+    livePriorities,
+    output,
+  );
   const labelInput = args.labels || frontmatter.labels;
   const cleanLabels = lib.sanitiseLabels(labelInput) || [];
   if (!cleanLabels.includes(syncLabel)) cleanLabels.push(syncLabel);
@@ -292,15 +370,24 @@ function collectCommonFields({ args, frontmatter, descAdf, livePriorities, outpu
   };
   if (priority) fields.priority = { name: priority };
 
-  if (frontmatter.assignee) fields.assignee = { accountId: String(frontmatter.assignee) };
+  if (frontmatter.assignee)
+    fields.assignee = { accountId: String(frontmatter.assignee) };
   if (frontmatter.due_date) fields.duedate = String(frontmatter.due_date);
   if (frontmatter.components) {
-    const comps = Array.isArray(frontmatter.components) ? frontmatter.components : [frontmatter.components];
-    fields.components = comps.filter(Boolean).map(name => ({ name: String(name) }));
+    const comps = Array.isArray(frontmatter.components)
+      ? frontmatter.components
+      : [frontmatter.components];
+    fields.components = comps
+      .filter(Boolean)
+      .map((name) => ({ name: String(name) }));
   }
   if (frontmatter.fix_versions) {
-    const fvs = Array.isArray(frontmatter.fix_versions) ? frontmatter.fix_versions : [frontmatter.fix_versions];
-    fields.fixVersions = fvs.filter(Boolean).map(name => ({ name: String(name) }));
+    const fvs = Array.isArray(frontmatter.fix_versions)
+      ? frontmatter.fix_versions
+      : [frontmatter.fix_versions];
+    fields.fixVersions = fvs
+      .filter(Boolean)
+      .map((name) => ({ name: String(name) }));
   }
 
   return fields;
@@ -319,13 +406,27 @@ function collectUpdateFields(opts) {
 
 // Backward-compat alias for callers/tests that still import `collectIssueFields`.
 function collectIssueFields(opts) {
-  return opts.epicTypeId || opts.projectKey ? collectCreateFields(opts) : collectUpdateFields(opts);
+  return opts.epicTypeId || opts.projectKey
+    ? collectCreateFields(opts)
+    : collectUpdateFields(opts);
 }
 
 // ---------------------------------------------------------------------------
 // File write-back
 // ---------------------------------------------------------------------------
-function updateEpicFile({ filePath, issueKey, issueUrl, epicBbUrl, prdBbUrl, changeEntry, lastSyncedAt, bodyHash, metaHash, output, skipChangelog = false }) {
+function updateEpicFile({
+  filePath,
+  issueKey,
+  issueUrl,
+  epicBbUrl,
+  prdBbUrl,
+  changeEntry,
+  lastSyncedAt,
+  bodyHash,
+  metaHash,
+  output,
+  skipChangelog = false,
+}) {
   try {
     let content = fs.readFileSync(filePath, "utf-8");
 
@@ -349,16 +450,32 @@ function updateEpicFile({ filePath, issueKey, issueUrl, epicBbUrl, prdBbUrl, cha
       return text.trimEnd() + "\n\n" + newLine + "\n";
     };
 
-    content = upsertLine(content, /^\*\*Jira Epic\*\*:.*$/m, `**Jira Epic**: [${issueKey}](${issueUrl})`);
-    if (prdBbUrl)  content = upsertLine(content, /^\*\*Parent PRD\*\*:.*$/m, `**Parent PRD**: [View on Bitbucket](${prdBbUrl})`);
-    if (epicBbUrl) content = upsertLine(content, /^\*\*Epic File\*\*:.*$/m,  `**Epic File**: [View on Bitbucket](${epicBbUrl})`);
+    content = upsertLine(
+      content,
+      /^\*\*Jira Epic\*\*:.*$/m,
+      `**Jira Epic**: [${issueKey}](${issueUrl})`,
+    );
+    if (prdBbUrl)
+      content = upsertLine(
+        content,
+        /^\*\*Parent PRD\*\*:.*$/m,
+        `**Parent PRD**: [View on Bitbucket](${prdBbUrl})`,
+      );
+    if (epicBbUrl)
+      content = upsertLine(
+        content,
+        /^\*\*Epic File\*\*:.*$/m,
+        `**Epic File**: [View on Bitbucket](${epicBbUrl})`,
+      );
 
     if (!skipChangelog) content = lib.upsertChangelog(content, changeEntry);
     fs.writeFileSync(filePath, content, "utf-8");
     output.info(`\n📝 Updated local epic file: ${filePath}`);
   } catch (err) {
     output.err(`\n⚠️  Failed to update local epic file: ${err.message}`);
-    output.err(`   The Jira epic was synced successfully. Add these to your epic frontmatter manually:`);
+    output.err(
+      `   The Jira epic was synced successfully. Add these to your epic frontmatter manually:`,
+    );
     output.err(`   jira_key: "${issueKey}"`);
     output.err(`   jira_url: "${issueUrl}"`);
   }
@@ -370,25 +487,62 @@ function updateEpicFile({ filePath, issueKey, issueUrl, epicBbUrl, prdBbUrl, cha
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
-    file: null, summary: null, priority: null, labels: null, docBranch: null,
-    dryRun: false, force: false, json: false, quiet: false,
-    verbose: false, version: false,
+    file: null,
+    summary: null,
+    priority: null,
+    labels: null,
+    docBranch: null,
+    dryRun: false,
+    force: false,
+    json: false,
+    quiet: false,
+    verbose: false,
+    version: false,
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
-      case "--file":     case "-f": opts.file     = args[++i]; break;
-      case "--summary":  case "-s": opts.summary  = args[++i]; break;
-      case "--priority": case "-p": opts.priority = args[++i]; break;
-      case "--labels":   case "-l": opts.labels   = args[++i]; break;
-      case "--doc-branch": opts.docBranch = args[++i]; break;
-      case "--dry-run":  opts.dryRun = true; break;
-      case "--force":    opts.force  = true; break;
-      case "--json":     opts.json   = true; break;
-      case "--quiet":    opts.quiet  = true; break;
-      case "--verbose":  case "-v": opts.verbose = true; break;
-      case "--version":  case "-V": opts.version = true; break;
+      case "--file":
+      case "-f":
+        opts.file = args[++i];
+        break;
+      case "--summary":
+      case "-s":
+        opts.summary = args[++i];
+        break;
+      case "--priority":
+      case "-p":
+        opts.priority = args[++i];
+        break;
+      case "--labels":
+      case "-l":
+        opts.labels = args[++i];
+        break;
+      case "--doc-branch":
+        opts.docBranch = args[++i];
+        break;
+      case "--dry-run":
+        opts.dryRun = true;
+        break;
+      case "--force":
+        opts.force = true;
+        break;
+      case "--json":
+        opts.json = true;
+        break;
+      case "--quiet":
+        opts.quiet = true;
+        break;
+      case "--verbose":
+      case "-v":
+        opts.verbose = true;
+        break;
+      case "--version":
+      case "-V":
+        opts.version = true;
+        break;
       default:
-        if (args[i].startsWith("-")) throw new Error(`Unknown option: ${args[i]}`);
+        if (args[i].startsWith("-"))
+          throw new Error(`Unknown option: ${args[i]}`);
     }
   }
   return opts;
@@ -397,7 +551,10 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
-async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefined" ? fetch : null) } = {}) {
+async function run({
+  argv = process.argv,
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null,
+} = {}) {
   lib.loadDotEnv();
   const args = parseArgs(argv);
   const output = lib.makeOutput({ json: args.json, quiet: args.quiet });
@@ -411,12 +568,16 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const dump = (label, value) => {
     if (!args.verbose) return;
     output.info(`\n--- ${label} ---`);
-    output.info(typeof value === "string" ? value : JSON.stringify(value, null, 2));
+    output.info(
+      typeof value === "string" ? value : JSON.stringify(value, null, 2),
+    );
   };
 
   if (!args.file) {
     output.err("Error: --file is required");
-    output.err("Usage: sync-jira-epic --file <epic.md> [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]");
+    output.err(
+      "Usage: sync-jira-epic --file <epic.md> [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]",
+    );
     return { exitCode: 1 };
   }
   const filePath = path.resolve(args.file);
@@ -428,22 +589,40 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const auth = lib.getAuth();
   if (!auth.ok) {
     if (args.dryRun) {
-      output.warn(`⚠️  Dry-run: missing env vars (${auth.missing.join(", ")}) — values will be required for live sync.`);
+      output.warn(
+        `⚠️  Dry-run: missing env vars (${auth.missing.join(", ")}) — values will be required for live sync.`,
+      );
     } else {
-      output.err(`Error: Missing required environment variables: ${auth.missing.join(", ")}`);
-      output.err("Set: JIRA_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL, JIRA_PROJECT_KEY.");
+      output.err(
+        `Error: Missing required environment variables: ${auth.missing.join(", ")}`,
+      );
+      output.err(
+        "Set: JIRA_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL, JIRA_PROJECT_KEY.",
+      );
       return { exitCode: 1 };
     }
   }
 
   const repoRoot = lib.getRepoRoot();
   const bbBase = lib.getBitbucketRepoBase();
-  if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
-  const branch = bbBase ? (args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()) : null;
-  const epicBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
-  const linkResolver = lib.makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch });
+  if (!bbBase)
+    output.warn(
+      "⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.",
+    );
+  const branch = bbBase
+    ? args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()
+    : null;
+  const epicBbUrl = bbBase
+    ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch)
+    : null;
+  const linkResolver = lib.makeRelativeLinkResolver({
+    filePath,
+    repoRoot,
+    bbBase,
+    branch,
+  });
   const relatedDocLinks = bbBase
-    ? findChildStories(filePath).map(s => ({
+    ? findChildStories(filePath).map((s) => ({
         label: s.label,
         href: lib.buildBitbucketUrl(s.file, repoRoot, bbBase, branch),
       }))
@@ -455,29 +634,55 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   let prdBbUrl = null;
   if (bbBase) {
     const prdFilePath = resolvePrdPath(frontmatter.prd_source, repoRoot);
-    if (prdFilePath) prdBbUrl = lib.buildBitbucketUrl(prdFilePath, repoRoot, bbBase, branch);
-    else if (frontmatter.prd_source) output.warn(`⚠️  Could not resolve prd_source "${frontmatter.prd_source}" — PRD link omitted.`);
+    if (prdFilePath)
+      prdBbUrl = lib.buildBitbucketUrl(prdFilePath, repoRoot, bbBase, branch);
+    else if (frontmatter.prd_source)
+      output.warn(
+        `⚠️  Could not resolve prd_source "${frontmatter.prd_source}" — PRD link omitted.`,
+      );
     if (!prdBbUrl && frontmatter.prd_bitbucket_url) {
       prdBbUrl = frontmatter.prd_bitbucket_url;
-      output.warn(`⚠️  Using cached prd_bitbucket_url from frontmatter — verify it still points to a valid file.`);
+      output.warn(
+        `⚠️  Using cached prd_bitbucket_url from frontmatter — verify it still points to a valid file.`,
+      );
     }
   }
 
-  let summary = args.summary || frontmatter.summary || frontmatter.title || body.match(/^# (.+)$/m)?.[1];
+  let summary =
+    args.summary ||
+    frontmatter.summary ||
+    frontmatter.title ||
+    body.match(/^# (.+)$/m)?.[1];
   if (!summary) {
-    output.err("Error: Could not determine summary (set frontmatter title or # heading).");
+    output.err(
+      "Error: Could not determine summary (set frontmatter title or # heading).",
+    );
     return { exitCode: 1 };
   }
   // Normalise to the canonical "[Epic N] {title}" bracket form (see helper).
   summary = normaliseEpicSummary(summary, frontmatter.epic_number);
 
-  const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
-  const livePriorities = (auth.ok && !args.dryRun)
-    ? await lib.resolveLivePriorities({ http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token })
-    : null;
+  const http = lib.makeHttp({
+    fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+  });
+  const livePriorities =
+    auth.ok && !args.dryRun
+      ? await lib.resolveLivePriorities({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+        })
+      : null;
 
   const syncLabel = syncLabelFor(filePath);
-  const newBodyHash = hashBody({ body, prdBbUrl, epicBbUrl, relatedDocLinks, linkResolver });
+  const newBodyHash = hashBody({
+    body,
+    prdBbUrl,
+    epicBbUrl,
+    relatedDocLinks,
+    linkResolver,
+  });
   const newMetaHash = hashMeta(frontmatter);
 
   let existingJiraKey = frontmatter.jira_key;
@@ -485,65 +690,103 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   // Pre-flight idempotency
   if (!existingJiraKey && auth.ok && !args.dryRun) {
     const found = await lib.findExistingByLabel({
-      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      projectKey: auth.project, label: syncLabel,
+      http,
+      baseUrl: auth.baseUrl,
+      email: auth.email,
+      token: auth.token,
+      projectKey: auth.project,
+      label: syncLabel,
     });
     if (found) {
-      output.warn(`ℹ️  Found existing issue ${found.key} with label "${syncLabel}" — switching to update.`);
+      output.warn(
+        `ℹ️  Found existing issue ${found.key} with label "${syncLabel}" — switching to update.`,
+      );
       existingJiraKey = found.key;
     }
   }
 
   const isUpdate = !!existingJiraKey;
-  output.info(`\n${isUpdate ? "🔄 Updating" : "➕ Creating"} Jira epic${isUpdate ? ` ${existingJiraKey}` : ""}…`);
+  output.info(
+    `\n${isUpdate ? "🔄 Updating" : "➕ Creating"} Jira epic${isUpdate ? ` ${existingJiraKey}` : ""}…`,
+  );
   output.info(`   File: ${filePath}`);
-  if (args.dryRun) output.info("   Mode: DRY RUN — no Jira calls or file writes");
-  if (args.force)  output.info("   Mode: --force — concurrent-edit guard disabled");
+  if (args.dryRun)
+    output.info("   Mode: DRY RUN — no Jira calls or file writes");
+  if (args.force)
+    output.info("   Mode: --force — concurrent-edit guard disabled");
 
-  let result, changeSummary, changeEntry, current = null;
+  let result,
+    changeSummary,
+    changeEntry,
+    current = null;
 
   if (isUpdate) {
     if (!args.dryRun) {
       current = await lib.fetchIssue({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey: existingJiraKey,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: existingJiraKey,
       });
       lib.guardConcurrentEdit({
         jiraUpdated: current.updated,
         lastSyncedAt: frontmatter.jira_last_synced_at,
-        force: args.force, output,
+        force: args.force,
+        output,
       });
     }
 
     const changedFields = current
       ? lib.diffFields({
           prev: current,
-          next: { summary, priority: lib.normalisePriority(args.priority || frontmatter.priority, livePriorities), labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [] },
+          next: {
+            summary,
+            priority: lib.normalisePriority(
+              args.priority || frontmatter.priority,
+              livePriorities,
+            ),
+            labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [],
+          },
           prevBodyHash: frontmatter.jira_last_body_hash,
           newBodyHash,
           prevMetaHash: frontmatter.jira_last_meta_hash,
           newMetaHash,
         })
       : ["summary", "description", "priority", "labels"];
-    changeSummary = changedFields.length ? `Updated: ${changedFields.join(", ")}` : "Sync (no field changes detected)";
+    changeSummary = changedFields.length
+      ? `Updated: ${changedFields.join(", ")}`
+      : "Sync (no field changes detected)";
     changeEntry = lib.fmtEntry(changeSummary);
 
     // No-change fast path: skip PUT and skip the local changelog row too —
     // an empty no-op shouldn't pollute the change log. Frontmatter timestamp
     // and hashes are still refreshed so the next run sees a clean baseline.
     if (current && changedFields.length === 0 && !args.force) {
-      output.info("\nℹ️  No field changes detected — skipping Jira update. Re-run with --force to push anyway.");
+      output.info(
+        "\nℹ️  No field changes detected — skipping Jira update. Re-run with --force to push anyway.",
+      );
       const issueUrl = `${auth.baseUrl}/browse/${existingJiraKey}`;
       updateEpicFile({
-        filePath, issueKey: existingJiraKey, issueUrl,
-        epicBbUrl, prdBbUrl, changeEntry,
-        lastSyncedAt: current.updated, bodyHash: newBodyHash, metaHash: newMetaHash,
-        output, skipChangelog: true,
+        filePath,
+        issueKey: existingJiraKey,
+        issueUrl,
+        epicBbUrl,
+        prdBbUrl,
+        changeEntry,
+        lastSyncedAt: current.updated,
+        bodyHash: newBodyHash,
+        metaHash: newMetaHash,
+        output,
+        skipChangelog: true,
       });
       if (args.json) {
         output.emit({
           action: "skip",
-          dryRun: false, file: filePath,
-          jira_key: existingJiraKey, jira_url: issueUrl,
+          dryRun: false,
+          file: filePath,
+          jira_key: existingJiraKey,
+          jira_url: issueUrl,
           change_summary: changeSummary,
           jira_last_synced_at: current.updated,
           jira_last_body_hash: newBodyHash,
@@ -554,10 +797,24 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     }
 
     const allEntries = [...lib.extractEntries(content), changeEntry];
-    const descAdf = buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver });
+    const descAdf = buildDescriptionAdf({
+      body,
+      frontmatter,
+      prdBbUrl,
+      epicBbUrl,
+      relatedDocLinks,
+      changelogEntries: allEntries,
+      linkResolver,
+      output,
+    });
     const fields = collectUpdateFields({
-      args, frontmatter, descAdf,
-      livePriorities, output, syncLabel, summary,
+      args,
+      frontmatter,
+      descAdf,
+      livePriorities,
+      output,
+      syncLabel,
+      summary,
     });
     dump("PUT fields", fields);
     dump("PUT description (ADF)", descAdf);
@@ -565,15 +822,30 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would UPDATE ${existingJiraKey} ===`);
       output.info(`  Changes: ${changeSummary}`);
-      result = { issueKey: existingJiraKey, issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`, updated: null };
+      result = {
+        issueKey: existingJiraKey,
+        issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+        updated: null,
+      };
     } else {
       const { updated } = await lib.putIssueAtomic({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-        issueKey: existingJiraKey, fields,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: existingJiraKey,
+        fields,
       });
-      const finalUpdated = updated
-        || (await lib.fetchUpdatedTimestamp({ http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey: existingJiraKey }))
-        || new Date().toISOString();
+      const finalUpdated =
+        updated ||
+        (await lib.fetchUpdatedTimestamp({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey: existingJiraKey,
+        })) ||
+        new Date().toISOString();
       result = {
         issueKey: existingJiraKey,
         issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
@@ -586,7 +858,16 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira epic created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, prdBbUrl, epicBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver });
+    const descAdf = buildDescriptionAdf({
+      body,
+      frontmatter,
+      prdBbUrl,
+      epicBbUrl,
+      relatedDocLinks,
+      changelogEntries: [changeEntry],
+      linkResolver,
+      output,
+    });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira epic ===`);
@@ -596,16 +877,29 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       result = { issueKey: null, issueUrl: null, updated: null };
     } else {
       const epicTypeId = await lib.getIssueTypeId({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-        projectKey: auth.project, typeName: ISSUE_TYPE, repoRoot,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        projectKey: auth.project,
+        typeName: ISSUE_TYPE,
+        repoRoot,
       });
       const fields = collectCreateFields({
-        args, frontmatter, descAdf, epicTypeId, projectKey: auth.project,
-        livePriorities, output, syncLabel, summary,
+        args,
+        frontmatter,
+        descAdf,
+        epicTypeId,
+        projectKey: auth.project,
+        livePriorities,
+        output,
+        syncLabel,
+        summary,
       });
 
       // Epic Name custom field — many Jira Cloud instances need it set on create.
-      const epicNameField = process.env.JIRA_EPIC_NAME_FIELD || "customfield_10011";
+      const epicNameField =
+        process.env.JIRA_EPIC_NAME_FIELD || "customfield_10011";
       if (epicNameField.toLowerCase() !== "none") {
         fields[epicNameField] = summary;
       }
@@ -615,7 +909,10 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
       // Build a regex that adapts to whatever epic-name field the user configured,
       // falling back to the canonical "epic name" / `customfield_10011` strings.
-      const epicNameRe = new RegExp(`${lib.escapeRe(epicNameField)}|epic[ _-]?name`, "i");
+      const epicNameRe = new RegExp(
+        `${lib.escapeRe(epicNameField)}|epic[ _-]?name`,
+        "i",
+      );
 
       const resp = await http(`${auth.baseUrl}/rest/api/3/issue`, {
         method: "POST",
@@ -629,8 +926,14 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       if (!resp.ok) {
         const errText = await lib.parseJiraError(resp);
         // Retry without epic-name field if Jira rejects it (team-managed projects)
-        if (resp.status === 400 && epicNameRe.test(errText) && fields[epicNameField]) {
-          output.info(`ℹ️  Retrying create without ${epicNameField} (team-managed project): ${errText.slice(0, 120)}`);
+        if (
+          resp.status === 400 &&
+          epicNameRe.test(errText) &&
+          fields[epicNameField]
+        ) {
+          output.info(
+            `ℹ️  Retrying create without ${epicNameField} (team-managed project): ${errText.slice(0, 120)}`,
+          );
           delete fields[epicNameField];
           const retry = await http(`${auth.baseUrl}/rest/api/3/issue`, {
             method: "POST",
@@ -641,13 +944,21 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
             },
             body: JSON.stringify({ fields }),
           });
-          if (!retry.ok) throw new Error(`HTTP ${retry.status}: ${await lib.parseJiraError(retry)}`);
+          if (!retry.ok)
+            throw new Error(
+              `HTTP ${retry.status}: ${await lib.parseJiraError(retry)}`,
+            );
           const created = await retry.json();
           const issueKey = created.key;
           const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
-          const updated = (await lib.fetchUpdatedTimestamp({
-            http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey,
-          })) || new Date().toISOString();
+          const updated =
+            (await lib.fetchUpdatedTimestamp({
+              http,
+              baseUrl: auth.baseUrl,
+              email: auth.email,
+              token: auth.token,
+              issueKey,
+            })) || new Date().toISOString();
           result = { issueKey, issueUrl, updated };
         } else {
           throw new Error(`HTTP ${resp.status}: ${errText}`);
@@ -655,17 +966,27 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       } else {
         const rawText = await resp.text();
         let created;
-        try { created = JSON.parse(rawText); }
-        catch (_) {
-          output.err("\n⚠️  Jira returned 2xx but response body was not valid JSON. Raw body:");
+        try {
+          created = JSON.parse(rawText);
+        } catch (_) {
+          output.err(
+            "\n⚠️  Jira returned 2xx but response body was not valid JSON. Raw body:",
+          );
           output.err(rawText.slice(0, 500));
-          throw new Error("Could not parse Jira create response — check Jira manually for the new epic");
+          throw new Error(
+            "Could not parse Jira create response — check Jira manually for the new epic",
+          );
         }
         const issueKey = created.key;
         const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
-        const updated = (await lib.fetchUpdatedTimestamp({
-          http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey,
-        })) || new Date().toISOString();
+        const updated =
+          (await lib.fetchUpdatedTimestamp({
+            http,
+            baseUrl: auth.baseUrl,
+            email: auth.email,
+            token: auth.token,
+            issueKey,
+          })) || new Date().toISOString();
         result = { issueKey, issueUrl, updated };
       }
 
@@ -673,41 +994,70 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       output.info(`   URL: ${result.issueUrl}`);
 
       await lib.moveToBacklog({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-        boardId: auth.boardId, issueKey: result.issueKey, output,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        boardId: auth.boardId,
+        issueKey: result.issueKey,
+        output,
       });
 
       // Set Team field (customfield_10001) so the epic appears on boards filtered by cf[10001].
       if (auth.boardId) {
         try {
-          const boardCfgResp = await http(`${auth.baseUrl}/rest/agile/1.0/board/${auth.boardId}/configuration`, {
-            headers: { Authorization: lib.authHeader(auth.email, auth.token), Accept: "application/json" },
-          });
+          const boardCfgResp = await http(
+            `${auth.baseUrl}/rest/agile/1.0/board/${auth.boardId}/configuration`,
+            {
+              headers: {
+                Authorization: lib.authHeader(auth.email, auth.token),
+                Accept: "application/json",
+              },
+            },
+          );
           if (boardCfgResp.ok) {
             const boardCfg = await boardCfgResp.json();
             const filterId = boardCfg?.filter?.id;
             if (filterId) {
-              const filterResp = await http(`${auth.baseUrl}/rest/api/3/filter/${filterId}`, {
-                headers: { Authorization: lib.authHeader(auth.email, auth.token), Accept: "application/json" },
-              });
+              const filterResp = await http(
+                `${auth.baseUrl}/rest/api/3/filter/${filterId}`,
+                {
+                  headers: {
+                    Authorization: lib.authHeader(auth.email, auth.token),
+                    Accept: "application/json",
+                  },
+                },
+              );
               if (filterResp.ok) {
                 const filter = await filterResp.json();
-                const teamMatch = /cf\[10001\]\s+in\s+\(([^)]+)\)/i.exec(filter.jql || "");
+                const teamMatch = /cf\[10001\]\s+in\s+\(([^)]+)\)/i.exec(
+                  filter.jql || "",
+                );
                 if (teamMatch) {
-                  const teamUuid = teamMatch[1].split(",")[0].trim().replace(/^["']|["']$/g, "");
+                  const teamUuid = teamMatch[1]
+                    .split(",")[0]
+                    .trim()
+                    .replace(/^["']|["']$/g, "");
                   if (teamUuid) {
-                    const teamResp = await http(`${auth.baseUrl}/rest/api/3/issue/${result.issueKey}`, {
-                      method: "PUT",
-                      headers: {
-                        Authorization: lib.authHeader(auth.email, auth.token),
-                        "Content-Type": "application/json",
+                    const teamResp = await http(
+                      `${auth.baseUrl}/rest/api/3/issue/${result.issueKey}`,
+                      {
+                        method: "PUT",
+                        headers: {
+                          Authorization: lib.authHeader(auth.email, auth.token),
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          fields: { customfield_10001: teamUuid },
+                        }),
                       },
-                      body: JSON.stringify({ fields: { customfield_10001: teamUuid } }),
-                    });
+                    );
                     if (teamResp.status === 204) {
                       output.info(`   Team field set: ${teamUuid}`);
                     } else {
-                      output.warn(`⚠️  Team field update returned HTTP ${teamResp.status} — epic created but may not appear on board`);
+                      output.warn(
+                        `⚠️  Team field update returned HTTP ${teamResp.status} — epic created but may not appear on board`,
+                      );
                     }
                   }
                 }
@@ -715,7 +1065,9 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
             }
           }
         } catch (teamErr) {
-          output.warn(`⚠️  Could not set team field: ${teamErr.message} — epic created but may not appear on board`);
+          output.warn(
+            `⚠️  Could not set team field: ${teamErr.message} — epic created but may not appear on board`,
+          );
         }
       }
     }
@@ -726,8 +1078,14 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     const target = lib.mapStatus(frontmatter.status, lib.loadStatusMap());
     const currentStatus = current?.status || null;
     await lib.transitionToStatus({
-      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      issueKey: result.issueKey, targetStatus: target, currentStatus, output,
+      http,
+      baseUrl: auth.baseUrl,
+      email: auth.email,
+      token: auth.token,
+      issueKey: result.issueKey,
+      targetStatus: target,
+      currentStatus,
+      output,
     });
   }
 
@@ -749,9 +1107,9 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     if (!isUpdate) {
       output.info(
         "\n📌 Story reminder:\n" +
-        `   jira_epic: "${result.issueKey}"\n` +
-        (epicBbUrl ? `   epic_bitbucket_url: "${epicBbUrl}"\n` : "") +
-        "   Add cross-reference links to both the Jira epic and Bitbucket epic file in each story body."
+          `   jira_epic: "${result.issueKey}"\n` +
+          (epicBbUrl ? `   epic_bitbucket_url: "${epicBbUrl}"\n` : "") +
+          "   Add cross-reference links to both the Jira epic and Bitbucket epic file in each story body.",
       );
     }
   }
@@ -779,11 +1137,16 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 // Entry / exports
 // ---------------------------------------------------------------------------
 if (require.main === module) {
-  run().then(r => process.exit(r.exitCode || 0)).catch(e => {
-    if (process.argv.includes("--json")) process.stdout.write(JSON.stringify({ error: e.message }, null, 2) + "\n");
-    else console.error("Unexpected error:", e.message || e);
-    process.exit(1);
-  });
+  run()
+    .then((r) => process.exit(r.exitCode || 0))
+    .catch((e) => {
+      if (process.argv.includes("--json"))
+        process.stdout.write(
+          JSON.stringify({ error: e.message }, null, 2) + "\n",
+        );
+      else console.error("Unexpected error:", e.message || e);
+      process.exit(1);
+    });
 } else {
   module.exports = {
     run,
@@ -812,34 +1175,34 @@ if (require.main === module) {
     CHANGELOG_DESCRIPTION_LIMIT,
     STORY_REQUIREMENTS_TEXT,
     // Re-export lib pieces for tests
-    inlineMarkdownToAdf:     lib.inlineMarkdownToAdf,
-    parseFrontmatter:        lib.parseFrontmatter,
-    rewriteFrontmatter:      lib.rewriteFrontmatter,
-    upsertFrontmatterKeys:   lib.upsertFrontmatterKeys,
-    upsertChangelog:         lib.upsertChangelog,
-    extractEntries:          lib.extractEntries,
+    inlineMarkdownToAdf: lib.inlineMarkdownToAdf,
+    parseFrontmatter: lib.parseFrontmatter,
+    rewriteFrontmatter: lib.rewriteFrontmatter,
+    upsertFrontmatterKeys: lib.upsertFrontmatterKeys,
+    upsertChangelog: lib.upsertChangelog,
+    extractEntries: lib.extractEntries,
     findHandWrittenChangelog: lib.findHandWrittenChangelog,
-    buildChangelogBlock:     lib.buildChangelogBlock,
-    fmtEntry:                lib.fmtEntry,
-    isEntryRow:              lib.isEntryRow,
-    diffFields:              lib.diffFields,
-    normalisePriority:       lib.normalisePriority,
-    sanitiseLabels:          lib.sanitiseLabels,
-    textToParagraphs:        lib.textToAdfNodes,
-    textToAdfNodes:          lib.textToAdfNodes,
-    blockToAdf:              lib.blockToAdf,
-    guardConcurrentEdit:     lib.guardConcurrentEdit,
-    parseJiraError:          lib.parseJiraError,
-    hashStable:              lib.hashStable,
-    findExistingByLabel:     lib.findExistingByLabel,
-    fetchUpdatedTimestamp:   lib.fetchUpdatedTimestamp,
-    escapeRe:                lib.escapeRe,
-    stripRemotePrefix:       lib.stripRemotePrefix,
-    resolveRelativeLink:      lib.resolveRelativeLink,
+    buildChangelogBlock: lib.buildChangelogBlock,
+    fmtEntry: lib.fmtEntry,
+    isEntryRow: lib.isEntryRow,
+    diffFields: lib.diffFields,
+    normalisePriority: lib.normalisePriority,
+    sanitiseLabels: lib.sanitiseLabels,
+    textToParagraphs: lib.textToAdfNodes,
+    textToAdfNodes: lib.textToAdfNodes,
+    blockToAdf: lib.blockToAdf,
+    guardConcurrentEdit: lib.guardConcurrentEdit,
+    parseJiraError: lib.parseJiraError,
+    hashStable: lib.hashStable,
+    findExistingByLabel: lib.findExistingByLabel,
+    fetchUpdatedTimestamp: lib.fetchUpdatedTimestamp,
+    escapeRe: lib.escapeRe,
+    stripRemotePrefix: lib.stripRemotePrefix,
+    resolveRelativeLink: lib.resolveRelativeLink,
     makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
     getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
-    getDefaultBranch:        lib.getDefaultBranch,
-    CL_START:                lib.CL_START,
-    CL_END:                  lib.CL_END,
+    getDefaultBranch: lib.getDefaultBranch,
+    CL_START: lib.CL_START,
+    CL_END: lib.CL_END,
   };
 }

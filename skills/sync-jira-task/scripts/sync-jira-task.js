@@ -64,7 +64,7 @@ function formatJiraTimeEstimate(value) {
 // ---------------------------------------------------------------------------
 // Description builder (task-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries, linkResolver }) {
+function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries, linkResolver, output = null }) {
   const content = [];
 
   if (changelogEntries && changelogEntries.length) {
@@ -93,7 +93,7 @@ function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, ch
       lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
   }
 
-  for (const sec of lib.extractBodySections(body, TASK_SECTIONS)) {
+  for (const sec of lib.extractBodySections(body, TASK_SECTIONS, output)) {
     content.push(lib.adf.heading(3, sec.name));
     content.push(...lib.textToAdfNodes(sec.content, linkResolver));
   }
@@ -388,7 +388,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     changeEntry = lib.fmtEntry(changeSummary);
 
     const allEntries = [...lib.extractEntries(content), changeEntry];
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver, output });
     const fields = collectIssueFields({
       summary, args, frontmatter, descAdf, taskTypeId: null, projectKey: null, livePriorities, output, syncLabel,
     });
@@ -442,7 +442,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira task created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver, output });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira task ===`);

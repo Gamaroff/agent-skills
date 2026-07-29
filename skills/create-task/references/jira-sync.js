@@ -27,7 +27,9 @@ const { execSync } = require("child_process");
 // ---------------------------------------------------------------------------
 function loadDotEnv() {
   try {
-    const root = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const root = execSync("git rev-parse --show-toplevel", {
+      encoding: "utf-8",
+    }).trim();
     const envPath = path.join(root, ".env");
     if (!fs.existsSync(envPath)) return;
     for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
@@ -36,7 +38,10 @@ function loadDotEnv() {
       const eq = t.indexOf("=");
       if (eq < 1) continue;
       const key = t.slice(0, eq).trim();
-      const val = t.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+      const val = t
+        .slice(eq + 1)
+        .trim()
+        .replace(/^["']|["']$/g, "");
       if (!(key in process.env)) process.env[key] = val;
     }
   } catch (_) {}
@@ -47,11 +52,18 @@ function loadDotEnv() {
 // ---------------------------------------------------------------------------
 function makeOutput({ json = false, quiet = false } = {}) {
   return {
-    log:  (...a) => { if (!json && !quiet) console.log(...a); },
-    info: (...a) => { if (!json && !quiet) console.log(...a); },
-    warn: (...a) => { if (!json) console.warn(...a); },
-    err:  (...a) => console.error(...a),
-    emit: payload => process.stdout.write(JSON.stringify(payload, null, 2) + "\n"),
+    log: (...a) => {
+      if (!json && !quiet) console.log(...a);
+    },
+    info: (...a) => {
+      if (!json && !quiet) console.log(...a);
+    },
+    warn: (...a) => {
+      if (!json) console.warn(...a);
+    },
+    err: (...a) => console.error(...a),
+    emit: (payload) =>
+      process.stdout.write(JSON.stringify(payload, null, 2) + "\n"),
     isJson: json,
     isQuiet: quiet,
   };
@@ -72,16 +84,29 @@ function parseFrontmatter(content) {
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    if (!line.includes(":")) { i++; continue; }
+    if (!line.includes(":")) {
+      i++;
+      continue;
+    }
     const ci = line.indexOf(":");
     const key = line.slice(0, ci).trim();
     let val = line.slice(ci + 1).trim();
 
-    if (val === "" && i + 1 < lines.length && lines[i + 1].trimStart().startsWith("-")) {
+    if (
+      val === "" &&
+      i + 1 < lines.length &&
+      lines[i + 1].trimStart().startsWith("-")
+    ) {
       const items = [];
       i++;
       while (i < lines.length && lines[i].trimStart().startsWith("-")) {
-        items.push(lines[i].trim().slice(1).trim().replace(/^["']|["']$/g, ""));
+        items.push(
+          lines[i]
+            .trim()
+            .slice(1)
+            .trim()
+            .replace(/^["']|["']$/g, ""),
+        );
         i++;
       }
       fm[key] = items;
@@ -92,8 +117,14 @@ function parseFrontmatter(content) {
       val = [];
     } else if (val.startsWith("[") && val.endsWith("]")) {
       const inner = val.slice(1, -1).trim();
-      val = inner === "" ? [] : inner.split(",").map(v => v.trim().replace(/^["']|["']$/g, ""));
-    } else if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val =
+        inner === ""
+          ? []
+          : inner.split(",").map((v) => v.trim().replace(/^["']|["']$/g, ""));
+    } else if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
       val = val.slice(1, -1);
     }
     if (val === "null" || val === "~") val = null;
@@ -116,16 +147,18 @@ function upsertFrontmatterKeys(content, updates) {
 
   const lines = fmText.split("\n");
   const seen = new Set();
-  const out = lines.map(line => {
-    const ci = line.indexOf(":");
-    if (ci < 1) return line;
-    const key = line.slice(0, ci).trim();
-    if (!(key in updates)) return line;
-    seen.add(key);
-    const v = updates[key];
-    if (v === null || v === undefined) return null;
-    return `${key}: ${formatYamlScalar(v)}`;
-  }).filter(l => l !== null);
+  const out = lines
+    .map((line) => {
+      const ci = line.indexOf(":");
+      if (ci < 1) return line;
+      const key = line.slice(0, ci).trim();
+      if (!(key in updates)) return line;
+      seen.add(key);
+      const v = updates[key];
+      if (v === null || v === undefined) return null;
+      return `${key}: ${formatYamlScalar(v)}`;
+    })
+    .filter((l) => l !== null);
 
   for (const [key, v] of Object.entries(updates)) {
     if (seen.has(key)) continue;
@@ -139,7 +172,8 @@ function upsertFrontmatterKeys(content, updates) {
 
 function formatYamlScalar(v) {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
-  if (Array.isArray(v)) return `[${v.map(x => `"${String(x).replace(/"/g, '\\"')}"`).join(", ")}]`;
+  if (Array.isArray(v))
+    return `[${v.map((x) => `"${String(x).replace(/"/g, '\\"')}"`).join(", ")}]`;
   return `"${String(v).replace(/"/g, '\\"')}"`;
 }
 
@@ -158,19 +192,28 @@ function rewriteFrontmatter(content, mutator) {
 // ---------------------------------------------------------------------------
 function getRepoRoot() {
   try {
-    return execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
-  } catch (_) { return process.cwd(); }
+    return execSync("git rev-parse --show-toplevel", {
+      encoding: "utf-8",
+    }).trim();
+  } catch (_) {
+    return process.cwd();
+  }
 }
 
 function getDefaultBranch() {
   try {
-    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
     const m = ref.match(/refs\/remotes\/origin\/(.+)$/);
     if (m) return m[1];
   } catch (_) {}
   for (const candidate of ["main", "master", "develop"]) {
     try {
-      execSync(`git rev-parse --verify --quiet origin/${candidate}`, { stdio: "ignore" });
+      execSync(`git rev-parse --verify --quiet origin/${candidate}`, {
+        stdio: "ignore",
+      });
       return candidate;
     } catch (_) {}
   }
@@ -210,7 +253,9 @@ function getBitbucketRepoBase() {
   const env = process.env.BITBUCKET_REPO_URL;
   if (env) return env.replace(/\/$/, "");
   try {
-    const remote = execSync("git remote get-url origin", { encoding: "utf-8" }).trim();
+    const remote = execSync("git remote get-url origin", {
+      encoding: "utf-8",
+    }).trim();
     const base = remote
       .replace(/^git@bitbucket\.org:/, "https://bitbucket.org/")
       .replace(/\.git$/, "");
@@ -248,17 +293,22 @@ function resolveRelativeLink(href, { filePath, repoRoot, bbBase, branch }) {
 
 function makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch }) {
   if (!bbBase) return null;
-  return href => resolveRelativeLink(href, { filePath, repoRoot, bbBase, branch });
+  return (href) =>
+    resolveRelativeLink(href, { filePath, repoRoot, bbBase, branch });
 }
 
 // ---------------------------------------------------------------------------
 // Changelog
 // ---------------------------------------------------------------------------
 const CL_START = "<!-- jira-sync-changelog-start -->";
-const CL_END   = "<!-- jira-sync-changelog-end -->";
-const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const RE_CL_BLOCK = new RegExp(`${escapeRe(CL_START)}[\\s\\S]*?${escapeRe(CL_END)}`);
-const RE_CL_INNER = new RegExp(`${escapeRe(CL_START)}([\\s\\S]*?)${escapeRe(CL_END)}`);
+const CL_END = "<!-- jira-sync-changelog-end -->";
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const RE_CL_BLOCK = new RegExp(
+  `${escapeRe(CL_START)}[\\s\\S]*?${escapeRe(CL_END)}`,
+);
+const RE_CL_INNER = new RegExp(
+  `${escapeRe(CL_START)}([\\s\\S]*?)${escapeRe(CL_END)}`,
+);
 
 const RE_ENTRY_ROW = /^\|\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s*\|/;
 
@@ -271,7 +321,8 @@ function buildChangelogBlock(entries) {
   return (
     `${CL_START}\n## Change Log\n\n` +
     `| Date (UTC) | Change |\n|------------|--------|\n` +
-    entries.join("\n") + `\n${CL_END}`
+    entries.join("\n") +
+    `\n${CL_END}`
   );
 }
 
@@ -292,8 +343,10 @@ function findHandWrittenChangelog(content) {
   if (!m) return null;
   const start = content.indexOf(m[0]);
   const after = content.slice(start + m[0].length);
-  const next  = after.match(/^## /m);
-  const end   = next ? start + m[0].length + after.indexOf(next[0]) : content.length;
+  const next = after.match(/^## /m);
+  const end = next
+    ? start + m[0].length + after.indexOf(next[0])
+    : content.length;
   return { start, end };
 }
 
@@ -304,15 +357,28 @@ function upsertChangelog(content, newEntry) {
   }
   const hand = findHandWrittenChangelog(content);
   if (hand) {
-    const existing = content.slice(hand.start, hand.end).split("\n").filter(isEntryRow);
+    const existing = content
+      .slice(hand.start, hand.end)
+      .split("\n")
+      .filter(isEntryRow);
     const entries = [...existing, newEntry];
     const trailing = hand.end < content.length ? "\n\n" : "\n";
-    return content.slice(0, hand.start) + buildChangelogBlock(entries) + trailing + content.slice(hand.end);
+    return (
+      content.slice(0, hand.start) +
+      buildChangelogBlock(entries) +
+      trailing +
+      content.slice(hand.end)
+    );
   }
   const sec = content.match(/^## /m);
   if (sec) {
     const idx = content.indexOf(sec[0]);
-    return content.slice(0, idx) + buildChangelogBlock([newEntry]) + "\n\n" + content.slice(idx);
+    return (
+      content.slice(0, idx) +
+      buildChangelogBlock([newEntry]) +
+      "\n\n" +
+      content.slice(idx)
+    );
   }
   return content.trimEnd() + "\n\n" + buildChangelogBlock([newEntry]) + "\n";
 }
@@ -323,13 +389,25 @@ function upsertChangelog(content, newEntry) {
 const adf = {
   doc: (...content) => ({ version: 1, type: "doc", content }),
   paragraph: (...content) => ({ type: "paragraph", content }),
-  heading: (level, text) => ({ type: "heading", attrs: { level }, content: [{ type: "text", text }] }),
-  text: t => ({ type: "text", text: t }),
-  link: (text, href) => ({ type: "text", text, marks: [{ type: "link", attrs: { href } }] }),
+  heading: (level, text) => ({
+    type: "heading",
+    attrs: { level },
+    content: [{ type: "text", text }],
+  }),
+  text: (t) => ({ type: "text", text: t }),
+  link: (text, href) => ({
+    type: "text",
+    text,
+    marks: [{ type: "link", attrs: { href } }],
+  }),
   bulletList: (...items) => ({ type: "bulletList", content: items }),
   orderedList: (...items) => ({ type: "orderedList", content: items }),
   listItem: (...content) => ({ type: "listItem", content }),
-  table: rows => ({ type: "table", attrs: { isNumberColumnEnabled: false, layout: "default" }, content: rows }),
+  table: (rows) => ({
+    type: "table",
+    attrs: { isNumberColumnEnabled: false, layout: "default" },
+    content: rows,
+  }),
   tableRow: (...cells) => ({ type: "tableRow", content: cells }),
   tableHeader: (...content) => ({ type: "tableHeader", attrs: {}, content }),
   tableCell: (...content) => ({ type: "tableCell", attrs: {}, content }),
@@ -351,9 +429,12 @@ function inlineMarkdownToAdf(text, linkResolver) {
   let m;
   while ((m = re.exec(text))) {
     if (m.index > lastIdx) out.push(adf.text(text.slice(lastIdx, m.index)));
-    if (m[1])      out.push({ type: "text", text: m[2], marks: [{ type: "strong" }] });
-    else if (m[3]) out.push({ type: "text", text: m[4], marks: [{ type: "code" }] });
-    else if (m[5]) out.push(adf.link(m[6], linkResolver ? linkResolver(m[7]) : m[7]));
+    if (m[1])
+      out.push({ type: "text", text: m[2], marks: [{ type: "strong" }] });
+    else if (m[3])
+      out.push({ type: "text", text: m[4], marks: [{ type: "code" }] });
+    else if (m[5])
+      out.push(adf.link(m[6], linkResolver ? linkResolver(m[7]) : m[7]));
     lastIdx = re.lastIndex;
   }
   if (lastIdx < text.length) out.push(adf.text(text.slice(lastIdx)));
@@ -363,31 +444,41 @@ function inlineMarkdownToAdf(text, linkResolver) {
 // ---------------------------------------------------------------------------
 // Table helpers for textToAdfNodes
 // ---------------------------------------------------------------------------
-const RE_MD_HEADING    = /^(#{2,6})\s+(.+)$/;
+const RE_MD_HEADING = /^(#{2,6})\s+(.+)$/;
 const RE_TABLE_ROW_START = /^\s*\|/;
-const RE_HR_LINE       = /^[-*_]{3,}\s*$/;
+const RE_HR_LINE = /^[-*_]{3,}\s*$/;
 
 function isTableSepLine(l) {
   return /^\|?[\s\-:|]+\|?$/.test(l.trim()) && /-/.test(l);
 }
 
 function tableLinesToAdf(lines, linkResolver) {
-  const dataLines = lines.filter(l => l.trim() && !isTableSepLine(l));
+  const dataLines = lines.filter((l) => l.trim() && !isTableSepLine(l));
   if (!dataLines.length) return null;
   const PH = "\x01";
-  const splitRow = line => {
+  const splitRow = (line) => {
     const masked = line.replace(/\\\|/g, PH);
     const cells = masked.split("|");
     if (cells.length && cells[0].trim() === "") cells.shift();
     if (cells.length && cells[cells.length - 1].trim() === "") cells.pop();
-    return cells.map(c => c.split(PH).join("|").trim());
+    return cells.map((c) => c.split(PH).join("|").trim());
   };
   const rows = dataLines.map(splitRow);
   const [header, ...body] = rows;
   if (!header || !header.length) return null;
   return adf.table([
-    adf.tableRow(...header.map(h => adf.tableHeader(adf.paragraph(...inlineMarkdownToAdf(h, linkResolver))))),
-    ...body.map(r => adf.tableRow(...r.map(c => adf.tableCell(adf.paragraph(...inlineMarkdownToAdf(c, linkResolver)))))),
+    adf.tableRow(
+      ...header.map((h) =>
+        adf.tableHeader(adf.paragraph(...inlineMarkdownToAdf(h, linkResolver))),
+      ),
+    ),
+    ...body.map((r) =>
+      adf.tableRow(
+        ...r.map((c) =>
+          adf.tableCell(adf.paragraph(...inlineMarkdownToAdf(c, linkResolver))),
+        ),
+      ),
+    ),
   ]);
 }
 
@@ -422,20 +513,31 @@ function textToAdfNodes(text, linkResolver) {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    if (RE_HR_LINE.test(trimmed)) {                  // horizontal rule — skip
-      flushBuf(); flushTable(); continue;
+    if (RE_HR_LINE.test(trimmed)) {
+      // horizontal rule — skip
+      flushBuf();
+      flushTable();
+      continue;
     }
     const hm = trimmed.match(RE_MD_HEADING);
-    if (hm) {                                         // ##–###### heading
-      flushBuf(); flushTable();
+    if (hm) {
+      // ##–###### heading
+      flushBuf();
+      flushTable();
       nodes.push(adf.heading(Math.min(hm[1].length, 6), hm[2]));
       continue;
     }
-    if (RE_TABLE_ROW_START.test(line)) {              // table row
-      flushBuf(); tableBuf.push(line); continue;
+    if (RE_TABLE_ROW_START.test(line)) {
+      // table row
+      flushBuf();
+      tableBuf.push(line);
+      continue;
     }
-    if (tableBuf.length) flushTable();                // non-table line ends table
-    if (trimmed === "") { flushBuf(); continue; }     // blank line = paragraph break
+    if (tableBuf.length) flushTable(); // non-table line ends table
+    if (trimmed === "") {
+      flushBuf();
+      continue;
+    } // blank line = paragraph break
     buf.push(line);
   }
 
@@ -445,20 +547,32 @@ function textToAdfNodes(text, linkResolver) {
 }
 
 function blockToAdf(block, linkResolver) {
-  const lines = block.split("\n").filter(l => l.length > 0);
+  const lines = block.split("\n").filter((l) => l.length > 0);
   if (lines.length === 0) return [];
 
-  if (lines.every(l => RE_BULLET.test(l))) {
-    return [adf.bulletList(...lines.map(l => {
-      const m = l.match(RE_BULLET);
-      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)));
-    }))];
+  if (lines.every((l) => RE_BULLET.test(l))) {
+    return [
+      adf.bulletList(
+        ...lines.map((l) => {
+          const m = l.match(RE_BULLET);
+          return adf.listItem(
+            adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)),
+          );
+        }),
+      ),
+    ];
   }
-  if (lines.every(l => RE_ORDERED.test(l))) {
-    return [adf.orderedList(...lines.map(l => {
-      const m = l.match(RE_ORDERED);
-      return adf.listItem(adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)));
-    }))];
+  if (lines.every((l) => RE_ORDERED.test(l))) {
+    return [
+      adf.orderedList(
+        ...lines.map((l) => {
+          const m = l.match(RE_ORDERED);
+          return adf.listItem(
+            adf.paragraph(...inlineMarkdownToAdf(m[1], linkResolver)),
+          );
+        }),
+      ),
+    ];
   }
 
   const inline = [];
@@ -472,16 +586,74 @@ function blockToAdf(block, linkResolver) {
 // Backward-compat name
 const textToParagraphs = textToAdfNodes;
 
+// Matches a level-2 section heading by name and captures its body.
+//
+//   (?:^|\n)     Anchor to the start of a line. Without this, `## Foo` matched as
+//                a SUBSTRING of `### Foo`, `#### Foo`, and even prose ("see ## Foo"),
+//                so a nested sub-heading could silently win over the real section.
+//   \d+[.)]      Optional numbering. `create-task`'s own template emits
+//                `## 1. Overview` … `## 11. Rollback Plan`, and lib.js requires
+//                those literal strings — so without this, every task card created
+//                the intended way extracted ZERO sections and shipped a Jira
+//                description containing no body at all.
+//   [ \t]*\n     Consume the rest of the heading LINE and nothing more. The old
+//                `\s*\n+` ate the blank line separating an empty section from the
+//                next heading, so `## Overview` immediately followed by
+//                `## Motivation` captured Motivation's heading AND body as
+//                Overview's content — mislabelling one section and dropping the
+//                other. Leading blank lines now stay inside the capture, which is
+//                harmless: callers `.trim()`.
+//
+// Deliberately NOT the `m` flag: the `$` in the lookahead must mean end-of-string.
+// With `m` it would mean end-of-line and truncate every section to its first line.
+//
+// `### Sub-headings` inside a section body are preserved — the lookahead stops at
+// `\n## ` and `\n# `, neither of which matches `\n### `.
 function sectionRe(name) {
-  return new RegExp(`## ${escapeRe(name)}\\s*\\n+([\\s\\S]*?)(?=\\n## |\\n# |$)`);
+  return new RegExp(
+    `(?:^|\\n)## (?:\\d+[.)]\\s*)?${escapeRe(name)}[ \\t]*\\n([\\s\\S]*?)(?=\\n## |\\n# |$)`,
+  );
 }
 
-function extractBodySections(body, sectionNames) {
+// Returns [{ name, content }] for each requested section found in `body`.
+//
+// `name` is always the CANONICAL requested name, never the matched text — so a
+// `## 3. Technical Background` heading yields name `Technical Background`. Callers
+// re-emit this as the Jira heading, and Jira renders sections in list order, so the
+// numbers would be redundant noise there. Keeping it canonical also means adding
+// or removing numbering in a doc does not churn `hashBody` and force a no-op PUT.
+//
+// Pass `output` to warn about sections that were requested but did not resolve.
+// Silence here is how a heading-contract mismatch went unnoticed across 28 task
+// cards: the sync succeeded, reported no problem, and published an empty body.
+// Only pass it from ONE call site per run — `buildDescriptionAdf` and `hashBody`
+// both extract from the same body, so passing it from both double-warns.
+function extractBodySections(body, sectionNames, output = null) {
   const out = [];
+  const missing = [];
   for (const head of sectionNames) {
     const m = body.match(sectionRe(head));
     if (m && m[1].trim()) out.push({ name: head, content: m[1].trim() });
+    else missing.push(head);
   }
+
+  if (output && missing.length) {
+    const warn = output.warn || ((...a) => console.warn(...a));
+    if (!out.length) {
+      // Every section missing means the document and the section list disagree
+      // about heading names — a contract mismatch, not an incomplete document.
+      warn(
+        `None of the ${sectionNames.length} expected sections were found. The Jira description will have no body.\n` +
+          `    Expected level-2 headings (numbering optional): ${sectionNames.join(", ")}\n` +
+          `    Check the document's '## ' headings match these names.`,
+      );
+    } else {
+      warn(
+        `Sections not found, omitted from the Jira description: ${missing.join(", ")}`,
+      );
+    }
+  }
+
   return out;
 }
 
@@ -489,9 +661,16 @@ function extractBodySections(body, sectionNames) {
 // Priority + labels
 // ---------------------------------------------------------------------------
 const PRIORITY_MAP = {
-  highest: "Highest", critical: "Highest", blocker: "Highest",
-  high: "High", medium: "Medium", normal: "Medium",
-  low: "Low", minor: "Low", lowest: "Lowest", trivial: "Lowest",
+  highest: "Highest",
+  critical: "Highest",
+  blocker: "Highest",
+  high: "High",
+  medium: "Medium",
+  normal: "Medium",
+  low: "Low",
+  minor: "Low",
+  lowest: "Lowest",
+  trivial: "Lowest",
 };
 
 function normalisePriority(raw, livePriorities = null, output = null) {
@@ -503,7 +682,8 @@ function normalisePriority(raw, livePriorities = null, output = null) {
   if (livePriorities) {
     if (livePriorities[lower]) return livePriorities[lower];
     const synonym = PRIORITY_MAP[lower];
-    if (synonym && livePriorities[synonym.toLowerCase()]) return livePriorities[synonym.toLowerCase()];
+    if (synonym && livePriorities[synonym.toLowerCase()])
+      return livePriorities[synonym.toLowerCase()];
   }
 
   const mapped = PRIORITY_MAP[lower];
@@ -520,18 +700,26 @@ function normalisePriority(raw, livePriorities = null, output = null) {
 function sanitiseLabels(input) {
   if (!input) return undefined;
   const arr = Array.isArray(input) ? input : String(input).split(",");
-  const cleaned = arr.map(l => String(l).trim()).filter(Boolean);
+  const cleaned = arr.map((l) => String(l).trim()).filter(Boolean);
   return cleaned.length ? cleaned : undefined;
 }
 
 // ---------------------------------------------------------------------------
 // Auth + HTTP (with retry, fetch DI)
 // ---------------------------------------------------------------------------
-function getAuth({ required = ["JIRA_URL", "JIRA_API_TOKEN", "JIRA_USER_EMAIL", "JIRA_PROJECT_KEY"], optional = ["JIRA_BOARD_ID"] } = {}) {
+function getAuth({
+  required = [
+    "JIRA_URL",
+    "JIRA_API_TOKEN",
+    "JIRA_USER_EMAIL",
+    "JIRA_PROJECT_KEY",
+  ],
+  optional = ["JIRA_BOARD_ID"],
+} = {}) {
   const env = {};
   for (const k of required) env[k] = process.env[k];
   for (const k of optional) env[k] = process.env[k];
-  const missing = required.filter(k => !env[k]);
+  const missing = required.filter((k) => !env[k]);
   return {
     ok: missing.length === 0,
     missing,
@@ -547,7 +735,13 @@ function authHeader(email, token) {
   return `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
 }
 
-function makeHttp({ fetchImpl = fetch, timeoutMs = 30000, retries = 2, retryDelayMs = 500, maxRetryAfterMs = 60000 } = {}) {
+function makeHttp({
+  fetchImpl = fetch,
+  timeoutMs = 30000,
+  retries = 2,
+  retryDelayMs = 500,
+  maxRetryAfterMs = 60000,
+} = {}) {
   return async function http(url, opts = {}) {
     let attempt = 0;
     let lastErr;
@@ -558,8 +752,13 @@ function makeHttp({ fetchImpl = fetch, timeoutMs = 30000, retries = 2, retryDela
         const resp = await fetchImpl(url, { ...opts, signal: ctrl.signal });
         clearTimeout(t);
         if (resp.status === 429 && attempt < retries) {
-          const ra = parseRetryAfter(resp.headers && resp.headers.get && resp.headers.get("retry-after"));
-          const wait = Math.min(ra != null ? ra : retryDelayMs * Math.pow(3, attempt), maxRetryAfterMs);
+          const ra = parseRetryAfter(
+            resp.headers && resp.headers.get && resp.headers.get("retry-after"),
+          );
+          const wait = Math.min(
+            ra != null ? ra : retryDelayMs * Math.pow(3, attempt),
+            maxRetryAfterMs,
+          );
           await sleep(wait);
           attempt++;
           continue;
@@ -598,7 +797,7 @@ function parseRetryAfter(value) {
 }
 
 function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 async function parseJiraError(resp) {
@@ -608,7 +807,8 @@ async function parseJiraError(resp) {
     const msgs = [];
     if (Array.isArray(json.errorMessages)) msgs.push(...json.errorMessages);
     if (json.errors && typeof json.errors === "object") {
-      for (const [field, msg] of Object.entries(json.errors)) msgs.push(`${field}: ${msg}`);
+      for (const [field, msg] of Object.entries(json.errors))
+        msgs.push(`${field}: ${msg}`);
     }
     return msgs.length ? msgs.join("; ") : text;
   } catch (_) {
@@ -617,24 +817,39 @@ async function parseJiraError(resp) {
 }
 
 function describeAuthFail(status) {
-  if (status === 401) return "401 Unauthorized — verify JIRA_USER_EMAIL and JIRA_API_TOKEN.";
-  if (status === 403) return "403 Forbidden — token lacks permission for this issue/project.";
-  if (status === 404) return "404 Not Found — issue key does not exist or you cannot view it.";
+  if (status === 401)
+    return "401 Unauthorized — verify JIRA_USER_EMAIL and JIRA_API_TOKEN.";
+  if (status === 403)
+    return "403 Forbidden — token lacks permission for this issue/project.";
+  if (status === 404)
+    return "404 Not Found — issue key does not exist or you cannot view it.";
   return null;
 }
 
 // ---------------------------------------------------------------------------
 // Diff + guard + hash
 // ---------------------------------------------------------------------------
-function diffFields({ prev, next, prevBodyHash, newBodyHash, prevMetaHash, newMetaHash, prevDescHash, newDescHash }) {
+function diffFields({
+  prev,
+  next,
+  prevBodyHash,
+  newBodyHash,
+  prevMetaHash,
+  newMetaHash,
+  prevDescHash,
+  newDescHash,
+}) {
   // Back-compat: prevDescHash/newDescHash collapse into body hash.
   const pBody = prevBodyHash !== undefined ? prevBodyHash : prevDescHash;
-  const nBody = newBodyHash  !== undefined ? newBodyHash  : newDescHash;
+  const nBody = newBodyHash !== undefined ? newBodyHash : newDescHash;
   const changed = [];
   if (prev.summary !== next.summary) changed.push("summary");
   if ((pBody || "") !== (nBody || "")) changed.push("description");
   if (prevMetaHash !== undefined || newMetaHash !== undefined) {
-    if ((prevMetaHash || "") !== (newMetaHash || "") && !changed.includes("description")) {
+    if (
+      (prevMetaHash || "") !== (newMetaHash || "") &&
+      !changed.includes("description")
+    ) {
       changed.push("metadata");
     }
   }
@@ -651,19 +866,26 @@ function guardConcurrentEdit({ jiraUpdated, lastSyncedAt, force, output }) {
   if (!lastSyncedAt || !jiraUpdated) return;
   if (new Date(jiraUpdated) <= new Date(lastSyncedAt)) return;
   if (force) {
-    if (output) output.warn(`⚠️  Jira issue updated since last sync (Jira: ${jiraUpdated}, local: ${lastSyncedAt}). --force in effect; overwriting.`);
+    if (output)
+      output.warn(
+        `⚠️  Jira issue updated since last sync (Jira: ${jiraUpdated}, local: ${lastSyncedAt}). --force in effect; overwriting.`,
+      );
     return;
   }
   throw new Error(
     `Jira issue updated since last local sync.\n` +
-    `  Local last sync: ${lastSyncedAt}\n` +
-    `  Jira updated:    ${jiraUpdated}\n` +
-    `Pull manual edits into the markdown first, or pass --force to overwrite.`
+      `  Local last sync: ${lastSyncedAt}\n` +
+      `  Jira updated:    ${jiraUpdated}\n` +
+      `Pull manual edits into the markdown first, or pass --force to overwrite.`,
   );
 }
 
 function hashStable(value) {
-  return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 // ---------------------------------------------------------------------------
@@ -682,7 +904,9 @@ function readIssueTypeCache(repoRoot, projectKey) {
     const data = JSON.parse(fs.readFileSync(p, "utf-8"));
     if (!data.ts || Date.now() - data.ts > ISSUE_TYPE_TTL_MS) return null;
     return data.types || null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 function writeIssueTypeCache(repoRoot, projectKey, types) {
@@ -691,7 +915,15 @@ function writeIssueTypeCache(repoRoot, projectKey, types) {
   fs.writeFileSync(p, JSON.stringify({ ts: Date.now(), types }, null, 2));
 }
 
-async function getIssueTypeId({ http, baseUrl, email, token, projectKey, typeName, repoRoot }) {
+async function getIssueTypeId({
+  http,
+  baseUrl,
+  email,
+  token,
+  projectKey,
+  typeName,
+  repoRoot,
+}) {
   const cache = repoRoot ? readIssueTypeCache(repoRoot, projectKey) : null;
   const wanted = typeName.toLowerCase();
   if (cache && cache[wanted]) return cache[wanted];
@@ -704,10 +936,15 @@ async function getIssueTypeId({ http, baseUrl, email, token, projectKey, typeNam
   let collected = {};
   for (const url of tries) {
     try {
-      const resp = await http(url, { headers: { Authorization: authHeader(email, token), Accept: "application/json" } });
+      const resp = await http(url, {
+        headers: {
+          Authorization: authHeader(email, token),
+          Accept: "application/json",
+        },
+      });
       if (!resp.ok) continue;
       const data = await resp.json();
-      const toArr = v => (Array.isArray(v) ? v : null);
+      const toArr = (v) => (Array.isArray(v) ? v : null);
       const types =
         toArr(data.issueTypes) ||
         toArr(data.values) ||
@@ -724,7 +961,9 @@ async function getIssueTypeId({ http, baseUrl, email, token, projectKey, typeNam
     if (repoRoot) writeIssueTypeCache(repoRoot, projectKey, collected);
     return collected[wanted];
   }
-  throw new Error(`Could not resolve Jira '${typeName}' issue type ID. Verify it is enabled for project ${projectKey}.`);
+  throw new Error(
+    `Could not resolve Jira '${typeName}' issue type ID. Verify it is enabled for project ${projectKey}.`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -733,7 +972,10 @@ async function getIssueTypeId({ http, baseUrl, email, token, projectKey, typeNam
 async function resolveLivePriorities({ http, baseUrl, email, token }) {
   try {
     const resp = await http(`${baseUrl}/rest/api/3/priority`, {
-      headers: { Authorization: authHeader(email, token), Accept: "application/json" },
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
     });
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -743,7 +985,9 @@ async function resolveLivePriorities({ http, baseUrl, email, token }) {
       if (p.name) map[p.name.toLowerCase()] = p.name;
     }
     return Object.keys(map).length ? map : null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -752,29 +996,53 @@ async function resolveLivePriorities({ http, baseUrl, email, token }) {
 async function getBoardType({ http, baseUrl, email, token, boardId }) {
   if (!boardId) return null;
   try {
-    const resp = await http(`${baseUrl}/rest/agile/1.0/board/${boardId}/configuration`, {
-      headers: { Authorization: authHeader(email, token), Accept: "application/json" },
-    });
+    const resp = await http(
+      `${baseUrl}/rest/agile/1.0/board/${boardId}/configuration`,
+      {
+        headers: {
+          Authorization: authHeader(email, token),
+          Accept: "application/json",
+        },
+      },
+    );
     if (!resp.ok) return null;
     const data = await resp.json();
     return (data.type || "").toLowerCase() || null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
-async function moveToBacklog({ http, baseUrl, email, token, boardId, issueKey, output }) {
+async function moveToBacklog({
+  http,
+  baseUrl,
+  email,
+  token,
+  boardId,
+  issueKey,
+  output,
+}) {
   if (!boardId) {
-    if (output) output.warn("⚠️  Skipping backlog placement — JIRA_BOARD_ID not set.");
+    if (output)
+      output.warn("⚠️  Skipping backlog placement — JIRA_BOARD_ID not set.");
     return { moved: false, reason: "no-board-id" };
   }
   const type = await getBoardType({ http, baseUrl, email, token, boardId });
   if (type && type !== "scrum") {
-    if (output) output.warn(`⚠️  Board ${boardId} is type "${type}" — backlog endpoint only applies to Scrum boards. Skipping.`);
+    if (output)
+      output.warn(
+        `⚠️  Board ${boardId} is type "${type}" — backlog endpoint only applies to Scrum boards. Skipping.`,
+      );
     return { moved: false, reason: `board-type-${type}` };
   }
   try {
     const resp = await http(`${baseUrl}/rest/agile/1.0/backlog/issue`, {
       method: "POST",
-      headers: { Authorization: authHeader(email, token), "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
       body: JSON.stringify({ issues: [issueKey] }),
     });
     if (resp.ok || resp.status === 204) {
@@ -782,10 +1050,14 @@ async function moveToBacklog({ http, baseUrl, email, token, boardId, issueKey, o
       return { moved: true };
     }
     const msg = await parseJiraError(resp);
-    if (output) output.warn(`⚠️  Backlog move failed (non-fatal): HTTP ${resp.status}: ${msg}`);
+    if (output)
+      output.warn(
+        `⚠️  Backlog move failed (non-fatal): HTTP ${resp.status}: ${msg}`,
+      );
     return { moved: false, reason: `http-${resp.status}` };
   } catch (e) {
-    if (output) output.warn(`⚠️  Backlog move failed (non-fatal): ${e.message}`);
+    if (output)
+      output.warn(`⚠️  Backlog move failed (non-fatal): ${e.message}`);
     return { moved: false, reason: e.message };
   }
 }
@@ -800,34 +1072,34 @@ async function moveToBacklog({ http, baseUrl, email, token, boardId, issueKey, o
 // override via skills-config.yaml `jira.statusMap` (see loadStatusMap).
 const DEFAULT_STATUS_MAP = {
   // canonical lifecycle
-  "draft": "To Do",
-  "planned": "To Do",
+  draft: "To Do",
+  planned: "To Do",
   "ready-for-development": "To Do",
   "in-progress": "In Progress",
   "ready-for-review": "In Review",
-  "accepted": "Done",
-  "cancelled": "Cancelled",
+  accepted: "Done",
+  cancelled: "Cancelled",
   // aliases
   "ready for development": "To Do",
-  "todo": "To Do",
+  todo: "To Do",
   "to do": "To Do",
-  "open": "To Do",
-  "backlog": "To Do",
+  open: "To Do",
+  backlog: "To Do",
   "in progress": "In Progress",
-  "doing": "In Progress",
+  doing: "In Progress",
   "ready for review": "In Review",
   "in review": "In Review",
-  "review": "In Review",
-  "ready": "Ready",
-  "done": "Done",
-  "completed": "Done",
-  "complete": "Done",
-  "blocked": "Blocked",
-  "canceled": "Cancelled",
+  review: "In Review",
+  ready: "Ready",
+  done: "Done",
+  completed: "Done",
+  complete: "Done",
+  blocked: "Blocked",
+  canceled: "Cancelled",
   "won't do": "Won't Do",
   "wont do": "Won't Do",
   "won't fix": "Won't Do",
-  "wontfix": "Won't Do",
+  wontfix: "Won't Do",
 };
 
 // Strip a YAML-style inline trailing comment from a scalar value. A `#` starts
@@ -862,11 +1134,14 @@ function stripInlineComment(s) {
 function parseStatusMapBlock(text) {
   const out = {};
   const lines = String(text || "").split("\n");
-  const indentOf = l => l.length - l.replace(/^\s+/, "").length;
+  const indentOf = (l) => l.length - l.replace(/^\s+/, "").length;
   let i = 0;
   // find top-level `jira:`
   for (; i < lines.length; i++) {
-    if (/^jira:\s*(#.*)?$/.test(lines[i])) { i++; break; }
+    if (/^jira:\s*(#.*)?$/.test(lines[i])) {
+      i++;
+      break;
+    }
   }
   if (i >= lines.length) return out;
   const jiraIndent = 0;
@@ -876,7 +1151,11 @@ function parseStatusMapBlock(text) {
     const raw = lines[i];
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
     if (indentOf(raw) <= jiraIndent) return out; // left the jira block
-    if (/^\s+statusMap:\s*(#.*)?$/.test(raw)) { smIndent = indentOf(raw); i++; break; }
+    if (/^\s+statusMap:\s*(#.*)?$/.test(raw)) {
+      smIndent = indentOf(raw);
+      i++;
+      break;
+    }
   }
   if (smIndent < 0) return out;
   // collect `key: value` entries indented deeper than statusMap
@@ -887,7 +1166,9 @@ function parseStatusMapBlock(text) {
     const m = raw.trim().match(/^("?[^":]+"?|'[^']+'):\s*(.+?)\s*$/);
     if (!m) continue;
     const key = m[1].replace(/^["']|["']$/g, "").trim();
-    const val = stripInlineComment(m[2]).replace(/^["']|["']$/g, "").trim();
+    const val = stripInlineComment(m[2])
+      .replace(/^["']|["']$/g, "")
+      .trim();
     if (key && val) out[key] = val;
   }
   return out;
@@ -900,7 +1181,9 @@ function parseStatusMapBlock(text) {
 function loadStatusMap(repoRoot) {
   const map = { ...DEFAULT_STATUS_MAP };
   try {
-    const root = repoRoot || execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const root =
+      repoRoot ||
+      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
     const cfgPath = path.join(root, "skills-config.yaml");
     if (!fs.existsSync(cfgPath)) return map;
     const overrides = parseStatusMapBlock(fs.readFileSync(cfgPath, "utf-8"));
@@ -933,12 +1216,15 @@ function mapStatus(raw, statusMap = DEFAULT_STATUS_MAP) {
 //     devEstimateField: customfield_10594
 function parseJiraScalar(text, key) {
   const lines = String(text || "").split("\n");
-  const indentOf = l => l.length - l.replace(/^\s+/, "").length;
+  const indentOf = (l) => l.length - l.replace(/^\s+/, "").length;
   const keyRe = new RegExp("^" + escapeRe(key) + ":\\s*(.+?)\\s*$");
   let i = 0;
   // find top-level `jira:`
   for (; i < lines.length; i++) {
-    if (/^jira:\s*(#.*)?$/.test(lines[i])) { i++; break; }
+    if (/^jira:\s*(#.*)?$/.test(lines[i])) {
+      i++;
+      break;
+    }
   }
   if (i >= lines.length) return "";
   // scan entries inside the jira block. Only consider DIRECT children (the
@@ -949,11 +1235,14 @@ function parseJiraScalar(text, key) {
     const raw = lines[i];
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
     const ind = indentOf(raw);
-    if (ind <= 0) break;                     // left the jira block
-    if (childIndent < 0) childIndent = ind;  // first child fixes the direct-child level
-    if (ind !== childIndent) continue;       // skip deeper nested entries
+    if (ind <= 0) break; // left the jira block
+    if (childIndent < 0) childIndent = ind; // first child fixes the direct-child level
+    if (ind !== childIndent) continue; // skip deeper nested entries
     const m = raw.trim().match(keyRe);
-    if (m) return stripInlineComment(m[1]).replace(/^["']|["']$/g, "").trim();
+    if (m)
+      return stripInlineComment(m[1])
+        .replace(/^["']|["']$/g, "")
+        .trim();
   }
   return "";
 }
@@ -963,10 +1252,15 @@ function parseJiraScalar(text, key) {
 // any failure (no file, unreadable, key absent) so callers skip the field.
 function loadDevEstimateField(repoRoot) {
   try {
-    const root = repoRoot || execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const root =
+      repoRoot ||
+      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
     const cfgPath = path.join(root, "skills-config.yaml");
     if (!fs.existsSync(cfgPath)) return "";
-    return parseJiraScalar(fs.readFileSync(cfgPath, "utf-8"), "devEstimateField");
+    return parseJiraScalar(
+      fs.readFileSync(cfgPath, "utf-8"),
+      "devEstimateField",
+    );
   } catch (_) {
     return "";
   }
@@ -976,47 +1270,93 @@ function loadDevEstimateField(repoRoot) {
 // Status transitions
 // ---------------------------------------------------------------------------
 function stripStatusEmoji(s) {
-  return String(s || "").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim();
+  return String(s || "")
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+    .trim();
 }
 
 async function getTransitions({ http, baseUrl, email, token, issueKey }) {
-  const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}/transitions`, {
-    headers: { Authorization: authHeader(email, token), Accept: "application/json" },
-  });
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${issueKey}/transitions`,
+    {
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
+    },
+  );
   if (!resp.ok) return [];
   const data = await resp.json();
   return data.transitions || [];
 }
 
-async function transitionToStatus({ http, baseUrl, email, token, issueKey, targetStatus, currentStatus, output }) {
+async function transitionToStatus({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  targetStatus,
+  currentStatus,
+  output,
+}) {
   const target = stripStatusEmoji(targetStatus);
   const current = stripStatusEmoji(currentStatus);
   if (!target) return { transitioned: false, reason: "no-target" };
-  if (target.toLowerCase() === current.toLowerCase()) return { transitioned: false, reason: "already" };
+  if (target.toLowerCase() === current.toLowerCase())
+    return { transitioned: false, reason: "already" };
 
-  const transitions = await getTransitions({ http, baseUrl, email, token, issueKey });
-  const match = transitions.find(t => (t.to?.name || "").toLowerCase() === target.toLowerCase()) ||
-                transitions.find(t => (t.name || "").toLowerCase() === target.toLowerCase());
+  const transitions = await getTransitions({
+    http,
+    baseUrl,
+    email,
+    token,
+    issueKey,
+  });
+  const match =
+    transitions.find(
+      (t) => (t.to?.name || "").toLowerCase() === target.toLowerCase(),
+    ) ||
+    transitions.find(
+      (t) => (t.name || "").toLowerCase() === target.toLowerCase(),
+    );
   if (!match) {
     if (output) {
-      const available = transitions.map(t => t.to?.name || t.name).filter(Boolean);
+      const available = transitions
+        .map((t) => t.to?.name || t.name)
+        .filter(Boolean);
       const avail = available.length ? available.join(", ") : "(none)";
-      output.warn(`⚠️  No Jira transition to "${target}" from "${current}". Available: ${avail}.`);
-      output.warn(`    Map your local status to a workflow name in skills-config.yaml under jira.statusMap. Skipping status change.`);
+      output.warn(
+        `⚠️  No Jira transition to "${target}" from "${current}". Available: ${avail}.`,
+      );
+      output.warn(
+        `    Map your local status to a workflow name in skills-config.yaml under jira.statusMap. Skipping status change.`,
+      );
     }
     return { transitioned: false, reason: "no-transition" };
   }
-  const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}/transitions`, {
-    method: "POST",
-    headers: { Authorization: authHeader(email, token), "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ transition: { id: match.id } }),
-  });
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${issueKey}/transitions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ transition: { id: match.id } }),
+    },
+  );
   if (!resp.ok) {
     const msg = await parseJiraError(resp);
-    if (output) output.warn(`⚠️  Status transition failed (non-fatal): HTTP ${resp.status}: ${msg}`);
+    if (output)
+      output.warn(
+        `⚠️  Status transition failed (non-fatal): HTTP ${resp.status}: ${msg}`,
+      );
     return { transitioned: false, reason: `http-${resp.status}` };
   }
-  if (output) output.info(`   🔀 Transitioned ${issueKey}: "${current}" → "${target}"`);
+  if (output)
+    output.info(`   🔀 Transitioned ${issueKey}: "${current}" → "${target}"`);
   return { transitioned: true, from: current, to: target };
 }
 
@@ -1036,7 +1376,9 @@ function readProjectStyleCache(repoRoot, projectKey) {
     const data = JSON.parse(fs.readFileSync(p, "utf-8"));
     if (!data.ts || Date.now() - data.ts > PROJECT_STYLE_TTL_MS) return null;
     return data.style || null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 function writeProjectStyleCache(repoRoot, projectKey, style) {
@@ -1045,17 +1387,31 @@ function writeProjectStyleCache(repoRoot, projectKey, style) {
   fs.writeFileSync(p, JSON.stringify({ ts: Date.now(), style }, null, 2));
 }
 
-async function detectProjectStyle({ http, baseUrl, email, token, projectKey, repoRoot, output } = {}) {
+async function detectProjectStyle({
+  http,
+  baseUrl,
+  email,
+  token,
+  projectKey,
+  repoRoot,
+  output,
+} = {}) {
   if (repoRoot) {
     const cached = readProjectStyleCache(repoRoot, projectKey);
     if (cached) return cached;
   }
   try {
     const resp = await http(`${baseUrl}/rest/api/3/project/${projectKey}`, {
-      headers: { Authorization: authHeader(email, token), Accept: "application/json" },
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
     });
     if (!resp.ok) {
-      if (output) output.warn(`⚠️  Could not detect Jira project style (HTTP ${resp.status}); will try team-managed parent first and fall back via 400-retry.`);
+      if (output)
+        output.warn(
+          `⚠️  Could not detect Jira project style (HTTP ${resp.status}); will try team-managed parent first and fall back via 400-retry.`,
+        );
       return null;
     }
     const d = await resp.json();
@@ -1063,7 +1419,10 @@ async function detectProjectStyle({ http, baseUrl, email, token, projectKey, rep
     if (style && repoRoot) writeProjectStyleCache(repoRoot, projectKey, style);
     return style;
   } catch (e) {
-    if (output) output.warn(`⚠️  Could not detect Jira project style (${e.message}); will try team-managed parent first and fall back via 400-retry.`);
+    if (output)
+      output.warn(
+        `⚠️  Could not detect Jira project style (${e.message}); will try team-managed parent first and fall back via 400-retry.`,
+      );
     return null;
   }
 }
@@ -1075,7 +1434,15 @@ async function detectProjectStyle({ http, baseUrl, email, token, projectKey, rep
 // /rest/api/3/search was deprecated by Atlassian in May 2025 and now returns
 // 410 Gone on Jira Cloud tenants that have migrated.
 // ---------------------------------------------------------------------------
-async function findExistingByLabel({ http, baseUrl, email, token, projectKey, label, output } = {}) {
+async function findExistingByLabel({
+  http,
+  baseUrl,
+  email,
+  token,
+  projectKey,
+  label,
+  output,
+} = {}) {
   const jql = `project = "${projectKey}" AND labels = "${label}"`;
   const resp = await http(`${baseUrl}/rest/api/3/search/jql`, {
     method: "POST",
@@ -1084,28 +1451,52 @@ async function findExistingByLabel({ http, baseUrl, email, token, projectKey, la
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({ jql, fields: ["summary", "updated"], maxResults: 5 }),
+    body: JSON.stringify({
+      jql,
+      fields: ["summary", "updated"],
+      maxResults: 5,
+    }),
   });
   if (!resp.ok) return null;
   const data = await resp.json();
   if (!data.issues || data.issues.length === 0) return null;
   if (data.issues.length > 1 && output) {
-    const keys = data.issues.map(i => i.key).join(", ");
-    output.warn(`⚠️  Multiple Jira issues match label "${label}": ${keys}. Adopting first (${data.issues[0].key}). The others are duplicates from prior failed runs — review and delete in Jira.`);
+    const keys = data.issues.map((i) => i.key).join(", ");
+    output.warn(
+      `⚠️  Multiple Jira issues match label "${label}": ${keys}. Adopting first (${data.issues[0].key}). The others are duplicates from prior failed runs — review and delete in Jira.`,
+    );
   }
-  return { key: data.issues[0].key, updated: data.issues[0].fields?.updated || null };
+  return {
+    key: data.issues[0].key,
+    updated: data.issues[0].fields?.updated || null,
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Atomic PUT with returnIssue
 // ---------------------------------------------------------------------------
-async function putIssueAtomic({ http, baseUrl, email, token, issueKey, fields }) {
-  const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}?returnIssue=true`, {
-    method: "PUT",
-    headers: { Authorization: authHeader(email, token), "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ fields }),
-  });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await parseJiraError(resp)}`);
+async function putIssueAtomic({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  fields,
+}) {
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${issueKey}?returnIssue=true`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ fields }),
+    },
+  );
+  if (!resp.ok)
+    throw new Error(`HTTP ${resp.status}: ${await parseJiraError(resp)}`);
   if (resp.status === 204) {
     return { updated: null };
   }
@@ -1117,10 +1508,23 @@ async function putIssueAtomic({ http, baseUrl, email, token, issueKey, fields })
   }
 }
 
-async function fetchIssue({ http, baseUrl, email, token, issueKey, fields = "summary,priority,labels,updated,status" }) {
-  const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}?fields=${fields}`, {
-    headers: { Authorization: authHeader(email, token), Accept: "application/json" },
-  });
+async function fetchIssue({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  fields = "summary,priority,labels,updated,status",
+}) {
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${issueKey}?fields=${fields}`,
+    {
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
+    },
+  );
   if (!resp.ok) {
     const auth = describeAuthFail(resp.status);
     if (auth) throw new Error(auth);
@@ -1136,23 +1540,51 @@ async function fetchIssue({ http, baseUrl, email, token, issueKey, fields = "sum
   };
 }
 
-async function fetchUpdatedTimestampStrict({ http, baseUrl, email, token, issueKey }) {
-  const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}?fields=updated`, {
-    headers: { Authorization: authHeader(email, token), Accept: "application/json" },
-  });
-  if (!resp.ok) throw new Error(`Failed to fetch updated timestamp for ${issueKey}: HTTP ${resp.status}`);
+async function fetchUpdatedTimestampStrict({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+}) {
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${issueKey}?fields=updated`,
+    {
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
+    },
+  );
+  if (!resp.ok)
+    throw new Error(
+      `Failed to fetch updated timestamp for ${issueKey}: HTTP ${resp.status}`,
+    );
   const d = await resp.json();
-  if (!d.fields?.updated) throw new Error(`Jira response missing fields.updated for ${issueKey}`);
+  if (!d.fields?.updated)
+    throw new Error(`Jira response missing fields.updated for ${issueKey}`);
   return d.fields.updated;
 }
 
 // Non-throwing variant. Returns null on failure so callers can fall back to
 // a synthetic timestamp rather than aborting after a successful create/update.
-async function fetchUpdatedTimestamp({ http, baseUrl, email, token, issueKey }) {
+async function fetchUpdatedTimestamp({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+}) {
   try {
-    const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}?fields=updated`, {
-      headers: { Authorization: authHeader(email, token), Accept: "application/json" },
-    });
+    const resp = await http(
+      `${baseUrl}/rest/api/3/issue/${issueKey}?fields=updated`,
+      {
+        headers: {
+          Authorization: authHeader(email, token),
+          Accept: "application/json",
+        },
+      },
+    );
     if (!resp.ok) return null;
     const d = await resp.json();
     return d.fields?.updated || null;
@@ -1166,32 +1598,82 @@ async function fetchUpdatedTimestamp({ http, baseUrl, email, token, issueKey }) 
 // ---------------------------------------------------------------------------
 module.exports = {
   // env / output
-  loadDotEnv, makeOutput,
+  loadDotEnv,
+  makeOutput,
   // frontmatter
-  parseFrontmatter, rewriteFrontmatter, upsertFrontmatterKeys, formatYamlScalar,
+  parseFrontmatter,
+  rewriteFrontmatter,
+  upsertFrontmatterKeys,
+  formatYamlScalar,
   // git / bb
-  getRepoRoot, getDefaultBranch, getCurrentBranchUpstream, stripRemotePrefix, getBitbucketRepoBase, buildBitbucketUrl,
-  resolveRelativeLink, makeRelativeLinkResolver,
+  getRepoRoot,
+  getDefaultBranch,
+  getCurrentBranchUpstream,
+  stripRemotePrefix,
+  getBitbucketRepoBase,
+  buildBitbucketUrl,
+  resolveRelativeLink,
+  makeRelativeLinkResolver,
   // changelog
-  CL_START, CL_END, fmtEntry, buildChangelogBlock, isEntryRow, RE_ENTRY_ROW,
-  extractEntries, findHandWrittenChangelog, upsertChangelog,
+  CL_START,
+  CL_END,
+  fmtEntry,
+  buildChangelogBlock,
+  isEntryRow,
+  RE_ENTRY_ROW,
+  extractEntries,
+  findHandWrittenChangelog,
+  upsertChangelog,
   // adf
-  adf, textToAdfNodes, textToParagraphs, blockToAdf, tableLinesToAdf, inlineMarkdownToAdf,
-  sectionRe, extractBodySections, escapeRe,
+  adf,
+  textToAdfNodes,
+  textToParagraphs,
+  blockToAdf,
+  tableLinesToAdf,
+  inlineMarkdownToAdf,
+  sectionRe,
+  extractBodySections,
+  escapeRe,
   // priority / labels
-  PRIORITY_MAP, normalisePriority, sanitiseLabels, resolveLivePriorities,
+  PRIORITY_MAP,
+  normalisePriority,
+  sanitiseLabels,
+  resolveLivePriorities,
   // auth / http
-  getAuth, authHeader, makeHttp, parseRetryAfter, sleep, parseJiraError, describeAuthFail,
+  getAuth,
+  authHeader,
+  makeHttp,
+  parseRetryAfter,
+  sleep,
+  parseJiraError,
+  describeAuthFail,
   // diff / guard / hash
-  diffFields, guardConcurrentEdit, hashStable,
+  diffFields,
+  guardConcurrentEdit,
+  hashStable,
   // jira api
-  fetchIssue, fetchUpdatedTimestampStrict, fetchUpdatedTimestamp, getIssueTypeId, getBoardType, moveToBacklog,
-  putIssueAtomic, findExistingByLabel, transitionToStatus, getTransitions, stripStatusEmoji,
+  fetchIssue,
+  fetchUpdatedTimestampStrict,
+  fetchUpdatedTimestamp,
+  getIssueTypeId,
+  getBoardType,
+  moveToBacklog,
+  putIssueAtomic,
+  findExistingByLabel,
+  transitionToStatus,
+  getTransitions,
+  stripStatusEmoji,
   detectProjectStyle,
   // status mapping
-  DEFAULT_STATUS_MAP, loadStatusMap, mapStatus,
+  DEFAULT_STATUS_MAP,
+  loadStatusMap,
+  mapStatus,
   // jira scalar config
-  parseJiraScalar, loadDevEstimateField,
+  parseJiraScalar,
+  loadDevEstimateField,
   // cache
-  readIssueTypeCache, writeIssueTypeCache, readProjectStyleCache, writeProjectStyleCache,
+  readIssueTypeCache,
+  writeIssueTypeCache,
+  readProjectStyleCache,
+  writeProjectStyleCache,
 };
