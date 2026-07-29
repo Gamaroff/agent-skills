@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.30.0] - 2026-07-29
+
 ### Added
 
 - **`jira.defaultAssignee` in `skills-config.yaml` — assign every synced card without repeating an accountId in each document.** Read by all three sync skills; a document's frontmatter `assignee` still wins. Left unset in both places the field is **omitted entirely**, so an update leaves Jira's existing assignee untouched rather than clearing it — that distinction is why the resolver returns `""` rather than `null` for "send nothing". It lives in config rather than in the template because an accountId is specific to one Jira site and one person, so hardcoding one into a shared skill would make the template wrong for every other consumer. Overridable per-run with `JIRA_DEFAULT_ASSIGNEE`. Documented in `docs/reference/configuration.md` and scaffolded (commented) by `setup-consumer.sh`.
