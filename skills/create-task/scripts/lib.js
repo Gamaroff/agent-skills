@@ -28,7 +28,8 @@ const {
 //   - lowercase kebab-case
 //   - sequential ID with no leading zeros
 // ---------------------------------------------------------------------------
-const TASK_FILENAME_RE = /^task\.(?<id>[1-9][0-9]*)\.(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+const TASK_FILENAME_RE =
+  /^task\.(?<id>[1-9][0-9]*)\.(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 function validateTaskFilename(name) {
   if (typeof name !== "string" || name.length === 0) {
@@ -36,9 +37,15 @@ function validateTaskFilename(name) {
   }
   const m = name.match(TASK_FILENAME_RE);
   if (!m) {
-    if (/_/.test(name)) return { ok: false, reason: "underscores not allowed — use dots/hyphens" };
-    if (/[A-Z]/.test(name)) return { ok: false, reason: "uppercase not allowed — use kebab-case" };
-    if (/^task\.0/.test(name)) return { ok: false, reason: "leading zero in id not allowed" };
+    if (/_/.test(name))
+      return {
+        ok: false,
+        reason: "underscores not allowed — use dots/hyphens",
+      };
+    if (/[A-Z]/.test(name))
+      return { ok: false, reason: "uppercase not allowed — use kebab-case" };
+    if (/^task\.0/.test(name))
+      return { ok: false, reason: "leading zero in id not allowed" };
     return { ok: false, reason: `does not match task.{id}.{kebab-name}.md` };
   }
   return { ok: true, id: Number(m.groups.id), name: m.groups.name };
@@ -46,9 +53,13 @@ function validateTaskFilename(name) {
 
 function validatePlanFilename(name) {
   // task.{N}.plan.{kebab-name}.md
-  const re = /^task\.(?<id>[1-9][0-9]*)\.plan\.(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+  const re =
+    /^task\.(?<id>[1-9][0-9]*)\.plan\.(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
   if (typeof name !== "string" || !re.test(name)) {
-    return { ok: false, reason: `does not match task.{id}.plan.{kebab-name}.md` };
+    return {
+      ok: false,
+      reason: `does not match task.{id}.plan.{kebab-name}.md`,
+    };
   }
   const m = name.match(re);
   return { ok: true, id: Number(m.groups.id), name: m.groups.name };
@@ -78,7 +89,9 @@ function nextTaskId(entries) {
 
 function assertUniqueTaskId(id, entries) {
   if (!Number.isInteger(id) || id < 1) {
-    throw new Error(`assertUniqueTaskId: id must be a positive integer, got ${id}`);
+    throw new Error(
+      `assertUniqueTaskId: id must be a positive integer, got ${id}`,
+    );
   }
   const ids = scanExistingTaskIds(entries);
   if (ids.has(id)) {
@@ -116,9 +129,23 @@ function countMandatorySections(markdown) {
 }
 
 function populateTaskTemplate(template, answers) {
-  if (typeof template !== "string") throw new TypeError("template must be string");
-  if (!answers || typeof answers !== "object") throw new TypeError("answers must be object");
-  const required = ["task_title", "task_id", "created", "priority", "assignee", "estimated_effort_hours"];
+  if (typeof template !== "string")
+    throw new TypeError("template must be string");
+  if (!answers || typeof answers !== "object")
+    throw new TypeError("answers must be object");
+  // `assignee` is deliberately NOT required. Jira needs an accountId, which an
+  // author rarely has to hand, and the old required-then-substitute behaviour is
+  // how `assignee: TBD` — and names like "platform-team" — reached the API and
+  // came back as a bare HTTP 400. Left blank, the template's null value makes the
+  // sync fall back to `jira.defaultAssignee` in skills-config.yaml, or leave
+  // Jira's existing assignee alone if that is unset too.
+  const required = [
+    "task_title",
+    "task_id",
+    "created",
+    "priority",
+    "estimated_effort_hours",
+  ];
   for (const k of required) {
     if (answers[k] === undefined || answers[k] === null || answers[k] === "") {
       throw new Error(`populateTaskTemplate: missing required answer "${k}"`);
@@ -134,8 +161,15 @@ function populateTaskTemplate(template, answers) {
   out = out.replace(/^updated: YYYY-MM-DD/m, `updated: ${answers.created}`);
   // priority / assignee / estimated_effort_hours are frontmatter keys (default values + trailing comments).
   out = out.replace(/^priority: [^\n]+/m, `priority: ${answers.priority}`);
-  out = out.replace(/^assignee: [^\n]+/m, `assignee: ${answers.assignee}`);
-  out = out.replace(/^estimated_effort_hours: [^\n]+/m, `estimated_effort_hours: ${answers.estimated_effort_hours}`);
+  // Only overwrite when an assignee was actually supplied — otherwise keep the
+  // template's documented, null-valued line.
+  if (answers.assignee) {
+    out = out.replace(/^assignee: [^\n]+/m, `assignee: ${answers.assignee}`);
+  }
+  out = out.replace(
+    /^estimated_effort_hours: [^\n]+/m,
+    `estimated_effort_hours: ${answers.estimated_effort_hours}`,
+  );
   return out;
 }
 

@@ -38,6 +38,7 @@ architecture:
 
 jira:
   devEstimateField: customfield_10594  # optional — Jira custom field id for estimated dev hours
+  defaultAssignee: 712020:00000000-0000-0000-0000-000000000000  # optional — accountId every card is assigned to
   statusMap:                          # optional — local status → Jira workflow status name
     ready-for-development: Selected for Development
     ready-for-review: In Review
@@ -88,6 +89,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
 | `jira.statusMap` | map[string→string] | (built-in defaults) | Maps local document status → the literal Jira workflow status name to transition to. See [Jira status mapping](#jira-status-mapping). |
 | `jira.devEstimateField` | string (custom field id) | (unset → skipped) | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field). |
+| `jira.defaultAssignee` | string (Jira accountId) | (unset → field not sent) | accountId applied on story/task/epic sync when the document's frontmatter has no `assignee`. Frontmatter wins. An **accountId**, never a name or team — Jira rejects anything else with a bare `HTTP 400`. Placeholders (`TBD`, `unassigned`, `none`, `n/a`, …) are refused with a warning in either position rather than sent. Unset in both places means the field is omitted entirely, so an update leaves Jira's existing assignee untouched. Find yours at `GET /rest/api/3/myself`. |
 | `github.projectEstimateField` | string (project field name) | `Estimate` | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field). |
 | `developNext.roadmapPath` | path | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`). |
 | `developNext.baseBranch` | branch name | `develop` | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to. |

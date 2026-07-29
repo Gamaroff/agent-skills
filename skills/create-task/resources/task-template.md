@@ -9,7 +9,7 @@ status: planned
 priority: Medium # Critical | High | Medium | Low
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-assignee: TBD
+assignee: # optional — a Jira accountId, never a name or team. Blank = use jira.defaultAssignee from skills-config.yaml; blank + unset = leave Jira's assignee untouched. Never a placeholder like TBD: Jira rejects it with HTTP 400.
 estimated_effort_hours: 0
 ---
 

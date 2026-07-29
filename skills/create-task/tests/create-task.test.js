@@ -153,7 +153,7 @@ test("populateTaskTemplate — fills title, id, date, metadata", () => {
     task_id: 42,
     created: "2026-05-10",
     priority: "High",
-    assignee: "platform-team",
+    assignee: "712020:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     estimated_effort_hours: 24,
   });
   assert.match(out, /# Technical Task Template: Cache-lib Simplification/);
@@ -164,7 +164,7 @@ test("populateTaskTemplate — fills title, id, date, metadata", () => {
   assert.match(out, /^created: 2026-05-10$/m);
   assert.match(out, /^updated: 2026-05-10$/m);
   assert.match(out, /^priority: High$/m);
-  assert.match(out, /^assignee: platform-team$/m);
+  assert.match(out, /^assignee: 712020:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee$/m);
   assert.match(out, /^estimated_effort_hours: 24$/m);
   // Untouched body placeholders remain so caller knows what's still missing.
   assert.match(out, /\[2-3 sentence description/);
@@ -247,4 +247,32 @@ priority: high
   assert.equal(frontmatter.title, "Cache-lib Simplification");
   assert.equal(frontmatter.status, "planned");
   assert.match(body, /^# Body/);
+});
+
+test("populateTaskTemplate — assignee is optional and defaults to the template's null value", () => {
+  // Jira needs an accountId, which an author rarely has to hand. Requiring an
+  // answer here is how `assignee: TBD` — and names like "platform-team" —
+  // reached the API and came back as a bare HTTP 400 with nothing naming the
+  // cause. Omitting it must leave the frontmatter key present but empty, so the
+  // sync falls back to `jira.defaultAssignee` or leaves Jira's assignee alone.
+  const template = fs.readFileSync(TEMPLATE_PATH, "utf-8");
+  const out = lib.populateTaskTemplate(template, {
+    task_title: "No Assignee",
+    task_id: 43,
+    created: "2026-05-10",
+    priority: "Low",
+    estimated_effort_hours: 1,
+  });
+
+  assert.match(out, /^assignee:(?: |$)/m, "the key must survive so it is discoverable");
+  assert.doesNotMatch(out, /^assignee: TBD$/m, "the placeholder that caused the 400 must not return");
+});
+
+test("task template ships no placeholder assignee", () => {
+  // Guards the template itself, not the renderer. `assignee: TBD` shipped here
+  // for a long time and every card created the intended way then failed to sync.
+  const template = fs.readFileSync(TEMPLATE_PATH, "utf-8");
+  const m = template.match(/^assignee:[ \t]*([^\n#]*)/m);
+  assert.ok(m, "the template must still declare an assignee key");
+  assert.equal(m[1].trim(), "", "the shipped value must be blank, never a placeholder");
 });

@@ -245,3 +245,62 @@ test("a fully matched body warns about nothing", () => {
   );
   assert.deepEqual(warnings, []);
 });
+
+// ---------------------------------------------------------------------------
+// Assignee resolution — a placeholder must never reach the Jira API
+// ---------------------------------------------------------------------------
+
+const { resolveAssignee, isAssigneePlaceholder } = require(
+  join(__dirname, "..", "jira-sync.js"),
+);
+
+const ACCOUNT = "712020:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+test("frontmatter assignee wins over the configured default", () => {
+  assert.equal(resolveAssignee(ACCOUNT, "712020:other"), ACCOUNT);
+});
+
+test("the configured default is used when frontmatter has none", () => {
+  assert.equal(resolveAssignee(undefined, ACCOUNT), ACCOUNT);
+  assert.equal(resolveAssignee("", ACCOUNT), ACCOUNT);
+  assert.equal(resolveAssignee(null, ACCOUNT), ACCOUNT);
+});
+
+test("with neither set, nothing is sent", () => {
+  // "" means omit the field entirely — on an update that leaves Jira's existing
+  // assignee alone, rather than clearing it.
+  assert.equal(resolveAssignee(undefined, ""), "");
+});
+
+test("`assignee: TBD` is dropped and warned about, not sent", () => {
+  // This exact value shipped in the task template. Passed through as an
+  // accountId it returns a bare HTTP 400 with nothing naming the cause.
+  const warnings = [];
+  const got = resolveAssignee("TBD", "", { warn: m => warnings.push(String(m)) });
+
+  assert.equal(got, "", "a placeholder must never be sent");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /TBD/);
+  assert.match(warnings[0], /accountId/);
+});
+
+test("a placeholder in frontmatter falls through to the configured default", () => {
+  assert.equal(resolveAssignee("TBD", ACCOUNT), ACCOUNT);
+});
+
+test("a placeholder configured as the default is also refused", () => {
+  assert.equal(resolveAssignee(undefined, "unassigned"), "");
+});
+
+test("placeholders are matched case- and whitespace-insensitively", () => {
+  for (const v of ["TBD", "tbd", "  Tbd  ", "N/A", "none", "unassigned", "-", "?"]) {
+    assert.equal(isAssigneePlaceholder(v), true, `${JSON.stringify(v)} should be a placeholder`);
+  }
+  for (const v of [ACCOUNT, "5b10a2844c20165700ede21g", "alice"]) {
+    assert.equal(isAssigneePlaceholder(v), false, `${JSON.stringify(v)} should not be`);
+  }
+});
+
+test("no warning is emitted without an output handle", () => {
+  assert.doesNotThrow(() => resolveAssignee("TBD", ""));
+});
