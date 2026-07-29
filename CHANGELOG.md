@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`jira.defaultAssignee` in `skills-config.yaml` — assign every synced card without repeating an accountId in each document.** Read by all three sync skills; a document's frontmatter `assignee` still wins. Left unset in both places the field is **omitted entirely**, so an update leaves Jira's existing assignee untouched rather than clearing it — that distinction is why the resolver returns `""` rather than `null` for "send nothing". It lives in config rather than in the template because an accountId is specific to one Jira site and one person, so hardcoding one into a shared skill would make the template wrong for every other consumer. Overridable per-run with `JIRA_DEFAULT_ASSIGNEE`. Documented in `docs/reference/configuration.md` and scaffolded (commented) by `setup-consumer.sh`.
+
+### Fixed
+
+- **`assignee: TBD` shipped in the task template, and the sync passed it to Jira verbatim as an accountId.** Every task card created the intended way and then synced came back `HTTP 400` with nothing in the message naming the cause — the template and the tool disagreed, again, and the failure pointed nowhere. `create-task/scripts/lib.js` made it worse by listing `assignee` as a **required** answer and substituting it unvalidated; its own test asserted `assignee: platform-team`, a team name, which would have failed identically. Now: the template ships the key with a **blank** value and a comment stating it must be an accountId; `populateTaskTemplate` no longer requires it and only substitutes when one is supplied; and `resolveAssignee` refuses a placebo list (`TBD`, `TBA`, `none`, `unassigned`, `unset`, `todo`, `n/a`, `na`, `-`, `?`, case- and whitespace-insensitive) in **either** frontmatter or config, warning with the reason and the three ways to fix it instead of letting Jira reject it. A frontmatter placeholder falls through to the configured default rather than aborting. Two guard tests added: one asserts the shipped template value is blank, one asserts omitting the answer leaves the key present and empty.
+
 ## [v0.29.5] - 2026-07-29
 
 ### Fixed

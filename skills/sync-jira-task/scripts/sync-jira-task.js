@@ -49,6 +49,11 @@ const SYNC_LABEL_PREFIX = "synced-from-";
 // `jira.devEstimateField` in skills-config.yaml. Empty → the field is skipped.
 const DEV_ESTIMATE_FIELD = process.env.JIRA_DEV_ESTIMATE_FIELD || lib.loadDevEstimateField();
 
+// Default Jira assignee accountId, from `jira.defaultAssignee` in skills-config.yaml.
+// Frontmatter `assignee` overrides it. Empty -> the field is never sent, which leaves
+// any existing Jira assignee alone rather than clearing it.
+const DEFAULT_ASSIGNEE = process.env.JIRA_DEFAULT_ASSIGNEE || lib.loadDefaultAssignee();
+
 const TIMETRACKING_ERROR_RE = /timetracking|time tracking|original.?estimate/i;
 
 // Format an estimate value for Jira timetracking. Numeric input → "Nh".
@@ -191,7 +196,8 @@ function collectIssueFields({ summary, args, frontmatter, descAdf, taskTypeId, p
   if (projectKey) fields.project = { key: projectKey };
   if (priority) fields.priority = { name: priority };
 
-  if (frontmatter.assignee)    fields.assignee = { accountId: String(frontmatter.assignee) };
+  const assigneeId = lib.resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE, output);
+  if (assigneeId) fields.assignee = { accountId: assigneeId };
   if (frontmatter.due_date)    fields.duedate = String(frontmatter.due_date);
   if (frontmatter.components) {
     const comps = Array.isArray(frontmatter.components) ? frontmatter.components : [frontmatter.components];

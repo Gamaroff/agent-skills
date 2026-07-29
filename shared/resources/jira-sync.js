@@ -1265,6 +1265,78 @@ function loadDevEstimateField(repoRoot) {
   }
 }
 
+// Frontmatter placeholders that must never reach the Jira API. `assignee: TBD`
+// shipped in the task template for a long time, and the sync passed it through
+// as an accountId — so every card created the intended way and then synced got
+// a bare `HTTP 400` with nothing naming the cause.
+const ASSIGNEE_PLACEHOLDERS = new Set([
+  "tbd",
+  "tba",
+  "none",
+  "unassigned",
+  "unset",
+  "todo",
+  "n/a",
+  "na",
+  "-",
+  "?",
+]);
+
+function isAssigneePlaceholder(value) {
+  return ASSIGNEE_PLACEHOLDERS.has(
+    String(value || "")
+      .trim()
+      .toLowerCase(),
+  );
+}
+
+// Resolve the default Jira assignee accountId from `jira.defaultAssignee` in
+// skills-config.yaml at the repo root. Returns "" on any failure (no file,
+// unreadable, key absent) so callers leave the assignee untouched.
+//
+// Kept in config rather than in the template because an accountId is specific
+// to one Jira site and one person — hardcoding one into a shared skill would
+// make the template wrong for every other consumer.
+function loadDefaultAssignee(repoRoot) {
+  try {
+    const root =
+      repoRoot ||
+      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const cfgPath = path.join(root, "skills-config.yaml");
+    if (!fs.existsSync(cfgPath)) return "";
+    return parseJiraScalar(
+      fs.readFileSync(cfgPath, "utf-8"),
+      "defaultAssignee",
+    );
+  } catch (_) {
+    return "";
+  }
+}
+
+// Decide the accountId to send, if any. Frontmatter wins over the configured
+// default; a placeholder in either is dropped with a warning rather than sent.
+//
+// Returns "" to mean "send nothing" — which leaves any existing Jira assignee
+// alone on an update, rather than clearing it.
+function resolveAssignee(frontmatterValue, defaultAssignee, output = null) {
+  const warn = (output && output.warn) || (() => {});
+
+  if (frontmatterValue) {
+    if (!isAssigneePlaceholder(frontmatterValue))
+      return String(frontmatterValue);
+    warn(
+      `Ignoring placeholder assignee "${frontmatterValue}" — Jira needs an accountId, ` +
+        `and sending this verbatim returns HTTP 400.\n` +
+        `    Replace it with an accountId, delete the line, or set jira.defaultAssignee in skills-config.yaml.`,
+    );
+  }
+
+  if (defaultAssignee && !isAssigneePlaceholder(defaultAssignee)) {
+    return String(defaultAssignee);
+  }
+  return "";
+}
+
 // ---------------------------------------------------------------------------
 // Status transitions
 // ---------------------------------------------------------------------------
@@ -1670,6 +1742,9 @@ module.exports = {
   // jira scalar config
   parseJiraScalar,
   loadDevEstimateField,
+  loadDefaultAssignee,
+  resolveAssignee,
+  isAssigneePlaceholder,
   // cache
   readIssueTypeCache,
   writeIssueTypeCache,
