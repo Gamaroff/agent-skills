@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.29.5] - 2026-07-29
+
 ### Fixed
 
 - **Every task card created the intended way published a Jira description with no body, and nothing reported a problem.** `create-task`'s own template emits `## 1. Overview` … `## 11. Rollback Plan`, and `create-task/scripts/lib.js` requires those literal numbered strings (`countMandatorySections`, pinned by `tests/skill-protocol.test.js`). But `sectionRe` in `shared/resources/jira-sync.js` matched `## ${name}` only — no numbering — so `extractBodySections(task-template.md, TASK_SECTIONS)` returned **0 of 11**. Two subsystems in this repo disagreed about the heading contract, and the sync silently omitted every section it could not match: no warning, no non-zero exit, a `✅ Task updated` and a Jira issue containing Change Log, Source Documents and Metadata and nothing else. Found in a consumer repo where four consecutive cards had been synced that way; the two cards there that _did_ render were hand-deviations from the template, not the conforming ones. `sectionRe` now tolerates an optional `1.` / `1)` prefix and returns the **canonical** unnumbered name, so `hashBody` does not churn and no description is rewritten merely because a doc gained or lost numbering.
