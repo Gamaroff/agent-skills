@@ -44,7 +44,7 @@ function formatJiraTimeEstimate(value) {
 // ---------------------------------------------------------------------------
 // Description builder (story-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries, linkResolver }) {
+function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries, linkResolver, output = null }) {
   const content = [];
 
   if (changelogEntries && changelogEntries.length) {
@@ -74,7 +74,7 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, related
       lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
   }
 
-  for (const sec of lib.extractBodySections(body, STORY_SECTIONS)) {
+  for (const sec of lib.extractBodySections(body, STORY_SECTIONS, output)) {
     content.push(lib.adf.heading(3, sec.name));
     content.push(...lib.textToAdfNodes(sec.content, linkResolver));
   }
@@ -528,7 +528,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       changeEntry = lib.fmtEntry(changeSummary);
 
       const allEntries = [...lib.extractEntries(content), changeEntry];
-      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver });
+      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver, output });
       // Send `description` only when body or metadata actually changed, to avoid
       // pointless edits in Jira's history.
       const includeDescription = changedFields.includes("description") || changedFields.includes("metadata");
@@ -589,7 +589,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira story created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver, output });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira story ===`);

@@ -49,7 +49,10 @@ End.
   assert.equal(frontmatter.title, "X");
   assert.ok(body.includes("Section A"));
   assert.ok(body.includes("Section B with second hr"));
-  assert.ok(body.match(/---/g).length >= 2, "expected 2+ horizontal rules in body");
+  assert.ok(
+    body.match(/---/g).length >= 2,
+    "expected 2+ horizontal rules in body",
+  );
   assert.ok(body.includes("End."));
 });
 
@@ -93,19 +96,28 @@ test("parseFrontmatter — missing close tag returns full content as body", () =
 // ---------------------------------------------------------------------------
 test("upsertChangelog — inserts when no changelog exists, before first ## section", () => {
   const src = `# Title\n\nIntro.\n\n## Section\n\nbody\n`;
-  const out = lib.upsertChangelog(src, lib.fmtEntry("Initial Jira task created"));
+  const out = lib.upsertChangelog(
+    src,
+    lib.fmtEntry("Initial Jira task created"),
+  );
   assert.ok(out.includes(lib.CL_START));
   assert.ok(out.includes(lib.CL_END));
-  assert.ok(out.indexOf(lib.CL_START) < out.indexOf("## Section"), "changelog must precede ## Section");
+  assert.ok(
+    out.indexOf(lib.CL_START) < out.indexOf("## Section"),
+    "changelog must precede ## Section",
+  );
 });
 
 test("upsertChangelog — appends entry within existing markers", () => {
-  const initial = lib.upsertChangelog(`# T\n\n## S\n\nbody\n`, lib.fmtEntry("Entry one"));
+  const initial = lib.upsertChangelog(
+    `# T\n\n## S\n\nbody\n`,
+    lib.fmtEntry("Entry one"),
+  );
   const out = lib.upsertChangelog(initial, lib.fmtEntry("Entry two"));
   assert.match(out, /Entry one/);
   assert.match(out, /Entry two/);
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
-  assert.equal(out.match(new RegExp(lib.CL_END,   "g")).length, 1);
+  assert.equal(out.match(new RegExp(lib.CL_END, "g")).length, 1);
 });
 
 test("upsertChangelog — preserves entries from hand-written `## Change Log` heading without markers", () => {
@@ -122,7 +134,11 @@ test("upsertChangelog — preserves entries from hand-written `## Change Log` he
 stuff
 `;
   const out = lib.upsertChangelog(src, lib.fmtEntry("New auto entry"));
-  assert.equal(out.match(/## Change Log/g).length, 1, "only one Change Log heading allowed");
+  assert.equal(
+    out.match(/## Change Log/g).length,
+    1,
+    "only one Change Log heading allowed",
+  );
   assert.match(out, /Manually written entry/);
   assert.match(out, /New auto entry/);
   assert.ok(out.includes(lib.CL_START));
@@ -136,7 +152,7 @@ test("upsertChangelog — idempotent format on repeated wrapping", () => {
   out = lib.upsertChangelog(out, lib.fmtEntry("b"));
   out = lib.upsertChangelog(out, lib.fmtEntry("c"));
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
-  assert.equal(out.match(new RegExp(lib.CL_END,   "g")).length, 1);
+  assert.equal(out.match(new RegExp(lib.CL_END, "g")).length, 1);
 });
 
 // ---------------------------------------------------------------------------
@@ -145,42 +161,77 @@ test("upsertChangelog — idempotent format on repeated wrapping", () => {
 test("diffFields — identical inputs produce no changes", () => {
   const prev = { summary: "S", priority: "High", labels: ["a", "b"] };
   const next = { summary: "S", priority: "High", labels: ["a", "b"] };
-  const changed = lib.diffFields({ prev, next, prevDescHash: "abc", newDescHash: "abc" });
+  const changed = lib.diffFields({
+    prev,
+    next,
+    prevDescHash: "abc",
+    newDescHash: "abc",
+  });
   assert.deepEqual(changed, []);
 });
 
 test("diffFields — detects each field independently", () => {
   const prev = { summary: "S", priority: "High", labels: ["a"] };
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "T", priority: "High", labels: ["a"] }, prevDescHash: "x", newDescHash: "x" }),
-    ["summary"]
+    lib.diffFields({
+      prev,
+      next: { summary: "T", priority: "High", labels: ["a"] },
+      prevDescHash: "x",
+      newDescHash: "x",
+    }),
+    ["summary"],
   );
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "S", priority: "Low", labels: ["a"] }, prevDescHash: "x", newDescHash: "x" }),
-    ["priority"]
+    lib.diffFields({
+      prev,
+      next: { summary: "S", priority: "Low", labels: ["a"] },
+      prevDescHash: "x",
+      newDescHash: "x",
+    }),
+    ["priority"],
   );
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "S", priority: "High", labels: ["b"] }, prevDescHash: "x", newDescHash: "x" }),
-    ["labels"]
+    lib.diffFields({
+      prev,
+      next: { summary: "S", priority: "High", labels: ["b"] },
+      prevDescHash: "x",
+      newDescHash: "x",
+    }),
+    ["labels"],
   );
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "S", priority: "High", labels: ["a"] }, prevDescHash: "x", newDescHash: "y" }),
-    ["description"]
+    lib.diffFields({
+      prev,
+      next: { summary: "S", priority: "High", labels: ["a"] },
+      prevDescHash: "x",
+      newDescHash: "y",
+    }),
+    ["description"],
   );
 });
 
 test("diffFields — label order does not matter", () => {
   const prev = { summary: "S", priority: "", labels: ["b", "a"] };
   const next = { summary: "S", priority: "", labels: ["a", "b"] };
-  assert.deepEqual(lib.diffFields({ prev, next, prevDescHash: "h", newDescHash: "h" }), []);
+  assert.deepEqual(
+    lib.diffFields({ prev, next, prevDescHash: "h", newDescHash: "h" }),
+    [],
+  );
 });
 
 test("hashDescriptionInput — stable for identical input, differs on body change", () => {
-  const args = { body: "## Overview\n\nDo a thing.\n", frontmatter: {}, taskBbUrl: null };
+  const args = {
+    body: "## Overview\n\nDo a thing.\n",
+    frontmatter: {},
+    taskBbUrl: null,
+  };
   const h1 = lib.hashDescriptionInput(args);
   const h2 = lib.hashDescriptionInput(args);
   assert.equal(h1, h2);
-  const h3 = lib.hashDescriptionInput({ ...args, body: "## Overview\n\nDo a different thing.\n" });
+  const h3 = lib.hashDescriptionInput({
+    ...args,
+    body: "## Overview\n\nDo a different thing.\n",
+  });
   assert.notEqual(h1, h3);
 });
 
@@ -197,7 +248,9 @@ test("normalisePriority — known synonyms map to canonical names", () => {
 test("normalisePriority — unknown returns undefined and warns", () => {
   const origWarn = console.warn;
   let warned = false;
-  console.warn = () => { warned = true; };
+  console.warn = () => {
+    warned = true;
+  };
   try {
     assert.equal(lib.normalisePriority("urgent-asap"), undefined);
     assert.ok(warned, "warning should have been emitted");
@@ -224,21 +277,24 @@ test("sanitiseLabels — filters empty / whitespace entries", () => {
 // guardConcurrentEdit
 // ---------------------------------------------------------------------------
 test("guardConcurrentEdit — passes when Jira not advanced past last sync", () => {
-  assert.doesNotThrow(() => lib.guardConcurrentEdit({
-    jiraUpdated:  "2026-04-28T10:00:00.000Z",
-    lastSyncedAt: "2026-04-28T10:00:00.000Z",
-    force: false,
-  }));
+  assert.doesNotThrow(() =>
+    lib.guardConcurrentEdit({
+      jiraUpdated: "2026-04-28T10:00:00.000Z",
+      lastSyncedAt: "2026-04-28T10:00:00.000Z",
+      force: false,
+    }),
+  );
 });
 
 test("guardConcurrentEdit — throws when Jira advanced past last sync", () => {
   assert.throws(
-    () => lib.guardConcurrentEdit({
-      jiraUpdated:  "2026-04-28T11:00:00.000Z",
-      lastSyncedAt: "2026-04-28T10:00:00.000Z",
-      force: false,
-    }),
-    /updated since last local sync/
+    () =>
+      lib.guardConcurrentEdit({
+        jiraUpdated: "2026-04-28T11:00:00.000Z",
+        lastSyncedAt: "2026-04-28T10:00:00.000Z",
+        force: false,
+      }),
+    /updated since last local sync/,
   );
 });
 
@@ -246,22 +302,26 @@ test("guardConcurrentEdit — --force overrides the abort", () => {
   const origWarn = console.warn;
   console.warn = () => {};
   try {
-    assert.doesNotThrow(() => lib.guardConcurrentEdit({
-      jiraUpdated:  "2026-04-28T11:00:00.000Z",
-      lastSyncedAt: "2026-04-28T10:00:00.000Z",
-      force: true,
-    }));
+    assert.doesNotThrow(() =>
+      lib.guardConcurrentEdit({
+        jiraUpdated: "2026-04-28T11:00:00.000Z",
+        lastSyncedAt: "2026-04-28T10:00:00.000Z",
+        force: true,
+      }),
+    );
   } finally {
     console.warn = origWarn;
   }
 });
 
 test("guardConcurrentEdit — no last sync (first run) skips guard", () => {
-  assert.doesNotThrow(() => lib.guardConcurrentEdit({
-    jiraUpdated: "2026-04-28T11:00:00.000Z",
-    lastSyncedAt: undefined,
-    force: false,
-  }));
+  assert.doesNotThrow(() =>
+    lib.guardConcurrentEdit({
+      jiraUpdated: "2026-04-28T11:00:00.000Z",
+      lastSyncedAt: undefined,
+      force: false,
+    }),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -277,16 +337,20 @@ Refactor cache layer.
 
 Steps go here.
 `,
-    frontmatter: { category: "refactoring", estimated_effort_hours: "24", status: "📋 Planned" },
+    frontmatter: {
+      category: "refactoring",
+      estimated_effort_hours: "24",
+      status: "📋 Planned",
+    },
     taskBbUrl: "https://bitbucket.org/org/repo/src/HEAD/task.md",
     changelogEntries: ["| 2026-04-28 09:40 | Initial Jira task created |"],
   });
   assert.equal(doc.type, "doc");
   assert.equal(doc.version, 1);
-  const table = doc.content.find(n => n.type === "table");
+  const table = doc.content.find((n) => n.type === "table");
   assert.ok(table, "table node present");
   assert.equal(table.content.length, 2, "header row + 1 data row");
-  const bullet = doc.content.find(n => n.type === "bulletList");
+  const bullet = doc.content.find((n) => n.type === "bulletList");
   assert.ok(bullet, "source-doc bullet list present");
   const linkText = bullet.content[0].content[0].content[0];
   assert.equal(linkText.marks[0].type, "link");
@@ -315,8 +379,15 @@ High risk: thing.
 
 Revert commit.
 `;
-  const doc = lib.buildDescriptionAdf({ body, frontmatter: {}, taskBbUrl: null, changelogEntries: [] });
-  const headings = doc.content.filter(n => n.type === "heading").map(n => n.content[0].text);
+  const doc = lib.buildDescriptionAdf({
+    body,
+    frontmatter: {},
+    taskBbUrl: null,
+    changelogEntries: [],
+  });
+  const headings = doc.content
+    .filter((n) => n.type === "heading")
+    .map((n) => n.content[0].text);
   assert.ok(headings.includes("Overview"));
   assert.ok(headings.includes("Motivation"));
   assert.ok(headings.includes("Implementation Plan"));
@@ -333,10 +404,23 @@ As a user.
 
 - AC1
 `;
-  const doc = lib.buildDescriptionAdf({ body, frontmatter: {}, taskBbUrl: null, changelogEntries: [] });
-  const headings = doc.content.filter(n => n.type === "heading").map(n => n.content[0].text);
-  assert.ok(!headings.includes("User Story"), "story-only sections must be absent");
-  assert.ok(!headings.includes("Acceptance Criteria"), "story-only sections must be absent");
+  const doc = lib.buildDescriptionAdf({
+    body,
+    frontmatter: {},
+    taskBbUrl: null,
+    changelogEntries: [],
+  });
+  const headings = doc.content
+    .filter((n) => n.type === "heading")
+    .map((n) => n.content[0].text);
+  assert.ok(
+    !headings.includes("User Story"),
+    "story-only sections must be absent",
+  );
+  assert.ok(
+    !headings.includes("Acceptance Criteria"),
+    "story-only sections must be absent",
+  );
 });
 
 test("buildDescriptionAdf — omits sections with no body match", () => {
@@ -347,6 +431,58 @@ test("buildDescriptionAdf — omits sections with no body match", () => {
     changelogEntries: [],
   });
   assert.equal(doc.content.length, 0);
+});
+
+test("buildDescriptionAdf — an empty body warns when given an output handle", () => {
+  // This assertion exists because its absence let a real defect ship. The case
+  // above asserts the empty document and stops there, so a card whose heading
+  // style did not match TASK_SECTIONS synced "successfully", reported nothing,
+  // and published a Jira description with no body at all. Silence was the bug.
+  const warnings = [];
+  const doc = lib.buildDescriptionAdf({
+    body: "# Just a title\n\nNothing else.\n",
+    frontmatter: {},
+    taskBbUrl: null,
+    changelogEntries: [],
+    output: { warn: (m) => warnings.push(String(m)) },
+  });
+
+  assert.equal(doc.content.length, 0);
+  assert.equal(
+    warnings.length,
+    1,
+    "an all-missing extraction must say so exactly once",
+  );
+  assert.match(warnings[0], /no body/i);
+});
+
+test("buildDescriptionAdf — numbered headings render the same as unnumbered", () => {
+  // create-task's template emits `## 1. Overview`; sync-jira-task's section list
+  // is unnumbered. These must agree, or every card created the intended way
+  // publishes an empty description.
+  const headings = (doc) =>
+    doc.content
+      .filter((n) => n.type === "heading")
+      .map((n) => n.content[0].text);
+
+  const numbered = lib.buildDescriptionAdf({
+    body: "## 1. Overview\n\nalpha\n\n## 6. Implementation Plan\n\nbeta\n",
+    frontmatter: {},
+    taskBbUrl: null,
+    changelogEntries: [],
+  });
+
+  assert.deepEqual(headings(numbered), ["Overview", "Implementation Plan"]);
+  assert.deepEqual(
+    numbered,
+    lib.buildDescriptionAdf({
+      body: "## Overview\n\nalpha\n\n## Implementation Plan\n\nbeta\n",
+      frontmatter: {},
+      taskBbUrl: null,
+      changelogEntries: [],
+    }),
+    "numbering must not change the rendered ADF — otherwise it churns the body hash",
+  );
 });
 
 test("TASK_SECTIONS — exposes the 11 task-doc section headings", () => {
@@ -361,10 +497,11 @@ test("TASK_SECTIONS — exposes the 11 task-doc section headings", () => {
 // ---------------------------------------------------------------------------
 test("parseJiraError — extracts errorMessages and field errors", async () => {
   const fake = {
-    text: async () => JSON.stringify({
-      errorMessages: ["Invalid project."],
-      errors: { priority: "Field 'priority' cannot be set." },
-    }),
+    text: async () =>
+      JSON.stringify({
+        errorMessages: ["Invalid project."],
+        errors: { priority: "Field 'priority' cannot be set." },
+      }),
   };
   const msg = await lib.parseJiraError(fake);
   assert.match(msg, /Invalid project/);
@@ -390,7 +527,7 @@ title: 'X'
 
 After rule.
 `;
-  const out = lib.rewriteFrontmatter(src, fm => fm + "\nadded: \"yes\"");
+  const out = lib.rewriteFrontmatter(src, (fm) => fm + '\nadded: "yes"');
   assert.match(out, /added: "yes"/);
   assert.match(out, /After rule\./);
   assert.match(out, /---\n\nAfter rule/, "body horizontal rule preserved");
@@ -453,12 +590,14 @@ test("blockToAdf — non-list paragraph uses hardBreaks", () => {
   const nodes = lib_inner.blockToAdf("line one\nline two");
   assert.equal(nodes.length, 1);
   assert.equal(nodes[0].type, "paragraph");
-  assert.ok(nodes[0].content.some(n => n.type === "hardBreak"));
+  assert.ok(nodes[0].content.some((n) => n.type === "hardBreak"));
 });
 
 test("textToAdfNodes — mixes paragraphs and bullet lists across blocks", () => {
-  const nodes = lib_inner.textToAdfNodes("Intro paragraph.\n\n- a\n- b\n\nMore prose.");
-  const types = nodes.map(n => n.type);
+  const nodes = lib_inner.textToAdfNodes(
+    "Intro paragraph.\n\n- a\n- b\n\nMore prose.",
+  );
+  const types = nodes.map((n) => n.type);
   assert.deepEqual(types, ["paragraph", "bulletList", "paragraph"]);
 });
 
@@ -486,7 +625,10 @@ title: 'X'
 
 body
 `;
-  const out = lib.upsertFrontmatterKeys(src, { jira_key: "PROJ-47", jira_url: "https://x/PROJ-47" });
+  const out = lib.upsertFrontmatterKeys(src, {
+    jira_key: "PROJ-47",
+    jira_url: "https://x/PROJ-47",
+  });
   assert.match(out, /jira_key: "PROJ-47"/);
   assert.match(out, /jira_url: "https:\/\/x\/PROJ-47"/);
 });
@@ -509,13 +651,27 @@ test("diffFields — separate body/meta hashes detect description vs metadata ch
   const next = { summary: "S", priority: "High", labels: [] };
   // body unchanged, meta changed → "metadata"
   assert.deepEqual(
-    lib.diffFields({ prev, next, prevBodyHash: "a", newBodyHash: "a", prevMetaHash: "x", newMetaHash: "y" }),
-    ["metadata"]
+    lib.diffFields({
+      prev,
+      next,
+      prevBodyHash: "a",
+      newBodyHash: "a",
+      prevMetaHash: "x",
+      newMetaHash: "y",
+    }),
+    ["metadata"],
   );
   // body changed → "description" (metadata not double-reported)
   assert.deepEqual(
-    lib.diffFields({ prev, next, prevBodyHash: "a", newBodyHash: "b", prevMetaHash: "x", newMetaHash: "y" }),
-    ["description"]
+    lib.diffFields({
+      prev,
+      next,
+      prevBodyHash: "a",
+      newBodyHash: "b",
+      prevMetaHash: "x",
+      newMetaHash: "y",
+    }),
+    ["description"],
   );
 });
 
@@ -541,14 +697,21 @@ test("mapStatus — covers the full canonical lifecycle (no passthrough)", () =>
 
 test("mapStatus — honours a project-supplied status map", () => {
   const custom = { "ready-for-development": "Selected for Development" };
-  assert.equal(task.mapStatus("ready-for-development", custom), "Selected for Development");
+  assert.equal(
+    task.mapStatus("ready-for-development", custom),
+    "Selected for Development",
+  );
 });
 
 test("loadStatusMap — merges jira.statusMap over defaults", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-task-"));
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
-    "jira:\n  statusMap:\n    accepted: Shipped\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    accepted: Shipped\n",
+  );
   const map = task.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
   assert.equal(map["in-progress"], "In Progress");
@@ -556,22 +719,46 @@ test("loadStatusMap — merges jira.statusMap over defaults", () => {
 });
 
 test("syncLabelFor — derives stable label from task dir name", () => {
-  const label = task.syncLabelFor("/repo/docs/tasks/task.1.cache-lib/task.1.cache-lib.md");
+  const label = task.syncLabelFor(
+    "/repo/docs/tasks/task.1.cache-lib/task.1.cache-lib.md",
+  );
   assert.equal(label, "synced-from-task.1.cache-lib");
 });
 
 test("hashBody — stable across runs, differs on body change", () => {
-  const a = task.hashBody({ body: "## Overview\n\nThing.\n", taskBbUrl: "https://bb/x" });
-  const b = task.hashBody({ body: "## Overview\n\nThing.\n", taskBbUrl: "https://bb/x" });
-  const c = task.hashBody({ body: "## Overview\n\nDifferent.\n", taskBbUrl: "https://bb/x" });
+  const a = task.hashBody({
+    body: "## Overview\n\nThing.\n",
+    taskBbUrl: "https://bb/x",
+  });
+  const b = task.hashBody({
+    body: "## Overview\n\nThing.\n",
+    taskBbUrl: "https://bb/x",
+  });
+  const c = task.hashBody({
+    body: "## Overview\n\nDifferent.\n",
+    taskBbUrl: "https://bb/x",
+  });
   assert.equal(a, b);
   assert.notEqual(a, c);
 });
 
 test("hashMeta — depends only on category/effort/status frontmatter fields", () => {
-  const m1 = task.hashMeta({ category: "refactor", estimated_effort_hours: 8, status: "Planned" });
-  const m2 = task.hashMeta({ category: "refactor", estimated_effort_hours: 8, status: "Planned", title: "X" });
-  const m3 = task.hashMeta({ category: "refactor", estimated_effort_hours: 8, status: "Done" });
+  const m1 = task.hashMeta({
+    category: "refactor",
+    estimated_effort_hours: 8,
+    status: "Planned",
+  });
+  const m2 = task.hashMeta({
+    category: "refactor",
+    estimated_effort_hours: 8,
+    status: "Planned",
+    title: "X",
+  });
+  const m3 = task.hashMeta({
+    category: "refactor",
+    estimated_effort_hours: 8,
+    status: "Done",
+  });
   assert.equal(m1, m2, "title change should not affect meta hash");
   assert.notEqual(m1, m3, "status change must change meta hash");
 });
@@ -584,7 +771,11 @@ test("makeHttp — retries on 500 then succeeds", async () => {
     if (n < 3) return { status: 500, ok: false, text: async () => "boom" };
     return { status: 200, ok: true, json: async () => ({ ok: 1 }) };
   };
-  const http = lib_inner.makeHttp({ fetchImpl: fakeFetch, retries: 2, retryDelayMs: 1 });
+  const http = lib_inner.makeHttp({
+    fetchImpl: fakeFetch,
+    retries: 2,
+    retryDelayMs: 1,
+  });
   const r = await http("http://x");
   assert.equal(r.ok, true);
   assert.equal(n, 3, "should have retried twice");
@@ -592,8 +783,15 @@ test("makeHttp — retries on 500 then succeeds", async () => {
 
 test("makeHttp — does not retry on 4xx", async () => {
   let n = 0;
-  const fakeFetch = async () => { n++; return { status: 404, ok: false, text: async () => "nope" }; };
-  const http = lib_inner.makeHttp({ fetchImpl: fakeFetch, retries: 3, retryDelayMs: 1 });
+  const fakeFetch = async () => {
+    n++;
+    return { status: 404, ok: false, text: async () => "nope" };
+  };
+  const http = lib_inner.makeHttp({
+    fetchImpl: fakeFetch,
+    retries: 3,
+    retryDelayMs: 1,
+  });
   const r = await http("http://x");
   assert.equal(r.status, 404);
   assert.equal(n, 1, "no retry on 4xx");
@@ -604,32 +802,55 @@ test("transitionToStatus — finds matching transition by to.name", async () => 
   const calls = [];
   const fakeFetch = async (url, opts) => {
     calls.push({ url, method: opts?.method || "GET" });
-    if (url.endsWith("/transitions") && (!opts || !opts.method || opts.method === "GET")) {
+    if (
+      url.endsWith("/transitions") &&
+      (!opts || !opts.method || opts.method === "GET")
+    ) {
       return {
-        ok: true, status: 200,
-        json: async () => ({ transitions: [
-          { id: "11", name: "Start", to: { name: "In Progress" } },
-          { id: "21", name: "Resolve", to: { name: "Done" } },
-        ] }),
+        ok: true,
+        status: 200,
+        json: async () => ({
+          transitions: [
+            { id: "11", name: "Start", to: { name: "In Progress" } },
+            { id: "21", name: "Resolve", to: { name: "Done" } },
+          ],
+        }),
       };
     }
-    return { ok: true, status: 204, json: async () => ({}), text: async () => "" };
+    return {
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+      text: async () => "",
+    };
   };
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const out = await lib_inner.transitionToStatus({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    issueKey: "PROJ-1", targetStatus: "In Progress", currentStatus: "To Do",
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    issueKey: "PROJ-1",
+    targetStatus: "In Progress",
+    currentStatus: "To Do",
   });
   assert.equal(out.transitioned, true);
-  assert.equal(calls.filter(c => c.method === "POST").length, 1);
+  assert.equal(calls.filter((c) => c.method === "POST").length, 1);
 });
 
 test("transitionToStatus — no-op when target equals current", async () => {
-  const fakeFetch = async () => { throw new Error("should not call fetch"); };
+  const fakeFetch = async () => {
+    throw new Error("should not call fetch");
+  };
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const out = await lib_inner.transitionToStatus({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    issueKey: "PROJ-1", targetStatus: "Done", currentStatus: "Done",
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    issueKey: "PROJ-1",
+    targetStatus: "Done",
+    currentStatus: "Done",
   });
   assert.equal(out.transitioned, false);
   assert.equal(out.reason, "already");
@@ -637,23 +858,41 @@ test("transitionToStatus — no-op when target equals current", async () => {
 
 // #11 — board type
 test("getBoardType — returns scrum/kanban", async () => {
-  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ type: "kanban" }) });
+  const fakeFetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ type: "kanban" }),
+  });
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
-  const t = await lib_inner.getBoardType({ http, baseUrl: "https://j", email: "e", token: "t", boardId: "1" });
+  const t = await lib_inner.getBoardType({
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    boardId: "1",
+  });
   assert.equal(t, "kanban");
 });
 
 test("moveToBacklog — skips on Kanban board", async () => {
   let postCalled = false;
   const fakeFetch = async (url, opts) => {
-    if (opts?.method === "POST") { postCalled = true; }
-    if (url.includes("/configuration")) return { ok: true, status: 200, json: async () => ({ type: "kanban" }) };
+    if (opts?.method === "POST") {
+      postCalled = true;
+    }
+    if (url.includes("/configuration"))
+      return { ok: true, status: 200, json: async () => ({ type: "kanban" }) };
     return { ok: true, status: 204, text: async () => "" };
   };
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const r = await lib_inner.moveToBacklog({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    boardId: "1", issueKey: "PROJ-1", output: lib_inner.makeOutput({ quiet: true }),
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    boardId: "1",
+    issueKey: "PROJ-1",
+    output: lib_inner.makeOutput({ quiet: true }),
   });
   assert.equal(r.moved, false);
   assert.equal(postCalled, false, "no POST on Kanban");
@@ -661,35 +900,66 @@ test("moveToBacklog — skips on Kanban board", async () => {
 
 // #16 — live priority resolution
 test("resolveLivePriorities — builds map keyed by lower-cased name", async () => {
-  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ([
-    { name: "Highest" }, { name: "High" }, { name: "Medium" }, { name: "Low" }, { name: "Lowest" },
-  ]) });
+  const fakeFetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => [
+      { name: "Highest" },
+      { name: "High" },
+      { name: "Medium" },
+      { name: "Low" },
+      { name: "Lowest" },
+    ],
+  });
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
-  const map = await lib_inner.resolveLivePriorities({ http, baseUrl: "https://j", email: "e", token: "t" });
+  const map = await lib_inner.resolveLivePriorities({
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+  });
   assert.equal(map.high, "High");
   assert.equal(map.lowest, "Lowest");
 });
 
 test("normalisePriority — uses live priorities when available", () => {
   const live = { urgent: "Urgent", high: "High", highest: "Urgent" };
-  assert.equal(lib.normalisePriority("urgent", live), "Urgent", "direct live match");
+  assert.equal(
+    lib.normalisePriority("urgent", live),
+    "Urgent",
+    "direct live match",
+  );
   assert.equal(lib.normalisePriority("high", live), "High", "lower-case match");
-  assert.equal(lib.normalisePriority("blocker", live), "Urgent", "synonym blocker→Highest→live[highest]=Urgent");
+  assert.equal(
+    lib.normalisePriority("blocker", live),
+    "Urgent",
+    "synonym blocker→Highest→live[highest]=Urgent",
+  );
 });
 
 // #8 — idempotent create via label search
 test("findExistingByLabel — returns key when issue with label exists", async () => {
   const fakeFetch = async (url) => {
-    if (url.includes("/search")) return {
-      ok: true, status: 200,
-      json: async () => ({ issues: [{ key: "PROJ-99", fields: { updated: "2026-04-28T10:00:00.000Z" } }] }),
-    };
+    if (url.includes("/search"))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          issues: [
+            { key: "PROJ-99", fields: { updated: "2026-04-28T10:00:00.000Z" } },
+          ],
+        }),
+      };
     return { ok: false, status: 404, text: async () => "" };
   };
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const r = await lib_inner.findExistingByLabel({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    projectKey: "RB", label: "synced-from-task.1.x",
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    projectKey: "RB",
+    label: "synced-from-task.1.x",
   });
   assert.equal(r.key, "PROJ-99");
 });
@@ -697,43 +967,74 @@ test("findExistingByLabel — returns key when issue with label exists", async (
 // #3 — atomic PUT with returnIssue
 test("putIssueAtomic — parses fields.updated from response body", async () => {
   const fakeFetch = async () => ({
-    ok: true, status: 200,
+    ok: true,
+    status: 200,
     json: async () => ({ fields: { updated: "2026-04-28T11:00:00.000Z" } }),
   });
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const r = await lib_inner.putIssueAtomic({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    issueKey: "PROJ-1", fields: { summary: "X" },
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    issueKey: "PROJ-1",
+    fields: { summary: "X" },
   });
   assert.equal(r.updated, "2026-04-28T11:00:00.000Z");
 });
 
 // #4 — fail-loud timestamp fetch
 test("fetchUpdatedTimestampStrict — throws on missing fields.updated", async () => {
-  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ fields: {} }) });
+  const fakeFetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ fields: {} }),
+  });
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   await assert.rejects(
-    lib_inner.fetchUpdatedTimestampStrict({ http, baseUrl: "https://j", email: "e", token: "t", issueKey: "PROJ-1" }),
+    lib_inner.fetchUpdatedTimestampStrict({
+      http,
+      baseUrl: "https://j",
+      email: "e",
+      token: "t",
+      issueKey: "PROJ-1",
+    }),
     /missing fields\.updated/,
   );
 });
 
 // #12 — issue type cache
 test("getIssueTypeId — caches type id and avoids second network call", async () => {
-  const tmpRoot = require("fs").mkdtempSync(require("os").tmpdir() + "/jira-cache-");
+  const tmpRoot = require("fs").mkdtempSync(
+    require("os").tmpdir() + "/jira-cache-",
+  );
   let calls = 0;
   const fakeFetch = async () => {
     calls++;
-    return { ok: true, status: 200, json: async () => ({ issueTypes: [{ id: "10001", name: "Task" }] }) };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ issueTypes: [{ id: "10001", name: "Task" }] }),
+    };
   };
   const http = lib_inner.makeHttp({ fetchImpl: fakeFetch });
   const id1 = await lib_inner.getIssueTypeId({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    projectKey: "RB", typeName: "Task", repoRoot: tmpRoot,
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    projectKey: "RB",
+    typeName: "Task",
+    repoRoot: tmpRoot,
   });
   const id2 = await lib_inner.getIssueTypeId({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    projectKey: "RB", typeName: "Task", repoRoot: tmpRoot,
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    projectKey: "RB",
+    typeName: "Task",
+    repoRoot: tmpRoot,
   });
   assert.equal(id1, "10001");
   assert.equal(id2, "10001");
@@ -745,7 +1046,10 @@ test("getIssueTypeId — caches type id and avoids second network call", async (
 // ---------------------------------------------------------------------------
 test("stripRemotePrefix — strips remote name, preserves slashes in branch", () => {
   assert.equal(lib.stripRemotePrefix("origin/main"), "main");
-  assert.equal(lib.stripRemotePrefix("origin/feature/story.5.1.foo"), "feature/story.5.1.foo");
+  assert.equal(
+    lib.stripRemotePrefix("origin/feature/story.5.1.foo"),
+    "feature/story.5.1.foo",
+  );
   assert.equal(lib.stripRemotePrefix("upstream/release/1.2"), "release/1.2");
 });
 
@@ -755,7 +1059,14 @@ test("stripRemotePrefix — empty or shape-less ref returns null", () => {
 });
 
 test("parseArgs — --doc-branch overrides the resolved branch", () => {
-  const opts = lib.parseArgs(["node", "script", "--file", "x.md", "--doc-branch", "develop"]);
+  const opts = lib.parseArgs([
+    "node",
+    "script",
+    "--file",
+    "x.md",
+    "--doc-branch",
+    "develop",
+  ]);
   assert.equal(opts.docBranch, "develop");
 });
 
@@ -788,23 +1099,58 @@ test("normaliseTaskSummary — no id resolvable leaves the summary unchanged", (
 // parseJiraScalar / loadDevEstimateField — Jira custom field id config
 // ---------------------------------------------------------------------------
 test("parseJiraScalar — reads a scalar key under jira:, ignores statusMap children", () => {
-  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594\n", "devEstimateField"), "customfield_10594");
-  const cfg = "jira:\n  statusMap:\n    devEstimateField: NotThis\n  devEstimateField: customfield_42\n";
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  devEstimateField: customfield_10594\n",
+      "devEstimateField",
+    ),
+    "customfield_10594",
+  );
+  const cfg =
+    "jira:\n  statusMap:\n    devEstimateField: NotThis\n  devEstimateField: customfield_42\n";
   assert.equal(lib.parseJiraScalar(cfg, "devEstimateField"), "customfield_42");
-  assert.equal(lib.parseJiraScalar("jira:\n  statusMap:\n    accepted: Done\n", "devEstimateField"), "");
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  statusMap:\n    accepted: Done\n",
+      "devEstimateField",
+    ),
+    "",
+  );
 });
 
 test("parseJiraScalar — strips a trailing inline comment, preserves in-value '#'", () => {
-  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594  # optional — Jira field id\n", "devEstimateField"), "customfield_10594");
-  assert.equal(lib.parseJiraScalar('jira:\n  devEstimateField: "customfield_10594"  # c\n', "devEstimateField"), "customfield_10594");
-  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: abc#def\n", "devEstimateField"), "abc#def");
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  devEstimateField: customfield_10594  # optional — Jira field id\n",
+      "devEstimateField",
+    ),
+    "customfield_10594",
+  );
+  assert.equal(
+    lib.parseJiraScalar(
+      'jira:\n  devEstimateField: "customfield_10594"  # c\n',
+      "devEstimateField",
+    ),
+    "customfield_10594",
+  );
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  devEstimateField: abc#def\n",
+      "devEstimateField",
+    ),
+    "abc#def",
+  );
 });
 
 test("loadStatusMap — tolerates inline comments on the statusMap opener and value lines", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-task-comment-"));
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
-    "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n",
+  );
   const map = task.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
   assert.equal(map["in-progress"], "In Progress");
@@ -812,10 +1158,15 @@ test("loadStatusMap — tolerates inline comments on the statusMap opener and va
 });
 
 test("loadDevEstimateField — reads jira.devEstimateField, '' when absent", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-task-"));
   assert.equal(lib.loadDevEstimateField(dir), "");
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"), "jira:\n  devEstimateField: customfield_10594\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  devEstimateField: customfield_10594\n",
+  );
   assert.equal(lib.loadDevEstimateField(dir), "customfield_10594");
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -828,17 +1179,32 @@ test("collectIssueFields — writes dev-estimate custom field when configured (n
   const freshLib = require(modPath);
   try {
     const numeric = freshLib.collectIssueFields({
-      summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
-      descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
-      livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+      summary: "T",
+      args: {},
+      frontmatter: { title: "T", estimated_effort_hours: 24 },
+      descAdf: { type: "doc", content: [] },
+      taskTypeId: null,
+      projectKey: null,
+      livePriorities: null,
+      output: { warn() {}, info() {} },
+      syncLabel: "synced-from-task.5",
     });
     assert.equal(numeric.customfield_10594, 24);
-    assert.deepEqual(numeric.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
+    assert.deepEqual(numeric.timetracking, {
+      originalEstimate: "24h",
+      remainingEstimate: "24h",
+    });
 
     const nonNumeric = freshLib.collectIssueFields({
-      summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: "~1 day" },
-      descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
-      livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+      summary: "T",
+      args: {},
+      frontmatter: { title: "T", estimated_effort_hours: "~1 day" },
+      descAdf: { type: "doc", content: [] },
+      taskTypeId: null,
+      projectKey: null,
+      livePriorities: null,
+      output: { warn() {}, info() {} },
+      syncLabel: "synced-from-task.5",
     });
     assert.equal(nonNumeric.customfield_10594, undefined);
   } finally {
@@ -850,12 +1216,21 @@ test("collectIssueFields — writes dev-estimate custom field when configured (n
 
 test("collectIssueFields — omits dev-estimate custom field when unconfigured", () => {
   const fields = lib.collectIssueFields({
-    summary: "T", args: {}, frontmatter: { title: "T", estimated_effort_hours: 24 },
-    descAdf: { type: "doc", content: [] }, taskTypeId: null, projectKey: null,
-    livePriorities: null, output: { warn() {}, info() {} }, syncLabel: "synced-from-task.5",
+    summary: "T",
+    args: {},
+    frontmatter: { title: "T", estimated_effort_hours: 24 },
+    descAdf: { type: "doc", content: [] },
+    taskTypeId: null,
+    projectKey: null,
+    livePriorities: null,
+    output: { warn() {}, info() {} },
+    syncLabel: "synced-from-task.5",
   });
   assert.equal(fields.customfield_10594, undefined);
-  assert.deepEqual(fields.timetracking, { originalEstimate: "24h", remainingEstimate: "24h" });
+  assert.deepEqual(fields.timetracking, {
+    originalEstimate: "24h",
+    remainingEstimate: "24h",
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -864,7 +1239,9 @@ test("collectIssueFields — omits dev-estimate custom field when unconfigured",
 // base path once the markdown is copied into a description.
 // ---------------------------------------------------------------------------
 test("resolveRelativeLink — rewrites an existing sibling-file link to an absolute Bitbucket URL", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "relative-link-"));
   const filePath = path.join(dir, "task.9.card.md");
   const siblingPath = path.join(dir, "task.9.runbook.md");
@@ -872,14 +1249,22 @@ test("resolveRelativeLink — rewrites an existing sibling-file link to an absol
   fs.writeFileSync(siblingPath, "# runbook\n");
 
   const href = lib.resolveRelativeLink("task.9.runbook.md", {
-    filePath, repoRoot: dir, bbBase: "https://bitbucket.org/org/repo", branch: "develop",
+    filePath,
+    repoRoot: dir,
+    bbBase: "https://bitbucket.org/org/repo",
+    branch: "develop",
   });
-  assert.equal(href, "https://bitbucket.org/org/repo/src/develop/task.9.runbook.md");
+  assert.equal(
+    href,
+    "https://bitbucket.org/org/repo/src/develop/task.9.runbook.md",
+  );
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("resolveRelativeLink — preserves a #fragment after resolving the path part", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "relative-link-frag-"));
   const filePath = path.join(dir, "task.4.card.md");
   const siblingPath = path.join(dir, "task.4.runbook.md");
@@ -887,32 +1272,77 @@ test("resolveRelativeLink — preserves a #fragment after resolving the path par
   fs.writeFileSync(siblingPath, "# runbook\n");
 
   const href = lib.resolveRelativeLink("task.4.runbook.md#step-0", {
-    filePath, repoRoot: dir, bbBase: "https://bitbucket.org/org/repo", branch: "HEAD",
+    filePath,
+    repoRoot: dir,
+    bbBase: "https://bitbucket.org/org/repo",
+    branch: "HEAD",
   });
-  assert.equal(href, "https://bitbucket.org/org/repo/src/HEAD/task.4.runbook.md#step-0");
+  assert.equal(
+    href,
+    "https://bitbucket.org/org/repo/src/HEAD/task.4.runbook.md#step-0",
+  );
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("resolveRelativeLink — leaves absolute URLs, mailto:, and in-page anchors unchanged", () => {
-  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: "https://bitbucket.org/org/repo", branch: "HEAD" };
-  assert.equal(lib.resolveRelativeLink("https://mediastreamag.atlassian.net/browse/RAPP-540", ctx),
-    "https://mediastreamag.atlassian.net/browse/RAPP-540");
-  assert.equal(lib.resolveRelativeLink("mailto:someone@example.com", ctx), "mailto:someone@example.com");
-  assert.equal(lib.resolveRelativeLink("#success-criteria", ctx), "#success-criteria");
+  const ctx = {
+    filePath: "/repo/docs/task.md",
+    repoRoot: "/repo",
+    bbBase: "https://bitbucket.org/org/repo",
+    branch: "HEAD",
+  };
+  assert.equal(
+    lib.resolveRelativeLink(
+      "https://mediastreamag.atlassian.net/browse/RAPP-540",
+      ctx,
+    ),
+    "https://mediastreamag.atlassian.net/browse/RAPP-540",
+  );
+  assert.equal(
+    lib.resolveRelativeLink("mailto:someone@example.com", ctx),
+    "mailto:someone@example.com",
+  );
+  assert.equal(
+    lib.resolveRelativeLink("#success-criteria", ctx),
+    "#success-criteria",
+  );
 });
 
 test("resolveRelativeLink — a broken/typo'd relative link is left as-authored, not masked", () => {
-  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: "https://bitbucket.org/org/repo", branch: "HEAD" };
-  assert.equal(lib.resolveRelativeLink("task.4.runbok.md", ctx), "task.4.runbok.md");
+  const ctx = {
+    filePath: "/repo/docs/task.md",
+    repoRoot: "/repo",
+    bbBase: "https://bitbucket.org/org/repo",
+    branch: "HEAD",
+  };
+  assert.equal(
+    lib.resolveRelativeLink("task.4.runbok.md", ctx),
+    "task.4.runbok.md",
+  );
 });
 
 test("resolveRelativeLink — no bbBase (Bitbucket base undetected) is a no-op", () => {
-  const ctx = { filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: null, branch: "HEAD" };
-  assert.equal(lib.resolveRelativeLink("task.4.runbook.md", ctx), "task.4.runbook.md");
+  const ctx = {
+    filePath: "/repo/docs/task.md",
+    repoRoot: "/repo",
+    bbBase: null,
+    branch: "HEAD",
+  };
+  assert.equal(
+    lib.resolveRelativeLink("task.4.runbook.md", ctx),
+    "task.4.runbook.md",
+  );
 });
 
 test("makeRelativeLinkResolver — returns null when bbBase is unset (Bitbucket base undetected)", () => {
-  assert.equal(lib.makeRelativeLinkResolver({ filePath: "/repo/docs/task.md", repoRoot: "/repo", bbBase: null }), null);
+  assert.equal(
+    lib.makeRelativeLinkResolver({
+      filePath: "/repo/docs/task.md",
+      repoRoot: "/repo",
+      bbBase: null,
+    }),
+    null,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -921,21 +1351,31 @@ test("makeRelativeLinkResolver — returns null when bbBase is unset (Bitbucket 
 // links them, without anyone remembering a frontmatter field.
 // ---------------------------------------------------------------------------
 test("findRelatedDocs — lists sibling .md files, excludes the task file itself and non-.md files", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-"));
   const filePath = path.join(dir, "task.4.containerize-framework-runtime.md");
   fs.writeFileSync(filePath, "# card\n");
   fs.writeFileSync(path.join(dir, "task.4.runbook.md"), "# runbook\n");
-  fs.writeFileSync(path.join(dir, "task.4.trivy-scan-2026-07-14.md"), "# scan\n");
+  fs.writeFileSync(
+    path.join(dir, "task.4.trivy-scan-2026-07-14.md"),
+    "# scan\n",
+  );
   fs.writeFileSync(path.join(dir, "notes.txt"), "not markdown\n");
 
-  const related = lib.findRelatedDocs(filePath).map(p => path.basename(p));
-  assert.deepEqual(related, ["task.4.runbook.md", "task.4.trivy-scan-2026-07-14.md"]);
+  const related = lib.findRelatedDocs(filePath).map((p) => path.basename(p));
+  assert.deepEqual(related, [
+    "task.4.runbook.md",
+    "task.4.trivy-scan-2026-07-14.md",
+  ]);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("findRelatedDocs — a task with no siblings returns an empty list", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-empty-"));
   const filePath = path.join(dir, "task.13.card.md");
   fs.writeFileSync(filePath, "# card\n");
@@ -945,8 +1385,14 @@ test("findRelatedDocs — a task with no siblings returns an empty list", () => 
 });
 
 test("labelForRelatedDoc — special-cases runbook filenames, backtick-quotes everything else", () => {
-  assert.equal(lib.labelForRelatedDoc("task.13.runbook.md"), "Execution runbook on Bitbucket");
-  assert.equal(lib.labelForRelatedDoc("task.4.trivy-scan-2026-07-14.md"), "`task.4.trivy-scan-2026-07-14.md` on Bitbucket");
+  assert.equal(
+    lib.labelForRelatedDoc("task.13.runbook.md"),
+    "Execution runbook on Bitbucket",
+  );
+  assert.equal(
+    lib.labelForRelatedDoc("task.4.trivy-scan-2026-07-14.md"),
+    "`task.4.trivy-scan-2026-07-14.md` on Bitbucket",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -959,14 +1405,19 @@ test("buildDescriptionAdf — Source Documents lists the task file plus each rel
     frontmatter: {},
     taskBbUrl: "https://bitbucket.org/org/repo/src/HEAD/task.13.card.md",
     relatedDocLinks: [
-      { label: "Execution runbook on Bitbucket", href: "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md" },
+      {
+        label: "Execution runbook on Bitbucket",
+        href: "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md",
+      },
     ],
     changelogEntries: [],
   });
-  const bullet = doc.content.find(n => n.type === "bulletList");
+  const bullet = doc.content.find((n) => n.type === "bulletList");
   assert.ok(bullet, "Source Documents bullet list present");
   assert.equal(bullet.content.length, 2, "task file + 1 related doc");
-  const hrefs = bullet.content.map(li => li.content[0].content[0].marks[0].attrs.href);
+  const hrefs = bullet.content.map(
+    (li) => li.content[0].content[0].marks[0].attrs.href,
+  );
   assert.deepEqual(hrefs, [
     "https://bitbucket.org/org/repo/src/HEAD/task.13.card.md",
     "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md",
@@ -981,14 +1432,17 @@ test("buildDescriptionAdf — with no taskBbUrl and no related docs, omits the S
     relatedDocLinks: [],
     changelogEntries: [],
   });
-  const headings = doc.content.filter(n => n.type === "heading").map(n => n.content[0].text);
+  const headings = doc.content
+    .filter((n) => n.type === "heading")
+    .map((n) => n.content[0].text);
   assert.ok(!headings.includes("Source Documents"));
 });
 
 test("buildDescriptionAdf — rewrites a relative in-body link via linkResolver", () => {
-  const resolver = href => href === "task.13.runbook.md"
-    ? "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md"
-    : href;
+  const resolver = (href) =>
+    href === "task.13.runbook.md"
+      ? "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md"
+      : href;
   const doc = lib.buildDescriptionAdf({
     body: "## Overview\n\nSee the [runbook](task.13.runbook.md) for detail.\n",
     frontmatter: {},
@@ -997,7 +1451,12 @@ test("buildDescriptionAdf — rewrites a relative in-body link via linkResolver"
     changelogEntries: [],
     linkResolver: resolver,
   });
-  const overview = doc.content.find(n => n.type === "paragraph");
-  const linkNode = overview.content.find(n => n.marks && n.marks[0].type === "link");
-  assert.equal(linkNode.marks[0].attrs.href, "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md");
+  const overview = doc.content.find((n) => n.type === "paragraph");
+  const linkNode = overview.content.find(
+    (n) => n.marks && n.marks[0].type === "link",
+  );
+  assert.equal(
+    linkNode.marks[0].attrs.href,
+    "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md",
+  );
 });

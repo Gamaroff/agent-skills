@@ -88,9 +88,21 @@ function extractEpicDescription(body, frontmatter) {
     sections.push("Metadata:\n" + metadata.join(" | "));
   }
 
-  // Extract Stories Breakdown table if present
+  // Extract Stories Breakdown table if present.
+  //
+  // Kept inline rather than calling the shared jira-sync helper's `sectionRe`,
+  // because this script is standalone and requiring that module would pull the
+  // whole Jira client into a skill that does not otherwise use it. (Naming that
+  // module's path in a comment is also enough to make the bundler vendor it here
+  // — pass 1 scans prose for shared-resource paths — so the path is spelled out
+  // nowhere in this file.) The pattern must stay in step with the canonical one;
+  // see the comment on `sectionRe` there for why each piece is present:
+  //   (?:^|\n)  line-anchored, so `### Stories Breakdown` cannot win
+  //   \d+[.)]   optional numbering, e.g. `## 5. Stories Breakdown`
+  // This copy also previously required exactly `\n\n` after the heading, so a
+  // single newline before the table silently yielded no stories at all.
   const storiesMatch = body.match(
-    /## Stories Breakdown\s*\n\n([\s\S]*?)(?=\n## |\n# |$)/,
+    /(?:^|\n)## (?:\d+[.)]\s*)?Stories Breakdown[ \t]*\n([\s\S]*?)(?=\n## |\n# |$)/,
   );
   if (storiesMatch) {
     const tableContent = storiesMatch[1].trim();
@@ -128,10 +140,15 @@ function extractEpicDescription(body, frontmatter) {
 
 function normaliseEpicSummary(summary, epicNumber) {
   const bracket = summary.match(/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i);
-  const colon   = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
+  const colon = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
   let epicId = epicNumber != null ? String(epicNumber) : null;
-  if (bracket)    { epicId = epicId || bracket[1]; summary = bracket[2].trim(); }
-  else if (colon) { epicId = epicId || colon[1];   summary = colon[2].trim(); }
+  if (bracket) {
+    epicId = epicId || bracket[1];
+    summary = bracket[2].trim();
+  } else if (colon) {
+    epicId = epicId || colon[1];
+    summary = colon[2].trim();
+  }
   return epicId != null ? `[Epic ${epicId}] ${summary}` : summary;
 }
 
@@ -322,9 +339,15 @@ function updateFileWithJiraLink(filePath, issueKey, issueUrl) {
       // Remove any existing jira_key / jira_url lines before re-adding
       fm = fm.replace(/^jira_key:.*\n?/m, "").replace(/^jira_url:.*\n?/m, "");
       // Append before the closing blank line (or at end)
-      fm = fm.trimEnd() + `\njira_key: "${issueKey}"\njira_url: "${issueUrl}"\n`;
+      fm =
+        fm.trimEnd() + `\njira_key: "${issueKey}"\njira_url: "${issueUrl}"\n`;
       parts[1] = fm;
-      updated = parts[0] + "---" + parts.slice(1, -1).join("---") + "---" + parts[parts.length - 1];
+      updated =
+        parts[0] +
+        "---" +
+        parts.slice(1, -1).join("---") +
+        "---" +
+        parts[parts.length - 1];
     } else {
       updated = content;
     }
@@ -378,7 +401,8 @@ async function main() {
     const content = fs.readFileSync(filePath, "utf-8");
     const { frontmatter, body } = await parseFrontmatter(content);
 
-    epicNumber = frontmatter.epic_number != null ? frontmatter.epic_number : null;
+    epicNumber =
+      frontmatter.epic_number != null ? frontmatter.epic_number : null;
     summary = args.summary || frontmatter.summary || frontmatter.title || "";
     // Use the epic-aware description extractor
     const epicDesc = extractEpicDescription(body, frontmatter);
@@ -410,7 +434,9 @@ async function main() {
     if (!summary) {
       console.error("Error: Provide --summary or --file");
       console.log("\nUsage:");
-      console.log("  node jira-create-epic.js --file docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md");
+      console.log(
+        "  node jira-create-epic.js --file docs/prd/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md",
+      );
       console.log(
         '  node jira-create-epic.js --summary "Epic Title" --description "Details"',
       );
