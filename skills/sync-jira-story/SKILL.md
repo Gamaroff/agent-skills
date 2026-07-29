@@ -184,21 +184,39 @@ Flow:
 
 ## Status Transitions
 
-Frontmatter `status` is normalised by stripping emoji and lower-casing, then mapped to a Jira workflow
-status name via the shared default map (overlaid with any `jira.statusMap` overrides from
-`skills-config.yaml`). Defaults for a vanilla Jira workflow:
+Frontmatter `status` is normalised by stripping emoji and lower-casing, then resolved against an
+**ordered list of candidate Jira status names** (overlaid with any `jira.statusMap` overrides from
+`skills-config.yaml`). Candidates exist because Jira workflows name the same stage differently:
 
-| Local status | Default Jira target |
+| Local status | Candidates, tried in order |
 |---|---|
-| `draft`, `planned`, `ready-for-development` | `To Do` |
-| `in-progress` | `In Progress` |
-| `ready-for-review` | `In Review` |
-| `accepted` | `Done` |
-| `cancelled` | `Cancelled` |
+| `draft`, `planned`, `ready-for-development` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development` |
+| `in-progress` | `In Progress`, `Doing`, `Started`, `Development` |
+| `ready-for-review` | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review` |
+| `accepted` | `Done`, `Closed`, `Resolved`, `Complete`, `Completed` |
+| `cancelled` | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed` |
 
-The script then fetches `/rest/api/3/issue/{key}/transitions` and matches the resolved target by `to.name` (or `name` as a fallback), case-insensitively. If no matching transition is available, a warning naming the available transitions is emitted and sync still succeeds.
+The script fetches `/rest/api/3/issue/{key}/transitions?expand=transitions.fields` and picks a
+transition by: already-in-a-candidate → no-op; then `to.name` across all candidates; then transition
+`name`; then, for `accepted`/`cancelled` only, the single transition into the `done` status category.
+It never infers a non-terminal transition from status category. If a transition's screen **requires**
+fields, `resolution` is filled from that transition's own `allowedValues`; any other required field is
+reported and the transition skipped rather than sent.
 
-**Custom workflow vocabulary.** If your Jira workflow uses different status names (e.g. "Selected for Development"), map them under `jira.statusMap` in `skills-config.yaml` — keys are the lowercase-kebab local statuses, values are the literal Jira status names. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping). Any status with no mapping passes through verbatim to Jira's transition matcher, so custom statuses still work without configuration.
+Nothing here fails the sync: a skipped status change warns, prints a summary line, and the rest of the
+issue still syncs. Pass `--fail-on-status-skip` to exit non-zero instead.
+
+**Inspect your board first.** `--probe-workflow` prints the project's statuses per issue type, the live
+transitions, and exactly what each local status would do. Read-only. Most projects need no `statusMap`:
+
+```bash
+node scripts/sync-jira-story.js --probe-workflow
+```
+
+**Custom workflow vocabulary.** Only if the probe shows a stage you use being skipped, override under
+`jira.statusMap` (scalar, ordered list, or a per-issue-type sub-map). See
+[Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping). Any status with no
+mapping passes through verbatim as a single candidate.
 
 **Estimated hours.** `estimated_effort_hours` is always written to Jira's built-in `timetracking.originalEstimate`. To also mirror it into a custom field (e.g. "Dev Estimate (hour)"), set its id under `jira.devEstimateField` in `skills-config.yaml` (or the `JIRA_DEV_ESTIMATE_FIELD` env var). The value is sent as a raw number. If Jira rejects the configured id, the sync warns, drops just that field, and retries. See [Jira estimate field](../../docs/reference/configuration.md#jira-estimate-field).
 

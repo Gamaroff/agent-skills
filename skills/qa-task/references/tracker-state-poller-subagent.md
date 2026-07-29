@@ -235,7 +235,7 @@ After `gh issue close` / Jira Done transition, verify the issue actually changed
 Invoke tracker state poller with PR_NUMBER= and ISSUE_KEY={TRACKER_ISSUE}.
 Check result.issue.state:
   GitHub: "CLOSED" → ✅
-  Jira: "Done" (or "Closed"/"Resolved") → ✅
+  Jira: any status in the done category — commonly "Done", "Closed", "Resolved", "Complete", "Completed" → ✅
   Anything else → ⚠️ log and retry close once.
 If errors[] non-empty → log and continue (non-blocking).
 ```

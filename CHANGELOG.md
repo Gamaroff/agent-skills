@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Jira status transitions are now workflow-agnostic — they adapt to the board instead of assuming one vocabulary.** A local status no longer maps to a single hardcoded Jira status name; it resolves against an ordered list of candidates (`In Review` / `Code Review` / `Waiting for Review` / …) matched against the transitions the issue actually offers. Any board whose workflow used different words was previously having *every* status change silently skipped while the sync still reported success. Resolution order is: already-in-a-candidate → `to.name` across all candidates → transition `name` (catching workflows that name the action, e.g. an `Implemented` transition leading to `Waiting for Review`) → for `accepted`/`cancelled` only, the single transition into the `done` category. Most projects can now delete their `jira.statusMap` entirely; `mapStatus()` still returns the primary candidate, so existing callers are unaffected.
+
+  A statusCategory fallback for `new`/`indeterminate` was implemented and then **rejected**: dry-run against a real board showed it picking *wrong* transitions — `ready-for-review` resolving to "In Progress", `in-progress` resolving to "Waiting for Review" — because those categories hold several unrelated states. It is restricted to terminal statuses, with a regression test pinning that.
+
+### Added
+
+- **Required transition fields are now satisfied from the transition's own schema.** Transitions are fetched with `expand=transitions.fields`, and a required `resolution` is filled from that transition's `allowedValues` — preferring `Done`/`Resolved`/`Fixed` for `accepted` and `Won't Do`/`Cancelled`/`Declined` for `cancelled`. Previously a workflow requiring a resolution on its Done transition returned a bare HTTP 400 that was swallowed as a warning, so issues silently never closed. Any *other* required field is reported by name and the transition skipped rather than sent — a request the workflow has already declared incomplete cannot succeed. Overridable via `jira.doneResolution` / `jira.cancelledResolution` (or `JIRA_DONE_RESOLUTION` / `JIRA_CANCELLED_RESOLUTION`).
+- **`--probe-workflow` on all three sync skills.** Read-only diagnostic printing the project's statuses per issue type, the live transitions from a sampled issue of each type, and exactly which transition each canonical local status would take and by which rule. Replaces guess-and-check when adopting a new board; transitions nothing.
+- **`--fail-on-status-skip`.** Opt-in non-zero exit when a requested status change did not happen. Regardless of the flag, a skipped transition now prints an explicit end-of-run summary line naming the reason, the candidates tried, and the transitions available — previously the only signal was a warning buried mid-run, and all three sync scripts discarded `transitionToStatus`'s return value entirely.
+- **`jira.statusMap` accepts ordered lists and a per-issue-type layer.** Values may be a scalar (as before), a flow sequence (`[A, B]`), or a block sequence; a nested `story:` / `task:` / `epic:` sub-map layers over the flat map, for projects running a different workflow per issue type (e.g. an Epic with only `Open`/`Done` beside a Story with a full review-and-test lane).
+
+### Fixed
+
+- **`transitionToStatus` no longer makes a network call when the issue is already in the target status** — the check now happens before fetching transitions, and considers every candidate rather than one name.
+- **`finalise` no longer carries its own divergent transition prose.** It referenced neither `jira-transition-protocol.md` nor its MUST-NOT clauses, giving a third implementation of the same matching logic; it now defers to the protocol. The protocol itself, the develop-pipeline step candidate lists, and the tracker-state poller's done-check were all aligned with the library's resolution order.
+
 ## [v0.30.0] - 2026-07-29
 
 ### Added

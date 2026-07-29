@@ -253,7 +253,7 @@ After extracting the PR URL from `create-pr`'s output, use the Atlassian MCP too
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to "In Review"** — follow `shared/resources/jira-transition-protocol.md` exactly with `candidates = ["In Review", "Code Review", "Ready for Review"]`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to `To Do`, `In Progress`, or any other transition — the issue must remain `In Progress` through QA when no review state exists in the workflow.
+2. **Transition to "In Review"** — follow `shared/resources/jira-transition-protocol.md` exactly with `candidates = ["In Review", "Code Review", "Ready for Review", "Waiting for Review", "Peer Review", "Review"]` and `terminal = false`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to `To Do`, `In Progress`, or any other transition — the issue must remain `In Progress` through QA when no review state exists in the workflow.
 
 Log in Decisions Log: "Jira {TRACKER_ISSUE} — PR comment posted; status: {transition name or 'In Progress (no review transition)'}."
 

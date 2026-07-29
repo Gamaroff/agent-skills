@@ -904,13 +904,16 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    Use the Atlassian MCP tools. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
 
-   1. **Transition to Done** — call `getTransitionsForJiraIssue` then `transitionJiraIssue`:
-      - Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey: {jira_key}`
-      - Find transition matching "Done" (case-insensitive); fallbacks: "Closed", "Resolved"
-      - If found: call `transitionJiraIssue` with `cloudId`, `issueIdOrKey: {jira_key}`, and `transition: {id: "<matched-id>"}`
-      - **Retry once** if the first call fails
-      - If both calls fail: post a PR comment (Bitbucket REST API) warning that the Jira issue was not moved to Done, and log in running summary
-      - If no matching transition: log "⚠️ No done-state transition found for {jira_key}" in running summary (non-blocking)
+   1. **Transition to Done** — follow `references/jira-transition-protocol.md` exactly, with
+      `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true`.
+      That protocol owns the matching order, the required-field handling (a workflow whose Done
+      transition requires a `resolution` is common — it must be sent in the same call), and the
+      MUST-NOT clauses against guessing a fallback transition. Do not re-implement it here.
+      - **Retry once** if the transition call fails with a transport-level error.
+      - If it still fails: post a PR comment (Bitbucket REST API) warning that the Jira issue was
+        not moved to Done, and log in running summary.
+      - If the protocol reports a skip (no matching transition, or a required field it cannot
+        fill): log that reason in the running summary (non-blocking).
 
    2. **Post completion comment** — call `addCommentToJiraIssue`:
       - `cloudId`: {derived hostname}

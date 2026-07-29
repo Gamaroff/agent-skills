@@ -332,7 +332,7 @@ Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to "In Progress"** — follow `shared/resources/jira-transition-protocol.md` exactly with `candidates = ["In Progress"]`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
+2. **Transition to "In Progress"** — follow `shared/resources/jira-transition-protocol.md` exactly with `candidates = ["In Progress", "Doing", "Started", "Development"]` and `terminal = false`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
 
 3. **Post-condition verification** — call `getJiraIssue` to confirm the transition worked:
    - Call `getJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, `fields: ["status"]`

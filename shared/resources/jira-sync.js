@@ -1066,40 +1066,152 @@ async function moveToBacklog({
 // ---------------------------------------------------------------------------
 // Single source of truth shared by sync-jira-{story,task,epic}. Covers the full
 // canonical lifecycle (see the document-status-lifecycle spec) plus the
-// historical aliases. Keys are lowercased; values are literal Jira status names
-// matched against transition `to.name`. Projects with custom workflow vocabulary
-// override via skills-config.yaml `jira.statusMap` (see loadStatusMap).
+// historical aliases. Keys are lowercased.
+//
+// Each local status maps to an ORDERED LIST of candidate Jira status names,
+// tried in order against the issue's *available* transitions (target status
+// name first, then transition name — see resolveTransition).
+//
+// Why a list and not one name: Jira workflows name the same lifecycle stage
+// very differently — "To Do" / "Selected for Development" / "Backlog"; "In
+// Review" / "Code Review" / "Waiting for Review". Matching a single hardcoded
+// name meant any board that picked a different word silently skipped every
+// status change, and the sync still reported success. The list makes the common
+// vocabularies work with no configuration at all; `jira.statusMap` in
+// skills-config.yaml still narrows, reorders, or replaces it (see
+// loadStatusMap) for a board that needs something else.
+//
+// The FIRST entry of each list is the historical single value, so mapStatus()
+// returns exactly what it always did for existing callers.
+const NEW_CANDIDATES = Object.freeze([
+  "To Do",
+  "Backlog",
+  "Open",
+  "New",
+  "Selected for Development",
+]);
+const IN_PROGRESS_CANDIDATES = Object.freeze([
+  "In Progress",
+  "Doing",
+  "Started",
+  "Development",
+]);
+const REVIEW_CANDIDATES = Object.freeze([
+  "In Review",
+  "Code Review",
+  "Ready for Review",
+  "Waiting for Review",
+  "Peer Review",
+  "Review",
+]);
+const DONE_CANDIDATES = Object.freeze([
+  "Done",
+  "Closed",
+  "Resolved",
+  "Complete",
+  "Completed",
+]);
+const CANCELLED_CANDIDATES = Object.freeze([
+  "Cancelled",
+  "Canceled",
+  "Won't Do",
+  "Rejected",
+  "Closed",
+]);
+const WONT_DO_CANDIDATES = Object.freeze([
+  "Won't Do",
+  "Wont Do",
+  "Won't Fix",
+  "Declined",
+  "Rejected",
+  "Cancelled",
+]);
+const BLOCKED_CANDIDATES = Object.freeze(["Blocked", "On Hold", "Impeded"]);
+const READY_CANDIDATES = Object.freeze([
+  "Ready",
+  "Ready for Development",
+  "Selected for Development",
+]);
+
 const DEFAULT_STATUS_MAP = {
   // canonical lifecycle
-  draft: "To Do",
-  planned: "To Do",
-  "ready-for-development": "To Do",
-  "in-progress": "In Progress",
-  "ready-for-review": "In Review",
-  accepted: "Done",
-  cancelled: "Cancelled",
+  draft: NEW_CANDIDATES,
+  planned: NEW_CANDIDATES,
+  "ready-for-development": NEW_CANDIDATES,
+  "in-progress": IN_PROGRESS_CANDIDATES,
+  "ready-for-review": REVIEW_CANDIDATES,
+  accepted: DONE_CANDIDATES,
+  cancelled: CANCELLED_CANDIDATES,
   // aliases
-  "ready for development": "To Do",
-  todo: "To Do",
-  "to do": "To Do",
-  open: "To Do",
-  backlog: "To Do",
-  "in progress": "In Progress",
-  doing: "In Progress",
-  "ready for review": "In Review",
-  "in review": "In Review",
-  review: "In Review",
-  ready: "Ready",
-  done: "Done",
-  completed: "Done",
-  complete: "Done",
-  blocked: "Blocked",
-  canceled: "Cancelled",
-  "won't do": "Won't Do",
-  "wont do": "Won't Do",
-  "won't fix": "Won't Do",
-  wontfix: "Won't Do",
+  "ready for development": NEW_CANDIDATES,
+  todo: NEW_CANDIDATES,
+  "to do": NEW_CANDIDATES,
+  open: NEW_CANDIDATES,
+  backlog: NEW_CANDIDATES,
+  "in progress": IN_PROGRESS_CANDIDATES,
+  doing: IN_PROGRESS_CANDIDATES,
+  "ready for review": REVIEW_CANDIDATES,
+  "in review": REVIEW_CANDIDATES,
+  review: REVIEW_CANDIDATES,
+  ready: READY_CANDIDATES,
+  done: DONE_CANDIDATES,
+  completed: DONE_CANDIDATES,
+  complete: DONE_CANDIDATES,
+  blocked: BLOCKED_CANDIDATES,
+  canceled: CANCELLED_CANDIDATES,
+  "won't do": WONT_DO_CANDIDATES,
+  "wont do": WONT_DO_CANDIDATES,
+  "won't fix": WONT_DO_CANDIDATES,
+  wontfix: WONT_DO_CANDIDATES,
 };
+
+// Local statuses meaning "this work is finished". Only these may fall back to
+// statusCategory matching (resolveTransition rule 4) — see the comment there
+// for why the fallback is unsafe for every other stage.
+const TERMINAL_LOCAL_STATUSES = new Set([
+  "accepted",
+  "cancelled",
+  "canceled",
+  "done",
+  "completed",
+  "complete",
+  "won't do",
+  "wont do",
+  "won't fix",
+  "wontfix",
+]);
+
+// Terminal statuses meaning "finished WITHOUT being delivered" — these pick a
+// negative resolution when the transition requires one.
+const NEGATIVE_LOCAL_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "won't do",
+  "wont do",
+  "won't fix",
+  "wontfix",
+  "rejected",
+]);
+
+// Ordered preferences used to satisfy a required `resolution` field, filtered
+// against that transition's own allowedValues. Never invented: if none match,
+// the first value the workflow itself offers is used.
+const POSITIVE_RESOLUTIONS = Object.freeze([
+  "Done",
+  "Resolved",
+  "Fixed",
+  "Complete",
+  "Completed",
+]);
+const NEGATIVE_RESOLUTIONS = Object.freeze([
+  "Won't Do",
+  "Wont Do",
+  "Cancelled",
+  "Canceled",
+  "Declined",
+  "Rejected",
+  "Won't Fix",
+]);
 
 // Strip a YAML-style inline trailing comment from a scalar value. A `#` starts
 // a comment only at the start of the token or when preceded by whitespace, and
@@ -1130,10 +1242,57 @@ function stripInlineComment(s) {
 //     statusMap:
 //       ready-for-development: Selected for Development
 //       accepted: "Done"
+// Returns { base, byType } where `base` is the flat local-status -> candidates
+// map and `byType` holds optional per-issue-type overrides. Values may be a
+// single name or an ordered candidate list, in any of three forms:
+//
+//   jira:
+//     statusMap:
+//       ready-for-development: Selected for Development   # scalar
+//       accepted: [Done, Closed]                          # flow sequence
+//       ready-for-review:                                 # block sequence
+//         - Waiting for Review
+//         - In Review
+//       epic:                                             # per-issue-type
+//         accepted: Closed
+//
+// A nested key is read as an issue-type override when its children are
+// `key: value` pairs, and as a candidate list when they are `- item` entries.
+function unquote(s) {
+  return String(s == null ? "" : s)
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
+}
+
+// `[A, B, "C, still C"]` -> ["A","B","C, still C"]; returns null if not a flow seq.
+function parseFlowSequence(value) {
+  const v = String(value || "").trim();
+  if (!v.startsWith("[") || !v.endsWith("]")) return null;
+  const inner = v.slice(1, -1);
+  const items = [];
+  let buf = "";
+  let quote = null;
+  for (const ch of inner) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else buf += ch;
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === ",") {
+      items.push(buf);
+      buf = "";
+    } else buf += ch;
+  }
+  items.push(buf);
+  return items.map((s) => unquote(s)).filter(Boolean);
+}
+
 function parseStatusMapBlock(text) {
-  const out = {};
+  const base = {};
+  const byType = {};
   const lines = String(text || "").split("\n");
   const indentOf = (l) => l.length - l.replace(/^\s+/, "").length;
+  const isSkippable = (l) => !l.trim() || l.trim().startsWith("#");
   let i = 0;
   // find top-level `jira:`
   for (; i < lines.length; i++) {
@@ -1142,64 +1301,139 @@ function parseStatusMapBlock(text) {
       break;
     }
   }
-  if (i >= lines.length) return out;
+  if (i >= lines.length) return { base, byType };
   const jiraIndent = 0;
   // find `statusMap:` nested under jira
   let smIndent = -1;
   for (; i < lines.length; i++) {
     const raw = lines[i];
-    if (!raw.trim() || raw.trim().startsWith("#")) continue;
-    if (indentOf(raw) <= jiraIndent) return out; // left the jira block
+    if (isSkippable(raw)) continue;
+    if (indentOf(raw) <= jiraIndent) return { base, byType }; // left the jira block
     if (/^\s+statusMap:\s*(#.*)?$/.test(raw)) {
       smIndent = indentOf(raw);
       i++;
       break;
     }
   }
-  if (smIndent < 0) return out;
-  // collect `key: value` entries indented deeper than statusMap
+  if (smIndent < 0) return { base, byType };
+
+  // collect entries indented deeper than statusMap
   for (; i < lines.length; i++) {
     const raw = lines[i];
-    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    if (isSkippable(raw)) continue;
     if (indentOf(raw) <= smIndent) break; // end of statusMap block
-    const m = raw.trim().match(/^("?[^":]+"?|'[^']+'):\s*(.+?)\s*$/);
+    const m = raw.trim().match(/^("?[^":]+"?|'[^']+'):\s*(.*?)\s*$/);
     if (!m) continue;
-    const key = m[1].replace(/^["']|["']$/g, "").trim();
-    const val = stripInlineComment(m[2])
-      .replace(/^["']|["']$/g, "")
-      .trim();
-    if (key && val) out[key] = val;
+    const key = unquote(m[1]);
+    if (!key) continue;
+    const rawVal = stripInlineComment(m[2]).trim();
+
+    if (rawVal) {
+      const flow = parseFlowSequence(rawVal);
+      const val = flow || unquote(rawVal);
+      if (Array.isArray(val) ? val.length : val) base[key.toLowerCase()] = val;
+      continue;
+    }
+
+    // Empty value: the entry continues on deeper-indented lines — either a
+    // block sequence (candidate list) or a nested map (issue-type override).
+    const entryIndent = indentOf(raw);
+    const items = [];
+    const nested = {};
+    let j = i + 1;
+    for (; j < lines.length; j++) {
+      const child = lines[j];
+      if (isSkippable(child)) continue;
+      if (indentOf(child) <= entryIndent) break;
+      const t = child.trim();
+      if (t.startsWith("- ")) {
+        const item = unquote(stripInlineComment(t.slice(2)));
+        if (item) items.push(item);
+        continue;
+      }
+      const cm = t.match(/^("?[^":]+"?|'[^']+'):\s*(.*?)\s*$/);
+      if (!cm) continue;
+      const ck = unquote(cm[1]);
+      const cvRaw = stripInlineComment(cm[2]).trim();
+      const cv = parseFlowSequence(cvRaw) || unquote(cvRaw);
+      if (ck && (Array.isArray(cv) ? cv.length : cv))
+        nested[ck.toLowerCase()] = cv;
+    }
+    i = j - 1;
+    if (items.length) base[key.toLowerCase()] = items;
+    else if (Object.keys(nested).length) byType[key.toLowerCase()] = nested;
   }
-  return out;
+  return { base, byType };
 }
 
 // Build the effective status map: DEFAULT_STATUS_MAP overlaid with any
-// `jira.statusMap` entries from skills-config.yaml at the repo root. Override
-// keys are lowercased so lookups stay case-insensitive. Any failure (no file,
+// `jira.statusMap` entries from skills-config.yaml at the repo root, then with
+// that block's `<issueType>:` sub-map when `issueType` is given. Override keys
+// are lowercased so lookups stay case-insensitive. Any failure (no file,
 // unreadable, parse error) falls back to the defaults unchanged.
-function loadStatusMap(repoRoot) {
+//
+// The per-issue-type layer exists because a Jira project can run a different
+// workflow per type — an Epic with only Open/Done alongside a Story with a full
+// review-and-test lane — which one flat map cannot express.
+function loadStatusMap(repoRoot, issueType) {
   const map = { ...DEFAULT_STATUS_MAP };
+  const apply = (overrides) => {
+    for (const [k, v] of Object.entries(overrides || {})) {
+      if (typeof v === "string" && v.trim()) map[String(k).toLowerCase()] = v;
+      else if (Array.isArray(v) && v.length)
+        map[String(k).toLowerCase()] = v.slice();
+    }
+  };
   try {
     const root =
       repoRoot ||
       execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
     const cfgPath = path.join(root, "skills-config.yaml");
     if (!fs.existsSync(cfgPath)) return map;
-    const overrides = parseStatusMapBlock(fs.readFileSync(cfgPath, "utf-8"));
-    for (const [k, v] of Object.entries(overrides)) {
-      if (typeof v === "string" && v.trim()) map[String(k).toLowerCase()] = v;
-    }
+    const { base, byType } = parseStatusMapBlock(
+      fs.readFileSync(cfgPath, "utf-8"),
+    );
+    apply(base);
+    if (issueType) apply(byType[String(issueType).toLowerCase()]);
   } catch (_) {}
   return map;
 }
 
-// Map a raw frontmatter status to its Jira target name. Strips emoji,
-// lowercases, looks up in `statusMap`; unmapped values pass through verbatim
-// (emoji-stripped) for custom workflows.
-function mapStatus(raw, statusMap = DEFAULT_STATUS_MAP) {
+// Map a raw frontmatter status to the ORDERED candidate Jira status names to
+// try. Strips emoji, lowercases, looks up in `statusMap`; unmapped values pass
+// through verbatim (emoji-stripped) as a single candidate, so a custom status
+// name written straight into frontmatter still works.
+//
+// A map entry may be a string (one candidate — the config form) or an array
+// (the defaults). Both normalise to an array here, so callers have one shape.
+function mapStatusCandidates(raw, statusMap = DEFAULT_STATUS_MAP) {
   if (!raw) return null;
   const stripped = stripStatusEmoji(raw);
-  return statusMap[stripped.toLowerCase()] || stripped;
+  if (!stripped) return null;
+  const hit = statusMap[stripped.toLowerCase()];
+  if (hit == null) return [stripped];
+  const list = (Array.isArray(hit) ? hit : [hit])
+    .map((s) => stripStatusEmoji(s))
+    .filter(Boolean);
+  return list.length ? list : [stripped];
+}
+
+// Back-compatible single-name view of the above: the primary (first) candidate.
+// Retained because it is an exported part of the library surface; the sync
+// scripts use mapStatusCandidates so they get the full list.
+function mapStatus(raw, statusMap = DEFAULT_STATUS_MAP) {
+  const list = mapStatusCandidates(raw, statusMap);
+  return list ? list[0] : null;
+}
+
+// Is this local status one that means "finished"? Drives both the terminal-only
+// statusCategory fallback and the choice of a positive/negative resolution.
+function isTerminalLocalStatus(raw) {
+  return TERMINAL_LOCAL_STATUSES.has(stripStatusEmoji(raw).toLowerCase());
+}
+
+function isNegativeLocalStatus(raw) {
+  return NEGATIVE_LOCAL_STATUSES.has(stripStatusEmoji(raw).toLowerCase());
 }
 
 // ---------------------------------------------------------------------------
@@ -1263,6 +1497,44 @@ function loadDevEstimateField(repoRoot) {
   } catch (_) {
     return "";
   }
+}
+
+// Resolve a `jira.<key>` scalar from skills-config.yaml, with an environment
+// override that wins. Returns "" when unset anywhere, which every caller reads
+// as "use the built-in preference order".
+function loadJiraScalarSetting(repoRoot, key, envVar) {
+  const fromEnv = envVar && process.env[envVar];
+  if (fromEnv && String(fromEnv).trim()) return String(fromEnv).trim();
+  try {
+    const root =
+      repoRoot ||
+      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const cfgPath = path.join(root, "skills-config.yaml");
+    if (!fs.existsSync(cfgPath)) return "";
+    return parseJiraScalar(fs.readFileSync(cfgPath, "utf-8"), key);
+  } catch (_) {
+    return "";
+  }
+}
+
+// Resolution names used when a workflow's done/cancelled transition requires a
+// `resolution` field. Optional: left unset, buildTransitionFields falls back to
+// POSITIVE_RESOLUTIONS / NEGATIVE_RESOLUTIONS and then to whatever the
+// transition's own allowedValues offer first.
+function loadDoneResolution(repoRoot) {
+  return loadJiraScalarSetting(
+    repoRoot,
+    "doneResolution",
+    "JIRA_DONE_RESOLUTION",
+  );
+}
+
+function loadCancelledResolution(repoRoot) {
+  return loadJiraScalarSetting(
+    repoRoot,
+    "cancelledResolution",
+    "JIRA_CANCELLED_RESOLUTION",
+  );
 }
 
 // Frontmatter placeholders that must never reach the Jira API. `assignee: TBD`
@@ -1346,9 +1618,13 @@ function stripStatusEmoji(s) {
     .trim();
 }
 
+// `expand=transitions.fields` makes Jira declare, per transition, which fields
+// the workflow's transition screen requires and what values it will accept.
+// Without it a transition that requires e.g. a resolution returns HTTP 400 with
+// no way to know what was missing. See buildTransitionFields.
 async function getTransitions({ http, baseUrl, email, token, issueKey }) {
   const resp = await http(
-    `${baseUrl}/rest/api/3/issue/${issueKey}/transitions`,
+    `${baseUrl}/rest/api/3/issue/${issueKey}/transitions?expand=transitions.fields`,
     {
       headers: {
         Authorization: authHeader(email, token),
@@ -1361,6 +1637,122 @@ async function getTransitions({ http, baseUrl, email, token, issueKey }) {
   return data.transitions || [];
 }
 
+const eqName = (a, b) =>
+  String(a || "").toLowerCase() === String(b || "").toLowerCase();
+
+// Pick the transition to fire, given the ordered candidate names for a local
+// status and the transitions Jira says are actually available right now.
+//
+// Pure (no I/O) so the rules can be unit-tested against captured API payloads.
+// Returns { match, rule } on success, or { match: null, reason } otherwise.
+//
+// Order matters, and each step is exact — never fuzzy:
+//   1. already satisfied — the issue already sits in one of the candidates
+//   2. target status name (`to.name`), candidates in order
+//   3. transition name (`name`), candidates in order
+//   4. terminal statuses ONLY: the single transition into statusCategory "done"
+//
+// Step 3 exists because workflows routinely name the *action* rather than the
+// destination — "Implemented" leading to "Waiting for Review". Step 2 is
+// exhausted across all candidates first so a board offering both an exact
+// destination match and an unrelated action name picks the destination.
+//
+// Step 4 is deliberately restricted to terminal statuses. Falling back to
+// statusCategory for "new"/"indeterminate" was tried and rejected: on a real
+// board it silently picked WRONG transitions — `ready-for-review` resolved to
+// "In Progress", and `in-progress` resolved to "Waiting for Review" — because
+// those categories routinely hold several unrelated states. A skipped status
+// change is recoverable; a confident wrong transition is not.
+function resolveTransition({
+  transitions,
+  candidates,
+  currentStatus,
+  terminal = false,
+}) {
+  const list = (candidates || []).map(stripStatusEmoji).filter(Boolean);
+  const current = stripStatusEmoji(currentStatus);
+  const avail = transitions || [];
+  if (!list.length) return { match: null, reason: "no-target" };
+
+  if (list.some((c) => eqName(c, current)))
+    return { match: null, reason: "already" };
+
+  for (const c of list) {
+    const m = avail.find((t) => eqName(t.to && t.to.name, c));
+    if (m) return { match: m, rule: `to.name="${c}"` };
+  }
+  for (const c of list) {
+    const m = avail.find((t) => eqName(t.name, c));
+    if (m) return { match: m, rule: `name="${c}"` };
+  }
+
+  if (terminal) {
+    const done = avail.filter(
+      (t) => t.to && t.to.statusCategory && t.to.statusCategory.key === "done",
+    );
+    if (done.length === 1)
+      return { match: done[0], rule: "statusCategory=done (unambiguous)" };
+    if (done.length > 1) return { match: null, reason: "ambiguous-terminal" };
+  }
+
+  return { match: null, reason: "no-transition" };
+}
+
+// Satisfy whatever fields the matched transition declares as required, using
+// only values that transition itself offers in `allowedValues`.
+//
+// Generic on purpose: nothing here knows any particular board's vocabulary, it
+// reads the schema the workflow publishes. `resolution` is the one field with
+// enough shared meaning to fill safely — everything else is reported as
+// unfillable so the caller can skip rather than fire a request certain to 400.
+function buildTransitionFields(
+  match,
+  { negative = false, resolutionPref = "" } = {},
+) {
+  const required = Object.entries((match && match.fields) || {}).filter(
+    ([, spec]) => spec && spec.required,
+  );
+  const fields = {};
+  const unfillable = [];
+
+  for (const [key, spec] of required) {
+    if (key !== "resolution") {
+      unfillable.push(key);
+      continue;
+    }
+    const allowed = (spec && spec.allowedValues) || [];
+    const prefs = [
+      resolutionPref,
+      ...(negative ? NEGATIVE_RESOLUTIONS : POSITIVE_RESOLUTIONS),
+    ].filter(Boolean);
+    const pick =
+      prefs.map((p) => allowed.find((v) => eqName(v.name, p))).find(Boolean) ||
+      allowed[0];
+    if (!pick) {
+      unfillable.push(key);
+      continue;
+    }
+    fields.resolution =
+      pick.id != null ? { id: String(pick.id) } : { name: pick.name };
+  }
+
+  return {
+    fields: Object.keys(fields).length ? fields : null,
+    unfillable,
+    requiredKeys: required.map(([k]) => k),
+  };
+}
+
+// Move an issue to the status implied by its local document status.
+//
+// `targetStatus` accepts either a single name (legacy callers) or the ordered
+// candidate list from mapStatusCandidates. `localStatus` is the raw frontmatter
+// value, used only to decide whether this is a terminal status — which unlocks
+// the statusCategory fallback and selects a positive vs negative resolution.
+//
+// Never throws and never fails the sync; returns a { transitioned, reason }
+// record that callers surface in their summary (see the --fail-on-status-skip
+// handling in the sync scripts).
 async function transitionToStatus({
   http,
   baseUrl,
@@ -1369,13 +1761,33 @@ async function transitionToStatus({
   issueKey,
   targetStatus,
   currentStatus,
+  localStatus,
+  doneResolution = "",
+  cancelledResolution = "",
   output,
 }) {
-  const target = stripStatusEmoji(targetStatus);
+  const candidates = (
+    Array.isArray(targetStatus) ? targetStatus : [targetStatus]
+  )
+    .map(stripStatusEmoji)
+    .filter(Boolean);
   const current = stripStatusEmoji(currentStatus);
-  if (!target) return { transitioned: false, reason: "no-target" };
-  if (target.toLowerCase() === current.toLowerCase())
-    return { transitioned: false, reason: "already" };
+  if (!candidates.length) return { transitioned: false, reason: "no-target" };
+
+  const localRaw = localStatus == null ? candidates[0] : localStatus;
+  const terminal = isTerminalLocalStatus(localRaw);
+  const negative = isNegativeLocalStatus(localRaw);
+
+  // Short-circuit before any network call when the issue already sits in one of
+  // the candidate statuses — resolveTransition would reach the same verdict,
+  // but only after a pointless round-trip.
+  if (candidates.some((c) => eqName(c, current)))
+    return {
+      transitioned: false,
+      reason: "already",
+      to: current,
+      from: current,
+    };
 
   const transitions = await getTransitions({
     http,
@@ -1384,28 +1796,77 @@ async function transitionToStatus({
     token,
     issueKey,
   });
-  const match =
-    transitions.find(
-      (t) => (t.to?.name || "").toLowerCase() === target.toLowerCase(),
-    ) ||
-    transitions.find(
-      (t) => (t.name || "").toLowerCase() === target.toLowerCase(),
-    );
+  const { match, rule, reason } = resolveTransition({
+    transitions,
+    candidates,
+    currentStatus: current,
+    terminal,
+  });
+
+  const describeAvailable = () => {
+    const seen = transitions
+      .map((t) => {
+        const to = (t.to && t.to.name) || "";
+        return to && !eqName(to, t.name) ? `${t.name} → ${to}` : t.name || to;
+      })
+      .filter(Boolean);
+    return seen.length ? seen.join(", ") : "(none)";
+  };
+
   if (!match) {
+    if (reason === "already")
+      return { transitioned: false, reason: "already", to: current };
     if (output) {
-      const available = transitions
-        .map((t) => t.to?.name || t.name)
-        .filter(Boolean);
-      const avail = available.length ? available.join(", ") : "(none)";
+      const why =
+        reason === "ambiguous-terminal"
+          ? `Several transitions lead to a done status, so none was assumed`
+          : `No transition matched`;
       output.warn(
-        `⚠️  No Jira transition to "${target}" from "${current}". Available: ${avail}.`,
+        `⚠️  Jira status not changed for ${issueKey} (currently "${current}").`,
       );
+      output.warn(`    ${why}. Tried, in order: ${candidates.join(", ")}.`);
+      output.warn(`    Available from here: ${describeAvailable()}.`);
       output.warn(
-        `    Map your local status to a workflow name in skills-config.yaml under jira.statusMap. Skipping status change.`,
+        `    Set jira.statusMap in skills-config.yaml to name the status this board uses,` +
+          ` or run with --probe-workflow to see the board's full transition graph.`,
       );
     }
-    return { transitioned: false, reason: "no-transition" };
+    return {
+      transitioned: false,
+      reason: reason || "no-transition",
+      candidates,
+      available: describeAvailable(),
+      from: current,
+    };
   }
+
+  const { fields, unfillable, requiredKeys } = buildTransitionFields(match, {
+    negative,
+    resolutionPref: negative ? cancelledResolution : doneResolution,
+  });
+
+  // Refuse to send a request the workflow has already told us is incomplete.
+  if (unfillable.length) {
+    if (output) {
+      output.warn(
+        `⚠️  Jira status not changed for ${issueKey}: transition "${match.name}" requires` +
+          ` field(s) this sync cannot fill: ${unfillable.join(", ")}.`,
+      );
+      output.warn(
+        `    Move it by hand in Jira, or relax the transition screen's required fields.`,
+      );
+    }
+    return {
+      transitioned: false,
+      reason: "required-fields",
+      unfillable,
+      from: current,
+    };
+  }
+
+  const body = { transition: { id: match.id } };
+  if (fields) body.fields = fields;
+
   const resp = await http(
     `${baseUrl}/rest/api/3/issue/${issueKey}/transitions`,
     {
@@ -1415,20 +1876,277 @@ async function transitionToStatus({
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ transition: { id: match.id } }),
+      body: JSON.stringify(body),
     },
   );
   if (!resp.ok) {
     const msg = await parseJiraError(resp);
-    if (output)
+    if (output) {
       output.warn(
-        `⚠️  Status transition failed (non-fatal): HTTP ${resp.status}: ${msg}`,
+        `⚠️  Jira status not changed for ${issueKey}: transition "${match.name}" returned HTTP ${resp.status}: ${msg}`,
       );
-    return { transitioned: false, reason: `http-${resp.status}` };
+      if (requiredKeys.length)
+        output.warn(`    Fields sent: ${JSON.stringify(fields || {})}.`);
+      // A workflow *validator* (as opposed to a required field) is invisible to
+      // `expand=transitions.fields`, so this is the only place it can surface.
+      output.warn(
+        `    If the message names a field or a worklog, that is a workflow validator the` +
+          ` transitions API does not advertise; it must be satisfied in the same request.`,
+      );
+    }
+    return {
+      transitioned: false,
+      reason: `http-${resp.status}`,
+      detail: msg,
+      from: current,
+    };
   }
+
+  const landed = (match.to && match.to.name) || match.name;
   if (output)
-    output.info(`   🔀 Transitioned ${issueKey}: "${current}" → "${target}"`);
-  return { transitioned: true, from: current, to: target };
+    output.info(
+      `   🔀 Transitioned ${issueKey}: "${current}" → "${landed}" (matched ${rule})`,
+    );
+  return { transitioned: true, from: current, to: landed, rule };
+}
+
+// Drive an issue's Jira status from a local document's frontmatter status.
+// Shared by all three sync skills so they resolve, configure, and report
+// identically. `docKind` ("story" | "task" | "epic") selects the optional
+// per-issue-type layer of jira.statusMap.
+async function syncDocumentStatus({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  localStatus,
+  currentStatus,
+  docKind,
+  repoRoot,
+  output,
+}) {
+  const root =
+    repoRoot ||
+    (() => {
+      try {
+        return execSync("git rev-parse --show-toplevel", {
+          encoding: "utf-8",
+        }).trim();
+      } catch (_) {
+        return "";
+      }
+    })();
+
+  const statusMap = loadStatusMap(root || undefined, docKind);
+  const candidates = mapStatusCandidates(localStatus, statusMap);
+  if (!candidates || !candidates.length)
+    return { transitioned: false, reason: "no-target", localStatus };
+
+  const res = await transitionToStatus({
+    http,
+    baseUrl,
+    email,
+    token,
+    issueKey,
+    targetStatus: candidates,
+    currentStatus,
+    localStatus,
+    doneResolution: loadDoneResolution(root || undefined),
+    cancelledResolution: loadCancelledResolution(root || undefined),
+    output,
+  });
+  return { ...res, localStatus, issueKey };
+}
+
+// Terse end-of-run line for a status change that did not happen, printed after
+// the success output so it cannot be lost in the middle of a long sync. The
+// detailed diagnosis was already emitted by transitionToStatus.
+//
+// Returns the exit code to use: non-zero only under --fail-on-status-skip, so
+// existing pipelines on boards this cannot drive keep working.
+function summariseStatusOutcome(outcome, { output, failOnSkip = false } = {}) {
+  if (!outcome) return 0;
+  const { transitioned, reason } = outcome;
+  if (transitioned || reason === "already" || reason === "no-target") return 0;
+
+  if (output) {
+    const where = outcome.from ? ` It is still "${outcome.from}".` : "";
+    output.warn(
+      `\n⚠️  Status NOT synced for ${outcome.issueKey} (local status "${outcome.localStatus}", reason: ${reason}).${where}` +
+        `\n    Everything else synced. Move it by hand, or see the guidance above.`,
+    );
+  }
+  return failOnSkip ? 1 : 0;
+}
+
+// The canonical local vocabulary, in lifecycle order — what a probe reports on.
+const CANONICAL_LOCAL_STATUSES = Object.freeze([
+  "draft",
+  "planned",
+  "ready-for-development",
+  "in-progress",
+  "ready-for-review",
+  "accepted",
+  "cancelled",
+]);
+
+// Read-only diagnostic: show what this Jira project's workflow actually offers
+// and, for each canonical local status, which transition would be chosen and by
+// which rule. Writes nothing, transitions nothing.
+//
+// Boards vary enough that guessing at `jira.statusMap` from documentation is a
+// waste of time; this prints the ground truth instead. Sampling a real issue
+// per type is what makes it honest — transitions are position-dependent, so the
+// answer legitimately differs depending on where an issue currently sits.
+async function probeWorkflow({
+  http,
+  baseUrl,
+  email,
+  token,
+  projectKey,
+  issueKey,
+  repoRoot,
+  docKind,
+  output,
+}) {
+  const log = (s) => output && output.info(s);
+  const headers = {
+    Authorization: authHeader(email, token),
+    Accept: "application/json",
+  };
+
+  log(
+    `\n🔎 Workflow probe — project ${projectKey}${baseUrl ? ` (${baseUrl})` : ""}`,
+  );
+
+  // 1. statuses per issue type
+  let types = [];
+  try {
+    const resp = await http(
+      `${baseUrl}/rest/api/3/project/${projectKey}/statuses`,
+      { headers },
+    );
+    if (resp.ok) types = await resp.json();
+  } catch (_) {}
+
+  if (!types.length) {
+    log(
+      `   Could not read project statuses (permissions or wrong project key).`,
+    );
+  } else {
+    log(`\n   Statuses by issue type`);
+    for (const t of types) {
+      const names = (t.statuses || [])
+        .map((s) => `${s.name} [${s.statusCategory && s.statusCategory.key}]`)
+        .join(", ");
+      log(`     ${t.name}: ${names || "(none)"}`);
+    }
+  }
+
+  // 2. sample a live issue per issue type so transitions are real, not guessed
+  const samples = [];
+  if (issueKey) {
+    samples.push({ key: issueKey, type: "(supplied)" });
+  } else {
+    for (const t of types) {
+      try {
+        const jql = encodeURIComponent(
+          `project=${projectKey} AND issuetype="${t.name}" ORDER BY updated DESC`,
+        );
+        const resp = await http(
+          `${baseUrl}/rest/api/3/search/jql?jql=${jql}&maxResults=1&fields=status`,
+          { headers },
+        );
+        if (!resp.ok) continue;
+        const data = await resp.json();
+        const hit = (data.issues || [])[0];
+        if (hit)
+          samples.push({
+            key: hit.key,
+            type: t.name,
+            status: hit.fields && hit.fields.status && hit.fields.status.name,
+          });
+      } catch (_) {}
+    }
+  }
+
+  if (!samples.length) {
+    log(
+      `\n   No issues found to sample — transitions are only visible from a real issue.`,
+    );
+    return { types, samples: [] };
+  }
+
+  const statusMap = loadStatusMap(repoRoot, docKind);
+  const results = [];
+
+  for (const s of samples) {
+    let transitions = [];
+    try {
+      transitions = await getTransitions({
+        http,
+        baseUrl,
+        email,
+        token,
+        issueKey: s.key,
+      });
+    } catch (_) {}
+
+    log(`\n   ${s.key} — ${s.type} @ "${s.status || "?"}"`);
+    log(`     Transitions available from here:`);
+    for (const t of transitions) {
+      const req = Object.entries(t.fields || {})
+        .filter(([, v]) => v && v.required)
+        .map(([k]) => k);
+      log(
+        `       id=${t.id} "${t.name}" → "${(t.to && t.to.name) || "?"}"` +
+          `${req.length ? `  requires: ${req.join(", ")}` : ""}`,
+      );
+    }
+
+    log(`     Local status → what this sync would do:`);
+    for (const local of CANONICAL_LOCAL_STATUSES) {
+      const candidates = mapStatusCandidates(local, statusMap) || [];
+      const r = resolveTransition({
+        transitions,
+        candidates,
+        currentStatus: s.status,
+        terminal: isTerminalLocalStatus(local),
+      });
+      if (!r.match) {
+        log(`       ${local.padEnd(22)} skip (${r.reason})`);
+        results.push({ issue: s.key, local, action: `skip:${r.reason}` });
+        continue;
+      }
+      const built = buildTransitionFields(r.match, {
+        negative: isNegativeLocalStatus(local),
+      });
+      const extra = built.unfillable.length
+        ? `  UNFILLABLE: ${built.unfillable.join(", ")}`
+        : built.fields
+          ? `  + ${JSON.stringify(built.fields)}`
+          : "";
+      log(
+        `       ${local.padEnd(22)} → "${(r.match.to && r.match.to.name) || r.match.name}"` +
+          ` (via ${r.rule})${extra}`,
+      );
+      results.push({
+        issue: s.key,
+        local,
+        to: r.match.to && r.match.to.name,
+        rule: r.rule,
+        unfillable: built.unfillable,
+      });
+    }
+  }
+
+  log(
+    `\n   Candidate names come from jira.statusMap in skills-config.yaml, overlaid on the defaults.` +
+      `\n   A "skip" above means this board has no transition for that stage from that position — which is` +
+      `\n   often correct. Only add a statusMap entry when a stage you actually use is being skipped.\n`,
+  );
+  return { types, samples, results };
 }
 
 // ---------------------------------------------------------------------------
@@ -1732,16 +2450,27 @@ module.exports = {
   putIssueAtomic,
   findExistingByLabel,
   transitionToStatus,
+  syncDocumentStatus,
+  summariseStatusOutcome,
+  probeWorkflow,
+  CANONICAL_LOCAL_STATUSES,
   getTransitions,
+  resolveTransition,
+  buildTransitionFields,
   stripStatusEmoji,
   detectProjectStyle,
   // status mapping
   DEFAULT_STATUS_MAP,
   loadStatusMap,
   mapStatus,
+  mapStatusCandidates,
+  isTerminalLocalStatus,
+  isNegativeLocalStatus,
   // jira scalar config
   parseJiraScalar,
   loadDevEstimateField,
+  loadDoneResolution,
+  loadCancelledResolution,
   loadDefaultAssignee,
   resolveAssignee,
   isAssigneePlaceholder,

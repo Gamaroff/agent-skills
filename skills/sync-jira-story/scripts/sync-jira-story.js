@@ -372,6 +372,8 @@ function parseArgs(argv) {
   const opts = {
     file: null, summary: null, priority: null, labels: null, docBranch: null,
     dryRun: false, noWrite: false, force: false, json: false, quiet: false,
+    failOnStatusSkip: false,
+    probeWorkflow: false,
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -385,6 +387,8 @@ function parseArgs(argv) {
       case "--force":    opts.force   = true; break;
       case "--json":     opts.json    = true; break;
       case "--quiet":    opts.quiet   = true; break;
+      case "--fail-on-status-skip": opts.failOnStatusSkip = true; break;
+      case "--probe-workflow":      opts.probeWorkflow    = true; break;
       default:
         if (args[i].startsWith("-")) throw new Error(`Unknown option: ${args[i]}`);
     }
@@ -399,6 +403,20 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   lib.loadDotEnv();
   const args = parseArgs(argv);
   const output = lib.makeOutput({ json: args.json, quiet: args.quiet });
+
+  if (args.probeWorkflow) {
+    const auth = lib.getAuth();
+    if (!auth.ok) {
+      output.err(`Error: Missing required environment variables: ${auth.missing.join(", ")}`);
+      return { exitCode: 1 };
+    }
+    const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
+    await lib.probeWorkflow({
+      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
+      projectKey: auth.project, docKind: "story", output,
+    });
+    return { exitCode: 0 };
+  }
 
   if (!args.file) {
     output.err("Error: --file is required");
@@ -644,12 +662,13 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   }
 
   // Status transition
+  let statusOutcome = null;
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
-    const target = lib.mapStatus(frontmatter.status, lib.loadStatusMap());
-    const currentStatus = current?.status || postCreateStatus || null;
-    await lib.transitionToStatus({
+    statusOutcome = await lib.syncDocumentStatus({
       http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      issueKey: result.issueKey, targetStatus: target, currentStatus, output,
+      issueKey: result.issueKey, localStatus: frontmatter.status,
+      currentStatus: current?.status || postCreateStatus || null,
+      docKind: "story", output,
     });
   }
 
@@ -691,7 +710,11 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     });
   }
 
-  return { exitCode: 0, result, changeSummary, isUpdate, storyBbUrl, epicBbUrl };
+  const statusExit = lib.summariseStatusOutcome(statusOutcome, {
+    output, failOnSkip: args.failOnStatusSkip,
+  });
+
+  return { exitCode: statusExit, result, changeSummary, isUpdate, storyBbUrl, epicBbUrl, statusOutcome };
 }
 
 // ---------------------------------------------------------------------------

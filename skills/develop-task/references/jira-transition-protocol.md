@@ -1,6 +1,6 @@
 ---
 name: jira-transition-protocol
-description: Deterministic Jira transition matching algorithm. Referenced by every develop-pipeline step that transitions a Jira issue via the Atlassian MCP tools. Prevents the LLM from inventing a fallback transition when no name matches.
+description: Deterministic Jira transition matching algorithm. Referenced by every develop-pipeline step that transitions a Jira issue via the Atlassian MCP tools. Prevents the LLM from inventing a fallback transition when no name matches, and fills the fields a transition screen requires.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/jira-transition-protocol.md. Regenerate via `npm run bundle`. -->
 
@@ -10,41 +10,58 @@ This protocol defines exactly how to transition a Jira issue via `getTransitions
 
 The matching loop is delegated to an LLM. Without explicit guard rails the model has been observed picking a non-matching transition (e.g. selecting `To Do` because it was first in the returned list when `In Review` was absent). The MUST-NOT clauses below close that hole.
 
+This mirrors `resolveTransition` / `buildTransitionFields` in `jira-sync.js`, which the sync skills use. **The two must stay in step** — same order, same rules, same refusals.
+
 ## Inputs
 
-- `cloudId`: derived from `JIRA_URL` hostname (e.g. `mediastreamag.atlassian.net`).
+- `cloudId`: derived from `JIRA_URL` hostname (e.g. `your-site.atlassian.net`).
 - `issueIdOrKey`: the Jira key (e.g. `RB-15`).
-- `candidates`: ordered list of acceptable transition names (case-insensitive). Examples:
-  - Signal Work Started → `["In Progress"]`
-  - PR opened → `["In Review", "Code Review", "Ready for Review"]`
-  - Finalise → `["Done", "Closed", "Resolved"]`
+- `candidates`: ordered list of acceptable status names (case-insensitive). Jira workflows name the same stage very differently, so each list covers the common vocabularies:
+  - Signal Work Started → `["In Progress", "Doing", "Started", "Development"]`
+  - PR opened → `["In Review", "Code Review", "Ready for Review", "Waiting for Review", "Peer Review", "Review"]`
+  - Finalise → `["Done", "Closed", "Resolved", "Complete", "Completed"]`
+- `terminal`: `true` only for the Finalise step (and any cancel/won't-do step). Unlocks rule 4 below.
 
 ## Algorithm (MUST follow exactly)
 
-1. Call `getTransitionsForJiraIssue` with `cloudId` and `issueIdOrKey`. Capture the returned `transitions` array.
-2. For each `candidate` in `candidates` (in order):
-   1. Find `t` in `transitions` where `t.to.name.toLowerCase() === candidate.toLowerCase()`. If found, record `matched = t` and break.
-   2. Else find `t` in `transitions` where `t.name.toLowerCase() === candidate.toLowerCase()`. If found, record `matched = t` and break.
-3. If `matched` is unset after the loop:
-   - Log `⚠️ No transition matching [<candidates>] available for <issueKey>. Available: [<list of t.to.name>]. Skipping.`
+1. Call `getTransitionsForJiraIssue` with `cloudId`, `issueIdOrKey`, and **`expand: "transitions.fields"`**. Capture the returned `transitions` array. The expand is what makes a transition's required fields visible; without it, a transition screen that requires a field returns a bare HTTP 400 with no way to know what was missing.
+2. **Already satisfied.** Read the issue's current status. If it case-insensitively equals any `candidate`, log `✅ <issueKey> is already <status>` and **return without calling `transitionJiraIssue`**.
+3. **Destination match.** For each `candidate` in order, find `t` in `transitions` where `t.to.name.toLowerCase() === candidate.toLowerCase()`. First hit wins; record `matched`.
+4. **Action match.** Only if step 3 found nothing: for each `candidate` in order, find `t` where `t.name.toLowerCase() === candidate.toLowerCase()`. First hit wins.
+   > Destinations are exhausted across **all** candidates before any action name is considered. Workflows routinely name the action rather than the destination — an `Implemented` transition leading to `Waiting for Review` — but where both exist the destination is the more reliable signal.
+5. **Terminal-only category fallback.** Only if `terminal` is true and steps 3–4 found nothing: collect the transitions whose `t.to.statusCategory.key === "done"`. If **exactly one** exists, use it. If two or more exist, do **not** guess — treat as no match.
+6. If nothing matched:
+   - Log `⚠️ No transition matching [<candidates>] available for <issueKey>. Available: [<t.name → t.to.name list>]. Skipping.`
    - **Return without calling `transitionJiraIssue`.** Non-blocking — the pipeline continues.
-4. If `matched` is set:
-   - Call `transitionJiraIssue` with `cloudId`, `issueIdOrKey`, and `transition: { id: matched.id }`.
-   - Log `✅ Jira issue <issueKey> moved to <matched.to.name>`.
-5. Post-condition: call `getJiraIssue` with `fields: ["status"]` and confirm `fields.status.name` equals `matched.to.name`. If mismatch, log a warning and continue.
+7. If `matched` is set, inspect `matched.fields` for entries with `required: true`:
+   - **`resolution`** — pick from that transition's own `allowedValues` by name: prefer `Done` / `Resolved` / `Fixed` for a positive finish, `Won't Do` / `Cancelled` / `Declined` for a cancellation. If none of those appear, use the first entry in `allowedValues`. Send it as `fields: { resolution: { id: "<id>" } }`.
+   - **Any other required field** — do **not** call `transitionJiraIssue`. Log `⚠️ Transition "<name>" requires field(s) this pipeline cannot fill: [<keys>]. Skipping.` and return. Firing a request the workflow has already declared incomplete buys nothing.
+8. Call `transitionJiraIssue` with `cloudId`, `issueIdOrKey`, `transition: { id: matched.id }`, and the `fields` object from step 7 **only if it is non-empty**. Log `✅ Jira issue <issueKey> moved to <matched.to.name>`.
+9. Post-condition: call `getJiraIssue` with `fields: ["status"]` and confirm `fields.status.name` equals `matched.to.name`. If mismatch, log a warning and continue.
 
 ## Hard rules — MUST NOT
 
-- **MUST NOT** call `transitionJiraIssue` with any transition id that was not produced by the exact-name match in step 2.
+- **MUST NOT** call `transitionJiraIssue` with any transition id that was not produced by steps 3–5.
 - **MUST NOT** pick the first / closest / "most plausible" transition as a fallback.
-- **MUST NOT** infer a transition by status-category (`new` / `indeterminate` / `done`) — match the **name** only.
+- **MUST NOT** infer a transition by status-category for a **non-terminal** step — match the **name** only. Step 5 is a deliberately narrow exception: terminal steps only, and only when exactly one done-category transition exists.
+- **MUST NOT** invent a value for a required field that is not `resolution`, and MUST NOT send a value that is absent from that field's own `allowedValues`.
 - **MUST NOT** silently retry with a different transition id after a successful API call. One transition per step invocation.
 - **MUST NOT** treat the absence of a matching transition as a failure — it is a documented non-blocking skip. The pipeline continues.
 
+## Why the category fallback is restricted to terminal steps
+
+Allowing a status-category fallback for `new` and `indeterminate` was tried and rejected. Dry-run against a real board: `ready-for-review` resolved to **In Progress**, and `in-progress` resolved to **Waiting for Review**, because those categories routinely hold several unrelated states and "the only indeterminate transition" is not the same thing as "the right one". A skipped status change is recoverable; a confident wrong transition is not.
+
+`done` is different: a workflow has one way to be finished far more often than not, and the "exactly one" condition makes the ambiguous case a skip anyway.
+
 ## Anti-example (what the bug looked like)
 
-Workflow has transitions `[To Do (id=11), In Progress (id=21), Done (id=31)]`. Step 4 tries `candidates = ["In Review", "Code Review", "Ready for Review"]`. None match. Buggy LLM behaviour: calls `transitionJiraIssue` with `transition.id = "11"` ("To Do") as a "reasonable default", silently reverting an `In Progress` issue back to `To Do`. Correct behaviour: log the skip and return without calling `transitionJiraIssue`.
+Workflow has transitions `[To Do (id=11), In Progress (id=21), Done (id=31)]`. The PR-opened step tries its review candidates. None match. Buggy LLM behaviour: calls `transitionJiraIssue` with `transition.id = "11"` ("To Do") as a "reasonable default", silently reverting an `In Progress` issue back to `To Do`. Correct behaviour: log the skip and return without calling `transitionJiraIssue`.
+
+## Workflow validators are invisible here
+
+A required **field** shows up in `matched.fields`. A workflow **validator** (e.g. "time spent must be logged before this transition") does not — it surfaces only as an HTTP 400 on the transition call, naming the thing it wants. When that happens, the value must be supplied **in the same request** as the transition; posting it separately first and then re-transitioning does not satisfy the validator. Log the message verbatim so the cause is visible, and treat it as a non-blocking skip.
 
 ## Workflow without a review state
 
-If the Jira workflow legitimately lacks a review-phase transition (small projects often do), Step 4 SHOULD be a no-op for the transition portion — the `addCommentToJiraIssue` portion still runs. The issue remains `In Progress` through QA and is moved to `Done` at Step 7. This is the intended fallback.
+If the Jira workflow legitimately lacks a review-phase transition (small projects often do), the PR-opened step SHOULD be a no-op for the transition portion — the `addCommentToJiraIssue` portion still runs. The issue remains `In Progress` through QA and is moved to `Done` at Finalise. This is the intended fallback.

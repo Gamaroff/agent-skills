@@ -87,7 +87,9 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `prd.prdShardedLocation` | path | `docs/prd` | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills. |
 | `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md) |
 | `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
-| `jira.statusMap` | map[string→string] | (built-in defaults) | Maps local document status → the literal Jira workflow status name to transition to. See [Jira status mapping](#jira-status-mapping). |
+| `jira.statusMap` | map[string→string\|list] | (built-in candidate lists) | Maps local document status → the Jira status name(s) to transition to, as a scalar or ordered candidate list. May carry a per-issue-type sub-map (`story`/`task`/`epic`). Usually unnecessary — check with `--probe-workflow` first. See [Jira status mapping](#jira-status-mapping). |
+| `jira.doneResolution` | string | (prefers `Done`, `Resolved`, `Fixed`) | Resolution name used when a workflow's done transition requires one. Env override: `JIRA_DONE_RESOLUTION`. |
+| `jira.cancelledResolution` | string | (prefers `Won't Do`, `Cancelled`, `Declined`) | Resolution name used when cancelling. Env override: `JIRA_CANCELLED_RESOLUTION`. |
 | `jira.devEstimateField` | string (custom field id) | (unset → skipped) | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field). |
 | `jira.defaultAssignee` | string (Jira accountId) | (unset → field not sent) | accountId applied on story/task/epic sync when the document's frontmatter has no `assignee`. Frontmatter wins. An **accountId**, never a name or team — Jira rejects anything else with a bare `HTTP 400`. Placeholders (`TBD`, `unassigned`, `none`, `n/a`, …) are refused with a warning in either position rather than sent. Unset in both places means the field is omitted entirely, so an update leaves Jira's existing assignee untouched. Find yours at `GET /rest/api/3/myself`. |
 | `github.projectEstimateField` | string (project field name) | `Estimate` | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field). |
@@ -123,36 +125,79 @@ The `sync-jira-{story,task,epic}` skills transition the Jira issue to match the 
 canonical local status (`shared/resources/document-status-lifecycle.md`) to a Jira status name before
 looking for a matching transition.
 
-**Built-in defaults** (used when `jira.statusMap` is absent — suitable for a vanilla Jira workflow):
+**Built-in defaults.** Each local status resolves against an ordered list of *candidate* Jira status
+names, not a single one — Jira workflows name the same lifecycle stage very differently, and a single
+hardcoded name silently skipped the status change on every board that chose a different word:
 
-| Local status (frontmatter) | Default Jira target |
+| Local status (frontmatter) | Candidates, tried in order |
 |---|---|
-| `draft`, `planned`, `ready-for-development` | `To Do` |
-| `in-progress` | `In Progress` |
-| `ready-for-review` | `In Review` |
-| `accepted` | `Done` |
-| `cancelled` | `Cancelled` |
+| `draft`, `planned`, `ready-for-development` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development` |
+| `in-progress` | `In Progress`, `Doing`, `Started`, `Development` |
+| `ready-for-review` | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review` |
+| `accepted` | `Done`, `Closed`, `Resolved`, `Complete`, `Completed` |
+| `cancelled` | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed` |
 
-If your Jira workflow uses different vocabulary (e.g. "Selected for Development" instead of "To Do"),
-override the entries you need under `jira.statusMap`. Keys are the lowercase-kebab local statuses; values
-are the **literal Jira workflow status names** (matched case-insensitively against the issue's available
-transitions). Your overrides are merged over the defaults — list only what differs:
+Most projects need **no `statusMap` at all**. Run `--probe-workflow` (below) before writing one.
+
+**Resolution order** (implemented by `resolveTransition`, mirrored by
+[`jira-transition-protocol.md`](../../shared/resources/jira-transition-protocol.md)):
+
+1. **Already satisfied** — the issue is in one of the candidates → no-op, no API call.
+2. **Destination match** — a transition whose `to.name` equals a candidate, candidates in order.
+3. **Action match** — a transition whose own `name` equals a candidate. Catches workflows that name
+   the action rather than the destination (an `Implemented` transition leading to `Waiting for Review`).
+4. **Terminal-only category fallback** — for `accepted`/`cancelled` only, and only when *exactly one*
+   available transition leads to the `done` status category.
+5. Otherwise **skip**, listing the candidates tried and the transitions available.
+
+Step 4 is restricted to terminal statuses deliberately. Falling back on status category for `new` and
+`indeterminate` was tried and rejected: against a real board it picked *wrong* transitions —
+`ready-for-review` resolving to "In Progress", `in-progress` resolving to "Waiting for Review". A
+skipped status change is recoverable; a confident wrong transition is not.
+
+**Overriding.** Only when the probe shows a stage you use being skipped. Keys are the lowercase-kebab
+local statuses; values are literal Jira status names as a scalar or an ordered list. Overrides *replace*
+the candidate list for that status, so an override narrows matching — prefer a list:
 
 ```yaml
 jira:
   statusMap:
-    ready-for-development: Selected for Development
-    ready-for-review: Code Review
-    accepted: Shipped
+    ready-for-development: Selected for Development     # scalar
+    ready-for-review: [Waiting for Review, In Review]   # ordered candidates
+    accepted:                                           # block form, same thing
+      - Shipped
+      - Done
+    epic:                     # optional per-issue-type layer, over the flat map
+      accepted: Closed
+```
+
+The per-issue-type layer (`story` / `task` / `epic`) exists because one project can run a different
+workflow per type — an Epic with only `Open`/`Done` beside a Story with a full review-and-test lane.
+
+**Required transition fields.** A workflow's transition screen can *require* a field — most often
+`resolution` on the Done transition. The skills read each transition's declared fields and fill
+`resolution` from that transition's own `allowedValues`, preferring `Done`/`Resolved`/`Fixed` for
+`accepted` and `Won't Do`/`Cancelled`/`Declined` for `cancelled`. Override with `jira.doneResolution` /
+`jira.cancelledResolution` (or `JIRA_DONE_RESOLUTION` / `JIRA_CANCELLED_RESOLUTION`). Any *other*
+required field is reported and the transition is skipped rather than sent — a request the workflow has
+already declared incomplete would only return HTTP 400.
+
+**Inspecting a board.** `--probe-workflow` on any of the three sync skills prints the project's statuses
+per issue type, the live transitions from a sampled issue, and exactly which transition each local
+status would take and by which rule. Read-only; it transitions nothing:
+
+```bash
+node .claude/skills/sync-jira-task/scripts/sync-jira-task.js --probe-workflow
 ```
 
 Notes:
 
-- A local status with no mapping (and no default) passes through verbatim to Jira's transition matcher,
+- A local status with no mapping (and no default) passes through verbatim as a single candidate,
   so custom statuses still work without configuration.
-- If no available transition matches the resolved target, the sync logs a non-fatal warning listing the
-  available transition names and skips the status change — the rest of the issue still syncs.
-- Matching is **by name only** (per [`jira-transition-protocol.md`](../../shared/resources/jira-transition-protocol.md)); the skills never guess a transition by status category.
+- If nothing matches, the sync logs a warning listing the candidates tried and the transitions
+  available, prints a summary line at the end, and skips the status change — the rest of the issue
+  still syncs. Pass `--fail-on-status-skip` to make that a non-zero exit instead.
+- The skills never guess a transition outside the declared candidates, except for step 4 above.
 
 ## Jira estimate field
 
