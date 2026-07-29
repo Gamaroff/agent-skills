@@ -1772,8 +1772,24 @@ async function transitionToStatus({
   )
     .map(stripStatusEmoji)
     .filter(Boolean);
-  const current = stripStatusEmoji(currentStatus);
+  let current = stripStatusEmoji(currentStatus);
   if (!candidates.length) return { transitioned: false, reason: "no-target" };
+
+  // On create there is no prior status to compare against, so callers pass none.
+  // Without it the already-check cannot fire, and we go looking for a transition
+  // into the status the issue is *already in* — which Jira never offers as a
+  // self-transition, producing a spurious "no transition matched" warning on
+  // every freshly created issue.
+  if (!current) {
+    try {
+      const live = await fetchIssue({
+        http, baseUrl, email, token, issueKey, fields: "status",
+      });
+      current = stripStatusEmoji(live && live.status);
+    } catch (_) {
+      /* fall through with an unknown current status */
+    }
+  }
 
   const localRaw = localStatus == null ? candidates[0] : localStatus;
   const terminal = isTerminalLocalStatus(localRaw);

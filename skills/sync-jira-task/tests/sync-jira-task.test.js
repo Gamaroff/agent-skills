@@ -1709,3 +1709,26 @@ test("summariseStatusOutcome — success, 'already' and 'no-target' are silent a
   }
   assert.deepEqual(warnings, []);
 });
+
+test("transitionToStatus — resolves the current status on create before deciding", async () => {
+  // A freshly created issue has no prior status for the caller to pass. Without
+  // looking it up, the already-check cannot fire and the sync hunts for a
+  // transition into the status the issue is already in — which Jira never offers
+  // as a self-transition — warning loudly about a non-problem.
+  const calls = [];
+  const fetchImpl = async (url, opts) => {
+    calls.push(url);
+    if (url.includes("?fields=status"))
+      return { ok: true, status: 200, json: async () => ({ fields: { status: { name: "Selected for Development" } } }) };
+    if (url.includes("/transitions"))
+      return { ok: true, status: 200, json: async () => ({ transitions: [TR.start, TR.done] }) };
+    return { ok: true, status: 204, json: async () => ({}), text: async () => "" };
+  };
+  const out = await lib_inner.transitionToStatus({
+    ...BASE, http: lib_inner.makeHttp({ fetchImpl }),
+    targetStatus: ["To Do", "Backlog", "Selected for Development"],
+    currentStatus: null, localStatus: "planned",
+  });
+  assert.equal(out.reason, "already");
+  assert.equal(calls.filter((u) => u.includes("/transitions")).length, 0, "no transition fetch needed");
+});
