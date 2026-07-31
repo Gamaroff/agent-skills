@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.31.1] - 2026-07-31
+
 ### Fixed
 
 - **`documentation-standards-validator` told agents to write an emoji into frontmatter `status:`, and the resulting Jira transition silently did nothing.** Its epic frontmatter example shipped `status: 🔄 In Progress`, and a note beside the story schema asserted "emoji status is epics only" — both contradicting this repo's own [`document-status-lifecycle.md`](shared/resources/document-status-lifecycle.md), which is kebab-case for every document type. The failure was invisible rather than loud: an emoji value canonicalises to `🔄-in-progress`, matches no `sync-jira-*` transition candidate, and the transition is skipped with no error — the card stays in whatever state it was in while the sync reports success. The example is now `status: in-progress`, the note points at the lifecycle spec, and the Standard Status Icons block states outright that those icons are body prose only and never a frontmatter value.
