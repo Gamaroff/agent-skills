@@ -487,7 +487,7 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 | All Acceptance Criteria Met? | Tests & PR Approved? | Docs Updated? | Security Passed? | Compliance Passed? | QA Gate Status? | **Decision**                     |
 | ---------------------------- | -------------------- | ------------- | ---------------- | ------------------ | --------------- | -------------------------------- |
 | ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ✅ PASS or N/A  | **ACCEPTED** ✅ — *only if `CI_ROLLUP` is `SUCCESS`; see "CI status is a DoD gate" below* |
-| -                            | -                    | -             | -                | -                  | -               | **IN PROGRESS** if `CI_ROLLUP` is `FAILURE` or `PENDING` |
+| -                            | -                    | -             | -                | -                  | -               | **IN PROGRESS** if `CI_ROLLUP` is `FAILURE` or `PENDING` (resolve `CANCELLED`/`NONE` by re-sampling first — they are undecided, not verdicts) |
 | ❌ No                        | -                    | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
 | ✅ Yes                       | ❌ No                | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
 | ✅ Yes                       | ✅ Yes               | ❌ No         | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
@@ -539,6 +539,13 @@ Read the rollup before deciding:
 # exact bug this block previously had, verified live against a queued `portal-e2e`.
 #
 # The reliable discriminator is `.status`: a CheckRun is only decided at COMPLETED.
+#
+# CANCELLED is deliberately NOT bucketed with FAILURE. On a repo whose workflow sets
+# `concurrency: cancel-in-progress: true`, every push cancels the previous run, so a
+# rollup sampled in that window legitimately contains CANCELLED entries that say nothing
+# about the code. Treating them as FAILURE blocks acceptance on healthy work — the mirror
+# of the bug this gate exists to prevent, and just as wrong. CANCELLED means UNDECIDED:
+# resample.
 CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
   -q '[ .statusCheckRollup[]
         | (.status // "") as $st
@@ -547,23 +554,44 @@ CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
            else "PENDING" end)                                 # QUEUED/IN_PROGRESS/WAITING
         | if . == "" then "PENDING" else . end ]               # empty ⇒ undecided, never green
       | if length == 0 then "NONE"
-        elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ERROR"
+        elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "ERROR"
                  or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "FAILURE"
         elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
                  or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
+        elif any(. == "CANCELLED") then "CANCELLED"
         else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
 ```
 
 `SKIPPED` and `NEUTRAL` conclusions intentionally fall into the `SUCCESS` bucket — a skipped job
 (e.g. a `paths:`-filtered `smoke`) is not a failure and never becomes one.
 
+**Resolve undecided states before deciding — do not conclude from a single sample.** `NONE` and
+`CANCELLED` are both transient on an active PR: a push that supersedes a run leaves the rollup
+momentarily empty, then briefly cancelled, before the replacement run registers. Re-sample:
+
+```bash
+# Re-sample undecided states rather than concluding from one reading.
+for attempt in 1 2 3 4 5; do
+  case "$CI_ROLLUP" in
+    NONE|CANCELLED|UNKNOWN) sleep 20; CI_ROLLUP=$( ...rerun the query above... ) ;;
+    *) break ;;
+  esac
+done
+```
+
 | `CI_ROLLUP` | Decision |
 | ----------- | -------- |
 | `SUCCESS` | Proceed — CI column passes |
 | `FAILURE` | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." |
 | `PENDING` | **Do NOT accept.** Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.** |
-| `NONE` | No checks configured for this PR. Record it explicitly in the DoD summary as *unverified by CI* rather than silently treating absence as success. |
+| `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict. |
+| `NONE` | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as *unverified by CI* rather than treating absence as success. |
 | `UNKNOWN` | Query failed. Treat as `PENDING` — never as success. |
+
+> **Observed live (tinker-city PR #539).** `/finalise` sampled the rollup once, read `NONE` on a
+> head whose run was mid-cancellation, and recorded "final head unverified by CI" in the DoD
+> summary. The head was in fact fully green minutes later. The note had to be corrected by hand.
+> A single sample of an actively-moving PR is a snapshot of a race, not a verdict.
 
 > **The failure mode this exists to stop** is a *pending* rollup being read as "nothing wrong yet"
 > and rounded up to acceptance. `PENDING` and `FAILURE` are both non-acceptance; only `SUCCESS`
