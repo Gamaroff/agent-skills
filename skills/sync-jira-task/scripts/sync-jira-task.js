@@ -112,7 +112,9 @@ function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, ch
     content.push(lib.adf.paragraph(lib.adf.text(meta.join(" | "))));
   }
 
-  return lib.adf.doc(...content);
+  // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
+  // wholesale and the issue silently keeps its previous description.
+  return lib.capDescriptionAdf(lib.adf.doc(...content), { sourceUrl: taskBbUrl || null, output });
 }
 
 function hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver }) {
