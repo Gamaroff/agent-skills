@@ -18,7 +18,13 @@ const lib = require("../references/jira-sync.js");
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const STORY_SECTIONS = ["User Story", "Acceptance Criteria", "Description"];
+// First entry is an ALIAS ARRAY — three spellings of the same section are in
+// active use and none is wrong. Measured across 426 story documents 2026-07-31:
+// `## Story` 234, `## Story Statement` 161, `## User Story` 7. The list named
+// only `User Story`, so ~98% of stories published their acceptance criteria and
+// nothing else, silently. `User Story` stays first: it is the canonical name
+// re-emitted as the Jira heading (see extractBodySections).
+const STORY_SECTIONS = [["User Story", "Story", "Story Statement"], "Acceptance Criteria", "Description"];
 
 const ISSUE_TYPE = "Story";
 
@@ -94,7 +100,9 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, related
     content.push(lib.adf.paragraph(lib.adf.text(meta.join(" | "))));
   }
 
-  return lib.adf.doc(...content);
+  // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
+  // wholesale and the issue silently keeps its previous description.
+  return lib.capDescriptionAdf(lib.adf.doc(...content), { sourceUrl: storyBbUrl || null, output });
 }
 
 function hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }) {

@@ -228,7 +228,9 @@ function buildDescriptionAdf({
   content.push(lib.adf.heading(3, "Story Requirements"));
   content.push(lib.adf.paragraph(lib.adf.text(STORY_REQUIREMENTS_TEXT)));
 
-  return lib.adf.doc(...content);
+  // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
+  // wholesale and the issue silently keeps its previous description.
+  return lib.capDescriptionAdf(lib.adf.doc(...content), { sourceUrl: epicBbUrl || null, output });
 }
 
 function hashBody({
@@ -460,12 +462,24 @@ function updateEpicFile({
       /^\*\*Jira Epic\*\*:.*$/m,
       `**Jira Epic**: [${issueKey}](${issueUrl})`,
     );
-    if (prdBbUrl)
+    if (prdBbUrl) {
+      // Keep any in-repo RELATIVE link already on this line and APPEND the
+      // Bitbucket one. Replacing the line wholesale dropped the only link that
+      // resolves when the repo is read as files — in an editor, on a checkout,
+      // in a diff — trading a working link for a remote-only one. The result is
+      // still valid Markdown pointing somewhere real, so no check would catch it.
+      const existing = content.match(/^\*\*Parent PRD\*\*:(.*)$/m);
+      const relLink = existing
+        ? (existing[1].match(/\[[^\]]*\]\((?!https?:)[^)]+\)/) || [])[0]
+        : null;
       content = upsertLine(
         content,
         /^\*\*Parent PRD\*\*:.*$/m,
-        `**Parent PRD**: [View on Bitbucket](${prdBbUrl})`,
+        relLink
+          ? `**Parent PRD**: ${relLink} · [View on Bitbucket](${prdBbUrl})`
+          : `**Parent PRD**: [View on Bitbucket](${prdBbUrl})`,
       );
+    }
     if (epicBbUrl)
       content = upsertLine(
         content,

@@ -170,11 +170,60 @@ function upsertFrontmatterKeys(content, updates) {
   return "---\n" + newFmText + tail.replace(/^\n/, "");
 }
 
+// Does the consuming repo's Prettier config ask for single quotes?
+//
+// The sync writes frontmatter back, so it authors files the repo then formats.
+// Hardcoding double quotes left every synced document prettier-dirty in a
+// `singleQuote: true` repo — the card describing this defect was reformatted by
+// the very sync that published it. Nothing fails; the file just drifts from
+// house style until someone runs Prettier.
+//
+// `JIRA_SYNC_QUOTE_STYLE=single|double` overrides detection — an escape hatch for
+// a repo whose config lives somewhere this does not look, and the seam the unit
+// tests drive. Default is DOUBLE, matching Prettier's own default, so a repo
+// with no config sees no behaviour change.
+let _singleQuote = null;
+function prefersSingleQuote() {
+  const env = process.env.JIRA_SYNC_QUOTE_STYLE;
+  if (env) return env.toLowerCase() === "single";
+  if (_singleQuote !== null) return _singleQuote;
+  _singleQuote = false;
+  try {
+    const root = getRepoRoot();
+    const names = [".prettierrc", ".prettierrc.json", ".prettierrc.yaml", ".prettierrc.yml"];
+    for (const f of names) {
+      const p = path.join(root, f);
+      if (!fs.existsSync(p)) continue;
+      // Matches JSON (`"singleQuote": true`) and YAML (`singleQuote: true`).
+      if (/["']?singleQuote["']?\s*:\s*true/.test(fs.readFileSync(p, "utf-8"))) _singleQuote = true;
+      break;
+    }
+    if (!_singleQuote) {
+      const pkg = path.join(root, "package.json");
+      if (fs.existsSync(pkg)) {
+        const j = JSON.parse(fs.readFileSync(pkg, "utf-8"));
+        if (j.prettier && j.prettier.singleQuote === true) _singleQuote = true;
+      }
+    }
+  } catch (_) {
+    // Unreadable config is not worth failing a sync over — fall back to default.
+  }
+  return _singleQuote;
+}
+
+// YAML single-quoted scalars escape an embedded quote by DOUBLING it, not with a
+// backslash — a backslash is literal inside single quotes.
+function quoteYaml(s) {
+  const str = String(s);
+  return prefersSingleQuote()
+    ? `'${str.replace(/'/g, "''")}'`
+    : `"${str.replace(/"/g, '\\"')}"`;
+}
+
 function formatYamlScalar(v) {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
-  if (Array.isArray(v))
-    return `[${v.map((x) => `"${String(x).replace(/"/g, '\\"')}"`).join(", ")}]`;
-  return `"${String(v).replace(/"/g, '\\"')}"`;
+  if (Array.isArray(v)) return `[${v.map(quoteYaml).join(", ")}]`;
+  return quoteYaml(v);
 }
 
 function rewriteFrontmatter(content, mutator) {
@@ -338,10 +387,28 @@ function extractEntries(content) {
   return content.slice(hand.start, hand.end).split("\n").filter(isEntryRow);
 }
 
+// Index of the first character AFTER the YAML frontmatter block, or 0 when there
+// is none. Every heading search below starts here.
+//
+// Without it, `/^## /m` matches inside frontmatter: a value that quotes a heading
+// name — a `description:` block scalar mentioning `## Change Log`, say — becomes
+// the insertion point, and the changelog is written INTO the YAML. The document
+// still parses, so nothing errors and nothing warns; the changelog silently
+// becomes part of a field's value and is published to Jira as such.
+function bodyStart(content) {
+  if (!content.startsWith("---")) return 0;
+  const close = content.indexOf("\n---", 3);
+  if (close === -1) return 0;
+  const nl = content.indexOf("\n", close + 1);
+  return nl === -1 ? content.length : nl + 1;
+}
+
 function findHandWrittenChangelog(content) {
-  const m = content.match(/^## Change Log[ \t]*\n+/m);
+  const from = bodyStart(content);
+  const scope = content.slice(from);
+  const m = scope.match(/^## Change Log[ \t]*\n+/m);
   if (!m) return null;
-  const start = content.indexOf(m[0]);
+  const start = from + scope.indexOf(m[0]);
   const after = content.slice(start + m[0].length);
   const next = after.match(/^## /m);
   const end = next
@@ -370,9 +437,12 @@ function upsertChangelog(content, newEntry) {
       content.slice(hand.end)
     );
   }
-  const sec = content.match(/^## /m);
+  // Search from the end of frontmatter, not byte 0 — see bodyStart().
+  const from = bodyStart(content);
+  const scope = content.slice(from);
+  const sec = scope.match(/^## /m);
   if (sec) {
-    const idx = content.indexOf(sec[0]);
+    const idx = from + scope.indexOf(sec[0]);
     return (
       content.slice(0, idx) +
       buildChangelogBlock([newEntry]) +
@@ -628,13 +698,32 @@ function sectionRe(name) {
 // cards: the sync succeeded, reported no problem, and published an empty body.
 // Only pass it from ONE call site per run — `buildDescriptionAdf` and `hashBody`
 // both extract from the same body, so passing it from both double-warns.
+// An entry in `sectionNames` may be an ARRAY OF ALTERNATIVE SPELLINGS for one
+// logical section — `["User Story", "Story", "Story Statement"]`. Alternatives
+// are tried in order and the first that resolves wins; `name` is the array's
+// FIRST element, keeping the canonical-name contract above intact so switching
+// between accepted spellings does not churn `hashBody`.
+//
+// Aliases exist because a section list and a corpus can disagree about a
+// heading's name without either being wrong. Measured across 426 stories:
+// `## Story` 234, `## Story Statement` 161, `## User Story` 7 — the list named
+// only the last, so 98% of stories published their acceptance criteria and
+// nothing else. Widening costs nothing; renaming ~395 files to satisfy the tool
+// would have been the tool dictating to the corpus.
 function extractBodySections(body, sectionNames, output = null) {
   const out = [];
   const missing = [];
-  for (const head of sectionNames) {
-    const m = body.match(sectionRe(head));
-    if (m && m[1].trim()) out.push({ name: head, content: m[1].trim() });
-    else missing.push(head);
+  for (const entry of sectionNames) {
+    const alts = Array.isArray(entry) ? entry : [entry];
+    let hit = null;
+    for (const alt of alts) {
+      const m = body.match(sectionRe(alt));
+      if (m && m[1].trim()) { hit = m[1].trim(); break; }
+    }
+    if (hit !== null) out.push({ name: alts[0], content: hit });
+    // Report every accepted spelling: a reader told only "User Story not found"
+    // would rename a heading that was already acceptable under another alias.
+    else missing.push(alts.join(" / "));
   }
 
   if (output && missing.length) {
@@ -644,7 +733,7 @@ function extractBodySections(body, sectionNames, output = null) {
       // about heading names — a contract mismatch, not an incomplete document.
       warn(
         `None of the ${sectionNames.length} expected sections were found. The Jira description will have no body.\n` +
-          `    Expected level-2 headings (numbering optional): ${sectionNames.join(", ")}\n` +
+          `    Expected level-2 headings (numbering optional, " / " = accepted alternatives): ${sectionNames.map((e) => (Array.isArray(e) ? e.join(" / ") : e)).join(", ")}\n` +
           `    Check the document's '## ' headings match these names.`,
       );
     } else {
@@ -655,6 +744,67 @@ function extractBodySections(body, sectionNames, output = null) {
   }
 
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Description size guard
+// ---------------------------------------------------------------------------
+
+// Jira rejects a description whose extracted text exceeds ~32,767 characters with
+// CONTENT_LIMIT_EXCEEDED. The whole PUT fails, so the issue keeps its PREVIOUS
+// description — the sync surfaces an opaque HTTP 400 and the Jira card silently
+// stays stale. Nothing in the error names the size.
+const JIRA_TEXT_LIMIT = 32767;
+const DEFAULT_CAP = JIRA_TEXT_LIMIT - 800; // headroom for the notice below
+
+function adfTextLength(node) {
+  if (!node || typeof node !== "object") return 0;
+  if (typeof node.text === "string") return node.text.length;
+  if (!Array.isArray(node.content)) return 0;
+  let n = 0;
+  for (const c of node.content) n += adfTextLength(c);
+  return n;
+}
+
+// Trim an ADF doc to fit, dropping WHOLE top-level blocks from the end and
+// appending a notice naming what was dropped and where to read it.
+//
+// Whole blocks, not sliced text: a half-emitted table or list is invalid ADF and
+// is rejected for a different, even less obvious reason. Truncation is announced
+// twice — in the published description (so a Jira reader knows they are seeing
+// part of it) and on stderr (so the operator knows it happened). Truncating
+// silently would be the same defect class as the failure it replaces.
+function capDescriptionAdf(doc, opts = {}) {
+  const { limit = DEFAULT_CAP, sourceUrl = null, output = null } = opts;
+  if (!doc || !Array.isArray(doc.content)) return doc;
+  const total = adfTextLength(doc);
+  if (total <= limit) return doc;
+
+  const kept = [];
+  let used = 0, dropped = 0;
+  for (const block of doc.content) {
+    const len = adfTextLength(block);
+    if (used + len > limit) { dropped++; continue; }
+    kept.push(block);
+    used += len;
+  }
+
+  const where = sourceUrl
+    ? [adf.text("Read the full document: "), adf.link("source document", sourceUrl)]
+    : [adf.text("Read the full document in the repository.")];
+  kept.push(adf.paragraph(
+    adf.text(`⚠️ Truncated to fit Jira's ${JIRA_TEXT_LIMIT}-character description limit — ` +
+      `${dropped} section(s) omitted, ${total} characters in the source. `),
+    ...where,
+  ));
+
+  if (output) {
+    const warn = output.warn || ((...a) => console.warn(...a));
+    warn(`Description is ${total} characters, over Jira's ${JIRA_TEXT_LIMIT} limit — ` +
+      `${dropped} trailing section(s) omitted from the published description.\n` +
+      `    The document itself is unchanged. Move detail into a companion file to publish it in full.`);
+  }
+  return { ...doc, content: kept };
 }
 
 // ---------------------------------------------------------------------------
@@ -2440,6 +2590,10 @@ module.exports = {
   sectionRe,
   extractBodySections,
   escapeRe,
+  // description size guard
+  JIRA_TEXT_LIMIT,
+  adfTextLength,
+  capDescriptionAdf,
   // priority / labels
   PRIORITY_MAP,
   normalisePriority,
