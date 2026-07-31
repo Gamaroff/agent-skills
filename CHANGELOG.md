@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`documentation-standards-validator` told agents to write an emoji into frontmatter `status:`, and the resulting Jira transition silently did nothing.** Its epic frontmatter example shipped `status: 🔄 In Progress`, and a note beside the story schema asserted "emoji status is epics only" — both contradicting this repo's own [`document-status-lifecycle.md`](shared/resources/document-status-lifecycle.md), which is kebab-case for every document type. The failure was invisible rather than loud: an emoji value canonicalises to `🔄-in-progress`, matches no `sync-jira-*` transition candidate, and the transition is skipped with no error — the card stays in whatever state it was in while the sync reports success. The example is now `status: in-progress`, the note points at the lifecycle spec, and the Standard Status Icons block states outright that those icons are body prose only and never a frontmatter value.
+- **`superseded` removed from the story `status` enum in `documentation-standards-validator`.** It was listed as a valid required-field value, but `develop-story` halts at Phase 0 on any status outside its own enum, which does not include it — so a story following this skill's advice became undevelopable. Use `cancelled`, or leave the story at `draft` and record the supersession in the Change Log.
+- **CANCELLED and NONE are undecided CI states in `finalise`, not verdicts.** The CI gate bucketed `CANCELLED` with `FAILURE`. On a repo whose workflow sets `concurrency: cancel-in-progress`, every push cancels the previous run, so a rollup sampled in that window contains CANCELLED entries that say nothing about the code — treating them as red blocks acceptance on healthy work, the mirror of the bug this gate was written to prevent. `NONE` had the same shape: an empty rollup is the normal state in the seconds between a push and its run registering, but the gate concluded "no checks configured" from a single sample. Both now resolve by re-sampling before any conclusion is drawn; `FAILURE` still means failure.
+
+### Removed
+
+- **The "Runnable lint/census" section of `documentation-standards-validator`, and the linter invocation in `create-parallel-stories`.** Both ran `node docs/tasks/task.12.documentation-conventions-normalization-validator/scripts/lint-docs.mjs` — a consumer repo's task directory hardcoded into a vendored skill, so it could never have resolved anywhere except the one repo that happened to have a task 12. The missing file was the symptom; the portability violation was the bug. The skill still *defines* the seven checks (status vocabulary, frontmatter completeness, Change Log header, FR-tags, registry⇔PRD parity, `estimated_stories` parity, stray `PROGRESS*.md`) — each consuming repo implements them as its own gates against its own layout and canon, which beats one linter guessing at everyone's doc roots. `create-parallel-stories` now describes the `estimated_stories` parity check in prose.
+
 ## [v0.31.0] - 2026-07-29
 
 ### Changed

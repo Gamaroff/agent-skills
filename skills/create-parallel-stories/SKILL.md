@@ -221,11 +221,7 @@ For every split, in one commit, update the parent epic's:
 4. **Dependency** notes and **Definition of Done** counts.
 5. The superseded parent story → `status: superseded` + a "Superseded by X/Y" banner on its main, plan, and any validate/review companion files (canon §3).
 
-**Verify before committing:** run the docs linter — check #6 (`estimated_stories` == active story dirs) must pass:
-
-```bash
-node docs/tasks/task.12.documentation-conventions-normalization-validator/scripts/lint-docs.mjs --only=6
-```
+**Verify before committing:** count the active (non-superseded) story directories under the epic's `stories/` folder and confirm the epic's `estimated_stories` frontmatter value matches exactly. If the repo has a docs gate that covers this check, run it too.
 
 Reference example: Epic 14's 14.7 split. Canon: [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §2.
 

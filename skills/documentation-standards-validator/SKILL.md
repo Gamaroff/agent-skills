@@ -18,17 +18,13 @@ Activate this skill when:
 5. **Migrating documentation** - Rename to proper format
 6. **Auditing docs** - Find naming violations
 
-## Runnable lint/census (run this first)
+## Mechanical checks
 
-This skill is a guidance checklist, but a **runnable** lint/census script now backs the mechanical checks. Run it to detect the defect classes below on demand (it is not a hard git-hook/CI gate — it surfaces failures for the agent to fix):
+This skill defines the mechanical checks below; each consuming repo implements them as its own gates (a git hook, a CI job, or a script against its own layout) — there is no shared linter here, because doc roots and corpus shape differ per repo.
 
-```bash
-node docs/tasks/task.12.documentation-conventions-normalization-validator/scripts/lint-docs.mjs
-```
+The seven checks, all validated against a repo's documentation conventions: (1) status vocabulary, (2) frontmatter key completeness, (3) Change Log header, (4) FR-tag presence (warn-level), (5) registry⇔PRD Epic-List parity, (6) epic `estimated_stories` vs active story dirs, (7) stray `PROGRESS*.md` under epics.
 
-It emits 7 findings against [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md): (1) status vocabulary, (2) frontmatter key completeness, (3) Change Log header, (4) FR-tag presence (warn), (5) registry⇔PRD Epic-List parity, (6) epic `estimated_stories` vs active story dirs, (7) stray `PROGRESS*.md` under epics. Exit non-zero on any error-level finding. Fixture tests: `node …/scripts/lint-docs.test.mjs`. Each check is independently toggleable (`--skip=4,7`).
-
-When creating or reviewing a story/epic/task, run the linter on the corpus and fix any error it reports before finishing.
+When creating or reviewing a story/epic/task, apply these checks to the affected documents and fix any violation before finishing.
 
 ## File Naming Standards
 
@@ -90,7 +86,7 @@ title: Account Security Enhancement
 type: epic
 description: One-sentence summary of the epic
 domain: Account
-status: 🔄 In Progress
+status: in-progress
 priority: High
 estimated_stories: 8
 created: 2025-12-31
@@ -104,7 +100,7 @@ target_completion: 2026-01-15
 
 ### Story Frontmatter
 
-> **Canonical schema:** see [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §4 + Appendix B. Story `status` is **kebab-case** (not emoji — emoji status is epics only), effort is `estimated_effort_hours`, and both `created` and `updated` are required.
+> **Canonical schema:** see [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §4 + Appendix B. Story `status` is **kebab-case** (kebab-case for every document type — see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)), effort is `estimated_effort_hours`, and both `created` and `updated` are required.
 
 ## \`\`\`yaml
 
@@ -129,7 +125,7 @@ github_issue: 1234
 
 \`\`\`
 
-**Required Fields** (canon §4): epic, epic_number, story_number, title, type, description, tags, status (kebab-case: `draft`/`planned`/`ready-for-development`/`in-progress`/`ready-for-review`/`accepted`/`superseded`/`cancelled`), priority, story_type (`full-stack`/`backend`/`frontend`/`infra`/`engine`), risk_level, assignee, estimated_effort_hours, created, updated, github_issue (`tags`/`resource` per [OKF](#open-knowledge-format-okf-conformance))
+**Required Fields** (canon §4): epic, epic_number, story_number, title, type, description, tags, status (kebab-case: `draft`/`planned`/`ready-for-development`/`in-progress`/`ready-for-review`/`accepted`/`cancelled`), priority, story_type (`full-stack`/`backend`/`frontend`/`infra`/`engine`), risk_level, assignee, estimated_effort_hours, created, updated, github_issue (`tags`/`resource` per [OKF](#open-knowledge-format-okf-conformance))
 
 ## Open Knowledge Format (OKF) conformance
 
@@ -150,6 +146,8 @@ All document frontmatter targets [OKF v0.1](references/open-knowledge-format.md)
 ❌ Cancelled - No longer pursuing
 📋 Planned - Not yet started
 \`\`\`
+
+These icons are for body prose only and are never a frontmatter `status:` value — frontmatter is always kebab-case (see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)).
 
 ### Usage in Documentation
 
