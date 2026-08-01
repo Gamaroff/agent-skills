@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.33.0] - 2026-08-01
+
 ### Added
 
 - **An epic can opt in to an integration branch again — per epic, by declaration, and only where it is argued for.** v0.24.0 removed the epic-integration model wholesale, because it had been **mandatory**: every epic got a long-lived `feature/epic.{n}.{name}` branch whether or not it needed one, and the resulting drift, deferred integration and big-bang merges are the well-known failure mode of that pattern. Nothing about that reasoning has changed, and `develop` remains the default and the recommendation. What returns is the narrow case the blanket removal also took with it: an epic whose stories are meaningless apart — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Such an epic now declares itself:
