@@ -539,14 +539,50 @@ Use the `AskUserQuestion` tool to ask all applicable questions in a single call.
 
 **Q1 — Feature branch base:**
 
+#### develop-story — epic integration pre-check (before building Q1 options)
+
+Resolve the story's parent epic document (frontmatter `epic_source:`, else `epic:` under the configured
+PRD root) and read its branch-model declaration. Key names are configurable; defaults:
+
+```yaml
+branch_model: epic-integration
+integration_branch: "epic/178.feature-ui"
+```
+
+| Epic declares                                             | `EPIC_BRANCH`                                            | Q1/Q2 recommendation  |
+| --------------------------------------------------------- | -------------------------------------------------------- | --------------------- |
+| `branch_model: epic-integration` + `integration_branch`   | as declared                                              | `EPIC_BRANCH`         |
+| `branch_model: epic-integration`, no `integration_branch` | derived from `branchPattern` (default `epic/{n}.{slug}`) | `EPIC_BRANCH`         |
+| nothing, or `develop-direct`, or epic unreadable          | unset                                                    | `develop` (unchanged) |
+
+**A declared `integration_branch` is used verbatim** — the epic document is the authority on its own
+branch name. If the epic cannot be resolved, proceed with `EPIC_BRANCH` unset; never guess, never block.
+
+> `epic/{n}.{name}` (integration branch — stories merge into it) is **not** `feature/epic.{n}.{name}`
+> (an ordinary short-lived branch for editing the epic document, which `/review-epic` creates). Do not
+> substitute one for the other.
+
 #### develop-story Q1 options
 
-Story branches are cut from `develop` (standard Gitflow feature branches). Ask "Which branch should `feature/story.{epic}.{story}.{name}` be based on?"
+Ask "Which branch should `feature/story.{epic}.{story}.{name}` be based on?"
+
+**When `EPIC_BRANCH` is set** — it leads and is Recommended, because a story in an
+integration-branch epic that lands on `develop` alone defeats the point of the epic delivering as one unit:
+
+- Options: "`{EPIC_BRANCH}`" (Recommended) / "develop" / "Other"
+
+**When `EPIC_BRANCH` is unset** — unchanged from before, plus the opt-in offered last:
 
 - On `develop` or `main`: Options: "develop" (Recommended) / "main" / "Other"
 - On any `feature/*` branch: Options: "develop" (Recommended) / "`feature/{current}`" / "Other"
+- Append, only when `branching.epicIntegration.offerWhenUndeclared` is not `false`:
+  "`{derived-epic-branch}` — create epic integration branch" (never Recommended)
 
 Store: Feature branch base = the answer.
+
+**If the chosen base does not exist yet**, `/create-branch` Step 2b.5 creates it from `develop` and
+pushes it during Step 1. Do not create it here — Phase 0 must remain side-effect-free so a HALT before
+Step 1 leaves no orphan branch behind.
 
 #### develop-task Q1 options
 
@@ -560,9 +596,18 @@ Ask "Which branch should `feature/task.{id}.{name}` be based on?"
 #### develop-story Q2
 
 Ask "Which branch should the pull request target?"
-Options: "develop" (Recommended) / "main" / "Other"
+
+**When `EPIC_BRANCH` is set** (from the Q1 pre-check), or when the user's Q1 answer was an `epic/*`
+branch: Options: "`{EPIC_BRANCH}`" (Recommended) / "develop" / "Other"
+
+**Otherwise:** Options: "develop" (Recommended) / "main" / "Other"
 
 > Story PRs target `develop` by default; "main" or "Other" let the user redirect (e.g. a hotfix story that should land directly on `main`).
+>
+> **Q1 and Q2 must agree for an integration-branch story.** Basing a story on `epic/178.feature-ui` and
+> then targeting `develop` produces a PR whose diff includes every earlier story in the epic — the base
+> is already in `develop`'s future, not its past. If the user picks the epic branch for Q1 and `develop`
+> for Q2, say so plainly and re-ask rather than proceeding.
 
 #### develop-task Q2
 

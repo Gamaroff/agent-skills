@@ -27,48 +27,56 @@ Skills resolve these via [`shared/resources/resolve-paths.sh`](../../shared/reso
 ## Full schema
 
 ```yaml
-tracker: jira       # optional override — see Platform Detection
-vcs: bitbucket      # optional override — see Platform Detection
+tracker: jira # optional override — see Platform Detection
+vcs: bitbucket # optional override — see Platform Detection
 
 prd:
-  prdShardedLocation: docs/prd        # root for PRD shard tree
+  prdShardedLocation: docs/prd # root for PRD shard tree
 
 architecture:
-  architectureShardedLocation: docs/architecture   # root for architecture docs
+  architectureShardedLocation: docs/architecture # root for architecture docs
 
 jira:
-  devEstimateField: customfield_10594  # optional — Jira custom field id for estimated dev hours
-  defaultAssignee: 712020:00000000-0000-0000-0000-000000000000  # optional — accountId every card is assigned to
-  statusMap:                          # optional — local status → Jira workflow status name
+  devEstimateField: customfield_10594 # optional — Jira custom field id for estimated dev hours
+  defaultAssignee: 712020:00000000-0000-0000-0000-000000000000 # optional — accountId every card is assigned to
+  statusMap: # optional — local status → Jira workflow status name
     ready-for-development: Selected for Development
     ready-for-review: In Review
 
 github:
-  projectEstimateField: Estimate      # optional — GitHub Projects v2 number field name for estimated dev hours
+  projectEstimateField: Estimate # optional — GitHub Projects v2 number field name for estimated dev hours
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 
-developNext:                          # optional — develop-next roadmap orchestrator
+branching: # optional — epic integration branches (create-branch, develop-story)
+  epicIntegration:
+    epicFrontmatterKey: branch_model # epic frontmatter key holding the delivery model
+    epicFrontmatterValue: epic-integration # the value meaning "this epic uses an integration branch"
+    branchKey: integration_branch # epic frontmatter key holding the branch name
+    branchPattern: "epic/{n}.{slug}" # fallback name when an epic wants one but names none
+    offerWhenUndeclared: true # false ⇒ only offer where an epic has opted in
+
+developNext: # optional — develop-next roadmap orchestrator
   roadmapPath: docs/development/project-completion-roadmap.md
   baseBranch: develop
-  qualityGateCommand: npm test        # merge gate run on every branch before gh pr merge
-  mergeStrategy: merge                # merge | squash | rebase
+  qualityGateCommand: npm test # merge gate run on every branch before gh pr merge
+  mergeStrategy: merge # merge | squash | rebase
 
-developBatch:                         # optional — develop-batch parallel fan-out
-  maxParallel: 4                      # GLOBAL ceiling on concurrent pipelines
-  requireTouches: false               # true → defer un-annotated (+own-default) rows
-  maxResumeAttempts: 2                # re-dispatch budget for an interrupted item
-  maxRebatches: 3                     # Step 5.5 re-selection cap per invocation
-  worktreeSeedPaths: []               # gitignored files to copy into each worktree
-  resources:                          # optional — named execution resources
+developBatch: # optional — develop-batch parallel fan-out
+  maxParallel: 4 # GLOBAL ceiling on concurrent pipelines
+  requireTouches: false # true → defer un-annotated (+own-default) rows
+  maxResumeAttempts: 2 # re-dispatch budget for an interrupted item
+  maxRebatches: 3 # Step 5.5 re-selection cap per invocation
+  worktreeSeedPaths: [] # gitignored files to copy into each worktree
+  resources: # optional — named execution resources
     - name: local
-      capacity: 1                     # per-resource cap (1 = runs are not isolated)
+      capacity: 1 # per-resource cap (1 = runs are not isolated)
       testCommand: "npm test"
     - name: build-box
       capacity: 3
       testCommand: "ssh build-box make test"
-      probe:                          # optional capacity probe (see the skill reference)
+      probe: # optional capacity probe (see the skill reference)
         command: "curl -fsS --max-time 5 $PROBE_URL/health"
         intervalSec: 60
         timeoutSec: 10
@@ -80,29 +88,34 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 
 ## Key reference
 
-| Key | Type | Default | What it controls |
-|---|---|---|---|
-| `tracker` | `jira` \| `github` | (auto-detected) | Issue tracker override. See [Platform Detection](../../shared/resources/platform-detection.md) |
-| `vcs` | `github` \| `bitbucket` | (auto-detected from git remote) | VCS override. See [Platform Detection](../../shared/resources/platform-detection.md) |
-| `prd.prdShardedLocation` | path | `docs/prd` | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills. |
-| `architecture.architectureShardedLocation` | path | `docs/architecture` | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md) |
-| `devLoadAlwaysFiles` | list[path] | `[]` | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.) |
-| `jira.statusMap` | map[string→string\|list] | (built-in candidate lists) | Maps local document status → the Jira status name(s) to transition to, as a scalar or ordered candidate list. May carry a per-issue-type sub-map (`story`/`task`/`epic`). Usually unnecessary — check with `--probe-workflow` first. See [Jira status mapping](#jira-status-mapping). |
-| `jira.doneResolution` | string | (prefers `Done`, `Resolved`, `Fixed`) | Resolution name used when a workflow's done transition requires one. Env override: `JIRA_DONE_RESOLUTION`. |
-| `jira.cancelledResolution` | string | (prefers `Won't Do`, `Cancelled`, `Declined`) | Resolution name used when cancelling. Env override: `JIRA_CANCELLED_RESOLUTION`. |
-| `jira.devEstimateField` | string (custom field id) | (unset → skipped) | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field). |
-| `jira.defaultAssignee` | string (Jira accountId) | (unset → field not sent) | accountId applied on story/task/epic sync when the document's frontmatter has no `assignee`. Frontmatter wins. An **accountId**, never a name or team — Jira rejects anything else with a bare `HTTP 400`. Placeholders (`TBD`, `unassigned`, `none`, `n/a`, …) are refused with a warning in either position rather than sent. Unset in both places means the field is omitted entirely, so an update leaves Jira's existing assignee untouched. Find yours at `GET /rest/api/3/myself`. |
-| `github.projectEstimateField` | string (project field name) | `Estimate` | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field). |
-| `developNext.roadmapPath` | path | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`). |
-| `developNext.baseBranch` | branch name | `develop` | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to. |
-| `developNext.qualityGateCommand` | shell command | `npm test` | Local merge gate `develop-next` runs on every branch before `gh pr merge` (the whole gate for projects without PR CI). |
-| `developNext.mergeStrategy` | `merge` \| `squash` \| `rebase` | `merge` | Strategy passed to `gh pr merge`. |
-| `developBatch.maxParallel` | integer | `4` | **Global** ceiling on concurrent worktree pipelines across all resources. Admission is rolling — a freed slot is refilled immediately, not at a wave boundary. With `resources` set, the effective cap is `min(maxParallel, sum(capacity))`. Batch reuses all `developNext.*` keys for roadmap/base/gate/strategy. |
-| `developBatch.requireTouches` | boolean | `false` | When `true`, the `--batch` selector defers all but one un-annotated (`touches:`-less, `+own`-default) row per batch instead of only warning — makes write-conflicts impossible by construction rather than caught at merge. Default off is non-breaking. |
-| `developBatch.resources` | array | *(unset)* | Named execution resources, each with `name`, `capacity`, optional `testCommand`, `env` and `probe`. Array order is the placement tiebreak. **Unset = one implicit resource at `maxParallel`**, i.e. exactly the pre-existing single-lane behaviour. See the skill's `references/execution-resources.md` for the probe contract. |
-| `developBatch.worktreeSeedPaths` | array | `[]` | Gitignored paths copied from the main tree into each fresh worktree. A `git worktree add` carries no gitignored files, and a missing runner config usually degrades *silently* rather than failing. |
-| `developBatch.maxResumeAttempts` | integer | `2` | How many times an **externally interrupted** item (plan mode, permission denial, compaction) may be re-dispatched before it becomes `haltKind: "interrupted-exhausted"`. Does not apply to genuine pipeline HALTs, which are never re-dispatched. |
-| `developBatch.maxRebatches` | integer | `3` | Cap on Step 5.5 re-selections within one invocation. Re-batching also requires that the previous batch ticked at least one roadmap row, which is the real anti-spin guard. |
+| Key                                              | Type                            | Default                                          | What it controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------ | ------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tracker`                                        | `jira` \| `github`              | (auto-detected)                                  | Issue tracker override. See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                                                                                                                                            |
+| `vcs`                                            | `github` \| `bitbucket`         | (auto-detected from git remote)                  | VCS override. See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `prd.prdShardedLocation`                         | path                            | `docs/prd`                                       | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `architecture.architectureShardedLocation`       | path                            | `docs/architecture`                              | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md)                                                                                                                                                                                                                                                                                                                                        |
+| `devLoadAlwaysFiles`                             | list[path]                      | `[]`                                             | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.)                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `jira.statusMap`                                 | map[string→string\|list]        | (built-in candidate lists)                       | Maps local document status → the Jira status name(s) to transition to, as a scalar or ordered candidate list. May carry a per-issue-type sub-map (`story`/`task`/`epic`). Usually unnecessary — check with `--probe-workflow` first. See [Jira status mapping](#jira-status-mapping).                                                                                                                                                                                                     |
+| `jira.doneResolution`                            | string                          | (prefers `Done`, `Resolved`, `Fixed`)            | Resolution name used when a workflow's done transition requires one. Env override: `JIRA_DONE_RESOLUTION`.                                                                                                                                                                                                                                                                                                                                                                                |
+| `jira.cancelledResolution`                       | string                          | (prefers `Won't Do`, `Cancelled`, `Declined`)    | Resolution name used when cancelling. Env override: `JIRA_CANCELLED_RESOLUTION`.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `jira.devEstimateField`                          | string (custom field id)        | (unset → skipped)                                | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field).                                                                                                                                                                                                                                                                                                   |
+| `jira.defaultAssignee`                           | string (Jira accountId)         | (unset → field not sent)                         | accountId applied on story/task/epic sync when the document's frontmatter has no `assignee`. Frontmatter wins. An **accountId**, never a name or team — Jira rejects anything else with a bare `HTTP 400`. Placeholders (`TBD`, `unassigned`, `none`, `n/a`, …) are refused with a warning in either position rather than sent. Unset in both places means the field is omitted entirely, so an update leaves Jira's existing assignee untouched. Find yours at `GET /rest/api/3/myself`. |
+| `github.projectEstimateField`                    | string (project field name)     | `Estimate`                                       | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field).                                                                                                                                                                                                                                                                                                                                |
+| `branching.epicIntegration.epicFrontmatterKey`   | string                          | `branch_model`                                   | Epic frontmatter key read to decide whether the epic delivers via an integration branch.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `branching.epicIntegration.epicFrontmatterValue` | string                          | `epic-integration`                               | Value of that key meaning "this epic's stories branch from and merge into an integration branch". Any other value, or the key's absence, means the pre-existing `develop`-direct behaviour.                                                                                                                                                                                                                                                                                               |
+| `branching.epicIntegration.branchKey`            | string                          | `integration_branch`                             | Epic frontmatter key holding the branch name. Used **verbatim** when present — the epic document is the authority on its own branch name.                                                                                                                                                                                                                                                                                                                                                 |
+| `branching.epicIntegration.branchPattern`        | string                          | `epic/{n}.{slug}`                                | Fallback name, used only when an epic opts in but names no branch. `{n}` = epic number, `{slug}` = epic name slug. `epic/*` is deliberately distinct from `feature/epic.*`, which is an ordinary short-lived branch for epic-**document** work.                                                                                                                                                                                                                                           |
+| `branching.epicIntegration.offerWhenUndeclared`  | boolean                         | `true`                                           | Whether `/create-branch` and `/develop-story` offer "create an epic integration branch" for a story whose epic declared nothing. `false` restricts integration branches to epics that opted in explicitly. Never the _recommended_ option either way.                                                                                                                                                                                                                                     |
+| `developNext.roadmapPath`                        | path                            | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`).                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `developNext.baseBranch`                         | branch name                     | `develop`                                        | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to.                                                                                                                                                                                                                                                                                                                                                                                  |
+| `developNext.qualityGateCommand`                 | shell command                   | `npm test`                                       | Local merge gate `develop-next` runs on every branch before `gh pr merge` (the whole gate for projects without PR CI).                                                                                                                                                                                                                                                                                                                                                                    |
+| `developNext.mergeStrategy`                      | `merge` \| `squash` \| `rebase` | `merge`                                          | Strategy passed to `gh pr merge`.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `developBatch.maxParallel`                       | integer                         | `4`                                              | **Global** ceiling on concurrent worktree pipelines across all resources. Admission is rolling — a freed slot is refilled immediately, not at a wave boundary. With `resources` set, the effective cap is `min(maxParallel, sum(capacity))`. Batch reuses all `developNext.*` keys for roadmap/base/gate/strategy.                                                                                                                                                                        |
+| `developBatch.requireTouches`                    | boolean                         | `false`                                          | When `true`, the `--batch` selector defers all but one un-annotated (`touches:`-less, `+own`-default) row per batch instead of only warning — makes write-conflicts impossible by construction rather than caught at merge. Default off is non-breaking.                                                                                                                                                                                                                                  |
+| `developBatch.resources`                         | array                           | _(unset)_                                        | Named execution resources, each with `name`, `capacity`, optional `testCommand`, `env` and `probe`. Array order is the placement tiebreak. **Unset = one implicit resource at `maxParallel`**, i.e. exactly the pre-existing single-lane behaviour. See the skill's `references/execution-resources.md` for the probe contract.                                                                                                                                                           |
+| `developBatch.worktreeSeedPaths`                 | array                           | `[]`                                             | Gitignored paths copied from the main tree into each fresh worktree. A `git worktree add` carries no gitignored files, and a missing runner config usually degrades _silently_ rather than failing.                                                                                                                                                                                                                                                                                       |
+| `developBatch.maxResumeAttempts`                 | integer                         | `2`                                              | How many times an **externally interrupted** item (plan mode, permission denial, compaction) may be re-dispatched before it becomes `haltKind: "interrupted-exhausted"`. Does not apply to genuine pipeline HALTs, which are never re-dispatched.                                                                                                                                                                                                                                         |
+| `developBatch.maxRebatches`                      | integer                         | `3`                                              | Cap on Step 5.5 re-selections within one invocation. Re-batching also requires that the previous batch ticked at least one roadmap row, which is the real anti-spin guard.                                                                                                                                                                                                                                                                                                                |
 
 ## QA artifacts are co-located
 
@@ -125,17 +138,17 @@ The `sync-jira-{story,task,epic}` skills transition the Jira issue to match the 
 canonical local status (`shared/resources/document-status-lifecycle.md`) to a Jira status name before
 looking for a matching transition.
 
-**Built-in defaults.** Each local status resolves against an ordered list of *candidate* Jira status
+**Built-in defaults.** Each local status resolves against an ordered list of _candidate_ Jira status
 names, not a single one — Jira workflows name the same lifecycle stage very differently, and a single
 hardcoded name silently skipped the status change on every board that chose a different word:
 
-| Local status (frontmatter) | Candidates, tried in order |
-|---|---|
-| `draft`, `planned`, `ready-for-development` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development` |
-| `in-progress` | `In Progress`, `Doing`, `Started`, `Development` |
-| `ready-for-review` | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review` |
-| `accepted` | `Done`, `Closed`, `Resolved`, `Complete`, `Completed` |
-| `cancelled` | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed` |
+| Local status (frontmatter)                  | Candidates, tried in order                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `draft`, `planned`, `ready-for-development` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development`                                 |
+| `in-progress`                               | `In Progress`, `Doing`, `Started`, `Development`                                              |
+| `ready-for-review`                          | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review` |
+| `accepted`                                  | `Done`, `Closed`, `Resolved`, `Complete`, `Completed`                                         |
+| `cancelled`                                 | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed`                                     |
 
 Most projects need **no `statusMap` at all**. Run `--probe-workflow` (below) before writing one.
 
@@ -146,39 +159,39 @@ Most projects need **no `statusMap` at all**. Run `--probe-workflow` (below) bef
 2. **Destination match** — a transition whose `to.name` equals a candidate, candidates in order.
 3. **Action match** — a transition whose own `name` equals a candidate. Catches workflows that name
    the action rather than the destination (an `Implemented` transition leading to `Waiting for Review`).
-4. **Terminal-only category fallback** — for `accepted`/`cancelled` only, and only when *exactly one*
+4. **Terminal-only category fallback** — for `accepted`/`cancelled` only, and only when _exactly one_
    available transition leads to the `done` status category.
 5. Otherwise **skip**, listing the candidates tried and the transitions available.
 
 Step 4 is restricted to terminal statuses deliberately. Falling back on status category for `new` and
-`indeterminate` was tried and rejected: against a real board it picked *wrong* transitions —
+`indeterminate` was tried and rejected: against a real board it picked _wrong_ transitions —
 `ready-for-review` resolving to "In Progress", `in-progress` resolving to "Waiting for Review". A
 skipped status change is recoverable; a confident wrong transition is not.
 
 **Overriding.** Only when the probe shows a stage you use being skipped. Keys are the lowercase-kebab
-local statuses; values are literal Jira status names as a scalar or an ordered list. Overrides *replace*
+local statuses; values are literal Jira status names as a scalar or an ordered list. Overrides _replace_
 the candidate list for that status, so an override narrows matching — prefer a list:
 
 ```yaml
 jira:
   statusMap:
-    ready-for-development: Selected for Development     # scalar
-    ready-for-review: [Waiting for Review, In Review]   # ordered candidates
-    accepted:                                           # block form, same thing
+    ready-for-development: Selected for Development # scalar
+    ready-for-review: [Waiting for Review, In Review] # ordered candidates
+    accepted: # block form, same thing
       - Shipped
       - Done
-    epic:                     # optional per-issue-type layer, over the flat map
+    epic: # optional per-issue-type layer, over the flat map
       accepted: Closed
 ```
 
 The per-issue-type layer (`story` / `task` / `epic`) exists because one project can run a different
 workflow per type — an Epic with only `Open`/`Done` beside a Story with a full review-and-test lane.
 
-**Required transition fields.** A workflow's transition screen can *require* a field — most often
+**Required transition fields.** A workflow's transition screen can _require_ a field — most often
 `resolution` on the Done transition. The skills read each transition's declared fields and fill
 `resolution` from that transition's own `allowedValues`, preferring `Done`/`Resolved`/`Fixed` for
 `accepted` and `Won't Do`/`Cancelled`/`Declined` for `cancelled`. Override with `jira.doneResolution` /
-`jira.cancelledResolution` (or `JIRA_DONE_RESOLUTION` / `JIRA_CANCELLED_RESOLUTION`). Any *other*
+`jira.cancelledResolution` (or `JIRA_DONE_RESOLUTION` / `JIRA_CANCELLED_RESOLUTION`). Any _other_
 required field is reported and the transition is skipped rather than sent — a request the workflow has
 already declared incomplete would only return HTTP 400.
 
@@ -214,7 +227,7 @@ jira:
 Notes:
 
 - The custom-field id is **project-specific** — find it in your Jira admin (Settings → Issues → Custom
-  fields) or via `GET /rest/api/3/field`. It is *not* guaranteed to be `customfield_10594` on every tenant.
+  fields) or via `GET /rest/api/3/field`. It is _not_ guaranteed to be `customfield_10594` on every tenant.
 - The field is treated as **numeric**: the integer hours are sent as a raw number (no `"4h"` suffix).
   Non-numeric `estimated_effort_hours` values are skipped for the custom field.
 - Override per-run with the `JIRA_DEV_ESTIMATE_FIELD` environment variable, which takes precedence over
@@ -266,7 +279,7 @@ architecture:
 # Local document status -> this project's Jira workflow status names.
 # Values shown are the built-in defaults; edit the right-hand names to match your workflow.
 jira:
-  devEstimateField: customfield_10594   # optional — mirror estimated_effort_hours to this custom field
+  devEstimateField: customfield_10594 # optional — mirror estimated_effort_hours to this custom field
   statusMap:
     draft: To Do
     planned: To Do
@@ -298,15 +311,15 @@ devLoadAlwaysFiles:
 
 Several skills use curly-brace placeholders in commands, file paths, and import examples. Replace these with values from your project before running anything verbatim.
 
-| Placeholder | Meaning | Example replacement |
-|---|---|---|
-| `{project}` | Top-level project / monorepo / docker-compose project name | `acme-platform` |
-| `{api-service}` | Name of an HTTP API service (NestJS app, container, NX project) | `api`, `web-api` |
-| `{db-service}` | Name of the database service (container, NX project) | `postgres`, `db` |
-| `{cache-service}` | Name of the cache service (container) | `redis`, `cache` |
-| `@your-org/<lib>` | Scoped package from your monorepo or registry | `@acme/auth`, `@acme/logging` |
-| `<your-server>` | SSH host or remote target | `prod-1.example.com` |
-| `<registry-host>` | Container registry hostname | `registry.example.com` |
+| Placeholder       | Meaning                                                         | Example replacement           |
+| ----------------- | --------------------------------------------------------------- | ----------------------------- |
+| `{project}`       | Top-level project / monorepo / docker-compose project name      | `acme-platform`               |
+| `{api-service}`   | Name of an HTTP API service (NestJS app, container, NX project) | `api`, `web-api`              |
+| `{db-service}`    | Name of the database service (container, NX project)            | `postgres`, `db`              |
+| `{cache-service}` | Name of the cache service (container)                           | `redis`, `cache`              |
+| `@your-org/<lib>` | Scoped package from your monorepo or registry                   | `@acme/auth`, `@acme/logging` |
+| `<your-server>`   | SSH host or remote target                                       | `prod-1.example.com`          |
+| `<registry-host>` | Container registry hostname                                     | `registry.example.com`        |
 
 Notes:
 
@@ -319,10 +332,10 @@ Notes:
 
 The `/develop-story` and `/develop-task` pipelines register two hooks in the project's `.claude/settings.json`:
 
-| Hook event | Script | Purpose |
-|---|---|---|
-| `PreCompact` | `on-precompact.sh` | Checkpoints the running pipeline before Claude Code compacts the conversation |
-| `Stop` | `on-stop.sh` | Blocks the orchestrator from yielding mid-pipeline when it tries to end its turn early |
+| Hook event   | Script             | Purpose                                                                                |
+| ------------ | ------------------ | -------------------------------------------------------------------------------------- |
+| `PreCompact` | `on-precompact.sh` | Checkpoints the running pipeline before Claude Code compacts the conversation          |
+| `Stop`       | `on-stop.sh`       | Blocks the orchestrator from yielding mid-pipeline when it tries to end its turn early |
 
 **Install (idempotent):**
 
@@ -336,10 +349,26 @@ The install script patches `.claude/settings.json` safely — preserves existing
 {
   "hooks": {
     "PreCompact": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-precompact.sh" }] }
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .agents/skills/develop-story/scripts/on-precompact.sh"
+          }
+        ]
+      }
     ],
     "Stop": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-stop.sh" }] }
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .agents/skills/develop-story/scripts/on-stop.sh"
+          }
+        ]
+      }
     ]
   }
 }
@@ -355,23 +384,23 @@ Full reference (hook catalogue, lock-file format, escape valves, interaction dia
 
 ### Jira
 
-| Variable | Example | Required | Purpose |
-|---|---|---|---|
-| `JIRA_URL` | `https://yourorg.atlassian.net` | Yes | Jira base URL; also triggers platform auto-detection |
-| `JIRA_USER_EMAIL` | `dev@example.com` | Yes | Basic Auth username |
-| `JIRA_API_TOKEN` | `ATATT3x...` | Yes | Basic Auth password — generate in Atlassian account settings |
-| `JIRA_PROJECT_KEY` | `PROJ` | Yes | Target project key for issue creation |
-| `JIRA_BOARD_ID` | `42` | No | Numeric board ID; omit → issues created but not placed in backlog |
-| `JIRA_EPIC_LINK_FIELD` | `customfield_10014` | No | Classic-project epic link field; unset = use default |
-| `JIRA_EPIC_NAME_FIELD` | `customfield_10011` | No | Classic-project epic name field; set to `none` for team-managed projects |
+| Variable               | Example                         | Required | Purpose                                                                  |
+| ---------------------- | ------------------------------- | -------- | ------------------------------------------------------------------------ |
+| `JIRA_URL`             | `https://yourorg.atlassian.net` | Yes      | Jira base URL; also triggers platform auto-detection                     |
+| `JIRA_USER_EMAIL`      | `dev@example.com`               | Yes      | Basic Auth username                                                      |
+| `JIRA_API_TOKEN`       | `ATATT3x...`                    | Yes      | Basic Auth password — generate in Atlassian account settings             |
+| `JIRA_PROJECT_KEY`     | `PROJ`                          | Yes      | Target project key for issue creation                                    |
+| `JIRA_BOARD_ID`        | `42`                            | No       | Numeric board ID; omit → issues created but not placed in backlog        |
+| `JIRA_EPIC_LINK_FIELD` | `customfield_10014`             | No       | Classic-project epic link field; unset = use default                     |
+| `JIRA_EPIC_NAME_FIELD` | `customfield_10011`             | No       | Classic-project epic name field; set to `none` for team-managed projects |
 
 ### Bitbucket
 
-| Variable | Example | Required | Purpose |
-|---|---|---|---|
-| `BITBUCKET_USERNAME` | `jsmith` | Yes | Basic Auth username |
-| `BITBUCKET_APP_PASSWORD` | `ATB...` | Yes | App password (not account password) — Bitbucket → Personal settings → App passwords |
-| `BITBUCKET_REPO_URL` | `https://bitbucket.org/org/repo` | No | Override if git remote auto-detect fails |
+| Variable                 | Example                          | Required | Purpose                                                                             |
+| ------------------------ | -------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `BITBUCKET_USERNAME`     | `jsmith`                         | Yes      | Basic Auth username                                                                 |
+| `BITBUCKET_APP_PASSWORD` | `ATB...`                         | Yes      | App password (not account password) — Bitbucket → Personal settings → App passwords |
+| `BITBUCKET_REPO_URL`     | `https://bitbucket.org/org/repo` | No       | Override if git remote auto-detect fails                                            |
 
 ### GitHub
 
