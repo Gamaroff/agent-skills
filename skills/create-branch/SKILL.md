@@ -102,13 +102,18 @@ Determine the input type and extract relevant information:
 Input: epic.178.feature-ui.md
  → Type: feature (from epic)
  → Branch Name: feature/epic.178.feature-ui
- → Base: develop (fixed — no user prompt for epic branches)
+ → Base: develop (fixed — no user prompt for epic-DOCUMENT branches)
 
 Input: story.178.8.example-feature.md
  → Type: feature (from story)
  → Branch Name: feature/story.178.8.example-feature
  → Base: TBD (will ask user)
 ```
+
+> **`feature/epic.*` and `epic/*` are different things.** `feature/epic.{n}.{name}` is an ordinary
+> short-lived branch for editing the epic **document** (what `/review-epic` creates). `epic/{n}.{name}`
+> is an **integration branch** that a whole epic's stories merge into — see Step 2b. Never use one name
+> for the other.
 
 ### Step 2: Check Current Branch Context
 
@@ -124,6 +129,73 @@ git branch --show-current
 - If on `develop`: Offer `develop` (recommended) + current branch
 - If on `main`: Only offer `develop` (block branching from main for features)
 - If detached HEAD: Only offer `develop`
+
+### Step 2b: Epic Integration Branch (story input only)
+
+**Skip this step entirely for task and epic-document inputs** — it applies only when the input is a
+story file.
+
+Most epics have no branch of their own: their stories are cut from `develop` and merge back into
+`develop`. That is the default and stays the default. Some epics must instead arrive **whole** — every
+story merges into one integration branch, which reaches `develop` once, at the end, as a single reviewed
+unit. This step decides which applies, and creates the integration branch if one is wanted and does not
+yet exist.
+
+**1. Resolve the parent epic document.** Read the story's frontmatter for `epic_source:` (a path) or
+`epic:` (an epic slug to locate under the configured PRD root). If neither resolves to a readable file,
+skip to Step 3 with no epic option — do not guess and do not block.
+
+**2. Read the epic's declaration.** Look for these keys in the epic document's frontmatter. Key names are
+configurable (see [Configuration](#configuration) below); the defaults are:
+
+```yaml
+branch_model: epic-integration
+integration_branch: "epic/178.feature-ui"
+```
+
+**3. Derive the recommendation:**
+
+| Epic declares                                                | Recommended base     | Integration option offered as |
+| ------------------------------------------------------------ | -------------------- | ----------------------------- |
+| `branch_model: epic-integration` **+** `integration_branch:` | the declared branch  | Recommended                   |
+| `branch_model: epic-integration`, no `integration_branch:`   | derived name (see 4) | Recommended                   |
+| nothing, or `branch_model: develop-direct`                   | `develop`            | offered, not recommended      |
+
+**Absence means `develop`.** An epic that declares nothing behaves exactly as it always has — this step
+adds an option, never a default change.
+
+**4. Derive the branch name** when the epic wants an integration branch but does not name one. Default
+pattern (configurable):
+
+```
+epic/{epic_number}.{epic-slug}      e.g.  epic/178.feature-ui
+```
+
+Use the declared `integration_branch` **verbatim** whenever it is present, even if it does not match this
+pattern — the epic document is the authority on its own branch name, not this skill.
+
+**5. Create it if absent.** Only after the user selects the integration branch in Step 3, and before
+Step 5 checks out a base:
+
+```bash
+EPIC_BRANCH="epic/178.feature-ui"
+git fetch origin
+if git show-ref --verify --quiet "refs/heads/${EPIC_BRANCH}"; then
+  :                                                    # already local — use it
+elif git ls-remote --exit-code --heads origin "${EPIC_BRANCH}" >/dev/null 2>&1; then
+  git branch --track "${EPIC_BRANCH}" "origin/${EPIC_BRANCH}"   # exists on remote
+else
+  git branch "${EPIC_BRANCH}" "origin/${BASE_DEFAULT}"          # create from develop
+  git push -u origin "${EPIC_BRANCH}"
+fi
+```
+
+> **The push is not optional.** Parallel orchestrators (`/develop-batch`) run in linked git worktrees and
+> cut branches from `origin/<base>`, never from a local ref. An integration branch that exists only
+> locally makes every worktree-dispatched story in that epic fail to branch.
+
+Note this uses `git branch`, not `git checkout -b` — the integration branch must **not** become the
+active branch here. Step 5 checks out the base; Step 6 cuts the story branch from it.
 
 ### Step 3: Ask User for Base Branch
 
@@ -171,8 +243,46 @@ Question: "Which branch should be the base for feature/story.309.2.3.mobile-noti
 
 Options:
 1. develop (Recommended)
-   Description: "Standard Gitflow - start from integration branch"
+   Description: "Standard Gitflow - start from develop"
 ```
+
+**Scenario D: Story whose epic uses an integration branch** (Step 2b resolved one)
+
+The integration option is added to whichever of Scenarios A–C applies; it does not replace them. It is
+listed **first and Recommended** when the epic declares `branch_model: epic-integration`, and listed last
+without a recommendation when the epic declares nothing.
+
+```
+Current: develop
+New: feature/story.178.8.example-feature
+Epic 178 declares: branch_model: epic-integration → epic/178.feature-ui
+
+Question: "Which branch should be the base for feature/story.178.8.example-feature?"
+
+Options:
+1. epic/178.feature-ui (Recommended)
+   Description: "Epic integration branch - epic 178 delivers as one unit; created from develop if absent"
+
+2. develop
+   Description: "Standard Gitflow - lands this story on develop independently of its epic"
+```
+
+And where the epic declares nothing, the same option appears without the recommendation:
+
+```
+Options:
+1. develop (Recommended)
+   Description: "Standard Gitflow - start from develop"
+
+2. epic/178.feature-ui — create epic integration branch
+   Description: "Only if epic 178 must arrive whole. Creates the branch from develop, then bases this
+                 story on it. Every later story in the epic must use it too."
+```
+
+> Selecting the integration option when the branch does not exist **creates it** (Step 2b.5) before
+> Step 5 runs. Selecting it does not update the epic document — if the epic is going to deliver this
+> way, record `branch_model:` / `integration_branch:` in its frontmatter so later stories get the
+> recommendation instead of relying on whoever runs them next remembering.
 
 ### Step 4: Ensure Clean Working Directory
 
@@ -259,21 +369,47 @@ Or for sub-stories:
 Ready to start development on sub-story!
 ```
 
+## Configuration
+
+Every key below is **optional**. With no configuration at all, Step 2b reads the default frontmatter keys
+and offers the integration option; an epic that declares nothing gets exactly the pre-existing behaviour.
+Configure only if your repository already spells these conventions differently.
+
+```yaml
+# skills-config.yaml
+branching:
+  epicIntegration:
+    epicFrontmatterKey: branch_model # epic frontmatter key holding the model
+    epicFrontmatterValue: epic-integration # the value that means "use an integration branch"
+    branchKey: integration_branch # epic frontmatter key holding the branch name
+    branchPattern: "epic/{n}.{slug}" # used ONLY when the epic wants one but names none
+    offerWhenUndeclared: true # false ⇒ never offer the option unless an epic declares it
+```
+
+`offerWhenUndeclared: false` is the setting for a team that wants integration branches to exist only
+where an epic has explicitly opted in — the prompt then never shows the option to anyone else.
+
+`branchPattern` is a fallback, not an enforced shape. A declared `integration_branch` is always used
+verbatim.
+
 ## Quick Reference: Gitflow Rules
 
-| Branch Type         | Created From | Merges Into          | Purpose                                        |
-| ------------------- | ------------ | -------------------- | ---------------------------------------------- |
-| **Feature (epic)**  | `develop`    | `develop`            | Epic-document work (not an integration branch) |
-| **Feature (story)** | `develop`    | `develop` (via PR)   | Story implementation                           |
-| **Feature (task)**  | user choice  | user choice (via PR) | Technical task implementation                  |
-| **Release**         | `develop`    | `main` & `develop`   | Release prep & bug fixes                       |
-| **Hotfix**          | `main`       | `main` & `develop`   | Emergency prod fixes                           |
+| Branch Type                     | Created From | Merges Into              | Purpose                                                                           |
+| ------------------------------- | ------------ | ------------------------ | --------------------------------------------------------------------------------- |
+| **Feature (epic)**              | `develop`    | `develop`                | Epic-**document** work (not an integration branch)                                |
+| **Feature (story)**             | `develop`    | `develop` (via PR)       | Story implementation                                                              |
+| **Feature (task)**              | user choice  | user choice (via PR)     | Technical task implementation                                                     |
+| **Epic integration** (`epic/*`) | `develop`    | `develop` (via PR, once) | Opt-in: a whole epic's stories merge here, then it lands on `develop` as one unit |
+| **Release**                     | `develop`    | `main` & `develop`       | Release prep & bug fixes                                                          |
+| **Hotfix**                      | `main`       | `main` & `develop`       | Emergency prod fixes                                                              |
 
 > [!IMPORTANT]
 >
 > - Feature branches **never** interact directly with `main`
-> - Story branches are created from `develop` and PR back to `develop` (short-lived feature branches — standard Gitflow). Epics are an organisational construct (Jira/docs), **not** a git integration branch; a story branch is never cut from an epic branch.
-> - Epic branches (`feature/epic.*`) exist only for epic-**document** work and are ordinary feature branches: created from `develop`, PR back to `develop`.
+> - Story branches are created from `develop` and PR back to `develop` (short-lived feature branches — standard Gitflow). **By default an epic is an organisational construct (Jira/docs), not a git branch.**
+> - **Exception, opt-in per epic:** an epic may declare `branch_model: epic-integration`, giving it an integration branch (`epic/{n}.{name}`) that its stories are cut from and merge into. The integration branch reaches `develop` once, at the end. See Step 2b. An epic that declares nothing behaves exactly as before.
+> - `feature/epic.*` branches exist only for epic-**document** work and are ordinary feature branches: created from `develop`, PR back to `develop`. They are **not** integration branches and must not be confused with `epic/*`.
+> - Never mix bases within one epic — if the epic has an integration branch, every story in it uses that branch.
 > - Hotfix branches **must** be merged back to both `main` AND `develop`
 > - Every merge to `main` triggers a version tag
 

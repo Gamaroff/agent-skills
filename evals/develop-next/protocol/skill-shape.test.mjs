@@ -77,12 +77,30 @@ test("SKILL.md: run-state file makes merge→tick crash-safe", () => {
   );
 });
 
-test("SKILL.md: story PRs merge straight to base — no epic promotion", () => {
+test("SKILL.md: story PRs merge to their own base — no automated epic promotion", () => {
   assert.match(
     skill,
-    /no epic integration branch to promote|merge straight to/i,
+    /target `<baseBranch>`[^\n]*directly|merge straight to/i,
+    "SKILL.md must say story PRs normally target the configured base directly",
   );
-  assert.doesNotMatch(skill, /--epic-status|--assume-ticked|promote the epic/i);
+  // The removed v0.24.0 machinery must stay removed. develop-next gained NO
+  // epic-completion check and NO epic→base promotion when epic-integration
+  // branches became an opt-in story-side feature in v0.25.0.
+  assert.doesNotMatch(skill, /--epic-status|--assume-ticked/i);
+});
+
+test("SKILL.md: the epic-integration gap is documented, not left to be discovered", () => {
+  assert.match(
+    skill,
+    /branch_model: epic-integration/,
+    "SKILL.md must acknowledge epics that opt in to an integration branch",
+  );
+  assert.match(
+    skill,
+    /nothing promotes the integration branch|by hand/i,
+    "SKILL.md must state that epic→base promotion is manual — a half-automated " +
+      "flow that looks complete is worse than one that says where it stops",
+  );
 });
 
 test("SKILL.md: merge gate verifies PR head SHA and uses configured gate/strategy", () => {

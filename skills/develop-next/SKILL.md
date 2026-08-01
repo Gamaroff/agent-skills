@@ -189,7 +189,22 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 
    > **Parsing note (Bitbucket):** the merge response embeds rendered HTML that can contain raw control characters, which makes some `jq` invocations fail on the _response_ even though the merge itself succeeded. **Never retry a merge on a parse error** — re-query `GET …/pullrequests/${PR_ID}` and check `.state` first, or you risk a duplicate merge attempt against an already-merged PR.
 
-   Story PRs target `<baseBranch>` (default `develop`) directly — there is no epic integration branch to promote. Epics are an organisational construct only; nothing special happens when an epic's last story merges.
+   Story PRs normally target `<baseBranch>` (default `develop`) directly, and nothing special happens when an epic's last story merges.
+
+   > **Epics using an integration branch are only partly automated.** If a story's epic declares
+   > `branch_model: epic-integration`, `/develop-story` bases that story on the epic's integration branch
+   > and its PR targets that branch. The merge here is correct without changes — the platform merges each
+   > PR into the base the PR itself declares, not into `<baseBranch>`.
+   >
+   > **But nothing promotes the integration branch to `<baseBranch>`.** There is no epic-completion check
+   > and no epic→base promotion step (both were removed in v0.24.0 along with the mandatory epic-branch
+   > model, and reinstating them is not part of the opt-in feature). So for such an epic:
+   >
+   > - Step 4 still ticks the roadmap on `<baseBranch>` as each story merges — correct, the roadmap tracks
+   >   stories, not branches.
+   > - The epic's work accumulates on the integration branch and **stays there**. Raise and merge the final
+   >   `epic/{n}.{name}` → `<baseBranch>` PR **by hand** once every story is in.
+   > - Do not read "all this epic's rows are ticked" as "the epic has landed on `<baseBranch>`". It has not.
 
 ## Step 4 — Tick the roadmap
 

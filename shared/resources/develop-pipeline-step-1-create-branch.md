@@ -64,6 +64,32 @@ When `create-branch` asks which base branch to use, select the Q1 answer from Up
 - **develop-story**: Q1 answer is the branch chosen in Phase 0d (default `develop`)
 - **develop-task**: Q1 answer is the branch chosen in Phase 0d
 
+#### When the Q1 answer is an epic integration branch (develop-story only)
+
+The Q1 answer may name a branch that **does not exist yet** — Phase 0d is deliberately side-effect-free,
+so an epic integration branch chosen there has not been created. `/create-branch` Step 2b.5 creates it
+from `develop` and pushes it before checking out a base; nothing extra is needed here.
+
+Two consequences to verify after `/create-branch` returns:
+
+```bash
+git rev-parse --abbrev-ref HEAD                      # the STORY branch, not the epic branch
+git rev-parse --abbrev-ref --symbolic-full-name @{u} # story branch tracks origin
+```
+
+If HEAD is the epic branch rather than the story branch, `/create-branch` stopped after creating the
+integration branch — **HALT** and report it. Continuing would commit story work directly onto the epic
+branch, which no PR would then isolate.
+
+The integration branch must also exist on `origin` at this point. `/develop-batch` dispatches stories
+into linked worktrees that cut from `origin/<base>`; a local-only integration branch makes every
+subsequent story in the epic fail to branch, with an error that names the story rather than the real
+cause. Verify once, cheaply:
+
+```bash
+git ls-remote --exit-code --heads origin "<epic-branch>" >/dev/null || echo "❌ integration branch not pushed"
+```
+
 ### Restore the Stash (shared)
 
 After `/create-branch` completes and the feature branch is checked out:

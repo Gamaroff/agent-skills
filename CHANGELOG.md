@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **An epic can opt in to an integration branch again — per epic, by declaration, and only where it is argued for.** v0.24.0 removed the epic-integration model wholesale, because it had been **mandatory**: every epic got a long-lived `feature/epic.{n}.{name}` branch whether or not it needed one, and the resulting drift, deferred integration and big-bang merges are the well-known failure mode of that pattern. Nothing about that reasoning has changed, and `develop` remains the default and the recommendation. What returns is the narrow case the blanket removal also took with it: an epic whose stories are meaningless apart — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Such an epic now declares itself:
+
+  ```yaml
+  branch_model: epic-integration
+  integration_branch: "epic/178.feature-ui"
+  ```
+
+  `/create-branch` gains **Step 2b**: for a story input, resolve the parent epic, read the declaration, and offer the integration branch as a base — **Recommended when the epic declares one, offered-but-not-recommended when it does not**, and creating the branch from `develop` (then pushing it) if it does not yet exist. `/develop-story` Phase 0d derives Q1/Q2 from the same declaration, so the autonomous orchestrators inherit correct behaviour with no new prompt and no change to the two-question count. **An epic that declares nothing behaves exactly as it did in v0.32.0** — this adds an option, never a default.
+
+  The declaration is read, never written: choosing the integration branch at the prompt does not edit the epic document. Record the keys in the epic's frontmatter so later stories in the same epic get the recommendation instead of depending on whoever runs them next remembering.
+
+- **`epic/{n}.{name}` is a new namespace, deliberately distinct from `feature/epic.{n}.{name}`.** The latter already exists and means something else — an ordinary short-lived branch for editing the epic **document**, which `/review-epic` creates. Reusing one name for both would have made a doc-review branch and an integration branch the same ref, quietly gating epic-document edits behind the entire epic's delivery. The split also makes the two expressible separately in branch protection, which matters because an integration branch must never be force-pushed while `feature/*` stays force-pushable. `create-branch`'s Gitflow reference gains a row for it; both documents state the distinction outright, and an eval test asserts they keep stating it.
+
+- **`branching.epicIntegration.*` configuration — all optional, no configuration required.** Frontmatter key names (`epicFrontmatterKey`, `epicFrontmatterValue`, `branchKey`), the fallback branch name (`branchPattern`, default `epic/{n}.{slug}`), and `offerWhenUndeclared` (set `false` to restrict integration branches to epics that opted in explicitly). Defaults are the conventions above, so a consumer that wants this needs to add nothing; a consumer that spells its conventions differently overrides the names rather than renaming its documents.
+
+### Changed
+
+- **`develop-next` / `develop-batch` are only partly automated for an epic-integration epic, and now say so.** The merge step needed no change — the platform merges each PR into the base the PR itself declares, so a story based on `epic/178.feature-ui` merges there rather than into `develop`. But **nothing promotes the integration branch to the base branch**: the epic-completion check and the epic→base promotion were removed in v0.24.0 along with the mandatory model, and reinstating them is not part of this opt-in feature. `develop-next`'s SKILL.md previously asserted "there is no epic integration branch to promote", which is now false; it instead states where the automation stops and that the final `epic/{n}.{name}` → base PR is raised by hand. The trap this closes is reading "every row in this epic is ticked" as "the epic has landed" — the roadmap tracks stories, not branches, and for these epics the two diverge. A half-automated flow that looks complete is worse than one that says where it ends.
+
+- **`develop-story`'s skill description no longer asserts that an epic is "never a git integration branch."** It is the string the model matches on when selecting the skill, so leaving it would have argued against the feature at the point of use.
+
+### Fixed
+
+- **The eval guard for the flat flow asserted the absence of a phrase rather than the presence of the behaviour.** `develop-branch-flow-rules.test.mjs` failed on any occurrence of `EPIC_BRANCH` anywhere in step-0 — so it could not distinguish "the mandatory model is back" from "an opt-in path is documented", and it would have blocked this change without indicating what was actually wrong. It now pins the invariants that matter: `develop` stays the recommendation when an epic declares nothing, the opt-in path fails open when the epic cannot be resolved, Phase 0 stays side-effect-free, and the pre-v0.24.0 machinery (`Step 1a`, `create-epic-branch`, `EPIC_BRANCH_EXISTS`) stays gone. All three new assertions were falsified individually before shipping.
+
+  The namespace guard was written twice. The first version hunted prose for a bad phrasing and flagged the very sentence that draws the distinction correctly — so it now asserts **positively** that the disambiguation is present. A guard that cries wolf gets disabled, which is worse than no guard.
+
 ## [v0.32.0] - 2026-07-31
 
 Four defects in Jira sync, every one of which **reported success while publishing something wrong**. They are grouped because that is the shared property, not the shared file: each prints `✅` and exits `0`, so none was findable by watching for failures. Falsified before shipping — the new test file fails 11/15 against the pre-fix code and passes 15/15 after.
