@@ -11,11 +11,14 @@ created: 2026-08-03
 updated: 2026-08-03
 assignee:
 estimated_effort_hours: 16
+github_issue: 186
 ---
 
 # Technical Task: Jira — walk the status ladder
 
 **Status:** Planned
+
+**GitHub Issue:** [#186](https://github.com/Gamaroff/agent-skills/issues/186)
 
 ---
 

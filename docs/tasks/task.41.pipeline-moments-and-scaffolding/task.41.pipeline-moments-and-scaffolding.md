@@ -11,11 +11,14 @@ created: 2026-08-03
 updated: 2026-08-03
 assignee:
 estimated_effort_hours: 16
+github_issue: 189
 ---
 
 # Technical Task: New moments, scaffolding, and the `develop-bug` gap
 
 **Status:** Planned
+
+**GitHub Issue:** [#189](https://github.com/Gamaroff/agent-skills/issues/189)
 
 ---
 

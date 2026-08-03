@@ -11,11 +11,14 @@ created: 2026-08-03
 updated: 2026-08-03
 assignee:
 estimated_effort_hours: 16
+github_issue: 187
 ---
 
 # Technical Task: `gh-stage.js` — a GitHub Projects board engine
 
 **Status:** Planned
+
+**GitHub Issue:** [#187](https://github.com/Gamaroff/agent-skills/issues/187)
 
 ---
 

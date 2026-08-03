@@ -11,11 +11,14 @@ created: 2026-08-03
 updated: 2026-08-03
 assignee:
 estimated_effort_hours: 2
+github_issue: 184
 ---
 
 # Technical Task: Stop `setup-consumer.sh` generating a `jira.statusMap` that disables status syncing
 
 **Status:** Planned
+
+**GitHub Issue:** [#184](https://github.com/Gamaroff/agent-skills/issues/184)
 
 ---
 

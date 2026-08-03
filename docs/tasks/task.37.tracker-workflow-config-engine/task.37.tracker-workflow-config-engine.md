@@ -11,11 +11,14 @@ created: 2026-08-03
 updated: 2026-08-03
 assignee:
 estimated_effort_hours: 16
+github_issue: 185
 ---
 
 # Technical Task: `tracker-workflow.yaml` — a consumer-owned status ladder
 
 **Status:** Planned
+
+**GitHub Issue:** [#185](https://github.com/Gamaroff/agent-skills/issues/185)
 
 ---
 

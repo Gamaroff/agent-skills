@@ -11,11 +11,14 @@ created: 2026-08-03
 updated: 2026-08-03
 assignee:
 estimated_effort_hours: 16
+github_issue: 188
 ---
 
 # Technical Task: Wire `gh-stage.js` into the pipeline step files
 
 **Status:** Planned
+
+**GitHub Issue:** [#188](https://github.com/Gamaroff/agent-skills/issues/188)
 
 **⚠️ This is the first task in the series that changes live pipeline behaviour.** Everything before
 it is inert.
