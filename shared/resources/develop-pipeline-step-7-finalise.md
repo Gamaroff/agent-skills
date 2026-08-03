@@ -14,6 +14,7 @@ Loaded by `/develop-story` and `/develop-task` during Step 7. Story/task variant
 ## DO NOT Inline This Step (CRITICAL)
 
 The orchestrator MUST invoke the `/finalise` skill via the Skill tool. It MUST NOT:
+
 - Write the `dod.N.md` file directly with `Write` (the finalise skill produces it)
 - Set `status: accepted` without first running `/finalise` (status is part of finalise's output, not a precondition)
 - Skip /finalise in lite mode (lite mode only affects Step 5 QA — see `shared/resources/develop-pipeline-lite-mode.md`)
@@ -25,9 +26,11 @@ If you find yourself reaching for `Write` to author a DoD file, STOP and invoke 
 ## Invoke /finalise
 
 #### develop-story
+
 Invoke the `/finalise` skill with the story file path.
 
 #### develop-task
+
 Invoke the `/finalise` skill with the task file path.
 
 ---
@@ -35,12 +38,16 @@ Invoke the `/finalise` skill with the task file path.
 ## Detecting Completion
 
 #### develop-story
+
 After finalise returns, read the story file and check the `status:` frontmatter field:
+
 - `accepted` → success, continue
 - Any other status, or if finalise listed DoD gaps → halt
 
 #### develop-task
+
 After finalise returns, read the task file and check the `status:` frontmatter field:
+
 - `accepted` → success, continue
 - Any other status, or if finalise listed DoD gaps → halt
 
@@ -51,17 +58,21 @@ After finalise returns, read the task file and check the `status:` frontmatter f
 Log each gap with specific detail in Issues Log. Invoke the `/commit-changes` skill to commit the implementation report before halting so the audit trail is in git:
 
 #### develop-story
+
 Suggested commit message: `docs(story.{epic}.{story}): implementation report — finalise gaps identified`
 
 #### develop-task
+
 Suggested commit message: `docs(task.{id}): implementation report — finalise gaps identified`
 
 Then push:
+
 ```bash
 git push origin HEAD
 ```
 
 Then HALT:
+
 ```
 ⚠️ Finalise identified Definition of Done gaps.
 Review the implementation report at {path} and address the gaps before re-running /finalise.
@@ -72,9 +83,11 @@ Review the implementation report at {path} and address the gaps before re-runnin
 ## On Success
 
 #### develop-story
+
 Log "Story accepted" in Decisions Log.
 
 #### develop-task
+
 Log "Task completed" in Decisions Log.
 
 ---
@@ -117,6 +130,7 @@ If `TRACKER_ISSUE` is set, explicitly close the issue and move the project board
 All `gh issue comment`/`gh issue close` calls below MUST be wrapped in `tracker_call_with_retry` (3× exponential backoff — see `references/resolve-platform.sh`). Source the helper at the top of the step.
 
 #### develop-story
+
 ```bash
 # 1. Post completion comment
 tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: accepted. All DoD criteria verified."
@@ -126,6 +140,7 @@ tracker_call_with_retry gh issue close {TRACKER_ISSUE} --comment "Closing — st
 ```
 
 #### develop-task
+
 ```bash
 # 1. Post completion comment
 tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: accepted. All DoD criteria verified."
@@ -160,11 +175,13 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
 1. **Post completion comment** — call `addCommentToJiraIssue`:
    - `issueIdOrKey`: `{TRACKER_ISSUE}`
    - `commentBody`: Build a structured summary. Locate the DoD summary file and gate file:
+
      ```bash
      DOD_PATH=$(ls {story-or-task-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
      FINAL_GATE=$(ls {story-or-task-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
        | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
      ```
+
      Format (story variant shown; substitute "Task" for develop-task):
 
      ```
@@ -179,10 +196,20 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
      ```
 
      If `DOD_PATH` is empty (finalise was not run via develop-story — rare), omit the DoD Summary line.
+
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to Done** — follow `shared/resources/jira-transition-protocol.md` exactly with `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true` (which permits the protocol's narrow single-done-transition fallback, and fills a required `resolution` from the transition's own `allowedValues`). The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to any other transition (e.g. `To Do`) — leaving the issue in its current state is the correct behaviour when no done-state transition exists.
+2. **Confirm the `done` stage** — `/finalise` (invoked at the top of this step) already drives the Done transition, via `sync-jira-{story,task}.js` when credentials exist and the MCP protocol otherwise. Do **not** transition again here as a matter of course: a second call is redundant, and re-deriving the candidates in a second place is how the two paths drift apart.
+
+   Run the stage CLI only as a **repair** — when `/finalise` reported its Jira step as failed or skipped:
+
+   ```bash
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+     --issue {TRACKER_ISSUE} --stage done --json
+   ```
+
+   It is idempotent (`reason: "already"` when `/finalise` succeeded), so running it after an ambiguous report costs one API call and cannot double-close anything. On `reason: "no-credentials"`, fall back to `shared/resources/jira-transition-protocol.md` with `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true` — that unlocks the protocol's narrow single-done-transition fallback and fills a required `resolution` from the transition's own `allowedValues`. Its MUST-NOT clauses are binding: if no transition matches, log the skip and do not call `transitionJiraIssue`. Never fall back to another transition (e.g. `To Do`) — leaving the issue where it is, is the correct behaviour when the workflow has no done state.
 
 3. **Post-transition state verification** — invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) with `PR_NUMBER=` (empty) and `ISSUE_KEY={TRACKER_ISSUE}`:
    - `result.issue.state` is in the done **status category**, or matches "Done", "Closed", "Resolved", "Complete" or "Completed" (case-insensitive) → log "✅ Jira issue {TRACKER_ISSUE} confirmed Done via poller"
@@ -190,7 +217,7 @@ If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comm
    - `result.errors | length > 0` → log each error in Issues Log; proceed (non-blocking)
 
 Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — comment: {posted ✅ / ⚠️ failed}."
-Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — transition to Done: {✅ / ⚠️ no matching transition found / ⚠️ failed}."
+Log in Decisions Log: "Jira issue {TRACKER_ISSUE} — Done: {✅ by /finalise / ✅ repaired via jira-stage / ⚠️ no matching transition found / ⚠️ failed}."
 Log in Decisions Log: "Post-close state check (poller): issue {TRACKER_ISSUE} state = {state}. errors = {error_count}."
 
 ---
@@ -220,11 +247,13 @@ Update Pipeline Progress: ✅ finalise.
 Locate the DoD summary file created by finalise:
 
 #### develop-story
+
 ```bash
 ls {story-directory}/story.{epic}.{story}.dod.*.md 2>/dev/null | sort | tail -1
 ```
 
 #### develop-task
+
 ```bash
 ls {task-directory}/task.{id}.dod.*.md 2>/dev/null | sort | tail -1
 ```

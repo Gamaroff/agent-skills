@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **The develop pipelines can drive more of a board than three columns, and a project can describe its board once instead of every consumer re-deriving it.** Until now `/develop-story` and `/develop-task` signalled exactly three points — In Progress, a review status, Done — with the candidate lists written out as **literals in prose** inside the step files, and an LLM executing the matching loop against the Atlassian MCP tools. Project configuration had no effect on any of it: `jira.statusMap` is read only by `jira-sync.js`, i.e. only by the `sync-jira-*` skills. Every other column a team actually uses — testing, merge queue, blocked — was moved by hand or not at all.
+
+  Adds a **stage vocabulary** distinct from the seven document statuses: `work-started`, `in-review`, `in-qa`, `ready-for-merge`, `blocked`, `done`. A stage is a point in a _run_; a document status is a word in a _file_. They are a superset, not a rename — `in-qa` names a column no document status has ever named, and `draft` names a state no run signals.
+
+  Three of the six **alias the existing frozen candidate constants** rather than re-declaring them. A second, independently overridable copy of the review candidates would let `/sync-jira-story` and `/develop-story` be configured to disagree about the same transition on the same board — precisely the drift this is meant to end. Only `in-qa` and `ready-for-merge` introduce new lists.
+
+  **The three new stages default off.** Consumers upgrade by replacing a skill directory wholesale; a stage that defaulted on would start moving cards into columns that project has never used, with nobody having asked. `work-started`, `in-review` and `done` behave byte-identically to v0.33.0.
+
+- **`jira.workflowRecord` — a machine-readable description of the board**, default `docs/development/jira-workflow.json`. Declares which stages to drive, per Jira issue type, plus the status ranks the monotonicity guard uses. Keyed on the **live Jira issue type name**, not the `story|task|epic` docKind `jira.statusMap` uses: one board routinely gives several task types genuinely different workflows, which a three-way layer cannot express. Absent or unreadable → built-in defaults, so a project with no record behaves exactly as before. `--probe-workflow --write-record <path>` generates it and preserves hand-authored `enabled`/`reason`/`worklog` intent on regeneration.
+
+  JSON rather than YAML because the record nests three levels where the hand-rolled parser handles one, and because it is meant to be generated and `--check`ed in CI — JSON round-trips with zero dependencies where YAML would need a writer too.
+
+- **`shared/resources/jira-stage.js` — the deterministic half of the transition protocol.** One command per stage point (`--issue KEY --stage in-review`), replacing an LLM executing a prose algorithm. The prose protocol survives as the **fallback**, not as dead weight: the MCP path rides Claude's Atlassian connector and needs no API token, so deleting it would regress every consumer that has the connector but no `.env`. Absent credentials is therefore a normal exit-0 outcome carrying `reason: "no-credentials"` — the signal the caller uses to take that fallback.
+
+  Exit codes are the load-bearing part of the contract. Pipeline steps run inside shells; a non-zero exit on "this board has no review column" would kill the run. So 0 for transitioned, already, disabled, no-transition and no-credentials alike; 1 only for a skip under `--strict`; 2 for usage errors. `--dry-run` is strictly GET-only, so a whole ladder is re-verifiable against a live board without moving anything.
+
+  On a skip it names the transitions the board _did_ offer and flags any leading somewhere a later stage wants. Stages resolve from wherever the issue currently sits, so one missed hop silently disables every stage after it; this turns a silent ladder failure into a one-line diagnosis.
+
+- **`jira.worklogTimeSpent` — opt-in, satisfies a time-spent workflow validator.** A required _field_ is visible in `expand=transitions.fields`; a _validator_ ("Please enter the time spent in order to move the task") is not, and surfaces only as a 400 on the transition. When the setting is present and the 400 names time, the transition is retried once with a worklog in the `update` verb — not `fields`, which Jira rejects outright.
+
+  Deliberately a retry rather than a pre-emptive attach: a worklog sent to a transition whose screen has no Log Work field is _itself_ rejected, so attaching one unconditionally would break transitions that would otherwise have succeeded. Both behaviours were observed on the same board. Safe to retry because a failed validator is atomic — Jira applies nothing, so the first call cannot have booked time. Fires at most once; worklogs are cumulative and cannot be silently undone. Never invented: unset means such a transition fails exactly as it always did.
+
+### Fixed
+
+- **`.env` was not found inside a linked git worktree**, so every `/develop-batch` agent silently degraded to "no credentials" and skipped every tracker update. `git rev-parse --show-toplevel` returns the _worktree_ root there, `.env` is gitignored, and `git worktree add` carries no ignored files. Falls back to `--git-common-dir`, which points at the main repo. Fixes all five sync scripts, not only the new CLI.
+
+- **A resumed pipeline could drag a card backwards.** Boards routinely offer backward transitions, so re-running an earlier step after a resume would move an issue that had already progressed. `transitionToStatus` now takes the rank it is moving to and refuses when the card already sits higher, overridable with `--allow-regress`. Unranked on either side means no opinion.
+
+- **`git rev-parse` printed `fatal: not a git repository` when run outside a repo.** Every such call already sat inside a try/catch reading failure as "no config, use defaults"; inheriting stderr turned that silent fallback into five `fatal:` lines that read as a broken tool.
+
+- **`develop-pipeline-step-7` fired the Done transition a second time**, after `/finalise` had already driven it. Harmless — the second call resolved to `already` — but it meant the candidate list was derived in two places, which is how two paths drift apart. Step 7 now treats the CLI as a **repair** for when `/finalise` reports its Jira step failed or skipped.
+
+- **Nothing asserted that the prose protocol and `resolveTransition` stayed in step**, though `jira-transition-protocol.md` claimed they must. The candidate lists quoted in the prose are now compared against the JS constants by a test.
+
 ## [v0.33.0] - 2026-08-01
 
 ### Added

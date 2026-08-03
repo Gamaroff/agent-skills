@@ -53,25 +53,25 @@ stateDiagram-v2
 
 ## Status Reference Table
 
-| Frontmatter value | Body label | Set by | Preconditions |
-|---|---|---|---|
-| `draft` | `Draft` | `create-story`, `create-task` | None — initial state |
-| `planned` | `Planned` | `create-task` (tasks only) | Author confirms draft complete |
-| `ready-for-development` | `Ready for Development` | `review-story`, `review-task` | Review passes (≥8/10, 0 critical issues) |
-| `in-progress` | `In Progress` | `develop` | Status was `ready-for-development` or `in-progress` (resume) |
-| `ready-for-review` | `Ready for Review` | `develop` (completion) | All implementation plan phases / tasks checked off |
-| `accepted` | `Accepted` | `finalise` | DoD checklist passed, QA gate PASS or WAIVED |
-| `cancelled` | `Cancelled` | Any skill / human | Manual decision — no automated transition |
+| Frontmatter value       | Body label              | Set by                        | Preconditions                                                |
+| ----------------------- | ----------------------- | ----------------------------- | ------------------------------------------------------------ |
+| `draft`                 | `Draft`                 | `create-story`, `create-task` | None — initial state                                         |
+| `planned`               | `Planned`               | `create-task` (tasks only)    | Author confirms draft complete                               |
+| `ready-for-development` | `Ready for Development` | `review-story`, `review-task` | Review passes (≥8/10, 0 critical issues)                     |
+| `in-progress`           | `In Progress`           | `develop`                     | Status was `ready-for-development` or `in-progress` (resume) |
+| `ready-for-review`      | `Ready for Review`      | `develop` (completion)        | All implementation plan phases / tasks checked off           |
+| `accepted`              | `Accepted`              | `finalise`                    | DoD checklist passed, QA gate PASS or WAIVED                 |
+| `cancelled`             | `Cancelled`             | Any skill / human             | Manual decision — no automated transition                    |
 
 ### Deprecated synonyms (do not use in new skills)
 
-| Deprecated value | Canonical replacement | Notes |
-|---|---|---|
-| `Ready for QA` | `Ready for Review` | Used in older qa-task versions; retire in follow-up task |
-| `📋 Planned` | `planned` (frontmatter) / `Planned` (body) | Emoji prefix in legacy docs; do not write in new skills |
-| `ready-for-dev` | `ready-for-development` | Shortened form found in create-task / create-story; normalise on next touch |
-| `Completed` | `Accepted` | qa-task used this for gate PASS; canonical is `accepted` / `Accepted` |
-| `Ready for Done` | `Accepted` | qa-story used this as an intermediate gate result; terminal state is `Accepted` |
+| Deprecated value | Canonical replacement                      | Notes                                                                           |
+| ---------------- | ------------------------------------------ | ------------------------------------------------------------------------------- |
+| `Ready for QA`   | `Ready for Review`                         | Used in older qa-task versions; retire in follow-up task                        |
+| `📋 Planned`     | `planned` (frontmatter) / `Planned` (body) | Emoji prefix in legacy docs; do not write in new skills                         |
+| `ready-for-dev`  | `ready-for-development`                    | Shortened form found in create-task / create-story; normalise on next touch     |
+| `Completed`      | `Accepted`                                 | qa-task used this for gate PASS; canonical is `accepted` / `Accepted`           |
+| `Ready for Done` | `Accepted`                                 | qa-story used this as an intermediate gate result; terminal state is `Accepted` |
 
 ---
 
@@ -79,10 +79,10 @@ stateDiagram-v2
 
 **Rule**: every time a status changes, **both** locations must be updated in the same edit.
 
-| Location | Format | Example |
-|---|---|---|
+| Location              | Format                         | Example                         |
+| --------------------- | ------------------------------ | ------------------------------- |
 | Frontmatter `status:` | lowercase kebab-case, no emoji | `status: ready-for-development` |
-| Body `Status:` | Title Case, no emoji | `Status: Ready for Development` |
+| Body `Status:`        | Title Case, no emoji           | `Status: Ready for Development` |
 
 The body `Status:` line lives in the document's metadata block, typically the second line after the frontmatter delimiter or the first line of a metadata table.
 
@@ -91,17 +91,21 @@ The body `Status:` line lives in the document's metadata block, typically the se
 ### Worked Example 1 — develop completes
 
 Before (frontmatter + body):
+
 ```yaml
 status: in-progress
 ```
+
 ```markdown
 **Status:** In Progress
 ```
 
 After:
+
 ```yaml
 status: ready-for-review
 ```
+
 ```markdown
 **Status:** Ready for Review
 ```
@@ -111,17 +115,21 @@ Both lines change in the same commit.
 ### Worked Example 2 — finalise accepts
 
 Before:
+
 ```yaml
 status: ready-for-review
 ```
+
 ```markdown
 **Status:** Ready for Review
 ```
 
 After:
+
 ```yaml
 status: accepted
 ```
+
 ```markdown
 **Status:** Accepted
 ```
@@ -132,15 +140,15 @@ Both lines change in the same commit.
 
 ## Who Reads and Writes Each Value
 
-| Status | Writer skill | Reader skills |
-|---|---|---|
-| `draft` | `create-story`, `create-task` | `review-story`, `review-task`, `develop` |
-| `planned` | `create-task`, human author | `review-task`, `develop` |
-| `ready-for-development` | `review-story`, `review-task` | `develop`, `develop-story`, `develop-task` (pipeline gate) |
-| `in-progress` | `develop` | `review-story`, `review-task` (skip review gate), `qa-task` |
-| `ready-for-review` | `develop` | `qa-task`, `qa-story`, `finalise` |
-| `accepted` | `finalise` | `scrum-master`, reporting tools |
-| `cancelled` | Human / any skill | All skills (treat as terminal — no further transitions) |
+| Status                  | Writer skill                  | Reader skills                                               |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------- |
+| `draft`                 | `create-story`, `create-task` | `review-story`, `review-task`, `develop`                    |
+| `planned`               | `create-task`, human author   | `review-task`, `develop`                                    |
+| `ready-for-development` | `review-story`, `review-task` | `develop`, `develop-story`, `develop-task` (pipeline gate)  |
+| `in-progress`           | `develop`                     | `review-story`, `review-task` (skip review gate), `qa-task` |
+| `ready-for-review`      | `develop`                     | `qa-task`, `qa-story`, `finalise`                           |
+| `accepted`              | `finalise`                    | `scrum-master`, reporting tools                             |
+| `cancelled`             | Human / any skill             | All skills (treat as terminal — no further transitions)     |
 
 ---
 
@@ -152,13 +160,21 @@ transition the issue to match.
 
 Default mapping (vanilla Jira workflow):
 
-| Local status | Default Jira status |
-|---|---|
-| `draft`, `planned`, `ready-for-development` | `To Do` |
-| `in-progress` | `In Progress` |
-| `ready-for-review` | `In Review` |
-| `accepted` | `Done` |
-| `cancelled` | `Cancelled` |
+| Local status                                | Default Jira status |
+| ------------------------------------------- | ------------------- |
+| `draft`, `planned`, `ready-for-development` | `To Do`             |
+| `in-progress`                               | `In Progress`       |
+| `ready-for-review`                          | `In Review`         |
+| `accepted`                                  | `Done`              |
+| `cancelled`                                 | `Cancelled`         |
+
+> **Pipeline stages are a different vocabulary.** The statuses above are the words a _document_
+> uses. The develop pipeline also signals **stages** — `work-started`, `in-review`, `in-qa`,
+> `ready-for-merge`, `blocked`, `done` — which are points in a _run_, configured separately via the
+> workflow record. They are a superset, not a replacement: `in-qa` and `ready-for-merge` name board
+> columns no document status has ever named, and `draft` / `planned` name document states the
+> pipeline never signals. Nothing here changes when a stage is enabled. See
+> [Pipeline stages](../../docs/reference/configuration.md#pipeline-stages).
 
 Projects whose Jira workflow uses different status names (e.g. "Selected for Development") override the
 mapping under `jira.statusMap` in `skills-config.yaml`. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping) for the full reference. Matching is by name only — see [`jira-transition-protocol.md`](jira-transition-protocol.md).

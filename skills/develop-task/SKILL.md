@@ -250,6 +250,17 @@ If a situation arises that is not in this table or the shared defaults table and
   ```
 
   Removing the active lock prevents a future PreCompact firing in this same session from re-running the pause flow, and stops accumulation of transient Step 3 test logs. The **halt snapshot** (`develop-pipeline.last-halt.json`) preserves resume context so the next `/develop-task` invocation can re-enter Phase 0b artifact verification: the resume detector subagent reads the snapshot when no active lock is present, surfaces it to the user, and offers "Resume from {halt_step}" or "Start fresh" (latter deletes the snapshot). The graceful-pause hook also removes the active lock itself if it runs — this rule covers the non-hook halt paths.
+- **Signal `blocked` on a terminal HALT** (when `TRACKER=jira` and `TRACKER_ISSUE` is set). After the snapshot above, before surfacing the HALT:
+
+  ```bash
+  node .agents/skills/develop-task/references/jira-stage.js \
+    --issue {TRACKER_ISSUE} --stage blocked --json
+  ```
+
+  **Only for a real blockage** — a review gate that failed, five QA cycles without a clean gate, a merge conflict, a DoD the work does not meet. Do **not** fire it when the halt is an *interruption*: plan mode, a denied permission, a compaction pause, or the user stopping the run. Those are pauses in the operator's attention, not states of the work, and a card parked in Blocked misreports the second as the first to everyone reading the board.
+
+  `blocked` is **off by default** and opted into per issue type in the workflow record. Expect `reason: "stage-disabled"` until a project turns it on, and `skip (no-transition)` on boards that have the status but do not offer it from where the card currently sits — many workflows only allow Blocked from a testing column. Both are correct outcomes; the CLI exits 0 and the HALT proceeds either way.
+
 - If a sub-skill cannot be found, log the error and tell the user to verify the skill is installed in `.agents/skills/`.
 
 ---

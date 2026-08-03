@@ -333,9 +333,20 @@ Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to "In Progress"** — follow `references/jira-transition-protocol.md` exactly with `candidates = ["In Progress", "Doing", "Started", "Development"]` and `terminal = false`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
+2. **Signal the `work-started` stage** — run the deterministic CLI:
 
-3. **Post-condition verification** — call `getJiraIssue` to confirm the transition worked:
+   ```bash
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+     --issue {TRACKER_ISSUE} --stage work-started --json
+   ```
+
+   Read `reason` from the JSON:
+   - `no-credentials` → the CLI found no `JIRA_*` env. **Fall back** to `references/jira-transition-protocol.md` with `candidates = ["In Progress", "Doing", "Started", "Development"]` and `terminal = false`, driving it through the Atlassian MCP tools. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
+   - anything else → the CLI has already resolved, transitioned and verified. Log its line and move on; it exits 0 for `already`, `stage-disabled` and `no-transition` alike, all of which are correct outcomes on some boards.
+
+   Do **not** run both paths. The CLI is authoritative whenever credentials exist.
+
+3. **Post-condition verification** — only needed on the MCP fallback path (the CLI verifies its own transition):
    - Call `getJiraIssue` with `cloudId`, `issueIdOrKey: {TRACKER_ISSUE}`, `fields: ["status"]`
    - Check `fields.status.name`: if "In Progress" → log "✅ Jira issue {TRACKER_ISSUE} confirmed In Progress"
    - If NOT "In Progress": retry step 2 once; if still not moved, log "⚠️ Jira status not updated — proceeding" in Issues Log

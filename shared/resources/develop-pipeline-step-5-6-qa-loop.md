@@ -16,10 +16,25 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles**. A clean PASS on any QA review exits the loop immediately.
 
 #### develop-story
+
 Each cycle = one `/qa-story` + one `/qa-fix`. A clean PASS on any qa-story exits the loop immediately.
 
 #### develop-task
+
 Each cycle = one `/qa-task` + one `/qa-fix`. A clean PASS on any qa-task review exits the loop immediately.
+
+### Signal the `in-qa` stage (when `TRACKER=jira` and `TRACKER_ISSUE` is set)
+
+Run **once**, before the first cycle. Do **not** repeat this per cycle — the same rule the GitHub re-assertion below follows, for the same reason. (Re-running is harmless: the stage resolves to `already` and makes no network call. The reason to run once is that a per-cycle move says nothing a reader of the board cannot already see.)
+
+```bash
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+  --issue {TRACKER_ISSUE} --stage in-qa --json
+```
+
+`in-qa` is **off by default**. A project turns it on in its workflow record (`jira.workflowRecord`), per issue type — most boards have no testing column, and a stage that moved cards into one uninvited would be worse than one that does nothing. Expect `reason: "stage-disabled"` until a project opts in; that is a success, not a warning.
+
+Log in Decisions Log: "Jira {TRACKER_ISSUE} — in-qa: {landed status / disabled / skip reason}."
 
 ### Re-assert board status at QA start (when `TRACKER=github` and `TRACKER_ISSUE` is set)
 
@@ -99,6 +114,7 @@ Log in Decisions Log: "GitHub board: QA-start re-assert → In Review (or ✅ al
 Use a format-agnostic regex to extract the numeric `{N}` from each filename, sort numerically, and pick the highest. Robust to story/task names that contain dots.
 
 #### develop-story
+
 ```bash
 ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null \
   | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
@@ -106,6 +122,7 @@ ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null \
 ```
 
 #### develop-task
+
 ```bash
 ls {task-directory}/task.{id}.gate.*.yml 2>/dev/null \
   | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
@@ -142,6 +159,7 @@ Follow the Execution Protocol exactly. Write the matrix file and return a one-li
 `{story-file}` and `{story-directory}` are the story file path and story directory path resolved in Phase 0a.
 
 After the subagent completes:
+
 1. Confirm `{story-directory}/.summaries/qa-traceability-matrix.md` was written.
 2. Write the summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
@@ -149,6 +167,7 @@ After the subagent completes:
 If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
 
 Skip this pre-step when any of:
+
 - `PIPELINE_MODE=lite` — the mapper adds overhead that lite mode trades away.
 - Story has **no Acceptance Criteria section** (`grep -ciE '^##+ +acceptance criteria' {story-file}` returns 0). Nothing to map.
 - Story has **≤ 2 ACs** (count `^- ` or `^[0-9]+\.` lines under the AC heading). The mapper's overhead exceeds its value at this size; qa-story's internal mapping is sufficient.
@@ -178,6 +197,7 @@ Skill(qa-story, args="code_review_blocking=true")
 **Pre-step: Dispatch traceability mapper (standard mode + Success Criteria table only)**
 
 Conditions to dispatch the mapper for tasks (all must be true):
+
 1. `PIPELINE_MODE = standard` (lite mode skips the mapper)
 2. `HAS_SUCCESS_CRITERIA_TABLE = true` (set by Phase 0a Agent 3 — the lite-mode/always-load detector)
 
@@ -193,6 +213,7 @@ Follow the Execution Protocol exactly. Write the matrix file and return a one-li
 ```
 
 After the subagent completes:
+
 1. Confirm `{task-directory}/.summaries/qa-traceability-matrix.md` was written.
 2. Write the summary JSON artifact to `{task-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
@@ -222,9 +243,21 @@ Skill(qa-task, args="code_review_blocking=true")
 ### Outcome branching (shared)
 
 After completion, find and read the latest gate file:
-- `PASS` with no `top_issues` → exit loop, proceed to Step 7
-- `WAIVED` with `waiver.active: true` and a documented reason/approver → exit loop, proceed to Step 7 (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
+
+- `PASS` with no `top_issues` → signal `ready-for-merge` (below), exit loop, proceed to Step 7
+- `WAIVED` with `waiver.active: true` and a documented reason/approver → signal `ready-for-merge` (below), exit loop, proceed to Step 7 (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
 - `CONCERNS`, `FAIL`, or has `top_issues` → proceed to 5b
+
+**On a gate that exits the loop** (`PASS` or `WAIVED`), when `TRACKER=jira` and `TRACKER_ISSUE` is set:
+
+```bash
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+  --issue {TRACKER_ISSUE} --stage ready-for-merge --json
+```
+
+Like `in-qa`, this stage is **off by default** and opted into per issue type in the workflow record; `reason: "stage-disabled"` is the expected outcome on a board without a merge-queue column. Non-blocking either way.
+
+Note the ordering: this fires on the QA gate, **before** Step 7. Step 7 is what moves the issue to `done`, and it runs while the PR is still open — merging happens later, by hand or via `/develop-next`. A board that wants a card to sit in a merge queue until the PR actually lands should leave `done` to a human, not turn this stage off.
 
 Log the result in the QA Iteration History section:
 
@@ -277,9 +310,11 @@ After fixes are applied:
    Conventional Commits message:
 
    #### develop-story
+
    `fix(story.{epic}.{story}): qa-fix cycle {N} — {brief summary of fixes}`
 
    #### develop-task
+
    `fix(task.{id}): qa-fix cycle {N} — {brief summary of fixes}`
 
    Rationale: previously the report was simply "not needed" in qa-fix commits but nothing prevented inclusion. Decisions Log / QA Iteration History entries written during the cycle would silently land in `fix(...)` commits, splitting report history across the branch. Step 8 is the single owner of the report commit (`docs(...)`).
@@ -287,6 +322,7 @@ After fixes are applied:
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
 3. Push to the remote branch so the PR reflects the latest changes:
+
    ```bash
    git push origin HEAD
    ```
@@ -299,20 +335,20 @@ After fixes are applied:
 
 4a. **Post QA fix summary to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
-   ```bash
-   # GitHub
-   tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔧 QA Fix Cycle {N} Applied — Step 6/8
+```bash
+# GitHub
+tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔧 QA Fix Cycle {N} Applied — Step 6/8
 
-   **Fixes applied**: {brief summary from qa-fix output}
-   **Commit**: \`{hash}\`"
+**Fixes applied**: {brief summary from qa-fix output}
+**Commit**: \`{hash}\`"
 
-   # Jira — call addCommentToJiraIssue:
-   #   issueIdOrKey: {TRACKER_ISSUE}
-   #   commentBody: same markdown body above
-   #   contentFormat: "markdown"
-   ```
+# Jira — call addCommentToJiraIssue:
+#   issueIdOrKey: {TRACKER_ISSUE}
+#   commentBody: same markdown body above
+#   contentFormat: "markdown"
+```
 
-   On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fix cycle {N} comment posted to {TRACKER} issue {TRACKER_ISSUE}."
+On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fix cycle {N} comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
 5. **Post-fix PR state check (uses tracker state poller)**: Invoke the tracker state poller (see `shared/resources/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty).
 
@@ -325,12 +361,14 @@ After fixes are applied:
    - `result.errors | length > 0` → log each error in Issues Log; treat `pr.state` per the rules above (the poller may still return a usable state alongside non-fatal errors).
 
 6. **Emit eval marker (EVAL_MODE guard)**: If the environment variable `EVAL_MODE=1` is set, write an empty marker file after each completed qa-fix iteration so eval harnesses can detect the iteration boundary and send a kill signal for resume testing:
+
    ```bash
    if [ "${EVAL_MODE}" = "1" ]; then
      mkdir -p .task-state
      touch ".task-state/qa-fix-iter-${QA_CYCLE}.marker"
    fi
    ```
+
    This is a no-op in all production runs where `EVAL_MODE` is unset.
 
 7. Increment the cycle counter and return to 5a.
@@ -398,12 +436,15 @@ infrastructure, success criteria that cannot be met with current approach}
 Set report status to `Escalated`. Invoke the `/commit-changes` skill to commit the implementation report:
 
 #### develop-story escalation commit
+
 Suggested commit message: `docs(story.{epic}.{story}): implementation report — qa loop escalation`
 
 #### develop-task escalation commit
+
 Suggested commit message: `docs(task.{id}): implementation report — qa loop escalation`
 
 Then push:
+
 ```bash
 git push origin HEAD
 ```
