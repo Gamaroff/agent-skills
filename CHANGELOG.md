@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The setup wizard generated a `jira.statusMap` that silently disabled status syncing on any board not using vanilla names.** The block was correct when it was written (`088af2b`, 2026-06-30): a map entry was one name, and one name was all there was. Candidate lists arrived in `2e14043` (2026-07-29) and made an override _replace_ the list rather than seed it — so the same seven generated lines began pinning every status to one vanilla name, discarding the five candidate lists behind them. A project whose board said "Waiting for Review" stopped syncing that status entirely, with the sync still reporting success. The generator never changed; its meaning did.
+
+  `setup-consumer.sh` now emits commented guidance instead of a live block, pointing at `--probe-workflow`. Nothing is rewritten in existing consumers — this repo does not edit a config it did not just create — so `--probe-workflow` gained a detector for the fingerprint: when every `statusMap` entry equals the first default candidate for its status, it says so and points at the migration recipe. `docs/reference/configuration.md` gains that recipe (delete the block, probe, re-add only what the probe shows being skipped, as ordered lists), and its two worked examples no longer teach the narrowing shape — one of which had asserted the values were "the built-in defaults", which is what let the drift survive review.
+
 ## [v0.34.1] - 2026-08-03
 
 ### Fixed

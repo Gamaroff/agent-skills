@@ -5,7 +5,7 @@ type: task
 description: "Remove the scalar jira.statusMap block the setup wizard writes into every Jira consumer, which narrows the built-in candidate lists to one name each and silently breaks status syncing on any non-vanilla board."
 tags: [jira, configuration, setup, regression]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: High
 created: 2026-08-03
 updated: 2026-08-03
@@ -16,7 +16,7 @@ github_issue: 184
 
 # Technical Task: Stop `setup-consumer.sh` generating a `jira.statusMap` that disables status syncing
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.36.review.1.setup-consumer-statusmap-fix.md` implemented 2026-08-03
 
@@ -197,9 +197,9 @@ lists. Documented in `configuration.md` and surfaced by the detector.
 
 **Changes**:
 
-- [ ] Replace the live `statusMap:` YAML in `tracker_block` (~L337) with commented guidance
-- [ ] Keep the existing commented `devEstimateField` / `defaultAssignee` lines and match their style
-- [ ] Verify the emitted YAML still parses via the wizard's own `_read_config_path` and via
+- [x] Replace the live `statusMap:` YAML in `tracker_block` (~L337) with commented guidance
+- [x] Keep the existing commented `devEstimateField` / `defaultAssignee` lines and match their style
+- [x] Verify the emitted YAML still parses via the wizard's own `_read_config_path` and via
       `resolve-platform.sh`'s `read_config_key`
 
 **Dependencies**: none
@@ -216,14 +216,14 @@ lists. Documented in `configuration.md` and surfaced by the detector.
 
 **Changes**:
 
-- [ ] Replace the `statusMap` block in the worked example (L360-372) with the same commented form
-- [ ] Delete the false claim at L362 that the values are "the built-in defaults"; state that they
+- [x] Replace the `statusMap` block in the worked example (L360-372) with the same commented form
+- [x] Delete the false claim at L362 that the values are "the built-in defaults"; state that they
       are the first entry of each candidate list and that writing them **narrows** matching
-- [ ] Fix the annotated skeleton at L42-44: show the list form
+- [x] Fix the annotated skeleton at L42-44: show the list form
       (`ready-for-review: [Waiting for Review, In Review]`), pluralise the comment to "status
       name(s)", and note that it is usually unnecessary
-- [ ] Add a **Migration** subsection under *Jira status mapping* with the delete-and-probe recipe
-- [ ] Cross-link it from the `jira.statusMap` row in the key reference table (L100) — that cell
+- [x] Add a **Migration** subsection under *Jira status mapping* with the delete-and-probe recipe
+- [x] Cross-link it from the `jira.statusMap` row in the key reference table (L100) — that cell
       already links to `#jira-status-mapping`, so target the Migration subsection's own anchor or
       replace the existing sentence rather than appending a second link to the same target
 
@@ -245,17 +245,17 @@ apart last time precisely because they were edited separately
 
 **Changes**:
 
-- [ ] Add `loadStatusMapOverrides(repoRoot)` beside `loadStatusMap`: reads `skills-config.yaml`,
+- [x] Add `loadStatusMapOverrides(repoRoot)` beside `loadStatusMap`: reads `skills-config.yaml`,
       returns `parseStatusMapBlock(...).base` **unmerged**, `{}` on any failure. Export it.
-- [ ] Add `detectNarrowingStatusMap(statusMap)` beside it: returns the keys whose scalar value
+- [x] Add `detectNarrowingStatusMap(statusMap)` beside it: returns the keys whose scalar value
       equals `DEFAULT_STATUS_MAP[key][0]`, and whether *every* present key matches. Export it.
-- [ ] Wire into `--probe-workflow` using `loadStatusMapOverrides()` — **not** the merged map that
+- [x] Wire into `--probe-workflow` using `loadStatusMapOverrides()` — **not** the merged map that
       `loadStatusMap()` returns, whose ~27 default keys make the whole-map fingerprint unmatchable
-- [ ] Print the advice from `--probe-workflow` when the whole-map fingerprint hits
-- [ ] Test: generate a config non-interactively for `TRACKER=jira` into a temp dir and assert the
+- [x] Print the advice from `--probe-workflow` when the whole-map fingerprint hits
+- [x] Test: generate a config non-interactively for `TRACKER=jira` into a temp dir and assert the
       emitted file contains no active `statusMap:` key (a commented `# statusMap:` is fine)
-- [ ] Test: the same generated file parses correctly under every reader listed in §8
-- [ ] Test: `detectNarrowingStatusMap` recognises the exact block the wizard used to emit, and does
+- [x] Test: the same generated file parses correctly under every reader listed in §8
+- [x] Test: `detectNarrowingStatusMap` recognises the exact block the wizard used to emit, and does
       **not** flag a deliberate list-valued override
 
 **Dependencies**: Phase 1 (the test asserts Phase 1's output)
@@ -272,10 +272,10 @@ apart last time precisely because they were edited separately
 
 **Changes**:
 
-- [ ] `### Fixed` entry under `[Unreleased]`, house style: bold lead clause naming the user-visible
+- [x] `### Fixed` entry under `[Unreleased]`, house style: bold lead clause naming the user-visible
       consequence, then the story — the block was correct on 2026-06-30, candidate lists landed
       2026-07-29 and changed its meaning without changing its text
-- [ ] Name the detector and the migration recipe
+- [x] Name the detector and the migration recipe
 
 **Dependencies**: Phases 1-3
 
@@ -313,13 +313,13 @@ None.
 
 **Actions**:
 
-- [ ] `detectNarrowingStatusMap` flags the exact historical wizard block
-- [ ] It does **not** flag a list-valued override, nor a scalar that differs from `candidates[0]`
-- [ ] It does not flag an empty or absent map
-- [ ] `loadStatusMapOverrides` returns the raw override block, **not** merged with the defaults —
+- [x] `detectNarrowingStatusMap` flags the exact historical wizard block
+- [x] It does **not** flag a list-valued override, nor a scalar that differs from `candidates[0]`
+- [x] It does not flag an empty or absent map
+- [x] `loadStatusMapOverrides` returns the raw override block, **not** merged with the defaults —
       guard against the wiring mistake that would make the whole-map fingerprint unmatchable
-- [ ] Generator output for `TRACKER=jira` contains no active `statusMap:` key
-- [ ] Generator output for `TRACKER=github` is unchanged
+- [x] Generator output for `TRACKER=jira` contains no active `statusMap:` key
+- [x] Generator output for `TRACKER=github` is unchanged
 
 **Approach**: the generator assertions run the wizard's config-writing path non-interactively into a
 temp directory and assert on the **emitted file**. A grep of `setup-consumer.sh` source is a useful
@@ -336,14 +336,14 @@ these assertions nor the integration checks below.
 
 **Actions**:
 
-- [ ] `resolve-platform.sh`'s `read_config_key` resolves `tracker:` from the new output
-- [ ] `resolve-paths.sh`'s `read_nested_config_key` resolves `prd.prdShardedLocation`
-- [ ] `jira-sync.js`'s `parseJiraScalar` resolves a `jira.` scalar past the new comment block —
+- [x] `resolve-platform.sh`'s `read_config_key` resolves `tracker:` from the new output
+- [x] `resolve-paths.sh`'s `read_nested_config_key` resolves `prd.prdShardedLocation`
+- [x] `jira-sync.js`'s `parseJiraScalar` resolves a `jira.` scalar past the new comment block —
       commented lines must not confuse the hand-rolled indentation scanner
-- [ ] `jira-sync.js`'s `parseStatusMapBlock` returns `{}` for the all-comment `jira:` block
-- [ ] `setup-consumer.sh`'s own `_read_config_path` resolves `prdShardedLocation` from the new output
-- [ ] `generate-prd-epic-index.mjs`'s `prdRootFromConfig` resolves `prd.prdShardedLocation`
-- [ ] `setup-consumer.sh` re-run against an existing config still reports `kept (existing)`
+- [x] `jira-sync.js`'s `parseStatusMapBlock` returns `{}` for the all-comment `jira:` block
+- [x] `setup-consumer.sh`'s own `_read_config_path` resolves `prdShardedLocation` from the new output
+- [x] `generate-prd-epic-index.mjs`'s `prdRootFromConfig` resolves `prd.prdShardedLocation`
+- [x] `setup-consumer.sh` re-run against an existing config still reports `kept (existing)`
 
 > These six cover every hand-rolled reader of `skills-config.yaml` in the repo. The seventh reader,
 > `set-github-project-estimate.sh`, shells out to Python `yaml.safe_load` and reads only the
@@ -359,7 +359,7 @@ these assertions nor the integration checks below.
 
 **Actions**:
 
-- [ ] `shared/resources/tests/jira-stage.test.mjs` and `jira-stage-fixtures.test.mjs` pass
+- [x] `shared/resources/tests/jira-stage.test.mjs` and `jira-stage-fixtures.test.mjs` pass
       **unchanged** — this task must not alter resolution
 
 ---
@@ -376,7 +376,7 @@ Not applicable — no hot path is touched. No baseline needed.
 
 **Actions**:
 
-- [ ] Generate a config in a scratch repo, point it at a board using "Waiting for Review", and
+- [x] Generate a config in a scratch repo, point it at a board using "Waiting for Review", and
       confirm `--probe-workflow` resolves `ready-for-review` (it would have skipped before)
 
 ---
@@ -385,28 +385,28 @@ Not applicable — no hot path is touched. No baseline needed.
 
 ### Functional
 
-- [ ] A freshly generated Jira `skills-config.yaml` contains no active `statusMap:` key
-- [ ] `--probe-workflow` prints the migration advice when the narrowing fingerprint is present —
+- [x] A freshly generated Jira `skills-config.yaml` contains no active `statusMap:` key
+- [x] `--probe-workflow` prints the migration advice when the narrowing fingerprint is present —
       verified against a config actually carrying the historical block, not only in a unit test
-- [ ] Re-running the wizard over an existing config still reports `kept (existing)` and edits nothing
-- [ ] `npm test` passes with the existing Jira suites unchanged
+- [x] Re-running the wizard over an existing config still reports `kept (existing)` and edits nothing
+- [x] `npm test` passes with the existing Jira suites unchanged
 
 ### Performance
 
-- [ ] No change to any hot path; no new I/O in `loadStatusMap`
-- [ ] The detector runs only under `--probe-workflow`, never during a normal sync
+- [x] No change to any hot path; no new I/O in `loadStatusMap`
+- [x] The detector runs only under `--probe-workflow`, never during a normal sync
 
 ### Code Quality
 
-- [ ] The new test is under an already-globbed directory (`shared/resources/tests/`)
-- [ ] Detector follows the file's swallow-everything discipline — never throws, returns empty on
+- [x] The new test is under an already-globbed directory (`shared/resources/tests/`)
+- [x] Detector follows the file's swallow-everything discipline — never throws, returns empty on
       any parse failure
-- [ ] Generated YAML comment style matches the adjacent `devEstimateField` lines
+- [x] Generated YAML comment style matches the adjacent `devEstimateField` lines
 
 ### Migration
 
-- [ ] `CHANGELOG.md` carries the `### Fixed` entry
-- [ ] `configuration.md` carries the Migration subsection and no longer claims the values are
+- [x] `CHANGELOG.md` carries the `### Fixed` entry
+- [x] `configuration.md` carries the Migration subsection and no longer claims the values are
       built-in defaults; neither of its two `statusMap` examples teaches the narrowing shape
 - [ ] The migration recipe is verified by hand against one real affected config
 
@@ -505,26 +505,26 @@ not warrant a revert.
 
 ### Phase 1: Remove the generated block
 
-- [ ] `tracker_block` emits commented guidance only
-- [ ] Emitted YAML verified against all six hand-rolled readers
+- [x] `tracker_block` emits commented guidance only
+- [x] Emitted YAML verified against all six hand-rolled readers
 
 ### Phase 2: Fix the mirrored documentation
 
-- [ ] Worked example (L360-372) updated
-- [ ] Annotated skeleton (L42-44) updated
-- [ ] False "built-in defaults" claim removed
-- [ ] Migration subsection added and cross-linked without duplicating the existing L100 link
+- [x] Worked example (L360-372) updated
+- [x] Annotated skeleton (L42-44) updated
+- [x] False "built-in defaults" claim removed
+- [x] Migration subsection added and cross-linked without duplicating the existing L100 link
 
 ### Phase 3: Detector and test
 
-- [ ] `loadStatusMapOverrides` implemented and exported
-- [ ] `detectNarrowingStatusMap` implemented and exported
-- [ ] Wired into `--probe-workflow` against the **raw** override block
-- [ ] New test suite passing, including the generate-for-real assertions
+- [x] `loadStatusMapOverrides` implemented and exported
+- [x] `detectNarrowingStatusMap` implemented and exported
+- [x] Wired into `--probe-workflow` against the **raw** override block
+- [x] New test suite passing, including the generate-for-real assertions
 
 ### Phase 4: CHANGELOG
 
-- [ ] `### Fixed` entry written in house style
+- [x] `### Fixed` entry written in house style
 
 ---
 

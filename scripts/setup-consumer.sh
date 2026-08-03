@@ -334,7 +334,7 @@ write_skills_config() {
 
   local tracker_block=""
   if [[ "$TRACKER" == "jira" ]]; then
-    tracker_block=$'\ntracker: jira\n\njira:\n  # devEstimateField: customfield_10594  # optional — Jira numeric custom field id for estimated dev hours\n  # defaultAssignee: 712020:00000000-0000-0000-0000-000000000000  # optional — Jira accountId every card is assigned to. Frontmatter assignee overrides. Unset = leave Jira alone.\n  statusMap:                          # local document status -> your Jira workflow status name\n    draft: To Do\n    planned: To Do\n    ready-for-development: To Do\n    in-progress: In Progress\n    ready-for-review: In Review\n    accepted: Done\n    cancelled: Cancelled'
+    tracker_block=$'\ntracker: jira\n\njira:\n  # devEstimateField: customfield_10594  # optional — Jira numeric custom field id for estimated dev hours\n  # defaultAssignee: 712020:00000000-0000-0000-0000-000000000000  # optional — Jira accountId every card is assigned to. Frontmatter assignee overrides. Unset = leave Jira alone.\n  #\n  # statusMap — local document status -> your Jira workflow status name(s).\n  # MOST PROJECTS NEED NONE. The built-in candidate lists already cover the\n  # common vocabularies (In Review / Code Review / Waiting for Review / ...).\n  # An override REPLACES the candidate list for that status, so adding one\n  # NARROWS matching. Run --probe-workflow first and add only the statuses it\n  # shows being skipped — as ordered lists, not single names:\n  #\n  # statusMap:\n  #   ready-for-review: [Waiting for Review, In Review]'
   fi
 
   local config
@@ -855,4 +855,6 @@ main() {
   print_summary
 }
 
-main "$@"
+# Sourcing with SETUP_CONSUMER_NO_MAIN=1 loads the function definitions without
+# running the wizard, so tests can exercise write_skills_config directly.
+[[ -n "${SETUP_CONSUMER_NO_MAIN:-}" ]] || main "$@"
