@@ -2183,6 +2183,7 @@ async function transitionToStatus({
   doneResolution = "",
   cancelledResolution = "",
   worklogTimeSpent = "",
+  configHint = "status",
   minRank = null,
   workflowRecord = null,
   allowRegress = false,
@@ -2291,9 +2292,17 @@ async function transitionToStatus({
       );
       output.warn(`    ${why}. Tried, in order: ${candidates.join(", ")}.`);
       output.warn(`    Available from here: ${describeAvailable()}.`);
+      // Which knob to point at depends on who is asking. A document-status
+      // sync is configured by jira.statusMap; a pipeline stage is configured by
+      // the workflow record. Naming the wrong one sends the reader to edit a
+      // key that cannot affect what they just saw.
       output.warn(
-        `    Set jira.statusMap in skills-config.yaml to name the status this board uses,` +
-          ` or run with --probe-workflow to see the board's full transition graph.`,
+        configHint === "stage"
+          ? `    Name the status this board uses under stages.<stage>.candidates in the` +
+              ` workflow record (jira.workflowRecord), or run --probe-workflow to see the` +
+              ` board's full transition graph.`
+          : `    Set jira.statusMap in skills-config.yaml to name the status this board uses,` +
+              ` or run with --probe-workflow to see the board's full transition graph.`,
       );
     }
     return {

@@ -251,6 +251,7 @@ async function run({
     doneResolution: lib.loadDoneResolution(),
     cancelledResolution: lib.loadCancelledResolution(),
     worklogTimeSpent: args.worklog || lib.loadWorklogTimeSpent(),
+    configHint: "stage",
     minRank: spec.rank,
     workflowRecord: record,
     allowRegress: args.allowRegress,

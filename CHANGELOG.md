@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **A stage that found no transition told the reader to edit the wrong key.** The skip message named `jira.statusMap`, which configures document-status syncing and has no effect on pipeline stages — so anyone following it would edit a key that could not change what they had just seen. The advice now depends on which caller is asking, pointing a stage skip at the workflow record instead.
+
 ## [v0.34.0] - 2026-08-03
 
 ### Added
