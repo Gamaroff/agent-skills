@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.34.0] - 2026-08-03
+
 ### Added
 
 - **The develop pipelines can drive more of a board than three columns, and a project can describe its board once instead of every consumer re-deriving it.** Until now `/develop-story` and `/develop-task` signalled exactly three points — In Progress, a review status, Done — with the candidate lists written out as **literals in prose** inside the step files, and an LLM executing the matching loop against the Atlassian MCP tools. Project configuration had no effect on any of it: `jira.statusMap` is read only by `jira-sync.js`, i.e. only by the `sync-jira-*` skills. Every other column a team actually uses — testing, merge queue, blocked — was moved by hand or not at all.
