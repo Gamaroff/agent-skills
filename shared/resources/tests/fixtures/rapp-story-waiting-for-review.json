@@ -1,0 +1,120 @@
+{
+  "transitions": [
+    {
+      "id": "401",
+      "name": "Start Review",
+      "to": {
+        "name": "In Review",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "151",
+      "name": "Ready for Showcase",
+      "to": {
+        "name": "READY FOR SHOWCASE",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "441",
+      "name": "Ready for Testing",
+      "to": {
+        "name": "Ready for Testing",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "451",
+      "name": "Reopen",
+      "to": {
+        "name": "Reopened",
+        "statusCategory": {
+          "key": "new"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "261",
+      "name": "Waiting for merge",
+      "to": {
+        "name": "Waiting for merge",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "161",
+      "name": "Done",
+      "to": {
+        "name": "Done",
+        "statusCategory": {
+          "key": "done"
+        }
+      },
+      "fields": {
+        "resolution": {
+          "required": true,
+          "allowedValues": [
+            {
+              "id": "10000",
+              "name": "Done"
+            },
+            {
+              "id": "10001",
+              "name": "Won't Do"
+            },
+            {
+              "id": "10002",
+              "name": "Duplicate"
+            },
+            {
+              "id": "10003",
+              "name": "Cannot Reproduce"
+            },
+            {
+              "id": "10004",
+              "name": "Declined"
+            },
+            {
+              "id": "10005",
+              "name": "Known Error"
+            },
+            {
+              "id": "10006",
+              "name": "Hardware failure"
+            },
+            {
+              "id": "10007",
+              "name": "Software failure"
+            },
+            {
+              "id": "10008",
+              "name": "Resolved"
+            },
+            {
+              "id": "10009",
+              "name": "Canceled"
+            },
+            {
+              "id": "10010",
+              "name": "Fail"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

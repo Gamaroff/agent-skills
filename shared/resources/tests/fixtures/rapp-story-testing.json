@@ -1,0 +1,48 @@
+{
+  "transitions": [
+    {
+      "id": "231",
+      "name": "Testing Passed",
+      "to": {
+        "name": "Waiting for merge",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "91",
+      "name": "Testing Failed",
+      "to": {
+        "name": "Reopened",
+        "statusCategory": {
+          "key": "new"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "141",
+      "name": "Ready for Testing",
+      "to": {
+        "name": "Ready for Testing",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "361",
+      "name": "Blocked",
+      "to": {
+        "name": "Blocked",
+        "statusCategory": {
+          "key": "new"
+        }
+      },
+      "fields": {}
+    }
+  ]
+}
