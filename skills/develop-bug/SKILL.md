@@ -48,11 +48,13 @@ See [`references/develop-bug-step-0-resolve-bug.md`](references/develop-bug-step
 If context was compressed while this pipeline was running (i.e., the conversation was summarized and you are now resuming), follow this sequence exactly — do not improvise:
 
 **Step 0 — Re-read the full skill file before anything else:**
+
 ```bash
 # The skill instructions in the system reminder are TRUNCATED after compression.
 # Improvising steps from memory produces wrong artifacts and misses required invocations.
 cat .agents/skills/develop-bug/SKILL.md
 ```
+
 Output: "⚠️ Context recovery — re-reading full skill file before resuming."
 
 **Step 0a — Dispatch stale-context detector:**
@@ -60,6 +62,7 @@ Output: "⚠️ Context recovery — re-reading full skill file before resuming.
 Dispatch a read-only Explore subagent using [`references/pipeline-resume-detector-prompt.md`](references/pipeline-resume-detector-prompt.md). The subagent reads `.claude/state/develop-pipeline.lock`, lists `.summaries/step-*.json` in the bug directory, and diffs artifact mtimes. It returns `recommended_step`, `deltas_since_pause`, and `blocking_issues`. Surface its output and wait for confirmation. If `blocking_issues` is non-empty: **HALT**. See [`references/develop-pipeline-resume-contract.md`](references/develop-pipeline-resume-contract.md) — Phase 0a.
 
 **Step 1 — Recover pipeline state from the implementation report:**
+
 ```bash
 ls {bug-directory}/{bug-prefix}.implementation.*.md 2>/dev/null | sort | tail -1
 ```
@@ -87,6 +90,7 @@ For the full lock-file format, hook contract, and half-done step recovery semant
 ### Context Management Rule (CRITICAL)
 
 After EVERY step completes, before moving to the next step:
+
 1. Retain only: step outcome (pass/fail), key decisions made, file paths of artifacts produced
 2. Release all intermediate file contents from active consideration
 3. Summarize the step result in ≤5 bullet points in the implementation report, then treat the step as closed
@@ -103,7 +107,7 @@ When a step dispatches subagents, persist their summaries per [`references/subag
 >                FIRST. ALWAYS. NO PROSE BEFORE.
 > ```
 
-Every step ends with the same four actions, executed *in order, with no text output between them*:
+Every step ends with the same four actions, executed _in order, with no text output between them_:
 
 1. **Bash tool call** advancing the lock to the next step: `bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}`. **This must be the first call** — it anchors the orchestrator into "still working" mode and signals the `Stop` hook that the pipeline advanced. If the just-completed step was Step 8, use `--complete` instead (removes the lock). Idempotent — a sub-skill normally self-advances the lock, so this re-advance noops.
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`).
@@ -118,24 +122,26 @@ Two structural defences back this up: each pipeline sub-skill self-advances the 
 **Step banners (required).** Before starting each step, output: `═══ DEVELOP-BUG PIPELINE: STEP {N}/8 — {STEP-NAME} ═══`
 
 **Lock file `current_step` update (required, Steps 2–8).** Per the Step Transition Protocol, this is **action #1** — the first tool call after a sub-skill returns:
+
 ```bash
 bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}
 ```
-For Step 8 → completion: `... advance-pipeline-lock.sh --complete`. Skip this for Step 1 (the lock is created at the *end* of Step 1, after the branch exists).
+
+For Step 8 → completion: `... advance-pipeline-lock.sh --complete`. Skip this for Step 1 (the lock is created at the _end_ of Step 1, after the branch exists).
 
 After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention / ⏸️ Paused) and log decisions before moving on.
 
 ### The 8 Steps
 
-| Step | Name | Reference |
-|------|------|-----------|
-| 1 | **Create Branch** | shared step-1 (see §"Step 1" below) + branch-model deltas |
-| 2 | **Review Bug** | [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md) |
-| 3 | **Investigate & Fix** (reproduce + fix) | [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md) |
-| 4 | **Create PR** | shared step-4 (see §"Step 4" below) + branch-model deltas |
-| 5–6 | **Verify & Fix Loop** | [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-step-5-6-verify-loop.md) |
-| 7 | **Finalise & Close Bug** | [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7-close-bug.md) |
-| 8 | **Commit Changes** | shared step-8 (see §"Step 8" below) |
+| Step | Name                                    | Reference                                                                                              |
+| ---- | --------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 1    | **Create Branch**                       | shared step-1 (see §"Step 1" below) + branch-model deltas                                              |
+| 2    | **Review Bug**                          | [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md)                   |
+| 3    | **Investigate & Fix** (reproduce + fix) | [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md) |
+| 4    | **Create PR**                           | shared step-4 (see §"Step 4" below) + branch-model deltas                                              |
+| 5–6  | **Verify & Fix Loop**                   | [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-step-5-6-verify-loop.md)     |
+| 7    | **Finalise & Close Bug**                | [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7-close-bug.md)             |
+| 8    | **Commit Changes**                      | shared step-8 (see §"Step 8" below)                                                                    |
 
 ### Step 1: Create Branch
 
@@ -150,7 +156,7 @@ Follow the generic mechanics in [`references/develop-pipeline-step-1-create-bran
 
 ### Step 2: Review Bug
 
-See [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md): invoke `/review-bug` in **validate-and-apply** mode against the bug file. review-bug checks fix-readiness — template/frontmatter compliance, reproducibility *from the report*, severity/priority correctness, mode/linkage — and runs two read-only pre-pass scans (duplicate; already-fixed/stale). Gate on its recommendation: **READY TO FIX** → proceed; **NEEDS DETAIL** (after auto-applied fixes), **DUPLICATE**, or **STALE (already fixed)** → **HALT** and surface. This is the bug analogue of `develop-task` Step 2 (review-task) and mirrors its NEEDS-REVISION halt.
+See [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md): invoke `/review-bug` in **validate-and-apply** mode against the bug file. review-bug checks fix-readiness — template/frontmatter compliance, reproducibility _from the report_, severity/priority correctness, mode/linkage — and runs two read-only pre-pass scans (duplicate; already-fixed/stale). Gate on its recommendation: **READY TO FIX** → proceed; **NEEDS DETAIL** (after auto-applied fixes), **DUPLICATE**, or **STALE (already fixed)** → **HALT** and surface. This is the bug analogue of `develop-task` Step 2 (review-task) and mirrors its NEEDS-REVISION halt.
 
 ### Step 3: Investigate & Fix (reproduce + fix)
 
@@ -223,17 +229,17 @@ Every default applied must be recorded in the Decisions Log. See [`references/de
 
 ### Skill-specific defaults (develop-bug only)
 
-| Situation | Default |
-|-----------|---------|
-| review-bug (Step 2) returns **READY TO FIX** | Proceed to Step 3 autonomously. |
-| review-bug returns **NEEDS DETAIL** after auto-applying critical+important fixes | **HALT** — the report lacks reproducibility detail only a human can supply. |
-| review-bug returns **DUPLICATE** | **HALT** — surface the duplicate; do not fix. |
-| review-bug returns **STALE (already fixed)** | **HALT** — recommend closing the bug; do not fabricate a fix. |
-| Bug proves not reproducible in Step 3 | **HALT** — do not fabricate a fix for a bug you cannot reproduce. Surface the reproduction attempt to the user. |
-| Bug severity `Blocker`/`Critical` | Never run in lite mode — full QA verification in Steps 5–6 regardless of size. |
-| Branch model ambiguous (Phase 0d Q1) | Default **bugfix off `develop`**. Choose hotfix only when the bug is explicitly a production regression (frontmatter/desc says so) or the user selects it. |
-| Bug already `closed` at Phase 0 | HALT — nothing to do; report the existing Resolution Summary to the user. |
-| qa-fix reopens the bug ≥5 times (MAX_ITER) | HALT — escalate; the fix approach is not converging. |
+| Situation                                                                        | Default                                                                                                                                                    |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| review-bug (Step 2) returns **READY TO FIX**                                     | Proceed to Step 3 autonomously.                                                                                                                            |
+| review-bug returns **NEEDS DETAIL** after auto-applying critical+important fixes | **HALT** — the report lacks reproducibility detail only a human can supply.                                                                                |
+| review-bug returns **DUPLICATE**                                                 | **HALT** — surface the duplicate; do not fix.                                                                                                              |
+| review-bug returns **STALE (already fixed)**                                     | **HALT** — recommend closing the bug; do not fabricate a fix.                                                                                              |
+| Bug proves not reproducible in Step 3                                            | **HALT** — do not fabricate a fix for a bug you cannot reproduce. Surface the reproduction attempt to the user.                                            |
+| Bug severity `Blocker`/`Critical`                                                | Never run in lite mode — full QA verification in Steps 5–6 regardless of size.                                                                             |
+| Branch model ambiguous (Phase 0d Q1)                                             | Default **bugfix off `develop`**. Choose hotfix only when the bug is explicitly a production regression (frontmatter/desc says so) or the user selects it. |
+| Bug already `closed` at Phase 0                                                  | HALT — nothing to do; report the existing Resolution Summary to the user.                                                                                  |
+| qa-fix reopens the bug ≥5 times (MAX_ITER)                                       | HALT — escalate; the fix approach is not converging.                                                                                                       |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the answer in the Decisions Log.
 
@@ -256,6 +262,17 @@ If a situation arises that is not in this table or the shared defaults table and
   fi
   rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log
   ```
+
+- **Signal `blocked` on a terminal HALT** (when `TRACKER=jira` and `TRACKER_ISSUE` is set). After the snapshot above, before surfacing the HALT:
+
+  ```bash
+  node .agents/skills/develop-bug/references/jira-stage.js \
+    --issue {TRACKER_ISSUE} --stage blocked --json
+  ```
+
+  **Only for a real blockage** — a fix-readiness gate that failed, five QA cycles without a clean gate, a merge conflict, a root cause that cannot be reproduced. Do **not** fire it when the halt is an _interruption_: plan mode, a denied permission, a compaction pause, or the user stopping the run. Those are pauses in the operator's attention, not states of the work, and a card parked in Blocked misreports the second as the first to everyone reading the board.
+
+  `blocked` is **off by default** and opted into per issue type in the workflow record. Expect `reason: "stage-disabled"` until a project turns it on, and `skip (no-transition)` on boards that have the status but do not offer it from where the card currently sits — many workflows only allow Blocked from a testing column. Both are correct outcomes; the CLI exits 0 and the HALT proceeds either way.
 
 - If a sub-skill cannot be found, log the error and tell the user to verify it is installed in `.agents/skills/`.
 

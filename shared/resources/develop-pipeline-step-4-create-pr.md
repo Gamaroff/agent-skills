@@ -253,9 +253,18 @@ After extracting the PR URL from `create-pr`'s output, use the Atlassian MCP too
    - `contentFormat`: `"markdown"`
    - On failure: log warning and continue (non-blocking)
 
-2. **Transition to "In Review"** — follow `shared/resources/jira-transition-protocol.md` exactly with `candidates = ["In Review", "Code Review", "Ready for Review", "Waiting for Review", "Peer Review", "Review"]` and `terminal = false`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to `To Do`, `In Progress`, or any other transition — the issue must remain `In Progress` through QA when no review state exists in the workflow.
+2. **Signal the `in-review` stage** — run the deterministic CLI:
 
-Log in Decisions Log: "Jira {TRACKER_ISSUE} — PR comment posted; status: {transition name or 'In Progress (no review transition)'}."
+   ```bash
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+     --issue {TRACKER_ISSUE} --stage in-review --json
+   ```
+
+   On `reason: "no-credentials"`, **fall back** to `shared/resources/jira-transition-protocol.md` with `candidates = ["In Review", "Code Review", "Ready for Review", "Waiting for Review", "Peer Review", "Review"]` and `terminal = false`. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT fall back to `To Do`, `In Progress`, or any other transition — the issue must remain `In Progress` through QA when no review state exists in the workflow.
+
+   > **On a board whose review transition demands time logged.** Some workflows put a validator on the review transition ("Please enter the time spent…"). Validators are invisible to the transitions API, so this cannot be predicted — it surfaces as a 400 on the attempt. The CLI retries once with a worklog **only** when the project has opted in via `jira.worklogTimeSpent` in `skills-config.yaml`, and it never invents a duration. If the log shows that 400 and no retry, that setting is missing. The MCP fallback path cannot satisfy such a validator at all; move the card by hand.
+
+Log in Decisions Log: "Jira {TRACKER_ISSUE} — PR comment posted; status: {landed status, or the skip reason}."
 
 ---
 

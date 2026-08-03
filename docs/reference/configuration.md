@@ -42,6 +42,8 @@ jira:
   statusMap: # optional — local status → Jira workflow status name
     ready-for-development: Selected for Development
     ready-for-review: In Review
+  workflowRecord: docs/development/jira-workflow.json # optional — machine-readable board description
+  worklogTimeSpent: 1m # optional — opt-in duration logged ONLY to satisfy a time-spent validator
 
 github:
   projectEstimateField: Estimate # optional — GitHub Projects v2 number field name for estimated dev hours
@@ -96,6 +98,8 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `architecture.architectureShardedLocation`       | path                            | `docs/architecture`                              | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md)                                                                                                                                                                                                                                                                                                                                        |
 | `devLoadAlwaysFiles`                             | list[path]                      | `[]`                                             | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.)                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `jira.statusMap`                                 | map[string→string\|list]        | (built-in candidate lists)                       | Maps local document status → the Jira status name(s) to transition to, as a scalar or ordered candidate list. May carry a per-issue-type sub-map (`story`/`task`/`epic`). Usually unnecessary — check with `--probe-workflow` first. See [Jira status mapping](#jira-status-mapping).                                                                                                                                                                                                     |
+| `jira.workflowRecord`                            | path                            | `docs/development/jira-workflow.json`            | JSON description of the board: which pipeline stages to drive, per Jira issue type, and the status ranks the monotonicity guard uses. Absent or unreadable → built-in defaults, i.e. exactly the old behaviour. Generate with `--probe-workflow --write-record`. See [Pipeline stages](#pipeline-stages).                                                                                                                                                                                 |
+| `jira.worklogTimeSpent`                          | string                          | (unset — no worklog is ever sent)                | Duration logged **only** to satisfy a workflow validator that demands time spent, sent inline with the transition that needs it, at most once per transition. Never invented: unset means such a transition fails as it always did. Env override: `JIRA_WORKLOG_TIME_SPENT`. See [Pipeline stages](#pipeline-stages).                                                                                                                                                                     |
 | `jira.doneResolution`                            | string                          | (prefers `Done`, `Resolved`, `Fixed`)            | Resolution name used when a workflow's done transition requires one. Env override: `JIRA_DONE_RESOLUTION`.                                                                                                                                                                                                                                                                                                                                                                                |
 | `jira.cancelledResolution`                       | string                          | (prefers `Won't Do`, `Cancelled`, `Declined`)    | Resolution name used when cancelling. Env override: `JIRA_CANCELLED_RESOLUTION`.                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `jira.devEstimateField`                          | string (custom field id)        | (unset → skipped)                                | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field).                                                                                                                                                                                                                                                                                                   |
@@ -130,6 +134,84 @@ story directory:
 ```
 
 Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
+
+## Pipeline stages
+
+A **stage** is a point in the develop pipeline; a **document status** is a word in a story or task
+file. They overlap but are not the same vocabulary — the pipeline passes through board columns that
+no document status names, and a document can sit in a status the pipeline never visits. `jira.statusMap`
+configures the second; the workflow record configures the first.
+
+| Stage             | Fired at                                    | Default |
+| ----------------- | ------------------------------------------- | ------- |
+| `work-started`    | Step 1, once the branch and lock exist      | on      |
+| `in-review`       | Step 4, once the PR URL is confirmed        | on      |
+| `in-qa`           | Step 5, once, on entering the QA loop       | **off** |
+| `ready-for-merge` | Step 6, on a gate that exits the loop       | **off** |
+| `blocked`         | before a terminal HALT, real blockages only | **off** |
+| `done`            | Step 7, by `/finalise`                      | on      |
+
+The three new stages default **off**. Consumers upgrade by replacing a skill directory wholesale, and
+a stage that defaulted on would start moving cards into columns that project has never used, with no
+one having asked for it. `work-started`, `in-review` and `done` behave exactly as they did before this
+existed.
+
+Turn one on in the workflow record:
+
+```json
+{
+  "version": 1,
+  "stages": {
+    "in-qa": {
+      "enabled": true,
+      "rank": 40,
+      "candidates": ["Testing", "Ready for Testing"]
+    }
+  },
+  "byIssueType": {
+    "IT / DevOps Task": {
+      "in-qa": {
+        "enabled": false,
+        "reason": "no Testing status in this workflow"
+      }
+    }
+  },
+  "statusRank": {
+    "In Progress": 20,
+    "In Review": 30,
+    "Testing": 40,
+    "Done": 60
+  }
+}
+```
+
+`byIssueType` is keyed on the **live Jira issue type name**, not the `story|task|epic` docKind that
+`jira.statusMap` uses. One board routinely gives several task types genuinely different workflows,
+which a three-way layer cannot express.
+
+`statusRank` powers the **monotonicity guard**: boards offer backward transitions, so a resumed
+pipeline re-running an earlier step could otherwise drag a card back down the ladder. A stage refuses
+to move an issue that already sits at a higher rank, unless `--allow-regress` is passed. Unranked
+either side means no opinion — `blocked` is deliberately unranked, being a side-state rather than a
+point on the ladder.
+
+Two outcomes are normal and non-failing, and it is worth being able to tell them apart:
+`stage-disabled` means this project opted out; `skip (no-transition)` means the board offers no such
+move **from where the card currently sits**. Transitions are position-dependent, so one missed hop
+disables every stage after it — `jira-stage.js` flags exactly that when it happens.
+
+### Workflow validators
+
+A required _field_ is visible in `expand=transitions.fields`. A workflow _validator_ — "Please enter
+the time spent in order to move the task" — is not. It surfaces only as a 400 on the transition
+itself. Setting `jira.worklogTimeSpent` lets the transition be retried once with a worklog attached in
+the same request, which is the only thing that satisfies such a validator.
+
+It is a retry rather than a pre-emptive attach because a worklog sent to a transition whose screen has
+no Log Work field is itself rejected — attaching one unconditionally would break transitions that
+would otherwise have succeeded. The retry is safe because a failed validator is atomic: Jira applies
+nothing, so the first call cannot have booked time. It fires at most once; worklogs are cumulative and
+cannot be silently undone. The time is booked against whoever owns `JIRA_API_TOKEN`.
 
 ## Jira status mapping
 

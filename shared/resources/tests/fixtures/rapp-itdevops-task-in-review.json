@@ -1,0 +1,37 @@
+{
+  "transitions": [
+    {
+      "id": "241",
+      "name": "Review passed",
+      "to": {
+        "name": "Done",
+        "statusCategory": {
+          "key": "done"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "81",
+      "name": "Review Failed",
+      "to": {
+        "name": "Reopened",
+        "statusCategory": {
+          "key": "new"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "351",
+      "name": "Waiting for Review",
+      "to": {
+        "name": "Waiting for Review",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    }
+  ]
+}

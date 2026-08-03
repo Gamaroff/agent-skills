@@ -1,15 +1,26 @@
 ---
 name: jira-transition-protocol
-description: Deterministic Jira transition matching algorithm. Referenced by every develop-pipeline step that transitions a Jira issue via the Atlassian MCP tools. Prevents the LLM from inventing a fallback transition when no name matches, and fills the fields a transition screen requires.
+description: Jira transition matching algorithm for the MCP fallback path. Used by a develop-pipeline step ONLY when jira-stage.js reports no-credentials. Prevents the LLM from inventing a fallback transition when no name matches, and fills the fields a transition screen requires.
 ---
 
 # Jira Transition Protocol — strict matching, no fallbacks
 
-This protocol defines exactly how to transition a Jira issue via `getTransitionsForJiraIssue` + `transitionJiraIssue`. **Every develop-pipeline step that performs a Jira transition MUST follow it verbatim.**
+> **This is the fallback path, not the primary one.** A develop-pipeline step first runs
+> `shared/resources/jira-stage.js --issue <KEY> --stage <stage>`, which implements everything below
+> in code. Follow this document **only** when that CLI reports `reason: "no-credentials"` — i.e. the
+> project has the Atlassian MCP connector but no `JIRA_*` env. Do not run both: the CLI is
+> authoritative whenever credentials exist.
 
-The matching loop is delegated to an LLM. Without explicit guard rails the model has been observed picking a non-matching transition (e.g. selecting `To Do` because it was first in the returned list when `In Review` was absent). The MUST-NOT clauses below close that hole.
+This protocol defines exactly how to transition a Jira issue via `getTransitionsForJiraIssue` + `transitionJiraIssue` when that fallback applies.
 
-This mirrors `resolveTransition` / `buildTransitionFields` in `jira-sync.js`, which the sync skills use. **The two must stay in step** — same order, same rules, same refusals.
+The matching loop is delegated to an LLM. Without explicit guard rails the model has been observed picking a non-matching transition (e.g. selecting `To Do` because it was first in the returned list when `In Review` was absent). The MUST-NOT clauses below close that hole. Moving the primary path into `jira-stage.js` is the more durable fix — the guard rails below only bind a model that reads them.
+
+This mirrors `resolveTransition` / `buildTransitionFields` in `jira-sync.js`. **The two must stay in step** — same order, same rules, same refusals. That is asserted by a test (`evals/shared/tests/transition-protocol-parity.test.mjs`), not left to discipline: the candidate lists quoted below are compared against the JS constants on every run.
+
+### What this fallback cannot do
+
+- **Workflow validators.** A transition that demands time logged (see below) cannot be satisfied through the MCP tools, which offer no way to attach a worklog to the transition request. The CLI can; this path cannot. Move such a card by hand.
+- **The monotonicity guard.** The CLI refuses to move a card backwards down the stage ladder. Following this document, that check is yours to make: read the current status first, and do not transition an issue that is already past the stage you were asked to signal.
 
 ## Inputs
 

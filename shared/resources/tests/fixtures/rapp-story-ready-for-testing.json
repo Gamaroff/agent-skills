@@ -1,0 +1,131 @@
+{
+  "transitions": [
+    {
+      "id": "41",
+      "name": "Start Testing",
+      "to": {
+        "name": "Testing",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "171",
+      "name": "In Review",
+      "to": {
+        "name": "In Review",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "201",
+      "name": "Reopen",
+      "to": {
+        "name": "Reopened",
+        "statusCategory": {
+          "key": "new"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "461",
+      "name": "Waiting for Review",
+      "to": {
+        "name": "Waiting for Review",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "361",
+      "name": "Blocked",
+      "to": {
+        "name": "Blocked",
+        "statusCategory": {
+          "key": "new"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "261",
+      "name": "Waiting for merge",
+      "to": {
+        "name": "Waiting for merge",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "161",
+      "name": "Done",
+      "to": {
+        "name": "Done",
+        "statusCategory": {
+          "key": "done"
+        }
+      },
+      "fields": {
+        "resolution": {
+          "required": true,
+          "allowedValues": [
+            {
+              "id": "10000",
+              "name": "Done"
+            },
+            {
+              "id": "10001",
+              "name": "Won't Do"
+            },
+            {
+              "id": "10002",
+              "name": "Duplicate"
+            },
+            {
+              "id": "10003",
+              "name": "Cannot Reproduce"
+            },
+            {
+              "id": "10004",
+              "name": "Declined"
+            },
+            {
+              "id": "10005",
+              "name": "Known Error"
+            },
+            {
+              "id": "10006",
+              "name": "Hardware failure"
+            },
+            {
+              "id": "10007",
+              "name": "Software failure"
+            },
+            {
+              "id": "10008",
+              "name": "Resolved"
+            },
+            {
+              "id": "10009",
+              "name": "Canceled"
+            },
+            {
+              "id": "10010",
+              "name": "Fail"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

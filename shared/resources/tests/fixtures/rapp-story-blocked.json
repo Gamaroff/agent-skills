@@ -1,0 +1,26 @@
+{
+  "transitions": [
+    {
+      "id": "371",
+      "name": "Ready for Testing",
+      "to": {
+        "name": "Ready for Testing",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    },
+    {
+      "id": "381",
+      "name": "Start Testing",
+      "to": {
+        "name": "Testing",
+        "statusCategory": {
+          "key": "indeterminate"
+        }
+      },
+      "fields": {}
+    }
+  ]
+}

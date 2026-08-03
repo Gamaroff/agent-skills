@@ -27,7 +27,8 @@ const ISSUE_TYPE = "Epic";
 // Default Jira assignee accountId, from `jira.defaultAssignee` in skills-config.yaml.
 // Frontmatter `assignee` overrides it. Empty -> the field is never sent, which leaves
 // any existing Jira assignee alone rather than clearing it.
-const DEFAULT_ASSIGNEE = process.env.JIRA_DEFAULT_ASSIGNEE || lib.loadDefaultAssignee();
+const DEFAULT_ASSIGNEE =
+  process.env.JIRA_DEFAULT_ASSIGNEE || lib.loadDefaultAssignee();
 const SYNC_LABEL_PREFIX = "synced-from-";
 
 const STORY_REQUIREMENTS_TEXT =
@@ -230,7 +231,10 @@ function buildDescriptionAdf({
 
   // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
   // wholesale and the issue silently keeps its previous description.
-  return lib.capDescriptionAdf(lib.adf.doc(...content), { sourceUrl: epicBbUrl || null, output });
+  return lib.capDescriptionAdf(lib.adf.doc(...content), {
+    sourceUrl: epicBbUrl || null,
+    output,
+  });
 }
 
 function hashBody({
@@ -377,7 +381,11 @@ function collectCommonFields({
   };
   if (priority) fields.priority = { name: priority };
 
-  const assigneeId = lib.resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE, output);
+  const assigneeId = lib.resolveAssignee(
+    frontmatter.assignee,
+    DEFAULT_ASSIGNEE,
+    output,
+  );
   if (assigneeId) fields.assignee = { accountId: assigneeId };
   if (frontmatter.due_date) fields.duedate = String(frontmatter.due_date);
   if (frontmatter.components) {
@@ -519,6 +527,7 @@ function parseArgs(argv) {
     version: false,
     failOnStatusSkip: false,
     probeWorkflow: false,
+    writeRecord: "",
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -555,6 +564,9 @@ function parseArgs(argv) {
         break;
       case "--probe-workflow":
         opts.probeWorkflow = true;
+        break;
+      case "--write-record":
+        opts.writeRecord = args[++i];
         break;
       case "--quiet":
         opts.quiet = true;
@@ -603,13 +615,23 @@ async function run({
   if (args.probeWorkflow) {
     const auth = lib.getAuth();
     if (!auth.ok) {
-      output.err(`Error: Missing required environment variables: ${auth.missing.join(", ")}`);
+      output.err(
+        `Error: Missing required environment variables: ${auth.missing.join(", ")}`,
+      );
       return { exitCode: 1 };
     }
-    const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
+    const http = lib.makeHttp({
+      fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+    });
     await lib.probeWorkflow({
-      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      projectKey: auth.project, docKind: "epic", output,
+      http,
+      baseUrl: auth.baseUrl,
+      email: auth.email,
+      token: auth.token,
+      projectKey: auth.project,
+      docKind: "epic",
+      writePath: args.writeRecord,
+      output,
     });
     return { exitCode: 0 };
   }
