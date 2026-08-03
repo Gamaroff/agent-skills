@@ -5,18 +5,20 @@ type: task
 description: "Remove the scalar jira.statusMap block the setup wizard writes into every Jira consumer, which narrows the built-in candidate lists to one name each and silently breaks status syncing on any non-vanilla board."
 tags: [jira, configuration, setup, regression]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: High
 created: 2026-08-03
 updated: 2026-08-03
 assignee:
-estimated_effort_hours: 2
+estimated_effort_hours: 4
 github_issue: 184
 ---
 
 # Technical Task: Stop `setup-consumer.sh` generating a `jira.statusMap` that disables status syncing
 
-**Status:** Planned
+**Status:** Ready for Development
+
+**Review**: ✅ All review recommendations from `task.36.review.1.setup-consumer-statusmap-fix.md` implemented 2026-08-03
 
 **GitHub Issue:** [#184](https://github.com/Gamaroff/agent-skills/issues/184)
 
@@ -26,9 +28,10 @@ github_issue: 184
 
 `scripts/setup-consumer.sh` writes a literal `jira.statusMap` block into the `skills-config.yaml` of
 every Jira consumer it configures. Because a `statusMap` override **replaces** the built-in
-candidate list rather than seeding it, that generated block collapses six 4–6-name candidate lists
-down to one vanilla name each. Any consumer whose board uses different words — "Waiting for
-Review", "Selected for Development", "Ready for Testing" — gets silent, total status-sync failure.
+candidate list rather than seeding it, that generated block pins all seven of its keys to one
+vanilla name apiece, discarding the five 4–6-name candidate lists behind them. Any status whose
+column a consumer's board words differently — "Waiting for Review", "Selected for Development",
+"Resolved" — then stops syncing, silently.
 
 This task deletes the generated block and the mirrored copy in the configuration reference, and
 adds a detector so already-affected consumers can find out.
@@ -117,13 +120,19 @@ directly above it.
 
 ✅ **Generator**: remove the live `statusMap:` block from `scripts/setup-consumer.sh`'s Jira
 `tracker_block`; replace with commented guidance and a pointer to `--probe-workflow`.
-✅ **Documentation**: fix the mirrored example at `docs/reference/configuration.md:361-372` and the
-false "Values shown are the built-in defaults" claim at L362, **in the same commit**.
+✅ **Documentation**: fix **both** mirrored examples in `docs/reference/configuration.md` — the
+worked example at L360-372 (including the false "Values shown are the built-in defaults" claim at
+L362) **and** the annotated skeleton at L42-44, which shows `ready-for-review: In Review` and a
+singular "status name" comment — **in the same commit**. (The third example at L253-268, under
+*Overriding*, is already correct: it shows list form and states the replace semantics.)
 ✅ **Migration**: a "Migration" subsection under *Jira status mapping* telling affected consumers
 what to delete and how to verify.
 ✅ **Detector**: a suspicious-`statusMap` check — if every key is a scalar equal to `candidates[0]`
-of its default list, that is the wizard's fingerprint. Printed by `--probe-workflow`.
-✅ **Test**: assert `setup-consumer.sh` emits no active `statusMap:` key for a Jira consumer.
+of its default list, that is the wizard's fingerprint. Printed by `--probe-workflow`. Requires a new
+exported `loadStatusMapOverrides()` so the detector sees the **raw** override block, not
+`loadStatusMap`'s merged output.
+✅ **Test**: generate a config non-interactively and assert it carries no active `statusMap:` key
+for a Jira consumer, then parse that generated file with every reader.
 ✅ **CHANGELOG**: a `### Fixed` entry in house style.
 
 ### Out of Scope
@@ -207,11 +216,16 @@ lists. Documented in `configuration.md` and surfaced by the detector.
 
 **Changes**:
 
-- [ ] Replace the `statusMap` block in the worked example (L361-372) with the same commented form
+- [ ] Replace the `statusMap` block in the worked example (L360-372) with the same commented form
 - [ ] Delete the false claim at L362 that the values are "the built-in defaults"; state that they
       are the first entry of each candidate list and that writing them **narrows** matching
+- [ ] Fix the annotated skeleton at L42-44: show the list form
+      (`ready-for-review: [Waiting for Review, In Review]`), pluralise the comment to "status
+      name(s)", and note that it is usually unnecessary
 - [ ] Add a **Migration** subsection under *Jira status mapping* with the delete-and-probe recipe
-- [ ] Cross-link it from the `jira.statusMap` row in the key reference table (L100)
+- [ ] Cross-link it from the `jira.statusMap` row in the key reference table (L100) — that cell
+      already links to `#jira-status-mapping`, so target the Migration subsection's own anchor or
+      replace the existing sentence rather than appending a second link to the same target
 
 **Dependencies**: ship in the same commit as Phase 1 — the generator and its mirrored doc drifted
 apart last time precisely because they were edited separately
@@ -231,11 +245,16 @@ apart last time precisely because they were edited separately
 
 **Changes**:
 
-- [ ] Add `detectNarrowingStatusMap(statusMap)` beside `loadStatusMap`: returns the keys whose
-      scalar value equals `DEFAULT_STATUS_MAP[key][0]`, and whether *every* present key matches
+- [ ] Add `loadStatusMapOverrides(repoRoot)` beside `loadStatusMap`: reads `skills-config.yaml`,
+      returns `parseStatusMapBlock(...).base` **unmerged**, `{}` on any failure. Export it.
+- [ ] Add `detectNarrowingStatusMap(statusMap)` beside it: returns the keys whose scalar value
+      equals `DEFAULT_STATUS_MAP[key][0]`, and whether *every* present key matches. Export it.
+- [ ] Wire into `--probe-workflow` using `loadStatusMapOverrides()` — **not** the merged map that
+      `loadStatusMap()` returns, whose ~27 default keys make the whole-map fingerprint unmatchable
 - [ ] Print the advice from `--probe-workflow` when the whole-map fingerprint hits
-- [ ] Test: run the wizard's `write_skills_config` path for `TRACKER=jira` and assert the output
-      contains no active `statusMap:` key (a commented `# statusMap:` is fine)
+- [ ] Test: generate a config non-interactively for `TRACKER=jira` into a temp dir and assert the
+      emitted file contains no active `statusMap:` key (a commented `# statusMap:` is fine)
+- [ ] Test: the same generated file parses correctly under every reader listed in §8
 - [ ] Test: `detectNarrowingStatusMap` recognises the exact block the wizard used to emit, and does
       **not** flag a deliberate list-valued override
 
@@ -267,7 +286,8 @@ apart last time precisely because they were edited separately
 ### Files to Modify (Core Implementation)
 
 1. ✅ `scripts/setup-consumer.sh` — remove the live `statusMap` from the Jira `tracker_block`
-2. ✅ `shared/resources/jira-sync.js` — add `detectNarrowingStatusMap`, wire into `--probe-workflow`
+2. ✅ `shared/resources/jira-sync.js` — add `loadStatusMapOverrides` + `detectNarrowingStatusMap`,
+   export both, wire into `--probe-workflow`
 
 ### Files to Modify (Tests)
 
@@ -275,8 +295,8 @@ apart last time precisely because they were edited separately
 
 ### Files to Modify (Documentation)
 
-4. ✅ `docs/reference/configuration.md` — worked example, the false "built-in defaults" claim, new
-   Migration subsection, key-table cross-link
+4. ✅ `docs/reference/configuration.md` — worked example (L360-372), annotated skeleton (L42-44),
+   the false "built-in defaults" claim (L362), new Migration subsection, key-table cross-link
 5. ✅ `CHANGELOG.md` — `### Fixed` entry
 
 ### Files to Delete
@@ -296,8 +316,15 @@ None.
 - [ ] `detectNarrowingStatusMap` flags the exact historical wizard block
 - [ ] It does **not** flag a list-valued override, nor a scalar that differs from `candidates[0]`
 - [ ] It does not flag an empty or absent map
+- [ ] `loadStatusMapOverrides` returns the raw override block, **not** merged with the defaults —
+      guard against the wiring mistake that would make the whole-map fingerprint unmatchable
 - [ ] Generator output for `TRACKER=jira` contains no active `statusMap:` key
 - [ ] Generator output for `TRACKER=github` is unchanged
+
+**Approach**: the generator assertions run the wizard's config-writing path non-interactively into a
+temp directory and assert on the **emitted file**. A grep of `setup-consumer.sh` source is a useful
+extra guard but is not sufficient on its own — it produces no file, so it can substantiate neither
+these assertions nor the integration checks below.
 
 **Command**: `node --test 'shared/resources/tests/*.test.mjs'`
 
@@ -313,7 +340,14 @@ None.
 - [ ] `resolve-paths.sh`'s `read_nested_config_key` resolves `prd.prdShardedLocation`
 - [ ] `jira-sync.js`'s `parseJiraScalar` resolves a `jira.` scalar past the new comment block —
       commented lines must not confuse the hand-rolled indentation scanner
+- [ ] `jira-sync.js`'s `parseStatusMapBlock` returns `{}` for the all-comment `jira:` block
+- [ ] `setup-consumer.sh`'s own `_read_config_path` resolves `prdShardedLocation` from the new output
+- [ ] `generate-prd-epic-index.mjs`'s `prdRootFromConfig` resolves `prd.prdShardedLocation`
 - [ ] `setup-consumer.sh` re-run against an existing config still reports `kept (existing)`
+
+> These six cover every hand-rolled reader of `skills-config.yaml` in the repo. The seventh reader,
+> `set-github-project-estimate.sh`, shells out to Python `yaml.safe_load` and reads only the
+> `github:` block — a real parser on an untouched section, so it needs no coverage here.
 
 **Command**: `npm test`
 
@@ -352,7 +386,8 @@ Not applicable — no hot path is touched. No baseline needed.
 ### Functional
 
 - [ ] A freshly generated Jira `skills-config.yaml` contains no active `statusMap:` key
-- [ ] `--probe-workflow` prints the migration advice when the narrowing fingerprint is present
+- [ ] `--probe-workflow` prints the migration advice when the narrowing fingerprint is present —
+      verified against a config actually carrying the historical block, not only in a unit test
 - [ ] Re-running the wizard over an existing config still reports `kept (existing)` and edits nothing
 - [ ] `npm test` passes with the existing Jira suites unchanged
 
@@ -372,7 +407,7 @@ Not applicable — no hot path is touched. No baseline needed.
 
 - [ ] `CHANGELOG.md` carries the `### Fixed` entry
 - [ ] `configuration.md` carries the Migration subsection and no longer claims the values are
-      built-in defaults
+      built-in defaults; neither of its two `statusMap` examples teaches the narrowing shape
 - [ ] The migration recipe is verified by hand against one real affected config
 
 ---
@@ -399,14 +434,16 @@ None. This task deletes generated text and adds a read-only detector.
 
 **2. Commented YAML confuses a hand-rolled parser**
 
-- **Risk**: five independent parsers read this file, each with its own comment handling.
+- **Risk**: six independent hand-rolled parsers read this file, each with its own comment handling.
   `parseJiraScalar` scans direct children of `jira:` by indentation; a commented child could be
   misread.
-- **Probability**: Low
+- **Probability**: Low — both `jira:` scanners skip `#`-leading lines before any indent logic
+  (`parseJiraScalar` at `jira-sync.js:1750`, `parseStatusMapBlock`'s `isSkippable` at L1576), and
+  the remaining four readers key off blocks that precede `jira:` in the generated file.
 - **Impact**: Major (a misparse silently disables a different setting)
-- **Mitigation**: the integration tests above exercise all readers against the new output. The
-  adjacent `devEstimateField` / `defaultAssignee` lines are already commented in the same block, so
-  the shape is proven.
+- **Mitigation**: the integration tests above exercise all six hand-rolled readers against the
+  generated output. The adjacent `devEstimateField` / `defaultAssignee` lines are already commented
+  in the same block, so the shape is proven.
 - **Rollback**: revert the generator hunk.
 
 ### Low Risk Areas
@@ -469,19 +506,21 @@ not warrant a revert.
 ### Phase 1: Remove the generated block
 
 - [ ] `tracker_block` emits commented guidance only
-- [ ] Emitted YAML verified against all five readers
+- [ ] Emitted YAML verified against all six hand-rolled readers
 
 ### Phase 2: Fix the mirrored documentation
 
-- [ ] Worked example updated
+- [ ] Worked example (L360-372) updated
+- [ ] Annotated skeleton (L42-44) updated
 - [ ] False "built-in defaults" claim removed
-- [ ] Migration subsection added and cross-linked
+- [ ] Migration subsection added and cross-linked without duplicating the existing L100 link
 
 ### Phase 3: Detector and test
 
-- [ ] `detectNarrowingStatusMap` implemented
-- [ ] Wired into `--probe-workflow`
-- [ ] New test suite passing
+- [ ] `loadStatusMapOverrides` implemented and exported
+- [ ] `detectNarrowingStatusMap` implemented and exported
+- [ ] Wired into `--probe-workflow` against the **raw** override block
+- [ ] New test suite passing, including the generate-for-real assertions
 
 ### Phase 4: CHANGELOG
 
@@ -514,5 +553,9 @@ not warrant a revert.
 
 **Open** (non-blocking):
 
-- ⚠️ Five independent hand-rolled YAML readers exist in this repo. Consolidating them is out of
+- ⚠️ Six independent hand-rolled YAML readers of `skills-config.yaml` exist in this repo —
+  `setup-consumer.sh:_read_config_path`, `resolve-platform.sh:read_config_key`,
+  `resolve-paths.sh:read_nested_config_key`, `jira-sync.js:parseStatusMapBlock`,
+  `jira-sync.js:parseJiraScalar`, and `generate-prd-epic-index.mjs:prdRootFromConfig` — plus
+  `set-github-project-estimate.sh`, which uses Python `yaml.safe_load`. Consolidating them is out of
   scope here; task.37 promotes `parseYamlSubset` and reduces the count by one.
