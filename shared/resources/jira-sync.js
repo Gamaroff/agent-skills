@@ -29,7 +29,21 @@ function loadDotEnv() {
     const root = execSync("git rev-parse --show-toplevel", {
       encoding: "utf-8",
     }).trim();
-    const envPath = path.join(root, ".env");
+    let envPath = path.join(root, ".env");
+    // Inside a linked worktree, --show-toplevel is the WORKTREE root. `.env` is
+    // gitignored and `git worktree add` copies no ignored files, so a worktree
+    // has none — every /develop-batch agent would silently degrade to
+    // "no credentials". --git-common-dir points at the main repo's .git, whose
+    // parent does have it.
+    if (!fs.existsSync(envPath)) {
+      const commonDir = execSync(
+        "git rev-parse --path-format=absolute --git-common-dir",
+        {
+          encoding: "utf-8",
+        },
+      ).trim();
+      envPath = path.join(path.dirname(commonDir), ".env");
+    }
     if (!fs.existsSync(envPath)) return;
     for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
       const t = line.trim();
@@ -189,12 +203,18 @@ function prefersSingleQuote() {
   _singleQuote = false;
   try {
     const root = getRepoRoot();
-    const names = [".prettierrc", ".prettierrc.json", ".prettierrc.yaml", ".prettierrc.yml"];
+    const names = [
+      ".prettierrc",
+      ".prettierrc.json",
+      ".prettierrc.yaml",
+      ".prettierrc.yml",
+    ];
     for (const f of names) {
       const p = path.join(root, f);
       if (!fs.existsSync(p)) continue;
       // Matches JSON (`"singleQuote": true`) and YAML (`singleQuote: true`).
-      if (/["']?singleQuote["']?\s*:\s*true/.test(fs.readFileSync(p, "utf-8"))) _singleQuote = true;
+      if (/["']?singleQuote["']?\s*:\s*true/.test(fs.readFileSync(p, "utf-8")))
+        _singleQuote = true;
       break;
     }
     if (!_singleQuote) {
@@ -717,7 +737,10 @@ function extractBodySections(body, sectionNames, output = null) {
     let hit = null;
     for (const alt of alts) {
       const m = body.match(sectionRe(alt));
-      if (m && m[1].trim()) { hit = m[1].trim(); break; }
+      if (m && m[1].trim()) {
+        hit = m[1].trim();
+        break;
+      }
     }
     if (hit !== null) out.push({ name: alts[0], content: hit });
     // Report every accepted spelling: a reader told only "User Story not found"
@@ -780,28 +803,41 @@ function capDescriptionAdf(doc, opts = {}) {
   if (total <= limit) return doc;
 
   const kept = [];
-  let used = 0, dropped = 0;
+  let used = 0,
+    dropped = 0;
   for (const block of doc.content) {
     const len = adfTextLength(block);
-    if (used + len > limit) { dropped++; continue; }
+    if (used + len > limit) {
+      dropped++;
+      continue;
+    }
     kept.push(block);
     used += len;
   }
 
   const where = sourceUrl
-    ? [adf.text("Read the full document: "), adf.link("source document", sourceUrl)]
+    ? [
+        adf.text("Read the full document: "),
+        adf.link("source document", sourceUrl),
+      ]
     : [adf.text("Read the full document in the repository.")];
-  kept.push(adf.paragraph(
-    adf.text(`⚠️ Truncated to fit Jira's ${JIRA_TEXT_LIMIT}-character description limit — ` +
-      `${dropped} section(s) omitted, ${total} characters in the source. `),
-    ...where,
-  ));
+  kept.push(
+    adf.paragraph(
+      adf.text(
+        `⚠️ Truncated to fit Jira's ${JIRA_TEXT_LIMIT}-character description limit — ` +
+          `${dropped} section(s) omitted, ${total} characters in the source. `,
+      ),
+      ...where,
+    ),
+  );
 
   if (output) {
     const warn = output.warn || ((...a) => console.warn(...a));
-    warn(`Description is ${total} characters, over Jira's ${JIRA_TEXT_LIMIT} limit — ` +
-      `${dropped} trailing section(s) omitted from the published description.\n` +
-      `    The document itself is unchanged. Move detail into a companion file to publish it in full.`);
+    warn(
+      `Description is ${total} characters, over Jira's ${JIRA_TEXT_LIMIT} limit — ` +
+        `${dropped} trailing section(s) omitted from the published description.\n` +
+        `    The document itself is unchanged. Move detail into a companion file to publish it in full.`,
+    );
   }
   return { ...doc, content: kept };
 }
@@ -1282,6 +1318,95 @@ const READY_CANDIDATES = Object.freeze([
   "Ready for Development",
   "Selected for Development",
 ]);
+const QA_CANDIDATES = Object.freeze([
+  "Testing",
+  "Ready for Testing",
+  "In Testing",
+  "QA",
+  "In QA",
+]);
+const MERGE_CANDIDATES = Object.freeze([
+  "Waiting for merge",
+  "Ready to Merge",
+  "Ready for Merge",
+  "Awaiting Merge",
+]);
+
+// ---------------------------------------------------------------------------
+// Pipeline stages
+// ---------------------------------------------------------------------------
+// A *stage* is a point in the develop pipeline (branch cut, PR opened, QA
+// entered, ...). A *document status* is a word in a story/task file. They are
+// not the same vocabulary: the pipeline passes through board columns no
+// document status names, and a document can sit in a status the pipeline never
+// visits.
+//
+// Three stages deliberately ALIAS the status candidate lists above rather than
+// re-declaring them. If `work-started` had its own copy, a project that tuned
+// `jira.statusMap["in-progress"]` would leave /sync-jira-story and
+// /develop-story firing different transitions for the same board position —
+// exactly the drift this file exists to prevent.
+//
+// `defaultEnabled: false` on the three new stages is load-bearing. Consumers
+// upgrade by `rm -rf`ing the skill directory and copying a new one; a stage
+// that defaults on would start moving cards into columns that project has
+// never used, with no one having asked for it. Opting in is one line in the
+// workflow record.
+//
+// `rank` powers the monotonicity guard (see resolveStatusRank): a resumed
+// pipeline re-running an earlier step must not drag a card backwards. `null`
+// means unranked — `blocked` is exempt in both directions, since it is a
+// side-state rather than a point on the ladder.
+const DEFAULT_STAGE_MAP = Object.freeze({
+  "work-started": {
+    candidates: IN_PROGRESS_CANDIDATES,
+    rank: 20,
+    defaultEnabled: true,
+  },
+  "in-review": {
+    candidates: REVIEW_CANDIDATES,
+    rank: 30,
+    defaultEnabled: true,
+  },
+  "in-qa": { candidates: QA_CANDIDATES, rank: 40, defaultEnabled: false },
+  "ready-for-merge": {
+    candidates: MERGE_CANDIDATES,
+    rank: 50,
+    defaultEnabled: false,
+  },
+  blocked: {
+    candidates: BLOCKED_CANDIDATES,
+    rank: null,
+    defaultEnabled: false,
+  },
+  done: {
+    candidates: DONE_CANDIDATES,
+    rank: 60,
+    defaultEnabled: true,
+    terminal: true,
+  },
+});
+
+const STAGE_NAMES = Object.freeze(Object.keys(DEFAULT_STAGE_MAP));
+
+// Default status -> rank, derived from the candidate lists themselves so there
+// is one place to change a stage's position. A status the board uses but no
+// stage names (e.g. "READY FOR SHOWCASE") is unranked, and the guard lets it
+// through rather than blocking on a status it has no opinion about.
+const DEFAULT_STATUS_RANK = Object.freeze(
+  (() => {
+    const rank = {};
+    for (const name of NEW_CANDIDATES) rank[name.toLowerCase()] = 10;
+    for (const [, spec] of Object.entries(DEFAULT_STAGE_MAP)) {
+      if (spec.rank == null) continue;
+      for (const name of spec.candidates) {
+        const k = name.toLowerCase();
+        if (rank[k] == null || rank[k] < spec.rank) rank[k] = spec.rank;
+      }
+    }
+    return rank;
+  })(),
+);
 
 const DEFAULT_STATUS_MAP = {
   // canonical lifecycle
@@ -1667,6 +1792,121 @@ function loadJiraScalarSetting(repoRoot, key, envVar) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Workflow record (machine-readable board description)
+// ---------------------------------------------------------------------------
+// A project can describe its board once, in JSON, instead of every consumer
+// re-deriving it. The path comes from `jira.workflowRecord` in
+// skills-config.yaml; DEFAULT_WORKFLOW_RECORD_PATH is the convention so most
+// projects set nothing.
+//
+// JSON, not YAML: the record nests three levels deep
+// (byIssueType.<type>.<stage>.candidates) where parseStatusMapBlock handles
+// one, and — more decisively — the record is meant to be GENERATED by
+// `--probe-workflow --write` and `--check`ed in CI. JSON round-trips with zero
+// dependencies; YAML would need a writer as well as a reader.
+//
+// Every failure returns {} — a project with no record must behave exactly as
+// it did before this existed. Same swallow-everything discipline as
+// loadStatusMap.
+const DEFAULT_WORKFLOW_RECORD_PATH = "docs/development/jira-workflow.json";
+
+function loadWorkflowRecord(repoRoot) {
+  try {
+    const root =
+      repoRoot ||
+      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    const rel =
+      loadJiraScalarSetting(root, "workflowRecord", "JIRA_WORKFLOW_RECORD") ||
+      DEFAULT_WORKFLOW_RECORD_PATH;
+    const p = path.isAbsolute(rel) ? rel : path.join(root, rel);
+    if (!fs.existsSync(p)) return {};
+    const parsed = JSON.parse(fs.readFileSync(p, "utf-8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+// Opt-in duration logged ONLY to satisfy a workflow validator that demands
+// time spent (see transitionToStatus). Never invented: absent this setting the
+// transition fails the way it always did.
+function loadWorklogTimeSpent(repoRoot) {
+  return loadJiraScalarSetting(
+    repoRoot,
+    "worklogTimeSpent",
+    "JIRA_WORKLOG_TIME_SPENT",
+  );
+}
+
+// Resolve one pipeline stage against the record, most specific layer winning:
+//   record.byIssueType[<live Jira issue type>] > record.stages > DEFAULT_STAGE_MAP
+//
+// Keyed on the LIVE Jira issue type name ("IT / DevOps Task"), not the docKind
+// ("task") that loadStatusMap uses. One board routinely gives several task
+// types genuinely different workflows — RAPP has six across three — and a
+// story|task|epic layer cannot express that.
+function resolveStage({ stage, issueType, record } = {}) {
+  const key = String(stage || "")
+    .trim()
+    .toLowerCase();
+  const base = DEFAULT_STAGE_MAP[key];
+  if (!base) return { known: false, stage: key };
+
+  const rec = record || {};
+  const layers = [rec.stages && rec.stages[key]];
+  if (issueType) {
+    const byType = rec.byIssueType || {};
+    const hit =
+      byType[issueType] ||
+      byType[
+        Object.keys(byType).find(
+          (k) => k.toLowerCase() === String(issueType).toLowerCase(),
+        )
+      ];
+    if (hit) layers.push(hit[key]);
+  }
+
+  let enabled = base.defaultEnabled;
+  let candidates = base.candidates.slice();
+  let rank = base.rank;
+  let reason = "";
+  for (const layer of layers) {
+    if (!layer || typeof layer !== "object") continue;
+    if (typeof layer.enabled === "boolean") enabled = layer.enabled;
+    if (Array.isArray(layer.candidates) && layer.candidates.length)
+      candidates = layer.candidates.slice();
+    if (layer.rank !== undefined) rank = layer.rank;
+    if (layer.reason) reason = String(layer.reason);
+  }
+
+  return {
+    known: true,
+    stage: key,
+    enabled,
+    candidates,
+    rank,
+    reason,
+    terminal: !!base.terminal,
+  };
+}
+
+// Rank a status name for the monotonicity guard. The record's statusRank wins;
+// otherwise fall back to the ranks implied by the default candidate lists.
+// Unknown -> null, which the guard reads as "no opinion, allow".
+function resolveStatusRank(statusName, record) {
+  const name = stripStatusEmoji(statusName).toLowerCase();
+  if (!name) return null;
+  const fromRecord = (record || {}).statusRank;
+  if (fromRecord && typeof fromRecord === "object") {
+    for (const [k, v] of Object.entries(fromRecord)) {
+      if (k.toLowerCase() === name) return v == null ? null : Number(v);
+    }
+  }
+  const d = DEFAULT_STATUS_RANK[name];
+  return d == null ? null : d;
+}
+
 // Resolution names used when a workflow's done/cancelled transition requires a
 // `resolution` field. Optional: left unset, buildTransitionFields falls back to
 // POSITIVE_RESOLUTIONS / NEGATIVE_RESOLUTIONS and then to whatever the
@@ -1893,6 +2133,28 @@ function buildTransitionFields(
   };
 }
 
+// Build the `update` verb carrying a worklog for a transition.
+//
+// A worklog is NOT a field — `{"fields":{"worklog":...}}` is rejected outright
+// ("Field does not support update 'worklog'"), which is why this cannot live in
+// buildTransitionFields. The transitions API takes it as a sibling verb:
+//   {"transition":{...},"update":{"worklog":[{"add":{"timeSpent":"1m"}}]}}
+//
+// No `comment` (API v3 wants ADF there, and a fabricated comment is worse than
+// none) and no `started` (needs a numeric-offset timestamp some instances
+// reject; Jira defaults it to now).
+function buildTransitionUpdate({ worklogTimeSpent } = {}) {
+  const t = String(worklogTimeSpent || "").trim();
+  if (!t) return null;
+  return { worklog: [{ add: { timeSpent: t } }] };
+}
+
+// A workflow VALIDATOR demanding time spent is invisible to
+// `expand=transitions.fields` — it surfaces only as a 400 on the transition
+// call. This matches that 400 so the caller can retry once with a worklog
+// attached.
+const WORKLOG_VALIDATOR_RE = /time spent|timespent|work ?log|log work/i;
+
 // Move an issue to the status implied by its local document status.
 //
 // `targetStatus` accepts either a single name (legacy callers) or the ordered
@@ -1914,6 +2176,10 @@ async function transitionToStatus({
   localStatus,
   doneResolution = "",
   cancelledResolution = "",
+  worklogTimeSpent = "",
+  minRank = null,
+  workflowRecord = null,
+  allowRegress = false,
   output,
 }) {
   const candidates = (
@@ -1932,7 +2198,12 @@ async function transitionToStatus({
   if (!current) {
     try {
       const live = await fetchIssue({
-        http, baseUrl, email, token, issueKey, fields: "status",
+        http,
+        baseUrl,
+        email,
+        token,
+        issueKey,
+        fields: "status",
       });
       current = stripStatusEmoji(live && live.status);
     } catch (_) {
@@ -1954,6 +2225,28 @@ async function transitionToStatus({
       to: current,
       from: current,
     };
+
+  // Monotonicity guard. Boards routinely offer backward transitions — RAPP
+  // offers "Waiting for merge -> In Progress" — so a resumed pipeline
+  // re-running an earlier step would happily drag a card backwards. Refuse when
+  // the caller declares the rank it is moving TO and the card already sits
+  // higher. Unranked either side means no opinion: allow.
+  if (!allowRegress && minRank != null) {
+    const currentRank = resolveStatusRank(current, workflowRecord);
+    if (currentRank != null && currentRank > minRank) {
+      if (output)
+        output.info(
+          `   ⏭️  ${issueKey} is already at "${current}" (rank ${currentRank}), past the requested rank ${minRank} — not moving it backwards.`,
+        );
+      return {
+        transitioned: false,
+        reason: "would-regress",
+        from: current,
+        currentRank,
+        minRank,
+      };
+    }
+  }
 
   const transitions = await getTransitions({
     http,
@@ -2030,12 +2323,11 @@ async function transitionToStatus({
     };
   }
 
-  const body = { transition: { id: match.id } };
-  if (fields) body.fields = fields;
-
-  const resp = await http(
-    `${baseUrl}/rest/api/3/issue/${issueKey}/transitions`,
-    {
+  const post = (update) => {
+    const body = { transition: { id: match.id } };
+    if (fields) body.fields = fields;
+    if (update) body.update = update;
+    return http(`${baseUrl}/rest/api/3/issue/${issueKey}/transitions`, {
       method: "POST",
       headers: {
         Authorization: authHeader(email, token),
@@ -2043,8 +2335,40 @@ async function transitionToStatus({
         Accept: "application/json",
       },
       body: JSON.stringify(body),
-    },
-  );
+    });
+  };
+
+  let resp = await post(null);
+  let loggedWork = false;
+
+  // Retry once, with a worklog, when the workflow turns out to have a
+  // time-spent validator and the project has opted in by naming a duration.
+  //
+  // Why retry rather than attach the worklog up front: a worklog sent to a
+  // transition whose screen has no Log Work field is REJECTED
+  // ("Field 'worklog' cannot be set. It is not on the appropriate screen"), so
+  // attaching one pre-emptively breaks transitions that would otherwise have
+  // succeeded. Observed on RAPP: two transitions succeed bare and 400 with a
+  // worklog, while three others 400 bare and succeed with one.
+  //
+  // Safe to retry because a failed validator is atomic — Jira applies nothing,
+  // including the worklog, so the first call cannot have booked time. Worklogs
+  // are cumulative and cannot be silently undone, so this fires at most once.
+  if (!resp.ok && resp.status === 400 && worklogTimeSpent) {
+    const firstMsg = await parseJiraError(resp);
+    if (WORKLOG_VALIDATOR_RE.test(firstMsg)) {
+      const update = buildTransitionUpdate({ worklogTimeSpent });
+      if (update) {
+        if (output)
+          output.info(
+            `   ⏱️  "${match.name}" needs time logged (${firstMsg}) — retrying once with ${worklogTimeSpent}.`,
+          );
+        resp = await post(update);
+        loggedWork = resp.ok;
+      }
+    }
+  }
+
   if (!resp.ok) {
     const msg = await parseJiraError(resp);
     if (output) {
@@ -2059,6 +2383,11 @@ async function transitionToStatus({
         `    If the message names a field or a worklog, that is a workflow validator the` +
           ` transitions API does not advertise; it must be satisfied in the same request.`,
       );
+      if (!worklogTimeSpent && WORKLOG_VALIDATOR_RE.test(msg))
+        output.warn(
+          `    This one wants time logged. Set jira.worklogTimeSpent (e.g. "1m") in` +
+            ` skills-config.yaml to let the sync satisfy it in the same request.`,
+        );
     }
     return {
       transitioned: false,
@@ -2071,9 +2400,10 @@ async function transitionToStatus({
   const landed = (match.to && match.to.name) || match.name;
   if (output)
     output.info(
-      `   🔀 Transitioned ${issueKey}: "${current}" → "${landed}" (matched ${rule})`,
+      `   🔀 Transitioned ${issueKey}: "${current}" → "${landed}" (matched ${rule})` +
+        (loggedWork ? ` [logged ${worklogTimeSpent}]` : ""),
     );
-  return { transitioned: true, from: current, to: landed, rule };
+  return { transitioned: true, from: current, to: landed, rule, loggedWork };
 }
 
 // Drive an issue's Jira status from a local document's frontmatter status.
@@ -2120,6 +2450,7 @@ async function syncDocumentStatus({
     localStatus,
     doneResolution: loadDoneResolution(root || undefined),
     cancelledResolution: loadCancelledResolution(root || undefined),
+    worklogTimeSpent: loadWorklogTimeSpent(root || undefined),
     output,
   });
   return { ...res, localStatus, issueKey };
@@ -2174,6 +2505,7 @@ async function probeWorkflow({
   issueKey,
   repoRoot,
   docKind,
+  writePath = "",
   output,
 }) {
   const log = (s) => output && output.info(s);
@@ -2245,7 +2577,9 @@ async function probeWorkflow({
   }
 
   const statusMap = loadStatusMap(repoRoot, docKind);
+  const workflowRecord = loadWorkflowRecord(repoRoot);
   const results = [];
+  const stageResults = [];
 
   for (const s of samples) {
     let transitions = [];
@@ -2305,14 +2639,120 @@ async function probeWorkflow({
         unfillable: built.unfillable,
       });
     }
+
+    // The develop pipeline moves through STAGES, not document statuses. They
+    // overlap but are not the same list, and a stage disabled for this issue
+    // type is a different answer from a stage the board cannot reach — print
+    // both so an operator can tell them apart.
+    log(`     Pipeline stage → what /develop-* would do:`);
+    for (const stage of STAGE_NAMES) {
+      const spec = resolveStage({
+        stage,
+        issueType: s.type,
+        record: workflowRecord,
+      });
+      if (!spec.enabled) {
+        log(
+          `       ${stage.padEnd(22)} disabled${spec.reason ? ` (${spec.reason})` : ""}`,
+        );
+        stageResults.push({ issue: s.key, stage, action: "disabled" });
+        continue;
+      }
+      const r = resolveTransition({
+        transitions,
+        candidates: spec.candidates,
+        currentStatus: s.status,
+        terminal: spec.terminal,
+      });
+      if (!r.match) {
+        log(`       ${stage.padEnd(22)} skip (${r.reason})`);
+        stageResults.push({ issue: s.key, stage, action: `skip:${r.reason}` });
+        continue;
+      }
+      const built = buildTransitionFields(r.match, { negative: false });
+      const extra = built.unfillable.length
+        ? `  UNFILLABLE: ${built.unfillable.join(", ")}`
+        : built.fields
+          ? `  + ${JSON.stringify(built.fields)}`
+          : "";
+      log(
+        `       ${stage.padEnd(22)} → "${(r.match.to && r.match.to.name) || r.match.name}"` +
+          ` (via ${r.rule})${extra}`,
+      );
+      stageResults.push({
+        issue: s.key,
+        stage,
+        to: r.match.to && r.match.to.name,
+        rule: r.rule,
+      });
+    }
   }
 
   log(
-    `\n   Candidate names come from jira.statusMap in skills-config.yaml, overlaid on the defaults.` +
+    `\n   Candidate names come from jira.statusMap / the workflow record, overlaid on the defaults.` +
       `\n   A "skip" above means this board has no transition for that stage from that position — which is` +
-      `\n   often correct. Only add a statusMap entry when a stage you actually use is being skipped.\n`,
+      `\n   often correct. "disabled" means the record opts this issue type out deliberately.` +
+      `\n   Only add an override when a stage you actually use is being skipped.\n`,
   );
-  return { types, samples, results };
+
+  if (writePath) {
+    const record = buildWorkflowRecord({
+      projectKey,
+      baseUrl,
+      types,
+      samples,
+      existing: workflowRecord,
+    });
+    fs.mkdirSync(path.dirname(writePath), { recursive: true });
+    fs.writeFileSync(writePath, JSON.stringify(record, null, 2) + "\n");
+    log(`   📝 Wrote workflow record → ${writePath}`);
+  }
+
+  return { types, samples, results, stageResults };
+}
+
+// Assemble the machine-readable record from what the probe just observed,
+// preserving any hand-authored intent (enabled/reason/worklog/statusRank) in an
+// existing file. Regenerating must never silently discard the decisions a human
+// made about which stages this board should drive.
+function buildWorkflowRecord({
+  projectKey,
+  baseUrl,
+  types,
+  existing = {},
+} = {}) {
+  const stages = {};
+  for (const stage of STAGE_NAMES) {
+    const spec = resolveStage({ stage, record: existing });
+    stages[stage] = {
+      enabled: spec.enabled,
+      rank: spec.rank,
+      candidates: spec.candidates,
+    };
+    if (spec.terminal) stages[stage].terminal = true;
+    if (spec.reason) stages[stage].reason = spec.reason;
+  }
+  return {
+    version: 1,
+    project: projectKey,
+    site: (() => {
+      try {
+        return new URL(baseUrl).hostname;
+      } catch (_) {
+        return baseUrl || "";
+      }
+    })(),
+    ...(existing.verifiedAt ? { verifiedAt: existing.verifiedAt } : {}),
+    ...(existing.board ? { board: existing.board } : {}),
+    statusesByIssueType: (types || []).reduce((acc, t) => {
+      acc[t.name] = (t.statuses || []).map((s) => s.name);
+      return acc;
+    }, {}),
+    ...(existing.worklog ? { worklog: existing.worklog } : {}),
+    ...(existing.statusRank ? { statusRank: existing.statusRank } : {}),
+    stages,
+    ...(existing.byIssueType ? { byIssueType: existing.byIssueType } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -2627,8 +3067,20 @@ module.exports = {
   getTransitions,
   resolveTransition,
   buildTransitionFields,
+  buildTransitionUpdate,
+  buildWorkflowRecord,
+  WORKLOG_VALIDATOR_RE,
   stripStatusEmoji,
   detectProjectStyle,
+  // pipeline stages
+  DEFAULT_STAGE_MAP,
+  STAGE_NAMES,
+  DEFAULT_STATUS_RANK,
+  DEFAULT_WORKFLOW_RECORD_PATH,
+  loadWorkflowRecord,
+  loadWorklogTimeSpent,
+  resolveStage,
+  resolveStatusRank,
   // status mapping
   DEFAULT_STATUS_MAP,
   loadStatusMap,

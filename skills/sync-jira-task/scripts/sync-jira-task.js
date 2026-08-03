@@ -266,6 +266,7 @@ function parseArgs(argv) {
     dryRun: false, force: false, json: false, quiet: false,
     failOnStatusSkip: false,
     probeWorkflow: false,
+    writeRecord: "",
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -280,6 +281,7 @@ function parseArgs(argv) {
       case "--quiet":    opts.quiet  = true; break;
       case "--fail-on-status-skip": opts.failOnStatusSkip = true; break;
       case "--probe-workflow":      opts.probeWorkflow    = true; break;
+      case "--write-record": opts.writeRecord = args[++i]; break;
       default:
         if (args[i].startsWith("-")) throw new Error(`Unknown option: ${args[i]}`);
     }
@@ -304,7 +306,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
     await lib.probeWorkflow({
       http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      projectKey: auth.project, docKind: "task", output,
+      projectKey: auth.project, docKind: "task", writePath: args.writeRecord, output,
     });
     return { exitCode: 0 };
   }
