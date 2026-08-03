@@ -22,14 +22,24 @@ const path = require("path");
 const crypto = require("crypto");
 const { execSync } = require("child_process");
 
+// Every `git rev-parse` below sits inside a try/catch that reads a failure as
+// "not in a repo, fall back to defaults". Without "ignore" on stderr that
+// silent fallback prints a `fatal: not a git repository` line per call, which
+// looks like a broken tool in pipeline output.
+const GIT_EXEC_OPTS = {
+  encoding: "utf-8",
+  stdio: ["ignore", "pipe", "ignore"],
+};
+
 // ---------------------------------------------------------------------------
 // .env loader
 // ---------------------------------------------------------------------------
 function loadDotEnv() {
   try {
-    const root = execSync("git rev-parse --show-toplevel", {
-      encoding: "utf-8",
-    }).trim();
+    const root = execSync(
+      "git rev-parse --show-toplevel",
+      GIT_EXEC_OPTS,
+    ).trim();
     let envPath = path.join(root, ".env");
     // Inside a linked worktree, --show-toplevel is the WORKTREE root. `.env` is
     // gitignored and `git worktree add` copies no ignored files, so a worktree
@@ -39,9 +49,7 @@ function loadDotEnv() {
     if (!fs.existsSync(envPath)) {
       const commonDir = execSync(
         "git rev-parse --path-format=absolute --git-common-dir",
-        {
-          encoding: "utf-8",
-        },
+        GIT_EXEC_OPTS,
       ).trim();
       envPath = path.join(path.dirname(commonDir), ".env");
     }
@@ -261,9 +269,7 @@ function rewriteFrontmatter(content, mutator) {
 // ---------------------------------------------------------------------------
 function getRepoRoot() {
   try {
-    return execSync("git rev-parse --show-toplevel", {
-      encoding: "utf-8",
-    }).trim();
+    return execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
   } catch (_) {
     return process.cwd();
   }
@@ -1663,7 +1669,7 @@ function loadStatusMap(repoRoot, issueType) {
   try {
     const root =
       repoRoot ||
-      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+      execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
     const cfgPath = path.join(root, "skills-config.yaml");
     if (!fs.existsSync(cfgPath)) return map;
     const { base, byType } = parseStatusMapBlock(
@@ -1763,7 +1769,7 @@ function loadDevEstimateField(repoRoot) {
   try {
     const root =
       repoRoot ||
-      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+      execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
     const cfgPath = path.join(root, "skills-config.yaml");
     if (!fs.existsSync(cfgPath)) return "";
     return parseJiraScalar(
@@ -1784,7 +1790,7 @@ function loadJiraScalarSetting(repoRoot, key, envVar) {
   try {
     const root =
       repoRoot ||
-      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+      execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
     const cfgPath = path.join(root, "skills-config.yaml");
     if (!fs.existsSync(cfgPath)) return "";
     return parseJiraScalar(fs.readFileSync(cfgPath, "utf-8"), key);
@@ -1816,7 +1822,7 @@ function loadWorkflowRecord(repoRoot) {
   try {
     const root =
       repoRoot ||
-      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+      execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
     const rel =
       loadJiraScalarSetting(root, "workflowRecord", "JIRA_WORKFLOW_RECORD") ||
       DEFAULT_WORKFLOW_RECORD_PATH;
@@ -1964,7 +1970,7 @@ function loadDefaultAssignee(repoRoot) {
   try {
     const root =
       repoRoot ||
-      execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+      execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
     const cfgPath = path.join(root, "skills-config.yaml");
     if (!fs.existsSync(cfgPath)) return "";
     return parseJiraScalar(
@@ -2427,9 +2433,7 @@ async function syncDocumentStatus({
     repoRoot ||
     (() => {
       try {
-        return execSync("git rev-parse --show-toplevel", {
-          encoding: "utf-8",
-        }).trim();
+        return execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
       } catch (_) {
         return "";
       }
@@ -2933,6 +2937,10 @@ async function fetchIssue({
     labels: d.fields?.labels || [],
     updated: d.fields?.updated || null,
     status: d.fields?.status?.name || null,
+    // Only populated when the caller asks for `issuetype` in `fields`. Stage
+    // resolution keys on the live type name because one board commonly gives
+    // several task types genuinely different workflows.
+    issueType: d.fields?.issuetype?.name || "",
   };
 }
 
