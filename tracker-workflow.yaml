@@ -1,0 +1,44 @@
+# tracker-workflow.yaml — this repo's own board, dogfooded.
+#
+# Schema and worked examples: docs/reference/tracker-workflow.md
+# Annotated starter template:  docs/examples/tracker-workflow.default.yaml
+#
+# The "Agent Skills" GitHub project board (project.yml → project_board_number: 1)
+# has exactly three columns. That is not a simplification for the example's sake —
+# it is the whole board, which makes this a useful demonstration that the format
+# scales down as readily as it scales up.
+#
+# DELIBERATELY UNWIRED. Nothing reads this file yet: task.37 ships the format and
+# the engine, task.38/39 add tracker execution, task.40 wires the step files. It
+# is here so the format is exercised against a real board from the day it lands,
+# and so the parser has a committed non-synthetic fixture.
+
+# The ladder, in board order. Order IS the workflow: a rung's index is its rank,
+# and the rungs between two positions are the path from one to the other.
+statuses:
+  - Todo
+  - In Progress
+  - Done
+
+# Which status each pipeline moment targets. Omit a moment to disable it.
+# A status named here but absent from `statuses` above is an off-ladder
+# side-state — entered directly, never walked to.
+pipeline:
+  work-started: In Progress
+  done: Done
+  # in-review, in-qa and ready-for-merge are omitted on purpose: this board has
+  # no column for any of them, and omission is how the format spells "off".
+  # Adding a "Ready for Review" column here would be a one-line change in each
+  # of the two blocks above.
+
+# Local document status -> board status, for /sync-github-*.
+# The lifecycle is the one in shared/resources/document-status-lifecycle.md;
+# this board collapses its seven states onto three columns.
+documentStatus:
+  draft: Todo
+  planned: Todo
+  ready-for-development: Todo
+  in-progress: In Progress
+  ready-for-review: In Progress
+  accepted: Done
+  cancelled: Done
