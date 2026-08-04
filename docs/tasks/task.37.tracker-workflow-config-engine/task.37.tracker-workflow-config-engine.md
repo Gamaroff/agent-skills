@@ -886,6 +886,44 @@ name, and `validateWorkflow`'s unreachable `rankOf` re-check is gone.
 Suite: **832 → 836** (4 new tests, including both boundaries: an unusable overlay must inherit
 nothing, and a genuinely inherited miss must still warn).
 
+### QA cycle 4 — fixes applied 2026-08-04
+
+Gate 4 was the only **FAIL** of the run, and the finding count went *down* — which is the point worth
+recording. CR-7's cycle-3 fix silenced the spurious warning by keying on "this moment has no
+`DEFAULT_RUNG_FOR_MOMENT` entry" when the intent was "this moment is a deliberate side-state". Those
+are different predicates, and the gap between them is exactly `changes-requested`, `pr-merged` and
+`blocked` **when their base target is genuinely on the base ladder**:
+
+```
+pipeline.changes-requested: In Review     ← on the base ladder
+byIssueType."Ops Request".statuses:       ← omits In Review
+
+resolveMoment(...) -> offLadder true;  validateWorkflow warns: []   ← warned correctly one commit earlier
+```
+
+A false negative in the validator is the most serious failure mode this module has: the validator is
+the only thing between a misconfigured overlay and a silently wrong board move, and its silence reads
+as approval. Hence HIGH where the original CR-5 was MEDIUM, and FAIL rather than CONCERNS.
+
+**CR-9 (medium)** came with it: `fromOverlay` meant "did the overlay supply rungs?" rather than "is
+the ladder in play different?", so an overlay *restating the base ladder verbatim* still marked base
+targets inherited and rerouted an authored one. Same invariant as CR-6, a third route to it.
+
+Fixed, and then the structure that kept regenerating these was removed:
+
+- The per-type guard now skips only when the **base resolution is itself off-ladder** — the actual
+  discriminator, needing no per-moment table.
+- `fromOverlay` is true only when the overlay's rungs **differ** from the base ladder's (`sameLadder`
+  compares normalised name lists).
+- **One `rankIn(ladder, status)` replaces three byte-identical scans** in `rankOf`, `describeTarget`
+  and `planMove` — the duplication that produced a finding in each of cycles 2, 3 and 4.
+- `resolveMoment` resolves the ladder **once** and threads `{ ladder, fromOverlay }` into
+  `describeTarget`, instead of three overlay lookups and two rebuilds per moment. `isInherited` is
+  deleted rather than left dead; its rule is stated where it is now applied.
+
+Suite: **836 → 840**, including a test that asserts the three former scan sites agree on emoji-,
+case- and whitespace-awkward inputs rather than trusting they still match by inspection.
+
 ### Deferred work
 
 None within scope. Two things are deliberately left for later tasks, both as specified: the engine is

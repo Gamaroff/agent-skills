@@ -719,6 +719,110 @@ byIssueType:
   );
 });
 
+test("CR-8 — an overlay restating the base ladder inherits nothing", () => {
+  // `fromOverlay` once meant "the overlay supplied rungs" rather than "the ladder
+  // in play differs". A redundant overlay therefore marked base targets inherited
+  // and alias-rerouted an authored one — the same invariant as CR-6, reached by a
+  // different route.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Closed
+
+pipeline:
+  done: Ready for Showcase
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - In Progress
+      - Closed
+`);
+  assert.deepEqual(
+    resolveMoment("done", wf, { issueType: "Ops Request" }),
+    resolveMoment("done", wf),
+    "the overlay restates the base ladder, so nothing about this type is different",
+  );
+  assert.equal(resolveMoment("done", wf, { issueType: "Ops Request" }).offLadder, true);
+});
+
+test("CR-9 — a moment with no default rung still warns when its base target IS on-ladder", () => {
+  // The cycle-3 guard keyed on "has no DEFAULT_RUNG_FOR_MOMENT entry", which also
+  // silenced `changes-requested` and `pr-merged` when their base target was on the
+  // base ladder and genuinely missing from a type's — the very miss the warning
+  // exists to report. The discriminator is whether the BASE resolution is
+  // off-ladder, not whether the moment has a default rung.
+  const wf = fromYaml(`
+statuses:
+  - Backlog
+  - In Progress
+  - In Review
+  - Done
+
+pipeline:
+  changes-requested: In Review
+  done: Done
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - Backlog
+      - In Progress
+      - Done
+`);
+  assert.ok(
+    validateWorkflow(wf).some(
+      (w) =>
+        w.level === "warn" &&
+        /changes-requested.*Ops Request.*inherits the base target "In Review"/.test(w.message),
+    ),
+    "'In Review' is on the base ladder and absent from this type's — that is a real miss",
+  );
+});
+
+test("CR-9 — and a by-design side-state still stays quiet", () => {
+  // The other side of the same boundary: `blocked: Blocked` is off-ladder for the
+  // base too, so there is nothing type-specific to report.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Done
+
+pipeline:
+  blocked: Blocked
+  done: Done
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - In Progress
+      - Closed
+`);
+  const warns = validateWorkflow(wf).filter((w) => w.level === "warn");
+  assert.ok(!warns.some((w) => /blocked/.test(w.message)), "no warning about a deliberate side-state");
+});
+
+test("CR-10 — one ladder scan serves rankOf, resolveMoment and planMove", () => {
+  // Three byte-identical copies of the scan existed at one point, which is how
+  // emoji/case/whitespace handling drifts apart. Assert they agree on the awkward
+  // inputs rather than trusting that they still match by inspection.
+  const wf = fromYaml(BESPOKE);
+  for (const probe of ["🚧 In Progress", "  in progress  ", "IN PROGRESS"]) {
+    assert.equal(rankOf(probe, wf), 2, `rankOf mishandled ${JSON.stringify(probe)}`);
+    assert.deepEqual(
+      planMove(probe, "Done", wf).map((r) => r.names[0]),
+      ["Waiting for Review", "Ready for Testing", "Ready for Showcase"],
+      `planMove mishandled ${JSON.stringify(probe)}`,
+    );
+  }
+  const wf2 = fromYaml("statuses:\n  - Backlog\n  - 🚧 Doing\n  - Done\n");
+  assert.equal(
+    resolveMoment("work-started", wf2).rank,
+    1,
+    "the alias fallback must strip emoji the same way rankOf does",
+  );
+});
+
 // ── 6. documentStatus ────────────────────────────────────────────────────────
 
 test("documentStatus — maps a local status to a board status", () => {

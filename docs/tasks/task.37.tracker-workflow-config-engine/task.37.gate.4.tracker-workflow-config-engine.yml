@@ -1,0 +1,82 @@
+schema: 1
+task: "task.37.tracker-workflow-config-engine"
+task_title: "tracker-workflow.yaml — a consumer-owned status ladder the pipelines read"
+gate: FAIL
+status_reason: "CR-6 and CR-7 fixed, but the CR-7 guard was too broad and silenced genuine per-type inherited misses for the three moments with no default rung — a high-severity regression introduced by the fix itself. `fromOverlay` also still answered the wrong question for an overlay restating the base ladder."
+reviewer: "QA Engineer"
+updated: "2026-08-04T17:55:00Z"
+
+previous_gate: "task.37.gate.3.tracker-workflow-config-engine.yml"
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: "2026-08-04"
+  total_iterations: 3
+  verification_method: "Executed the module against adversarial overlay shapes; re-ran each prior reproduction; confirmed the default-ladder snapshot still derives from jira-sync.js's live constants."
+  verified:
+    - id: CR-6
+      status: closed
+      note: "resolveLadder returns {ladder, fromOverlay} from one decision; ladderFor is a thin wrapper. An unusable overlay now inherits nothing."
+    - id: CR-7
+      status: closed
+      note: "Per-type loop no longer warns about deliberate side-states — but the guard chosen was too broad; see CR-8."
+
+top_issues:
+  - id: CR-8
+    issue: "The CR-7 guard keyed on `DEFAULT_RUNG_FOR_MOMENT[moment] == null`, which also silenced genuine per-type inherited misses for `changes-requested`, `pr-merged` and `blocked`."
+    severity: high
+    finding: "Verified: a config with `pipeline.changes-requested: In Review` (on the base ladder) plus an `Ops Request` overlay omitting `In Review` warned correctly at the previous commit and emitted zero warnings after the fix, while the moment silently resolved off-ladder for that type. The guard was aimed at 'this moment is a side-state' but expressed as 'this moment has no default rung', and the two are not the same predicate."
+    suggested_action: "Skip only when the BASE resolution is itself off-ladder — that is the actual discriminator for a deliberate side-state — rather than keying on the absence of a default rung."
+    suggested_owner: dev
+  - id: CR-9
+    issue: "`fromOverlay` answered 'did the overlay supply rungs?' rather than 'is the ladder in play actually different?'"
+    severity: medium
+    finding: "Verified: an overlay restating the base ladder verbatim still marked base targets inherited, so an authored `done: Ready for Showcase` resolved to the correct off-ladder side-state for the base and was rerouted to `Closed` at rank 1 for that issue type — violating the invariant the diff's own CR-6 test asserts, reached by a different route."
+    suggested_action: "Set `fromOverlay` only when the overlay's rungs actually differ from the base ladder's, comparing normalised name lists."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 836
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
+  performance:
+    status: PASS
+    notes: "planMove fixed. The stated 'resolve once' goal is still not met on the main path: resolveMoment calls overlayFor, isInherited calls resolveLadder, describeTarget calls ladderFor which calls resolveLadder again — three overlay lookups and two full rebuilds per moment, multiplied by moments × types during validation. Advisory."
+  reliability:
+    status: FAIL
+    notes: "CR-8 is a regression introduced by the previous fix: a warning that existed and was correct now does not fire. The validator is the only thing standing between a misconfigured overlay and a silently wrong board move, so a false negative in it is worse than the original finding it was fixing."
+  maintainability:
+    status: CONCERNS
+    notes: "Three byte-identical copies of the ladder scan now exist (rankOf, describeTarget, planMove). They currently agree, so this is duplication risk rather than live divergence — but every finding in cycles 2, 3 and 4 has been one truth computed in two places, and this is the same shape again."
+
+recommendations:
+  immediate:
+    - action: "Replace the no-default-rung guard with 'skip when the base resolution is off-ladder' (CR-8)"
+      refs: ["shared/resources/tracker-workflow.js"]
+    - action: "Make `fromOverlay` mean 'the ladder differs', comparing normalised name lists (CR-9)"
+      refs: ["shared/resources/tracker-workflow.js"]
+  future:
+    - action: "Extract one `rankIn(ladder, status)` helper used by rankOf, describeTarget and planMove"
+      refs: ["shared/resources/tracker-workflow.js"]
+    - action: "Resolve the ladder once in resolveMoment and thread {ladder, fromOverlay} down"
+      refs: ["shared/resources/tracker-workflow.js"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "CR-8 fixed — a validator false negative is the worst failure mode available to this module"
+    - "CR-9 fixed — an authored target must resolve identically wherever the ladder is identical"
