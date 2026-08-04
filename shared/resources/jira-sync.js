@@ -1324,6 +1324,28 @@ const READY_CANDIDATES = Object.freeze([
   "Ready for Development",
   "Selected for Development",
 ]);
+// The `ready-for-development` lifecycle stage. Boards split two ways on it:
+// some fold it into the backlog column ("To Do"), others give it a dedicated
+// column spelled exactly like the status. Binding the stage to NEW_CANDIDATES
+// alone covered only the first kind, so a board whose column is named
+// "Ready for Development" matched nothing and the transition was silently
+// skipped — the most literal possible spelling of the status was the one
+// spelling that did not work (bug.1).
+//
+// Derived from both lists rather than hand-written so a future edit to either
+// propagates here, and deduped because NEW_CANDIDATES and READY_CANDIDATES
+// share "Selected for Development".
+//
+// Order is the whole safety argument: the dedicated names are APPENDED, never
+// prepended. Candidate matching is ordered and exact (see resolveTransition),
+// so every board that resolves to "To Do"/"Backlog"/"Open"/"New" today keeps
+// that exact destination, and only a board with none of them reaches the
+// "Ready*" names. Prepending would silently relocate cards on boards that work
+// correctly today — a second silent-transition bug in the process of fixing
+// the first.
+const READY_FOR_DEVELOPMENT_CANDIDATES = Object.freeze([
+  ...new Set([...NEW_CANDIDATES, ...READY_CANDIDATES]),
+]);
 const QA_CANDIDATES = Object.freeze([
   "Testing",
   "Ready for Testing",
@@ -1418,13 +1440,17 @@ const DEFAULT_STATUS_MAP = {
   // canonical lifecycle
   draft: NEW_CANDIDATES,
   planned: NEW_CANDIDATES,
-  "ready-for-development": NEW_CANDIDATES,
+  "ready-for-development": READY_FOR_DEVELOPMENT_CANDIDATES,
   "in-progress": IN_PROGRESS_CANDIDATES,
   "ready-for-review": REVIEW_CANDIDATES,
   accepted: DONE_CANDIDATES,
   cancelled: CANCELLED_CANDIDATES,
   // aliases
-  "ready for development": NEW_CANDIDATES,
+  // Must stay bound to the same list as the canonical "ready-for-development"
+  // key above — two spellings of one status resolving differently is a worse
+  // failure than both being wrong, because it is inconsistent rather than
+  // uniformly wrong.
+  "ready for development": READY_FOR_DEVELOPMENT_CANDIDATES,
   todo: NEW_CANDIDATES,
   "to do": NEW_CANDIDATES,
   open: NEW_CANDIDATES,

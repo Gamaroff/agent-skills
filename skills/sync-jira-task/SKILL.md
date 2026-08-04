@@ -189,7 +189,8 @@ Frontmatter `status` is normalised by stripping emoji and lower-casing, then res
 
 | Local status | Candidates, tried in order |
 |---|---|
-| `draft`, `planned`, `ready-for-development` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development` |
+| `draft`, `planned` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development` |
+| `ready-for-development` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development`, `Ready`, `Ready for Development` |
 | `in-progress` | `In Progress`, `Doing`, `Started`, `Development` |
 | `ready-for-review` | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review` |
 | `accepted` | `Done`, `Closed`, `Resolved`, `Complete`, `Completed` |
