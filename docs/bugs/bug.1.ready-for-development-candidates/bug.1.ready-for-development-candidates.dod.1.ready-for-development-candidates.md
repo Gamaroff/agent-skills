@@ -98,6 +98,11 @@ running `CheckRun` from a finished one, rather than rounding an empty `conclusio
 Verified green on the **exact head commit**, not an ancestor:
 PR head `cd43e48e8c9c0c5f61f2fa5ec17ce1e0804fcc14` == local HEAD `cd43e48e8c9c0c5f61f2fa5ec17ce1e0804fcc14`.
 
+**Post-close confirmation.** The Step 8 terminal commit `315254c` (this DoD file, the implementation
+report, and the registry row — documentation only, no code) moved the PR head afterwards. Its rollup
+was re-sampled rather than assumed, and resolved `PENDING → SUCCESS` with all three jobs green. So
+the PR is green on its final head as well as on the commit that carried the code.
+
 ### 5. No new security surface ✅ (NOT_APPLICABLE in substance)
 
 The change adds string literals to an in-memory candidate list. No new input parsing, no network
