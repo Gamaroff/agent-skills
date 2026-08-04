@@ -77,6 +77,10 @@ also matches local `HEAD`, so the green is about *this* code and not an ancestor
 | `validate` | COMPLETED | SUCCESS |
 | `link-check` | COMPLETED | SUCCESS |
 
+**Re-sampled after the terminal documentation commit** (`341ad55`), so the recorded green describes
+the branch as it actually stands rather than an ancestor: `test`, `validate` and `link-check` all
+COMPLETED/SUCCESS on `341ad55` as well. Both the code head and the final head are green.
+
 ### Success Criteria (§9)
 
 **Functional — 7/7 ✅**
