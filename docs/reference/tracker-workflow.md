@@ -371,25 +371,36 @@ console.log(validateWorkflow(wf)); // [{ level, message }, …]
 errors. An off-ladder pipeline target is reported as `info`, not an error — declaring a side-state is
 a legitimate pattern rather than a mistake.
 
-One case sits between the two, and is reported as `warn`: you declared `statuses:` but no
-`pipeline:`, and one of the built-in default moments does not match any rung on your ladder. Nobody
-chose that target, so it is almost certainly a gap rather than a deliberate side-state:
+Two cases sit between the two and are reported as `warn`. Both are the same thing: a target **nobody
+chose for the ladder it is being resolved against**.
+
+1. You declared `statuses:` but no `pipeline:`, and a default moment matches no rung on your ladder.
+2. A `byIssueType` overlay replaced `statuses:` for a type, and a moment it did not re-declare
+   inherits a base target that type's ladder does not have:
+
+   ```
+   warn: `in-qa` for issue type "Ops Request" inherits the base target "Ready for Testing", which
+         is not on that type's ladder — declare it under `byIssueType."Ops Request".pipeline`, or
+         set it to `~` to disable it for this type
+   ```
+
+### Inherited targets and aliases
+
+Most boards need no `pipeline:` block at all. An **inherited** target — one from the built-in default,
+or from the base pipeline applied to an overlay-replaced ladder — is matched against your ladder by
+name, and if that misses, against the other historical names on the same rung. So all of these wire
+`work-started` correctly with nothing written:
 
 ```yaml
-statuses:
-  - Backlog
-  - Doing # ← your board says "Doing"; the default moment targets "In Progress"
-  - Shipped
+statuses: [Backlog, In Progress, Done] # "In Progress" — direct match
+statuses: [Backlog, Doing, Done] # "Doing"       — alias on the same rung
+statuses: [Backlog, Development, Done] # "Development" — alias on the same rung
 ```
 
-```
-warn: `work-started` falls back to the built-in default target "In Progress", which is not on
-      this ladder — declare a `pipeline:` block naming the status this board actually uses…
-```
-
-Boards using conventional column names need no `pipeline:` block at all: the defaults resolve **by
-name** against whatever ladder you declare, so a four-rung `Backlog / In Progress / In Review / Done`
-board gets all three default moments wired correctly with nothing further to write.
+**An authored target never takes this path.** If you write `done: Ready for Showcase` on a board that
+also has a `Closed` column, it resolves to Showcase or to nothing — an explicit choice is never
+silently rerouted through an alias list. That is the difference between a target you chose and one
+you inherited, and it is the whole reason the two behave differently.
 
 ---
 

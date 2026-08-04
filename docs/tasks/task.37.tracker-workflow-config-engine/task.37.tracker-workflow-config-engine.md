@@ -820,6 +820,44 @@ asserted equal modulo the generated header.
 
 Suite: **816 → 825** (9 new tests, all regression guards for the above). `npm run bundle` clean.
 
+### QA cycle 2 — fixes applied 2026-08-04
+
+Gate 2 verified all four cycle-1 fixes as correct (not merely present — the resolved candidate lists
+were diffed against `jira-sync.js`'s constants and the CR-1 reproduction re-run), and moved the score
+80 → 90 with Maintainability upgraded to PASS. It found one further finding, in the same class.
+
+**CR-5 (medium, gating) — an overlay type inherited base targets its own ladder lacks.**
+`byIssueType.<type>.statuses` **replaces** the ladder for that type, but
+`byIssueType.<type>.pipeline` only overrides the moments it names. Every other moment kept a base
+target chosen against the *base* ladder. Reproduced: for `IT / DevOps Task`, `in-review` resolved to
+`Waiting for Review` with `offLadder: true` — a column that type's workflow does not have — and
+`validateWorkflow` said nothing, because its `byIssueType` loop only inspected moments the overlay
+itself declared.
+
+This is CR-1 one level down, and it got the same treatment: name the concept rather than patch the
+symptom. A target is now **inherited** when it comes from the built-in default *or* from a base
+pipeline applied to an overlay-replaced ladder; an inherited miss resolves against the corresponding
+`DEFAULT_LADDER` rung's full alias list before falling back to off-ladder, and `validateWorkflow`
+checks every inherited moment against each per-type ladder.
+
+Two things fall out of that one concept:
+
+- **The alias gap closes too** (the cycle-2 advisory finding). A board spelled
+  `Backlog / Doing / Review / Done` — all legitimate default-rung aliases — now wires all three
+  default moments with no `pipeline:` block at all, where before `work-started` missed and became a
+  side-state.
+- **Authored targets are explicitly excluded.** `done: Ready for Showcase` on a board that also has
+  `Closed` still resolves to Showcase or to nothing. Rerouting an explicit choice through an alias
+  list would be a worse failure than the miss, and a test pins the boundary in both the base and
+  overlay cases.
+
+Three cleanups from the same gate: the `catch` around the overlay deep-copy was **removed** rather
+than kept (it would have converted an impossible error into the total silent loss of every overlay —
+`loadWorkflow`'s own catch is the honest place for that); `planMove` now resolves its ladder once
+instead of three times; and a dead `void readFileSync` left over from cycle 1's test additions is gone.
+
+Suite: **825 → 832** (7 new tests). `npm run bundle` clean.
+
 ### Deferred work
 
 None within scope. Two things are deliberately left for later tasks, both as specified: the engine is

@@ -499,6 +499,132 @@ test("overlay — planMove walks the overlaid ladder for that type", () => {
   assert.deepEqual(hops.map((r) => r.names[0]), ["In Review"]);
 });
 
+// ── 5b. QA CR-5: inherited targets resolved against the ladder in play ───────
+//
+// The same defect class as CR-1, one level down. An overlay REPLACES `statuses:`
+// for a type but only overrides the moments its own `pipeline:` names, so every
+// other moment kept a base target chosen against the BASE ladder — a ladder that
+// type does not use. It resolved to a silent off-ladder side-state, and
+// validateWorkflow's byIssueType loop never looked at inherited moments at all.
+
+test("CR-5 — an overlay type resolves an inherited moment against its OWN ladder", () => {
+  const wf = fromYaml(OVERLAY);
+  const t = { issueType: "IT / DevOps Task" };
+  const r = resolveMoment("in-review", wf, t);
+
+  assert.equal(
+    r.offLadder,
+    false,
+    "'Waiting for Review' is a BASE-ladder column; this type's board has 'In Review'. " +
+      "Handing a tracker executor a column the type does not have is the CR-1 failure again.",
+  );
+  assert.equal(r.rank, 2, "rank must follow the overlay ladder");
+  assert.deepEqual(r.targets, ["In Review"]);
+});
+
+test("CR-5 — the base ladder is unaffected for every other type", () => {
+  const wf = fromYaml(OVERLAY);
+  const base = resolveMoment("in-review", wf);
+  assert.deepEqual(base.targets, ["Waiting for Review"]);
+  assert.equal(base.rank, 2);
+});
+
+test("CR-5 — validateWorkflow warns when an inherited moment misses a type's ladder", () => {
+  // A type whose ladder shares no alias with the inherited target: nothing can
+  // resolve it, so the author must be told.
+  const wf = fromYaml(`
+statuses:
+  - Backlog
+  - In Progress
+  - Ready for Testing
+  - Done
+
+pipeline:
+  work-started: In Progress
+  in-qa: Ready for Testing
+  done: Done
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - Backlog
+      - In Progress
+      - Done
+`);
+  const warns = validateWorkflow(wf).filter((w) => w.level === "warn");
+  assert.ok(
+    warns.some((w) => /in-qa.*Ops Request.*inherits the base target/.test(w.message)),
+    `expected a warn naming the inherited moment; got: ${JSON.stringify(warns)}`,
+  );
+  assert.ok(
+    warns.some((w) => /set it to `~` to disable it for this type/.test(w.message)),
+    "and it must name both fixes",
+  );
+});
+
+test("CR-5 — an inherited miss falls back to the default rung's aliases", () => {
+  // A board spelled with legitimate DEFAULT_LADDER aliases needs no `pipeline:`
+  // block at all. Before this, `work-started` targeted the single name
+  // "In Progress", missed, and became a side-state.
+  const wf = fromYaml("statuses:\n  - Backlog\n  - Doing\n  - Review\n  - Done\n");
+  const ws = resolveMoment("work-started", wf);
+  assert.equal(ws.offLadder, false, "'Doing' is an alias on the same default rung as 'In Progress'");
+  assert.equal(ws.rank, 1);
+  assert.deepEqual(ws.targets, ["Doing"]);
+
+  const ir = resolveMoment("in-review", wf);
+  assert.equal(ir.rank, 2, "'Review' is an alias on the in-review rung");
+  assert.equal(resolveMoment("done", wf).rank, 3);
+
+  assert.deepEqual(
+    validateWorkflow(wf).filter((w) => w.level === "warn"),
+    [],
+    "a board that resolves cleanly through aliases must not be warned at",
+  );
+});
+
+test("CR-5 — an AUTHORED target that misses is still a side-state, never alias-resolved", () => {
+  // The boundary that keeps the fallback honest. `done: Ready for Showcase` on a
+  // board that also has "Closed" must resolve to Showcase or not at all —
+  // rerouting an explicit choice through an alias list would be worse than a miss.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Closed
+
+pipeline:
+  done: Ready for Showcase
+`);
+  const r = resolveMoment("done", wf);
+  assert.equal(r.offLadder, true, "an explicit choice must not be silently rerouted to 'Closed'");
+  assert.deepEqual(r.targets, ["Ready for Showcase"]);
+});
+
+test("CR-5 — an overlay's own explicit target is never alias-resolved either", () => {
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Done
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - In Progress
+      - Closed
+    pipeline:
+      done: Parked
+`);
+  const r = resolveMoment("done", wf, { issueType: "Ops Request" });
+  assert.equal(r.offLadder, true);
+  assert.deepEqual(r.targets, ["Parked"]);
+});
+
+test("CR-5 — `blocked` stays off-ladder; it has no default rung to alias through", () => {
+  const wf = fromYaml("statuses:\n  - In Progress\n  - Done\npipeline:\n  blocked: Blocked\n");
+  const r = resolveMoment("blocked", wf);
+  assert.equal(r.offLadder, true, "blocked is a side-state by nature — an inherited miss is correct");
+});
+
 // ── 6. documentStatus ────────────────────────────────────────────────────────
 
 test("documentStatus — maps a local status to a board status", () => {
@@ -692,7 +818,6 @@ test("cache — the file is read once per process, not once per resolution", () 
   const root = repoWith({ "tracker-workflow.yaml": BESPOKE });
   tw.clearWorkflowCache();
 
-  const { readFileSync } = require("node:fs");
   const fsMod = require("node:fs");
   const target = join(root, "tracker-workflow.yaml");
   let reads = 0;
@@ -709,7 +834,6 @@ test("cache — the file is read once per process, not once per resolution", () 
     fsMod.readFileSync = orig;
   }
   assert.equal(reads, 1, `expected exactly one read of the workflow file, saw ${reads}`);
-  void readFileSync;
 });
 
 test("cache — a cached workflow cannot be poisoned by a caller mutating it", () => {
