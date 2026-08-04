@@ -231,8 +231,9 @@ All three names rank identically, and the pipeline tries them in the order writt
 there. Use this when your board's column has been spelled differently over time, or when one config
 serves several boards.
 
-The plain-string form is sugar: `- Backlog` and `- names: [Backlog]` mean the same thing. Internally
-a rung is always `{ names: [...] }`.
+The plain-string form is sugar: a bare `- Backlog` and a `names:` rung listing only `Backlog` mean the
+same thing. Internally a rung is always `{ names: [...] }` — but that is the *parsed* shape, not
+something you write: in the file, every list is a block sequence (see Format rules below).
 
 This is not decoration. The built-in defaults are candidate *lists*, and flattening them to one name
 per rung would change behaviour for every consumer with no file — a board whose column is
@@ -392,10 +393,30 @@ name, and if that misses, against the other historical names on the same rung. S
 `work-started` correctly with nothing written:
 
 ```yaml
-statuses: [Backlog, In Progress, Done] # "In Progress" — direct match
-statuses: [Backlog, Doing, Done] # "Doing"       — alias on the same rung
-statuses: [Backlog, Development, Done] # "Development" — alias on the same rung
+# Any of these three ladders wires `work-started` with no `pipeline:` block:
+statuses:
+  - Backlog
+  - In Progress # direct match
+  - Done
+# …or…
+statuses:
+  - Backlog
+  - Doing # alias on the same rung
+  - Done
+# …or…
+statuses:
+  - Backlog
+  - Development # alias on the same rung
+  - Done
 ```
+
+Two limits worth knowing:
+
+- **`blocked` never alias-resolves.** It has no rung on the default ladder — it is a side-state by
+  nature — so an inherited miss there stays off-ladder, which is the correct answer.
+- **An overlay that restates the base ladder inherits nothing.** If a `byIssueType` block declares the
+  same statuses the base already has, its targets were chosen against exactly the ladder still in use,
+  so they are treated as authored rather than inherited.
 
 **An authored target never takes this path.** If you write `done: Ready for Showcase` on a board that
 also has a `Closed` column, it resolves to Showcase or to nothing — an explicit choice is never
