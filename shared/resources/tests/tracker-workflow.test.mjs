@@ -625,6 +625,100 @@ test("CR-5 — `blocked` stays off-ladder; it has no default rung to alias throu
   assert.equal(r.offLadder, true, "blocked is a side-state by nature — an inherited miss is correct");
 });
 
+test("CR-6 — an overlay that yields no usable rung inherits nothing", () => {
+  // `isInherited` tested `overlay.statuses.length` while `ladderFor` required a
+  // rung surviving normalizeRung, so an unusable overlay left the BASE ladder in
+  // play yet still counted as overlaid — silently alias-rerouting an explicitly
+  // authored target, the one thing the fallback must never do.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Closed
+
+pipeline:
+  done: Ready for Showcase
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - foo: bar
+`);
+  const base = resolveMoment("done", wf);
+  const typed = resolveMoment("done", wf, { issueType: "Ops Request" });
+
+  assert.equal(base.offLadder, true);
+  assert.deepEqual(
+    typed,
+    base,
+    "the same ladder is in play for both, so the authored target must resolve identically — " +
+      "rerouting it to 'Closed' for one issue type is a silent, type-specific wrong answer",
+  );
+});
+
+test("CR-6 — a usable overlay still inherits, so the CR-5 fix is intact", () => {
+  const wf = fromYaml(OVERLAY);
+  assert.equal(resolveMoment("in-review", wf, { issueType: "IT / DevOps Task" }).rank, 2);
+});
+
+test("CR-7 — a by-design side-state does not draw a per-type warning", () => {
+  // `blocked` has no default rung precisely because it is a side-state. Warning
+  // about it contradicted the base loop, which reports the same target as info,
+  // and told the author to act on configuration that was already correct.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Done
+
+pipeline:
+  work-started: In Progress
+  blocked: Blocked
+  done: Done
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - In Progress
+      - Done
+`);
+  const all = validateWorkflow(wf);
+  assert.ok(
+    all.some((w) => w.level === "info" && /pipeline\.blocked/.test(w.message)),
+    "the base loop still classifies it as an info-level side-state",
+  );
+  assert.deepEqual(
+    all.filter((w) => w.level === "warn"),
+    [],
+    "and nothing warns about it per issue type — the two must not disagree about the same target",
+  );
+});
+
+test("CR-7 — a genuinely inherited miss still warns", () => {
+  // The guard must not silence the case CR-5 added the warning for.
+  const wf = fromYaml(`
+statuses:
+  - Backlog
+  - In Progress
+  - Ready for Testing
+  - Done
+
+pipeline:
+  in-qa: Ready for Testing
+  done: Done
+
+byIssueType:
+  "Ops Request":
+    statuses:
+      - Backlog
+      - In Progress
+      - Done
+`);
+  assert.ok(
+    validateWorkflow(wf).some(
+      (w) => w.level === "warn" && /in-qa.*Ops Request.*inherits the base target/.test(w.message),
+    ),
+  );
+});
+
 // ── 6. documentStatus ────────────────────────────────────────────────────────
 
 test("documentStatus — maps a local status to a board status", () => {

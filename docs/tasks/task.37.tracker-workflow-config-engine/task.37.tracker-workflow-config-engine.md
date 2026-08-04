@@ -858,6 +858,34 @@ instead of three times; and a dead `void readFileSync` left over from cycle 1's 
 
 Suite: **825 → 832** (7 new tests). `npm run bundle` clean.
 
+### QA cycle 3 — fixes applied 2026-08-04
+
+Gate 3 confirmed CR-5 fixed and judged the *inherited* abstraction correct — but found two defects in
+its implementation, both the same mistake: **one truth computed in two places.**
+
+**CR-6 (medium) — `isInherited` and `ladderFor` disagreed about when an overlay was in play.**
+`isInherited` tested `overlay.statuses.length`; `ladderFor` required a rung surviving
+`normalizeRung`. An overlay whose `statuses:` was non-empty but wholly unusable therefore left the
+**base** ladder standing while still counting as overlaid — so the alias fallback engaged against a
+ladder whose targets had been authored deliberately. Verified: with the identical ladder in play,
+`done: Ready for Showcase` resolved to the correct off-ladder side-state for the base and was
+silently rerouted to `Closed` for the overlay type. That is the reroute of an explicit choice the
+cycle-2 fix's own comment forbids, and the more dangerous direction of the class.
+
+**CR-7 (medium) — the per-type warning fired for side-states that are off-ladder by design.**
+`blocked` and `pr-merged` have no `DEFAULT_RUNG_FOR_MOMENT` entry precisely *because* they are
+side-states, but the new loop warned about them anyway — emitting an `info` and a contradictory
+`warn` about the same target, the latter telling the author to fix correct configuration.
+
+Both fixed by removing the duplication rather than reconciling the copies: `resolveLadder()` now
+returns `{ ladder, fromOverlay }` from a single decision, `isInherited` derives from it so the two
+cannot disagree, and the per-type loop skips moments with no default rung. The advisory cleanups fell
+out of the same change — `describeTarget` resolves its ladder once instead of once per candidate
+name, and `validateWorkflow`'s unreachable `rankOf` re-check is gone.
+
+Suite: **832 → 836** (4 new tests, including both boundaries: an unusable overlay must inherit
+nothing, and a genuinely inherited miss must still warn).
+
 ### Deferred work
 
 None within scope. Two things are deliberately left for later tasks, both as specified: the engine is

@@ -481,14 +481,29 @@ function cloneWorkflow(wf) {
 // Resolution
 // ---------------------------------------------------------------------------
 
-/** The ladder a given issue type sees, after the byIssueType overlay. */
-function ladderFor(workflow, issueType) {
+/**
+ * The ladder a given issue type sees, and whether the overlay actually supplied it.
+ *
+ * Both answers come from one place on purpose. They were previously computed
+ * separately — `ladderFor` required at least one rung surviving `normalizeRung`,
+ * while the inherited check only tested `overlay.statuses.length` — so an overlay
+ * whose `statuses:` was non-empty but wholly unusable left the BASE ladder in play
+ * while still counting as overlaid. That combination silently alias-rerouted an
+ * explicitly authored target, which is the one thing the inherited fallback must
+ * never do.
+ */
+function resolveLadder(workflow, issueType) {
   const overlay = overlayFor(workflow, issueType);
   if (overlay && Array.isArray(overlay.statuses)) {
     const rungs = overlay.statuses.map(normalizeRung).filter(Boolean);
-    if (rungs.length) return rungs;
+    if (rungs.length) return { ladder: rungs, fromOverlay: true };
   }
-  return (workflow && workflow.ladder) || [];
+  return { ladder: (workflow && workflow.ladder) || [], fromOverlay: false };
+}
+
+/** The ladder a given issue type sees, after the byIssueType overlay. */
+function ladderFor(workflow, issueType) {
+  return resolveLadder(workflow, issueType).ladder;
 }
 
 /**
@@ -579,8 +594,10 @@ function resolveMoment(moment, workflow, opts) {
  */
 function isInherited(workflow, issueType) {
   if (!workflow) return false;
-  const overlay = overlayFor(workflow, issueType);
-  if (overlay && Array.isArray(overlay.statuses) && overlay.statuses.length) return true;
+  // Derived from the SAME answer that decides which ladder is in play, so the two
+  // cannot disagree. An overlay that did not actually replace the ladder inherits
+  // nothing — the base targets were chosen against the very ladder still in use.
+  if (resolveLadder(workflow, issueType).fromOverlay) return true;
   return workflow.pipelineAuthored === false;
 }
 
@@ -595,14 +612,27 @@ function isInherited(workflow, issueType) {
  * choice that misses is a side-state, which is a thing authors deliberately do.
  */
 function describeTarget(name, workflow, issueType, moment, inherited) {
-  let rank = rankOf(name, workflow, { issueType });
+  // Resolve the ladder once and scan it directly. Going through rankOf per
+  // candidate rebuilt an overlay ladder up to seven times for a single moment,
+  // and validateWorkflow multiplies that by moments × issue types.
+  const ladder = ladderFor(workflow, issueType);
+  const indexOf = (status) => {
+    const target = normalizeName(status);
+    if (!target) return null;
+    for (let i = 0; i < ladder.length; i++) {
+      if (ladder[i].names.some((n) => normalizeName(n) === target)) return i;
+    }
+    return null;
+  };
+
+  let rank = indexOf(name);
 
   if (rank == null && inherited && moment != null) {
     const defaultRung = DEFAULT_RUNG_FOR_MOMENT[moment];
     const aliases = defaultRung == null ? null : DEFAULT_LADDER[defaultRung];
     if (aliases) {
       for (const alt of aliases.names) {
-        const r = rankOf(alt, workflow, { issueType });
+        const r = indexOf(alt);
         if (r != null) {
           rank = r;
           break;
@@ -616,7 +646,6 @@ function describeTarget(name, workflow, issueType, moment, inherited) {
     // construction — there is no second list to declare it in.
     return { targets: [name], rank: null, offLadder: true };
   }
-  const ladder = ladderFor(workflow, issueType);
   return { targets: ladder[rank].names.slice(), rank, offLadder: false };
 }
 
@@ -710,25 +739,24 @@ function validateWorkflow(workflow) {
     // behaviour — including the inherited-alias fallback.
     const resolved = resolveMoment(moment, workflow);
     if (resolved && !resolved.offLadder) continue;
-    if (rankOf(target, workflow) == null) {
-      // Off-ladder is a legitimate pattern (Blocked, Cancelled) when the author
-      // chose the target — but nobody chose the built-in default, so the same
-      // shape means something quite different there: the ladder was declared and
-      // the moments were not, and this moment is now pointing at a column the
-      // board does not have. Say so, and say what to do about it.
-      if (workflow.pipelineAuthored === false && workflow.source === "file") {
-        out.push({
-          level: "warn",
-          message:
-            `\`${moment}\` falls back to the built-in default target "${target}", which is not on this ladder — ` +
-            "declare a `pipeline:` block naming the status this board actually uses, or the moment will be treated as an off-ladder side-state",
-        });
-      } else {
-        out.push({
-          level: "info",
-          message: `\`pipeline.${moment}\` targets "${target}", which is not on the ladder — treating it as an off-ladder side-state`,
-        });
-      }
+
+    // Reaching here means the target is off-ladder. Off-ladder is a legitimate
+    // pattern (Blocked, Cancelled) when the author chose the target — but nobody
+    // chose the built-in default, so the same shape means something quite
+    // different there: the ladder was declared and the moments were not, and this
+    // moment now points at a column the board does not have.
+    if (workflow.pipelineAuthored === false && workflow.source === "file") {
+      out.push({
+        level: "warn",
+        message:
+          `\`${moment}\` falls back to the built-in default target "${target}", which is not on this ladder — ` +
+          "declare a `pipeline:` block naming the status this board actually uses, or the moment will be treated as an off-ladder side-state",
+      });
+    } else {
+      out.push({
+        level: "info",
+        message: `\`pipeline.${moment}\` targets "${target}", which is not on the ladder — treating it as an off-ladder side-state`,
+      });
     }
   }
 
@@ -754,10 +782,18 @@ function validateWorkflow(workflow) {
     // not re-declare — and those were chosen against the base ladder. Check each
     // one against the ladder this type actually uses, or the overlay's whole point
     // (that this type's workflow differs) is silently undone at resolution time.
-    if (!Array.isArray(spec.statuses) || !spec.statuses.length) continue;
+    // Only when the overlay ladder is genuinely in play — an overlay whose
+    // `statuses:` yields no usable rung leaves the base ladder standing, and
+    // nothing is inherited in that case.
+    if (!resolveLadder(workflow, type).fromOverlay) continue;
     for (const moment of Object.keys(workflow.pipeline || {})) {
       if (!MOMENT_SET.has(moment)) continue;
       if (Object.prototype.hasOwnProperty.call(overlayPipeline, moment)) continue;
+      // A moment with no default rung — `blocked`, `pr-merged` — is off-ladder by
+      // design. Warning about it would contradict the base loop, which correctly
+      // reports the very same target as info, and would tell the author to "fix"
+      // configuration that is already right.
+      if (DEFAULT_RUNG_FOR_MOMENT[moment] == null) continue;
       const resolved = resolveMoment(moment, workflow, { issueType: type });
       if (resolved && resolved.offLadder) {
         out.push({
