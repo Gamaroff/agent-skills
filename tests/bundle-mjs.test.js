@@ -272,3 +272,29 @@ test("mjs: the real develop-batch skill bundles its shared parser with a rewritt
       "resolves in this checkout and nowhere else",
   );
 });
+
+test("mjs: the bundled parser matches its shared source (drift guard)", () => {
+  // Asserting the bundled file merely *exists* is not enough now that schedule.mjs
+  // executes it in-repo as well as in an install. An edit to shared/resources/
+  // without `npm run bundle` would leave develop-batch running a stale parser
+  // while every suite in this repo stays green — the same class of
+  // invisible-in-a-checkout failure the .mjs bundler work was written to remove,
+  // arriving through a different door.
+  const shared = path.join(REPO_ROOT, "shared", "resources", "yaml-subset.js");
+  const bundled = path.join(
+    REPO_ROOT, "skills", "develop-batch", "references", "yaml-subset.js",
+  );
+  if (!fs.existsSync(bundled)) return; // promotion not yet wired
+
+  // The bundled copy differs from source by exactly one thing: the generated
+  // header the bundler injects. Strip it and the two must be identical.
+  const strip = (s) =>
+    s.split("\n").filter((l) => !l.includes("AUTO-GENERATED — DO NOT EDIT")).join("\n");
+
+  assert.equal(
+    strip(fs.readFileSync(bundled, "utf-8")),
+    strip(fs.readFileSync(shared, "utf-8")),
+    "skills/develop-batch/references/yaml-subset.js has drifted from " +
+      "shared/resources/yaml-subset.js — run `npm run bundle` and commit the result",
+  );
+});

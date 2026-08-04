@@ -190,6 +190,79 @@ test("default snapshot — MOMENTS is the closed set, including the two not yet 
   }
 });
 
+// ── 1b. QA CR-1: a declared ladder with no pipeline block ────────────────────
+//
+// The regression this group exists to catch: DEFAULT_PIPELINE once stored rung
+// INDICES authored against the built-in six-rung ladder. `buildWorkflow` replaces
+// the ladder when `statuses:` is present but keeps the default pipeline when
+// `pipeline:` is absent, so those indices were applied to a ladder they were
+// never written for. The failure was partial, which is what made it dangerous:
+// two moments resolved correctly by coincidence of position while `done` fell off
+// the end and silently never fired.
+
+test("CR-1 — a custom ladder with no `pipeline:` resolves every default moment by name", () => {
+  const wf = fromYaml(`
+statuses:
+  - Backlog
+  - In Progress
+  - In Review
+  - Done
+`);
+  assert.deepEqual(resolveMoment("work-started", wf).targets, ["In Progress"]);
+  assert.equal(resolveMoment("work-started", wf).rank, 1);
+  assert.deepEqual(resolveMoment("in-review", wf).targets, ["In Review"]);
+  assert.equal(resolveMoment("in-review", wf).rank, 2);
+
+  const done = resolveMoment("done", wf);
+  assert.ok(
+    done,
+    "`done` must fire. Under the index-based default it resolved to null on any ladder " +
+      "shorter than six rungs — the card advanced through review and then stopped forever.",
+  );
+  assert.deepEqual(done.targets, ["Done"]);
+  assert.equal(done.rank, 3, "rank follows THIS ladder, not the built-in one");
+});
+
+test("CR-1 — the default pipeline stores names, never indices", () => {
+  for (const [moment, target] of Object.entries(DEFAULT_PIPELINE)) {
+    assert.equal(
+      typeof target,
+      "string",
+      `${moment} must target a status name; an index is only meaningful against the ladder it was authored for`,
+    );
+  }
+});
+
+test("CR-1 — a two-rung ladder with no pipeline block still reaches done", () => {
+  const wf = fromYaml("statuses:\n  - In Progress\n  - Done\n");
+  assert.equal(resolveMoment("done", wf).rank, 1);
+  assert.deepEqual(resolveMoment("done", wf).targets, ["Done"]);
+});
+
+test("CR-1 — an unconventional ladder with no pipeline block warns and says what to do", () => {
+  // Names cannot resolve here, and that is the honest outcome — but it must be
+  // reported, not silently degraded into a side-state.
+  const wf = fromYaml("statuses:\n  - Backlog\n  - Doing\n  - Shipped\n");
+  const warns = validateWorkflow(wf).filter((w) => w.level === "warn");
+  assert.ok(
+    warns.some((w) => /falls back to the built-in default target/.test(w.message)),
+    "an unauthored default moment that misses the ladder must be reported",
+  );
+  assert.ok(
+    warns.some((w) => /declare a `pipeline:` block/.test(w.message)),
+    "and the warning must name the fix",
+  );
+});
+
+test("CR-1 — an author's own off-ladder target stays info, not a warning", () => {
+  // The distinction that matters: `blocked: Blocked` is a deliberate side-state.
+  // Only an unauthored default falling off the ladder is a misconfiguration.
+  const wf = fromYaml(BESPOKE);
+  const all = validateWorkflow(wf);
+  assert.equal(all.filter((w) => w.level === "warn").length, 0);
+  assert.equal(all.find((w) => /Blocked/.test(w.message)).level, "info");
+});
+
 // ── 2. Rank, and rung alternatives ───────────────────────────────────────────
 
 test("rank — a rung's index is its rank", () => {
@@ -648,6 +721,47 @@ test("cache — a cached workflow cannot be poisoned by a caller mutating it", (
   const b = loadWorkflow({ repoRoot: root });
   assert.equal(b.ladder.length, 7, "the second caller must not inherit the first's mutation");
   assert.equal(rankOf("Ready for Showcase", b), 5);
+});
+
+test("CR-2 — a cached byIssueType overlay cannot be poisoned by a caller", () => {
+  // cloneWorkflow copied ladder/pipeline/documentStatus but assigned byIssueType
+  // by reference, so its own "no caller can mutate the cached entry" comment was
+  // false for overlays. The original poisoning test passed anyway, because it
+  // only mutated the fields that were copied.
+  const root = repoWith({ "tracker-workflow.yaml": OVERLAY });
+  tw.clearWorkflowCache();
+
+  const a = loadWorkflow({ repoRoot: root });
+  a.byIssueType["IT / DevOps Task"].pipeline["in-qa"] = "Poisoned";
+  a.byIssueType["IT / DevOps Task"].statuses = ["Wrecked"];
+
+  const b = loadWorkflow({ repoRoot: root });
+  assert.equal(
+    resolveMoment("in-qa", b, { issueType: "IT / DevOps Task" }),
+    null,
+    "the overlay's `in-qa: ~` must survive the first caller's mutation",
+  );
+  assert.equal(rankOf("In Review", b, { issueType: "IT / DevOps Task" }), 2);
+});
+
+test("CR-3 — a wrong-shaped `pipeline:` falls back to defaults, as documented", () => {
+  // `pipeline` was reset to {} before its shape was checked, so a scalar disabled
+  // every moment while the warning said "ignoring it" and the reference doc
+  // promised a fallback. Disabling everything silently is the worse failure.
+  const wf = fromYaml("statuses:\n  - Backlog\n  - In Progress\n  - Done\npipeline: In Progress\n");
+  assert.ok(
+    resolveMoment("work-started", wf),
+    "a malformed pipeline block must not silently switch every moment off",
+  );
+  assert.ok(resolveMoment("done", wf));
+  assert.ok(validateWorkflow(wf).some((w) => w.level === "error" && /must be a mapping/.test(w.message)));
+});
+
+test("CR-3 — an explicitly empty `pipeline:` really does disable everything", () => {
+  // The distinction: a wrong-shaped block is a mistake; an empty one is a choice.
+  const wf = fromYaml("statuses:\n  - Backlog\n  - Done\npipeline:\n");
+  assert.equal(resolveMoment("work-started", wf), null);
+  assert.equal(resolveMoment("done", wf), null);
 });
 
 test("cache — clearWorkflowCache lets a rewritten file be re-read", () => {

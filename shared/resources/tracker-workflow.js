@@ -109,13 +109,27 @@ const DEFAULT_LADDER = Object.freeze([
   Object.freeze({ names: Object.freeze(["Done", "Closed", "Resolved", "Complete", "Completed"]) }),
 ]);
 
-// Rung indices, not names. The three moments absent here are absent on purpose:
-// `in-qa`, `ready-for-merge` and `blocked` are `defaultEnabled: false` in
-// DEFAULT_STAGE_MAP today, and omission is how this format spells "off".
+// Status NAMES, not rung indices. This is load-bearing: `buildWorkflow` replaces
+// the ladder when a file declares `statuses:` but leaves the pipeline at this
+// default when the file omits `pipeline:`. Indices authored against the built-in
+// six-rung ladder mean nothing against a consumer's own ladder — and the failure
+// is not a clean one. On a four-rung board they resolve *partially*: two moments
+// land correctly by coincidence of position while `done` (index 5) falls off the
+// end and silently never fires, which reads as "mostly working" rather than
+// "misconfigured".
+//
+// Names resolve against whichever ladder is in play, so the same default is
+// correct for the built-in ladder and for any board using conventional column
+// names. A board using unconventional names gets an off-ladder miss that
+// validateWorkflow reports and tells the author how to fix.
+//
+// The three moments absent here are absent on purpose: `in-qa`, `ready-for-merge`
+// and `blocked` are `defaultEnabled: false` in DEFAULT_STAGE_MAP today, and
+// omission is how this format spells "off".
 const DEFAULT_PIPELINE = Object.freeze({
-  "work-started": 1,
-  "in-review": 2,
-  done: 5,
+  "work-started": "In Progress",
+  "in-review": "In Review",
+  done: "Done",
 });
 
 // ---------------------------------------------------------------------------
@@ -212,6 +226,7 @@ function defaultWorkflow(extra) {
     {
       ladder: DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })),
       pipeline: Object.assign({}, DEFAULT_PIPELINE),
+      pipelineAuthored: false,
       documentStatus: {},
       byIssueType: {},
       source: "default",
@@ -293,16 +308,28 @@ function buildWorkflow(doc, meta) {
   // on the ladder, and kept as a bare name where it is not (an off-ladder
   // side-state). A moment whose value is `~`/null/empty is absent by intent.
   let pipeline = base.pipeline;
+  let pipelineAuthored = false;
   if (doc.pipeline !== undefined) {
-    pipeline = {};
     const p = doc.pipeline;
     if (p && typeof p === "object" && !Array.isArray(p)) {
+      // Reset only once the shape is known good. Resetting first meant a
+      // wrong-shaped block disabled every moment while the warning said
+      // "ignoring it" and the reference doc promised a fallback to defaults.
+      pipeline = {};
+      pipelineAuthored = true;
       for (const [moment, target] of Object.entries(p)) {
         if (target === null || target === undefined || String(target).trim() === "") continue;
         pipeline[moment] = String(target).trim();
       }
-    } else if (p !== null) {
-      warnings.push({ level: "error", message: "`pipeline:` must be a mapping — ignoring it" });
+    } else if (p === null) {
+      // `pipeline:` with nothing under it — an explicit, empty declaration.
+      pipeline = {};
+      pipelineAuthored = true;
+    } else {
+      warnings.push({
+        level: "error",
+        message: "`pipeline:` must be a mapping — ignoring it and using the built-in default moments",
+      });
     }
   }
 
@@ -331,6 +358,7 @@ function buildWorkflow(doc, meta) {
   return Object.assign(base, {
     ladder,
     pipeline,
+    pipelineAuthored,
     documentStatus,
     byIssueType,
     warnings,
@@ -398,13 +426,28 @@ function loadWorkflow(opts) {
   }
 }
 
-/** Structural copy deep enough that no caller can mutate the cached entry. */
+/**
+ * Structural copy deep enough that no caller can mutate the cached entry.
+ *
+ * `byIssueType` nests two levels (type → { statuses, pipeline }), so a shallow
+ * copy would leave every overlay shared with the cache — one caller mutating
+ * `wf.byIssueType[type].pipeline` would poison every later load in the process.
+ * The overlay values are plain parsed YAML, so a JSON round-trip is both correct
+ * and cheaper to keep right than a hand-written walk.
+ */
 function cloneWorkflow(wf) {
+  let byIssueType;
+  try {
+    byIssueType = JSON.parse(JSON.stringify(wf.byIssueType || {}));
+  } catch (_) {
+    byIssueType = {};
+  }
   return {
     ladder: wf.ladder.map((r) => ({ names: r.names.slice() })),
     pipeline: Object.assign({}, wf.pipeline),
+    pipelineAuthored: wf.pipelineAuthored,
     documentStatus: Object.assign({}, wf.documentStatus),
-    byIssueType: wf.byIssueType,
+    byIssueType,
     source: wf.source,
     path: wf.path,
     warnings: wf.warnings.slice(),
@@ -493,14 +536,8 @@ function resolveMoment(moment, workflow, opts) {
   const raw = pipeline[key];
   if (raw === null || raw === undefined || String(raw).trim() === "") return null;
 
-  // The built-in default stores rung INDICES (it is authored against the ladder
-  // it ships with); a loaded file stores NAMES. Both resolve to the same shape.
-  if (typeof raw === "number") {
-    const ladder = ladderFor(workflow, issueType);
-    const rung = ladder[raw];
-    if (!rung) return null;
-    return { targets: rung.names.slice(), rank: raw, offLadder: false };
-  }
+  // Always a status NAME — the built-in default and a loaded file use the same
+  // representation, so there is no second code path that can diverge.
   return describeTarget(String(raw).trim(), workflow, issueType);
 }
 
@@ -591,12 +628,25 @@ function validateWorkflow(workflow) {
       });
       continue;
     }
-    if (typeof target === "number") continue; // built-in default, indices
     if (rankOf(target, workflow) == null) {
-      out.push({
-        level: "info",
-        message: `\`pipeline.${moment}\` targets "${target}", which is not on the ladder — treating it as an off-ladder side-state`,
-      });
+      // Off-ladder is a legitimate pattern (Blocked, Cancelled) when the author
+      // chose the target — but nobody chose the built-in default, so the same
+      // shape means something quite different there: the ladder was declared and
+      // the moments were not, and this moment is now pointing at a column the
+      // board does not have. Say so, and say what to do about it.
+      if (workflow.pipelineAuthored === false && workflow.source === "file") {
+        out.push({
+          level: "warn",
+          message:
+            `\`${moment}\` falls back to the built-in default target "${target}", which is not on this ladder — ` +
+            "declare a `pipeline:` block naming the status this board actually uses, or the moment will be treated as an off-ladder side-state",
+        });
+      } else {
+        out.push({
+          level: "info",
+          message: `\`pipeline.${moment}\` targets "${target}", which is not on the ladder — treating it as an off-ladder side-state`,
+        });
+      }
     }
   }
 

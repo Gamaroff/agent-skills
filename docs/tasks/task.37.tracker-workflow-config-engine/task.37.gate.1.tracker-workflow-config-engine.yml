@@ -1,0 +1,66 @@
+schema: 1
+task: "task.37.tracker-workflow-config-engine"
+task_title: "tracker-workflow.yaml — a consumer-owned status ladder the pipelines read"
+gate: CONCERNS
+status_reason: "All 4 phases complete and 816/816 tests pass, but the diff review found that a file declaring `statuses:` without `pipeline:` inherits rung INDICES authored against the default ladder — silently disabling `done` on a custom ladder, unreported by validateWorkflow."
+reviewer: "QA Engineer"
+updated: "2026-08-04T16:35:00Z"
+
+top_issues:
+  - id: CR-1
+    issue: "A file with `statuses:` but no `pipeline:` keeps DEFAULT_PIPELINE, whose values are rung indices authored against the built-in 6-rung ladder; applied to a consumer's custom ladder those indices are meaningless by construction."
+    severity: medium
+    finding: "Verified live on a 4-rung ladder [Backlog, In Progress, In Review, Done]: work-started→rung 1 and in-review→rung 2 resolve correctly only by coincidence of position, while done (index 5) resolves to null and never fires. validateWorkflow reports nothing because it unconditionally skips numeric targets."
+    suggested_action: "Make DEFAULT_PIPELINE name-based so it resolves by name against whatever ladder is in play, and drop validateWorkflow's numeric-target skip so an unresolvable default moment is reported."
+    suggested_owner: dev
+  - id: CR-2
+    issue: "cloneWorkflow assigns `byIssueType` by reference, so the cache-poisoning guard it documents does not hold for overlays."
+    severity: low
+    finding: "Verified: mutating wf.byIssueType.<type>.pipeline after one loadWorkflow makes every subsequent loadWorkflow in the process return the poisoned overlay. The function's own comment claims it is 'deep enough that no caller can mutate the cached entry'."
+    suggested_action: "Deep-copy byIssueType in cloneWorkflow and extend the cache-poisoning test to cover an overlay."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 816
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Engine is pure — no HTTP, no gh, no shell beyond the single `git rev-parse --show-toplevel` fallback, asserted by a test that greps execSync call sites. No secrets, no user input reaching a shell. Purity from jira-sync.js asserted behaviourally via a clean child process's require cache."
+  performance:
+    status: PASS
+    notes: "Parse cached per resolved path; a test intercepts fs.readFileSync and asserts exactly one read across three loadWorkflow calls. develop-batch scheduling unchanged — its 41 unit tests pass without modification."
+  reliability:
+    status: CONCERNS
+    notes: "Swallow-everything contract holds and nothing throws on missing/unreadable/malformed/wrong-shaped input. But CR-1 means a plausible, well-formed consumer file silently disables the `done` moment with no warning — a silent wrong answer is worse than the throw the contract exists to avoid. CR-3 (advisory) compounds it: a wrong-shaped `pipeline:` block disables every moment while the warning says 'ignoring it' and the reference doc promises a fallback to defaults."
+  maintainability:
+    status: CONCERNS
+    notes: "Code is clear, densely commented with rationale, and comprehensively tested (74 new tests across two suites). The default-ladder snapshot deriving from jira-sync's exported constants is a genuinely strong regression guard. Deduction is for CR-4: schedule.mjs now executes the bundled copy in-repo, and nothing asserts it matches the shared source — an edit to shared/resources without `npm run bundle` leaves develop-batch on a stale parser with every suite green."
+
+recommendations:
+  immediate:
+    - action: "Make DEFAULT_PIPELINE name-based and remove the numeric-target special case from resolveMoment and validateWorkflow (CR-1)"
+      refs: ["shared/resources/tracker-workflow.js"]
+    - action: "Deep-copy byIssueType in cloneWorkflow (CR-2)"
+      refs: ["shared/resources/tracker-workflow.js"]
+  future:
+    - action: "Only reset `pipeline` after confirming the value is a mapping, so a wrong-shaped block genuinely falls back to defaults as documented (CR-3)"
+      refs: ["shared/resources/tracker-workflow.js"]
+    - action: "Assert the bundled yaml-subset.js matches the shared source modulo the AUTO-GENERATED header (CR-4)"
+      refs: ["tests/bundle-mjs.test.js"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "CR-1 fixed — it is the one finding that produces a silently wrong board state"
+    - "CR-2 fixed — cheap, and the code currently documents a guarantee it does not provide"

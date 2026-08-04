@@ -669,6 +669,36 @@ almost everything here is a forward fix.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-04
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.37.qa.1.tracker-workflow-config-engine.md](./task.37.qa.1.tracker-workflow-config-engine.md)
+- **Gate File**: [task.37.gate.1.tracker-workflow-config-engine.yml](./task.37.gate.1.tracker-workflow-config-engine.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 816 (816 pass, 0 fail)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW, 2 advisory
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+Every declared success criterion is met, and the test work exceeds what the task asked for. The
+diff review found one medium correctness defect the criteria do not describe: a file declaring
+`statuses:` without `pipeline:` inherits rung **indices** authored against the built-in ladder, so
+on a custom ladder `done` silently never fires while two other moments work by coincidence of
+position — and `validateWorkflow` reports nothing. Fixed in cycle 1 (see below).
+
+---
+
 ## Implementation Record
 
 **Started**: 2026-08-04 · **Completed**: 2026-08-04 · **Status**: Ready for Review
@@ -750,6 +780,45 @@ a textual scan matches the module's own comment explaining why it does not requi
 | `npm run bundle`                               | clean, idempotent  |
 
 Suite grew from 760 to 812 (+52 net new). No pre-existing test was modified.
+
+### QA cycle 1 — fixes applied 2026-08-04
+
+Gate 1 returned **CONCERNS (80/100)** with two gating findings and two advisory. All four were fixed;
+none required a design change beyond the first, which did.
+
+**CR-1 (medium, gating) — the default pipeline stored rung *indices*.** `DEFAULT_PIPELINE` mapped
+moments to positions (`work-started: 1`, `done: 5`) authored against the built-in six-rung ladder.
+`buildWorkflow` replaces the ladder when a file declares `statuses:` but keeps the default pipeline
+when it omits `pipeline:` — so those indices were applied to a ladder they were never written for.
+Reproduced on a four-rung board: `work-started` and `in-review` resolved correctly *by coincidence of
+position* while `done` (index 5) fell off the end, returned `null`, and never fired. `validateWorkflow`
+was silent because it skipped numeric targets unconditionally.
+
+Fixed at the root rather than patched: `DEFAULT_PIPELINE` now stores **names**, which resolve against
+whichever ladder is in play. The numeric branch is deleted from `resolveMoment` and the numeric skip
+from `validateWorkflow`, so there is no second representation left to diverge. A consequence worth
+having: any board using conventional column names now needs no `pipeline:` block at all, and a board
+using unconventional ones gets a `warn` naming the fix instead of silence.
+
+**CR-2 (low, gating) — `cloneWorkflow` shallow-copied `byIssueType`.** The function's own comment
+claimed it was "deep enough that no caller can mutate the cached entry"; overlays were shared by
+reference, so one caller mutating `byIssueType[type].pipeline` poisoned every later load. Now
+deep-copied. The pre-existing cache test passed regardless because it only mutated copied fields —
+the new test mutates an overlay.
+
+**CR-3 (advisory) — a wrong-shaped `pipeline:` disabled everything.** `pipeline` was reset to `{}`
+before its shape was checked, so `pipeline: SomeScalar` switched every moment off while the warning
+said "ignoring it" and the reference doc promised a fallback. Reset now happens only after the shape
+is known good. An *explicitly empty* `pipeline:` still disables everything — that is a choice, not a
+mistake, and the two are now distinguished.
+
+**CR-4 (advisory) — nothing asserted the bundled parser matched its source.** Since the swap,
+`schedule.mjs` executes `references/yaml-subset.js` in-repo too, so an edit to `shared/resources/`
+without `npm run bundle` would leave `develop-batch` on a stale parser with every suite green — the
+same invisible-in-a-checkout failure Phase 1 exists to prevent, through a different door. Now
+asserted equal modulo the generated header.
+
+Suite: **816 → 825** (9 new tests, all regression guards for the above). `npm run bundle` clean.
 
 ### Deferred work
 

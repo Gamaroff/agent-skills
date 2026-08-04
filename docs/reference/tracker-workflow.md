@@ -367,9 +367,29 @@ console.log(wf.source); // "file" or "default"
 console.log(validateWorkflow(wf)); // [{ level, message }, …]
 ```
 
-`validateWorkflow` reports unknown moments, a status appearing on two rungs, flow collections, and —
-as `info`, not an error — pipeline targets that are off-ladder, since that is a legitimate pattern
-rather than a mistake.
+`validateWorkflow` reports unknown moments, a status appearing on two rungs, and flow collections as
+errors. An off-ladder pipeline target is reported as `info`, not an error — declaring a side-state is
+a legitimate pattern rather than a mistake.
+
+One case sits between the two, and is reported as `warn`: you declared `statuses:` but no
+`pipeline:`, and one of the built-in default moments does not match any rung on your ladder. Nobody
+chose that target, so it is almost certainly a gap rather than a deliberate side-state:
+
+```yaml
+statuses:
+  - Backlog
+  - Doing # ← your board says "Doing"; the default moment targets "In Progress"
+  - Shipped
+```
+
+```
+warn: `work-started` falls back to the built-in default target "In Progress", which is not on
+      this ladder — declare a `pipeline:` block naming the status this board actually uses…
+```
+
+Boards using conventional column names need no `pipeline:` block at all: the defaults resolve **by
+name** against whatever ladder you declare, so a four-rung `Backlog / In Progress / In Review / Done`
+board gets all three default moments wired correctly with nothing further to write.
 
 ---
 
