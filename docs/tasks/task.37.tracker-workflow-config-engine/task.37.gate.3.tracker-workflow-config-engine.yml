@@ -1,0 +1,77 @@
+schema: 1
+task: "task.37.tracker-workflow-config-engine"
+task_title: "tracker-workflow.yaml — a consumer-owned status ladder the pipelines read"
+gate: CONCERNS
+status_reason: "CR-5 is fixed and the inherited concept is the right abstraction, but the cycle-2 implementation has two defects of its own: `isInherited` and `ladderFor` disagree about when an overlay is in play, which reroutes an authored target on the base ladder; and the new per-type warning fires for side-states that are off-ladder by design."
+reviewer: "QA Engineer"
+updated: "2026-08-04T17:30:00Z"
+
+previous_gate: "task.37.gate.2.tracker-workflow-config-engine.yml"
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-08-04"
+  total_iterations: 2
+  verification_method: "Re-ran the CR-5 reproduction; traced the new inherited/alias path and executed the module against adversarial overlay shapes."
+  verified:
+    - id: CR-5
+      status: closed
+      note: "in-review for 'IT / DevOps Task' now resolves to In Review at rank 2 instead of the base ladder's 'Waiting for Review' off-ladder. The alias gap closed with it, and the authored-target boundary is tested in both base and overlay forms. The concept is right; two implementation defects remain (below)."
+
+top_issues:
+  - id: CR-6
+    issue: "`isInherited` and `ladderFor` disagree about when an overlay ladder is actually in play, so an authored base target can be silently alias-rerouted."
+    severity: medium
+    finding: "`isInherited` tests `overlay.statuses.length`, but `ladderFor` requires at least one rung that survives `normalizeRung`. An overlay whose `statuses:` is non-empty but wholly unusable therefore leaves the BASE ladder in play while still being flagged inherited. Verified: base ladder [In Progress, Closed] with authored `done: Ready for Showcase` — base resolves to the off-ladder side-state 'Ready for Showcase', while the overlay type resolves to 'Closed' at rank 1 off the identical ladder. That is exactly the silent reroute of an explicit choice that the fix's own comment forbids."
+    suggested_action: "Resolve the ladder once and report whether the overlay was actually applied, then derive `inherited` from that single answer so the two cannot disagree."
+    suggested_owner: dev
+  - id: CR-7
+    issue: "The new per-issue-type warning fires for moments that are off-ladder by design, contradicting the base loop's own classification of the same target."
+    severity: medium
+    finding: "The byIssueType inherited-miss loop warns on every off-ladder inherited moment, including `blocked` and `pr-merged`, which have no DEFAULT_RUNG_FOR_MOMENT entry precisely because they are side-states. Verified: an authored `blocked: Blocked` plus one overlay type emits both `info: pipeline.blocked … treating it as an off-ladder side-state` and `warn: blocked for issue type 'Ops Request' … declare it … or set it to ~`. The two messages describe the same target and disagree, and the warn tells the author to act on something correct."
+    suggested_action: "Skip moments with no DEFAULT_RUNG_FOR_MOMENT entry in the per-type loop, so the warning fires only when the overlay's replaced ladder is what caused the miss."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 832
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged. No new surface."
+  performance:
+    status: PASS
+    notes: "planMove's triple rebuild is fixed. The same cost reappeared in describeTarget's alias fallback (up to one ladder rebuild per candidate name, multiplied by moments × issue types during validation) — advisory, and the CR-6 fix removes it as a side effect."
+  reliability:
+    status: CONCERNS
+    notes: "CR-5's class is closed for well-formed configs. CR-6 reopens a narrow instance of it for a malformed overlay, and it is the higher-stakes direction: an explicitly authored target being silently rerouted, rather than an inherited one being missed."
+  maintainability:
+    status: PASS
+    notes: "The inherited concept is the right abstraction and is well documented at both its definition and its use. CR-6 and CR-7 are both cases of one truth being computed in two places — the fix for each is to compute it once."
+
+recommendations:
+  immediate:
+    - action: "Resolve the ladder once, returning whether the overlay applied, and derive `inherited` from it (CR-6)"
+      refs: ["shared/resources/tracker-workflow.js"]
+    - action: "Skip moments with no default rung in the per-type inherited-miss loop (CR-7)"
+      refs: ["shared/resources/tracker-workflow.js"]
+  future:
+    - action: "Drop the now-unreachable `rankOf` re-check in validateWorkflow's base loop — the preceding offLadder guard already implies it"
+      refs: ["shared/resources/tracker-workflow.js"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "CR-6 fixed — an authored target must never be alias-rerouted"
+    - "CR-7 fixed — the validator must not tell authors to fix correct configuration"

@@ -1,0 +1,86 @@
+schema: 1
+task: "task.37.tracker-workflow-config-engine"
+task_title: "tracker-workflow.yaml — a consumer-owned status ladder the pipelines read"
+gate: PASS
+status_reason: "Independent re-review of the cycle-4 restructure found zero correctness defects. All nine prior findings are closed and re-verified by re-running each original reproduction; the three advisory cleanups it did raise were applied within the cycle. 840/840 tests pass and the default-ladder compatibility contract is intact after five cycles."
+reviewer: "QA Engineer"
+updated: "2026-08-04T18:20:00Z"
+
+previous_gate: "task.37.gate.4.tracker-workflow-config-engine.yml"
+
+bug_resolution:
+  bugs_fixed: 9
+  bugs_remaining: 0
+  fix_date: "2026-08-04"
+  total_iterations: 4
+  verification_method: "Every original reproduction re-executed against the final code, not merely re-tested; default candidate lists re-diffed against jira-sync.js's live constants."
+  verified:
+    - id: CR-1
+      status: closed
+      note: "Default pipeline is name-based; `done` resolves on any ladder length."
+    - id: CR-2
+      status: closed
+      note: "byIssueType deep-copied; overlay poisoning test covers it."
+    - id: CR-3
+      status: closed
+      note: "Wrong-shaped `pipeline:` falls back to defaults; explicitly-empty still disables."
+    - id: CR-4
+      status: closed
+      note: "Bundled parser asserted equal to source modulo the generated header."
+    - id: CR-5
+      status: closed
+      note: "Overlay types resolve inherited moments against their own ladder."
+    - id: CR-6
+      status: closed
+      note: "resolveLadder is the single overlay decision; an unusable overlay inherits nothing."
+    - id: CR-7
+      status: closed
+      note: "Deliberate side-states draw no per-type warning."
+    - id: CR-8
+      status: closed
+      note: "The guard now keys on the base resolution being off-ladder, so genuine per-type misses for changes-requested / pr-merged / blocked warn again. Re-verified against the exact cycle-4 reproduction."
+    - id: CR-9
+      status: closed
+      note: "fromOverlay means the ladder DIFFERS; an overlay restating the base ladder inherits nothing."
+    - id: CR-10
+      status: closed
+      note: "Advisory cleanups applied in-cycle: base resolutions memoised once for both validateWorkflow loops; the ladder resolved lazily so disabled moments cost nothing; the 'resolve once' comment made accurate."
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 840
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No HTTP, no gh, no credential handling, no user input reaching a shell. The single execSync is a fixed `git rev-parse --show-toplevel` with no interpolation, asserted by test to be the only one. Independence from jira-sync.js asserted behaviourally via a clean child process's require cache, so a GitHub-only consumer cannot acquire the Jira client transitively."
+  performance:
+    status: PASS
+    notes: "Parse cached per resolved path, asserted by intercepting fs.readFileSync. The ladder is now resolved once per resolveMoment and lazily, so the five moments disabled under the built-in default cost nothing; validateWorkflow memoises base resolutions across both its loops. develop-batch's 41 unit tests unchanged."
+  reliability:
+    status: PASS
+    notes: "The defect class this review chased for four cycles — a target chosen against one ladder silently resolved against another — is closed at the root, and its boundaries are pinned in both directions: an inherited miss alias-resolves and warns; an authored miss stays a side-state and never reroutes. Swallow-everything holds; missing, unreadable, malformed and wrong-shaped inputs all yield defaults and nothing throws."
+  maintainability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. The meta-cause of cycles 2–4 was one truth computed in several places; the final structure has one ladder scan (rankIn), one overlay decision (resolveLadder), one base resolution per moment (memoised), and one representation for pipeline targets. Rationale is written down at each of those, naming the failure it prevents. 91 tests across the two suites, several of which assert boundaries rather than happy paths."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "When task.38/39 wire this up, have jira-sync.js re-export stripStatusEmoji/eqName from here so there is one implementation rather than two"
+      refs: ["shared/resources/jira-sync.js", "shared/resources/tracker-workflow.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -29,6 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { parseYamlSubset } from "../references/yaml-subset.js";
 
 const DEFAULT_CONFIG = "skills-config.yaml";
 const DEFAULT_STATE = ".claude/state/develop-batch.state.json";
@@ -67,114 +68,14 @@ const INTERRUPT_SIGNATURES = [
 ];
 
 // ── minimal YAML subset ──────────────────────────────────────────────────────
-// Enough for skills-config.yaml's shape: nested maps, lists of maps, lists of
-// scalars, and scalar values. Deliberately NOT a general YAML parser — no
-// anchors, no multi-line strings, no flow collections. A consumer whose config
-// needs those should be told so loudly rather than parsed wrongly.
-
-function stripComment(line) {
-  // Only strip a `#` that is not inside quotes.
-  let inS = false;
-  let inD = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === "'" && !inD) inS = !inS;
-    else if (c === '"' && !inS) inD = !inD;
-    else if (c === "#" && !inS && !inD) return line.slice(0, i);
-  }
-  return line;
-}
-
-function parseScalar(raw) {
-  const v = raw.trim();
-  if (v === "") return "";
-  if (
-    (v.startsWith('"') && v.endsWith('"') && v.length > 1) ||
-    (v.startsWith("'") && v.endsWith("'") && v.length > 1)
-  ) {
-    return v.slice(1, -1);
-  }
-  if (v === "true") return true;
-  if (v === "false") return false;
-  if (v === "null" || v === "~") return null;
-  if (/^-?\d+$/.test(v)) return Number(v);
-  if (/^-?\d*\.\d+$/.test(v)) return Number(v);
-  if (v === "[]") return [];
-  if (v === "{}") return {};
-  return v;
-}
-
-/** Rows of {indent, text} for non-blank, non-comment lines. */
-function significantLines(text) {
-  const out = [];
-  for (const raw of text.split(/\r?\n/)) {
-    const noComment = stripComment(raw);
-    if (!noComment.trim()) continue;
-    out.push({ indent: noComment.match(/^\s*/)[0].length, text: noComment.trim() });
-  }
-  return out;
-}
-
-function parseBlock(rows, start, indent) {
-  // Decide list vs map by the first row at this indent.
-  if (start < rows.length && rows[start].indent === indent && rows[start].text.startsWith("- ")) {
-    const arr = [];
-    let i = start;
-    while (i < rows.length && rows[i].indent === indent && rows[i].text.startsWith("- ")) {
-      const inline = rows[i].text.slice(2).trim();
-      // `- key: value` starts a map entry whose siblings are indented further.
-      if (/^[\w.-]+\s*:/.test(inline)) {
-        const synthetic = [{ indent: indent + 2, text: inline }];
-        let j = i + 1;
-        while (j < rows.length && rows[j].indent > indent) {
-          synthetic.push(rows[j]);
-          j++;
-        }
-        const [val] = parseBlock(synthetic, 0, indent + 2);
-        arr.push(val);
-        i = j;
-      } else {
-        arr.push(parseScalar(inline));
-        i++;
-      }
-    }
-    return [arr, i];
-  }
-
-  const obj = {};
-  let i = start;
-  while (i < rows.length && rows[i].indent === indent) {
-    const m = rows[i].text.match(/^([\w.-]+)\s*:\s*(.*)$/);
-    if (!m) {
-      i++;
-      continue;
-    }
-    const [, key, rest] = m;
-    if (rest.trim() !== "") {
-      obj[key] = parseScalar(rest);
-      i++;
-      continue;
-    }
-    // Nested block: everything indented further than this key.
-    let j = i + 1;
-    if (j < rows.length && rows[j].indent > indent) {
-      const [val, next] = parseBlock(rows, j, rows[j].indent);
-      obj[key] = val;
-      i = next;
-    } else {
-      obj[key] = null;
-      i = j;
-    }
-  }
-  return [obj, i];
-}
-
-export function parseYamlSubset(text) {
-  const rows = significantLines(text);
-  if (!rows.length) return {};
-  const [val] = parseBlock(rows, 0, rows[0].indent);
-  return val ?? {};
-}
+// Moved to shared/resources/yaml-subset.js, which is imported above. It was the
+// most capable of this repo's five hand-rolled readers, and tracker-workflow.js
+// needs the same shape — so it is shared rather than copied.
+//
+// Re-exported because the unit suite (evals/develop-batch/unit/schedule.test.mjs)
+// imports it from here. Keeping the name exported from this module means the
+// promotion is invisible to every existing caller.
+export { parseYamlSubset };
 
 // ── resources ────────────────────────────────────────────────────────────────
 

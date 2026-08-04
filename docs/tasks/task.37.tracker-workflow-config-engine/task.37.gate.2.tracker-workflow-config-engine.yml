@@ -1,0 +1,81 @@
+schema: 1
+task: "task.37.tracker-workflow-config-engine"
+task_title: "tracker-workflow.yaml — a consumer-owned status ladder the pipelines read"
+gate: CONCERNS
+status_reason: "All four cycle-1 findings verified fixed and correct. Re-review found the same defect class one level down: a byIssueType overlay replaces `statuses:` but inherits the base `pipeline:`, so an inherited target absent from the overlay ladder becomes a silent off-ladder side-state that validateWorkflow never checks."
+reviewer: "QA Engineer"
+updated: "2026-08-04T17:05:00Z"
+
+previous_gate: "task.37.gate.1.tracker-workflow-config-engine.yml"
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: "2026-08-04"
+  total_iterations: 1
+  verification_method: "Independent re-review: resolved candidate lists diffed against jira-sync.js constants; CR-1 reproduction re-run against the fix; bundled/source equality diffed directly."
+  verified:
+    - id: CR-1
+      status: closed
+      note: "DEFAULT_PIPELINE is name-based; no numeric branch survives in resolveMoment or validateWorkflow. For a no-file consumer the names resolve to rungs 1/2/5 and describeTarget returns the full rung list, confirmed byte-identical to IN_PROGRESS_CANDIDATES / REVIEW_CANDIDATES / DONE_CANDIDATES in order."
+    - id: CR-2
+      status: closed
+      note: "byIssueType deep-copied; parseYamlSubset output is JSON-safe by construction so the round-trip is lossless."
+    - id: CR-3
+      status: closed
+      note: "The pipeline reset is now inside the shape-checked branch; a scalar falls through to the default."
+    - id: CR-4
+      status: closed
+      note: "Bundled parser asserted equal to source modulo the single generated header line; diffed directly."
+
+top_issues:
+  - id: CR-5
+    issue: "A byIssueType overlay replaces `statuses:` but inherits the base `pipeline:`, and an inherited target absent from the overlay ladder silently becomes an off-ladder side-state."
+    severity: medium
+    finding: "Verified live: for issue type 'IT / DevOps Task' (overlay ladder [Selected for Development, In Progress, In Review, Done]), `in-review` resolves to the base target 'Waiting for Review' with offLadder:true — a column that type's workflow does not have. validateWorkflow returns no warning because its byIssueType loop only checks moments the overlay itself declares. This is the cycle-1 defect one level down: nobody chose that target for this ladder."
+    suggested_action: "Treat a target as inherited when it comes from the built-in default OR from the base pipeline applied to an overlay-replaced ladder, and resolve an inherited miss against the corresponding DEFAULT_LADDER rung's full alias list before falling back to off-ladder; extend validateWorkflow's byIssueType loop to check inherited moments against the per-type ladder."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 825
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from gate 1. No HTTP, no gh, single fixed git shell-out, purity from jira-sync.js asserted behaviourally."
+  performance:
+    status: PASS
+    notes: "Parse still cached and asserted. One inefficiency noted (planMove rebuilds the overlay ladder three times per call, re-running normalizeRung over every rung) — advisory only; the ladder is a handful of entries and the parse it depends on is cached."
+  reliability:
+    status: CONCERNS
+    notes: "Cycle 1's silent-wrong-target class is materially reduced but not eliminated: CR-5 reproduces it for any issue type carrying a statuses overlay. Same failure signature — a plausible config yields a move to a column the board does not have, with no warning."
+  maintainability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. The bundled-vs-source drift guard closed the gap that drove the cycle-1 deduction, and the 9 regression tests added are specific and well-explained. Two minor cleanups remain (a catch that would silently empty every overlay on a copy failure; a dead `void readFileSync` in a test) — neither affects behaviour."
+
+recommendations:
+  immediate:
+    - action: "Resolve inherited pipeline targets against the ladder in play via the default rung's alias list, and warn when an inherited moment misses a per-type ladder (CR-5)"
+      refs: ["shared/resources/tracker-workflow.js"]
+  future:
+    - action: "Drop the catch around the byIssueType deep copy, or warn instead of substituting an empty map — a copy failure currently loses every overlay silently"
+      refs: ["shared/resources/tracker-workflow.js"]
+    - action: "Compute the ladder once per public call in planMove instead of three times"
+      refs: ["shared/resources/tracker-workflow.js"]
+    - action: "Remove the unused readFileSync destructure and its `void` suppression in the cache test"
+      refs: ["shared/resources/tests/tracker-workflow.test.mjs"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "CR-5 fixed — it is the last member of the silent-wrong-target class this review has been chasing"

@@ -1,0 +1,94 @@
+# tracker-workflow.yaml — copy-paste starter.
+#
+#   cp docs/examples/tracker-workflow.default.yaml tracker-workflow.yaml
+#
+# Then edit `statuses:` to match your board's columns, in the order they appear
+# on it, and point each moment at the column it should move a card to.
+#
+# Full reference, including the three ways to handle a bespoke column:
+#   docs/reference/tracker-workflow.md
+#
+# The file is optional. With no file at all, the pipelines use a built-in default
+# ladder that reproduces their historical behaviour exactly.
+
+# ── The ladder ───────────────────────────────────────────────────────────────
+# Your board's columns, in board order. Order IS the workflow:
+#
+#   • Order is rank.        A rung's index is its rank, so a resumed run cannot
+#                           drag a card backwards out of a column.
+#   • Order is the path.    Moving two rungs walks the rung between. No transition
+#                           graph to author.
+#
+# Block sequences only — one `- Name` per line. A flow sequence (`[A, B, C]`) is
+# NOT supported and is rejected with an error rather than silently misread.
+statuses:
+  - Backlog
+  - Selected for Development
+  - In Progress
+  - Waiting for Review
+  - Ready for Testing
+  - Done
+
+# A rung may carry ALTERNATIVES when your board's column has been spelled several
+# ways over time, or when one config serves several boards. All names on a rung
+# share its rank, and the pipeline tries them in the order written:
+#
+#   statuses:
+#     - Backlog
+#     - names:
+#         - In Progress
+#         - Doing
+#     - Done
+
+# ── The moments ──────────────────────────────────────────────────────────────
+# Which status each pipeline moment targets.
+#
+#   • Omission is disablement. A moment not named here does not fire. There is no
+#                              `enabled: false` and no second place to switch it off.
+#   • Off-ladder is free.      A status named here but absent from `statuses:` is a
+#                              side-state: entered directly, never walked to.
+#
+# The moments are a closed set — each one is a point in the pipeline where a step
+# signals progress. Config chooses the target; it cannot invent a new moment.
+#
+#   work-started     branch created, development begins
+#   in-review        pull request opened
+#   in-qa            QA review starts
+#   ready-for-merge  QA passed, awaiting merge
+#   blocked          a pipeline gate failed and needs a human
+#   done             Definition of Done met, work accepted
+pipeline:
+  work-started: In Progress
+  in-review: Waiting for Review
+  in-qa: Ready for Testing
+  done: Done
+  # blocked: Blocked        # ← off-ladder side-state; uncomment if your board has one
+  # ready-for-merge: ...    # ← omitted here; add the column and the line together
+
+# ── Document status mapping (optional) ───────────────────────────────────────
+# Local document status -> board status, used by the /sync-* skills. The local
+# names are the canonical lifecycle from
+# shared/resources/document-status-lifecycle.md.
+documentStatus:
+  ready-for-development: Selected for Development
+  in-progress: In Progress
+  ready-for-review: Waiting for Review
+  accepted: Done
+
+# ── Per-issue-type overlay (optional; Jira only) ─────────────────────────────
+# Keyed on the LIVE tracker issue type name, matched case-insensitively. Quote any
+# key containing spaces or a slash.
+#
+# The overlay REPLACES `statuses:` for that type rather than merging into it, so a
+# type cannot inherit a rung its own workflow has never had. Setting a moment to
+# `~` disables it for that type only.
+#
+# byIssueType:
+#   "IT / DevOps Task":
+#     statuses:
+#       - Selected for Development
+#       - In Progress
+#       - In Review
+#       - Done
+#     pipeline:
+#       in-qa: ~

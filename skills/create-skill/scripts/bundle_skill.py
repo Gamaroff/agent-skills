@@ -27,6 +27,16 @@ SHARED_REF_RE = re.compile(r'(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
 JS_SHARED_RE = re.compile(
     r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)'
 )
+# ESM counterpart of JS_SHARED_RE, for `.mjs` (and any `.js` written as ESM):
+#   import { x } from "../../../shared/resources/x.js"
+#   import "../../shared/resources/x.js"
+#   await import("../../shared/resources/x.js")
+# `require()` and `import` are different syntax for the same edge, so both must be
+# rewritten or a `.mjs` skill script breaks in every bundled install while passing
+# in-repo — the un-bundled relative path resolves only here.
+JS_ESM_SHARED_RE = re.compile(
+    r'((?:from|import)\s+["\']|import\s*\(\s*["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])'
+)
 # Shell scripts under <skill>/scripts/ source shared libs via a relative path.
 # Rewrite any `../…/shared/resources/<name>` to `../references/<name>` (the
 # bundled location, one level up from scripts/).
@@ -36,6 +46,11 @@ REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:md|
 # Sibling require/import in JS — `require("./foo.js")` — used to follow transitive
 # deps inside bundled shared .js files.
 JS_SIBLING_RE = re.compile(r'require\(["\']\./([A-Za-z0-9._/-]+\.js)["\']\)')
+# ESM sibling counterpart — `import … from "./foo.js"` / `import("./foo.mjs")` —
+# so transitive deps are followed inside bundled shared ESM files too.
+JS_ESM_SIBLING_RE = re.compile(
+    r'(?:(?:from|import)\s+["\']|import\s*\(\s*["\'])\./([A-Za-z0-9._/-]+\.m?js)["\']'
+)
 # Sibling source/exec in shell — for transitive deps inside bundled shared .sh
 # files. Matches:
 #   source "$(dirname "$0")/foo.sh"   |   exec "$(dirname "$0")/foo.sh" "$@"
@@ -101,9 +116,16 @@ def bundle_skill(skill_path):
     def rewrite_text(content, suffix):
         if suffix == '.md':
             return SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
-        if suffix == '.js':
-            return JS_SHARED_RE.sub(
+        if suffix in ('.js', '.mjs'):
+            # Both forms are applied to both suffixes: a `.js` file may be ESM in a
+            # consumer whose package.json says so, and a `.mjs` file may still use
+            # createRequire(). Each regex is a no-op when its syntax is absent.
+            content = JS_SHARED_RE.sub(
                 lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})',
+                content,
+            )
+            return JS_ESM_SHARED_RE.sub(
+                lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)}',
                 content,
             )
         if suffix == '.sh':
@@ -114,6 +136,7 @@ def bundle_skill(skill_path):
     skill_files = (
         list(skill_path.rglob('*.md'))
         + list(skill_path.rglob('*.js'))
+        + list(skill_path.rglob('*.mjs'))
         + list(skill_path.rglob('*.sh'))
     )
     skill_files = [
@@ -153,8 +176,9 @@ def bundle_skill(skill_path):
         except (UnicodeDecodeError, OSError):
             continue
         pending.extend(collect_shared_refs(text))
-        if src.suffix == '.js':
+        if src.suffix in ('.js', '.mjs'):
             pending.extend(m.group(1) for m in JS_SIBLING_RE.finditer(text))
+            pending.extend(m.group(1) for m in JS_ESM_SIBLING_RE.finditer(text))
         if src.suffix == '.sh':
             pending.extend(m.group(1) for m in SH_SIBLING_RE.finditer(text))
 
