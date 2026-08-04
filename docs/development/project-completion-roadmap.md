@@ -44,7 +44,7 @@ T37–T39 are inert until T40 wires the first live behaviour change.
 
 ### Independent fix
 
-- [ ] **T36** Stop `setup-consumer.sh` generating a narrowing `jira.statusMap` · deps: none · touches: setup-consumer!, docs-config~ · /develop-task docs/tasks/task.36.setup-consumer-statusmap-fix/task.36.setup-consumer-statusmap-fix.md
+- [x] **T36** Stop `setup-consumer.sh` generating a narrowing `jira.statusMap` · deps: none · touches: setup-consumer!, docs-config~ · /develop-task docs/tasks/task.36.setup-consumer-statusmap-fix/task.36.setup-consumer-statusmap-fix.md
 
 ### Engine
 
@@ -85,3 +85,4 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 | Date       | Change                                                          |
 | ---------- | --------------------------------------------------------------- |
 | 2026-08-03 | Roadmap created; Phase 1 seeded with the tracker-workflow series (T36–T41) |
+| 2026-08-04 | T36 accepted — PR #190 merged (`48bb57e`). One success criterion waived: migration recipe unverified against a live board |

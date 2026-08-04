@@ -5,7 +5,7 @@ type: task
 description: "Remove the scalar jira.statusMap block the setup wizard writes into every Jira consumer, which narrows the built-in candidate lists to one name each and silently breaks status syncing on any non-vanilla board."
 tags: [jira, configuration, setup, regression]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-03
 updated: 2026-08-03
@@ -16,7 +16,7 @@ github_issue: 184
 
 # Technical Task: Stop `setup-consumer.sh` generating a `jira.statusMap` that disables status syncing
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.36.review.1.setup-consumer-statusmap-fix.md` implemented 2026-08-03
 
@@ -409,6 +409,10 @@ Not applicable — no hot path is touched. No baseline needed.
 - [x] `configuration.md` carries the Migration subsection and no longer claims the values are
       built-in defaults; neither of its two `statusMap` examples teaches the narrowing shape
 - [ ] The migration recipe is verified by hand against one real affected config
+      — **waived at acceptance (2026-08-04)**: needs a live Jira board with a non-vanilla
+      column. Accepted without it because the recipe's two moving parts are covered by
+      automated tests (the probe is read-only; `narrowingStatusMapAdvice` is asserted
+      against the exact historical block). Re-check when a real affected consumer surfaces.
 
 ---
 
