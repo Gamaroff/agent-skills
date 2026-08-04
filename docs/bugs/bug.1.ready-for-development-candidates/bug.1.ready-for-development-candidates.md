@@ -1,6 +1,6 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: 2026-08-04
@@ -13,7 +13,7 @@ github_issue: 191
 **Bug ID**: bug.1
 **GitHub Issue**: [#191](https://github.com/Gamaroff/agent-skills/issues/191)
 **Related**: none — cross-cutting (no single owner)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-08-04
@@ -30,6 +30,11 @@ it — `READY_CANDIDATES` — is only reachable via the alias key `ready`, which
 lifecycle status. A Jira board whose column is named exactly "Ready for Development" therefore never
 matches, and the status change is silently skipped.
 
+The spelled-out alias `"ready for development"` (jira-sync.js:1427) is bound to `NEW_CANDIDATES`
+too, so **both** spellings of the status fail identically — there is no spelling of this stage that
+reaches `READY_CANDIDATES`. Put the other way round: `READY_CANDIDATES` is currently unreachable
+from any canonical lifecycle status. The fix is less "widen a list" than "wire up an orphaned one".
+
 **Expected Behavior**: A document at `status: ready-for-development` syncs to a Jira column named
 "Ready for Development" with no configuration. That is the most literal possible spelling of the
 status, and the built-in candidate lists exist precisely so that the common vocabularies work
@@ -39,8 +44,9 @@ without a `statusMap`.
 `Selected for Development`. "Ready for Development" is not among them, so the transition is skipped.
 
 ```
-local ready-for-development → ["To Do","Backlog","Open","New","Selected for Development"]
-alias  ready                → ["Ready","Ready for Development","Selected for Development"]
+local ready-for-development   → ["To Do","Backlog","Open","New","Selected for Development"]
+alias "ready for development" → ["To Do","Backlog","Open","New","Selected for Development"]
+alias  ready                  → ["Ready","Ready for Development","Selected for Development"]
 ```
 
 **Impact**: Silent, and easy to misread as correct behaviour. The sync reports success overall and
@@ -97,9 +103,20 @@ ready                 → [ 'Ready', 'Ready for Development', 'Selected for Deve
 **Related Files**:
 
 - `shared/resources/jira-sync.js` — `NEW_CANDIDATES` (L1278), `READY_CANDIDATES` (L1322),
-  `DEFAULT_STATUS_MAP` (L1417)
-- `docs/reference/configuration.md` — the "Built-in defaults" table under *Jira status mapping*,
-  which documents the current (incorrect) grouping and must be updated with the fix
+  `DEFAULT_STATUS_MAP` (L1417), the canonical key (L1421) and the `"ready for development"` alias
+  (L1427). `mapStatusCandidates` is exported at L3227.
+- `shared/resources/tests/jira-stage.test.mjs`, `shared/resources/tests/jira-stage-fixtures.test.mjs`
+  — the existing Jira stage suites; already covered by the `shared/resources/tests/*.test.mjs` glob
+  in `package.json`, so a regression test added here needs no `npm test` wiring.
+- **Docs carrying the same incorrect grouping — all four must be updated together:**
+  - `docs/reference/configuration.md` (L~229) — the "Built-in defaults" table under *Jira status mapping*
+  - `skills/sync-jira-task/SKILL.md` (L192)
+  - `skills/sync-jira-story/SKILL.md` (L193)
+  - `skills/sync-jira-epic/SKILL.md` (L198)
+
+Not affected: `shared/resources/jira-transition-protocol.md` documents the resolution *order*, not
+the candidate lists, and needs no change. `shared/resources/document-status-lifecycle.md` mentions
+"Selected for Development" only as prose example.
 
 ---
 
@@ -119,61 +136,176 @@ copies. No one story or task owns it.
 behaviour, and its contract test asserts the existing Jira suites pass **unchanged**. This fix
 changes what a given local status resolves to, so it needs its own change with its own verification.
 
+**Coordination with task.37 / task.38** (both `planned`): task.37 introduces a consumer-supplied
+`tracker-workflow.yaml` whose built-in default reproduces today's behaviour. It does not own this
+defect — an explicit consumer config is a different path from the zero-config default — but whichever
+of the two lands second must carry the same binding, or the defect reappears through the other path.
+Check task.37's built-in default when this bug is picked up.
+
 ---
 
 ## Suggested Fix
 
-Not prescriptive — the choice between these is a judgment call for whoever picks it up.
+Not prescriptive — the choice between these is a judgment call for whoever picks it up. The single
+axis that decides it: **on a board that has both a `To Do` column and a `Ready*` column, which one
+should `ready-for-development` land in?** Options 2 and 3 say the `Ready*` column and accept a
+destination change for existing boards; options 1 and 4 say `To Do` and change nothing that works today.
 
 1. **Widen `NEW_CANDIDATES` for this key**: bind `"ready-for-development"` to a list that includes
    both the vanilla backlog names and `Ready for Development`. Lowest-risk, but leaves two lists
    that overlap confusingly.
-2. **Rebind the key to `READY_CANDIDATES`**: most literal reading of the status name. Riskier —
+2. **Rebind the key to `READY_CANDIDATES`**: most literal reading of the status name. Riskiest —
    a board with both a `To Do` and a `Ready` column would change destination, and `To Do` would no
    longer be tried at all for this status.
-3. **Concatenate**: `"ready-for-development": [...READY_CANDIDATES, ...NEW_CANDIDATES]` deduped, so
-   the literal name wins but existing boards keep their current destination via the later entries.
-   Probably the right answer: it is additive, and no board that works today stops working.
+3. **Prepend**: `"ready-for-development": [...READY_CANDIDATES, ...NEW_CANDIDATES]` deduped, so the
+   literal name wins on boards that have it while `To Do` is still tried as a fallback. Nothing is
+   *removed*, but this **does** change destinations — see the regression cases below. Choose it only
+   if the `Ready*`-column-wins semantics are what you want.
+4. **Append**: `"ready-for-development": [...NEW_CANDIDATES, "Ready", "Ready for Development"]`.
+   The only variant that is genuinely zero-regression: every board keeps the exact destination it
+   resolves to today, and a board that has *only* a `Ready for Development` column — the reported
+   case — starts working. The cost is that a board with both columns keeps landing in `To Do`, which
+   some would call the wrong answer for this stage.
+
+> **Correction to an earlier draft of this section**: option 3 was described as additive with "no
+> board that works today stops working". That is false and contradicted the ordering rule stated
+> below. Deduped, option 3 resolves to
+> `["Ready","Ready for Development","Selected for Development","To Do","Backlog","Open","New"]`, so:
+>
+> - a board with both `Ready` and `To Do` flips from `To Do` → `Ready`;
+> - a board with both `Selected for Development` and `To Do` flips from `To Do` →
+>   `Selected for Development`, because dedup promotes that entry from position 5 to position 3.
+>
+> Both are silent destination changes on boards that work correctly today.
 
 Whichever is chosen:
 
 - The ordered nature of candidate matching means **appending is safe, prepending is not** — anything
-  placed before `To Do` changes where existing boards land. Option 3 prepends deliberately, so it
-  needs a test proving a `To Do`-only board is unaffected.
-- Update the "Built-in defaults" table in `docs/reference/configuration.md` in the same commit.
-- Add a regression test asserting `mapStatusCandidates("ready-for-development")` contains
-  `"Ready for Development"`.
-- Re-run `jira-stage.test.mjs` / `jira-stage-fixtures.test.mjs` and expect **deliberate** diffs;
-  unlike task.36 this change is *supposed* to move resolution.
+  placed before `To Do` changes where existing boards land. Option 4 is the only option that
+  respects this rule; options 2 and 3 break it by design and must own that trade-off explicitly.
+- **Apply the same binding to both keys**: the canonical `"ready-for-development"` (L1421) *and* the
+  spelled-out alias `"ready for development"` (L1427). Fixing only one makes the two spellings of
+  the same status resolve differently — a worse failure than the current one, because it is
+  inconsistent rather than merely wrong.
+- Update **all four** documentation tables listed in *Related Files* in the same commit, not just
+  `docs/reference/configuration.md`.
+- Edit `shared/resources/jira-sync.js` only, then run **`npm run bundle`** to propagate into the
+  eleven bundled `skills/*/references/jira-sync.js` copies, and commit the result. Editing a bundled
+  copy directly is silently reverted by the next bundle run.
+- Add regression tests asserting:
+  - `mapStatusCandidates("ready-for-development")` contains `"Ready for Development"`;
+  - `mapStatusCandidates("ready for development")` returns the identical list;
+  - a board exposing **both** `To Do` and a `Ready*` column resolves to the intended destination.
+    A `To Do`-only board test is necessary but **not sufficient** — it cannot catch either flip
+    described in the correction above.
+- Re-run `jira-stage.test.mjs` / `jira-stage-fixtures.test.mjs` and expect **deliberate** diffs under
+  options 2 and 3; unlike task.36 this change is *supposed* to move resolution. Under options 1 and 4
+  the existing suites should pass unchanged — a diff there is a bug in the fix.
 
 ---
 
 ## Developer Fix Cycle
 
-[This section will be filled by developer during fix process]
-
 ### Iteration 1
 
 #### Investigation (New → In Progress)
 
-**Date**: [Date]
-**Developer**: [Name]
+**Date**: 2026-08-04
+**Developer**: Claude (`/develop-bug`)
 
-[Investigation notes, root cause analysis]
+**Reproduction**: Reproduced verbatim at the library level, exactly as the report specifies — no Jira
+board required:
+
+```
+ready-for-development → ["To Do","Backlog","Open","New","Selected for Development"]
+ready for development → ["To Do","Backlog","Open","New","Selected for Development"]
+ready                 → ["Ready","Ready for Development","Selected for Development"]
+
+contains "Ready for Development"? false
+```
+
+**Root Cause Analysis**: `shared/resources/jira-sync.js` — `DEFAULT_STATUS_MAP` bound the canonical
+key `"ready-for-development"` (L1421) and its spelled-out alias `"ready for development"` (L1427) to
+`NEW_CANDIDATES` (L1278), which does not contain the literal string `"Ready for Development"`. The
+purpose-built `READY_CANDIDATES` (L1322) was referenced exactly once, by the non-canonical `ready`
+alias (L1437) — confirmed by grep: only two references in the whole file, the definition and that one
+binding. So `READY_CANDIDATES` was unreachable from any canonical lifecycle status, and no spelling
+of this stage could match a column named after it.
+
+Nothing downstream rescues the miss. `eqName` (L2142) is exact lowercase equality, `resolveTransition`
+(L2169) is exact at every step, and its `statusCategory` fallback is gated on `terminal` — which
+`ready-for-development` is not. The result is `{ match: null, reason: "no-transition" }`: a silent
+skip that still reports overall success.
+
+Blast-radius check before touching anything: `DEFAULT_STATUS_RANK` (L1403) derives from
+`NEW_CANDIDATES` and `DEFAULT_STAGE_MAP`, **not** from `DEFAULT_STATUS_MAP`, so rebinding these two
+keys cannot perturb the backwards-transition rank guard.
+
+**Proposed Fix**: Option 4 (append) — bind both keys to `NEW_CANDIDATES` followed by the dedicated
+`Ready*` names, deduped.
 
 #### Fix Implementation (In Progress → Ready for QA)
 
-**Date**: [Date]
+**Date**: 2026-08-04
 
-**Root Cause**: [Explanation]
+**Root Cause**: Both spellings of the `ready-for-development` stage were bound to a candidate list
+that omits the stage's own name, while the list containing that name was orphaned behind a
+non-canonical alias.
 
-**Fix Description**: [What was changed]
+**Fix Description**:
+
+- Added `READY_FOR_DEVELOPMENT_CANDIDATES`, derived as the deduped union
+  `[...new Set([...NEW_CANDIDATES, ...READY_CANDIDATES])]` →
+  `["To Do","Backlog","Open","New","Selected for Development","Ready","Ready for Development"]`.
+  Derived rather than hand-written so a future edit to either source list propagates, and so
+  `READY_CANDIDATES` is no longer orphaned.
+- Rebound **both** `"ready-for-development"` and `"ready for development"` to it, with an inline
+  comment on the alias explaining that the two must never diverge.
+- **Ordering is the whole safety argument** and is documented as such at the definition: the
+  dedicated names are *appended*, never prepended. Because candidate matching is ordered and exact,
+  every board that resolves to `To Do`/`Backlog`/`Open`/`New` today keeps that exact destination;
+  only a board exposing none of them reaches the `Ready*` names. Dedup keeps the first occurrence, so
+  `Selected for Development` stays at position 5 rather than being promoted to position 3 — the
+  specific flip the report's correction block warns about.
 
 **Files Modified**:
 
-- [file1.js]
+- `shared/resources/jira-sync.js` — new `READY_FOR_DEVELOPMENT_CANDIDATES` const; both
+  `DEFAULT_STATUS_MAP` keys rebound to it.
+- `shared/resources/tests/jira-ready-for-development-candidates.test.mjs` — **new** regression suite
+  (11 tests). Added as a new file rather than editing the existing Jira suites, so "existing suites
+  pass unchanged" remains a meaningful verification signal. Already covered by the
+  `shared/resources/tests/*.test.mjs` glob in `package.json` — no test wiring needed.
+- `docs/reference/configuration.md`, `skills/sync-jira-task/SKILL.md`,
+  `skills/sync-jira-story/SKILL.md`, `skills/sync-jira-epic/SKILL.md` — all four defaults tables
+  split `ready-for-development` onto its own row with the seven-name list.
+- `skills/*/references/jira-sync.js` — all **11** bundled copies regenerated via `npm run bundle`
+  (verified present in every one).
 
-**Testing**: [How the fix was tested]
+**Testing**:
+
+- **Fails-without verified explicitly**: with `jira-sync.js` reverted via `git stash`, the two tests
+  encoding the defect fail (`includes the literal 'Ready for Development'`, and the
+  `Ready for Development`-only board resolving to `null`); the 9 zero-regression guards pass both
+  before and after the fix, which is exactly what a no-regression guarantee should look like.
+- New suite post-fix: **11/11 pass**.
+- `jira-stage.test.mjs` + `jira-stage-fixtures.test.mjs`: **30/30 pass, unchanged** — the signal
+  option 4 predicts. A diff here would have indicated a bug in the fix.
+- Full `npm test`: **734/734 pass, 0 fail**.
+- Ordering is asserted as a *prefix* rather than by membership, so a future prepend fails loudly. The
+  decisive case — a board exposing **both** `To Do` and a `Ready*` column — is tested in both column
+  orders, since a `To Do`-only test cannot distinguish append from prepend.
+
+**Verification Steps for QA**:
+
+1. `node -e 'console.log(require("./shared/resources/jira-sync.js").mapStatusCandidates("ready-for-development"))'`
+   → must include `Ready for Development` and start with `To Do`.
+2. Confirm both spellings return identical lists.
+3. `node --test shared/resources/tests/jira-ready-for-development-candidates.test.mjs` → 11/11.
+4. `node --test shared/resources/tests/jira-stage.test.mjs shared/resources/tests/jira-stage-fixtures.test.mjs`
+   → 30/30, unchanged.
+5. Confirm all 11 `skills/*/references/jira-sync.js` copies contain `READY_FOR_DEVELOPMENT_CANDIDATES`.
+6. Confirm all four doc tables list the seven-name list for `ready-for-development`.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
@@ -193,6 +325,9 @@ Whichever is chosen:
 | Date       | Status | Changed By | Notes                                            |
 | ---------- | ------ | ---------- | ------------------------------------------------ |
 | 2026-08-04 | New    | Claude     | Found while verifying task.36 (#184); filed after |
+| 2026-08-04 | New    | Claude     | `/review-bug` — 9/10, READY TO FIX; no duplicate, defect confirmed present. Corrected option 3's safety claim, added option 4, added alias key + `npm run bundle` + full doc list to scope |
+| 2026-08-04 | In Progress | develop-bug | Reproduced at library level; investigation started |
+| 2026-08-04 | Ready for QA | develop-bug | Fix implemented (option 4, append) + 11-test regression suite; 734/734 npm test |
 
 ---
 
