@@ -585,11 +585,17 @@ function resolveMoment(moment, workflow, opts) {
   if (!key) return null;
   const issueType = opts && opts.issueType;
 
-  // Resolved ONCE and threaded down. Previously resolveMoment, isInherited and
-  // describeTarget each re-derived it — three overlay lookups and two full ladder
-  // rebuilds per moment, which validateWorkflow multiplied by moments × types,
-  // and which is how the two copies came to disagree in the first place.
-  const ctx = resolveLadder(workflow, issueType);
+  // The ladder is resolved ONCE per call and threaded down — previously
+  // resolveMoment, isInherited and describeTarget each re-derived it, which is how
+  // the copies came to disagree in the first place. It is also resolved LAZILY:
+  // most moments return null (five of the eight are disabled under the built-in
+  // default), and the expensive part — a normalizeRung pass over every overlay
+  // rung plus a sameLadder comparison — would answer a question never asked.
+  //
+  // `overlayFor` stays eager and separate because it is a single key lookup; only
+  // the ladder build is worth deferring.
+  let _ctx = null;
+  const ctx = () => (_ctx || (_ctx = resolveLadder(workflow, issueType)));
 
   // The overlay may null out a moment for one issue type.
   const overlay = overlayFor(workflow, issueType);
@@ -598,7 +604,7 @@ function resolveMoment(moment, workflow, opts) {
       const v = overlay.pipeline[key];
       if (v === null || v === undefined || String(v).trim() === "") return null;
       // Authored for this exact type — never alias-resolved.
-      return describeTarget(String(v).trim(), ctx.ladder, key, false);
+      return describeTarget(String(v).trim(), ctx().ladder, key, false);
     }
   }
 
@@ -621,8 +627,9 @@ function resolveMoment(moment, workflow, opts) {
   //
   // An overlay that restates the base ladder is neither: `fromOverlay` is false
   // for it, so authored targets stay authored.
-  const inherited = ctx.fromOverlay || (workflow && workflow.pipelineAuthored === false);
-  return describeTarget(String(raw).trim(), ctx.ladder, key, !!inherited);
+  const resolved = ctx();
+  const inherited = resolved.fromOverlay || (workflow && workflow.pipelineAuthored === false);
+  return describeTarget(String(raw).trim(), resolved.ladder, key, !!inherited);
 }
 
 /**
@@ -705,6 +712,16 @@ function validateWorkflow(workflow) {
 
   const ladder = workflow.ladder || [];
 
+  // One base resolution per moment, shared by both loops below. The base loop asks
+  // "is this off-ladder?" and the per-type loop asks the inverse; computing it in
+  // both places is precisely the duplication that produced a finding in each of
+  // cycles 2, 3 and 4.
+  const _baseCache = new Map();
+  const baseResolution = (moment) => {
+    if (!_baseCache.has(moment)) _baseCache.set(moment, resolveMoment(moment, workflow));
+    return _baseCache.get(moment);
+  };
+
   // Duplicate names across rungs make rankOf's answer depend on rung order,
   // which is not something an author can reason about.
   const seen = new Map();
@@ -739,8 +756,11 @@ function validateWorkflow(workflow) {
       continue;
     }
     // Resolve exactly as resolveMoment would, so validation cannot disagree with
-    // behaviour — including the inherited-alias fallback.
-    const resolved = resolveMoment(moment, workflow);
+    // behaviour — including the inherited-alias fallback. Memoised because the
+    // per-issue-type loop below needs the same answer for every moment, and
+    // deriving it twice with opposite polarity is the duplication that produced a
+    // finding in each of the preceding cycles.
+    const resolved = baseResolution(moment);
     if (resolved && !resolved.offLadder) continue;
 
     // Reaching here means the target is off-ladder. Off-ladder is a legitimate
@@ -800,7 +820,7 @@ function validateWorkflow(workflow) {
       // `changes-requested` and `pr-merged` when their base target WAS on the base
       // ladder and genuinely missing from this type's — the exact unreported
       // inherited miss the warning exists for.
-      const baseRes = resolveMoment(moment, workflow);
+      const baseRes = baseResolution(moment);
       if (!baseRes || baseRes.offLadder) continue;
       const resolved = resolveMoment(moment, workflow, { issueType: type });
       if (resolved && resolved.offLadder) {

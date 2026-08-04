@@ -671,31 +671,40 @@ almost everything here is a forward fix.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-04
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (after 4 fix cycles)
 
 ### QA Report
 
-- **Full Report**: [task.37.qa.1.tracker-workflow-config-engine.md](./task.37.qa.1.tracker-workflow-config-engine.md)
-- **Gate File**: [task.37.gate.1.tracker-workflow-config-engine.yml](./task.37.gate.1.tracker-workflow-config-engine.yml)
+- **Final Report**: [task.37.qa.5.tracker-workflow-config-engine.md](./task.37.qa.5.tracker-workflow-config-engine.md)
+- **Final Gate**: [task.37.gate.5.tracker-workflow-config-engine.yml](./task.37.gate.5.tracker-workflow-config-engine.yml)
+- **Cycle history**: [qa.1](./task.37.qa.1.tracker-workflow-config-engine.md) CONCERNS 80 → [qa.2](./task.37.qa.2.tracker-workflow-config-engine.md) CONCERNS 90 → [qa.3](./task.37.qa.3.tracker-workflow-config-engine.md) CONCERNS 90 → [qa.4](./task.37.qa.4.tracker-workflow-config-engine.md) **FAIL** 80 → [qa.5](./task.37.qa.5.tracker-workflow-config-engine.md) **PASS** 100
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 816 (816 pass, 0 fail)
+- **Tests Executed**: 840 (840 pass, 0 fail) — from 760 at branch point
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW, 2 advisory
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Issues**: 9 found and closed across 5 cycles (1 HIGH, 5 MEDIUM, 2 LOW, plus cleanups); 0 remaining
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Every declared success criterion is met, and the test work exceeds what the task asked for. The
-diff review found one medium correctness defect the criteria do not describe: a file declaring
-`statuses:` without `pipeline:` inherits rung **indices** authored against the built-in ladder, so
-on a custom ladder `done` silently never fires while two other moments work by coincidence of
-position — and `validateWorkflow` reports nothing. Fixed in cycle 1 (see below).
+Every declared success criterion is met. Beyond them, five QA cycles found and closed nine defects
+that the criteria do not describe — all one class: **a target chosen against one ladder being
+silently resolved against a different one**, with the meta-cause that the concept was evaluated in
+several places using predicates that were individually plausible and mutually inconsistent.
+
+The first fix each cycle was correct; each also introduced its successor, until cycle 4 collapsed the
+duplication (one ladder scan, one overlay decision, one base resolution per moment) and cycle 5
+confirmed the class closed with zero correctness defects. Every reproduction was re-executed against
+the final code rather than re-tested, since fixes and their tests were authored together and are not
+independent evidence.
+
+The compatibility contract survived intact: the built-in default still resolves to candidate lists
+byte-identical to `jira-sync.js`'s constants, in order.
 
 ---
 
