@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: 2026-08-04
@@ -13,7 +13,7 @@ github_issue: 191
 **Bug ID**: bug.1
 **GitHub Issue**: [#191](https://github.com/Gamaroff/agent-skills/issues/191)
 **Related**: none — cross-cutting (no single owner)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-08-04
@@ -309,14 +309,40 @@ non-canonical alias.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-08-04
+**Verified by**: develop-bug (Verify Cycle 1)
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: All three verification signals green on the first cycle.
 
-**Decision**: Closed | Reopened
+1. **Regression test** — `jira-ready-for-development-candidates.test.mjs` 11/11 pass. The
+   fails-without property was established in Step 3 by reverting `jira-sync.js` and re-running: the
+   two defect-encoding tests fail on pre-fix code, the nine zero-regression guards pass either way.
+2. **Suite + validation** — full `npm test` 734/734, 0 fail. `npm run validate:all` 113 skills
+   passed, 0 failed (relevant because three `SKILL.md` files were edited). No `lint` script exists in
+   this repo; `validate:all` is its equivalent gate.
+3. **Diff code review** — no blocking correctness findings. Verified: declaration order is safe
+   (`READY_FOR_DEVELOPMENT_CANDIDATES` follows both source lists); `Set` dedup preserves insertion
+   order and collapses the shared `Selected for Development` entry; **no identity (`===`) or
+   enumeration dependence on `DEFAULT_STATUS_MAP` values exists anywhere in the file**, so rebinding
+   is safe; `DEFAULT_STATUS_RANK` derives from `NEW_CANDIDATES`/`DEFAULT_STAGE_MAP` and is untouched;
+   all 11 bundled copies differ from source by exactly one line — the bundler's `AUTO-GENERATED`
+   header — with the fix region and both key bindings byte-identical.
+
+Documentation completeness was re-checked rather than trusted. The review's "not affected" list holds:
+`shared/resources/document-status-lifecycle.md` maps to a **Default Jira status** (singular, the
+primary candidate `To Do`), which the fix leaves unchanged and which the test suite asserts; its
+"Selected for Development" mention is prose. `CHANGELOG.md` is a historical record and correctly
+untouched. `scripts/setup-consumer.sh` emits no `ready-for-development` binding (task.36 removed the
+generated `statusMap`). The `loadStatusMap` comment blocks are YAML-syntax examples, not claims about
+defaults. `--probe-workflow` picks up the corrected list automatically via `mapStatusCandidates`.
+
+The reported failure no longer reproduces: a board whose only column is `Ready for Development` now
+resolves to it, while every board that resolves to `To Do`/`Backlog`/`Open`/`New` today keeps that
+exact destination.
+
+**Decision**: Closed (finalised in Step 7)
 
 ---
 
@@ -328,15 +354,58 @@ non-canonical alias.
 | 2026-08-04 | New    | Claude     | `/review-bug` — 9/10, READY TO FIX; no duplicate, defect confirmed present. Corrected option 3's safety claim, added option 4, added alias key + `npm run bundle` + full doc list to scope |
 | 2026-08-04 | In Progress | develop-bug | Reproduced at library level; investigation started |
 | 2026-08-04 | Ready for QA | develop-bug | Fix implemented (option 4, append) + 11-test regression suite; 734/734 npm test |
+| 2026-08-04 | Ready for QA | develop-bug | Fix verified — bug scenario gone; all 3 signals green on cycle 1 |
+| 2026-08-04 | Closed | develop-bug | Fix verified and accepted; DoD satisfied, CI green on head. PR #192 |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: ✅ Closed — Fixed
 
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Total Iterations**: 1 (no reopen; verification passed on the first cycle)
+
+**Time to Resolution**: Same day — filed and closed 2026-08-04
+
+**Final Fix Details**: `DEFAULT_STATUS_MAP` bound both the canonical `"ready-for-development"` key
+and its spelled-out alias `"ready for development"` to `NEW_CANDIDATES`, a list that omits the
+stage's own name; the list that contained it, `READY_CANDIDATES`, was reachable only from the
+non-canonical `ready` alias and so was unreachable from any lifecycle status. Both keys now bind to
+`READY_FOR_DEVELOPMENT_CANDIDATES` — the deduped union of the two lists, with the dedicated `Ready*`
+names **appended rather than prepended**. Because candidate matching is ordered and exact, every
+board keeps the exact destination it resolves to today, and a board whose column is named
+`Ready for Development` starts matching. Shipped with an 11-test regression suite, all four
+documentation tables corrected, and the 11 bundled skill copies regenerated.
+
+**Lessons Learned**:
+
+1. **An ordered candidate list has two independent failure modes, and only one is obvious.** The
+   filed defect was *membership* — a missing name. The likelier defect while fixing it was *ordering*
+   — silently relocating cards on boards that already work. A membership-only test passes just as
+   happily under a prepend, so the regression suite asserts the backlog names as a **prefix** and
+   exercises a board exposing both `To Do` and a `Ready*` column. A `To Do`-only test, which is the
+   natural thing to write, cannot distinguish append from prepend at all.
+
+2. **Dedup is an ordering operation, not just a tidiness one.** `NEW_CANDIDATES` and
+   `READY_CANDIDATES` share `Selected for Development`. Deduping a *prepended* union would have
+   promoted that entry from position 5 to position 3 and flipped any board exposing both it and
+   `To Do` — a regression with no new name involved anywhere, invisible to a reader checking only
+   which names were added.
+
+3. **The review's most valuable output was catching a self-contradiction, not a gap.** The report
+   originally recommended an option as "no board that works today stops working" while stating the
+   opposing ordering rule two lines later. Both could not be true, and the plausible-sounding one
+   would have shipped a second silent transition failure while fixing the first.
+
+4. **A "not affected" list deserves the same verification as an "affected" one.** Four of the five
+   files the review declared unaffected were re-checked here rather than trusted; all four held, but
+   the check is cheap and a wrong exclusion leaves documentation silently contradicting code.
+
+5. **Deriving a list beats hand-writing it.** `[...new Set([...NEW_CANDIDATES, ...READY_CANDIDATES])]`
+   yields the same seven names as a literal would, but propagates future edits to either source list
+   and retires `READY_CANDIDATES`'s orphan status — the underlying condition that allowed this bug.
+
+6. **Zero-regression is a testable claim, so test it.** Under the chosen option the pre-existing Jira
+   suites must pass **unchanged**; that turns 30/30 from a routine green into evidence about this
+   specific decision. Adding the new tests to a separate file, rather than editing those suites, is
+   what preserved that signal.

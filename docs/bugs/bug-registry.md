@@ -27,7 +27,7 @@
 
 | #   | Title | Status | Severity | Priority | Created | Area |
 | --- | ----- | ------ | -------- | -------- | ------- | ---- |
-| 1 | [`ready-for-development` cannot match a Jira column named "Ready for Development"](bug.1.ready-for-development-candidates/bug.1.ready-for-development-candidates.md) | new | Minor | Medium | 2026-08-04 | jira-sync / status mapping |
+| 1 | [`ready-for-development` cannot match a Jira column named "Ready for Development"](bug.1.ready-for-development-candidates/bug.1.ready-for-development-candidates.md) | closed | Minor | Medium | 2026-08-04 | jira-sync / status mapping |
 
 ---
 
