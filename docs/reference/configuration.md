@@ -30,6 +30,12 @@ Skills resolve these via [`shared/resources/resolve-paths.sh`](../../shared/reso
 tracker: jira # optional override — see Platform Detection
 vcs: bitbucket # optional override — see Platform Detection
 
+# NOTE: `tracker` is a SCALAR above. The map form below is an alternative use of
+# the same key — YAML cannot hold both, so pick one. Most projects need neither:
+# the platform auto-detects, and tracker-workflow.yaml is found at its default path.
+tracker:
+  workflowFile: tracker-workflow.yaml # optional — path to the status ladder
+
 prd:
   prdShardedLocation: docs/prd # root for PRD shard tree
 
@@ -94,6 +100,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | ------------------------------------------------ | ------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tracker`                                        | `jira` \| `github`              | (auto-detected)                                  | Issue tracker override. See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                                                                                                                                            |
 | `vcs`                                            | `github` \| `bitbucket`         | (auto-detected from git remote)                  | VCS override. See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `tracker.workflowFile`                           | path                            | `tracker-workflow.yaml`                          | Path to the consumer-owned status ladder. Env override `TRACKER_WORKFLOW_FILE` wins. Mutually exclusive with the scalar `tracker:` form above — see [Tracker workflow](#tracker-workflow). Full spec: [`tracker-workflow.md`](./tracker-workflow.md)                                                                                                                                                                                                                                       |
 | `prd.prdShardedLocation`                         | path                            | `docs/prd`                                       | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `architecture.architectureShardedLocation`       | path                            | `docs/architecture`                              | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md)                                                                                                                                                                                                                                                                                                                                        |
 | `devLoadAlwaysFiles`                             | list[path]                      | `[]`                                             | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.)                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -134,6 +141,51 @@ story directory:
 ```
 
 Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
+
+## Tracker workflow
+
+`tracker-workflow.yaml` at the repo root declares your board's statuses **in order**, plus which
+status each pipeline moment targets. Ordering does three jobs at once: it is the rank the
+backward-move guard uses, it is the path a card walks between two positions, and a status omitted
+from `pipeline:` simply does not fire.
+
+```yaml
+statuses:
+  - Backlog
+  - In Progress
+  - Waiting for Review
+  - Done
+
+pipeline:
+  work-started: In Progress
+  in-review: Waiting for Review
+  done: Done
+```
+
+The file is optional — with none, the pipelines use a built-in default ladder reproducing their
+historical behaviour exactly. Full format, the moment table, and worked examples for bespoke columns:
+[`tracker-workflow.md`](./tracker-workflow.md). Copy-paste starter:
+[`docs/examples/tracker-workflow.default.yaml`](../examples/tracker-workflow.default.yaml).
+
+**Path resolution**, highest precedence first:
+
+1. `TRACKER_WORKFLOW_FILE` environment variable
+2. `tracker.workflowFile` in `skills-config.yaml`
+3. `tracker-workflow.yaml` at the repo root (the default — most projects set nothing)
+
+> **`tracker:` scalar vs map.** `tracker: jira` (a platform override) and `tracker: {workflowFile: …}`
+> are the same YAML key used two ways, and a file can only hold one of them. If you need both, keep
+> the scalar and set `TRACKER_WORKFLOW_FILE` — or leave the workflow file at its default path, which
+> needs no config at all.
+
+**Precedence against the older keys**, which both keep working:
+
+```
+tracker-workflow.yaml  >  jira.workflowRecord  >  jira.statusMap  >  built-in defaults
+```
+
+No migration is required. A project with no `tracker-workflow.yaml` resolves exactly as it did
+before this key existed.
 
 ## Pipeline stages
 
@@ -529,6 +581,7 @@ Full spec: [`shared/resources/platform-detection.md`](../../shared/resources/pla
 ## See also
 
 - [File naming](../standards/file-naming.md)
+- [Tracker workflow](./tracker-workflow.md) — `tracker-workflow.yaml`, the consumer-owned status ladder
 - [Story documents](../standards/story-documents.md) — story directory conventions
 - [Task documents](../standards/task-documents.md) — uses `devLoadAlwaysFiles`, `devDebugLog`
 - [Story Development Runbook](../runbooks/story-development.md)

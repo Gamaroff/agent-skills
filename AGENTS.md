@@ -79,6 +79,10 @@ Packaged `.zip` files are build artifacts (gitignored: `skills/*/*.zip`). Regene
 
 Projects place a `skills-config.yaml` at their root. Full schema and key reference: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 
+### Tracker Workflow
+
+Canonical spec: [`docs/reference/tracker-workflow.md`](./docs/reference/tracker-workflow.md). TL;DR: an optional `tracker-workflow.yaml` at the consumer repo root declares the board's statuses **in order** plus which status each pipeline moment targets. Order is rank, order is the path between two positions, an omitted moment does not fire, and a target absent from `statuses:` is an off-ladder side-state. Missing file → a built-in default ladder reproducing today's behaviour. Engine: [`shared/resources/tracker-workflow.js`](./shared/resources/tracker-workflow.js) (pure, tracker-agnostic; **not wired to any pipeline yet**).
+
 ### Platform Detection
 
 Skills that interact with remote trackers or PRs use a resolver order to pick the platform — explicit config → env vars → git remote → default GitHub. Canonical spec: [`shared/resources/platform-detection.md`](./shared/resources/platform-detection.md).
