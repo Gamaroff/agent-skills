@@ -48,7 +48,7 @@ T37–T39 are inert until T40 wires the first live behaviour change.
 
 ### Engine
 
-- [ ] **T37** `tracker-workflow.yaml` config engine + promoted YAML parser · deps: none · touches: workflow-engine!, docs-config~ · /develop-task docs/tasks/task.37.tracker-workflow-config-engine/task.37.tracker-workflow-config-engine.md
+- [x] **T37** `tracker-workflow.yaml` config engine + promoted YAML parser · deps: none · touches: workflow-engine!, docs-config~ · /develop-task docs/tasks/task.37.tracker-workflow-config-engine/task.37.tracker-workflow-config-engine.md
 
 ### Per-tracker execution ‖ (dependency-independent once T37 lands)
 
@@ -86,3 +86,4 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 | ---------- | --------------------------------------------------------------- |
 | 2026-08-03 | Roadmap created; Phase 1 seeded with the tracker-workflow series (T36–T41) |
 | 2026-08-04 | T36 accepted — PR #190 merged (`48bb57e`). One success criterion waived: migration recipe unverified against a live board |
+| 2026-08-04 | T37 accepted — PR #193 merged (`deeb795`). All 17 success criteria met, no waivers. 5 QA cycles, 9 findings closed; tests 760 → 840. **T38 and T39 are now unblocked** — they may run in parallel |

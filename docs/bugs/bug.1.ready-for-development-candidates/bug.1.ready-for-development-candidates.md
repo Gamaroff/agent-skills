@@ -142,6 +142,22 @@ defect — an explicit consumer config is a different path from the zero-config 
 of the two lands second must carry the same binding, or the defect reappears through the other path.
 Check task.37's built-in default when this bug is picked up.
 
+> **Resolved 2026-08-04 — task.37 landed second (PR #193, `deeb795`) and does not reintroduce the
+> defect.** Verified by executing the shipped engine rather than by reading it:
+>
+> - The built-in default's `documentStatus` is `{}`, so
+>   `resolveDocumentStatus("ready-for-development", <default workflow>)` returns `null`. The engine
+>   does not own this mapping in the zero-config case at all, so `jira-sync.js`'s binding still
+>   governs and there is no second default to keep in sync.
+> - That binding is intact: both `ready-for-development` and its `ready for development` alias still
+>   resolve to the seven-name union including `Ready for Development`.
+> - Task.37's rung 0 is byte-identical to `DEFAULT_STATUS_RANK`'s rank-10 set, and
+>   `Ready for Development` is unranked in **both** — so the ladder matches existing rank semantics
+>   exactly rather than diverging from them.
+>
+> A consumer who writes an explicit `documentStatus:` block can of course override this, but that is
+> the deliberate consumer-config path this note already distinguishes from the zero-config default.
+
 ---
 
 ## Suggested Fix
