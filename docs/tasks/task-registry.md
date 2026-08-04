@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-06-28
-**Next Available Task Number:** **36**
+**Last Updated:** 2026-08-03
+**Next Available Task Number:** **42**
 
 ## How to use
 
@@ -75,6 +75,12 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 33 | [Build evals for develop-task pipeline (protocol + step-isolation + smoke)](task.33.develop-task-evals/task.33.develop-task-evals.md) | draft | testing | Medium | 2026-05-11 | [#68](https://github.com/Gamaroff/agent-skills/issues/68) | task.32 |
 | 34 | [Build evals for develop-story pipeline (mirrors develop-task + epic-branch + resume coverage)](task.34.develop-story-evals/task.34.develop-story-evals.md) | draft | testing | Medium | 2026-05-11 | [#69](https://github.com/Gamaroff/agent-skills/issues/69) | task.33 |
 | 35 | [Conform document skills, templates, and standards to the Open Knowledge Format (OKF) v0.1](task.35.okf-conformance-document-skills/task.35.okf-conformance-document-skills.md) | draft | documentation | Medium | 2026-06-28 | [#162](https://github.com/Gamaroff/agent-skills/issues/162) | — |
+| 36 | [Stop setup-consumer.sh generating a jira.statusMap that disables status syncing](task.36.setup-consumer-statusmap-fix/task.36.setup-consumer-statusmap-fix.md) | ready-for-review | refactoring | High | 2026-08-03 | [#184](https://github.com/Gamaroff/agent-skills/issues/184) | — |
+| 37 | [tracker-workflow.yaml — a consumer-owned status ladder the pipelines read](task.37.tracker-workflow-config-engine/task.37.tracker-workflow-config-engine.md) | planned | infrastructure | High | 2026-08-03 | [#185](https://github.com/Gamaroff/agent-skills/issues/185) | — |
+| 38 | [Jira: walk the status ladder, and stop the terminal fallback firing on a retargeted done](task.38.jira-ladder-walking/task.38.jira-ladder-walking.md) | planned | refactoring | High | 2026-08-03 | [#186](https://github.com/Gamaroff/agent-skills/issues/186) | task.37 |
+| 39 | [gh-stage.js — a GitHub Projects board engine driven by the workflow ladder](task.39.github-board-stage-engine/task.39.github-board-stage-engine.md) | planned | infrastructure | High | 2026-08-03 | [#187](https://github.com/Gamaroff/agent-skills/issues/187) | task.37 |
+| 40 | [Replace the five inline GitHub GraphQL board blocks with gh-stage.js calls](task.40.github-pipeline-step-wiring/task.40.github-pipeline-step-wiring.md) | planned | refactoring | High | 2026-08-03 | [#188](https://github.com/Gamaroff/agent-skills/issues/188) | task.39 |
+| 41 | [Two new pipeline moments, workflow-file scaffolding, and the develop-bug gap](task.41.pipeline-moments-and-scaffolding/task.41.pipeline-moments-and-scaffolding.md) | planned | infrastructure | Medium | 2026-08-03 | [#189](https://github.com/Gamaroff/agent-skills/issues/189) | task.38, task.40 |
 
 ---
 
@@ -82,4 +88,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 - Task 6 has no tracker issue — pre-dates the tracker-on-creation requirement; backfill via `/sync-jira-task` or `gh issue create` if needed.
 - Tasks 32-34 are the **Evals Infrastructure** milestone ([#1](https://github.com/Gamaroff/agent-skills/milestone/1)).
-- Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../../AGENTS.md#file-naming-conventions-used-in-target-projects).
+- Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
