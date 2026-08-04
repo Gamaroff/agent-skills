@@ -2,7 +2,7 @@
 
 How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[x]` rows satisfy
 `deps:`. This is a **living backlog** — completed items are archived to
-[`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
+`roadmap-history.md` (created at the first phase close), so a `deps:` entry naming no current row means
 _already shipped_, not an error.
 
 Selection is executed by `select-next.mjs`, never by eye:

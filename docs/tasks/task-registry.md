@@ -88,4 +88,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 - Task 6 has no tracker issue — pre-dates the tracker-on-creation requirement; backfill via `/sync-jira-task` or `gh issue create` if needed.
 - Tasks 32-34 are the **Evals Infrastructure** milestone ([#1](https://github.com/Gamaroff/agent-skills/milestone/1)).
-- Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../../AGENTS.md#file-naming-conventions-used-in-target-projects).
+- Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
