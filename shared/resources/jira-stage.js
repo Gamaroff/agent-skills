@@ -22,7 +22,8 @@
  *   0  transitioned, walked, parked mid-ladder (walk-incomplete), already there,
  *      disabled, no matching transition, a printed plan, or no credentials —
  *      every outcome the pipeline should shrug at
- *   1  a skip, but only under --strict
+ *   1  a skip, but only under --strict. A parked walk counts as a skip: the card
+ *      did not reach the status the moment asked for.
  *   2  usage error (unknown stage, missing --issue)
  *
  * Zero non-transition exit codes matter: pipeline steps run inside shells, and
@@ -161,12 +162,40 @@ function describeAlternatives(transitions, stage, record, issueType) {
 //     confident wrong transition into the board's real Done is not recoverable,
 //     whereas a skip is.
 function resolveMomentSpec({ stage, issueType, record, workflow }) {
-  const moment = workflow
-    ? tw.resolveMoment(stage, workflow, { issueType })
-    : null;
-  if (!moment) {
+  // Only an AUTHORED file outranks the JSON record. `loadWorkflow` never fails —
+  // with no file it returns the BUILT-IN default ladder, whose `pipeline:` covers
+  // work-started, in-review and done. Treating that as a ladder hit would put the
+  // built-in defaults ABOVE `jira.workflowRecord` and invert the documented
+  // precedence: every existing consumer who configured the record and never
+  // adopted the new format would silently lose its `enabled`, `candidates`,
+  // `rank` and `byIssueType` for exactly those three stages.
+  const authored = !!(workflow && workflow.source === "file");
+  if (!authored) {
     return { spec: lib.resolveStage({ stage, issueType, record }), moment: null };
   }
+
+  const moment = tw.resolveMoment(stage, workflow, { issueType });
+
+  // Null from an authored file means DISABLED, not "unspecified". Omission from
+  // `pipeline:` is the only way to switch a moment off, so falling back to the
+  // built-in defaults here would fire a transition the author deliberately
+  // removed — and for `done` that means firing the board's real Done. An
+  // unwanted terminal transition is the one outcome that cannot be undone.
+  if (!moment) {
+    return {
+      spec: {
+        known: true,
+        stage,
+        enabled: false,
+        candidates: [],
+        rank: null,
+        reason: "not declared in tracker-workflow.yaml — omission is disablement",
+        terminal: false,
+      },
+      moment: null,
+    };
+  }
+
   return {
     spec: {
       known: true,
@@ -181,16 +210,9 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
   };
 }
 
-// The hops a moment implies from a given position: the rungs the ladder declares
-// between here and the target, then the target rung itself. Every element is an
-// array of names in preference order.
-function planHops({ from, targets, workflow, issueType }) {
-  if (!workflow || !targets || !targets.length) return targets ? [targets] : [];
-  return [
-    ...tw.planMove(from, targets[0], workflow, { issueType }).map((r) => r.names),
-    targets,
-  ];
-}
+// Hop construction lives in jira-sync.js beside walkLadder, so the plan printed
+// here is built by the same code that walks it. Re-exported for tests.
+const planHops = lib.planHops;
 
 async function run({
   argv = process.argv,
@@ -424,25 +446,61 @@ async function run({
     output,
   });
 
-  if (res.reason === "walked" || res.transitioned) {
-    return emit({ ...res, issueType }, 0);
-  }
-
   // A partial walk is neither a success nor "nothing happened" — the card is
   // parked in a gate the board declares, and a reader must be able to tell that
-  // from a card that never moved. Both are exit 0: a gate is a legitimate board
-  // shape and stopping at one is the correct outcome.
+  // from a card that never moved.
+  //
+  // This is tested FIRST, before the success branch. A partial walk that got
+  // through the gate has `transitioned: true` — it really did move — so a
+  // success branch checking `res.transitioned` would swallow it and report a
+  // parked card as a clean pass, with no warning at all. The one outcome the
+  // three-shape reporting exists to surface would be the one never surfaced.
+  //
+  // Exit 0 unless --strict, matching every other skip: a gate is a legitimate
+  // board shape and stopping at one is the correct outcome, but a caller that
+  // has opted into strictness wants to hear about anything short of arrival.
   if (res.reason === "walk-incomplete") {
     const remaining = (res.remaining || [])
       .map((rung) => rung.join(" / "))
       .join(" → ");
+    const moved = res.landed && res.landed !== res.from;
     output.warn(
-      `⏸️  ${args.issue} walked as far as "${res.landed}" — ${remaining || "the target"} not reachable from there.`,
+      moved
+        ? `⏸️  ${args.issue} walked as far as "${res.landed}" — ${remaining || "the target"} not reachable from there.`
+        : `⏸️  ${args.issue} did not move from "${res.from}" — ${remaining || "the target"} not reachable.`,
     );
-    output.warn(
-      `    The card is parked mid-ladder, not un-moved. Move it on by hand, or declare the missing rung.`,
-    );
+    if (moved)
+      output.warn(
+        `    The card is parked mid-ladder, not un-moved. Move it on by hand, or declare the missing rung.`,
+      );
+    // The hop's own failure, which `incomplete()` carries up as `cause`. Without
+    // this an HTTP error or a required-field refusal reads as a gate.
+    if (res.cause && res.cause !== "no-transition")
+      output.warn(`    Hop failed with: ${res.cause}${res.detail ? ` — ${res.detail}` : ""}.`);
+    if (res.cause === "no-transition") {
+      let transitions = [];
+      try {
+        transitions = await lib.getTransitions({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey: args.issue,
+        });
+      } catch (_) {}
+      for (const h of describeAlternatives(
+        transitions,
+        args.stage,
+        record,
+        issueType,
+      ))
+        output.warn(`   ↪ ${h}`);
+    }
     return emit({ ...res, issueType }, args.strict ? 1 : 0);
+  }
+
+  if (res.reason === "walked" || res.transitioned) {
+    return emit({ ...res, issueType }, 0);
   }
 
   if (res.reason === "already") {

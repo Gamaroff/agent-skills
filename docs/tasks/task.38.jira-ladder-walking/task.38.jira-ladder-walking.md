@@ -847,3 +847,65 @@ automatically by the bundler from the new `require`.
 | Date | Change |
 | --- | --- |
 | 2026-08-05 | Phases 1–5 implemented; `npm test` 870/870; `npm run bundle` run; status → Ready for Review |
+
+
+---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-05
+**Quality Score**: 20/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.38.qa.1.jira-ladder-walking.md](./task.38.qa.1.jira-ladder-walking.md)
+- **Gate File**: [task.38.gate.1.jira-ladder-walking.yml](./task.38.gate.1.jira-ladder-walking.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 870 (870 passing)
+- **Phases Verified**: 5/5 implemented; 3/5 clean, 2 with issues
+- **Critical Issues**: 3 HIGH, 2 MEDIUM, 2 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings
+
+Three high-confidence correctness bugs on the primary feature path, each reproduced by executing the
+shipped code. The green suite does not contradict them: every new test calls the helpers directly,
+and two of the three live in `jira-stage.run()`'s branch ordering — a path no test exercises end to
+end.
+
+- **CR-1** — a card already at the target reports `walk-incomplete` instead of `already`. The most
+  common pipeline outcome, now warning nonsensically and exiting 1 under `--strict`.
+- **CR-2** — a genuine partial walk is emitted as a success with no warning, because
+  `res.transitioned` is true for it and that branch is tested first.
+- **CR-3** — an authored ladder that omits a moment still fires the built-in default for it, so
+  `--stage done` can fire a real Done transition on a board that switched `done` off.
+- **CR-4** (medium) — with no yaml, the built-in default ladder bypasses the JSON workflow record,
+  contradicting the documented precedence and the task's "no breaking changes" claim.
+- **CR-5** (medium) — a hop-0 HTTP or required-fields failure is flattened to `walk-incomplete`,
+  losing the diagnostics that are the only way such failures surface.
+
+### QA Fix Cycle 1 — 2026-08-05
+
+All five gate issues fixed; both cleanups and the test-coverage gap closed. Verified by executing the
+shipped code, not just by the suite going green.
+
+| ID | Fix | Verified |
+| --- | --- | --- |
+| CR-1 | Cycle guard skipped on the first hop (`i > 0`). `planMove` returns rungs *strictly between* from and to, so an intermediate rung can never be `from` — the guard is only meaningful from `i>=1`. | `already` ✅ |
+| CR-1b | Follow-on found while fixing CR-1: with the guard skipped, an all-`already` walk fell through to the success return and reported `walked`. The final return now emits the legacy `already` shape when no hop fired. | `already` ✅ |
+| CR-2 | `walk-incomplete` branch moved **above** the success branch in `run()`, since a partial walk that moved has `transitioned: true`. Warning text now distinguishes moved-and-parked from never-moved. | run() test ✅ |
+| CR-3 | `resolveMomentSpec` returns `enabled: false` when an **authored** file omits the moment — omission is disablement. | `enabled=false` ✅ |
+| CR-4 | The ladder branch is taken only when `workflow.source === "file"`, so the built-in default sits **below** `jira.workflowRecord` as documented. | record honoured ✅ |
+| CR-5 | `incomplete()` carries the hop's own `cause` (plus `detail`/`unfillable`/`available`), and `run()` surfaces it — including re-running `describeAlternatives` on a `no-transition` cause. | `cause: http-500` ✅ |
+| Cleanup | Hop construction de-duplicated into one exported `planHops` in `jira-sync.js`, used by both `walkLadder` and the print-plan/dry-run paths. The drift the parity test guards is now structurally impossible. | — |
+| Cleanup | Exit-code comment corrected — the code was right (`--strict` → 1), the comment was wrong. | — |
+| Coverage | Six `run()`-level tests added (already-at-target, partial walk, `--strict`, `--dry-run` issues no POST, unhandled throw exits 0), plus cause-propagation and precedence tests. This gap is why the original 24 tests passed with three bugs present. | 880/880 ✅ |
+
+**Tests**: 870 → **880**, all passing. `npm run bundle` re-run.
+
+Status returned to Ready for Review for QA cycle 2.

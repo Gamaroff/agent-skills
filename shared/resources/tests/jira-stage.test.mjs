@@ -550,22 +550,30 @@ test("walk — a blocked second hop parks the card and says where", async () => 
 });
 
 test("walk — a cycle is stopped and reported as incomplete, never as walked", async () => {
-  // A ladder whose gate offers only a route back to where the walk started.
-  const wf = fromYaml(GATE_LADDER);
+  // A misauthored ladder whose TARGET rung lists a status the walk has already
+  // passed through — the shape the guard exists for. The card moves to the gate,
+  // then hop 2 asks it back to where it started.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Ready for Showcase
+  - names:
+      - Waiting for Review
+      - In Progress
+
+pipeline:
+  in-review: Waiting for Review
+`);
   const s = stubWalk([
     [T("21", "Ready for Showcase", "Ready for Showcase")],
     [T("22", "Back", "In Progress")],
-    [T("21", "Ready for Showcase", "Ready for Showcase")],
   ]);
   const res = await lib.walkLadder(
     walkArgs({
       http: s.http,
       from: "In Progress",
-      // Target the status the walk STARTED from, so the target rung is a status
-      // already visited and the loop guard has to fire.
-      targets: ["In Progress"],
+      targets: tw.resolveMoment("in-review", wf).targets,
       workflow: wf,
-      allowRegress: true,
     }),
   );
   assert.equal(
@@ -575,6 +583,262 @@ test("walk — a cycle is stopped and reported as incomplete, never as walked", 
   );
   assert.notEqual(res.reason, "walked");
   assert.ok("landed" in res && "remaining" in res);
+  assert.equal(res.landed, "Ready for Showcase", "it did reach the gate");
+  assert.equal(s.posts.length, 1, "the cycling hop was never fired");
+});
+
+test("walk — a card already AT the target reports `already`, not a parked walk", async () => {
+  // The most common pipeline outcome: a resumed run re-fires a stage the card
+  // has already passed. The cycle guard is seeded with `from`, and the target
+  // rung contains `from`, so guarding the first hop turned this into
+  // `walk-incomplete` — a card that never moved reported as parked in a gate,
+  // exiting 1 under --strict.
+  const wf = fromYaml(GATE_LADDER);
+  const s = stubWalk([[T("1", "Onward", "Done")]]);
+  const res = await lib.walkLadder(
+    walkArgs({
+      http: s.http,
+      from: "Waiting for Review",
+      targets: ["Waiting for Review"],
+      workflow: wf,
+    }),
+  );
+  assert.equal(res.reason, "already");
+  assert.notEqual(res.reason, "walk-incomplete");
+  assert.equal(res.transitioned, false);
+  assert.equal(s.posts.length, 0);
+});
+
+test("walk — a hop's own failure survives as `cause`, not flattened to walk-incomplete", async () => {
+  // A multi-hop plan whose FIRST hop 500s. Reporting only "walk-incomplete"
+  // loses the Jira message, which is the sole route a workflow validator has to
+  // the operator, and suppresses the caller's no-transition diagnostics.
+  const wf = fromYaml(GATE_LADDER);
+  const s = stubWalk(
+    [[T("21", "Ready for Showcase", "Ready for Showcase")]],
+    { postResponses: [fail(500, { errorMessages: ["Boom"] })] },
+  );
+  const res = await lib.walkLadder(
+    walkArgs({
+      http: s.http,
+      from: "In Progress",
+      targets: ["Waiting for Review"],
+      workflow: wf,
+    }),
+  );
+  assert.equal(res.reason, "walk-incomplete");
+  assert.equal(res.cause, "http-500", "the underlying failure is preserved");
+  assert.ok(res.detail, "and so is its message");
+  assert.equal(res.landed, "In Progress", "the card never left");
+  assert.equal(res.transitioned, false);
+});
+
+// --- precedence: an authored ladder vs the JSON record ---------------------
+
+test("spec — an authored ladder that OMITS a moment disables it, never falls back", () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  // Omission from `pipeline:` is the only way to switch a moment off. Falling
+  // back to the built-in defaults here would fire the board's real Done on a
+  // board whose author deliberately removed that moment.
+  const wf = fromYaml(`
+statuses:
+  - Todo
+  - In Progress
+  - Done
+
+pipeline:
+  work-started: In Progress
+`);
+  assert.equal(tw.resolveMoment("done", wf), null, "precondition: omitted");
+  const { spec } = cli.resolveMomentSpec({
+    stage: "done",
+    issueType: "",
+    record: {},
+    workflow: wf,
+  });
+  assert.equal(spec.enabled, false);
+  assert.deepEqual(spec.candidates, []);
+  assert.equal(spec.terminal, false);
+  assert.match(spec.reason, /omission is disablement/);
+});
+
+test("spec — with NO authored file the JSON workflow record still wins", () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  // `loadWorkflow` never fails: with no file it returns the BUILT-IN default
+  // ladder, whose pipeline covers work-started/in-review/done. Treating that as
+  // a ladder hit would put the built-in defaults ABOVE jira.workflowRecord and
+  // invert the documented precedence, silently dropping the record's config for
+  // every consumer who has not adopted the new format.
+  const dflt = tw.buildWorkflow(parseYamlSubset(""), {
+    source: "default",
+    path: "<default>",
+  });
+  const record = {
+    stages: {
+      done: { enabled: false, reason: "we never auto-close" },
+      "work-started": { candidates: ["Kicked Off"], rank: 15 },
+    },
+  };
+  const done = cli.resolveMomentSpec({
+    stage: "done",
+    issueType: "",
+    record,
+    workflow: dflt,
+  }).spec;
+  assert.equal(done.enabled, false, "the record's enabled:false is honoured");
+  assert.equal(done.reason, "we never auto-close");
+
+  const started = cli.resolveMomentSpec({
+    stage: "work-started",
+    issueType: "",
+    record,
+    workflow: dflt,
+  }).spec;
+  assert.deepEqual(started.candidates, ["Kicked Off"]);
+  assert.equal(started.rank, 15);
+});
+
+test("spec — an authored ladder DOES outrank the record for a declared moment", () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const wf = fromYaml(GATE_LADDER);
+  const record = { stages: { "in-review": { candidates: ["Record Column"] } } };
+  const { spec } = cli.resolveMomentSpec({
+    stage: "in-review",
+    issueType: "",
+    record,
+    workflow: wf,
+  });
+  assert.deepEqual(spec.candidates, ["Waiting for Review"]);
+});
+
+// --- run() end-to-end -------------------------------------------------------
+//
+// Every other test calls the helpers directly, which is exactly why the branch
+// ordering inside run() could be wrong while the suite stayed green. These drive
+// the CLI itself.
+
+function withAuth(fn) {
+  const saved = {};
+  const env = {
+    JIRA_URL: "https://x.atlassian.net",
+    JIRA_API_TOKEN: "t",
+    JIRA_USER_EMAIL: "e@x",
+    JIRA_PROJECT_KEY: "K",
+  };
+  for (const [k, v] of Object.entries(env)) {
+    saved[k] = process.env[k];
+    process.env[k] = v;
+  }
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+}
+
+/** A fetch stub answering the issue read, then a transition list per hop. */
+function stubFetch({ status, issueType = "Story", perGet = [], postOk = true }) {
+  const posts = [];
+  let g = 0;
+  return {
+    posts,
+    fetchImpl: async (url, opts = {}) => {
+      const json = async () => {
+        if (url.includes("/transitions"))
+          return { transitions: perGet[Math.min(g++, perGet.length - 1)] };
+        return { fields: { status: { name: status }, issuetype: { name: issueType } } };
+      };
+      if ((opts.method || "GET") !== "GET") {
+        posts.push(JSON.parse(opts.body));
+        return { ok: postOk, status: postOk ? 204 : 500, json: async () => ({}), text: async () => "" };
+      }
+      return { ok: true, status: 200, json, text: async () => "" };
+    },
+  };
+}
+
+test("run() — a card already at the target exits 0 and reports already", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  await withAuth(async () => {
+    const s = stubFetch({ status: "In Progress", perGet: [[]] });
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--strict"],
+      fetchImpl: s.fetchImpl,
+    });
+    assert.equal(r.reason, "already");
+    assert.equal(r.exitCode, 0, "already is exit 0 even under --strict");
+    assert.equal(s.posts.length, 0);
+  });
+});
+
+test("run() — a partial walk is reported as walk-incomplete, not as a success", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  await withAuth(async () => {
+    // This repo's own tracker-workflow.yaml is authored (Todo → In Progress →
+    // Done) and declares work-started, so the walk resolves from the ladder.
+    const s = stubFetch({
+      status: "Todo",
+      perGet: [[T("9", "Nowhere", "Somewhere Else")]],
+    });
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet"],
+      fetchImpl: s.fetchImpl,
+    });
+    // One rung, unreachable → the legacy single-hop reason, not walk-incomplete.
+    assert.equal(r.reason, "no-transition");
+    assert.equal(r.exitCode, 0);
+    assert.equal(s.posts.length, 0, "nothing was fired");
+  });
+});
+
+test("run() — --strict turns a skip into exit 1, unchanged", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  await withAuth(async () => {
+    const s = stubFetch({
+      status: "Todo",
+      perGet: [[T("9", "Nowhere", "Somewhere Else")]],
+    });
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--strict"],
+      fetchImpl: s.fetchImpl,
+    });
+    assert.equal(r.exitCode, 1);
+  });
+});
+
+test("run() — --dry-run issues no POST", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  await withAuth(async () => {
+    const s = stubFetch({
+      status: "Todo",
+      perGet: [[T("11", "Start", "In Progress")]],
+    });
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--dry-run"],
+      fetchImpl: s.fetchImpl,
+    });
+    assert.equal(r.reason, "dry-run");
+    assert.equal(r.would, "In Progress");
+    assert.equal(s.posts.length, 0, "dry-run must never POST");
+  });
+});
+
+test("run() — an unhandled throw still exits 0", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  await withAuth(async () => {
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet"],
+      fetchImpl: () => {
+        throw new Error("network on fire");
+      },
+    });
+    // fetchIssue failing is a documented non-failing outcome.
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.reason, "issue-unreadable");
+  });
 });
 
 test("walk — a rung resolves via a NON-first name, not just names[0]", async () => {

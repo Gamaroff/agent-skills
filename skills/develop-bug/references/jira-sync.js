@@ -2637,6 +2637,29 @@ async function transitionToStatus({
   return { transitioned: true, from: current, to: landed, rule, loggedWork };
 }
 
+// The hops a moment implies from a given position: the rungs the ladder declares
+// between here and the target, then the target rung itself. Every element is an
+// ARRAY of candidate names in preference order, never a single name — collapsing
+// a rung to names[0] makes alternative spellings unreachable, which is the
+// regression tracker-workflow's plural `targets` exists to prevent.
+//
+// ONE implementation, deliberately. `--print-plan` and `--dry-run` print the plan
+// while `walkLadder` executes it; two copies of this rule would let the printed
+// plan and the walked one drift apart, which is precisely the failure the parity
+// test exists to catch. Both now call this.
+//
+// A null/absent workflow means no ladder is in play, so there is nothing between
+// here and there: the target rung alone.
+function planHops({ from, targets, workflow, issueType = "" }) {
+  const rungs = (targets || []).filter(Boolean);
+  if (!rungs.length) return [];
+  if (!workflow) return [rungs];
+  return [
+    ...tw.planMove(from, rungs[0], workflow, { issueType }).map((r) => r.names),
+    rungs,
+  ];
+}
+
 // Walk the rungs between where a card sits and where a moment wants it.
 //
 // Transitions are POSITION-DEPENDENT: the set available from "In Progress" is
@@ -2683,27 +2706,35 @@ async function walkLadder({
   if (!rungs.length) return { transitioned: false, reason: "no-target", from };
 
   const key = (s) => stripStatusEmoji(s).toLowerCase();
-  // A uniform array of name-ARRAYS: the intermediate rungs the ladder declares,
-  // then the target rung itself. Every element is a candidate list.
-  const hops = [
-    ...tw
-      .planMove(from, rungs[0], workflow, { issueType })
-      .map((r) => r.names),
-    rungs,
-  ];
+  const hops = planHops({ from, targets: rungs, workflow, issueType });
 
   const visited = new Set([key(from)]);
   const walked = [];
   let current = from;
 
-  const incomplete = (i, reason) => ({
-    transitioned: current !== from,
-    reason,
-    from,
-    landed: current,
-    remaining: hops.slice(i),
-    hops: walked,
-  });
+  // `cause` carries the hop's OWN failure reason up through the walk. Without it
+  // a hop-0 `http-500`, `required-fields` or `no-transition` is flattened to a
+  // bare "walk-incomplete", and the caller's diagnostics — which branch on
+  // `no-transition` to list what the board did offer, and on `detail` to surface
+  // the workflow-validator message that has no other route to the operator —
+  // silently stop firing. A 500 from Jira must not read as "parked in a gate".
+  const incomplete = (i, reason, res) => {
+    const out = {
+      transitioned: current !== from,
+      reason,
+      from,
+      landed: current,
+      remaining: hops.slice(i),
+      hops: walked,
+    };
+    if (res) {
+      out.cause = res.reason;
+      for (const k of ["detail", "unfillable", "available", "candidates"]) {
+        if (res[k] !== undefined) out[k] = res[k];
+      }
+    }
+    return out;
+  };
 
   for (let i = 0; i < hops.length; i++) {
     const rung = hops[i];
@@ -2711,7 +2742,19 @@ async function walkLadder({
     // into the success return below. An aborted cycle is a BLOCKED walk, and
     // reporting it as `walked` erases the distinction the three outcomes exist
     // to preserve.
-    if (rung.some((n) => visited.has(key(n)))) {
+    //
+    // NOT on the first hop. `visited` is seeded with `from`, and when the card is
+    // already where the moment wants it the TARGET rung contains `from` — the
+    // single most common outcome in a pipeline, since every resumed run re-fires
+    // stages the card has already passed. Guarding at i=0 turned that into
+    // `walk-incomplete`, which reads as "parked in a gate" and exits 1 under
+    // --strict. Letting hop 0 reach transitionToStatus gets the honest `already`
+    // instead, from the same short-circuit that has always produced it.
+    //
+    // Skipping i=0 costs nothing: planMove returns the rungs STRICTLY between
+    // `from` and the target, so an intermediate rung can never be `from`, and a
+    // one-rung walk has no earlier hop to cycle back to.
+    if (i > 0 && rung.some((n) => visited.has(key(n)))) {
       return incomplete(i, "walk-incomplete");
     }
 
@@ -2775,7 +2818,23 @@ async function walkLadder({
     // A one-rung ladder must be byte-identical to today, so when the first and
     // only hop fails, report ITS reason rather than dressing it up as a walk.
     if (isLast && i === 0) return { ...res, from, landed: current, hops: walked };
-    return incomplete(i, "walk-incomplete");
+    return incomplete(i, "walk-incomplete", res);
+  }
+
+  // Every rung was already satisfied and nothing fired. That is `already`, not a
+  // walk of length zero: callers branch on it to print "is already X" and it is
+  // the legacy shape a one-rung ladder has always returned. Reporting `walked`
+  // here would make a no-op indistinguishable from a real move on the reader's
+  // side, and `to`/`from` are both the current status exactly as before.
+  if (walked.length && walked.every((h) => h.result === "already")) {
+    return {
+      transitioned: false,
+      reason: "already",
+      to: current,
+      from: current,
+      landed: current,
+      hops: walked,
+    };
   }
 
   return {
@@ -3458,6 +3517,7 @@ module.exports = {
   findExistingByLabel,
   transitionToStatus,
   walkLadder,
+  planHops,
   syncDocumentStatus,
   summariseStatusOutcome,
   probeWorkflow,
