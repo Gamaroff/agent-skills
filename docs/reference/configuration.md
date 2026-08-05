@@ -43,6 +43,7 @@ architecture:
   architectureShardedLocation: docs/architecture # root for architecture docs
 
 jira:
+  docBranch: develop # optional — branch that document links point at (see Document link branch)
   devEstimateField: customfield_10594 # optional — Jira custom field id for estimated dev hours
   defaultAssignee: 712020:00000000-0000-0000-0000-000000000000 # optional — accountId every card is assigned to
   statusMap: # optional, usually unnecessary — local status → Jira workflow status name(s)
@@ -110,6 +111,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `jira.doneResolution`                            | string                          | (prefers `Done`, `Resolved`, `Fixed`)            | Resolution name used when a workflow's done transition requires one. Env override: `JIRA_DONE_RESOLUTION`.                                                                                                                                                                                                                                                                                                                                                                                |
 | `jira.cancelledResolution`                       | string                          | (prefers `Won't Do`, `Cancelled`, `Declined`)    | Resolution name used when cancelling. Env override: `JIRA_CANCELLED_RESOLUTION`.                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `jira.devEstimateField`                          | string (custom field id)        | (unset → skipped)                                | Jira custom field id that `estimated_effort_hours` is written to on story/task sync (e.g. `customfield_10594`, "Dev Estimate (hour)"). See [Jira estimate field](#jira-estimate-field).                                                                                                                                                                                                                                                                                                   |
+| `jira.docBranch`                                 | string (branch name)            | (falls back to `developNext.baseBranch`, then git) | Branch that Bitbucket **document links** in a synced issue point at. Set this on any repo whose docs live somewhere other than the git default branch — i.e. most Gitflow repos. Env override: `JIRA_DOC_BRANCH`. See [Document link branch](#document-link-branch).                                                                                                                                                                                                                     |
 | `jira.defaultAssignee`                           | string (Jira accountId)         | (unset → field not sent)                         | accountId applied on story/task/epic sync when the document's frontmatter has no `assignee`. Frontmatter wins. An **accountId**, never a name or team — Jira rejects anything else with a bare `HTTP 400`. Placeholders (`TBD`, `unassigned`, `none`, `n/a`, …) are refused with a warning in either position rather than sent. Unset in both places means the field is omitted entirely, so an update leaves Jira's existing assignee untouched. Find yours at `GET /rest/api/3/myself`. |
 | `github.projectEstimateField`                    | string (project field name)     | `Estimate`                                       | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field).                                                                                                                                                                                                                                                                                                                                |
 | `branching.epicIntegration.epicFrontmatterKey`   | string                          | `branch_model`                                   | Epic frontmatter key read to decide whether the epic delivers via an integration branch.                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -404,6 +406,45 @@ Notes:
 - Resilient by design: if Jira rejects the configured id (wrong id, or not on the issue's screen), the
   sync logs a warning, drops just that field, and retries — the rest of the issue still syncs.
 
+## Document link branch
+
+When a story, task or epic syncs to Jira, the issue description carries a Bitbucket
+link back to the source document. That link needs a branch, and the branch it needs
+is the one the document **durably** lives on.
+
+Resolution order:
+
+1. `--doc-branch <name>` on the command line
+2. `JIRA_DOC_BRANCH` in the environment
+3. `jira.docBranch` in `skills-config.yaml`
+4. `developNext.baseBranch` in `skills-config.yaml`
+5. the current branch's upstream
+6. git's default branch (`origin/HEAD`, else `main`/`master`/`develop`)
+
+**Set `jira.docBranch` if your documents do not live on the git default branch.**
+On a Gitflow repo, git will correctly report the default branch as `main`, and docs
+authored on `develop` reach `main` only through a release — so links resolved from
+git alone point at a path that does not exist yet, and 404.
+
+```yaml
+jira:
+  docBranch: develop
+```
+
+Two details worth knowing:
+
+- **`developNext.baseBranch` is read as a fallback.** A project that already declares
+  `developNext: { baseBranch: develop }` has said where its work lands; making it
+  repeat itself under a second key only invents a way for the two to disagree. Set
+  `jira.docBranch` explicitly when the two genuinely differ.
+- **Config outranks the current branch's upstream, deliberately.** A feature branch
+  does contain the document, so a link to it resolves *today* — and 404s the moment
+  the branch is deleted on merge. The configured branch is the durable one, which is
+  the entire point of writing a permanent link into a tracker issue.
+
+Setting neither key leaves behaviour exactly as it was: git decides, and repos that
+never had this problem do not acquire one.
+
 ## GitHub estimate field
 
 The `sync-github-{story,task}` skills (and their internal `ensure-{story,task}-github-issue`
@@ -559,9 +600,26 @@ Full reference (hook catalogue, lock-file format, escape valves, interaction dia
 
 | Variable                 | Example                          | Required | Purpose                                                                             |
 | ------------------------ | -------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| `BITBUCKET_USERNAME`     | `jsmith`                         | Yes      | Basic Auth username                                                                 |
-| `BITBUCKET_APP_PASSWORD` | `ATB...`                         | Yes      | App password (not account password) — Bitbucket → Personal settings → App passwords |
+| `BITBUCKET_USERNAME`     | `jsmith@example.com`             | Yes      | Basic Auth username — your Atlassian account email                                  |
+| `BITBUCKET_API_TOKEN`    | `ATATT...`                       | Yes      | Atlassian API token **with Bitbucket scopes ticked**. Create at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `BITBUCKET_APP_PASSWORD` | `ATATT...`                       | No       | Legacy **name**, still read as a fallback. Set it to the same API token — app passwords themselves were removed by Atlassian on 2026-07-28 |
 | `BITBUCKET_REPO_URL`     | `https://bitbucket.org/org/repo` | No       | Override if git remote auto-detect fails                                            |
+
+Four things about the Bitbucket credential are easy to get wrong, and each fails
+quietly rather than loudly:
+
+- **It is an API token, not an app password.** Only the older variable *name* survives.
+- **The token needs Bitbucket scopes.** A scopeless token works against Jira and fails
+  against Bitbucket, which reads as an outage rather than a permissions problem.
+- **Bitbucket uses Basic auth (`curl -u`), never Bearer.** Bearer belongs to repository
+  and workspace access tokens — a different credential in a different context.
+- **An unauthenticated call returns 404, not 401**, because Bitbucket hides private
+  repositories from anonymous callers. A missing credential therefore looks like an
+  *empty result*. Never read an empty listing as evidence until a repo-root probe
+  has returned 200.
+
+Skills resolve the credential as `${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}`,
+so setting either name works and setting both is harmless.
 
 ### GitHub
 

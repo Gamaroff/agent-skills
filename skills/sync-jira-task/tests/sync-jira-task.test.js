@@ -1732,3 +1732,135 @@ test("transitionToStatus — resolves the current status on create before decidi
   assert.equal(out.reason, "already");
   assert.equal(calls.filter((u) => u.includes("/transitions")).length, 0, "no transition fetch needed");
 });
+
+// ---------------------------------------------------------------------------
+// Document-link branch resolution (task.55 defect B)
+//
+// The bug these cover: getDefaultBranch() asked git, git correctly answered
+// `main`, and the sync emitted document links to a branch the documents are not
+// on. git is not wrong — it cannot know a repo's docs live on `develop` and
+// reach `main` only via a release. So the durable branch comes from config.
+// ---------------------------------------------------------------------------
+
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+function withConfig(yaml, fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "docbranch-"));
+  try {
+    if (yaml !== null) {
+      fs.writeFileSync(path.join(dir, "skills-config.yaml"), yaml);
+    }
+    return fn(dir);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("parseTopLevelScalar — reads a key from a non-jira top-level block", () => {
+  const cfg = "developNext:\n  baseBranch: develop\n";
+  assert.equal(
+    lib.parseTopLevelScalar(cfg, "developNext", "baseBranch"),
+    "develop",
+  );
+});
+
+test("parseTopLevelScalar — does not read across blocks", () => {
+  const cfg = "jira:\n  docBranch: release\ndevelopNext:\n  baseBranch: develop\n";
+  assert.equal(lib.parseTopLevelScalar(cfg, "jira", "baseBranch"), "");
+  assert.equal(lib.parseTopLevelScalar(cfg, "developNext", "docBranch"), "");
+});
+
+test("parseJiraScalar — still delegates correctly after generalisation", () => {
+  assert.equal(
+    lib.parseJiraScalar("jira:\n  docBranch: develop\n", "docBranch"),
+    "develop",
+  );
+});
+
+test("loadDocBranchSetting — reads jira.docBranch", () => {
+  withConfig("jira:\n  docBranch: develop\n", (dir) => {
+    assert.equal(lib.loadDocBranchSetting(dir), "develop");
+  });
+});
+
+test("loadDocBranchSetting — falls back to developNext.baseBranch", () => {
+  withConfig("developNext:\n  baseBranch: develop\n", (dir) => {
+    assert.equal(lib.loadDocBranchSetting(dir), "develop");
+  });
+});
+
+test("loadDocBranchSetting — jira.docBranch wins over developNext.baseBranch", () => {
+  const cfg = "jira:\n  docBranch: release\ndevelopNext:\n  baseBranch: develop\n";
+  withConfig(cfg, (dir) => {
+    assert.equal(lib.loadDocBranchSetting(dir), "release");
+  });
+});
+
+test("loadDocBranchSetting — returns '' when neither key is set", () => {
+  withConfig("jira:\n  devEstimateField: customfield_1\n", (dir) => {
+    assert.equal(lib.loadDocBranchSetting(dir), "");
+  });
+});
+
+test("loadDocBranchSetting — returns '' when there is no config file at all", () => {
+  withConfig(null, (dir) => {
+    assert.equal(lib.loadDocBranchSetting(dir), "");
+  });
+});
+
+test("resolveDocBranch — an explicit --doc-branch beats config", () => {
+  withConfig("jira:\n  docBranch: develop\n", (dir) => {
+    assert.equal(lib.resolveDocBranch("hotfix/x", dir), "hotfix/x");
+  });
+});
+
+test("resolveDocBranch — config beats the current branch's upstream", () => {
+  // The regression that started this: a feature branch DOES contain the doc, so
+  // linking to it resolves today and 404s once the branch is deleted on merge.
+  withConfig("jira:\n  docBranch: develop\n", (dir) => {
+    assert.equal(lib.resolveDocBranch(null, dir), "develop");
+  });
+});
+
+test("resolveDocBranch — blank explicit value is ignored, not treated as a branch", () => {
+  withConfig("jira:\n  docBranch: develop\n", (dir) => {
+    assert.equal(lib.resolveDocBranch("   ", dir), "develop");
+    assert.equal(lib.resolveDocBranch("", dir), "develop");
+  });
+});
+
+test("resolveDocBranch — with no config set, behaviour is unchanged (git decides)", () => {
+  // Inertness guard: repos that never had this problem must not acquire one.
+  withConfig(null, (dir) => {
+    const resolved = lib.resolveDocBranch(null, dir);
+    const expected = lib.getCurrentBranchUpstream() || lib.gitDefaultBranch();
+    assert.equal(resolved, expected);
+  });
+});
+
+test("getDefaultBranch — stays git-only; config must NOT leak into it", () => {
+  // Guards the CR-2 fix: getDefaultBranch is the public name for git's default
+  // branch. resolveDocBranch is the config-aware path. If these ever merge again,
+  // an exported function starts returning something its name does not promise.
+  const prev = process.env.JIRA_DOC_BRANCH;
+  process.env.JIRA_DOC_BRANCH = "develop";
+  try {
+    assert.equal(lib.getDefaultBranch(), lib.gitDefaultBranch());
+  } finally {
+    if (prev === undefined) delete process.env.JIRA_DOC_BRANCH;
+    else process.env.JIRA_DOC_BRANCH = prev;
+  }
+});
+
+test("gitDefaultBranch — is never overridden by config (git's answer stays available)", () => {
+  const prev = process.env.JIRA_DOC_BRANCH;
+  process.env.JIRA_DOC_BRANCH = "totally-not-a-real-branch";
+  try {
+    assert.notEqual(lib.gitDefaultBranch(), "totally-not-a-real-branch");
+  } finally {
+    if (prev === undefined) delete process.env.JIRA_DOC_BRANCH;
+    else process.env.JIRA_DOC_BRANCH = prev;
+  }
+});

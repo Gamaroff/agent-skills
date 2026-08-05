@@ -123,6 +123,7 @@ stories/
 - Test Design: `story.{epic}.{story}.test-design.*.{name}.md`
 
 For tasks:
+
 - Risk Assessment: `task.{id}.risk.*.{name}.md` (in task subdirectory)
 - Test Design: `task.{id}.test-design.*.{name}.md` (in task subdirectory)
 
@@ -159,11 +160,11 @@ For tasks:
 
 ### Environment Variables
 
-| Variable | Required when | Purpose |
-|----------|--------------|---------|
-| `BITBUCKET_USERNAME` | `PLATFORM=bitbucket` | Bitbucket REST API auth (username) |
-| `BITBUCKET_APP_PASSWORD` | `PLATFORM=bitbucket` | Bitbucket REST API auth (app password) |
-| `JIRA_URL` | Jira comment desired | Enables Jira MCP comment when set (e.g. `https://myorg.atlassian.net`) |
+| Variable              | Required when        | Purpose                                                                                                                                                                                                     |
+| --------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BITBUCKET_USERNAME`  | `PLATFORM=bitbucket` | Bitbucket REST API auth (username)                                                                                                                                                                          |
+| `BITBUCKET_API_TOKEN` | `PLATFORM=bitbucket` | Bitbucket REST API auth — an Atlassian API token (`ATATT…`) with Bitbucket scopes ticked. `BITBUCKET_APP_PASSWORD` is read as a fallback; app passwords themselves were removed by Atlassian on 2026-07-28. |
+| `JIRA_URL`            | Jira comment desired | Enables Jira MCP comment when set (e.g. `https://myorg.atlassian.net`)                                                                                                                                      |
 
 Cross-reference: `create-pr` and `finalise` use the same variables — set them once in your shell profile.
 
@@ -229,7 +230,7 @@ Before starting fixes:
 
    elif [ "$PLATFORM" = "bitbucket" ]; then
      ENCODED_BRANCH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$BRANCH" 2>/dev/null || echo "$BRANCH")
-     BB_PR_JSON=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+     BB_PR_JSON=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${ENCODED_BRANCH}%22+AND+state%3D%22OPEN%22")
      if [ $? -ne 0 ] || [ "$(echo "$BB_PR_JSON" | jq '.values | length')" -eq 0 ]; then
        echo "⚠️ No open Bitbucket PR found for branch ${BRANCH}"
@@ -287,17 +288,17 @@ Before starting fixes:
 
 **CRITICAL**: Before doing anything else, use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing.
 
-| Task Subject | Description |
-|---|---|
-| PR existence check | Validate PR exists; store PR_URL, PR_NUMBER, PR_STATE, PR_TITLE |
-| Load config & locate story | Read skills-config.yaml; find story file, QA report, gate, bug reports |
-| Collect QA findings | Parse gate YAML, assessment markdowns, and bug reports |
-| Build fix plan | Prioritize issues; resolve ambiguities with user before proceeding |
-| Apply changes | Implement code fixes and add missing tests |
-| Validate | Run lint + tests; iterate until zero errors and all tests pass |
-| Update story file & bug reports | Update authorized sections only; set correct status per Status Rule |
-| Post fix summary to PR | Post fix summary comment via platform-appropriate path (GitHub `gh pr comment` / Bitbucket REST); optionally post to Jira via MCP when `TRACKER=jira` |
-| Communicate to user | Output completion summary with next steps |
+| Task Subject                    | Description                                                                                                                                           |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR existence check              | Validate PR exists; store PR_URL, PR_NUMBER, PR_STATE, PR_TITLE                                                                                       |
+| Load config & locate story      | Read skills-config.yaml; find story file, QA report, gate, bug reports                                                                                |
+| Collect QA findings             | Parse gate YAML, assessment markdowns, and bug reports                                                                                                |
+| Build fix plan                  | Prioritize issues; resolve ambiguities with user before proceeding                                                                                    |
+| Apply changes                   | Implement code fixes and add missing tests                                                                                                            |
+| Validate                        | Run lint + tests; iterate until zero errors and all tests pass                                                                                        |
+| Update story file & bug reports | Update authorized sections only; set correct status per Status Rule                                                                                   |
+| Post fix summary to PR          | Post fix summary comment via platform-appropriate path (GitHub `gh pr comment` / Bitbucket REST); optionally post to Jira via MCP when `TRACKER=jira` |
+| Communicate to user             | Output completion summary with next steps                                                                                                             |
 
 ---
 
@@ -323,6 +324,7 @@ The PRD root is configurable; the nested structure under it and QA-artifact co-l
 Dispatch a read-only Explore subagent to ingest all QA artifacts and return a compact, risk-sorted Findings Summary. This keeps raw artifact content out of main context.
 
 Load the prompt from `references/qa-findings-ingester-prompt.md`. Substitute placeholders before dispatching:
+
 - `<dir>`: substitute with absolute path to the story or task directory
 - `<mode>`: substitute with `story` or `task`
 - `<epic>`, `<story>` (story mode) OR `<id>` (task mode): substitute with the relevant IDs from context
@@ -511,6 +513,7 @@ Options:
 **Pre-fix codebase mapping (do this before any code changes):**
 
 Use the Agent tool with subagent_type="Explore" to map the codebase around the files being fixed:
+
 - For each file in the fix plan, find: the file itself, its spec file, any service/module it imports from, any similar implementations in the same module
 - Identify the existing patterns and conventions used in the affected module (naming, error handling style, dependency injection patterns)
 - Return a compact summary: file path + pattern observation (max 2 lines per file)
@@ -603,10 +606,10 @@ Iterate until:
 
 **PR-comment authorship contract**:
 
-| Skill | Owns |
-|---|---|
-| `qa-task` | Per-cycle gate decision (best-effort, non-blocking) |
-| `qa-fix` | Per-cycle fix summary (best-effort, non-blocking) |
+| Skill      | Owns                                                                                                      |
+| ---------- | --------------------------------------------------------------------------------------------------------- |
+| `qa-task`  | Per-cycle gate decision (best-effort, non-blocking)                                                       |
+| `qa-fix`   | Per-cycle fix summary (best-effort, non-blocking)                                                         |
 | `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
@@ -691,7 +694,7 @@ if [ "$PLATFORM" = "github" ]; then
 elif [ "$PLATFORM" = "bitbucket" ]; then
   BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$COMMENT_BODY" '{content: {raw: $raw}}')
   curl -sf -X POST \
-    -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+    -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
     -H "Content-Type: application/json" \
     "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
     -d "$BB_COMMENT_PAYLOAD" >/dev/null

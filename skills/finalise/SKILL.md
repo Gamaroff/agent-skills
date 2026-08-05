@@ -858,7 +858,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    ```bash
    # Search for existing canonical comment by marker
    EXISTING_COMMENT_ID=$(curl -sf \
-     -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+     -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
      "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
      | jq -r '.values[] | select(.content.raw | startswith("<!-- finalise-canonical-summary -->")) | .id' \
      | head -1)
@@ -866,7 +866,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$BODY" '{content: {raw: $raw}}')
    if [ -n "$EXISTING_COMMENT_ID" ]; then
      curl -sf -X PUT \
-       -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+       -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
        -H "Content-Type: application/json" \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments/${EXISTING_COMMENT_ID}" \
        -d "$BB_COMMENT_PAYLOAD" >/dev/null \
@@ -874,7 +874,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
        || echo "⚠️ PR comment edit failed — attempting new comment"
    else
      curl -sf -X POST \
-       -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+       -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
        -H "Content-Type: application/json" \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
        -d "$BB_COMMENT_PAYLOAD" >/dev/null \

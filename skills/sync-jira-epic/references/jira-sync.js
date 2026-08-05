@@ -280,7 +280,12 @@ function getRepoRoot() {
   }
 }
 
-function getDefaultBranch() {
+// git's idea of the default branch. Correct, and frequently the wrong answer for
+// a DOCUMENT link: git can tell you a repo's default branch is `main`, but it
+// cannot know that the repo's documents live on `develop` and only reach `main`
+// through a release. That is a project convention, so it comes from config —
+// see loadDocBranchSetting() and resolveDocBranch() below.
+function gitDefaultBranch() {
   try {
     const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", {
       encoding: "utf-8",
@@ -298,6 +303,30 @@ function getDefaultBranch() {
     } catch (_) {}
   }
   return "main";
+}
+
+// Kept as the long-standing public name for git's default branch, and kept
+// git-only ON PURPOSE. Making it config-aware would have left an exported
+// function whose name promises one thing and returns another, for no gain:
+// resolveDocBranch() below is the single config-aware entry point, and it is
+// what every caller now uses.
+function getDefaultBranch() {
+  return gitDefaultBranch();
+}
+
+// Resolve the branch a document link should point at, in the documented order:
+//
+//   explicit --doc-branch  →  config  →  current branch's upstream  →  git default
+//
+// Config sits AHEAD of the branch upstream deliberately. A feature branch does
+// contain the document, so linking to it resolves today — and 404s the moment
+// the branch is deleted after merge. The configured branch is the durable one,
+// which is the whole point of emitting a permanent link.
+function resolveDocBranch(explicit, repoRoot) {
+  if (explicit && String(explicit).trim()) return String(explicit).trim();
+  const configured = loadDocBranchSetting(repoRoot);
+  if (configured) return configured;
+  return getCurrentBranchUpstream() || gitDefaultBranch();
 }
 
 // Pure: strip the remote name (first path segment) from an upstream ref.
@@ -1866,28 +1895,33 @@ function isNegativeLocalStatus(raw) {
 //
 //   jira:
 //     devEstimateField: customfield_10594
-function parseJiraScalar(text, key) {
+// Generalised form of parseJiraScalar: read `<block>.<key>` from a
+// skills-config.yaml body. Same self-contained indentation scan, parameterised
+// on the top-level block name so `developNext:` can be read the same way as
+// `jira:` without a second parser.
+function parseTopLevelScalar(text, block, key) {
   const lines = String(text || "").split("\n");
   const indentOf = (l) => l.length - l.replace(/^\s+/, "").length;
   const keyRe = new RegExp("^" + escapeRe(key) + ":\\s*(.+?)\\s*$");
+  const blockRe = new RegExp("^" + escapeRe(block) + ":\\s*(#.*)?$");
   let i = 0;
-  // find top-level `jira:`
+  // find the top-level block
   for (; i < lines.length; i++) {
-    if (/^jira:\s*(#.*)?$/.test(lines[i])) {
+    if (blockRe.test(lines[i])) {
       i++;
       break;
     }
   }
   if (i >= lines.length) return "";
-  // scan entries inside the jira block. Only consider DIRECT children (the
-  // indent of the first child), so deeper nested keys — e.g. a statusMap entry
-  // that happens to share the name — never match.
+  // scan entries inside the block. Only consider DIRECT children (the indent of
+  // the first child), so deeper nested keys — e.g. a statusMap entry that
+  // happens to share the name — never match.
   let childIndent = -1;
   for (; i < lines.length; i++) {
     const raw = lines[i];
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
     const ind = indentOf(raw);
-    if (ind <= 0) break; // left the jira block
+    if (ind <= 0) break; // left the block
     if (childIndent < 0) childIndent = ind; // first child fixes the direct-child level
     if (ind !== childIndent) continue; // skip deeper nested entries
     const m = raw.trim().match(keyRe);
@@ -1897,6 +1931,40 @@ function parseJiraScalar(text, key) {
         .trim();
   }
   return "";
+}
+
+// Back-compat wrapper — `jira.<key>`, the original and by far the commonest use.
+function parseJiraScalar(text, key) {
+  return parseTopLevelScalar(text, "jira", key);
+}
+
+// Resolve the branch a repository's DOCUMENTS durably live on.
+//
+// Order: JIRA_DOC_BRANCH env → jira.docBranch → developNext.baseBranch.
+//
+// developNext.baseBranch is read as a fallback on purpose: a Gitflow consumer
+// that already declares `developNext.baseBranch: develop` has said where its
+// work lands, and making it repeat itself under a second key invents a way for
+// the two to disagree. Returns "" when nothing is set anywhere, which callers
+// read as "fall through to git" — so repos that were never affected by this are
+// completely unaffected by the change.
+function loadDocBranchSetting(repoRoot) {
+  const fromEnv = process.env.JIRA_DOC_BRANCH;
+  if (fromEnv && String(fromEnv).trim()) return String(fromEnv).trim();
+  try {
+    const root =
+      repoRoot ||
+      execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
+    const cfgPath = path.join(root, "skills-config.yaml");
+    if (!fs.existsSync(cfgPath)) return "";
+    const text = fs.readFileSync(cfgPath, "utf-8");
+    return (
+      parseTopLevelScalar(text, "jira", "docBranch") ||
+      parseTopLevelScalar(text, "developNext", "baseBranch")
+    );
+  } catch (_) {
+    return "";
+  }
 }
 
 // Resolve the configured Jira custom-field id for estimated dev hours from
@@ -2044,7 +2112,12 @@ function resolveStage({ stage, issueType, record } = {}) {
 // gate column has a `done` moment that is terminal in NAME but not in POSITION,
 // and the done-category fallback must stay shut for it. Both, or neither.
 function isTerminalMoment(moment) {
-  const spec = DEFAULT_STAGE_MAP[String(moment || "").trim().toLowerCase()];
+  const spec =
+    DEFAULT_STAGE_MAP[
+      String(moment || "")
+        .trim()
+        .toLowerCase()
+    ];
   return !!(spec && spec.terminal);
 }
 
@@ -2832,7 +2905,8 @@ async function walkLadder({
     walked.push({ index: i, result: res.reason, candidates: rung });
     // A one-rung ladder must be byte-identical to today, so when the first and
     // only hop fails, report ITS reason rather than dressing it up as a walk.
-    if (isLast && i === 0) return { ...res, from, landed: current, hops: walked };
+    if (isLast && i === 0)
+      return { ...res, from, landed: current, hops: walked };
     return incomplete(i, "walk-incomplete", res);
   }
 
@@ -3477,6 +3551,9 @@ module.exports = {
   // git / bb
   getRepoRoot,
   getDefaultBranch,
+  gitDefaultBranch,
+  resolveDocBranch,
+  loadDocBranchSetting,
   getCurrentBranchUpstream,
   stripRemotePrefix,
   getBitbucketRepoBase,
@@ -3570,6 +3647,7 @@ module.exports = {
   isNegativeLocalStatus,
   // jira scalar config
   parseJiraScalar,
+  parseTopLevelScalar,
   loadDevEstimateField,
   loadDoneResolution,
   loadCancelledResolution,

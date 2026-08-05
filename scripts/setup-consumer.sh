@@ -197,12 +197,26 @@ collect_env_vars() {
   fi
 
   # Bitbucket creds
+  #
+  # The value is an Atlassian API token (ATATT…) with Bitbucket scopes ticked —
+  # NOT an app password. Atlassian removed app passwords on 2026-07-28; only the
+  # older variable NAME survives. We write the token under BOTH names on purpose:
+  # BITBUCKET_API_TOKEN is the honest one for everything written from here on,
+  # and BITBUCKET_APP_PASSWORD keeps the skills' existing references resolving.
+  # Dropping either name silently breaks callers — and Bitbucket answers an
+  # unauthenticated request with 404 rather than 401, so the breakage reads as
+  # "no results" instead of "no credentials".
   if [[ "$VCS" == "bitbucket" ]]; then
-    local BITBUCKET_USERNAME BITBUCKET_APP_PASSWORD
-    prompt_plain   BITBUCKET_USERNAME    "BITBUCKET_USERNAME"
-    prompt_secret  BITBUCKET_APP_PASSWORD "BITBUCKET_APP_PASSWORD"
+    local BITBUCKET_USERNAME BITBUCKET_API_TOKEN
+    prompt_plain   BITBUCKET_USERNAME  "BITBUCKET_USERNAME"
+    prompt_secret  BITBUCKET_API_TOKEN "BITBUCKET_API_TOKEN"
     ENV_LINES+=("BITBUCKET_USERNAME=${BITBUCKET_USERNAME}")
-    ENV_LINES+=("BITBUCKET_APP_PASSWORD=${BITBUCKET_APP_PASSWORD}")
+    ENV_LINES+=("BITBUCKET_API_TOKEN=${BITBUCKET_API_TOKEN}")
+    # Same token again, under the legacy name the vendored skills still read.
+    # NOTE: every ENV_LINES entry must be `KEY=value`. The .env.example generator
+    # emits "${line%%=*}=" per entry, so a bare comment pushed in here would come
+    # out as "# ...text...=" — a malformed line in a file meant for humans.
+    ENV_LINES+=("BITBUCKET_APP_PASSWORD=${BITBUCKET_API_TOKEN}")
   fi
 
   # Jira creds

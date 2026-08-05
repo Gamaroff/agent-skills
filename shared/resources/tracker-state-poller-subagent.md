@@ -61,6 +61,7 @@ ERRORS=$(echo "$POLL" | jq -r '.errors | length')
 ```
 
 Always check `errors` before trusting the state fields:
+
 - `errors | length > 0` → log each error in Issues Log; proceed with caution
 - `errors | length == 0` → state fields are authoritative
 
@@ -123,7 +124,8 @@ fi
 Derive `{WORKSPACE}` and `{REPO_SLUG}` from git remote URL (`git remote get-url origin`), e.g. `git@bitbucket.org:{workspace}/{slug}.git`.
 
 ```bash
-BB_RESP=$(curl -s -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+BB_TOKEN="${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}"   # new name preferred; old honoured
+BB_RESP=$(curl -s -u "${BITBUCKET_USERNAME}:${BB_TOKEN}" \
   "https://api.bitbucket.org/2.0/repositories/{WORKSPACE}/{REPO_SLUG}/pullrequests/{PR_NUMBER}" 2>&1)
 if echo "$BB_RESP" | jq -e '.id' >/dev/null 2>&1; then
   PR_URL=$(echo "$BB_RESP" | jq -r '.links.html.href')
@@ -156,11 +158,13 @@ fi
 #### TRACKER = jira
 
 Call `getJiraIssue` MCP tool:
+
 - `cloudId`: derived from `JIRA_URL` hostname
 - `issueIdOrKey`: `{ISSUE_KEY}`
 - `fields`: `["status", "labels", "parent", "comment"]`
 
 Extract:
+
 - `ISSUE_STATE` = `fields.status.name`
 - `ISSUE_LABELS` = `fields.labels` (array of plain strings — e.g. `["bug", "critical"]`)
 - `ISSUE_COLUMN` = `null` (Jira board column not directly available from issue fields)
