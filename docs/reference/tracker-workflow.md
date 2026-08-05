@@ -33,9 +33,10 @@ That is a complete, working file.
 reproduces their historical behaviour exactly. Adding one is how you opt into describing your own
 board; it is never a prerequisite.
 
-> **Status**: shipped in task.37 as format + engine only. Nothing reads it yet — Jira execution is
-> task.38, GitHub is task.39, step-file wiring is task.40. You can author and validate the file today;
-> it starts affecting board moves when those land.
+> **Status**: **Jira reads this file** (task.38) — `jira-stage.js` resolves every moment's target from
+> the ladder and walks the rungs between. GitHub execution is task.39 and step-file wiring is task.40,
+> so on a GitHub board you can author and validate the file today but it does not yet move cards.
+> See [Jira execution semantics](#jira-execution-semantics) for exactly what the Jira path does with it.
 
 ---
 
@@ -77,7 +78,8 @@ needs no transition graph.
 This matters on a board where a status is only reachable through another one. `resolveTransition`
 does exactly one hop; a board that gates Done behind a showcase column would skip the move entirely —
 and because every later move resolves from wherever the card actually sits, one missed hop silently
-disables every moment after it.
+disables every moment after it. On Jira this is no longer a promise about the format: the ladder is
+walked, rung by rung. See [Jira execution semantics](#jira-execution-semantics).
 
 Given the ladder above, moving a card from `In Progress` to `Done` walks:
 
@@ -349,6 +351,110 @@ tracker-workflow.yaml  >  jira.workflowRecord  >  jira.statusMap  >  built-in de
 `jira.workflowRecord` and `jira.statusMap` both keep working, at lower precedence. Nothing is
 removed, and no migration is required — a project with no `tracker-workflow.yaml` resolves exactly as
 it did before.
+
+Precedence is resolved **per moment**, not per file. A file that declares `work-started` and omits
+`in-review` gets its ladder target for the first and falls through to the workflow record for the
+second. Omission is disablement *within* the ladder, and the fall-through is what stops a partial
+file being a downgrade.
+
+---
+
+## Jira execution semantics
+
+What the Jira path actually does with the ladder. Everything here is
+`shared/resources/jira-stage.js` plus `walkLadder` in `jira-sync.js`.
+
+### The target comes from the ladder
+
+`jira-stage.js --issue K --stage <moment>` resolves the moment against your ladder first, falling
+back to the workflow record. The rung's **full name list** is used as the candidate list, in order,
+so a rung declared with alternatives works whichever spelling your board uses.
+
+### Unreachable targets are walked to
+
+When the target is not directly reachable, the rungs the ladder declares between the card's position
+and the target are walked in order:
+
+```
+In Progress ──▶ Ready for Showcase ──▶ Waiting for Review
+             hop 1                  hop 2
+```
+
+**The available transitions are re-read after every hop**, because they are position-dependent — the
+set offered from `In Progress` is not the set offered from `Ready for Showcase`. This is why a walk
+cannot be planned once up front and then executed, and why the API cost is `1 + 2n` for an `n`-hop
+walk rather than a constant.
+
+A one-rung walk issues exactly the calls the single-hop implementation always did.
+
+### Three outcomes, three shapes
+
+A partial walk is neither success nor "nothing happened", and `--json` distinguishes them:
+
+| Outcome | `reason` | Shape |
+| --- | --- | --- |
+| Reached the target | `walked` | `landed` = target |
+| Parked mid-ladder | `walk-incomplete` | `landed` = the rung it stopped in, `remaining` = the rungs it did not reach |
+| Never moved | the existing reasons (`no-transition`, `already`, `would-regress`, …) | unchanged |
+
+**A gate is a legitimate board shape.** If a column is gated behind a human, every card will park
+there and `walk-incomplete` is the correct outcome, not a failure — the exit code stays 0. A walk
+aborted by the cycle guard reports the same shape, because an aborted cycle is a blocked walk.
+
+There is **no rollback** on a partial walk: the reverse transition may not exist, and attempting one
+fights the guard that just allowed the forward move.
+
+### Guards
+
+- **Monotonicity, once, at entry** — against the target's rank. Intermediate rungs bypass it, because
+  a rung below the target is by construction "backwards" relative to it, and a per-hop guard would
+  refuse the gate itself.
+- **Ranks come from the ladder.** A rung you declare is ranked by its index, which is what finally
+  makes a bespoke column defensible: previously a column no built-in stage named was unranked, and a
+  resumed run would drag a card straight back out of it.
+  > Off-ladder statuses rank as *no opinion* in ladder mode, exactly as side-states always have. The
+  > ladder's indices and the built-in ranks are different scales and are never mixed.
+- **One hop per rung, and no status is visited twice** in a single walk.
+
+### Terminality is two conditions
+
+The done-category fallback — "if exactly one transition leads to a `done` status, use it" — asks *is
+there exactly one way to finish?* That question only has a right answer when the target **is** the
+finish. So it now requires both:
+
+1. the moment is one the defaults mark terminal (today, `done` alone), **and**
+2. its resolved target is the ladder's **last rung**.
+
+Point `done` at a gate column and the fallback stays shut: the moment skips, listing what the board
+did offer, rather than confidently firing your real Done transition. A skip is recoverable; a wrong
+terminal transition is not.
+
+Last-rung is measured against **the ladder in play for that issue type**, so a `byIssueType` overlay
+that lengthens or shortens the ladder moves the terminal with it.
+
+### Inspecting without moving anything
+
+```bash
+# No credentials, no network. Reads the file and prints the plan.
+jira-stage.js --stage done --from "In Progress" --print-plan
+
+# Touches the board read-only. Verifies hop 1 against live transitions;
+# later hops are reported as "unverified (depends on hop 1)".
+jira-stage.js --issue K-1 --stage done --dry-run
+```
+
+`--from` tells `--print-plan` where the card is. Without it there is no starting point to measure
+from, so the plan is the target rung alone and `spansFrom: false` says so.
+
+`--dry-run` cannot honestly do better than one hop: the transitions available after a hop do not
+exist until that hop fires.
+
+### The credential-free fallback is one hop only
+
+Consumers with the Atlassian MCP connector but no API token follow
+`shared/resources/jira-transition-protocol.md`. That path reads `--print-plan` for its candidates but
+**performs at most one transition**. If the plan needs more than one hop it logs and leaves the card
+for a human — firing hop 1 and stopping, or jumping the gate, are both worse than not trying.
 
 ---
 
