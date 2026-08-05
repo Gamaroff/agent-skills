@@ -365,16 +365,20 @@ ones you leave out. Within an authored pipeline, **omission is disablement**: a 
 does not fire, and does not fall through to the record. That is the whole mechanism for switching a
 moment off, so a fall-through would make it unusable.
 
-`byIssueType` is resolved the same way, per issue type: an overlay that authors its own `pipeline:`
-opts *that* issue type in even when the file has no top-level block, and an issue type with no authored
-pipeline defers to the record.
+`byIssueType` is resolved the same way, but **per moment**. An overlay that authors its own `pipeline:`
+opts that issue type in for the moments it actually names, even when the file has no top-level block.
+Moments the overlay does not name are not authored for that type, so the record keeps deciding them —
+which matters because the documented per-type *disable* (`in-qa: ~`) is itself a one-line overlay
+pipeline, and it must not silently take over the seven moments it says nothing about.
+
+Once there **is** a top-level `pipeline:`, it is authored for every moment, and an overlay refines it.
 
 | Your file | Who decides the target | Does it walk? |
 | --- | --- | --- |
 | No file | record → built-in | no |
 | `statuses:` only (or empty / malformed) | record → built-in | no |
 | `statuses:` + `pipeline:` | the file; omitted moments are **off** | yes |
-| `byIssueType` overlay with its own `pipeline:` | the file, for that issue type | yes |
+| `byIssueType` overlay with its own `pipeline:`, no top-level block | the file for the moments the overlay names; record for the rest | yes, for the named moments |
 
 ---
 

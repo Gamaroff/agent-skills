@@ -949,4 +949,22 @@ all is shipping a known unrecoverable wrong-Done. Same justification the task it
 
 **Tests**: 884 → **886**, all passing. `npm run bundle` re-run.
 
-Status remains Ready for Review for QA cycle 4.
+### QA Fix Cycle 4 — 2026-08-05
+
+Cycle 4 confirmed every earlier fix and found that **CR-11's fix had the same shape of defect as the
+bug it fixed**, pointing the other way.
+
+| ID | Finding | Fix | Verified |
+| --- | --- | --- | --- |
+| CR-17 (high) | `pipelineAuthoredFor` was **per issue type** while `resolveMoment` resolves **per key**. So an overlay naming ONE moment claimed authorship of all eight — and the documented per-type disable (`byIssueType.Bug.pipeline: { in-qa: ~ }`) is exactly a one-key overlay. The seven moments it never mentions then resolved from the built-in default and outranked the record: `done` fired with `terminal: true` despite an explicit `enabled: false`. Strictly worse than ignoring the overlay entirely, and silent. | `pipelineAuthoredFor(workflow, issueType, moment)` — authorship is now answered at the same granularity `resolveMoment` resolves at. A base pipeline authors every moment; an overlay authors only the moments it names. | record honoured ✅ |
+| CR-18 (low) | `--print-plan` labelled a *ladder-disabled* moment `source: "record"`, when the file is precisely what answered "off". | `source: authored ? workflow.source : "record"`; `authored` returned from `resolveMomentSpec` rather than inferred from `moment`. | ✅ |
+| CR-19 (low, test) | Two `--print-plan` tests still read this repo's own `tracker-workflow.yaml`, the gap CR-13 set out to close. | Pinned to their own ladder via `repoRoot`; the `--from` case now also asserts the hops span the real distance. | ✅ |
+
+**The pattern across cycles 2–4 is worth recording**: three consecutive fixes to the same
+precedence question were each wrong in a different direction, because the authorship gate and the
+resolution it guards were at different granularities. They only agree at per-moment-per-issue-type,
+which is where it now sits.
+
+**Tests**: 886 → **887**, all passing.
+
+Status: Ready for Review — QA cycle 5.

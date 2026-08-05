@@ -179,13 +179,14 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
   // below reads as deliberate disablement — silently switching off a stage the
   // consumer explicitly opted into. A broken YAML would do the same thing.
   //
-  // `tracker-workflow.js` answers this via `pipelineAuthoredFor`, which is
-  // PER ISSUE TYPE. The file-level `pipelineAuthored` flag alone is not enough:
-  // a `byIssueType` overlay may author a `pipeline:` for one type while the file
-  // has no top-level block, a shape the reference documents. Reading the
-  // file-level flag there ignores an authored per-type target and falls back to
-  // a built-in default — and for `done` that means firing the board's real Done
-  // instead of the column its author named, with `terminal` wrongly true.
+  // `tracker-workflow.js` answers this via `pipelineAuthoredFor`, at the same
+  // granularity `resolveMoment` itself resolves at: per moment AND per issue
+  // type. Anything coarser disagrees with it somewhere. The file-level flag
+  // alone ignores an overlay-authored target, firing a built-in `done` instead
+  // of the column the author named. A type-level answer lets an overlay that
+  // names ONE moment — the documented `in-qa: ~` disable is exactly that —
+  // claim authorship of all eight, so the seven it never mentions outrank the
+  // record and `done` fires despite an explicit `enabled: false`.
   //
   // Consequence, deliberate: a `statuses:`-only file resolves its targets from
   // the record and does NOT walk. That is the conservative reading — its moment
@@ -195,10 +196,14 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
   const authored = !!(
     workflow &&
     workflow.source === "file" &&
-    tw.pipelineAuthoredFor(workflow, issueType)
+    tw.pipelineAuthoredFor(workflow, issueType, stage)
   );
   if (!authored) {
-    return { spec: lib.resolveStage({ stage, issueType, record }), moment: null };
+    return {
+      spec: lib.resolveStage({ stage, issueType, record }),
+      moment: null,
+      authored: false,
+    };
   }
 
   const moment = tw.resolveMoment(stage, workflow, { issueType });
@@ -220,6 +225,9 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
         terminal: false,
       },
       moment: null,
+      // The FILE answered — it just answered "off". A reader asking which source
+      // decided this must not be told "record".
+      authored: true,
     };
   }
 
@@ -234,6 +242,7 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
       terminal: lib.isTerminalMoment(stage) && moment.isLastRung,
     },
     moment,
+    authored: true,
   };
 }
 
@@ -303,7 +312,7 @@ async function run({
   // `output.emit` writes unconditionally rather than only under --json, which is
   // what makes the flag machine-readable on its own.
   if (args.printPlan) {
-    const { spec, moment } = resolveMomentSpec({
+    const { spec, moment, authored } = resolveMomentSpec({
       stage: args.stage,
       issueType: args.issueType,
       record: lib.loadWorkflowRecord(repoRoot),
@@ -335,8 +344,12 @@ async function run({
       // "does a file exist". A statuses-only or malformed file is `source:
       // "file"` while contributing nothing to the plan, and this is the one
       // field a reader consults to answer "did my ladder do this?".
-      source: moment ? workflow.source : "record",
-      authored: !!moment,
+      //
+      // A ladder-DISABLED moment came from the file too: `enabled: false` with
+      // the omission reason is the file's answer, not the record's, so it must
+      // not be labelled "record".
+      source: authored ? workflow.source : "record",
+      authored,
       exitCode: 0,
     });
     return { exitCode: 0, reason: "plan", hops, spansFrom: !!args.from };

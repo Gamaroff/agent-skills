@@ -1023,6 +1023,43 @@ byIssueType:
   assert.equal(other.reason, "never", "the record decides for an unauthored type");
 });
 
+test("spec — an overlay that names ONE moment does not claim authorship of the rest", () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  // The documented per-type disable is a one-key overlay pipeline. Treating that
+  // as authorship of all eight moments makes the seven it never mentions resolve
+  // from the built-in default and outrank the consumer's own record — so `done`
+  // fires with terminal:true despite an explicit `enabled: false`. Strictly worse
+  // than ignoring the overlay altogether, and silent.
+  const wf = fromYaml(`
+statuses:
+  - Todo
+  - In Progress
+  - Done
+
+byIssueType:
+  "Bug":
+    pipeline:
+      in-qa: ~
+`);
+  const record = {
+    stages: {
+      done: { enabled: false, reason: "we never auto-close" },
+      "in-qa": { enabled: true, candidates: ["Verifying"] },
+    },
+  };
+
+  // Named by the overlay → the overlay decides, and `~` means off.
+  assert.equal(
+    cli.resolveMomentSpec({ stage: "in-qa", issueType: "Bug", record, workflow: wf }).spec.enabled,
+    false,
+  );
+
+  // NOT named by the overlay, and no top-level pipeline → the record still decides.
+  const done = cli.resolveMomentSpec({ stage: "done", issueType: "Bug", record, workflow: wf }).spec;
+  assert.equal(done.enabled, false);
+  assert.equal(done.reason, "we never auto-close", "the record's answer, not the ladder's");
+});
+
 test("spec — a statuses-only file does not disable a record-enabled stage", () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
   // The file exists and declares a ladder, but authors no `pipeline:`, so its
@@ -1268,6 +1305,7 @@ test("--print-plan needs no --issue, no credentials and no network", async () =>
   const r = await cli.run({
     argv: ["node", "jira-stage.js", "--stage", "done", "--print-plan", "--quiet"],
     fetchImpl: boom,
+    repoRoot: withLadder(RUN_LADDER),
   });
   assert.equal(r.exitCode, 0);
   assert.equal(r.reason, "plan");
@@ -1276,17 +1314,25 @@ test("--print-plan needs no --issue, no credentials and no network", async () =>
 
 test("--print-plan reports whether the plan spans a real distance", async () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
   const without = await cli.run({
     argv: ["node", "jira-stage.js", "--stage", "done", "--print-plan", "--quiet"],
+    repoRoot: root,
   });
   assert.equal(without.spansFrom, false);
   const with_ = await cli.run({
     argv: [
       "node", "jira-stage.js", "--stage", "done", "--print-plan", "--quiet",
-      "--from", "In Progress",
+      "--from", "Todo",
     ],
+    repoRoot: root,
   });
   assert.equal(with_.spansFrom, true);
+  assert.deepEqual(
+    with_.hops,
+    [["In Progress"], ["Done"]],
+    "--from spans the real ladder distance: the gate, then the target",
+  );
 });
 
 test("--print-plan still refuses an unknown stage with exit 2", async () => {

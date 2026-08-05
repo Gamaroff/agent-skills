@@ -556,29 +556,46 @@ function overlayFor(workflow, issueType) {
 }
 
 /**
- * Did a human author the moment targets that apply to THIS issue type?
+ * Did a human author the target for THIS moment, for THIS issue type?
  *
- * `workflow.pipelineAuthored` answers that for the file as a whole, and only for
- * the top-level `pipeline:` block. A `byIssueType` overlay may author a pipeline
- * for one issue type while the file has no top-level block at all — a shape the
- * reference documents — and for that type the targets are every bit as authored.
+ * The granularity matters, and getting it wrong is dangerous in both directions.
+ * `resolveMoment` resolves per key, so an authorship gate coarser than per-key
+ * will disagree with it somewhere:
  *
- * A caller cannot compute this correctly: `overlayFor` matches the issue-type key
+ *  - Too coarse in the FALSE direction (file-level `pipelineAuthored` alone): an
+ *    overlay-authored type reads as unauthored, its explicit target is ignored,
+ *    and a built-in default is used instead. For `done` that fires the board's
+ *    real Done rather than the column the author named.
+ *
+ *  - Too coarse in the TRUE direction (type-level): an overlay that names ONE
+ *    moment — the documented per-type disable `in-qa: ~` is exactly this —
+ *    claims authorship of all eight. The seven it never mentions then resolve
+ *    from the built-in default and outrank the consumer's own config, so `done`
+ *    fires despite an explicit `enabled: false`. Worse than not looking at the
+ *    overlay at all.
+ *
+ * So: the base pipeline being authored makes every moment authored (falling
+ * through to it is legitimate — a human wrote it). Otherwise only the moments the
+ * overlay actually names are authored; the rest are not, and the caller's older
+ * configuration keeps deciding them, exactly as it did before this file existed.
+ *
+ * `moment` is optional — omit it for the type-level question ("does this issue
+ * type have any authored pipeline at all?").
+ *
+ * A caller cannot compute this: `overlayFor` matches the issue-type key
  * case-insensitively and is not exported, so any call-site version would either
  * duplicate that matching or get it subtly wrong. Same reason `isLastRung` lives
  * in here.
- *
- * Consumers use this to decide whether the ladder outranks their older config.
- * Getting it wrong in the false direction ignores an authored per-type target and
- * falls back to a built-in default — which, for a `done` moment, means firing a
- * board's real Done transition instead of the column its author actually named.
  */
-function pipelineAuthoredFor(workflow, issueType) {
+function pipelineAuthoredFor(workflow, issueType, moment) {
   if (!workflow) return false;
   if (workflow.pipelineAuthored === true) return true;
   const overlay = overlayFor(workflow, issueType);
   const p = overlay && overlay.pipeline;
-  return !!(p && typeof p === "object" && !Array.isArray(p));
+  if (!p || typeof p !== "object" || Array.isArray(p)) return false;
+  if (moment === undefined || moment === null) return true;
+  const key = String(moment).trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(p, key);
 }
 
 /**
