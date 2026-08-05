@@ -2782,6 +2782,13 @@ async function walkLadder({
       localStatus: isLast ? localStatus : undefined,
       doneResolution,
       cancelledResolution,
+      // Worklog is offered to EVERY hop, and each hop that hits a time-spent
+      // validator books it again — so an n-hop walk can log n × the configured
+      // duration. That is intended: the retry only fires on a transition whose
+      // workflow demands time, and a board that demands it on two transitions is
+      // asking to be billed twice. It is worth knowing about, because worklogs
+      // are cumulative and cannot be silently undone; a consumer who wants one
+      // booking per moment should set `jira.worklogTimeSpent` low.
       worklogTimeSpent,
       configHint: "stage",
       // The monotonicity guard runs ONCE, at entry, against the final target's

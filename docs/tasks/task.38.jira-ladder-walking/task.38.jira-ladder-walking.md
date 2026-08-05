@@ -967,4 +967,30 @@ which is where it now sits.
 
 **Tests**: 886 → **887**, all passing.
 
-Status: Ready for Review — QA cycle 5.
+### QA Fix Cycle 5 — 2026-08-05
+
+Cycle 5 settled the question the previous three cycles kept re-opening: **the precedence/authorship
+area is correct**, verified by executing all 105 combinations of
+{no file, statuses-only, statuses+pipeline, empty, malformed} × {no overlay, overlay naming the moment,
+overlay not naming it, `pipeline: ~`, malformed overlay} × {record disables / enables / silent}. No
+combination fires a `done` the consumer did not ask for, and none silently disables a stage they opted
+into. The case-sensitivity question has no hole — `pipelineAuthoredFor` and `resolveMoment` lowercase
+and look up identically.
+
+The one blocking issue found was in **prose, not JavaScript** — and it reached the same unrecoverable
+outcome by the one path the code fixes could not cover.
+
+| ID | Finding | Fix |
+| --- | --- | --- |
+| CR-20 (high, docs) | `jira-transition-protocol.md` told the MCP fallback to run `--print-plan` **without `--issue-type`**, so no `byIssueType` overlay is applied. A moment retargeted for one issue type — `done` pointed at a gate column — resolved to the base answer with `terminal: true`, and rule 5 then fires the board's real Done. The credential-free path reached exactly the failure the CLI path was hardened against over four cycles. | `--issue-type` added to the command and to the step-2 `getJiraIssue` read (one request returns status and type), with the consequence spelled out. |
+| CR-21 (high, docs) | The protocol never mentioned `enabled: false`, so a moment the consumer switched off would fire from the default candidate lists. | Stated explicitly: log the skip and return; the default lists are the no-file default, not a floor. |
+| CR-22 (low) | `docs/reference/tracker-workflow.md` claimed a one-rung walk costs exactly what the single-hop path did. True when it moves the card; the **already** case now spends one GET more, because the walk reads transitions before discovering it. | Corrected, with the outcome noted as unchanged. |
+| CR-23 (low) | Worklog is offered to every hop, so a board with a time-spent validator on two transitions in one walk books the duration twice — undocumented, and worklogs cannot be silently undone. | Documented at the call site and in the reference; intended behaviour, now stated. |
+
+Both doc rules are now pinned by the parity test, which asserts the copy-pasteable command itself
+carries `--from` and `--issue-type` — a rule stated in prose but missing from the command is a rule
+that will not be followed.
+
+**Tests**: 887 → **888**, all passing.
+
+Status: Ready for Review — QA cycle 6 (verification).

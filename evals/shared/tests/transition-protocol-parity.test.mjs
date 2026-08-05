@@ -218,3 +218,24 @@ test("the prose states the one-hop limit and the terminal override", () => {
   assert.match(protocol, /--print-plan/);
   assert.match(protocol, /--from/);
 });
+
+test("the prose tells the fallback to pass --issue-type, and to honour enabled:false", () => {
+  // Both are load-bearing against the SAME unrecoverable outcome the CLI path
+  // guards. Drop --issue-type and no byIssueType overlay applies: a moment
+  // retargeted for one issue type resolves to the base answer with
+  // `terminal: true`, and rule 5 fires the board's real Done on an issue whose
+  // author deliberately routed it elsewhere. Ignore `enabled: false` and a
+  // moment the consumer switched off fires from the default lists.
+  assert.match(protocol, /--issue-type/);
+  assert.match(protocol, /`--issue-type` is not optional/);
+  assert.match(protocol, /enabled: false/);
+  // The command the model is told to run must itself carry both flags — a rule
+  // stated in prose but absent from the copy-pasteable command is a rule that
+  // will not be followed. The invocation is line-wrapped, so match the block.
+  const at = protocol.indexOf("jira-stage.js --stage");
+  assert.notEqual(at, -1, "no --print-plan invocation found in the protocol");
+  const block = protocol.slice(at, at + 220);
+  assert.match(block, /--print-plan/);
+  assert.match(block, /--from/);
+  assert.match(block, /--issue-type/);
+});
