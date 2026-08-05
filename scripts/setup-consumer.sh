@@ -212,7 +212,10 @@ collect_env_vars() {
     prompt_secret  BITBUCKET_API_TOKEN "BITBUCKET_API_TOKEN"
     ENV_LINES+=("BITBUCKET_USERNAME=${BITBUCKET_USERNAME}")
     ENV_LINES+=("BITBUCKET_API_TOKEN=${BITBUCKET_API_TOKEN}")
-    ENV_LINES+=("# Same token again, under the legacy name the vendored skills still read.")
+    # Same token again, under the legacy name the vendored skills still read.
+    # NOTE: every ENV_LINES entry must be `KEY=value`. The .env.example generator
+    # emits "${line%%=*}=" per entry, so a bare comment pushed in here would come
+    # out as "# ...text...=" — a malformed line in a file meant for humans.
     ENV_LINES+=("BITBUCKET_APP_PASSWORD=${BITBUCKET_API_TOKEN}")
   fi
 

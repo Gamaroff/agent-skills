@@ -1840,11 +1840,14 @@ test("resolveDocBranch — with no config set, behaviour is unchanged (git decid
   });
 });
 
-test("getDefaultBranch — prefers a configured doc branch over git's answer", () => {
+test("getDefaultBranch — stays git-only; config must NOT leak into it", () => {
+  // Guards the CR-2 fix: getDefaultBranch is the public name for git's default
+  // branch. resolveDocBranch is the config-aware path. If these ever merge again,
+  // an exported function starts returning something its name does not promise.
   const prev = process.env.JIRA_DOC_BRANCH;
   process.env.JIRA_DOC_BRANCH = "develop";
   try {
-    assert.equal(lib.getDefaultBranch(), "develop");
+    assert.equal(lib.getDefaultBranch(), lib.gitDefaultBranch());
   } finally {
     if (prev === undefined) delete process.env.JIRA_DOC_BRANCH;
     else process.env.JIRA_DOC_BRANCH = prev;

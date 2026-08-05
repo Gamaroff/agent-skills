@@ -304,8 +304,13 @@ function gitDefaultBranch() {
   return "main";
 }
 
+// Kept as the long-standing public name for git's default branch, and kept
+// git-only ON PURPOSE. Making it config-aware would have left an exported
+// function whose name promises one thing and returns another, for no gain:
+// resolveDocBranch() below is the single config-aware entry point, and it is
+// what every caller now uses.
 function getDefaultBranch() {
-  return loadDocBranchSetting() || gitDefaultBranch();
+  return gitDefaultBranch();
 }
 
 // Resolve the branch a document link should point at, in the documented order:
