@@ -180,8 +180,13 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
   // below reads as deliberate disablement — silently switching off a stage the
   // consumer explicitly opted into. A broken YAML would do the same thing.
   //
-  // `tracker-workflow.js` sets `pipelineAuthored` for exactly this distinction
-  // and `validateWorkflow` already reasons with it ("nobody chose that target").
+  // `tracker-workflow.js` answers this via `pipelineAuthoredFor`, which is
+  // PER ISSUE TYPE. The file-level `pipelineAuthored` flag alone is not enough:
+  // a `byIssueType` overlay may author a `pipeline:` for one type while the file
+  // has no top-level block, a shape the reference documents. Reading the
+  // file-level flag there ignores an authored per-type target and falls back to
+  // a built-in default — and for `done` that means firing the board's real Done
+  // instead of the column its author named, with `terminal` wrongly true.
   //
   // Consequence, deliberate: a `statuses:`-only file resolves its targets from
   // the record and does NOT walk. That is the conservative reading — its moment
@@ -191,7 +196,7 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
   const authored = !!(
     workflow &&
     workflow.source === "file" &&
-    workflow.pipelineAuthored === true
+    tw.pipelineAuthoredFor(workflow, issueType)
   );
   if (!authored) {
     return { spec: lib.resolveStage({ stage, issueType, record }), moment: null };
@@ -302,7 +307,7 @@ async function run({
     const { spec, moment } = resolveMomentSpec({
       stage: args.stage,
       issueType: args.issueType,
-      record: lib.loadWorkflowRecord(),
+      record: lib.loadWorkflowRecord(repoRoot),
       workflow,
     });
     const targets = spec.enabled ? spec.candidates : [];
@@ -327,7 +332,12 @@ async function run({
       spansFrom: !!args.from,
       isLastRung: moment ? moment.isLastRung : null,
       terminal: spec.terminal,
-      source: workflow.source,
+      // Where this plan actually came from — which is not the same question as
+      // "does a file exist". A statuses-only or malformed file is `source:
+      // "file"` while contributing nothing to the plan, and this is the one
+      // field a reader consults to answer "did my ladder do this?".
+      source: moment ? workflow.source : "record",
+      authored: !!moment,
       exitCode: 0,
     });
     return { exitCode: 0, reason: "plan", hops, spansFrom: !!args.from };
@@ -345,7 +355,7 @@ async function run({
   }
 
   const http = lib.makeHttp({ fetchImpl });
-  const record = lib.loadWorkflowRecord();
+  const record = lib.loadWorkflowRecord(repoRoot);
 
   let issue;
   try {
@@ -465,9 +475,9 @@ async function run({
     // a resolution. Correct, and load-bearing: do not "simplify" it.
     localStatus: spec.terminal ? "accepted" : args.stage,
     terminal: spec.terminal,
-    doneResolution: lib.loadDoneResolution(),
-    cancelledResolution: lib.loadCancelledResolution(),
-    worklogTimeSpent: args.worklog || lib.loadWorklogTimeSpent(),
+    doneResolution: lib.loadDoneResolution(repoRoot),
+    cancelledResolution: lib.loadCancelledResolution(repoRoot),
+    worklogTimeSpent: args.worklog || lib.loadWorklogTimeSpent(repoRoot),
     minRank: spec.rank,
     workflowRecord: record,
     allowRegress: args.allowRegress,

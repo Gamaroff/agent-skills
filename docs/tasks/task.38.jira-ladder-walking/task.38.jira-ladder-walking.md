@@ -926,4 +926,27 @@ Also added: a full two-hop `run()` walk asserting both transitions fire in ladde
 
 **Tests**: 880 → **884**, all passing. `npm run bundle` re-run.
 
-Status remains Ready for Review for QA cycle 3.
+### QA Fix Cycle 3 — 2026-08-05
+
+Cycle 3's re-review confirmed CR-1, CR-1b, CR-2, CR-5, CR-7, CR-8, CR-9, CR-10 and the `planHops`
+de-duplication, and found that **the cycle-2 fix for CR-6 introduced a new high-severity regression**.
+
+| ID | Finding | Fix | Verified |
+| --- | --- | --- | --- |
+| CR-11 (high) | `pipelineAuthored` is a **file-level** flag, set only from the top-level `pipeline:` block. A `byIssueType` overlay that authors a per-type `pipeline:` with no top-level block therefore read as unauthored, so an authored per-type target was ignored entirely: `done: Verified` for a Bug resolved to the built-in `["Done","Closed",…]` **with `terminal: true`**, unlocking rule 4 and firing the board's real Done. The documented per-type disable (`in-qa: ~`) also stopped disabling. | New exported `pipelineAuthoredFor(workflow, issueType)` in `tracker-workflow.js` — the call site cannot compute this because `overlayFor`'s case-insensitive matching is unexported, the same reason `isLastRung` lives there. | `["Verified"]`, terminal false ✅ |
+| CR-12 (medium, test) | The test whose comment claimed to "pin the branch ordering" did not: both orders emit the same `res`, so every assertion passed with the fix reverted. The real discriminators are the `--strict` exit code (sibling test) and the warning output. The comment's stated reasoning was inverted. | Comment corrected to say what actually discriminates, and a test added that captures stderr and asserts the parked-mid-ladder warning — which the swapped order does not emit. | ✅ |
+| CR-13 (low, test) | CR-8 pinned the ladder but not the record axis: `run()` still read this repo's `skills-config.yaml` / `jira-workflow.json` via `git rev-parse`. Temp dirs also leaked. | `repoRoot` threaded into `loadWorkflowRecord`/`loadDoneResolution`/`loadCancelledResolution`/`loadWorklogTimeSpent`; temp dirs removed on exit. | ✅ |
+| CR-14 (medium, docs) | `docs/reference/tracker-workflow.md` contradicted the code in three places — including the "precedence is resolved **per moment**" paragraph added earlier in this same task, which is now exactly backwards. | Replaced with a "What 'opts in' actually means" section and a four-row table; the Jira-execution and terminality sections corrected. | ✅ |
+| CR-15 (low, test) | A test named `run() — …` never called `run()` — the same defect cycle 2 flagged, reintroduced by the fix for it. | Renamed to `spec — …`. | ✅ |
+| CR-16 (low) | `--print-plan` emitted `source: "file"` for a plan the file contributed nothing to. | Emits `source: moment ? workflow.source : "record"` plus an explicit `authored` field. | ✅ |
+
+**Scope note**: CR-11 required a second additive export on `tracker-workflow.js`
+(`pipelineAuthoredFor`), beyond the `isLastRung` field §4 scopes as "the whole of it". Taken
+deliberately: the alternative is duplicating `overlayFor`'s case-insensitive matching at the call
+site — the precise drift this codebase repeatedly warns against — and the alternative to fixing it at
+all is shipping a known unrecoverable wrong-Done. Same justification the task itself gives for putting
+`isLastRung` in the engine.
+
+**Tests**: 884 → **886**, all passing. `npm run bundle` re-run.
+
+Status remains Ready for Review for QA cycle 4.

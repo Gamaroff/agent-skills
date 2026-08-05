@@ -352,10 +352,29 @@ tracker-workflow.yaml  >  jira.workflowRecord  >  jira.statusMap  >  built-in de
 removed, and no migration is required — a project with no `tracker-workflow.yaml` resolves exactly as
 it did before.
 
-Precedence is resolved **per moment**, not per file. A file that declares `work-started` and omits
-`in-review` gets its ladder target for the first and falls through to the workflow record for the
-second. Omission is disablement *within* the ladder, and the fall-through is what stops a partial
-file being a downgrade.
+### What "opts in" actually means
+
+**An authored `pipeline:` block is the switch.** A file with no `pipeline:` — one that declares only
+`statuses:`, or is empty, or is malformed — leaves every moment's target at the built-in default. Those
+defaults were not chosen by you, so they sit *below* your `jira.workflowRecord`, and the record decides
+every moment exactly as it did before this file existed. Declaring a ladder alone changes nothing about
+where cards go.
+
+Write one `pipeline:` line per moment and the file takes over — for **every** moment, including the
+ones you leave out. Within an authored pipeline, **omission is disablement**: a moment you do not name
+does not fire, and does not fall through to the record. That is the whole mechanism for switching a
+moment off, so a fall-through would make it unusable.
+
+`byIssueType` is resolved the same way, per issue type: an overlay that authors its own `pipeline:`
+opts *that* issue type in even when the file has no top-level block, and an issue type with no authored
+pipeline defers to the record.
+
+| Your file | Who decides the target | Does it walk? |
+| --- | --- | --- |
+| No file | record → built-in | no |
+| `statuses:` only (or empty / malformed) | record → built-in | no |
+| `statuses:` + `pipeline:` | the file; omitted moments are **off** | yes |
+| `byIssueType` overlay with its own `pipeline:` | the file, for that issue type | yes |
 
 ---
 
@@ -366,9 +385,12 @@ What the Jira path actually does with the ladder. Everything here is
 
 ### The target comes from the ladder
 
-`jira-stage.js --issue K --stage <moment>` resolves the moment against your ladder first, falling
-back to the workflow record. The rung's **full name list** is used as the candidate list, in order,
-so a rung declared with alternatives works whichever spelling your board uses.
+`jira-stage.js --issue K --stage <moment>` resolves the moment against your ladder when your file has
+an authored `pipeline:` for that issue type (see [What "opts in" actually means](#what-opts-in-actually-means)),
+and against the workflow record otherwise. The rung's **full name list** is used as the candidate list,
+in order, so a rung declared with alternatives works whichever spelling your board uses.
+
+`--print-plan` reports which of the two answered, as `source` (`file` or `record`) and `authored`.
 
 ### Unreachable targets are walked to
 
@@ -431,6 +453,10 @@ terminal transition is not.
 
 Last-rung is measured against **the ladder in play for that issue type**, so a `byIssueType` overlay
 that lengthens or shortens the ladder moves the terminal with it.
+
+Both conditions require your ladder to be driving in the first place. When it is not — no authored
+`pipeline:` for this issue type — terminality comes from the workflow record exactly as it did before,
+and `--print-plan` reports `isLastRung: null` to say the ladder had no opinion.
 
 ### Inspecting without moving anything
 

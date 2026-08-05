@@ -556,6 +556,32 @@ function overlayFor(workflow, issueType) {
 }
 
 /**
+ * Did a human author the moment targets that apply to THIS issue type?
+ *
+ * `workflow.pipelineAuthored` answers that for the file as a whole, and only for
+ * the top-level `pipeline:` block. A `byIssueType` overlay may author a pipeline
+ * for one issue type while the file has no top-level block at all — a shape the
+ * reference documents — and for that type the targets are every bit as authored.
+ *
+ * A caller cannot compute this correctly: `overlayFor` matches the issue-type key
+ * case-insensitively and is not exported, so any call-site version would either
+ * duplicate that matching or get it subtly wrong. Same reason `isLastRung` lives
+ * in here.
+ *
+ * Consumers use this to decide whether the ladder outranks their older config.
+ * Getting it wrong in the false direction ignores an authored per-type target and
+ * falls back to a built-in default — which, for a `done` moment, means firing a
+ * board's real Done transition instead of the column its author actually named.
+ */
+function pipelineAuthoredFor(workflow, issueType) {
+  if (!workflow) return false;
+  if (workflow.pipelineAuthored === true) return true;
+  const overlay = overlayFor(workflow, issueType);
+  const p = overlay && overlay.pipeline;
+  return !!(p && typeof p === "object" && !Array.isArray(p));
+}
+
+/**
  * Rank a status: its index on the ladder, or null when off-ladder.
  *
  * Matches ANY name on a rung, not just the first — a board whose column is
@@ -863,6 +889,7 @@ module.exports = {
   rankOf,
   resolveMoment,
   planMove,
+  pipelineAuthoredFor,
   resolveDocumentStatus,
   validateWorkflow,
   normalizeRung,

@@ -22,7 +22,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const require = createRequire(import.meta.url);
@@ -727,12 +727,22 @@ test("spec — an authored ladder DOES outrank the record for a declared moment"
  * ("Adding a 'Ready for Review' column here would be a one-line change"). Every
  * assertion below would then silently depend on it. Pin the ladder instead.
  */
+const _tmpDirs = [];
 function withLadder(yaml) {
   const dir = mkdtempSync(join(tmpdir(), "jira-stage-"));
   writeFileSync(join(dir, "tracker-workflow.yaml"), yaml);
-  tw.clearWorkflowCache();
+  _tmpDirs.push(dir);
   return dir;
 }
+// `_cache` is keyed on the absolute path and mkdtemp gives a unique dir per
+// call, so no clearing is needed between tests — but the dirs must not pile up.
+process.on("exit", () => {
+  for (const d of _tmpDirs) {
+    try {
+      rmSync(d, { recursive: true, force: true });
+    } catch (_) {}
+  }
+});
 
 function withAuth(fn) {
   const saved = {};
@@ -812,10 +822,12 @@ test("run() — a partial walk reports walk-incomplete, NOT a success", async ()
     // Todo → (In Progress) → Done. Hop 1 lands; hop 2 has nothing on offer, so
     // the card is parked mid-ladder having genuinely moved.
     //
-    // This is the test that pins the branch ordering. A partial walk that moved
-    // carries `transitioned: true`, so a success branch checking that flag first
-    // swallows it and reports a clean pass — and because BOTH orders exit 0, an
-    // exit-code assertion alone would not catch the regression. Assert `reason`.
+    // NOTE ON WHAT THIS DOES AND DOES NOT PIN. Both branch orders emit the same
+    // `res` object, so `reason`, `transitioned`, `landed` and `cause` are
+    // identical either way — these assertions document the shape, they do not
+    // catch a re-ordering. The two things the swap actually loses are the
+    // parked-mid-ladder warning (asserted below via a captured output) and the
+    // `--strict` exit code (the sibling test).
     const s = stubFetch({
       status: "Todo",
       perGet: [[T("11", "Start", "In Progress")], []],
@@ -832,6 +844,35 @@ test("run() — a partial walk reports walk-incomplete, NOT a success", async ()
     assert.equal(r.cause, "no-transition", "the hop's own reason survives");
     assert.equal(r.exitCode, 0);
     assert.equal(s.posts.length, 1, "only the reachable hop fired");
+  });
+});
+
+test("run() — a parked walk WARNS that the card is mid-ladder", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
+  await withAuth(async () => {
+    const s = stubFetch({
+      status: "Todo",
+      perGet: [[T("11", "Start", "In Progress")], []],
+    });
+    // Capture stderr. Swapping the branches back makes the walk take the success
+    // path, which emits NOTHING — so this assertion, unlike the shape ones, does
+    // discriminate the ordering.
+    const lines = [];
+    const realWarn = console.warn;
+    console.warn = (...a) => lines.push(a.join(" "));
+    try {
+      await cli.run({
+        argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "done"],
+        fetchImpl: s.fetchImpl,
+        repoRoot: root,
+      });
+    } finally {
+      console.warn = realWarn;
+    }
+    const all = lines.join("\n");
+    assert.match(all, /walked as far as "In Progress"/);
+    assert.match(all, /parked mid-ladder/);
   });
 });
 
@@ -929,7 +970,60 @@ test("run() — --dry-run issues no POST", async () => {
   });
 });
 
-test("run() — a statuses-only file does not disable a record-enabled stage", async () => {
+test("spec — a byIssueType overlay that authors a pipeline IS authored", () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  // `pipelineAuthored` is a FILE-level flag set only from the top-level
+  // `pipeline:` block. An overlay may author a pipeline for one issue type while
+  // the file has no top-level block — a documented shape. Reading the file-level
+  // flag there ignores the authored per-type target and falls back to the
+  // built-in defaults, which for `done` means resolving the built-in Done
+  // candidates with `terminal: true` and firing the board's real Done instead of
+  // the column the author actually named. Unrecoverable.
+  const wf = fromYaml(`
+statuses:
+  - Todo
+  - In Progress
+  - Verified
+  - Done
+
+byIssueType:
+  "Bug":
+    pipeline:
+      done: Verified
+      in-qa: ~
+`);
+  assert.equal(wf.pipelineAuthored, false, "precondition: no top-level pipeline");
+
+  const bug = cli.resolveMomentSpec({
+    stage: "done",
+    issueType: "Bug",
+    record: {},
+    workflow: wf,
+  }).spec;
+  assert.deepEqual(bug.candidates, ["Verified"], "the author's own target");
+  assert.equal(bug.terminal, false, "Verified is not the last rung — rule 4 stays shut");
+
+  // The documented per-type disable must still disable.
+  const inQa = cli.resolveMomentSpec({
+    stage: "in-qa",
+    issueType: "Bug",
+    record: { stages: { "in-qa": { enabled: true, candidates: ["Verifying"] } } },
+    workflow: wf,
+  }).spec;
+  assert.equal(inQa.enabled, false);
+
+  // A different issue type has no authored pipeline, so it defers to the record.
+  const other = cli.resolveMomentSpec({
+    stage: "done",
+    issueType: "Story",
+    record: { stages: { done: { enabled: false, reason: "never" } } },
+    workflow: wf,
+  }).spec;
+  assert.equal(other.enabled, false);
+  assert.equal(other.reason, "never", "the record decides for an unauthored type");
+});
+
+test("spec — a statuses-only file does not disable a record-enabled stage", () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
   // The file exists and declares a ladder, but authors no `pipeline:`, so its
   // moment targets ARE the built-in defaults. Keying authorship on the file's
