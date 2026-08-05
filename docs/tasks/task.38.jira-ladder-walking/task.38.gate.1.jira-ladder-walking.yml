@@ -1,0 +1,147 @@
+schema: 1
+task: "task.38.jira-ladder-walking"
+task_title: "Jira: walk the status ladder, and stop the terminal fallback firing on a retargeted done"
+gate: FAIL
+status_reason: >-
+  All 5 phases are implemented and 870/870 tests pass, but an adversarial diff review found three
+  high-confidence correctness bugs in the primary feature path — each verified by execution. The
+  most serious fires a real Done transition on a board whose author explicitly disabled the moment,
+  which is precisely the unrecoverable wrong move this task exists to prevent.
+reviewer: "QA Engineer"
+updated: "2026-08-05T06:40:00Z"
+
+top_issues:
+  - id: CR-1
+    severity: high
+    finding: >-
+      walkLadder's cycle guard runs on the first iteration against a `visited` set pre-seeded with
+      `key(from)`. When the card is already at the target the target rung contains `from`, so the
+      guard fires immediately and returns `walk-incomplete` instead of `already`. Verified:
+      walkLadder({from:"Waiting for Review", targets:["Waiting for Review"]}) returns
+      reason:"walk-incomplete". This is the single most common pipeline outcome — every resumed run
+      re-firing a stage — and it now reports a self-contradictory "parked mid-ladder" warning and
+      exits 1 under --strict where it exited 0. Both the `already` branch in jira-stage.js and
+      walkLadder's own `already` branch are rendered unreachable.
+    suggested_action: >-
+      Skip the cycle check on i===0 so hop 0 reaches transitionToStatus and its already-short-circuit
+      produces the legacy shape. planMove returns rungs strictly between from and to, so an
+      intermediate rung can never contain `from` — the guard is only meaningful from i>=1.
+    suggested_owner: dev
+  - id: CR-2
+    severity: high
+    finding: >-
+      jira-stage.js evaluates `if (res.reason === "walked" || res.transitioned)` BEFORE the
+      walk-incomplete branch, but incomplete() sets `transitioned: current !== from`. A genuine
+      partial walk — moved through the gate, blocked after it — therefore has transitioned:true and
+      is emitted as a plain success at exit 0 with no warning. The walk-incomplete branch only fires
+      when the card did NOT move, the exact inverse of its own comment, so the operator gets zero
+      signal that a card is stuck in a gate. The suite's own "blocked second hop" test asserts
+      transitioned===true for this shape, confirming the ordering bug.
+    suggested_action: >-
+      Test `res.reason === "walk-incomplete"` before the success branch.
+    suggested_owner: dev
+  - id: CR-3
+    severity: high
+    finding: >-
+      resolveMomentSpec treats a null resolveMoment as "no ladder opinion" and falls back to
+      lib.resolveStage — but tracker-workflow documents omission from `pipeline:` as the ONLY way to
+      disable a moment. Verified: an authored tracker-workflow.yaml declaring only work-started
+      yields resolveMoment("done")===null, and resolveMomentSpec then returns
+      {enabled:true, candidates:["Done","Closed",...], terminal:true}. So `--stage done` fires a real
+      Done transition on a board whose author switched that moment off.
+    suggested_action: >-
+      Take the ladder branch only when the workflow was actually authored (workflow.source ===
+      "file"); when authored and resolveMoment returns null, return enabled:false with a reason
+      naming the omission. This also fixes CR-4.
+    suggested_owner: dev
+  - id: CR-4
+    severity: medium
+    finding: >-
+      With no tracker-workflow.yaml, loadWorkflow returns the BUILT-IN default ladder
+      (source:"default", DEFAULT_PIPELINE covering work-started/in-review/done), so resolveMoment
+      resolves and the JSON workflow record is bypassed entirely — contradicting the documented
+      precedence "ladder file > JSON record > built-in". Verified: with
+      record.stages.done.enabled=false, the ladder path returns enabled:true while resolveStage
+      returns enabled:false. Every existing consumer configuring jira.workflowRecord without
+      adopting the new yaml silently loses enabled/candidates/rank/byIssueType for those stages —
+      a compatibility regression against the task's own "no breaking changes" claim.
+    suggested_action: >-
+      Same fix as CR-3 — gate the ladder branch on workflow.source === "file" so the built-in
+      default sits below the JSON record, as documented.
+    suggested_owner: dev
+  - id: CR-5
+    severity: medium
+    finding: >-
+      incomplete() builds a fresh object and discards res.reason and res.detail, so on a multi-hop
+      plan a hop-0 failure — http-400/500 with the Jira message, required-fields with its unfillable
+      list, or no-transition — is flattened to "walk-incomplete". jira-stage keys its
+      describeAlternatives diagnostics on reason==="no-transition", and the HTTP detail is the only
+      place a workflow validator failure surfaces, so a 500 from Jira is reported as "the card is
+      parked mid-ladder" at exit 0.
+    suggested_action: >-
+      Carry the underlying failure through as a `cause` field (plus detail/unfillable/available) and
+      have jira-stage run its no-transition diagnostics when cause === "no-transition".
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 20
+
+evidence:
+  tests_reviewed: 870
+  phases_verified: "5/5 implemented (Phase 5 partial — one fixture blocked externally)"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No credentials handled beyond the existing getAuth path. --print-plan correctly runs before
+      the auth check and makes no network call (asserted by a test using a throwing fetchImpl).
+      No secrets in the diff.
+  performance:
+    status: PASS
+    notes: >-
+      The 1+2n target is met and asserted: the optional `transitions` parameter suppresses the
+      second GET per hop (verified by a test counting GETs), and a one-rung walk issues exactly one
+      GET and one POST — the documented baseline.
+  reliability:
+    status: FAIL
+    notes: >-
+      Three confirmed correctness bugs in the primary path. CR-3 in particular causes an
+      unrecoverable wrong transition into Done, which is the failure mode the task's own risk
+      assessment rates Critical. CR-1 breaks the most common invocation.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      Hop construction is implemented twice — planHops in jira-stage.js and inline in walkLadder —
+      and the two have already drifted on null-workflow handling. --print-plan prints one while the
+      live run walks the other, which is the drift the parity test exists to prevent. Code comments
+      and documentation are otherwise unusually thorough.
+
+recommendations:
+  immediate:
+    - action: "Fix CR-1 — skip the cycle guard on the first hop"
+      refs: ["shared/resources/jira-sync.js"]
+    - action: "Fix CR-2 — order the walk-incomplete branch before the success branch"
+      refs: ["shared/resources/jira-stage.js"]
+    - action: "Fix CR-3 + CR-4 — gate the ladder branch on an authored workflow; omission disables"
+      refs: ["shared/resources/jira-stage.js"]
+    - action: "Fix CR-5 — carry the underlying failure reason through a partial walk"
+      refs: ["shared/resources/jira-sync.js", "shared/resources/jira-stage.js"]
+    - action: "Add run()-level tests: already-at-target, partial walk, hop-0 HTTP failure"
+      refs: ["shared/resources/tests/jira-stage.test.mjs"]
+  future:
+    - action: "De-duplicate hop construction into one exported helper used by both paths"
+      refs: ["shared/resources/jira-sync.js", "shared/resources/jira-stage.js"]
+    - action: "Capture rapp-story-ready-for-showcase.json when board access is available"
+      refs: ["shared/resources/tests/fixtures/"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "CR-1, CR-2, CR-3 fixed and covered by run()-level tests"

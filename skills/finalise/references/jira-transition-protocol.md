@@ -22,21 +22,40 @@ This mirrors `resolveTransition` / `buildTransitionFields` in `jira-sync.js`. **
 
 - **Workflow validators.** A transition that demands time logged (see below) cannot be satisfied through the MCP tools, which offer no way to attach a worklog to the transition request. The CLI can; this path cannot. Move such a card by hand.
 - **The monotonicity guard.** The CLI refuses to move a card backwards down the stage ladder. Following this document, that check is yours to make: read the current status first, and do not transition an issue that is already past the stage you were asked to signal.
+- **Ladders.** The CLI walks intermediate rungs when a target is not directly reachable, re-reading the available transitions after every hop. This path fires **one transition, once**. If `--print-plan` returns more than one hop, log `this moment needs a multi-hop walk the MCP fallback cannot perform; move the card by hand` and return without transitioning. Firing hop 1 and stopping leaves the card somewhere nobody asked for, and skipping the gate to jump at the final rung defeats the reason the gate was declared — both are worse than not trying.
+- **The terminal override.** Terminality is two conditions, not one: the moment must be `done` **and** its target must be the ladder's last rung. If `--print-plan` reports `isLastRung: false`, treat `terminal` as **false** and do not use rule 5, however obviously "finished" the moment's name sounds. A board that points `done` at a gate column has exactly one done-category transition on offer, and rule 5 would fire the board's real Done with full confidence.
 
 ## Inputs
 
 - `cloudId`: derived from `JIRA_URL` hostname (e.g. `your-site.atlassian.net`).
 - `issueIdOrKey`: the Jira key (e.g. `RB-15`).
-- `candidates`: ordered list of acceptable status names (case-insensitive). Jira workflows name the same stage very differently, so each list covers the common vocabularies:
+- `candidates`: ordered list of acceptable status names (case-insensitive).
+
+  **Ask the CLI first.** Read the issue's current status via `getJiraIssue`, then run:
+
+  ```bash
+  node references/jira-stage.js --stage <stage> \
+    --from "<current status>" --issue-type "<issue type>" --print-plan
+  ```
+
+  This needs no credentials and makes no network call — it reads the consumer's `tracker-workflow.yaml` and prints `{ enabled, targets, hops, spansFrom, isLastRung, terminal, source, authored }`. Use `targets` as the candidate list and check `hops` against the one-hop rule above.
+
+  **`--from` is not optional.** Without it `planMove` has no starting point, every plan collapses to the target rung alone, and the multi-hop check can never fire — it would report one hop for a walk of any length. You have just read the status for step 2 of the algorithm, so passing it costs nothing.
+
+  **`--issue-type` is not optional either.** A `byIssueType` overlay can retarget a moment for one issue type — most consequentially, pointing `done` at a gate column instead of the board's terminal. Omit the flag and no overlay is applied: you get the base answer, with `terminal: true`, and rule 5 then fires the board's **real** Done on an issue whose author deliberately routed it elsewhere. That is unrecoverable. The `getJiraIssue` call in step 2 already returns `fields.issuetype.name` — read the status and the type in the same request and pass both.
+
+  **`enabled: false` means do nothing.** The moment is switched off for this issue type — either the consumer omitted it from an authored `pipeline:`, or their workflow record disabled it. Log the skip and return **without** calling `transitionJiraIssue`. Do not fall back to the default candidate lists below; they are the no-file default, not a floor.
+
+  When no `tracker-workflow.yaml` exists the CLI prints the built-in defaults, which are these lists — the same values, kept in step by the parity test:
   - Signal Work Started → `["In Progress", "Doing", "Started", "Development"]`
   - PR opened → `["In Review", "Code Review", "Ready for Review", "Waiting for Review", "Peer Review", "Review"]`
   - Finalise → `["Done", "Closed", "Resolved", "Complete", "Completed"]`
-- `terminal`: `true` only for the Finalise step (and any cancel/won't-do step). Unlocks rule 4 below.
+- `terminal`: take it from `--print-plan`. `true` only when the step is Finalise (or a cancel/won't-do step) **and** the plan reports `isLastRung: true`. Unlocks rule 5 below.
 
 ## Algorithm (MUST follow exactly)
 
 1. Call `getTransitionsForJiraIssue` with `cloudId`, `issueIdOrKey`, and **`expand: "transitions.fields"`**. Capture the returned `transitions` array. The expand is what makes a transition's required fields visible; without it, a transition screen that requires a field returns a bare HTTP 400 with no way to know what was missing.
-2. **Already satisfied.** Read the issue's current status. If it case-insensitively equals any `candidate`, log `✅ <issueKey> is already <status>` and **return without calling `transitionJiraIssue`**.
+2. **Already satisfied.** Read the issue's current status **and its issue type** (`getJiraIssue` with `fields: ["status", "issuetype"]` — one request answers both, and `--print-plan` needs the type). If the status case-insensitively equals any `candidate`, log `✅ <issueKey> is already <status>` and **return without calling `transitionJiraIssue`**.
 3. **Destination match.** For each `candidate` in order, find `t` in `transitions` where `t.to.name.toLowerCase() === candidate.toLowerCase()`. First hit wins; record `matched`.
 4. **Action match.** Only if step 3 found nothing: for each `candidate` in order, find `t` where `t.name.toLowerCase() === candidate.toLowerCase()`. First hit wins.
    > Destinations are exhausted across **all** candidates before any action name is considered. Workflows routinely name the action rather than the destination — an `Implemented` transition leading to `Waiting for Review` — but where both exist the destination is the more reliable signal.
@@ -57,6 +76,7 @@ This mirrors `resolveTransition` / `buildTransitionFields` in `jira-sync.js`. **
 - **MUST NOT** infer a transition by status-category for a **non-terminal** step — match the **name** only. Step 5 is a deliberately narrow exception: terminal steps only, and only when exactly one done-category transition exists.
 - **MUST NOT** invent a value for a required field that is not `resolution`, and MUST NOT send a value that is absent from that field's own `allowedValues`.
 - **MUST NOT** silently retry with a different transition id after a successful API call. One transition per step invocation.
+- **MUST NOT** perform more than one transition per invocation, even when the plan lists several. A ladder is the CLI's job; see "Ladders" above.
 - **MUST NOT** treat the absence of a matching transition as a failure — it is a documented non-blocking skip. The pipeline continues.
 
 ## Why the category fallback is restricted to terminal steps

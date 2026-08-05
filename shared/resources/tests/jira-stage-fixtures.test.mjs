@@ -248,3 +248,202 @@ test("transition id 21 means different things per issue type — destinations, n
     "READY FOR SHOWCASE",
   );
 });
+
+// --- ladder walking against real payloads ----------------------------------
+//
+// Everything above resolves ONE hop. These replay a multi-hop walk, which is
+// where position-dependence stops being a footnote and becomes the mechanism:
+// the destination of hop 2 is not offered from where hop 1 started, so a walk
+// that reused the first transition list would resolve nothing and skip.
+//
+// NOTE ON COVERAGE. The demo walk named in task.38 —
+// `In Progress → READY FOR SHOWCASE → Waiting for Review` — cannot be replayed
+// end-to-end yet: the transitions available *from* the showcase column are
+// captured nowhere. `id=21` (rapp-story-in-progress) and `id=151`
+// (rapp-story-waiting-for-review) are both transitions *into* it. Capturing
+// `rapp-story-ready-for-showcase.json` needs a real issue parked in that column
+// and is tracked as an open item on the task.
+//
+// So the two-hop proof below uses a path this board HAS captured at both ends,
+// and the uppercase-destination assertion is kept separately against the real
+// `id=21`. Between them they cover the same two properties the showcase walk
+// was chosen to demonstrate.
+
+const tw = require(join(__dirname, "..", "tracker-workflow.js"));
+const { parseYamlSubset } = require(join(__dirname, "..", "yaml-subset.js"));
+const fromYaml = (text) =>
+  tw.buildWorkflow(parseYamlSubset(text), { source: "file", path: "<test>" });
+
+const silent = { log() {}, info() {}, warn() {}, err() {}, emit() {} };
+
+/**
+ * Replay a walk against real captured payloads, one fixture per position.
+ *
+ * The GET sequence is keyed by hop, exactly as a live board would answer it:
+ * fixture[0] is what the board offers from the starting column, fixture[1] what
+ * it offers once the first transition has fired, and so on.
+ */
+function replayWalk({ fixtures, from, targets, workflow, ...rest }) {
+  const posts = [];
+  let g = 0;
+  const http = async (url, opts = {}) => {
+    if ((opts.method || "GET") === "GET") {
+      const list = load(fixtures[Math.min(g, fixtures.length - 1)]);
+      g++;
+      return { ok: true, status: 200, json: async () => ({ transitions: list }) };
+    }
+    posts.push(JSON.parse(opts.body));
+    return { ok: true, status: 204, json: async () => ({}), text: async () => "" };
+  };
+  return lib
+    .walkLadder({
+      http,
+      baseUrl: "https://rapp.atlassian.net",
+      email: "e@x",
+      token: "t",
+      issueKey: "RAPP-1",
+      from,
+      targets,
+      workflow,
+      output: silent,
+      ...rest,
+    })
+    .then((res) => ({ res, posts, getCount: g }));
+}
+
+test("Story walk: Waiting for Review → In Review → Ready for Testing, re-fetched per hop", async () => {
+  // A ladder that declares In Review between the review column and testing, so
+  // reaching Ready for Testing from Waiting for Review must pass through it.
+  const wf = fromYaml(`
+statuses:
+  - Selected for Development
+  - In Progress
+  - Waiting for Review
+  - In Review
+  - Ready for Testing
+  - Waiting for merge
+  - Done
+
+pipeline:
+  in-qa: Ready for Testing
+`);
+  const { res, posts, getCount } = await replayWalk({
+    fixtures: [
+      "rapp-story-waiting-for-review.json", // offers 401 Start Review → In Review
+      "rapp-story-in-review.json", // offers 61 Review Passed → Ready for Testing
+    ],
+    from: "Waiting for Review",
+    targets: tw.resolveMoment("in-qa", wf).targets,
+    workflow: wf,
+  });
+
+  assert.equal(res.reason, "walked");
+  assert.equal(res.landed, "Ready for Testing");
+  assert.equal(getCount, 2, "transitions re-read after the hop");
+  assert.deepEqual(
+    posts.map((p) => p.transition.id),
+    ["401", "61"],
+    "the real captured transition ids, in ladder order",
+  );
+
+  // The property that makes the re-fetch load-bearing rather than tidy: hop 2's
+  // transition is simply not on offer from where hop 1 began.
+  const fromReview = load("rapp-story-waiting-for-review.json");
+  assert.equal(
+    fromReview.some((t) => t.id === "61"),
+    false,
+    "Review Passed is not offered from Waiting for Review — only from In Review",
+  );
+});
+
+test("Story walk: the destination is matched case-insensitively (UPPERCASE board column)", async () => {
+  // This board spells the column READY FOR SHOWCASE. The ladder spells it in
+  // title case. Matching is on the stripped, case-folded name, so `id=21`
+  // resolves — an exact-string matcher would skip and the gate would never open.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Ready for Showcase
+
+pipeline:
+  ready-for-merge: Ready for Showcase
+`);
+  const moment = tw.resolveMoment("ready-for-merge", wf);
+  assert.equal(moment.isLastRung, true, "last rung of THIS ladder");
+
+  const { res, posts } = await replayWalk({
+    fixtures: ["rapp-story-in-progress.json"],
+    from: "In Progress",
+    targets: moment.targets,
+    workflow: wf,
+  });
+  assert.equal(res.reason, "walked");
+  assert.equal(res.landed, "READY FOR SHOWCASE", "the board's own spelling");
+  assert.equal(posts[0].transition.id, "21");
+});
+
+test("Story: a retargeted done skips rather than firing the board's real Done", async () => {
+  // `done` pointed at the showcase gate. From In Progress the board offers
+  // exactly one done-category transition (id=161 → Done), which is the shape
+  // that used to make rule 4 fire with confidence — and send the card to Done.
+  const wf = fromYaml(`
+statuses:
+  - In Progress
+  - Ready for Showcase
+  - Waiting for merge
+  - Done
+
+pipeline:
+  done: Ready for Showcase
+`);
+  const moment = tw.resolveMoment("done", wf);
+  assert.equal(moment.isLastRung, false);
+
+  const doneCategory = load("rapp-story-in-progress.json").filter(
+    (t) => t.to && t.to.statusCategory && t.to.statusCategory.key === "done",
+  );
+  assert.equal(doneCategory.length, 1, "precondition: exactly one, so rule 4 would be unambiguous");
+
+  // Rebuild the ladder so the gate is NOT reachable in one hop either, forcing
+  // the question "is there another way to finish?" that rule 4 used to answer.
+  const { res, posts } = await replayWalk({
+    fixtures: ["rapp-story-testing.json"], // offers no route to the showcase column
+    from: "Testing",
+    targets: moment.targets,
+    workflow: wf,
+    terminal: lib.isTerminalMoment("done") && moment.isLastRung,
+    localStatus: "done",
+  });
+
+  assert.equal(res.transitioned, false);
+  assert.equal(posts.length, 0, "a skip — nothing fired");
+  assert.notEqual(res.landed, "Done");
+});
+
+test("Story: when done IS the last rung, the category fallback is still available", async () => {
+  const wf = fromYaml(`
+statuses:
+  - Testing
+  - Waiting for merge
+  - Done
+
+pipeline:
+  done: Done
+`);
+  const moment = tw.resolveMoment("done", wf);
+  assert.equal(moment.isLastRung, true);
+
+  // From In Review the task workflow offers "Review passed" → Done: the name
+  // matches neither the rung nor the destination spelling by action name, so
+  // this lands via the done-category rule.
+  const { res, posts } = await replayWalk({
+    fixtures: ["rapp-itdevops-task-in-review.json"],
+    from: "In Review",
+    targets: moment.targets,
+    workflow: wf,
+    terminal: lib.isTerminalMoment("done") && moment.isLastRung,
+    localStatus: "accepted",
+  });
+  assert.equal(res.landed, "Done");
+  assert.equal(posts[0].transition.id, "241");
+});

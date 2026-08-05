@@ -102,3 +102,140 @@ test("the protocol still declares itself the fallback, not the primary path", ()
   assert.match(protocol, /fallback path, not the primary one/i);
   assert.match(protocol, /no-credentials/);
 });
+
+// --- --print-plan parity ---------------------------------------------------
+//
+// The prose now tells the fallback to take its candidates from
+// `jira-stage.js --print-plan` rather than from the literals below it, keeping
+// the literals only as the no-file default. That makes the CLI's DEFAULT output
+// the thing that must match the prose — a second drift surface, and the one a
+// reader following the document actually consumes.
+
+const cli = require(join(sharedDir, "jira-stage.js"));
+const tw = require(join(sharedDir, "tracker-workflow.js"));
+const { parseYamlSubset } = require(join(sharedDir, "yaml-subset.js"));
+
+/**
+ * A workflow built from an EMPTY document — the built-in default ladder.
+ *
+ * Deliberately not `loadWorkflow({})`: this repo dogfoods its own
+ * tracker-workflow.yaml, so loading from disk would test this board's three
+ * columns rather than the defaults the prose documents.
+ */
+const defaultWorkflow = tw.buildWorkflow(parseYamlSubset(""), {
+  source: "default",
+  path: "<default>",
+});
+
+for (const [label, stage] of PAIRS) {
+  test(`--print-plan default targets for "${label}" match the prose literal`, () => {
+    const { spec } = cli.resolveMomentSpec({
+      stage,
+      issueType: "",
+      record: {},
+      workflow: defaultWorkflow,
+    });
+    assert.deepEqual(
+      candidatesAfter(label),
+      [...spec.candidates],
+      `The prose literal and what --print-plan would print for stage ${stage} have drifted. ` +
+        `A reader following the document would feed different candidates than the CLI resolves.`,
+    );
+  });
+}
+
+test("--print-plan without --from reports the target rung alone", () => {
+  // planMove has no starting point, so there is nothing to span. The output must
+  // say so via spansFrom rather than letting a one-element plan read as "this
+  // moment is one hop from where the card is".
+  const { spec } = cli.resolveMomentSpec({
+    stage: "done",
+    issueType: "",
+    record: {},
+    workflow: defaultWorkflow,
+  });
+  const hops = cli.planHops({
+    from: "",
+    targets: spec.candidates,
+    workflow: defaultWorkflow,
+    issueType: "",
+  });
+  assert.equal(hops.length, 1, "the target rung, and nothing else");
+  assert.deepEqual(hops[0], [...spec.candidates]);
+});
+
+test("--print-plan with --from spans the real ladder distance", () => {
+  const wf = tw.buildWorkflow(
+    parseYamlSubset(`
+statuses:
+  - Backlog
+  - In Progress
+  - Ready for Showcase
+  - Waiting for Review
+  - Done
+
+pipeline:
+  in-review: Waiting for Review
+`),
+    { source: "file", path: "<test>" },
+  );
+  const { spec } = cli.resolveMomentSpec({
+    stage: "in-review",
+    issueType: "",
+    record: {},
+    workflow: wf,
+  });
+
+  const spanned = cli.planHops({
+    from: "In Progress",
+    targets: spec.candidates,
+    workflow: wf,
+    issueType: "",
+  });
+  assert.deepEqual(
+    spanned,
+    [["Ready for Showcase"], ["Waiting for Review"]],
+    "the gate, then the target",
+  );
+
+  // Same moment, same board, no --from: one hop. This is the pair the prose's
+  // "--from is not optional" rule exists for — without it the multi-hop check
+  // reads a two-hop walk as a one-hop move and the fallback fires blind.
+  const unspanned = cli.planHops({
+    from: "",
+    targets: spec.candidates,
+    workflow: wf,
+    issueType: "",
+  });
+  assert.equal(unspanned.length, 1);
+});
+
+test("the prose states the one-hop limit and the terminal override", () => {
+  // Both are rules a model can only follow if they are actually written down.
+  assert.match(protocol, /multi-hop walk the MCP fallback cannot perform/);
+  assert.match(protocol, /MUST NOT\*\* perform more than one transition per invocation/);
+  assert.match(protocol, /isLastRung/);
+  assert.match(protocol, /--print-plan/);
+  assert.match(protocol, /--from/);
+});
+
+test("the prose tells the fallback to pass --issue-type, and to honour enabled:false", () => {
+  // Both are load-bearing against the SAME unrecoverable outcome the CLI path
+  // guards. Drop --issue-type and no byIssueType overlay applies: a moment
+  // retargeted for one issue type resolves to the base answer with
+  // `terminal: true`, and rule 5 fires the board's real Done on an issue whose
+  // author deliberately routed it elsewhere. Ignore `enabled: false` and a
+  // moment the consumer switched off fires from the default lists.
+  assert.match(protocol, /--issue-type/);
+  assert.match(protocol, /`--issue-type` is not optional/);
+  assert.match(protocol, /enabled: false/);
+  // The command the model is told to run must itself carry both flags — a rule
+  // stated in prose but absent from the copy-pasteable command is a rule that
+  // will not be followed. The invocation is line-wrapped, so match the block.
+  const at = protocol.indexOf("jira-stage.js --stage");
+  assert.notEqual(at, -1, "no --print-plan invocation found in the protocol");
+  const block = protocol.slice(at, at + 220);
+  assert.match(block, /--print-plan/);
+  assert.match(block, /--from/);
+  assert.match(block, /--issue-type/);
+});

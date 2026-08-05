@@ -26,10 +26,9 @@
 // `require("./jira-sync.js")` — a GitHub-only consumer must never pull the Jira
 // client in behind this. The only shell-out is the `git rev-parse` fallback used
 // when the caller injects no `repoRoot`, exactly as loadWorkflowRecord does.
-// Tracker-specific execution lands in task.38 (Jira) and task.39 (GitHub).
-//
-// Nothing calls this module yet. That is intentional: a modelling mistake here
-// cannot reach a real board until the wiring tasks land.
+// Tracker-specific execution: Jira reads this module (task.38 — jira-stage.js
+// resolves every moment from the ladder and jira-sync.js walks it); GitHub is
+// task.39 and step-file wiring is task.40.
 
 const fs = require("fs");
 const path = require("path");
@@ -555,6 +554,49 @@ function overlayFor(workflow, issueType) {
 }
 
 /**
+ * Did a human author the target for THIS moment, for THIS issue type?
+ *
+ * The granularity matters, and getting it wrong is dangerous in both directions.
+ * `resolveMoment` resolves per key, so an authorship gate coarser than per-key
+ * will disagree with it somewhere:
+ *
+ *  - Too coarse in the FALSE direction (file-level `pipelineAuthored` alone): an
+ *    overlay-authored type reads as unauthored, its explicit target is ignored,
+ *    and a built-in default is used instead. For `done` that fires the board's
+ *    real Done rather than the column the author named.
+ *
+ *  - Too coarse in the TRUE direction (type-level): an overlay that names ONE
+ *    moment — the documented per-type disable `in-qa: ~` is exactly this —
+ *    claims authorship of all eight. The seven it never mentions then resolve
+ *    from the built-in default and outrank the consumer's own config, so `done`
+ *    fires despite an explicit `enabled: false`. Worse than not looking at the
+ *    overlay at all.
+ *
+ * So: the base pipeline being authored makes every moment authored (falling
+ * through to it is legitimate — a human wrote it). Otherwise only the moments the
+ * overlay actually names are authored; the rest are not, and the caller's older
+ * configuration keeps deciding them, exactly as it did before this file existed.
+ *
+ * `moment` is optional — omit it for the type-level question ("does this issue
+ * type have any authored pipeline at all?").
+ *
+ * A caller cannot compute this: `overlayFor` matches the issue-type key
+ * case-insensitively and is not exported, so any call-site version would either
+ * duplicate that matching or get it subtly wrong. Same reason `isLastRung` lives
+ * in here.
+ */
+function pipelineAuthoredFor(workflow, issueType, moment) {
+  if (!workflow) return false;
+  if (workflow.pipelineAuthored === true) return true;
+  const overlay = overlayFor(workflow, issueType);
+  const p = overlay && overlay.pipeline;
+  if (!p || typeof p !== "object" || Array.isArray(p)) return false;
+  if (moment === undefined || moment === null) return true;
+  const key = String(moment).trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(p, key);
+}
+
+/**
  * Rank a status: its index on the ladder, or null when off-ladder.
  *
  * Matches ANY name on a rung, not just the first — a board whose column is
@@ -579,6 +621,9 @@ function rankOf(status, workflow, opts) {
  * move target: a board whose column is "Waiting for Review" would be moved to
  * "In Review", which is exactly the behaviour change the default ladder exists to
  * prevent. Task.38/39 try the candidates in order, as resolveTransition already does.
+ *
+ * The result also carries `isLastRung` — see describeTarget for why that answer
+ * belongs in here rather than at the call site.
  */
 function resolveMoment(moment, workflow, opts) {
   const key = String(moment || "").trim().toLowerCase();
@@ -633,7 +678,7 @@ function resolveMoment(moment, workflow, opts) {
 }
 
 /**
- * Turn a target name into `{ targets, rank, offLadder }`.
+ * Turn a target name into `{ targets, rank, offLadder, isLastRung }`.
  *
  * When the target is INHERITED and its name misses the ladder in play, fall back
  * to the other historical names on the same default rung before declaring it a
@@ -641,6 +686,15 @@ function resolveMoment(moment, workflow, opts) {
  * `pipeline:` block at all, and what stops an overlay type being sent to a base
  * ladder's column. An *authored* target never takes this path — an explicit
  * choice that misses is a side-state, which is a thing authors deliberately do.
+ *
+ * `isLastRung` answers "is this target the end of the ladder?" and is computed
+ * HERE, against `ladder` — the ladder already resolved for this issue type —
+ * rather than at the call site. A caller cannot get it right: `workflow.ladder`
+ * is the BASE ladder, which a `byIssueType` overlay may replace with one of a
+ * different length, and `ladderFor` is not exported. It is the input to Jira's
+ * terminal rule (task.38): the done-category fallback asks "is there exactly one
+ * way to finish?", a question that only has a right answer when the target IS
+ * the finish. Off-ladder is never a last rung — a side-state is not a position.
  */
 function describeTarget(name, ladder, moment, inherited) {
   let rank = rankIn(ladder, name);
@@ -662,9 +716,14 @@ function describeTarget(name, ladder, moment, inherited) {
   if (rank == null) {
     // Off-ladder: a side-state, entered directly and never walked to. Free by
     // construction — there is no second list to declare it in.
-    return { targets: [name], rank: null, offLadder: true };
+    return { targets: [name], rank: null, offLadder: true, isLastRung: false };
   }
-  return { targets: ladder[rank].names.slice(), rank, offLadder: false };
+  return {
+    targets: ladder[rank].names.slice(),
+    rank,
+    offLadder: false,
+    isLastRung: rank === ladder.length - 1,
+  };
 }
 
 /**
@@ -845,6 +904,7 @@ module.exports = {
   rankOf,
   resolveMoment,
   planMove,
+  pipelineAuthoredFor,
   resolveDocumentStatus,
   validateWorkflow,
   normalizeRung,
