@@ -2826,7 +2826,10 @@ async function walkLadder({
   // the legacy shape a one-rung ladder has always returned. Reporting `walked`
   // here would make a no-op indistinguishable from a real move on the reader's
   // side, and `to`/`from` are both the current status exactly as before.
-  if (walked.length && walked.every((h) => h.result === "already")) {
+  // `walked` is never empty here — every iteration either pushes or returns, and
+  // the empty-targets case returned `no-target` above — so `every` on it is a
+  // genuine test, not a vacuous truth.
+  if (walked.every((h) => h.result === "already")) {
     return {
       transitioned: false,
       reason: "already",

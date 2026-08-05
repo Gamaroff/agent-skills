@@ -22,6 +22,8 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -717,6 +719,21 @@ test("spec — an authored ladder DOES outrank the record for a declared moment"
 // ordering inside run() could be wrong while the suite stayed green. These drive
 // the CLI itself.
 
+/**
+ * A throwaway repo root carrying its own tracker-workflow.yaml.
+ *
+ * Without this, run() shells out to `git rev-parse --show-toplevel` and reads
+ * THIS repo's committed board file — a file whose own comments invite editing
+ * ("Adding a 'Ready for Review' column here would be a one-line change"). Every
+ * assertion below would then silently depend on it. Pin the ladder instead.
+ */
+function withLadder(yaml) {
+  const dir = mkdtempSync(join(tmpdir(), "jira-stage-"));
+  writeFileSync(join(dir, "tracker-workflow.yaml"), yaml);
+  tw.clearWorkflowCache();
+  return dir;
+}
+
 function withAuth(fn) {
   const saved = {};
   const env = {
@@ -760,13 +777,27 @@ function stubFetch({ status, issueType = "Story", perGet = [], postOk = true }) 
   };
 }
 
+// A gated ladder: reaching Done from Todo must pass through In Progress.
+const RUN_LADDER = `
+statuses:
+  - Todo
+  - In Progress
+  - Done
+
+pipeline:
+  work-started: In Progress
+  done: Done
+`;
+
 test("run() — a card already at the target exits 0 and reports already", async () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
   await withAuth(async () => {
     const s = stubFetch({ status: "In Progress", perGet: [[]] });
     const r = await cli.run({
       argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--strict"],
       fetchImpl: s.fetchImpl,
+      repoRoot: root,
     });
     assert.equal(r.reason, "already");
     assert.equal(r.exitCode, 0, "already is exit 0 even under --strict");
@@ -774,11 +805,59 @@ test("run() — a card already at the target exits 0 and reports already", async
   });
 });
 
-test("run() — a partial walk is reported as walk-incomplete, not as a success", async () => {
+test("run() — a partial walk reports walk-incomplete, NOT a success", async () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
   await withAuth(async () => {
-    // This repo's own tracker-workflow.yaml is authored (Todo → In Progress →
-    // Done) and declares work-started, so the walk resolves from the ladder.
+    // Todo → (In Progress) → Done. Hop 1 lands; hop 2 has nothing on offer, so
+    // the card is parked mid-ladder having genuinely moved.
+    //
+    // This is the test that pins the branch ordering. A partial walk that moved
+    // carries `transitioned: true`, so a success branch checking that flag first
+    // swallows it and reports a clean pass — and because BOTH orders exit 0, an
+    // exit-code assertion alone would not catch the regression. Assert `reason`.
+    const s = stubFetch({
+      status: "Todo",
+      perGet: [[T("11", "Start", "In Progress")], []],
+    });
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "done", "--quiet"],
+      fetchImpl: s.fetchImpl,
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "walk-incomplete");
+    assert.notEqual(r.reason, "walked");
+    assert.equal(r.transitioned, true, "it really did move — that is the trap");
+    assert.equal(r.landed, "In Progress");
+    assert.equal(r.cause, "no-transition", "the hop's own reason survives");
+    assert.equal(r.exitCode, 0);
+    assert.equal(s.posts.length, 1, "only the reachable hop fired");
+  });
+});
+
+test("run() — a parked walk exits 1 under --strict", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
+  await withAuth(async () => {
+    const s = stubFetch({
+      status: "Todo",
+      perGet: [[T("11", "Start", "In Progress")], []],
+    });
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "done", "--quiet", "--strict"],
+      fetchImpl: s.fetchImpl,
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "walk-incomplete");
+    assert.equal(r.exitCode, 1, "the card did not reach what the moment asked for");
+  });
+});
+
+test("run() — a single unreachable rung keeps the legacy no-transition reason", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
+  await withAuth(async () => {
+    // One rung, nothing on offer → byte-identical to pre-walking behaviour.
     const s = stubFetch({
       status: "Todo",
       perGet: [[T("9", "Nowhere", "Somewhere Else")]],
@@ -786,16 +865,17 @@ test("run() — a partial walk is reported as walk-incomplete, not as a success"
     const r = await cli.run({
       argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet"],
       fetchImpl: s.fetchImpl,
+      repoRoot: root,
     });
-    // One rung, unreachable → the legacy single-hop reason, not walk-incomplete.
     assert.equal(r.reason, "no-transition");
     assert.equal(r.exitCode, 0);
     assert.equal(s.posts.length, 0, "nothing was fired");
   });
 });
 
-test("run() — --strict turns a skip into exit 1, unchanged", async () => {
+test("run() — --strict turns a plain skip into exit 1, unchanged", async () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
   await withAuth(async () => {
     const s = stubFetch({
       status: "Todo",
@@ -804,13 +884,35 @@ test("run() — --strict turns a skip into exit 1, unchanged", async () => {
     const r = await cli.run({
       argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--strict"],
       fetchImpl: s.fetchImpl,
+      repoRoot: root,
     });
     assert.equal(r.exitCode, 1);
   });
 });
 
+test("run() — a full two-hop walk succeeds and fires both transitions", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
+  await withAuth(async () => {
+    const s = stubFetch({
+      status: "Todo",
+      perGet: [[T("11", "Start", "In Progress")], [T("12", "Finish", "Done")]],
+    });
+    const r = await cli.run({
+      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "done", "--quiet"],
+      fetchImpl: s.fetchImpl,
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "walked");
+    assert.equal(r.landed, "Done");
+    assert.equal(r.exitCode, 0);
+    assert.deepEqual(s.posts.map((p) => p.transition.id), ["11", "12"]);
+  });
+});
+
 test("run() — --dry-run issues no POST", async () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
+  const root = withLadder(RUN_LADDER);
   await withAuth(async () => {
     const s = stubFetch({
       status: "Todo",
@@ -819,11 +921,40 @@ test("run() — --dry-run issues no POST", async () => {
     const r = await cli.run({
       argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--dry-run"],
       fetchImpl: s.fetchImpl,
+      repoRoot: root,
     });
     assert.equal(r.reason, "dry-run");
     assert.equal(r.would, "In Progress");
     assert.equal(s.posts.length, 0, "dry-run must never POST");
   });
+});
+
+test("run() — a statuses-only file does not disable a record-enabled stage", async () => {
+  const cli = require(join(__dirname, "..", "jira-stage.js"));
+  // The file exists and declares a ladder, but authors no `pipeline:`, so its
+  // moment targets ARE the built-in defaults. Keying authorship on the file's
+  // existence made this shape both fire a built-in `done` over the record's
+  // enabled:false AND silently disable stages the record opted into.
+  const wf = tw.buildWorkflow(
+    parseYamlSubset("statuses:\n  - Todo\n  - In Progress\n  - Done\n"),
+    { source: "file", path: "<t>" },
+  );
+  assert.equal(wf.source, "file");
+  assert.equal(wf.pipelineAuthored, false, "precondition: no pipeline authored");
+
+  const record = {
+    stages: {
+      done: { enabled: false, reason: "we never auto-close" },
+      "in-qa": { enabled: true, candidates: ["Verifying"] },
+    },
+  };
+  const done = cli.resolveMomentSpec({ stage: "done", issueType: "", record, workflow: wf }).spec;
+  assert.equal(done.enabled, false, "the record's enabled:false must survive");
+  assert.equal(done.reason, "we never auto-close");
+
+  const inQa = cli.resolveMomentSpec({ stage: "in-qa", issueType: "", record, workflow: wf }).spec;
+  assert.equal(inQa.enabled, true, "an opted-in stage must not be silently disabled");
+  assert.deepEqual(inQa.candidates, ["Verifying"]);
 });
 
 test("run() — an unhandled throw still exits 0", async () => {

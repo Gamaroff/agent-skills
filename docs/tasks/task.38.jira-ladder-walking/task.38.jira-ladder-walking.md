@@ -908,4 +908,22 @@ shipped code, not just by the suite going green.
 
 **Tests**: 870 → **880**, all passing. `npm run bundle` re-run.
 
-Status returned to Ready for Review for QA cycle 2.
+### QA Fix Cycle 2 — 2026-08-05
+
+Cycle 2's re-review confirmed CR-1, CR-1b, CR-2, CR-5 and the `planHops` de-duplication as genuinely
+fixed, and found that **the cycle-1 fix for CR-4 was itself wrong**, plus a test that did not test
+what its name claimed.
+
+| ID | Finding | Fix | Verified |
+| --- | --- | --- | --- |
+| CR-6 (high) | The CR-4 fix keyed authorship on `workflow.source === "file"`, which is true for a file that exists but authors no `pipeline:` — an empty file, a malformed one, or the **documented `statuses:`-only shape**. In all three the pipeline IS the built-in default, so the bug was only half-fixed and a new one was added: a built-in `done` still outranked the record's `enabled: false` (firing the board's real Done), while `in-qa`/`ready-for-merge`/`blocked` — absent from the built-in pipeline — were read as deliberate omissions and **silently disabled a stage the consumer had opted into**. | Key on `workflow.pipelineAuthored === true`, the field `tracker-workflow.js` maintains for exactly this distinction. | all 4 workflow shapes ✅ |
+| CR-7 (high, test) | The run() test named "a partial walk is reported as walk-incomplete" asserted `reason === "no-transition"` on a **single-rung** plan. `walk-incomplete` appeared in no run() test at all, so the CR-2 fix — the highest-severity bug of cycle 1 — had zero coverage, and reverting the branch order left the suite green. | Renamed to what it asserts, and added a real two-hop partial walk asserting `reason`, `transitioned: true`, `landed` and `cause`. Both branch orders exit 0, so the assertion is on `reason`, not the exit code. | ✅ |
+| CR-8 (medium, test) | The run() tests read this repo's own committed `tracker-workflow.yaml` via `git rev-parse`, so their outcomes depended on a file whose comments invite editing. | `run()` takes an optional `repoRoot`; tests write their own ladder to a temp dir and clear the workflow cache. | ✅ |
+| CR-9 (low) | The `getTransitions` + `describeAlternatives` block was duplicated verbatim across two branches, the copy also costing an extra API round-trip. | Extracted `explainNoTransition()`, called from both. | ✅ |
+| CR-10 (low) | Two dead conditions left by the refactor. | `walked.length &&` dropped with a note on why `every` is not vacuous; the unreachable disjunct kept and labelled defensive. | ✅ |
+
+Also added: a full two-hop `run()` walk asserting both transitions fire in ladder order.
+
+**Tests**: 880 → **884**, all passing. `npm run bundle` re-run.
+
+Status remains Ready for Review for QA cycle 3.

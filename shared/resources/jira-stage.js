@@ -162,14 +162,36 @@ function describeAlternatives(transitions, stage, record, issueType) {
 //     confident wrong transition into the board's real Done is not recoverable,
 //     whereas a skip is.
 function resolveMomentSpec({ stage, issueType, record, workflow }) {
-  // Only an AUTHORED file outranks the JSON record. `loadWorkflow` never fails —
-  // with no file it returns the BUILT-IN default ladder, whose `pipeline:` covers
-  // work-started, in-review and done. Treating that as a ladder hit would put the
-  // built-in defaults ABOVE `jira.workflowRecord` and invert the documented
-  // precedence: every existing consumer who configured the record and never
-  // adopted the new format would silently lose its `enabled`, `candidates`,
-  // `rank` and `byIssueType` for exactly those three stages.
-  const authored = !!(workflow && workflow.source === "file");
+  // Only an authored `pipeline:` outranks the JSON record.
+  //
+  // The discriminator is `pipelineAuthored`, NOT the mere existence of a file.
+  // `loadWorkflow` never fails, and there are three separate ways to end up
+  // holding a workflow whose `pipeline` is the BUILT-IN default: no file at all
+  // (source "default"), a file that is empty or not a mapping (source "file",
+  // built-in pipeline, plus a warning), and the documented `statuses:`-only shape
+  // where an author declares their ladder and leaves the moments inherited.
+  //
+  // Keying on `source === "file"` treats the last two as authored, which is wrong
+  // in both directions at once: for a moment the built-in default declares, the
+  // built-in target would outrank the record's `enabled: false` and fire the
+  // board's real Done; and for a moment it does NOT declare (in-qa,
+  // ready-for-merge, blocked) `resolveMoment` returns null, which the branch
+  // below reads as deliberate disablement — silently switching off a stage the
+  // consumer explicitly opted into. A broken YAML would do the same thing.
+  //
+  // `tracker-workflow.js` sets `pipelineAuthored` for exactly this distinction
+  // and `validateWorkflow` already reasons with it ("nobody chose that target").
+  //
+  // Consequence, deliberate: a `statuses:`-only file resolves its targets from
+  // the record and does NOT walk. That is the conservative reading — its moment
+  // targets are built-in-derived, so they belong below the record — and it keeps
+  // the compatibility guarantee exact. Authoring one `pipeline:` line per moment
+  // is what opts a board into walking.
+  const authored = !!(
+    workflow &&
+    workflow.source === "file" &&
+    workflow.pipelineAuthored === true
+  );
   if (!authored) {
     return { spec: lib.resolveStage({ stage, issueType, record }), moment: null };
   }
@@ -217,6 +239,11 @@ const planHops = lib.planHops;
 async function run({
   argv = process.argv,
   fetchImpl = typeof fetch !== "undefined" ? fetch : null,
+  // Where to look for tracker-workflow.yaml. Absent, `loadWorkflow` shells out to
+  // `git rev-parse --show-toplevel` and reads the real repo's file — which makes
+  // a test's outcome depend on a committed board description whose own comments
+  // invite editing. Tests pin their own ladder through this.
+  repoRoot = undefined,
 } = {}) {
   lib.loadDotEnv();
 
@@ -262,7 +289,7 @@ async function run({
   // The ladder is read before credentials are even looked at, because
   // --print-plan must work without them — that is the entire point of it. Never
   // throws: a missing or malformed file resolves to the built-in default ladder.
-  const workflow = tw.loadWorkflow({});
+  const workflow = tw.loadWorkflow(repoRoot ? { repoRoot } : {});
 
   // --print-plan: resolve and print, no credentials, no network, exit 0.
   //
@@ -446,6 +473,29 @@ async function run({
     output,
   });
 
+  // A skip is only actionable if the operator can see what the board DID offer.
+  // Shared by the walk-incomplete branch and the plain no-transition tail — two
+  // copies of this drifted apart once already.
+  const explainNoTransition = async () => {
+    let transitions = [];
+    try {
+      transitions = await lib.getTransitions({
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: args.issue,
+      });
+    } catch (_) {}
+    for (const h of describeAlternatives(
+      transitions,
+      args.stage,
+      record,
+      issueType,
+    ))
+      output.warn(`   ↪ ${h}`);
+  };
+
   // A partial walk is neither a success nor "nothing happened" — the card is
   // parked in a gate the board declares, and a reader must be able to tell that
   // from a card that never moved.
@@ -477,28 +527,13 @@ async function run({
     // this an HTTP error or a required-field refusal reads as a gate.
     if (res.cause && res.cause !== "no-transition")
       output.warn(`    Hop failed with: ${res.cause}${res.detail ? ` — ${res.detail}` : ""}.`);
-    if (res.cause === "no-transition") {
-      let transitions = [];
-      try {
-        transitions = await lib.getTransitions({
-          http,
-          baseUrl: auth.baseUrl,
-          email: auth.email,
-          token: auth.token,
-          issueKey: args.issue,
-        });
-      } catch (_) {}
-      for (const h of describeAlternatives(
-        transitions,
-        args.stage,
-        record,
-        issueType,
-      ))
-        output.warn(`   ↪ ${h}`);
-    }
+    if (res.cause === "no-transition") await explainNoTransition();
     return emit({ ...res, issueType }, args.strict ? 1 : 0);
   }
 
+  // `walked` is the only success shape walkLadder can return with
+  // `transitioned: true` once walk-incomplete is handled above; the second
+  // disjunct is defensive and currently unreachable.
   if (res.reason === "walked" || res.transitioned) {
     return emit({ ...res, issueType }, 0);
   }
@@ -509,25 +544,7 @@ async function run({
   }
 
   // Everything else is a skip. Surface why, then let the pipeline continue.
-  if (res.reason === "no-transition") {
-    let transitions = [];
-    try {
-      transitions = await lib.getTransitions({
-        http,
-        baseUrl: auth.baseUrl,
-        email: auth.email,
-        token: auth.token,
-        issueKey: args.issue,
-      });
-    } catch (_) {}
-    for (const h of describeAlternatives(
-      transitions,
-      args.stage,
-      record,
-      issueType,
-    ))
-      output.warn(`   ↪ ${h}`);
-  }
+  if (res.reason === "no-transition") await explainNoTransition();
 
   return emit({ ...res, issueType }, args.strict ? 1 : 0);
 }
