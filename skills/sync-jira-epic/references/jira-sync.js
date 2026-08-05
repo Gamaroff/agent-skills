@@ -22,6 +22,11 @@ const path = require("path");
 const crypto = require("crypto");
 const { execSync } = require("child_process");
 
+// The consumer-owned status ladder (task.37). One-directional by design: this
+// module requires tracker-workflow.js, never the reverse — that module is pure
+// and a GitHub-only consumer must not pull the Jira client in behind it.
+const tw = require("./tracker-workflow.js");
+
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
 // "not in a repo, fall back to defaults". Without "ignore" on stderr that
 // silent fallback prints a `fatal: not a git repository` line per call, which
@@ -2030,12 +2035,57 @@ function resolveStage({ stage, issueType, record } = {}) {
   };
 }
 
-// Rank a status name for the monotonicity guard. The record's statusRank wins;
-// otherwise fall back to the ranks implied by the default candidate lists.
-// Unknown -> null, which the guard reads as "no opinion, allow".
-function resolveStatusRank(statusName, record) {
+// Is this pipeline moment one whose target is, by definition, the end of the
+// work? Today `done` and only `done` (DEFAULT_STAGE_MAP above).
+//
+// Terminality is TWO independent conditions and this is only the first. The
+// second is positional — the resolved target must also be the ladder's last rung
+// (`resolveMoment(...).isLastRung`). A project that points `done` at a bespoke
+// gate column has a `done` moment that is terminal in NAME but not in POSITION,
+// and the done-category fallback must stay shut for it. Both, or neither.
+function isTerminalMoment(moment) {
+  const spec = DEFAULT_STAGE_MAP[String(moment || "").trim().toLowerCase()];
+  return !!(spec && spec.terminal);
+}
+
+// Rank a status name for the monotonicity guard. Unknown -> null, which the
+// guard reads as "no opinion, allow".
+//
+// TWO RANK SCALES, NEVER MIXED. `workflow` selects which one is in play:
+//
+//   ladder mode (`workflow` supplied) — the rank is the rung INDEX (0, 1, 2 …).
+//     The ladder is the only source that knows a project's bespoke columns.
+//     DEFAULT_STATUS_RANK is derived from the default candidate lists, so a
+//     column no stage names — its own comment picks "READY FOR SHOWCASE" as the
+//     example — is unranked there and the guard waves a card straight back out
+//     of it. Declaring a rung now ranks it, which is what makes a gate column
+//     defensible against a resumed run.
+//
+//   legacy mode (no `workflow`) — the record's statusRank, then the ranks
+//     implied by the default candidate lists (10, 20, … 60). Byte-identical to
+//     the behaviour before ladders existed.
+//
+// In ladder mode the ladder is the SOLE authority and off-ladder returns null,
+// rather than falling through to the legacy chain. That fall-through is a trap:
+// the caller's `minRank` in ladder mode is a rung index (0..6), so a status that
+// missed the ladder but happens to sit in DEFAULT_STATUS_RANK would be compared
+// at the wrong magnitude — "In Review" (30) against a target rung of 2 reads as
+// a regress, and the guard would refuse a perfectly ordinary forward move. Any
+// board whose ladder omits a column the defaults happen to name would stop
+// moving entirely.
+//
+// Returning null instead is also the semantically right answer, not merely the
+// safe one: it is exactly what `rankOf` documents ("null means no opinion") and
+// what DEFAULT_STAGE_MAP already says about `blocked` — a status off the ladder
+// is a side-state, and a side-state is exempt in both directions.
+//
+// This guard is shared by document, epic, story and task sync. None of them pass
+// `workflow`, so all of them stay in legacy mode and their existing tests passing
+// unchanged is the regression signal.
+function resolveStatusRank(statusName, record, workflow, issueType) {
   const name = stripStatusEmoji(statusName).toLowerCase();
   if (!name) return null;
+  if (workflow) return tw.rankOf(statusName, workflow, { issueType });
   const fromRecord = (record || {}).statusRank;
   if (fromRecord && typeof fromRecord === "object") {
     for (const [k, v] of Object.entries(fromRecord)) {
@@ -2321,6 +2371,25 @@ async function transitionToStatus({
   workflowRecord = null,
   allowRegress = false,
   output,
+  // A transition list the caller has ALREADY fetched for this exact position.
+  // Supplied only by walkLadder, which must GET once per hop anyway: without
+  // this every hop would fetch twice, making an n-hop walk cost 1 + 3n calls
+  // against the 1 + 2n the design targets. Absent (every other caller), the
+  // fetch below happens exactly as it always did.
+  transitions: transitionsIn = null,
+  // Explicit terminality, overriding the value derived from `localStatus`.
+  //
+  // Needed because the two questions `localStatus` currently answers have come
+  // apart. It picks the RESOLUTION (positive vs negative) and it unlocks the
+  // done-category fallback (rule 4) — fine while "the moment is called done"
+  // and "the target is the end of the ladder" were the same thing. Once a board
+  // can point `done` at a gate column they are not, and rule 4 must stay shut
+  // while resolution filling carries on unchanged. `null` = derive as before.
+  terminal: terminalIn = null,
+  // The ladder, when the caller is operating in ladder mode. Switches
+  // resolveStatusRank to rung indices — see its comment on the two scales.
+  workflow = null,
+  issueType = "",
 }) {
   const candidates = (
     Array.isArray(targetStatus) ? targetStatus : [targetStatus]
@@ -2352,7 +2421,14 @@ async function transitionToStatus({
   }
 
   const localRaw = localStatus == null ? candidates[0] : localStatus;
-  const terminal = isTerminalLocalStatus(localRaw);
+  // Rule 4's gate. The explicit override wins when given; otherwise the local
+  // status decides, exactly as before.
+  const terminal =
+    terminalIn == null ? isTerminalLocalStatus(localRaw) : !!terminalIn;
+  // Resolution choice stays keyed on the LOCAL status, never on `terminal`.
+  // These two must not be collapsed: a retargeted `done` arrives here with
+  // terminal=false and localStatus="done", and still needs a positive
+  // resolution if the transition it eventually fires demands one.
   const negative = isNegativeLocalStatus(localRaw);
 
   // Short-circuit before any network call when the issue already sits in one of
@@ -2372,7 +2448,12 @@ async function transitionToStatus({
   // the caller declares the rank it is moving TO and the card already sits
   // higher. Unranked either side means no opinion: allow.
   if (!allowRegress && minRank != null) {
-    const currentRank = resolveStatusRank(current, workflowRecord);
+    const currentRank = resolveStatusRank(
+      current,
+      workflowRecord,
+      workflow,
+      issueType,
+    );
     if (currentRank != null && currentRank > minRank) {
       if (output)
         output.info(
@@ -2388,13 +2469,15 @@ async function transitionToStatus({
     }
   }
 
-  const transitions = await getTransitions({
-    http,
-    baseUrl,
-    email,
-    token,
-    issueKey,
-  });
+  const transitions =
+    transitionsIn ||
+    (await getTransitions({
+      http,
+      baseUrl,
+      email,
+      token,
+      issueKey,
+    }));
   const { match, rule, reason } = resolveTransition({
     transitions,
     candidates,
@@ -2552,6 +2635,157 @@ async function transitionToStatus({
         (loggedWork ? ` [logged ${worklogTimeSpent}]` : ""),
     );
   return { transitioned: true, from: current, to: landed, rule, loggedWork };
+}
+
+// Walk the rungs between where a card sits and where a moment wants it.
+//
+// Transitions are POSITION-DEPENDENT: the set available from "In Progress" is
+// not the set available from "Waiting for Review". So the list is re-fetched
+// after every hop. Caching the first one defeats the entire feature.
+//
+// EVERY rung is an ARRAY of candidate names in preference order, never one name.
+// `resolveMoment` returns `targets` (plural) and `planMove` returns
+// `{ names: [...] }` per rung. Collapsing either to `names[0]` makes alternative
+// spellings unreachable — a board whose column is "Waiting for Review" would be
+// sent to "In Review" — which is the regression task.37's plural return exists
+// to prevent. `resolveTransition` already takes an ordered candidate list, so
+// each rung passes straight through with no adaptation.
+//
+// Never throws. A hop that finds no transition ENDS the walk and reports where
+// the card actually stopped: a board that gates a column behind a human is a
+// correct board, and parking there is the right outcome rather than a failure.
+// Three outcomes, three shapes — walked, walk-incomplete, and the single-hop
+// reasons a one-rung ladder produces today, byte-identical.
+//
+// No rollback on a partial walk: the reverse transition may not exist, and
+// attempting one fights the guard that just let the card forward.
+async function walkLadder({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  from,
+  targets,
+  workflow,
+  issueType = "",
+  doneResolution = "",
+  cancelledResolution = "",
+  worklogTimeSpent = "",
+  localStatus,
+  terminal = null,
+  minRank = null,
+  workflowRecord = null,
+  allowRegress = false,
+  output,
+}) {
+  const rungs = (targets || []).filter(Boolean);
+  if (!rungs.length) return { transitioned: false, reason: "no-target", from };
+
+  const key = (s) => stripStatusEmoji(s).toLowerCase();
+  // A uniform array of name-ARRAYS: the intermediate rungs the ladder declares,
+  // then the target rung itself. Every element is a candidate list.
+  const hops = [
+    ...tw
+      .planMove(from, rungs[0], workflow, { issueType })
+      .map((r) => r.names),
+    rungs,
+  ];
+
+  const visited = new Set([key(from)]);
+  const walked = [];
+  let current = from;
+
+  const incomplete = (i, reason) => ({
+    transitioned: current !== from,
+    reason,
+    from,
+    landed: current,
+    remaining: hops.slice(i),
+    hops: walked,
+  });
+
+  for (let i = 0; i < hops.length; i++) {
+    const rung = hops[i];
+    // Cycle guard. This RETURNS the walk-incomplete shape — it must never break
+    // into the success return below. An aborted cycle is a BLOCKED walk, and
+    // reporting it as `walked` erases the distinction the three outcomes exist
+    // to preserve.
+    if (rung.some((n) => visited.has(key(n)))) {
+      return incomplete(i, "walk-incomplete");
+    }
+
+    const isLast = i === hops.length - 1;
+    const transitions = await getTransitions({
+      http,
+      baseUrl,
+      email,
+      token,
+      issueKey,
+    });
+
+    const res = await transitionToStatus({
+      http,
+      baseUrl,
+      email,
+      token,
+      issueKey,
+      targetStatus: rung,
+      currentStatus: current,
+      // Only the FINAL rung can be terminal; an intermediate one is a gate the
+      // card passes through, and unlocking rule 4 there could fire a board's
+      // real Done transition halfway up the ladder.
+      terminal: isLast ? terminal : false,
+      localStatus: isLast ? localStatus : undefined,
+      doneResolution,
+      cancelledResolution,
+      worklogTimeSpent,
+      configHint: "stage",
+      // The monotonicity guard runs ONCE, at entry, against the final target's
+      // rank. An intermediate rung is by construction below that rank, so a
+      // per-hop guard would refuse the gate itself.
+      minRank: i === 0 ? minRank : null,
+      allowRegress: i === 0 ? allowRegress : true,
+      workflowRecord,
+      workflow,
+      issueType,
+      transitions,
+      output,
+    });
+
+    if (res.transitioned) {
+      // `landed` is always a STRING. Fall back to the rung's first NAME, never
+      // the rung object — an object here propagates into the next hop's
+      // currentStatus and every comparison downstream silently stops matching.
+      current = res.to || rung[0];
+      visited.add(key(current));
+      walked.push({ index: i, to: current, result: "transitioned" });
+      continue;
+    }
+
+    if (res.reason === "already") {
+      // Already on this rung: not a move, not a failure. Keep walking.
+      current = res.to || current;
+      visited.add(key(current));
+      walked.push({ index: i, to: current, result: "already" });
+      continue;
+    }
+
+    walked.push({ index: i, result: res.reason, candidates: rung });
+    // A one-rung ladder must be byte-identical to today, so when the first and
+    // only hop fails, report ITS reason rather than dressing it up as a walk.
+    if (isLast && i === 0) return { ...res, from, landed: current, hops: walked };
+    return incomplete(i, "walk-incomplete");
+  }
+
+  return {
+    transitioned: current !== from,
+    reason: "walked",
+    from,
+    landed: current,
+    to: current,
+    hops: walked,
+  };
 }
 
 // Drive an issue's Jira status from a local document's frontmatter status.
@@ -3223,6 +3457,7 @@ module.exports = {
   putIssueAtomic,
   findExistingByLabel,
   transitionToStatus,
+  walkLadder,
   syncDocumentStatus,
   summariseStatusOutcome,
   probeWorkflow,
@@ -3244,6 +3479,7 @@ module.exports = {
   loadWorklogTimeSpent,
   resolveStage,
   resolveStatusRank,
+  isTerminalMoment,
   // status mapping
   DEFAULT_STATUS_MAP,
   loadStatusMap,

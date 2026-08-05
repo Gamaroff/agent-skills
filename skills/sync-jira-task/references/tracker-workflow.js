@@ -1,3 +1,4 @@
+// AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/tracker-workflow.js. Regenerate via `npm run bundle`.
 "use strict";
 
 // ---------------------------------------------------------------------------

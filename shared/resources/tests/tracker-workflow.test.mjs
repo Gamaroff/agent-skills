@@ -418,12 +418,110 @@ pipeline:
 test("moments — a target absent from statuses is an off-ladder side-state", () => {
   const wf = fromYaml(BESPOKE);
   const r = resolveMoment("blocked", wf);
-  assert.deepEqual(r, { targets: ["Blocked"], rank: null, offLadder: true });
+  // `isLastRung: false` for a side-state, and it is not merely "the last rung
+  // happens to be elsewhere": a status off the ladder has no position at all, so
+  // it can never be the end of one. Jira's terminal rule reads this field, and a
+  // side-state that claimed to be the last rung would unlock the done-category
+  // fallback from a column the ladder deliberately keeps out of the sequence.
+  assert.deepEqual(r, {
+    targets: ["Blocked"],
+    rank: null,
+    offLadder: true,
+    isLastRung: false,
+  });
 });
 
 test("moments — resolution is case-insensitive on the moment name", () => {
   const wf = fromYaml(BESPOKE);
   assert.ok(resolveMoment("WORK-STARTED", wf));
+});
+
+test("moments — isLastRung marks the end of the ladder, and only the end", () => {
+  const wf = fromYaml(BESPOKE);
+  // Ready for Showcase sits at index 5 of a 7-rung ladder — a gate, not the end.
+  const merge = resolveMoment("ready-for-merge", wf);
+  assert.equal(merge.rank, 5);
+  assert.equal(merge.isLastRung, false);
+  // Done is index 6 of 7.
+  const done = resolveMoment("done", wf);
+  assert.equal(done.rank, 6);
+  assert.equal(done.isLastRung, true);
+  // And an earlier rung is emphatically not the end.
+  assert.equal(resolveMoment("work-started", wf).isLastRung, false);
+});
+
+// The reason isLastRung is computed inside this module rather than at the call
+// site. `workflow.ladder` is the BASE ladder; an overlay may replace it with one
+// of a DIFFERENT LENGTH, so a caller measuring `rank === workflow.ladder.length - 1`
+// gets the wrong answer for exactly the issue types an overlay exists to serve.
+// Here the same target — Done, inherited from the base pipeline — is the last
+// rung for one issue type and a middle rung for the other.
+const OVERLAY_LONGER = `
+statuses:
+  - Backlog
+  - In Progress
+  - Done
+
+pipeline:
+  work-started: In Progress
+  done: Done
+
+byIssueType:
+  "IT / DevOps Task":
+    statuses:
+      - Backlog
+      - In Progress
+      - Done
+      - Awaiting Sign-off
+      - Archived
+`;
+
+test("moments — isLastRung is measured against the issue type's ladder, not the base", () => {
+  const wf = fromYaml(OVERLAY_LONGER);
+
+  const base = resolveMoment("done", wf);
+  assert.equal(base.rank, 2, "index 2 of a 3-rung base ladder");
+  assert.equal(base.isLastRung, true);
+
+  const overlaid = resolveMoment("done", wf, { issueType: "IT / DevOps Task" });
+  assert.equal(overlaid.rank, 2, "same index…");
+  assert.equal(
+    overlaid.isLastRung,
+    false,
+    "…but the overlay ladder runs on past Done, so Done is not its end",
+  );
+
+  // The trap this guards: measuring against the BASE ladder would have said
+  // true for both, which is what unlocks Jira's done-category fallback from a
+  // column that is not this issue type's terminal.
+  assert.equal(wf.ladder.length, 3);
+});
+
+test("moments — isLastRung follows an overlay that SHORTENS the ladder too", () => {
+  const wf = fromYaml(`
+statuses:
+  - Backlog
+  - In Progress
+  - Ready for Showcase
+  - Done
+
+pipeline:
+  ready-for-merge: Ready for Showcase
+  done: Done
+
+byIssueType:
+  "Bug":
+    statuses:
+      - Backlog
+      - In Progress
+      - Ready for Showcase
+`);
+  assert.equal(resolveMoment("ready-for-merge", wf).isLastRung, false);
+  assert.equal(
+    resolveMoment("ready-for-merge", wf, { issueType: "Bug" }).isLastRung,
+    true,
+    "the overlay stops at the showcase column, so there it IS the end",
+  );
 });
 
 // ── 5. byIssueType overlay ───────────────────────────────────────────────────
