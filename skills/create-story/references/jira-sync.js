@@ -2759,14 +2759,23 @@ async function walkLadder({
     }
 
     const isLast = i === hops.length - 1;
-    const transitions = await getTransitions({
-      http,
-      baseUrl,
-      email,
-      token,
-      issueKey,
-    });
 
+    // NO pre-fetch here, deliberately. `transitionToStatus` fetches its own list
+    // per call, which already gives the per-hop re-read a walk needs — the
+    // position has changed, so the list it fetches is the one for where the card
+    // now is. Pre-fetching and handing it over via the `transitions` parameter
+    // costs the same on a hop that moves, and strictly MORE on the two paths that
+    // never reach the network: `already` and `would-regress` both short-circuit
+    // before the fetch, so pre-fetching spends a GET to learn nothing.
+    //
+    // That matters because those are not edge cases. A resumed pipeline re-firing
+    // a stage the card has already passed is the single most common invocation,
+    // and this is what keeps a one-rung walk call-for-call identical to the
+    // pre-walking implementation, not merely close to it.
+    //
+    // The `transitions` parameter stays on `transitionToStatus` — it is the right
+    // escape hatch for a caller that HAS already fetched, and it is tested. This
+    // walk simply is not such a caller.
     const res = await transitionToStatus({
       http,
       baseUrl,
@@ -2799,7 +2808,6 @@ async function walkLadder({
       workflowRecord,
       workflow,
       issueType,
-      transitions,
       output,
     });
 

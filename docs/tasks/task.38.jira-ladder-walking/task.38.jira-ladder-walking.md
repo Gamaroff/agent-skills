@@ -5,10 +5,12 @@ type: task
 description: "Drive Jira transitions from the tracker-workflow ladder, walking intermediate rungs when the target is not directly reachable, and restrict the done-category fallback to the last rung."
 tags: [jira, pipeline, transitions, workflow]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-03
 updated: 2026-08-05
+completed_date: 2026-08-05
+pr_number: 194
 assignee:
 estimated_effort_hours: 22
 github_issue: 186
@@ -16,7 +18,7 @@ github_issue: 186
 
 # Technical Task: Jira — walk the status ladder
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ⚠️ Revised against `task.38.review.1.jira-ladder-walking.md` — all critical + important
 recommendations implemented 2026-08-05.
@@ -1017,3 +1019,43 @@ execution.
 
 Deferred, non-blocking: the `rapp-story-ready-for-showcase.json` capture and two consumer tests, both
 needing live board access.
+
+
+---
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED · **Accepted on:** 2026-08-05
+
+### QA Summary
+
+**Final gate:** [`task.38.gate.2.jira-ladder-walking.yml`](./task.38.gate.2.jira-ladder-walking.yml) — ✅ **PASS**, 90/100
+**Final report:** [`task.38.qa.2.jira-ladder-walking.md`](./task.38.qa.2.jira-ladder-walking.md)
+**QA cycles:** 5 · **Findings:** 23 found, 23 fixed (7 high-severity)
+
+### Verified
+
+✅ **Success criteria** — 19 of 20 met; the one exception is externally blocked, disclosed and mitigated
+✅ **CI** — `SUCCESS` on `c79d24b`, confirmed to be the PR head (not an ancestor)
+✅ **Tests** — 889/889 passing; all 8 pre-existing fixture assertions unchanged
+✅ **Security** — no new credential handling; `--print-plan`'s offline claim proven by a throwing `fetchImpl`
+⚠️ **Compliance** — N/A (no personal data, UI, payment or accessibility surface)
+✅ **Documentation** — CHANGELOG, reference doc, protocol, plus three stale "not wired yet" claims retired
+✅ **Bundling** — every `references/` copy byte-identical to source; `npm run bundle` idempotent
+
+### Gap found and closed during this DoD pass
+
+The traceability check caught the Performance criterion *"default one-rung path makes exactly the same
+API calls as today"* as only partially met: `walkLadder` pre-fetched the transition list ahead of
+`transitionToStatus`'s `already` and `would-regress` short-circuits, both of which previously cost
+zero network calls. Removed the pre-fetch — `transitionToStatus` already fetches per call, which is
+the per-hop re-read a walk needs — and pinned it with `getCount() === 0` assertions on both paths.
+The criterion now holds unconditionally rather than with a documented caveat.
+
+### Deferred (non-blocking — both need live board access)
+
+1. `rapp-story-ready-for-showcase.json` capture and the showcase-walk assertion
+2. Two consumer tests (`--dry-run` across one real issue per column)
+3. Advisory: `validateWorkflow` could warn when a `source: "file"` workflow authors no `pipeline:`
+
+**Detailed verification log:** [`task.38.dod.1.jira-ladder-walking.md`](./task.38.dod.1.jira-ladder-walking.md)

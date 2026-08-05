@@ -411,10 +411,12 @@ set offered from `In Progress` is not the set offered from `Ready for Showcase`.
 cannot be planned once up front and then executed, and why the API cost is `1 + 2n` for an `n`-hop
 walk rather than a constant.
 
-A one-rung walk that moves the card issues exactly the calls the single-hop implementation always did.
-One case costs a call more than before: when the card is **already** at the target, the walk reads the
-transition list before discovering that, where the old path short-circuited first. The outcome is
-unchanged (`already`, nothing fired) — only a GET is spent to reach it.
+A one-rung walk issues exactly the calls the single-hop implementation always did — including the two
+paths that never reach the network at all. A card **already** at the target, and a move the
+monotonicity guard **refuses**, both short-circuit before any request, exactly as before. The walk
+does not read the transition list in front of those checks, because doing so would spend a call to
+learn nothing on the most common invocation there is: a resumed pipeline re-firing a stage the card
+has already passed.
 
 If a board puts a time-spent validator on more than one transition in a walk, the configured
 `jira.worklogTimeSpent` is booked once per such transition. Worklogs are cumulative, so set it low.

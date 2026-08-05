@@ -609,6 +609,30 @@ test("walk — a card already AT the target reports `already`, not a parked walk
   assert.notEqual(res.reason, "walk-incomplete");
   assert.equal(res.transitioned, false);
   assert.equal(s.posts.length, 0);
+  // ZERO network calls, not merely zero POSTs. transitionToStatus short-circuits
+  // on `already` before it fetches, and the walk must not spend a GET in front of
+  // that to learn nothing. This is the most common invocation in a pipeline — a
+  // resumed run re-firing a stage the card has already passed — so it is where
+  // "a one-rung walk costs exactly what it did before" is actually decided.
+  assert.equal(s.getCount(), 0, "an already-satisfied walk must not hit the API");
+});
+
+test("walk — a refused regress also costs no API calls", async () => {
+  // The other path that short-circuits before the network. Same reasoning.
+  const wf = fromYaml(GATE_LADDER);
+  const s = stubWalk([[T("50", "Back to Work", "In Progress")]]);
+  const res = await lib.walkLadder(
+    walkArgs({
+      http: s.http,
+      from: "Ready for Showcase",
+      targets: ["In Progress"],
+      workflow: wf,
+      minRank: tw.rankOf("In Progress", wf),
+    }),
+  );
+  assert.equal(res.reason, "would-regress");
+  assert.equal(s.posts.length, 0);
+  assert.equal(s.getCount(), 0, "the guard refuses before any request is made");
 });
 
 test("walk — a hop's own failure survives as `cause`, not flattened to walk-incomplete", async () => {
