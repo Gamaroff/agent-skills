@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.35.0] - 2026-08-05
+
 ### Added
 
 - **Document links in synced Jira issues can now point at the branch the documents actually live on**, via a new optional `jira.docBranch` key (env override `JIRA_DOC_BRANCH`), falling back to `developNext.baseBranch` before asking git. Resolution order is now `--doc-branch` → `JIRA_DOC_BRANCH` → `jira.docBranch` → `developNext.baseBranch` → the current branch's upstream → git's default.
