@@ -58,7 +58,7 @@ Before step 1:
   vcs: bitbucket # or: github   | auto (default)
   ```
 
-  Auth env vars per combo: `gh auth login` (GitHub VCS); `BITBUCKET_USERNAME` + `BITBUCKET_APP_PASSWORD` (Bitbucket VCS); `JIRA_URL` + `JIRA_USER_EMAIL` + `JIRA_API_TOKEN` (Jira tracker). Full spec: [platform detection](../../shared/resources/platform-detection.md).
+  Auth env vars per combo: `gh auth login` (GitHub VCS); `BITBUCKET_USERNAME` + `BITBUCKET_API_TOKEN` (Bitbucket VCS — an Atlassian API token with the **Bitbucket scopes ticked**; `BITBUCKET_APP_PASSWORD` is still read as a fallback); `JIRA_URL` + `JIRA_USER_EMAIL` + `JIRA_API_TOKEN` (Jira tracker). Full spec: [platform detection](../../shared/resources/platform-detection.md).
 
 ## See also
 

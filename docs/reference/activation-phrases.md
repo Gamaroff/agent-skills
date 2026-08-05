@@ -27,6 +27,8 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Review story 2.3" / "Story 2.3 has unclear requirements" | `review-story` |
 | "Review this task" | `review-task` |
 | "Validate story 2.3" / "Is story 2.3 ready?" | `review-story --validate` |
+| "Review this bug report" / "Is this bug ready to fix?" | `review-bug` (the second phrasing picks `--validate`) |
+| "Review my changes" / "Review this diff" / "Review PR 123" | `review-code` |
 
 ## Development
 
@@ -34,6 +36,9 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 |---|---|
 | "Develop and QA this story end to end" | `develop-story` |
 | "Develop and QA this task end to end" | `develop-task` |
+| "Research and fix this bug end to end" | `develop-bug` |
+| "Work the next thing on the roadmap" / "What's next?" | `develop-next` |
+| "Work everything that can go in parallel" | `develop-batch` |
 | "Implement story 2.3" (lite intent) | `develop` |
 | "Create a feature branch from story 2.3" | `create-branch` |
 | "Commit these changes" / "Write a commit" | `commit-changes` |
@@ -56,6 +61,10 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Sync this epic to Jira" / "Publish epic to Jira" | `sync-jira-epic` |
 | "Sync this story to Jira" | `sync-jira-story` |
 | "Sync this task to Jira" | `sync-jira-task` |
+| "Sync this epic to GitHub" / "Publish epic to GitHub" | `sync-github-epic` |
+| "Sync this story to GitHub" | `sync-github-story` |
+| "Sync this task to GitHub" | `sync-github-task` |
+| "File an issue for this" / "Create a ticket" | `create-issue` (platform auto-detected) |
 
 ## Lifecycle / change management
 

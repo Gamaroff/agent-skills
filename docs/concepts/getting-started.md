@@ -21,7 +21,7 @@ Skills auto-detect your platform via `skills-config.yaml` + env vars + git remot
 | --------- | ------------- | -------------------------------------------------------------------------------------------------------- |
 | GitHub    | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration              |
 | GitHub    | Jira          | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported                         |
-| Bitbucket | Jira          | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira          | `BITBUCKET_USERNAME`, `BITBUCKET_API_TOKEN`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
 ### How to pick a row
 
@@ -64,16 +64,23 @@ export JIRA_BOARD_ID=1          # Scrum boards only
 
 **Bitbucket** (Bitbucket+Jira):
 
-| Variable                 | Required | Description                                                     |
-| ------------------------ | -------- | --------------------------------------------------------------- |
-| `BITBUCKET_USERNAME`     | ✅       | Your Bitbucket username                                         |
-| `BITBUCKET_APP_PASSWORD` | ✅       | App password — generate at Bitbucket → Settings → App passwords |
-| `BITBUCKET_REPO_URL`     | optional | Override auto-detected repo base URL (rarely needed)            |
+| Variable                 | Required | Description                                                                                                                                            |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BITBUCKET_USERNAME`     | ✅       | Basic Auth username — your Atlassian account email                                                                                                     |
+| `BITBUCKET_API_TOKEN`    | ✅       | Atlassian API token **with Bitbucket scopes ticked** — create at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens)        |
+| `BITBUCKET_APP_PASSWORD` | optional | Legacy **name** for the same value, still read as a fallback. Atlassian removed app passwords themselves on 2026-07-28 — set this to the API token too. |
+| `BITBUCKET_REPO_URL`     | optional | Override auto-detected repo base URL (rarely needed)                                                                                                   |
 
 ```bash
-export BITBUCKET_USERNAME=your-username
-export BITBUCKET_APP_PASSWORD=your-app-password
+export BITBUCKET_USERNAME=you@example.com
+export BITBUCKET_API_TOKEN=ATATT...
 ```
+
+> **Tick the Bitbucket scopes when you create the token.** A scopeless Atlassian token
+> authenticates fine against Jira and fails against Bitbucket — and because Bitbucket hides
+> private repos from anonymous callers, that failure arrives as a **404 with an empty result**,
+> not a 401. It reads as "no pull requests found" rather than "your credential is wrong".
+> Full detail: [Bitbucket credentials](../reference/configuration.md#bitbucket).
 
 **Staying local:**
 

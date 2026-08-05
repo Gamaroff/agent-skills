@@ -60,6 +60,37 @@ References: [`skills/review-bug/SKILL.md`](../../skills/review-bug/SKILL.md), [`
 
 QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills — **dev skills never modify gate files**.
 
+### Roadmap-driven orchestration
+
+The three pipelines above each take a path you supply. Two orchestrators sit one level up and
+**choose the path for you**, reading `docs/development/project-completion-roadmap.md`:
+
+```
+develop-next
+  └── select-next.mjs (deterministic) → /develop-story | /develop-task
+        → merge the green PR → tick the roadmap + Change Log
+```
+
+```
+develop-batch
+  └── select-next.mjs --batch → N write-disjoint items
+        → one git worktree each, pipelines run concurrently
+        → merge serially, rebasing each on the new base tip
+```
+
+Selection is executed by the script, never by eye — only `[ ]` rows are candidates, and `deps:`
+are satisfied by `[x]` rows. **This makes the roadmap load-bearing**: a merged item left unticked
+gets selected and redone. Conflict safety in `--batch` comes from `touches:` tags — two rows
+conflict when they share a tag either side marks `!`.
+
+Both are crash-safe via a run-state file (re-running resumes), stop at manual/blocked rows,
+planning gaps, or any pipeline HALT, and support `--dry-run` for a read-only preview. Wrap either
+in `/loop` for continuous runs.
+
+References: [`skills/develop-next/README.md`](../../skills/develop-next/README.md),
+[`skills/develop-batch/README.md`](../../skills/develop-batch/README.md),
+[roadmap selection](../../skills/develop-next/references/roadmap-selection.md).
+
 ## Lifecycle phases (reference)
 
 ```

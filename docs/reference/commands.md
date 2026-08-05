@@ -10,7 +10,18 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 |---|---|---|
 | `/develop-story <path>` | Full story lifecycle: branch → review → develop → PR → QA → fix → finalise → commit | [Story Development](../runbooks/story-development.md) |
 | `/develop-task <path>` | Full task lifecycle (no epic) | [Task Development](../runbooks/task-development.md) |
+| `/develop-bug <path>` | Full bug-fix lifecycle: branch → review-bug → investigate & fix → PR → verify loop → close | [Bug Fix Runbook](../runbooks/bug-fix.md), [`develop-bug` README](../../skills/develop-bug/README.md) |
 | `/develop <path>` | Just the implementation loop — used inside the orchestrators | [`develop` SKILL.md](../../skills/develop/SKILL.md) |
+
+### Roadmap-driven (pick the work for you)
+
+| Command | What it does | Reference |
+|---|---|---|
+| `/develop-next` | Select the next unblocked roadmap item, run its pipeline end to end, merge, tick the roadmap | [`develop-next` README](../../skills/develop-next/README.md) |
+| `/develop-next --dry-run` | Read-only preview of what would be selected, and why | [Roadmap selection](../../skills/develop-next/references/roadmap-selection.md) |
+| `/develop-batch` | Same, but fans the whole conflict-free frontier into parallel worktrees — develop in parallel, merge serially | [`develop-batch` README](../../skills/develop-batch/README.md) |
+| `/develop-batch --dry-run` | Read-only preview of the batch the selector would pick | [Roadmap selection](../../skills/develop-next/references/roadmap-selection.md) |
+| `/loop /develop-next` | Run an orchestrator continuously until the frontier empties or a pipeline HALTs | [`develop-next` README](../../skills/develop-next/README.md) |
 
 ## Authoring
 
@@ -22,7 +33,8 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/create-epic` | Author an epic (assigns next registry number) | [Epic documents](../standards/epic-documents.md), [`create-epic`](../../skills/create-epic/SKILL.md) |
 | `/create-story` | Author the next story for an epic | [Story documents](../standards/story-documents.md), [`create-story`](../../skills/create-story/SKILL.md) |
 | `/create-task` | Author a standalone task (assigns next registry number) | [Task documents](../standards/task-documents.md), [`create-task`](../../skills/create-task/SKILL.md) |
-| `/create-bug-report` | Record a structured bug against a story | [Bug Fix Runbook](../runbooks/bug-fix.md) |
+| `/create-bug-report` | Record a structured bug — story, task, or general (cross-cutting, numbered from the global bug registry) | [Bug Fix Runbook](../runbooks/bug-fix.md), [Bug documents](../standards/bug-documents.md) |
+| `/create-issue` | Create a tracker issue + matching local work-item doc (GitHub / Bitbucket / Jira, auto-detected) | [`create-issue`](../../skills/create-issue/SKILL.md) |
 | `/create-architecture-doc` | Author a project architecture doc | [`create-architecture-doc`](../../skills/create-architecture-doc/SKILL.md) |
 
 ## Review
@@ -33,7 +45,11 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/review-epic <path>` | Epic review, scope-overlap detection | [`review-epic`](../../skills/review-epic/SKILL.md) |
 | `/review-story <path>` | Interactive story review | [`review-story`](../../skills/review-story/SKILL.md) |
 | `/review-task <path>` | Interactive task review | [`review-task`](../../skills/review-task/SKILL.md) |
+| `/review-bug <path>` | Interactive bug-report review — reproduction detail, severity, duplicate + already-fixed scans | [`review-bug`](../../skills/review-bug/SKILL.md) |
 | `/review-story --validate <path>` | Non-interactive GO/NO-GO readiness score | [`review-story`](../../skills/review-story/SKILL.md) |
+| `/review-bug --validate <path>` | Non-interactive GO/NO-GO fix-readiness score (the gate `develop-bug` Step 2 runs) | [`review-bug`](../../skills/review-bug/SKILL.md) |
+| `/review-code` | Adversarial diff review of the working tree or a PR — advisory by default | [`review-code`](../../skills/review-code/SKILL.md) |
+| `/review-code --comment` / `--fix` | Post findings as inline PR comments, or apply them to the working tree | [`review-code`](../../skills/review-code/SKILL.md) |
 
 ## QA
 
@@ -70,7 +86,12 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/sync-jira-epic <path>` | Create/update Jira epic from local file | [Jira Publish](../runbooks/jira-publish.md) |
 | `/sync-jira-story <path>` | Create/update Jira story, link to epic | [Jira Publish](../runbooks/jira-publish.md) |
 | `/sync-jira-task <path>` | Create/update standalone Jira task | [Jira Publish](../runbooks/jira-publish.md) |
+| `/sync-github-epic <path>` | Create/update GitHub epic issue, add to board, mirror priority | [`sync-github-epic`](../../skills/sync-github-epic/SKILL.md) |
+| `/sync-github-story <path>` | Create/update GitHub story issue, link as sub-issue of the epic | [`sync-github-story`](../../skills/sync-github-story/SKILL.md) |
+| `/sync-github-task <path>` | Create/update standalone GitHub task issue | [`sync-github-task`](../../skills/sync-github-task/SKILL.md) |
 | `/jira-epic-creator` | Bulk Jira epic creation from PRD | [`jira-epic-creator`](../../skills/jira-epic-creator/SKILL.md) |
+
+Which family fires is resolved per-run, not chosen by hand — see [platform detection](../../shared/resources/platform-detection.md) and [tracker workflow](./tracker-workflow.md).
 
 ## Discovery & meta
 
@@ -78,7 +99,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 |---|---|---|
 | `/find-skills` | Locate the right skill for a task | [`find-skills`](../../skills/find-skills/SKILL.md) |
 | `/create-skill` | Scaffold a new skill | [Authoring skills](../contributing/authoring-skills.md) |
-| `/document-project` | Generate brownfield architecture doc | [Document Existing Project](../runbooks/document-existing-project.md) |
+| `/document-existing-project` | Generate brownfield architecture doc | [Document Existing Project](../runbooks/document-existing-project.md) |
 | `/remember-insight` | Save an insight to project memory | [`remember-insight`](../../skills/remember-insight/SKILL.md) |
 
 ## Checklists

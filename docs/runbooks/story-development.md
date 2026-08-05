@@ -283,7 +283,7 @@ gh pr view --json baseRefName,statusCheckRollup
 gh pr view --json comments | jq '.comments[].body' | grep -i 'definition of done'
 
 # Bitbucket — view PR in the web UI, or:
-curl -u $BITBUCKET_USERNAME:$BITBUCKET_APP_PASSWORD \
+curl -u "$BITBUCKET_USERNAME:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
   "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests/{id}"
 ```
 

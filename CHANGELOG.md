@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The roadmap no longer offers already-merged work.** `T38` stayed `[ ]` in `project-completion-roadmap.md` and `planned` in `task-registry.md` after PR #194 merged, so `select-next.mjs` picked it as the next candidate — `/develop-next` would have re-run a completed task. Ticking the row moves selection on to `T39`, which is the correct frontier. The roadmap is load-bearing, not descriptive: only `[ ]` rows are candidates and `deps:` are satisfied by `[x]` rows, so an unticked merge is a live defect rather than a tidiness issue.
+
+- **User-facing docs no longer instruct people to create a credential type Atlassian has removed.** v0.35.0 renamed the Bitbucket credential to `BITBUCKET_API_TOKEN` and recorded that app passwords were removed on **2026-07-28**, but only `docs/reference/configuration.md` and `setup-consumer.sh` were updated. `getting-started.md` — the *first-run* doc — still pointed at "Bitbucket → Settings → App passwords", and `quickstart-story.md`'s troubleshooting table still said to "regenerate app password with `repo:write` + `pullrequest:write` scopes". Corrected across `getting-started.md`, `quickstart-story.md`, `quickstart-task.md`, `troubleshooting.md`, `new-project-setup.md`, and `story-development.md`.
+
+  This mattered beyond naming. A wrong or unscoped Bitbucket credential fails as a **404 that reads as an empty result**, because Bitbucket hides private repositories from anonymous callers — precisely the silent-failure mode v0.35.0 existed to eliminate. Anyone following getting-started landed in it. The auth probes in those docs now use the `${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}` form the skills actually resolve, and `troubleshooting.md` gained a status-code probe so an empty listing is never read as evidence. The skills and `shared/resources/` were already correct and are untouched.
+
+- **`/document-project` was documented but does not exist.** `commands.md` listed it; the skill is `document-existing-project`. Corrected to the real command name.
+
+- **Broken relative links.** `epic-template.md`'s "Related Documentation" and "Project Resources" sections still pointed at six files carried over from an unrelated source project (`product-requirements.md`, `DEVELOPER-QUICK-START.md`, `IMPLEMENTATION-STATUS.md`, …). Replaced with links that resolve from an instantiated epic's actual location — the PRD, the architecture index and coding standards, and the three registries.
+
+- **This repo's own epic registry sat off-spec.** `docs/standards/epic-registry.md`, `glossary.md`, `invocation.md`, `new-project-setup.md` and 35 skill references all name `docs/development/epic-registry.md`; the file was at `docs/epic-registry.md`. Moved (`git mv`) so the library follows the convention it publishes.
+
+### Changed
+
+- **`commands.md` covers the orchestrators and tracker skills shipped since 2026-05-28.** Added `/develop-next`, `/develop-batch` (both with `--dry-run`), `/loop`, `/develop-bug`, `/review-bug` (+ `--validate`), `/review-code` (+ `--comment` / `--fix`), `/create-issue`, and `/sync-github-epic|story|task` — nine commands that were live but absent. `/create-bug-report` had been described as story-only and now names all three modes. `activation-phrases.md` gained matching natural-language rows, and `workflows.md` gained a **Roadmap-driven orchestration** section covering `develop-next` / `develop-batch` and why the roadmap file is load-bearing.
+
+- **README skill count corrected from 110 to 113** (badge and prose).
+
 ## [v0.35.0] - 2026-08-05
 
 ### Added

@@ -34,7 +34,7 @@ Platform-specific — needed because `/develop-task` opens a PR and (optionally)
 |---|---|---|
 | GitHub | GitHub Issues | `gh` CLI authenticated (`gh auth status`) |
 | GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
-| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_APP_PASSWORD`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira | `BITBUCKET_USERNAME`, `BITBUCKET_API_TOKEN`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
 Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc. To skip tracker integration entirely (PR-only), choose **Skip — docs only** at the tracker prompt.
 
@@ -50,7 +50,7 @@ git --version
 
 # VCS auth — pick your platform:
 gh auth status                                                              # GitHub
-[ -n "$BITBUCKET_USERNAME" ] && [ -n "$BITBUCKET_APP_PASSWORD" ] && echo ok  # Bitbucket
+[ -n "$BITBUCKET_USERNAME" ] && [ -n "${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" ] && echo ok  # Bitbucket
 
 # Jira (only if tracker is Jira):
 [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo ok

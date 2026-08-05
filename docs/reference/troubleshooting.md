@@ -22,9 +22,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 |---|---|
 | GitHub | `gh auth status` — re-run `gh auth login` if expired |
 | Jira | `curl -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/myself"` — should return your user JSON, not a 401 |
-| Bitbucket | `curl -u "$BITBUCKET_USERNAME:$BITBUCKET_APP_PASSWORD" "https://api.bitbucket.org/2.0/user"` |
+| Bitbucket | `curl -u "$BITBUCKET_USERNAME:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" "https://api.bitbucket.org/2.0/user"` |
 
-Tokens are revocable — if `curl` confirms the creds are wrong, regenerate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) (Jira) or Bitbucket → Settings → App passwords (Bitbucket). To work offline without fixing this, choose **Skip — docs only** at the tracker prompt — the creation and review skills never sync without it.
+**Bitbucket answers a bad credential with 404, not 401** — it hides private repositories from anonymous callers, so a missing or unscoped token reads as an *empty result* rather than an auth error. Probe the repo root and check the status code before believing an empty listing:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -u "$BITBUCKET_USERNAME:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+  "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}"   # expect 200
+```
+
+Tokens are revocable — if `curl` confirms the creds are wrong, regenerate at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens). The **same page serves both**: Jira needs no extra scopes, Bitbucket needs the **Bitbucket scopes ticked** at creation time. (Bitbucket app passwords were removed by Atlassian on 2026-07-28; only the older `BITBUCKET_APP_PASSWORD` variable *name* survives as a fallback.) To work offline without fixing this, choose **Skip — docs only** at the tracker prompt — the creation and review skills never sync without it.
 
 ## `setup-consumer.sh` install fails or `.agents/skills/` is empty
 

@@ -7,7 +7,7 @@ type: registry
 # Epic Registry
 
 > **Source of truth for epic numbering across this project.**
-> See [`docs/standards/epic-registry.md`](./standards/epic-registry.md) for rules.
+> See [`docs/standards/epic-registry.md`](../standards/epic-registry.md) for rules.
 
 ## Next Available Epic Number
 
