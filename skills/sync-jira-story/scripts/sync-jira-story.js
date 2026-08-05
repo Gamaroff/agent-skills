@@ -464,7 +464,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const repoRoot = lib.getRepoRoot();
   const bbBase = lib.getBitbucketRepoBase();
   if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
-  const branch = bbBase ? (args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()) : null;
+  const branch = bbBase ? (lib.resolveDocBranch(args.docBranch)) : null;
   const storyBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
   const linkResolver = lib.makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch });
   const relatedDocLinks = bbBase
@@ -785,6 +785,10 @@ if (require.main === module) {
     makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
     getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
     getDefaultBranch:        lib.getDefaultBranch,
+    gitDefaultBranch:        lib.gitDefaultBranch,
+    resolveDocBranch:        lib.resolveDocBranch,
+    loadDocBranchSetting:        lib.loadDocBranchSetting,
+    parseTopLevelScalar:        lib.parseTopLevelScalar,
     CL_START:                lib.CL_START,
     CL_END:                  lib.CL_END,
   };

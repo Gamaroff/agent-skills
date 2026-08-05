@@ -673,7 +673,7 @@ async function run({
       "⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.",
     );
   const branch = bbBase
-    ? args.docBranch || lib.getCurrentBranchUpstream() || lib.getDefaultBranch()
+    ? lib.resolveDocBranch(args.docBranch)
     : null;
   const epicBbUrl = bbBase
     ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch)
@@ -1278,6 +1278,10 @@ if (require.main === module) {
     makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
     getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
     getDefaultBranch: lib.getDefaultBranch,
+    gitDefaultBranch: lib.gitDefaultBranch,
+    resolveDocBranch: lib.resolveDocBranch,
+    loadDocBranchSetting: lib.loadDocBranchSetting,
+    parseTopLevelScalar: lib.parseTopLevelScalar,
     CL_START: lib.CL_START,
     CL_END: lib.CL_END,
   };

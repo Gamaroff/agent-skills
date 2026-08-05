@@ -1,6 +1,6 @@
 ---
 name: create-issue
-description: 'Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development. Creates an issue via the GitHub CLI (GitHub), Bitbucket REST API (Bitbucket), or Jira REST API (Jira). Platform is auto-detected: Jira takes priority when JIRA_URL is set, otherwise detected from the git remote URL.'
+description: "Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development. Creates an issue via the GitHub CLI (GitHub), Bitbucket REST API (Bitbucket), or Jira REST API (Jira). Platform is auto-detected: Jira takes priority when JIRA_URL is set, otherwise detected from the git remote URL."
 ---
 
 # Create Issue
@@ -163,8 +163,8 @@ elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
   BB_API="https://api.bitbucket.org/2.0"
 
   # Verify credentials
-  if [ -z "$BITBUCKET_USERNAME" ] || [ -z "$BITBUCKET_APP_PASSWORD" ]; then
-    echo "Error: BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD must be set" && exit 1
+  if [ -z "$BITBUCKET_USERNAME" ] || [ -z "${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" ]; then
+    echo "Error: BITBUCKET_USERNAME and BITBUCKET_API_TOKEN must be set" && exit 1
   fi
 else
   PLATFORM="unknown"
@@ -268,6 +268,7 @@ fi
 ---
 
 **GitHub:**
+
 ```bash
 issue_url=$(gh issue create \
   --title "[Story 180.3] Debounce timing needs adjustment" \
@@ -279,6 +280,7 @@ issue_url="$issue_url"
 ```
 
 Post-create verification:
+
 ```bash
 created_body=$(gh issue view "$issue_number" --json body --jq '.body')
 if echo "$created_body" | grep -Eq '(_PLACEHOLDER|\{[a-z_]+\})'; then
@@ -311,7 +313,7 @@ Map type and priority to Bitbucket values:
 ISSUE_RESPONSE=$(curl -s -X POST \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/issues" \
   -H "Content-Type: application/json" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
   -d "$(jq -n \
     --arg title "[Story 180.3] Debounce timing needs adjustment" \
     --arg content "$(cat "$body_file")" \
@@ -418,8 +420,8 @@ Add a link to the issue in the source story/task's issues section.
 ```markdown
 ## Issues
 
-| ID      | Title                                                       | Status  | Priority | Tracker                   |
-| ------- | ----------------------------------------------------------- | ------- | -------- | ------------------------- |
+| ID      | Title                                                       | Status  | Priority | Tracker                |
+| ------- | ----------------------------------------------------------- | ------- | -------- | ---------------------- |
 | issue.1 | [Debounce timing](./story.180.3.issue.1.debounce-timing.md) | 🆕 Open | Medium   | [PROJ-45](https://...) |
 ```
 
@@ -434,6 +436,7 @@ Add a link to the issue in the source story/task's issues section.
 ### Step 6: Output Summary
 
 For **Jira**:
+
 ```
 ✅ Issue Created!
 
@@ -451,6 +454,7 @@ Next Steps:
 ```
 
 For **GitHub**:
+
 ```
 ✅ Issue Created!
 
@@ -525,6 +529,7 @@ Please provide a valid story or task file/directory:
 ### Not Authenticated
 
 **Jira:**
+
 ```
 Error: Jira credentials not set or invalid.
 
@@ -541,6 +546,7 @@ Then retry /create-issue
 ```
 
 **GitHub:**
+
 ```
 Error: GitHub CLI is not authenticated.
 
@@ -551,15 +557,23 @@ Then retry /create-issue
 ```
 
 **Bitbucket:**
+
 ```
 Error: Bitbucket credentials not set or invalid.
 
 Set the following environment variables:
-  export BITBUCKET_USERNAME=your-username
-  export BITBUCKET_APP_PASSWORD=your-app-password
+  export BITBUCKET_USERNAME=your-atlassian-account-email
+  export BITBUCKET_API_TOKEN=your-atlassian-api-token
 
-App passwords can be created at:
-  https://bitbucket.org/account/settings/app-passwords/
+The value is an Atlassian API token (ATATT...), created at:
+  https://id.atlassian.com/manage-profile/security/api-tokens
+
+Tick the Bitbucket scopes when creating it — a scopeless token
+authenticates against Jira and fails against Bitbucket.
+
+App passwords were REMOVED by Atlassian on 2026-07-28. The older
+variable name BITBUCKET_APP_PASSWORD is still read as a fallback,
+but it too must now hold an API token.
 
 Then retry /create-issue
 ```

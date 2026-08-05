@@ -19,13 +19,17 @@ Use this skill when:
 ## Prerequisites
 
 **GitHub:**
+
 - **GitHub CLI (`gh`)** must be installed and authenticated (`gh auth status`)
 
 **Bitbucket:**
-- `BITBUCKET_USERNAME` and `BITBUCKET_APP_PASSWORD` environment variables must be set
+
+- `BITBUCKET_USERNAME` and `BITBUCKET_API_TOKEN` environment variables must be set
+  (`BITBUCKET_APP_PASSWORD` is still honoured as a fallback — see the note below)
 - `curl` and `jq` must be available
 
 **Both:**
+
 - Current branch must have commits to push (or uncommitted changes that can be committed)
 
 ## Target Branch Selection
@@ -48,6 +52,7 @@ Common Gitflow patterns:
 ## Workflow
 
 **IMPORTANT**: This skill performs a complete workflow from uncommitted changes to PR creation:
+
 1. **Asks user for target branch** — ALWAYS the very first action, no exceptions
 2. Commits any uncommitted changes (if present)
 3. Pushes branch to remote
@@ -62,18 +67,21 @@ Common Gitflow patterns:
 Before asking the user, check whether parameters were supplied:
 
 **`--base <branch>`**:
+
 - The caller may pass `--base <branch>` (e.g., `/create-pr --base develop`)
 - When invoked by the `develop-story` or `develop-task` orchestrator, the base branch is passed programmatically
 - If provided: store as `BASE_BRANCH`, skip Step 1, log: "Base branch pre-supplied: {branch} — skipping interactive prompt", proceed to Step 2
 - If not provided: proceed to Step 1 as normal
 
 **`--issue <N>`**:
+
 - The caller may pass `--issue <N>` (e.g., `/create-pr --issue 42`)
 - When invoked by the `develop-story` or `develop-task` orchestrator, the issue number is passed if `GITHUB_ISSUE` is set
 - If provided: store as `GITHUB_ISSUE`, use in Step 5 PR description
 - If not provided: attempt auto-detection in Step 5 (see GitHub Issue Detection below)
 
 **`--exclude <path>`** (repeatable):
+
 - The caller may pass one or more `--exclude <path>` flags (e.g., `/create-pr --exclude path/to/report.md`)
 - When invoked by the `develop-story` or `develop-task` orchestrator, the implementation report path is passed so it is never staged in the auto-commit
 - Collect all values into an `EXCLUDE_PATHS` array
@@ -81,6 +89,7 @@ Before asking the user, check whether parameters were supplied:
 - When there are NO uncommitted changes (commit-changes is not invoked): silently ignore all `--exclude` values and log `"--exclude received but no commit needed — ignored"`
 
 **`--scope <path>`** (repeatable):
+
 - The caller may pass one or more `--scope <path>` flags (e.g., `/create-pr --scope docs/tasks/task.5/`)
 - When invoked by the `develop-story` or `develop-task` orchestrator, the work-item dir and changed code paths are passed so only in-scope files are staged in the auto-commit
 - Collect all values into a `SCOPE_PATHS` array
@@ -141,22 +150,31 @@ git status --porcelain
 
 **Platform-specific auth verification:**
 
-*GitHub:*
+_GitHub:_
+
 ```bash
 gh auth status
 ```
 
-*Bitbucket:*
+_Bitbucket:_
+
 ```bash
-if [ -z "$BITBUCKET_USERNAME" ] || [ -z "$BITBUCKET_APP_PASSWORD" ]; then
-  echo "Error: BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD must be set"
+if [ -z "$BITBUCKET_USERNAME" ] || [ -z "${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" ]; then
+  echo "Error: BITBUCKET_USERNAME and BITBUCKET_API_TOKEN must be set"
   exit 1
 fi
-# Verify credentials are valid
+# Verify credentials against the REPOSITORY, not ${BB_API}/user.
+#
+# GET /2.0/user needs the read:user scope, which tokens scoped for PR work
+# routinely lack — it answers 403 while every PR and repository call succeeds.
+# Probing it here would abort create-pr for a perfectly good credential.
+# (develop-next documents the same hazard; this used to contradict it.)
 AUTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
-  "${BB_API}/user")
-[ "$AUTH_CHECK" != "200" ] && echo "Error: Bitbucket auth failed (HTTP $AUTH_CHECK)" && exit 1
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}")
+# 404 here means unauthenticated, not missing: Bitbucket hides private repos
+# from anonymous callers rather than returning 401.
+[ "$AUTH_CHECK" != "200" ] && echo "Error: Bitbucket auth failed (HTTP $AUTH_CHECK — 404 means the credential was not accepted)" && exit 1
 ```
 
 If there are uncommitted changes:
@@ -308,7 +326,7 @@ printf '%s' "$PR_BODY" > "$PR_BODY_FILE"
 PR_RESPONSE=$(curl -s -X POST \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests" \
   -H "Content-Type: application/json" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
   -d "$(jq -n \
     --arg title "$PR_TITLE" \
     --arg desc "$(cat "$PR_BODY_FILE")" \
@@ -340,12 +358,14 @@ Branch on `PLATFORM` and tracker detection:
 **GitHub path** (when `PLATFORM=github`):
 
 If `GITHUB_ISSUE` is set (from Step 0), post a comment linking the PR:
+
 ```bash
 if [ -n "$GITHUB_ISSUE" ]; then
   gh issue comment "$GITHUB_ISSUE" --body "PR opened — #${PR_NUMBER}: ${PR_URL}" \
     || echo "⚠️  Issue comment failed — continuing"
 fi
 ```
+
 If `GITHUB_ISSUE` is not set, skip silently.
 
 ---
@@ -523,6 +543,7 @@ List any breaking changes.
 ### Not Authenticated
 
 **GitHub:**
+
 ```
 Error: gh CLI is not authenticated.
 
@@ -533,15 +554,23 @@ Then retry /create-pr
 ```
 
 **Bitbucket:**
+
 ```
 Error: Bitbucket credentials not set or invalid.
 
 Set the following environment variables:
-  export BITBUCKET_USERNAME=your-username
-  export BITBUCKET_APP_PASSWORD=your-app-password
+  export BITBUCKET_USERNAME=your-atlassian-account-email
+  export BITBUCKET_API_TOKEN=your-atlassian-api-token
 
-App passwords can be created at:
-  https://bitbucket.org/account/settings/app-passwords/
+The value is an Atlassian API token (ATATT...), created at:
+  https://id.atlassian.com/manage-profile/security/api-tokens
+
+Tick the Bitbucket scopes when creating it — a scopeless token
+authenticates against Jira and fails against Bitbucket.
+
+App passwords were REMOVED by Atlassian on 2026-07-28. The older
+variable name BITBUCKET_APP_PASSWORD is still read as a fallback,
+but it too must now hold an API token.
 
 Then retry /create-pr
 ```
@@ -564,6 +593,7 @@ If push fails:
 ### PR Already Exists
 
 **GitHub:**
+
 ```
 A pull request already exists for this branch.
 
@@ -578,27 +608,29 @@ Options:
 **Bitbucket:**
 
 Check for an existing PR before creating:
+
 ```bash
 EXISTING=$(curl -s \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${CURRENT_BRANCH}%22%20AND%20state%3D%22OPEN%22" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
   | jq -r '.values[0].links.html.href // empty')
 ```
+
 If non-empty, report to the user and offer the same options.
 
 ## Options
 
-| Flag         | Description        | Example                             |
-| ------------ | ------------------ | ----------------------------------- |
-| `--base`     | Pre-supply target branch (skip prompt) | `/create-pr --base develop`         |
-| `--issue`    | Pre-supply GitHub issue number (skip auto-detection) | `/create-pr --issue 42`  |
-| `--exclude`  | Exclude path from auto-commit staging (repeatable; forwarded to `/commit-changes`) | `/create-pr --exclude path/to/report.md` |
-| `--scope`    | Allowlist paths for auto-commit staging (repeatable; forwarded to `/commit-changes`) | `/create-pr --scope docs/tasks/task.5/` |
-| `--draft`    | Create as draft PR | `/create-pr --draft`                |
-| `--title`    | Override PR title  | `/create-pr --title "custom title"` |
-| `--body`     | Override PR body   | `/create-pr --body "custom body"`   |
-| `--reviewer` | Add reviewers      | `/create-pr --reviewer @username`   |
-| `--label`    | Add labels         | `/create-pr --label "feature"`      |
+| Flag         | Description                                                                          | Example                                  |
+| ------------ | ------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `--base`     | Pre-supply target branch (skip prompt)                                               | `/create-pr --base develop`              |
+| `--issue`    | Pre-supply GitHub issue number (skip auto-detection)                                 | `/create-pr --issue 42`                  |
+| `--exclude`  | Exclude path from auto-commit staging (repeatable; forwarded to `/commit-changes`)   | `/create-pr --exclude path/to/report.md` |
+| `--scope`    | Allowlist paths for auto-commit staging (repeatable; forwarded to `/commit-changes`) | `/create-pr --scope docs/tasks/task.5/`  |
+| `--draft`    | Create as draft PR                                                                   | `/create-pr --draft`                     |
+| `--title`    | Override PR title                                                                    | `/create-pr --title "custom title"`      |
+| `--body`     | Override PR body                                                                     | `/create-pr --body "custom body"`        |
+| `--reviewer` | Add reviewers                                                                        | `/create-pr --reviewer @username`        |
+| `--label`    | Add labels                                                                           | `/create-pr --label "feature"`           |
 
 ## Examples
 
