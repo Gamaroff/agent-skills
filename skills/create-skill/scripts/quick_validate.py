@@ -10,6 +10,9 @@ import os
 import re
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import skill_frontmatter
+
 # ANSI colour helpers — disabled when not a TTY (e.g. CI pipe)
 _USE_COLOR = sys.stdout.isatty()
 
@@ -55,78 +58,63 @@ def validate_skill(skill_path):
     content = skill_md.read_text()
     if not content.startswith('---'):
         return False, "No YAML frontmatter found"
-    
-    # Extract frontmatter
-    match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
-    if not match:
+
+    frontmatter = skill_frontmatter.split_frontmatter(content)
+    if frontmatter is None:
         return False, "Invalid frontmatter format"
-    
-    frontmatter = match.group(1)
 
     if 'managed-by:' in frontmatter:
         print(yellow("  ⚠  Warning: 'managed-by' field found in SKILL.md — injected by packager, do not author manually"))
 
-    # Check required fields
-    if 'name:' not in frontmatter:
-        return False, "Missing 'name' in frontmatter"
-    if 'description:' not in frontmatter:
-        return False, "Missing 'description' in frontmatter"
-    
-    # Extract name for validation
-    name_match = re.search(r'name:\s*(.+)', frontmatter)
-    if name_match:
-        name = name_match.group(1).strip()
-        # Check naming convention (hyphen-case: lowercase with hyphens)
-        if not re.match(r'^[a-z0-9-]+$', name):
-            return False, f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)"
-        if name.startswith('-') or name.endswith('-') or '--' in name:
-            return False, f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
+    # An unquoted description containing ': ' is invalid YAML. Caught here rather
+    # than left to the parser below purely for the more actionable message.
+    raw_desc = re.search(r'^description:[ \t]*(.*)$', frontmatter, re.MULTILINE)
+    if raw_desc:
+        raw_value = raw_desc.group(1).strip()
+        if (raw_value
+                and raw_value not in skill_frontmatter.BLOCK_SCALARS
+                and not raw_value.startswith(('"', "'"))
+                and ': ' in raw_value):
+            return False, (
+                "Description is unquoted but contains ': ' — GitHub's YAML parser "
+                "will reject this. Wrap in single quotes: description: '...'"
+            )
 
-    # Extract and validate description
+    # Parse for real. Regex extraction used to silently truncate a single-quoted
+    # description at its first unescaped apostrophe and report success, shipping
+    # a skill whose description no YAML parser could read.
+    fm, parse_error = skill_frontmatter.parse(content)
+    if parse_error:
+        return False, parse_error
+
+    # Check required fields
+    if 'name' not in fm:
+        return False, "Missing 'name' in frontmatter"
+    if 'description' not in fm:
+        return False, "Missing 'description' in frontmatter"
+
+    # Validate name
+    name = str(fm['name']).strip()
+    # Check naming convention (hyphen-case: lowercase with hyphens)
+    if not re.match(r'^[a-z0-9-]+$', name):
+        return False, f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)"
+    if name.startswith('-') or name.endswith('-') or '--' in name:
+        return False, f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
+
+    # Validate description
     warnings = []
-    desc_match = re.search(r'description:\s*(.+)', frontmatter)
-    if desc_match:
-        description = desc_match.group(1).strip()
-        # Unquoted description containing ': ' breaks YAML parsers (GitHub, etc.)
-        block_scalars = ('>', '|', '>-', '|-', '>+', '|+')
-        if description not in block_scalars and not description.startswith(('"', "'")):
-            if ': ' in description:
-                return False, (
-                    "Description is unquoted but contains ': ' — GitHub's YAML parser "
-                    "will reject this. Wrap in single quotes: description: '...'"
-                )
-        # YAML block scalar — extract actual multi-line content
-        if description in ('>', '|', '>-', '|-', '>+', '|+'):
-            block_match = re.search(r'description:\s*[>|][+\-]?\n((?:[ \t]+.+\n?)+)', frontmatter)
-            if block_match:
-                description = ' '.join(line.strip() for line in block_match.group(1).splitlines())
-        # Quoted multi-line scalar (double or single quotes spanning lines)
-        elif description.startswith(('"', "'")):
-            quote = description[0]
-            quoted_match = re.search(
-                rf'description:\s*{quote}((?:[^{quote}\\]|\\.)*){quote}',
-                frontmatter,
-                re.DOTALL,
-            )
-            if quoted_match:
-                description = ' '.join(quoted_match.group(1).split())
-        # Plain unquoted multi-line scalar (continuation lines indented)
-        else:
-            plain_match = re.search(
-                r'description:\s*(.+(?:\n[ \t]+\S.*)*)',
-                frontmatter,
-            )
-            if plain_match:
-                description = ' '.join(plain_match.group(1).split())
-        # Check for angle brackets
-        if '<' in description or '>' in description:
-            return False, "Description cannot contain angle brackets (< or >)"
-        # Warn if description is too short or too long (target: ~100 words)
-        word_count = len(description.split())
-        if word_count < 10:
-            warnings.append(f"Description is very short ({word_count} words); aim for ~100 words for reliable auto-activation")
-        elif word_count > 150:
-            warnings.append(f"Description is long ({word_count} words); descriptions over 150 words consume unnecessary context — aim for ~100")
+    description = ' '.join(str(fm['description']).split())
+    if not description:
+        return False, "Description is empty"
+    # Check for angle brackets
+    if '<' in description or '>' in description:
+        return False, "Description cannot contain angle brackets (< or >)"
+    # Warn if description is too short or too long (target: ~100 words)
+    word_count = len(description.split())
+    if word_count < 10:
+        warnings.append(f"Description is very short ({word_count} words); aim for ~100 words for reliable auto-activation")
+    elif word_count > 150:
+        warnings.append(f"Description is long ({word_count} words); descriptions over 150 words consume unnecessary context — aim for ~100")
 
     # Check shared/resources/ references exist at repo level
     repo_root = find_repo_root(skill_path)
@@ -150,6 +138,10 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
+
+    if not skill_frontmatter.HAVE_YAML:
+        print(yellow("  ⚠  PyYAML not installed — frontmatter is NOT strictly validated. "
+                     "Install it (pip install pyyaml) for the full check."), file=sys.stderr)
 
     skill_name = Path(sys.argv[1]).name
     valid, message = validate_skill(sys.argv[1])

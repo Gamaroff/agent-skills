@@ -18,6 +18,9 @@ Uncategorized skills fall into "Other".
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import skill_frontmatter
 from datetime import date
 
 
@@ -113,23 +116,16 @@ def find_repo_root(start: Path) -> Path:
 
 
 def parse_frontmatter(text: str) -> dict:
-    match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
-    if not match:
+    """Parse SKILL.md frontmatter, or return {} when it cannot be read.
+
+    Uses a real YAML parser. The previous line-by-line regex stripped only
+    double quotes, so single-quoted descriptions kept a stray leading `'` in the
+    catalog, and an unescaped apostrophe truncated the value silently.
+    """
+    fm, error = skill_frontmatter.parse(text)
+    if error:
+        print(f"  ⚠  Skipping unparseable frontmatter: {error}", file=sys.stderr)
         return {}
-    fm = {}
-    for line in match.group(1).splitlines():
-        kv = re.match(r"^(\w+):\s*(.*)", line)
-        if kv:
-            fm[kv.group(1)] = kv.group(2).strip().strip('"')
-    # Handle block scalar descriptions
-    if fm.get("description") in (">", "|", ">-", "|-", ">+", "|+"):
-        block = re.search(
-            r"description:\s*[>|][+\-]?\n((?:[ \t]+.+\n?)+)", match.group(1)
-        )
-        if block:
-            fm["description"] = " ".join(
-                l.strip() for l in block.group(1).splitlines()
-            )
     return fm
 
 

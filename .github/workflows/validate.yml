@@ -24,6 +24,12 @@ jobs:
         with:
           python-version: '3.x'
 
+      # setup-python provides a bare interpreter. Without PyYAML the validator
+      # falls back to a regex parse that cannot detect malformed frontmatter,
+      # which is exactly what this job exists to catch.
+      - name: Install PyYAML
+        run: pip install pyyaml
+
       - name: Validate all skills
         run: |
           failed=0

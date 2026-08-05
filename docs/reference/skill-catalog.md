@@ -35,18 +35,18 @@ Full categorised index below.
 | ----- | ----------- |
 | `develop` | Provides guidance for implementing features and technical tasks. Use when starting new feature work, implementing stories, executing technical tasks, or needing guidance on development patterns.… |
 | `develop-next` | Roadmap orchestrator: deterministically selects the next unblocked item from the project completion roadmap (via scripts/select-next.mjs), runs its named pipeline (/develop-story or /develop-task) fully autonomously (Upfront… |
-| `develop-story` | 'Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise… |
-| `develop-task` | 'Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise… |
+| `develop-story` | Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise… |
+| `develop-task` | Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise… |
 
 ## Development — Implementation
 
 | Skill | Description |
 | ----- | ----------- |
-| `commit-changes` | 'Create high-quality git commits: review/stage intended changes, split into logical commits, and write clear commit messages (including Conventional Commits). Use when the user asks to… |
+| `commit-changes` | Create high-quality git commits: review/stage intended changes, split into logical commits, and write clear commit messages (including Conventional Commits). Use when the user asks to… |
 | `correct-course` | Change management and navigation skill for handling project pivots, blockers, and requirement changes. Uses change-checklist to analyze impacts, evaluate options, and generate Sprint Change Proposals… |
 | `create-branch` | Create git branches following Gitflow conventions. This skill should be used when starting work on a new feature, hotfix, or release. Accepts story files, task… |
 | `create-pr` | Create pull requests following project conventions. This skill should be used when ready to submit code for review. Automatically commits any uncommitted changes using /commit-changes… |
-| `enforce-standards` | 'Enforce naming conventions and file structure architecture on a specific target directory. Use when the user asks to "fix filenames", "apply naming conventions", or "restructure"… |
+| `enforce-standards` | Enforce naming conventions and file structure architecture on a specific target directory. Use when the user asks to "fix filenames", "apply naming conventions", or "restructure"… |
 | `error-handling-enforcer` | Ensure consistent error handling across client and server. Use when adding error handling, reviewing exceptions, implementing error boundaries, creating error classes, validating error codes, ensuring… |
 | `git-time-travel` | Expert in navigating and manipulating git history. Covers finding bugs with bisect, understanding code evolution, recovering lost work, and rewriting history safely. Understands that git… |
 | `harden` | Improve interface resilience through better error handling, i18n support, text overflow handling, and edge case management. Makes interfaces robust and production-ready. Use when the user… |
@@ -64,8 +64,8 @@ Full categorised index below.
 | `qa-story` | Use for comprehensive quality review during/after implementation. Performs adaptive test architecture review with conditional parallel agents based on story complexity. Uses direct tools for well-documented… |
 | `qa-task` | Comprehensive quality assurance review for technical tasks. Focuses on success criteria validation, implementation phase verification, and non-functional requirements assessment for infrastructure and refactoring work. |
 | `review-epic` | Deep interactive epic review that checks template compliance, detects scope overlap with existing epics, validates against architecture docs, and scans the codebase for already-implemented features.… |
-| `review-prd` |  |
-| `review-story` | 'Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements… |
+| `review-prd` | Deep interactive PRD review that verifies claims against the actual codebase, checks requirements traceability to epics/stories, detects staleness, and asks clarifying questions. Produces a co-located… |
+| `review-story` | Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements… |
 | `review-task` | Interactive task document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and implementability issues. Provides user-aligned recommendations based on collaborative… |
 
 ## Architecture & Design
@@ -108,7 +108,7 @@ Full categorised index below.
 | `edit-epic` | Edit epic documents with validation, cascade analysis for child stories, and diff preview. Use when modifying epic files. Rejects story files with appropriate message. |
 | `edit-story` | Edit story documents with comprehensive validation and diff preview. Use when modifying story files. Rejects epic files with appropriate message. |
 | `ensure-epic-github-issue` | Internal sub-routine called from create-story and review-story. Given an epic markdown file path, ensures the epic has a corresponding GitHub issue. Creates the issue if… |
-| `ensure-epic-jira-issue` | 'Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating… |
+| `ensure-epic-jira-issue` | Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating… |
 | `epic-registry-manager` | Manage global epic numbering and registry updates. Use when creating new epics to assign next available epic number, validate epic.NUMBER.name.md filename format, update epic-registry.md with… |
 | `jira-epic-creator` | Create Jira epics from epic markdown documents. Use when user wants to sync local epic documentation to Jira, create Jira tickets from epic files, or… |
 
@@ -131,7 +131,7 @@ Full categorised index below.
 | `offline-first-enforcer` | This skill should be used when implementing offline-first architecture for mobile or web apps, validating sync queue implementations, reviewing conflict resolution strategies, ensuring optimistic UI… |
 | `platform-separation-validator` | This skill should be used when reviewing code for platform separation violations, validating library imports (client vs server paths), ensuring crypto operations remain server-side, checking… |
 | `response-envelope-enforcer` | Validate and enforce standardized API response wrapping patterns. Ensures HTTP endpoints wrap responses in StandardSuccessResponse/StandardPaginatedResponse, domain DTOs are used as payload data, service interfaces remain… |
-| `test-co-location-enforcer` | 'Ensure all tests are co-located with source files using .spec.ts suffix instead of __tests__/ directories. Use when creating new tests, moving legacy tests, validating test… |
+| `test-co-location-enforcer` | Ensure all tests are co-located with source files using .spec.ts suffix instead of __tests__/ directories. Use when creating new tests, moving legacy tests, validating test… |
 
 ## Testing
 
@@ -217,16 +217,16 @@ Full categorised index below.
 | Skill | Description |
 | ----- | ----------- |
 | `develop-batch` | Parallel roadmap orchestrator: selects the maximal set of unblocked, write-disjoint roadmap items (via scripts/select-next.mjs --batch), fans each into its own git worktree, runs their pipelines… |
-| `develop-bug` | 'Automates the full end-to-end bug-fix lifecycle: takes an existing bug report and runs it from open to closed — create-branch → review-bug → investigate &… |
+| `develop-bug` | Automates the full end-to-end bug-fix lifecycle: takes an existing bug report and runs it from open to closed — create-branch → review-bug → investigate &… |
 | `ensure-story-github-issue` | Internal sub-routine called from create-story and review-story. Given a story markdown file path and (optionally) a parent epic GitHub issue number, ensures the story has… |
-| `ensure-story-jira-issue` | 'Internal sub-routine called from create-story and review-story. Given a story markdown file path and (optionally) a parent epic Jira key, ensures the story has a… |
+| `ensure-story-jira-issue` | Internal sub-routine called from create-story and review-story. Given a story markdown file path and (optionally) a parent epic Jira key, ensures the story has a… |
 | `ensure-task-github-issue` | Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding GitHub issue. Creates the issue if… |
-| `ensure-task-jira-issue` | 'Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing… |
+| `ensure-task-jira-issue` | Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing… |
 | `jira-sprint-manager` | Manage Jira sprints via the Agile REST API — start, close, audit velocity, check for unestimated issues, list future/active sprints, migrate leftover scope to backlog… |
 | `jira-sprint-review-prep` | Automate data collection for the Sprint Review ceremony. Collects completed increments, evaluates compliance with the Definition of Done (DoD), highlights scope creep or uncompleted items,… |
 | `jira-standup-auditor` | Audit recent Jira activity and local Git telemetry to compile a precise async daily standup update. Use when the user asks for "standup prep", "daily… |
-| `review-bug` | 'Bug report review with two modes. Interactive mode (default): asks batched clarifying questions to resolve missing reproduction detail, wrong severity/priority, and linkage gaps — use… |
-| `review-code` | 'Standalone adversarial diff code review of the working tree or a pull request — surfaces correctness bugs (logic, null/async/race, API misuse, broken invariants) and reuse/simplification/efficiency… |
+| `review-bug` | Bug report review with two modes. Interactive mode (default): asks batched clarifying questions to resolve missing reproduction detail, wrong severity/priority, and linkage gaps — use… |
+| `review-code` | Standalone adversarial diff code review of the working tree or a pull request — surfaces correctness bugs (logic, null/async/race, API misuse, broken invariants) and reuse/simplification/efficiency… |
 | `sync-github-epic` | Sync a local epic markdown file to GitHub Issues — creates the epic issue if it has no github_issue, updates it if github_issue is already… |
 | `sync-github-story` | Sync a local story markdown file to GitHub Issues — creates the story issue if it has no github_issue, updates it if github_issue is already… |
 | `sync-github-task` | Sync a local technical task markdown file to GitHub Issues — creates the task issue if it has no github_issue, updates it if github_issue is… |
