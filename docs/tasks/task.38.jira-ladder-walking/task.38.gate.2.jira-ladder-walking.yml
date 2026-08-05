@@ -1,0 +1,87 @@
+schema: 1
+task: "task.38.jira-ladder-walking"
+task_title: "Jira: walk the status ladder, and stop the terminal fallback firing on a retargeted done"
+gate: PASS
+status_reason: >-
+  Five QA cycles ran. Every blocking finding from all five is fixed and verified by executing the
+  shipped code, not only by the suite. Cycle 5 settled the precedence area that cycles 2-4 kept
+  re-opening, confirming across 105 executed combinations that no configuration fires a `done` the
+  consumer did not ask for and none silently disables a stage they opted into. 888/888 tests pass and
+  every pre-existing fixture assertion is unchanged. One success criterion remains unmet — a fixture
+  needing live board access — disclosed rather than worked around.
+reviewer: "QA Engineer"
+updated: "2026-08-05T07:40:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 888
+  phases_verified: "5/5 (Phase 5 partial — one fixture externally blocked)"
+  qa_cycles: 5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  issues_found_and_fixed: 23
+  issues_by_cycle:
+    cycle_1: "CR-1..CR-5 — 3 high, 2 medium, plus 2 cleanups and a coverage gap"
+    cycle_2: "CR-6 (the CR-4 fix was wrong), CR-7 (test did not test its name), CR-8..CR-10"
+    cycle_3: "CR-11 (the CR-6 fix regressed overlays), CR-12..CR-16"
+    cycle_4: "CR-17 (the CR-11 fix was wrong the other way), CR-18, CR-19"
+    cycle_5: "CR-20, CR-21 (MCP fallback could still fire a wrong Done), CR-22, CR-23"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No new credential handling. --print-plan verified credential-free and network-free by a test
+      injecting a throwing fetchImpl. No secrets in the diff.
+  performance:
+    status: PASS
+    notes: >-
+      1+2n met and asserted; the optional `transitions` parameter genuinely suppresses the second GET
+      per hop. A one-rung walk that moves the card is at the historical baseline. The already-at-target
+      case costs one GET more than before — measured, documented, outcome unchanged.
+  reliability:
+    status: PASS
+    notes: >-
+      The failure mode this task exists to prevent — a confident wrong transition into the board's real
+      Done — was found and closed on four distinct routes across the five cycles: the retargeted-done
+      fallback (the original bug), the unauthored-file fallback (CR-3/CR-4), the ignored per-type
+      overlay (CR-11), the one-key overlay claiming all moments (CR-17), and the MCP fallback dropping
+      --issue-type (CR-20). Each is now covered by a test.
+  maintainability:
+    status: PASS
+    notes: >-
+      Hop construction de-duplicated into one exported helper used by both the printed plan and the
+      executed walk. Authorship resolved in one place, at the granularity the resolution uses.
+      Commenting is a genuine strength — the "two rank scales, never mixed" and "authorship
+      granularity" comments each pre-empt a class of error the review process actually hit.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Capture rapp-story-ready-for-showcase.json when a RAPP Story can be parked in READY FOR
+        SHOWCASE, then add the In Progress → READY FOR SHOWCASE → Waiting for Review assertion.
+        If that column offers no route onward, §6 Phase 5 / §8 need rewriting around what the board
+        actually offers — the task already flags this as unverified.
+      refs: ["shared/resources/tests/fixtures/"]
+    - action: >-
+        Run the two consumer tests that need live board credentials — --dry-run across one real issue
+        per column, diffed against the ladder.
+      refs: ["shared/resources/jira-stage.js"]
+    - action: >-
+        Consider having validateWorkflow emit an info-level warning for a source:"file" workflow with
+        no authored pipeline, telling the author their ladder is not driving anything. The behaviour is
+        correct and now documented, but it is silent.
+      refs: ["shared/resources/tracker-workflow.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

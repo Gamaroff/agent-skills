@@ -27,10 +27,9 @@
 // `require("./jira-sync.js")` — a GitHub-only consumer must never pull the Jira
 // client in behind this. The only shell-out is the `git rev-parse` fallback used
 // when the caller injects no `repoRoot`, exactly as loadWorkflowRecord does.
-// Tracker-specific execution lands in task.38 (Jira) and task.39 (GitHub).
-//
-// Nothing calls this module yet. That is intentional: a modelling mistake here
-// cannot reach a real board until the wiring tasks land.
+// Tracker-specific execution: Jira reads this module (task.38 — jira-stage.js
+// resolves every moment from the ladder and jira-sync.js walks it); GitHub is
+// task.39 and step-file wiring is task.40.
 
 const fs = require("fs");
 const path = require("path");

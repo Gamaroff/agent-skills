@@ -993,4 +993,27 @@ that will not be followed.
 
 **Tests**: 887 → **888**, all passing.
 
-Status: Ready for Review — QA cycle 6 (verification).
+Also corrected three stale "not wired yet" claims that this task invalidates —
+`tracker-workflow.js`'s header, `tracker-workflow.yaml`'s header, and `AGENTS.md`.
+
+Status: Ready for Review.
+
+---
+
+## Final QA Result
+
+**Gate**: **PASS** — 90/100 ([task.38.gate.2](./task.38.gate.2.jira-ladder-walking.yml),
+[task.38.qa.2](./task.38.qa.2.jira-ladder-walking.md))
+**QA cycles**: 5
+**Findings**: 23 found, 23 fixed (7 high-severity)
+**Tests**: 888/888 passing; all 8 pre-existing fixture assertions unchanged
+
+The failure mode this task exists to prevent — a confident wrong transition into the board's real
+Done — was closed on **five distinct routes**, four of which only became visible once the one before
+it was fixed. Cycles 2, 3 and 4 each found the previous cycle's fix wrong in the same area: the
+authorship gate and the resolution it guarded sat at different granularities, and they agree only at
+per-moment-per-issue-type. Cycle 5 verified that across all 105 configuration combinations by
+execution.
+
+Deferred, non-blocking: the `rapp-story-ready-for-showcase.json` capture and two consumer tests, both
+needing live board access.

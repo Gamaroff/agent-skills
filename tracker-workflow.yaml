@@ -8,10 +8,14 @@
 # it is the whole board, which makes this a useful demonstration that the format
 # scales down as readily as it scales up.
 #
-# DELIBERATELY UNWIRED. Nothing reads this file yet: task.37 ships the format and
-# the engine, task.38/39 add tracker execution, task.40 wires the step files. It
-# is here so the format is exercised against a real board from the day it lands,
-# and so the parser has a committed non-synthetic fixture.
+# READ BY THE JIRA PATH (task.38); GitHub execution is task.39 and step-file
+# wiring is task.40. This board is on GitHub, so nothing here moves a card today —
+# it is committed so the format is exercised against a real board and the parser
+# has a non-synthetic fixture.
+#
+# Note the `pipeline:` block below IS authored, which is what would opt this repo
+# in if it were a Jira board: an authored block decides every moment, and the
+# three moments omitted from it are off rather than inherited.
 
 # The ladder, in board order. Order IS the workflow: a rung's index is its rank,
 # and the rungs between two positions are the path from one to the other.
