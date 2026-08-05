@@ -101,7 +101,7 @@ Full categorised index below.
 | `create-bug-report` | Create bug report files for issues found during QA or code sweeps. Use when QA identifies bugs during story/task testing, or when a cross-cutting bug… |
 | `create-epic` | Create single epic for medium-sized brownfield enhancements (1-3 stories). Use when enhancement follows existing patterns, has minimal architectural changes, and manageable integration complexity. |
 | `create-epics-from-shards` | Convert PRD shards into implementation epic files. Use after shard-prd to generate focused epic documents in epics/ subdirectory following standard epic structure. |
-| `create-issue` | 'Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development.… |
+| `create-issue` | Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development.… |
 | `create-parallel-stories` | Generate stories organized for parallel development using Git worktrees. Implements hybrid numbering (1-1, 1-2 for parallel, 2, 3 for sequential) with dependency mapping, conflict prevention,… |
 | `create-story` | Primary workflow for creating the next logical story in a development sequence. Implements a rigorous 10-step process to identify, extract, and document story requirements with… |
 | `create-task` | Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work. |
