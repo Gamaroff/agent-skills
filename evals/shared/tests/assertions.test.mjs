@@ -31,6 +31,15 @@ test("fileMatches — regex hit", () => {
   assert.equal(A.fileMatches(p, /## Nope/).ok, false);
 });
 
+test("fileDoesNotMatch — passes on absence, fails on presence and on a missing file", () => {
+  const p = tmpFile("foo\n## Overview\nbar");
+  assert.equal(A.fileDoesNotMatch(p, /## Stakeholder Sign-off/).ok, true);
+  assert.equal(A.fileDoesNotMatch(p, /## Overview/).ok, false);
+  // A missing file is a failure, not a pass — otherwise a typo'd path would
+  // silently "prove" the pattern is absent.
+  assert.equal(A.fileDoesNotMatch(p + ".missing", /anything/).ok, false);
+});
+
 test("frontmatterHas / frontmatterEquals", () => {
   const p = tmpFile("---\nid: t.1\nstatus: draft\n---\nbody\n");
   assert.equal(A.frontmatterHas(p, ["id", "status"]).ok, true);

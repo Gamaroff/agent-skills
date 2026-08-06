@@ -62,6 +62,7 @@ updated: 2026-01-15
 | `estimated_effort_hours` | number | Optional | Estimated dev hours. Synced to Jira `timetracking.originalEstimate` (and, when configured via [`jira.devEstimateField`](../reference/configuration.md#jira-estimate-field), a Jira custom field) and the GitHub Projects v2 `Estimate` number field. Captured at create time, surfaced as a LOW review gap if missing |
 | `effort` | string | Optional | Deprecated free-text estimate, e.g. `~0.5 day`. New tasks should use `estimated_effort_hours` instead |
 | `depends_on` | string | Optional | `task.N` — blocks pipeline if the dependency is not `accepted` |
+| `sign_off_roles` | list | Optional | Per-task override of the `skills-config.yaml` sign-off roster, e.g. `[CTO, Tech Lead, Design (optional)]`. Replaces the config roster for this task only; `[]` means no signatures required. Read once, at creation — after that the table in the document is authoritative. See [`sign-off.md`](../../shared/resources/sign-off.md) |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
@@ -89,6 +90,12 @@ updated: 2026-01-15
 11. Rollback Plan
 
 The **Implementation Plan** section must contain a checkbox list. `develop-task` tracks progress by counting checked vs unchecked items across pipeline iterations.
+
+### Unnumbered tail sections
+
+`Stakeholder Sign-off`, `Progress Tracking`, `References` and `Notes` follow the numbered eleven and are **never numbered**. The count of 11 is a contract asserted in code (`skills/create-task/scripts/lib.js` → `countMandatorySections`) and in `tests/skill-protocol.test.js`; numbering a tail section breaks it.
+
+**Stakeholder Sign-off** is emitted only when `sign-off.enabled: true` in `skills-config.yaml`. `create-task` scaffolds the roles from `sign-off.task.*` (or a `sign_off_roles` frontmatter override); humans type their own name and commit it. Agents never write a Signature or Date cell, and the section is never synced to a tracker. Spec: [`sign-off.md`](../../shared/resources/sign-off.md).
 
 ## Co-located artifacts
 

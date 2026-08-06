@@ -68,6 +68,7 @@ updated: 2026-01-15
 | `risk_level` | enum | Optional | `high`, `medium`, `low` — triggers the high-risk gate |
 | `code_review_blocking` | boolean | Optional | Controls whether high-confidence correctness bugs from the QA diff code review gate the build (appended to the QA gate's `top_issues[]` → fixed in the qa-fix loop). **Under `/develop-story` this is ON by default** (the pipeline passes a run-level override); set `false` to opt this story **out** (escape hatch). Standalone `/qa-story`: absent → advisory, `true` → blocking. See [`qa-story`](../../skills/qa-story/SKILL.md) Phase 1.6 |
 | `estimated_effort_hours` | number | Optional | Estimated dev hours. Synced to Jira `timetracking.originalEstimate` (and, when configured via [`jira.devEstimateField`](../reference/configuration.md#jira-estimate-field), a Jira custom field) and the GitHub Projects v2 `Estimate` number field. Captured at create time, surfaced as a LOW review gap if missing |
+| `sign_off_roles` | list | Optional | Per-story override of the `skills-config.yaml` sign-off roster, e.g. `[CTO, Tech Lead, Design (optional)]`. Replaces the config roster for this story only; `[]` means no signatures required. Read once, at creation — after that the table in the document is authoritative. See [`sign-off.md`](../../shared/resources/sign-off.md) |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` — pipeline creates one if tracker is Jira and this is absent |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
@@ -87,6 +88,7 @@ Stories have distinct sections owned by distinct roles. `create-story` writes th
 | Tasks / Subtasks | `create-story` | Dev may add subtasks during implementation |
 | Dev Notes (extracted context) | `create-story` | Anti-hallucination: every claim sourced |
 | Testing guidance | `create-story` | |
+| Stakeholder Sign-off | `create-story` scaffolds the roles; **humans sign** | Only when `sign-off.enabled: true`. Agents never write a Signature or Date cell. Sits between Dev Notes and Change Log. Never synced to a tracker. See [`sign-off.md`](../../shared/resources/sign-off.md) |
 | Dev Agent Record (model, completion notes, file list) | `develop-story` (developer) | Append-only during implementation |
 | QA Results | `qa-story` / `qa-gate` | Never modified by dev skills |
 

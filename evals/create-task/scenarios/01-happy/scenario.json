@@ -1,7 +1,7 @@
 {
   "name": "01-happy",
   "skill": "create-task",
-  "description": "Happy-path create-task: agent creates task.42.cache-lib-simplification.md with all 11 mandatory sections, ≥2 source citations, valid frontmatter, and posts a tracker payload.",
+  "description": "Happy-path create-task: agent creates task.42.cache-lib-simplification.md with all 11 mandatory sections, ≥2 source citations, valid frontmatter, and posts a tracker payload. No skills-config.yaml sign-off block is present, so the Stakeholder Sign-off section must NOT be emitted.",
   "prompt": "Create a task for simplifying the cache lib. Architectural source: docs/architecture/tech-stack.md#caching and docs/architecture/coding-standards.md#naming.",
   "assertions": [
     {
@@ -43,6 +43,13 @@
       "args": [
         "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md",
         "## 11\\. Rollback Plan"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.cache-lib-simplification.md",
+        "Stakeholder Sign-off"
       ]
     },
     {

@@ -1,7 +1,7 @@
 {
   "name": "01-happy",
   "skill": "create-story",
-  "description": "Happy-path create-story: agent produces story.178.8.example-feature.md with all required sections, ≥2 source citations, valid frontmatter, and appends to sprint-status under stories: list.",
+  "description": "Happy-path create-story: agent produces story.178.8.example-feature.md with all required sections, ≥2 source citations, valid frontmatter, and appends to sprint-status under stories: list. No skills-config.yaml sign-off block is present, so the Stakeholder Sign-off section must NOT be emitted.",
   "prompt": "Create story 8 under epic 178 for the example feature. Source: docs/architecture/tech-stack.md#typescript and docs/architecture/coding-standards.md#naming.",
   "assertions": [
     {
@@ -66,6 +66,13 @@
       "args": [
         "$SANDBOX/docs/stories/story.178.8.example-feature.md",
         "## Dev Notes"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "Stakeholder Sign-off"
       ]
     },
     {

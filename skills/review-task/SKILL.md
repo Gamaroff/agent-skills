@@ -446,6 +446,7 @@ options:
    - Success Criteria
    - Risk Assessment
    - Rollback Plan
+   - Stakeholder Sign-off — **only when `sign-off.enabled: true`** in `skills-config.yaml` (see check 4a); never expected otherwise. Unnumbered by design; the 11 numbered sections above are the mandatory contract.
    - Progress Tracking
    - References
 
@@ -472,6 +473,36 @@ options:
 4. **Placeholder Detection**:
    - Search for: `[TBD]`, `[TODO]`, `[PLACEHOLDER]`, `???`, `[Description]`
    - Each unfilled placeholder is a gap
+
+4a. **Stakeholder Sign-off** (conditional — full spec: [`references/sign-off.md`](references/sign-off.md)):
+
+Read `sign-off.enabled` from `skills-config.yaml`. **When it is absent or `false`, skip this check entirely** — do not flag a missing section, do not mention sign-off in the report. When `sign-off.enforcement` is `off`, likewise skip.
+
+Otherwise check exactly two things — presence and fill. **There is no git verification, no name matching, and no identity check**; the commit history behind each signature is the audit trail and is left for humans to inspect.
+
+- **Grade the table, not the config.** The rows present in the document are the source of truth. A row added by hand during refinement is enforced exactly like a config-seeded one; a deleted row is a removed requirement, visible in the diff. Never rewrite an existing table to match the config roster.
+- A row is **signed** when both its Signature and Date cells are non-empty after trimming. Cells holding only a placeholder (`_sign here_`, `TBD`, `—`, `-`, `N/A`, or the template's `[Required Role]` stub) count as **unsigned**.
+- A row is **optional** when its Role cell ends with ` (optional)` (case-insensitive). Optional rows are **never graded**.
+- Flag when the section is **missing entirely**, or when **any required row is unsigned**.
+- Correct the `**Sign-off status:**` line if it disagrees with the table; the table wins.
+- The section must remain **unnumbered**. A `## 12. Stakeholder Sign-off` heading is an Optional finding — it breaks the 11-section mandatory contract that `countMandatorySections` asserts.
+
+Severity is driven by `sign-off.enforcement`:
+
+| `enforcement`        | Severity      | Verdict effect                                                                     |
+| -------------------- | ------------- | ----------------------------------------------------------------------------------- |
+| `advisory` (default) | **Important** | Score deduction only — `develop-task` must not be blocked.                          |
+| `blocking`           | **Critical**  | Do **not** promote the task out of `planned` in Step 9 — the develop pipeline gates on `Status:`, not on the score, so leaving the status unpromoted is what actually stops the run. |
+| `off`                | not checked   | —                                                                                   |
+
+Name the outstanding roles so the human knows who to chase:
+
+```markdown
+- **[Important]** Stakeholder Sign-off incomplete — 0 of 1 required signatures.
+  Awaiting: **Tech Lead**. Enforcement is `advisory`, so this does not block development.
+```
+
+> **Never sign on a stakeholder's behalf.** The auto-fix pass may create a missing section (roles only, from the roster) but must **never** write into a Signature or Date cell. An unsigned document stays unsigned until a human commits their name.
 
 5. **Tracker Issue Linkage**:
 
@@ -619,9 +650,9 @@ options:
 
 **Issues to Flag**:
 
-- **Critical**: Missing required sections (Implementation Plan, Testing Strategy)
-- **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage
-- **Optional**: Missing optional sections or metadata
+- **Critical**: Missing required sections (Implementation Plan, Testing Strategy); unsigned sign-off when `sign-off.enforcement: blocking`
+- **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage; unsigned sign-off when `sign-off.enforcement: advisory` (the default)
+- **Optional**: Missing optional sections or metadata; a numbered `## 12. Stakeholder Sign-off` heading
 
 **Output**: Template compliance report with specific issues listed
 
@@ -1403,6 +1434,14 @@ On non-zero exit → log warning `⚠️ sync-jira-task failed — Jira descript
    - Read the `Status:` field from task document metadata
    - If status is already "Ready for Development" or "In Progress", skip this step
    - If status is "Draft", "Planned", "Not Started", or similar, proceed
+
+1a. **Sign-off gate** (only when `sign-off.enabled: true` AND `sign-off.enforcement: blocking`):
+
+   If any required sign-off row is unsigned (Step 2, check 4a), do **NOT** promote the status — regardless of the review outcome, and including the pipeline auto-answer path above. Leave it at `planned` and tell the user:
+
+   > "Task is technically ready but unsigned. Awaiting: **{roles}**. Status stays 'Planned' until a stakeholder types their name in the Stakeholder Sign-off table and commits the change. `develop-task` will HALT at Step 2 until then."
+
+   This is the mechanism that actually blocks the pipeline: `develop-task` gates on the `Status:` field, not on the review outcome. Under `advisory` enforcement this gate does not apply — promote normally and let the Important issue stand in the report.
 
 2. **Ask User About Fixes**:
 

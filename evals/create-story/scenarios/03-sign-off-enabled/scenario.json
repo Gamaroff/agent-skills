@@ -1,0 +1,57 @@
+{
+  "name": "03-sign-off-enabled",
+  "skill": "create-story",
+  "description": "create-story with `sign-off.enabled: true` in skills-config.yaml: the story must carry a Stakeholder Sign-off table seeded with the configured roster (Product Owner + Tech Lead required, Design optional), every Signature and Date cell left EMPTY, and a status line reading 0 of 2. Agents scaffold this section but never sign it.",
+  "prompt": "Create story 9 under epic 178 for the signed feature. Source: docs/architecture/tech-stack.md#typescript and docs/architecture/coding-standards.md#naming.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": ["$SANDBOX/docs/stories/story.178.9.signed-feature.md"]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.9.signed-feature.md",
+        "## Stakeholder Sign-off"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.9.signed-feature.md",
+        "\\|\\s*Role\\s*\\|\\s*Signature\\s*\\|\\s*Date\\s*\\|"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.9.signed-feature.md",
+        "\\|\\s*Product Owner\\s*\\|\\s*\\|\\s*\\|"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.9.signed-feature.md",
+        "\\|\\s*Tech Lead\\s*\\|\\s*\\|\\s*\\|"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.9.signed-feature.md",
+        "\\|\\s*Design \\(optional\\)\\s*\\|\\s*\\|\\s*\\|"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/stories/story.178.9.signed-feature.md",
+        "\\*\\*Sign-off status:\\*\\* Pending — 0 of 2 required signatures"
+      ]
+    },
+    {
+      "fn": "answerQueueDrained"
+    }
+  ]
+}

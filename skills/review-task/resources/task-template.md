@@ -353,6 +353,28 @@
 
 ---
 
+<!--
+  Emitted only when `sign-off.enabled: true` in skills-config.yaml.
+  Roles come from `sign-off.task.required` / `sign-off.task.optional`; optional roles
+  carry a " (optional)" suffix. Unconfigured roster → a single "Stakeholder" row.
+  Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
+  Canonical spec: references/sign-off.md
+  AGENTS NEVER FILL A SIGNATURE OR DATE CELL.
+-->
+
+## Stakeholder Sign-off
+
+Development must not begin until every required role below has signed. To sign, replace your **Signature** cell with your name and today's date, then commit the change yourself — your commit authorship is the audit trail.
+
+| Role                | Signature | Date |
+| ------------------- | --------- | ---- |
+| [Required Role]     |           |      |
+| [Role] (optional)   |           |      |
+
+**Sign-off status:** Pending — 0 of [N] required signatures
+
+---
+
 ## Progress Tracking
 
 ### Phase 1: [Phase Name]

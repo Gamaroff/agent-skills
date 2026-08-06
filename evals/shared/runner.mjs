@@ -100,6 +100,9 @@ function runAssertions(assertions, ctx, pathResolver) {
       case "fileMatches":
         results.push(A.fileMatches(args[0], new RegExp(args[1])));
         break;
+      case "fileDoesNotMatch":
+        results.push(A.fileDoesNotMatch(args[0], new RegExp(args[1])));
+        break;
       case "frontmatterHas":
         results.push(A.frontmatterHas(...args));
         break;

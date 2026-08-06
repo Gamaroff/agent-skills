@@ -876,6 +876,49 @@ For each risk:
 
 ---
 
+## Bonus Section: Stakeholder Sign-off
+
+**Purpose**: Human approval gate — the stakeholders accountable for this work sign before development begins.
+
+Emitted **only** when `sign-off.enabled: true` in `skills-config.yaml`. Deliberately **unnumbered** — the 11 numbered sections above remain the mandatory contract. Canonical spec: `references/sign-off.md`.
+
+### What to Include
+
+- One row per role from `sign-off.task.required` and `sign-off.task.optional`
+- Optional roles carry a ` (optional)` suffix in the Role cell — that suffix is the only marker separating required from optional
+- A `**Sign-off status:**` summary line below the table
+- Unconfigured roster → a single `Stakeholder` row
+
+### Example
+
+```markdown
+## Stakeholder Sign-off
+
+Development must not begin until every required role below has signed. To sign, replace your **Signature** cell with your name and today's date, then commit the change yourself — your commit authorship is the audit trail.
+
+| Role              | Signature | Date |
+| ----------------- | --------- | ---- |
+| Tech Lead         |           |      |
+| Product Owner (optional) |    |      |
+
+**Sign-off status:** Pending — 0 of 1 required signatures
+```
+
+### Key Points
+
+- **Agents never sign.** Scaffold the roles and the status line; leave every Signature and Date cell empty. Never fill one on a human's behalf, even when asked.
+- **Signing is a commit.** Stakeholders edit the file (Bitbucket, GitHub, or `git`) and commit it themselves — the commit authorship is the audit trail behind the typed name.
+- **Never synced to a tracker.** Signing in a Jira or GitHub UI produces no commit and therefore no audit trail.
+
+### Common Mistakes
+
+- ❌ Filling in a signature for the user
+- ❌ Numbering the section (breaks the 11-section mandatory contract)
+- ❌ Adding a fourth "Signatory" column — the Signature cell *is* the name
+- ❌ Emitting the section when `sign-off.enabled` is false or absent
+
+---
+
 ## Bonus Section: Notes
 
 **Purpose**: Additional context, reminders, and future improvements.
@@ -963,6 +1006,7 @@ Use this when creating a technical task:
 - [ ] **Section 9 - Success Criteria**: 4 categories with 2-3 criteria each
 - [ ] **Section 10 - Risk Assessment**: High/Medium/Low risks with mitigations
 - [ ] **Section 11 - Rollback Plan**: Immediate/Partial/Forward approaches with triggers
+- [ ] **Bonus - Stakeholder Sign-off**: Roles from config, Signature/Date left empty (only when `sign-off.enabled`)
 - [ ] **Bonus - Notes**: Reminders, known issues, future improvements
 
 ---
@@ -1177,6 +1221,19 @@ Use this when creating a technical task:
 ### Rollback Triggers
 **Critical**: [Issues requiring immediate rollback]
 **Non-Critical**: [Issues to fix forward]
+
+---
+
+<!-- Only when `sign-off.enabled: true`. Unnumbered. Agents never fill Signature/Date. -->
+
+## Stakeholder Sign-off
+
+| Role              | Signature | Date |
+| ----------------- | --------- | ---- |
+| [Required Role]   |           |      |
+| [Role] (optional) |           |      |
+
+**Sign-off status:** Pending — 0 of [N] required signatures
 
 ---
 

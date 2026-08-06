@@ -1,0 +1,16 @@
+# Sandbox config for the sign-off opt-in scenario.
+#
+# NOTE: `task.required` here is [Tech Lead], but the task's frontmatter carries
+# `sign_off_roles: [CTO, Tech Lead, Design (optional)]`. The frontmatter wins —
+# that precedence is what this scenario exists to pin.
+prd:
+  prdShardedLocation: docs/prd
+
+architecture:
+  architectureShardedLocation: docs/architecture
+
+sign-off:
+  enabled: true
+  enforcement: advisory
+  task:
+    required: [Tech Lead]

@@ -58,6 +58,15 @@ github:
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 
+sign-off: # optional — stakeholder sign-off gate on stories/tasks (default: off)
+  enabled: true
+  enforcement: advisory # advisory | blocking | off
+  story:
+    required: [Product Owner, Tech Lead]
+    optional: [Design]
+  task:
+    required: [Tech Lead]
+
 branching: # optional — epic integration branches (create-branch, develop-story)
   epicIntegration:
     epicFrontmatterKey: branch_model # epic frontmatter key holding the delivery model
@@ -114,6 +123,10 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `jira.docBranch`                                 | string (branch name)            | (falls back to `developNext.baseBranch`, then git) | Branch that Bitbucket **document links** in a synced issue point at. Set this on any repo whose docs live somewhere other than the git default branch — i.e. most Gitflow repos. Env override: `JIRA_DOC_BRANCH`. See [Document link branch](#document-link-branch).                                                                                                                                                                                                                     |
 | `jira.defaultAssignee`                           | string (Jira accountId)         | (unset → field not sent)                         | accountId applied on story/task/epic sync when the document's frontmatter has no `assignee`. Frontmatter wins. An **accountId**, never a name or team — Jira rejects anything else with a bare `HTTP 400`. Placeholders (`TBD`, `unassigned`, `none`, `n/a`, …) are refused with a warning in either position rather than sent. Unset in both places means the field is omitted entirely, so an update leaves Jira's existing assignee untouched. Find yours at `GET /rest/api/3/myself`. |
 | `github.projectEstimateField`                    | string (project field name)     | `Estimate`                                       | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field).                                                                                                                                                                                                                                                                                                                                |
+| `sign-off.enabled`                               | boolean                         | `false`                                          | Master switch for the stakeholder sign-off gate. Absent or `false` → `create-*` emits no section and `review-*` checks nothing, i.e. exactly the pre-existing behaviour. See [Stakeholder sign-off](#stakeholder-sign-off).                                                                                                                                                                                                                                                              |
+| `sign-off.enforcement`                           | `advisory` \| `blocking` \| `off` | `advisory`                                     | How `review-story` / `review-task` grade an unsigned document. `advisory` = Important issue + score deduction, pipeline proceeds. `blocking` = Critical → NO-GO, and the review withholds the status promotion so `develop-*` HALTs. `off` = section emitted but never checked.                                                                                                                                                                                                          |
+| `sign-off.story.required` / `sign-off.task.required` | list[string]                | `[Stakeholder]`                                  | Roles that must sign before development begins. One table row each. Overridden per-document by a `sign_off_roles` frontmatter key.                                                                                                                                                                                                                                                                                                                                                       |
+| `sign-off.story.optional` / `sign-off.task.optional` | list[string]                | `[]`                                             | Roles given a row but never graded. Rendered with a ` (optional)` suffix in the Role cell, which is the only marker separating them from required rows.                                                                                                                                                                                                                                                                                                                                  |
 | `branching.epicIntegration.epicFrontmatterKey`   | string                          | `branch_model`                                   | Epic frontmatter key read to decide whether the epic delivers via an integration branch.                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `branching.epicIntegration.epicFrontmatterValue` | string                          | `epic-integration`                               | Value of that key meaning "this epic's stories branch from and merge into an integration branch". Any other value, or the key's absence, means the pre-existing `develop`-direct behaviour.                                                                                                                                                                                                                                                                                               |
 | `branching.epicIntegration.branchKey`            | string                          | `integration_branch`                             | Epic frontmatter key holding the branch name. Used **verbatim** when present — the epic document is the authority on its own branch name.                                                                                                                                                                                                                                                                                                                                                 |
@@ -143,6 +156,38 @@ story directory:
 ```
 
 Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
+
+## Stakeholder sign-off
+
+Off by default. When `sign-off.enabled: true`, `create-story` and `create-task` add a table to each new document where the accountable people type their name before development begins:
+
+```markdown
+## Stakeholder Sign-off
+
+| Role              | Signature | Date       |
+| ----------------- | --------- | ---------- |
+| Product Owner     | Jane Doe  | 2026-08-06 |
+| Tech Lead         |           |            |
+| Design (optional) |           |            |
+
+**Sign-off status:** Pending — 1 of 2 required signatures
+```
+
+Stakeholders sign by editing the document — in the Bitbucket or GitHub web editor, or via `git` — and **committing the change themselves**. The typed name is the human-readable signature; the commit authorship is the audit trail. Nothing cross-checks the two automatically: if they disagree, `git log` shows exactly what happened. This is also why the section is **never synced to a tracker** — signing in a Jira or GitHub UI produces no commit and therefore no evidence.
+
+**Agents never sign.** `create-*` writes the Role cells; `review-*` may create a missing section. Neither ever writes into a Signature or Date cell, including when asked to sign on someone's behalf.
+
+**Where the roster comes from**, in precedence order:
+
+1. `sign_off_roles` in the individual story/task frontmatter — for the one-off ("this one needs the CTO"). `[]` means no signatures required.
+2. `sign-off.{story,task}.required` + `.optional` here — the project-wide default.
+3. A single `Stakeholder` row, when neither is set.
+
+**After creation the table is authoritative**, not the config. `review-*` grades the rows present in the document, so adding `| CTO | | |` by hand during refinement makes it a real requirement, and deleting a row removes one — visibly, in the diff. A later config change never rewrites an existing table.
+
+Enforcement is per-project via `sign-off.enforcement`. The default `advisory` keeps `/develop-next` and `/develop-batch` running unattended — an unsigned document is flagged and docks the readiness score but does not HALT. Under `blocking`, the review withholds the status promotion, which is what actually stops the pipeline (`develop-*` gates on `Status:`, not on the score).
+
+Full spec: [`sign-off.md`](../../shared/resources/sign-off.md).
 
 ## Tracker workflow
 

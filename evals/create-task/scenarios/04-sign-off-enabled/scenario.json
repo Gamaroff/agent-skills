@@ -1,0 +1,57 @@
+{
+  "name": "04-sign-off-enabled",
+  "skill": "create-task",
+  "description": "create-task with `sign-off.enabled: true`. The task's `sign_off_roles` frontmatter ([CTO, Tech Lead, Design (optional)]) overrides the project roster ([Tech Lead]) — per-document wins. The section must be UNNUMBERED (the 11-section contract is unchanged), every Signature and Date cell must be EMPTY, and the optional row must not count toward the required total.",
+  "prompt": "Create a task for audit log retention. Architectural source: docs/architecture/tech-stack.md#storage and docs/architecture/coding-standards.md#naming.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": ["$SANDBOX/docs/tasks/task.43.audit-log-retention.md"]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.43.audit-log-retention.md",
+        "\\n## Stakeholder Sign-off\\n"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.43.audit-log-retention.md",
+        "\\n## \\d+\\. Stakeholder Sign-off"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.43.audit-log-retention.md",
+        "\\|\\s*CTO\\s*\\|\\s*\\|\\s*\\|"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.43.audit-log-retention.md",
+        "\\|\\s*Design \\(optional\\)\\s*\\|\\s*\\|\\s*\\|"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.43.audit-log-retention.md",
+        "\\*\\*Sign-off status:\\*\\* Pending — 0 of 2 required signatures"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.43.audit-log-retention.md",
+        "## 11\\. Rollback Plan"
+      ]
+    },
+    {
+      "fn": "answerQueueDrained"
+    }
+  ]
+}

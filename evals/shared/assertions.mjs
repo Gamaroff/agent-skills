@@ -39,6 +39,18 @@ export function fileMatches(p, re) {
   return { ok, reason: ok ? "" : `${p} does not match ${re}` };
 }
 
+/**
+ * Inverse of fileMatches — the file must exist but must NOT contain the pattern.
+ * Distinct from fileAbsent, which is about the file itself. Use this to pin
+ * default-off behaviour: a section that must not appear unless opted in.
+ */
+export function fileDoesNotMatch(p, re) {
+  if (!fs.existsSync(p)) return { ok: false, reason: `missing file: ${p}` };
+  const content = fs.readFileSync(p, "utf-8");
+  const ok = !re.test(content);
+  return { ok, reason: ok ? "" : `${p} unexpectedly matches ${re}` };
+}
+
 export function frontmatterHas(p, expectedKeys) {
   if (!fs.existsSync(p)) return { ok: false, reason: `missing file: ${p}` };
   const content = fs.readFileSync(p, "utf-8");

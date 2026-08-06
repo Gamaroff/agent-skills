@@ -68,6 +68,8 @@ Activate this skill when:
 
 Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). The `sprint-status.yaml` update step below uses `${PRD_ROOT}`; task locations under `docs/tasks/` are fixed.
 
+Also read `sign-off.*` from `skills-config.yaml`: `enabled` (default `false`) decides whether step 4.3 emits the Stakeholder Sign-off section at all, and `task.required` / `task.optional` are the role roster. Spec: [`references/sign-off.md`](references/sign-off.md).
+
 ### Scope: Documentation + Opt-in Tracker Sync — Do NOT Implement
 
 This skill produces **task documentation and the co-located plan file**, and then — **only after explicitly asking the user in step 4.5** — may optionally sync the task to an issue tracker (GitHub or Jira). It MUST NOT perform, begin, or scaffold the implementation work that the task describes. Tracker sync is **opt-in**: never create a remote issue without the user's confirmation in this run.
@@ -121,6 +123,8 @@ When this skill is activated:
 9. **Success Criteria** - Functional, Performance, Quality, Migration criteria
 10. **Risk Assessment** - High/Medium/Low risk areas with mitigations
 11. **Rollback Plan** - Immediate, partial, forward fix strategies with triggers
+
+**Unnumbered tail sections** (`Stakeholder Sign-off`, `Progress Tracking`, `References`, `Notes`) sit outside this contract and are never numbered. `Stakeholder Sign-off` is emitted only when `sign-off.enabled: true` in `skills-config.yaml` — see step 4.3 and [`references/sign-off.md`](references/sign-off.md).
 
 ### File Naming Convention
 
@@ -434,6 +438,39 @@ Once validated:
    - Invoke `documentation-standards-validator` on the created file
    - Confirm: dots used as structural separators, hyphens within names, lowercase, `.md` extension
    - Fix any naming violations before presenting the file to the user
+
+### 4.3 Scaffold Stakeholder Sign-off Section (conditional)
+
+Human approval gate — stakeholders sign the task before development begins. Full spec: [`references/sign-off.md`](references/sign-off.md).
+
+**Skip this step entirely** when `sign-off.enabled` is absent or `false` in `skills-config.yaml`. Emit nothing — no section, no placeholder.
+
+When enabled, insert an **unnumbered** `## Stakeholder Sign-off` section after `## 11. Rollback Plan` and before `## Progress Tracking`. It is deliberately unnumbered: the 11 mandatory sections above remain the contract, and numbering this one would break that count.
+
+Resolve the roster in this order:
+
+1. **`sign_off_roles` in this task's frontmatter**, when present — replaces the config roster for this task alone. An empty list means no signatures are required.
+2. **`sign-off.task.required` + `sign-off.task.optional`** from `skills-config.yaml`.
+3. **Fallback** — a single `Stakeholder` row.
+
+Emit one row per role, appending ` (optional)` to the Role cell for every role drawn from the `optional` list, then the status line with `required_count` = the number of non-optional rows.
+
+```markdown
+## Stakeholder Sign-off
+
+Development must not begin until every required role below has signed. To sign, replace your **Signature** cell with your name and today's date, then commit the change yourself — your commit authorship is the audit trail.
+
+| Role                     | Signature | Date |
+| ------------------------ | --------- | ---- |
+| Tech Lead                |           |      |
+| Product Owner (optional) |           |      |
+
+**Sign-off status:** Pending — 0 of 1 required signatures
+```
+
+> **CRITICAL — agents never sign.** Leave every Signature and Date cell empty. Do not fill one on a stakeholder's behalf, and do not fill one when a user asks you to sign for them — point them at the file and let them commit it. The commit authorship behind each signature is the entire audit trail, and an agent-written signature destroys it.
+
+**Never sync this section to a tracker.** Signing in a Jira or GitHub web UI produces no commit, so the tracker copy would carry a signature with no evidence behind it. `sync-jira-task` and `sync-github-task` deliberately exclude it.
 
 ### 4.4 Prompt for Effort Estimate (Optional)
 

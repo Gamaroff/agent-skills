@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Stories and tasks can now carry a stakeholder sign-off gate**, off by default, enabled with a `sign-off:` block in `skills-config.yaml`. `create-story` and `create-task` seed a three-column table — **Role | Signature | Date** — and `review-story` / `review-task` check that every required row is signed before development begins. Canonical spec: [`shared/resources/sign-off.md`](shared/resources/sign-off.md).
+
+  Stakeholders sign by editing the document — in the Bitbucket or GitHub web editor, or via `git` — and **committing the change themselves**. The typed name is the human-readable signature; the commit authorship is the audit trail. Nothing cross-checks the two, and nothing needs to: if they disagree, `git log` shows exactly what happened, and the evidence is durable and inspectable. This is also why the section is **never synced to a tracker** — signing in a Jira or GitHub UI produces no commit and therefore no evidence, so `STORY_SECTIONS` and `TASK_SECTIONS` are deliberately unchanged.
+
+  **Agents scaffold the section but never sign it**, including when asked to sign on someone's behalf — an agent-written signature destroys the only thing the design rests on. The rule is stated in all four skills and enforced by a test.
+
+  **The roster resolves in three levels**: `sign_off_roles` in the individual story/task frontmatter (the one-off — "this one needs the CTO") → `sign-off.{story,task}.required` + `.optional` in config (the project default) → a single `Stakeholder` row. Optional roles carry a ` (optional)` suffix in the Role cell, which is what lets the table stay three columns. **After creation the table itself is authoritative, not the config**: `review-*` grades the rows present in the document, so a `| CTO | | |` typed in during refinement is enforced like any other, and deleting a row removes that requirement — visibly, in the diff. A later config change never rewrites an existing table.
+
+  **Enforcement is per-project via `sign-off.enforcement`.** The default `advisory` flags an unsigned document as Important and docks the readiness score but does not HALT, so `/develop-next` and `/develop-batch` keep running unattended. Under `blocking` it is Critical, and the review **withholds the status promotion** — that, not the numeric score, is what stops the pipeline, since `develop-*` gates on `Status:`.
+
+  The task section is deliberately **unnumbered**, alongside `Progress Tracking` / `References` / `Notes`: the 11-section contract asserted by `countMandatorySections` and `tests/skill-protocol.test.js` is unchanged.
+
+  **Inert for anyone who does not opt in**: with no `sign-off:` block, `create-*` emits nothing and `review-*` checks nothing — exactly the previous behaviour. Existing story and task documents are not backfilled; adoption is additive and going-forward only, matching how OKF frontmatter was rolled out.
+
+  Covered by 9 new protocol tests — including one pinning the two `story-template.yaml` copies byte-identical, since that pair is kept in sync by hand and its task-side equivalent has already drifted — plus a new `fileDoesNotMatch` eval assertion, two new eval scenarios (`create-story/03-sign-off-enabled`, `create-task/04-sign-off-enabled`, the latter pinning frontmatter-beats-config), and negative assertions on both happy paths locking in the default-off behaviour.
+
 ### Fixed
 
 - **The roadmap no longer offers already-merged work.** `T38` stayed `[ ]` in `project-completion-roadmap.md` and `planned` in `task-registry.md` after PR #194 merged, so `select-next.mjs` picked it as the next candidate — `/develop-next` would have re-run a completed task. Ticking the row moves selection on to `T39`, which is the correct frontier. The roadmap is load-bearing, not descriptive: only `[ ]` rows are candidates and `deps:` are satisfied by `[x]` rows, so an unticked merge is a live defect rather than a tidiness issue.

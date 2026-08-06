@@ -90,6 +90,7 @@ Each step builds on the previous one. Skipping steps will result in incomplete o
 3. Extract key configurations:
    - `architecture.*` - Architecture document settings
    - `workflow.*` - Workflow preferences
+   - `sign-off.*` - Stakeholder sign-off gate. `enabled` (default `false`) decides whether Step 5.55 emits the section at all; `story.required` / `story.optional` are the role roster. Spec: [`references/sign-off.md`](references/sign-off.md)
 
    PRD and architecture roots are configurable via `prd.prdShardedLocation` and `architecture.architectureShardedLocation` — resolved into `${PRD_ROOT}` / `${ARCH_ROOT}` in Step 0.0. Nested structure under each root is fixed. See [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
 
@@ -707,6 +708,38 @@ In the **Testing** subsection of Dev Notes:
 2. Specify test file locations
 3. Note testing frameworks and patterns to use
 4. Include any specific testing requirements for this story
+
+### 5.55 Scaffold Stakeholder Sign-off Section (conditional)
+
+Human approval gate — stakeholders sign the story before development begins. Full spec: [`references/sign-off.md`](references/sign-off.md).
+
+**Skip this step entirely** when `sign-off.enabled` is absent or `false` in `skills-config.yaml`. Emit nothing — no section, no placeholder.
+
+When enabled, insert the section **after Dev Notes and before Change Log**, and resolve the roster in this order:
+
+1. **`sign_off_roles` in this story's frontmatter**, when present — replaces the config roster for this story alone. An empty list means no signatures are required.
+2. **`sign-off.story.required` + `sign-off.story.optional`** from `skills-config.yaml`.
+3. **Fallback** — a single `Stakeholder` row.
+
+Emit one row per role. Append ` (optional)` to the Role cell for every role drawn from the `optional` list. Then emit the status line with `required_count` = the number of non-optional rows.
+
+```markdown
+## Stakeholder Sign-off
+
+Development must not begin until every required role below has signed. To sign, replace your **Signature** cell with your name and today's date, then commit the change yourself — your commit authorship is the audit trail.
+
+| Role              | Signature | Date |
+| ----------------- | --------- | ---- |
+| Product Owner     |           |      |
+| Tech Lead         |           |      |
+| Design (optional) |           |      |
+
+**Sign-off status:** Pending — 0 of 2 required signatures
+```
+
+> **CRITICAL — agents never sign.** Leave every Signature and Date cell empty. Do not fill one on a stakeholder's behalf, and do not fill one when a user asks you to sign for them — point them at the file and let them commit it. The commit authorship behind each signature is the entire audit trail, and an agent-written signature destroys it.
+
+**Never sync this section to a tracker.** Signing in a Jira or GitHub web UI produces no commit, so the tracker copy would carry a signature with no evidence behind it. `sync-jira-story` and `sync-github-story` deliberately exclude it.
 
 ### 5.6 Scaffold QA Handoff Section
 

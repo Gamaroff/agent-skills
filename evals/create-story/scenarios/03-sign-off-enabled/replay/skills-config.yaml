@@ -1,0 +1,13 @@
+# Sandbox config for the sign-off opt-in scenario.
+prd:
+  prdShardedLocation: docs/prd
+
+architecture:
+  architectureShardedLocation: docs/architecture
+
+sign-off:
+  enabled: true
+  enforcement: advisory
+  story:
+    required: [Product Owner, Tech Lead]
+    optional: [Design]

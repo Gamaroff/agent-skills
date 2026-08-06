@@ -55,6 +55,9 @@ Ordered step-by-step reference for the full story/task development pipeline. Use
 | File | Used by (skill count) | Purpose |
 |------|-----------------------|---------|
 | `document-status-lifecycle.md` | 18 skills | Canonical status states (`Draft → … → Accepted`) and frontmatter conventions |
+| `sign-off.md` | 4 skills | Stakeholder sign-off table: format, `skills-config.yaml` roster, enforcement levels, and the agents-never-sign rule |
+
+Skills that reference `sign-off.md`: `create-story`, `create-task`, `review-story`, `review-task`
 
 ### Code Quality
 

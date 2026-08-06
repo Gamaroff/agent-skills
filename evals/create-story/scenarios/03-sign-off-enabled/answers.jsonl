@@ -1,0 +1,4 @@
+{"matches": "story title", "answer": "Signed feature"}
+{"matches": "epic", "answer": "178"}
+{"matches": "tracker|jira|github", "answer": "skip"}
+{"matches": "confirm|proceed", "answer": "yes"}

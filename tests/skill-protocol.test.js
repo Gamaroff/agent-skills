@@ -147,6 +147,107 @@ test("create-story — template declares all required sections", () => {
   }
 });
 
+// ===========================================================================
+// Stakeholder sign-off — the section exists in every template that carries it,
+// the two story-template copies stay byte-identical, and the task section stays
+// UNNUMBERED (numbering it would break the 11-section contract above).
+// ===========================================================================
+const SIGN_OFF_HEADING = "Stakeholder Sign-off";
+
+test("sign-off — story-template.yaml declares the sign-off section and allows editing it", () => {
+  const lib = require(path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"));
+  const tpl = fs.readFileSync(
+    path.join(SKILLS_DIR, "create-story", "resources", "story-template.yaml"),
+    "utf-8",
+  );
+  assert.ok(
+    lib.listTemplateSectionIds(tpl).includes("sign-off"),
+    'story-template.yaml must declare a "sign-off" section id',
+  );
+  assert.match(
+    tpl,
+    new RegExp(`editable_sections:[\\s\\S]*?- ${SIGN_OFF_HEADING}`),
+    `"${SIGN_OFF_HEADING}" must be listed in agent_config.editable_sections`,
+  );
+});
+
+test("sign-off — create-story and review-story ship byte-identical story templates", () => {
+  // These two files are kept in sync by hand, so they drift silently. The task
+  // pair already did (review-task's copy lost its frontmatter). Lock the story
+  // pair down now that both carry the sign-off section.
+  const a = fs.readFileSync(
+    path.join(SKILLS_DIR, "create-story", "resources", "story-template.yaml"),
+    "utf-8",
+  );
+  const b = fs.readFileSync(
+    path.join(SKILLS_DIR, "review-story", "resources", "story-template.yaml"),
+    "utf-8",
+  );
+  assert.equal(
+    a,
+    b,
+    "skills/{create,review}-story/resources/story-template.yaml have diverged — re-copy the create-story version",
+  );
+});
+
+for (const skill of ["create-task", "review-task"]) {
+  test(`sign-off — ${skill} task template carries an unnumbered sign-off section`, () => {
+    const tpl = fs.readFileSync(
+      path.join(SKILLS_DIR, skill, "resources", "task-template.md"),
+      "utf-8",
+    );
+    assert.match(
+      tpl,
+      new RegExp(`^## ${SIGN_OFF_HEADING}$`, "m"),
+      `task-template.md must contain an unnumbered "## ${SIGN_OFF_HEADING}" heading`,
+    );
+    assert.doesNotMatch(
+      tpl,
+      new RegExp(`^## \\d+\\.\\s*${SIGN_OFF_HEADING}`, "m"),
+      "sign-off must stay unnumbered — numbering it breaks the 11-section contract",
+    );
+    // Signature and Date columns must ship empty. An agent-written signature
+    // would destroy the commit-authorship audit trail the design rests on.
+    const row = tpl.match(/^\|\s*\[Required Role\]\s*\|([^|]*)\|([^|]*)\|/m);
+    assert.ok(row, "template must carry a required-role placeholder row");
+    assert.equal(row[1].trim(), "", "Signature cell must ship empty");
+    assert.equal(row[2].trim(), "", "Date cell must ship empty");
+  });
+}
+
+test("sign-off — create-task keeps the mandatory count at 11 with sign-off present", () => {
+  const lib = require(path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"));
+  const tpl = fs.readFileSync(
+    path.join(SKILLS_DIR, "create-task", "resources", "task-template.md"),
+    "utf-8",
+  );
+  assert.match(tpl, new RegExp(`^## ${SIGN_OFF_HEADING}$`, "m"));
+  assert.equal(
+    lib.countMandatorySections(tpl),
+    11,
+    "adding the sign-off section must not change the mandatory-section count",
+  );
+});
+
+for (const skill of ["create-story", "create-task", "review-story", "review-task"]) {
+  test(`sign-off — ${skill} documents the config gate and the agents-never-sign rule`, () => {
+    const { content } = loadSkill(skill);
+    assert.match(content, /sign-off\.enabled/, "must gate on sign-off.enabled");
+    assert.match(
+      content,
+      /never (sign|write into a Signature)/i,
+      "must state that agents never sign on a stakeholder's behalf",
+    );
+    // Bundling rewrites `shared/resources/X` → `references/X` in place, so accept
+    // either form; what matters is that the canonical spec is referenced at all.
+    assert.match(
+      content,
+      /(shared\/resources|references)\/sign-off\.md/,
+      "must reference the canonical sign-off spec",
+    );
+  });
+}
+
 test("create-story — naming convention examples are accepted by validator", () => {
   const lib = require(path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"));
   assert.equal(lib.validateStoryFilename("story.178.8.example-feature.md").ok, true);

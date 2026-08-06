@@ -536,6 +536,7 @@ Actions:
    - Dev Notes
    - Testing (subsection of Dev Notes)
    - Manual Testing Steps (subsection of Dev Notes) — required for UI/navigation stories
+   - Stakeholder Sign-off — **only when `sign-off.enabled: true`** in `skills-config.yaml` (see check 4a); never expected otherwise
    - Change Log
    - Dev Agent Record
    - QA Handoff Notes
@@ -566,6 +567,35 @@ Actions:
    - Acceptance Criteria must be numbered list
    - Tasks must use checkbox format with subtasks
    - Change Log must be table format
+
+4a. **Stakeholder Sign-off** (conditional — full spec: [`references/sign-off.md`](references/sign-off.md)):
+
+Read `sign-off.enabled` from `skills-config.yaml`. **When it is absent or `false`, skip this check entirely** — do not flag a missing section, do not mention sign-off in the report. When `sign-off.enforcement` is `off`, likewise skip.
+
+Otherwise check exactly two things — presence and fill. **There is no git verification, no name matching, and no identity check**; the commit history behind each signature is the audit trail and is left for humans to inspect.
+
+- **Grade the table, not the config.** The rows present in the document are the source of truth. A row added by hand during refinement is enforced exactly like a config-seeded one; a deleted row is a removed requirement, visible in the diff. Never rewrite an existing table to match the config roster.
+- A row is **signed** when both its Signature and Date cells are non-empty after trimming. Cells holding only a placeholder (`_sign here_`, `TBD`, `—`, `-`, `N/A`) count as **unsigned**.
+- A row is **optional** when its Role cell ends with ` (optional)` (case-insensitive). Optional rows are **never graded** — an unsigned optional row is not a finding at any enforcement level.
+- Flag when the section is **missing entirely**, or when **any required row is unsigned**.
+- Correct the `**Sign-off status:**` line if it disagrees with the table; the table wins.
+
+Severity is driven by `sign-off.enforcement`:
+
+| `enforcement`        | Severity      | Verdict effect                                                                        |
+| -------------------- | ------------- | ------------------------------------------------------------------------------------- |
+| `advisory` (default) | **Important** | Score deduction only. The verdict may still be GO — `develop-story` must not be blocked. |
+| `blocking`           | **Critical**  | Forces NO-GO. Do **not** promote the story out of `draft` in Step 10 — the develop pipeline gates on `Status:`, not on the score, so leaving the status unpromoted is what actually stops the run. |
+| `off`                | not checked   | —                                                                                      |
+
+Name the outstanding roles so the human knows who to chase:
+
+```markdown
+- **[Important]** Stakeholder Sign-off incomplete — 1 of 2 required signatures.
+  Awaiting: **Tech Lead**. Enforcement is `advisory`, so this does not block development.
+```
+
+> **Never sign on a stakeholder's behalf.** This applies in validate-and-apply mode too: the auto-fix pass may create a missing section (roles only, from the roster) but must **never** write into a Signature or Date cell. An unsigned document stays unsigned until a human commits their name.
 
 5. **Title Format**:
    - When the story `title` frontmatter (or the `# ` heading) embeds a story-id prefix, it MUST use the canonical bracket form `[Story N.M] Name` — never the colon form `Story N.M: Name` nor the hyphen form `Story N-M: Name`.
@@ -712,8 +742,8 @@ Actions:
 
 **Issues to Flag**:
 
-- **Critical**: Missing required sections (Story, ACs, Tasks, Dev Notes)
-- **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage
+- **Critical**: Missing required sections (Story, ACs, Tasks, Dev Notes); unsigned sign-off when `sign-off.enforcement: blocking`
+- **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage; unsigned sign-off when `sign-off.enforcement: advisory` (the default)
 - **Optional**: Missing optional sections or subsections
 
 **Output**: Section compliance report with specific issues listed
@@ -2009,6 +2039,14 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
 3. **If NEEDS REVISION or REQUIRES REWORK**:
    - Do NOT offer status update
    - Inform user: "Story status remains '[current status]'. Address the critical/important issues above, then run `/review-story` again."
+
+3a. **Sign-off gate** (only when `sign-off.enabled: true` AND `sign-off.enforcement: blocking`):
+
+   If any required sign-off row is unsigned (Step 2, check 4a), do **NOT** promote the status — regardless of the readiness score or a READY TO IMPLEMENT recommendation. Leave it at `draft` and tell the user:
+
+   > "Story is technically ready but unsigned. Awaiting: **{roles}**. Status stays 'Draft' until a stakeholder types their name in the Stakeholder Sign-off table and commits the change. `develop-story` will HALT at Step 2 until then."
+
+   This is the mechanism that actually blocks the pipeline: `develop-story` gates on the `Status:` field, not on the numeric score. Under `advisory` enforcement this gate does not apply — promote normally and let the Important issue stand in the report.
 
 4. **Update Status Based on User Response** (READY TO IMPLEMENT path only):
 
