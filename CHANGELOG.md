@@ -20,9 +20,7 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
-- **The release workflow could not run the test suite.** `v0.35.0`'s frontmatter work added a PyYAML dependency — `tests/skill-frontmatter.test.js` asserts the strict, PyYAML-backed validation path is active — and added an `Install PyYAML` step to `test.yml` and `validate.yml`, but not to `release.yml`. `actions/setup-python` provides a bare interpreter, so the first tag cut afterwards (`v0.36.0`) failed 4 tests and published no GitHub Release.
-
-  This was worth fixing rather than working around: `quick_validate.py` **silently degrades to lenient parsing** when PyYAML is absent, so the release gate would have waved through malformed frontmatter that a consumer install then rejects. The gate was weaker than the PR gate that preceded it.
+- **`develop-batch` worktree seeding now specifies a path-preserving copy.** Step 2 said only "copy every `developBatch.worktreeSeedPaths` entry from the main tree into `<dir>`", which reads naturally as `cp "$p" "$dir/"` — correct for every entry that is a repo-root basename, and silently wrong for any that is not. Two entries sharing a basename both land at the same flattened destination: the second clobbers the first, _and_ the nested location that actually needed the file is never created. Nothing fails; the seed step reports success and the worktree looks configured, so the defect surfaces much later as whatever the missing file was supposed to prevent. Found downstream by a consumer that seeds both a repo-root `.env` and a per-workspace `apps/<svc>/.env` — only the nested one carried the database URL its test run needed, so a flattening copy would have re-created the exact worktree failure the entry was added to fix. Step 2 and `docs/reference/configuration.md` now state that entries are **repo-relative paths**, show the `mkdir -p "$dir/$(dirname "$p")" && cp "$p" "$dir/$p"` form (with `rsync -R` as the one-liner), and name the clobber as the failure mode rather than leaving it to be rediscovered.
 
 ## [v0.36.0] - 2026-08-06
 
@@ -45,6 +43,10 @@ All notable changes to this project will be documented in this file. Format foll
   Covered by 9 new protocol tests — including one pinning the two `story-template.yaml` copies byte-identical, since that pair is kept in sync by hand and its task-side equivalent has already drifted — plus a new `fileDoesNotMatch` eval assertion, two new eval scenarios (`create-story/03-sign-off-enabled`, `create-task/04-sign-off-enabled`, the latter pinning frontmatter-beats-config), and negative assertions on both happy paths locking in the default-off behaviour.
 
 ### Fixed
+
+- **The release workflow could not run the test suite.** `v0.35.0`'s frontmatter work added a PyYAML dependency — `tests/skill-frontmatter.test.js` asserts the strict, PyYAML-backed validation path is active — and added an `Install PyYAML` step to `test.yml` and `validate.yml`, but not to `release.yml`. `actions/setup-python` provides a bare interpreter, so the first tag cut afterwards failed 4 tests and published no GitHub Release. Fixed and shipped inside `v0.36.0` itself — the tag was re-pointed at the fix and re-pushed, so the published `v0.36.0` tarball contains it.
+
+  This was worth fixing rather than working around: `quick_validate.py` **silently degrades to lenient parsing** when PyYAML is absent, so the release gate would have waved through malformed frontmatter that a consumer install then rejects. The gate was weaker than the PR gate that preceded it.
 
 - **The roadmap no longer offers already-merged work.** `T38` stayed `[ ]` in `project-completion-roadmap.md` and `planned` in `task-registry.md` after PR #194 merged, so `select-next.mjs` picked it as the next candidate — `/develop-next` would have re-run a completed task. Ticking the row moves selection on to `T39`, which is the correct frontier. The roadmap is load-bearing, not descriptive: only `[ ]` rows are candidates and `deps:` are satisfied by `[x]` rows, so an unticked merge is a live defect rather than a tidiness issue.
 

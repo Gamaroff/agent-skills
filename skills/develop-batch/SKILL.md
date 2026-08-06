@@ -241,6 +241,27 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    worktree carries no gitignored files, and a missing runner config typically degrades
    *silently* rather than failing.
 
+   **Entries are repo-relative PATHS and MUST be copied path-preservingly** — recreate each
+   entry's directory inside the worktree rather than flattening it to the basename:
+
+   ```bash
+   for p in "${WORKTREE_SEED_PATHS[@]}"; do
+     [ -e "$p" ] || continue
+     mkdir -p "$dir/$(dirname "$p")"
+     cp "$p" "$dir/$p"
+   done
+   # equivalently: rsync -R "${WORKTREE_SEED_PATHS[@]}" "$dir/"
+   ```
+
+   A naive `cp "$p" "$dir/"` is wrong as soon as any entry is not a repo-root basename, and
+   it fails in the worst possible way — **silently**. Two entries sharing a basename (e.g. a
+   repo-root `.env` and a per-workspace `apps/<svc>/.env`) both land at `<dir>/.env`, so the
+   second clobbers the first *and* never reaches the nested location that needed it. The
+   seeding step reports success, the worktree looks configured, and the failure surfaces
+   much later as whatever the missing file was supposed to prevent. This is not
+   hypothetical — it is reachable for any consumer whose per-workspace env file, rather
+   than its root one, carries the credentials a test run needs.
+
 2. **Dispatch one agent per admitted worktree.** Run the item's named command
    (`worktrees[].run`, e.g. `/develop-task <path>`) **with its working directory set to
    `<dir>`**, prepending the directive below. Mark `dispatched: true`.
