@@ -569,6 +569,25 @@ you inherited, and it is the whole reason the two behave differently.
 
 ---
 
+## Scaffolding it from your board
+
+Everything the ladder needs — your columns, their order, and the statuses behind each — is already in
+your tracker. `/scaffold-tracker-workflow` reads it and writes the file:
+
+```bash
+node skills/scaffold-tracker-workflow/scripts/scaffold-tracker-workflow.js --print
+```
+
+`--print` writes nothing, and reading the output first is the point: the **ladder** it produces is
+observed, but the **`pipeline:` mapping is inferred** from column names, and it annotates each choice
+with the evidence. It flags the four things it cannot decide — moments that come out in the wrong
+order for your column arrangement, columns that matched two moments, moments no column matched, and
+whether `done` should fire at all on a board with a merge queue. It validates its output through the
+engine below before writing.
+
+Prefer it to the template on any board with more than a handful of columns. The template stays the
+right answer for a small board, or where you would rather write the file than review one.
+
 ## The shipped template
 
 `docs/examples/tracker-workflow.default.yaml`, in full. Copy it and edit:
@@ -681,6 +700,7 @@ documentStatus:
 
 ## See also
 
+- [`skills/scaffold-tracker-workflow`](../../skills/scaffold-tracker-workflow/SKILL.md) — generate this file from a live board
 - [`docs/examples/tracker-workflow.default.yaml`](../examples/tracker-workflow.default.yaml) — annotated copy-paste starter
 - [`docs/reference/configuration.md`](./configuration.md) — `skills-config.yaml` schema, including `tracker.workflowFile`
 - [`shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md) — the local status lifecycle `documentStatus:` maps from
