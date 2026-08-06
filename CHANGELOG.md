@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.36.0] - 2026-08-06
+
 ### Added
 
 - **Stories and tasks can now carry a stakeholder sign-off gate**, off by default, enabled with a `sign-off:` block in `skills-config.yaml`. `create-story` and `create-task` seed a three-column table — **Role | Signature | Date** — and `review-story` / `review-task` check that every required row is signed before development begins. Canonical spec: [`shared/resources/sign-off.md`](shared/resources/sign-off.md).
