@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The release workflow could not run the test suite.** `v0.35.0`'s frontmatter work added a PyYAML dependency — `tests/skill-frontmatter.test.js` asserts the strict, PyYAML-backed validation path is active — and added an `Install PyYAML` step to `test.yml` and `validate.yml`, but not to `release.yml`. `actions/setup-python` provides a bare interpreter, so the first tag cut afterwards (`v0.36.0`) failed 4 tests and published no GitHub Release.
+
+  This was worth fixing rather than working around: `quick_validate.py` **silently degrades to lenient parsing** when PyYAML is absent, so the release gate would have waved through malformed frontmatter that a consumer install then rejects. The gate was weaker than the PR gate that preceded it.
+
 ## [v0.36.0] - 2026-08-06
 
 ### Added

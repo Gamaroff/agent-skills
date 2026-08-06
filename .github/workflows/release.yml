@@ -34,6 +34,14 @@ jobs:
         with:
           python-version: '3.x'
 
+      # setup-python provides a bare interpreter. tests/skill-frontmatter.test.js
+      # asserts the strict (PyYAML-backed) validation path is active, and
+      # quick_validate.py silently degrades to lenient parsing without it — so
+      # the release gate would pass on frontmatter a consumer install rejects.
+      # test.yml and validate.yml already install it; this job was the gap.
+      - name: Install PyYAML
+        run: pip install pyyaml
+
       - name: Install npm deps
         run: npm ci || npm install
 
