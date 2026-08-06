@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.37.0] - 2026-08-06
+
 ### Added
 
 - **`/scaffold-tracker-workflow` — generate `tracker-workflow.yaml` from a live board** instead of hand-deriving it. Reads the board's columns and their order from Jira (`/rest/agile/1.0/board/{id}/configuration` plus per-issue-type statuses) or GitHub Projects v2 (the Status single-select field's options, which are already in board order), infers which pipeline moment belongs at each column, and emits an annotated file. Validated through `tracker-workflow.js` — the same engine the pipelines read it with — and it refuses to write anything that fails.
