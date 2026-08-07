@@ -150,6 +150,7 @@ Before running `develop-task`, verify:
 
 - [Status lifecycle](./status-lifecycle.md)
 - [File naming](./file-naming.md)
+- [Pipeline artifacts](../reference/pipeline-artifacts.md) — which step writes each co-located file
 - [Configuration](../reference/configuration.md)
 - [Task Development Runbook](../runbooks/task-development.md)
 - [`create-task` SKILL.md](../../skills/create-task/SKILL.md)

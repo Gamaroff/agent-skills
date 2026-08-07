@@ -121,14 +121,29 @@ These files are generated automatically by skills during the pipeline. Do not cr
 
 ## Branch strategy
 
-`develop-story` manages branches automatically:
+`develop-story` and `create-branch` **ask** which base to use — they never decide silently. Two models are always on the menu:
 
-| Branch | Pattern | Created from | PR targets |
-|---|---|---|---|
-| Epic branch | `feature/epic.{N}.{name}` | `develop` (on first story) | `develop` (merged manually when all stories done) |
-| Story branch | `feature/story.{E}.{S}.{name}` | Epic branch | Epic branch |
+| Model | Story branch | Created from | PR targets | Reaches `develop` |
+|---|---|---|---|---|
+| **Develop-direct** (default) | `feature/story.{E}.{S}.{name}` | `develop` | `develop` | per story, continuously |
+| **Epic integration** (opt-in) | `feature/story.{E}.{S}.{name}` | `epic/{N}.{slug}` | `epic/{N}.{slug}` | once, when the epic branch is merged by hand |
 
-Story PRs target the parent **epic branch**, not `develop`.
+Which one is *recommended* in the prompt comes from the parent epic's frontmatter — but the other option is always selectable:
+
+```yaml
+branch_model: epic-integration      # ⇒ epic/{N}.{slug} leads, "develop" still offered
+integration_branch: "epic/178.feature-ui"   # optional — used verbatim when present
+```
+
+Absent, or `branch_model: develop-direct` ⇒ `develop` leads and the integration branch is offered last, unrecommended. Set `branching.epicIntegration.offerWhenUndeclared: false` in `skills-config.yaml` to drop that trailing option entirely.
+
+Choose epic integration only when the epic's stories are meaningless apart — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Long-lived integration branches drift, defer integration, and end in a big-bang merge; `develop` is the default for a reason. Nothing automates the final `epic/{N}.{slug}` → `develop` promotion: raise that PR by hand.
+
+> `epic/{N}.{name}` (integration branch) is **not** `feature/epic.{N}.{name}` (an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates). Do not substitute one for the other.
+
+**Q1 and Q2 must agree.** Basing a story on `epic/178.feature-ui` and then targeting `develop` produces a PR whose diff includes every earlier story in the epic.
+
+Full option-by-option behaviour: [`create-branch/SKILL.md`](../../skills/create-branch/SKILL.md) Step 2b–3. Config keys: [Configuration](../reference/configuration.md).
 
 ## Prerequisites checklist
 
@@ -154,6 +169,7 @@ Before running `develop-story`, verify:
 - [Epic documents](./epic-documents.md)
 - [Status lifecycle](./status-lifecycle.md)
 - [File naming](./file-naming.md)
+- [Pipeline artifacts](../reference/pipeline-artifacts.md) — which step writes each co-located file
 - [Configuration](../reference/configuration.md)
 - [Story Development Runbook](../runbooks/story-development.md)
 - [`create-story` SKILL.md](../../skills/create-story/SKILL.md)

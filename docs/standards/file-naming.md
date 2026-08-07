@@ -66,6 +66,7 @@ Epic numbers are **globally unique** — see [`epic-registry.md`](./epic-registr
 
 ## See also
 
+- [Pipeline artifacts](../reference/pipeline-artifacts.md) — which pipeline step writes each of the files above
 - [Story documents](./story-documents.md) — full schema and directory layout
 - [Task documents](./task-documents.md) — full schema and directory layout
 - [Bug documents](./bug-documents.md) — general-bug schema and directory layout

@@ -276,7 +276,7 @@ Not sure what to run? See [which-path.md](./which-path.md) — a three-question 
 | First refactor / infra task             | [Task Development](../runbooks/task-development.md)                   |
 | Just learning what skills are           | [Overview](./overview.md)                                             |
 
-**Story work introduces one extra concept:** story branches always target a parent _epic branch_ (e.g. `feature/epic.{N}.name`), not `develop` directly. The epic branch is created from `develop` once per epic; story PRs merge into it. `/develop-story` will prompt you for this in Phase 0.
+**Story work introduces one extra concept:** `/develop-story` asks in Phase 0 which branch the story is cut from and which branch its PR targets. The default for both is `develop` — short-lived feature branches, integrated continuously. An epic whose stories are meaningless apart can instead opt into an _integration branch_ (`epic/{N}.{slug}`) that all its stories merge into and that reaches `develop` once, at the end. Both options appear in the prompt every time; see [Story documents § Branch strategy](../standards/story-documents.md#branch-strategy).
 
 ## 5. Run your first command
 

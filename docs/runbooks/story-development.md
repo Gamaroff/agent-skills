@@ -179,45 +179,74 @@ This is the orchestrator. One command runs the full lifecycle.
 
 ### Phase 0 — Resolve & Prepare
 
-`develop-story` prompts (via `AskUserQuestion`) for:
+`develop-story` prompts (via `AskUserQuestion`) for exactly two things:
 
-- **Story path** if not supplied
-- **Base branch** for the epic branch (default `develop`)
-- **Epic branch creation** if one doesn't already exist (default Yes, base = `develop`)
-- **PR target branch** (default = epic branch)
-- **Lite mode** for low-risk stories (skips some context-gathering)
+- **Q1 — Feature branch base**: which branch `feature/story.{E}.{S}.{name}` is cut from
+- **Q2 — PR target branch**: which branch the PR merges into
 
-Branch model:
+(Story path is prompted for only if not supplied. Lite mode is auto-detected, not asked. The `qa-planning` skip is silent.)
+
+### Branch model — you choose, per story
+
+Both models are always on the menu. The prompt marks one **Recommended**; the other is one keypress away.
+
+**Develop-direct (default).** Short-lived feature branches, continuous integration — standard Gitflow. The epic is an organisational construct with no branch of its own.
 
 ```
 develop
-└── feature/epic.{N}.{name}              ← epic branch (created once per epic)
-    └── feature/story.{E}.{S}.{name}     ← story branch (one per story)
+└── feature/story.{E}.{S}.{name}     ← cut from develop, PRs back to develop
 ```
 
-Story PRs target the **epic branch**. The epic branch is merged to `develop` manually once all child stories are accepted.
+**Epic integration (opt-in).** Every story in the epic merges into one long-lived integration branch, which reaches `develop` once, at the end, as a single reviewed unit.
+
+```
+develop
+└── epic/{N}.{slug}                  ← integration branch, created on demand
+    └── feature/story.{E}.{S}.{name} ← cut from the epic branch, PRs back to it
+```
+
+Which one leads the prompt comes from the parent epic's frontmatter:
+
+| Epic frontmatter | Q1/Q2 Recommended | Other option |
+|---|---|---|
+| `branch_model: epic-integration` (+ optional `integration_branch:`) | `epic/{N}.{slug}` | `develop` |
+| nothing, or `branch_model: develop-direct` | `develop` | `epic/{N}.{slug}` — *create epic integration branch*, listed last, never recommended |
+
+Set `branching.epicIntegration.offerWhenUndeclared: false` in `skills-config.yaml` to drop that trailing option for epics that never opted in. See [Configuration](../reference/configuration.md).
+
+**Pick epic integration only when the epic's stories are meaningless apart** — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Long-lived integration branches drift from `develop`, defer the integration CI exists to force, and end in a big-bang merge. `develop` is the default for a reason.
+
+Three things to know if you pick it:
+
+1. **Q1 and Q2 must agree.** Basing a story on `epic/178.feature-ui` and targeting `develop` produces a PR whose diff includes every earlier story in the epic — the base is in `develop`'s future, not its past. The pipeline re-asks rather than proceeding.
+2. **Selecting the option does not update the epic document.** Record `branch_model:` / `integration_branch:` in the epic's frontmatter so later stories get the recommendation instead of relying on whoever runs them next remembering.
+3. **Nothing promotes the integration branch.** `develop-next` / `develop-batch` merge each story PR into the base the PR declares, but the final `epic/{N}.{slug}` → `develop` PR is raised by hand. Every roadmap row ticked ≠ the epic has landed.
+
+> `epic/{N}.{name}` (integration branch) is **not** `feature/epic.{N}.{name}` — an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates.
 
 ### Phase 1 — 8-step pipeline
 
 | Step | Skill                 | What happens                                                                                                                                                        |
 | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | `create-branch`       | Cuts the epic branch from `develop` if missing, then the story branch from the epic branch.                                                                         |
+| 1    | `create-branch`       | Cuts the story branch from the Q1 base. If that base is an epic integration branch that does not exist yet, creates and pushes it from `develop` first.             |
 | 2    | `review-story`        | Runs the interactive review (skipped if the story was reviewed recently and is still `ready-for-development`).                                                      |
 | 3    | `develop`             | Implements the story. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → DoD check.                                                                   |
-| 4    | `create-pr`           | Pushes the branch, opens a PR against the epic branch with auto-generated description. `--base` is pre-supplied from Phase 0.                                       |
+| 4    | `create-pr`           | Pushes the branch, opens a PR with auto-generated description. `--base` is the Q2 answer, pre-supplied from Phase 0.                                                |
 | 5–6  | `qa-story` → `qa-fix` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). If `CONCERNS`/`FAIL`, `qa-fix` runs. Up to 5 cycles.                                      |
 | 7    | `finalise`            | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Runs full side-effects even in lite mode.** |
 | 8    | `commit-changes`      | Stages and commits any final artifacts (implementation report, DoD summary, status updates).                                                                        |
 
 Throughout, `develop-story` records every decision in a co-located implementation report: `story.{E}.{S}.implementation.{N}.{name}.md`.
 
+For the full list of files each step writes — including the runtime state you should never commit — see [Pipeline artifacts](../reference/pipeline-artifacts.md).
+
 ### Phase 2 — Completion
 
-Story `status` advances to `accepted`. PR is left for human merge. The epic branch is _not_ auto-merged.
+Story `status` advances to `accepted`. The PR is left for human merge. If the story used an epic integration branch, the `epic/{N}.{slug}` → `develop` PR is also yours to raise — nothing auto-merges it.
 
 ### Lite mode
 
-Add `--lite` (or answer "Lite" at the Phase 0 prompt) to skip pre-develop codebase mapping and other context-gathering for low-risk stories. Side-effects in Step 7 (`finalise`) **still run in full** — that's not a corner you can cut.
+Add `--lite` to skip pre-develop codebase mapping and other context-gathering for low-risk stories. Lite mode is otherwise auto-detected in Phase 0a — it is not a prompt. Side-effects in Step 7 (`finalise`) **still run in full** — that's not a corner you can cut.
 
 ### Resume semantics
 
@@ -235,10 +264,10 @@ What the orchestrator invokes internally, top-down.
 
 | Called skill                                             | Role inside the pipeline                                           |
 | -------------------------------------------------------- | ------------------------------------------------------------------ |
-| [`create-branch`](../../skills/create-branch/SKILL.md)   | Creates epic branch (from `develop`) and story branch (from epic). |
+| [`create-branch`](../../skills/create-branch/SKILL.md)   | Creates the story branch from the chosen base; creates the epic integration branch first if that base was chosen and is absent. |
 | [`review-story`](../../skills/review-story/SKILL.md)     | Resolves ambiguities before code is written.                       |
 | [`develop`](../../skills/develop/SKILL.md)               | Actual implementation loop (plan → code → test → DoD).             |
-| [`create-pr`](../../skills/create-pr/SKILL.md)           | Pushes branch, opens PR with `--base` = epic branch.               |
+| [`create-pr`](../../skills/create-pr/SKILL.md)           | Pushes branch, opens PR with `--base` = the Q2 answer.             |
 | [`qa-story`](../../skills/qa-story/SKILL.md)             | Produces QA gate file. Dev skills must not edit gate files.        |
 | [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `CONCERNS`/`FAIL` gates. Up to 5 cycles.         |
 | [`finalise`](../../skills/finalise/SKILL.md)             | DoD check, PR comment, tracker comment, board update.              |

@@ -6,7 +6,9 @@ Schema and conventions for epic markdown files consumed by `create-epic`, `revie
 
 ## Purpose
 
-An epic is a mid-scope work unit nested inside a PRD. It owns 1–N stories and lives on its own long-lived branch (`feature/epic.{N}.{name}`). Epic numbers are globally unique.
+An epic is a mid-scope work unit nested inside a PRD. It owns 1–N stories. Epic numbers are globally unique.
+
+An epic is an **organisational construct, not a git branch** — by default its stories are cut from `develop` and merge back into `develop` independently. An epic whose stories are meaningless apart may opt into a long-lived integration branch by declaring `branch_model: epic-integration` in its frontmatter; see [Story documents § Branch strategy](./story-documents.md#branch-strategy).
 
 ## Directory layout
 

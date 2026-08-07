@@ -59,9 +59,9 @@ Worktrees share the same `.git` directory — so commits, fetches, and pushes ar
   ```
 - [ ] Open two terminal sessions (or agent sessions). In each, `cd` to the matching worktree and run `/develop-story <story-path>`.
 - [ ] Both pipelines run independently — commits in one worktree do not affect the other.
-- [ ] Confirm both PRs open against the epic branch without conflict.
+- [ ] Confirm both PRs open against the base you chose at Phase 0 Q2 — `develop` by default — without conflict.
 
-**Expected artifact:** Two open PRs against `feature/epic.{E}.*`, each from its own story branch.
+**Expected artifact:** Two open PRs against `develop` (or against `epic/{E}.*` if the epic opted into an integration branch), each from its own story branch.
 
 ---
 

@@ -116,17 +116,17 @@ See [Story documents](../standards/story-documents.md#frontmatter-schema).
 
 **Symptom:** Phase 0 created the story branch from `main` (or the wrong base) and the PR diff is huge.
 
-**Cause:** You accepted the default at the Phase 0 base-branch prompt without checking that the project's integration branch is `develop` (not `main`).
+**Cause:** You accepted the default at the Phase 0 Q1 prompt without checking that the project's integration branch is `develop` (not `main`), or Q1 and Q2 disagreed — basing on an epic integration branch and then targeting `develop` yields a PR containing every earlier story in the epic.
 
-**Fix:**
+**Fix:** rebase onto the base you meant, where `{CORRECT_BASE}` is `develop` or the epic integration branch (`epic/{N}.{slug}`):
 
 ```bash
 git checkout feature/story.{E}.{S}.{name}
-git rebase --onto feature/epic.{N}.{name} <wrong-base>
+git rebase --onto {CORRECT_BASE} <wrong-base>
 git push --force-with-lease
 ```
 
-If the PR is already open, update its base via `gh pr edit --base feature/epic.{N}.{name}`.
+If the PR is already open, update its base via `gh pr edit --base {CORRECT_BASE}`. Q1 and Q2 must name the same branch.
 
 ## Epic / task registry collision
 

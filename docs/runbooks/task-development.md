@@ -117,6 +117,8 @@ develop
 
 `develop-task` records every decision in a co-located implementation report: `task.{N}.implementation.{M}.{name}.md`.
 
+For the full list of files each step writes — including the runtime state you should never commit — see [Pipeline artifacts](../reference/pipeline-artifacts.md).
+
 ### Phase 2 — Completion
 
 Task `status` advances to `accepted`. PR is left for human merge. The task registry row reflects the final status.
@@ -158,8 +160,8 @@ Tracker linkage inside `finalise` uses the platform resolver (GitHub or Jira) �
 |---|---|---|
 | Upstream docs | PRD → epic → story | Task only |
 | Numbering authority | epic registry + per-epic story sequence | task registry (global) |
-| Branch model | `develop` → `feature/epic.{N}.*` → `feature/story.{E}.{S}.*` | `develop` → `feature/task.{N}.*` |
-| PR target | Epic branch | Configurable base (default `develop`) |
+| Branch model | `develop` → `feature/story.{E}.{S}.*` (or `epic/{N}.*` → `feature/story.{E}.{S}.*` where the epic opts in) | `develop` → `feature/task.{N}.*` |
+| PR target | Q2 answer — `develop`, or the epic integration branch | Configurable base (default `develop`) |
 | QA skill | `qa-story` | `qa-task` (NFR/refactor-aware) |
 | Epic issue helper | `ensure-epic-{github,jira}-issue` | n/a |
 

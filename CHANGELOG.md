@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **[Pipeline artifacts](docs/reference/pipeline-artifacts.md) — a user-facing map of every file `/develop-story` and `/develop-task` write.** The information existed, split three ways and joined nowhere: `docs/standards/file-naming.md` gave the filename grammar, `docs/standards/{story,task}-documents.md` gave the directory layout, the runbooks gave the pipeline steps, and only the skill READMEs' Artifact Lifecycle Tables connected a step to the file it produces — written for harness maintainers and eval anchors, not for someone asking "what should be on disk right now?". The new page answers that directly: annotated directory trees per pipeline, a Phase 0e → Step 8 table with a **Committed?** column, plain-language ownership of the seven documents (including that gate files are QA-write-only), and runtime state — the pipeline lock, halt snapshot, test logs, `.summaries/` — in a separate table because none of it should be committed. It also reads a **partial** run: an implementation report with no gate file stopped in Steps 3–5; a gate file with no DoD summary stopped before Step 7.
+
+### Fixed
+
+- **Eight documents still described the epic-integration branch model as mandatory, four releases after it stopped being so** — making a choice that the pipelines have always offered look unavailable. v0.24.0 replaced the mandatory long-lived `feature/epic.{n}.{name}` integration branch with flat Gitflow, and v0.35.0 reinstated it as a per-epic opt-in; neither change propagated past the skills into the consumer docs. `docs/standards/story-documents.md` still tabulated "Story branch → created from Epic branch → PR targets Epic branch"; `docs/runbooks/story-development.md` still drew the two-level branch tree and listed a since-removed "Create epic branch from develop?" prompt; `docs/concepts/getting-started.md` told first-time readers that story branches "always target a parent epic branch, not `develop` directly". `epic-documents.md`, `quickstart-story.md`, `task-development.md`, `troubleshooting.md` and `first-week/day-4-parallel.md` carried the same assumption in smaller pieces.
+
+  Nothing in the skills was wrong. `/develop-story` Phase 0d (Q1 branch base, Q2 PR target) and `/create-branch` Steps 2b–3 have both offered `develop` **and** the epic integration branch on every prompt; the epic's `branch_model:` frontmatter decides only which one is marked *Recommended*, and `branching.epicIntegration.offerWhenUndeclared` (default `true`) keeps the other on the list. The docs are now corrected to state both models, when each is the right call, and the three traps of the integration path: **Q1 and Q2 must name the same branch** (basing on `epic/178.feature-ui` and targeting `develop` yields a PR containing every earlier story in the epic), **selecting the option does not update the epic document** (record `branch_model:` yourself or the next story loses the recommendation), and **nothing promotes the integration branch** — every roadmap row ticked is not the same as the epic having landed.
+
+  `docs/standards/story-documents.md § Branch strategy` is now the canonical statement; the other seven link to it rather than restating it, so the next change to this model has one place to land.
+
 ## [v0.37.0] - 2026-08-06
 
 ### Added

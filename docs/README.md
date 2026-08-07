@@ -36,6 +36,7 @@ Each area of the docs has its own index page with full contents and intro:
   - [Activation phrases](./reference/activation-phrases.md) — natural-language phrases that trigger each skill
   - [Commands](./reference/commands.md) — every `/foo` invocation, consolidated
   - [Configuration](./reference/configuration.md) — `skills-config.yaml` keys + worked examples + placeholders
+  - [Pipeline artifacts](./reference/pipeline-artifacts.md) — every file `develop-story` / `develop-task` create, step by step
   - [Skill Catalog](./reference/skill-catalog.md) — categorised index of all skills
   - [Glossary](./reference/glossary.md) — terms used across the docs
   - [FAQ](./reference/faq.md) — design rationale

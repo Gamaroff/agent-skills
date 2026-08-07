@@ -117,14 +117,14 @@ No additional prompts beyond confirming the story title.
 /develop-story docs/prd/footer-link/epics/epic.{N}.footer-link/stories/story.{N}.1.add-footer-link/
 ```
 
-Phase 0 of `/develop-story` will ask several questions. Recommended answers for a practice run:
+Phase 0 of `/develop-story` asks two questions. Recommended answers for a practice run:
 
-| Prompt                           | Recommended answer                                         |
-| -------------------------------- | ---------------------------------------------------------- |
-| Base branch                      | `develop` (or `main` if your repo has no `develop` branch) |
-| PR target                        | epic branch — `feature/epic.{N}.footer-link`               |
-| Create epic branch from develop? | Yes                                                        |
-| Lite mode?                       | Yes — speeds up a trivial single-file story                |
+| Prompt                    | Recommended answer                                         |
+| ------------------------- | ---------------------------------------------------------- |
+| Q1 — Feature branch base | `develop` (or `main` if your repo has no `develop` branch) |
+| Q2 — PR target           | `develop` (same as Q1)                                     |
+
+Both prompts also offer an epic integration branch (`epic/{N}.footer-link`) as a trailing, unrecommended option. Ignore it for a practice run — it exists for epics whose stories must land as one unit, and it adds a manual promotion step at the end. Lite mode is auto-detected for a story this small; it is not a prompt.
 
 > **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). It skips the parallel QA agents and the traceability matrix step, but **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour. Pick `No` for anything with cross-file impact, security implications, or unclear acceptance criteria.
 
@@ -177,7 +177,7 @@ Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice
 
 ```bash
 git checkout develop
-git branch -D feature/epic.{N}.footer-link feature/story.{N}.1.add-footer-link
+git branch -D feature/story.{N}.1.add-footer-link
 ```
 
 Revert or drop the PRD/epic/story commits from your branch. Mark registry rows `CANCELLED` — do NOT delete them.
