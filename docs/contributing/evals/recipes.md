@@ -149,7 +149,7 @@ Runs all protocol tests (`evals/develop-task/protocol/*.test.mjs`) then all step
 npm run eval:develop-story
 ```
 
-Runs all protocol tests (`evals/develop-story/protocol/*.test.mjs`) then all 10 step-isolation scenarios in replay mode. Includes story-specific checks: epic branch creation (`create-epic-branch`), only-if-missing semantics, PR targets epic branch (`prTargetsEpicBranch`), and the 9-step sub-skill ordering. Deterministic — no model calls, no creds needed.
+Runs all protocol tests (`evals/develop-story/protocol/*.test.mjs`) then all 10 step-isolation scenarios in replay mode. Includes story-specific checks: PR base (`prTargetsBranch`, expecting `develop`) and the 8-step sub-skill ordering. Deterministic — no model calls, no creds needed.
 
 ### 14. "I want to run the develop-story smoke test"
 
@@ -159,13 +159,13 @@ Full 8-step pipeline for a story with git-sandbox + optional gh-sandbox:
 ANTHROPIC_API_KEY=sk-ant-... npm run eval:develop-story:smoke
 ```
 
-Full — with real GitHub PR targeting the epic branch:
+Full — with a real GitHub PR:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-... GH_TOKEN=ghp_... GH_REPO=your-handle/eval-sandbox npm run eval:develop-story:smoke
 ```
 
-Key assertion: `prTargetsEpicBranch` verifies the PR base is `feature/epic.5.example`, not `develop`. This is the primary regression guard for story pipeline drift.
+Key assertion: `prTargetsBranch($SANDBOX/.eval/gh-receipt.json, "develop")` verifies the PR base is `develop`. This is the primary regression guard for story pipeline drift — a story that lands on an epic branch by default is the pre-v0.24.0 behaviour and fails here. Epic integration branches are a per-epic opt-in, not the default; see [Story documents § Branch strategy](../../standards/story-documents.md#branch-strategy).
 
 Resume test (requires `EVAL_MODE=1` + kill support in driver):
 

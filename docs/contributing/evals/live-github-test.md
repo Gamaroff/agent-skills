@@ -217,18 +217,18 @@ Open Claude Code in `~/sandbox/eval-sandbox` and invoke:
 /develop-story docs/prd/app/core/epics/epic.1.health-endpoint/stories/story.1.1.add-health-route/story.1.1.add-health-route.md
 ```
 
-Phase 0 will ask, in order:
+Phase 0 asks exactly two questions:
 
-1. **Epic branch creation** — `Epic branch feature/epic.1.health-endpoint does not exist yet. Create it from develop?` → choose **Create epic branch from develop** (recommended default).
-2. **Story branch base** — `Confirm story branch base?` → choose **feature/epic.1.health-endpoint (epic branch — recommended)**.
-3. **PR target** — `Confirm PR target branch?` → choose **feature/epic.1.health-endpoint (epic branch — recommended)**.
+1. **Q1 — Feature branch base** — `Which branch should feature/story.1.1.add-health-route be based on?` → choose **develop** (recommended default).
+2. **Q2 — PR target branch** — `Which branch should the pull request target?` → choose **develop** (recommended default).
+
+Both prompts also list `epic/1.health-endpoint — create epic integration branch` as a trailing, unrecommended option. Do not pick it for this test: epic 1 declares no `branch_model:`, so `develop` is the path under test. (A third prompt, or an "Epic branch creation" question, means you are on a pre-v0.24.0 build — see [recipes § develop-story evals](./recipes.md).)
 
 Expected pipeline progression:
 
 ```
 ═══ DEVELOP-STORY PIPELINE: STEP 1/8 — CREATE-BRANCH ═══
-  creates feature/epic.1.health-endpoint from develop
-  creates feature/story.1.1.add-health-route from the epic branch
+  creates feature/story.1.1.add-health-route from develop
 
 ═══ DEVELOP-STORY PIPELINE: STEP 2/8 — REVIEW-STORY ═══
 
@@ -237,7 +237,7 @@ Expected pipeline progression:
   adds tests/health.test.js (Jest + supertest)
 
 ═══ DEVELOP-STORY PIPELINE: STEP 4/8 — CREATE-PR ═══
-  opens PR targeting feature/epic.1.health-endpoint (NOT develop)
+  opens PR targeting develop
 
 ═══ DEVELOP-STORY PIPELINE: STEP 5/8 — QA-STORY ═══
 ═══ DEVELOP-STORY PIPELINE: STEP 6/8 — QA-FIX ═══   (only if QA finds issues)
@@ -283,9 +283,9 @@ git log --format="%ai %s" | head -20
 
 | Check | Expected |
 |---|---|
-| Epic branch | `feature/epic.1.health-endpoint` based on `develop` |
-| Story branch | `feature/story.1.1.add-health-route` based on the epic branch |
-| PR base | `feature/epic.1.health-endpoint` (**not** `develop`) |
+| Epic branch | none — epic 1 declares no `branch_model:`, so no branch is created for it |
+| Story branch | `feature/story.1.1.add-health-route` based on `develop` |
+| PR base | `develop` |
 | Implementation report | `story.1.1.implementation.{N}.{name}.md` with `status: accepted` |
 | QA report | `story.1.1.qa.{N}.{name}.md` |
 | QA gate | `story.1.1.gate.{N}.{name}.yml` with `gate: PASS` or `CONCERNS` |

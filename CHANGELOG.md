@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file. Format foll
 
   `docs/standards/story-documents.md § Branch strategy` is now the canonical statement; the other seven link to it rather than restating it, so the next change to this model has one place to land.
 
+- **The develop-story eval docs named an assertion that does not exist and inverted what it checks.** `docs/contributing/evals/recipes.md` described `prTargetsEpicBranch` as verifying "the PR base is `feature/epic.5.example`, not `develop`" and called it "the primary regression guard for story pipeline drift". The real assertion is `prTargetsBranch(receiptPath, expectedBase)`, and both scenarios that use it (`smoke/01-end-to-end-dry`, `step-isolation/04-create-pr`) pass `"develop"` — so the guard asserts the exact opposite of what the recipe claimed, and a contributor debugging a failure would have been reading the inverse of the truth. `live-github-test.md`'s Step 4 walkthrough likewise scripted three Phase 0 prompts including a since-removed "Create epic branch from develop?", where the pipeline now asks two.
+
+- **Six develop-story step-isolation fixtures still answered the Phase 0 base-branch prompt with `feature/epic.5.example`.** The v0.24.0 rewrite updated the two scenarios that assert on the branch (`01-create-story-branch`, `04-create-pr`) to `develop` and left the rest, because nothing asserted on them — so they were inert, but they modelled a story based on an epic branch, under the *pre*-v0.24.0 name (`feature/epic.*`, not the current `epic/{n}.{slug}`). All eight now answer `develop`. Verified against `npm run eval:develop-story` before and after: 55 protocol tests and 10 replay scenarios pass either way, which is the point — the fixtures were describing a contract nothing was checking.
+
 ## [v0.37.0] - 2026-08-06
 
 ### Added
