@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.37.1] - 2026-08-07
+
 ### Added
 
 - **[Pipeline artifacts](docs/reference/pipeline-artifacts.md) — a user-facing map of every file `/develop-story` and `/develop-task` write.** The information existed, split three ways and joined nowhere: `docs/standards/file-naming.md` gave the filename grammar, `docs/standards/{story,task}-documents.md` gave the directory layout, the runbooks gave the pipeline steps, and only the skill READMEs' Artifact Lifecycle Tables connected a step to the file it produces — written for harness maintainers and eval anchors, not for someone asking "what should be on disk right now?". The new page answers that directly: annotated directory trees per pipeline, a Phase 0e → Step 8 table with a **Committed?** column, plain-language ownership of the seven documents (including that gate files are QA-write-only), and runtime state — the pipeline lock, halt snapshot, test logs, `.summaries/` — in a separate table because none of it should be committed. It also reads a **partial** run: an implementation report with no gate file stopped in Steps 3–5; a gate file with no DoD summary stopped before Step 7.
