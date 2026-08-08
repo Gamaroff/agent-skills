@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The epic-index generator leaked YAML's escaped apostrophe into every table it wrote.** `frontmatterField` stripped quotes with a single `replace(/^['"]|['"]$/g, '')`, which removes the wrapper but leaves the escaping the wrapper *requires*. A title written `'[Epic 1] Anna''s wallet'` — the only legal single-quoted YAML spelling — rendered as `Anna''s wallet`, doubling visible to every reader of the generated index. The same one-liner also stripped a leading **or** trailing quote independently, so an unquoted value merely *ending* in one (`Say it "loud"`) silently lost its last character.
+
+  Replaced with an `unquote()` that only strips a **matching pair** and then undoes that pair's escaping — `''` → `'` inside single quotes, `\\"` → `"` inside double quotes.
+
+  Worth recording how this was found, because the mechanism outlasts the bug: a consumer repo had already fixed it — locally, in `scripts/generate-prd-epic-index.mjs`. But `setup-consumer.sh` **vendors this file into `scripts/`** (it copies `shared/resources/generate-prd-epic-index.mjs` over it and prints "vendor-managed — do not hand-edit"). So every `setup-consumer.sh --update` silently reverted the consumer's fix; it had happened twice before anyone noticed, and would have kept happening indefinitely. **A vendored file can only be fixed here.** Two regression tests pin both behaviours.
+
 ### Changed
 
 - **The four live workflows now pin `actions/checkout@v7`, `actions/setup-node@v7` and `actions/setup-python@v7`** — previously `@v4`/`@v4`/`@v5`, all of which target Node.js 20. GitHub-hosted runners already force those to Node.js 24 and annotate every run saying so; the deprecation ends with the shim being removed, at which point the pinned versions stop running rather than degrading. Bumping now is the same behaviour without the annotation.

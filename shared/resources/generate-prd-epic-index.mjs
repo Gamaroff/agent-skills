@@ -93,7 +93,27 @@ const PRDS_DIR = argValue('--prd-root') || prdRootFromConfig() || 'docs/prd';
 function frontmatterField(src, key) {
   const m = src.match(new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm'));
   if (!m) return '';
-  return m[1].replace(/^['"]|['"]$/g, '').trim();
+  return unquote(m[1]);
+}
+
+// Strip the matching quote pair and undo YAML's in-string escaping.
+//
+// Stripping the quotes alone is not enough: a value that contains the quote
+// character it is wrapped in must escape it, and that escape then leaks verbatim
+// into the generated table. A title written `'Anna''s wallet'` — the only legal
+// single-quoted YAML spelling of an apostrophe — renders as `Anna''s wallet`.
+//
+// The old one-line strip also removed a leading OR trailing quote independently,
+// so an unquoted value that merely ends in a quote character lost it.
+function unquote(value) {
+  const v = value.trim();
+  if (v.startsWith("'") && v.endsWith("'") && v.length > 1) {
+    return v.slice(1, -1).replace(/''/g, "'").trim();
+  }
+  if (v.startsWith('"') && v.endsWith('"') && v.length > 1) {
+    return v.slice(1, -1).replace(/\\"/g, '"').trim();
+  }
+  return v;
 }
 
 /** Clean an epic title for display: drop a leading "[Epic N] " prefix, escape table pipes. */
