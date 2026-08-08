@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.37.4] - 2026-08-09
+
 ### Fixed
 
 - **The one shared resource vendored outside `.agents/` carried no do-not-edit warning, and a consumer lost the same fix to it twice.** `setup-consumer.sh` copies `shared/resources/generate-prd-epic-index.mjs` into a consumer's **`scripts/`** so their `docs:epic-index` npm script can reach it. Every other shared resource is protected twice over — it lives under `.agents/`, which consumers' `AGENTS.md` documents as vendored, **and** it carries the bundler's `AUTO-GENERATED — DO NOT EDIT` header. This file's `scripts/` copy had neither, because the installer copies the **source**, not the bundled output the header is injected into. It landed beside the consumer's own tooling, reading like their code, and `--update` overwrote it silently.
