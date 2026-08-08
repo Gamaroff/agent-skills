@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.37.3] - 2026-08-08
+
 ### Fixed
 
 - **The epic-index generator leaked YAML's escaped apostrophe into every table it wrote.** `frontmatterField` stripped quotes with a single `replace(/^['"]|['"]$/g, '')`, which removes the wrapper but leaves the escaping the wrapper *requires*. A title written `'[Epic 1] Anna''s wallet'` — the only legal single-quoted YAML spelling — rendered as `Anna''s wallet`, doubling visible to every reader of the generated index. The same one-liner also stripped a leading **or** trailing quote independently, so an unquoted value merely *ending* in one (`Say it "loud"`) silently lost its last character.
