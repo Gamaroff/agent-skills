@@ -273,3 +273,68 @@ test("missing PRD root is a graceful no-op (exit 0)", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ===========================================================================
+// YAML quote escaping
+// ===========================================================================
+
+// A value that contains the quote character it is wrapped in MUST escape it, and
+// the old one-line strip (`replace(/^['"]|['"]$/g, '')`) left that escape in the
+// rendered table. Single-quoted YAML doubles the apostrophe, so `'Anna''s wallet'`
+// rendered as `Anna''s wallet` — the doubling visible to every reader of the
+// generated index.
+//
+// Found in a consumer repo (rebirth-wallet) which had patched this locally. The
+// installer vendors this file over `scripts/`, so the local fix was silently
+// reverted on every `setup-consumer.sh --update` — twice before anyone noticed.
+// Fixing it here is what makes it survive.
+test("frontmatter — a single-quoted title undoubles YAML's escaped apostrophe", () => {
+  const root = tmp();
+  try {
+    const prdDir = join(root, "prd.quoted");
+    mkdirSync(join(prdDir, "epics", "epic.1.wallet"), { recursive: true });
+    writeFileSync(
+      join(prdDir, "prd.quoted.md"),
+      `---\ntype: prd\n---\n\n# Quoted PRD\n\nBody.\n`,
+    );
+    writeFileSync(
+      join(prdDir, "epics", "epic.1.wallet", "epic.1.wallet.md"),
+      `---\ntitle: '[Epic 1] Anna''s wallet'\nepic_number: 1\nstatus: planned\n---\n\n# [Epic 1] Anna's wallet\n`,
+    );
+
+    const res = run(root, ["--prd-root", root]);
+    assert.equal(res.status, 0, res.stderr);
+
+    const out = readPrd(prdDir, "prd.quoted");
+    assert.match(out, /Anna's wallet/, "renders one apostrophe");
+    assert.doesNotMatch(out, /Anna''s wallet/, "never leaks YAML's doubling");
+    assert.doesNotMatch(out, /'\[Epic 1\]/, "the wrapping quote is still stripped");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The mirror case, and the second bug in the old one-liner: because it stripped a
+// leading OR trailing quote independently, an UNQUOTED value that merely ends in
+// one lost the character. Only a matching pair is a quote pair.
+test("frontmatter — an unquoted title keeping a trailing quote is left intact", () => {
+  const root = tmp();
+  try {
+    const prdDir = join(root, "prd.trailing");
+    mkdirSync(join(prdDir, "epics", "epic.2.shout"), { recursive: true });
+    writeFileSync(
+      join(prdDir, "prd.trailing.md"),
+      `---\ntype: prd\n---\n\n# Trailing PRD\n\nBody.\n`,
+    );
+    writeFileSync(
+      join(prdDir, "epics", "epic.2.shout", "epic.2.shout.md"),
+      `---\ntitle: Say it "loud"\nepic_number: 2\nstatus: planned\n---\n\n# Say it "loud"\n`,
+    );
+
+    const res = run(root, ["--prd-root", root]);
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(readPrd(prdDir, "prd.trailing"), /Say it "loud"/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
