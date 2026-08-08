@@ -12,6 +12,7 @@ description: Verify story/task completion against comprehensive Definition of Do
 Mark a story or task as complete by verifying it against a comprehensive Definition of Done (DoD) checklist. This skill automates the verification of acceptance criteria, unit tests, code reviews, documentation updates, security reviews, and compliance checks.
 
 **Parallel DoD Verification Approach:** This skill dispatches four read-only Explore subagents in a single parallel message to perform DoD checks (AC traceability, security, compliance, docs/changelog). Each agent returns a structured YAML result. Main context writes the DoD running summary in **one consolidated pass per section** after aggregation — not per individual check. This gives:
+
 - ~3–4× wall-clock speedup vs serial verification
 - ≥80% reduction in DoD-summary file writes (≤6 writes vs ~25 baseline)
 - Partial-failure isolation: one failed agent marks that section for manual review; others continue
@@ -51,20 +52,20 @@ Use `TaskCreate` to register every sub-step you will execute. This prevents skip
 
 **Tasks to create at the start (use TaskCreate for each):**
 
-| Task Subject | Description |
-|---|---|
-| Read story document | Locate and parse the story/task markdown file |
-| Review QA reports | Find and read QA report and gate files in story directory |
-| Dispatch parallel DoD checks | Fan out 4 Explore subagents simultaneously: AC traceability, security, compliance, docs/changelog |
-| Aggregate DoD results | Parse 4 YAML responses; flag agent failures as NEEDS_MANUAL_REVIEW |
-| Write consolidated DoD sections | One append per section (AC, security, compliance, docs) to running summary |
-| Make acceptance decision | Evaluate all checks and decide ACCEPT or GAPS |
-| Update story document | Add DoD section (accepted or gap report) to story file |
-| Update frontmatter | Change status, updated, completed_date fields (accepted path only) |
-| Generate Sprint Review summary | Create sprint-review-summary.md from template (accepted path only) |
-| Post PR comment | Post acceptance or gap comment to GitHub PR |
-| Update running summary | Finalize story.{epic}.{story}.dod.{num}.{name}.md with outcome |
-| Communicate to user | Output final result block to user |
+| Task Subject                    | Description                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Read story document             | Locate and parse the story/task markdown file                                                     |
+| Review QA reports               | Find and read QA report and gate files in story directory                                         |
+| Dispatch parallel DoD checks    | Fan out 4 Explore subagents simultaneously: AC traceability, security, compliance, docs/changelog |
+| Aggregate DoD results           | Parse 4 YAML responses; flag agent failures as NEEDS_MANUAL_REVIEW                                |
+| Write consolidated DoD sections | One append per section (AC, security, compliance, docs) to running summary                        |
+| Make acceptance decision        | Evaluate all checks and decide ACCEPT or GAPS                                                     |
+| Update story document           | Add DoD section (accepted or gap report) to story file                                            |
+| Update frontmatter              | Change status, updated, completed_date fields (accepted path only)                                |
+| Generate Sprint Review summary  | Create sprint-review-summary.md from template (accepted path only)                                |
+| Post PR comment                 | Post acceptance or gap comment to GitHub PR                                                       |
+| Update running summary          | Finalize story.{epic}.{story}.dod.{num}.{name}.md with outcome                                    |
+| Communicate to user             | Output final result block to user                                                                 |
 
 Create all tasks upfront, then work through them in order. Do NOT skip any task.
 
@@ -151,7 +152,7 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    - Use Glob to find gate files: `{story-directory}/*.gate.*.yml`
    - If multiple reports exist, review the most recent one (highest number in filename)
 
-3. **Ignore prior-run acceptance blocks in the document body — they are history, not evidence.**
+2. **Ignore prior-run acceptance blocks in the document body — they are history, not evidence.**
 
    A story/task that was accepted once and later reopened still carries its previous
    `## Definition of Done - PASSED ✅` / `**Status:** ACCEPTED` section verbatim in the body. This
@@ -168,7 +169,7 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    - Treat **every** existing DoD/ACCEPTED block as **superseded**. Verify each criterion afresh
      against the code — do not inherit a single ✅ from it.
    - Confirm the block is visibly marked as historical (e.g. retitled `— run N (historical,
-     superseded)`). If it is not, that is itself a finding: an unmarked stale PASS banner is a trap
+superseded)`). If it is not, that is itself a finding: an unmarked stale PASS banner is a trap
      for the next reader and for the next `/finalise` run.
    - Scope this run's verdict to a **new** `dod.{N}` file. Never edit a previous run's DoD summary.
 
@@ -177,7 +178,7 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    > between runs, so inheriting the old block would have declared 7/7 complete against a bar that
    > now had 8 items — and the eighth was the entire reason for the reopen.
 
-2. **Read and Analyze QA Reports (if found):**
+3. **Read and Analyze QA Reports (if found):**
    - Read the QA report markdown file
    - Extract key information:
      - **Gate Status**: PASS/FAIL/CONCERNS/WAIVED
@@ -189,7 +190,7 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
      - **Recommendations**: Immediate actions, future improvements
      - **Deployment Readiness**: Staging/production approval status
 
-3. **Read and Analyze Gate Files (if found):**
+4. **Read and Analyze Gate Files (if found):**
    - Read the gate YAML file
    - Parse key fields:
      - `gate`: PASS/FAIL/CONCERNS/WAIVED
@@ -206,7 +207,7 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
      - `deployment_readiness`: Staging/production conditions
      - `test_execution_status`: Test suite creation and execution status
 
-4. **Use QA Information to Inform DoD Decision:**
+5. **Use QA Information to Inform DoD Decision:**
    - **If gate status is PASS:**
      - Verify that all acceptance criteria are marked as covered
      - Check that NFR validations all show PASS status
@@ -230,7 +231,7 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
      - Verify waiver is appropriate and documented
      - Consider waived issues in acceptance decision
 
-5. **Document QA Report Findings:**
+6. **Document QA Report Findings:**
    - If QA reports exist, reference them in the final DoD verification section
    - Include gate status, quality score, and key findings
    - Link to QA report and gate files in the acceptance documentation
@@ -294,11 +295,13 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    **Quality Score:** 90/100 (EXCELLENT)
 
    **Acceptance Criteria Coverage (from QA):**
+
    - AC1: ✅ COMPLETE
    - AC2: ✅ COMPLETE
    - AC3: ⚠️ READY (tests created, pending execution)
 
    **NFR Validation (from QA):**
+
    - Security: ✅ PASS
    - Performance: ✅ PASS
    - Reliability: ✅ PASS
@@ -354,18 +357,19 @@ DIFF_FILE=".claude/state/pr-diff-$(date +%s).diff"
 
 Read each prompt file to get the template, substitute the placeholder values, then dispatch:
 
-| Agent | Prompt file | Key substitutions |
-|-------|------------|-------------------|
-| 1. AC traceability | `references/finalise-dod-ac-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
-| 2. Security review | `references/finalise-dod-security-prompt.md` | `<STORY_FILE>`, `<STORY_TYPE>` |
-| 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>` |
-| 4. Docs & changelog | `references/finalise-dod-docs-prompt.md` | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>` |
+| Agent                | Prompt file                                    | Key substitutions                                            |
+| -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
+| 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`                               |
+| 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>`                                               |
+| 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`                |
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
 #### Step 3c: Aggregate Results
 
 After all 4 agents complete, parse each YAML result. Handle agent failures:
+
 - **Agent returns valid YAML**: extract `overall` field → `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`
 - **Agent errors or returns unparseable output**: set that section's overall to `NEEDS_MANUAL_REVIEW`; mark section for manual verification in the DoD running summary; continue with remaining sections
 
@@ -387,17 +391,22 @@ Append sections to the running summary file. **One append per section** — not 
 ### Acceptance Criteria
 
 {for each ac in ac_result.acs:}
+
 #### {ac.ac_id}: {ac.description}
+
 **Status:** {✅ PASS | ❌ FAIL}
+
 - Code evidence: `{ac.code_citation or "not found — FAIL"}`
 - Test evidence: `{ac.test_citation or "not found — FAIL"}`
-{ac.note ? "- Note: " + ac.note : ""}
-{endfor}
+  {ac.note ? "- Note: " + ac.note : ""}
+  {endfor}
 
 ### Documentation
+
 {for each item in ac_result.docs:}
+
 - **{item.item}**: {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}{item.citation ? " — `" + item.citation + "`" : ""}{item.note ? " — " + item.note : ""}
-{endfor}
+  {endfor}
 
 **Agent summary:** {ac_result.summary}
 
@@ -413,16 +422,20 @@ Append sections to the running summary file. **One append per section** — not 
 **Overall Security Status:** {SEC_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE | 🔍 NEEDS_MANUAL_REVIEW}
 
 {for each check in security_result.checks:}
+
 ### {check.check}
+
 **Status:** {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}
 {check.citation ? "- Evidence: `" + check.citation + "`" : "- No citation found"}
 {check.note ? "- Note: " + check.note : ""}
 {endfor}
 
 ### General Security
+
 {for each check in security_result.general:}
+
 - **{check.check}**: {✅ PASS | ❌ FAIL}{check.citation ? " — `" + check.citation + "`" : ""}{check.note ? " — " + check.note : ""}
-{endfor}
+  {endfor}
 
 **Agent summary:** {security_result.summary}
 
@@ -438,7 +451,9 @@ Append sections to the running summary file. **One append per section** — not 
 **Applicable areas:** {list areas where value is true from compliance_result.applicable_areas, or "None — NOT_APPLICABLE"}
 
 {for each check in compliance_result.checks:}
+
 ### {check.area}: {check.check}
+
 **Status:** {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}
 {check.citation ? "- Evidence: `" + check.citation + "`" : "- No citation found"}
 {check.note ? "- Note: " + check.note : ""}
@@ -457,7 +472,9 @@ Append sections to the running summary file. **One append per section** — not 
 **Overall Docs Status:** {DOCS_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE | 🔍 NEEDS_MANUAL_REVIEW}
 
 {for each item in docs_result.checks:}
+
 ### {item.item}
+
 **Status:** {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}
 {item.citation ? "- Evidence: `" + item.citation + "`" : "- No citation found"}
 {item.note ? "- Note: " + item.note : ""}
@@ -484,16 +501,16 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 
 **Decision Logic:**
 
-| All Acceptance Criteria Met? | Tests & PR Approved? | Docs Updated? | Security Passed? | Compliance Passed? | QA Gate Status? | **Decision**                     |
-| ---------------------------- | -------------------- | ------------- | ---------------- | ------------------ | --------------- | -------------------------------- |
-| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ✅ PASS or N/A  | **ACCEPTED** ✅ — *only if `CI_ROLLUP` is `SUCCESS`; see "CI status is a DoD gate" below* |
+| All Acceptance Criteria Met? | Tests & PR Approved? | Docs Updated? | Security Passed? | Compliance Passed? | QA Gate Status? | **Decision**                                                                                                                                  |
+| ---------------------------- | -------------------- | ------------- | ---------------- | ------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ✅ PASS or N/A  | **ACCEPTED** ✅ — _only if `CI_ROLLUP` is `SUCCESS`; see "CI status is a DoD gate" below_                                                     |
 | -                            | -                    | -             | -                | -                  | -               | **IN PROGRESS** if `CI_ROLLUP` is `FAILURE` or `PENDING` (resolve `CANCELLED`/`NONE` by re-sampling first — they are undecided, not verdicts) |
-| ❌ No                        | -                    | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
-| ✅ Yes                       | ❌ No                | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
-| ✅ Yes                       | ✅ Yes               | ❌ No         | -                | -                  | -               | **IN PROGRESS** (list gaps)      |
-| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ❌ No            | -                  | -               | **IN PROGRESS** (list gaps)      |
-| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ❌ No              | -               | **IN PROGRESS** (list gaps)      |
-| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ❌ FAIL         | **IN PROGRESS** (QA gate failed) |
+| ❌ No                        | -                    | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)                                                                                                                   |
+| ✅ Yes                       | ❌ No                | -             | -                | -                  | -               | **IN PROGRESS** (list gaps)                                                                                                                   |
+| ✅ Yes                       | ✅ Yes               | ❌ No         | -                | -                  | -               | **IN PROGRESS** (list gaps)                                                                                                                   |
+| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ❌ No            | -                  | -               | **IN PROGRESS** (list gaps)                                                                                                                   |
+| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ❌ No              | -               | **IN PROGRESS** (list gaps)                                                                                                                   |
+| ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ❌ FAIL         | **IN PROGRESS** (QA gate failed)                                                                                                              |
 
 **QA Gate Integration:**
 
@@ -506,23 +523,32 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 
 **Mapping parallel check results to the decision matrix:**
 
-| Decision matrix column | Source variable |
-|---|---|
-| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL) |
-| Tests & PR Approved? | `ac_result.pr_review_decision` (APPROVED) |
-| **CI green?** | **`CI_ROLLUP` (see below) — a hard blocker** |
-| Docs Updated? | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
-| Security Passed? | `SEC_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
-| Compliance Passed? | `COMP_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
+| Decision matrix column       | Source variable                                     |
+| ---------------------------- | --------------------------------------------------- |
+| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL)                    |
+| Tests & PR Approved?         | `ac_result.pr_review_decision` (APPROVED)           |
+| **CI green?**                | **`CI_ROLLUP` (see below) — a hard blocker**        |
+| Docs Updated?                | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
+| Security Passed?             | `SEC_OVERALL` (PASS/NOT_APPLICABLE counts as pass)  |
+| Compliance Passed?           | `COMP_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
 
 ### CI status is a DoD gate — check it, do not assume it
 
-**A PR being *approved* is not the same as a PR being *green*.** Review approval is a human
+**A PR being _approved_ is not the same as a PR being _green_.** Review approval is a human
 judgement about the diff; the check rollup is a machine result about the code. This skill used to
 read the first and never the second, which meant it could — and did — mark work `accepted` while its
 CI was still running, on a job that then failed. Acceptance had to be withdrawn by hand afterwards.
 
 Read the rollup before deciding:
+
+**Branch on the platform first.** `$PLATFORM`/`$VCS` is already resolved by
+`references/resolve-platform.sh`. The rollup query below is **GitHub-only** — `gh pr view` against a
+Bitbucket remote fails, which resolves to `UNKNOWN`, which this gate treats as `PENDING`. Read
+literally on a Bitbucket repo that means **`/finalise` can never accept anything**, which is not the
+intent: the gate exists to stop a _pending_ build being rounded up to green, not to make acceptance
+unreachable on half the platforms this skill supports. Use the Bitbucket branch below instead.
+
+#### GitHub (`PLATFORM=github`)
 
 ```bash
 # Prefer the rollup (covers checks AND commit statuses); fall back to `gh pr checks`.
@@ -562,6 +588,63 @@ CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
         else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
 ```
 
+#### Bitbucket (`PLATFORM=bitbucket`)
+
+Bitbucket has no rollup. Read the pipeline for the PR's head commit, and **check the HTTP status
+before reading the body** — that is the whole difficulty here, for the reason below.
+
+```bash
+BB_API="https://api.bitbucket.org/2.0"
+HEAD_SHA=$(git rev-parse HEAD)
+AUTH="${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}"
+
+# Capture body AND status separately. `curl -s` alone cannot tell 403 from 200-with-no-results.
+BB_CODE=$(curl -s -o /tmp/bb-pipelines.json -w '%{http_code}' -u "$AUTH" \
+  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pipelines/?sort=-created_on&pagelen=20")
+
+if [ "$BB_CODE" = "403" ]; then
+  # NOT "no CI". The token lacks read:pipeline:bitbucket. Every other call can
+  # succeed on the same credential, so nothing else looks wrong.
+  CI_ROLLUP="UNKNOWN"
+elif [ "$BB_CODE" != "200" ]; then
+  CI_ROLLUP="UNKNOWN"
+else
+  CI_ROLLUP=$(python3 -c '
+import json,sys
+sha=sys.argv[1]
+runs=[p for p in json.load(open("/tmp/bb-pipelines.json")).get("values",[])
+      if (p.get("target") or {}).get("commit",{}).get("hash","").startswith(sha[:12])]
+if not runs: print("NONE"); raise SystemExit
+st=[(r.get("state") or {}) for r in runs]
+names={s.get("name") for s in st}
+res={((s.get("result") or {}).get("name") or "") for s in st}
+if "IN_PROGRESS" in names or "PENDING" in names: print("PENDING")
+elif "FAILED" in res or "ERROR" in res:          print("FAILURE")
+elif "STOPPED" in res:                            print("CANCELLED")
+elif "SUCCESSFUL" in res:                         print("SUCCESS")
+else:                                             print("PENDING")
+' "$HEAD_SHA")
+fi
+```
+
+The same `NONE`/`CANCELLED`/`UNKNOWN` re-sampling loop below applies unchanged.
+
+> **A 403 here is the trap, and it has caught two stories.** Bitbucket answers `403` on
+> `/pipelines/` when the token lacks `read:pipeline:bitbucket`, and the commit-status endpoint
+> returns an **empty list** rather than an error. Meanwhile the repository root and the
+> pull-request endpoints keep answering `200` on the same credential, so the token looks entirely
+> healthy. The result is indistinguishable from a repository that simply has no CI configured.
+>
+> Observed live (rebirth-wallet, stories 3.2 and 3.3, 2026-08-05 and 2026-08-08) — diagnosed
+> independently both times, because nothing in the output says "scope". **Never infer CI presence
+> from an empty list; infer it from the status code.** On `UNKNOWN`, record the reason in the DoD
+> summary — "unverified: token lacks `read:pipeline:bitbucket`" is actionable, "no CI found" sends
+> the next reader hunting for a missing pipeline that exists.
+>
+> Where CI runs a command that can also be run locally, a maintainer may accept on that evidence —
+> but it must be recorded as **unverified**, never rounded up to `SUCCESS`, and the residual gap
+> named. That judgement belongs to a human, not to this gate.
+
 `SKIPPED` and `NEUTRAL` conclusions intentionally fall into the `SUCCESS` bucket — a skipped job
 (e.g. a `paths:`-filtered `smoke`) is not a failure and never becomes one.
 
@@ -579,33 +662,33 @@ for attempt in 1 2 3 4 5; do
 done
 ```
 
-| `CI_ROLLUP` | Decision |
-| ----------- | -------- |
-| `SUCCESS` | Proceed — CI column passes |
-| `FAILURE` | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." |
-| `PENDING` | **Do NOT accept.** Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.** |
-| `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict. |
-| `NONE` | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as *unverified by CI* rather than treating absence as success. |
-| `UNKNOWN` | Query failed. Treat as `PENDING` — never as success. |
+| `CI_ROLLUP` | Decision                                                                                                                                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUCCESS`   | Proceed — CI column passes                                                                                                                                                                                                                                                                              |
+| `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code."                                                                                                                                                                        |
+| `PENDING`   | **Do NOT accept.** Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.**                                                                                                                                                                |
+| `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict.                                                         |
+| `NONE`      | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as _unverified by CI_ rather than treating absence as success. |
+| `UNKNOWN`   | Query failed. Treat as `PENDING` — never as success.                                                                                                                                                                                                                                                    |
 
 > **Observed live (tinker-city PR #539).** `/finalise` sampled the rollup once, read `NONE` on a
 > head whose run was mid-cancellation, and recorded "final head unverified by CI" in the DoD
 > summary. The head was in fact fully green minutes later. The note had to be corrected by hand.
 > A single sample of an actively-moving PR is a snapshot of a race, not a verdict.
 
-> **The failure mode this exists to stop** is a *pending* rollup being read as "nothing wrong yet"
+> **The failure mode this exists to stop** is a _pending_ rollup being read as "nothing wrong yet"
 > and rounded up to acceptance. `PENDING` and `FAILURE` are both non-acceptance; only `SUCCESS`
 > passes. If the rollup is green but the newest commit is docs-only on top of untested code, say so
 > in the DoD summary — a green on an ancestor commit is evidence about that commit, not this one.
 
 > **Verify the query, not just the table.** The first version of this gate had the table above
-> exactly right and still accepted on pending CI, because the *query* silently never produced
+> exactly right and still accepted on pending CI, because the _query_ silently never produced
 > `PENDING` (see the empty-string note above). If you change this jq, test it against a rollup with
 > a running check — `{"status":"IN_PROGRESS","conclusion":""}` must yield `PENDING`. A gate whose
 > logic is correct but whose input is mis-parsed is worse than no gate, because it reports success.
 >
 > Do not substitute `gh pr checks` output parsing for this: it prints `pending` for a job that is
-> merely *queued behind another job on a serial runner*, which is indistinguishable in its output
+> merely _queued behind another job on a serial runner_, which is indistinguishable in its output
 > from one that is running. The rollup's `.status` is the field that actually distinguishes states.
 
 **Actions:**
@@ -613,7 +696,7 @@ done
 1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
 2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable
 3. **Determine pass/fail** for each decision matrix column using the mapping above
-3. **Write the acceptance decision to the running summary:**
+4. **Write the acceptance decision to the running summary:**
 
    **Example decision append (all criteria met):**
 
@@ -623,6 +706,7 @@ done
    **Decision:** ✅ ACCEPTED
 
    **Summary:**
+
    - QA Report: ✅ PASS (Quality Score: 90/100)
    - Acceptance Criteria: ✅ 5/5 complete
    - PR Review & Tests: ✅ Approved by 2 reviewers, 14 unit tests
@@ -643,6 +727,7 @@ done
    **Decision:** ❌ NOT ACCEPTED - GAPS IDENTIFIED
 
    **Summary:**
+
    - QA Report: ❌ FAIL (Quality Score: 45/100)
    - Acceptance Criteria: ⚠️ 4/5 complete (AC3 missing)
    - PR Review & Tests: ❌ No PR linked
@@ -651,6 +736,7 @@ done
    - Compliance Review: ❌ GDPR consent flow missing
 
    **Blocking Issues:**
+
    1. QA Gate: FAIL status (3 blocking security issues from QA)
    2. AC3: Success message not implemented
    3. No PR number in story document
@@ -663,7 +749,7 @@ done
    ---
    ```
 
-4. **Proceed based on decision:**
+5. **Proceed based on decision:**
    - If **ALL criteria are met** (including QA gate if present), proceed to Step 7 (Mark as Accepted)
    - If **ANY criteria are missing** or **QA gate is FAIL**, proceed to Step 8 (Report Gaps)
 
@@ -688,6 +774,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    **Total Duration:** {duration}
 
    **Artifacts Generated:**
+
    - ✅ Story document updated with DoD verification section
    - ✅ Sprint Review summary created
    - ✅ PR comment posted (if applicable)
@@ -695,6 +782,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - ✅ GitHub project board moved to Done (GitHub only — or ⚠️ not found / mutation failed — see PR comment)
 
    **Next Steps:**
+
    - Story is ready for Sprint Review
    - No further action required
    ```
@@ -788,10 +876,10 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    **PR-comment authorship contract**:
 
-   | Skill | Owns |
-   |---|---|
-   | `qa-task` | Per-cycle gate decision (best-effort, non-blocking) |
-   | `qa-fix` | Per-cycle fix summary (best-effort, non-blocking) |
+   | Skill      | Owns                                                                                                      |
+   | ---------- | --------------------------------------------------------------------------------------------------------- |
+   | `qa-task`  | Per-cycle gate decision (best-effort, non-blocking)                                                       |
+   | `qa-fix`   | Per-cycle fix summary (best-effort, non-blocking)                                                         |
    | `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
 
    `finalise` is the designated author of the canonical PR summary. It edits in place on re-run.
@@ -831,7 +919,8 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    **Step 6c — Idempotent post (search-then-edit):**
 
-   *GitHub:*
+   _GitHub:_
+
    ```bash
    # Search for existing canonical comment by marker; extract numeric ID from URL
    # (.databaseId is not available — gh pr view returns .url like ...#issuecomment-12345)
@@ -854,7 +943,8 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    fi
    ```
 
-   *Bitbucket:*
+   _Bitbucket:_
+
    ```bash
    # Search for existing canonical comment by marker
    EXISTING_COMMENT_ID=$(curl -sf \
@@ -970,6 +1060,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
         ```
 
         Use ✅ PASS, ❌ FAIL, ⚠️ CONCERNS, or — N/A for each status cell. `{pr_status}` is APPROVED or NOT_APPROVED from the AC agent result.
+
       - `contentFormat`: `"markdown"`
       - On failure: log warning and continue (non-blocking)
 
@@ -1151,6 +1242,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Total Duration:** {duration}
 
    **Blocking Issues Summary:**
+
    1. QA Gate: FAIL status (3 blocking security issues from QA)
    2. AC3: Success message not implemented
    3. No PR number in story document
@@ -1161,10 +1253,12 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Estimated Effort to Close Gaps:** Large (6-8 hours)
 
    **Artifacts Generated:**
+
    - ✅ Gap report added to story document
    - ✅ PR comment posted (if applicable)
 
    **Next Steps:**
+
    - Address blocking issues listed above
    - Re-run verification after fixes are implemented
    ```

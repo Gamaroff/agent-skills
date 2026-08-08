@@ -459,7 +459,11 @@ function stubWalk(perGet, { postResponses = [] } = {}) {
       const list = perGet[Math.min(g, perGet.length - 1)];
       gets.push(url);
       g++;
-      return { ok: true, status: 200, json: async () => ({ transitions: list }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ transitions: list }),
+      };
     }
     posts.push(JSON.parse(opts.body));
     const r = postResponses[p++];
@@ -543,12 +547,117 @@ test("walk — a blocked second hop parks the card and says where", async () => 
     }),
   );
   assert.equal(res.reason, "walk-incomplete");
-  assert.equal(res.landed, "Ready for Showcase", "names the gate it stopped in");
+  assert.equal(
+    res.landed,
+    "Ready for Showcase",
+    "names the gate it stopped in",
+  );
   assert.equal(res.transitioned, true, "it DID move — just not all the way");
   assert.deepEqual(res.remaining, [["Waiting for Review"]]);
   // Distinguishable from a card that never moved at all: three outcomes, three
   // shapes. `landed !== from` is the discriminator.
   assert.notEqual(res.landed, res.from);
+});
+
+test("walk — an unreachable intermediate rung falls through to a directly-reachable target", async () => {
+  // The live regression this exists for (rebirth-wallet RAPP-111, 2026-08-08):
+  // `ready-for-merge` from "Ready for Testing" planned a hop through a gate the
+  // board does not offer from there, while the DESTINATION was directly
+  // available and even appeared in the run's own `available` list. The card
+  // parked one rung short of a reachable target, the CLI exited 0 with
+  // `walk-incomplete` — which reads as a correct no-op — and a human had to move
+  // the card by hand.
+  //
+  // The board never said the gate was required. It said the gate was not
+  // reachable from here, which is a statement about shape, not permission.
+  const wf = fromYaml(GATE_LADDER);
+  const s = stubWalk([
+    // From "In Progress": the gate is NOT on offer, but the target is.
+    [T("60", "Straight to Review", "Waiting for Review")],
+  ]);
+  const res = await lib.walkLadder(
+    walkArgs({
+      http: s.http,
+      from: "In Progress",
+      targets: ["Waiting for Review"],
+      workflow: wf,
+    }),
+  );
+
+  assert.equal(res.reason, "walked");
+  assert.equal(res.transitioned, true);
+  assert.equal(
+    res.landed,
+    "Waiting for Review",
+    "reaches the real destination",
+  );
+
+  // The shortcut is RECORDED, not silently smoothed over. A reader auditing
+  // "did my ladder do this?" must be able to see that a declared rung was
+  // skipped because the board did not offer it.
+  const shortcut = res.hops.find((h) => h.shortcut);
+  assert.ok(shortcut, "the skip is visible in hops");
+  assert.equal(shortcut.to, "Waiting for Review");
+  assert.ok(
+    res.hops.some((h) => h.result === "no-transition"),
+    "the rung that could not be reached is still reported",
+  );
+});
+
+test("walk — a rung blocked by required fields still parks; only `no-transition` falls through", async () => {
+  // The guard on the fallback above. `no-transition` says the board has no such
+  // path from here. `required-fields` says the path EXISTS and something must be
+  // supplied to take it — a real obstruction. Skipping past that would route
+  // around a gate the board genuinely enforces, which is the opposite of the
+  // bug being fixed.
+  const wf = fromYaml(GATE_LADDER);
+  const s = stubWalk(
+    [
+      // The gate IS offered — so this is not a shape problem — and so is the
+      // target. If the fallback fired on any failure, it would take the target
+      // and skip an enforced gate.
+      [
+        T("21", "Ready for Showcase", "Ready for Showcase"),
+        T("60", "Straight to Review", "Waiting for Review"),
+      ],
+    ],
+    {
+      postResponses: [
+        {
+          ok: false,
+          status: 400,
+          json: async () => ({
+            errors: { customfield_10010: "Please enter the time spent" },
+          }),
+          text: async () =>
+            '{"errors":{"customfield_10010":"Please enter the time spent"}}',
+        },
+      ],
+    },
+  );
+  const res = await lib.walkLadder(
+    walkArgs({
+      http: s.http,
+      from: "In Progress",
+      targets: ["Waiting for Review"],
+      workflow: wf,
+    }),
+  );
+
+  assert.equal(
+    res.reason,
+    "walk-incomplete",
+    "parks rather than routing around",
+  );
+  assert.notEqual(
+    res.landed,
+    "Waiting for Review",
+    "must NOT reach the target by skipping an enforced gate",
+  );
+  assert.ok(
+    !res.hops.some((h) => h.shortcut),
+    "no shortcut is taken when the gate is real",
+  );
 });
 
 test("walk — a cycle is stopped and reported as incomplete, never as walked", async () => {
@@ -614,7 +723,11 @@ test("walk — a card already AT the target reports `already`, not a parked walk
   // that to learn nothing. This is the most common invocation in a pipeline — a
   // resumed run re-firing a stage the card has already passed — so it is where
   // "a one-rung walk costs exactly what it did before" is actually decided.
-  assert.equal(s.getCount(), 0, "an already-satisfied walk must not hit the API");
+  assert.equal(
+    s.getCount(),
+    0,
+    "an already-satisfied walk must not hit the API",
+  );
 });
 
 test("walk — a refused regress also costs no API calls", async () => {
@@ -640,10 +753,9 @@ test("walk — a hop's own failure survives as `cause`, not flattened to walk-in
   // loses the Jira message, which is the sole route a workflow validator has to
   // the operator, and suppresses the caller's no-transition diagnostics.
   const wf = fromYaml(GATE_LADDER);
-  const s = stubWalk(
-    [[T("21", "Ready for Showcase", "Ready for Showcase")]],
-    { postResponses: [fail(500, { errorMessages: ["Boom"] })] },
-  );
+  const s = stubWalk([[T("21", "Ready for Showcase", "Ready for Showcase")]], {
+    postResponses: [fail(500, { errorMessages: ["Boom"] })],
+  });
   const res = await lib.walkLadder(
     walkArgs({
       http: s.http,
@@ -791,7 +903,12 @@ function withAuth(fn) {
 }
 
 /** A fetch stub answering the issue read, then a transition list per hop. */
-function stubFetch({ status, issueType = "Story", perGet = [], postOk = true }) {
+function stubFetch({
+  status,
+  issueType = "Story",
+  perGet = [],
+  postOk = true,
+}) {
   const posts = [];
   let g = 0;
   return {
@@ -800,11 +917,18 @@ function stubFetch({ status, issueType = "Story", perGet = [], postOk = true }) 
       const json = async () => {
         if (url.includes("/transitions"))
           return { transitions: perGet[Math.min(g++, perGet.length - 1)] };
-        return { fields: { status: { name: status }, issuetype: { name: issueType } } };
+        return {
+          fields: { status: { name: status }, issuetype: { name: issueType } },
+        };
       };
       if ((opts.method || "GET") !== "GET") {
         posts.push(JSON.parse(opts.body));
-        return { ok: postOk, status: postOk ? 204 : 500, json: async () => ({}), text: async () => "" };
+        return {
+          ok: postOk,
+          status: postOk ? 204 : 500,
+          json: async () => ({}),
+          text: async () => "",
+        };
       }
       return { ok: true, status: 200, json, text: async () => "" };
     },
@@ -829,7 +953,16 @@ test("run() — a card already at the target exits 0 and reports already", async
   await withAuth(async () => {
     const s = stubFetch({ status: "In Progress", perGet: [[]] });
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--strict"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "work-started",
+        "--quiet",
+        "--strict",
+      ],
       fetchImpl: s.fetchImpl,
       repoRoot: root,
     });
@@ -857,7 +990,15 @@ test("run() — a partial walk reports walk-incomplete, NOT a success", async ()
       perGet: [[T("11", "Start", "In Progress")], []],
     });
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "done", "--quiet"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "done",
+        "--quiet",
+      ],
       fetchImpl: s.fetchImpl,
       repoRoot: root,
     });
@@ -909,12 +1050,25 @@ test("run() — a parked walk exits 1 under --strict", async () => {
       perGet: [[T("11", "Start", "In Progress")], []],
     });
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "done", "--quiet", "--strict"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "done",
+        "--quiet",
+        "--strict",
+      ],
       fetchImpl: s.fetchImpl,
       repoRoot: root,
     });
     assert.equal(r.reason, "walk-incomplete");
-    assert.equal(r.exitCode, 1, "the card did not reach what the moment asked for");
+    assert.equal(
+      r.exitCode,
+      1,
+      "the card did not reach what the moment asked for",
+    );
   });
 });
 
@@ -928,7 +1082,15 @@ test("run() — a single unreachable rung keeps the legacy no-transition reason"
       perGet: [[T("9", "Nowhere", "Somewhere Else")]],
     });
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "work-started",
+        "--quiet",
+      ],
       fetchImpl: s.fetchImpl,
       repoRoot: root,
     });
@@ -947,7 +1109,16 @@ test("run() — --strict turns a plain skip into exit 1, unchanged", async () =>
       perGet: [[T("9", "Nowhere", "Somewhere Else")]],
     });
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--strict"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "work-started",
+        "--quiet",
+        "--strict",
+      ],
       fetchImpl: s.fetchImpl,
       repoRoot: root,
     });
@@ -964,14 +1135,25 @@ test("run() — a full two-hop walk succeeds and fires both transitions", async 
       perGet: [[T("11", "Start", "In Progress")], [T("12", "Finish", "Done")]],
     });
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "done", "--quiet"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "done",
+        "--quiet",
+      ],
       fetchImpl: s.fetchImpl,
       repoRoot: root,
     });
     assert.equal(r.reason, "walked");
     assert.equal(r.landed, "Done");
     assert.equal(r.exitCode, 0);
-    assert.deepEqual(s.posts.map((p) => p.transition.id), ["11", "12"]);
+    assert.deepEqual(
+      s.posts.map((p) => p.transition.id),
+      ["11", "12"],
+    );
   });
 });
 
@@ -984,7 +1166,16 @@ test("run() — --dry-run issues no POST", async () => {
       perGet: [[T("11", "Start", "In Progress")]],
     });
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet", "--dry-run"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "work-started",
+        "--quiet",
+        "--dry-run",
+      ],
       fetchImpl: s.fetchImpl,
       repoRoot: root,
     });
@@ -1016,7 +1207,11 @@ byIssueType:
       done: Verified
       in-qa: ~
 `);
-  assert.equal(wf.pipelineAuthored, false, "precondition: no top-level pipeline");
+  assert.equal(
+    wf.pipelineAuthored,
+    false,
+    "precondition: no top-level pipeline",
+  );
 
   const bug = cli.resolveMomentSpec({
     stage: "done",
@@ -1025,13 +1220,19 @@ byIssueType:
     workflow: wf,
   }).spec;
   assert.deepEqual(bug.candidates, ["Verified"], "the author's own target");
-  assert.equal(bug.terminal, false, "Verified is not the last rung — rule 4 stays shut");
+  assert.equal(
+    bug.terminal,
+    false,
+    "Verified is not the last rung — rule 4 stays shut",
+  );
 
   // The documented per-type disable must still disable.
   const inQa = cli.resolveMomentSpec({
     stage: "in-qa",
     issueType: "Bug",
-    record: { stages: { "in-qa": { enabled: true, candidates: ["Verifying"] } } },
+    record: {
+      stages: { "in-qa": { enabled: true, candidates: ["Verifying"] } },
+    },
     workflow: wf,
   }).spec;
   assert.equal(inQa.enabled, false);
@@ -1044,7 +1245,11 @@ byIssueType:
     workflow: wf,
   }).spec;
   assert.equal(other.enabled, false);
-  assert.equal(other.reason, "never", "the record decides for an unauthored type");
+  assert.equal(
+    other.reason,
+    "never",
+    "the record decides for an unauthored type",
+  );
 });
 
 test("spec — an overlay that names ONE moment does not claim authorship of the rest", () => {
@@ -1074,14 +1279,28 @@ byIssueType:
 
   // Named by the overlay → the overlay decides, and `~` means off.
   assert.equal(
-    cli.resolveMomentSpec({ stage: "in-qa", issueType: "Bug", record, workflow: wf }).spec.enabled,
+    cli.resolveMomentSpec({
+      stage: "in-qa",
+      issueType: "Bug",
+      record,
+      workflow: wf,
+    }).spec.enabled,
     false,
   );
 
   // NOT named by the overlay, and no top-level pipeline → the record still decides.
-  const done = cli.resolveMomentSpec({ stage: "done", issueType: "Bug", record, workflow: wf }).spec;
+  const done = cli.resolveMomentSpec({
+    stage: "done",
+    issueType: "Bug",
+    record,
+    workflow: wf,
+  }).spec;
   assert.equal(done.enabled, false);
-  assert.equal(done.reason, "we never auto-close", "the record's answer, not the ladder's");
+  assert.equal(
+    done.reason,
+    "we never auto-close",
+    "the record's answer, not the ladder's",
+  );
 });
 
 test("spec — a statuses-only file does not disable a record-enabled stage", () => {
@@ -1095,7 +1314,11 @@ test("spec — a statuses-only file does not disable a record-enabled stage", ()
     { source: "file", path: "<t>" },
   );
   assert.equal(wf.source, "file");
-  assert.equal(wf.pipelineAuthored, false, "precondition: no pipeline authored");
+  assert.equal(
+    wf.pipelineAuthored,
+    false,
+    "precondition: no pipeline authored",
+  );
 
   const record = {
     stages: {
@@ -1103,12 +1326,26 @@ test("spec — a statuses-only file does not disable a record-enabled stage", ()
       "in-qa": { enabled: true, candidates: ["Verifying"] },
     },
   };
-  const done = cli.resolveMomentSpec({ stage: "done", issueType: "", record, workflow: wf }).spec;
+  const done = cli.resolveMomentSpec({
+    stage: "done",
+    issueType: "",
+    record,
+    workflow: wf,
+  }).spec;
   assert.equal(done.enabled, false, "the record's enabled:false must survive");
   assert.equal(done.reason, "we never auto-close");
 
-  const inQa = cli.resolveMomentSpec({ stage: "in-qa", issueType: "", record, workflow: wf }).spec;
-  assert.equal(inQa.enabled, true, "an opted-in stage must not be silently disabled");
+  const inQa = cli.resolveMomentSpec({
+    stage: "in-qa",
+    issueType: "",
+    record,
+    workflow: wf,
+  }).spec;
+  assert.equal(
+    inQa.enabled,
+    true,
+    "an opted-in stage must not be silently disabled",
+  );
   assert.deepEqual(inQa.candidates, ["Verifying"]);
 });
 
@@ -1116,7 +1353,15 @@ test("run() — an unhandled throw still exits 0", async () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
   await withAuth(async () => {
     const r = await cli.run({
-      argv: ["node", "jira-stage.js", "--issue", "K-1", "--stage", "work-started", "--quiet"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "K-1",
+        "--stage",
+        "work-started",
+        "--quiet",
+      ],
       fetchImpl: () => {
         throw new Error("network on fire");
       },
@@ -1143,7 +1388,10 @@ pipeline:
   // Collapsing the rung to names[0] would send the card to "In Review", which
   // this board does not have, and the walk would skip.
   const rung = tw.resolveMoment("in-review", wf);
-  assert.ok(rung.targets.length > 1, "the fixture must actually offer two names");
+  assert.ok(
+    rung.targets.length > 1,
+    "the fixture must actually offer two names",
+  );
   const s = stubWalk([[T("7", "Review", "Waiting for Review")]]);
   const res = await lib.walkLadder(
     walkArgs({
@@ -1180,7 +1428,11 @@ pipeline:
   done: Ready for Showcase
 `);
   const moment = tw.resolveMoment("done", wf);
-  assert.equal(moment.isLastRung, false, "precondition: retargeted off the end");
+  assert.equal(
+    moment.isLastRung,
+    false,
+    "precondition: retargeted off the end",
+  );
   const terminal = lib.isTerminalMoment("done") && moment.isLastRung;
   assert.equal(terminal, false);
 
@@ -1198,7 +1450,11 @@ pipeline:
     }),
   );
   assert.equal(res.transitioned, false);
-  assert.equal(s.posts.length, 0, "nothing was fired — a skip, not a wrong move");
+  assert.equal(
+    s.posts.length,
+    0,
+    "nothing was fired — a skip, not a wrong move",
+  );
   assert.notEqual(res.landed, "Done");
 });
 
@@ -1279,7 +1535,10 @@ test("rank — the legacy chain is untouched when no ladder is supplied", () => 
   assert.equal(resolveStatusRank("In Progress", {}), 20);
   assert.equal(resolveStatusRank("Done", {}), 60);
   assert.equal(resolveStatusRank("Nonsense Column", {}), null);
-  assert.equal(resolveStatusRank("In Progress", { statusRank: { "in progress": 5 } }), 5);
+  assert.equal(
+    resolveStatusRank("In Progress", { statusRank: { "in progress": 5 } }),
+    5,
+  );
 });
 
 test("rank — in ladder mode an off-ladder status is null, not a legacy rank", () => {
@@ -1327,7 +1586,14 @@ test("--print-plan needs no --issue, no credentials and no network", async () =>
     throw new Error("--print-plan must not touch the network");
   };
   const r = await cli.run({
-    argv: ["node", "jira-stage.js", "--stage", "done", "--print-plan", "--quiet"],
+    argv: [
+      "node",
+      "jira-stage.js",
+      "--stage",
+      "done",
+      "--print-plan",
+      "--quiet",
+    ],
     fetchImpl: boom,
     repoRoot: withLadder(RUN_LADDER),
   });
@@ -1340,14 +1606,27 @@ test("--print-plan reports whether the plan spans a real distance", async () => 
   const cli = require(join(__dirname, "..", "jira-stage.js"));
   const root = withLadder(RUN_LADDER);
   const without = await cli.run({
-    argv: ["node", "jira-stage.js", "--stage", "done", "--print-plan", "--quiet"],
+    argv: [
+      "node",
+      "jira-stage.js",
+      "--stage",
+      "done",
+      "--print-plan",
+      "--quiet",
+    ],
     repoRoot: root,
   });
   assert.equal(without.spansFrom, false);
   const with_ = await cli.run({
     argv: [
-      "node", "jira-stage.js", "--stage", "done", "--print-plan", "--quiet",
-      "--from", "Todo",
+      "node",
+      "jira-stage.js",
+      "--stage",
+      "done",
+      "--print-plan",
+      "--quiet",
+      "--from",
+      "Todo",
     ],
     repoRoot: root,
   });
@@ -1375,12 +1654,26 @@ test("--from and --print-plan are documented in USAGE", () => {
 
 test("parseArgs accepts the new flags and defaults them off", () => {
   const cli = require(join(__dirname, "..", "jira-stage.js"));
-  const base = cli.parseArgs(["node", "x", "--issue", "K-1", "--stage", "done"]);
+  const base = cli.parseArgs([
+    "node",
+    "x",
+    "--issue",
+    "K-1",
+    "--stage",
+    "done",
+  ]);
   assert.equal(base.printPlan, false);
   assert.equal(base.from, "");
   const full = cli.parseArgs([
-    "node", "x", "--stage", "done", "--print-plan", "--from", "In Progress",
-    "--issue-type", "Story",
+    "node",
+    "x",
+    "--stage",
+    "done",
+    "--print-plan",
+    "--from",
+    "In Progress",
+    "--issue-type",
+    "Story",
   ]);
   assert.equal(full.printPlan, true);
   assert.equal(full.from, "In Progress");

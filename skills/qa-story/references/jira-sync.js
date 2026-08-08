@@ -2907,6 +2907,73 @@ async function walkLadder({
     // only hop fails, report ITS reason rather than dressing it up as a walk.
     if (isLast && i === 0)
       return { ...res, from, landed: current, hops: walked };
+
+    // An intermediate rung the board does not offer FROM HERE is not necessarily
+    // a rung the board REQUIRES. `no-transition` means exactly that — unreachable
+    // from this position — which is a different thing from a rung that exists and
+    // is blocked. `required-fields`, an HTTP error or a cycle are real
+    // obstructions and must still park the walk; only this one reason is a
+    // statement about the board's shape rather than about permission.
+    //
+    // So before parking, try the DESTINATION directly. If the board offers it,
+    // the ladder's intermediate rung is simply not on this board's path from
+    // here, and insisting on it invents a requirement the board never stated.
+    //
+    // Observed live (rebirth-wallet RAPP-111, 2026-08-08): `ready-for-merge` from
+    // "Ready for Testing" planned a hop through "Ready for Showcase", which that
+    // board does not offer from there — while "Waiting for merge", the actual
+    // destination, WAS directly available and appeared in the run's own
+    // `available` list. The card parked one rung short of a reachable target and
+    // the CLI exited 0 with `walk-incomplete`, which reads as a correct no-op and
+    // is not one. A human had to move the card by hand.
+    if (res.reason === "no-transition") {
+      const finalRung = hops[hops.length - 1];
+      const direct = await transitionToStatus({
+        http,
+        baseUrl,
+        email,
+        token,
+        issueKey,
+        targetStatus: finalRung,
+        currentStatus: current,
+        // This IS the final rung, so it carries the terminal semantics the walk
+        // reserves for it — the very thing an intermediate hop must never get.
+        terminal,
+        localStatus,
+        doneResolution,
+        cancelledResolution,
+        worklogTimeSpent,
+        configHint: "stage",
+        // Same guard semantics as the loop: the monotonicity check belongs to the
+        // first move only, and by here the card has not moved if i === 0.
+        minRank: i === 0 ? minRank : null,
+        allowRegress: i === 0 ? allowRegress : true,
+        workflowRecord,
+        workflow,
+        issueType,
+        output,
+      });
+
+      if (direct.transitioned || direct.reason === "already") {
+        current = direct.to || current;
+        visited.add(key(current));
+        walked.push({
+          index: hops.length - 1,
+          to: current,
+          result: direct.transitioned ? "transitioned" : "already",
+          // Flags that the rungs between here and the target were skipped because
+          // the board did not offer them, not because the walk gave up. A reader
+          // auditing "did my ladder do this?" needs to see the shortcut, not a
+          // clean walk that silently omits rungs the ladder declares.
+          shortcut: true,
+        });
+        // Fall through to the success return rather than duplicating its shape —
+        // `walked` already carries the failed rung above it, so the `every`
+        // already-check below correctly does not fire.
+        break;
+      }
+    }
+
     return incomplete(i, "walk-incomplete", res);
   }
 
