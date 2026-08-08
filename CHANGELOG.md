@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.37.2] - 2026-08-08
+
 ### Fixed
 
 - **A ladder walk parked one rung short of a target the board was offering directly.** `walkLadder` planned every intermediate rung between the card's position and the moment's target, then treated a rung the board did not offer as the end of the walk. But `no-transition` does not mean "this gate is closed" — it means "there is no such path from here", which is a statement about the board's _shape_, not about permission. When the destination itself was directly reachable, the walk still stopped at the phantom gate and reported `walk-incomplete`.
