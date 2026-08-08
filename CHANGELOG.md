@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The one shared resource vendored outside `.agents/` carried no do-not-edit warning, and a consumer lost the same fix to it twice.** `setup-consumer.sh` copies `shared/resources/generate-prd-epic-index.mjs` into a consumer's **`scripts/`** so their `docs:epic-index` npm script can reach it. Every other shared resource is protected twice over — it lives under `.agents/`, which consumers' `AGENTS.md` documents as vendored, **and** it carries the bundler's `AUTO-GENERATED — DO NOT EDIT` header. This file's `scripts/` copy had neither, because the installer copies the **source**, not the bundled output the header is injected into. It landed beside the consumer's own tooling, reading like their code, and `--update` overwrote it silently.
+
+  A downstream repo hit exactly that: it fixed a YAML quote-escaping bug in its own `scripts/` copy and lost the fix **twice** to `--update` before anyone noticed. Nothing failed at any point — the fix simply stopped existing, and the bug quietly came back.
+
+  The header now lives in the **source**, so it travels to both destinations. Two regression tests pin it, because the trap for a future reader is that the bundler *does* add the header to `skills/*/references/`, which makes the source copy look redundant — deleting it would silently un-protect every consumer's `scripts/`. The second test asserts the installer still vendors from `shared/resources/`, so if that ever changes the tests say the source header is no longer needed rather than letting it outlive its reason.
+
+  Note what this does **not** do: `--update` still overwrites without warning. This makes the file announce itself before someone edits it; it does not make the overwrite safe. A checksum-and-refuse in `setup-consumer.sh`, or not vendoring into `scripts/` at all, remain open options.
+
 ## [v0.37.3] - 2026-08-08
 
 ### Fixed
