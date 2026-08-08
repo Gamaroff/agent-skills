@@ -316,3 +316,70 @@ ${Object.entries(HISTORICAL_BLOCK)
     assert.equal(detectNarrowingStatusMap(merged).wholeMap, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The one shared resource that is vendored OUTSIDE .agents/.
+//
+// `setup-consumer.sh` copies `shared/resources/generate-prd-epic-index.mjs` to a
+// consumer's `scripts/generate-prd-epic-index.mjs`, so their `docs:epic-index` npm
+// script can reach it. That destination is the problem: it lands in `scripts/`,
+// beside the consumer's own tooling, and `--update` overwrites it silently.
+//
+// Every other shared resource is protected twice — it lives under `.agents/`, which
+// consumers' AGENTS.md documents as vendored, AND it carries the bundler's
+// AUTO-GENERATED header. This file's `scripts/` copy has neither, because
+// setup-consumer copies the SOURCE, not the bundled output the header is injected into.
+//
+// A downstream repo hit exactly that: it fixed a YAML quote-escaping bug in its own
+// `scripts/` copy and lost the fix twice to `--update` before anyone noticed. Nothing
+// failed — the fix simply stopped existing.
+//
+// So the header has to live in the SOURCE for this file, not only in the bundled
+// copies. The trap for a future reader is that the bundler *does* add it to
+// `skills/*/references/`, which makes the source header look redundant. It is not:
+// deleting it silently un-protects every consumer's `scripts/` copy.
+test("the epic-index generator carries its DO-NOT-EDIT header in the SOURCE", () => {
+  const src = readFileSync(
+    path.join(REPO, "shared", "resources", "generate-prd-epic-index.mjs"),
+    "utf8",
+  );
+
+  const head = src.slice(0, 400);
+  assert.match(
+    head,
+    /AUTO-GENERATED — DO NOT EDIT/,
+    "source must carry the marker — setup-consumer.sh vendors THIS file, not the bundled copy",
+  );
+  assert.match(
+    head,
+    /setup-consumer\.sh/,
+    "the header must name the second destination, or it reads as bundler-only boilerplate",
+  );
+
+  // The shebang must stay line 1 or the script stops being directly executable.
+  assert.equal(
+    src.split("\n")[0],
+    "#!/usr/bin/env node",
+    "header must sit AFTER the shebang",
+  );
+});
+
+test("setup-consumer.sh still vendors the epic-index generator from shared/resources", () => {
+  // If this ever changes to copy a bundled copy instead, the source-header
+  // requirement above becomes unnecessary — and this test is what will say so,
+  // rather than the header quietly outliving its reason.
+  const sh = readFileSync(
+    WIZARD,
+    "utf8",
+  );
+  assert.match(
+    sh,
+    /shared\/resources\/generate-prd-epic-index\.mjs/,
+    "vendoring source changed — re-check whether the source header is still the right fix",
+  );
+  assert.match(
+    sh,
+    /cp\s+"\$_gen_src"\s+scripts\/generate-prd-epic-index\.mjs/,
+    "destination changed — re-check the scripts/ trap this header guards",
+  );
+});

@@ -1,4 +1,17 @@
 #!/usr/bin/env node
+// AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/generate-prd-epic-index.mjs.
+// Regenerate via `npm run bundle`.
+//
+// Unlike every other shared resource, this file has TWO destinations. The bundler copies
+// it to `skills/*/references/`, and `setup-consumer.sh` ALSO vendors it to a consumer's
+// `scripts/generate-prd-epic-index.mjs` so their `docs:epic-index` npm script can reach it.
+// That second copy lands in `scripts/`, beside the consumer's own tooling, with nothing
+// around it to suggest it is not theirs — and `--update` overwrites it silently.
+//
+// A downstream repo hit exactly that: it fixed a YAML quote-escaping bug here, in its own
+// `scripts/`, and lost the fix twice to `--update` before anyone noticed. Nothing failed;
+// the fix simply stopped existing. This header travels with the file to both destinations,
+// so the next person to open it in a consumer repo is told before they edit rather than after.
 /**
  * generate-prd-epic-index.mjs
  *
