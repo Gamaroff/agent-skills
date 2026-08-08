@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The four live workflows now pin `actions/checkout@v7`, `actions/setup-node@v7` and `actions/setup-python@v7`** — previously `@v4`/`@v4`/`@v5`, all of which target Node.js 20. GitHub-hosted runners already force those to Node.js 24 and annotate every run saying so; the deprecation ends with the shim being removed, at which point the pinned versions stop running rather than degrading. Bumping now is the same behaviour without the annotation.
+
+  Each major between the old and new pins was checked against what these workflows actually do, because the version numbers cover three separate breaking changes that don't apply here: checkout v7 blocks fork-PR checkout under `pull_request_target` and `workflow_run` (no workflow here uses either trigger); setup-node v5 auto-caches when `package.json` declares `packageManager` and v6 narrows that to npm (this repo declares no `packageManager`, so nothing turns on); setup-python v7 removes the `pip-install` input (unused — both Python jobs install PyYAML with an explicit `pip install` step). Node 24 runtimes also require runner ≥ v2.327.1, which GitHub-hosted runners satisfy.
+
+  The archived YAML snippets in `.github/workflows/README.md` are deliberately left at their original pins — they record removed workflows as they were, not workflows that run.
+
 ## [v0.37.2] - 2026-08-08
 
 ### Fixed
