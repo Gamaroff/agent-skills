@@ -36,8 +36,8 @@ flowchart TD
 
 - Creates the Jira epic if `jira_key` is absent; updates it otherwise.
 - Embeds Bitbucket links to the parent PRD and epic file (rendered via ADF).
-- Renders the Stories Breakdown markdown table as a real ADF table.
-- Maintains a Change Log in both the local epic and Jira.
+- Renders the Stories Breakdown **overview table** as a real ADF table (per-story subsections stay in the file).
+- Maintains a Change Log in the local epic file.
 - Concurrent-edit guard via stored Jira `updated` timestamp.
 
 Writes `jira_key` + `jira_url` back to the local epic's frontmatter.
@@ -54,7 +54,7 @@ Writes `jira_key` + `jira_url` back to the local epic's frontmatter.
 - Links the Jira story to its parent Jira epic (team-managed `parent` field or classic Epic Link customfield — auto-detected with retry).
 - Adds the story to the project backlog (Scrum boards only).
 - Embeds Bitbucket links rendered via ADF.
-- Maintains a Change Log.
+- Maintains a Change Log in the local story file.
 
 The parent epic **must already exist in Jira** with `jira_key` set — Phase 1 first.
 
@@ -69,6 +69,16 @@ The parent epic **must already exist in Jira** with `jira_key` set — Phase 1 f
 - Idempotent create via `synced-from-*` label search.
 - Adds the task to the project backlog (Scrum boards only).
 - Embeds Bitbucket links rendered via ADF.
+
+## What lands on a card
+
+Every card is a **summary that points at the local document**, never a copy of
+it: a short summary, criteria capped at 5 with a `+N more` pointer, metadata, and
+links to the file. The document's Change Log is never published — Jira keeps its
+own issue history.
+
+The full contract, including the caps and the per-type section lists, is
+[`shared/resources/tracker-card-summary.md`](../../shared/resources/tracker-card-summary.md).
 
 ## Status transitions
 

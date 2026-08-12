@@ -76,16 +76,21 @@ gh api repos/${OWNER}/$(gh repo view --json name -q '.name')/milestones \
   -f state="open" 2>/dev/null || true
 ```
 
-Create the epic issue:
+Create the epic issue.
+
+The body is a **summary**, not a copy of the epic file — the contract is
+[`references/tracker-card-summary.md`](./references/tracker-card-summary.md),
+which is also what the Jira path enforces in code. Read it before changing this
+template.
 
 ```bash
 EPIC_ISSUE_URL=$(gh issue create \
   --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
   --label "epic" \
   --milestone "${MILESTONE_TITLE}" \
-  --body "## Overview
+  --body "## Summary
 
-{first paragraph of the epic description — the text immediately after the first ## heading or the opening paragraph}
+{First paragraph of the epic's Epic Goal — or its Epic Description if it has no goal — capped at 4 sentences}
 
 ## Metadata
 

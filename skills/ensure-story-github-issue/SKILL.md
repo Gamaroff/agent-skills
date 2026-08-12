@@ -90,7 +90,13 @@ gh api repos/${OWNER}/$(gh repo view --json name -q '.name')/milestones \
   -f state="open" 2>/dev/null || true
 ```
 
-Create the story issue:
+Create the story issue.
+
+The body is a **summary**, not a copy of the story file — the caps below are the
+contract in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md),
+which is also what the Jira path enforces in code. Read it before changing this
+template. Anything trimmed must be announced with an accurate count; a reader who
+is not told they are seeing part of something believes they saw all of it.
 
 ```bash
 STORY_ISSUE_URL=$(gh issue create \
@@ -99,13 +105,15 @@ STORY_ISSUE_URL=$(gh issue create \
   --label "story" \
   --label "priority:${priority}" \
   --milestone "${MILESTONE_TITLE}" \
-  --body "## Overview
+  --body "## Summary
 
-{First 2-4 sentences from the story's User Story / purpose / description}
+{First 2-4 sentences from the story's User Story / Story / Story Statement — or its Description if it has none}
 
 ## Acceptance Criteria
 
-{Acceptance criteria formatted as a GitHub checkbox list}
+{The first 5 acceptance criteria as a GitHub checkbox list. If more remain, add a
+final line: '+N more in the [story document](${DOC_URL})' with N the exact number
+omitted. If 5 or fewer, list them all and add no such line.}
 
 ## Metadata
 

@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(__dirname, "..", "..", "..");
 const lib = require(join(__dirname, "..", "jira-sync.js"));
 
 const {
@@ -46,12 +47,12 @@ const {
 // A — section aliases
 // ---------------------------------------------------------------------------
 
-// Mirrors STORY_SECTIONS in skills/sync-jira-story/scripts/sync-jira-story.js.
-const STORY_SECTIONS = [
-  ["User Story", "Story", "Story Statement"],
-  "Acceptance Criteria",
-  "Description",
-];
+// The REAL card section list, not a mirror of it — a hand-copied list drifts
+// from the thing it claims to pin, which is the defect class this file exists
+// to catch.
+const STORY_SECTIONS = require(
+  join(repoRoot, "skills/sync-jira-story/scripts/sync-jira-story.js"),
+).STORY_CARD_SECTIONS.map((s) => s.names);
 
 const withHeading = (h) =>
   `# Story 1.1\n\n## ${h}\n\nAs a user I want a thing.\n\n## Acceptance Criteria\n\n- it works\n`;

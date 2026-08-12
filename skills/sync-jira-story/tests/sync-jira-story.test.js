@@ -280,26 +280,72 @@ test("guardConcurrentEdit — no last sync (first run) skips guard", () => {
 // ---------------------------------------------------------------------------
 // buildDescriptionAdf — structural assertions
 // ---------------------------------------------------------------------------
-test("buildDescriptionAdf — produces valid ADF doc with table for changelog", () => {
+const headingsOf = (doc) =>
+  doc.content.filter(n => n.type === "heading").map(n => n.content[0].text);
+
+test("buildDescriptionAdf — produces a valid ADF doc with summary, criteria and links", () => {
   const doc = lib.buildDescriptionAdf({
     body: "## User Story\n\nAs a developer I want X.\n\n## Acceptance Criteria\n\n- AC1\n- AC2\n",
     frontmatter: { story_type: "feature_enhancement", estimated_effort_hours: "4", jira_epic: "PROJ-14" },
     epicBbUrl: "https://bitbucket.org/org/repo/src/HEAD/epic.md",
     storyBbUrl: "https://bitbucket.org/org/repo/src/HEAD/story.md",
-    changelogEntries: ["| 2026-04-28 09:40 | Initial Jira story created |"],
   });
   assert.equal(doc.type, "doc");
   assert.equal(doc.version, 1);
-  // Find table node
-  const table = doc.content.find(n => n.type === "table");
-  assert.ok(table, "table node present");
-  assert.equal(table.content.length, 2, "header row + 1 data row");
-  // Bullet list with link nodes
-  const bullet = doc.content.find(n => n.type === "bulletList");
+  assert.deepEqual(headingsOf(doc), ["Summary", "Acceptance Criteria", "Metadata", "Source Documents"]);
+  // Links come LAST and the story file leads them.
+  const bullet = doc.content.filter(n => n.type === "bulletList").at(-1);
   assert.ok(bullet);
   const linkText = bullet.content[0].content[0].content[0];
   assert.equal(linkText.marks[0].type, "link");
+  assert.equal(linkText.text, "Story document");
   assert.match(linkText.marks[0].attrs.href, /bitbucket\.org/);
+});
+
+// The card is a POINTER. Republishing the document's changelog onto it added
+// length on every sync and duplicated what Jira's own issue history already holds.
+test("buildDescriptionAdf — never publishes the document's Change Log", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: "## User Story\n\nAs a developer I want X.\n\n## Change Log\n\n| 2026-04-28 | created |\n",
+    frontmatter: {},
+    epicBbUrl: null,
+    storyBbUrl: null,
+  });
+  assert.ok(!headingsOf(doc).includes("Change Log"));
+  assert.ok(!doc.content.some(n => n.type === "table"), "no changelog table on the card");
+});
+
+// `Description` is the LAST alias of the Summary block, not a section of its own:
+// a story that has a story statement must not also publish its Description.
+test("buildDescriptionAdf — Description is a fallback, not an extra section", () => {
+  const both = lib.buildDescriptionAdf({
+    body: "## Story\n\nStatement text.\n\n## Description\n\nLong description text.\n",
+    frontmatter: {}, epicBbUrl: null, storyBbUrl: null,
+  });
+  assert.deepEqual(headingsOf(both), ["Summary"]);
+  assert.equal(both.content[1].content[0].text, "Statement text.");
+
+  const onlyDescription = lib.buildDescriptionAdf({
+    body: "## Description\n\nLong description text.\n",
+    frontmatter: {}, epicBbUrl: null, storyBbUrl: null,
+  });
+  assert.deepEqual(headingsOf(onlyDescription), ["Summary"]);
+  assert.equal(onlyDescription.content[1].content[0].text, "Long description text.");
+});
+
+test("buildDescriptionAdf — caps acceptance criteria and says how many were dropped", () => {
+  const acs = Array.from({ length: 12 }, (_, i) => `- AC${i + 1}`).join("\n");
+  const doc = lib.buildDescriptionAdf({
+    body: `## User Story\n\nAs a dev I want X.\n\n## Acceptance Criteria\n\n${acs}\n`,
+    frontmatter: {},
+    epicBbUrl: null,
+    storyBbUrl: "https://bitbucket.org/org/repo/src/HEAD/story.md",
+  });
+  const list = doc.content.find(n => n.type === "bulletList");
+  assert.equal(list.content.length, 5, "5 criteria kept");
+  const more = JSON.stringify(doc);
+  assert.match(more, /\+7 more in /, "the 7 dropped criteria are announced");
+  assert.match(more, /story document/);
 });
 
 test("buildDescriptionAdf — omits sections with no body match", () => {
@@ -308,7 +354,6 @@ test("buildDescriptionAdf — omits sections with no body match", () => {
     frontmatter: {},
     epicBbUrl: null,
     storyBbUrl: null,
-    changelogEntries: [],
   });
   // No headings, no metadata, no source-doc list — empty doc body
   assert.equal(doc.content.length, 0);

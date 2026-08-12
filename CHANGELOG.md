@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Tracker cards were mirroring the document instead of pointing at it.** A Jira task card published all **eleven** `## ` sections of the task document verbatim — Overview, Motivation, Technical Background, Scope, Breaking Changes, Implementation Plan, Files Summary, Testing Strategy, Success Criteria, Risk Assessment, Rollback Plan — plus the document's entire Change Log as a table, re-rendered on every sync. Story cards published their full uncapped acceptance criteria; epic cards published every per-story `###` subsection of the Stories Breakdown.
+
+  Measured on three real task documents in this repo, the old card was **25,246 / 20,946 / 24,814 characters**. Jira's description limit is 32,767, and over it the whole `PUT` is rejected with `CONTENT_LIMIT_EXCEEDED` — which fails silently and leaves the card showing its *previous* description. `capDescriptionAdf()` exists because that had already happened. The same three documents now produce **694 / 775 / 852** characters, a ~97% reduction that moves the ceiling from "77% of the limit and climbing" to "not a consideration".
+
+  The card now carries a summary and a link: a prose summary (first paragraph, 4 sentences), criteria capped at 5, metadata, then the document links — which moved to the **end**, so a reader meets the summary first and the route to detail on the way out. Anything trimmed is announced with an exact count and a link (`+7 more in the story document`); trimming silently would leave a reader believing they had read the whole thing.
+
+  Removed from every card: the document's Change Log (Jira keeps its own issue history, and the local file is the authoritative log — the third copy told a reader nothing new), the eight task sections above, epic per-story subsections, and the fixed "Story Requirements" boilerplate, which told story *authors* which frontmatter keys to set and was never information for a card reader.
+
+  Three details worth knowing:
+
+  - **`hashBody` now hashes what is published**, not the raw sections. Otherwise editing a section the card no longer carries would flip the hash and fire a `PUT` that changes nothing. This also fixes a pre-existing inconsistency where the changelog was rendered into the description but never hashed.
+  - **Breaking Changes survives the cut** (capped at 3, omitted entirely when absent) because it is the one piece of detail a board reader should not have to open a file to discover.
+  - **`shared/resources/tracker-card-summary.md` is now the single spec** for both platforms. The GitHub path had two hand-maintained copies of its body contract — the create template in `ensure-story-github-issue` and the update prose in `sync-github-story` — and they had **already drifted**: the prose named `User Story / Acceptance Criteria / Description` while the template emitted `## Overview` + `## Acceptance Criteria`. Every writer now links the spec rather than restating it. That includes the two independent builders that had gone their own way: `review-task`'s inline REST call and `jira-epic-creator`.
+
+  `capDescriptionAdf()` stays as a backstop, but after summarisation it should never fire.
+
 ## [v0.37.4] - 2026-08-09
 
 ### Fixed

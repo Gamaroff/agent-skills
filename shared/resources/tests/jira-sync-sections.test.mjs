@@ -31,8 +31,11 @@ const { extractBodySections, sectionRe } = require(
   join(__dirname, "..", "jira-sync.js"),
 );
 
-// Mirrors TASK_SECTIONS in skills/sync-jira-task/scripts/sync-jira-task.js.
-const TASK_SECTIONS = [
+// The headings create-task's template WRITES. This is deliberately the full
+// list, not the shorter set the Jira card publishes: the contract under test is
+// that `extractBodySections` can read every heading the template emits, and it
+// is `sectionRe` — shared by both — that broke last time.
+const TEMPLATE_SECTIONS = [
   "Overview",
   "Motivation",
   "Technical Background",
@@ -66,11 +69,31 @@ test("the canonical create-task template extracts every section", () => {
     "template is expected to use numbered headings — if this changed, the contract this test pins has moved",
   );
 
-  const got = extractBodySections(template, TASK_SECTIONS);
+  const got = extractBodySections(template, TEMPLATE_SECTIONS);
   assert.deepEqual(
     names(got),
-    TASK_SECTIONS,
+    TEMPLATE_SECTIONS,
     "every section create-task writes must be one sync-jira-task can read",
+  );
+});
+
+// The card publishes a SUBSET of the above. Pin it against the real exported
+// list rather than a mirror — a hand-copied list is how the last contract
+// mismatch went unnoticed across 28 task cards.
+test("the create-task template resolves every section the CARD publishes", () => {
+  const { TASK_CARD_SECTIONS } = require(
+    join(repoRoot, "skills/sync-jira-task/scripts/sync-jira-task.js"),
+  );
+  const template = readFileSync(
+    join(repoRoot, "skills/create-task/resources/task-template.md"),
+    "utf8",
+  );
+  const required = TASK_CARD_SECTIONS.filter((s) => !s.optional);
+  const got = extractBodySections(template, required.map((s) => s.names));
+  assert.deepEqual(
+    names(got),
+    required.map((s) => s.names[0]),
+    "a card section the template never writes would publish an empty card",
   );
 });
 

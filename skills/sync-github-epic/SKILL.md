@@ -143,7 +143,7 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue
   || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
 ```
 
-Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt from the epic document's `## Overview` (or the opening paragraph / Epic Goal), a `## Metadata` table (`Status`, `Priority`), and a `## Document` link block (using `DOC_URL` above, plus the `📋 [Parent PRD](…)` line from `${PRD_LINE}` when `prd_source` resolves) — the **same shape** `ensure-epic-github-issue` emits on create, so create→update is diff-stable. Re-syncing from a feature branch refreshes the link to that branch (it changes the body, so the diff is non-empty and the edit runs). At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
+Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt to the **same shape** `ensure-epic-github-issue` emits on create — Summary, Metadata (`Status`, `Priority`), and a `## Document` link block (using `DOC_URL` above, plus the `📋 [Parent PRD](…)` line from `${PRD_LINE}` when `prd_source` resolves) — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. Re-syncing from a feature branch refreshes the link to that branch (it changes the body, so the diff is non-empty and the edit runs). At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
 
 If anything changed, run:
 

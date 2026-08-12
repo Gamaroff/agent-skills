@@ -154,7 +154,7 @@ gh issue edit ${ISSUE_NUM} \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
 ```
 
-The body is rebuilt from the story document's `## User Story`, `## Acceptance Criteria`, `## Description` sections plus a `## Metadata` table (`Priority`, `Effort` from `estimated_effort_hours`) — same as the create path in `ensure-story-github-issue`.
+The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create — Summary, Acceptance Criteria (capped at 5), Metadata, Document — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. Two hand-maintained copies of this contract had already drifted apart once.
 
 If the priority label changed, also re-mirror the board's Priority field:
 

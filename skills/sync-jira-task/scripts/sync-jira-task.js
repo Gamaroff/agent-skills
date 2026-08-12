@@ -27,18 +27,22 @@ const lib = require("../references/jira-sync.js");
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const TASK_SECTIONS = [
-  "Overview",
-  "Motivation",
-  "Technical Background",
-  "Scope",
-  "Breaking Changes",
-  "Implementation Plan",
-  "Files Summary",
-  "Testing Strategy",
-  "Success Criteria",
-  "Risk Assessment",
-  "Rollback Plan",
+// What the CARD carries — a summary, not a copy. The task file is the source of
+// truth and every card links to it; see shared/resources/tracker-card-summary.md.
+//
+// This list used to name ELEVEN sections — Overview, Motivation, Technical
+// Background, Scope, Breaking Changes, Implementation Plan, Files Summary,
+// Testing Strategy, Success Criteria, Risk Assessment, Rollback Plan — i.e. the
+// whole task document, republished onto the card verbatim on every sync.
+//
+// `Breaking Changes` survives the cut because it is the one piece of detail a
+// board reader must not have to open a file to discover. It is capped harder
+// than the rest and omitted entirely when the section is absent, which is the
+// common case.
+const TASK_CARD_SECTIONS = [
+  { heading: "Summary", names: ["Overview"] },
+  { heading: "Success Criteria", names: ["Success Criteria"] },
+  { heading: "Breaking Changes", names: ["Breaking Changes"], maxItems: 3, maxSentences: 2, optional: true },
 ];
 
 const ISSUE_TYPE = "Task";
@@ -69,39 +73,19 @@ function formatJiraTimeEstimate(value) {
 // ---------------------------------------------------------------------------
 // Description builder (task-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries, linkResolver, output = null }) {
+function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output = null }) {
   const content = [];
 
-  if (changelogEntries && changelogEntries.length) {
-    content.push(lib.adf.heading(3, "Change Log"));
-    content.push(lib.adf.table([
-      lib.adf.tableRow(
-        lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Date (UTC)"))),
-        lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Change"))),
-      ),
-      ...changelogEntries.map(row => {
-        const [date = "", change = ""] = row.replace(/^\|/, "").replace(/\|$/, "").split("|").map(s => s.trim());
-        return lib.adf.tableRow(
-          lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(date))),
-          lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(change))),
-        );
-      }),
-    ]));
-  }
+  // The document's Change Log is deliberately NOT published here. Jira keeps its
+  // own issue history, and the local file holds the authoritative log — a third
+  // copy on the card added length on every sync and told a reader nothing new.
 
-  const sourceLinks = [];
-  if (taskBbUrl) sourceLinks.push({ label: "Task file on Bitbucket", href: taskBbUrl });
-  if (relatedDocLinks && relatedDocLinks.length) sourceLinks.push(...relatedDocLinks);
-  if (sourceLinks.length) {
-    content.push(lib.adf.heading(3, "Source Documents"));
-    content.push(lib.adf.bulletList(...sourceLinks.map(l =>
-      lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
-  }
-
-  for (const sec of lib.extractBodySections(body, TASK_SECTIONS, output)) {
-    content.push(lib.adf.heading(3, sec.name));
-    content.push(...lib.textToAdfNodes(sec.content, linkResolver));
-  }
+  content.push(...lib.buildCardSections(body, TASK_CARD_SECTIONS, {
+    sourceUrl: taskBbUrl || null,
+    docLabel: "the task document",
+    linkResolver,
+    output,
+  }));
 
   const meta = [];
   if (frontmatter.category)               meta.push(`Category: ${frontmatter.category}`);
@@ -112,16 +96,35 @@ function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, ch
     content.push(lib.adf.paragraph(lib.adf.text(meta.join(" | "))));
   }
 
+  // Links go LAST, and the task file leads them. The card is a pointer, so the
+  // route to the full detail is the last thing a reader passes on their way out
+  // — not a block they scroll past before reaching the summary.
+  const sourceLinks = [];
+  if (taskBbUrl) sourceLinks.push({ label: "Task document", href: taskBbUrl });
+  if (relatedDocLinks && relatedDocLinks.length) sourceLinks.push(...relatedDocLinks);
+  if (sourceLinks.length) {
+    content.push(lib.adf.heading(3, "Source Documents"));
+    content.push(lib.adf.bulletList(...sourceLinks.map(l =>
+      lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
+  }
+
   // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
-  // wholesale and the issue silently keeps its previous description.
+  // wholesale and the issue silently keeps its previous description. After
+  // summarisation this should never fire; it stays as a backstop.
   return lib.capDescriptionAdf(lib.adf.doc(...content), { sourceUrl: taskBbUrl || null, output });
 }
 
+// Hash exactly what gets PUBLISHED, not the raw sections.
+//
+// Hashing the verbatim document would make an edit to a section the card no
+// longer carries — a Rollback Plan reword, say — flip the hash and trigger a
+// description PUT that changes nothing on the card.
 function hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver }) {
-  const sections = lib.extractBodySections(body, TASK_SECTIONS).map(s => ({
-    name: s.name,
-    nodes: lib.textToAdfNodes(s.content, linkResolver),
-  }));
+  const sections = lib.buildCardSections(body, TASK_CARD_SECTIONS, {
+    sourceUrl: taskBbUrl || null,
+    docLabel: "the task document",
+    linkResolver,
+  });
   return lib.hashStable({ sections, taskBbUrl, relatedDocLinks: (relatedDocLinks || []).map(l => l.href) });
 }
 
@@ -415,8 +418,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     changeSummary = changedFields.length ? `Updated: ${changedFields.join(", ")}` : "Sync (no field changes detected)";
     changeEntry = lib.fmtEntry(changeSummary);
 
-    const allEntries = [...lib.extractEntries(content), changeEntry];
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver, output });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output });
     const fields = collectIssueFields({
       summary, args, frontmatter, descAdf, taskTypeId: null, projectKey: null, livePriorities, output, syncLabel,
     });
@@ -470,7 +472,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira task created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver, output });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira task ===`);
@@ -608,7 +610,7 @@ if (require.main === module) {
     collectIssueFields,
     findRelatedDocs,
     labelForRelatedDoc,
-    TASK_SECTIONS,
+    TASK_CARD_SECTIONS,
     STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     // Re-export lib pieces used by existing tests
     parseFrontmatter:        lib.parseFrontmatter,

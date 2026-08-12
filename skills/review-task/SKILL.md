@@ -556,6 +556,7 @@ Name the outstanding roles so the human knows who to chase:
          3. **Zero matches** → fall through to create block below
          4. **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Task {id}]\": {key1}, {key2}, … — proceeding to create"` and fall through to create block below
          - **Note on search/create asymmetry**: this search uses Atlassian MCP (`searchJiraIssuesUsingJql`); the create block below uses curl REST. This split is intentional — switching create to MCP is out of scope and tracked separately.
+         - **Note on the description**: the card is a summary, not a copy of the task file — see [`references/tracker-card-summary.md`](./references/tracker-card-summary.md). The block below writes plain markdown via REST v2; `sync-jira-task` later re-renders the same shape as ADF and is the authority. Keep the two consistent.
        ```bash
        JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
        JIRA_RESPONSE=$(curl -s -X POST \
@@ -564,7 +565,7 @@ Name the outstanding roles so the human knows who to chase:
          -H "Authorization: Basic ${JIRA_AUTH}" \
          -d "$(jq -n \
            --arg summary "[Task {id}] {title}" \
-           --arg description "## Overview\n\n{overview}\n\n## Document\n📁 \`{task-file-relative-path}\`" \
+           --arg description "## Summary\n\n{first paragraph of Overview, capped at 4 sentences}\n\n## Success Criteria\n\n{first 5 criteria; if more remain add '+N more in the task document'}\n\n## Document\n📁 \`{task-file-relative-path}\`" \
            --arg project "$JIRA_PROJECT_KEY" \
            --arg priority "{High|Medium|Low}" \
            '{

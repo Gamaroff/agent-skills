@@ -52,25 +52,41 @@ async function parseFrontmatter(content) {
   return { frontmatter: {}, body: content };
 }
 
+// The card is a POINTER to the epic file, not a copy of it — the same contract
+// the sync-jira-* scripts enforce, spelled out in `tracker-card-summary.md`
+// under the repo's shared resources. This script is standalone by design (see
+// the note on the Stories Breakdown pattern below for why it does not require
+// the shared Jira library), so the cap is reimplemented here in miniature. Keep
+// the numbers in step with the shared `CARD_MAX_SENTENCES`.
+const CARD_MAX_SENTENCES = 4;
+
+function summariseForCard(text) {
+  const firstPara = text.trim().split(/\n\s*\n/)[0].replace(/\n+/g, " ").trim();
+  const sentences = firstPara.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [firstPara];
+  const kept = sentences.slice(0, CARD_MAX_SENTENCES).join(" ").trim();
+  const omitted = sentences.length - CARD_MAX_SENTENCES;
+  // Never trim silently: a reader not told they are seeing part of something
+  // believes they saw all of it.
+  return omitted > 0 ? `${kept}\n\n(+${omitted} more in the epic document)` : kept;
+}
+
 function extractEpicDescription(body, frontmatter) {
   const sections = [];
 
-  // Extract Epic Goal section
+  // Summary — Epic Goal, falling back to Epic Description when there is no goal.
+  // Description is a FALLBACK, never a second block: publishing both put the
+  // whole of an epic's prose on the card.
   const epicGoalMatch = body.match(/## Epic Goal\s*\n\n([^#]+)/);
-  if (epicGoalMatch) {
-    sections.push("Epic Goal:\n" + epicGoalMatch[1].trim());
-  }
-
-  // Extract Epic Description section
   const epicDescMatch = body.match(/## Epic Description\s*\n\n([^#]+)/);
-  if (epicDescMatch) {
-    const descContent = epicDescMatch[1].trim();
-    // Clean up the nested markdown format
-    const cleaned = descContent
-      .replace(/\*\*Existing System Context:\*\*/g, "Existing System Context:")
-      .replace(/\*\*Enhancement Details:\*\*/g, "Enhancement Details:")
-      .replace(/\*\*Success criteria:\*\*/g, "Success criteria:");
-    sections.push("Description:\n" + cleaned);
+  const summarySource = epicGoalMatch
+    ? epicGoalMatch[1]
+    : epicDescMatch
+      ? epicDescMatch[1]
+          // Flatten inline bold labels — Jira renders them poorly mid-paragraph.
+          .replace(/\*\*([^*\n]+):\*\*/g, "$1:")
+      : null;
+  if (summarySource) {
+    sections.push("Summary:\n" + summariseForCard(summarySource));
   }
 
   // Add epic metadata
@@ -105,7 +121,11 @@ function extractEpicDescription(body, frontmatter) {
     /(?:^|\n)## (?:\d+[.)]\s*)?Stories Breakdown[ \t]*\n([\s\S]*?)(?=\n## |\n# |$)/,
   );
   if (storiesMatch) {
-    const tableContent = storiesMatch[1].trim();
+    // Overview table only — cut at the first `### Story N.M` subsection. Those
+    // subsections are the detail that belongs in the epic file, and a line of
+    // their prose containing a `|` would otherwise leak in as a bogus row.
+    const subIdx = storiesMatch[1].search(/(?:^|\n)#{3,6}\s+/);
+    const tableContent = (subIdx >= 0 ? storiesMatch[1].slice(0, subIdx) : storiesMatch[1]).trim();
     if (tableContent.includes("|")) {
       // Convert markdown table to Jira wiki markup
       const lines = tableContent.split("\n").filter((line) => line.trim());

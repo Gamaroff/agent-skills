@@ -884,6 +884,264 @@ function capDescriptionAdf(doc, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Card summarisation
+// ---------------------------------------------------------------------------
+
+// A tracker card is a POINTER to the document, not a copy of it.
+//
+// This used to be a mirror: the task card published all ELEVEN `## ` sections of
+// the task document verbatim, the story card published its full uncapped
+// acceptance criteria, and every card re-published the document's entire Change
+// Log as a table on every sync. Two costs. The obvious one is that a board reader
+// scrolls a wall of text to learn what a ticket is about. The subtler one is that
+// the mirror was always going to lose: the local file is the source of truth, so
+// a card that duplicates it is a second copy that silently goes stale between
+// syncs, and `capDescriptionAdf` below exists only because those descriptions
+// grew until Jira rejected the whole PUT.
+//
+// So the caps are editorial, not defensive. `capDescriptionAdf` remains as a
+// last-resort guard; after summarisation it should never fire.
+const CARD_MAX_LIST_ITEMS = 5; // criteria kept on the card
+const CARD_MAX_SENTENCES = 4; // prose sentences kept on the card
+
+const RE_SUBHEADING = /^#{3,6}\s+/;
+const RE_FENCE = /^\s*(```|~~~)/;
+
+// Split prose into sentences without a full parser.
+//
+// Terminator followed by whitespace + an uppercase-ish opener. The negative
+// lookbehind list covers the abbreviations that actually show up in these
+// documents; a missed split yields a slightly longer summary, never a wrong one.
+const RE_ABBREV = /(?:\b(?:e\.g|i\.e|etc|vs|approx|Dr|Mr|Ms|Mrs|St|No|Fig|cf)\.)$/i;
+
+function splitSentences(text) {
+  const out = [];
+  let start = 0;
+  const re = /[.!?]+(?=\s+|$)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const end = m.index + m[0].length;
+    const candidate = text.slice(start, end);
+    // Don't split on a decimal point ("2.5 hours") or a known abbreviation.
+    if (RE_ABBREV.test(candidate.trimEnd())) continue;
+    if (/\d\.$/.test(candidate) && /^\s*\d/.test(text.slice(end))) continue;
+    out.push(candidate.trim());
+    start = end;
+  }
+  const tail = text.slice(start).trim();
+  if (tail) out.push(tail);
+  return out.filter(Boolean);
+}
+
+// Strip `### ` heading LINES while keeping everything under them.
+//
+// Real documents group card content under sub-headings: a task's Success
+// Criteria opens with `### Functional`, an epic's Stories Breakdown puts its
+// overview table under `### Stories Overview`. An earlier version of this cut
+// the body at the first sub-heading, which deleted precisely the content the
+// card wanted and left the grouping preamble behind — the exact inverse. On a
+// card this short the grouping labels are noise anyway: drop the labels, keep
+// the items.
+function dropHeadingLines(src) {
+  const out = [];
+  let inFence = false;
+  for (const line of String(src).split("\n")) {
+    if (RE_FENCE.test(line)) {
+      inFence = !inFence;
+      out.push(line);
+      continue;
+    }
+    if (!inFence && RE_SUBHEADING.test(line)) continue;
+    out.push(line);
+  }
+  return out;
+}
+
+// The first pipe table in `content`, or "" — fence-aware.
+//
+// Used for an epic's Stories Breakdown, where the wanted content is exactly the
+// overview table and everything else in the section (authoring guidelines, then
+// a `###` block per story) is detail belonging in the file.
+function firstTableIn(content) {
+  const lines = String(content || "").split("\n");
+  const table = [];
+  let inFence = false;
+  for (const line of lines) {
+    if (RE_FENCE.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    if (RE_TABLE_ROW_START.test(line)) table.push(line);
+    else if (table.length) break; // table ended
+  }
+  return table.join("\n");
+}
+
+// Is this section body a list?
+//
+// Judged on the FIRST non-blank line rather than a ratio: a criteria section
+// opening with a lead-in sentence ("The task is done when all of:") followed by
+// bullets is prose whose bullets are its detail, and capping it as a list would
+// silently drop the lead-in — the one line that gives the bullets meaning.
+function isListSection(lines) {
+  const first = lines.find((l) => l.trim());
+  if (!first) return false;
+  return RE_BULLET.test(first) || RE_ORDERED.test(first);
+}
+
+/**
+ * Reduce one section body to what belongs on a card.
+ *
+ * Returns `{ text, omitted, kind }` — `omitted` counts the units NOT shown
+ * (list items, or sentences), so the caller can render an honest "+N more"
+ * pointer. Truncating without saying so would leave a reader believing they had
+ * read the whole thing, which is worse than any amount of verbosity.
+ */
+function summariseSection(content, opts = {}) {
+  const {
+    maxItems = CARD_MAX_LIST_ITEMS,
+    maxSentences = CARD_MAX_SENTENCES,
+  } = opts;
+  const raw = String(content || "").trim();
+  if (!raw) return { text: "", omitted: 0, kind: "empty" };
+
+  // Grouping sub-headings go; the items under them stay. See dropHeadingLines.
+  const lines = dropHeadingLines(raw);
+  const src = lines.join("\n").trim();
+  if (!src) return { text: "", omitted: 0, kind: "empty" };
+
+  if (isListSection(lines)) {
+    // Group each top-level item with its continuation lines so a wrapped or
+    // nested bullet stays attached to the item it belongs to.
+    const items = [];
+    let inFence = false;
+    for (const line of lines) {
+      if (RE_FENCE.test(line)) inFence = !inFence;
+      const isTop =
+        !inFence &&
+        (RE_BULLET.test(line) || RE_ORDERED.test(line)) &&
+        !/^\s/.test(line);
+      if (isTop) items.push([line]);
+      else if (items.length) items[items.length - 1].push(line);
+    }
+    const kept = items.slice(0, maxItems);
+    return {
+      text: kept
+        .map((g) => g.join("\n").trimEnd())
+        .join("\n")
+        .trim(),
+      omitted: Math.max(0, items.length - kept.length),
+      kind: "list",
+    };
+  }
+
+  // Prose: the first paragraph only, capped at `maxSentences`.
+  const paras = src
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const first = paras[0] || "";
+  // A table or fence as the opening block is detail, not a summary lead.
+  if (RE_TABLE_ROW_START.test(first) || RE_FENCE.test(first)) {
+    return { text: "", omitted: paras.length, kind: "prose" };
+  }
+  const sentences = splitSentences(first.replace(/\n+/g, " ").trim());
+  const kept = sentences.slice(0, maxSentences);
+  // Anything past the first paragraph is omitted too, so the count reflects
+  // sentences dropped from THIS paragraph plus the paragraphs never considered.
+  const omitted = sentences.length - kept.length + (paras.length - 1);
+  return { text: kept.join(" ").trim(), omitted: Math.max(0, omitted), kind: "prose" };
+}
+
+/**
+ * Render one summarised section as ADF nodes: a heading, the summarised body,
+ * and — when anything was left out — a trailing pointer at the full document.
+ *
+ * Returns [] when the section resolved to nothing, so a caller can feed it an
+ * absent or empty section without guarding at every call site.
+ */
+function summaryBlockNodes(opts = {}) {
+  const {
+    heading,
+    content,
+    sourceUrl = null,
+    docLabel = "the full document",
+    linkResolver = null,
+    maxItems,
+    maxSentences,
+  } = opts;
+  const { text, omitted } = summariseSection(content, { maxItems, maxSentences });
+  if (!text) return [];
+
+  const nodes = [];
+  if (heading) nodes.push(adf.heading(3, heading));
+  nodes.push(...textToAdfNodes(text, linkResolver));
+
+  if (omitted > 0) {
+    const tail = sourceUrl
+      ? [adf.text(`+${omitted} more in `), adf.link(docLabel, sourceUrl)]
+      : [adf.text(`+${omitted} more in ${docLabel}`)];
+    nodes.push(adf.paragraph(...tail));
+  }
+  return nodes;
+}
+
+/**
+ * Build the card body for a set of section specs.
+ *
+ * `specs` entries: `{ heading, names, kind, maxItems, maxSentences }` where
+ * `names` is passed straight to `extractBodySections` (so alias arrays and
+ * `## 1.` numbering keep working). `heading` is a FIXED string rather than the
+ * matched heading — a story whose statement lives under `## Story Statement`
+ * and one using `## User Story` must produce the same card.
+ *
+ * `optional: true` suppresses the missing-section warning. `Breaking Changes`
+ * is absent from most task documents and rightly so; warning about it every
+ * sync would train operators to ignore the warning that matters — the one
+ * saying the document and the section list disagree about a heading name.
+ */
+function buildCardSections(body, specs, opts = {}) {
+  const { sourceUrl = null, docLabel, linkResolver = null, output = null } = opts;
+  // Warn only for required sections: extract those with `output`, the optional
+  // ones silently.
+  const required = specs.filter((s) => !s.optional);
+  const optional = specs.filter((s) => s.optional);
+  const found = [
+    ...extractBodySections(body, required.map((s) => s.names), output),
+    ...extractBodySections(body, optional.map((s) => s.names)),
+  ];
+  // extractBodySections keys results by the FIRST alias; map back to the spec.
+  const byFirstAlias = new Map(
+    found.map((f) => [f.name, f.content]),
+  );
+
+  const nodes = [];
+  for (const spec of specs) {
+    const alts = Array.isArray(spec.names) ? spec.names : [spec.names];
+    const raw = byFirstAlias.get(alts[0]);
+    if (!raw) continue;
+    // `transform` lets a caller normalise a section before it is summarised —
+    // epics use it to flatten inline `**Label:**` runs, which ADF renders badly
+    // mid-paragraph.
+    const content = spec.transform ? spec.transform(raw) : raw;
+    if (!content) continue;
+    nodes.push(
+      ...summaryBlockNodes({
+        heading: spec.heading,
+        content,
+        sourceUrl,
+        docLabel,
+        linkResolver,
+        maxItems: spec.maxItems,
+        maxSentences: spec.maxSentences,
+      }),
+    );
+  }
+  return nodes;
+}
+
+// ---------------------------------------------------------------------------
 // Priority + labels
 // ---------------------------------------------------------------------------
 const PRIORITY_MAP = {
@@ -3651,6 +3909,15 @@ module.exports = {
   JIRA_TEXT_LIMIT,
   adfTextLength,
   capDescriptionAdf,
+  // card summarisation
+  CARD_MAX_LIST_ITEMS,
+  CARD_MAX_SENTENCES,
+  dropHeadingLines,
+  firstTableIn,
+  splitSentences,
+  summariseSection,
+  summaryBlockNodes,
+  buildCardSections,
   // priority / labels
   PRIORITY_MAP,
   normalisePriority,

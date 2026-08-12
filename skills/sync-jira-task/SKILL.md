@@ -1,6 +1,6 @@
 ---
 name: sync-jira-task
-description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Maintains a Change Log in both the local task and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
+description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Maintains a Change Log in the local task file. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
 ---
 
 # sync-jira-task
@@ -155,7 +155,7 @@ Flow:
 3. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 4. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 5. Diff `summary`, body hash, meta hash, priority, labels.
-6. Build a Jira ADF description: Change Log table → Source link → 11 task-doc sections → Metadata.
+6. Build a Jira ADF description: Summary → Success Criteria (capped) → Breaking Changes (if any) → Metadata → Source link.
 7. Resolve cached `Task` issue type id (or fetch + cache).
 8. **Create** (POST) or **Update** (atomic PUT with `returnIssue=true`).
 9. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning.
@@ -274,21 +274,31 @@ Note: no `jira_epic` is written (tasks are standalone). Any `jira_epic` already 
 
 ## Description sections rendered
 
-The script extracts and renders these 11 task-doc headings into the Jira description:
+The Jira card is a **summary that points at the task document**, not a copy of it. The
+contract — which sections, what caps, how omissions are announced — is specified
+once in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md)
+and enforced in code by `buildCardSections()` in `references/jira-sync.js`.
 
-1. Overview
-2. Motivation
-3. Technical Background
-4. Scope
-5. Breaking Changes
-6. Implementation Plan
-7. Files Summary
-8. Testing Strategy
-9. Success Criteria
-10. Risk Assessment
-11. Rollback Plan
+What lands on a task card — **three** sections, where this list once named
+eleven, i.e. the whole task document republished verbatim on every sync:
 
-Each section's body is converted to ADF, with `- item` and `1. item` lines becoming proper bulletList / orderedList nodes.
+| Block | Source |
+|-------|--------|
+| Summary | `## Overview` |
+| Success Criteria | `## Success Criteria`, **first 5 items** |
+| Breaking Changes | `## Breaking Changes`, **first 3 items** — omitted entirely when absent |
+| Metadata | category, estimated hours, status |
+| Source Documents | task file, co-located siblings (runbooks, reports) |
+
+Motivation, Technical Background, Scope, Implementation Plan, Files Summary,
+Testing Strategy, Risk Assessment and Rollback Plan are **not** published — they
+are one click away in the linked document.
+
+Each section's body is converted to ADF, with `- item` and `1. item` lines
+becoming proper bulletList / orderedList nodes. Anything trimmed is followed by a
+`+N more in …` link to the task document. The document's Change Log is **never**
+published to the card — Jira keeps its own issue history and the local file holds
+the authoritative log.
 
 ## Script Options
 

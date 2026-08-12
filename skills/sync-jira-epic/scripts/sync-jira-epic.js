@@ -20,7 +20,21 @@ const lib = require("../references/jira-sync.js");
 // ---------------------------------------------------------------------------
 const VERSION = "1.2.0";
 
-const EPIC_SECTIONS = ["Epic Goal", "Epic Description"];
+// What the CARD carries — a summary, not a copy. The epic file is the source of
+// truth and every card links to it; see shared/resources/tracker-card-summary.md.
+//
+// `Epic Description` is the LAST alias, not its own section: an epic with a goal
+// never shows it, and one that has only a description still gets a non-empty card.
+const EPIC_CARD_SECTIONS = [
+  {
+    heading: "Summary",
+    names: ["Epic Goal", "Epic Description"],
+    // Flatten any inline `**Label:**` heading (e.g. `**Existing System Context:**`)
+    // to plain `Label:`. ADF can't render mid-paragraph bold headings well, so
+    // this preserves the label as a leading text run that ADF renders cleanly.
+    transform: (t) => t.replace(/\*\*([^*\n]+):\*\*/g, "$1:"),
+  },
+];
 
 const ISSUE_TYPE = "Epic";
 
@@ -30,12 +44,6 @@ const ISSUE_TYPE = "Epic";
 const DEFAULT_ASSIGNEE =
   process.env.JIRA_DEFAULT_ASSIGNEE || lib.loadDefaultAssignee();
 const SYNC_LABEL_PREFIX = "synced-from-";
-
-const STORY_REQUIREMENTS_TEXT =
-  "Each story MUST include in frontmatter: jira_epic, epic_bitbucket_url. " +
-  "Cross-reference both Jira and Bitbucket from the story body.";
-
-const CHANGELOG_DESCRIPTION_LIMIT = 20;
 
 // ---------------------------------------------------------------------------
 // PRD path resolution (multi-variant)
@@ -147,61 +155,23 @@ function buildDescriptionAdf({
   prdBbUrl,
   epicBbUrl,
   relatedDocLinks,
-  changelogEntries,
   linkResolver,
   output = null,
 }) {
   const content = [];
 
-  if (changelogEntries && changelogEntries.length) {
-    const recent = changelogEntries.slice(-CHANGELOG_DESCRIPTION_LIMIT);
-    content.push(lib.adf.heading(3, "Change Log"));
-    content.push(
-      lib.adf.table([
-        lib.adf.tableRow(
-          lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Date (UTC)"))),
-          lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Change"))),
-        ),
-        ...recent.map((row) => {
-          const [date = "", change = ""] = row
-            .replace(/^\|/, "")
-            .replace(/\|$/, "")
-            .split("|")
-            .map((s) => s.trim());
-          return lib.adf.tableRow(
-            lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(date))),
-            lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(change))),
-          );
-        }),
-      ]),
-    );
-  }
+  // The document's Change Log is deliberately NOT published here. Jira keeps its
+  // own issue history, and the local file holds the authoritative log — a third
+  // copy on the card added length on every sync and told a reader nothing new.
 
-  const links = [];
-  if (prdBbUrl)
-    links.push({ label: "Parent PRD on Bitbucket", href: prdBbUrl });
-  if (epicBbUrl)
-    links.push({ label: "Epic file on Bitbucket", href: epicBbUrl });
-  if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
-  if (links.length) {
-    content.push(lib.adf.heading(3, "Source Documents"));
-    content.push(
-      lib.adf.bulletList(
-        ...links.map((l) =>
-          lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))),
-        ),
-      ),
-    );
-  }
-
-  for (const sec of lib.extractBodySections(body, EPIC_SECTIONS, output)) {
-    content.push(lib.adf.heading(3, sec.name));
-    // Flatten any inline `**Label:**` heading (e.g. `**Existing System Context:**`)
-    // to plain `Label:`. ADF can't render mid-paragraph bold headings well, so
-    // this preserves the label as a leading text run that ADF will render cleanly.
-    const cleaned = sec.content.replace(/\*\*([^*\n]+):\*\*/g, "$1:");
-    content.push(...lib.textToAdfNodes(cleaned, linkResolver));
-  }
+  content.push(
+    ...lib.buildCardSections(body, EPIC_CARD_SECTIONS, {
+      sourceUrl: epicBbUrl || null,
+      docLabel: "the epic document",
+      linkResolver,
+      output,
+    }),
+  );
 
   const meta = [];
   if (frontmatter.epic_type) meta.push(`Type: ${frontmatter.epic_type}`);
@@ -214,29 +184,67 @@ function buildDescriptionAdf({
     content.push(lib.adf.paragraph(lib.adf.text(meta.join(" | "))));
   }
 
-  // Render the full Stories Breakdown section (guidelines + overview table +
-  // individual story sections) using the enhanced textToAdfNodes instead of
-  // extracting only the first table — which previously swallowed all story
-  // subsections as table rows and lost inline markdown formatting.
-  const storiesSections = lib.extractBodySections(body, ["Stories Breakdown"]);
-  if (storiesSections.length && storiesSections[0].content.trim()) {
-    content.push(lib.adf.heading(3, "Stories Breakdown"));
+  // The Stories Breakdown OVERVIEW TABLE only. It is the one part of an epic a
+  // board reader genuinely wants without opening the file: which stories exist
+  // and where they stand. The authoring guidelines above it and the per-story
+  // `###` blocks below it are detail, and those blocks were what made epic
+  // descriptions the longest of the three.
+  content.push(...storiesBreakdownNodes(body, linkResolver));
+
+  // The old fixed "Story Requirements" paragraph is gone: it told story AUTHORS
+  // which frontmatter keys to set, which is authoring guidance for the repo, not
+  // information for anyone reading the epic's card.
+
+  // Links go LAST, and the epic file leads them. The card is a pointer, so the
+  // route to the full detail is the last thing a reader passes on their way out
+  // — not a block they scroll past before reaching the summary.
+  const links = [];
+  if (epicBbUrl) links.push({ label: "Epic document", href: epicBbUrl });
+  if (prdBbUrl) links.push({ label: "Parent PRD", href: prdBbUrl });
+  if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
+  if (links.length) {
+    content.push(lib.adf.heading(3, "Source Documents"));
     content.push(
-      ...lib.textToAdfNodes(storiesSections[0].content, linkResolver),
+      lib.adf.bulletList(
+        ...links.map((l) =>
+          lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))),
+        ),
+      ),
     );
   }
 
-  content.push(lib.adf.heading(3, "Story Requirements"));
-  content.push(lib.adf.paragraph(lib.adf.text(STORY_REQUIREMENTS_TEXT)));
-
   // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
-  // wholesale and the issue silently keeps its previous description.
+  // wholesale and the issue silently keeps its previous description. After
+  // summarisation this should never fire; it stays as a backstop.
   return lib.capDescriptionAdf(lib.adf.doc(...content), {
     sourceUrl: epicBbUrl || null,
     output,
   });
 }
 
+// The Stories Breakdown overview table. Shared by buildDescriptionAdf and
+// hashBody so the hash covers exactly what is published — see hashBody below.
+//
+// `firstTableIn` rather than "cut at the first sub-heading": in real epics the
+// overview table sits UNDER a `### Stories Overview` heading, so cutting at the
+// first sub-heading deleted the table and kept only the authoring guidelines
+// above it — the exact inverse of what the card wants.
+function storiesBreakdownNodes(body, linkResolver) {
+  const found = lib.extractBodySections(body, ["Stories Breakdown"]);
+  if (!found.length) return [];
+  const table = lib.firstTableIn(found[0].content);
+  if (!table) return [];
+  return [
+    lib.adf.heading(3, "Stories Breakdown"),
+    ...lib.textToAdfNodes(table, linkResolver),
+  ];
+}
+
+// Hash exactly what gets PUBLISHED, not the raw sections.
+//
+// Hashing the verbatim document would make an edit to a per-story subsection the
+// card no longer carries flip the hash and trigger a description PUT that
+// changes nothing on the card.
 function hashBody({
   body,
   prdBbUrl,
@@ -244,17 +252,14 @@ function hashBody({
   relatedDocLinks,
   linkResolver,
 }) {
-  const sections = lib.extractBodySections(body, EPIC_SECTIONS).map((s) => ({
-    name: s.name,
-    nodes: lib.textToAdfNodes(s.content, linkResolver),
-  }));
-  const storiesSections = lib.extractBodySections(body, ["Stories Breakdown"]);
-  const storiesContent = storiesSections.length
-    ? storiesSections[0].content
-    : null;
+  const sections = lib.buildCardSections(body, EPIC_CARD_SECTIONS, {
+    sourceUrl: epicBbUrl || null,
+    docLabel: "the epic document",
+    linkResolver,
+  });
   return lib.hashStable({
     sections,
-    storiesContent,
+    storiesContent: storiesBreakdownNodes(body, linkResolver),
     prdBbUrl,
     epicBbUrl,
     relatedDocLinks: (relatedDocLinks || []).map((l) => `${l.label}|${l.href}`),
@@ -859,14 +864,12 @@ async function run({
       return { exitCode: 0, isUpdate: true, skipped: true };
     }
 
-    const allEntries = [...lib.extractEntries(content), changeEntry];
     const descAdf = buildDescriptionAdf({
       body,
       frontmatter,
       prdBbUrl,
       epicBbUrl,
       relatedDocLinks,
-      changelogEntries: allEntries,
       linkResolver,
       output,
     });
@@ -927,7 +930,6 @@ async function run({
       prdBbUrl,
       epicBbUrl,
       relatedDocLinks,
-      changelogEntries: [changeEntry],
       linkResolver,
       output,
     });
@@ -1245,11 +1247,9 @@ if (require.main === module) {
     resolvePrdPath,
     inlineToAdfNodes,
     splitTableRow,
-    EPIC_SECTIONS,
+    EPIC_CARD_SECTIONS,
     STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     VERSION,
-    CHANGELOG_DESCRIPTION_LIMIT,
-    STORY_REQUIREMENTS_TEXT,
     // Re-export lib pieces for tests
     inlineMarkdownToAdf: lib.inlineMarkdownToAdf,
     parseFrontmatter: lib.parseFrontmatter,

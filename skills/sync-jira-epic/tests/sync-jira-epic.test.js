@@ -113,23 +113,52 @@ test("storiesTableToAdf — emits ADF table with header + body", () => {
 // ---------------------------------------------------------------------------
 // buildDescriptionAdf
 // ---------------------------------------------------------------------------
-test("buildDescriptionAdf — produces ADF doc with epic sections + stories table", () => {
+const headingsOf = (doc) =>
+  doc.content.filter(n => n.type === "heading").map(h => h.content[0].text);
+
+test("buildDescriptionAdf — produces ADF doc with summary, stories table and links", () => {
   const doc = lib.buildDescriptionAdf({
     body: "## Epic Goal\n\nGoal text.\n\n## Epic Description\n\nDesc.\n\n## Stories Breakdown\n\n| ID | Title |\n|----|-------|\n| 1 | A |\n",
     frontmatter: { epic_type: "foundation", prd_source: "p.md", estimated_sprints: 2 },
     prdBbUrl: "https://bitbucket.org/o/r/src/main/p.md",
     epicBbUrl: "https://bitbucket.org/o/r/src/main/e.md",
-    changelogEntries: ["| 2026-04-28 09:40 | Initial Jira epic created |"],
   });
   assert.equal(doc.type, "doc");
-  const headings = doc.content.filter(n => n.type === "heading").map(h => h.content[0].text);
-  assert.ok(headings.includes("Change Log"));
-  assert.ok(headings.includes("Source Documents"));
-  assert.ok(headings.includes("Epic Goal"));
-  assert.ok(headings.includes("Epic Description"));
-  assert.ok(headings.includes("Metadata"));
-  assert.ok(headings.includes("Stories Breakdown"));
-  assert.ok(headings.includes("Story Requirements"));
+  // `Epic Description` is a FALLBACK alias of Summary, never its own block, and
+  // the old fixed "Story Requirements" boilerplate is authoring guidance, not
+  // card content.
+  assert.deepEqual(headingsOf(doc), ["Summary", "Metadata", "Stories Breakdown", "Source Documents"]);
+  assert.equal(doc.content[1].content[0].text, "Goal text.");
+});
+
+// The card is a POINTER. Republishing the document's changelog onto it added
+// length on every sync and duplicated what Jira's own issue history already holds.
+test("buildDescriptionAdf — never publishes the document's Change Log", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: "## Epic Goal\n\nGoal text.\n\n## Change Log\n\n| 2026-04-28 | created |\n",
+    frontmatter: {}, prdBbUrl: null, epicBbUrl: null,
+  });
+  assert.ok(!headingsOf(doc).includes("Change Log"));
+  assert.ok(!doc.content.some(n => n.type === "table"), "no changelog table on the card");
+});
+
+// The per-story `###` blocks are what made epic descriptions the longest of the
+// three. The overview table is the part a board reader actually wants.
+test("buildDescriptionAdf — Stories Breakdown keeps the overview table, cuts the story subsections", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: [
+      "## Epic Goal", "", "Goal text.", "",
+      "## Stories Breakdown", "",
+      "| ID | Title |", "|----|-------|", "| 1 | A |", "",
+      "### Story 1.1: A", "", "Lots of detail that belongs in the file.", "",
+      "### Story 1.2: B", "", "More detail.", "",
+    ].join("\n"),
+    frontmatter: {}, prdBbUrl: null, epicBbUrl: null,
+  });
+  const json = JSON.stringify(doc);
+  assert.ok(doc.content.some(n => n.type === "table"), "overview table survives");
+  assert.doesNotMatch(json, /Lots of detail/);
+  assert.doesNotMatch(json, /Story 1\.2: B/);
 });
 
 test("buildDescriptionAdf — strips ** ** markers from Epic Description", () => {
@@ -137,7 +166,6 @@ test("buildDescriptionAdf — strips ** ** markers from Epic Description", () =>
     body: "## Epic Description\n\n**Existing System Context:** baseline.\n",
     frontmatter: {},
     prdBbUrl: null, epicBbUrl: null,
-    changelogEntries: [],
   });
   const text = JSON.stringify(doc);
   assert.doesNotMatch(text, /\*\*Existing System Context:\*\*/);
@@ -203,8 +231,9 @@ test("parseJiraError — extracts errorMessages and field errors", async () => {
 // ---------------------------------------------------------------------------
 // EPIC_SECTIONS
 // ---------------------------------------------------------------------------
-test("EPIC_SECTIONS — exposes Epic Goal + Epic Description", () => {
-  assert.deepEqual(lib.EPIC_SECTIONS, ["Epic Goal", "Epic Description"]);
+test("EPIC_CARD_SECTIONS — one Summary block, with Epic Description as its fallback alias", () => {
+  assert.deepEqual(lib.EPIC_CARD_SECTIONS.map(s => s.heading), ["Summary"]);
+  assert.deepEqual(lib.EPIC_CARD_SECTIONS[0].names, ["Epic Goal", "Epic Description"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -214,13 +243,13 @@ test("VERSION — semver string exported", () => {
   assert.match(lib.VERSION, /^\d+\.\d+\.\d+$/);
 });
 
-test("CHANGELOG_DESCRIPTION_LIMIT — positive integer", () => {
-  assert.ok(Number.isInteger(lib.CHANGELOG_DESCRIPTION_LIMIT) && lib.CHANGELOG_DESCRIPTION_LIMIT > 0);
-});
-
-test("STORY_REQUIREMENTS_TEXT — non-empty string referencing co-location", () => {
-  assert.equal(typeof lib.STORY_REQUIREMENTS_TEXT, "string");
-  assert.ok(lib.STORY_REQUIREMENTS_TEXT.length > 0);
+// `CHANGELOG_DESCRIPTION_LIMIT` and `STORY_REQUIREMENTS_TEXT` are gone: the card
+// no longer publishes the document's changelog at any length, and the fixed
+// "Story Requirements" paragraph told story authors which frontmatter keys to
+// set — repo authoring guidance, not information for a card reader.
+test("removed constants stay removed", () => {
+  assert.equal(lib.CHANGELOG_DESCRIPTION_LIMIT, undefined);
+  assert.equal(lib.STORY_REQUIREMENTS_TEXT, undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -506,27 +535,6 @@ test("collectCommonFields — does not duplicate sync label if already present",
   assert.equal(count, 1);
 });
 
-// ---------------------------------------------------------------------------
-// buildDescriptionAdf — Change Log cap
-// ---------------------------------------------------------------------------
-test("buildDescriptionAdf — Change Log cap limits rendered rows", () => {
-  const entries = [];
-  for (let i = 0; i < lib.CHANGELOG_DESCRIPTION_LIMIT + 5; i++) {
-    entries.push(`| 2026-04-${String((i % 28) + 1).padStart(2, "0")} 09:00 | entry ${i} |`);
-  }
-  const doc = lib.buildDescriptionAdf({
-    body: "## Epic Goal\n\nx.\n",
-    frontmatter: {},
-    prdBbUrl: null, epicBbUrl: null,
-    changelogEntries: entries,
-  });
-  const tables = doc.content.filter(n => n.type === "table");
-  const cl = tables[0];
-  assert.equal(cl.content.length, lib.CHANGELOG_DESCRIPTION_LIMIT + 1);
-  const lastRowText = JSON.stringify(cl.content[cl.content.length - 1]);
-  assert.match(lastRowText, /entry \d+/);
-  assert.doesNotMatch(lastRowText, /entry 0\b/);
-});
 
 // ---------------------------------------------------------------------------
 // parseArgs — --version / --verbose
