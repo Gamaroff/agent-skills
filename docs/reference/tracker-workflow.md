@@ -555,21 +555,36 @@ An issue can sit on several project boards. `set-github-project-priority.sh` and
 wrong for a status: a status change is a claim about where the work is, visible to whoever reads that
 board. `gh-stage.js` picks exactly one, in this order:
 
-1. exactly one board → use it
-2. `--board <number|name>`
-3. `github.projectBoard`
+1. `--board <number|name>`, when set → must **match**, else fail closed
+2. `github.projectBoard`, when set → must **match**, else fail closed
+3. exactly one board → use it
 4. `project.yml` → `project_board_number` / `project_board_name`
 5. otherwise → skip with `ambiguous-board`, **naming the candidates** rather than guessing
 
-**An unmatched hint fails closed.** These tiers are consulted in order only while each is *unset*.
-The first one that IS set is authoritative: if it names a board the issue is not on, the result is
-`ambiguous-board` — it does **not** fall through to the next tier. "No hint given" and "the hint you
-gave was wrong" are different questions, and answering the second by quietly consulting a lower tier
-is how a mistyped `--board` ends up changing the status on somebody else's board.
+Two kinds of hint, deliberately treated differently.
 
-`--add-to-board` follows the same discipline. It needs a board *number*, so a title-valued hint is
-resolved against the boards actually read; a hint that cannot be resolved to a number skips the add
-with a warning rather than substituting whatever `project.yml` happens to name.
+**`--board` and `github.projectBoard` are an operator naming a board.** If the named board is not
+among those read, that is a question — not a licence to pick a different one. Each fails closed on its
+own, without consulting the tier below: "no hint given" and "the hint you gave was wrong" are
+different questions, and answering the second by quietly consulting a lower tier is how a mistyped
+`--board` ends up changing the status on somebody else's board.
+
+Note where the single-board rule sits: **after** those checks, not before. A read returns one board
+for reasons other than the issue being on one board — a partially-failed read is exactly that, with
+the named board missing precisely because the token could not see it. Checking "is there only one?"
+first would write to the survivor without ever comparing its name. When a hint fails to match on a
+partial read, the skip says so, because the candidate list alone actively hides that explanation.
+
+**`project.yml` is ambient repo config** — where this repo's board generally is, not an assertion
+about this issue. It disambiguates when several boards are in play and never vetoes a move on the one
+board an issue actually sits on. Its two keys are two spellings of one board, so a stale
+`project_board_number` does not make `project_board_name` unreachable.
+
+**`--add-to-board` needs a board NUMBER.** `gh project item-add` takes one, and a title cannot be
+resolved to a number from anything this CLI reads: its only read is issue-scoped, so it lists boards
+the issue is *already* on. A non-numeric hint therefore skips the add with a warning rather than
+substituting whatever `project.yml` happens to name. The status move itself still works with a title —
+only the add needs the number.
 
 ### Matching is exact, case-insensitive, emoji-stripped — and never prefix
 

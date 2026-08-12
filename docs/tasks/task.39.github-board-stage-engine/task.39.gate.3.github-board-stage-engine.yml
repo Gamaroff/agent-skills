@@ -1,0 +1,82 @@
+schema: 1
+task: "task.39.github-board-stage-engine"
+task_title: "gh-stage.js — a GitHub Projects board engine driven by the workflow ladder"
+gate: FAIL
+status_reason: "The cycle-2 partial-read tolerance reintroduced the cycle-1 defect through a different door: a partially-failed read can leave one usable board, and selectBoard's only-board short-circuit then bypasses the hint check entirely, writing the status to a board the operator explicitly did not name — silently under --json. The CR2-4 title-hint fix also does not work, and its test passes vacuously."
+reviewer: "QA Engineer"
+updated: "2026-08-12T13:40:00Z"
+
+cycle: 3
+previous_gate: "task.39.gate.2.github-board-stage-engine.yml (CONCERNS, 80/100)"
+
+fix_verification:
+  verified_fixed: [CR2-1, CR2-2, CR2-3]
+  not_fixed: [CR2-4]
+  note: "CR2-1 and CR2-2 hold. CR2-3's implementation is as described but its consequence was not thought through — see CR3-1. CR2-4 is wired but cannot work: it resolves a title against boards the issue is ALREADY on."
+
+top_issues:
+  - id: CR3-1
+    severity: high
+    finding: "A partially-failed read now returns the boards that did resolve, and when exactly one does, selectBoard's `items.length === 1 → only-board` short-circuit returns it WITHOUT consulting any hint. So an explicit `--board 7` whose board the token cannot see silently moves the card on board 12 instead. Verified by execution: reason `transitioned`, board `Org Portfolio`, 1 mutation — where before CR2-3 the read threw and nothing moved. Under `--json`, which is how the pipelines call it, `output.warn` is suppressed and no payload field records the partial error, so the wrong-board write is completely silent. This is the cycle-1 CR-1 defect re-entering through the door CR2-3 opened."
+    suggested_action: "Evaluate the hint tiers BEFORE the only-board short-circuit — the short-circuit is only valid when no hint is set. Also carry a `partial` flag out of readBoard so a fail-closed result can say the hinted board may simply have been unreadable."
+    suggested_owner: dev
+  - id: CR3-2
+    severity: medium
+    finding: "The CR2-4 second-pass add cannot fix what it claims: `boardHintNumber(..., items)` resolves a title only against `items`, which comes from `repository.issue.projectItems` — boards the issue is ALREADY on. So `--add-to-board --board \"<title>\"` still never adds the issue to a new board; it fires only in the case where the add is a redundant no-op, at the cost of a write call, a 3s sleep and a second full read. The new test passes vacuously because its fixture already contains the titled board."
+    suggested_action: "A title cannot be resolved to a board number from an issue-scoped read. Either resolve it against the owner's project list, or accept that --add-to-board requires a NUMERIC hint — say so plainly, drop the dead `items` parameter, and delete the test that asserts the redundant case."
+    suggested_owner: dev
+  - id: CR3-3
+    severity: medium
+    finding: "When the verify re-read throws, or the item is absent from it, `observed` stays null and the message still asserts the board \"still shows (unset)\" — a claim about board state that was never read. The JSON emits `observed: null` for both 'read failed' and 'item missing', so a consumer cannot tell either from a real observation. This is the same conflation CR2-2 set out to remove, one level down."
+    suggested_action: "Distinguish the three states: `observed: null` = not read, `observed: \"\"` = read and unset, `observed: \"X\"` = read and showing X. Word the message from whichever actually applies."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 55
+
+evidence:
+  tests_reviewed: 62
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged — --issue validated on every path, auth delegated to gh, no secrets."
+  performance:
+    status: PASS
+    notes: "Unchanged on the happy path. CR3-2 notes a wasted write + 3s sleep + extra read in the redundant-add case, which is a correctness symptom rather than a performance one."
+  reliability:
+    status: FAIL
+    notes: "CR3-1 can write a status to a board the operator explicitly did not name, and does so silently in the mode the pipelines use. That is the same class of failure that gated cycle 1 FAIL, and it must not ship."
+  maintainability:
+    status: CONCERNS
+    notes: "Downgraded from PASS. The CR2-4 test asserts a case its name does not describe — a vacuous test of exactly the kind cycle 1 spent a round removing. That the fixture already satisfied the assertion is the tell."
+
+recommendations:
+  immediate:
+    - action: "Evaluate hint tiers before the only-board short-circuit; carry a partial-read flag so a fail-closed answer can explain itself"
+      refs: ["shared/resources/gh-stage.js:428", "shared/resources/gh-stage.js:362"]
+    - action: "Make --add-to-board's title handling honest — resolve against the owner's projects or require a numeric hint — and delete the vacuous test"
+      refs: ["shared/resources/gh-stage.js:772", "shared/resources/tests/gh-stage.test.mjs:1065"]
+    - action: "Give `observed` three distinguishable states and word the unverified message from the one that applies"
+      refs: ["shared/resources/gh-stage.js:975"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "CR3-1 must be fixed — an explicit board hint must never be bypassed, including when a partial read leaves exactly one board"
+
+code_review:
+  bugs: 3
+  cleanups: 0
+  promoted_to_gate: ["CR3-1", "CR3-2", "CR3-3"]
+  blocking_resolution: "code_review_blocking=true from pipeline Skill args; no per-doc override present"
+
+lesson:
+  note: "Cycle 2 accepted CR2-3 as a low-confidence advisory and fixed it in the same pass as the blockers. It was the only change of the four that widened what the code accepts rather than narrowing it, and it is the one that regressed. Widening a guard deserves its own scrutiny even when it arrives labelled advisory."

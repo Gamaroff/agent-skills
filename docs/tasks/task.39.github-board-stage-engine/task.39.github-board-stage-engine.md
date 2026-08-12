@@ -347,12 +347,19 @@ None in this task. Task.40 deletes the inline GraphQL.
 - [x] Single board → used directly
 - [x] Two boards, no hint → `ambiguous-board`, naming both
 - [x] Two boards + `--board` / `github.projectBoard` / `project.yml` → correct one chosen
-- [x] **An unmatched hint fails closed** — a hint that is *set* but names no board the issue is on
-      yields `ambiguous-board` and does **not** fall through to a lower-precedence tier. Added after
-      QA cycle 1 found the `||` chain conflating "hint absent" with "hint wrong", which let a mistyped
+- [x] **An unmatched operator hint fails closed** — `--board` / `github.projectBoard` that names no
+      board the issue is on yields `ambiguous-board` and does **not** fall through. Added after QA
+      cycle 1 found the `||` chain conflating "hint absent" with "hint wrong", which let a mistyped
       `--board` set the status on a board the operator never named
-- [x] **`--add-to-board` with an unresolvable board hint skips the add** rather than substituting
-      `project.yml`'s number — a title hint resolves to its own board's number or to nothing
+- [x] **A partial read cannot bypass that check** — the single-board rule runs *after* the hint
+      tiers, so a read that fails for the named board and succeeds for another does not write to the
+      survivor. QA cycle 3 found this: the partial-read tolerance added in cycle 2 had reopened the
+      cycle-1 defect through a different door
+- [x] **`project.yml` disambiguates but never vetoes** — it must not refuse a move on the single
+      board an issue actually sits on, and a stale `project_board_number` must not make
+      `project_board_name` unreachable
+- [x] **`--add-to-board` with a non-numeric board hint skips the add** rather than substituting
+      `project.yml`'s number or performing a redundant one
 - [x] `nodes: []` → `not-on-board`
 - [x] No Status field → skip, not a crash
 - [x] **A GraphQL error response → `board-unreadable`, not `not-on-board`** — the two must not be
@@ -378,7 +385,9 @@ None in this task. Task.40 deletes the inline GraphQL.
       not just the board
 - [x] **`--issue` is validated on every path**, including `--probe-board`, before any query is built
 - [x] **The verify re-read is confirmation, not truth** — a stale read never overwrites the reported
-      option; the result carries `verified: true|false` instead
+      option; the result carries `verified: true|false` instead, plus `observed` in three
+      distinguishable states (`null` = not read, `""` = read and unset, `"X"` = read and showing X) so
+      a genuine no-op stays tellable from a lagging read and from a failed read
 - [x] Flag surface matches `jira-stage.js` where the concept exists
 
 ---
@@ -699,6 +708,8 @@ and four tests pass vacuously, including both guard tests and the verify-re-read
 | 2026-08-03 | Task authored | Claude |
 | 2026-08-12 | `/review-task` — 9/10 READY TO IMPLEMENT. Five wrong `file:line` citations corrected across the task and plan; Motivation #5 rewritten to name `DEFAULT_LADDER` rather than the unreachable `DEFAULT_STATUS_RANK`, with the `"Todo"` fix explicitly scoped out and recorded under Known Issues | Claude |
 | 2026-08-12 | Phases 1–4 implemented: `gh-stage.js`, 50 tests, 8 fixtures. `tracker-workflow.md` gains `## GitHub execution semantics`; `configuration.md` gains both new keys plus a `project.yml` section; `CHANGELOG.md` `### Added`. Fixed a stale-parse-cache bug in `--write-ladder`. `npm test` 1050/1050 | Claude |
+| 2026-08-12 | QA cycle 3 → **FAIL (55/100)**, then `qa-fix` cycle 3. The partial-read tolerance added in cycle 2 had **reopened the cycle-1 defect through a different door**: a read that failed for the named board and succeeded for another left one board standing, and the single-board short-circuit — which ran *before* the hint check — wrote to it without comparing its name, silently under `--json`. The hint tiers now run first, `--board` and `github.projectBoard` are separate tiers each failing closed on their own, and `project.yml` disambiguates without vetoing a single-board move. Also: `--add-to-board` now honestly requires a numeric hint (a title cannot be resolved from an issue-scoped read, so the cycle-2 "fix" could only ever perform a redundant add — and its test passed vacuously because the fixture already contained the titled board); `observed` gained a third state so a failed read is not reported as an unset column. `npm test` 1064/1064 | Claude |
+| 2026-08-12 | QA cycle 2 → **CONCERNS (80/100)**, then `qa-fix` cycle 2 — all 12 cycle-1 fixes verified holding; four issues the fixes themselves introduced were corrected (project.yml's two keys collapsed into one tier, `observed` surfaced, title-hint add, partial-read tolerance). `npm test` 1062/1062 | Claude |
 | 2026-08-12 | QA cycle 1 → **FAIL (60/100)**. `qa-fix` cycle 1 applied 12 fixes. **CR-1 (HIGH)**: `selectBoard` now fails closed — a hint that is set but unmatched yields `ambiguous-board` instead of falling through and writing to a board the operator never named. **CR-2**: `boardHintNumber` resolves a title hint to its own board's number or to nothing, never `project.yml`'s. **CR-3**: the mutation error-envelope check moved *inside* the retried closure, so a transient board mutation is retried 3× as §8 always claimed. Four vacuous tests made real (verify re-read, both guard tests, retry attempt count). Advisory: verify re-read no longer trusted when it disagrees (`verified` flag added); `--write-ladder` writes nothing under `--dry-run`; `--issue` validated on the probe path; `readBoard` surfaces `doc.errors`. `npm test` 1058/1058 | Claude |
 
 ---

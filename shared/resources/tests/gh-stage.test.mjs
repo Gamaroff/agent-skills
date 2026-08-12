@@ -393,17 +393,20 @@ test("selectBoard: project.yml's two keys are ONE tier — name is reachable pas
   assert.equal(r3.unmatchedRule, "--board");
 });
 
-test("boardHintNumber: never substitutes an unrelated board for a title hint", () => {
-  const items = twoBoards();
+test("boardHintNumber: a non-numeric hint yields no add, never another board", () => {
   const yml = { boardNumber: "1", boardName: "Agent Skills" };
   // A numeric hint passes straight through.
   assert.equal(cli.boardHintNumber("12", "", yml), "12");
-  // A title hint resolves to ITS OWN number when the board list is available…
-  assert.equal(cli.boardHintNumber("Team Sprint", "", yml, items), "7");
-  // …and yields "" (no add) when it cannot be resolved — NOT project.yml's
-  // number, which is a different board entirely.
+  // A TITLE hint yields "" — meaning "do not add". It must NOT fall back to
+  // project.yml's number, which is a different board entirely; that is what used
+  // to add the issue to one board while the status went to another.
+  //
+  // Resolving a title to a number would need the OWNER's project list. The only
+  // read this CLI performs is issue-scoped, so it lists boards the issue is
+  // already on — resolving against it could only ever "add" to a board the issue
+  // is already on, which is a no-op. `--add-to-board` therefore needs a number.
   assert.equal(cli.boardHintNumber("Team Sprint", "", yml), "");
-  assert.equal(cli.boardHintNumber("No Such Board", "", yml, items), "");
+  assert.equal(cli.boardHintNumber("No Such Board", "", yml), "");
   // Absent hints fall through to the configured value, then project.yml.
   assert.equal(cli.boardHintNumber("", "4", yml), "4");
   assert.equal(cli.boardHintNumber("", "", yml), "1");
@@ -985,6 +988,54 @@ test("readBoard tolerates a PARTIAL-success envelope (errors + usable nodes)", (
   assert.notEqual(r.reason, "board-unreadable");
 });
 
+test("a PARTIAL read must not let the one survivor bypass an explicit --board", () => {
+  // The regression this pins, and it is the cycle-1 defect re-entering through
+  // the door the partial-read tolerance opened: the operator names board 7, the
+  // token cannot see board 7, so the read returns errors plus board 12 alone —
+  // and a one-board short-circuit placed BEFORE the hint check writes the status
+  // to board 12 without ever comparing its name. Silently, because under --json
+  // output.warn is suppressed and that is how the pipelines call it.
+  const root = withRepo({ "tracker-workflow.yaml": LADDER });
+  const full = JSON.parse(raw("gh-issue-on-two-boards"));
+  const partial = {
+    data: {
+      repository: {
+        issue: {
+          projectItems: { nodes: [full.data.repository.issue.projectItems.nodes[1]] },
+        },
+      },
+    },
+    errors: [{ message: "Resource not accessible: ProjectV2 #7" }],
+  };
+  const body = JSON.stringify(partial);
+  const calls = [];
+  const execImpl = (argv) => {
+    calls.push(argv);
+    if (argv[0] === "auth") return "ok";
+    if (argv[0] === "repo") return argv.includes("owner") ? "Gamaroff" : "agent-skills";
+    if (String(argv[argv.length - 1]).includes("mutation"))
+      return JSON.stringify({ data: { updateProjectV2ItemFieldValue: { projectV2Item: { id: "x" } } } });
+    return body;
+  };
+  const r = cli.run({
+    argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "in-review", "--board", "7"],
+    execImpl,
+    repoRoot: root,
+    sleepImpl: noSleep,
+  });
+  assert.equal(r.reason, "ambiguous-board");
+  assert.equal(
+    calls.filter((c) => String(c[c.length - 1]).includes("mutation")).length,
+    0,
+    "must not write to the board that merely happened to survive the read",
+  );
+  // And the payload must carry the partial-read hint, because output.warn is
+  // invisible under --json and the candidate list actively hides the reason:
+  // the named board is missing precisely because it could not be read.
+  assert.equal(r.partialRead, true);
+  assert.equal(r.unmatchedRule, "--board");
+});
+
 test("readBoard surfaces a GraphQL error instead of reporting not-on-board", () => {
   // An errors-bearing response with a null repository used to degrade into an
   // empty node list, which reads as the benign 'this issue is not on a board'
@@ -1062,11 +1113,30 @@ test("describeAlternatives does not hint at the moment being resolved", () => {
 // ensureOnBoard — the propagation dance
 // ===========================================================================
 
-test("--add-to-board with a TITLE hint resolves after the read and adds", () => {
-  // boardHintNumber cannot turn a title into a number before any board has been
-  // read — the title→number map only exists in the read response. The first pass
-  // therefore yields nothing, and a second pass must resolve it against what was
-  // just read. Without that, documented behaviour could never fire.
+test("--add-to-board with a NUMERIC hint adds to exactly that board", () => {
+  const root = withRepo({ "tracker-workflow.yaml": LADDER });
+  const s = stubGh({ boardQueue: ["gh-issue-on-two-boards", "gh-issue-on-two-boards"] });
+  const r = go(
+    ["--issue", "42", "--stage", "in-review", "--board", "7", "--add-to-board"],
+    s,
+    root,
+  );
+  const adds = s.calls.filter((c) => c[1] === "item-add");
+  assert.equal(adds.length, 1);
+  assert.ok(adds[0].includes("7"), `added to board 7, got: ${adds[0].join(" ")}`);
+  assert.equal(r.transitioned, true);
+});
+
+test("--add-to-board with a TITLE hint skips the add rather than faking it", () => {
+  // A title cannot become a board number here: `item-add` needs a number, and
+  // the only read this CLI performs is issue-scoped — it lists boards the issue
+  // is ALREADY on, so resolving a title against it could only ever "add" to a
+  // board the issue is already on. That is a no-op costing a write, a 3s sleep
+  // and a second read, so it is not attempted at all.
+  //
+  // The previous version of this test asserted exactly that redundant case and
+  // passed because its fixture already contained the titled board — a vacuous
+  // test of the kind cycle 1 spent a round removing.
   const root = withRepo({ "tracker-workflow.yaml": LADDER });
   const s = stubGh({ boardQueue: ["gh-issue-on-two-boards"] });
   const r = go(
@@ -1074,10 +1144,10 @@ test("--add-to-board with a TITLE hint resolves after the read and adds", () => 
     s,
     root,
   );
-  const adds = s.calls.filter((c) => c[1] === "item-add");
-  assert.equal(adds.length, 1, "the add really happened");
-  assert.ok(adds[0].includes("7"), `added to board 7 (Team Sprint), got: ${adds[0].join(" ")}`);
+  assert.equal(s.calls.filter((c) => c[1] === "item-add").length, 0, "no add attempted");
+  // The status move itself still works — selectBoard matches on the title.
   assert.equal(r.transitioned, true);
+  assert.equal(r.board, "Team Sprint");
 });
 
 test("--add-to-board with an unresolvable hint skips the add rather than guessing", () => {

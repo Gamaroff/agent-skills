@@ -552,15 +552,24 @@ A status change is a claim about where the work is, visible to whoever reads tha
 `set-github-project-priority.sh` and `set-github-project-estimate.sh`, which fan an estimate or a
 priority out to every board; that is harmless for those fields and wrong for a status.) The order:
 
-1. exactly one board → use it, no config needed
-2. `--board <number|name>` on the command line
-3. `github.projectBoard`
+1. `--board <number|name>` on the command line — when set, must **match**
+2. `github.projectBoard` — when set, must **match**
+3. exactly one board → use it, no config needed
 4. `project.yml` → `project_board_number`, then `project_board_name`
 5. no hint → **skip**, reason `ambiguous-board`, naming the candidates
 
-The list is walked only past tiers that are **unset**. The first tier that is set decides: if it names
-a board the issue is not on, the move is skipped as `ambiguous-board` rather than falling through to
-the next tier. A mistyped `--board` therefore changes nothing, instead of changing the wrong board.
+`--board` and `github.projectBoard` name a specific board, so each fails closed when it matches
+nothing: the move is skipped as `ambiguous-board` rather than falling through. A mistyped `--board`
+therefore changes nothing, instead of changing the wrong board — and this check runs *before* the
+single-board rule, because a partially-failed read can leave exactly one board standing that nobody
+asked for.
+
+`project.yml` is different: it is ambient repo config rather than a claim about this issue, so it
+disambiguates when several boards are in play but never vetoes a move on the single board an issue
+sits on.
+
+**`--add-to-board` needs a board number**, since `gh project item-add` takes one and a title cannot be
+resolved from an issue-scoped read. A title still works for selecting the board to *move*.
 
 Set `github.projectBoard` only if your issues genuinely sit on more than one board. Both a number and
 a title work:

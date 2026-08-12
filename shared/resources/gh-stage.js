@@ -359,8 +359,16 @@ function readBoard({ exec, owner, repo, issue, statusField, onWarn }) {
   //
   // Deliberately unlike setOption, where all-or-nothing IS correct: a mutation
   // either applied or it did not, and there is no partial state to salvage.
+  // The array carries a non-enumerable `partial` marker rather than changing the
+  // return type: every caller iterates it as a list, and the one caller that has
+  // to make a safety decision (selectBoard) reads the flag. Non-enumerable so
+  // JSON.stringify and deepEqual on the items are unaffected.
   if (errs && !items.length) throw new Error(errs);
   if (errs && onWarn) onWarn(errs);
+  Object.defineProperty(items, "partial", {
+    value: !!errs,
+    enumerable: false,
+  });
   return items;
 }
 
@@ -397,15 +405,29 @@ function normalizeItem(node, statusField) {
  * for an estimate and wrong for a status: a status change is a claim about where
  * the work is, visible to whoever reads that board. So: never fan out.
  *
- *   1 exactly one board            → use it
- *   2 --board                      → that one
- *   3 github.projectBoard          → that one
- *   4 project.yml number / name    → that one
- *   5 otherwise                    → skip, "ambiguous-board", naming them
+ *   1 --board / github.projectBoard, when set → must MATCH, else fail closed
+ *   2 exactly one board                      → use it
+ *   3 project.yml number / name              → that one
+ *   4 otherwise                              → skip, "ambiguous-board", naming them
+ *
+ * Two different kinds of hint, deliberately handled differently:
+ *
+ * `--board` and `github.projectBoard` are an OPERATOR NAMING A BOARD. If the
+ * named board is not among those read, that is a question, not a licence to pick
+ * another one — so it fails closed even when only one board came back. The
+ * one-board short-circuit must therefore come AFTER this check: a read returns
+ * one board for reasons other than the issue being on one board, and a
+ * partially-failed read is exactly that — the named board is missing precisely
+ * because the token could not see it, and the survivor would be written to
+ * without its name ever being compared.
+ *
+ * `project.yml` is ambient repo config — where this repo's board generally is —
+ * not an assertion about this issue. It DISAMBIGUATES when several boards are in
+ * play; it must not veto a move on the single board an issue actually sits on,
+ * which would refuse every issue that lives anywhere else.
  */
-function selectBoard(items, { board, configured, projectYml }) {
+function selectBoard(items, { board, configured, projectYml, partial = false }) {
   if (items.length === 0) return { item: null, reason: "not-on-board" };
-  if (items.length === 1) return { item: items[0], rule: "only-board" };
 
   const yml = projectYml || {};
   const candidates = items.map((i) => `${i.projectTitle} (#${i.projectNumber})`);
@@ -416,50 +438,51 @@ function selectBoard(items, { board, configured, projectYml }) {
     );
   };
 
-  // Precedence, most specific first. Only tiers that are actually SET are
-  // considered — but the first one that IS set is authoritative.
-  //
-  // A tier may hold SEVERAL hints that all describe the SAME board. project.yml
-  // is exactly that: `project_board_number` and `project_board_name` are two
-  // spellings of one board, so they belong to one tier. Failing closed between
-  // them would make the name unreachable whenever the number is set — which is
-  // the normal config — and a stale number would then refuse a move the name
-  // resolves perfectly well.
-  const tiers = [
-    { hints: [[board, "--board"]] },
-    { hints: [[configured, "github.projectBoard"]] },
-    {
-      hints: [
-        [yml.boardNumber, "project.yml project_board_number"],
-        [yml.boardName, "project.yml project_board_name"],
-      ],
-    },
-  ];
+  const fail = (set) => ({
+    item: null,
+    reason: "ambiguous-board",
+    ...(set
+      ? {
+          unmatchedHint: set.map(([h]) => String(h).trim()).join(" / "),
+          unmatchedRule: set.map(([, r]) => r).join(" / "),
+        }
+      : {}),
+    // A partial read is the likeliest innocent explanation for a hint that
+    // matches nothing, and the operator cannot guess it from the candidate
+    // list — the board they named is precisely the one missing from it.
+    partialRead: !!partial,
+    candidates,
+  });
 
-  for (const tier of tiers) {
-    const set = tier.hints.filter(([hint]) => !!hint);
-    if (!set.length) continue; // wholly absent — fall through to the next tier
-    for (const [hint, rule] of set) {
-      const hit = match(hint);
-      if (hit) return { item: hit, rule };
-    }
-    // SET BUT UNMATCHED — fail closed, without consulting a lower tier.
-    //
-    // Falling through here is what made a mistyped `--board 999` land on
-    // whatever project.yml happened to name: a status change on a board the
-    // operator explicitly did not ask for, which is precisely the outcome the
-    // never-fan-out rule exists to prevent. `hint absent` and `hint present but
-    // wrong` are different questions and must not share an answer.
-    return {
-      item: null,
-      reason: "ambiguous-board",
-      unmatchedHint: set.map(([h]) => String(h).trim()).join(" / "),
-      unmatchedRule: set.map(([, r]) => r).join(" / "),
-      candidates,
-    };
+  // 1. Operator-named board. `--board` and `github.projectBoard` are SEPARATE
+  //    tiers — `--board` outranks the config, so a set-but-unmatched `--board`
+  //    must fail closed without consulting the config either. Falling through is
+  //    what let a mistyped `--board 999` land on another board entirely.
+  for (const [hint, rule] of [
+    [board, "--board"],
+    [configured, "github.projectBoard"],
+  ]) {
+    if (!hint) continue; // absent — the next tier may answer
+    const hit = match(hint);
+    if (hit) return { item: hit, rule };
+    return fail([[hint, rule]]);
   }
 
-  return { item: null, reason: "ambiguous-board", candidates };
+  // 2. Nothing named, and only one board exists — nothing to disambiguate.
+  if (items.length === 1) return { item: items[0], rule: "only-board" };
+
+  // 3. project.yml disambiguates. Its two keys are two spellings of ONE board,
+  //    so they are one tier: a stale number must not make the name unreachable.
+  const ymlHints = [
+    [yml.boardNumber, "project.yml project_board_number"],
+    [yml.boardName, "project.yml project_board_name"],
+  ].filter(([h]) => !!h);
+  for (const [hint, rule] of ymlHints) {
+    const hit = match(hint);
+    if (hit) return { item: hit, rule };
+  }
+
+  return fail(ymlHints.length ? ymlHints : null);
 }
 
 /**
@@ -746,7 +769,28 @@ function run({
     return emit({ transitioned: false, reason: "stage-disabled" }, 0);
   }
 
-  let addBoardNum = boardHintNumber(args.board, configuredBoard, projectYml);
+  // `item-add` takes a board NUMBER. A title cannot be turned into one from
+  // anything this CLI reads: the only read it performs is issue-scoped
+  // (`repository.issue.projectItems`), which by definition lists boards the issue
+  // is ALREADY on — so resolving a title against it can only ever "add" the issue
+  // to a board it is already on, which is the one case where the add is a no-op.
+  // Mapping a title to a number properly needs the OWNER's project list, a
+  // different API surface this task does not take on.
+  //
+  // So the honest contract is: --add-to-board needs a numeric hint. Say so, and
+  // skip the add rather than performing a useless one or guessing another board.
+  const addBoardNum = boardHintNumber(args.board, configuredBoard, projectYml);
+
+  if (args.addToBoard && !args.dryRun && !addBoardNum) {
+    output.warn(
+      "⚠️  --add-to-board needs a board NUMBER and none was resolved — skipping the add. " +
+        (args.board
+          ? `"${args.board}" looks like a title; a title cannot be resolved to a board number ` +
+            "from an issue-scoped read. "
+          : "") +
+        "Pass --board <number>, or set github.projectBoard / project.yml's project_board_number.",
+    );
+  }
 
   let items;
   try {
@@ -762,37 +806,6 @@ function run({
             sleepMs: sleepImpl,
           })
         : readBoard({ exec, owner, repo, issue: args.issue, statusField, onWarn });
-
-    // A TITLE-valued hint cannot become a number until some board has been read
-    // — `item-add` takes a number, and the title→number map only exists in the
-    // read response. So when the first pass could not resolve one, retry the
-    // resolution against what we just read and add then. Without this second
-    // pass the documented `--add-to-board --board "<title>"` could never add,
-    // because the only call site ran before any read.
-    if (args.addToBoard && !args.dryRun && !addBoardNum) {
-      addBoardNum = boardHintNumber(
-        args.board,
-        configuredBoard,
-        projectYml,
-        items,
-      );
-      if (addBoardNum) {
-        items = ensureOnBoard({
-          exec,
-          owner,
-          repo,
-          issue: args.issue,
-          statusField,
-          boardNum: addBoardNum,
-          sleepMs: sleepImpl,
-        });
-      } else {
-        output.warn(
-          "⚠️  --add-to-board given but no board number could be resolved — skipping the add. " +
-            "Pass --board <number>, or set github.projectBoard / project.yml's project_board_number.",
-        );
-      }
-    }
   } catch (e) {
     output.warn(`⚠️  Could not read the board: ${e.message}`);
     return emit({ transitioned: false, reason: "board-unreadable" }, 0);
@@ -812,19 +825,35 @@ function run({
     board: args.board,
     configured: configuredBoard,
     projectYml,
+    partial: !!items.partial,
   });
 
   if (!picked.item) {
     if (picked.reason === "ambiguous-board") {
       output.warn(
-        `⚠️  issue #${args.issue} is on ${items.length} boards and none was selected — ` +
-          `pass --board, or set github.projectBoard. Candidates: ${picked.candidates.join(", ")}`,
+        picked.unmatchedHint
+          ? `⚠️  ${picked.unmatchedRule} names "${picked.unmatchedHint}", which is not among the ` +
+              `boards read for issue #${args.issue} — not guessing. Candidates: ${picked.candidates.join(", ")}`
+          : `⚠️  issue #${args.issue} is on ${items.length} boards and none was selected — ` +
+              `pass --board, or set github.projectBoard. Candidates: ${picked.candidates.join(", ")}`,
       );
+      // The likeliest innocent explanation, and one the candidate list actively
+      // hides: the named board is missing precisely because it could not be read.
+      if (picked.partialRead)
+        output.warn(
+          "    NOTE: that read returned errors for at least one board, so the one you named " +
+            "may exist but be unreadable with this token rather than be absent.",
+        );
       return emit(
         {
           transitioned: false,
           reason: "ambiguous-board",
           candidates: picked.candidates,
+          unmatchedHint: picked.unmatchedHint || null,
+          unmatchedRule: picked.unmatchedRule || null,
+          // Emitted so a --json consumer sees it too; output.warn is suppressed
+          // under --json, which is the mode the pipelines use.
+          partialRead: !!picked.partialRead,
         },
         args.strict ? 1 : 0,
       );
@@ -952,29 +981,46 @@ function run({
   // the silent-no-op detection this exists for. So: trust it only when it agrees
   // with what we asked for; otherwise keep the requested name and say the
   // confirmation did not come back.
+  // `observed` has THREE meanings and they must stay distinguishable:
+  //   null  — the verify read did not happen or the item was absent from it.
+  //           We know nothing about the board's current state.
+  //   ""    — the read succeeded and the column is genuinely unset.
+  //   "X"   — the read succeeded and the column shows X.
+  //
+  // Collapsing the first two lets the CLI assert the board "shows (unset)" when
+  // it never managed to look, which is the same conflation the observed value was
+  // introduced to remove, one level down.
   let landed = r.match.name;
   let verified = false;
   let observed = null;
+  let verifyError = null;
   try {
     const after = readBoard({ exec, owner, repo, issue: args.issue, statusField });
     const same = after.find((i) => i.itemId === item.itemId);
     if (same) observed = same.current || "";
+    else verifyError = "the item was not in the verify read";
     if (observed && tw.eqName(observed, r.match.name)) {
       landed = observed;
       verified = true;
     }
-  } catch (_) {}
+  } catch (e) {
+    verifyError = (e && e.message) || "verify read failed";
+  }
 
-  // `observed` is reported even when it disagrees. Dropping it would make a
-  // genuine silent no-op — the mutation returned no error but the board did not
-  // change — indistinguishable from a read that simply had not caught up, and
-  // telling those apart is the only reason to re-read at all.
-  output.info(
-    verified
-      ? `✅ ${label} → "${landed}".`
-      : `⚠️  ${label} → "${landed}" requested, but the verify read still shows ` +
-          `"${observed || "(unset)"}" — either propagation lag or the change did not stick.`,
-  );
+  if (verified) {
+    output.info(`✅ ${label} → "${landed}".`);
+  } else if (observed === null) {
+    // Say only what is true: the move was issued, and we could not check it.
+    output.warn(
+      `⚠️  ${label} → "${landed}" requested, but it could not be confirmed ` +
+        `(${verifyError}). The change may well have applied.`,
+    );
+  } else {
+    output.warn(
+      `⚠️  ${label} → "${landed}" requested, but the verify read shows ` +
+        `"${observed || "(unset)"}" — either propagation lag or the change did not stick.`,
+    );
+  }
   return emit(
     {
       transitioned: true,
@@ -983,6 +1029,7 @@ function run({
       to: landed,
       verified,
       observed,
+      verifyError,
       board: item.projectTitle,
       rule: r.rule,
     },
@@ -1004,24 +1051,24 @@ function repoContext(exec, field) {
  * The board NUMBER to hand `gh project item-add`, or "" when it cannot be known.
  *
  * `item-add` takes a number, but a board hint may legitimately be a TITLE — both
- * `--board 12` and `--board "Team Sprint"` are accepted by selectBoard. Silently
- * substituting `project.yml`'s number for an unresolvable title used to add the
- * issue to one board while the status was written to another. A hint that is set
- * but not resolvable to a number therefore yields "" — no add — rather than a
- * different board.
+ * `--board 12` and `--board "Team Sprint"` are accepted by selectBoard, which
+ * matches on either. Silently substituting `project.yml`'s number for an
+ * unresolvable title used to add the issue to one board while the status was
+ * written to another.
  *
- * `items` (optional) lets a title resolve to its own number when the board has
- * already been read.
+ * So a hint that is SET but is not a number yields "" — meaning "no add" — and
+ * never another board's number. Resolving a title properly would need the
+ * owner's project list; an issue-scoped read cannot do it, because it only lists
+ * boards the issue is already on.
  */
-function boardHintNumber(board, configured, projectYml, items) {
+function boardHintNumber(board, configured, projectYml) {
   const yml = projectYml || {};
   const resolve = (hint) => {
     if (!hint) return null; // absent — try the next source
     const h = String(hint).trim();
     if (/^\d+$/.test(h)) return h;
-    const hit = (items || []).find((i) => tw.eqName(i.projectTitle, h));
-    // Set but unresolvable: "" (no add), never a fallback to another board.
-    return hit && hit.projectNumber ? hit.projectNumber : "";
+    // Set but not a number: "" (no add), never a fallback to another board.
+    return "";
   };
   for (const hint of [board, configured, yml.boardNumber, yml.boardName]) {
     const r = resolve(hint);
@@ -1079,6 +1126,7 @@ function probeBoard({
     board: args.board,
     configured: configuredBoard,
     projectYml,
+    partial: !!items.partial,
   });
   if (!picked.item) {
     output.warn(
