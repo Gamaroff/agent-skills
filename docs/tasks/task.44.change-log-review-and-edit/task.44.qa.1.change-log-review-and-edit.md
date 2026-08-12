@@ -258,3 +258,44 @@ Not applicable — the change set is markdown instructions plus one test file. C
 **QA Report**: co-located at `task.44.qa.1.change-log-review-and-edit.md`
 **Gate File**: co-located at `task.44.gate.1.change-log-review-and-edit.yml`
 **Next Steps**: `/qa-fix` addresses TASK-44-BUG-1, then re-review.
+
+---
+
+## Bug Resolution Summary
+
+**Fix cycle**: 1 · **Date**: 2026-08-12 · **Commit**: `91557db` · **Bugs fixed**: 1 · **Bugs remaining**: 0
+
+### TASK-44-BUG-1 — VERIFIED FIXED
+
+The block was moved to follow item 3, giving the sequence 1, 2, 3, 4. The fix also closed the underlying ambiguity rather than only the numbering, which is the right call — reordering alone would have left the unconditional scope inferable but unstated:
+
+- opening now reads "…recording the review outcome — **regardless of which option was chosen above** — and bump frontmatter `updated`…"
+- the quiet case is stated outright: a review that found nothing still writes `Review passed (9/10) — no changes required`, because the verdict is the event being recorded, not the edits
+- the dependency is named: check 4b's currency heuristic relies on this write being unconditional
+- "Skip when" tightened to "**Skip only when** `change-log.enabled: false`"
+- the step's **Output** line now states a row is written in both branches
+
+**Verification performed:**
+
+| Check | Result |
+| --- | --- |
+| List order in Step 8.5 | `1, 2, 3, 4` ✓ |
+| "regardless of which option was chosen above" present | ✓ |
+| Quiet case stated | ✓ |
+| 4b dependency named | ✓ |
+| Risk area unchanged by the edit | `advisory` → **Important** still; `4b` still between `4a` (477) and `5` (537) ✓ |
+| `npm test` | 1175/1175, 0 fail ✓ |
+| `npm run bundle` | still idempotent ✓ |
+| Regression sweep — numbered-list order across all 5 structurally-edited files | `review-task` 1-4, `edit-story` 1-4, `edit-epic` 1-4, `review-epic` 1-7, `enforce-standards` 1-7 — all in order ✓ |
+
+### Revised Gate
+
+**Gate Status**: CONCERNS → **PASS**
+**Quality Score**: 90 → **100/100**
+**Deployment Recommendation**: CONDITIONAL → **APPROVED** (staging and production, no conditions)
+
+All four NFRs remain PASS. No new issues were introduced by the fix; the change was confined to `skills/review-task/SKILL.md` plus QA artifacts.
+
+### Note for future cycles
+
+The one non-blocking recommendation stands and is worth restating, because this cycle demonstrates it: an out-of-order numbered list in a skill file passed lint, the full 1175-test suite, the bundler, the eval scenarios and doc-link resolution. These files *are* the product, so a mis-ordered instruction list is a product defect that no existing automated check can see. A protocol test asserting numbered-list sequence integrity would close that gap cheaply.

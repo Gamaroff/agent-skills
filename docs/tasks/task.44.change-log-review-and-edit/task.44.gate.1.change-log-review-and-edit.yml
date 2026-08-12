@@ -1,10 +1,10 @@
 schema: 1
 task: 'task.44.change-log-review-and-edit'
 task_title: 'Review and edit skills log their document mutations'
-gate: CONCERNS
-status_reason: 'All five phases delivered and verified; the highest-risk area (Phase 4 grading) is correctly specified with advisory as the default mapping to Important in all four review skills. One MEDIUM instruction defect: review-task Step 8.5 numbers its new Change Log item out of sequence, making its conditional scope ambiguous.'
+gate: PASS
+status_reason: 'TASK-44-BUG-1 fixed and verified in cycle 1: the Step 8.5 block was moved after item 3 (sequence now 1,2,3,4) and the ambiguity closed explicitly rather than left to inference. All five phases delivered; the highest-risk area (Phase 4 grading) is correctly specified with advisory as the default mapping to Important in all four review skills, confirmed live on a legacy document.'
 reviewer: 'QA Engineer'
-updated: '2026-08-12T20:40:00Z'
+updated: '2026-08-12T20:52:00Z'
 
 top_issues:
   - id: TASK-44-BUG-1
@@ -14,12 +14,21 @@ top_issues:
     bug_ref: 'task.44.bug.1.review-task-step-8-5-list-numbering.md'
     suggested_action: 'Move the item after the "No, I will fix manually" block so the sequence reads 1,2,3,4; optionally add "regardless of which option was chosen above"'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-08-12'
 
 waiver:
   active: false
 
-quality_score: 90
+quality_score: 100
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-08-12'
+  total_iterations: 1
+  fix_commit: '91557db'
+  verification_method: 'List-order extraction (now 1,2,3,4); three targeted greps confirming the unconditional phrasing, the quiet-case statement and the named 4b dependency; full suite 1175/1175; bundle idempotent; regression sweep over all five structurally-edited files.'
 
 evidence:
   tests_reviewed: 1175
@@ -43,15 +52,12 @@ nfr_validation:
     notes: 'Every one of the 14 skills links shared/resources/document-change-log.md rather than restating the column list — the stated anti-drift goal. 21 new protocol tests pin the contract. The single numbering defect is recorded as TASK-44-BUG-1 rather than double-counted here.'
 
 recommendations:
-  immediate:
-    - action: 'Fix review-task Step 8.5 list ordering (TASK-44-BUG-1)'
-      refs: ['skills/review-task/SKILL.md']
+  immediate: []
   future:
     - action: 'Consider a protocol test asserting numbered-list sequence integrity in skill files — this defect class is invisible to every existing check and was only caught by reading the rendered order'
       refs: ['tests/skill-protocol.test.js']
 
 deployment_readiness:
-  staging: CONDITIONAL
-  production: CONDITIONAL
-  conditions:
-    - 'TASK-44-BUG-1 fixed — one-block move in skills/review-task/SKILL.md'
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -512,16 +512,19 @@ structural-rewrite skill missing its row.
 | 2026-08-12 | 1.1     | Review passed (9/10) — ready for development; Change Log section added, absent since the document predated task.43's template | review-task |
 | 2026-08-12 |         | Status → in-progress                                         | develop     |
 | 2026-08-12 |         | Implemented — all 5 phases; 16 files, 21 new protocol tests, 1175/1175 passing | develop     |
+| 2026-08-12 |         | QA gate CONCERNS (90/100) — 1 medium: review-task Step 8.5 list order | qa-task     |
+| 2026-08-12 |         | TASK-44-BUG-1 fixed — Step 8.5 block moved, scope made unconditional | qa-fix      |
+| 2026-08-12 |         | QA gate PASS (100/100) after 1 fix cycle                      | qa-task     |
 
 ---
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (after 1 fix cycle)
 
 ### QA Report
 
@@ -539,7 +542,7 @@ structural-rewrite skill missing its row.
 
 The highest-risk element — Phase 4's grading check — is correctly built: `advisory` is genuinely the default and maps to **Important**, never Critical, in all four review skills, and the legacy-document path was confirmed live during this pipeline's own Step 2.
 
-One MEDIUM issue: [TASK-44-BUG-1](./task.44.bug.1.review-task-step-8-5-list-numbering.md) — `review-task` Step 8.5 numbers its new Change Log item out of sequence (1, 2, 4, 3), placing it between the two conditional branches so an unconditional write reads as conditional on fixes having been applied.
+One MEDIUM issue was found and fixed in cycle 1: [TASK-44-BUG-1](./task.44.bug.1.review-task-step-8-5-list-numbering.md) — `review-task` Step 8.5 numbered its new Change Log item out of sequence (1, 2, 4, 3), placing it between the two conditional branches so an unconditional write read as conditional on fixes having been applied. The block was moved after item 3 and the scope made explicit. Re-verified: list order 1-4, suite 1175/1175, bundle idempotent, no regressions across the other four structurally-edited files. **Gate CONCERNS → PASS, 90 → 100/100.**
 
 ---
 
