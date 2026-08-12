@@ -918,6 +918,20 @@ test("--probe-board reports options in board order and each moment's verdict", (
   assert.deepEqual(s.calls.filter(isWrite), [], "probe is read-only");
 });
 
+test("--probe-board reports an unmatched hint accurately, even with one board", () => {
+  // The message must not claim "you are on several boards — pass --board" when
+  // the issue is on ONE board and --board was already passed. run() was given
+  // this reporting in cycle 3; probeBoard was left behind.
+  const root = withRepo({ "tracker-workflow.yaml": LADDER });
+  const s = stubGh({ board: "gh-status-unset" }); // a single board, #1
+  const r = go(["--probe-board", "--issue", "42", "--board", "999"], s, root);
+  assert.equal(r.reason, "ambiguous-board");
+  assert.equal(r.unmatchedHint, "999");
+  assert.equal(r.unmatchedRule, "--board");
+  assert.equal(r.partialRead, false);
+  assert.deepEqual(s.calls.filter(isWrite), [], "probe stays read-only");
+});
+
 test("--probe-board surfaces a moment the board cannot serve", () => {
   const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
   const s = stubGh({ board: "gh-bespoke-columns" });

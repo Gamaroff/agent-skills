@@ -1129,12 +1129,38 @@ function probeBoard({
     partial: !!items.partial,
   });
   if (!picked.item) {
-    output.warn(
-      picked.reason === "ambiguous-board"
-        ? `⚠️  issue #${issue} is on several boards — pass --board. Candidates: ${picked.candidates.join(", ")}`
-        : `⚠️  issue #${issue} is not on any project board.`,
+    // Mirrors run()'s reporting. Kept in step deliberately: an unmatched hint can
+    // now yield ambiguous-board with a SINGLE board, so the old "you are on
+    // several boards — pass --board" line would tell an operator two things that
+    // are both false, while they are staring at the one board they did name.
+    if (picked.reason !== "ambiguous-board") {
+      output.warn(`⚠️  issue #${issue} is not on any project board.`);
+    } else if (picked.unmatchedHint) {
+      output.warn(
+        `⚠️  ${picked.unmatchedRule} names "${picked.unmatchedHint}", which is not among the ` +
+          `boards read for issue #${issue}. Candidates: ${picked.candidates.join(", ")}`,
+      );
+      if (picked.partialRead)
+        output.warn(
+          "    NOTE: that read returned errors for at least one board, so the one you named " +
+            "may exist but be unreadable with this token rather than be absent.",
+        );
+    } else {
+      output.warn(
+        `⚠️  issue #${issue} is on ${items.length} boards — pass --board. ` +
+          `Candidates: ${picked.candidates.join(", ")}`,
+      );
+    }
+    return emit(
+      {
+        reason: picked.reason,
+        candidates: picked.candidates,
+        unmatchedHint: picked.unmatchedHint || null,
+        unmatchedRule: picked.unmatchedRule || null,
+        partialRead: !!picked.partialRead,
+      },
+      0,
     );
-    return emit({ reason: picked.reason, candidates: picked.candidates }, 0);
   }
 
   const item = picked.item;
