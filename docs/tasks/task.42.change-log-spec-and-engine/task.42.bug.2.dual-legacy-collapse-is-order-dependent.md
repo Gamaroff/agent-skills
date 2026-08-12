@@ -4,7 +4,7 @@
 **Bug ID**: TASK-42-BUG-2
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-08-12
 
@@ -146,3 +146,19 @@ Both recommendations applied, as the report advised:
 1. `node --test shared/resources/tests/change-log.test.mjs` — both `D: BOTH legacy pairs collapse
    … (jira first)` and `… (github first)` pass
 2. Re-run the reproduction snippet in this report: one block, zero legacy markers, rows in date order
+
+
+---
+
+## QA Verification
+
+**Verified By**: QA Engineer
+**Date**: 2026-08-12
+**Result**: ✅ **FIXED — bug closed**
+
+Verified against gate 3 ([task.42.gate.3.change-log-spec-and-engine.yml](./task.42.gate.3.change-log-spec-and-engine.yml), PASS 100/100).
+The regression test for this bug was confirmed to **fail against the pre-fix engine**, so it pins
+the behaviour rather than merely accompanying the fix. Adversarial re-probing of the changed code
+found no side effects.
+
+Full re-review: [task.42.qa.2.change-log-spec-and-engine.md](./task.42.qa.2.change-log-spec-and-engine.md).

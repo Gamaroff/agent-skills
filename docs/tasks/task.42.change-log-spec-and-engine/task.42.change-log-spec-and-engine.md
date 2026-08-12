@@ -5,7 +5,7 @@ type: task
 description: "Establish one canonical Change Log section format for PRD/epic/story/task documents, backed by a shared engine extracted from jira-sync.js, and record it in the standards."
 tags: [change-log, documentation, shared-resources]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 created: 2026-08-12
 updated: 2026-08-12
@@ -16,7 +16,7 @@ github_issue: 201
 
 # [Task 42] Canonical Change Log spec and shared engine
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.42.review.1.change-log-spec-and-engine.md` implemented 2026-08-12
 
@@ -775,30 +775,37 @@ standards document that reads badly.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-12
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS (after 2 fix cycles)
 
-### QA Report
-- **Full Report**: [task.42.qa.1.change-log-spec-and-engine.md](./task.42.qa.1.change-log-spec-and-engine.md)
-- **Gate File**: [task.42.gate.1.change-log-spec-and-engine.yml](./task.42.gate.1.change-log-spec-and-engine.yml)
+### QA Reports
+- **Cycle 1 report**: [task.42.qa.1.change-log-spec-and-engine.md](./task.42.qa.1.change-log-spec-and-engine.md) — gate FAIL, 60/100
+- **Re-review report (cycles 2–3)**: [task.42.qa.2.change-log-spec-and-engine.md](./task.42.qa.2.change-log-spec-and-engine.md)
+- **Final gate**: [task.42.gate.3.change-log-spec-and-engine.yml](./task.42.gate.3.change-log-spec-and-engine.yml)
+- Superseded gates: [gate.1 (FAIL)](./task.42.gate.1.change-log-spec-and-engine.yml), [gate.2 (CONCERNS)](./task.42.gate.2.change-log-spec-and-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 1137 (all passing)
-- **Phases Verified**: 5/5 complete; 2 with concerns
-- **Critical Issues**: 2 HIGH
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Tests Executed**: 1144 (all passing; baseline before this task was 1104)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 open (2 HIGH, 1 MEDIUM, 3 LOW raised and closed)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Bug Reports
+
+| Bug | Severity | Status |
+|---|---|---|
+| [TASK-42-BUG-1](./task.42.bug.1.heading-block-end-scan-ignores-fences.md) — heading-block end scan ignored fences | HIGH | ✅ Closed |
+| [TASK-42-BUG-2](./task.42.bug.2.dual-legacy-collapse-is-order-dependent.md) — dual-legacy collapse was order-dependent | HIGH | ✅ Closed |
+| [TASK-42-BUG-3](./task.42.bug.3.duplicate-current-block-never-collapsed.md) — duplicate current block never collapsed | MEDIUM | ✅ Closed |
 
 ### Key Findings
 
-Two high-confidence correctness bugs, both in the fence guard this task introduced:
+All three defects had the same shape: **a rule stated correctly in the spec, then applied to a subset of the places it governs.** The fence guard covered a block's start but not its end; block selection used declaration order rather than document order; the collapse sweep was scoped to superseded pairs rather than to every pair that can carry a Change Log. Each fix widened an existing rule rather than adding a new one — none required rethinking the design.
 
-- **[TASK-42-BUG-1](./task.42.bug.1.heading-block-end-scan-ignores-fences.md)** — the guard is applied where a Change Log block *starts* but not where it *ends*. A fenced `##` inside a Change Log section terminates the block early, consuming the opening fence and stranding a row outside the log.
-- **[TASK-42-BUG-2](./task.42.bug.2.dual-legacy-collapse-is-order-dependent.md)** — dual-legacy collapse depends on document order. With the github block before the jira block, both survive — failing the "no duplication" Success Criterion. The existing test covers only the working ordering.
-
-The architecture, extraction, spec and documentation are sound; both fixes are localised.
+Every fix is pinned by a regression test verified to **fail against the pre-fix engine**, and the cycle-3 re-review adversarially probed the changed code for side effects (notably: widening the collapse sweep did not weaken the fence guard).
 
 ---
 

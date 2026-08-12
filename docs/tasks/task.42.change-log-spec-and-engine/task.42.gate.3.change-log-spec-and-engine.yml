@@ -1,0 +1,72 @@
+schema: 1
+task: "task.42.change-log-spec-and-engine"
+task_title: "Canonical Change Log spec and shared engine"
+gate: PASS
+status_reason: "All three issues from cycles 1-2 verified fixed, each pinned by a regression test confirmed to fail against the pre-fix engine. Adversarial re-probing of the cycle-2 code found no new defects, including the case that most needed checking: widening the collapse sweep did not weaken the fence guard. All five success-criteria groups met, all NFRs PASS."
+reviewer: "QA Engineer"
+updated: "2026-08-12T19:05:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 1144
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+re_review_context:
+  previous_gate: "task.42.gate.2.change-log-spec-and-engine.yml (CONCERNS, 90/100)"
+  scope: "shared/resources/change-log.js and its test file — the only non-generated, non-doc files changed since gate 2"
+  previous_issues:
+    - id: TASK-42-BUG-1
+      status: FIXED
+      fixed_date: "2026-08-12"
+      verification: "Cycle 2. End-scan walks matchAll and skips protected candidates."
+    - id: TASK-42-BUG-2
+      status: FIXED
+      fixed_date: "2026-08-12"
+      verification: "Cycle 2. Positional selection + two-sided collapse; dual-pair test parameterised over both orderings."
+    - id: TASK-42-BUG-3
+      status: FIXED
+      fixed_date: "2026-08-12"
+      verification: "Cycle 3. SWEEP_PAIRS includes the current pair. Verified on three mixed-vintage blocks (collapse to 1, 4 rows preserved) and on two current blocks in one slice (exercises the new per-pair loop). New tests fail against the pre-fix engine."
+  adversarial_reprobe:
+    - probe: "Three blocks of mixed vintage (current + jira + github)"
+      result: "1 block, 4 rows — PASS"
+    - probe: "Two CURRENT blocks in one slice (exercises the new per-pair loop)"
+      result: "1 block, 3 rows — PASS"
+    - probe: "Idempotence over 5 further writes on a collapsed document"
+      result: "1 block, rows accumulate correctly, no run of 3+ newlines — PASS"
+    - probe: "Fenced CURRENT marker pair after widening the sweep (regression risk of the BUG-3 fix)"
+      result: "still ignored; illustrative row untouched — PASS"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged across all three cycles. Pure string manipulation; no I/O, network, shell or eval; the single constructed regex interpolates only a 2-3 bounded integer. No new dependencies."
+  performance:
+    status: PASS
+    notes: "Suite 34.5s vs 33.7s baseline with 40 tests added. The two-sided collapse and per-pair loop add bounded passes over slices that shrink as blocks are removed. No test slowed by more than a second."
+  reliability:
+    status: PASS
+    notes: "All three silent or invariant-violating paths closed and pinned. The engine was additionally verified clean against its own specification document, which is the fixture most likely to expose the guard it introduces."
+  maintainability:
+    status: PASS
+    notes: "The strongest dimension throughout. Each fix comments the reasoning error rather than the change — 'the guard was written as a property of finding the heading rather than of reading the document', 'the sweep was scoped to superseded pairs when the invariant it serves is exactly one Change Log'. That is the form that prevents recurrence."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "When task.45 rewires the three sync-jira scripts to call change-log.js directly, pass the precise author (sync-jira-story / -task / -epic) rather than the interim 'sync-jira' the shim supplies"
+      refs: ["shared/resources/jira-sync.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

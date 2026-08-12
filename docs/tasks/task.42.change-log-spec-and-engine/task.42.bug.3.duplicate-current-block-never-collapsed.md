@@ -4,7 +4,7 @@
 **Bug ID**: TASK-42-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 re-review)
 **Date Found**: 2026-08-12
 
@@ -145,3 +145,19 @@ head/block/tail join.
 **Verification steps for QA**:
 1. `node --test shared/resources/tests/change-log.test.mjs` — 40/40
 2. Re-run the reproduction snippet: one block, one opening marker, three rows in date order
+
+
+---
+
+## QA Verification
+
+**Verified By**: QA Engineer
+**Date**: 2026-08-12
+**Result**: ✅ **FIXED — bug closed**
+
+Verified against gate 3 ([task.42.gate.3.change-log-spec-and-engine.yml](./task.42.gate.3.change-log-spec-and-engine.yml), PASS 100/100).
+The regression test for this bug was confirmed to **fail against the pre-fix engine**, so it pins
+the behaviour rather than merely accompanying the fix. Adversarial re-probing of the changed code
+found no side effects.
+
+Full re-review: [task.42.qa.2.change-log-spec-and-engine.md](./task.42.qa.2.change-log-spec-and-engine.md).
