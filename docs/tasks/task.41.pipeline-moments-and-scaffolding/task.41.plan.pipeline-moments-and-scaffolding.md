@@ -89,7 +89,12 @@ write_tracker_workflow() {
   if probe_available; then
     "$STAGE_CLI" --init-workflow && record_step "tracker-workflow" "ok" "generated from board" && return
   fi
-  write_file "tracker-workflow.yaml" "$(cat assets/tracker-workflow.default.yaml)"
+  # Inline heredoc — the wizard runs in the CONSUMER repo, where this repo's
+  # docs/examples/ does not exist. It reads no template off disk.
+  write_file "tracker-workflow.yaml" "$(cat <<'EOF'
+...generic ladder...
+EOF
+)"
   record_step "tracker-workflow" "ok" "template (edit before first run)"
 }
 ```
@@ -107,7 +112,7 @@ board resolves nothing, and the failure is silent:
 - **Convert an existing `jira.workflowRecord` JSON** into the YAML ladder: read `stages`, order the
   rungs by `rank`, and emit `pipeline:` entries from each stage's first candidate. Preserve
   `reason:` strings as YAML comments — they are the hand-authored intent, and `buildWorkflowRecord`
-  already treats them as sacred (`jira-sync.js:2731`).
+  already treats them as sacred (`jira-sync.js:3744`).
 
 ### Phase 4: `--check`
 
@@ -136,7 +141,7 @@ Rules:
 Exit codes: non-zero on any failure; **0** with a loud skip when credentials are absent, so a fork's
 PR does not fail on a secret it cannot have. `--offline` runs rules 1-2 only and is what most
 consumer CI will actually use — and what this repo's own CI can run against
-`assets/tracker-workflow.default.yaml`.
+`docs/examples/tracker-workflow.default.yaml`.
 
 ### Phase 5: `develop-bug` parity, READMEs, docs
 
@@ -172,7 +177,9 @@ why not.
 These READMEs are skill-native, not bundled, so no `npm run bundle` is needed for them.
 `skills/develop-bug/README.md` is already clean.
 
-**`docs/reference/configuration.md`** — the `project.yml` section that has never existed:
+**`docs/reference/configuration.md`** — the `project.yml` section ALREADY EXISTS (L586-608). Only
+its now-false "It has never been documented here" clause (L589) needs deleting. For reference, the
+section reads:
 
 > **`project.yml`** — a second, GitHub-only config file at the repo root, holding board *identity*
 > (`github.owner`, `github.repo`, `github.project_board_name`, `github.project_board_number`). The
@@ -184,14 +191,17 @@ Cross-link from `docs/concepts/getting-started.md:22,33`, which currently restat
 
 ## Key Patterns and References
 
-- `setup-consumer.sh:307-317` — the "already exists → `kept (existing)`" pattern to reuse verbatim.
-- `buildWorkflowRecord` — `jira-sync.js:2731-2769`. The preserve-hand-authored-intent discipline the
+- `setup-consumer.sh:322-331` (skills-config) and `:261-266` (.env) — the "already exists → `kept (existing)`" pattern to reuse verbatim.
+- `buildWorkflowRecord` — `jira-sync.js:3744-3827`. The preserve-hand-authored-intent discipline the
   JSON→YAML conversion must honour.
 - `develop-pipeline-step-5-6-qa-loop.md:28-38` (`in-qa`, fires once) and `:250-260`
   (`ready-for-merge`, plus the merge-queue ordering note) — the two shapes Phases 1 and 2 mirror.
 - `develop-story/SKILL.md:266-274` — the `blocked` guard rails, and the interruption-vs-blockage
   distinction. `changes-requested` is a side-state in the same sense.
-- `jira-sync.js:1812` — the "meant to be `--check`ed in CI" comment this phase finally makes true.
+- `jira-sync.js:2433` — the "meant to be `--check`ed in CI" comment this phase finally makes true.
+- `gh-stage.js` already ships `--probe-board --write-ladder` (usage L652-653, `writeLadder()` L1226),
+  which is the never-overwrite half of `--init-workflow`. EXTEND it; do not add a parallel flag.
+- The Jira probe is `probeWorkflow` in `jira-sync.js:3522` (exported L4112) — NOT on `jira-stage.js`.
 
 ## Testing Approach
 
@@ -200,7 +210,7 @@ Cross-link from `docs/concepts/getting-started.md:22,33`, which currently restat
   contract for every consumer without the file.
 - Assert `--stage pr-merged` appears inside `develop-batch`'s per-item merge loop, not outside it.
 - `--check` tests: non-zero on drift, 0 on clean, 0 without credentials, `--offline` issues no
-  network call. Run `--check --offline` against `assets/tracker-workflow.default.yaml` in this
+  network call. Run `--check --offline` against `docs/examples/tracker-workflow.default.yaml` in this
   repo's own CI.
 - Scaffolding: run the wizard into a scratch dir twice; the second run must report `kept (existing)`
   and leave the file byte-identical.

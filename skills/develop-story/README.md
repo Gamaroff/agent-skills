@@ -22,7 +22,7 @@ Story branches are cut from **`develop`** and PR back to `develop` — short-liv
 | **Filesystem**           | story file (read/append `[x]`), epic file, implementation report (`story.{epic}.{story}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<story-dir>/.summaries/step-*.json`, traceability matrix `<story-dir>/.summaries/qa-traceability-matrix.md`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
 | **Git**                  | story branch create (from `develop`), stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits                                                                                                                                                                                                                                                                |
 | **GitHub**               | `gh issue comment/close/view`, `gh pr view/comment`, board moves via `gh-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`; Priority auto-set inline), PR creation via `/create-pr` targeting `develop`                                                                                                                                                                                                                                                   |
-| **Jira** (Atlassian MCP) | `getJiraIssue`, `addCommentToJiraIssue`, `getTransitionsForJiraIssue`, `transitionJiraIssue` (In Progress → In Review → Done)                                                                                                                                                                                                                                                                                                        |
+| **Jira**                 | `addCommentToJiraIssue`, status moves via `jira-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`). Atlassian MCP (`getTransitionsForJiraIssue`, `transitionJiraIssue`, `getJiraIssue`) is the **fallback only**, used when the CLI reports `no-credentials`                                                                                                                                                                                                                                                                                                        |
 | **Subagents (Explore)**  | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, **QA traceability mapper** (story-only), post-fix tracker state poller                                                                                                                                                         |
 | **Hooks**                | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission)                                                                                                                                                                                                                                                                         |
 
@@ -460,23 +460,38 @@ Every file the harness creates or mutates, with its lifecycle. Anchor for "did t
 
 ### GitHub (default — when `JIRA_URL` is unset)
 
-| Pipeline event              | Operation                                                                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Phase 0c-reg (Work Started) | `gh issue comment` ("Pipeline started — branch:") + `gh-stage.js --stage work-started --add-to-board` (board membership ensured, column from `tracker-workflow.yaml`, landed option re-read by the CLI) + Priority → P2 if unset |
-| Step 4 (PR opened)          | `/create-pr` passes `--base develop` and `--issue {N}`; PR description links the issue                                                                             |
-| Step 5b (post qa-fix push)  | tracker state poller checks `pr.state` is OPEN                                                                                                                     |
-| Step 7 (finalise)           | `gh issue close {N}` + `gh-stage.js --stage done` (`stage-disabled` is a success, not a warning) + DoD body posted as PR comment                                   |
-| Pause hook                  | `gh pr comment` + `gh issue comment` (best-effort)                                                                                                                 |
+Every board move goes through a **moment** — a named point in the pipeline — resolved to a column by the consumer's `tracker-workflow.yaml`. No step file names a status literal. Full spec: [`docs/reference/tracker-workflow.md`](../../docs/reference/tracker-workflow.md).
 
-### Jira (when `JIRA_URL` is set; uses Atlassian MCP)
+| Pipeline event                 | Moment              | Operation                                                                                                                                                                                   |
+| ------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Step 1 (Work Started)          | `work-started`      | `gh issue comment` ("Pipeline started — branch:") + `gh-stage.js --stage work-started --add-to-board` (board membership ensured, landed option re-read by the CLI) + Priority → P2 if unset |
+| Step 4 (PR opened)             | `in-review`         | `/create-pr` passes `--base develop` and `--issue {N}` + `gh-stage.js --stage in-review`                                                                                                     |
+| Step 5 (QA start)              | `in-qa`             | `gh-stage.js --stage in-qa` — **once**, not per cycle. *Off by default.*                                                                                                                     |
+| Step 5b (entering a fix cycle) | `changes-requested` | `gh-stage.js --stage changes-requested` — **per cycle**, because it marks a state the card re-enters. *Off by default.*                                                                      |
+| Step 6 (gate exits the loop)   | `ready-for-merge`   | `gh-stage.js --stage ready-for-merge`. *Off by default.*                                                                                                                                     |
+| Step 5b (post qa-fix push)     | —                   | tracker state poller checks `pr.state` is OPEN                                                                                                                                              |
+| Step 7 (finalise)              | `done`              | `gh issue close {N}` + `gh-stage.js --stage done` + DoD body posted as PR comment                                                                                                            |
+| Terminal HALT                  | `blocked`           | `gh-stage.js --stage blocked` — only for a real blockage, never an interruption. *Off by default.*                                                                                           |
+| After the PR merges            | `pr-merged`         | Fired by `/develop-next` and `/develop-batch`, **not** by this pipeline — it finishes while the PR is still open. *Off by default.*                                                          |
+| Pause hook                     | —                   | `gh pr comment` + `gh issue comment` (best-effort)                                                                                                                                          |
 
-| Pipeline event | Operation                                                                                                                                                   |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 0c-reg   | `addCommentToJiraIssue` ("Pipeline started — branch:") + `getTransitionsForJiraIssue` → `transitionJiraIssue` (In Progress) + `getJiraIssue` post-condition |
-| Step 4         | `addCommentToJiraIssue` ("PR opened: …") + `transitionJiraIssue` (In Review)                                                                                |
-| Step 5b        | tracker state poller (Jira branch — board status read)                                                                                                      |
-| Step 7         | `addCommentToJiraIssue` (DoD body) + `transitionJiraIssue` (Done)                                                                                           |
-| Pause hook     | **silent** — Jira posting requires authenticated MCP, unavailable from shell context                                                                        |
+`stage-disabled`, `no-option`, `not-on-board` and `would-regress` are all successes, not warnings — the CLI exits 0 for each and the pipeline continues.
+
+### Jira (when `JIRA_URL` is set)
+
+Same moments, same call sites, same off-by-default set — only the CLI differs. `jira-stage.js` is the primary path whenever `JIRA_*` credentials exist; the Atlassian MCP verbs (`getTransitionsForJiraIssue` → `transitionJiraIssue` → `getJiraIssue`) are the **fallback** used only when the CLI reports `no-credentials`, per [`jira-transition-protocol.md`](references/jira-transition-protocol.md).
+
+| Pipeline event | Moment              | Operation                                                                                          |
+| -------------- | ------------------- | ---------------------------------------------------------------------------------------------------- |
+| Step 1         | `work-started`      | `addCommentToJiraIssue` ("Pipeline started — branch:") + `jira-stage.js --stage work-started`       |
+| Step 4         | `in-review`         | `addCommentToJiraIssue` ("PR opened: …") + `jira-stage.js --stage in-review`                        |
+| Step 5         | `in-qa`             | `jira-stage.js --stage in-qa` — once. *Off by default.*                                             |
+| Step 5b        | `changes-requested` | `jira-stage.js --stage changes-requested` — per cycle. *Off by default.*                            |
+| Step 6         | `ready-for-merge`   | `jira-stage.js --stage ready-for-merge`. *Off by default.*                                          |
+| Step 5b        | —                   | tracker state poller (Jira branch — board status read)                                              |
+| Step 7         | `done`              | `addCommentToJiraIssue` (DoD body) + `jira-stage.js --stage done`                                   |
+| Terminal HALT  | `blocked`           | `jira-stage.js --stage blocked` — real blockage only. *Off by default.*                             |
+| Pause hook     | —                   | **silent** — Jira posting requires authenticated MCP, unavailable from shell context                |
 
 ---
 
@@ -489,7 +504,8 @@ When updating this document, verify:
 3. **Step coverage** — every `develop-pipeline-step-*.md` file in `shared/resources/` is referenced by at least one diagram node.
 4. **Lock-file mutations** — every `current_step` write shown in any diagram corresponds to a mutation point listed in `develop-pipeline-pause.md` "Lock file" section.
 5. **Artifact paths** — every path in the artifact-lifecycle table matches a real path written by the pipeline (verify via `git grep` of the path pattern across `shared/resources/`).
-6. **Eval-readiness** — pick any contract row (e.g., test-failure triage, traceability mapper) and confirm a unit eval could write `assert output['counts']['real'] >= 0` or `assert matrix.rows[0]['Coverage'] in ['full','partial','none','integration','unit']` without further interpretation.
+6. **Tracker operations map to a `--stage` moment** — every operation named in the Tracker Integration tables must be a `--stage <moment>` invocation or a named script, **never a raw API verb** (`transitionJiraIssue`, a GraphQL mutation, `gh project item-edit`). A raw verb in those tables is the drift itself: it means the table is describing a status literal the pipeline no longer names, and both of these tables sat wrong for a whole release for exactly that reason. Cross-check the moment list against `MOMENTS` in `references/tracker-workflow.js` — it is a closed set of eight.
+7. **Eval-readiness** — pick any contract row (e.g., test-failure triage, traceability mapper) and confirm a unit eval could write `assert output['counts']['real'] >= 0` or `assert matrix.rows[0]['Coverage'] in ['full','partial','none','integration','unit']` without further interpretation.
 
 ---
 

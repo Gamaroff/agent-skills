@@ -129,20 +129,40 @@ Moments are a **closed set**. Each one is a point in the pipeline where a step s
 line of code in a step file. This file chooses which status a moment targets; it can never invent a
 new moment.
 
-| Moment              | Fires when                                     | Wired |
-| ------------------- | ---------------------------------------------- | ----- |
-| `work-started`      | branch created, development begins             | ✅    |
-| `in-review`         | pull request opened                            | ✅    |
-| `in-qa`             | QA review starts                               | ✅    |
-| `ready-for-merge`   | QA passed, awaiting merge                      | ✅    |
-| `blocked`           | a pipeline gate failed and needs a human       | ✅    |
-| `done`              | Definition of Done met, work accepted          | ✅    |
-| `changes-requested` | a reviewer requests changes on the PR          | task.41 |
-| `pr-merged`         | the PR merges                                  | task.41 |
+| Moment              | Fires when                                             | Fires from                                   | On by default |
+| ------------------- | ------------------------------------------------------ | -------------------------------------------- | ------------- |
+| `work-started`      | branch created, development begins                     | Step 1                                       | ✅            |
+| `in-review`         | pull request opened                                    | Step 4                                       | ✅            |
+| `changes-requested` | a QA gate came back with issues — **once per cycle**    | Step 5b, before `/qa-fix`                    | ❌            |
+| `in-qa`             | QA review starts — **once**, not per cycle              | Step 5                                       | ❌            |
+| `ready-for-merge`   | QA passed, awaiting merge                              | Step 6, on a gate that exits the loop        | ❌            |
+| `pr-merged`         | the PR actually landed on the base branch              | `/develop-next`, `/develop-batch` post-merge | ❌            |
+| `blocked`           | a pipeline gate failed and needs a human               | before a terminal HALT                       | ❌            |
+| `done`              | Definition of Done met, work accepted                  | Step 7 (`/finalise`)                         | ✅            |
 
-`changes-requested` and `pr-merged` are declared by the engine but nothing fires them yet. Setting
-them today is a harmless no-op, which is why the [shipped template](../examples/tracker-workflow.default.yaml)
-leaves them out.
+All eight are wired. The five marked ❌ are **absent from the built-in `pipeline:` map**, so they fire
+nowhere until you name a status for them — omission is how this format spells "off". That is why the
+[shipped template](../examples/tracker-workflow.default.yaml) leaves them commented out: consumers
+upgrade by replacing a skill directory wholesale, and a moment that defaulted on would start moving
+cards into columns nobody asked about.
+
+Three of them repay a closer read:
+
+**`changes-requested` fires once per fix cycle**, which is the opposite of the rule for `in-qa`
+directly above it. The distinction is deliberate. `in-qa` marks a phase the card enters once, and
+re-announcing it every cycle tells a board reader nothing new. `changes-requested` marks a state the
+card *re-enters*, and a board that shows it on cycle 1 and then goes quiet through cycles 2–5 is
+actively saying something false. It is also why it should be an **off-ladder side-state** — named
+under `pipeline:` but *not* under `statuses:`. A ranked target makes the second and later entries
+backward moves, which the monotonicity guard rejects, silently capping the signal at one cycle.
+
+**`pr-merged` fires outside the develop pipelines.** `/develop-story` and `/develop-task` finish while
+the PR is still open — Step 7 moves the card to `done` with nothing merged. Only the orchestrators
+that merge (`/develop-next`, `/develop-batch`) reach a merged PR, so that is where it fires.
+
+**Ordering, `done` vs `pr-merged`.** If you want a card to wait in a merge or showcase queue until the
+code actually lands, **omit `done:` entirely** and let `pr-merged` be the last automated move. Naming
+both is coherent only when your post-merge column sits *after* Done on the ladder.
 
 ---
 
@@ -737,6 +757,58 @@ engine below before writing.
 Prefer it to the template on any board with more than a handful of columns. The template stays the
 right answer for a small board, or where you would rather write the file than review one.
 
+### `--init-workflow` — generate it from the stage CLI
+
+The stage CLIs write the file too, which is the route for a consumer who upgraded a skill directory
+without re-running the install wizard:
+
+```bash
+# GitHub — reads the live board; --issue is any issue already on it
+node .agents/skills/develop-task/references/gh-stage.js --init-workflow --issue 42
+
+# Jira — converts an existing jira.workflowRecord into the YAML ladder
+node .agents/skills/develop-task/references/jira-stage.js --init-workflow
+```
+
+Both **refuse to overwrite an existing file** and exit 0 saying so; pass `--force` if you mean it. The
+file encodes column names you tuned against a real board and nothing can re-derive, and losing it is
+silent — the pipelines keep running and simply stop moving cards.
+
+The Jira path prefers an existing `jira.workflowRecord` over anything it could infer, because that
+record is the output of a real probe of your board plus whatever you then hand-edited. Two things are
+carried across rather than recomputed: `enabled: false` becomes **omission** (the YAML format's only
+way to say off), and each `reason:` string becomes a **YAML comment** beside the moment it explains.
+
+`setup-consumer.sh` scaffolds the file on a fresh install by the same rule — it writes when absent,
+reports `kept (existing)` when present, and never overwrites.
+
+### `--check` — catch drift in CI
+
+A renamed column is the most common way a working setup breaks, and it breaks **silently**: the file
+still parses, every moment still names a status, and nothing moves.
+
+```bash
+node .agents/skills/develop-task/references/gh-stage.js --check --offline   # schema only, no network
+node .agents/skills/develop-task/references/gh-stage.js --check --issue 42  # + live board comparison
+```
+
+> **`--check` is the one mode in this family that exits non-zero on failure.** Every other entry point
+> exits 0 on every documented skip, because pipeline steps run inside shells where a non-zero exit
+> would kill the run. `--check` does not run inside a pipeline step — it runs in CI, where a green exit
+> over a broken file is the whole failure. Do not "harmonise" it.
+
+| Mode                 | Checks                                                                       | Network |
+| -------------------- | ---------------------------------------------------------------------------- | ------- |
+| `--check --offline`  | parses; every `pipeline:` key is a real moment; no duplicate rungs           | none    |
+| `--check`            | the above, plus: every status an enabled moment names exists on the board    | one read |
+
+`--offline` is what most consumer CI should run: it is the half that can never flake. Two cases exit
+**0** deliberately — no `tracker-workflow.yaml` at all (nothing to check), and no credentials. The
+second matters: a fork's PR cannot hold your repo secret, and failing it on that basis would penalise
+exactly the contributors least able to fix it.
+
+On drift, it prints the mismatch, the board's real columns, and the command that fixes it.
+
 ## The shipped template
 
 `docs/examples/tracker-workflow.default.yaml`, in full. Copy it and edit:
@@ -799,19 +871,35 @@ statuses:
 # The moments are a closed set — each one is a point in the pipeline where a step
 # signals progress. Config chooses the target; it cannot invent a new moment.
 #
-#   work-started     branch created, development begins
-#   in-review        pull request opened
-#   in-qa            QA review starts
-#   ready-for-merge  QA passed, awaiting merge
-#   blocked          a pipeline gate failed and needs a human
-#   done             Definition of Done met, work accepted
+#   work-started       branch created, development begins
+#   in-review          pull request opened
+#   changes-requested  a QA gate came back with issues; fires ONCE PER FIX CYCLE
+#   in-qa              QA review starts
+#   ready-for-merge    QA passed, awaiting merge
+#   pr-merged          the PR actually landed on the base branch
+#   blocked            a pipeline gate failed and needs a human
+#   done               Definition of Done met, work accepted
 pipeline:
   work-started: In Progress
   in-review: Waiting for Review
   in-qa: Ready for Testing
   done: Done
-  # blocked: Blocked        # ← off-ladder side-state; uncomment if your board has one
-  # ready-for-merge: ...    # ← omitted here; add the column and the line together
+  # blocked: Blocked            # ← off-ladder side-state; uncomment if your board has one
+  # ready-for-merge: ...        # ← omitted here; add the column and the line together
+  # changes-requested: Rework   # ← off-ladder side-state. Re-entered every fix cycle, so
+  #                             #   leave it OFF the `statuses:` ladder: a ranked target
+  #                             #   makes the 2nd and later moves backward ones the guard
+  #                             #   rejects, silently capping the signal at one cycle.
+  # pr-merged: Ready for Showcase
+  #                             # ← fires from /develop-next and /develop-batch AFTER the
+  #                             #   merge, not from the develop pipelines — those finish
+  #                             #   while the PR is still open.
+  #
+  # ORDERING, `done` vs `pr-merged`: the develop pipeline moves a card to `done` at
+  # finalise, while the PR is still open. If you want a card to WAIT in a merge or
+  # showcase queue until the code actually lands, omit `done:` entirely and let
+  # `pr-merged` be the last automated move. Naming both is coherent only when your
+  # post-merge column sits after Done on the ladder.
 
 # ── Document status mapping (optional) ───────────────────────────────────────
 # Local document status -> board status, used by the /sync-* skills. The local
