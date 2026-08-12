@@ -1,0 +1,94 @@
+schema: 1
+task: "task.39.github-board-stage-engine"
+task_title: "gh-stage.js — a GitHub Projects board engine driven by the workflow ladder"
+gate: CONCERNS
+status_reason: "All 12 cycle-1 findings verified fixed, including both blockers — an unmatched board hint now fails closed and board mutations are genuinely retried. Four new medium/low issues introduced by the fix itself: the fail-closed rule is applied between project.yml's two keys (making project_board_name dead), and the verify re-read now discards the observed value it was meant to surface."
+reviewer: "QA Engineer"
+updated: "2026-08-12T13:05:00Z"
+
+cycle: 2
+previous_gate: "task.39.gate.1.github-board-stage-engine.yml (FAIL, 60/100)"
+
+fix_verification:
+  verified_fixed: [CR-1, CR-2, CR-3, CR-4, CR-5, CR-6, CR-7, CR-8, CR-9, CR-10, CR-11, CR-12]
+  method: "Each claimed fix traced in the code rather than taken from the commit message; CR-1, CR-2 and CR-3 additionally re-run against their original cycle-1 reproductions."
+  evidence:
+    CR-1: "selectBoard fails closed on the first SET-but-unmatched tier; the regression test populates every lower tier, so a fall-through fails it. Reproduction now returns ambiguous-board (was: Org Portfolio)."
+    CR-3: "The errors check sits inside the retried closure; measured 3 attempts (was 1), and a second-attempt success is reported as transitioned."
+    CR-4: "gh-status-verify reuses itemId PVTI_unset_item so the verify lookup hits; the test asserts verified === true and exactly 3 gh api calls."
+
+top_issues:
+  - id: CR2-1
+    severity: medium
+    finding: "Fail-closed is applied BETWEEN project.yml's two keys, so project_board_name is unreachable whenever project_board_number is set — which is the normal config. A stale number now refuses a move the matching name would have resolved. Verified: selectBoard(twoBoards, {projectYml:{boardNumber:'999', boardName:'Team Sprint'}}) → ambiguous-board, though Team Sprint is right there."
+    suggested_action: "Treat the two project.yml keys as ONE tier — try number then name, and fail closed only if neither matches. Keep the hard stop for the operator-supplied --board and github.projectBoard tiers."
+    suggested_owner: dev
+  - id: CR2-2
+    severity: medium
+    finding: "The observed value from the verify re-read is now discarded entirely, so a genuine silent no-op and a merely lagging read produce byte-identical output (transitioned:true, to:<requested>, verified:false). The no-op detection the re-read exists for is no longer available to any consumer, though the code comment still claims it."
+    suggested_action: "Keep the requested name in `to` but also emit the observed column as `observed`, so a caller can tell a lagging read from a mutation that did not stick. Drop the ✅ from the unconfirmed message."
+    suggested_owner: dev
+  - id: CR2-4
+    severity: low
+    finding: "boardHintNumber's `items` parameter is never supplied by its one production call site (:719, which runs before any board read), so the documented title→number resolution is exercised only by the unit test — `--add-to-board --board \"<title>\"` can never add."
+    suggested_action: "Resolve the title after the first readBoard and perform the add then, or drop the parameter and the docstring paragraph describing it. Do not leave documented behaviour that cannot fire."
+    suggested_owner: dev
+
+advisory:
+  - id: CR2-3
+    severity: medium
+    confidence: low
+    finding: "readBoard throws on ANY doc.errors, including GitHub's partial-success envelope (usable nodes plus an error for one board the token cannot see), turning a movable card into board-unreadable. A read is not a mutation, where the same all-or-nothing check is correct."
+    suggested_action: "Throw only when no usable nodes came back; otherwise warn with the messages and proceed with the nodes that did resolve."
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 58
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "CR-9 fixed — --issue is validated on every path, including the probe, before any query is built. No secrets handled; auth delegated to gh."
+  performance:
+    status: PASS
+    notes: "Unchanged: 3 gh api calls per move, 0 item-add without the flag. The retry only fires on failure, so the happy path is untouched."
+  reliability:
+    status: CONCERNS
+    notes: "Upgraded from FAIL. The two blockers are gone: a wrong-board write is no longer reachable, and transient mutation failures are retried. What remains is the opposite failure direction — CR2-1 can refuse a legitimate move on a stale project.yml number, and CR2-3 may refuse on a partial-success read. Refusing to act is far safer than acting wrongly, which is why this is CONCERNS and not FAIL."
+  maintainability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. All four vacuous tests were replaced and independently verified to exercise their names; the suite grew 51→58 with two fixtures that pin real shapes. Only CR2-4 (a dead parameter) detracts."
+
+recommendations:
+  immediate:
+    - action: "Collapse project.yml's two keys into a single tier so project_board_name is reachable"
+      refs: ["shared/resources/gh-stage.js:414"]
+    - action: "Emit the observed column alongside the requested one so a no-op stays distinguishable from a lagging read"
+      refs: ["shared/resources/gh-stage.js:906"]
+    - action: "Make the title→number resolution real, or remove the parameter and its docstring"
+      refs: ["shared/resources/gh-stage.js:960"]
+  future:
+    - action: "Tolerate a GraphQL partial-success envelope in readBoard when usable nodes came back"
+      refs: ["shared/resources/gh-stage.js:343"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "CR2-1 — a normal project.yml (both keys set) must not have its name tier shadowed by a stale number"
+    - "CR2-2 — the verify read must remain able to distinguish a no-op from a lagging read"
+
+code_review:
+  bugs: 3
+  cleanups: 1
+  promoted_to_gate: ["CR2-1", "CR2-2", "CR2-4"]
+  advisory_only: ["CR2-3"]
+  blocking_resolution: "code_review_blocking=true from pipeline Skill args; no per-doc override present"

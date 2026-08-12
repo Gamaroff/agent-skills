@@ -364,6 +364,35 @@ test("selectBoard: an unmatched hint FAILS CLOSED — it never falls through", (
   assert.equal(r3.rule, "project.yml project_board_number");
 });
 
+test("selectBoard: project.yml's two keys are ONE tier — name is reachable past a stale number", () => {
+  // `project_board_number` and `project_board_name` are two spellings of the
+  // SAME board, so failing closed between them would make the name unreachable
+  // whenever the number is set — which is the normal config — and a stale number
+  // would refuse a move the name resolves perfectly well.
+  const r = cli.selectBoard(twoBoards(), {
+    projectYml: { boardNumber: "999", boardName: "Team Sprint" },
+  });
+  assert.equal(r.item.projectTitle, "Team Sprint");
+  assert.equal(r.rule, "project.yml project_board_name");
+
+  // Both wrong → still fails closed, and names both hints.
+  const r2 = cli.selectBoard(twoBoards(), {
+    projectYml: { boardNumber: "999", boardName: "Nope" },
+  });
+  assert.equal(r2.item, null);
+  assert.equal(r2.reason, "ambiguous-board");
+  assert.ok(r2.unmatchedHint.includes("999") && r2.unmatchedHint.includes("Nope"));
+
+  // The operator-supplied tiers keep their HARD stop — a wrong --board must not
+  // be rescued by project.yml.
+  const r3 = cli.selectBoard(twoBoards(), {
+    board: "999",
+    projectYml: { boardNumber: "7", boardName: "Team Sprint" },
+  });
+  assert.equal(r3.item, null);
+  assert.equal(r3.unmatchedRule, "--board");
+});
+
 test("boardHintNumber: never substitutes an unrelated board for a title hint", () => {
   const items = twoBoards();
   const yml = { boardNumber: "1", boardName: "Agent Skills" };
@@ -404,16 +433,20 @@ test("run: moves the card, and the verify re-read CONFIRMS the landed option", (
   assert.equal(s.calls.filter((c) => c[0] === "api").length, 3);
 });
 
-test("run: a stale verify read does NOT overwrite the reported option", () => {
+test("run: a stale verify read does NOT overwrite the reported option, but IS surfaced", () => {
   const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
   // Both reads return the UNSET fixture — i.e. the second read has not caught up.
-  // Believing it would report the move as landing on "" / the old column, which
-  // is the inverse of the silent-no-op detection the re-read exists for.
+  // Believing it would report the move as landing on the old column, which is the
+  // inverse of the silent-no-op detection the re-read exists for.
   const s = stubGh({ boardQueue: ["gh-status-unset", "gh-status-unset"] });
   const r = go(["--issue", "42", "--stage", "work-started"], s, root);
   assert.equal(r.transitioned, true);
   assert.equal(r.to, "In Progress", "falls back to the REQUESTED option, not the stale read");
   assert.equal(r.verified, false, "and says so");
+  // Discarding the observed value entirely would make a genuine silent no-op and
+  // a merely lagging read byte-identical — which is the only thing the re-read
+  // was ever for.
+  assert.equal(r.observed, "", "the observed column is reported even when it disagrees");
 });
 
 test("run: already there → no mutation issued", () => {
@@ -927,6 +960,31 @@ test("--write-ladder does NOT write under --dry-run", () => {
   ]);
 });
 
+test("readBoard tolerates a PARTIAL-success envelope (errors + usable nodes)", () => {
+  // GraphQL answers partially: an error for one board the token cannot see, plus
+  // usable nodes for the rest. Throwing on any error would turn a perfectly
+  // movable card into board-unreadable. A read is not a mutation.
+  const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
+  const partial = JSON.parse(raw("gh-status-unset"));
+  partial.errors = [{ message: "Resource not accessible: ProjectV2 #99" }];
+  const body = JSON.stringify(partial);
+  const execImpl = (argv) => {
+    if (argv[0] === "auth") return "ok";
+    if (argv[0] === "repo") return argv.includes("owner") ? "Gamaroff" : "agent-skills";
+    if (String(argv[argv.length - 1]).includes("mutation"))
+      return JSON.stringify({ data: { updateProjectV2ItemFieldValue: { projectV2Item: { id: "x" } } } });
+    return body;
+  };
+  const r = cli.run({
+    argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "work-started"],
+    execImpl,
+    repoRoot: root,
+    sleepImpl: noSleep,
+  });
+  assert.equal(r.transitioned, true, "a usable node means the move proceeds");
+  assert.notEqual(r.reason, "board-unreadable");
+});
+
 test("readBoard surfaces a GraphQL error instead of reporting not-on-board", () => {
   // An errors-bearing response with a null repository used to degrade into an
   // empty node list, which reads as the benign 'this issue is not on a board'
@@ -1003,6 +1061,37 @@ test("describeAlternatives does not hint at the moment being resolved", () => {
 // ===========================================================================
 // ensureOnBoard — the propagation dance
 // ===========================================================================
+
+test("--add-to-board with a TITLE hint resolves after the read and adds", () => {
+  // boardHintNumber cannot turn a title into a number before any board has been
+  // read — the title→number map only exists in the read response. The first pass
+  // therefore yields nothing, and a second pass must resolve it against what was
+  // just read. Without that, documented behaviour could never fire.
+  const root = withRepo({ "tracker-workflow.yaml": LADDER });
+  const s = stubGh({ boardQueue: ["gh-issue-on-two-boards"] });
+  const r = go(
+    ["--issue", "42", "--stage", "in-review", "--board", "Team Sprint", "--add-to-board"],
+    s,
+    root,
+  );
+  const adds = s.calls.filter((c) => c[1] === "item-add");
+  assert.equal(adds.length, 1, "the add really happened");
+  assert.ok(adds[0].includes("7"), `added to board 7 (Team Sprint), got: ${adds[0].join(" ")}`);
+  assert.equal(r.transitioned, true);
+});
+
+test("--add-to-board with an unresolvable hint skips the add rather than guessing", () => {
+  const root = withRepo({ "tracker-workflow.yaml": LADDER });
+  const s = stubGh({ boardQueue: ["gh-issue-on-two-boards"] });
+  const r = go(
+    ["--issue", "42", "--stage", "in-review", "--board", "No Such Board", "--add-to-board"],
+    s,
+    root,
+  );
+  assert.equal(s.calls.filter((c) => c[1] === "item-add").length, 0, "no blind add");
+  // And the unmatched hint still fails closed on selection.
+  assert.equal(r.reason, "ambiguous-board");
+});
 
 test("ensureOnBoard re-reads once after an empty first read", () => {
   const s = stubGh({ boardQueue: ["gh-not-on-board", "gh-status-unset"] });

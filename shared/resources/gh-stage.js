@@ -322,7 +322,7 @@ const BOARD_QUERY = (owner, repo, issue, statusField) => `
  * matters too: `options` comes back in board order, and a Projects board's
  * option order IS its workflow order, which is what --write-ladder reads.
  */
-function readBoard({ exec, owner, repo, issue, statusField }) {
+function readBoard({ exec, owner, repo, issue, statusField, onWarn }) {
   const raw = exec([
     "api",
     "graphql",
@@ -335,14 +335,10 @@ function readBoard({ exec, owner, repo, issue, statusField }) {
   } catch (e) {
     throw new Error(`could not parse gh api response: ${e.message}`);
   }
-  // A response can carry `errors` alongside a null `repository`. Ignoring them
-  // degraded a real API failure (bad scope, rate limit, unknown repo) into an
-  // empty node list, which the caller then reported as the benign `not-on-board`
-  // skip — and under --add-to-board also bought a pointless item-add plus 8s of
-  // sleeping. setOption already checks this; readBoard must agree with it.
-  if (doc && Array.isArray(doc.errors) && doc.errors.length) {
-    throw new Error(doc.errors.map((e) => e && e.message).join("; "));
-  }
+  const errs =
+    doc && Array.isArray(doc.errors) && doc.errors.length
+      ? doc.errors.map((e) => e && e.message).join("; ")
+      : "";
   const nodes =
     (doc &&
       doc.data &&
@@ -351,7 +347,21 @@ function readBoard({ exec, owner, repo, issue, statusField }) {
       doc.data.repository.issue.projectItems &&
       doc.data.repository.issue.projectItems.nodes) ||
     [];
-  return nodes.map((n) => normalizeItem(n, statusField)).filter(Boolean);
+  const items = nodes.map((n) => normalizeItem(n, statusField)).filter(Boolean);
+
+  // GraphQL answers partially: a response may carry `errors` for one board the
+  // token cannot see AND usable nodes for the rest. Throwing on any error at all
+  // would turn a perfectly movable card into `board-unreadable`.
+  //
+  // So: throw only when nothing usable came back — that is the real failure (bad
+  // scope, rate limit, unknown repo), and it must not be reported as the benign
+  // `not-on-board` skip. Otherwise warn and proceed with what resolved.
+  //
+  // Deliberately unlike setOption, where all-or-nothing IS correct: a mutation
+  // either applied or it did not, and there is no partial state to salvage.
+  if (errs && !items.length) throw new Error(errs);
+  if (errs && onWarn) onWarn(errs);
+  return items;
 }
 
 function normalizeItem(node, statusField) {
@@ -408,18 +418,32 @@ function selectBoard(items, { board, configured, projectYml }) {
 
   // Precedence, most specific first. Only tiers that are actually SET are
   // considered — but the first one that IS set is authoritative.
+  //
+  // A tier may hold SEVERAL hints that all describe the SAME board. project.yml
+  // is exactly that: `project_board_number` and `project_board_name` are two
+  // spellings of one board, so they belong to one tier. Failing closed between
+  // them would make the name unreachable whenever the number is set — which is
+  // the normal config — and a stale number would then refuse a move the name
+  // resolves perfectly well.
   const tiers = [
-    [board, "--board"],
-    [configured, "github.projectBoard"],
-    [yml.boardNumber, "project.yml project_board_number"],
-    [yml.boardName, "project.yml project_board_name"],
+    { hints: [[board, "--board"]] },
+    { hints: [[configured, "github.projectBoard"]] },
+    {
+      hints: [
+        [yml.boardNumber, "project.yml project_board_number"],
+        [yml.boardName, "project.yml project_board_name"],
+      ],
+    },
   ];
 
-  for (const [hint, rule] of tiers) {
-    if (!hint) continue; // absent — fall through to the next tier
-    const hit = match(hint);
-    if (hit) return { item: hit, rule };
-    // PRESENT BUT UNMATCHED — fail closed.
+  for (const tier of tiers) {
+    const set = tier.hints.filter(([hint]) => !!hint);
+    if (!set.length) continue; // wholly absent — fall through to the next tier
+    for (const [hint, rule] of set) {
+      const hit = match(hint);
+      if (hit) return { item: hit, rule };
+    }
+    // SET BUT UNMATCHED — fail closed, without consulting a lower tier.
     //
     // Falling through here is what made a mistyped `--board 999` land on
     // whatever project.yml happened to name: a status change on a board the
@@ -429,8 +453,8 @@ function selectBoard(items, { board, configured, projectYml }) {
     return {
       item: null,
       reason: "ambiguous-board",
-      unmatchedHint: String(hint).trim(),
-      unmatchedRule: rule,
+      unmatchedHint: set.map(([h]) => String(h).trim()).join(" / "),
+      unmatchedRule: set.map(([, r]) => r).join(" / "),
       candidates,
     };
   }
@@ -637,6 +661,11 @@ function run({
     return { exitCode, ...payload };
   };
 
+  // Surfaced when a board read returns errors for SOME board but usable nodes
+  // for others — a warning, because the card we care about may still be movable.
+  const onWarn = (m) =>
+    output.warn(`⚠️  board read reported errors (continuing with what resolved): ${m}`);
+
   // --probe-board reads a board; every other mode moves one card on it.
   // Hoisted out of the non-probe branch: EVERY path that reaches the network
   // interpolates --issue straight into the GraphQL document, and --probe-board
@@ -702,6 +731,7 @@ function run({
       root,
       projectYml,
       configuredBoard,
+      onWarn,
     });
 
   // Omission from `pipeline:` is the only way to switch a moment off, so a null
@@ -716,7 +746,7 @@ function run({
     return emit({ transitioned: false, reason: "stage-disabled" }, 0);
   }
 
-  const addBoardNum = boardHintNumber(args.board, configuredBoard, projectYml);
+  let addBoardNum = boardHintNumber(args.board, configuredBoard, projectYml);
 
   let items;
   try {
@@ -731,17 +761,41 @@ function run({
             boardNum: addBoardNum,
             sleepMs: sleepImpl,
           })
-        : readBoard({ exec, owner, repo, issue: args.issue, statusField });
+        : readBoard({ exec, owner, repo, issue: args.issue, statusField, onWarn });
+
+    // A TITLE-valued hint cannot become a number until some board has been read
+    // — `item-add` takes a number, and the title→number map only exists in the
+    // read response. So when the first pass could not resolve one, retry the
+    // resolution against what we just read and add then. Without this second
+    // pass the documented `--add-to-board --board "<title>"` could never add,
+    // because the only call site ran before any read.
+    if (args.addToBoard && !args.dryRun && !addBoardNum) {
+      addBoardNum = boardHintNumber(
+        args.board,
+        configuredBoard,
+        projectYml,
+        items,
+      );
+      if (addBoardNum) {
+        items = ensureOnBoard({
+          exec,
+          owner,
+          repo,
+          issue: args.issue,
+          statusField,
+          boardNum: addBoardNum,
+          sleepMs: sleepImpl,
+        });
+      } else {
+        output.warn(
+          "⚠️  --add-to-board given but no board number could be resolved — skipping the add. " +
+            "Pass --board <number>, or set github.projectBoard / project.yml's project_board_number.",
+        );
+      }
+    }
   } catch (e) {
     output.warn(`⚠️  Could not read the board: ${e.message}`);
     return emit({ transitioned: false, reason: "board-unreadable" }, 0);
-  }
-
-  if (args.addToBoard && !args.dryRun && !addBoardNum) {
-    output.warn(
-      "⚠️  --add-to-board given but no board number could be resolved — skipping the add. " +
-        "Pass --board <number>, or set github.projectBoard / project.yml's project_board_number.",
-    );
   }
 
   // --dry-run must not run item-add. This is the one place a naive port of
@@ -900,19 +954,26 @@ function run({
   // confirmation did not come back.
   let landed = r.match.name;
   let verified = false;
+  let observed = null;
   try {
     const after = readBoard({ exec, owner, repo, issue: args.issue, statusField });
     const same = after.find((i) => i.itemId === item.itemId);
-    if (same && same.current && tw.eqName(same.current, r.match.name)) {
-      landed = same.current;
+    if (same) observed = same.current || "";
+    if (observed && tw.eqName(observed, r.match.name)) {
+      landed = observed;
       verified = true;
     }
   } catch (_) {}
 
+  // `observed` is reported even when it disagrees. Dropping it would make a
+  // genuine silent no-op — the mutation returned no error but the board did not
+  // change — indistinguishable from a read that simply had not caught up, and
+  // telling those apart is the only reason to re-read at all.
   output.info(
     verified
       ? `✅ ${label} → "${landed}".`
-      : `✅ ${label} → "${landed}" (unconfirmed — the verify read did not yet show it).`,
+      : `⚠️  ${label} → "${landed}" requested, but the verify read still shows ` +
+          `"${observed || "(unset)"}" — either propagation lag or the change did not stick.`,
   );
   return emit(
     {
@@ -921,6 +982,7 @@ function run({
       from: item.current,
       to: landed,
       verified,
+      observed,
       board: item.projectTitle,
       rule: r.rule,
     },
@@ -993,6 +1055,7 @@ function probeBoard({
   root,
   projectYml,
   configuredBoard,
+  onWarn,
 }) {
   // Probing needs an issue only as a handle to reach the board through. Any
   // issue on the board answers the question "what are this board's columns?".
@@ -1006,7 +1069,7 @@ function probeBoard({
 
   let items;
   try {
-    items = readBoard({ exec, owner, repo, issue, statusField });
+    items = readBoard({ exec, owner, repo, issue, statusField, onWarn });
   } catch (e) {
     output.warn(`⚠️  Could not read the board: ${e.message}`);
     return emit({ reason: "board-unreadable" }, 0);
