@@ -614,6 +614,60 @@ malformed.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-12
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.43.qa.1.change-log-templates-and-creation.md](./task.43.qa.1.change-log-templates-and-creation.md)
+- **Gate File**: [task.43.gate.1.change-log-templates-and-creation.yml](./task.43.gate.1.change-log-templates-and-creation.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1158 (all pass) + 27 eval assertions + 115 skill validations
+- **Phases Verified**: 5/5 implemented, 4/5 defect-free
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+One medium defect: `create-epic` is instructed to keep frontmatter `updated:` in step with the seeded
+Change Log row, but the epic frontmatter contract has no `updated:` field, so the instruction cannot be
+satisfied (CR-2). Two low cleanups: `{{today}}` vs `{today}` in create-epic (CR-3), and the byte-locked
+epic copies' comment path not resolving inside a bundled skill (CR-4).
+
+The T42 engine integration was verified directly rather than assumed — `findChangeLog` locates every new
+H2 block, `upsertChangeLog` extends it in place with the seeded row and authoring comment intact, and no
+second block is ever inserted.
+
+`review-prd`'s five-cell writer against the now-four-column brownfield table (CR-1) was confirmed real but
+**not** promoted to the gate: it is documented as Breaking Change 1 / Risk 4 with task.44 as its named
+owner, and its fix lives in a file §4 places out of scope. It is carried as a blocking condition on
+task.44 instead. Full reasoning in the QA report's Code Review section.
+
+### QA Fix Cycle 1 — 2026-08-12
+
+All three gate issues fixed. Verifying CR-2 independently surfaced a **second instance the code review
+missed**: the legacy story markdown template carries no YAML frontmatter at all (it uses a
+`**Last Updated**:` bold line), so the same `updated:` instruction was wrong there too.
+
+| Issue | Fix |
+| --- | --- |
+| CR-2 (medium) | The epic template comment and `create-epic`'s guidance (both the seed block and the Post-Creation Validation bullet) no longer assert a frontmatter `updated:` field that epics do not have; they name `created:`/`target_completion:` and state the contrast with PRD/story/task explicitly |
+| CR-2b (found while fixing CR-2) | The legacy story markdown template's comment now points at its real `**Last Updated**:` line instead of a frontmatter field the file has no frontmatter for |
+| CR-3 (low) | `{{today}}` → `{today}` in `create-epic/SKILL.md`; zero occurrences of `{{today}}` remain under `skills/` |
+| CR-4 (low) | The epic-template and legacy story-template comments now name **both** path forms — `shared/resources/…` for in-repo readers, `references/…` for a bundled skill — so the pointer resolves in either context without breaking byte-equality |
+
+Re-verified after the fixes: all three byte-locks hold **through** a fresh `npm run bundle`;
+`npm test` 1158/1158; both eval suites green; `countMandatorySections()` still 11.
+
+---
+
 ## Implementation Record
 
 **Started**: 2026-08-12

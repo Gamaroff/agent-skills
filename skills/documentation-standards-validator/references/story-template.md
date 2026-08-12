@@ -720,8 +720,12 @@ Before marking this story as "Ready for QA", verify:
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
   Canonical spec: shared/resources/document-change-log.md
+    — inside a bundled skill the same file sits at references/document-change-log.md
   Authoring/review/edit skills bump Version; machine writers leave it blank.
-  EVERY new row bumps frontmatter `updated:` in the same edit.
+  This legacy template carries no YAML frontmatter, so there is no `updated:` field
+  to bump — keep the `**Last Updated**:` line at the top of the document in step with
+  the newest row instead. (story-template.yaml, the authoritative template, does use
+  frontmatter `updated:`.)
   Placed here to match story-template.yaml's ordering — the log sits with the
   document-lifecycle tail, immediately before the QA/dev record sections.
 -->
