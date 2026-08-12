@@ -1,0 +1,148 @@
+{
+  "sprint": {
+    "id": 42,
+    "name": "Platform Sprint 7",
+    "goal": "Ship the new checkout flow behind a flag",
+    "startDate": "2026-05-04T09:00:00.000Z",
+    "endDate": "2026-05-18T17:00:00.000Z",
+    "completeDate": "2026-05-18T17:30:00.000Z",
+    "state": "closed"
+  },
+  "assignees": [
+    {
+      "displayName": "Ada Lovelace",
+      "accountId": "acc-ada",
+      "emailAddress": "ada@example.com"
+    },
+    {
+      "displayName": "Grace Hopper",
+      "accountId": "acc-grace",
+      "emailAddress": "grace@example.com"
+    }
+  ],
+  "unassignedCount": 1,
+  "issues": [
+    {
+      "key": "PROJ-101",
+      "summary": "Wire up new checkout endpoint",
+      "description": "Expose POST /checkout behind the new flag so the mobile client can integrate before the flow is public.",
+      "issueType": "Story",
+      "parentKey": "PROJ-1",
+      "status": "Done",
+      "statusCategoryKey": "done",
+      "resolution": "Done",
+      "resolutionDate": "2026-05-11T14:00:00.000Z",
+      "created": "2026-04-20T09:00:00.000Z",
+      "points": 5,
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      },
+      "addedMidSprint": false,
+      "addedDate": null,
+      "carriedOver": false
+    },
+    {
+      "key": "PROJ-102",
+      "summary": "Migrate legacy tax calculator",
+      "description": "The old calculator rounds per line item rather than per invoice, which drifts by a cent on multi-line orders.",
+      "issueType": "Story",
+      "parentKey": "PROJ-1",
+      "status": "Done",
+      "statusCategoryKey": "done",
+      "resolution": "Done",
+      "resolutionDate": "2026-05-15T10:00:00.000Z",
+      "created": "2026-03-02T09:00:00.000Z",
+      "points": 3,
+      "assignee": {
+        "displayName": "Grace Hopper",
+        "accountId": "acc-grace",
+        "emailAddress": "grace@example.com"
+      },
+      "addedMidSprint": false,
+      "addedDate": null,
+      "carriedOver": true
+    },
+    {
+      "key": "PROJ-103",
+      "summary": "Add feature flag UI toggle",
+      "description": "Operators need to flip the checkout flag without a deploy.",
+      "issueType": "Story",
+      "parentKey": "PROJ-1",
+      "status": "In Progress",
+      "statusCategoryKey": "indeterminate",
+      "resolution": null,
+      "resolutionDate": null,
+      "created": "2026-04-28T09:00:00.000Z",
+      "points": 2,
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      },
+      "addedMidSprint": false,
+      "addedDate": null,
+      "carriedOver": false
+    },
+    {
+      "key": "PROJ-104",
+      "summary": "Hotfix — payment gateway timeout",
+      "description": "Gateway calls hang for 30s under load; the client gives up first and the order is written twice.",
+      "issueType": "Bug",
+      "parentKey": null,
+      "status": "Done",
+      "statusCategoryKey": "done",
+      "resolution": "Done",
+      "resolutionDate": "2026-05-09T16:00:00.000Z",
+      "created": "2026-05-08T08:00:00.000Z",
+      "points": 2,
+      "assignee": {
+        "displayName": "Grace Hopper",
+        "accountId": "acc-grace",
+        "emailAddress": "grace@example.com"
+      },
+      "addedMidSprint": true,
+      "addedDate": "2026-05-08T09:15:00.000Z",
+      "carriedOver": false
+    },
+    {
+      "key": "PROJ-105",
+      "summary": "Rotate the staging signing key",
+      "description": "",
+      "issueType": "Task",
+      "parentKey": null,
+      "status": "To Do",
+      "statusCategoryKey": "new",
+      "resolution": null,
+      "resolutionDate": null,
+      "created": "2026-05-12T09:00:00.000Z",
+      "points": 1,
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      },
+      "addedMidSprint": true,
+      "addedDate": "2026-05-12T11:00:00.000Z",
+      "carriedOver": false
+    },
+    {
+      "key": "PROJ-106",
+      "summary": "Triage the flaky order-import suite",
+      "description": "Fails about one run in five, always on the same two cases.",
+      "issueType": "Task",
+      "parentKey": null,
+      "status": "To Do",
+      "statusCategoryKey": "new",
+      "resolution": null,
+      "resolutionDate": null,
+      "created": "2026-04-30T09:00:00.000Z",
+      "points": 0,
+      "assignee": null,
+      "addedMidSprint": false,
+      "addedDate": null,
+      "carriedOver": false
+    }
+  ]
+}

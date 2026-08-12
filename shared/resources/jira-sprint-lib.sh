@@ -80,13 +80,28 @@ jsm_validate_iso8601() {
   fi
 }
 
+# Both paginators accumulate into a TEMP FILE, not a shell variable.
+#
+# They used to hold the running array in `acc` and merge each page with
+# `jq --argjson a "$acc"`, which passes the entire accumulated result through
+# argv. Past roughly 256 KB on macOS that fails with "Argument list too long"
+# — and it fails at the merge, so the caller sees a jq error rather than a
+# size problem. A 30-issue sprint fetched with `expand=changelog` and a
+# `description` field is already past the limit, and every caller that expands
+# the changelog is one large sprint away from it. --slurpfile reads from disk
+# and has no such ceiling.
+#
 # Paginate a GET endpoint that returns {values: [...], isLast?, total?, startAt, maxResults}.
 # Usage: jsm_paginate_values URL_NO_QUERY QUERY_STRING
 # Echoes a JSON array of merged values to stdout.
 jsm_paginate_values() {
   local base=$1
   local query=${2:-}
-  local start=0 acc='[]' is_last page_len grand_total url
+  local start=0 is_last page_len grand_total url acc_f page_f new_f
+  acc_f=$(mktemp); page_f=$(mktemp); new_f=$(mktemp)
+  # shellcheck disable=SC2064
+  trap "rm -f '$acc_f' '$page_f' '$new_f'" RETURN
+  printf '[]' > "$acc_f"
   while :; do
     if [ -n "$query" ]; then
       url="${base}?${query}&startAt=${start}"
@@ -98,10 +113,12 @@ jsm_paginate_values() {
       echo "Jira API Error ($JSM_HTTP_STATUS): $JSM_BODY" >&2
       exit 1
     fi
-    acc=$(jq -nc --argjson a "$acc" --argjson p "$JSM_BODY" '$a + ($p.values // [])')
-    is_last=$(jq -r '.isLast // empty' <<<"$JSM_BODY")
-    page_len=$(jq -r '.values | length' <<<"$JSM_BODY")
-    grand_total=$(jq -r '.total // empty' <<<"$JSM_BODY")
+    printf '%s' "$JSM_BODY" > "$page_f"
+    jq -nc --slurpfile a "$acc_f" --slurpfile p "$page_f" '$a[0] + ($p[0].values // [])' > "$new_f"
+    mv "$new_f" "$acc_f"
+    is_last=$(jq -r '.isLast // empty' "$page_f")
+    page_len=$(jq -r '.values | length' "$page_f")
+    grand_total=$(jq -r '.total // empty' "$page_f")
     if [ "$page_len" -eq 0 ] || [ "$is_last" = "true" ]; then
       break
     fi
@@ -110,14 +127,18 @@ jsm_paginate_values() {
       break
     fi
   done
-  printf '%s' "$acc"
+  cat "$acc_f"
 }
 
 # Paginate /sprint/{id}/issue → echoes JSON array of issues to stdout.
 jsm_paginate_issues() {
   local base=$1
   local query=${2:-}
-  local start=0 acc='[]' page_len grand_total url
+  local start=0 page_len grand_total url acc_f page_f new_f
+  acc_f=$(mktemp); page_f=$(mktemp); new_f=$(mktemp)
+  # shellcheck disable=SC2064
+  trap "rm -f '$acc_f' '$page_f' '$new_f'" RETURN
+  printf '[]' > "$acc_f"
   while :; do
     if [ -n "$query" ]; then
       url="${base}?${query}&startAt=${start}"
@@ -129,9 +150,11 @@ jsm_paginate_issues() {
       echo "Jira API Error ($JSM_HTTP_STATUS): $JSM_BODY" >&2
       exit 1
     fi
-    acc=$(jq -nc --argjson a "$acc" --argjson p "$JSM_BODY" '$a + ($p.issues // [])')
-    page_len=$(jq -r '.issues | length' <<<"$JSM_BODY")
-    grand_total=$(jq -r '.total // empty' <<<"$JSM_BODY")
+    printf '%s' "$JSM_BODY" > "$page_f"
+    jq -nc --slurpfile a "$acc_f" --slurpfile p "$page_f" '$a[0] + ($p[0].issues // [])' > "$new_f"
+    mv "$new_f" "$acc_f"
+    page_len=$(jq -r '.issues | length' "$page_f")
+    grand_total=$(jq -r '.total // empty' "$page_f")
     if [ "$page_len" -eq 0 ]; then
       break
     fi
@@ -140,5 +163,5 @@ jsm_paginate_issues() {
       break
     fi
   done
-  printf '%s' "$acc"
+  cat "$acc_f"
 }

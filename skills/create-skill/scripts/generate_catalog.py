@@ -61,6 +61,10 @@ CATEGORIES = [
     ("Jira / GitHub Sync", [
         "sync-jira-epic", "sync-jira-story", "sync-jira-task",
     ]),
+    ("Sprint & Ceremony", [
+        "jira-sprint-manager", "jira-sprint-review-prep",
+        "jira-sprint-retrospective", "jira-standup-auditor",
+    ]),
     ("Validation & Enforcement", [
         "api-endpoint-validator", "code-smell-validator",
         "documentation-standards-validator", "navigation-pattern-validator",

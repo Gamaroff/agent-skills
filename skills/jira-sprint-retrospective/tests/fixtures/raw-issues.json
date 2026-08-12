@@ -1,0 +1,103 @@
+[
+  {
+    "key": "PROJ-201",
+    "fields": {
+      "summary": "Joined before the sprint started",
+      "description": null,
+      "issuetype": { "name": "Story" },
+      "parent": null,
+      "status": { "name": "Done", "statusCategory": { "key": "done" } },
+      "resolution": { "name": "Done" },
+      "resolutiondate": "2026-08-08T10:00:00.000+0200",
+      "created": "2026-06-11T19:04:00.000+0200",
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      }
+    },
+    "changelog": {
+      "histories": [
+        {
+          "created": "2026-08-05T16:03:00.440+0200",
+          "items": [{ "field": "Sprint", "from": "", "to": "5434" }]
+        }
+      ]
+    }
+  },
+  {
+    "key": "PROJ-202",
+    "fields": {
+      "summary": "Joined five days into the sprint",
+      "description": null,
+      "issuetype": { "name": "Story" },
+      "parent": null,
+      "status": { "name": "To Do", "statusCategory": { "key": "new" } },
+      "resolution": null,
+      "resolutiondate": null,
+      "created": "2026-05-28T09:00:00.000+0200",
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      }
+    },
+    "changelog": {
+      "histories": [
+        {
+          "created": "2026-08-10T16:10:00.000+0200",
+          "items": [{ "field": "Sprint", "from": "", "to": "5434" }]
+        }
+      ]
+    }
+  },
+  {
+    "key": "PROJ-203",
+    "fields": {
+      "summary": "Carried in from the previous sprint",
+      "description": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              { "type": "text", "text": "Nested ADF" },
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [{ "type": "text", "text": "deep leaf" }]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "issuetype": { "name": "Task" },
+      "parent": null,
+      "status": {
+        "name": "In Progress",
+        "statusCategory": { "key": "indeterminate" }
+      },
+      "resolution": null,
+      "resolutiondate": null,
+      "created": "2026-07-01T09:00:00.000Z",
+      "assignee": null
+    },
+    "changelog": {
+      "histories": [
+        {
+          "created": "2026-08-05T10:00:00.000Z",
+          "items": [{ "field": "Sprint", "from": "5232", "to": "5232, 5434" }]
+        }
+      ]
+    }
+  }
+]
