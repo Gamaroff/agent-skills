@@ -5,7 +5,8 @@
 **QA Engineer**: QA Engineer
 **Review Date**: 2026-08-12
 **Testing Completed**: 2026-08-12
-**Gate Status**: CONCERNS
+**Gate Status**: **PASS** (98/100) — reached at cycle 2, after one fix cycle. Cycle 1 findings are
+preserved in full below; the Bug Resolution Summary at the end records their verification.
 **PR**: [#210](https://github.com/Gamaroff/agent-skills/pull/210)
 
 ---
@@ -17,13 +18,17 @@ through bundling, the full suite and both eval suites are green, all three CI ch
 engine was verified end-to-end against the new sections rather than assumed to work. The task also found
 and correctly resolved a drift twice the size it had documented.
 
-The gate is CONCERNS for one reason: **create-epic is now instructed to do something impossible.** The new
-guidance tells it to keep frontmatter `updated:` in step with the seeded Change Log row, but the epic
-frontmatter contract has no `updated:` field. Nothing is broken at runtime — but an instruction an agent
+Cycle 1 gated at CONCERNS for one reason: **create-epic was instructed to do something impossible.** The
+new guidance told it to keep frontmatter `updated:` in step with the seeded Change Log row, but the epic
+frontmatter contract has no `updated:` field. Nothing was broken at runtime — but an instruction an agent
 cannot satisfy is a defect in a change whose entire product *is* instructions.
 
-**Overall Assessment**: CONCERNS
-**Deployment Recommendation**: CONDITIONAL — three cheap fixes, one fix cycle
+That is now fixed, along with two low cleanups and a fourth instance of the same defect class that
+verification surfaced independently (the legacy story template has no frontmatter at all). A repo-wide
+sweep establishes the invariant both violated.
+
+**Overall Assessment**: PASS (cycle 2)
+**Deployment Recommendation**: APPROVED
 
 ---
 
@@ -66,10 +71,10 @@ Code Review).
 | Phase 1: Task template | PASS | Verified | Unnumbered `## Change Log` at line 395 in both copies, between Sign-off and Progress Tracking. `countMandatorySections()` = 11. `cmp` clean — the pair's pre-existing frontmatter drift is resolved |
 | Phase 2: Epic templates | PASS | Verified | H2 log at line 685, immediately before `## Notes & Updates` (693); Open Questions (695) and Decisions Made retained; bulleted form gone. All three copies `cmp`-identical |
 | Phase 3: Story and PRD templates | PASS | Verified | Legacy story md promoted and tabulated; brownfield PRD 5→4 columns; all four YAML templates carry the canonical columns and instruction; story YAML pair `cmp`-identical |
-| Phase 4: Creation skills | **CONCERNS** | Verified with defects | All six skills seed row one and link the spec. Two internal inconsistencies in the new create-epic guidance — see CR-2, CR-3 |
+| Phase 4: Creation skills | PASS *(CONCERNS at cycle 1)* | Verified | All six skills seed row one and link the spec. Two internal inconsistencies in the new create-epic guidance (CR-2, CR-3) were found at cycle 1 and fixed in cycle 1 |
 | Phase 5: Tests, evals, bundle | PASS | Verified | 13 protocol tests, 6 eval assertions, both replay fixtures updated; bundle idempotent by content hash; byte-locks re-verified *after* bundling |
 
-**Overall Phase Completion**: 5/5 phases implemented; 4/5 defect-free.
+**Overall Phase Completion**: 5/5 phases implemented; 4/5 defect-free at cycle 1, **5/5 at cycle 2**.
 
 ---
 
@@ -312,16 +317,53 @@ Not applicable — no runtime source added. Coverage here is contract coverage: 
 
 ## Final Assessment
 
-**Gate Status**: CONCERNS
+**Gate Status**: **PASS** (CONCERNS at cycle 1 → PASS at cycle 2)
 **Rationale**: The work is complete, well-tested, and better-evidenced than the task that specified it —
-it corrected its own premise mid-flight and verified the T42 integration instead of assuming it. One
-medium defect (an unsatisfiable instruction to `create-epic`) and two low cleanups stand between it and a
-clean gate, and all three land in a single fix cycle.
-**Quality Score**: 90/100
+it corrected its own premise mid-flight and verified the T42 integration instead of assuming it. The one
+medium defect (an unsatisfiable instruction to `create-epic`) and two low cleanups were fixed in a single
+cycle, and fixing them surfaced a fourth instance of the same class. Nothing outstanding is in scope.
+**Quality Score**: 98/100 (was 90 at cycle 1)
 
-**Deployment Recommendation**: CONDITIONAL
-**Conditions**: CR-2 resolved before merge; CR-3 and CR-4 fixed in the same cycle (both trivial).
+**Deployment Recommendation**: APPROVED
+**Carried forward, not blocking**: task.44 must land `review-prd`'s four-column writer (CR-1).
 
 ---
 
-**Next Steps**: `/qa-fix` on this gate file (CR-2, CR-3, CR-4), then re-review as QA cycle 2.
+## Bug Resolution Summary — QA Cycle 2 (2026-08-12)
+
+All three gate issues fixed in one cycle, plus a fourth instance of the same defect class that
+verification surfaced independently. **Gate updated in place: CONCERNS → PASS, 90 → 98.**
+
+| ID | Severity | Verification | Result |
+| --- | --- | --- | --- |
+| CR-2 | medium | Epic template comment and both `create-epic` guidance sites now state that epic frontmatter has no `updated:` field and name `created:`/`target_completion:` instead | ✅ CLOSED |
+| CR-2b | medium | *Not in the original gate.* Verifying CR-2 revealed the legacy story markdown template has no YAML frontmatter at all — it carries `**Last Updated**:`. Its comment now points at that line | ✅ CLOSED |
+| CR-3 | low | `grep -rn "{{today}}" skills/` → zero matches; `create-epic` uses `{today}` in both places | ✅ CLOSED |
+| CR-4 | low | Both `references/`-resident templates name **both** path forms, so the spec pointer resolves in-repo and inside a bundled skill | ✅ CLOSED |
+| CR-1 | medium | **Not fixed — out of scope by design.** `review-prd`'s five-cell writer remains; documented as Breaking Change 1 / Risk 4 with task.44 as owner, and carried in `recommendations.future` | ⏭️ DEFERRED to task.44 |
+
+### Invariant established
+
+A repo-wide sweep now confirms the property that CR-2 and CR-2b both violated: **a template's Change Log
+comment instructs a writer to bump `updated:` if and only if that document type actually has the field.**
+The two task templates (which do) still require it; the epic and legacy-story templates (which do not)
+now describe the absence instead of asserting the field.
+
+### Re-verification evidence
+
+```
+npm test                     1158/1158 pass, 0 fail
+eval:create-task             12/12 assertions
+eval:create-story            15/15 assertions
+countMandatorySections()     11 (unchanged)
+npm run bundle               idempotent; all three byte-locks verified to hold THROUGH it
+gh pr checks 210             test / validate / link-check all pass on commit ce8f287
+```
+
+**NFR change**: Maintainability CONCERNS → **PASS**. The defect that caused the downgrade — instructions
+an agent cannot follow — is resolved, and the sweep makes the invariant checkable rather than assumed.
+
+---
+
+**Next Steps**: gate is PASS — proceed to `/finalise`.
+

@@ -1,10 +1,10 @@
 schema: 1
 task: "task.43.change-log-templates-and-creation"
 task_title: "Templates and creation skills emit the canonical Change Log"
-gate: CONCERNS
-status_reason: "All five phases implemented and verified; full suite, both evals and CI green, every byte-lock holds through bundling. One real defect in the new authoring guidance: create-epic is instructed to keep frontmatter `updated:` in step with the seeded row, but the epic frontmatter contract has no `updated:` field, so the instruction cannot be satisfied."
+gate: PASS
+status_reason: "All five phases implemented and verified. QA cycle 1 found one medium and two low issues in the new authoring guidance; all three were fixed in cycle 1, plus a fourth instance of the same defect class that verification surfaced independently. Re-verified at cycle 2: every byte-lock holds through a fresh bundle, npm test 1158/1158, both eval suites green, 11-section count intact, CI green on the fix commit."
 reviewer: "QA Engineer"
-updated: "2026-08-12T20:10:00Z"
+updated: "2026-08-12T20:35:00Z"
 
 top_issues:
   - id: CR-2
@@ -12,21 +12,27 @@ top_issues:
     finding: "create-epic's new Change Log guidance requires frontmatter `updated:` to match the seeded row's date, but the epic frontmatter contract (docs/templates/epic-template.md:17-28, the block create-epic emits at SKILL.md:149-161, and the required-field list at SKILL.md:347) has no `updated:` field — the instruction is unsatisfiable as written."
     suggested_action: "Reword the epic-side guidance so it does not assert a field the epic schema lacks, and record the missing-`updated:`-on-epics gap as a follow-on rather than changing the epic frontmatter contract inside this task."
     suggested_owner: dev
+    status: closed
+    fixed_date: "2026-08-12"
   - id: CR-3
     severity: low
     finding: "create-epic seeds the row with `{{today}}` (SKILL.md:268) while its own validation bullet (SKILL.md:350) and all five sibling create-* skills use `{today}`; `{{today}}` appears nowhere else in the repo outside this task's plan file."
     suggested_action: "Use `{today}` in both places in create-epic, matching the five sibling skills."
     suggested_owner: dev
+    status: closed
+    fixed_date: "2026-08-12"
   - id: CR-4
     severity: low
     finding: "The byte-locked epic-template copies carry the literal comment path `shared/resources/document-change-log.md`, which does not resolve inside a bundled skill because bundling deliberately skips `references/` — an agent reading the bundled copy follows a dead pointer even though a live `references/document-change-log.md` sits beside it."
     suggested_action: "Name both path forms in the template comment so the pointer resolves in-repo and in a bundled skill without breaking byte-equality."
     suggested_owner: dev
+    status: closed
+    fixed_date: "2026-08-12"
 
 waiver:
   active: false
 
-quality_score: 90
+quality_score: 98
 
 evidence:
   tests_reviewed: 1158
@@ -46,17 +52,11 @@ nfr_validation:
     status: PASS
     notes: "Engine integration verified directly: shared/resources/change-log.js findChangeLog locates every new H2 block, upsertChangeLog extends it in place, the seeded row survives, the authoring comment survives, and no second block is ever inserted. Per-phase rollback confirmed independent — Phases 1/2/3 touch disjoint template families."
   maintainability:
-    status: CONCERNS
-    notes: "Net strongly positive: two live template drifts killed and both duplicate families byte-locked in CI, replacing six restatements of the column list with a link to one spec. Downgraded from PASS because two of the new authoring instructions are internally inconsistent (CR-2 unsatisfiable, CR-3 placeholder mismatch) — instructions an agent cannot follow are a maintainability defect even when no code is wrong."
+    status: PASS
+    notes: "Two live template drifts killed and both duplicate families byte-locked in CI, replacing six restatements of the column list with a link to one spec. Upgraded from CONCERNS at cycle 2: the internally-inconsistent instructions (CR-2, CR-3) are fixed, and a repo-wide sweep confirms the invariant now holds — only templates that actually carry a frontmatter `updated:` field instruct a writer to bump it."
 
 recommendations:
-  immediate:
-    - action: "Reword create-epic's `updated:` requirement to match the epic frontmatter contract (CR-2)"
-      refs: ["skills/create-epic/SKILL.md", "docs/templates/epic-template.md"]
-    - action: "Normalise `{{today}}` to `{today}` in create-epic (CR-3)"
-      refs: ["skills/create-epic/SKILL.md"]
-    - action: "Name both path forms in the epic template's Change Log comment (CR-4)"
-      refs: ["docs/templates/epic-template.md"]
+  immediate: []   # all three resolved in QA fix cycle 1 — see bug_resolution
   future:
     - action: "task.44 must land review-prd's four-column writer — this task narrows the brownfield PRD table and leaves that writer emitting five cells (documented Breaking Change 1 / Risk 4, noted in CHANGELOG.md)"
       refs: ["skills/review-prd/SKILL.md"]
@@ -65,9 +65,16 @@ recommendations:
     - action: "Bring create-architecture-doc's brownfield template to the canonical four columns — its three sibling architecture templates already use them"
       refs: ["skills/create-architecture-doc/resources/templates/brownfield-architecture-tmpl.yaml"]
 
+bug_resolution:
+  bugs_fixed: 4          # CR-2, CR-2b, CR-3, CR-4
+  bugs_remaining: 0
+  fix_date: "2026-08-12"
+  total_iterations: 1
+  verification_method: "Repo-wide sweep of every template's Change Log comment against its own frontmatter shape; byte-lock cmp through a fresh bundle; npm test 1158/1158; both eval suites; countMandatorySections(); CI green on commit ce8f287"
+  notes: "CR-2b was not in the original gate. Verifying CR-2 revealed the legacy story markdown template carries no YAML frontmatter at all (it has a `**Last Updated**:` bold line), so the same unsatisfiable instruction was present there too. Fixed in the same cycle."
+
 deployment_readiness:
-  staging: CONDITIONAL
-  production: CONDITIONAL
+  staging: APPROVED
+  production: APPROVED
   conditions:
-    - "CR-2 resolved — an unsatisfiable instruction will otherwise mislead every create-epic run"
-    - "CR-3 and CR-4 are low severity and may ship, but all three are cheap and land in one fix cycle"
+    - "task.44 must land review-prd's four-column writer — tracked in recommendations.future, not a condition on this task"

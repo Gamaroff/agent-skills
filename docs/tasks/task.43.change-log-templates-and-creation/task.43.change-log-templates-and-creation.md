@@ -5,10 +5,12 @@ type: task
 description: "Give every PRD, epic, story, and task template the canonical Change Log section, and make the create-* skills seed its first row."
 tags: [change-log, templates, documentation]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-12
 updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 210
 assignee:
 estimated_effort_hours: 16
 github_issue: 202
@@ -16,7 +18,7 @@ github_issue: 202
 
 # [Task 43] Templates and creation skills emit the canonical Change Log
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.43.review.1.change-log-templates-and-creation.md` implemented 2026-08-12
 
@@ -616,11 +618,11 @@ malformed.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 98/100 (was 90 at cycle 1)
+**Gate Decision**: PASS (cycle 2, after one fix cycle)
 
 ### QA Report
 
@@ -632,7 +634,7 @@ malformed.
 - **Tests Executed**: 1158 (all pass) + 27 eval assertions + 115 skill validations
 - **Phases Verified**: 5/5 implemented, 4/5 defect-free
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS (upgraded at cycle 2)
 
 ### Key Findings
 
@@ -734,6 +736,45 @@ as this task's Risk 4 anticipated.
 
 No Change Log was added to this task document itself — §4 excludes backfilling existing documents, and
 the pipeline-side writers are task.45's scope.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.43.qa.1.change-log-templates-and-creation.md`
+**Gate File**: `task.43.gate.1.change-log-templates-and-creation.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 98/100 (90 at cycle 1)
+**QA Cycles**: 2 (1 fix cycle)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** every Functional, Performance, Code Quality and Migration criterion met
+✅ **Tests:** `npm test` 1158/1158 pass; 13 new protocol assertions; `countMandatorySections()` still 11
+✅ **Evals:** `eval:create-task` 12/12, `eval:create-story` 15/15 — generation actually emits the section
+✅ **CI:** SUCCESS on head `ce8f287` — the exact commit accepted (test / validate / link-check all green)
+✅ **Byte-locks:** epic trio, task-template pair and story-YAML pair all `cmp`-clean **through** a bundle
+✅ **Documentation:** `CHANGELOG.md`, both breaking changes with migration paths, both out-of-scope findings
+✅ **Security Review:** ⚠️ NOT_APPLICABLE — verified empty (no executables, credentials, deps or input handling)
+✅ **Compliance Review:** ⚠️ NOT_APPLICABLE; repo standards PASS — `validate:all` 115/115, and the change
+   clears a live OKF `type:` violation in the validator's epic copy
+
+**PR:** [#210](https://github.com/Gamaroff/agent-skills/pull/210) — OPEN, MERGEABLE. `reviewDecision` is
+empty because this repo has no required-review protection; the independent adversarial code review (QA
+Step 3b, blocking mode, 4 real findings) and the QA gate stand in its place, recorded rather than rounded up.
+
+**Carried forward — a blocking condition on task.44, not on this task:** `review-prd/SKILL.md:772` still
+writes a five-cell row into the now-four-column brownfield PRD table. Documented here as Breaking Change 1
+and Risk 4, and in `CHANGELOG.md`.
+
+**Detailed Verification Log:** see `task.43.dod.1.change-log-templates-and-creation.md` for complete
+verification evidence, per-job CI detail, and the reasoning behind each NOT_APPLICABLE.
+
+**Task marked as ACCEPTED on:** 2026-08-12
 
 ---
 
