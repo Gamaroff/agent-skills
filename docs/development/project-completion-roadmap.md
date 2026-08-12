@@ -56,7 +56,7 @@ T37–T39 are inert until T40 wires the first live behaviour change.
 ### Per-tracker execution ‖ (dependency-independent once T37 lands)
 
 - [x] **T38** Jira: walk the status ladder + last-rung terminal restriction · deps: T37 · touches: jira-sync!, workflow-engine~, docs-config~ · /develop-task docs/tasks/task.38.jira-ladder-walking/task.38.jira-ladder-walking.md
-- [ ] **T39** `gh-stage.js` — GitHub Projects board engine · deps: T37 · touches: gh-stage!, workflow-engine~, docs-config~ · /develop-task docs/tasks/task.39.github-board-stage-engine/task.39.github-board-stage-engine.md
+- [x] **T39** `gh-stage.js` — GitHub Projects board engine · deps: T37 · touches: gh-stage!, workflow-engine~, docs-config~ · /develop-task docs/tasks/task.39.github-board-stage-engine/task.39.github-board-stage-engine.md
 
 ### Wiring — first live behaviour change
 
@@ -131,3 +131,4 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 | 2026-08-04 | T36 accepted — PR #190 merged (`48bb57e`). One success criterion waived: migration recipe unverified against a live board |
 | 2026-08-04 | T37 accepted — PR #193 merged (`deeb795`). All 17 success criteria met, no waivers. 5 QA cycles, 9 findings closed; tests 760 → 840. **T38 and T39 are now unblocked** — they may run in parallel |
 | 2026-08-12 | Phase 2 seeded with the document change-log series (T42–T45, issues #201–204). Strictly sequential via `deps:`; T45 `manual`-gated on verifying T44's advisory default. Legend gained `change-log`, `templates`, `review-skills` tags |
+| 2026-08-12 | T39 accepted — PR #206 merged (`2c7ff3e`). `gh-stage.js` (1,299 lines), 65 tests, 10 fixtures. All 16 success criteria met, no waivers. 5 QA cycles, 20 findings closed; tests 1050 → 1065. The same defect — writing a status to a board the operator did not name — was caught twice, the second time reopened by a fix's own partial-read tolerance. **T40 is now unblocked** |
