@@ -4,7 +4,7 @@
 **Bug ID**: TASK-41-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-08-12
 
@@ -133,3 +133,14 @@ leaves a file (TASK-41-BUG-1)".
 | 2026-08-12 | New | QA Engineer | Found during QA cycle 1 |
 | 2026-08-12 | In Progress | qa-fix | Investigation started |
 | 2026-08-12 | Ready for QA | qa-fix | Fix implemented and verified |
+| 2026-08-12 | Closed | QA Engineer | Fix verified in QA cycle 2 — see task.41.qa.2 |
+
+---
+
+## QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-08-12
+**Verified by**: QA Engineer (cycle 2)
+**Verification Result**: ✅ Fixed
+
+See [task.41.qa.2.pipeline-moments-and-scaffolding.md](./task.41.qa.2.pipeline-moments-and-scaffolding.md) for the verification detail. Gate 2 is PASS at 96/100.

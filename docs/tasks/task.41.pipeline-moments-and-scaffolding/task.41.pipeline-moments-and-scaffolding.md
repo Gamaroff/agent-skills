@@ -5,11 +5,13 @@ type: task
 description: "Add the changes-requested and pr-merged moments, scaffold tracker-workflow.yaml on install without ever overwriting, add --init-workflow and a CI --check, and close the develop-bug QA-stage gap."
 tags: [pipeline, scaffolding, setup, github, jira, documentation]
 category: infrastructure
-status: ready-for-development
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-08-03
 updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 208
 assignee:
 estimated_effort_hours: 16
 github_issue: 189
@@ -17,7 +19,7 @@ github_issue: 189
 
 # Technical Task: New moments, scaffolding, and the `develop-bug` gap
 
-**Status:** Ready for Development
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.41.review.1.pipeline-moments-and-scaffolding.md` implemented 2026-08-12
 
@@ -578,26 +580,28 @@ in CI.
 
 ## QA Testing Results
 
-**QA Status**: FAIL (cycle 1) → fixes applied, awaiting re-review
+**QA Status**: ✅ PASS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-12
-**Quality Score**: 60/100 (cycle 1)
-**Gate Decision**: FAIL
+**Quality Score**: 96/100 (cycle 2; 60/100 at cycle 1)
+**Gate Decision**: PASS
+**QA Cycles**: 2
 
 ### QA Report
-- **Full Report**: [task.41.qa.1.pipeline-moments-and-scaffolding.md](./task.41.qa.1.pipeline-moments-and-scaffolding.md)
-- **Gate File**: [task.41.gate.1.pipeline-moments-and-scaffolding.yml](./task.41.gate.1.pipeline-moments-and-scaffolding.yml)
+- **Final Report**: [task.41.qa.2.pipeline-moments-and-scaffolding.md](./task.41.qa.2.pipeline-moments-and-scaffolding.md) (cycle 2)
+- **Final Gate**: [task.41.gate.2.pipeline-moments-and-scaffolding.yml](./task.41.gate.2.pipeline-moments-and-scaffolding.yml) — PASS
+- **Cycle 1**: [qa.1](./task.41.qa.1.pipeline-moments-and-scaffolding.md) / [gate.1](./task.41.gate.1.pipeline-moments-and-scaffolding.yml) — FAIL
 
 ### Test Coverage Summary
 - **Tests Executed**: 1104 (1099 at cycle 1, +5 added by qa-fix)
-- **Phases Verified**: 4/5 at cycle 1 (Phase 3 failed); 5/5 after fixes
-- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW — all addressed in qa-fix cycle 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS → addressed, Maintainability: PASS
+- **Phases Verified**: 5/5 (4/5 at cycle 1 — Phase 3 failed and was fixed)
+- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW at cycle 1 — all fixed, verified and closed at cycle 2
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS (CONCERNS at cycle 1), Maintainability: PASS
 
 ### Bug Reports
-- [TASK-41-BUG-1](./task.41.bug.1.init-workflow-silent-noop-skips-scaffolding.md) — HIGH — ✅ Ready for QA
-- [TASK-41-BUG-2](./task.41.bug.2.generic-ladder-mislabelled-as-board-derived.md) — MEDIUM — ✅ Ready for QA
-- [TASK-41-BUG-3](./task.41.bug.3.scaffolding-probe-branch-untested.md) — MEDIUM — ✅ Ready for QA
+- [TASK-41-BUG-1](./task.41.bug.1.init-workflow-silent-noop-skips-scaffolding.md) — HIGH — ✅ Closed
+- [TASK-41-BUG-2](./task.41.bug.2.generic-ladder-mislabelled-as-board-derived.md) — MEDIUM — ✅ Closed
+- [TASK-41-BUG-3](./task.41.bug.3.scaffolding-probe-branch-untested.md) — MEDIUM — ✅ Closed
 
 ### Key Findings
 
@@ -614,6 +618,35 @@ honestly via the `fromRecord` field the CLI already returned, and adding four
 stub-CLI tests that pin the wizard's contract with the CLI across every outcome it
 can produce.
 
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final QA Report**: `task.41.qa.2.pipeline-moments-and-scaffolding.md`
+**Final Gate**: `task.41.gate.2.pipeline-moments-and-scaffolding.yml`
+**Gate Status**: ✅ PASS · **Quality Score**: 96/100 · **QA Cycles**: 2
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 15/15 met (F1–F6, P1–P2, Q1–Q3, M1–M3)
+✅ **Tests:** 1104 pass / 0 fail (+24 added by this task, +5 by qa-fix); `npm run eval:all` exit 0
+✅ **CI:** SUCCESS on the final commit — `link-check`, `test`, `validate` all green, head verified identical to `b0105d0`
+✅ **PR:** [#208](https://github.com/Gamaroff/agent-skills/pull/208) — OPEN, MERGEABLE
+✅ **Documentation:** CHANGELOG, `tracker-workflow.md` (+132), shipped template, both develop READMEs, `configuration.md`
+✅ **Security:** No secrets introduced; `--issue` numeric validation still guards every GraphQL path; `--check` provably read-only; JSON parsing degrades to the conservative branch
+⚠️ **Compliance:** NOT_APPLICABLE — developer tooling, no personal data / payments / UI surface
+✅ **Bugs:** 3 raised at QA cycle 1 (1 HIGH, 2 MEDIUM) — all fixed, verified and closed
+
+**Residual (non-blocking):** the GitHub live-probe branch is unreachable from the wizard by construction (handled and commented); the Jira `--check` board half compares against a local record rather than a live probe.
+
+**Detailed Verification Log:** See [`task.41.dod.1.pipeline-moments-and-scaffolding.md`](./task.41.dod.1.pipeline-moments-and-scaffolding.md) for full evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-08-12
+
+---
 
 ## Notes
 

@@ -1,0 +1,75 @@
+schema: 1
+task: "task.41.pipeline-moments-and-scaffolding"
+task_title: "Two new pipeline moments, workflow-file scaffolding, and the develop-bug gap"
+gate: PASS
+status_reason: "All three cycle-1 issues fixed and independently verified, including a proof that the BUG-1 regression test actually fails when the defect is reintroduced. Phase 3 now passes; the other four phases were unchanged by the fix and re-verified green."
+reviewer: "QA Engineer"
+updated: "2026-08-12T17:40:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 1104
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. The fix adds no network or filesystem reach: it replaces an exit-code test with an `[[ -f ]]` test and parses the CLI's own --json stdout through jq with a `// empty` default, so malformed output degrades to the template branch rather than throwing."
+  performance:
+    status: PASS
+    notes: "Unchanged. Both quantified criteria still met; --check --offline still asserted to issue zero network calls."
+  reliability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. The cycle-1 defect was a silent no-op reported as success; the wizard now derives its report from the artifact and from the CLI's own `fromRecord` claim rather than from an exit code that never carried that meaning. Every CLI outcome — writes nothing, writes record-derived, writes generic, fails — now has a defined wizard behaviour and a test."
+  maintainability:
+    status: PASS
+    notes: "Improved. The three advisory cleanups landed (explicit if/elif precedence for _cli, keyed lookup replacing a three-deep ternary, unused destructured args dropped). The probe branch is no longer a blind spot: a stub harness pins the wizard's contract with the CLI, so the next person to touch it gets told immediately."
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: "2026-08-12"
+  total_iterations: 1
+  verification_method: "Re-ran the original reproductions; proved the regression test fails when the defect is reintroduced; full suite + evals"
+
+resolved_issues:
+  - id: TASK-41-BUG-1
+    severity: high
+    status: closed
+    fixed_date: "2026-08-12"
+    verification: "Re-ran the exact cycle-1 reproduction (real gh-stage.js + PATH stub making gh unauthenticated). Before: exit 0, no file, 'generated from your live board'. After: file written from the heredoc with the generic-ladder warning surfaced. Additionally reintroduced the defect in a scratch copy of the wizard and confirmed the file is NOT written — proving the new regression test genuinely fails on reintroduction rather than passing vacuously."
+    bug_ref: "task.41.bug.1.init-workflow-silent-noop-skips-scaffolding.md"
+  - id: TASK-41-BUG-2
+    severity: medium
+    status: closed
+    fixed_date: "2026-08-12"
+    verification: "Verified against the real jira-stage.js with no workflow record: now reports `template (edit before first run)` and re-emits all three warning lines plus a record_warning, instead of claiming board provenance."
+    bug_ref: "task.41.bug.2.generic-ladder-mislabelled-as-board-derived.md"
+  - id: TASK-41-BUG-3
+    severity: medium
+    status: closed
+    fixed_date: "2026-08-12"
+    verification: "5 tests added (21 → 26 in that file). The probe branch is entered by a stub CLI installed at the resolved path, covering all four CLI outcomes plus the trailing-newline assertion."
+    bug_ref: "task.41.bug.3.scaffolding-probe-branch-untested.md"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "gh-stage --init-workflow needs an --issue to reach a board and the wizard has none to give, so on GitHub the wizard's normal outcome is the template. The code now handles this correctly and says so in a comment, but consider sourcing an issue number during setup if board-derived scaffolding on GitHub is wanted."
+      refs: ["scripts/setup-consumer.sh", "shared/resources/gh-stage.js"]
+    - action: "The Jira --check board half compares against the local workflow record rather than a live probe. Adequate and credential-free, but a live-probe variant would catch a column renamed since the record was written."
+      refs: ["shared/resources/jira-stage.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
