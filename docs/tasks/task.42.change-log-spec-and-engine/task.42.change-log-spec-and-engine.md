@@ -5,10 +5,12 @@ type: task
 description: "Establish one canonical Change Log section format for PRD/epic/story/task documents, backed by a shared engine extracted from jira-sync.js, and record it in the standards."
 tags: [change-log, documentation, shared-resources]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-12
 updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 209
 assignee:
 estimated_effort_hours: 16
 github_issue: 201
@@ -16,7 +18,7 @@ github_issue: 201
 
 # [Task 42] Canonical Change Log spec and shared engine
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.42.review.1.change-log-spec-and-engine.md` implemented 2026-08-12
 
@@ -770,6 +772,35 @@ standards document that reads badly.
 - [`docs/standards/`](../../standards/) — the five document standards
 - Follow-on tasks: task.43 (templates + creation), task.44 (review + edit), task.45
   (pipeline + sync)
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: [task.42.gate.3.change-log-spec-and-engine.yml](./task.42.gate.3.change-log-spec-and-engine.yml) — ✅ **PASS, 100/100**
+**QA Cycles**: 3 (2 fix cycles) · gate.1 FAIL 60 → gate.2 CONCERNS 90 → gate.3 PASS 100
+**Bug reports**: TASK-42-BUG-1, -2, -3 — all closed with QA Verification
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 14/15 met — 6/6 functional, 1/1 performance, 4/4 code quality, 4/4 migration. One criterion is recorded as **not met** with its full reasoning (see §9 → Code Quality); it could not be met, because it contradicts this task's own Breaking Changes 1–2.
+✅ **CI:** SUCCESS on the **exact final commit** `b90017c` — `link-check`, `test`, `validate` all COMPLETED/SUCCESS. PR head verified equal to local HEAD, so the green run covers the final code rather than an ancestor.
+✅ **Tests:** 1144 passing, 0 failing (baseline before this task: 1104; +40 engine tests)
+✅ **PR:** [#209](https://github.com/Gamaroff/agent-skills/pull/209) — 6 commits, 45 files
+✅ **Documentation:** canonical spec + all five standards documents + configuration reference + AGENTS.md + CHANGELOG.md
+✅ **Security Review:** PASS — pure string manipulation; no I/O, network, shell or eval; the one constructed regex interpolates a 2–3 bounded integer; no new dependencies
+⚠️ **Compliance Review:** NOT_APPLICABLE — developer tooling with no personal data, payments, or UI surface (reason recorded rather than silently skipped)
+✅ **Bundle:** idempotent; no `skills/*/references/` file hand-edited (all 28 bundler-generated)
+
+**Deployment Readiness:** Staging ✅ APPROVED · Production ✅ APPROVED
+
+**Detailed Verification Log:** See [task.42.dod.1.change-log-spec-and-engine.md](./task.42.dod.1.change-log-spec-and-engine.md) for complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-08-12
 
 ---
 
