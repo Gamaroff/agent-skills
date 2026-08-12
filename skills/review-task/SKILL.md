@@ -1449,19 +1449,19 @@ options:
      - Add `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD` to the report's opening summary
      - In the task file, add `**Review**: ✅ All review recommendations from \`[report-filename]\` implemented YYYY-MM-DD` immediately after the `**Status**:` line
 
-4. **Append a Change Log row** to the task recording the review outcome, and bump frontmatter `updated` to today in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name. Illustrative row:
-
-   | 2026-08-12 | 1.1 | Review passed (9/10) — ready for development | review-task |
-
-   Describe **what the review found and changed**, not that a review happened. Skip when `change-log.enabled: false` in `skills-config.yaml`.
-
-   > Write this row **regardless of tracker platform**. Step 8.6's Jira sync also appends a row on the Jira path, but that is a *sync* record, not the *review* record — and the GitHub and no-tracker paths get nothing at all without this step. This is the write that makes the local file the authoritative history the [tracker card contract](references/tracker-card-summary.md) already claims it is.
-
 3. **If "No, I will fix manually"**:
    - Acknowledge and proceed to Step 9
    - Remind user: "The full issue list is in the report above. Run `/review-task` again after making changes."
 
-**Output**: Task document with fixes applied (if user chose to apply), or unchanged (if user declined).
+4. **Append a Change Log row** to the task recording the review outcome — **regardless of which option was chosen above** — and bump frontmatter `updated` to today in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name. Illustrative row:
+
+   | 2026-08-12 | 1.1 | Review passed (9/10) — ready for development | review-task |
+
+   Describe **what the review found and changed**, not that a review happened. A review that found nothing still writes a row (`Review passed (9/10) — no changes required`): the verdict is the event being recorded, not the edits. Check 4b's currency heuristic depends on this being unconditional. Skip only when `change-log.enabled: false` in `skills-config.yaml`.
+
+   > Write this row **regardless of tracker platform** too. Step 8.6's Jira sync also appends a row on the Jira path, but that is a *sync* record, not the *review* record — and the GitHub and no-tracker paths get nothing at all without this step. This is the write that makes the local file the authoritative history the [tracker card contract](references/tracker-card-summary.md) already claims it is.
+
+**Output**: Task document with fixes applied (if user chose to apply), or unchanged (if user declined) — and in both cases a Change Log row recording the review verdict.
 
 ---
 
