@@ -1505,6 +1505,18 @@ function checkDrift({ moments, optionNames, boardTitle, warnings, args, output }
  * lifecycle onto first/middle/last rungs, which is a guess — it is labelled as
  * one in the file it writes.
  */
+// Why a moment came out commented, keyed on the moment. The two opt-in ones sit
+// side by side here on purpose: both are off by DEFAULT rather than missing from
+// the board, and a reader comparing them should not have to reconstruct that
+// from a nested ternary.
+const UNRESOLVED_MOMENT_NOTE = Object.freeze({
+  "changes-requested":
+    "off by default; fires once per QA fix cycle. Keep it OFF `statuses:` — a ranked target makes the 2nd move backward and the guard rejects it",
+  "pr-merged":
+    "off by default; fires after the PR merges, from /develop-next and /develop-batch. To gate on a real merge, omit `done:` above and let this be the last move",
+  _default: "no matching column on this board — add the column and this line together",
+});
+
 function renderWorkflowFile(optionNames, moments) {
   const q = (n) => JSON.stringify(n);
   const first = optionNames[0];
@@ -1540,13 +1552,7 @@ function renderWorkflowFile(optionNames, moments) {
     // Commented, with the moment's own reason. `changes-requested` and
     // `pr-merged` are off by default, so they resolve to nothing on a fresh
     // read even on a board that has a perfectly good column for them.
-    const why =
-      m === "changes-requested"
-        ? "off by default; fires once per QA fix cycle. Keep it OFF `statuses:` — a ranked target makes the 2nd move backward and the guard rejects it"
-        : m === "pr-merged"
-          ? "off by default; fires after the PR merges, from /develop-next and /develop-batch. To gate on a real merge, omit `done:` above and let this be the last move"
-          : "no matching column on this board — add the column and this line together";
-    lines.push(`  # ${m}: ...   # ${why}`);
+    lines.push(`  # ${m}: ...   # ${UNRESOLVED_MOMENT_NOTE[m] || UNRESOLVED_MOMENT_NOTE._default}`);
   }
   lines.push("");
   lines.push("# Local document status -> board status, for the /sync-* skills.");

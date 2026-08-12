@@ -399,18 +399,54 @@ write_tracker_workflow() {
 
   # Prefer the real board over a generic ladder. Both CLIs refuse to overwrite
   # without --force, so this is safe even if the file appeared since the check.
+  #
+  # Tracker wins over VCS: a Bitbucket repo tracked in Jira must probe Jira.
   local _cli=""
-  case "${VCS:-github}" in
-    github) _cli=".agents/skills/develop-task/references/gh-stage.js" ;;
-    *)      _cli="" ;;
-  esac
-  [[ "${TRACKER:-github}" == "jira" ]] && _cli=".agents/skills/develop-task/references/jira-stage.js"
+  if [[ "${TRACKER:-github}" == "jira" ]]; then
+    _cli=".agents/skills/develop-task/references/jira-stage.js"
+  elif [[ "${VCS:-github}" == "github" ]]; then
+    _cli=".agents/skills/develop-task/references/gh-stage.js"
+  fi
 
-  if [[ "$DRY_RUN" != true && -n "$_cli" && -f "$_cli" ]] \
-     && node "$_cli" --init-workflow >/dev/null 2>&1; then
-    ok "tracker-workflow.yaml — generated from your live board"
-    record_step "tracker-workflow" "ok" "generated from board"
-    return
+  # NEVER infer "the file was written" from the exit code.
+  #
+  # Every mode in this CLI family except --check exits 0 on a documented skip —
+  # `no-credentials` (gh not authenticated, which this wizard does not require),
+  # `no-repo-context` (no origin remote yet), `stage-disabled`, and so on. Each
+  # of those writes nothing. Gating on `&& node ... ` therefore reported
+  # "generated from your live board" and returned early over an empty directory,
+  # so the fallback below never ran and the consumer ended up with NO workflow
+  # file while the summary claimed success (TASK-41-BUG-1).
+  #
+  # Test the artifact instead. That is correct for both CLIs and for every
+  # present and future exit-0 skip reason, which an exit-code check can never be.
+  if [[ "$DRY_RUN" != true && -n "$_cli" && -f "$_cli" ]]; then
+    local _out
+    _out=$(node "$_cli" --init-workflow --json 2>/dev/null) || true
+    if [[ -f "tracker-workflow.yaml" ]]; then
+      # `fromRecord` distinguishes a board/record-derived file from the CLI's own
+      # generic fallback. Reporting both as "generated from board" hid a generic
+      # ladder behind a provenance claim, and the redirect above swallowed the
+      # CLI's own loud warning about it (TASK-41-BUG-2).
+      local _from_record=""
+      _from_record=$(printf '%s' "$_out" | jq -r '.fromRecord // empty' 2>/dev/null) || true
+      if [[ "$_from_record" == "true" ]]; then
+        ok "tracker-workflow.yaml — generated from your live board"
+        record_step "tracker-workflow" "ok" "generated from board"
+      else
+        ok "tracker-workflow.yaml"
+        warn "The CLI wrote a GENERIC ladder — your board's real columns are almost certainly different."
+        warn "A ladder that does not match the board resolves nothing, and fails SILENTLY."
+        warn "Edit it before your first pipeline run, or regenerate from the live board:"
+        warn "  node ${_cli} --init-workflow --force"
+        record_warning "tracker-workflow.yaml is a generic ladder — edit it to match your board before the first pipeline run"
+        record_step "tracker-workflow" "ok" "template (edit before first run)"
+      fi
+      return
+    fi
+    # Nothing written — fall through to the heredoc below. This is the ordinary
+    # outcome on GitHub, where --init-workflow needs an --issue to reach a board
+    # and the wizard has none to give.
   fi
 
   # Fallback: a generic ladder. Say so LOUDLY. A template whose columns do not
@@ -460,7 +496,8 @@ documentStatus:
   accepted: Done
   cancelled: Done
 TRACKER_WORKFLOW_EOF
-)"
+)
+"
   ok "tracker-workflow.yaml"
   warn "Wrote a GENERIC ladder — your board's real columns are almost certainly different."
   warn "A ladder that does not match the board resolves nothing, and fails SILENTLY."

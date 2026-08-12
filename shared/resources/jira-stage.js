@@ -314,8 +314,8 @@ async function run({
     const workflow = tw.loadWorkflow(repoRoot ? { repoRoot } : {});
     const root = repoRoot || gitToplevel();
     return args.check
-      ? checkWorkflow({ root, args, output, workflow, repoRoot })
-      : initWorkflow({ root, args, output, workflow, repoRoot });
+      ? checkWorkflow({ args, output, workflow, repoRoot })
+      : initWorkflow({ root, args, output, repoRoot });
   }
 
   // --print-plan needs no issue: it reads a config file, not a board.
@@ -796,7 +796,7 @@ function initWorkflow({ root, args, output, repoRoot }) {
  * hold. `--offline` asserts the schema half alone and is what most consumer CI
  * should run.
  */
-function checkWorkflow({ root, args, output, workflow, repoRoot }) {
+function checkWorkflow({ args, output, workflow, repoRoot }) {
   const findings = tw.validateWorkflow(workflow) || [];
   const errors = findings.filter((f) => f.level === "error");
   const warns = findings.filter((f) => f.level === "warn");

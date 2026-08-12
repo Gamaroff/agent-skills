@@ -1,0 +1,74 @@
+schema: 1
+task: "task.41.pipeline-moments-and-scaffolding"
+task_title: "Two new pipeline moments, workflow-file scaffolding, and the develop-bug gap"
+gate: FAIL
+status_reason: "Both moments, both CLIs and the develop-bug parity fix are correct and well covered. The scaffolder is not: it infers 'file written' from an exit code that is deliberately 0 on write-nothing skips, so an unauthenticated gh leaves the consumer with no tracker-workflow.yaml while the wizard reports success."
+reviewer: "QA Engineer"
+updated: "2026-08-12T17:05:00Z"
+
+top_issues:
+  - id: TASK-41-BUG-1
+    severity: high
+    finding: "write_tracker_workflow() treats exit 0 from `gh-stage.js --init-workflow` as proof of a write. Both CLIs exit 0 on paths that write nothing (no-credentials, no-repo-context). The wizard then reports 'generated from your live board' and returns early, so the heredoc fallback never runs and NO tracker-workflow.yaml is written. Defeats success criterion F3 on the common case of an unauthenticated gh, which the wizard does not require."
+    suggested_action: "Test for the artifact (`[[ -f tracker-workflow.yaml ]]`), not the exit code. Correct for every present and future exit-0 skip reason."
+    suggested_owner: dev
+    bug_ref: "task.41.bug.1.init-workflow-silent-noop-skips-scaffolding.md"
+
+  - id: TASK-41-BUG-2
+    severity: medium
+    finding: "A generic Jira ladder is reported as 'generated from your live board'. The wizard invokes the CLI with `>/dev/null 2>&1`, discarding the deliberately loud 'this is a GENERIC ladder / fails SILENTLY' warning, and labels both outcomes identically."
+    suggested_action: "Branch on the `fromRecord` field initWorkflow already returns in its --json payload; surface the warning and record_warning when false."
+    suggested_owner: dev
+    bug_ref: "task.41.bug.2.generic-ladder-mislabelled-as-board-derived.md"
+
+  - id: TASK-41-BUG-3
+    severity: medium
+    finding: "The scaffolder's live-probe branch has zero test coverage — all five new setup-consumer tests run in a scratch dir with no .agents/skills/ tree, so `-f \"$_cli\"` is false and every test takes the heredoc path. This is why BUG-1 and BUG-2 shipped green at 1099/1099."
+    suggested_action: "Add stub-CLI tests covering the three outcomes: exits 0 writing nothing; exits 0 writing a file; exits non-zero."
+    suggested_owner: dev
+    bug_ref: "task.41.bug.3.scaffolding-probe-branch-untested.md"
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 1099
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No new attack surface. --check is read-only and never writes. No secrets logged; the no-credentials path exits 0 without echoing environment. `--issue` remains validated as numeric before any GraphQL interpolation on every path including the new ones."
+  performance:
+    status: PASS
+    notes: "changes-requested is bounded by MAX_ITER=5, so ≤5 extra calls per run and only when opted in (P1 met). `--check --offline` issues zero network calls — asserted against the stub's full call log, not merely absence of writes (P2 met)."
+  reliability:
+    status: CONCERNS
+    notes: "BUG-1 is a reliability defect of exactly the class this task set out to eliminate: a silent no-op reported as success. The engine and CLI paths themselves are sound — every documented skip exits 0 deliberately, the inverted --check exit is shimmed on both sides, and the write guards refuse to overwrite. The defect is in the wizard's inference about them, not in the contract."
+  maintainability:
+    status: PASS
+    notes: "Shared validation lives in tracker-workflow.js and is not duplicated per CLI; checkDrift consumes the probe's own resolution rather than re-reading the board. The inverted exit code carries a single-line greppable marker in both CLIs plus tests asserting it. Bundles regenerated and verified in sync by the pre-commit hook."
+
+recommendations:
+  immediate:
+    - action: "Replace the exit-code inference in write_tracker_workflow() with an artifact check, and branch on `fromRecord` for the provenance label"
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Add stub-CLI tests for the probe branch's three outcomes"
+      refs: ["shared/resources/tests/setup-consumer-config.test.mjs"]
+  future:
+    - action: "Scaffolded file lacks a trailing newline — `write_file` uses `printf '%s'` and `$(cat <<EOF)` strips it. Parses cleanly; cosmetic only."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "gh-stage --init-workflow requires --issue to reach a board, but the wizard has no issue number to pass, so the GitHub live-probe branch cannot succeed as written. Decide whether to source an issue or to document the template as the wizard's normal GitHub outcome."
+      refs: ["scripts/setup-consumer.sh", "shared/resources/gh-stage.js"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK-41-BUG-1 fixed and verified — the wizard must leave a tracker-workflow.yaml on disk regardless of CLI outcome"
+    - "TASK-41-BUG-3 closed — the probe branch must be exercised by tests"

@@ -576,6 +576,45 @@ in CI.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL (cycle 1) → fixes applied, awaiting re-review
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-12
+**Quality Score**: 60/100 (cycle 1)
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.41.qa.1.pipeline-moments-and-scaffolding.md](./task.41.qa.1.pipeline-moments-and-scaffolding.md)
+- **Gate File**: [task.41.gate.1.pipeline-moments-and-scaffolding.yml](./task.41.gate.1.pipeline-moments-and-scaffolding.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1104 (1099 at cycle 1, +5 added by qa-fix)
+- **Phases Verified**: 4/5 at cycle 1 (Phase 3 failed); 5/5 after fixes
+- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW — all addressed in qa-fix cycle 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS → addressed, Maintainability: PASS
+
+### Bug Reports
+- [TASK-41-BUG-1](./task.41.bug.1.init-workflow-silent-noop-skips-scaffolding.md) — HIGH — ✅ Ready for QA
+- [TASK-41-BUG-2](./task.41.bug.2.generic-ladder-mislabelled-as-board-derived.md) — MEDIUM — ✅ Ready for QA
+- [TASK-41-BUG-3](./task.41.bug.3.scaffolding-probe-branch-untested.md) — MEDIUM — ✅ Ready for QA
+
+### Key Findings
+
+Phases 1, 2, 4 and 5 passed cycle 1. Phase 3 (scaffolding) failed on a defect of
+exactly the class this task exists to remove: `write_tracker_workflow()` inferred
+"the file was written" from an exit code that this CLI family deliberately returns
+as 0 on write-nothing skips, so an unauthenticated `gh` left the consumer with no
+`tracker-workflow.yaml` while the wizard reported success. Root cause was a
+contract misread, not a logic slip — and the probe branch had no test coverage,
+which is why it shipped green.
+
+Fixed by testing the artifact rather than the exit code, labelling generic ladders
+honestly via the `fromRecord` field the CLI already returned, and adding four
+stub-CLI tests that pin the wizard's contract with the CLI across every outcome it
+can produce.
+
+
 ## Notes
 
 ### Important Reminders
