@@ -670,34 +670,54 @@ real caller.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-12
-**Quality Score**: 60/100
-**Gate Decision**: FAIL (cycle 1)
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 5 of 5)
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.39.qa.1.github-board-stage-engine.md](./task.39.qa.1.github-board-stage-engine.md)
-- **Gate File**: [task.39.gate.1.github-board-stage-engine.yml](./task.39.gate.1.github-board-stage-engine.yml)
+- **Final Report (cycles 2–5)**: [task.39.qa.2.github-board-stage-engine.md](./task.39.qa.2.github-board-stage-engine.md)
+- **Cycle-1 Report**: [task.39.qa.1.github-board-stage-engine.md](./task.39.qa.1.github-board-stage-engine.md)
+- **Final Gate**: [task.39.gate.5.github-board-stage-engine.yml](./task.39.gate.5.github-board-stage-engine.yml)
+- Gates 1–4: [1](./task.39.gate.1.github-board-stage-engine.yml) · [2](./task.39.gate.2.github-board-stage-engine.yml) · [3](./task.39.gate.3.github-board-stage-engine.yml) · [4](./task.39.gate.4.github-board-stage-engine.yml)
+
+### QA Loop
+
+| Cycle | Gate | Score |
+|---|---|---|
+| 1 | FAIL | 60 |
+| 2 | CONCERNS | 80 |
+| 3 | FAIL | 55 |
+| 4 | CONCERNS | 90 |
+| 5 | **PASS** | **100** |
+
+**20 findings, all fixed and independently verified.** Suite 51 → 65 tests; full repo suite 1050 → 1065, green throughout.
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 1051 full suite (0 failures); 51 in the new suite
-- **Phases Verified**: 4/4 implemented, 2/4 with defects
-- **Critical Issues**: 1 HIGH, 5 MEDIUM, 4 LOW (advisory)
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Tests Executed**: 1065 full suite (0 failures); 65 in the new suite
+- **Phases Verified**: 4/4, no phases with outstanding issues
+- **Critical Issues**: 0 remaining
+- **NFR Status**: Security PASS · Performance PASS · Reliability PASS · Maintainability PASS
 
 ### Key Findings
 
-**CR-1 (HIGH)** — `selectBoard` chains its precedence tiers with `||`, and `tryHint` cannot distinguish
-"hint absent" from "hint present but unmatched". So a mistyped `--board` falls through to the next
-tier and writes the status to a board the operator never named — the exact outcome the never-fan-out
-rule exists to prevent. Reproduced directly.
+The same defect — writing a status to a board the operator did not name — was found
+**twice, through two different doors**. Cycle 1: an `||` chain that could not tell
+"hint absent" from "hint wrong". Cycle 3: cycle 2's partial-read tolerance let a
+one-board short-circuit run *before* the hint check, so a read that failed for the
+named board wrote to whichever board survived.
 
-Plus: a title-valued `--board` sends `item-add` to the wrong board (CR-2); a mutation error envelope is
-never retried despite §8's Integration Test criterion saying it is (CR-3, measured 1 attempt not 3);
-and four tests pass vacuously, including both guard tests and the verify-re-read test (CR-4/5/6).
+Also: a retry that never retried (a GraphQL error envelope is a *successful* process
+exit, so `withRetry` never saw it), and **five vacuous tests** across the loop —
+including both guard tests and the verify-re-read test. From cycle 4 the review
+verified each new test fails when its fix is reverted.
+
+> Of cycle 2's four changes, the only one that **widened** what the code accepts is
+> the only one that regressed — and it arrived labelled low-confidence advisory. A
+> loosened guard deserves the scrutiny of a new feature.
 
 ---
 
