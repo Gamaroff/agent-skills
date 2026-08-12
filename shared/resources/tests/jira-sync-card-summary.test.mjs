@@ -467,9 +467,13 @@ test("H: the formatter renders findings with their fixes", () => {
   assert.match(out, /MISSING/);
 });
 
-// Every real task document in this repo must either pass or fail for a reason a
-// reader can act on. A preflight that cried wolf would be turned off.
-test("H: the real task corpus produces no spurious findings", () => {
+// Every real task document in this repo must pass. This is a ZERO-tolerance
+// assertion, not a threshold: a preflight allowed a standing exception is one
+// nobody reads the output of. The single document that failed when this landed
+// (task.2, whose criteria list was headed "Definition of Done") was fixed rather
+// than tolerated, so any future failure here is a real regression — either in
+// the checker or in a document someone just wrote.
+test("H: every real task card passes preflight", () => {
   const { execSync } = require("node:child_process");
   // A task CARD is `docs/tasks/task.N.name/task.N.name.md` — basename equals its
   // directory. Everything else in the folder (plans, reviews, QA write-ups,
@@ -492,9 +496,63 @@ test("H: the real task corpus produces no spurious findings", () => {
     if (!r.ok) failing.push(f.split("/").pop());
   }
   assert.ok(files.length > 20, "the corpus should be substantial");
-  // task.2 genuinely has no `## Success Criteria` heading — a true positive.
-  assert.ok(
-    failing.length <= 1,
-    `expected at most the one known-bad document, got: ${failing.join(", ")}`,
+  assert.deepEqual(
+    failing,
+    [],
+    `task cards that would publish a thin card: ${failing.join(", ")}`,
   );
 });
+
+// Same guard for the other two document types. A card document is the one whose
+// basename matches its directory; everything else in the folder (plans, reviews,
+// QA write-ups, sprint-review summaries) is a sibling artifact no card is built
+// from, and a suffix blocklist misses the ones nobody thought of.
+//
+// `find`, not a shell glob: `**` is NOT recursive in /bin/sh, so an `ls`-based
+// version of this matched zero story documents and passed vacuously. Each test
+// below asserts a non-zero corpus so it can never do that again.
+const cardDocsNamed = (prefix) => {
+  const { execSync } = require("node:child_process");
+  const out = execSync(
+    `find ${repoRoot}/docs -type f -name '${prefix}.*.md'`,
+    { encoding: "utf8" },
+  );
+  return out
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .filter((f) => {
+      const parts = f.split("/");
+      return parts.at(-1) === `${parts.at(-2)}.md`;
+    });
+};
+
+for (const [kind, prefix, skill, specKey] of [
+  ["story", "story", "sync-jira-story", "STORY_CARD_SECTIONS"],
+  ["epic", "epic", "sync-jira-epic", "EPIC_CARD_SECTIONS"],
+]) {
+  test(`H: every real ${kind} card passes preflight`, () => {
+    const specs = require(join(repoRoot, `skills/${skill}/scripts/${skill}.js`))[specKey];
+    const files = cardDocsNamed(prefix);
+    assert.ok(files.length > 0, `found no ${kind} card documents — the corpus glob is broken`);
+
+    const failing = [];
+    for (const f of files) {
+      const body = readFileSync(f, "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+      const r = lib.checkCardSections(body, specs);
+      // An epic also needs its Stories Breakdown overview table, which no spec
+      // list can express — mirror the check the script adds.
+      const tableMissing =
+        kind === "epic" &&
+        !lib.firstTableIn(
+          (lib.extractBodySections(body, ["Stories Breakdown"])[0] || {}).content || "",
+        );
+      if (!r.ok || tableMissing) failing.push(f.split("/").pop());
+    }
+    assert.deepEqual(
+      failing,
+      [],
+      `${kind} cards that would publish a thin card: ${failing.join(", ")}`,
+    );
+  });
+}

@@ -12,7 +12,13 @@ All notable changes to this project will be documented in this file. Format foll
 
   `review-story`, `review-task` and `review-epic` run it in their template-compliance step and treat `missing` / `empty` / `no-body` as **Critical**. In review-story's scored `--validate` gate it lowers **Template Compliance** rather than adding a dimension — a document that cannot produce a usable card is not template-compliant. Deliberately *not* checked: card length. The builder caps it and every omission carries a `+N more` link, so a long document cannot produce a long card; a review-time length check would only re-verify the builder.
 
-  The fix always belongs in the **document**, which is why this is a review gate and not a sync-time guard: no code can invent a Summary the file does not contain. Run against the repo's own corpus it flags exactly one true positive (`task.2`, which has no `## Success Criteria`) across 41 tasks, 17 stories and 4 epics — zero false positives, pinned by a test that runs the real corpus.
+  The fix always belongs in the **document**, which is why this is a review gate and not a sync-time guard: no code can invent a Summary the file does not contain. The repo's own corpus — 41 tasks, 17 stories, 4 epics — now passes clean, pinned by a **zero-tolerance** test that runs the real files. A preflight granted a standing exception is one nobody reads the output of.
+
+- **`task.2`'s criteria list was headed "Definition of Done", so its card published no criteria.** Found by the preflight above. Renamed to `## 11. Success Criteria`, which is what the other 40 of 41 task documents use and what `create-task`'s template emits.
+
+  This is a rename, not a new section: the list was already the task's measurable outcome criteria. The two headings are not synonyms and aliasing them would have been wrong — 36 of 41 task documents carry **both**, because in this repo `## N. Success Criteria` is the numbered in-contract criteria section while the unnumbered `## Definition of Done — PASSED ✅` is the acceptance record appended at completion. `task.2` already had the latter, correctly named; only the criteria list was mislabelled.
+
+  The section **number** is preserved because `§11` references exist in the task file itself and in its sibling `task.2.review.2026-05-05.md`; renumbering to match the template's slot would have broken a historical review document.
 
 ### Changed
 
