@@ -1,0 +1,58 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "projectItems": {
+          "nodes": [
+            {
+              "id": "PVTI_team_board_item",
+              "fieldValueByName": { "name": "Todo" },
+              "project": {
+                "id": "PVT_team",
+                "title": "Team Sprint",
+                "number": 7,
+                "fields": {
+                  "nodes": [
+                    {
+                      "id": "PVTSSF_team_status",
+                      "name": "Status",
+                      "options": [
+                        { "id": "t-todo", "name": "Todo" },
+                        { "id": "t-prog", "name": "In Progress" },
+                        { "id": "t-rev", "name": "In Review" },
+                        { "id": "t-done", "name": "Done" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "PVTI_org_board_item",
+              "fieldValueByName": { "name": "Triage" },
+              "project": {
+                "id": "PVT_org",
+                "title": "Org Portfolio",
+                "number": 12,
+                "fields": {
+                  "nodes": [
+                    {
+                      "id": "PVTSSF_org_status",
+                      "name": "Status",
+                      "options": [
+                        { "id": "o-triage", "name": "Triage" },
+                        { "id": "o-prog", "name": "In Progress" },
+                        { "id": "o-rev", "name": "In Review" },
+                        { "id": "o-done", "name": "Done" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

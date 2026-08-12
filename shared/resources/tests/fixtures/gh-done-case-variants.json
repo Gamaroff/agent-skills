@@ -1,0 +1,35 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "projectItems": {
+          "nodes": [
+            {
+              "id": "PVTI_casevariant_item",
+              "fieldValueByName": { "name": "In Progress" },
+              "project": {
+                "id": "PVT_casevariant",
+                "title": "Legacy Board",
+                "number": 2,
+                "fields": {
+                  "nodes": [
+                    {
+                      "id": "PVTSSF_casevariant_status",
+                      "name": "Status",
+                      "options": [
+                        { "id": "cv-todo", "name": "Todo" },
+                        { "id": "cv-prog", "name": "In Progress" },
+                        { "id": "cv-done-lower", "name": "done" },
+                        { "id": "cv-done-upper", "name": "Done" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

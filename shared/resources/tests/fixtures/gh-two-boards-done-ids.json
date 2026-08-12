@@ -1,0 +1,57 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "projectItems": {
+          "nodes": [
+            {
+              "id": "PVTI_lAHOAAOfhs4BWu4Ezg1GNxQ",
+              "fieldValueByName": { "name": "In Progress" },
+              "project": {
+                "id": "PVT_kwHOAAOfhs4BWu4E",
+                "title": "Agent Skills",
+                "number": 1,
+                "fields": {
+                  "nodes": [
+                    {},
+                    {
+                      "id": "PVTSSF_lAHOAAOfhs4BWu4EzhSArRM",
+                      "name": "Status",
+                      "options": [
+                        { "id": "f75ad846", "name": "Todo" },
+                        { "id": "47fc9ee4", "name": "In Progress" },
+                        { "id": "98236657", "name": "Done" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "PVTI_lAHOAAOfhs4BWu4Ezg2QQQQ",
+              "fieldValueByName": { "name": "Todo" },
+              "project": {
+                "id": "PVT_kwHOAAOfhs4BXy9Z",
+                "title": "Platform Roadmap",
+                "number": 4,
+                "fields": {
+                  "nodes": [
+                    {
+                      "id": "PVTSSF_lAHOAAOfhs4BXy9ZzhSBBBB",
+                      "name": "Status",
+                      "options": [
+                        { "id": "aa11bb22", "name": "Todo" },
+                        { "id": "cc33dd44", "name": "In Progress" },
+                        { "id": "ee55ff66", "name": "Done" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -64,7 +64,16 @@ function resolveOption(options, candidates, current) {
 `require("./jira-sync.js")` — keeping this module free of it is what stops GitHub-only consumers
 bundling ~3,100 lines of Jira code.
 
-Exit codes, transcribed from `jira-stage.js:19-27`:
+`candidates` is **`resolveMoment(moment, workflow).targets`** — note the plural. `resolveMoment`
+(`tracker-workflow.js:628`) returns `null` when the moment is disabled (that is the `stage-disabled`
+exit, and it must be checked before `resolveOption` is called at all), otherwise
+`{ targets, rank, offLadder, isLastRung }` where `targets` is the full preference-ordered name list.
+Feed that list in unchanged — the "first candidate that matches an existing option wins" rule below
+*is* the preference order being honoured. `rankOf` and `resolveMoment` are the only two ladder calls
+this CLI needs; `ladderFor` and `rankIn` are not exported, so take `isLastRung` off the
+`resolveMoment` result rather than recomputing it.
+
+Exit codes, transcribed from `jira-stage.js:21-27`:
 
 ```js
 // Zero non-transition exit codes matter: pipeline steps run inside shells, and
@@ -125,7 +134,9 @@ if (!allowRegress && curRank != null && tgtRank != null && curRank > tgtRank) {
 }
 ```
 
-Unranked either side → no opinion, allow — same semantics as the Jira guard at `jira-sync.js:2241`.
+Unranked either side → no opinion, allow — same semantics as the Jira monotonicity guard at
+`jira-sync.js:2933-2957` (the rationale comment at `:2933-2937`, the check at `:2938`, the
+`would-regress` return at `:2952`).
 Note this is exactly why the ladder matters on a tracker with no graph: without a declared order,
 `rankOf` returns `null` for every bespoke column and the guard is inert. Worth a comment.
 
@@ -166,7 +177,7 @@ if (args.dryRun && args.addToBoard) {
 Assert it: stub the `gh` invocation in tests and fail on any argv containing `item-add`, `mutation`
 or `--method POST`. A comment is not a guarantee.
 
-Skip output ports `describeAlternatives` (`jira-stage.js:87-110`) — the single highest-value thing
+Skip output ports `describeAlternatives` (`jira-stage.js:127`, called at `:448`/`:513`) — the single highest-value thing
 to bring across, because it turns "nothing moved" into a one-line diagnosis:
 
 ```
@@ -189,7 +200,9 @@ statuses: options.map((o) => o.name);
 ```
 
 Write only when no ladder exists; preserve an existing one verbatim, matching
-`buildWorkflowRecord`'s preserve-hand-authored-intent discipline (`jira-sync.js:2731`).
+`buildWorkflowRecord`'s preserve-hand-authored-intent discipline (`jira-sync.js:3744`, whose
+`...(existing.X ? { X: existing.X } : {})` spreads at `:3771-3781` are the pattern to copy —
+including `existing.statusRank`, the ladder field itself).
 
 ### Phase 4: Fixtures and tests
 
@@ -204,7 +217,7 @@ matcher reads. The test header must document the exact capture query and the tri
 | `gh-bespoke-columns.json` | `Backlog / In Development / Ready for Showcase / Shipped` — without it nothing proves the ladder does anything |
 | `gh-no-status-field.json` | skip, not a crash |
 | `gh-not-on-board.json` (`nodes: []`) | the `not-on-board` path `/finalise` escalates on |
-| `gh-done-case-variants.json` | an option named `done` beside one named `Done` — pins the case-sensitivity fix at `skills/finalise/SKILL.md:1061` |
+| `gh-done-case-variants.json` | an option named `done` beside one named `Done` — pins the case-sensitivity fix at `skills/finalise/SKILL.md:1152` |
 | `gh-status-unset.json` (`fieldValueByName: null`) | the unset branch |
 | `gh-mutation-error.json` | retry logic, testable with no network |
 

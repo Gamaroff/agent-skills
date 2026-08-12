@@ -1,0 +1,35 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "projectItems": {
+          "nodes": [
+            {
+              "id": "PVTI_bespoke_item",
+              "fieldValueByName": { "name": "In Development" },
+              "project": {
+                "id": "PVT_bespoke",
+                "title": "Delivery",
+                "number": 3,
+                "fields": {
+                  "nodes": [
+                    {
+                      "id": "PVTSSF_bespoke_status",
+                      "name": "Status",
+                      "options": [
+                        { "id": "b-backlog", "name": "Backlog" },
+                        { "id": "b-dev", "name": "In Development" },
+                        { "id": "b-showcase", "name": "Ready for Showcase" },
+                        { "id": "b-shipped", "name": "Shipped" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

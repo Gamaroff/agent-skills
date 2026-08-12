@@ -1,0 +1,35 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "projectItems": {
+          "nodes": [
+            {
+              "id": "PVTI_nostatus_item",
+              "fieldValueByName": null,
+              "project": {
+                "id": "PVT_nostatus",
+                "title": "Notes Board",
+                "number": 9,
+                "fields": {
+                  "nodes": [
+                    {},
+                    {},
+                    {
+                      "id": "PVTSSF_nostatus_stage",
+                      "name": "Stage",
+                      "options": [
+                        { "id": "n-one", "name": "One" },
+                        { "id": "n-two", "name": "Two" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

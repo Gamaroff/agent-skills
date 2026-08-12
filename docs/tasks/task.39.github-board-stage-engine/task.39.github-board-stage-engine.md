@@ -5,10 +5,10 @@ type: task
 description: "Add a deterministic CLI that sets a GitHub Projects v2 Status field from the tracker-workflow ladder, with a mandatory backward-move guard and a read-only board probe. Nothing is wired to it yet."
 tags: [github, projects-v2, pipeline, workflow]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-08-03
-updated: 2026-08-03
+updated: 2026-08-12
 assignee:
 estimated_effort_hours: 16
 github_issue: 187
@@ -16,7 +16,9 @@ github_issue: 187
 
 # Technical Task: `gh-stage.js` — a GitHub Projects board engine
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.39.review.1.github-board-stage-engine.md` implemented 2026-08-12
 
 **GitHub Issue:** [#187](https://github.com/Gamaroff/agent-skills/issues/187)
 
@@ -44,7 +46,7 @@ propagation delay) surface here with no card moving.
    reader to hand-edit `select(.name == "In Review")` if their board uses a different label. That
    paragraph is the clearest statement of the problem being solved.
 2. **Five copies, three different matching disciplines.** Steps 0/4/5-6/7 use `ascii_downcase`;
-   `skills/finalise/SKILL.md:1061` uses case-**sensitive** `name == "Done"`. Step 4 line 182
+   `skills/finalise/SKILL.md:1152` uses case-**sensitive** `name == "Done"`. Step 4 line 182
    computes `BOARD_NUM` and never uses it.
 3. **Nothing prevents a backward move.** Jira's workflow graph refuses illegal transitions; a
    Projects v2 single-select has no graph at all, so `updateProjectV2ItemFieldValue` will cheerfully
@@ -52,9 +54,18 @@ propagation delay) surface here with no card moving.
 4. **The post-condition check gives false passes.**
    `develop-pipeline-step-0-resolve-and-prepare.md:497` tests `[ "$BOARD_STATUS" = "Todo" ]`, so a
    board whose first column is "Backlog" reports "✅ Post-condition verified" after a failed move.
-5. **`DEFAULT_STATUS_RANK` does not even cover GitHub's default first column.** The built-in list
-   has `"To Do"` (with a space); GitHub's default column is `"Todo"`. An unconfigured board's
-   starting column is unranked, so any guard would silently have no opinion there.
+5. **The built-in ladder does not cover GitHub's default first column.** `DEFAULT_LADDER`
+   (`shared/resources/tracker-workflow.js:82-84`) has `"To Do"` (with a space) on rung 0; GitHub's
+   default column is `"Todo"`. An unconfigured board's starting column is unranked, so the guard
+   silently has no opinion there — which on GitHub means no protection at all, since the ladder is
+   the only brake.
+
+   > The Jira-side `DEFAULT_STATUS_RANK` (`shared/resources/jira-sync.js:1874`) has the same gap, but
+   > it is **not** the constant that governs this CLI: `gh-stage.js` is barred from importing
+   > `jira-sync.js` (see §9 Code Quality), so `rankOf` reaches `DEFAULT_LADDER` and nothing else. Any
+   > fix belongs in `tracker-workflow.js`. **Adding `"Todo"` to rung 0 is out of scope here** — it
+   > changes the default ladder for Jira consumers too, and belongs with the ladder, not with this
+   > CLI. It is recorded under Known Issues.
 
 ### Benefits
 
@@ -177,13 +188,13 @@ the run.
 
 **Changes**:
 
-- [ ] Arg parsing mirroring `jira-stage.js` (`--issue`, `--stage`, `--json`, `--quiet`, `--dry-run`,
+- [x] Arg parsing mirroring `jira-stage.js` (`--issue`, `--stage`, `--json`, `--quiet`, `--dry-run`,
       `--strict`, `--allow-regress`, `--board`, `--field`)
-- [ ] `resolveOption(options, candidates, current)` — pure: already-check, then exact
+- [x] `resolveOption(options, candidates, current)` — pure: already-check, then exact
       case-insensitive, emoji-stripped match per candidate in order, then `no-option`. **No** prefix
       matching, no fuzzy matching, no category analogue
-- [ ] Exit-code table and the top-level `.catch` that still exits 0
-- [ ] `no-credentials` when `gh` is absent or `gh auth status` fails — a dead end, not a handoff
+- [x] Exit-code table and the top-level `.catch` that still exits 0
+- [x] `no-credentials` when `gh` is absent or `gh auth status` fails — a dead end, not a handoff
 
 **Dependencies**: task.37
 
@@ -197,18 +208,18 @@ the run.
 
 **Changes**:
 
-- [ ] Single GraphQL read fetching item id, project id/title, the Status field id and all options,
+- [x] Single GraphQL read fetching item id, project id/title, the Status field id and all options,
       **and the current value** — steps 0/4/7 do not fetch the current value today, so this is a
       real addition
-- [ ] Multi-board rule: one board → use it; several → `--board`, else `github.projectBoard`, else
+- [x] Multi-board rule: one board → use it; several → `--board`, else `github.projectBoard`, else
       `project.yml`'s `project_board_number`/`project_board_name`, else skip with
       `reason: "ambiguous-board"` naming the candidates. Never fan a status change out to boards
       nobody asked about
-- [ ] Backward-move guard from ladder rank; unranked either side → no opinion, allow
-- [ ] `updateProjectV2ItemFieldValue`, then re-read and report the landed option
-- [ ] Wrap mutations in `tracker_call_with_retry`-equivalent backoff (the shell helper wraps
+- [x] Backward-move guard from ladder rank; unranked either side → no opinion, allow
+- [x] `updateProjectV2ItemFieldValue`, then re-read and report the landed option
+- [x] Wrap mutations in `tracker_call_with_retry`-equivalent backoff (the shell helper wraps
       `gh issue` calls but no board mutation today)
-- [ ] `ensureOnBoard` behind `--add-to-board`: `gh project item-add`, `sleep 3`, retry-once-after-5s
+- [x] `ensureOnBoard` behind `--add-to-board`: `gh project item-add`, `sleep 3`, retry-once-after-5s
       when `projectItems` returns empty — real Projects API propagation behaviour, not scaffolding
 
 **Dependencies**: Phase 1
@@ -223,16 +234,16 @@ the run.
 
 **Changes**:
 
-- [ ] `--dry-run` performs the read and the guard, prints the intended option, and issues **no**
+- [x] `--dry-run` performs the read and the guard, prints the intended option, and issues **no**
       mutation and **no** `gh project item-add`. Today's step-0 block runs `item-add` *before* its
       read query, so a naive port would write during a read-only check. Print
       `would add issue #N to board X` instead
-- [ ] Skip output names the options the board *did* offer, plus the `describeAlternatives` analogue
-      (`jira-stage.js:87-110`) — "Ready for Showcase is present and is the target for moment
+- [x] Skip output names the options the board *did* offer, plus the `describeAlternatives` analogue
+      (`jira-stage.js:127`) — "Ready for Showcase is present and is the target for moment
       `pr-merged`"
-- [ ] `--probe-board`: enumerate boards, Status options in **board order**, and per moment the
+- [x] `--probe-board`: enumerate boards, Status options in **board order**, and per moment the
       resolved option or `no-option`
-- [ ] `--write-ladder`: derive ladder order from board option order — a Projects board's option
+- [x] `--write-ladder`: derive ladder order from board option order — a Projects board's option
       order *is* its workflow order. Preserve an existing ladder; never overwrite silently
 
 **Dependencies**: Phase 2
@@ -248,13 +259,13 @@ the run.
 
 **Changes**:
 
-- [ ] Capture real `projectItems` responses; document the exact query and trimming rule in the test
+- [x] Capture real `projectItems` responses; document the exact query and trimming rule in the test
       header, as `jira-stage-fixtures.test.mjs:1-29` does, so they can be re-captured
-- [ ] Fixtures, each pinning one real failure: two boards with a `Done` option carrying **different**
+- [x] Fixtures, each pinning one real failure: two boards with a `Done` option carrying **different**
       option ids; an issue on two boards; a board with non-default columns; a board with no `Status`
       field; `nodes: []`; an option named `done` beside one named `Done`; `fieldValueByName: null`;
       and a mutation error envelope
-- [ ] Assert `--dry-run` issues no non-GET verb by stubbing the `gh` invocation — a comment is not
+- [x] Assert `--dry-run` issues no non-GET verb by stubbing the `gh` invocation — a comment is not
       enough
 
 **Dependencies**: Phases 1-3
@@ -263,25 +274,48 @@ the run.
 
 ## 7. Files Summary
 
-### Files to Modify (Core Implementation)
+### Files Added (Core Implementation)
 
-1. ✅ `shared/resources/gh-stage.js` — **new**
+1. ✅ `shared/resources/gh-stage.js` — **new**, 1,044 lines
 
-### Files to Modify (Tests)
+### Files Added (Tests)
 
-2. ✅ `shared/resources/tests/gh-stage.test.mjs` — **new**
-3. ✅ `shared/resources/tests/fixtures/gh-*.json` — **new**, 8 captured payloads
+2. ✅ `shared/resources/tests/gh-stage.test.mjs` — **new**, 50 tests
+3. ✅ `shared/resources/tests/fixtures/gh-bespoke-columns.json` — **new**
+4. ✅ `shared/resources/tests/fixtures/gh-done-case-variants.json` — **new**
+5. ✅ `shared/resources/tests/fixtures/gh-issue-on-two-boards.json` — **new**
+6. ✅ `shared/resources/tests/fixtures/gh-mutation-error.json` — **new**
+7. ✅ `shared/resources/tests/fixtures/gh-no-status-field.json` — **new**
+8. ✅ `shared/resources/tests/fixtures/gh-not-on-board.json` — **new**
+9. ✅ `shared/resources/tests/fixtures/gh-status-unset.json` — **new**
+10. ✅ `shared/resources/tests/fixtures/gh-two-boards-done-ids.json` — **new**
 
-### Files to Modify (Documentation)
+### Files Modified (Documentation)
 
-4. ✅ `docs/reference/tracker-workflow.md` — GitHub execution semantics; the no-graph asymmetry
-5. ✅ `docs/reference/configuration.md` — `github.projectStatusField`, `github.projectBoard`, and
-   the missing `project.yml` section
-6. ✅ `CHANGELOG.md` — `### Added`
+11. ✅ `docs/reference/tracker-workflow.md` — new `## GitHub execution semantics` section; the
+    top-of-file status note corrected (it said GitHub execution was still pending)
+12. ✅ `docs/reference/configuration.md` — `github.projectStatusField` and `github.projectBoard` in
+    the schema block and the key-reference table; new `## GitHub board status field` and
+    `## project.yml — board identity` sections; `GH_PROJECT_STATUS_FIELD` in the env-var table
+13. ✅ `CHANGELOG.md` — `### Added`
 
-### Files to Delete
+### Files Modified (This task's own documents)
+
+14. ✅ `task.39.github-board-stage-engine.md` — citation fixes from the Step 2 review; checkboxes
+15. ✅ `task.39.plan.github-board-stage-engine.md` — citation fixes; the `candidates` source paragraph
+
+### Files Deleted
 
 None in this task. Task.40 deletes the inline GraphQL.
+
+### Not modified (deliberately)
+
+- `package.json` — the `shared/resources/tests/*.test.mjs` glob already covers the new suite.
+- The five pipeline step files — task.40 wires them. Nothing calls `gh-stage.js` yet.
+- `shared/resources/tracker-workflow.js` — the `"Todo"` ladder gap (Motivation #5) is deferred; see
+  Known Issues.
+- Bundled `skills/*/references/` — `npm run bundle` was run and reported no drift, because no skill
+  references `gh-stage.js` yet.
 
 ---
 
@@ -293,12 +327,12 @@ None in this task. Task.40 deletes the inline GraphQL.
 
 **Actions**:
 
-- [ ] Exact case-insensitive match; `done` and `Done` both resolve
-- [ ] Emoji-stripped (`🚧 In Progress`)
-- [ ] Candidates tried in order; first hit wins
-- [ ] **No** prefix matching — `In Review` must not match `In Review (blocked)`
-- [ ] No option → `no-option` with the offered options listed
-- [ ] Guard refuses a lower-ranked target; unranked either side allows; `--allow-regress` overrides
+- [x] Exact case-insensitive match; `done` and `Done` both resolve
+- [x] Emoji-stripped (`🚧 In Progress`)
+- [x] Candidates tried in order; first hit wins
+- [x] **No** prefix matching — `In Review` must not match `In Review (blocked)`
+- [x] No option → `no-option` with the offered options listed
+- [x] Guard refuses a lower-ranked target; unranked either side allows; `--allow-regress` overrides
 
 **Command**: `node --test 'shared/resources/tests/gh-stage.test.mjs'`
 
@@ -310,12 +344,12 @@ None in this task. Task.40 deletes the inline GraphQL.
 
 **Actions**:
 
-- [ ] Single board → used directly
-- [ ] Two boards, no hint → `ambiguous-board`, naming both
-- [ ] Two boards + `--board` / `github.projectBoard` / `project.yml` → correct one chosen
-- [ ] `nodes: []` → `not-on-board`
-- [ ] No Status field → skip, not a crash
-- [ ] Mutation error envelope → retried, then a warning and exit 0
+- [x] Single board → used directly
+- [x] Two boards, no hint → `ambiguous-board`, naming both
+- [x] Two boards + `--board` / `github.projectBoard` / `project.yml` → correct one chosen
+- [x] `nodes: []` → `not-on-board`
+- [x] No Status field → skip, not a crash
+- [x] Mutation error envelope → retried, then a warning and exit 0
 
 ---
 
@@ -325,11 +359,11 @@ None in this task. Task.40 deletes the inline GraphQL.
 
 **Actions**:
 
-- [ ] Every documented reason exits 0; only `--strict` yields 1; usage errors yield 2
-- [ ] An unhandled throw exits 0
-- [ ] `--dry-run` issues **no** mutation and **no** `item-add` — asserted by stubbing `gh` and
+- [x] Every documented reason exits 0; only `--strict` yields 1; usage errors yield 2
+- [x] An unhandled throw exits 0
+- [x] `--dry-run` issues **no** mutation and **no** `item-add` — asserted by stubbing `gh` and
       failing on any non-GET verb
-- [ ] Flag surface matches `jira-stage.js` where the concept exists
+- [x] Flag surface matches `jira-stage.js` where the concept exists
 
 ---
 
@@ -353,10 +387,19 @@ reduction.
 
 **Actions**:
 
-- [ ] `--probe-board` against this repo's own board 1 ("Agent Skills")
-- [ ] `--dry-run` for every moment against one real issue
+- [x] `--probe-board` against this repo's own board 1 ("Agent Skills")
+- [x] `--dry-run` for every moment against one real issue
 - [ ] A scratch Projects v2 board with bespoke column names — free and disposable, and the honest
       pre-adoption ritual
+
+  > **Not performed — left for the operator.** This one requires creating a real GitHub Projects v2
+  > board on the account, which is an outward-facing change this task has no mandate to make. It is
+  > also the least load-bearing of the three: `gh-bespoke-columns.json` pins exactly this shape
+  > (`Backlog / In Development / Ready for Showcase / Shipped`) as a fixture, and the suite asserts
+  > that a bespoke board resolves through its own ladder, refuses a backward move on it, and reports
+  > `no-option` against a ladder it cannot serve. What a live scratch board would add over the fixture
+  > is confidence that the *capture* is faithful — worth doing before adopting this on a real board,
+  > which is why it stays listed here as the pre-adoption ritual rather than being deleted.
 
 ---
 
@@ -364,31 +407,44 @@ reduction.
 
 ### Functional
 
-- [ ] `--probe-board` prints the board's real options in board order and each moment's resolution
-- [ ] `--write-ladder` produces a ladder that round-trips through `tracker-workflow.js`
-- [ ] The guard refuses a backward move and `--allow-regress` overrides it
-- [ ] `no-option` names the options the board offered
-- [ ] `--dry-run` provably issues no write
+- [x] `--probe-board` prints the board's real options in board order and each moment's resolution —
+      verified against this repo's live board 1: `Todo → In Progress → Done`, `work-started →
+      "In Progress"`, `done → "Done"`, the six undeclared moments `disabled`
+- [x] `--write-ladder` produces a ladder that round-trips through `tracker-workflow.js` — asserted by
+      loading the written file back through `loadWorkflow` and comparing rung names
+- [x] The guard refuses a backward move and `--allow-regress` overrides it
+- [x] `no-option` names the options the board offered (returned as `offered`, and printed)
+- [x] `--dry-run` provably issues no write — asserted by a `gh` stub that fails on any argv containing
+      `item-add` / `mutation` / `--method` / `-X`, **and** confirmed against the live board: all eight
+      moments dry-run, board still reads `In Progress` afterwards
 
 ### Performance
 
-- [ ] One read + one mutation + one verify read per move
-- [ ] `item-add` only under `--add-to-board`
+- [x] One read + one mutation + one verify read per move — measured on a stubbed run: 3 `gh api`
+      calls, of which 2 reads and 1 mutation
+- [x] `item-add` only under `--add-to-board` — measured as 0 in the same run
 
 ### Code Quality
 
-- [ ] Depends on `tracker-workflow.js` only — **not** on `jira-sync.js`, so GitHub-only consumers
-      never bundle ~3,100 lines of Jira code
-- [ ] Always exits 0 outside `--strict`/usage; never throws out
-- [ ] Single matching discipline; no prefix matching anywhere
-- [ ] New tests under an already-globbed directory
+- [x] Depends on `tracker-workflow.js` only — **not** on `jira-sync.js`, so GitHub-only consumers
+      never bundle ~3,100 lines of Jira code. Asserted by a test that greps the module's own
+      `require()` calls. **One deviation from the literal wording, deliberate:** it also requires
+      `./yaml-subset.js`, a 140-line dependency-free YAML reader that `tracker-workflow.js` already
+      pulls in transitively. It adds nothing to the bundle and is what lets config be read without
+      shelling out to python-or-awk the way `set-github-project-estimate.sh:29-61` does. The
+      criterion's actual purpose — no Jira code — is met exactly.
+- [x] Always exits 0 outside `--strict`/usage; never throws out
+- [x] Single matching discipline; no prefix matching anywhere
+- [x] New tests under an already-globbed directory — `package.json`'s existing
+      `shared/resources/tests/*.test.mjs` glob picked the file up with no `package.json` change
 
 ### Migration
 
-- [ ] `configuration.md` documents both new keys **and** `project.yml`, which has never been
+- [x] `configuration.md` documents both new keys **and** `project.yml`, which has never been
       documented there
-- [ ] `tracker-workflow.md` states the no-graph asymmetry explicitly
-- [ ] `CHANGELOG.md` `### Added` entry
+- [x] `tracker-workflow.md` states the no-graph asymmetry explicitly (new
+      `## GitHub execution semantics` section, plus the corrected status note at the top)
+- [x] `CHANGELOG.md` `### Added` entry
 
 ---
 
@@ -481,28 +537,28 @@ essentially everything here is a forward fix.
 
 ### Phase 1: `resolveOption` + CLI skeleton
 
-- [ ] Arg parsing and exit-code table
-- [ ] Pure `resolveOption`
-- [ ] `no-credentials` handling
+- [x] Arg parsing and exit-code table
+- [x] Pure `resolveOption`
+- [x] `no-credentials` handling
 
 ### Phase 2: Read, guard, mutate
 
-- [ ] Single read including current value
-- [ ] Multi-board rule
-- [ ] Backward-move guard
-- [ ] Mutation + verify + retry
-- [ ] `ensureOnBoard`
+- [x] Single read including current value
+- [x] Multi-board rule
+- [x] Backward-move guard
+- [x] Mutation + verify + retry
+- [x] `ensureOnBoard`
 
 ### Phase 3: `--dry-run` + `--probe-board`
 
-- [ ] Provably write-free dry run
-- [ ] Alternatives hint on skip
-- [ ] Probe and `--write-ladder`
+- [x] Provably write-free dry run
+- [x] Alternatives hint on skip
+- [x] Probe and `--write-ladder`
 
 ### Phase 4: Fixtures and tests
 
-- [ ] 8 captured fixtures with a documented capture recipe
-- [ ] Unit, integration and contract suites
+- [x] 8 captured fixtures with a documented capture recipe
+- [x] Unit, integration and contract suites
 
 ---
 
@@ -512,11 +568,88 @@ essentially everything here is a forward fix.
 - **Consumed by**: task.40 (step-file wiring)
 - **Template**: `shared/resources/set-github-project-priority.sh`,
   `set-github-project-estimate.sh` — the behavioural shape (always `exit 0`, env → config → default)
-- **Contract source**: `shared/resources/jira-stage.js:19-27` (exit codes), `:87-110`
-  (`describeAlternatives`)
+- **Contract source**: `shared/resources/jira-stage.js:21-27` (exit codes), `:127`
+  (`describeAlternatives` — defined there, called at `:448` and `:513`)
 - **Current inline blocks**: `develop-pipeline-step-0-resolve-and-prepare.md:364-504`,
   `-step-4-create-pr.md:178-238`, `-step-5-6-qa-loop.md:43-106`, `-step-7-finalise.md:165`,
-  `skills/finalise/SKILL.md:1023-1093`
+  `skills/finalise/SKILL.md:1114-1195` (case-sensitive `Done` match at `:1152`)
+
+---
+
+## Implementation Record
+
+**Started**: 2026-08-12 · **Completed**: 2026-08-12 · **Branch**: `feature/task.39.github-board-stage-engine`
+
+### Implementation Summary
+
+`shared/resources/gh-stage.js` (1,044 lines) is a CommonJS CLI isomorphic to `jira-stage.js`, resolving
+a pipeline moment's target from the `tracker-workflow.yaml` ladder and setting a GitHub Projects v2
+single-select Status field. All four phases landed; nothing is wired to it, as scoped.
+
+### Implementation Approach
+
+**Phase 1 — `resolveOption` and the skeleton.** `parseArgs` mirrors `jira-stage.js:49-115` including
+the `default:` clause that throws on any unrecognised `-` prefix. `resolveOption(options, candidates,
+current)` is pure and ~12 lines: already-check, then exact `eqName` match per candidate in order, then
+`no-option`. `eqName`/`stripStatusEmoji` come from `tracker-workflow.js`. `no-credentials` is `gh auth
+status` returning non-zero — one warning, exit 0, and the message does not imply a fallback exists,
+because none does.
+
+**Phase 2 — read, guard, mutate.** One GraphQL read returns item id, project id/title/number, the
+Status field id, every option in board order, **and the current value** — the last of which steps 0/4/7
+do not fetch today and is what makes a guard possible at all. `--issue` is validated numeric before it
+reaches the query builder. `selectBoard` implements the never-fan-out precedence. The guard compares
+`tw.rankOf(current)` against `tw.rankOf(target)`, allowing when either is `null`. The mutation is
+wrapped in a local 3×/1s/2s retry (`tracker_call_with_retry` is shell-only and cannot wrap a JS call),
+then the item is re-read so the reported status is the option that **landed**, not the one requested.
+
+**Phase 3 — dry-run and probe.** `--dry-run` runs the read and the guard, then stops; under
+`--add-to-board` it prints `would add issue #N to board X` rather than performing it. `--probe-board`
+mirrors `probeWorkflow`'s three-verdict shape. `--write-ladder` reads the board's option order
+straight into `statuses:`.
+
+**Config.** `github.projectStatusField` (env `GH_PROJECT_STATUS_FIELD`) and `github.projectBoard`,
+read via `parseYamlSubset` rather than the shell scripts' python-or-awk fallback chain.
+
+### Testing Results
+
+- **`gh-stage.test.mjs`: 50/50 passing** — unit (`resolveOption`, fixtures, `selectBoard`),
+  integration (the `run()` flow with `gh` stubbed), contract (exit codes, the write-free dry-run,
+  the flag surface, the dependency boundary), plus `--probe-board`/`--write-ladder`,
+  `describeAlternatives` and `ensureOnBoard`.
+- **Full suite: `npm test` → 1050/1050 passing, 0 failures.** No regressions; this task only adds files.
+- **Consumer tests, read-only, against this repo's live board 1 ("Agent Skills"):** `--probe-board`
+  reported `Todo → In Progress → Done` with `work-started → "In Progress"` and `done → "Done"`;
+  `--dry-run` was run for all eight moments against issue #187 and the board still read `In Progress`
+  afterwards — the write-free contract held against a real board, not just a stub.
+- **Measured call counts:** 3 `gh api` calls per move (2 reads + 1 mutation), 0 `item-add` without
+  `--add-to-board`.
+
+### One bug found and fixed during development
+
+`--write-ladder` wrote a correct file that then read back as the built-in default ladder. The cause
+was not the writer: `run()` calls `tw.loadWorkflow()` before the file exists, which memoises the
+default under that exact absolute path in `tracker-workflow.js`'s parse cache, and `writeLadder`
+created the file without invalidating it — so any process that probes, writes and then reads sees the
+pre-write ladder forever. That is the cache's own documented failure mode
+(`tracker-workflow.js:392-393`). Fixed by calling the exported `tw.clearWorkflowCache()` on the
+success branch of `writeLadder`. Fixing it in the test instead would have left the bug live for every
+real caller.
+
+### Deferred Work
+
+- Adding `"Todo"` to `DEFAULT_LADDER` rung 0 — deliberately out of scope; see Known Issues.
+- Wiring the five inline GraphQL blocks to this CLI — task.40, as scoped.
+
+---
+
+## Change Log
+
+| Date | Change | Author |
+| --- | --- | --- |
+| 2026-08-03 | Task authored | Claude |
+| 2026-08-12 | `/review-task` — 9/10 READY TO IMPLEMENT. Five wrong `file:line` citations corrected across the task and plan; Motivation #5 rewritten to name `DEFAULT_LADDER` rather than the unreachable `DEFAULT_STATUS_RANK`, with the `"Todo"` fix explicitly scoped out and recorded under Known Issues | Claude |
+| 2026-08-12 | Phases 1–4 implemented: `gh-stage.js`, 50 tests, 8 fixtures. `tracker-workflow.md` gains `## GitHub execution semantics`; `configuration.md` gains both new keys plus a `project.yml` section; `CHANGELOG.md` `### Added`. Fixed a stale-parse-cache bug in `--write-ladder`. `npm test` 1050/1050 | Claude |
 
 ---
 
@@ -536,3 +669,11 @@ essentially everything here is a forward fix.
 
 - ⚠️ `project.yml` remains a second, separate config file. Documenting it is in scope; consolidating
   it is not.
+- ⚠️ `DEFAULT_LADDER` rung 0 (`tracker-workflow.js:82-84`) lacks `"Todo"`, GitHub's default first
+  column — see Motivation #5. Deliberately **not** fixed here: it is a change to the shared default
+  ladder that Jira consumers also read, so it belongs with the ladder rather than with this CLI. The
+  practical consequence for `gh-stage.js` is bounded and worth stating plainly: on a board that still
+  uses GitHub's stock `Todo` column and declares no `tracker-workflow.yaml`, `rankOf("Todo")` returns
+  `null`, so the backward-move guard allows every move out of that column. Any board that declares a
+  ladder — the case this task exists to serve — is unaffected. A `--probe-board` run surfaces it,
+  because the column shows up in the board's option list but carries no rank.
