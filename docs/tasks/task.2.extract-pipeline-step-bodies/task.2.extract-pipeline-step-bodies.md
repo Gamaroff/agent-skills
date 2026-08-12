@@ -329,7 +329,15 @@ These are not risks — they are extraction targets where the LOC return is high
 - Cosmetic line-count overshoot (orchestrator >500 but <600 lines)
 - Variant table needs a column added (edit shared file in place)
 
-## 11. Definition of Done
+## 11. Success Criteria
+
+<!-- Renamed from "Definition of Done" 2026-08-12. This list is the task's
+     measurable outcome criteria, which every other task document carries as
+     "## N. Success Criteria" (40 of 41 do). The unnumbered
+     "## Definition of Done — PASSED ✅" acceptance record below is the DoD in
+     this repo's convention, and it is unchanged. The section NUMBER is kept at
+     11 so the §11 references in this file and in
+     task.2.review.2026-05-05.md still resolve. -->
 
 - [x] All 8 step bodies extracted to `shared/resources/develop-pipeline-step-*.md`
 - [x] `develop-story/SKILL.md` ≤ 500 lines (239 lines)

@@ -327,15 +327,18 @@ test("guardConcurrentEdit — no last sync (first run) skips guard", () => {
 // ---------------------------------------------------------------------------
 // buildDescriptionAdf — structural assertions
 // ---------------------------------------------------------------------------
-test("buildDescriptionAdf — produces valid ADF doc with table for changelog", () => {
+const headingsOf = (doc) =>
+  doc.content.filter((n) => n.type === "heading").map((n) => n.content[0].text);
+
+test("buildDescriptionAdf — produces a valid ADF doc with summary, metadata and links", () => {
   const doc = lib.buildDescriptionAdf({
     body: `## Overview
 
 Refactor cache layer.
 
-## Implementation Plan
+## Success Criteria
 
-Steps go here.
+- Cache hit rate above 90%.
 `,
     frontmatter: {
       category: "refactoring",
@@ -343,21 +346,36 @@ Steps go here.
       status: "📋 Planned",
     },
     taskBbUrl: "https://bitbucket.org/org/repo/src/HEAD/task.md",
-    changelogEntries: ["| 2026-04-28 09:40 | Initial Jira task created |"],
   });
   assert.equal(doc.type, "doc");
   assert.equal(doc.version, 1);
-  const table = doc.content.find((n) => n.type === "table");
-  assert.ok(table, "table node present");
-  assert.equal(table.content.length, 2, "header row + 1 data row");
-  const bullet = doc.content.find((n) => n.type === "bulletList");
+  assert.deepEqual(headingsOf(doc), ["Summary", "Success Criteria", "Metadata", "Source Documents"]);
+  // Links come LAST and the task file leads them.
+  const bullet = doc.content.filter((n) => n.type === "bulletList").at(-1);
   assert.ok(bullet, "source-doc bullet list present");
   const linkText = bullet.content[0].content[0].content[0];
   assert.equal(linkText.marks[0].type, "link");
+  assert.equal(linkText.text, "Task document");
   assert.match(linkText.marks[0].attrs.href, /bitbucket\.org/);
 });
 
-test("buildDescriptionAdf — renders task-specific sections (Overview, Implementation Plan, etc.)", () => {
+// The card is a POINTER. Republishing the document's changelog onto it added
+// length on every sync and duplicated what Jira's own issue history already holds.
+test("buildDescriptionAdf — never publishes the document's Change Log", () => {
+  const doc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nRefactor cache layer.\n\n## Change Log\n\n| 2026-04-28 | created |\n",
+    frontmatter: {},
+    taskBbUrl: null,
+  });
+  assert.ok(!headingsOf(doc).includes("Change Log"));
+  assert.ok(!doc.content.some((n) => n.type === "table"), "no changelog table on the card");
+});
+
+test("buildDescriptionAdf — publishes only the card sections, not the whole document", () => {
+  // This list was ELEVEN sections — effectively the entire task document,
+  // republished verbatim onto the card. The card is a pointer now: Summary,
+  // Success Criteria, and Breaking Changes when it exists. Everything else is
+  // one click away in the linked file.
   const body = `## Overview
 
 Top-level summary.
@@ -371,6 +389,10 @@ Why we need this.
 - [ ] Phase 1
 - [ ] Phase 2
 
+## Success Criteria
+
+- [ ] Criterion one
+
 ## Risk Assessment
 
 High risk: thing.
@@ -379,20 +401,33 @@ High risk: thing.
 
 Revert commit.
 `;
-  const doc = lib.buildDescriptionAdf({
-    body,
-    frontmatter: {},
-    taskBbUrl: null,
-    changelogEntries: [],
+  const doc = lib.buildDescriptionAdf({ body, frontmatter: {}, taskBbUrl: null });
+  assert.deepEqual(headingsOf(doc), ["Summary", "Success Criteria"]);
+});
+
+// Breaking Changes is the one detail kept beyond the summary: a board reader
+// must not have to open a file to discover it. Absent from most tasks, so it
+// must not leave an empty heading behind — nor warn on every sync.
+test("buildDescriptionAdf — Breaking Changes appears only when present, and never warns", () => {
+  const warnings = [];
+  const withBc = lib.buildDescriptionAdf({
+    body: "## Overview\n\nSummary.\n\n## Breaking Changes\n\n- API v1 removed\n",
+    frontmatter: {}, taskBbUrl: null,
+    output: { warn: (m) => warnings.push(String(m)) },
   });
-  const headings = doc.content
-    .filter((n) => n.type === "heading")
-    .map((n) => n.content[0].text);
-  assert.ok(headings.includes("Overview"));
-  assert.ok(headings.includes("Motivation"));
-  assert.ok(headings.includes("Implementation Plan"));
-  assert.ok(headings.includes("Risk Assessment"));
-  assert.ok(headings.includes("Rollback Plan"));
+  assert.deepEqual(headingsOf(withBc), ["Summary", "Breaking Changes"]);
+
+  const without = lib.buildDescriptionAdf({
+    body: "## Overview\n\nSummary.\n",
+    frontmatter: {}, taskBbUrl: null,
+    output: { warn: (m) => warnings.push(String(m)) },
+  });
+  assert.deepEqual(headingsOf(without), ["Summary"]);
+  assert.deepEqual(
+    warnings.filter((w) => /Breaking Changes/.test(w)),
+    [],
+    "an optional section must not warn — that trains operators to ignore the warning that matters",
+  );
 });
 
 test("buildDescriptionAdf — does not render User Story / Acceptance Criteria (story-only sections)", () => {
@@ -408,7 +443,6 @@ As a user.
     body,
     frontmatter: {},
     taskBbUrl: null,
-    changelogEntries: [],
   });
   const headings = doc.content
     .filter((n) => n.type === "heading")
@@ -428,7 +462,6 @@ test("buildDescriptionAdf — omits sections with no body match", () => {
     body: "# Just a title\n\nNothing else.\n",
     frontmatter: {},
     taskBbUrl: null,
-    changelogEntries: [],
   });
   assert.equal(doc.content.length, 0);
 });
@@ -443,7 +476,6 @@ test("buildDescriptionAdf — an empty body warns when given an output handle", 
     body: "# Just a title\n\nNothing else.\n",
     frontmatter: {},
     taskBbUrl: null,
-    changelogEntries: [],
     output: { warn: (m) => warnings.push(String(m)) },
   });
 
@@ -466,30 +498,30 @@ test("buildDescriptionAdf — numbered headings render the same as unnumbered", 
       .map((n) => n.content[0].text);
 
   const numbered = lib.buildDescriptionAdf({
-    body: "## 1. Overview\n\nalpha\n\n## 6. Implementation Plan\n\nbeta\n",
+    body: "## 1. Overview\n\nalpha\n\n## 9. Success Criteria\n\n- beta\n",
     frontmatter: {},
     taskBbUrl: null,
-    changelogEntries: [],
   });
 
-  assert.deepEqual(headings(numbered), ["Overview", "Implementation Plan"]);
+  assert.deepEqual(headings(numbered), ["Summary", "Success Criteria"]);
   assert.deepEqual(
     numbered,
     lib.buildDescriptionAdf({
-      body: "## Overview\n\nalpha\n\n## Implementation Plan\n\nbeta\n",
+      body: "## Overview\n\nalpha\n\n## Success Criteria\n\n- beta\n",
       frontmatter: {},
       taskBbUrl: null,
-      changelogEntries: [],
     }),
     "numbering must not change the rendered ADF — otherwise it churns the body hash",
   );
 });
 
-test("TASK_SECTIONS — exposes the 11 task-doc section headings", () => {
-  assert.ok(Array.isArray(lib.TASK_SECTIONS));
-  assert.equal(lib.TASK_SECTIONS.length, 11);
-  assert.ok(lib.TASK_SECTIONS.includes("Overview"));
-  assert.ok(lib.TASK_SECTIONS.includes("Rollback Plan"));
+test("TASK_CARD_SECTIONS — exposes the three card sections, not the whole document", () => {
+  assert.ok(Array.isArray(lib.TASK_CARD_SECTIONS));
+  assert.deepEqual(
+    lib.TASK_CARD_SECTIONS.map((s) => s.heading),
+    ["Summary", "Success Criteria", "Breaking Changes"],
+  );
+  assert.deepEqual(lib.TASK_CARD_SECTIONS[0].names, ["Overview"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -1410,7 +1442,6 @@ test("buildDescriptionAdf — Source Documents lists the task file plus each rel
         href: "https://bitbucket.org/org/repo/src/HEAD/task.13.runbook.md",
       },
     ],
-    changelogEntries: [],
   });
   const bullet = doc.content.find((n) => n.type === "bulletList");
   assert.ok(bullet, "Source Documents bullet list present");
@@ -1430,7 +1461,6 @@ test("buildDescriptionAdf — with no taskBbUrl and no related docs, omits the S
     frontmatter: {},
     taskBbUrl: null,
     relatedDocLinks: [],
-    changelogEntries: [],
   });
   const headings = doc.content
     .filter((n) => n.type === "heading")
@@ -1448,7 +1478,6 @@ test("buildDescriptionAdf — rewrites a relative in-body link via linkResolver"
     frontmatter: {},
     taskBbUrl: null,
     relatedDocLinks: [],
-    changelogEntries: [],
     linkResolver: resolver,
   });
   const overview = doc.content.find((n) => n.type === "paragraph");

@@ -102,7 +102,13 @@ DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | 
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${TASK_RELATIVE_PATH}"
 ```
 
-Create the task issue:
+Create the task issue.
+
+The body is a **summary**, not a copy of the task file — the caps below are the
+contract in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md),
+which is also what the Jira path enforces in code. Read it before changing this
+template. Anything trimmed must be announced with an accurate count; a reader who
+is not told they are seeing part of something believes they saw all of it.
 
 ```bash
 TASK_ISSUE_URL=$(gh issue create \
@@ -111,17 +117,21 @@ TASK_ISSUE_URL=$(gh issue create \
   --label "task" \
   --label "priority:${priority}" \
   --milestone "${MILESTONE_TITLE}" \
-  --body "## Overview
+  --body "## Summary
 
 {First paragraph of the task's Overview section — 2-4 sentences}
 
-## Key Deliverables
+## Success Criteria
 
-{Bulleted list from the task's Key Deliverables or Scope section}
+{The first 5 success criteria as a GitHub checkbox list. If more remain, add a
+final line: '+N more in the [task document](${DOC_URL})' with N the exact number
+omitted. If 5 or fewer, list them all and add no such line.}
 
-## Success Criteria (summary)
+## Breaking Changes
 
-{2-5 most important criteria as a GitHub checkbox list}
+{The first 3 items from the task's Breaking Changes section. OMIT THIS HEADING
+ENTIRELY when the task has no Breaking Changes section or it is empty — which is
+the common case. Never leave an empty heading behind.}
 
 ## Metadata
 

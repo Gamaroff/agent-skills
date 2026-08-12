@@ -109,7 +109,7 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue
   || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
 ```
 
-Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt from the task document's Overview / Key Deliverables / Success Criteria / Metadata / Document sections (the `## Document` link uses `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
+Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt to the **same shape** `ensure-task-github-issue` emits on create — Summary, Success Criteria (capped at 5), Breaking Changes when present, Metadata, Document — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. The `## Document` link uses `DOC_URL` above, so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
 
 If anything changed, run:
 

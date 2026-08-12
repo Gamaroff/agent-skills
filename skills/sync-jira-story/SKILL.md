@@ -1,6 +1,6 @@
 ---
 name: sync-jira-story
-description: Sync a local story markdown file to Jira — creates the story if it has no jira_key, updates it if jira_key is already set. Links the Jira story to its parent Jira epic (team-managed `parent` or classic Epic Link customfield, auto-detected with retry). Adds the story to the project backlog (Scrum boards only). Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Maintains a Change Log in both the local story and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this story in Jira", "update this story in Jira", "sync story to Jira", "push story changes to Jira", or "publish story to Jira".
+description: Sync a local story markdown file to Jira — creates the story if it has no jira_key, updates it if jira_key is already set. Links the Jira story to its parent Jira epic (team-managed `parent` or classic Epic Link customfield, auto-detected with retry). Adds the story to the project backlog (Scrum boards only). Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Maintains a Change Log in the local story file. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this story in Jira", "update this story in Jira", "sync story to Jira", "push story changes to Jira", or "publish story to Jira".
 ---
 
 # sync-jira-story
@@ -156,7 +156,7 @@ Flow:
 6. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 7. Diff `summary`, body hash, meta hash, priority, labels.
 8. **If diff empty (update path only):** skip the PUT, the file write-back, and the changelog entry. Status transition still runs. Exit clean.
-9. Build a Jira ADF description: Change Log table → Source links → User Story / Acceptance Criteria / Description → Metadata.
+9. Build a Jira ADF description: Summary → Acceptance Criteria (capped) → Metadata → Source links.
 10. Resolve cached `Story` issue type id (or fetch + cache); detect project style (cached 24 h).
 11. **Create** (POST, with parent/Epic Link auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`). On update, `description` is sent only when body or metadata hash changed.
 12. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning. Fetch fresh `updated` + `status` in a single GET.
@@ -280,13 +280,25 @@ jira_last_meta_hash: "a91c0aef33eb1d04"
 
 ## Description sections rendered
 
-The script extracts and renders these story-doc headings into the Jira description:
+The Jira card is a **summary that points at the story document**, not a copy of it. The
+contract — which sections, what caps, how omissions are announced — is specified
+once in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md)
+and enforced in code by `buildCardSections()` in `references/jira-sync.js`.
 
-1. User Story
-2. Acceptance Criteria
-3. Description
+What lands on a story card:
 
-Each section's body is converted to ADF, with `- item` and `1. item` lines becoming proper bulletList / orderedList nodes.
+| Block | Source |
+|-------|--------|
+| Summary | `## User Story` / `## Story` / `## Story Statement`, falling back to `## Description` |
+| Acceptance Criteria | `## Acceptance Criteria`, **first 5 items** |
+| Metadata | type, estimated hours, epic, status |
+| Source Documents | story file, parent epic, durable sibling docs |
+
+Each section's body is converted to ADF, with `- item` and `1. item` lines
+becoming proper bulletList / orderedList nodes. Anything trimmed is followed by a
+`+N more in …` link to the story document. The document's Change Log is **never**
+published to the card — Jira keeps its own issue history and the local file holds
+the authoritative log.
 
 ## Script Options
 
@@ -297,6 +309,7 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
 | `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Used by `finalise` (passes the durable integration branch) so a closed issue doesn't link to a deleted feature branch. |
+| `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-story` to catch a heading mismatch before it publishes a thin card. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--no-write` | | Run live Jira sync but skip the local file write-back. Useful for first-time adopters who want to inspect what would change in the markdown without committing the change. Differs from `--dry-run` in that the Jira side is updated. |
 | `--force` | | Override the concurrent-edit guard |

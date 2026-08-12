@@ -18,13 +18,22 @@ const lib = require("../references/jira-sync.js");
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-// First entry is an ALIAS ARRAY — three spellings of the same section are in
+// What the CARD carries — a summary, not a copy. The story file is the source
+// of truth and every card links to it; see shared/resources/tracker-card-summary.md.
+//
+// `names` is an ALIAS ARRAY — three spellings of the story statement are in
 // active use and none is wrong. Measured across 426 story documents 2026-07-31:
-// `## Story` 234, `## Story Statement` 161, `## User Story` 7. The list named
-// only `User Story`, so ~98% of stories published their acceptance criteria and
-// nothing else, silently. `User Story` stays first: it is the canonical name
-// re-emitted as the Jira heading (see extractBodySections).
-const STORY_SECTIONS = [["User Story", "Story", "Story Statement"], "Acceptance Criteria", "Description"];
+// `## Story` 234, `## Story Statement` 161, `## User Story` 7. The list once
+// named only `User Story`, so ~98% of stories published their acceptance
+// criteria and nothing else, silently.
+//
+// `Description` is the LAST alias, not its own section: a story that has a story
+// statement never shows it, and one that has only a Description still gets a
+// non-empty card instead of a heading with nothing under it.
+const STORY_CARD_SECTIONS = [
+  { heading: "Summary", names: ["User Story", "Story", "Story Statement", "Description"] },
+  { heading: "Acceptance Criteria", names: ["Acceptance Criteria"] },
+];
 
 const ISSUE_TYPE = "Story";
 
@@ -55,40 +64,19 @@ function formatJiraTimeEstimate(value) {
 // ---------------------------------------------------------------------------
 // Description builder (story-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries, linkResolver, output = null }) {
+function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver, output = null }) {
   const content = [];
 
-  if (changelogEntries && changelogEntries.length) {
-    content.push(lib.adf.heading(3, "Change Log"));
-    content.push(lib.adf.table([
-      lib.adf.tableRow(
-        lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Date (UTC)"))),
-        lib.adf.tableHeader(lib.adf.paragraph(lib.adf.text("Change"))),
-      ),
-      ...changelogEntries.map(row => {
-        const [date = "", change = ""] = row.replace(/^\|/, "").replace(/\|$/, "").split("|").map(s => s.trim());
-        return lib.adf.tableRow(
-          lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(date))),
-          lib.adf.tableCell(lib.adf.paragraph(lib.adf.text(change))),
-        );
-      }),
-    ]));
-  }
+  // The document's Change Log is deliberately NOT published here. Jira keeps its
+  // own issue history, and the local file holds the authoritative log — a third
+  // copy on the card added length on every sync and told a reader nothing new.
 
-  const links = [];
-  if (epicBbUrl)  links.push({ label: "Parent Epic on Bitbucket", href: epicBbUrl });
-  if (storyBbUrl) links.push({ label: "Story file on Bitbucket", href: storyBbUrl });
-  if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
-  if (links.length) {
-    content.push(lib.adf.heading(3, "Source Documents"));
-    content.push(lib.adf.bulletList(...links.map(l =>
-      lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
-  }
-
-  for (const sec of lib.extractBodySections(body, STORY_SECTIONS, output)) {
-    content.push(lib.adf.heading(3, sec.name));
-    content.push(...lib.textToAdfNodes(sec.content, linkResolver));
-  }
+  content.push(...lib.buildCardSections(body, STORY_CARD_SECTIONS, {
+    sourceUrl: storyBbUrl || null,
+    docLabel: "the story document",
+    linkResolver,
+    output,
+  }));
 
   const meta = [];
   if (frontmatter.story_type)             meta.push(`Type: ${frontmatter.story_type}`);
@@ -100,16 +88,36 @@ function buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, related
     content.push(lib.adf.paragraph(lib.adf.text(meta.join(" | "))));
   }
 
+  // Links go LAST, and the story file leads them. The card is a pointer, so the
+  // route to the full detail is the last thing a reader passes on their way out
+  // — not a block they scroll past before reaching the summary.
+  const links = [];
+  if (storyBbUrl) links.push({ label: "Story document", href: storyBbUrl });
+  if (epicBbUrl)  links.push({ label: "Parent epic", href: epicBbUrl });
+  if (relatedDocLinks && relatedDocLinks.length) links.push(...relatedDocLinks);
+  if (links.length) {
+    content.push(lib.adf.heading(3, "Source Documents"));
+    content.push(lib.adf.bulletList(...links.map(l =>
+      lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
+  }
+
   // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
-  // wholesale and the issue silently keeps its previous description.
+  // wholesale and the issue silently keeps its previous description. After
+  // summarisation this should never fire; it stays as a backstop.
   return lib.capDescriptionAdf(lib.adf.doc(...content), { sourceUrl: storyBbUrl || null, output });
 }
 
+// Hash exactly what gets PUBLISHED, not the raw sections.
+//
+// Hashing the verbatim document would make an edit to a section the card no
+// longer carries flip the hash and trigger a description PUT that changes
+// nothing on the card.
 function hashBody({ body, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver }) {
-  const sections = lib.extractBodySections(body, STORY_SECTIONS).map(s => ({
-    name: s.name,
-    nodes: lib.textToAdfNodes(s.content, linkResolver),
-  }));
+  const sections = lib.buildCardSections(body, STORY_CARD_SECTIONS, {
+    sourceUrl: storyBbUrl || null,
+    docLabel: "the story document",
+    linkResolver,
+  });
   return lib.hashStable({
     sections, epicBbUrl, storyBbUrl,
     relatedDocLinks: (relatedDocLinks || []).map(l => l.href),
@@ -379,7 +387,7 @@ function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
     file: null, summary: null, priority: null, labels: null, docBranch: null,
-    dryRun: false, noWrite: false, force: false, json: false, quiet: false,
+    checkCard: false, dryRun: false, noWrite: false, force: false, json: false, quiet: false,
     failOnStatusSkip: false,
     probeWorkflow: false,
     writeRecord: "",
@@ -391,6 +399,7 @@ function parseArgs(argv) {
       case "--priority": case "-p": opts.priority = args[++i]; break;
       case "--labels":   case "-l": opts.labels   = args[++i]; break;
       case "--doc-branch": opts.docBranch = args[++i]; break;
+      case "--check-card": opts.checkCard = true; break;
       case "--dry-run":  opts.dryRun  = true; break;
       case "--no-write": opts.noWrite = true; break;
       case "--force":    opts.force   = true; break;
@@ -430,13 +439,27 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   if (!args.file) {
     output.err("Error: --file is required");
-    output.err("Usage: sync-jira-story --file <story.md> [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet]");
+    output.err("Usage: sync-jira-story --file <story.md> [--check-card] [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet]");
     return { exitCode: 1 };
   }
   const filePath = path.resolve(args.file);
   if (!fs.existsSync(filePath)) {
     output.err(`Error: File not found: ${filePath}`);
     return { exitCode: 1 };
+  }
+
+  // --check-card: preflight the DOCUMENT against the card spec and exit. No
+  // auth, no network, no writes — a review-time gate, not a sync mode.
+  if (args.checkCard) {
+    const { body } = lib.parseFrontmatter(fs.readFileSync(filePath, "utf8"));
+    const check = lib.checkCardSections(body, STORY_CARD_SECTIONS, { docLabel: "the story document" });
+
+    if (args.json) {
+      output.emit({ action: "check-card", file: filePath, ...check });
+    } else {
+      output.info(lib.formatCardCheck(check, { title: `Card preflight — ${path.basename(filePath)}` }));
+    }
+    return { exitCode: check.findings.length ? 1 : 0 };
   }
 
   const content = fs.readFileSync(filePath, "utf-8");
@@ -561,8 +584,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       changeSummary = `Updated: ${changedFields.join(", ")}`;
       changeEntry = lib.fmtEntry(changeSummary);
 
-      const allEntries = [...lib.extractEntries(content), changeEntry];
-      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: allEntries, linkResolver, output });
+      const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver, output });
       // Send `description` only when body or metadata actually changed, to avoid
       // pointless edits in Jira's history.
       const includeDescription = changedFields.includes("description") || changedFields.includes("metadata");
@@ -623,7 +645,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   } else {
     changeSummary = "Initial Jira story created";
     changeEntry = lib.fmtEntry(changeSummary);
-    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, changelogEntries: [changeEntry], linkResolver, output });
+    const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver, output });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira story ===`);
@@ -756,7 +778,7 @@ if (require.main === module) {
     resolveEpicPath,
     upsertInlineLine,
     withCodeBlocksMasked,
-    STORY_SECTIONS,
+    STORY_CARD_SECTIONS,
     STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     EPIC_LINK_FIELD,
     // Re-export lib pieces for tests

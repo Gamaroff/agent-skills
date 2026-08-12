@@ -1,6 +1,6 @@
 ---
 name: sync-jira-epic
-description: Sync a local epic markdown file to Jira — creates the epic if it has no jira_key, updates it if jira_key is already set. Top-level work item (no parent). Embeds Bitbucket links to the parent PRD and epic file in the Jira description (rendered via ADF). Renders the Stories Breakdown markdown table as a real ADF table in Jira. Maintains a Change Log in both the local epic and Jira. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this epic in Jira", "update this epic in Jira", "sync epic to Jira", "push epic changes to Jira", or "publish epic to Jira".
+description: Sync a local epic markdown file to Jira — creates the epic if it has no jira_key, updates it if jira_key is already set. Top-level work item (no parent). Embeds Bitbucket links to the parent PRD and epic file in the Jira description (rendered via ADF). Renders the Stories Breakdown overview table as a real ADF table in Jira. Maintains a Change Log in the local epic file. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this epic in Jira", "update this epic in Jira", "sync epic to Jira", "push epic changes to Jira", or "publish epic to Jira".
 ---
 
 # sync-jira-epic
@@ -142,7 +142,7 @@ Flow:
 4. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 5. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 6. Diff `summary`, body hash, meta hash, priority, labels.
-7. Build a Jira ADF description: Change Log table → Source links → Epic Goal → Epic Description → Metadata → Stories Breakdown table → Story Requirements.
+7. Build a Jira ADF description: Summary → Metadata → Stories Breakdown overview table → Source links.
 8. Resolve cached `Epic` issue type id (or fetch + cache).
 9. **Create** (POST, with Epic-Name-field auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`).
 10. **No-change fast path:** on update, if no fields changed, skip the PUT but still record a local Change Log entry. Use `--force` to push anyway.
@@ -266,7 +266,7 @@ If your epic markdown has a `## Stories Breakdown` section with a pipe-table, th
 
 If your epic already has a hand-written `## Change Log` heading without HTML markers, the first sync **wraps it in markers in place** and preserves any existing `| date | change |` rows — no duplication. Entry rows are matched by a strict regex `^\|\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s*\|`, so unrelated body markdown tables can't pollute the changelog.
 
-The local file holds the **full** changelog history. The Jira ADF description renders only the **last 20 entries** (configurable via `CHANGELOG_DESCRIPTION_LIMIT` in the script) to keep the issue body readable; older entries remain in the local epic file as the source of truth. No-change syncs (no-op fast path) skip writing a Change Log row entirely — only real changes are recorded.
+The local file holds the changelog history and is the source of truth for it. The Jira description does **not** publish it at all — Jira keeps its own issue history, so a third copy on the card grew on every sync and told a reader nothing new. No-change syncs (no-op fast path) skip writing a Change Log row entirely — only real changes are recorded.
 
 ## Epic File Format
 
@@ -284,13 +284,26 @@ jira_last_meta_hash: "a91c0aef33eb1d04"
 
 ## Description sections rendered
 
-The script extracts and renders these epic-doc headings into the Jira description:
+The Jira card is a **summary that points at the epic document**, not a copy of
+it. The contract — which sections, what caps, how omissions are announced — is
+specified once in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md)
+and enforced in code by `buildCardSections()` in `references/jira-sync.js`.
 
-1. Epic Goal
-2. Epic Description (with `**Existing System Context:**` etc. flattened to plain `Existing System Context:`)
-3. Stories Breakdown (ADF table)
+What lands on an epic card:
 
-Each section's body is converted to ADF, with `- item` and `1. item` lines becoming proper bulletList / orderedList nodes.
+| Block | Source |
+|-------|--------|
+| Summary | `## Epic Goal`, falling back to `## Epic Description` (with `**Existing System Context:**` etc. flattened to plain `Existing System Context:`) |
+| Stories Breakdown | the **overview table only**, found wherever it sits (typically under `### Stories Overview`); the per-story `###` blocks are not published |
+| Metadata | type, PRD, estimated sprints, status |
+| Source Documents | epic file, parent PRD, child stories |
+
+Each section's body is converted to ADF, with `- item` and `1. item` lines
+becoming proper bulletList / orderedList nodes. Anything trimmed is followed by a
+`+N more in …` link to the epic document. The document's Change Log is **never**
+published to the card, and the old fixed "Story Requirements" paragraph is gone —
+it told story authors which frontmatter keys to set, which is repo authoring
+guidance, not information for a card reader.
 
 ## Script Options
 
@@ -301,6 +314,7 @@ Each section's body is converted to ADF, with `- item` and `1. item` lines becom
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
 | `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Lets a post-merge re-sync point links at the durable integration branch instead of a deleted feature branch. |
+| `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-epic` to catch a heading mismatch before it publishes a thin card. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--force` | | Override the concurrent-edit guard AND the no-change fast path |
 | `--json` | | Suppress human output; emit a single JSON object on completion |
@@ -359,7 +373,7 @@ The script is a thin wrapper over `references/jira-sync.js`, which holds the sha
 node --test .agents/skills/sync-jira-epic/tests/*.test.js
 ```
 
-Covers frontmatter parsing (incl. `---` in body), changelog upsert / hand-written-heading rescue, body/meta hash split, ADF builder + Stories Breakdown table (incl. inline links + escaped pipes), Change Log description cap, PRD path resolution, full status map (incl. Backlog / In Review / Ready / Won't Do), `syncLabelFor` derivation, in-place frontmatter update, Jira error parser, `findExistingByLabel` POST `/search/jql` shape, `fetchUpdatedTimestamp` non-throwing variant, `guardConcurrentEdit` (incl. `--force` override path), `collectCreateFields` vs `collectUpdateFields` field shape, and `--verbose` / `--version` flag parsing.
+Covers frontmatter parsing (incl. `---` in body), changelog upsert / hand-written-heading rescue, body/meta hash split, ADF builder + Stories Breakdown table (incl. inline links + escaped pipes), PRD path resolution, full status map (incl. Backlog / In Review / Ready / Won't Do), `syncLabelFor` derivation, in-place frontmatter update, Jira error parser, `findExistingByLabel` POST `/search/jql` shape, `fetchUpdatedTimestamp` non-throwing variant, `guardConcurrentEdit` (incl. `--force` override path), `collectCreateFields` vs `collectUpdateFields` field shape, and `--verbose` / `--version` flag parsing.
 
 ## Notes
 

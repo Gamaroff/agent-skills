@@ -178,6 +178,12 @@ fi
 
 **ALWAYS use a tempfile for the body** — never inline it. This avoids heredoc wrapping issues with long URLs.
 
+The body below is authored from a PR or review finding, not copied from a
+story/task file, so it is already summary-shaped. Keep it that way: **cap the
+acceptance criteria at 5**, and when more remain add a final
+`+N more in the linked document` line with the exact count. The general contract
+is [`references/tracker-card-summary.md`](./references/tracker-card-summary.md).
+
 1. Render the body to a tempfile:
 
 ```bash

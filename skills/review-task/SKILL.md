@@ -556,6 +556,7 @@ Name the outstanding roles so the human knows who to chase:
          3. **Zero matches** → fall through to create block below
          4. **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Task {id}]\": {key1}, {key2}, … — proceeding to create"` and fall through to create block below
          - **Note on search/create asymmetry**: this search uses Atlassian MCP (`searchJiraIssuesUsingJql`); the create block below uses curl REST. This split is intentional — switching create to MCP is out of scope and tracked separately.
+         - **Note on the description**: the card is a summary, not a copy of the task file — see [`references/tracker-card-summary.md`](./references/tracker-card-summary.md). The block below writes plain markdown via REST v2; `sync-jira-task` later re-renders the same shape as ADF and is the authority. Keep the two consistent.
        ```bash
        JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
        JIRA_RESPONSE=$(curl -s -X POST \
@@ -564,7 +565,7 @@ Name the outstanding roles so the human knows who to chase:
          -H "Authorization: Basic ${JIRA_AUTH}" \
          -d "$(jq -n \
            --arg summary "[Task {id}] {title}" \
-           --arg description "## Overview\n\n{overview}\n\n## Document\n📁 \`{task-file-relative-path}\`" \
+           --arg description "## Summary\n\n{first paragraph of Overview, capped at 4 sentences}\n\n## Success Criteria\n\n{first 5 criteria; if more remain add '+N more in the task document'}\n\n## Document\n📁 \`{task-file-relative-path}\`" \
            --arg project "$JIRA_PROJECT_KEY" \
            --arg priority "{High|Medium|Low}" \
            '{
@@ -648,13 +649,49 @@ Name the outstanding roles so the human knows who to chase:
        - If found: confirm the issue number in the link matches `github_issue:` in frontmatter; and confirm the URL path ends with `/issues/{N}`. Any mismatch → flag as **Important**: "Body link `[#X](url)` does not match frontmatter `github_issue: {N}`"
        - If no body link found: flag as **Important** — add one (e.g., `[#{N}](https://github.com/{owner}/{repo}/issues/{N})`)
 
+5a. **Tracker Card Preflight**:
+
+   The tracker card is a **summary that points at this document**, not a copy of
+   it — see [`references/tracker-card-summary.md`](./references/tracker-card-summary.md).
+   It is built from a handful of named `## ` headings, so a document whose
+   headings do not match that list publishes a thin or empty card **and the sync
+   still reports success**. That is not hypothetical: 28 task cards once shipped
+   with empty bodies, and ~98% of stories published their acceptance criteria
+   and nothing else. Both went unnoticed because there is no error to raise.
+
+   Run the preflight (no auth, no network, no writes — it only reads the file):
+
+   ```bash
+   node .agents/skills/sync-jira-task/scripts/sync-jira-task.js --file "{task-file-path}" --check-card
+   ```
+
+   Exit 0 = every card block resolves. Exit 1 = at least one finding, printed
+   with the exact fix. Add `--json` for a machine-readable `{ok, findings, blocks}`.
+
+   Map the output to review findings:
+
+   - A `missing` finding → **Critical**. The card loses a whole block. The fix is
+     always in the **document** — rename or add the heading; no sync-side change
+     can invent content the file does not have.
+   - An `empty` finding → **Critical** (or **Important** for an optional block).
+     The heading exists but holds only a table or a code block, so there is no
+     prose or list to summarise.
+   - A `no-body` finding → **Critical**. Nothing resolved; the card would publish
+     an empty description.
+   - Exit 0 → no finding. Do **not** raise anything about card length: the
+     builder caps it (4-sentence summary, 5 success criteria, 3 breaking changes) and announces every omission
+     with a `+N more` link, so a long document cannot produce a long card.
+
+   Report the `+N more` counts in the review body as information, not a defect —
+   they tell the author how much of the section a board reader will not see.
+
 **Issues to Flag**:
 
-- **Critical**: Missing required sections (Implementation Plan, Testing Strategy); unsigned sign-off when `sign-off.enforcement: blocking`
+- **Critical**: Missing required sections (Implementation Plan, Testing Strategy); unsigned sign-off when `sign-off.enforcement: blocking`; a tracker-card block that fails preflight with `missing`, `empty`, or `no-body`
 - **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage; unsigned sign-off when `sign-off.enforcement: advisory` (the default)
 - **Optional**: Missing optional sections or metadata; a numbered `## 12. Stakeholder Sign-off` heading
 
-**Output**: Template compliance report with specific issues listed
+**Output**: Template compliance report with specific issues listed. Card-preflight findings count toward the **Template Compliance** score — a document that cannot produce a usable card is not template-compliant, whatever else it satisfies.
 
 **Questions to Collect** (for batch asking):
 
