@@ -500,6 +500,16 @@ PRDs grow over time — it is expected and normal to add new epics as scope evol
 - Check if the user's intent is to **extend** an existing PRD (add a new epic area) rather than create from scratch
 - If extending: append the new epic to the existing PRD's Epic and Story Structure section; do not re-create the whole PRD
 - The continuation detection step (1a) must offer an **Extend** option for completed PRDs
+- **Record the extension in the PRD's `### Change Log`** — appending an epic changes the PRD's scope,
+  so it must leave a trace. Append one row (never edit an existing one) and bump the PRD's frontmatter
+  `updated:` in the same edit. Canonical format: `references/document-change-log.md` —
+  append-only, newest last, four columns. Leave `Version` blank for this machine-written row:
+
+  ```markdown
+  | {today} |  | Epic {N} appended | create-prd |
+  ```
+
+  PRDs keep the log nested as `### Change Log` under §1 — do not promote it to `## `.
 
 **IMPORTANT — Epic Numbering:**
 When epic files are created from this PRD, they will be assigned **globally unique** epic numbers from the system registry (`/docs/development/epic-registry.md`). In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers), but the actual epic files will use system-wide unique numbers like `epic.163.md`, `epic.164.md`, etc. This ensures no duplicate epic numbers across the entire project.

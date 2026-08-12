@@ -1,12 +1,21 @@
+---
+id: task.[ID]
+title: "[TASK_TITLE]"
+type: task
+description: "[One-sentence summary of what this task accomplishes]"
+tags: []
+category: refactoring # refactoring | infrastructure | documentation | testing | other
+status: planned
+priority: Medium # Critical | High | Medium | Low
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+assignee: # optional — a Jira accountId, never a name or team. Blank = use jira.defaultAssignee from skills-config.yaml; blank + unset = leave Jira's assignee untouched. Never a placeholder like TBD: Jira rejects it with HTTP 400.
+estimated_effort_hours: 0
+---
+
 # Technical Task Template: [TASK_TITLE]
 
-**Task ID**: TASK-[ID]
-**Created**: YYYY-MM-DD
-**Status**: 📋 Planned | 🔄 In Progress | ⏸️ Paused | ✅ Completed | ❌ Cancelled
-**Priority**: Critical | High | Medium | Low
-**Assignee**: [Developer or team name]
-**Estimated Effort**: [Hours or days]
-**Completed**: [When applicable]
+**Status:** Planned
 
 ---
 
@@ -375,6 +384,22 @@ Development must not begin until every required role below has signed. To sign, 
 
 ---
 
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
+  Canonical spec: references/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  EVERY new row bumps frontmatter `updated:` in the same edit.
+-->
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| YYYY-MM-DD | 1.0     | Initial draft | create-task |
+
+---
+
 ## Progress Tracking
 
 ### Phase 1: [Phase Name]
@@ -418,7 +443,7 @@ Development must not begin until every required role below has signed. To sign, 
 
 ---
 
-**Status**: 📋 Planned
+**Status:** Planned
 
 **Next Steps**:
 1. Implement according to implementation plan

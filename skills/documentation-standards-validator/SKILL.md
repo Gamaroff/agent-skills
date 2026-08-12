@@ -22,7 +22,7 @@ Activate this skill when:
 
 This skill defines the mechanical checks below; each consuming repo implements them as its own gates (a git hook, a CI job, or a script against its own layout) — there is no shared linter here, because doc roots and corpus shape differ per repo.
 
-The seven checks, all validated against a repo's documentation conventions: (1) status vocabulary, (2) frontmatter key completeness, (3) Change Log header, (4) FR-tag presence (warn-level), (5) registry⇔PRD Epic-List parity, (6) epic `estimated_stories` vs active story dirs, (7) stray `PROGRESS*.md` under epics.
+The seven checks, all validated against a repo's documentation conventions: (1) status vocabulary, (2) frontmatter key completeness, (3) Change Log header — canonical format: `references/document-change-log.md`, (4) FR-tag presence (warn-level), (5) registry⇔PRD Epic-List parity, (6) epic `estimated_stories` vs active story dirs, (7) stray `PROGRESS*.md` under epics.
 
 When creating or reviewing a story/epic/task, apply these checks to the affected documents and fix any violation before finishing.
 

@@ -169,7 +169,10 @@ sections:
     title: Change Log
     type: table
     columns: [Date, Version, Description, Author]
-    instruction: Track changes made to this story document
+    instruction: |
+      Append-only record of changes to this story, newest last. Canonical format:
+      shared/resources/document-change-log.md. Leave Version blank for machine-written rows.
+      Every new row bumps the frontmatter `updated:` field in the same edit.
     owner: scrum-master
     editors: [scrum-master, dev-agent, qa-agent]
 

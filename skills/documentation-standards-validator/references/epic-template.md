@@ -16,6 +16,9 @@
 
 epic_number: N
 title: "[Epic Name]"
+type: epic
+description: "[One-sentence summary of what this epic delivers]"
+tags: []
 domain: "[Domain]"
 status: "📋 Planned"
 priority: "Critical | High | Medium | Low"
@@ -654,9 +657,9 @@ Epic [N] is complete when all criteria below are met:
 
 ### Related Documentation
 
-- [Product Requirements](../../product-requirements.md) - Source requirements
-- [Technical Implementation](../../technical-implementation.md) - Architecture details
-- [Developer Quick Start](../../DEVELOPER-QUICK-START.md) - Implementation guide
+- [Product Requirements](../../prd.[name].md) - Source PRD this epic decomposes
+- [Architecture](../../../../architecture/index.md) - Architecture index for the project
+- [Coding standards](../../../../architecture/concepts/coding-standards.md) - Loaded into every pipeline run
 - [[Specification]](../../[spec-name].md) - Feature specification
 
 ### Related Epics
@@ -666,24 +669,31 @@ Epic [N] is complete when all criteria below are met:
 
 ### Project Resources
 
-- [Implementation Phases](../../implementation-phases.md) - Overall roadmap
-- [Implementation Status](../../IMPLEMENTATION-STATUS.md) - Current progress
-- [Cross-Reference Guide](../../CROSS-REFERENCE-GUIDE.md) - Navigation help
+- [Project completion roadmap](../../../../development/project-completion-roadmap.md) - Ordered backlog `develop-next` selects from
+- [Epic registry](../../../../development/epic-registry.md) - Global epic numbering
+- [Task registry](../../../../tasks/task-registry.md) - Global task numbering
+
+---
+
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Canonical spec: shared/resources/document-change-log.md
+    — inside a bundled skill the same file sits at references/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  Epic frontmatter has NO `updated:` field (its date fields are `created:` and
+  `target_completion:`), so there is nothing to bump here — unlike PRD, story and
+  task documents, where every new row bumps `updated:` in the same edit.
+-->
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| YYYY-MM-DD | 1.0     | Initial draft | create-epic |
 
 ---
 
 ## Notes & Updates
-
-### Change Log
-
-**[Date]**: [Change description]
-
-- [Detail 1]
-- [Detail 2]
-
-**[Date]**: [Change description]
-
-- [Detail 1]
 
 ### Open Questions
 

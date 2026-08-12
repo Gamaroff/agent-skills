@@ -816,9 +816,11 @@ Review all sections for:
 ### 6.2 Update Status and Save
 
 1. Confirm status is set to `Draft`
-2. Add entry to Change Log table:
+2. Seed the Change Log table with exactly one row — Author is the skill name, per the canonical
+   format in `references/document-change-log.md` (append-only, newest row last, four columns).
+   Keep frontmatter `updated:` equal to the row's date:
    ```markdown
-   | 2025-10-30 | 1.0 | Initial draft created by Scrum Master | SM Agent |
+   | {today} | 1.0 | Initial draft | create-story |
    ```
 3. Save the story file to the self-named subdirectory inside the epic's `stories/` folder: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
 4. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:

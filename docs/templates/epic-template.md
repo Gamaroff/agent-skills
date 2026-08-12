@@ -675,18 +675,25 @@ Epic [N] is complete when all criteria below are met:
 
 ---
 
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Canonical spec: shared/resources/document-change-log.md
+    — inside a bundled skill the same file sits at references/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  Epic frontmatter has NO `updated:` field (its date fields are `created:` and
+  `target_completion:`), so there is nothing to bump here — unlike PRD, story and
+  task documents, where every new row bumps `updated:` in the same edit.
+-->
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| YYYY-MM-DD | 1.0     | Initial draft | create-epic |
+
+---
+
 ## Notes & Updates
-
-### Change Log
-
-**[Date]**: [Change description]
-
-- [Detail 1]
-- [Detail 2]
-
-**[Date]**: [Change description]
-
-- [Detail 1]
 
 ### Open Questions
 

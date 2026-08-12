@@ -61,3 +61,9 @@ Low — callers are internal. Migration is mechanical.
 ## 11. Rollback Plan
 
 Revert the commit. Adapter chain has no persistent state.
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| 2026-08-12 | 1.0     | Initial draft | create-task |

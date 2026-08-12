@@ -29,7 +29,10 @@ sections:
         title: Change Log
         type: table
         columns: [Date, Version, Description, Author]
-        instruction: Track document versions and changes
+        instruction: |
+          Append-only record of changes to this PRD, newest last. Canonical format:
+          shared/resources/document-change-log.md. Leave Version blank for machine-written rows.
+          Every new row bumps the frontmatter `updated:` field in the same edit.
 
   - id: requirements
     title: Requirements

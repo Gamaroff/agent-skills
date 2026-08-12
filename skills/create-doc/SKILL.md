@@ -135,7 +135,14 @@ Select 1-9 or just type your question/feedback:
 **f. Save to File**
 
 - Incrementally save completed sections to output file
-- Update change log if applicable
+- **Write the Change Log** when the template declares a `changelog` (or `change-log`) section.
+  Canonical format: `references/document-change-log.md` — append-only, newest row last,
+  four columns (`Date`, `Version`, `Description`, `Author`).
+  - On the first save, seed exactly one row: `| {today} | 1.0 | Initial draft | create-doc |`
+  - On any later save that **revises an already-written section**, append a new row describing the
+    revision — never edit an existing row. Bump `Version` for a substantive revision.
+  - Every appended row bumps the document's frontmatter `updated:` field in the same edit.
+- If the template declares no changelog section, write nothing — do not invent the section.
 
 **g. Handle Repeatable Sections**
 

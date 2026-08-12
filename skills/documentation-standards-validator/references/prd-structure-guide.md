@@ -196,16 +196,24 @@ Each epic has its own subdirectory containing:
 
 ```yaml
 ---
-title: "[Epic N] Epic Name"
-prd_source: "[source-document].md"
-epic_type: "system_implementation | feature_enhancement | infrastructure"
-priority: "critical | high | medium | low"
-estimated_sprints: N
-dependencies: ["epic-X", "epic-Y"]
-status: "NOT_STARTED | IN_PROGRESS | PARTIALLY_COMPLETE | COMPLETE"
-completion_percentage: 0-100
+epic_number: N
+title: "[Epic Name]"
+type: epic
+description: "[One-sentence summary of what this epic delivers]"
+tags: []
+domain: "[Domain]"
+status: "📋 Planned"
+priority: "Critical | High | Medium | Low"
+estimated_stories: N
+created: YYYY-MM-DD
+target_completion: YYYY-MM-DD
+prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative PRD path, or "brownfield-enhancement"
 ---
 ```
+
+Authoritative copy: `references/epic-template.md` (byte-identical to `docs/templates/epic-template.md`).
+`type` is OKF's one hard requirement; `status` follows the canonical lifecycle in
+`shared/resources/document-status-lifecycle.md`.
 
 **File Locations**:
 

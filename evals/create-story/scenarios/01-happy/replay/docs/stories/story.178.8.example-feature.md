@@ -37,3 +37,9 @@ Draft
 
 Naming follows kebab-case per [Source: docs/architecture/coding-standards.md#naming].
 Implementation should live under `packages/example/src/`. No new dependencies required.
+
+## Change Log
+
+| Date       | Version | Description   | Author       |
+| ---------- | ------- | ------------- | ------------ |
+| 2026-08-12 | 1.0     | Initial draft | create-story |

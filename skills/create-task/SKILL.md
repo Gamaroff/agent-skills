@@ -421,6 +421,13 @@ Once validated:
    - Emit a YAML frontmatter block (per `resources/task-template.md`) with: `id`, `title`, `type: task`, `description` (a one-sentence summary — recommended), optional `tags`, `category`, `status`, `priority`, `created`, `updated`, `assignee`. `type` is OKF's one hard requirement; `description` is OKF-recommended. See [OKF conformance](references/open-knowledge-format.md).
    - Set frontmatter `status: planned` (body `**Status:** Planned`) and both `created`/`updated` to today
    - Initialize empty progress tracking checkboxes
+   - Seed the unnumbered `## Change Log` section (between `## Stakeholder Sign-off` and
+     `## Progress Tracking`, per `resources/task-template.md`) with exactly one row:
+     `| {today} | 1.0 | Initial draft | create-task |`. Keep frontmatter `updated:` equal to that
+     date. Append-only, newest row last, four columns — canonical format:
+     `references/document-change-log.md` (do not restate the column list elsewhere).
+     The heading stays **unnumbered**: numbering it would break the 11-section contract that
+     `scripts/lib.js` `countMandatorySections()` asserts.
 
 3. **Create Placeholder Notes**
    - Document where QA report will be created
