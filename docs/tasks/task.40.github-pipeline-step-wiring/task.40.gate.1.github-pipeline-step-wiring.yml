@@ -1,0 +1,105 @@
+schema: 1
+task: 'task.40.github-pipeline-step-wiring'
+task_title: 'Wire gh-stage.js into the pipeline step files'
+gate: CONCERNS
+status_reason: 'Implementation is correct and well-guarded — all five sites converted, three behavioural changes correctly implemented and documented, 1070 tests green. One MEDIUM issue: the reason-to-action table added to finalise/SKILL.md covers 7 reasons but 6 more are reachable from a plain --stage call, leaving an agent with no instruction for real failure states.'
+reviewer: 'QA Engineer'
+updated: '2026-08-12T16:45:00Z'
+
+top_issues:
+  - id: 'TASK-40-QA1-01'
+    severity: medium
+    finding: >-
+      The reason-to-action table in skills/finalise/SKILL.md documents 7 reasons
+      (transitioned, already, stage-disabled, would-regress, no-option,
+      not-on-board, mutation-failed) but gh-stage.js can emit 6 more that are
+      reachable from a plain `--stage done` call: ambiguous-board,
+      board-unreadable, no-credentials, no-options, no-repo-context,
+      no-status-field. The prose immediately below the table says "The CLI exits
+      0 for every row above, so never treat a zero exit as proof the card moved;
+      read `reason`" — which instructs the agent to read a value the table then
+      fails to explain. ambiguous-board is the most consequential: it fires when
+      an issue sits on two boards with no --board configured, which is a normal
+      multi-board setup, not an error condition.
+    suggested_action: >-
+      Extend the table with the 6 missing reasons, or add a catch-all row
+      ("any other reason — log verbatim in the running summary and treat as a
+      non-blocking warning") so no reachable state is undefined. Reasons only
+      produced by --probe-board / --write-ladder / --dry-run / --add-to-board
+      (probe, write-failed, exists, dry-run) are correctly out of scope for this
+      call site and need not be listed.
+    suggested_owner: dev
+    refs: ['skills/finalise/SKILL.md:1135-1143']
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 1070
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+  traceability_matrix: '.summaries/qa-traceability-matrix.md (working artifact — gitignored, not committed)'
+  success_criteria: '12/13 fully satisfied; F5 guarded in test but not live-proven (deferred, board topology)'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No credential handling changed. The CLI's auth path is task.39 code, not
+      under review here. Removing inline GraphQL reduces the surface where a
+      hand-edited query could leak a token into a log. No secrets in the diff.
+  performance:
+    status: PASS
+    notes: >-
+      Net reduction in `gh` invocations confirmed structurally: each site went
+      from read + mutate (+ step-0's second read and a separate post-condition
+      `gh project item-list`) to one CLI call doing read + mutate + verify.
+      `--add-to-board` fires at exactly one site, verified by inspection.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      Board mutations gain retries for the first time and the false-pass
+      post-condition is gone — both real improvements. But the finalise
+      reason-to-action table leaves 6 reachable states undocumented (see
+      TASK-40-QA1-01), so the escalation path is under-specified for exactly the
+      failure modes an operator would need it for. Rollback remains credible:
+      each site is a self-contained block.
+  maintainability:
+    status: PASS
+    notes: >-
+      ~240 lines of duplicated prose removed; one matching discipline replaces
+      three. Five new guards, each mutation-tested rather than assumed. CI now
+      checks bundle freshness, closing the gap that previously surfaced only at
+      release time.
+
+recommendations:
+  immediate:
+    - action: 'Extend the finalise reason table to cover all reasons reachable from a --stage call, or add a catch-all row'
+      refs: ['skills/finalise/SKILL.md']
+  future:
+    - action: >-
+        Scope the "no inline board Status mutation" guard to the code block
+        containing the mutation rather than the whole file. It currently passes
+        only because step-0 has no bare "Status" literal alongside its retained
+        Priority mutation; prose added later would false-positive. This is the
+        same fragility already hit and fixed in the --allow-regress guard.
+      refs: ['evals/shared/tests/transition-protocol-parity.test.mjs']
+    - action: >-
+        Consider restoring an explicit retry-on-empty to the Priority query.
+        The original shared a response with the status read, which carried
+        item-add + sleep 3 + a retry after 5s. The standalone query relies on
+        ensureOnBoard having already settled propagation — true in practice,
+        but the explicit guard is gone.
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'Run the two deferred consumer tests once a scratch board with bespoke column names exists'
+      refs: ['docs/tasks/task.40.github-pipeline-step-wiring/task.40.github-pipeline-step-wiring.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Address TASK-40-QA1-01 (reason-table completeness) — it is a documentation gap in an instruction file agents execute, not a code defect'

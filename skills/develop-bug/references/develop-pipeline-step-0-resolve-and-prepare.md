@@ -365,20 +365,34 @@ Add to the implementation report Pipeline Configuration table:
 ```bash
 # 1. Post pipeline-start comment (wrapped in tracker_call_with_retry — 3× backoff)
 tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
+```
 
-# 2. Move issue to "In Progress" on the Projects board (graceful — warn and continue on any failure)
+**2. Signal the `work-started` stage** — run the deterministic CLI:
+
+```bash
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \
+  --issue {TRACKER_ISSUE} --stage work-started --add-to-board --json
+```
+
+Engine source: `references/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
+
+`--add-to-board` is what makes this call, and only this call, ensure board **membership** before setting status — `ensureOnBoard` performs the `gh project item-add`, waits for Projects API propagation, and re-queries once if the first read comes back empty. Board membership is not board status, so no later moment passes this flag.
+
+The column this lands in comes from `pipeline.work-started` in `tracker-workflow.yaml`. Run `gh-stage.js --probe-board` to see your board's real options and which moment each resolves to.
+
+The CLI re-reads the item after mutating and reports the option it actually landed on, so **no separate post-condition check is needed** — read `reason` from the JSON. It exits 0 for `already`, `stage-disabled`, `no-option`, `not-on-board` and `would-regress` alike, all of which are correct outcomes on some boards.
+
+**3. Set Priority to P2 – Medium when unset** (graceful — warn and continue on any failure).
+
+This is a **separate concern** that merely used to share a GraphQL response with the status move. `gh-stage.js` deliberately does not touch Priority — it owns the Status field and nothing else — so this block keeps its own query:
+
+> **Ordering matters: this block must run *after* the `work-started` call above.** It carries no `item-add` and no propagation retry, because it does not need them — `ensureOnBoard` has already added the item, slept for Projects API propagation, and successfully read the item back (it could not have set the status otherwise). Running this block first, or on its own, against an issue not yet on a board would read an empty `projectItems` and silently skip the Priority default. That is graceful rather than harmful, but it is a silent no-op, so keep the order.
+
+```bash
 (
   OWNER=$(gh repo view --json owner -q '.owner.login')
   REPO_NAME=$(gh repo view --json name -q '.name')
-  REPO_URL=$(gh repo view --json url -q '.url')
-  BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
 
-  # Ensure issue is on the board (idempotent — returns existing item if already present)
-  gh project item-add "$BOARD_NUM" --owner "$OWNER" --url "$REPO_URL/issues/{TRACKER_ISSUE}" \
-    && echo "✅ item-add succeeded" || echo "⚠️  item-add may have failed or item already present"
-  sleep 3  # Allow Projects API to propagate before querying
-
-  # Query the issue directly for its project items — avoids item-list pagination limits
   RESPONSE=$(gh api graphql -f query='
   {
     repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
@@ -391,7 +405,6 @@ tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline starte
             }
             project {
               id
-              title
               fields(first: 20) {
                 nodes {
                   ... on ProjectV2SingleSelectField {
@@ -408,106 +421,35 @@ tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline starte
     }
   }')
 
-  # Extract IDs from the first project item (retry once if empty — handles Projects API propagation delay after item-add)
   ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
-  if [ -z "$ITEM_ID" ]; then
-    echo "⚠️  projectItems empty on first query — waiting 5s and retrying"
-    sleep 5
-    RESPONSE=$(gh api graphql -f query='
-    {
-      repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
-        issue(number: {TRACKER_ISSUE}) {
-          projectItems(first: 10) {
-            nodes {
-              id
-              fieldValueByName(name: "Priority") {
-                ... on ProjectV2ItemFieldSingleSelectValue { name }
-              }
-              project {
-                id
-                title
-                fields(first: 20) {
-                  nodes {
-                    ... on ProjectV2SingleSelectField {
-                      id
-                      name
-                      options { id name }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }')
-    ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
-  fi
   PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
-  STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
-  OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name | ascii_downcase == "in progress") | .id // empty')
-
-  # Extract Priority field details (for auto-set when unset)
   PRIORITY_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
   CURRENT_PRIORITY=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
   P2_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
 
-  if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$OPTION_ID" ]; then
-    echo "⚠️  Could not resolve project item or Status field — skipping board update"
-  else
+  # Only when the field exists and is currently unset — never overwrite a human's choice.
+  if [ -n "$ITEM_ID" ] && [ -n "$PROJECT_ID" ] && [ -n "$PRIORITY_FIELD_ID" ] && [ -n "$P2_OPTION_ID" ] && [ -z "$CURRENT_PRIORITY" ]; then
     gh api graphql -f query='
     mutation {
-      updateProjectV2ItemFieldValue(
-        input: {
-          projectId: "'"$PROJECT_ID"'"
-          itemId: "'"$ITEM_ID"'"
-          fieldId: "'"$STATUS_FIELD_ID"'"
-          value: { singleSelectOptionId: "'"$OPTION_ID"'" }
-        }
-      ) {
-        projectV2Item { id }
-      }
-    }' \
-      && echo "✅ Issue #{TRACKER_ISSUE} moved to In Progress on Projects board" \
-      || echo "⚠️  Board status update failed — issue comment was posted successfully"
-
-    # Set Priority to P2 – Medium if the field exists and is currently unset
-    if [ -n "$PRIORITY_FIELD_ID" ] && [ -n "$P2_OPTION_ID" ] && [ -z "$CURRENT_PRIORITY" ]; then
-      gh api graphql -f query='
-      mutation {
-        updateProjectV2ItemFieldValue(input: {
-          projectId: "'"$PROJECT_ID"'"
-          itemId: "'"$ITEM_ID"'"
-          fieldId: "'"$PRIORITY_FIELD_ID"'"
-          value: { singleSelectOptionId: "'"$P2_OPTION_ID"'" }
-        }) { projectV2Item { id } }
-      }' >/dev/null 2>&1 \
-        && echo "✅ Priority set to P2 – Medium (was unset)" \
-        || echo "⚠️  Priority field update failed — continuing"
-    fi
+      updateProjectV2ItemFieldValue(input: {
+        projectId: "'"$PROJECT_ID"'"
+        itemId: "'"$ITEM_ID"'"
+        fieldId: "'"$PRIORITY_FIELD_ID"'"
+        value: { singleSelectOptionId: "'"$P2_OPTION_ID"'" }
+      }) { projectV2Item { id } }
+    }' >/dev/null 2>&1 \
+      && echo "✅ Priority set to P2 – Medium (was unset)" \
+      || echo "⚠️  Priority field update failed — continuing"
   fi
-) || echo "⚠️  Projects board update skipped (gh project unavailable or auth scope missing)"
+) || echo "⚠️  Priority update skipped (gh unavailable or auth scope missing)"
 ```
-
-**Post-condition check** — immediately after the block above, verify the board actually moved:
-
-```bash
-BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
-BOARD_STATUS=$(gh project item-list "$BOARD_NUM" --owner "$(gh repo view --json owner -q '.owner.login')" --format json 2>/dev/null \
-  | jq -r '.items[] | select(.content.number == {TRACKER_ISSUE}) | .status // "unknown"')
-if [ "$BOARD_STATUS" = "Todo" ] || [ "$BOARD_STATUS" = "unknown" ]; then
-  echo "⚠️  POST-CONDITION FAILED: Issue #{TRACKER_ISSUE} is still '$BOARD_STATUS' on the board — board update did not take effect"
-else
-  echo "✅ Post-condition verified: board status is '$BOARD_STATUS'"
-fi
-```
-
-If the post-condition warns, retry the board update once. If it still fails, log the warning in the implementation report Issues Log and continue — do not block the pipeline.
 
 Add to the implementation report Pipeline Configuration table:
 
 | Tracker Issue | #{TRACKER_ISSUE} (GitHub) or not linked |
-| Board status | In Progress ✅ / ⚠️ update failed |
+| Board status | {landed option} ✅ / ⚠️ {reason} |
+
+Report the option the CLI says it landed on, not the option you asked for. Log in Decisions Log: "GitHub board: work-started → {landed / already / no-option / not-on-board / would-regress}."
 
 If `TRACKER_ISSUE` is not set, skip this entire section — no fallback register needed.
 

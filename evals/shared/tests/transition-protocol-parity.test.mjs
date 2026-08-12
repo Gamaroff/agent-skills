@@ -96,6 +96,172 @@ test("every --stage literal in shipped markdown names a real stage", () => {
   );
 });
 
+/**
+ * Collect every shipped markdown file under shared/resources/ and skills/.
+ * Bundled `references/` copies are included deliberately: a consumer installs
+ * those, not the source, so a stale bundle is exactly the failure this catches.
+ */
+function shippedMarkdown() {
+  const out = [];
+  const scan = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name === ".git") continue;
+        scan(p);
+        continue;
+      }
+      if (entry.name.endsWith(".md")) out.push(p);
+    }
+  };
+  scan(join(repoRoot, "shared", "resources"));
+  scan(join(repoRoot, "skills"));
+  return out;
+}
+
+// Absence alone is a bad guard — v0.33 records one that passed vacuously and
+// flagged the very sentence that got it right. So this is PAIRED: no inline
+// board Status mutation anywhere, AND each site positively invokes the CLI.
+test("no shipped markdown carries an inline board Status mutation", () => {
+  // Scoped to the FENCED BLOCK holding the mutation, not the whole file. A
+  // file-wide check passes today only because step-0 happens to contain no bare
+  // `"Status"` literal alongside the Priority mutation it legitimately retains —
+  // prose added later would false-positive it. Same fragility, and same fix, as
+  // the --allow-regress guard below.
+  const offenders = [];
+  for (const f of shippedMarkdown()) {
+    const src = readFileSync(f, "utf-8");
+    if (!src.includes("updateProjectV2ItemFieldValue")) continue;
+    for (const block of src.matchAll(/```[a-z]*\n([\s\S]*?)```/g)) {
+      const code = block[1];
+      if (!code.includes("updateProjectV2ItemFieldValue")) continue;
+      // `"Status"` inside the mutating block is the tell: it selects the Status
+      // single-select field. Priority/Estimate mutations legitimately remain
+      // inline — a different concern gh-stage.js deliberately does not own.
+      if (/"Status"/.test(code)) offenders.push(f);
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "Inline board Status mutation found. Board moves go through gh-stage.js " +
+      "(--stage <moment>) so the consumer's tracker-workflow.yaml resolves the " +
+      "column. Priority/Estimate mutations may stay inline.",
+  );
+});
+
+test("each pipeline site positively invokes gh-stage.js for its moment", () => {
+  const sites = [
+    ["develop-pipeline-step-0-resolve-and-prepare.md", "work-started"],
+    ["develop-pipeline-step-4-create-pr.md", "in-review"],
+    ["develop-pipeline-step-5-6-qa-loop.md", "in-review"],
+    ["develop-pipeline-step-7-finalise.md", "done"],
+  ];
+  for (const [file, stage] of sites) {
+    const src = readFileSync(join(sharedDir, file), "utf-8");
+    assert.match(
+      src,
+      new RegExp(`gh-stage\\.js[\\s\\S]{0,160}--stage ${stage}`),
+      `${file} must invoke gh-stage.js --stage ${stage}`,
+    );
+  }
+  // finalise is skill-native, not a shared step file, and uses its own
+  // `.agents/skills/finalise/references/` path — the brace form the step files
+  // use does not cover it.
+  const finalise = readFileSync(
+    join(repoRoot, "skills", "finalise", "SKILL.md"),
+    "utf-8",
+  );
+  assert.match(
+    finalise,
+    /gh-stage\.js[\s\S]{0,160}--stage done/,
+    "skills/finalise/SKILL.md must invoke gh-stage.js --stage done",
+  );
+  assert.match(
+    finalise,
+    /\.agents\/skills\/finalise\/references\/gh-stage\.js/,
+    "finalise must reference its own bundled copy, not the develop-* brace path",
+  );
+});
+
+test("no pipeline step passes --allow-regress", () => {
+  // The QA-start re-assert is the site that used to force-write "In Review"
+  // over whatever column a card was on. `--allow-regress` there would restore
+  // exactly that behaviour, and the positive per-site guard above would still
+  // pass because the `--stage in-review` literal is unchanged. This asserts the
+  // absence directly. --allow-regress is for a deliberate operator reset, never
+  // for an automated step.
+  // Scan FENCED CODE BLOCKS ONLY. Prose that *mentions* the flag is not just
+  // allowed, it is required — step 5-6 explains why the flag is absent and when
+  // an operator would use it. A naive proximity window matches that sentence and
+  // fails on the very text that documents the correct behaviour, which is the
+  // v0.33 guard failure inverted. The invocation lives in a ```bash block; the
+  // explanation never does.
+  const offenders = [];
+  for (const f of shippedMarkdown()) {
+    const src = readFileSync(f, "utf-8");
+    for (const block of src.matchAll(/```[a-z]*\n([\s\S]*?)```/g)) {
+      const code = block[1];
+      if (!code.includes("gh-stage.js")) continue;
+      if (!/--allow-regress/.test(code)) continue;
+      offenders.push(`${f}: ${code.trim().split("\n")[0].slice(0, 60)}…`);
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "A pipeline step invokes gh-stage.js with --allow-regress. That disables " +
+      "the backward-move guard and reinstates the force-write behaviour task.40 " +
+      "removed. The flag is for deliberate operator resets only.",
+  );
+});
+
+test("the step-4 hand-edit instruction is gone", () => {
+  // The clearest statement of the problem this task fixed: it told readers to
+  // hand-edit a jq selector to match their board's column name. Its removal is
+  // the acceptance criterion.
+  for (const f of shippedMarkdown()) {
+    const src = readFileSync(f, "utf-8");
+    assert.ok(
+      !src.includes('select(.name == "In Review")'),
+      `${f} still tells the reader to hand-edit an option-name selector`,
+    );
+  }
+});
+
+test("gh-stage.js is bundled wherever a skill invokes it", () => {
+  const missing = [];
+  for (const skill of readdirSync(join(repoRoot, "skills"))) {
+    const skillDir = join(repoRoot, "skills", skill);
+    let files;
+    try {
+      files = readdirSync(skillDir, { recursive: true });
+    } catch {
+      continue;
+    }
+    const invokes = files.some((rel) => {
+      if (typeof rel !== "string" || !rel.endsWith(".md")) return false;
+      if (rel.split(/[\\/]/).includes("references")) return false;
+      return readFileSync(join(skillDir, rel), "utf-8").includes(
+        "gh-stage.js --",
+      );
+    });
+    if (!invokes) continue;
+    try {
+      readFileSync(join(skillDir, "references", "gh-stage.js"));
+    } catch {
+      missing.push(skill);
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    "Skill invokes gh-stage.js but has no bundled references/gh-stage.js. " +
+      "The bundler only follows `shared/resources/X` paths, so a step file must " +
+      "name `shared/resources/gh-stage.js` somewhere for it to be copied.",
+  );
+});
+
 test("the protocol still declares itself the fallback, not the primary path", () => {
   // If someone re-promotes this document, the CLI stops being authoritative and
   // the determinism it buys is quietly lost.

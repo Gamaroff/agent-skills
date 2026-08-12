@@ -173,70 +173,18 @@ Log in Decisions Log: "Post-PR state check: PR #{PR_NUMBER} state = {state}. err
 
 > **MUST execute — pipeline action, not optional sync.** This is the GitHub Projects counterpart to the Jira "In Review" transition below. `create-pr` already posts the PR-opened `gh issue comment`; this step additionally moves the issue's board column.
 
-After the PR URL is confirmed, move the issue to **"In Review"** on the GitHub Projects board (graceful — warn and continue on any failure):
+After the PR URL is confirmed, **signal the `in-review` stage** — run the deterministic CLI:
 
 ```bash
-(
-  OWNER=$(gh repo view --json owner -q '.owner.login')
-  REPO_NAME=$(gh repo view --json name -q '.name')
-  BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
-
-  RESPONSE=$(gh api graphql -f query='
-  {
-    repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
-      issue(number: {TRACKER_ISSUE}) {
-        projectItems(first: 10) {
-          nodes {
-            id
-            project {
-              id
-              fields(first: 20) {
-                nodes {
-                  ... on ProjectV2SingleSelectField {
-                    id
-                    name
-                    options { id name }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }')
-
-  ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
-  PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
-  STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
-  IN_REVIEW_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name | ascii_downcase == "in review") | .id // empty')
-
-  if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$IN_REVIEW_OPTION_ID" ]; then
-    echo "⚠️  Could not resolve project item or In Review option — skipping board update"
-    echo "    ITEM_ID=${ITEM_ID} PROJECT_ID=${PROJECT_ID} STATUS_FIELD_ID=${STATUS_FIELD_ID} IN_REVIEW_OPTION_ID=${IN_REVIEW_OPTION_ID}"
-  else
-    gh api graphql -f query='
-    mutation {
-      updateProjectV2ItemFieldValue(
-        input: {
-          projectId: "'"$PROJECT_ID"'"
-          itemId: "'"$ITEM_ID"'"
-          fieldId: "'"$STATUS_FIELD_ID"'"
-          value: { singleSelectOptionId: "'"$IN_REVIEW_OPTION_ID"'" }
-        }
-      ) {
-        projectV2Item { id }
-      }
-    }' \
-      && echo "✅ Issue #{TRACKER_ISSUE} moved to In Review on Projects board" \
-      || echo "⚠️  Board In Review update failed — continuing"
-  fi
-) || echo "⚠️  GitHub board In Review update skipped (gh project unavailable or auth scope missing)"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \
+  --issue {TRACKER_ISSUE} --stage in-review --json
 ```
 
-> The board must have a Status column option named exactly **"In Review"**. If the project uses a different label (e.g. "Review", "Code Review"), the option lookup returns empty and the block logs a skip — update `select(.name == "In Review")` to match the exact option name.
+The column this lands in comes from `pipeline.in-review` in `tracker-workflow.yaml`. Run `gh-stage.js --probe-board` to see your board's real options and which moment each resolves to. Engine source: `shared/resources/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
 
-Log in Decisions Log: "GitHub board: issue #{TRACKER_ISSUE} → In Review (or ⚠️ skipped — see output)."
+Read `reason` from the JSON. The CLI has already resolved the target column, mutated it and re-read the result; it exits 0 for `already`, `stage-disabled`, `no-option`, `not-on-board` and `would-regress` alike, all of which are correct outcomes on some boards. Log its line and move on.
+
+Log in Decisions Log: "GitHub board: in-review → {landed / already / no-option / would-regress}."
 
 ---
 

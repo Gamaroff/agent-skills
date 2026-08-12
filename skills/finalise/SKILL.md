@@ -1001,26 +1001,17 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    **Jira path** (when `TRACKER=jira`):
 
-   **Re-point the Jira Document link** — the description is ADF (can't be patched in place), so re-run the sync with the durable branch pinned. This is best-effort and additive; it also drives the status transition from frontmatter (`accepted` → Done), so the MCP transition below becomes a no-op when it succeeds:
-
-   ```bash
-   WORKITEM=story   # set to "task" when finalising a task
-   if [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ]; then
-     # sync-jira-{story|task} (same script the create/sync flow uses)
-     node .agents/skills/sync-jira-${WORKITEM}/scripts/sync-jira-${WORKITEM}.js \
-       -f "$DOC_PATH" --doc-branch "$DURABLE_BRANCH" --quiet \
-       && echo "✅ Jira Document link re-pointed to ${DURABLE_BRANCH} (status transition handled by sync)" \
-       || echo "⚠️ sync-jira re-link failed — the MCP transition below still runs; re-sync from develop after merge"
-   else
-     echo "ℹ️ JIRA_* env not set — skipping Document-link refresh; re-sync from develop after merge to pin a durable link"
-   fi
-   ```
-
-   `${WORKITEM}` is `story` or `task` depending on the document being finalised. If the re-link succeeded, the issue is already in Done; the steps below are then idempotent.
-
    Extract `jira_key` from story/task frontmatter. If absent or null, skip this step silently.
 
    Use the Atlassian MCP tools. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
+
+   > **Order matters — the transition runs first, the re-link second.** Both `jira-stage.js` (via the
+   > transition protocol) and the `sync-jira-*` re-link below can drive the status to Done, but they
+   > resolve it from **different config sources**: the transition uses the `tracker-workflow.yaml`
+   > ladder, the sync uses its own `loadStatusMap`. Running the ladder first makes it the single
+   > resolver — the sync's own transition then finds the issue already in Done and no-ops, while its
+   > real job (re-pointing the Document link at the durable branch) still happens. Do not reverse
+   > these two blocks.
 
    1. **Transition to Done** — follow `references/jira-transition-protocol.md` exactly, with
       `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true`.
@@ -1065,6 +1056,23 @@ If all DoD criteria are met, finalize the running summary, update the story/task
       - On failure: log warning and continue (non-blocking)
 
    Log outcome in running summary: "Jira issue {jira_key} transitioned to Done ✅" or the warning detail.
+
+   3. **Re-point the Jira Document link** — the description is ADF (can't be patched in place), so re-run the sync with the durable branch pinned. This is best-effort and additive. It also drives the status transition from frontmatter (`accepted` → Done), but because step 1 has already run, that transition resolves to a no-op and the ladder remains the single resolver:
+
+   ```bash
+   WORKITEM=story   # set to "task" when finalising a task
+   if [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ]; then
+     # sync-jira-{story|task} (same script the create/sync flow uses)
+     node .agents/skills/sync-jira-${WORKITEM}/scripts/sync-jira-${WORKITEM}.js \
+       -f "$DOC_PATH" --doc-branch "$DURABLE_BRANCH" --quiet \
+       && echo "✅ Jira Document link re-pointed to ${DURABLE_BRANCH}" \
+       || echo "⚠️ sync-jira re-link failed — the transition in step 1 already ran; re-sync from develop after merge"
+   else
+     echo "ℹ️ JIRA_* env not set — skipping Document-link refresh; re-sync from develop after merge to pin a durable link"
+   fi
+   ```
+
+   `${WORKITEM}` is `story` or `task` depending on the document being finalised.
 
    **GitHub path** (when `TRACKER=github`):
 
@@ -1111,92 +1119,62 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    Log outcome in running summary: "GitHub Issue #{github_issue} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
 
-   - Query the issue's project board items using GraphQL to discover item ID, project ID, Status field ID, and "Done" option ID — all in one call:
+   - **Signal the `done` stage** — run the deterministic CLI rather than a hand-rolled board mutation:
 
    ```bash
-   gh api graphql -f query='
-   {
-     repository(owner: "<owner>", name: "<repo>") {
-       issue(number: <github_issue>) {
-         projectItems(first: 10) {
-           nodes {
-             id
-             project {
-               id
-               title
-               fields(first: 20) {
-                 nodes {
-                   ... on ProjectV2SingleSelectField {
-                     id
-                     name
-                     options {
-                       id
-                       name
-                     }
-                   }
-                 }
-               }
-             }
-           }
-         }
-       }
-     }
-   }'
+   node .agents/skills/finalise/references/gh-stage.js \
+     --issue <github_issue> --stage done --json
    ```
 
-   - From the response, find the item where `project.title` matches the active project board (typically the first result if there is only one)
-   - Extract:
-     - `item.id` → the project item ID
-     - `item.project.id` → the project ID
-     - The field where `name == "Status"` → its `id` is the fieldId
-     - The option in that field where `name == "Done"` → its `id` is the singleSelectOptionId
+   Engine source: `references/gh-stage.js` (bundled into this skill as `references/gh-stage.js`). Note the path is `finalise`-local — the `{develop-story|develop-task|develop-bug}` brace form used by the pipeline step files does not cover this skill.
 
-   **If no project items are found (issue not on any board):**
-   - Do NOT silently skip. Post a PR comment warning that the board was not updated, using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
-     ```
-     ⚠️ Project Board Not Updated
+   The column this lands in comes from `pipeline.done` in the consumer's `tracker-workflow.yaml`, and the option is matched case-insensitively — a board whose column is `done` or `DONE` resolves exactly as `Done` does. Run `gh-stage.js --probe-board` to see a board's real options.
 
-     This story/task was accepted but GitHub issue #<github_issue> was not found on any project board — the board status was **not** moved to Done automatically.
+   - **Branch on `reason` in the JSON:**
 
-     **Action required:** manually move the card to Done on the project board, or add the issue to the board first.
+     | `reason` | Meaning | Action |
+     | --- | --- | --- |
+     | `transitioned` | Card moved to the resolved column | Record success in the running summary |
+     | `already` | Card was already there | Record success — no mutation was needed |
+     | `stage-disabled` | Consumer omitted `done:` from `pipeline:` | **Success, not a warning** — a human moves this card by design |
+     | `would-regress` | A human advanced the card past Done | Record as informational — the board is ahead of the pipeline |
+     | `no-option` | Board has no column matching the `done` moment | Record a warning in the running summary |
+     | `no-options` | The Status field exists but has no options at all | Record a warning — the board is misconfigured |
+     | `no-status-field` | The board has no Status field | Record a warning — nothing to move |
+     | `ambiguous-board` | The issue is on more than one board and no board was selected | Record a warning naming the candidate boards. **Not an error** — a multi-board setup is ordinary. Fix by setting `github.projectBoard` in `skills-config.yaml` or `project_board_number` in `project.yml` |
+     | `board-unreadable` | The board read failed (API/permissions) | Record a warning with the CLI's message |
+     | `no-repo-context` | `gh repo view` could not resolve the repository | Record a warning — usually a detached checkout or missing `gh` auth |
+     | `no-credentials` | `gh` is not authenticated | Record a warning — the card was not moved |
+     | `not-on-board` | Issue is on no project board | **Escalate — see below** |
+     | `mutation-failed` | The CLI already retried and still failed | Escalate — see below |
+     | _any other value_ | A reason added to the CLI since this table was written | Log it verbatim in the running summary and treat as a non-blocking warning. Never treat an unrecognised reason as success |
 
-     ```
-   - Record this as a warning (not a blocker) in the running summary.
+     The CLI exits 0 for every row above, so never treat a zero exit as proof the card moved; read `reason`. Reasons produced only by `--probe-board`, `--write-ladder`, `--dry-run` or `--add-to-board` (`probe`, `write-failed`, `exists`, `dry-run`) cannot occur here — this call passes none of those flags.
 
-   - Apply the update with the mutation:
+   - **If `reason` is `not-on-board`:**
+     - Do NOT silently skip. Post a PR comment warning that the board was not updated, using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
+       ```
+       ⚠️ Project Board Not Updated
 
-   ```bash
-   gh api graphql -f query='
-   mutation {
-     updateProjectV2ItemFieldValue(
-       input: {
-         projectId: "<project.id>"
-         itemId: "<item.id>"
-         fieldId: "<status-field.id>"
-         value: { singleSelectOptionId: "<done-option.id>" }
-       }
-     ) {
-       projectV2Item {
-         id
-       }
-     }
-   }'
-   ```
+       This story/task was accepted but GitHub issue #<github_issue> was not found on any project board — the board status was **not** moved to Done automatically.
 
-   - Inspect the response:
-     - **Success**: response contains `data.updateProjectV2ItemFieldValue.projectV2Item.id` with no `errors` key → board update confirmed.
-     - **Failure**: response contains an `errors` key, or `projectV2Item` is null → **retry once** by re-running the exact same mutation. If the retry also fails, post a PR comment using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
+       **Action required:** manually move the card to Done on the project board, or add the issue to the board first.
+
+       ```
+     - Record this as a warning (not a blocker) in the running summary.
+
+   - **If `reason` is `mutation-failed`:** post a PR comment using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
        ```
        ⚠️ Project Board Update Failed
 
-       This story/task was accepted but the attempt to move GitHub issue #<github_issue> to **Done** on the project board failed (GraphQL error).
+       This story/task was accepted but the attempt to move GitHub issue #<github_issue> to **Done** on the project board failed.
 
-       **Error details:** `<paste the errors array from the response>`
+       **Error details:** `<paste the CLI's JSON output>`
 
        **Action required:** manually move the card to Done on the project board.
 
        ```
-     - Record the failure (and the error detail) in the running summary regardless of retry outcome.
+     - Record the failure (and the error detail) in the running summary. The CLI has already retried internally — do not re-run it.
 
 8. **Communicate to User:**
    - Display a success message with summary of completion

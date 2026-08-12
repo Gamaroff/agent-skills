@@ -162,9 +162,18 @@ On any `gh issue close` failure: `tracker_call_with_retry` retries 3× (1s, 2s, 
 Log in Decisions Log: "Post-close state check (poller): issue #{TRACKER_ISSUE} state = {state}. errors = {error_count}."
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
 
-Then move the project board item to Done using the same GraphQL pattern from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (0c-reg GitHub path), but with `ascii_downcase == "done"` as the target option match (not "in progress") — use case-insensitive matching so "Done", "done", etc. all resolve. If the board move fails, post a comment on the issue warning that the board was not updated.
+Then **signal the `done` stage** — run the deterministic CLI:
 
-Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — board: {Done ✅ / ⚠️ not found / ⚠️ mutation failed}."
+```bash
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \
+  --issue {TRACKER_ISSUE} --stage done --json
+```
+
+Engine source: `shared/resources/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
+
+The column this lands in comes from `pipeline.done` in `tracker-workflow.yaml`. A consumer who omitted `done:` from `pipeline:` — because a human moves the final card themselves — gets `reason: "stage-disabled"`, and that is a **success, not a warning**. Do not log it as a failure. Likewise `already` (the card is on the final column) and `would-regress` (a human moved it somewhere beyond Done) are correct outcomes.
+
+Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — board: done → {landed / already / stage-disabled / not-on-board / would-regress}."
 
 ### Jira (`TRACKER=jira`) — shared structure, story/task text differs
 
