@@ -1255,3 +1255,209 @@ test("gh-stage.js does not depend on jira-sync.js", () => {
     ["./tracker-workflow.js", "./yaml-subset.js"],
   );
 });
+
+// ── task.41: --init-workflow and --check ─────────────────────────────────────
+//
+// Two properties dominate this group:
+//
+//  - `--init-workflow` must never clobber a hand-authored ladder without being
+//    told to. The file encodes a board's real column names, which nothing can
+//    re-derive; losing it is silent, because the pipelines keep running and
+//    simply stop moving cards.
+//  - `--check` must EXIT NON-ZERO on failure. It is the only mode in this family
+//    that does, which makes it the one a future contributor is most likely to
+//    "harmonise" with the others. A --check that cannot fail is not a check.
+
+test("--init-workflow writes a full workflow file from the live board", () => {
+  const root = withRepo();
+  const { execImpl } = stubGh({ board: "gh-status-unset" });
+  const r = cli.run({
+    argv: ["node", "gh-stage", "--init-workflow", "--issue", "1"],
+    execImpl,
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.ladderWritten.written, true);
+
+  const body = readFileSync(join(root, tw.DEFAULT_WORKFLOW_PATH), "utf-8");
+  // The ladder is the board's own option order.
+  assert.match(body, /statuses:\n {2}- "Todo"\n {2}- "In Progress"\n {2}- "Done"/);
+  // Enabled moments resolve to real columns; the rest are commented, never
+  // silently dropped — an author needs to see the moment exists.
+  assert.match(body, /^ {2}work-started: "In Progress"$/m);
+  assert.match(body, /^ {2}done: "Done"$/m);
+  assert.match(body, /^ {2}# changes-requested:/m);
+  assert.match(body, /^ {2}# pr-merged:/m);
+  // Every moment appears exactly once, commented or not.
+  for (const m of tw.MOMENTS) {
+    const hits = body.split("\n").filter((l) => new RegExp(`^ {2}#? ?${m}:`).test(l));
+    assert.equal(hits.length, 1, `${m} must appear exactly once in pipeline:`);
+  }
+});
+
+test("--init-workflow refuses to overwrite; --force overwrites", () => {
+  const root = withRepo({ [tw.DEFAULT_WORKFLOW_PATH]: "statuses:\n  - Mine\n" });
+  const mk = () => stubGh({ board: "gh-status-unset" }).execImpl;
+
+  const refused = cli.run({
+    argv: ["node", "gh-stage", "--init-workflow", "--issue", "1"],
+    execImpl: mk(),
+    repoRoot: root,
+  });
+  assert.equal(refused.exitCode, 0, "refusing is not an error — it exits 0");
+  assert.equal(refused.ladderWritten.reason, "exists");
+  assert.equal(
+    readFileSync(join(root, tw.DEFAULT_WORKFLOW_PATH), "utf-8"),
+    "statuses:\n  - Mine\n",
+    "the hand-authored file must be byte-identical after a refused run",
+  );
+
+  const forced = cli.run({
+    argv: ["node", "gh-stage", "--init-workflow", "--force", "--issue", "1"],
+    execImpl: mk(),
+    repoRoot: root,
+  });
+  assert.equal(forced.ladderWritten.written, true);
+  assert.match(readFileSync(join(root, tw.DEFAULT_WORKFLOW_PATH), "utf-8"), /- "Todo"/);
+});
+
+test("--write-ladder still writes a statuses-only ladder (unchanged by --init-workflow)", () => {
+  const root = withRepo();
+  const { execImpl } = stubGh({ board: "gh-status-unset" });
+  cli.run({
+    argv: ["node", "gh-stage", "--probe-board", "--write-ladder", "--issue", "1"],
+    execImpl,
+    repoRoot: root,
+  });
+  const body = readFileSync(join(root, tw.DEFAULT_WORKFLOW_PATH), "utf-8");
+  assert.match(body, /--probe-board --write-ladder/, "keeps its own provenance header");
+  assert.ok(!/^pipeline:/m.test(body), "bare --write-ladder must NOT emit a pipeline block");
+});
+
+test("--check exits 0 on a clean file and issues no board call under --offline", () => {
+  const root = withRepo({
+    [tw.DEFAULT_WORKFLOW_PATH]:
+      "statuses:\n  - Todo\n  - In Progress\n  - Done\npipeline:\n  work-started: In Progress\n  done: Done\n",
+  });
+  const { execImpl, calls } = stubGh({ board: "gh-status-unset" });
+  const r = cli.run({
+    argv: ["node", "gh-stage", "--check", "--offline"],
+    execImpl,
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.reason, "ok-offline");
+  assert.deepEqual(calls, [], "--offline must issue NO network call at all");
+});
+
+test("--check exits NON-ZERO on an unknown moment and a duplicate rung", () => {
+  const root = withRepo({
+    [tw.DEFAULT_WORKFLOW_PATH]:
+      "statuses:\n  - Todo\n  - In Progress\n  - Todo\npipeline:\n  work-started: In Progress\n  not-a-moment: Todo\n",
+  });
+  const r = cli.run({
+    argv: ["node", "gh-stage", "--check", "--offline"],
+    execImpl: stubGh().execImpl,
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 1, "a broken file MUST fail — this is the inverted contract");
+  assert.equal(r.reason, "invalid");
+  assert.ok(r.messages.some((m) => /unknown moment/.test(m)));
+  assert.ok(r.messages.some((m) => /may sit at only one position/.test(m)));
+});
+
+test("--check catches a RENAMED column against the live board", () => {
+  // The payload case. The file parses, every moment names a status, and nothing
+  // moves — invisible until someone notices cards sitting still.
+  const root = withRepo({
+    [tw.DEFAULT_WORKFLOW_PATH]:
+      "statuses:\n  - Todo\n  - Code Review\n  - Done\npipeline:\n  work-started: Code Review\n  done: Done\n",
+  });
+  const { execImpl } = stubGh({ board: "gh-status-unset" });
+  const r = cli.run({
+    argv: ["node", "gh-stage", "--check", "--issue", "1"],
+    execImpl,
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 1);
+  assert.equal(r.reason, "drift");
+  assert.equal(r.drift[0].moment, "work-started");
+
+  // …and the offline half passes on the very same file, which is why the board
+  // half has to exist at all.
+  const off = cli.run({
+    argv: ["node", "gh-stage", "--check", "--offline"],
+    execImpl: stubGh().execImpl,
+    repoRoot: root,
+  });
+  assert.equal(off.exitCode, 0);
+});
+
+test("--check exits 0 with no credentials — a fork's PR cannot hold the secret", () => {
+  const root = withRepo({
+    [tw.DEFAULT_WORKFLOW_PATH]:
+      "statuses:\n  - Todo\n  - In Progress\npipeline:\n  work-started: In Progress\n",
+  });
+  const { execImpl } = stubGh({ authOk: false });
+  const r = cli.run({
+    argv: ["node", "gh-stage", "--check", "--issue", "1"],
+    execImpl,
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 0, "missing credentials is a skip, never a failure");
+  assert.equal(r.reason, "no-credentials");
+});
+
+test("--check exits 0 when there is no file to check", () => {
+  const root = withRepo();
+  const r = cli.run({
+    argv: ["node", "gh-stage", "--check", "--offline"],
+    execImpl: stubGh().execImpl,
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.reason, "no-file");
+});
+
+test("--check never writes, even when the file would be regenerated", () => {
+  const before = "statuses:\n  - Todo\n  - Code Review\npipeline:\n  work-started: Code Review\n";
+  const root = withRepo({ [tw.DEFAULT_WORKFLOW_PATH]: before });
+  cli.run({
+    argv: ["node", "gh-stage", "--check", "--issue", "1"],
+    execImpl: stubGh({ board: "gh-status-unset" }).execImpl,
+    repoRoot: root,
+  });
+  assert.equal(
+    readFileSync(join(root, tw.DEFAULT_WORKFLOW_PATH), "utf-8"),
+    before,
+    "--check is read-only; it reports drift, it does not fix it",
+  );
+});
+
+test("the inverted --check exit code is documented as deliberate, and shimmed", () => {
+  // Guards against exactly the "harmonisation" §10 predicts: someone making
+  // --check exit 0 like every other mode, producing a CI check that cannot fail.
+  const src = readFileSync(join(__dirname, "..", "gh-stage.js"), "utf-8");
+  assert.match(
+    src,
+    /ONE mode in this family that exits non-zero/,
+    "the inversion must carry a comment saying why, or it will be 'fixed'",
+  );
+  assert.match(
+    src,
+    /process\.exit\(process\.argv\.includes\("--check"\) \? 1 : 0\)/,
+    "the module shim must not swallow a --check failure to exit 0",
+  );
+});
+
+test("every non-check mode still exits 0 on a documented skip", () => {
+  // The other half of the contract: only --check inverts.
+  const root = withRepo({ [tw.DEFAULT_WORKFLOW_PATH]: "statuses:\n  - Todo\npipeline: {}\n" });
+  const r = cli.run({
+    argv: ["node", "gh-stage", "--issue", "1", "--stage", "work-started"],
+    execImpl: stubGh({ board: "gh-status-unset" }).execImpl,
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.reason, "stage-disabled");
+});

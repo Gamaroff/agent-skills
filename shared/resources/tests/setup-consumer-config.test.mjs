@@ -383,3 +383,94 @@ test("setup-consumer.sh still vendors the epic-index generator from shared/resou
     "destination changed — re-check the scripts/ trap this header guards",
   );
 });
+
+// ── task.41: tracker-workflow.yaml scaffolding ───────────────────────────────
+//
+// The never-overwrite guard is the whole safety story here. tracker-workflow.yaml
+// encodes a board's real column names — hand-tuned against a live board, and not
+// re-derivable from anything the wizard asks. Clobbering it is SILENT: the
+// pipelines keep running and simply stop moving cards.
+
+/** Run just the workflow writer in a scratch dir, returning {out, body}. */
+function runWorkflowWriter(seed) {
+  const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-"));
+  try {
+    if (seed !== undefined) writeFileSync(path.join(dir, "tracker-workflow.yaml"), seed);
+    const out = execFileSync(
+      "bash",
+      ["-c", `source '${WIZARD}'; write_tracker_workflow; print_summary 2>/dev/null || true`],
+      {
+        cwd: dir,
+        input: "\n",
+        env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", VCS: "github", TRACKER: "github" },
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    let body = null;
+    try {
+      body = readFileSync(path.join(dir, "tracker-workflow.yaml"), "utf-8");
+    } catch (_) {}
+    return { out, body };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("scaffolds tracker-workflow.yaml when absent", () => {
+  const { body } = runWorkflowWriter(undefined);
+  assert.ok(body, "a fresh run must write the file");
+  assert.match(body, /^statuses:/m);
+  assert.match(body, /^pipeline:/m);
+  assert.match(body, /work-started:/);
+  // The template must announce that it IS a template — a generic ladder that
+  // does not match the board resolves nothing, and fails silently.
+  assert.match(body, /GENERATED FROM A TEMPLATE, NOT FROM YOUR BOARD/);
+});
+
+test("NEVER overwrites an existing tracker-workflow.yaml, and says it kept it", () => {
+  const mine = "statuses:\n  - My Very Own Column\n";
+  const { out, body } = runWorkflowWriter(mine);
+  assert.equal(body, mine, "an existing ladder must survive byte-identical");
+  assert.match(out, /kept \(existing\)|already exists/);
+});
+
+test("a re-run leaves the scaffolded file byte-identical", () => {
+  // The consumer test from §8: run the wizard twice, second run is a no-op.
+  const first = runWorkflowWriter(undefined).body;
+  const second = runWorkflowWriter(first);
+  assert.equal(second.body, first, "the second run must not rewrite the file");
+});
+
+test("the scaffolded template parses as a valid workflow", () => {
+  const { body } = runWorkflowWriter(undefined);
+  const tw = require(path.join(REPO, "shared", "resources", "tracker-workflow.js"));
+  const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-parse-"));
+  try {
+    writeFileSync(path.join(dir, "tracker-workflow.yaml"), body);
+    const wf = tw.loadWorkflow({ repoRoot: dir });
+    assert.equal(wf.source, "file");
+    const errors = (tw.validateWorkflow(wf) || []).filter((f) => f.level === "error");
+    assert.deepEqual(errors, [], "the file the wizard writes must pass --check --offline");
+    // And its enabled moments must actually resolve on its own ladder.
+    assert.ok(tw.resolveMoment("work-started", wf));
+    assert.equal(tw.resolveMoment("work-started", wf).offLadder, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the two opt-in moments are commented out in the scaffolded template", () => {
+  // A consumer who upgrades must see no new card movement until they opt in.
+  const { body } = runWorkflowWriter(undefined);
+  for (const m of ["changes-requested", "pr-merged"]) {
+    assert.ok(
+      new RegExp(`^\\s*#\\s*${m}:`, "m").test(body),
+      `${m} must be present but COMMENTED — visible, and off`,
+    );
+    assert.ok(
+      !new RegExp(`^ {2}${m}:`, "m").test(body),
+      `${m} must not be live in a scaffolded file`,
+    );
+  }
+});
