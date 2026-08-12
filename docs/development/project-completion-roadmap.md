@@ -43,7 +43,8 @@ order** and maps each pipeline moment to one of them. Order is rank (a resumed r
 card backwards) and order is the walk path (a gate column needs no graph authored).
 
 Ordered so risk front-loads into the reversible parts: T36 is a pure deletion of generated text;
-T37–T39 are inert until T40 wires the first live behaviour change.
+T37–T39 were inert until T40 wired the first live behaviour change. **As of T40 the GitHub path
+is live** — a consumer's `tracker-workflow.yaml` now drives their board.
 
 ### Independent fix
 
@@ -60,7 +61,7 @@ T37–T39 are inert until T40 wires the first live behaviour change.
 
 ### Wiring — first live behaviour change
 
-- [ ] **T40** Replace the five inline GitHub GraphQL board blocks with `gh-stage.js` calls · deps: T39 · touches: pipeline-steps!, bundles!, gh-stage~ · /develop-task docs/tasks/task.40.github-pipeline-step-wiring/task.40.github-pipeline-step-wiring.md
+- [x] **T40** Replace the five inline GitHub GraphQL board blocks with `gh-stage.js` calls · deps: T39 · touches: pipeline-steps!, bundles!, gh-stage~ · /develop-task docs/tasks/task.40.github-pipeline-step-wiring/task.40.github-pipeline-step-wiring.md
 
 ### Capstone
 
@@ -132,3 +133,4 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 | 2026-08-04 | T37 accepted — PR #193 merged (`deeb795`). All 17 success criteria met, no waivers. 5 QA cycles, 9 findings closed; tests 760 → 840. **T38 and T39 are now unblocked** — they may run in parallel |
 | 2026-08-12 | Phase 2 seeded with the document change-log series (T42–T45, issues #201–204). Strictly sequential via `deps:`; T45 `manual`-gated on verifying T44's advisory default. Legend gained `change-log`, `templates`, `review-skills` tags |
 | 2026-08-12 | T39 accepted — PR #206 merged (`2c7ff3e`). `gh-stage.js` (1,299 lines), 65 tests, 10 fixtures. All 16 success criteria met, no waivers. 5 QA cycles, 20 findings closed; tests 1050 → 1065. The same defect — writing a status to a board the operator did not name — was caught twice, the second time reopened by a fix's own partial-read tolerance. **T40 is now unblocked** |
+| 2026-08-12 | T40 accepted — PR #207 merged (`f3d37be`). Five inline board blocks → `gh-stage.js` calls; ~240 lines of duplicated GraphQL deleted. **The GitHub path is now live** — a consumer's ladder drives their board. Three intended behavioural changes (regress guard, case-insensitive Done, honest post-condition). 2 QA cycles, 1 MEDIUM + 3 LOW closed; tests 1065 → 1070, all 5 new guards mutation-tested. Found on the way: **the bundler cannot see `.agents/skills/…/references/X` paths**, so writing a CLI call did not ship it — each site now names `shared/resources/gh-stage.js` and CI gained a bundle-freshness check. Two consumer tests deferred (no scratch board with bespoke columns). **T41 is now unblocked** (deps T38, T40 — both shipped) |
