@@ -347,9 +347,19 @@ None in this task. Task.40 deletes the inline GraphQL.
 - [x] Single board → used directly
 - [x] Two boards, no hint → `ambiguous-board`, naming both
 - [x] Two boards + `--board` / `github.projectBoard` / `project.yml` → correct one chosen
+- [x] **An unmatched hint fails closed** — a hint that is *set* but names no board the issue is on
+      yields `ambiguous-board` and does **not** fall through to a lower-precedence tier. Added after
+      QA cycle 1 found the `||` chain conflating "hint absent" with "hint wrong", which let a mistyped
+      `--board` set the status on a board the operator never named
+- [x] **`--add-to-board` with an unresolvable board hint skips the add** rather than substituting
+      `project.yml`'s number — a title hint resolves to its own board's number or to nothing
 - [x] `nodes: []` → `not-on-board`
 - [x] No Status field → skip, not a crash
-- [x] Mutation error envelope → retried, then a warning and exit 0
+- [x] **A GraphQL error response → `board-unreadable`, not `not-on-board`** — the two must not be
+      conflated, since one is a real failure and the other is benign
+- [x] Mutation error envelope → retried (**asserted by attempt count**, which is what makes the
+      assertion real), then a warning and exit 0
+- [x] A mutation that succeeds on retry is reported as a success, not a failure
 
 ---
 
@@ -363,6 +373,12 @@ None in this task. Task.40 deletes the inline GraphQL.
 - [x] An unhandled throw exits 0
 - [x] `--dry-run` issues **no** mutation and **no** `item-add` — asserted by stubbing `gh` and
       failing on any non-GET verb
+- [x] **`--dry-run` writes no file either** — `--write-ladder` under `--dry-run` prints the ladder it
+      would have written and leaves the filesystem untouched. The no-write contract covers the disk,
+      not just the board
+- [x] **`--issue` is validated on every path**, including `--probe-board`, before any query is built
+- [x] **The verify re-read is confirmation, not truth** — a stale read never overwrites the reported
+      option; the result carries `verified: true|false` instead
 - [x] Flag surface matches `jira-stage.js` where the concept exists
 
 ---
@@ -643,6 +659,39 @@ real caller.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-12
+**Quality Score**: 60/100
+**Gate Decision**: FAIL (cycle 1)
+
+### QA Report
+
+- **Full Report**: [task.39.qa.1.github-board-stage-engine.md](./task.39.qa.1.github-board-stage-engine.md)
+- **Gate File**: [task.39.gate.1.github-board-stage-engine.yml](./task.39.gate.1.github-board-stage-engine.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1051 full suite (0 failures); 51 in the new suite
+- **Phases Verified**: 4/4 implemented, 2/4 with defects
+- **Critical Issues**: 1 HIGH, 5 MEDIUM, 4 LOW (advisory)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings
+
+**CR-1 (HIGH)** — `selectBoard` chains its precedence tiers with `||`, and `tryHint` cannot distinguish
+"hint absent" from "hint present but unmatched". So a mistyped `--board` falls through to the next
+tier and writes the status to a board the operator never named — the exact outcome the never-fan-out
+rule exists to prevent. Reproduced directly.
+
+Plus: a title-valued `--board` sends `item-add` to the wrong board (CR-2); a mutation error envelope is
+never retried despite §8's Integration Test criterion saying it is (CR-3, measured 1 attempt not 3);
+and four tests pass vacuously, including both guard tests and the verify-re-read test (CR-4/5/6).
+
+---
+
 ## Change Log
 
 | Date | Change | Author |
@@ -650,6 +699,7 @@ real caller.
 | 2026-08-03 | Task authored | Claude |
 | 2026-08-12 | `/review-task` — 9/10 READY TO IMPLEMENT. Five wrong `file:line` citations corrected across the task and plan; Motivation #5 rewritten to name `DEFAULT_LADDER` rather than the unreachable `DEFAULT_STATUS_RANK`, with the `"Todo"` fix explicitly scoped out and recorded under Known Issues | Claude |
 | 2026-08-12 | Phases 1–4 implemented: `gh-stage.js`, 50 tests, 8 fixtures. `tracker-workflow.md` gains `## GitHub execution semantics`; `configuration.md` gains both new keys plus a `project.yml` section; `CHANGELOG.md` `### Added`. Fixed a stale-parse-cache bug in `--write-ladder`. `npm test` 1050/1050 | Claude |
+| 2026-08-12 | QA cycle 1 → **FAIL (60/100)**. `qa-fix` cycle 1 applied 12 fixes. **CR-1 (HIGH)**: `selectBoard` now fails closed — a hint that is set but unmatched yields `ambiguous-board` instead of falling through and writing to a board the operator never named. **CR-2**: `boardHintNumber` resolves a title hint to its own board's number or to nothing, never `project.yml`'s. **CR-3**: the mutation error-envelope check moved *inside* the retried closure, so a transient board mutation is retried 3× as §8 always claimed. Four vacuous tests made real (verify re-read, both guard tests, retry attempt count). Advisory: verify re-read no longer trusted when it disagrees (`verified` flag added); `--write-ladder` writes nothing under `--dry-run`; `--issue` validated on the probe path; `readBoard` surfaces `doc.errors`. `npm test` 1058/1058 | Claude |
 
 ---
 

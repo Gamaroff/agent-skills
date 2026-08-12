@@ -561,6 +561,16 @@ board. `gh-stage.js` picks exactly one, in this order:
 4. `project.yml` → `project_board_number` / `project_board_name`
 5. otherwise → skip with `ambiguous-board`, **naming the candidates** rather than guessing
 
+**An unmatched hint fails closed.** These tiers are consulted in order only while each is *unset*.
+The first one that IS set is authoritative: if it names a board the issue is not on, the result is
+`ambiguous-board` — it does **not** fall through to the next tier. "No hint given" and "the hint you
+gave was wrong" are different questions, and answering the second by quietly consulting a lower tier
+is how a mistyped `--board` ends up changing the status on somebody else's board.
+
+`--add-to-board` follows the same discipline. It needs a board *number*, so a title-valued hint is
+resolved against the boards actually read; a hint that cannot be resolved to a number skips the add
+with a warning rather than substituting whatever `project.yml` happens to name.
+
 ### Matching is exact, case-insensitive, emoji-stripped — and never prefix
 
 One discipline everywhere. `🚧 In Progress` matches `In Progress`; `done` matches `Done`. **`In
@@ -595,7 +605,9 @@ gh-stage.js --probe-board --write-ladder --issue 123
 
 It writes `tracker-workflow.yaml` with your board's Status options as `statuses:`, in board order.
 **It never overwrites an existing file** — a hand-authored ladder encodes intent a board read cannot
-recover, so an existing one is left untouched and you are told why.
+recover, so an existing one is left untouched and you are told why. Combined with `--dry-run` it
+prints the ladder it would have written and writes nothing: the no-write contract covers the
+filesystem, not just the board.
 
 ### Exit codes
 

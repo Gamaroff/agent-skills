@@ -558,6 +558,10 @@ priority out to every board; that is harmless for those fields and wrong for a s
 4. `project.yml` → `project_board_number`, then `project_board_name`
 5. no hint → **skip**, reason `ambiguous-board`, naming the candidates
 
+The list is walked only past tiers that are **unset**. The first tier that is set decides: if it names
+a board the issue is not on, the move is skipped as `ambiguous-board` rather than falling through to
+the next tier. A mistyped `--board` therefore changes nothing, instead of changing the wrong board.
+
 Set `github.projectBoard` only if your issues genuinely sit on more than one board. Both a number and
 a title work:
 

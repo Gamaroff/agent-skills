@@ -335,6 +335,14 @@ function readBoard({ exec, owner, repo, issue, statusField }) {
   } catch (e) {
     throw new Error(`could not parse gh api response: ${e.message}`);
   }
+  // A response can carry `errors` alongside a null `repository`. Ignoring them
+  // degraded a real API failure (bad scope, rate limit, unknown repo) into an
+  // empty node list, which the caller then reported as the benign `not-on-board`
+  // skip — and under --add-to-board also bought a pointless item-add plus 8s of
+  // sleeping. setOption already checks this; readBoard must agree with it.
+  if (doc && Array.isArray(doc.errors) && doc.errors.length) {
+    throw new Error(doc.errors.map((e) => e && e.message).join("; "));
+  }
   const nodes =
     (doc &&
       doc.data &&
@@ -389,25 +397,45 @@ function selectBoard(items, { board, configured, projectYml }) {
   if (items.length === 0) return { item: null, reason: "not-on-board" };
   if (items.length === 1) return { item: items[0], rule: "only-board" };
 
-  const tryHint = (hint, rule) => {
-    if (!hint) return null;
+  const yml = projectYml || {};
+  const candidates = items.map((i) => `${i.projectTitle} (#${i.projectNumber})`);
+  const match = (hint) => {
     const h = String(hint).trim();
-    const hit = items.find(
+    return items.find(
       (i) => i.projectNumber === h || tw.eqName(i.projectTitle, h),
     );
-    return hit ? { item: hit, rule } : null;
   };
 
-  return (
-    tryHint(board, "--board") ||
-    tryHint(configured, "github.projectBoard") ||
-    tryHint(projectYml.boardNumber, "project.yml project_board_number") ||
-    tryHint(projectYml.boardName, "project.yml project_board_name") || {
+  // Precedence, most specific first. Only tiers that are actually SET are
+  // considered — but the first one that IS set is authoritative.
+  const tiers = [
+    [board, "--board"],
+    [configured, "github.projectBoard"],
+    [yml.boardNumber, "project.yml project_board_number"],
+    [yml.boardName, "project.yml project_board_name"],
+  ];
+
+  for (const [hint, rule] of tiers) {
+    if (!hint) continue; // absent — fall through to the next tier
+    const hit = match(hint);
+    if (hit) return { item: hit, rule };
+    // PRESENT BUT UNMATCHED — fail closed.
+    //
+    // Falling through here is what made a mistyped `--board 999` land on
+    // whatever project.yml happened to name: a status change on a board the
+    // operator explicitly did not ask for, which is precisely the outcome the
+    // never-fan-out rule exists to prevent. `hint absent` and `hint present but
+    // wrong` are different questions and must not share an answer.
+    return {
       item: null,
       reason: "ambiguous-board",
-      candidates: items.map((i) => `${i.projectTitle} (#${i.projectNumber})`),
-    }
-  );
+      unmatchedHint: String(hint).trim(),
+      unmatchedRule: rule,
+      candidates,
+    };
+  }
+
+  return { item: null, reason: "ambiguous-board", candidates };
 }
 
 /**
@@ -467,23 +495,31 @@ mutation {
 }`;
 
 function setOption({ exec, item, optionId, sleepMs = sleepSync }) {
-  const raw = withRetry(
-    () =>
-      exec([
+  // The errors check lives INSIDE the retried closure on purpose. A GraphQL
+  // error envelope is a *successful* process exit — `gh` returns 0 and prints
+  // the errors — so checking it outside meant withRetry never saw a failure and
+  // exactly one mutation was ever issued. Board mutations fail transiently at
+  // least as often as the `gh issue` calls the shell helper already wraps, so
+  // this is the one path that most needed the retry and was not getting it.
+  withRetry(
+    () => {
+      const raw = exec([
         "api",
         "graphql",
         "-f",
         `query=${MUTATION(item.projectId, item.itemId, item.statusFieldId, optionId)}`,
-      ]),
+      ]);
+      let doc = null;
+      try {
+        doc = JSON.parse(raw);
+      } catch (_) {}
+      if (doc && Array.isArray(doc.errors) && doc.errors.length) {
+        throw new Error(doc.errors.map((e) => e && e.message).join("; "));
+      }
+      return raw;
+    },
     { sleepMs },
   );
-  let doc = null;
-  try {
-    doc = JSON.parse(raw);
-  } catch (_) {}
-  if (doc && Array.isArray(doc.errors) && doc.errors.length) {
-    throw new Error(doc.errors.map((e) => e && e.message).join("; "));
-  }
   return true;
 }
 
@@ -569,7 +605,14 @@ const USAGE = `Usage: gh-stage --issue <N> --stage <${tw.MOMENTS.join("|")}>
        gh-stage --probe-board [--write-ladder] [--board <number|name>]
               (read-only; --write-ladder writes tracker-workflow.yaml only when absent)`;
 
-function run({ argv = process.argv, execImpl = null, repoRoot = undefined } = {}) {
+function run({
+  argv = process.argv,
+  execImpl = null,
+  repoRoot = undefined,
+  // Injectable so tests exercise the retry and propagation paths without paying
+  // their real wall-clock cost. Production always uses the real sleep.
+  sleepImpl = sleepSync,
+} = {}) {
   const root = repoRootOf(repoRoot);
   loadDotEnv(root);
 
@@ -595,14 +638,19 @@ function run({ argv = process.argv, execImpl = null, repoRoot = undefined } = {}
   };
 
   // --probe-board reads a board; every other mode moves one card on it.
+  // Hoisted out of the non-probe branch: EVERY path that reaches the network
+  // interpolates --issue straight into the GraphQL document, and --probe-board
+  // is no exception. Validating it only on the move path left the probe able to
+  // inject arbitrary text into the query.
+  if (args.issue && !/^\d+$/.test(String(args.issue).trim())) {
+    output.err(`Error: --issue must be a number, got "${args.issue}"`);
+    return { exitCode: 2 };
+  }
+
   if (!args.probeBoard) {
     if (!args.issue || !args.stage) {
       output.err("Error: --issue and --stage are both required");
       output.err(USAGE);
-      return { exitCode: 2 };
-    }
-    if (!/^\d+$/.test(String(args.issue).trim())) {
-      output.err(`Error: --issue must be a number, got "${args.issue}"`);
       return { exitCode: 2 };
     }
     if (!tw.MOMENTS.includes(String(args.stage).toLowerCase())) {
@@ -617,7 +665,10 @@ function run({ argv = process.argv, execImpl = null, repoRoot = undefined } = {}
   const workflow = tw.loadWorkflow(repoRoot ? { repoRoot } : {});
   const statusField = args.field || resolveStatusFieldName(root);
   const projectYml = readProjectYml(root);
-  const configuredBoard = args.board || resolveConfiguredBoard(root);
+  // Kept SEPARATE from args.board. Folding `--board` into this made the second
+  // precedence tier in selectBoard dead whenever --board was given, and hid the
+  // fail-closed behaviour behind a duplicate value.
+  const configuredBoard = resolveConfiguredBoard(root);
 
   const exec = makeExec(execImpl);
 
@@ -665,22 +716,32 @@ function run({ argv = process.argv, execImpl = null, repoRoot = undefined } = {}
     return emit({ transitioned: false, reason: "stage-disabled" }, 0);
   }
 
+  const addBoardNum = boardHintNumber(args.board, configuredBoard, projectYml);
+
   let items;
   try {
     items =
-      args.addToBoard && !args.dryRun
+      args.addToBoard && !args.dryRun && addBoardNum
         ? ensureOnBoard({
             exec,
             owner,
             repo,
             issue: args.issue,
             statusField,
-            boardNum: boardHintNumber(configuredBoard, projectYml),
+            boardNum: addBoardNum,
+            sleepMs: sleepImpl,
           })
         : readBoard({ exec, owner, repo, issue: args.issue, statusField });
   } catch (e) {
     output.warn(`⚠️  Could not read the board: ${e.message}`);
     return emit({ transitioned: false, reason: "board-unreadable" }, 0);
+  }
+
+  if (args.addToBoard && !args.dryRun && !addBoardNum) {
+    output.warn(
+      "⚠️  --add-to-board given but no board number could be resolved — skipping the add. " +
+        "Pass --board <number>, or set github.projectBoard / project.yml's project_board_number.",
+    );
   }
 
   // --dry-run must not run item-add. This is the one place a naive port of
@@ -689,9 +750,7 @@ function run({ argv = process.argv, execImpl = null, repoRoot = undefined } = {}
   // BEFORE its read query. Announce the intent instead of performing it.
   if (args.dryRun && args.addToBoard) {
     output.info(
-      `🔎 would add issue #${args.issue} to board ${
-        boardHintNumber(configuredBoard, projectYml) || "(unresolved)"
-      } (skipped: --dry-run)`,
+      `🔎 would add issue #${args.issue} to board ${addBoardNum || "(unresolved)"} (skipped: --dry-run)`,
     );
   }
 
@@ -818,7 +877,7 @@ function run({ argv = process.argv, execImpl = null, repoRoot = undefined } = {}
   }
 
   try {
-    setOption({ exec, item, optionId: r.match.id });
+    setOption({ exec, item, optionId: r.match.id, sleepMs: sleepImpl });
   } catch (e) {
     output.warn(`⚠️  Could not set ${statusField} on ${label}: ${e.message}`);
     return emit(
@@ -830,20 +889,38 @@ function run({ argv = process.argv, execImpl = null, repoRoot = undefined } = {}
   // Re-read and report the option that actually landed, rather than the one we
   // asked for. A silent no-op mutation is otherwise indistinguishable from a
   // successful one.
+  // Re-read to confirm the option that actually landed.
+  //
+  // The re-read is CONFIRMATION, not the source of truth. It is issued with no
+  // propagation delay — unlike ensureOnBoard, which deliberately sleeps for the
+  // same API — so a stale read returns the PREVIOUS status. Believing it would
+  // make a successful move report the old column, which is the exact inverse of
+  // the silent-no-op detection this exists for. So: trust it only when it agrees
+  // with what we asked for; otherwise keep the requested name and say the
+  // confirmation did not come back.
   let landed = r.match.name;
+  let verified = false;
   try {
     const after = readBoard({ exec, owner, repo, issue: args.issue, statusField });
     const same = after.find((i) => i.itemId === item.itemId);
-    if (same && same.current) landed = same.current;
+    if (same && same.current && tw.eqName(same.current, r.match.name)) {
+      landed = same.current;
+      verified = true;
+    }
   } catch (_) {}
 
-  output.info(`✅ ${label} → "${landed}".`);
+  output.info(
+    verified
+      ? `✅ ${label} → "${landed}".`
+      : `✅ ${label} → "${landed}" (unconfirmed — the verify read did not yet show it).`,
+  );
   return emit(
     {
       transitioned: true,
       reason: "transitioned",
       from: item.current,
       to: landed,
+      verified,
       board: item.projectTitle,
       rule: r.rule,
     },
@@ -861,10 +938,34 @@ function repoContext(exec, field) {
   }
 }
 
-function boardHintNumber(configured, projectYml) {
-  if (configured && /^\d+$/.test(String(configured).trim()))
-    return String(configured).trim();
-  return projectYml.boardNumber || "";
+/**
+ * The board NUMBER to hand `gh project item-add`, or "" when it cannot be known.
+ *
+ * `item-add` takes a number, but a board hint may legitimately be a TITLE — both
+ * `--board 12` and `--board "Team Sprint"` are accepted by selectBoard. Silently
+ * substituting `project.yml`'s number for an unresolvable title used to add the
+ * issue to one board while the status was written to another. A hint that is set
+ * but not resolvable to a number therefore yields "" — no add — rather than a
+ * different board.
+ *
+ * `items` (optional) lets a title resolve to its own number when the board has
+ * already been read.
+ */
+function boardHintNumber(board, configured, projectYml, items) {
+  const yml = projectYml || {};
+  const resolve = (hint) => {
+    if (!hint) return null; // absent — try the next source
+    const h = String(hint).trim();
+    if (/^\d+$/.test(h)) return h;
+    const hit = (items || []).find((i) => tw.eqName(i.projectTitle, h));
+    // Set but unresolvable: "" (no add), never a fallback to another board.
+    return hit && hit.projectNumber ? hit.projectNumber : "";
+  };
+  for (const hint of [board, configured, yml.boardNumber, yml.boardName]) {
+    const r = resolve(hint);
+    if (r !== null) return r;
+  }
+  return "";
 }
 
 // ---------------------------------------------------------------------------
@@ -955,7 +1056,13 @@ function probeBoard({
   }
 
   let ladderWritten = null;
-  if (args.writeLadder) ladderWritten = writeLadder({ root, optionNames, output });
+  if (args.writeLadder)
+    ladderWritten = writeLadder({
+      root,
+      optionNames,
+      output,
+      dryRun: args.dryRun,
+    });
 
   const payload = {
     reason: "probe",
@@ -979,7 +1086,7 @@ function probeBoard({
  * :3771-3781 do the same job) — a hand-authored ladder encodes intent a board
  * read cannot recover.
  */
-function writeLadder({ root, optionNames, output }) {
+function writeLadder({ root, optionNames, output, dryRun = false }) {
   const target = path.join(root, tw.DEFAULT_WORKFLOW_PATH);
   if (fs.existsSync(target)) {
     output.warn(
@@ -1000,6 +1107,16 @@ function writeLadder({ root, optionNames, output }) {
     "statuses:\n" +
     optionNames.map((n) => `  - ${JSON.stringify(n)}`).join("\n") +
     "\n";
+  // --dry-run is a no-write contract for the whole CLI, not just for the board.
+  // A filesystem write is still a write, and a caller checking "did --dry-run
+  // touch anything" would have been wrong about this one.
+  if (dryRun) {
+    output.info(
+      `🔎 would write ${tw.DEFAULT_WORKFLOW_PATH} with ${optionNames.length} rungs ` +
+        `(skipped: --dry-run):\n${body.replace(/^/gm, "   ")}`,
+    );
+    return { written: false, reason: "dry-run", path: target, statuses: optionNames };
+  }
   try {
     fs.writeFileSync(target, body);
     // Drop tracker-workflow.js's parse cache. This run already called
@@ -1034,6 +1151,7 @@ module.exports = {
   resolveOption,
   describeAlternatives,
   selectBoard,
+  boardHintNumber,
   normalizeItem,
   readBoard,
   ensureOnBoard,

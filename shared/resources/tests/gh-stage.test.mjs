@@ -46,7 +46,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
@@ -169,8 +169,16 @@ const PROJECT_YML = `github:
   project_board_number: 1
 `;
 
+const noSleep = () => {};
 const go = (args, s, root) =>
-  cli.run({ argv: ["node", "gh-stage.js", ...args], execImpl: s.execImpl, repoRoot: root });
+  cli.run({
+    argv: ["node", "gh-stage.js", ...args],
+    execImpl: s.execImpl,
+    repoRoot: root,
+    // Retries and the propagation dance are exercised for their behaviour, not
+    // their wall-clock cost.
+    sleepImpl: noSleep,
+  });
 
 // ===========================================================================
 // Unit — resolveOption
@@ -323,41 +331,100 @@ test("selectBoard: precedence is --board > github.projectBoard > project.yml", (
   assert.equal(cli.selectBoard(twoBoards(), ymlOnly).rule, "project.yml project_board_number");
 });
 
-test("selectBoard: an unmatched hint is ambiguous, never a guess", () => {
-  const r = cli.selectBoard(twoBoards(), { board: "999", projectYml: {} });
-  assert.equal(r.item, null);
+test("selectBoard: an unmatched hint FAILS CLOSED — it never falls through", () => {
+  // The regression this pins: `tryHint` returned null both for "hint absent" and
+  // for "hint present but matched nothing", so an `||` chain could not tell them
+  // apart. A mistyped --board then fell through to project.yml and set the
+  // status on a board the operator explicitly did not name — the exact outcome
+  // the never-fan-out rule exists to prevent.
+  //
+  // Note the lower tiers here are POPULATED and each would match. If any of them
+  // is consulted, this test fails.
+  const r = cli.selectBoard(twoBoards(), {
+    board: "999",
+    configured: "12",
+    projectYml: { boardNumber: "7", boardName: "Team Sprint" },
+  });
+  assert.equal(r.item, null, "must not pick a board the operator did not name");
   assert.equal(r.reason, "ambiguous-board");
+  assert.equal(r.unmatchedHint, "999");
+  assert.equal(r.unmatchedRule, "--board");
+
+  // Same rule one tier down: a wrong github.projectBoard does not fall through
+  // to project.yml either.
+  const r2 = cli.selectBoard(twoBoards(), {
+    configured: "999",
+    projectYml: { boardNumber: "7" },
+  });
+  assert.equal(r2.item, null);
+  assert.equal(r2.unmatchedRule, "github.projectBoard");
+
+  // But an ABSENT tier still falls through normally.
+  const r3 = cli.selectBoard(twoBoards(), { projectYml: { boardNumber: "7" } });
+  assert.equal(r3.rule, "project.yml project_board_number");
+});
+
+test("boardHintNumber: never substitutes an unrelated board for a title hint", () => {
+  const items = twoBoards();
+  const yml = { boardNumber: "1", boardName: "Agent Skills" };
+  // A numeric hint passes straight through.
+  assert.equal(cli.boardHintNumber("12", "", yml), "12");
+  // A title hint resolves to ITS OWN number when the board list is available…
+  assert.equal(cli.boardHintNumber("Team Sprint", "", yml, items), "7");
+  // …and yields "" (no add) when it cannot be resolved — NOT project.yml's
+  // number, which is a different board entirely.
+  assert.equal(cli.boardHintNumber("Team Sprint", "", yml), "");
+  assert.equal(cli.boardHintNumber("No Such Board", "", yml, items), "");
+  // Absent hints fall through to the configured value, then project.yml.
+  assert.equal(cli.boardHintNumber("", "4", yml), "4");
+  assert.equal(cli.boardHintNumber("", "", yml), "1");
 });
 
 // ===========================================================================
 // Integration — the run() flow, gh stubbed
 // ===========================================================================
 
-test("run: moves the card and reports the option that landed", () => {
+test("run: moves the card, and the verify re-read CONFIRMS the landed option", () => {
   const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
-  const s = stubGh({
-    boardQueue: ["gh-status-unset", "gh-two-boards-done-ids"],
-  });
+  // gh-status-verify carries the SAME itemId as gh-status-unset with the status
+  // now set. Without a matching itemId the verify lookup misses, `landed` falls
+  // back to the requested name, and the assertion below would pass even if the
+  // re-read were deleted entirely — which is exactly how this test used to lie.
+  const s = stubGh({ boardQueue: ["gh-status-unset", "gh-status-verify"] });
   const r = go(["--issue", "42", "--stage", "work-started"], s, root);
   assert.equal(r.exitCode, 0);
   assert.equal(r.transitioned, true);
   assert.equal(r.reason, "transitioned");
-  // The verify re-read is what makes this the LANDED option, not the requested one.
   assert.equal(r.to, "In Progress");
+  assert.equal(r.verified, true, "the re-read agreed, so the move is confirmed");
   const mutations = s.calls.filter((c) => String(c[c.length - 1]).includes("mutation"));
   assert.equal(mutations.length, 1);
   assert.ok(mutations[0][mutations[0].length - 1].includes("u-prog"));
+  // Three gh api calls: read, mutate, verify-read.
+  assert.equal(s.calls.filter((c) => c[0] === "api").length, 3);
+});
+
+test("run: a stale verify read does NOT overwrite the reported option", () => {
+  const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
+  // Both reads return the UNSET fixture — i.e. the second read has not caught up.
+  // Believing it would report the move as landing on "" / the old column, which
+  // is the inverse of the silent-no-op detection the re-read exists for.
+  const s = stubGh({ boardQueue: ["gh-status-unset", "gh-status-unset"] });
+  const r = go(["--issue", "42", "--stage", "work-started"], s, root);
+  assert.equal(r.transitioned, true);
+  assert.equal(r.to, "In Progress", "falls back to the REQUESTED option, not the stale read");
+  assert.equal(r.verified, false, "and says so");
 });
 
 test("run: already there → no mutation issued", () => {
-  const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
-  const s = stubGh({ board: "gh-two-boards-done-ids", boardQueue: ["gh-bespoke-columns"] });
-  // Board is at "In Development"; bespoke ladder's work-started target is the same.
-  const bespokeRoot = withRepo({
+  // Board sits at "In Development"; the bespoke ladder's work-started target is
+  // the same column, so this must short-circuit before any mutation.
+  const root = withRepo({
     "tracker-workflow.yaml": BESPOKE_LADDER,
     "project.yml": PROJECT_YML,
   });
-  const r = go(["--issue", "42", "--stage", "work-started"], s, bespokeRoot);
+  const s = stubGh({ board: "gh-bespoke-columns" });
+  const r = go(["--issue", "42", "--stage", "work-started"], s, root);
   assert.equal(r.reason, "already");
   assert.equal(r.exitCode, 0);
   assert.equal(s.calls.filter((c) => String(c[c.length - 1]).includes("mutation")).length, 0);
@@ -456,14 +523,44 @@ pipeline:
 // Integration — the backward-move guard
 // ===========================================================================
 
-test("guard: refuses a lower-ranked target", () => {
+test("guard: allows a forward move (card behind the target)", () => {
   const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
-  // Board sits at "In Progress" (rank 1); work-started targets rank 1, done rank 3.
-  // Ask for work-started from a card already in Review.
-  const s = stubGh({ board: "gh-two-boards-done-ids", boardQueue: ["gh-two-boards-done-ids"] });
+  // Board 4 sits at "Todo" (rank 0); work-started targets "In Progress" (rank 1).
+  // Forward, so the guard must NOT interfere.
+  const s = stubGh({ board: "gh-two-boards-done-ids" });
   const r = go(["--issue", "42", "--stage", "work-started", "--board", "4"], s, root);
-  // Board 4 sits at "Todo" (rank 0) → forward to In Progress, allowed.
   assert.equal(r.transitioned, true);
+  assert.equal(r.from, "Todo");
+});
+
+test("guard: refuses a lower-ranked target", () => {
+  // The card sits at "Done" (rank 2); the moment targets "In Progress" (rank 1).
+  // Strictly backwards — and on GitHub the guard is the ONLY thing that can
+  // refuse it, since a single-select accepts any option from any other.
+  const root = withRepo({
+    "tracker-workflow.yaml": `
+statuses:
+  - Todo
+  - In Progress
+  - Done
+pipeline:
+  work-started: In Progress
+`,
+    "project.yml": PROJECT_YML,
+  });
+  const s = stubGh({ board: "gh-card-done" });
+  const r = go(["--issue", "42", "--stage", "work-started"], s, root);
+  assert.equal(r.reason, "would-regress");
+  assert.equal(r.from, "Done");
+  assert.equal(r.to, "In Progress");
+  assert.equal(r.currentRank, 2);
+  assert.equal(r.targetRank, 1);
+  assert.equal(r.exitCode, 0);
+  assert.equal(
+    s.calls.filter((c) => String(c[c.length - 1]).includes("mutation")).length,
+    0,
+    "a refused move must issue no mutation",
+  );
 });
 
 test("guard: would-regress when the card is past the target", () => {
@@ -512,23 +609,40 @@ pipeline:
 });
 
 test("guard: unranked either side means no opinion — allow", () => {
-  // A board column that appears on no ladder rung ranks null, so the guard is
-  // inert. This is exactly why declaring a ladder matters on a tracker with no
-  // transition graph.
+  // Both the card's column ("Done") and the target ("Todo") are absent from this
+  // ladder, so rankOf returns null for each and the guard must have no opinion —
+  // even though this move is backwards by any ordinary reading. That is the
+  // documented semantics, and it is the sharp edge of relying on the ladder: an
+  // undeclared board gets no protection at all.
+  //
+  // The target must DIFFER from the card's current value, or resolveOption
+  // short-circuits to `already` and the guard is never reached — which is what
+  // made the earlier version of this test vacuous.
   const root = withRepo({
     "tracker-workflow.yaml": `
 statuses:
   - Alpha
   - Omega
 pipeline:
-  work-started: In Progress
+  work-started: Todo
 `,
     "project.yml": PROJECT_YML,
   });
-  const s = stubGh({ board: "gh-two-boards-done-ids" });
-  assert.equal(tw.rankOf("In Progress", tw.loadWorkflow({ repoRoot: root })), null);
-  const r = go(["--issue", "42", "--stage", "work-started", "--board", "1"], s, root);
-  assert.equal(r.reason, "already");
+  const wf = tw.loadWorkflow({ repoRoot: root });
+  assert.equal(tw.rankOf("Done", wf), null, "card's column is off-ladder");
+  assert.equal(tw.rankOf("Todo", wf), null, "target is off-ladder too");
+
+  const s = stubGh({ boardQueue: ["gh-card-done", "gh-card-done"] });
+  const r = go(["--issue", "42", "--stage", "work-started"], s, root);
+  assert.equal(r.reason, "transitioned", "unranked means allow, not refuse");
+  assert.equal(r.transitioned, true);
+  assert.equal(r.from, "Done");
+  assert.equal(r.to, "Todo");
+  assert.equal(
+    s.calls.filter((c) => String(c[c.length - 1]).includes("mutation")).length,
+    1,
+    "the mutation really was issued — the guard did not intervene",
+  );
 });
 
 // ===========================================================================
@@ -654,7 +768,7 @@ test("no credentials is a normal exit-0 outcome, and a dead end", () => {
   assert.deepEqual(s.calls.filter(isWrite), []);
 });
 
-test("a mutation error envelope is retried, then warned about, then exit 0", () => {
+test("a mutation error envelope is retried 3×, then warned about, then exit 0", () => {
   const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
   const s = stubGh({
     board: "gh-status-unset",
@@ -668,6 +782,32 @@ test("a mutation error envelope is retried, then warned about, then exit 0", () 
   assert.equal(r.reason, "mutation-failed");
   assert.equal(r.exitCode, 0);
   assert.ok(r.detail.includes("Resource not accessible"));
+  // The count is the assertion that matters. A GraphQL error envelope is a
+  // SUCCESSFUL process exit, so when the errors check sat outside the retried
+  // closure withRetry never saw a failure and exactly one mutation was issued —
+  // and this test passed anyway, because it only looked at the reason.
+  assert.equal(
+    s.calls.filter((c) => String(c[c.length - 1]).includes("mutation")).length,
+    3,
+    "a transient board-mutation failure must be retried, not given up on after one try",
+  );
+});
+
+test("a mutation that succeeds on the second attempt is not reported as failed", () => {
+  const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
+  const s = stubGh({
+    boardQueue: ["gh-status-unset", "gh-status-verify"],
+    mutationResponses: [
+      raw("gh-mutation-error"),
+      JSON.stringify({ data: { updateProjectV2ItemFieldValue: { projectV2Item: { id: "x" } } } }),
+    ],
+  });
+  const r = go(["--issue", "42", "--stage", "work-started"], s, root);
+  assert.equal(r.transitioned, true);
+  assert.equal(
+    s.calls.filter((c) => String(c[c.length - 1]).includes("mutation")).length,
+    2,
+  );
 });
 
 test("withRetry retries three times then rethrows", () => {
@@ -763,6 +903,69 @@ test("--write-ladder derives the ladder from board option order", () => {
     ["Backlog", "In Development", "Ready for Showcase", "Shipped"],
   );
   assert.ok(written.includes("statuses:"));
+});
+
+test("--write-ladder does NOT write under --dry-run", () => {
+  // --dry-run is a no-write contract for the whole CLI. A filesystem write is
+  // still a write, and this path used to make one.
+  const root = withRepo({ "project.yml": PROJECT_YML });
+  const s = stubGh({ board: "gh-bespoke-columns" });
+  const r = go(["--probe-board", "--write-ladder", "--dry-run", "--issue", "42"], s, root);
+  assert.equal(r.ladderWritten.written, false);
+  assert.equal(r.ladderWritten.reason, "dry-run");
+  assert.equal(
+    existsSync(join(root, "tracker-workflow.yaml")),
+    false,
+    "--dry-run must leave the filesystem untouched",
+  );
+  // It still reports what it would have written, so the flag is useful.
+  assert.deepEqual(r.ladderWritten.statuses, [
+    "Backlog",
+    "In Development",
+    "Ready for Showcase",
+    "Shipped",
+  ]);
+});
+
+test("readBoard surfaces a GraphQL error instead of reporting not-on-board", () => {
+  // An errors-bearing response with a null repository used to degrade into an
+  // empty node list, which reads as the benign 'this issue is not on a board'
+  // skip — hiding a real auth/scope/rate-limit failure.
+  const root = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
+  const errBody = JSON.stringify({
+    data: { repository: null },
+    errors: [{ message: "Could not resolve to a Repository" }],
+  });
+  const calls = [];
+  const execImpl = (argv) => {
+    calls.push(argv);
+    if (argv[0] === "auth") return "ok";
+    if (argv[0] === "repo") return argv.includes("owner") ? "Gamaroff" : "agent-skills";
+    return errBody;
+  };
+  const r = cli.run({
+    argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "work-started"],
+    execImpl,
+    repoRoot: root,
+    sleepImpl: noSleep,
+  });
+  assert.equal(r.reason, "board-unreadable");
+  assert.notEqual(r.reason, "not-on-board");
+  assert.equal(r.exitCode, 0, "still a shrug, not a pipeline-killing exit");
+});
+
+test("--probe-board also rejects a non-numeric --issue", () => {
+  // The validation used to live inside the non-probe branch, so the probe path
+  // interpolated whatever it was given straight into the GraphQL document.
+  const root = withRepo({ "tracker-workflow.yaml": LADDER });
+  const s = stubGh({ board: "gh-status-unset" });
+  const r = go(["--probe-board", "--issue", "42) { evil }"], s, root);
+  assert.equal(r.exitCode, 2);
+  assert.equal(
+    s.calls.filter((c) => c[0] === "api").length,
+    0,
+    "must be rejected before any query is built",
+  );
 });
 
 test("--write-ladder never overwrites an existing ladder", () => {
