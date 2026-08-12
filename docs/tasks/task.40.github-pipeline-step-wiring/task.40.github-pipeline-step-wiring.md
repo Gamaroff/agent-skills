@@ -5,10 +5,12 @@ type: task
 description: "Rewrite the hardcoded gh api graphql board-move blocks in the develop pipeline step files and finalise as one-line gh-stage.js invocations, fixing the false-pass post-condition and the case-sensitive Done match on the way."
 tags: [github, pipeline, refactoring, step-files]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-03
 updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 207
 assignee:
 estimated_effort_hours: 16
 github_issue: 188
@@ -16,7 +18,7 @@ github_issue: 188
 
 # Technical Task: Wire `gh-stage.js` into the pipeline step files
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.40.review.1.github-pipeline-step-wiring.md` implemented 2026-08-12
 
@@ -579,6 +581,42 @@ missing file.
   `-step-7-finalise.md:165`, `skills/finalise/SKILL.md:1114-1190` (case-sensitive `"Done"` at :1152,
   `not-on-board` escalation at :1154)
 - **Bundling**: `AGENTS.md` — never edit `skills/*/references/`; `npm run bundle` regenerates
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+| | |
+|---|---|
+| **Final Gate** | [`task.40.gate.2.github-pipeline-step-wiring.yml`](./task.40.gate.2.github-pipeline-step-wiring.yml) — ✅ **PASS** |
+| **Quality Score** | 100/100 |
+| **QA Cycles** | 2 (CONCERNS 90/100 → qa-fix → PASS 100/100) |
+| **Tests** | 1070 passing, 0 failing |
+| **CI Rollup** | ✅ SUCCESS on head `d72af8e` — `link-check`, `test`, `validate` all green |
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 12/13 fully satisfied + 1 accepted deferral (F5 guarded by test, live proof blocked by board topology)
+✅ **CI:** green on the exact head commit — verified, not assumed. `validate` carries the bundle-freshness step this task added, so CI independently confirms bundle sync
+✅ **Tests:** 1070 passing; 5 new guards, **each mutation-tested** by injecting the violation it targets
+✅ **Documentation:** CHANGELOG (3 Changed + 3 Fixed), both `develop-*` READMEs, step-file prose, `tracker-workflow.yaml` header
+✅ **Security:** PASS — no secrets in diff, no credential logic touched, attack surface reduced by removing hand-editable inline GraphQL
+⚠️ **Compliance:** N/A — no personal data, no UI, no payment or health data
+✅ **Reliability:** PASS (upgraded from CONCERNS after the reason-table fix)
+
+**Accepted deferrals** — recorded so this is not read as "everything was verified live":
+1. F5 live backward-move refusal — board #1 has three columns and `in-review` disabled, so no rung exists above review
+2. Scratch board with bespoke column names — no such board exists
+
+Both remain unchecked in §8 by design.
+
+**Detailed Verification Log:** See [`task.40.dod.1.github-pipeline-step-wiring.md`](./task.40.dod.1.github-pipeline-step-wiring.md) for complete evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-08-12
 
 ---
 
