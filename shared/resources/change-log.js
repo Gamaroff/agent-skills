@@ -431,8 +431,12 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     const block = buildChangeLogBlock([...history, newRow], {
       level: found.level,
     });
+    // Normalise both seams: the head may now end in blank lines where a swept
+    // block used to be, and the tail may begin with them. Without this the
+    // separators stack up (up to three blank lines observed) and accumulate
+    // across writes.
     const trailing = found.end < content.length ? "\n\n" : "\n";
-    return head.content + block + trailing + tail.content;
+    return trimSeam(head.content.replace(/\n+$/, "\n") + block + trailing + tail.content);
   }
 
   const anchor = ANCHORS[docType];
@@ -459,26 +463,53 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
 // rows sharing a date keep their original relative order.
 const byDate = (a, b) => rowCells(a)[0].localeCompare(rowCells(b)[0]);
 
-// Remove any *other* legacy block from a slice of the document and return its
-// rows, so a dual-synced document ends with exactly one Change Log. Called for
-// the text on each side of the chosen block.
+// Every marker pair a stray block can be wearing — the current one included.
+//
+// Sweeping only the legacy pairs left one reachable way to end up with two Change
+// Logs: a document holding a legacy block AND a current block kept both, because
+// the survivor wore markers the sweep did not recognise. "Exactly one Change Log"
+// is the invariant, so the sweep is over every pair that can carry one, not over
+// the pairs that happen to be superseded.
+const SWEEP_PAIRS = [
+  { start: CL_START, end: CL_END, author: "" },
+  ...LEGACY_MARKER_PAIRS,
+];
+
+// Remove any *other* Change Log block from a slice of the document and return its
+// rows, so a document ends with exactly one. Called for the text on each side of
+// the chosen block, which is therefore never a candidate for removal itself.
 function collapseOtherLegacyBlocks(rest, docType, alreadyMigrated) {
   const entries = [];
   let out = rest;
 
-  for (const pair of LEGACY_MARKER_PAIRS) {
-    if (pair.author === alreadyMigrated) continue;
-    const found = findMarkerBlock(out, protectedRanges(out), pair.start, pair.end);
-    if (!found) continue;
-    const rows = out.slice(found.start, found.end).split("\n").filter(isEntryRow);
-    entries.push(
-      ...migrateLegacyEntries(rows, { legacyAuthor: pair.author, docType }),
-    );
-    out = (out.slice(0, found.start) + out.slice(found.end)).replace(/\n{3,}/g, "\n\n");
+  for (const pair of SWEEP_PAIRS) {
+    // Skip only when this slice's pair IS the one already migrated into the
+    // primary block — an empty `author` (the current pair) never matches a legacy
+    // author, so the current pair is always swept.
+    if (pair.author && pair.author === alreadyMigrated) continue;
+
+    // Loop: a slice may hold more than one block of the same pair.
+    for (;;) {
+      const found = findMarkerBlock(out, protectedRanges(out), pair.start, pair.end);
+      if (!found) break;
+      const rows = out.slice(found.start, found.end).split("\n").filter(isEntryRow);
+      // Rows from a current-format block are already canonical, so
+      // migrateLegacyEntries returns them untouched via its `>= 4 cells` guard.
+      entries.push(
+        ...migrateLegacyEntries(rows, { legacyAuthor: pair.author, docType }),
+      );
+      out = trimSeam(out.slice(0, found.start) + out.slice(found.end));
+    }
   }
 
   return { entries, content: out };
 }
+
+// Removing a block leaves the blank line that preceded it next to the one that
+// followed it. Collapse any run of 3+ newlines back to a single blank line so the
+// seam is invisible; markdown renders the same either way, but the excess
+// accumulates across writes and shows up in diffs.
+const trimSeam = (s) => s.replace(/\n{3,}/g, "\n\n");
 
 // ---------------------------------------------------------------------------
 // Frontmatter timestamp

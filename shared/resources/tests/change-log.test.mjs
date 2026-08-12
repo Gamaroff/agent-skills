@@ -663,6 +663,76 @@ test("F: an H3 log with a fenced heading inside still ends at the next real sibl
   assert.match(out, /^### Change Log$/m, "level preserved");
 });
 
+// A partially-migrated document: one block still legacy, one already current.
+// Reachable during the task.43-45 rollout, when fourteen vendored copies of the
+// engine may be of different vintages. Sweeping only the legacy pairs left the
+// current block standing, so the document kept two Change Logs (TASK-42-BUG-3).
+const CURRENT_BLOCK = [
+  "<!-- change-log-start -->",
+  "## Change Log",
+  "",
+  "| Date | Version | Description | Author |",
+  "|------|---------|-------------|--------|",
+  "| 2026-05-05 | 1.0 | Current row | create-story |",
+  "<!-- change-log-end -->",
+];
+
+for (const [label, first, second] of [
+  ["legacy first", JIRA_BLOCK, CURRENT_BLOCK],
+  ["current first", CURRENT_BLOCK, JIRA_BLOCK],
+]) {
+  test(`D: a legacy block beside a CURRENT block collapses to one (${label}) — TASK-42-BUG-3`, () => {
+    const doc = [
+      "# Story",
+      "",
+      ...first,
+      "",
+      "## Middle",
+      "",
+      ...second,
+      "",
+      "## Dev Agent Record",
+      "",
+    ].join("\n");
+
+    const out = CL.upsertChangeLog(doc, ENTRY, { docType: "story" });
+
+    assert.equal(
+      out.match(/^#{2,3} Change Log$/gm).length,
+      1,
+      "exactly one Change Log",
+    );
+    assert.equal(
+      (out.match(/<!-- change-log-start -->/g) || []).length,
+      1,
+      "exactly one opening marker",
+    );
+    assert.ok(!out.includes("jira-sync-changelog-start"), "legacy markers gone");
+    assert.equal(CL.extractEntries(out).length, 3, "all rows preserved");
+    assert.match(out, /Jira story created/, "legacy row kept");
+    assert.match(out, /Current row/, "already-canonical row kept");
+    assert.match(out, /^## Middle$/m, "unrelated section survives");
+  });
+}
+
+test("D: collapsing a block leaves no more than one blank line at the seam", () => {
+  const doc = [
+    "# Story",
+    "",
+    ...CURRENT_BLOCK,
+    "",
+    "## Middle",
+    "",
+    ...JIRA_BLOCK,
+    "",
+    "## Dev Agent Record",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "story" });
+  assert.doesNotMatch(out, /\n{3,}/, "no run of 3+ newlines anywhere in the output");
+});
+
 test("D: a 3-cell legacy row keeps all of its text", () => {
   // Neither legacy writer emitted 3 cells, so this only arises from a hand edit.
   // Widening must not silently drop the third cell.
