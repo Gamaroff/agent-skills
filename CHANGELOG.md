@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The five inline GitHub board blocks are now `gh-stage.js` calls — a consumer's `tracker-workflow.yaml` finally drives their board.** `gh-stage.js` shipped inert in task.39; this is what wires it in. Roughly 240 lines of duplicated `gh api graphql` prose across `develop-pipeline-step-{0,4,5-6,7}*.md` and `skills/finalise/SKILL.md` collapse to one-line invocations that read identically to the adjacent `jira-stage.js` calls.
+
+  The option names that used to be `jq` literals — `ascii_downcase == "in progress"`, `== "in review"`, `== "done"` — are gone. Which column each moment lands on now comes from `pipeline.<moment>` in the consumer's ladder, so a board whose columns are `Backlog / In Development / Ready for Showcase / Shipped` works without editing a single skill file. `gh-stage.js --probe-board` prints a board's real options and which moment each resolves to.
+
+  The paragraph at `develop-pipeline-step-4-create-pr.md:237` that instructed the reader to hand-edit `select(.name == "In Review")` is deleted; its removal was the acceptance criterion for this change. The dead `BOARD_NUM` two lines below it — computed and never used since it was written — goes too. A test now fails on any shipped markdown that reintroduces either.
+
+  One packaging subtlety cost more than the rewrite: **the bundler only follows `shared/resources/X` paths.** A step file naming `.agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js` is invisible to it, so writing the call alone shipped skills referencing a file that was not in their bundle. `jira-stage.js` had never hit this because `jira-transition-protocol.md` happens to name its `shared/resources/` path in prose. Each site now names the engine source explicitly, and a guard asserts that any skill invoking the CLI actually bundles it.
+
+- **GitHub board moves are guarded against regression.** Every move is ranked against the ladder, and a card already on a higher-ranked column stays put and logs `would-regress`.
+
+  This is a real behaviour change and it is the desired one. Step 5-6 previously force-wrote "In Review" at QA start over whatever the card was on. So a card a human had advanced to a showcase or merge column was silently dragged backwards on every QA cycle. It now refuses: the board is ahead of the pipeline, not behind it. `--allow-regress` exists for a deliberate reset, and no pipeline step passes it.
+
+  Note the guard is **inert without a ladder** — on a board with no `tracker-workflow.yaml` every column is unranked, so declaring the ladder is what switches the protection on.
+
+- **`/finalise` runs the stage call before the `sync-jira-*` re-link.** Both could drive the status to Done, but from *different config sources* — the stage call reads the `tracker-workflow.yaml` ladder, the sync reads its own `loadStatusMap`. One skill resolved Done two ways from two places. Ordering fixes it without a new flag: the ladder goes first, the sync's own transition then finds the issue already there and no-ops, and its real job (re-pointing the Document link at the durable branch) is untouched.
+
+### Fixed
+
+- **`/finalise` matched `"Done"` case-sensitively while every step file matched case-insensitively.** `skills/finalise/SKILL.md` selected the board option where `name == "Done"`, so a board whose column is spelled `done` silently skipped there and worked everywhere else — the kind of split that looks like a flaky board rather than a bug. Routing through the shared engine fixes it by construction: there is now one matcher (exact, case-insensitive, emoji-stripped, no prefix matching) for every caller. Strictly widening — it can only start working where it used to skip, never move a card somewhere different.
+
+- **The Step 0 post-condition check reported success after a failed move.** It asked `[ "$BOARD_STATUS" = "Todo" ]` — "is the card still literally in the column named `Todo`?" — so any board whose first column was named otherwise (`Backlog`, `New`, `Icebox`) printed "✅ Post-condition verified" after a move that had not happened. It is deleted rather than repaired: `gh-stage.js` re-reads the item after mutating and reports the option it actually landed on, which is the check this was trying to be. Some runs that looked clean will now correctly warn.
+
+- **Board mutations are retried.** `tracker_call_with_retry` wrapped the `gh issue` calls but not a single board mutation; the CLI's internal retry now covers them for the first time.
+
 ### Added
 
 - **`gh-stage.js` — a GitHub Projects board engine driven by the workflow ladder.** GitHub board moves have been five hardcoded `gh api graphql` blocks inlined in step markdown, with the field name `"Status"` and the option names written as literal `jq` matches. `develop-pipeline-step-4-create-pr.md:237` literally instructs the reader to hand-edit `select(.name == "In Review")` if their board uses a different label — that paragraph is the clearest statement of the problem. `shared/resources/gh-stage.js` replaces it with a deterministic CLI that resolves its target from the `tracker-workflow.yaml` ladder and sets the Projects v2 Status field, with the same exit-code contract as `jira-stage.js`.

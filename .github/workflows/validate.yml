@@ -50,3 +50,17 @@ jobs:
             git --no-pager diff docs/reference/skill-catalog.md | head -100
             exit 1
           fi
+
+      # A shared/resources/ edit committed without re-bundling ships skills whose
+      # references/ copies are stale — or, worse, that reference a file which is
+      # not in their bundle at all. Until now only scripts/release.sh caught this,
+      # long after review. bundle_skill.py is pure Python, like the catalog check.
+      - name: Bundle freshness check
+        run: |
+          python3 skills/create-skill/scripts/bundle_skill.py --all >/dev/null
+          if ! git diff --quiet -- 'skills/*/references/*'; then
+            echo "::error::Bundled references/ are out of date."
+            echo "Run 'npm run bundle' locally and commit the regenerated files."
+            git --no-pager diff --stat -- 'skills/*/references/*'
+            exit 1
+          fi

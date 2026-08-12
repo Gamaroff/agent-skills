@@ -30,7 +30,7 @@ Lite mode trades **QA depth** for speed on low-risk work. It does NOT trade away
 2. Set the story/task `status: accepted` in both frontmatter and body
 3. **Post the full DoD body as a PR comment** (the entire DoD file content, not just a "task accepted" line)
 4. **Comment on the linked tracker issue** (GitHub `gh issue comment` + `gh issue close`, or Jira `addCommentToJiraIssue`) with PR URL and DoD verdict
-5. **Update the project board / Jira board** status to Done (GitHub Projects v2 GraphQL `updateProjectV2ItemFieldValue` or Jira `transitionJiraIssue`)
+5. **Update the project board / Jira board** status to Done — `gh-stage.js --stage done` on GitHub, `jira-stage.js --stage done` on Jira. Both resolve the target column from the consumer's `tracker-workflow.yaml`; neither is skipped in lite mode.
 
 Skipping any of these in lite mode leaves the issue stuck "In Progress" forever and hides acceptance evidence from reviewers. The full Step 7 protocol in `references/develop-pipeline-step-7-finalise.md` applies in lite mode without exception.
 

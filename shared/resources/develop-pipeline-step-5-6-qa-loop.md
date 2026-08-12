@@ -38,74 +38,20 @@ Log in Decisions Log: "Jira {TRACKER_ISSUE} — in-qa: {landed status / disabled
 
 ### Re-assert board status at QA start (when `TRACKER=github` and `TRACKER_ISSUE` is set)
 
-Belt-and-suspenders: run **once**, before the first cycle, to ensure the issue is in **"In Review"** on entering QA. Step 4 (create-pr) already performs this move; this re-assertion corrects the board if that move was skipped (e.g. transient API error). Idempotent — re-setting the same option is a no-op. Skip silently if `TRACKER` is not `github` or `TRACKER_ISSUE` is empty. Do **not** repeat this per cycle.
+Belt-and-suspenders: run **once**, before the first cycle, to re-assert the `in-review` moment on entering QA. Step 4 (create-pr) already performs this move; this re-assertion corrects the board if that move was skipped (e.g. transient API error). Skip silently if `TRACKER` is not `github` or `TRACKER_ISSUE` is empty. Do **not** repeat this per cycle.
 
 ```bash
-(
-  OWNER=$(gh repo view --json owner -q '.owner.login')
-  REPO_NAME=$(gh repo view --json name -q '.name')
-
-  RESPONSE=$(gh api graphql -f query='
-  {
-    repository(owner: "'"$OWNER"'", name: "'"$REPO_NAME"'") {
-      issue(number: {TRACKER_ISSUE}) {
-        projectItems(first: 10) {
-          nodes {
-            id
-            fieldValueByName(name: "Status") {
-              ... on ProjectV2ItemFieldSingleSelectValue { name }
-            }
-            project {
-              id
-              fields(first: 20) {
-                nodes {
-                  ... on ProjectV2SingleSelectField {
-                    id
-                    name
-                    options { id name }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }')
-
-  CURRENT_STATUS=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
-  if [ "$(echo "$CURRENT_STATUS" | tr '[:upper:]' '[:lower:]')" = "in review" ]; then
-    echo "✅ Board already In Review — no re-assert needed"
-  else
-    ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
-    PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
-    STATUS_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .id // empty')
-    IN_REVIEW_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Status") | .options[] | select(.name | ascii_downcase == "in review") | .id // empty')
-
-    if [ -z "$ITEM_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$STATUS_FIELD_ID" ] || [ -z "$IN_REVIEW_OPTION_ID" ]; then
-      echo "⚠️  Could not resolve project item or In Review option — skipping QA-start board re-assert"
-    else
-      gh api graphql -f query='
-      mutation {
-        updateProjectV2ItemFieldValue(
-          input: {
-            projectId: "'"$PROJECT_ID"'"
-            itemId: "'"$ITEM_ID"'"
-            fieldId: "'"$STATUS_FIELD_ID"'"
-            value: { singleSelectOptionId: "'"$IN_REVIEW_OPTION_ID"'" }
-          }
-        ) {
-          projectV2Item { id }
-        }
-      }' \
-        && echo "✅ Issue #{TRACKER_ISSUE} re-asserted to In Review at QA start (was '${CURRENT_STATUS:-unknown}')" \
-        || echo "⚠️  QA-start board re-assert failed — continuing"
-    fi
-  fi
-) || echo "⚠️  QA-start board re-assert skipped (gh project unavailable or auth scope missing)"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \
+  --issue {TRACKER_ISSUE} --stage in-review --json
 ```
 
-Log in Decisions Log: "GitHub board: QA-start re-assert → In Review (or ✅ already In Review / ⚠️ skipped)."
+Engine source: `shared/resources/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
+
+Note the absence of `--allow-regress`, which is deliberate. **This re-assert is guarded.** A card someone has already advanced past review — to a showcase or merge column — will log `would-regress` and stay where it is. That is correct: the board is ahead of the pipeline, not behind it. Pass `--allow-regress` only for a deliberate reset.
+
+A card already sitting on the review column returns `reason: "already"` and the CLI makes no mutation, so no hand-rolled "is it already there?" check is needed.
+
+Log in Decisions Log: "GitHub board: QA-start re-assert → {landed / already / would-regress / no-option / skipped}."
 
 ---
 
