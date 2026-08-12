@@ -1,0 +1,100 @@
+schema: 1
+task: "task.39.github-board-stage-engine"
+task_title: "gh-stage.js — a GitHub Projects board engine driven by the workflow ladder"
+gate: FAIL
+status_reason: "Board selection falls through an explicit --board that matches nothing and writes the status to a board the operator never named — the one outcome the never-fan-out rule exists to prevent. Four tests also pass vacuously, so the suite overstates its coverage of the guard and the verify re-read."
+reviewer: "QA Engineer"
+updated: "2026-08-12T12:15:00Z"
+
+top_issues:
+  - id: CR-1
+    severity: high
+    finding: "selectBoard ||-chains its hints, so an explicit --board (or github.projectBoard) that matches no board silently falls through to the next hint and acts on a board the user never named. Verified: selectBoard(twoBoards, {board:'999', projectYml:{boardNumber:'12'}}) returns Org Portfolio with rule 'project.yml project_board_number'."
+    suggested_action: "Make the highest-precedence hint that is PRESENT authoritative — if supplied but unmatched, return ambiguous-board rather than trying lower-precedence hints."
+    suggested_owner: dev
+  - id: CR-2
+    severity: medium
+    finding: "boardHintNumber discards a non-numeric board hint and substitutes project.yml's project_board_number, so `--add-to-board --board \"Team Sprint\"` adds the issue to a different board than the one the status is written to."
+    suggested_action: "Resolve a title hint to its board number from the read items, or skip the add, rather than falling back to an unrelated configured number."
+    suggested_owner: dev
+  - id: CR-3
+    severity: medium
+    finding: "A mutation error envelope is never retried — setOption wraps only the exec call in withRetry and an error envelope does not throw, so exactly one mutation is issued. This contradicts the task's own Integration Test criterion ('Mutation error envelope → retried, then a warning and exit 0'). Verified: 1 attempt, not 3."
+    suggested_action: "Move the errors-envelope check inside the retried closure so a transient GraphQL error is retried, and assert the call count in the test."
+    suggested_owner: dev
+  - id: CR-4
+    severity: medium
+    finding: "The test 'run: moves the card and reports the option that landed' proves nothing about the post-mutation verify re-read: the queued verify fixture contains no item matching PVTI_unset_item, so `landed` falls back to r.match.name and the assertion passes even if the re-read were deleted."
+    suggested_action: "Queue a verify fixture carrying the same itemId with a different current value and assert r.to equals that value."
+    suggested_owner: dev
+  - id: CR-5
+    severity: medium
+    finding: "The test named 'guard: refuses a lower-ranked target' asserts transitioned === true — it selects a board at Todo and moves forward, so it exercises the allow path and never a refusal. Its own inline comment admits this."
+    suggested_action: "Rename to describe the forward-move allow case, or change the ladder so the target really is lower-ranked and assert reason === 'would-regress'."
+    suggested_owner: dev
+  - id: CR-6
+    severity: medium
+    finding: "The test 'guard: unranked either side means no opinion — allow' never reaches the guard: the card's current value matches the moment's only candidate, so resolveOption short-circuits to 'already' and run() returns before the rank comparison."
+    suggested_action: "Point the moment at a different off-ladder column than the card's current value so the flow reaches the rank comparison, and assert transitioned === true."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 51
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: "The --issue numeric validation sits inside the `if (!args.probeBoard)` block, so the probe path interpolates an unvalidated --issue directly into the GraphQL document (CR-9). Local operator-supplied CLI input, so impact is limited, but the plan explicitly requires validating N before interpolation. No secrets handled; auth stays entirely in `gh`."
+  performance:
+    status: PASS
+    notes: "Measured 3 gh api calls per move (1 board read + 1 mutation + 1 verify read) and 0 item-add without --add-to-board — exactly the stated Performance criteria. Net reduction against the inline block it replaces."
+  reliability:
+    status: FAIL
+    notes: "CR-1 writes a status to an unnamed board on an unmatched explicit hint. CR-3 means a transient GraphQL mutation error is never retried, contrary to the task's own criterion. CR-7 (advisory) can report a stale `landed` value because the verify re-read has no propagation delay, inverting the silent-no-op detection it exists for. CR-10 (advisory): readBoard ignores doc.errors, degrading a real API error into a benign not-on-board skip."
+  maintainability:
+    status: CONCERNS
+    notes: "Four of 51 tests pass vacuously or contradict their own names (CR-3/4/5/6), so the suite overstates coverage of the guard, the retry and the verify re-read — the three highest-risk behaviours. Module structure, comments and the documented dependency boundary are otherwise excellent, and the boundary is itself test-asserted."
+
+recommendations:
+  immediate:
+    - action: "Make an explicit unmatched board hint fail closed as ambiguous-board instead of falling through"
+      refs: ["shared/resources/gh-stage.js:401"]
+    - action: "Resolve or reject a title-valued board hint in boardHintNumber instead of substituting project.yml's number"
+      refs: ["shared/resources/gh-stage.js:864"]
+    - action: "Retry a mutation error envelope, per the task's own Integration Test criterion, and assert the attempt count"
+      refs: ["shared/resources/gh-stage.js:428"]
+    - action: "Repair the four vacuous/misnamed tests so they exercise the behaviour their names claim"
+      refs: ["shared/resources/tests/gh-stage.test.mjs:345", "shared/resources/tests/gh-stage.test.mjs:459", "shared/resources/tests/gh-stage.test.mjs:514", "shared/resources/tests/gh-stage.test.mjs:657"]
+  future:
+    - action: "Only trust the verify re-read when it matches the requested option; otherwise report the requested name and flag the read as unverified"
+      refs: ["shared/resources/gh-stage.js:833"]
+    - action: "Skip writeLadder under --dry-run and print the ladder it would have written"
+      refs: ["shared/resources/gh-stage.js:958"]
+    - action: "Hoist the --issue numeric validation so it also covers the probe path"
+      refs: ["shared/resources/gh-stage.js:604"]
+    - action: "Check doc.errors in readBoard as setOption already does"
+      refs: ["shared/resources/gh-stage.js:338"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "CR-1 must be fixed — it can write a status to a board nobody asked about, which is the failure mode the never-fan-out rule exists to prevent"
+    - "CR-3 must be fixed or the task's Integration Test criterion amended to match the implementation"
+    - "The four vacuous tests must genuinely exercise the guard, the retry and the verify re-read"
+
+code_review:
+  bugs: 10
+  cleanups: 2
+  promoted_to_gate: ["CR-1", "CR-2", "CR-3", "CR-4", "CR-5", "CR-6"]
+  advisory_only: ["CR-7", "CR-8", "CR-9", "CR-10", "CR-11", "CR-12"]
+  blocking_resolution: "code_review_blocking=true from pipeline Skill args; no per-doc override present"

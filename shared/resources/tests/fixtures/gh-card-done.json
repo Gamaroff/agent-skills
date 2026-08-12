@@ -1,0 +1,34 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "projectItems": {
+          "nodes": [
+            {
+              "id": "PVTI_done_item",
+              "fieldValueByName": { "name": "Done" },
+              "project": {
+                "id": "PVT_done",
+                "title": "Agent Skills",
+                "number": 1,
+                "fields": {
+                  "nodes": [
+                    {
+                      "id": "PVTSSF_done_status",
+                      "name": "Status",
+                      "options": [
+                        { "id": "d-todo", "name": "Todo" },
+                        { "id": "d-prog", "name": "In Progress" },
+                        { "id": "d-done", "name": "Done" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

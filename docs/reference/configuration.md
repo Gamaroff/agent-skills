@@ -54,6 +54,8 @@ jira:
 
 github:
   projectEstimateField: Estimate # optional — GitHub Projects v2 number field name for estimated dev hours
+  projectStatusField: Status # optional — GitHub Projects v2 single-select field name that pipeline moments set
+  projectBoard: 1 # optional — board number or title, used only to disambiguate a multi-board issue
 
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
@@ -131,6 +133,8 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `jira.docBranch`                                 | string (branch name)            | (falls back to `developNext.baseBranch`, then git) | Branch that Bitbucket **document links** in a synced issue point at. Set this on any repo whose docs live somewhere other than the git default branch — i.e. most Gitflow repos. Env override: `JIRA_DOC_BRANCH`. See [Document link branch](#document-link-branch).                                                                                                                                                                                                                     |
 | `jira.defaultAssignee`                           | string (Jira accountId)         | (unset → field not sent)                         | accountId applied on story/task/epic sync when the document's frontmatter has no `assignee`. Frontmatter wins. An **accountId**, never a name or team — Jira rejects anything else with a bare `HTTP 400`. Placeholders (`TBD`, `unassigned`, `none`, `n/a`, …) are refused with a warning in either position rather than sent. Unset in both places means the field is omitted entirely, so an update leaves Jira's existing assignee untouched. Find yours at `GET /rest/api/3/myself`. |
 | `github.projectEstimateField`                    | string (project field name)     | `Estimate`                                       | GitHub Projects v2 Number field name that `estimated_effort_hours` is mirrored to on story/task sync. See [GitHub estimate field](#github-estimate-field).                                                                                                                                                                                                                                                                                                                                |
+| `github.projectStatusField`                      | string (project field name)     | `Status`                                         | GitHub Projects v2 **single-select** field name that pipeline moments set via `gh-stage.js`. Env override: `GH_PROJECT_STATUS_FIELD`. See [GitHub board status field](#github-board-status-field).                                                                                                                                                                                                                                                                                       |
+| `github.projectBoard`                            | number \| string (board title)  | (unset)                                          | Which board to act on when an issue sits on **several**. Consulted only to disambiguate — a single-board issue never reads it. Falls back to `project.yml`'s `project_board_number` / `project_board_name`; with no hint at all the move is skipped as `ambiguous-board` rather than guessed. See [GitHub board status field](#github-board-status-field).                                                                                                                                 |
 | `sign-off.enabled`                               | boolean                         | `false`                                          | Master switch for the stakeholder sign-off gate. Absent or `false` → `create-*` emits no section and `review-*` checks nothing, i.e. exactly the pre-existing behaviour. See [Stakeholder sign-off](#stakeholder-sign-off).                                                                                                                                                                                                                                                              |
 | `sign-off.enforcement`                           | `advisory` \| `blocking` \| `off` | `advisory`                                     | How `review-story` / `review-task` grade an unsigned document. `advisory` = Important issue + score deduction, pipeline proceeds. `blocking` = Critical → NO-GO, and the review withholds the status promotion so `develop-*` HALTs. `off` = section emitted but never checked.                                                                                                                                                                                                          |
 | `sign-off.story.required` / `sign-off.task.required` | list[string]                | `[Stakeholder]`                                  | Roles that must sign before development begins. One table row each. Overridden per-document by a `sign_off_roles` frontmatter key.                                                                                                                                                                                                                                                                                                                                                       |
@@ -525,6 +529,84 @@ Notes:
 - Resilient by design: if the named field isn't found on a board (wrong name, wrong type, or issue not on
   that board), the sync logs a warning and skips that board — the rest of the issue still syncs.
 
+## GitHub board status field
+
+`shared/resources/gh-stage.js` sets a GitHub Projects v2 **single-select** field from the
+`tracker-workflow.yaml` ladder — the GitHub half of the same engine the Jira path uses. By default the
+field is looked up by the name `"Status"`. If your board calls it something else:
+
+```yaml
+github:
+  projectStatusField: Workflow State
+```
+
+Override per-run with `GH_PROJECT_STATUS_FIELD`, which takes precedence over the config key.
+
+A board with no field of that name is a **skip, not an error** — one warning, exit 0, and the rest of
+the pipeline step continues.
+
+### Choosing a board when an issue is on several
+
+A status change is a claim about where the work is, visible to whoever reads that board, so
+`gh-stage.js` writes to exactly **one** — never all of them. (This is deliberately unlike
+`set-github-project-priority.sh` and `set-github-project-estimate.sh`, which fan an estimate or a
+priority out to every board; that is harmless for those fields and wrong for a status.) The order:
+
+1. `--board <number|name>` on the command line — when set, must **match**
+2. `github.projectBoard` — when set, must **match**
+3. exactly one board → use it, no config needed
+4. `project.yml` → `project_board_number`, then `project_board_name`
+5. no hint → **skip**, reason `ambiguous-board`, naming the candidates
+
+`--board` and `github.projectBoard` name a specific board, so each fails closed when it matches
+nothing: the move is skipped as `ambiguous-board` rather than falling through. A mistyped `--board`
+therefore changes nothing, instead of changing the wrong board — and this check runs *before* the
+single-board rule, because a partially-failed read can leave exactly one board standing that nobody
+asked for.
+
+`project.yml` is different: it is ambient repo config rather than a claim about this issue, so it
+disambiguates when several boards are in play but never vetoes a move on the single board an issue
+sits on.
+
+**`--add-to-board` needs a board number**, since `gh project item-add` takes one and a title cannot be
+resolved from an issue-scoped read. A title still works for selecting the board to *move*.
+
+Set `github.projectBoard` only if your issues genuinely sit on more than one board. Both a number and
+a title work:
+
+```yaml
+github:
+  projectBoard: 1 # or: "Agent Skills"
+```
+
+Full semantics — the backward-move guard, `--probe-board`, `--write-ladder`, and why there is no
+walking on GitHub — are in
+[Tracker workflow → GitHub execution semantics](./tracker-workflow.md#github-execution-semantics).
+
+## `project.yml` — board identity
+
+Separate from `skills-config.yaml`, at the repo root, and read by the GitHub skills for **board
+identity** rather than behaviour. It has never been documented here; it looks like this:
+
+```yaml
+github:
+  owner: Gamaroff
+  repo: agent-skills
+  project_board_name: "Agent Skills"
+  project_board_number: 1
+```
+
+| Key                          | Used for                                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `github.owner`               | Project-board owner for `gh project item-add` and the board GraphQL queries.                 |
+| `github.repo`                | Repository name in those same queries.                                                       |
+| `github.project_board_number`| The board to add issues to, and the last-resort disambiguator for `gh-stage.js`.             |
+| `github.project_board_name`  | Human-readable board title; also matched against when disambiguating.                        |
+
+It stays a separate file on purpose: board identity has a different lifetime from skill configuration,
+and consolidating the two is not planned. `gh-stage.js` reads it as a fallback exactly as the pipeline
+step files do today. When both are present, `github.projectBoard` in `skills-config.yaml` wins.
+
 ## Worked example — typical project
 
 Complete `skills-config.yaml` for an NX-style monorepo with NestJS + Expo:
@@ -681,6 +763,14 @@ so setting either name works and setting both is harmless.
 ### GitHub
 
 GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no env vars needed in normal use. Set `GH_TOKEN` only in CI environments where interactive login is unavailable.
+
+| Variable                    | Overrides                     |
+| --------------------------- | ----------------------------- |
+| `GH_PROJECT_STATUS_FIELD`   | `github.projectStatusField`   |
+| `GH_PROJECT_ESTIMATE_FIELD` | `github.projectEstimateField` |
+
+`gh-stage.js` treats an unauthenticated `gh` as a **dead end, not a handoff**: one warning, exit 0, no
+board change. There is no MCP fallback for the GitHub path — unlike Jira, there is no second transport.
 
 ### Platform resolution order
 

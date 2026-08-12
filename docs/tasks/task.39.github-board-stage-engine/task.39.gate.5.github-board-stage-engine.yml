@@ -1,0 +1,64 @@
+schema: 1
+task: "task.39.github-board-stage-engine"
+task_title: "gh-stage.js — a GitHub Projects board engine driven by the workflow ladder"
+gate: PASS
+status_reason: "Final verification pass found no issues. Every finding from four prior cycles is fixed and independently verified, the selection matrix was walked exhaustively rather than spot-checked, and the cycle-4 fix was confirmed by reverting it and observing the test fail. Full suite 1065/1065."
+reviewer: "QA Engineer"
+updated: "2026-08-12T14:35:00Z"
+
+cycle: 5
+previous_gate: "task.39.gate.4.github-board-stage-engine.yml (CONCERNS, 90/100)"
+
+fix_verification:
+  verified_fixed: [CR4-1]
+  method: "All three probeBoard branches executed against the real module. The 'genuinely several' count was checked reachable only with items.length >= 2. The new test was validated as non-vacuous by compiling the pre-fix source and confirming all three assertions fail on revert — the check cycles 1 and 3 showed to be necessary."
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 65
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "--issue validated on every path including the probe, before any query is built. Auth delegated entirely to gh; no secrets handled; no second transport to secure."
+  performance:
+    status: PASS
+    notes: "Measured, not assumed: 3 gh api calls per move (read + mutation + verify read), 0 item-add without --add-to-board. A net reduction against the inline block being replaced."
+  reliability:
+    status: PASS
+    notes: "The board-selection bypass is closed on both the operator-hint and partial-read paths, verified by exhaustive matrix walk. Transient mutation failures retry 3×. Failure modes bias consistently toward refusing to act rather than acting wrongly — the correct direction for a tool whose only brake is its own guard, since a Projects v2 single-select accepts any option from any other."
+  maintainability:
+    status: PASS
+    notes: "Suite grew 51 → 65 across the loop, every addition pinning a defect that actually occurred rather than a hypothetical. No vacuous tests remain; the last one was caught in cycle 3 and this cycle's reviewer verified the newest test fails on revert. Comments explain why rather than what, and the no-Jira dependency boundary is asserted by a test rather than left as convention."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add \"Todo\" to DEFAULT_LADDER rung 0 so a stock GitHub board is ranked and the guard is not inert there"
+      refs: ["shared/resources/tracker-workflow.js:82-84"]
+      note: "Deliberately out of scope — it changes a default that Jira consumers also read. Recorded in the task's Known Issues with its blast radius stated."
+    - action: "Wire the five inline GraphQL board blocks to this CLI"
+      refs: ["docs/tasks/task.40.github-pipeline-step-wiring/"]
+      note: "task.40, as scoped. Nothing calls gh-stage.js yet and that ordering was deliberate."
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+qa_loop_summary:
+  cycles: 5
+  gates: ["FAIL (60)", "CONCERNS (80)", "FAIL (55)", "CONCERNS (90)", "PASS (100)"]
+  findings_total: 20
+  findings_fixed: 20
+  note: "Cycle 3's FAIL is the one worth remembering: cycle 2's partial-read tolerance — the only change of that round that WIDENED what the code accepts rather than narrowing it, and the only one that arrived labelled low-confidence advisory — reopened the cycle-1 wrong-board defect through a different door. A loosened guard warrants the same scrutiny as a new feature, whatever label it arrives under."

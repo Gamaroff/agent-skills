@@ -33,10 +33,13 @@ That is a complete, working file.
 reproduces their historical behaviour exactly. Adding one is how you opt into describing your own
 board; it is never a prerequisite.
 
-> **Status**: **Jira reads this file** (task.38) — `jira-stage.js` resolves every moment's target from
-> the ladder and walks the rungs between. GitHub execution is task.39 and step-file wiring is task.40,
-> so on a GitHub board you can author and validate the file today but it does not yet move cards.
-> See [Jira execution semantics](#jira-execution-semantics) for exactly what the Jira path does with it.
+> **Status**: **Both trackers read this file.** Jira (task.38) resolves every moment's target from the
+> ladder and walks the rungs between; GitHub (task.39) resolves the target the same way and sets the
+> Projects v2 Status field, with no walking — see below for why. **Step-file wiring is task.40**, so on
+> a GitHub board you can author, validate and probe the file today, and `gh-stage.js` will move a card
+> when you call it directly, but the pipeline steps still use their own inline GraphQL.
+> See [Jira execution semantics](#jira-execution-semantics) and
+> [GitHub execution semantics](#github-execution-semantics) for what each path does with it.
 
 ---
 
@@ -493,6 +496,152 @@ Consumers with the Atlassian MCP connector but no API token follow
 `shared/resources/jira-transition-protocol.md`. That path reads `--print-plan` for its candidates but
 **performs at most one transition**. If the plan needs more than one hop it logs and leaves the card
 for a human — firing hop 1 and stopping, or jumping the gate, are both worse than not trying.
+
+---
+
+## GitHub execution semantics
+
+What the GitHub path does with the ladder. Everything here is
+`shared/resources/gh-stage.js`, which depends on `tracker-workflow.js` and nothing else — a
+GitHub-only consumer never bundles the Jira engine.
+
+### There is no workflow, so there is no walking
+
+This is the asymmetry to internalise before reading anything else here. A Jira workflow is a graph:
+it can refuse a transition, which is why the Jira path walks the rungs between two positions and
+re-reads the available transitions after every hop. **A Projects v2 Status field is a single-select
+list.** Every option is settable from every other one. There is no transition graph, no "not reachable
+from here", and therefore no walking and no `--print-plan`.
+
+The ladder still matters, for two things: **rank**, and **which option each moment names**.
+
+### The guard is the only brake
+
+On Jira the workflow refuses illegal moves, so the backward-move guard is a second line of defence.
+On GitHub there is no first line — `updateProjectV2ItemFieldValue` will cheerfully move a card from
+Done back to In Progress, and a resumed pipeline run does exactly that. So the guard here is
+**mandatory, not advisory**:
+
+```bash
+gh-stage.js --issue 123 --stage work-started      # refused if the card is past In Progress
+gh-stage.js --issue 123 --stage work-started --allow-regress   # override, deliberately
+```
+
+Ranks come from your ladder, and unranked either side means no opinion — allow. That is the same
+semantics as the Jira guard, and it has a sharper consequence here: **on a board with no
+`tracker-workflow.yaml`, every bespoke column is unranked and the guard is inert.** Declaring the
+ladder is what switches the protection on. (GitHub's own default first column, `Todo`, is not on the
+built-in ladder either — it has `To Do`, with a space. A stock board with no file therefore starts
+unranked. Fixing that is a change to the shared default ladder and is tracked separately.)
+
+### A skip means something different from Jira's
+
+On Jira, "no transition from here" is frequently correct — the board genuinely cannot get there from
+where the card sits. On GitHub, `no-option` can only mean **the Status field has no such option at
+all**, which is always a configuration error. The message says so, and lists what the board did
+offer:
+
+```
+⚠️  no option matching [In Review] on board "Agent Skills" — board offers: Todo, In Progress, Ready for Showcase, Done
+   ↪ "Ready for Showcase" is present and is the target for moment pr-merged
+```
+
+Do not reuse Jira's "a skip is often correct" wording for this outcome.
+
+### Never fan out across boards
+
+An issue can sit on several project boards. `set-github-project-priority.sh` and
+`set-github-project-estimate.sh` write to **every** one of them, which is fine for an estimate and
+wrong for a status: a status change is a claim about where the work is, visible to whoever reads that
+board. `gh-stage.js` picks exactly one, in this order:
+
+1. `--board <number|name>`, when set → must **match**, else fail closed
+2. `github.projectBoard`, when set → must **match**, else fail closed
+3. exactly one board → use it
+4. `project.yml` → `project_board_number` / `project_board_name`
+5. otherwise → skip with `ambiguous-board`, **naming the candidates** rather than guessing
+
+Two kinds of hint, deliberately treated differently.
+
+**`--board` and `github.projectBoard` are an operator naming a board.** If the named board is not
+among those read, that is a question — not a licence to pick a different one. Each fails closed on its
+own, without consulting the tier below: "no hint given" and "the hint you gave was wrong" are
+different questions, and answering the second by quietly consulting a lower tier is how a mistyped
+`--board` ends up changing the status on somebody else's board.
+
+Note where the single-board rule sits: **after** those checks, not before. A read returns one board
+for reasons other than the issue being on one board — a partially-failed read is exactly that, with
+the named board missing precisely because the token could not see it. Checking "is there only one?"
+first would write to the survivor without ever comparing its name. When a hint fails to match on a
+partial read, the skip says so, because the candidate list alone actively hides that explanation.
+
+**`project.yml` is ambient repo config** — where this repo's board generally is, not an assertion
+about this issue. It disambiguates when several boards are in play and never vetoes a move on the one
+board an issue actually sits on. Its two keys are two spellings of one board, so a stale
+`project_board_number` does not make `project_board_name` unreachable.
+
+**`--add-to-board` needs a board NUMBER.** `gh project item-add` takes one, and a title cannot be
+resolved to a number from anything this CLI reads: its only read is issue-scoped, so it lists boards
+the issue is *already* on. A non-numeric hint therefore skips the add with a warning rather than
+substituting whatever `project.yml` happens to name. The status move itself still works with a title —
+only the add needs the number.
+
+### Matching is exact, case-insensitive, emoji-stripped — and never prefix
+
+One discipline everywhere. `🚧 In Progress` matches `In Progress`; `done` matches `Done`. **`In
+Review` does not match `In Review (blocked)`** — prefix matching is what makes that go wrong, so
+there is none. Candidates are tried in the order the rung declares them, first hit wins.
+
+### Inspecting without moving anything
+
+```bash
+# Read-only. Prints the board's real options in board order, and how every
+# moment resolves against them.
+gh-stage.js --probe-board --issue 123
+
+# Read-only. Resolves the target and applies the guard, then stops.
+gh-stage.js --issue 123 --stage in-review --dry-run
+```
+
+`--dry-run` issues **no** write — including no `gh project item-add`. This is worth stating because
+the inline step-0 block it replaces runs `item-add` *before* its read query, so a naive port would
+write during a read-only check. Under `--dry-run --add-to-board` it prints `would add issue #N to
+board X` instead. A test stubs `gh` and fails on any write verb, because a comment is not a guarantee.
+
+### `--write-ladder`: the ergonomic win over Jira
+
+Jira needs `statusRank` hand-authored, because a workflow graph has no inherent order. **A
+single-select field is a list, and your team already put it in the order work flows through it** — so
+the ladder can simply be read off the board:
+
+```bash
+gh-stage.js --probe-board --write-ladder --issue 123
+```
+
+It writes `tracker-workflow.yaml` with your board's Status options as `statuses:`, in board order.
+**It never overwrites an existing file** — a hand-authored ladder encodes intent a board read cannot
+recover, so an existing one is left untouched and you are told why. Combined with `--dry-run` it
+prints the ladder it would have written and writes nothing: the no-write contract covers the
+filesystem, not just the board.
+
+### Exit codes
+
+Identical to the Jira path, and for the same reason — pipeline steps run inside shells:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | `transitioned`, `already`, `stage-disabled`, `no-option`, `not-on-board`, `ambiguous-board`, `no-status-field`, `no-credentials`, `would-regress`, `dry-run`, and any unhandled throw |
+| 1 | a skip, **only** under `--strict` |
+| 2 | usage error (unknown moment, missing or non-numeric `--issue`) |
+
+`would-regress` and `already` stay exit 0 even under `--strict`: both mean the board is at or past
+where the moment wanted it, which is not a skip worth escalating.
+
+### No credentials is a dead end, not a handoff
+
+`gh` is either authenticated or it is not. Unlike Jira there is **no MCP fallback and no second
+transport**, so `no-credentials` logs one line and exits 0. Do not look for a fallback protocol
+document for the GitHub path — none exists, and none should.
 
 ---
 

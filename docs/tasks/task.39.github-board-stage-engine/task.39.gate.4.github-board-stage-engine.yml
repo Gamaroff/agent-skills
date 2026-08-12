@@ -1,0 +1,67 @@
+schema: 1
+task: "task.39.github-board-stage-engine"
+task_title: "gh-stage.js — a GitHub Projects board engine driven by the workflow ladder"
+gate: CONCERNS
+status_reason: "All three cycle-3 fixes verified, including the HIGH board-selection bypass — an exhaustive walk of the selection matrix found no combination that selects a board the operator named differently. One inconsistency remains: probeBoard was not updated alongside run(), so on a single-board hint miss it prints a message that is factually wrong and omits the new diagnostic fields. Read-only path, no writes at risk."
+reviewer: "QA Engineer"
+updated: "2026-08-12T14:10:00Z"
+
+cycle: 4
+previous_gate: "task.39.gate.3.github-board-stage-engine.yml (FAIL, 55/100)"
+
+fix_verification:
+  verified_fixed: [CR3-1, CR3-2, CR3-3]
+  selectboard_matrix: "All 16 combinations of (--board × github.projectBoard × one-vs-many boards × project.yml matching) walked. No combination selects a board the operator named differently. The only refusals of a would-be-legitimate move are the documented and tested fail-closed intent."
+  partial_marker: "The non-enumerable `partial` marker survives every path it is read on — ensureOnBoard returns readBoard's array verbatim, and no filter/map/slice sits between read and select."
+  observed_tristate: "Every path leaving observed === null also sets verifyError, so the message can never interpolate null, and 'shows (unset)' is printed only when the read actually succeeded."
+
+top_issues:
+  - id: CR4-1
+    severity: medium
+    finding: "probeBoard was not updated alongside run(). Now that an unmatched --board can yield ambiguous-board with a SINGLE board, probeBoard's warning asserts a falsehood — `gh-stage --probe-board --issue 42 --board 999` on a one-board issue prints \"issue #42 is on several boards — pass --board\", when the issue is on one board and --board was already passed. Its emitted payload also drops unmatchedHint / unmatchedRule / partialRead, so under --json the partial-read explanation cycle 3 added is computed here but never surfaced."
+    suggested_action: "Give probeBoard the same reporting branch run() has: name the unmatched hint and its rule, and carry partialRead into the payload."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 64
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged — --issue validated on every path, auth delegated to gh, no secrets handled."
+  performance:
+    status: PASS
+    notes: "3 gh api calls per move, 0 item-add without the flag. The cycle-3 removal of the redundant title-hint add also removed a wasted write, a 3s sleep and a second read from that path."
+  reliability:
+    status: PASS
+    notes: "Upgraded from FAIL. The board-selection bypass is closed and the fix was verified by exhaustive matrix walk rather than by spot check. Failure modes now bias consistently toward refusing to act rather than acting wrongly, which is the correct direction for a tool whose only brake is its own guard."
+  maintainability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. The vacuous test flagged in cycle 3 was replaced with two that assert distinct real behaviours, and this cycle's review found no new vacuous tests. Suite 51 → 64 across the loop, every addition pinning a defect that actually occurred."
+
+recommendations:
+  immediate:
+    - action: "Mirror run()'s ambiguous-board reporting in probeBoard"
+      refs: ["shared/resources/gh-stage.js:1134"]
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "CR4-1 — probeBoard must not tell an operator they are on several boards when they are on one"
+
+code_review:
+  bugs: 1
+  cleanups: 0
+  promoted_to_gate: ["CR4-1"]
+  blocking_resolution: "code_review_blocking=true from pipeline Skill args; no per-doc override present"

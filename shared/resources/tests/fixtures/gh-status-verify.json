@@ -1,0 +1,34 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "projectItems": {
+          "nodes": [
+            {
+              "id": "PVTI_unset_item",
+              "fieldValueByName": { "name": "In Progress" },
+              "project": {
+                "id": "PVT_unset",
+                "title": "Agent Skills",
+                "number": 1,
+                "fields": {
+                  "nodes": [
+                    {
+                      "id": "PVTSSF_unset_status",
+                      "name": "Status",
+                      "options": [
+                        { "id": "u-todo", "name": "Todo" },
+                        { "id": "u-prog", "name": "In Progress" },
+                        { "id": "u-done", "name": "Done" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

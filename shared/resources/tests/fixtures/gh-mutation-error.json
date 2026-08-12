@@ -1,0 +1,11 @@
+{
+  "data": { "updateProjectV2ItemFieldValue": null },
+  "errors": [
+    {
+      "type": "FORBIDDEN",
+      "path": ["updateProjectV2ItemFieldValue"],
+      "locations": [{ "line": 2, "column": 3 }],
+      "message": "Resource not accessible by integration"
+    }
+  ]
+}
