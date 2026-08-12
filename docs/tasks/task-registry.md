@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-08-05
-**Next Available Task Number:** **42**
+**Last Updated:** 2026-08-12
+**Next Available Task Number:** **46**
 
 ## How to use
 
@@ -81,6 +81,10 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 39 | [gh-stage.js — a GitHub Projects board engine driven by the workflow ladder](task.39.github-board-stage-engine/task.39.github-board-stage-engine.md) | planned | infrastructure | High | 2026-08-03 | [#187](https://github.com/Gamaroff/agent-skills/issues/187) | task.37 |
 | 40 | [Replace the five inline GitHub GraphQL board blocks with gh-stage.js calls](task.40.github-pipeline-step-wiring/task.40.github-pipeline-step-wiring.md) | planned | refactoring | High | 2026-08-03 | [#188](https://github.com/Gamaroff/agent-skills/issues/188) | task.39 |
 | 41 | [Two new pipeline moments, workflow-file scaffolding, and the develop-bug gap](task.41.pipeline-moments-and-scaffolding/task.41.pipeline-moments-and-scaffolding.md) | planned | infrastructure | Medium | 2026-08-03 | [#189](https://github.com/Gamaroff/agent-skills/issues/189) | task.38, task.40 |
+| 42 | [Canonical Change Log spec and shared engine](task.42.change-log-spec-and-engine/task.42.change-log-spec-and-engine.md) | planned | infrastructure | High | 2026-08-12 | [#201](https://github.com/Gamaroff/agent-skills/issues/201) | — |
+| 43 | [Templates and creation skills emit the canonical Change Log](task.43.change-log-templates-and-creation/task.43.change-log-templates-and-creation.md) | planned | documentation | High | 2026-08-12 | [#202](https://github.com/Gamaroff/agent-skills/issues/202) | task.42 |
+| 44 | [Review and edit skills log their document mutations](task.44.change-log-review-and-edit/task.44.change-log-review-and-edit.md) | planned | refactoring | High | 2026-08-12 | [#203](https://github.com/Gamaroff/agent-skills/issues/203) | task.42, task.43 |
+| 45 | [Pipeline, QA, finalise, and tracker sync write the Change Log](task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md) | planned | refactoring | High | 2026-08-12 | [#204](https://github.com/Gamaroff/agent-skills/issues/204) | task.42, task.43, task.44 |
 
 ---
 
