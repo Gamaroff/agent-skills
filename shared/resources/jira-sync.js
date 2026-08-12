@@ -902,6 +902,10 @@ function capDescriptionAdf(doc, opts = {}) {
 // last-resort guard; after summarisation it should never fire.
 const CARD_MAX_LIST_ITEMS = 5; // criteria kept on the card
 const CARD_MAX_SENTENCES = 4; // prose sentences kept on the card
+// Backstop for prose the sentence cap cannot reach: an author who writes one
+// long unpunctuated paragraph splits into a single "sentence", so 4 sentences
+// is no limit at all. Generous enough that normal prose never hits it.
+const CARD_MAX_CHARS = 600;
 
 const RE_SUBHEADING = /^#{3,6}\s+/;
 const RE_FENCE = /^\s*(```|~~~)/;
@@ -1035,22 +1039,47 @@ function summariseSection(content, opts = {}) {
     };
   }
 
-  // Prose: the first paragraph only, capped at `maxSentences`.
+  // Prose: the first PROSE paragraph, capped at `maxSentences`.
   const paras = src
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter(Boolean);
-  const first = paras[0] || "";
-  // A table or fence as the opening block is detail, not a summary lead.
-  if (RE_TABLE_ROW_START.test(first) || RE_FENCE.test(first)) {
+
+  // Skip leading tables and fenced blocks rather than giving up on the section.
+  //
+  // Returning nothing here meant a document whose Overview opens with a table —
+  // a decision matrix, a before/after — published a card with NO summary at all,
+  // and `summaryBlockNodes` drops an empty block, so the heading vanished too.
+  // A silently summary-less card is the failure this whole change exists to
+  // prevent, arrived at from the other direction. The prose is usually right
+  // below; take it.
+  const isProseBlock = (p) =>
+    !RE_TABLE_ROW_START.test(p) && !RE_FENCE.test(p) && !isTableSepLine(p);
+  const firstIdx = paras.findIndex(isProseBlock);
+  if (firstIdx === -1) {
+    // Genuinely nothing but tables and code. Say how much was skipped rather
+    // than reporting a confident empty.
     return { text: "", omitted: paras.length, kind: "prose" };
   }
+  const first = paras[firstIdx];
+
   const sentences = splitSentences(first.replace(/\n+/g, " ").trim());
-  const kept = sentences.slice(0, maxSentences);
-  // Anything past the first paragraph is omitted too, so the count reflects
-  // sentences dropped from THIS paragraph plus the paragraphs never considered.
-  const omitted = sentences.length - kept.length + (paras.length - 1);
-  return { text: kept.join(" ").trim(), omitted: Math.max(0, omitted), kind: "prose" };
+  let kept = sentences.slice(0, maxSentences);
+  // Anything before or after the chosen paragraph is omitted too, so the count
+  // reflects sentences dropped from THIS paragraph plus every block skipped.
+  let omitted = sentences.length - kept.length + (paras.length - 1);
+  let text = kept.join(" ").trim();
+
+  // A wall of text with no sentence terminators splits into ONE "sentence", so
+  // the sentence cap never engages and the whole thing lands on the card. Cap
+  // the characters as a backstop, cutting on a word boundary.
+  if (text.length > CARD_MAX_CHARS) {
+    const cut = text.slice(0, CARD_MAX_CHARS);
+    const brk = cut.lastIndexOf(" ");
+    text = (brk > CARD_MAX_CHARS * 0.6 ? cut.slice(0, brk) : cut).trimEnd() + "…";
+    omitted = Math.max(omitted, 1);
+  }
+  return { text, omitted: Math.max(0, omitted), kind: "prose" };
 }
 
 /**
@@ -3911,6 +3940,7 @@ module.exports = {
   // card summarisation
   CARD_MAX_LIST_ITEMS,
   CARD_MAX_SENTENCES,
+  CARD_MAX_CHARS,
   dropHeadingLines,
   firstTableIn,
   splitSentences,

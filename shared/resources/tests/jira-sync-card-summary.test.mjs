@@ -36,6 +36,7 @@ const lib = require(join(__dirname, "..", "jira-sync.js"));
 const {
   CARD_MAX_LIST_ITEMS,
   CARD_MAX_SENTENCES,
+  CARD_MAX_CHARS,
   dropHeadingLines,
   firstTableIn,
   splitSentences,
@@ -140,6 +141,34 @@ test("B: abbreviations and decimals do not split a sentence", () => {
   assert.equal(splitSentences("Use the cache, e.g. Redis, for reads.").length, 1);
   assert.equal(splitSentences("It takes 2.5 hours to run.").length, 1);
   assert.equal(splitSentences("First. Second.").length, 2);
+});
+
+// A section opening with a table (a decision matrix, a before/after) must not
+// cost the card its whole summary. An earlier version returned empty here, and
+// because summaryBlockNodes drops an empty block the HEADING vanished too — a
+// silently summary-less card, which is the failure this change exists to
+// prevent, reached from the other direction.
+test("B: a leading table or fence is skipped, not treated as the summary", () => {
+  for (const lead of ["| a | b |\n|---|---|\n| 1 | 2 |", "```js\ncode()\n```"]) {
+    const { text, omitted } = summariseSection(`${lead}\n\nReal prose here.`);
+    assert.equal(text, "Real prose here.", `failed for lead: ${lead.slice(0, 12)}`);
+    assert.equal(omitted, 1, "the skipped block still counts as omitted");
+  }
+});
+
+test("B: a section that is nothing but a table yields no summary, and says so", () => {
+  const { text, omitted } = summariseSection("| a | b |\n|---|---|\n| 1 | 2 |");
+  assert.equal(text, "");
+  assert.ok(omitted > 0, "an empty result must still report what was skipped");
+});
+
+// One long unpunctuated paragraph splits into a SINGLE sentence, so the
+// sentence cap never engages and the whole wall of text lands on the card.
+test("B: prose with no sentence terminators is still capped", () => {
+  const { text, omitted } = summariseSection("word ".repeat(400));
+  assert.ok(text.length <= CARD_MAX_CHARS + 1, `got ${text.length} chars`);
+  assert.match(text, /…$/, "a character-capped summary must show it was cut");
+  assert.ok(omitted > 0, "and must count as omitted so a pointer is emitted");
 });
 
 // ---------------------------------------------------------------------------
