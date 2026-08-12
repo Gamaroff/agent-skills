@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **One canonical Change Log, and one engine that writes it.** A Change Log already existed on PRD, epic, story, and task documents — in four incompatible table shapes, written by nine skills that disagreed about the format, with only the Jira path having any code at all. `shared/resources/document-change-log.md` is now the single definition (four columns: `Date`, `Version`, `Description`, `Author`), and `shared/resources/change-log.js` is the only implementation of it. Nothing changes behaviour yet: `jira-sync.js` keeps its old exports as wrappers, so all three `sync-jira-*` scripts are untouched. Task.43–45 rewire the callers.
+
+  `Version` is what lets one table serve two audiences: authoring and review skills bump it (`1.0` → `1.1`), machine writers leave it blank. Without that convention the alternative is a human log and a machine log that disagree about what happened.
+
+  Three defects die with the extraction, and one new guard arrives:
+
+  - **H3 headings are found.** `/^## Change Log/m` could not see the `### Change Log` that the epic and story templates actually emit, so the update-in-place branch never fired and a **second** block was inserted at the top of the document body — above the Epic Goal. Now H2 or H3 with optional section numbering (`### 1.5 Change Log`), and the level found is the level preserved.
+  - **Blocks end where they should.** The old end-scan looked only for `/^## /m`, so an H3 log ran to the next H2 and swallowed its sibling subsections. Now it stops at the next heading of the same or shallower level.
+  - **The top-of-body fallback is gone.** "Insert before the first `##`" is how a Change Log ended up above the Epic Goal. Insertion now targets a doc-type anchor (`## Dev Agent Record` / `## Progress Tracking` / `## Notes & Updates`), falling back to end-of-document. An anchor that does not match appends harmlessly; guessing the top does not.
+  - **An example is not a section.** Every match — marker pair or heading — is discarded when it falls inside a fenced code block *or an inline code span*. This is the sibling of the existing frontmatter guard, and all of them answer one question: is this text content, or a picture of content? It is not tidiness. Documentation about a Change Log necessarily contains examples of one; the task documents specifying this engine hold eleven fenced headings and two complete fenced marker pairs, and the spec's own Phase 2 checklist names both markers in backticks on adjacent lines. Unguarded, running the engine over its own specification appends live rows into a code fence, migrates an illustrative row into real history, and overwrites the checklist bullet. The inline-code half was found exactly that way — by pointing the finished engine at the document that specified it.
+
+  One marker pair (`<!-- change-log-start/end -->`) supersedes the two legacy pairs (`jira-sync-`, `github-sync-`), which are read and **migrated in place**, never written. A document synced to both trackers had grown two independent logs; on first write they collapse into one, rows merged in date order.
+
+  Two exclusions are stated rather than left implicit: bug reports keep `## Status History` (richer — it has a Status column), and tracker cards never carry the log at all.
+
 - **The last two moments are wired: `changes-requested` and `pr-merged`.** task.37 declared all eight moments; six of them fired. The two that did not were the two covering the parts of a run the board previously could not see at all — a card sat frozen in review through up to five QA fix cycles, and nothing whatsoever fired when the PR actually merged, which is the only moment at which "the code is on `develop`" is known.
 
   `changes-requested` fires from the shared QA-loop step file on entering each fix cycle, before `/qa-fix`. **It fires once per cycle**, which is the exact opposite of the rule stated a few lines above it for `in-qa`, so both the step file and the reference doc now say why: `in-qa` marks a phase the card enters once, and re-announcing it every cycle tells a board reader nothing new; `changes-requested` marks a state the card *re-enters*, and a board that shows it on cycle 1 and then goes quiet through cycles 2–5 is actively saying something false.

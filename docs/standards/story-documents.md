@@ -89,6 +89,7 @@ Stories have distinct sections owned by distinct roles. `create-story` writes th
 | Dev Notes (extracted context) | `create-story` | Anti-hallucination: every claim sourced |
 | Testing guidance | `create-story` | |
 | Stakeholder Sign-off | `create-story` scaffolds the roles; **humans sign** | Only when `sign-off.enabled: true`. Agents never write a Signature or Date cell. Sits between Dev Notes and Change Log. Never synced to a tracker. See [`sign-off.md`](../../shared/resources/sign-off.md) |
+| Change Log | Every skill that mutates the document | Append-only. Sits between Stakeholder Sign-off and Dev Agent Record. Four columns; machine writers leave `Version` blank. See [`document-change-log.md`](../../shared/resources/document-change-log.md) |
 | Dev Agent Record (model, completion notes, file list) | `develop-story` (developer) | Append-only during implementation |
 | QA Results | `qa-story` / `qa-gate` | Never modified by dev skills |
 

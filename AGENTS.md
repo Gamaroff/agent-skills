@@ -97,6 +97,10 @@ Canonical patterns: [`docs/standards/file-naming.md`](./docs/standards/file-nami
 
 Canonical spec: [`shared/resources/document-status-lifecycle.md`](./shared/resources/document-status-lifecycle.md). TL;DR: `draft → planned → ready-for-development → in-progress → ready-for-review → accepted`, with `cancelled` reachable from any non-terminal state. Frontmatter `status:` uses `lowercase-kebab-case`; body `**Status:**` uses `Title Case`. Update both in the same edit.
 
+## Document Change Log
+
+Canonical spec: [`shared/resources/document-change-log.md`](./shared/resources/document-change-log.md). Engine: [`shared/resources/change-log.js`](./shared/resources/change-log.js) (pure, tracker-agnostic). TL;DR: every PRD, epic, story, and task carries an append-only `## Change Log` — four columns (`Date`, `Version`, `Description`, `Author`), newest at the bottom. Authoring/review/edit skills bump `Version`; machine writers (sync, QA, finalise, develop) leave it blank. **Every entry bumps frontmatter `updated:` in the same edit** (`updated` ≡ OKF `timestamp`). PRDs keep a nested `### Change Log`; readers accept H2 or H3 with optional numbering and preserve the level found. Markers are `<!-- change-log-start/end -->`, superseding the two legacy `jira-sync-`/`github-sync-` pairs, which migrate in place. Two exclusions: bug reports use `## Status History`, and tracker cards never carry the log. Adoption is additive and going-forward only — no backfill.
+
 ## Open Knowledge Format
 
 Document frontmatter targets **OKF v0.1**. Canonical mapping + conformance statement: [`shared/resources/open-knowledge-format.md`](./shared/resources/open-knowledge-format.md). TL;DR: every document carries a non-empty `type` (OKF's one hard requirement); `description` is recommended and `tags` optional; `updated` ≡ OKF `timestamp`; the tracker URL (`github_url`/`jira_url`, or derived from `github_issue`) ≡ OKF `resource`. Adoption is additive and going-forward only — `review-*` enforce a missing `type` as Critical.

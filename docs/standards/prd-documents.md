@@ -66,7 +66,7 @@ tags: [onboarding, docs]
 
 `create-prd` / `new-product-prd` produces a document with these eight level-2 sections:
 
-1. **Goals and Background Context** — problem statement, target users, business goals
+1. **Goals and Background Context** — problem statement, target users, business goals, and the nested `### Change Log`
 2. **Requirements** — functional + non-functional (numbered FR/NFR), mandatory elicitation
 3. **UI Design Goals** — UX vision (when applicable)
 4. **Technical Assumptions** — repo structure, languages, deployment, key constraints
@@ -79,12 +79,14 @@ tags: [onboarding, docs]
 
 `create-prd` (brownfield) replaces sections 1–4 with brownfield-specific structure:
 
-1. **Intro Project Analysis and Context** — analyses the existing codebase
+1. **Intro Project Analysis and Context** — analyses the existing codebase, and carries the nested `### Change Log`
 2. **Requirements** — mandatory elicitation
 3. **UI Enhancement Goals** — conditional
 4. **Technical Constraints and Integration Requirements** — compatibility, integration points, risk
 5. **Epic and Story Structure** — mandatory elicitation
 6. **Epic Details** — mandatory per epic
+
+> **Change Log placement.** Unlike epics, stories, and tasks — which carry a top-level `## Change Log` — a PRD keeps its log **nested under §1 as `### Change Log`**, because the `create-doc` engine owns section nesting and the numbered section contract above is asserted against it. The engine reads H2 or H3 with optional numbering (`### 1.5 Change Log`) and preserves whichever level it finds, so no PRD needs restructuring. Spec: [`document-change-log.md`](../../shared/resources/document-change-log.md).
 
 ## Templates
 

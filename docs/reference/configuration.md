@@ -139,6 +139,8 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `sign-off.enforcement`                           | `advisory` \| `blocking` \| `off` | `advisory`                                     | How `review-story` / `review-task` grade an unsigned document. `advisory` = Important issue + score deduction, pipeline proceeds. `blocking` = Critical → NO-GO, and the review withholds the status promotion so `develop-*` HALTs. `off` = section emitted but never checked.                                                                                                                                                                                                          |
 | `sign-off.story.required` / `sign-off.task.required` | list[string]                | `[Stakeholder]`                                  | Roles that must sign before development begins. One table row each. Overridden per-document by a `sign_off_roles` frontmatter key.                                                                                                                                                                                                                                                                                                                                                       |
 | `sign-off.story.optional` / `sign-off.task.optional` | list[string]                | `[]`                                             | Roles given a row but never graded. Rendered with a ` (optional)` suffix in the Role cell, which is the only marker separating them from required rows.                                                                                                                                                                                                                                                                                                                                  |
+| `change-log.enabled`                             | boolean                         | `true`                                           | Master switch for the document Change Log. `false` → `create-*` emits no section and `review-*` checks nothing. Defaults **on**, unlike sign-off: a log is a record of what happened, not a gate on a human. See [Document change log](#document-change-log).                                                                                                                                                                                                                              |
+| `change-log.enforcement`                         | `advisory` \| `blocking` \| `off` | `advisory`                                     | How `review-*` grade a missing or stale Change Log. `advisory` = Important issue + score deduction, pipeline proceeds. `blocking` = Critical → NO-GO, and the review withholds the status promotion so `develop-*` HALTs. `off` = section emitted but never checked.                                                                                                                                                                                                                     |
 | `branching.epicIntegration.epicFrontmatterKey`   | string                          | `branch_model`                                   | Epic frontmatter key read to decide whether the epic delivers via an integration branch.                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `branching.epicIntegration.epicFrontmatterValue` | string                          | `epic-integration`                               | Value of that key meaning "this epic's stories branch from and merge into an integration branch". Any other value, or the key's absence, means the pre-existing `develop`-direct behaviour.                                                                                                                                                                                                                                                                                               |
 | `branching.epicIntegration.branchKey`            | string                          | `integration_branch`                             | Epic frontmatter key holding the branch name. Used **verbatim** when present — the epic document is the authority on its own branch name.                                                                                                                                                                                                                                                                                                                                                 |
@@ -204,6 +206,36 @@ Stakeholders sign by editing the document — in the Bitbucket or GitHub web edi
 Enforcement is per-project via `sign-off.enforcement`. The default `advisory` keeps `/develop-next` and `/develop-batch` running unattended — an unsigned document is flagged and docks the readiness score but does not HALT. Under `blocking`, the review withholds the status promotion, which is what actually stops the pipeline (`develop-*` gates on `Status:`, not on the score).
 
 Full spec: [`sign-off.md`](../../shared/resources/sign-off.md).
+
+## Document change log
+
+On by default. Every PRD, epic, story, and task document carries a **Change Log**: an append-only table of what changed about the document, when, and who changed it.
+
+```markdown
+<!-- change-log-start -->
+## Change Log
+
+| Date       | Version | Description                                  | Author          |
+|------------|---------|----------------------------------------------|-----------------|
+| 2026-05-11 | 1.0     | Initial draft                                | create-story    |
+| 2026-05-13 | 1.1     | Review passed (9/10) — ready for development | review-story    |
+| 2026-08-12 |         | Jira story created (PROJ-42)                 | sync-jira-story |
+<!-- change-log-end -->
+```
+
+Four columns, because two audiences read one table. **Humans** authoring and reviewing care about the document `Version` — `1.0` at first draft, `1.1` after a review changes the acceptance criteria. **Machines** syncing, gating, and finalising care about the moment, and leave `Version` blank. That single convention is what avoids a human log and a machine log that disagree about what happened.
+
+**Every entry bumps frontmatter `updated:` in the same edit.** `updated` is this repo's OKF `timestamp`; a log entry that does not move it leaves the document claiming it was last touched before its own most recent recorded change.
+
+The heading is `## Change Log` for epics, stories, and tasks. **PRDs keep `### Change Log` nested under §1** — readers accept H2 or H3, with optional section numbering (`### 1.5 Change Log`), and the level found is the level preserved on rewrite.
+
+**Two exclusions.** Bug reports carry `## Status History` instead, which is richer (it has a Status column) and is already the bug-type equivalent. Tracker cards never carry the log at all — Jira and GitHub keep their own issue history, and a third copy told a reader nothing new. See [`tracker-card-summary.md`](../../shared/resources/tracker-card-summary.md).
+
+Enforcement mirrors sign-off: `advisory` keeps `/develop-next` and `/develop-batch` running unattended, `blocking` withholds the status promotion, which is what actually stops the pipeline.
+
+**No backfill.** Adoption is additive and going-forward only, matching sign-off and OKF v0.1. Documents written before the spec have no section; the first skill to record a moment creates one at the correct anchor.
+
+Full spec: [`document-change-log.md`](../../shared/resources/document-change-log.md). Engine: [`change-log.js`](../../shared/resources/change-log.js).
 
 ## Tracker workflow
 

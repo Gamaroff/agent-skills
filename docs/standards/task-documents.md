@@ -93,7 +93,9 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 
 ### Unnumbered tail sections
 
-`Stakeholder Sign-off`, `Progress Tracking`, `References` and `Notes` follow the numbered eleven and are **never numbered**. The count of 11 is a contract asserted in code (`skills/create-task/scripts/lib.js` → `countMandatorySections`) and in `tests/skill-protocol.test.js`; numbering a tail section breaks it.
+`Stakeholder Sign-off`, `Change Log`, `Progress Tracking`, `References` and `Notes` follow the numbered eleven and are **never numbered**. The count of 11 is a contract asserted in code (`skills/create-task/scripts/lib.js` → `countMandatorySections`) and in `tests/skill-protocol.test.js`; numbering a tail section breaks it.
+
+**Change Log** is an append-only table of what changed about the document — four columns (`Date`, `Version`, `Description`, `Author`), newest at the bottom, every entry bumping frontmatter `updated:` in the same edit. It is inserted before `## Progress Tracking` when absent, and adding it leaves the 11-section contract unaffected because it is unnumbered. Spec: [`document-change-log.md`](../../shared/resources/document-change-log.md).
 
 **Stakeholder Sign-off** is emitted only when `sign-off.enabled: true` in `skills-config.yaml`. `create-task` scaffolds the roles from `sign-off.task.*` (or a `sign_off_roles` frontmatter override); humans type their own name and commit it. Agents never write a Signature or Date cell, and the section is never synced to a tracker. Spec: [`sign-off.md`](../../shared/resources/sign-off.md).
 

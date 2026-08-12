@@ -86,6 +86,11 @@ Before a bug is worked, [`review-bug`](../../skills/review-bug/SKILL.md) checks 
 mode/linkage — plus read-only duplicate and already-fixed scans. It never mutates the bug lifecycle
 `status`; it may edit the report to add missing detail. It is also `develop-bug`'s Step 2 gate.
 
+> **Bug reports carry no Change Log.** `## Status History` (section 7) is the bug-type equivalent and
+> is richer — it has a `Status` column, which is what a bug's history is actually about. Do not add the
+> four-column `## Change Log` that PRD, epic, story, and task documents carry; the exclusion is stated in
+> the spec itself. See [`document-change-log.md`](../../shared/resources/document-change-log.md).
+
 `create-bug-report` writes sections 1–5 and leaves 6–8 as stubs. The **fix-executing** skills fill them:
 [`develop-bug`](../../skills/develop-bug/SKILL.md) is the end-to-end orchestrator — it takes an open bug
 report and runs it to a **closed, verified, documented** fix, writing sections 6–8 (Developer Fix Cycle,
