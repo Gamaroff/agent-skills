@@ -169,7 +169,10 @@ test("B: trimming drops WHOLE blocks — never a half-emitted one", () => {
 // C — changelog must never land inside frontmatter
 // ---------------------------------------------------------------------------
 
-const ROW = "| 2026-07-31 10:00 | Updated: description |";
+// Four columns since the changelog moved to `change-log.js` (task.42). The engine
+// widens a legacy 2-column row on read, so the old fixture would still have been
+// accepted — this is the canonical shape it is widened *to*.
+const ROW = "| 2026-07-31 |  | Updated: description | sync-jira-story |";
 
 test("C: a heading name quoted in frontmatter does not capture the changelog", () => {
   // The live shape: a `description:` value that mentions a heading. Before the
@@ -207,20 +210,29 @@ test("C: a heading name quoted in frontmatter does not capture the changelog", (
   );
 });
 
-test("C: normal documents still get the changelog before the first body heading", () => {
+// These two previously asserted "the changelog precedes the first level-2 body
+// heading". That WAS the defect: inserting before the first `##` is how a Change
+// Log ended up above the Epic Goal, at the top of the document body. Task.42's
+// Breaking Change 2 replaces that fallback with a doc-type anchor, falling back to
+// end-of-document. `upsertChangelog` (the legacy shim) passes no docType, so these
+// documents take the EOF path — which is the point: an unknown doc type appends
+// somewhere harmless instead of guessing the top.
+
+test("C: a document with no anchor gets the changelog appended at EOF, never at the top", () => {
   const doc = "---\nid: task.1\n---\n\n# Task 1\n\n## Overview\n\ntext\n";
   const out = upsertChangelog(doc, ROW);
   assert.ok(out.includes(ROW));
   assert.ok(
-    out.indexOf(ROW) < out.indexOf("## Overview"),
-    "changelog should precede the first level-2 body heading",
+    out.indexOf(ROW) > out.indexOf("## Overview"),
+    "changelog must NOT be inserted above the first body heading",
   );
+  assert.ok(out.trimEnd().endsWith("<!-- change-log-end -->"));
 });
 
 test("C: a document with no frontmatter is unaffected", () => {
   const out = upsertChangelog("# Task\n\n## Overview\n\ntext\n", ROW);
   assert.ok(out.includes(ROW));
-  assert.ok(out.indexOf(ROW) < out.indexOf("## Overview"));
+  assert.ok(out.indexOf(ROW) > out.indexOf("## Overview"));
 });
 
 // ---------------------------------------------------------------------------
