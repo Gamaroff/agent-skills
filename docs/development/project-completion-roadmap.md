@@ -46,6 +46,11 @@ Ordered so risk front-loads into the reversible parts: T36 is a pure deletion of
 T37–T39 were inert until T40 wired the first live behaviour change. **As of T40 the GitHub path
 is live** — a consumer's `tracker-workflow.yaml` now drives their board.
 
+**The series is complete as of T41.** All eight moments have a call site, the file is scaffolded on
+install without ever overwriting one, `--check` fails CI on drift, and all three develop pipelines
+signal the same moments. Both moments T41 added remain **off by default** — absent from the built-in
+`pipeline:` map — so a consumer who upgrades and changes nothing sees no new card movement.
+
 ### Independent fix
 
 - [x] **T36** Stop `setup-consumer.sh` generating a narrowing `jira.statusMap` · deps: none · touches: setup-consumer!, docs-config~ · /develop-task docs/tasks/task.36.setup-consumer-statusmap-fix/task.36.setup-consumer-statusmap-fix.md
@@ -65,7 +70,7 @@ is live** — a consumer's `tracker-workflow.yaml` now drives their board.
 
 ### Capstone
 
-- [ ] **T41** New pipeline moments, workflow-file scaffolding, `--check`, `develop-bug` parity · deps: T38, T40 · touches: orchestrators!, pipeline-steps!, setup-consumer!, bundles!, docs-config~ · /develop-task docs/tasks/task.41.pipeline-moments-and-scaffolding/task.41.pipeline-moments-and-scaffolding.md
+- [x] **T41** New pipeline moments, workflow-file scaffolding, `--check`, `develop-bug` parity · deps: T38, T40 · touches: orchestrators!, pipeline-steps!, setup-consumer!, bundles!, docs-config~ · /develop-task docs/tasks/task.41.pipeline-moments-and-scaffolding/task.41.pipeline-moments-and-scaffolding.md
 
 ---
 
@@ -134,3 +139,4 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 | 2026-08-12 | Phase 2 seeded with the document change-log series (T42–T45, issues #201–204). Strictly sequential via `deps:`; T45 `manual`-gated on verifying T44's advisory default. Legend gained `change-log`, `templates`, `review-skills` tags |
 | 2026-08-12 | T39 accepted — PR #206 merged (`2c7ff3e`). `gh-stage.js` (1,299 lines), 65 tests, 10 fixtures. All 16 success criteria met, no waivers. 5 QA cycles, 20 findings closed; tests 1050 → 1065. The same defect — writing a status to a board the operator did not name — was caught twice, the second time reopened by a fix's own partial-read tolerance. **T40 is now unblocked** |
 | 2026-08-12 | T40 accepted — PR #207 merged (`f3d37be`). Five inline board blocks → `gh-stage.js` calls; ~240 lines of duplicated GraphQL deleted. **The GitHub path is now live** — a consumer's ladder drives their board. Three intended behavioural changes (regress guard, case-insensitive Done, honest post-condition). 2 QA cycles, 1 MEDIUM + 3 LOW closed; tests 1065 → 1070, all 5 new guards mutation-tested. Found on the way: **the bundler cannot see `.agents/skills/…/references/X` paths**, so writing a CLI call did not ship it — each site now names `shared/resources/gh-stage.js` and CI gained a bundle-freshness check. Two consumer tests deferred (no scratch board with bespoke columns). **T41 is now unblocked** (deps T38, T40 — both shipped) |
+| 2026-08-12 | T41 accepted — PR #208 merged (`0b9d336`). **The tracker-workflow series is complete**: `changes-requested` (per QA fix cycle) and `pr-merged` (from the merging orchestrators, inside `develop-batch`'s per-item loop) now fire; `setup-consumer.sh` scaffolds `tracker-workflow.yaml` and never overwrites; `--init-workflow [--force]` and `--check [--offline]` on both stage CLIs; `develop-bug` reaches parity after signalling nothing for a release. All 15 success criteria met, no waivers. 2 QA cycles, 3 bugs closed; tests 1070 → 1104. Both new moments are off by default and were verified inert against a live board. Found on the way: **the scaffolder inferred "file written" from an exit code this CLI family deliberately returns as 0 on write-nothing skips** — an unauthenticated `gh` would have left consumers with no workflow file while the wizard reported success. Caught by *executing* the code against throwaway consumer repos, not by reading it, and the fix verified by reintroducing the defect to prove the regression test fails. Two residuals named: GitHub's live-probe branch is unreachable from the wizard by construction, and Jira's `--check` board half compares against a local record rather than a live probe. **Phase 2 (T42–T45) is now the frontier** |
