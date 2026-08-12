@@ -385,6 +385,8 @@ The CLI re-reads the item after mutating and reports the option it actually land
 
 This is a **separate concern** that merely used to share a GraphQL response with the status move. `gh-stage.js` deliberately does not touch Priority — it owns the Status field and nothing else — so this block keeps its own query:
 
+> **Ordering matters: this block must run *after* the `work-started` call above.** It carries no `item-add` and no propagation retry, because it does not need them — `ensureOnBoard` has already added the item, slept for Projects API propagation, and successfully read the item back (it could not have set the status otherwise). Running this block first, or on its own, against an issue not yet on a board would read an empty `projectItems` and silently skip the Priority default. That is graceful rather than harmful, but it is a silent no-op, so keep the order.
+
 ```bash
 (
   OWNER=$(gh repo view --json owner -q '.owner.login')

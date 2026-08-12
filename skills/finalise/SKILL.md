@@ -1139,10 +1139,17 @@ If all DoD criteria are met, finalize the running summary, update the story/task
      | `stage-disabled` | Consumer omitted `done:` from `pipeline:` | **Success, not a warning** — a human moves this card by design |
      | `would-regress` | A human advanced the card past Done | Record as informational — the board is ahead of the pipeline |
      | `no-option` | Board has no column matching the `done` moment | Record a warning in the running summary |
+     | `no-options` | The Status field exists but has no options at all | Record a warning — the board is misconfigured |
+     | `no-status-field` | The board has no Status field | Record a warning — nothing to move |
+     | `ambiguous-board` | The issue is on more than one board and no board was selected | Record a warning naming the candidate boards. **Not an error** — a multi-board setup is ordinary. Fix by setting `github.projectBoard` in `skills-config.yaml` or `project_board_number` in `project.yml` |
+     | `board-unreadable` | The board read failed (API/permissions) | Record a warning with the CLI's message |
+     | `no-repo-context` | `gh repo view` could not resolve the repository | Record a warning — usually a detached checkout or missing `gh` auth |
+     | `no-credentials` | `gh` is not authenticated | Record a warning — the card was not moved |
      | `not-on-board` | Issue is on no project board | **Escalate — see below** |
      | `mutation-failed` | The CLI already retried and still failed | Escalate — see below |
+     | _any other value_ | A reason added to the CLI since this table was written | Log it verbatim in the running summary and treat as a non-blocking warning. Never treat an unrecognised reason as success |
 
-     The CLI exits 0 for every row above, so never treat a zero exit as proof the card moved; read `reason`.
+     The CLI exits 0 for every row above, so never treat a zero exit as proof the card moved; read `reason`. Reasons produced only by `--probe-board`, `--write-ladder`, `--dry-run` or `--add-to-board` (`probe`, `write-failed`, `exists`, `dry-run`) cannot occur here — this call passes none of those flags.
 
    - **If `reason` is `not-on-board`:**
      - Do NOT silently skip. Post a PR comment warning that the board was not updated, using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):

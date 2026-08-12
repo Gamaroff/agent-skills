@@ -582,6 +582,30 @@ missing file.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-12
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.40.qa.1.github-pipeline-step-wiring.md](./task.40.qa.1.github-pipeline-step-wiring.md)
+- **Gate File**: [task.40.gate.1.github-pipeline-step-wiring.yml](./task.40.gate.1.github-pipeline-step-wiring.yml)
+- **Traceability Matrix**: `.summaries/qa-traceability-matrix.md` (working artifact — gitignored, not committed)
+
+### Test Coverage Summary
+- **Tests Executed**: 1070 passing, 0 failing (baseline 1065)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security PASS, Performance PASS, Reliability CONCERNS, Maintainability PASS
+
+### Key Findings
+One MEDIUM issue (`TASK-40-QA1-01`): the reason-to-action table in `finalise/SKILL.md` documents 7 reasons, but 6 more are reachable from a plain `--stage done` call — while the prose beneath it instructs the agent to read `reason`. Three LOW observations recorded. Zero HIGH.
+
+---
+
 ## Implementation Record
 
 **Started**: 2026-08-12 · **Completed**: 2026-08-12 · **Branch**: `feature/task.40.github-pipeline-step-wiring`

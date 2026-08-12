@@ -123,14 +123,23 @@ function shippedMarkdown() {
 // flagged the very sentence that got it right. So this is PAIRED: no inline
 // board Status mutation anywhere, AND each site positively invokes the CLI.
 test("no shipped markdown carries an inline board Status mutation", () => {
+  // Scoped to the FENCED BLOCK holding the mutation, not the whole file. A
+  // file-wide check passes today only because step-0 happens to contain no bare
+  // `"Status"` literal alongside the Priority mutation it legitimately retains —
+  // prose added later would false-positive it. Same fragility, and same fix, as
+  // the --allow-regress guard below.
   const offenders = [];
   for (const f of shippedMarkdown()) {
     const src = readFileSync(f, "utf-8");
     if (!src.includes("updateProjectV2ItemFieldValue")) continue;
-    // `"Status"` is the tell: the mutation is selecting the Status single-select
-    // field. Mutations of Priority/Estimate legitimately remain inline — they
-    // are a different concern and gh-stage.js deliberately does not own them.
-    if (/"Status"/.test(src)) offenders.push(f);
+    for (const block of src.matchAll(/```[a-z]*\n([\s\S]*?)```/g)) {
+      const code = block[1];
+      if (!code.includes("updateProjectV2ItemFieldValue")) continue;
+      // `"Status"` inside the mutating block is the tell: it selects the Status
+      // single-select field. Priority/Estimate mutations legitimately remain
+      // inline — a different concern gh-stage.js deliberately does not own.
+      if (/"Status"/.test(code)) offenders.push(f);
+    }
   }
   assert.deepEqual(
     offenders,
@@ -172,6 +181,38 @@ test("each pipeline site positively invokes gh-stage.js for its moment", () => {
     finalise,
     /\.agents\/skills\/finalise\/references\/gh-stage\.js/,
     "finalise must reference its own bundled copy, not the develop-* brace path",
+  );
+});
+
+test("no pipeline step passes --allow-regress", () => {
+  // The QA-start re-assert is the site that used to force-write "In Review"
+  // over whatever column a card was on. `--allow-regress` there would restore
+  // exactly that behaviour, and the positive per-site guard above would still
+  // pass because the `--stage in-review` literal is unchanged. This asserts the
+  // absence directly. --allow-regress is for a deliberate operator reset, never
+  // for an automated step.
+  // Scan FENCED CODE BLOCKS ONLY. Prose that *mentions* the flag is not just
+  // allowed, it is required — step 5-6 explains why the flag is absent and when
+  // an operator would use it. A naive proximity window matches that sentence and
+  // fails on the very text that documents the correct behaviour, which is the
+  // v0.33 guard failure inverted. The invocation lives in a ```bash block; the
+  // explanation never does.
+  const offenders = [];
+  for (const f of shippedMarkdown()) {
+    const src = readFileSync(f, "utf-8");
+    for (const block of src.matchAll(/```[a-z]*\n([\s\S]*?)```/g)) {
+      const code = block[1];
+      if (!code.includes("gh-stage.js")) continue;
+      if (!/--allow-regress/.test(code)) continue;
+      offenders.push(`${f}: ${code.trim().split("\n")[0].slice(0, 60)}…`);
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "A pipeline step invokes gh-stage.js with --allow-regress. That disables " +
+      "the backward-move guard and reinstates the force-write behaviour task.40 " +
+      "removed. The flag is for deliberate operator resets only.",
   );
 });
 
