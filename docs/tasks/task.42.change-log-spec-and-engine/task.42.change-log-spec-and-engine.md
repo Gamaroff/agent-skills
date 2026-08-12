@@ -5,10 +5,12 @@ type: task
 description: "Establish one canonical Change Log section format for PRD/epic/story/task documents, backed by a shared engine extracted from jira-sync.js, and record it in the standards."
 tags: [change-log, documentation, shared-resources]
 category: infrastructure
-status: planned
+status: accepted
 priority: High
 created: 2026-08-12
 updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 209
 assignee:
 estimated_effort_hours: 16
 github_issue: 201
@@ -16,7 +18,9 @@ github_issue: 201
 
 # [Task 42] Canonical Change Log spec and shared engine
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.42.review.1.change-log-spec-and-engine.md` implemented 2026-08-12
 
 **GitHub Issue:** [#201](https://github.com/Gamaroff/agent-skills/issues/201)
 
@@ -124,9 +128,11 @@ shared/resources/jira-sync.js
   :4049 exported
 ```
 
-It is vendored by `bundle_skill.py` into `references/jira-sync.js` under twelve skills
-(create-story, create-task, develop-bug, develop-story, develop-task, finalise, qa-story,
-qa-task, scaffold-tracker-workflow, sync-jira-{story,epic,task}).
+It is vendored by `bundle_skill.py` into `references/jira-sync.js` under **fourteen** skills
+(create-story, create-task, develop-batch, develop-bug, develop-next, develop-story,
+develop-task, finalise, qa-story, qa-task, scaffold-tracker-workflow,
+sync-jira-{story,epic,task}). Two of those — `develop-batch` and `develop-next` — run
+unattended, which is where a silent sync failure is least likely to be noticed.
 
 The GitHub path has **no code at all** — `sync-github-{story,epic,task}` describe the format
 in prose and the model reproduces it.
@@ -194,6 +200,12 @@ Target (one, everywhere):
   not add a second table to bug reports.
 - **Tracker cards still never carry the Change Log.**
   `shared/resources/tracker-card-summary.md:81` is unchanged by this task.
+- **A fenced example is not a Change Log.** Every match — marker pair or heading — must be
+  ignored when it falls inside a ```` ``` ```` or `~~~` fenced code block. This is the same
+  class of guard as `bodyStart()`, which keeps the search out of frontmatter: both answer
+  "is this text content, or a picture of content?". It is not optional polish — the
+  documents in this very task series contain eleven fenced `Change Log` headings and two
+  complete fenced marker blocks, and task.43/44/45 point the engine at them.
 
 ---
 
@@ -277,12 +289,74 @@ i.e. at the top of the body, above the Epic Goal.
 | unknown | end of document |
 
 **Affected**: any document currently carrying a top-of-body Change Log written by the old
-fallback. There are none in this repo (verified: `grep -rn "^## Change Log"` over `docs/`
-returns only correctly-placed story sections), but consumer repos may have some.
+fallback. There are none in this repo, but consumer repos may have some.
+
+The verification is worth stating precisely, because a naive grep is misleading here.
+`grep -rn "^## Change Log" docs/` returns eleven hits and **not one of them is a real
+section** — every match is an illustrative example inside a ```` ```markdown ```` fence in
+the task.42–45 change-log planning documents (including this one, at the two samples in §3).
+Zero documents in `docs/` carry a genuine misplaced block. That same grep output is the
+evidence for the fence rule in Breaking Change 3 below.
 
 **Migration path**: the engine finds an existing block by marker or heading before it ever
 considers insertion, so a misplaced legacy block is **updated in place**, never duplicated.
 Moving it is a manual, one-line edit; the spec documents that and no tooling forces it.
+
+### Breaking Change 3: matches inside fenced code blocks and inline code spans are ignored
+
+**Before**: `findHandWrittenChangelog()` runs `/^## Change Log[ \t]*\n+/m` over the whole
+body, and `RE_CL_BLOCK` matches its marker pair anywhere. Neither knows what a code fence is.
+The flaw is currently *masked*: only the three `sync-jira-*` scripts call this code, and they
+run on documents whose real block is marker-delimited.
+
+**After**: every match — marker pair or heading — is discarded when it falls inside a
+```` ``` ```` or `~~~` fenced block.
+
+**Why this task must fix it, rather than inherit it.** This task hands the same engine to six
+sync skills, four review skills, and the QA/finalise steps (§2, benefit 4), across every
+document type. The documents it will be pointed at include this task series' own, and those
+are dense with fenced examples:
+
+| Document | Fenced `Change Log` headings |
+|---|---|
+| `task.42.change-log-spec-and-engine.md` | 2 (§3, both samples) |
+| `task.42.plan.change-log-spec-and-engine.md` | 1 |
+| `task.43.change-log-templates-and-creation.md` | 1 |
+| `task.43.plan.change-log-templates-and-creation.md` | 5 (one at H3) |
+| `task.45.plan.change-log-pipeline-and-sync.md` | 2 (one at H3) |
+
+Headings are the smaller half. **This document contains both marker pairs inside fences**: a
+complete legacy `jira-sync-changelog-start/end` block with a 2-column row (the "current"
+sample in §3), and a complete `change-log-start/end` block using the markers this task
+introduces (the "target" sample). Without the guard:
+
+1. `findChangeLog()` matches the fenced marker block *before* heading matching is reached, so
+   `upsertChangeLog()` appends live rows into a code fence in §3.
+2. `migrateLegacyEntries()` widens the illustrative legacy row to four columns and invents an
+   `Author` for it.
+3. Breaking Change 2's own promise — a found block is *updated in place, never duplicated* —
+   is what converts this from cosmetic to corrupting: the engine treats the picture as the
+   thing.
+
+**And a second exposure, found in implementation** by running the finished engine against this
+document. Prose that *names* the markers puts them in backticks — Phase 2's own checklist does:
+
+```markdown
+- [x] Create `change-log.js` with `CL_START`/`CL_END` = `<!-- change-log-start -->` /
+      `<!-- change-log-end -->` plus a `LEGACY_MARKER_PAIRS` table
+```
+
+Unguarded, that pair of inline-code mentions reads as a complete marker block, and
+`upsertChangeLog` replaces the whole checklist bullet with a generated table. The guard
+therefore covers **inline code spans as well as fences**, scoped per line — a genuine marker
+always sits alone on its own line, unbackticked, so prose naming the markers beside a real block
+still resolves to the real block.
+
+**Affected**: nothing today (no caller changes in this task). The guard exists so task.43–45
+cannot reintroduce the failure.
+
+**Migration path**: none needed — the guard is strictly narrowing. Any document whose real
+Change Log is outside a fence and outside inline code behaves identically.
 
 ---
 
@@ -295,17 +369,20 @@ Moving it is a manual, one-line edit; the spec documents that and no tooling for
 **Risk**: Low. Documentation only.
 **Files**: `shared/resources/document-change-log.md` (new)
 
-- [ ] Write the spec modelled on `shared/resources/sign-off.md` — same section order:
+- [x] Write the spec modelled on `shared/resources/sign-off.md` — same section order:
       what it is, why it looks like this, the section, rules, who writes what, configuration
-- [ ] Define the section: `## Change Log`, four columns, `YYYY-MM-DD`, append-only,
+- [x] Define the section: `## Change Log`, four columns, `YYYY-MM-DD`, append-only,
       newest at the bottom
-- [ ] Define heading tolerance: H2 or H3, optional numbering, `Change Log` exactly
-- [ ] Define the marker pair and name the two legacy pairs it supersedes
-- [ ] State the `updated:` rule — every entry bumps frontmatter `updated` in the same edit
-- [ ] Write the moment table (which skill writes which row), in the style of the Pipeline
-      stages table at `docs/reference/configuration.md:237`
-- [ ] Document `change-log.enabled` / `change-log.enforcement` and their defaults
-- [ ] State the two exclusions: bug reports use `## Status History`; tracker cards never
+- [x] Define heading tolerance: H2 or H3, optional numbering, `Change Log` exactly
+- [x] Define the **fence rule**: a marker pair or heading inside a ```` ``` ```` or `~~~`
+      block is an example, not a section, and is never matched — the sibling of the
+      frontmatter guard, stated in the same breath as it
+- [x] Define the marker pair and name the two legacy pairs it supersedes
+- [x] State the `updated:` rule — every entry bumps frontmatter `updated` in the same edit
+- [x] Write the moment table (which skill writes which row), in the style of the Pipeline
+      stages table at `docs/reference/configuration.md:253`
+- [x] Document `change-log.enabled` / `change-log.enforcement` and their defaults
+- [x] State the two exclusions: bug reports use `## Status History`; tracker cards never
       carry the log (link `tracker-card-summary.md`)
 
 ### Phase 2: Extract and generalise the engine
@@ -314,21 +391,27 @@ Moving it is a manual, one-line edit; the spec documents that and no tooling for
 **Files**: `shared/resources/change-log.js` (new), `shared/resources/jira-sync.js`
 **Depends on**: Phase 1 (the spec is the test oracle)
 
-- [ ] Create `change-log.js` with `CL_START`/`CL_END` = `<!-- change-log-start -->` /
+- [x] Create `change-log.js` with `CL_START`/`CL_END` = `<!-- change-log-start -->` /
       `<!-- change-log-end -->` plus a `LEGACY_MARKER_PAIRS` table
-- [ ] Port `bodyStart()` unchanged — the frontmatter guard is a real fix, pinned by
+- [x] Port `bodyStart()` unchanged — the frontmatter guard is a real fix, pinned by
       `jira-sync-publishing-fidelity.test.mjs:174`
-- [ ] `RE_HEADING` = `/^(#{2,3})[ \t]+(?:\d+(?:\.\d+)*[.)]?[ \t]+)?Change Log[ \t]*$/m`,
+- [x] Add `fencedRanges(content)` — the offsets of every ```` ``` ````/`~~~` fenced block
+      (respecting the opening fence's length and info string, so a fence inside a longer
+      fence does not close it), and a predicate `insideFence(ranges, index)`. **Every**
+      marker and heading match is filtered through it, including inside
+      `migrateLegacyEntries()` — filtering only the heading path leaves the marker path,
+      which is the one that actually fires on this document, wide open
+- [x] `RE_HEADING` = `/^(#{2,3})[ \t]+(?:\d+(?:\.\d+)*[.)]?[ \t]+)?Change Log[ \t]*$/m`,
       capturing the level so it can be preserved on rewrite
-- [ ] `RE_ENTRY_ROW` accepts `YYYY-MM-DD` and legacy `YYYY-MM-DD HH:MM`
-- [ ] `fmtEntry({ date, version, description, author })` → 4-column row
-- [ ] `buildChangeLogBlock(entries, { level })`
-- [ ] `findChangeLog(content)` → `{ start, end, level }` — marker block first, then heading
-- [ ] `migrateLegacyEntries(content)` — widen 2-col rows, infer Author from marker pair
-- [ ] `upsertChangeLog(content, entry, { docType })` with the anchor table from Breaking
+- [x] `RE_ENTRY_ROW` accepts `YYYY-MM-DD` and legacy `YYYY-MM-DD HH:MM`
+- [x] `fmtEntry({ date, version, description, author })` → 4-column row
+- [x] `buildChangeLogBlock(entries, { level })`
+- [x] `findChangeLog(content)` → `{ start, end, level }` — marker block first, then heading
+- [x] `migrateLegacyEntries(content)` — widen 2-col rows, infer Author from marker pair
+- [x] `upsertChangeLog(content, entry, { docType })` with the anchor table from Breaking
       Change 2
-- [ ] `bumpUpdated(content, date)` — set frontmatter `updated`, used by every caller
-- [ ] Re-point `jira-sync.js:408-513` at the new module; keep `upsertChangelog`,
+- [x] `bumpUpdated(content, date)` — set frontmatter `updated`, used by every caller
+- [x] Re-point `jira-sync.js:408-513` at the new module; keep `upsertChangelog`,
       `buildChangelogBlock`, `findHandWrittenChangelog`, `extractEntries` exported with
       their old signatures
 
@@ -339,22 +422,30 @@ Moving it is a manual, one-line edit; the spec documents that and no tooling for
 `shared/resources/tests/jira-sync-publishing-fidelity.test.mjs`
 **Depends on**: Phase 2
 
-- [ ] **The H3 regression**: a document with `### Change Log` under `## Notes & Updates`
+- [x] **The H3 regression**: a document with `### Change Log` under `## Notes & Updates`
       gets its existing block updated, not a second H2 block inserted at the top
-- [ ] Numbered heading `### 1.5 Change Log` is found and preserved
-- [ ] Heading level is preserved on rewrite (H3 in → H3 out)
-- [ ] Legacy `jira-sync-changelog-*` block is migrated in place, rows widened to 4 columns,
+- [x] Numbered heading `### 1.5 Change Log` is found and preserved
+- [x] Heading level is preserved on rewrite (H3 in → H3 out)
+- [x] Legacy `jira-sync-changelog-*` block is migrated in place, rows widened to 4 columns,
       Author inferred, no duplication
-- [ ] Legacy `github-sync-changelog-*` block, same
-- [ ] A document with **both** legacy pairs collapses to one block, rows in date order
-- [ ] Frontmatter containing the literal text `## Change Log` in a block scalar is not
+- [x] Legacy `github-sync-changelog-*` block, same
+- [x] A document with **both** legacy pairs collapses to one block, rows in date order
+- [x] Frontmatter containing the literal text `## Change Log` in a block scalar is not
       used as the insertion point (port the existing case at
       `jira-sync-publishing-fidelity.test.mjs:174`)
-- [ ] Insertion anchors: story → before `## Dev Agent Record`; task → before
+- [x] **The fence regression**, using this task's own document as the fixture: a doc whose
+      only `## Change Log` headings sit inside ```` ```markdown ```` fences gets a new block
+      at its anchor — the fenced samples are left byte-identical
+- [x] A fenced **legacy marker pair** (`jira-sync-changelog-start/end` wrapping a 2-column
+      row, exactly as §3 of this document shows) is not migrated and not appended to
+- [x] A fenced **new marker pair** (`change-log-start/end`) is likewise ignored
+- [x] A document with a fenced example **and** a real Change Log updates only the real one
+- [x] A `~~~`-fenced example is ignored the same as a backtick-fenced one
+- [x] Insertion anchors: story → before `## Dev Agent Record`; task → before
       `## Progress Tracking`; epic → before `## Notes & Updates`; unknown → EOF
-- [ ] Append-only: an existing row is never rewritten or reordered
-- [ ] `bumpUpdated` sets `updated` and leaves `created` alone
-- [ ] Update the fidelity test's 2-column `ROW` fixture to the 4-column form
+- [x] Append-only: an existing row is never rewritten or reordered
+- [x] `bumpUpdated` sets `updated` and leaves `created` alone
+- [x] Update the fidelity test's 2-column `ROW` fixture to the 4-column form
 
 ### Phase 4: Standards, configuration, and AGENTS.md
 
@@ -363,30 +454,33 @@ Moving it is a manual, one-line edit; the spec documents that and no tooling for
 `AGENTS.md`
 **Depends on**: Phase 1
 
-- [ ] `docs/reference/configuration.md` — add `change-log.enabled` and
+- [x] `docs/reference/configuration.md` — add `change-log.enabled` and
       `change-log.enforcement` rows to the key table, and a `## Document change log`
-      section next to the existing `## Stakeholder sign-off` at `:160`
-- [ ] `docs/standards/story-documents.md` — add a **Change Log** row to the Section
+      section next to the existing `## Stakeholder sign-off` at `:176`. (Note the file
+      carries two adjacent sign-off headings — `## Stakeholder sign-off` at `:176` and
+      `## Stakeholder Sign-off` at `:181`. Insert after the pair; do not try to tidy the
+      duplicate, which is pre-existing and out of scope.)
+- [x] `docs/standards/story-documents.md` — add a **Change Log** row to the Section
       ownership table at `:79` (currently absent; the section is named only in passing at `:91`)
-- [ ] `docs/standards/task-documents.md` — add Change Log to **Unnumbered tail sections**
+- [x] `docs/standards/task-documents.md` — add Change Log to **Unnumbered tail sections**
       (`:94`), stating explicitly that the 11-section contract is unaffected
-- [ ] `docs/standards/epic-documents.md` — add a **Required body sections** section; this
+- [x] `docs/standards/epic-documents.md` — add a **Required body sections** section; this
       file has none today
-- [ ] `docs/standards/prd-documents.md` — name Change Log in both section lists (`:65`, `:78`)
-- [ ] `docs/standards/bug-documents.md` — state that `## Status History` is the bug-type
+- [x] `docs/standards/prd-documents.md` — name Change Log in both section lists (`:65`, `:78`)
+- [x] `docs/standards/bug-documents.md` — state that `## Status History` is the bug-type
       equivalent and that bug reports carry no Change Log
-- [ ] `AGENTS.md` — TL;DR pointer in the style of the Status Lifecycle and OKF entries
+- [x] `AGENTS.md` — TL;DR pointer in the style of the Status Lifecycle and OKF entries
 
 ### Phase 5: Bundle and verify
 
 **Risk**: Low.
 **Depends on**: Phases 1–4
 
-- [ ] `npm run bundle` — distributes `document-change-log.md` and `change-log.js` into the
+- [x] `npm run bundle` — distributes `document-change-log.md` and `change-log.js` into the
       `references/` of every skill that links them
-- [ ] Re-run `npm run bundle`; `git diff --stat` must be empty (idempotence)
-- [ ] `npm test` green
-- [ ] Confirm no edit was made directly to a skill's `references/` copy
+- [x] Re-run `npm run bundle`; `git diff --stat` must be empty (idempotence)
+- [x] `npm test` green
+- [x] Confirm no edit was made directly to a skill's `references/` copy
 
 ---
 
@@ -404,17 +498,32 @@ Moving it is a manual, one-line edit; the spec documents that and no tooling for
 
 ### Files to Modify (Tests)
 
-5. ✅ `shared/resources/tests/jira-sync-publishing-fidelity.test.mjs` — 4-column `ROW` fixture
+5. ✅ `shared/resources/tests/jira-sync-publishing-fidelity.test.mjs` — 4-column `ROW` fixture,
+   plus two "C" cases rewritten to assert the EOF fallback instead of the removed
+   before-first-`##` fallback
+6. ✅ `skills/sync-jira-story/tests/sync-jira-story.test.js` — same fallback assertion (1 case)
+7. ✅ `skills/sync-jira-task/tests/sync-jira-task.test.js` — same fallback assertion (1 case)
+
+> Items 6–7 were **not** in the original plan. They pin the same removed behaviour as the
+> fidelity cases; see the Code Quality criterion in §9 for the full account.
 
 ### Files to Modify (Documentation)
 
-6. ✅ `docs/reference/configuration.md` — `change-log.*` keys + section
-7. ✅ `docs/standards/story-documents.md` — Section-ownership row
-8. ✅ `docs/standards/task-documents.md` — unnumbered tail section
-9. ✅ `docs/standards/epic-documents.md` — new Required body sections
-10. ✅ `docs/standards/prd-documents.md` — both section lists
-11. ✅ `docs/standards/bug-documents.md` — Status History equivalence note
-12. ✅ `AGENTS.md` — TL;DR pointer
+8. ✅ `docs/reference/configuration.md` — `change-log.*` keys + `## Document change log` section
+9. ✅ `docs/standards/story-documents.md` — Section-ownership row
+10. ✅ `docs/standards/task-documents.md` — unnumbered tail section
+11. ✅ `docs/standards/epic-documents.md` — new `## Required body sections`
+12. ✅ `docs/standards/prd-documents.md` — both section lists + nesting note
+13. ✅ `docs/standards/bug-documents.md` — Status History equivalence note
+14. ✅ `AGENTS.md` — TL;DR pointer
+15. ✅ `CHANGELOG.md` — Unreleased entry
+
+### Files Regenerated by `npm run bundle` (never hand-edited)
+
+16. ✅ `skills/*/references/jira-sync.js` — 14 vendored copies re-bundled
+17. ✅ `skills/*/references/change-log.js` — 14 NEW vendored copies, distributed
+    transitively via `bundle_skill.py`'s `JS_SIBLING_RE` (the plan calls this constant
+    `REQUIRE_RE`; the real names are `JS_SHARED_RE` / `JS_SIBLING_RE`)
 
 ### Files to Delete
 
@@ -436,7 +545,9 @@ None.
   `package.json:24` — no glob edit needed. (A new *per-skill* `tests/` directory would need
   one; that omission has silently orphaned whole suites before.)
 - **Target**: every branch of `upsertChangeLog` — marker hit, heading hit at H2, heading hit
-  at H3, numbered heading, each anchor, EOF fallback, both legacy migrations
+  at H3, numbered heading, each anchor, EOF fallback, both legacy migrations, and every
+  fence case (fenced heading, fenced legacy marker pair, fenced new marker pair, `~~~`
+  fence, fenced-plus-real coexistence)
 
 ### Integration Tests
 
@@ -463,7 +574,7 @@ baseline needed.
 
 ### Consumer Tests
 
-- **Scope**: the twelve skills that vendor `jira-sync.js`
+- **Scope**: the fourteen skills that vendor `jira-sync.js`
 - **Risk area**: a skill whose bundled copy goes stale relative to the shared source.
   `tests/bundle-mjs.test.js` carries a drift guard for exactly this; confirm it still passes
 
@@ -473,37 +584,55 @@ baseline needed.
 
 ### Functional
 
-- [ ] `shared/resources/document-change-log.md` exists and defines the section, the four
+- [x] `shared/resources/document-change-log.md` exists and defines the section, the four
       columns, the heading tolerance, the marker pair, the `updated:` rule, the moment table,
       and the two exclusions
-- [ ] `shared/resources/change-log.js` exists and exports `upsertChangeLog`,
+- [x] `shared/resources/change-log.js` exists and exports `upsertChangeLog`,
       `findChangeLog`, `buildChangeLogBlock`, `fmtEntry`, `migrateLegacyEntries`, `bumpUpdated`
-- [ ] A document with `### Change Log` under `## Notes & Updates` gets that block updated —
+- [x] A document with `### Change Log` under `## Notes & Updates` gets that block updated —
       no second block, nothing inserted at the top of the body
-- [ ] Both legacy marker pairs migrate in place, widened to four columns, with no duplication
-- [ ] `jira-sync.js` still exports `upsertChangelog`, `buildChangelogBlock`,
+- [x] Both legacy marker pairs migrate in place, widened to four columns, with no duplication
+- [x] Running `upsertChangeLog` against this task's own document leaves both fenced samples
+      in §3 byte-identical and writes the new block at the task anchor
+- [x] `jira-sync.js` still exports `upsertChangelog`, `buildChangelogBlock`,
       `findHandWrittenChangelog`, `extractEntries` with their existing signatures
 
 ### Performance
 
-- [ ] No measurable change to sync runtime — the module does the same string work in a
+- [x] No measurable change to sync runtime — the module does the same string work in a
       different file. No baseline required; assert only that no test slows by more than a
       second
 
 ### Code Quality
 
-- [ ] `npm test` passes with no pre-existing test modified except the `ROW` fixture
-- [ ] `node --test shared/resources/tests/change-log.test.mjs` passes
-- [ ] `npm run bundle` is idempotent — second run yields an empty diff
-- [ ] No file under any `skills/*/references/` edited by hand
+- [x] `npm test` passes — **1134/1134** (baseline was 1104; +30 new engine cases)
+- [x] ~~no pre-existing test modified except the `ROW` fixture~~ — **not met, and could not
+      be.** Four pre-existing tests beyond the `ROW` fixture assert behaviour that Breaking
+      Changes 1–2 deliberately remove, so they had to change with it. This criterion was
+      written without noticing them. What was modified, and why:
+      - `jira-sync-publishing-fidelity.test.mjs` ×2 and `sync-jira-{story,task}.test.js` ×1 each
+        asserted *"the changelog precedes the first `##` body heading"* — that **is** Breaking
+        Change 2's removed fallback, i.e. the defect. Rewritten to assert the EOF fallback.
+      - The same suites assert `out.includes(lib.CL_START)`. `CL_START` now names the unified
+        marker (Breaking Change 1), which is the honest value: nothing writes the old string
+        any more. The legacy pair stays reachable as `LEGACY_MARKER_PAIRS`.
+
+      No test was weakened to pass. Each still asserts the same property, against the
+      documented new behaviour. The behaviour-preservation oracle the criterion was reaching
+      for is intact: **`jira-sync-sections` and `jira-sync-card-summary` pass completely
+      untouched**, and every remaining fidelity assertion (frontmatter capture, ADF rendering,
+      quote style) is unchanged.
+- [x] `node --test shared/resources/tests/change-log.test.mjs` passes
+- [x] `npm run bundle` is idempotent — second run yields an empty diff
+- [x] No file under any `skills/*/references/` edited by hand
 
 ### Migration
 
-- [ ] `docs/reference/configuration.md` documents both `change-log.*` keys with defaults
-- [ ] All five `docs/standards/*-documents.md` name the section (or, for bugs, name the
+- [x] `docs/reference/configuration.md` documents both `change-log.*` keys with defaults
+- [x] All five `docs/standards/*-documents.md` name the section (or, for bugs, name the
       equivalent)
-- [ ] `AGENTS.md` carries the TL;DR pointer
-- [ ] `CHANGELOG.md` updated
+- [x] `AGENTS.md` carries the TL;DR pointer
+- [x] `CHANGELOG.md` updated
 
 ---
 
@@ -537,7 +666,20 @@ baseline needed.
      `HH:MM` variant, and test both an unrelated 4-column table and a real legacy row.
    - **Rollback**: n/a — caught by unit tests before merge.
 
-3. **PRD nested heading vs top-level heading**
+3. **A fenced example is mistaken for a real Change Log**
+   - **Risk**: the engine matches a marker pair or heading inside a ```` ``` ```` block and
+     writes live rows into a documentation sample — or "migrates" one. The documents most
+     exposed are this task series' own (eleven fenced headings, two complete fenced marker
+     blocks), which are exactly what task.43–45 operate on.
+   - **Probability**: High without the guard — this document would trip it on the first run
+   - **Impact**: High — silent corruption of a source document, and the corrupted text is a
+     spec that other work is read from
+   - **Mitigation**: `fencedRanges()` + `insideFence()` filter every match, marker and
+     heading alike (Phase 2); six fence cases in the unit tests including this document as a
+     fixture (Phase 3).
+   - **Rollback**: n/a — caught by unit tests before merge.
+
+4. **PRD nested heading vs top-level heading**
    - **Risk**: the H2/H3 tolerance makes the engine match a `### Change Log` that is a
      genuine subsection of something else.
    - **Probability**: Low
@@ -547,7 +689,7 @@ baseline needed.
 
 ### Low Risk Areas
 
-4. **Standards documents drift from the spec**
+5. **Standards documents drift from the spec**
    - **Risk**: six documents restate the rule and one of them goes stale.
    - **Probability**: Medium
    - **Impact**: Low
@@ -600,19 +742,19 @@ standards document that reads badly.
 ## Progress Tracking
 
 ### Phase 1: Write the canonical spec
-- [ ] Not started
+- [x] Complete
 
 ### Phase 2: Extract and generalise the engine
-- [ ] Not started
+- [x] Complete
 
 ### Phase 3: Unit tests
-- [ ] Not started
+- [x] Complete
 
 ### Phase 4: Standards, configuration, and AGENTS.md
-- [ ] Not started
+- [x] Complete
 
 ### Phase 5: Bundle and verify
-- [ ] Not started
+- [x] Complete
 
 ---
 
@@ -630,6 +772,132 @@ standards document that reads badly.
 - [`docs/standards/`](../../standards/) — the five document standards
 - Follow-on tasks: task.43 (templates + creation), task.44 (review + edit), task.45
   (pipeline + sync)
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: [task.42.gate.3.change-log-spec-and-engine.yml](./task.42.gate.3.change-log-spec-and-engine.yml) — ✅ **PASS, 100/100**
+**QA Cycles**: 3 (2 fix cycles) · gate.1 FAIL 60 → gate.2 CONCERNS 90 → gate.3 PASS 100
+**Bug reports**: TASK-42-BUG-1, -2, -3 — all closed with QA Verification
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 14/15 met — 6/6 functional, 1/1 performance, 4/4 code quality, 4/4 migration. One criterion is recorded as **not met** with its full reasoning (see §9 → Code Quality); it could not be met, because it contradicts this task's own Breaking Changes 1–2.
+✅ **CI:** SUCCESS on the **exact final commit** `b90017c` — `link-check`, `test`, `validate` all COMPLETED/SUCCESS. PR head verified equal to local HEAD, so the green run covers the final code rather than an ancestor.
+✅ **Tests:** 1144 passing, 0 failing (baseline before this task: 1104; +40 engine tests)
+✅ **PR:** [#209](https://github.com/Gamaroff/agent-skills/pull/209) — 6 commits, 45 files
+✅ **Documentation:** canonical spec + all five standards documents + configuration reference + AGENTS.md + CHANGELOG.md
+✅ **Security Review:** PASS — pure string manipulation; no I/O, network, shell or eval; the one constructed regex interpolates a 2–3 bounded integer; no new dependencies
+⚠️ **Compliance Review:** NOT_APPLICABLE — developer tooling with no personal data, payments, or UI surface (reason recorded rather than silently skipped)
+✅ **Bundle:** idempotent; no `skills/*/references/` file hand-edited (all 28 bundler-generated)
+
+**Deployment Readiness:** Staging ✅ APPROVED · Production ✅ APPROVED
+
+**Detailed Verification Log:** See [task.42.dod.1.change-log-spec-and-engine.md](./task.42.dod.1.change-log-spec-and-engine.md) for complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-08-12
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-12
+**Quality Score**: 100/100
+**Gate Decision**: PASS (after 2 fix cycles)
+
+### QA Reports
+- **Cycle 1 report**: [task.42.qa.1.change-log-spec-and-engine.md](./task.42.qa.1.change-log-spec-and-engine.md) — gate FAIL, 60/100
+- **Re-review report (cycles 2–3)**: [task.42.qa.2.change-log-spec-and-engine.md](./task.42.qa.2.change-log-spec-and-engine.md)
+- **Final gate**: [task.42.gate.3.change-log-spec-and-engine.yml](./task.42.gate.3.change-log-spec-and-engine.yml)
+- Superseded gates: [gate.1 (FAIL)](./task.42.gate.1.change-log-spec-and-engine.yml), [gate.2 (CONCERNS)](./task.42.gate.2.change-log-spec-and-engine.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1144 (all passing; baseline before this task was 1104)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 open (2 HIGH, 1 MEDIUM, 3 LOW raised and closed)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Bug Reports
+
+| Bug | Severity | Status |
+|---|---|---|
+| [TASK-42-BUG-1](./task.42.bug.1.heading-block-end-scan-ignores-fences.md) — heading-block end scan ignored fences | HIGH | ✅ Closed |
+| [TASK-42-BUG-2](./task.42.bug.2.dual-legacy-collapse-is-order-dependent.md) — dual-legacy collapse was order-dependent | HIGH | ✅ Closed |
+| [TASK-42-BUG-3](./task.42.bug.3.duplicate-current-block-never-collapsed.md) — duplicate current block never collapsed | MEDIUM | ✅ Closed |
+
+### Key Findings
+
+All three defects had the same shape: **a rule stated correctly in the spec, then applied to a subset of the places it governs.** The fence guard covered a block's start but not its end; block selection used declaration order rather than document order; the collapse sweep was scoped to superseded pairs rather than to every pair that can carry a Change Log. Each fix widened an existing rule rather than adding a new one — none required rethinking the design.
+
+Every fix is pinned by a regression test verified to **fail against the pre-fix engine**, and the cycle-3 re-review adversarially probed the changed code for side effects (notably: widening the collapse sweep did not weaken the fence guard).
+
+---
+
+## Implementation Record
+
+**Completed**: 2026-08-12 · **Status**: Ready for Review
+
+### Summary
+
+All five phases complete. The spec, the engine, 33 unit tests, the standards/config/AGENTS.md
+updates, and the bundle. No skill behaviour changed — `jira-sync.js` keeps every old export as
+a wrapper, and the three `sync-jira-*` scripts were not touched.
+
+### Testing results
+
+| Check | Result |
+|---|---|
+| `npm test` | **1137 passing, 0 failing** (baseline 1104, +33 new) |
+| `node --test shared/resources/tests/change-log.test.mjs` | 33/33 |
+| `jira-sync-{sections,card-summary}` suites | pass, **completely untouched** |
+| `npm run bundle` twice | second `git diff --stat` empty (idempotent) |
+| Card preflight | exit 0, all three blocks resolve |
+| Files hand-edited under `skills/*/references/` | **none** |
+
+### Two defects found during implementation, by the tests
+
+1. **Block glued to the following section.** The rewrite emitted
+   `<!-- change-log-end -->### Sibling` with no separator. Caught by the H3 test asserting the
+   sibling subsection survives.
+2. **`parseLegacyRow` mis-read an already-canonical row.** It always took cell 1 as the
+   description; on a 4-column row that is the *version* cell, so the shim silently emitted a
+   row with an empty description and dropped the caller's text. Caught by the fidelity suite
+   the moment its `ROW` fixture went to four columns. It now branches on cell count.
+
+### The inline-code guard — found by pointing the engine at this document
+
+The fence guard (Breaking Change 3) was specified from review. Running the finished engine
+against this very file then surfaced a second exposure the review had not: Phase 2's checklist
+names both markers in adjacent inline code spans, and `findChangeLog` matched them as a real
+marker block — `upsertChangeLog` would have replaced the whole bullet with a generated table.
+`protectedRanges()` now covers fenced blocks **and** inline code spans, scoped per line so a
+genuine marker (always alone on its own line, unbackticked) still resolves.
+
+The engine is now clean against its own specification: `findChangeLog` on this document returns
+`null`, both §3 samples stay byte-identical, and a new block lands at `## Progress Tracking`.
+
+### Deviations from plan
+
+- **Four pre-existing tests changed, not one.** The plan and §9 expected only the `ROW`
+  fixture. Four more assert behaviour that Breaking Changes 1–2 deliberately remove. Full
+  account in §9 → Code Quality. No test was weakened.
+- **`CL_START` / `CL_END` now name the unified markers.** The plan kept them as the legacy
+  jira strings. Those names mean "the markers the block is wrapped in", and nothing writes the
+  old strings any more, so exporting them under those names would be misleading.
+  `LEGACY_MARKER_PAIRS` is exported alongside.
+- **`escapeRe` stayed in `jira-sync.js`.** It lived inside the extracted region but is not
+  changelog-specific — the section extractor and frontmatter rewriter use it, and it is
+  exported.
+- **The plan's `REQUIRE_RE` does not exist.** The bundler's real constants are `JS_SHARED_RE`
+  and `JS_SIBLING_RE`; the latter follows sibling requires transitively, exactly as the plan
+  assumed, so `change-log.js` reached all 14 vendored `references/` directories automatically.
 
 ---
 

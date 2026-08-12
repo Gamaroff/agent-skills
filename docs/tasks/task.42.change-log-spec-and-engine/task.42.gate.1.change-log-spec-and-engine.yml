@@ -1,0 +1,67 @@
+schema: 1
+task: "task.42.change-log-spec-and-engine"
+task_title: "Canonical Change Log spec and shared engine"
+gate: FAIL
+status_reason: "Two high-confidence correctness bugs in the new engine, both in the guard the task itself introduced. The heading-block end scan ignores fences (structurally corrupts the document and detaches a Change Log row); dual-legacy collapse works in only one of two document orderings, failing a stated Success Criterion while its test passes."
+reviewer: "QA Engineer"
+updated: "2026-08-12T18:20:00Z"
+
+top_issues:
+  - id: TASK-42-BUG-1
+    severity: high
+    finding: "findChangeLog() applies the fence guard when locating the heading (change-log.js:296) but not when computing the block end (:305-309). A fenced ##/### line inside a Change Log section terminates the block early, consuming the opening fence and leaving an orphaned closing fence plus a Change Log row stranded outside the block."
+    suggested_action: "Filter the end-scan through protectedRanges() — already computed at :266 — advancing past any nextRe match that falls inside a protected range. Add a regression test."
+    suggested_owner: dev
+    bug_ref: "task.42.bug.1.heading-block-end-scan-ignores-fences.md"
+  - id: TASK-42-BUG-2
+    severity: high
+    finding: "Dual-legacy collapse is order-dependent. findChangeLog() iterates LEGACY_MARKER_PAIRS in array order (:275) ignoring document position, and collapseOtherLegacyBlocks() only scans content.slice(found.end) (:371). With the github block before the jira block, both blocks survive and the github legacy markers remain — failing the Success Criterion 'both legacy marker pairs migrate in place with no duplication'. The existing test only covers the passing ordering."
+    suggested_action: "Make findChangeLog positional (lowest start index wins) and scan the whole document in the collapse pass. Parameterise the dual-pair test over both orderings."
+    suggested_owner: dev
+    bug_ref: "task.42.bug.2.dual-legacy-collapse-is-order-dependent.md"
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 1137
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Pure string manipulation. No I/O, no network, no shell, no eval, no user-controlled regex construction beyond a bounded heading-level integer. No new dependencies. No secrets."
+  performance:
+    status: PASS
+    notes: "Single-document string work, as before. fencedRanges/inlineCodeRanges are O(lines) with a bounded per-line inner pairing loop. Full suite 34.4s vs 33.7s baseline — within noise, and 33 tests were added."
+  reliability:
+    status: FAIL
+    notes: "Two silent-failure paths: BUG-1 corrupts document structure and detaches a log row; BUG-2 leaves two Change Logs and superseded markers in place. Neither errors nor warns, and BUG-2 is masked by a passing test that covers only one ordering."
+  maintainability:
+    status: PASS
+    notes: "Exceptional. Header comment enumerates each defect class the module guards and why; bodyStart's original comment preserved verbatim as the reason it exists; 33 tests organised A-G by defect class. Spec and engine cross-link."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK-42-BUG-1 — apply protectedRanges() to the heading-block end scan"
+      refs: ["shared/resources/change-log.js:305-309"]
+    - action: "Fix TASK-42-BUG-2 — make block selection positional and collapse across the whole document"
+      refs: ["shared/resources/change-log.js:275", "shared/resources/change-log.js:371", "shared/resources/change-log.js:418"]
+    - action: "Parameterise the dual-legacy test over both document orderings"
+      refs: ["shared/resources/tests/change-log.test.mjs:227"]
+  future:
+    - action: "Rename insideFence — it now receives protectedRanges (fences AND inline code), so the name understates it"
+      refs: ["shared/resources/change-log.js:189"]
+    - action: "Consider whether a 3-cell legacy row should be migrated or flagged; currently cell 2 is silently dropped"
+      refs: ["shared/resources/change-log.js:225"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK-42-BUG-1 and TASK-42-BUG-2 fixed and covered by regression tests"

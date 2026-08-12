@@ -1,0 +1,66 @@
+schema: 1
+task: "task.42.change-log-spec-and-engine"
+task_title: "Canonical Change Log spec and shared engine"
+gate: CONCERNS
+status_reason: "Both cycle-1 HIGH issues verified fixed, with regression tests that fail against the pre-fix engine. Re-review found one MEDIUM residual — a duplicate *current* marker block is never collapsed, so the 'exactly one Change Log' invariant still has a reachable exception — plus a cosmetic blank-line seam. Neither is a regression; the mixed case is strictly better than before."
+reviewer: "QA Engineer"
+updated: "2026-08-12T18:45:00Z"
+
+top_issues:
+  - id: TASK-42-BUG-3
+    severity: medium
+    finding: "collapseOtherLegacyBlocks sweeps only LEGACY marker pairs, never the current change-log-* pair. A document holding a legacy block AND a current block therefore ends with two Change Logs — both now in canonical format, but two. Verified reachable: legacy-before-current yields 2 blocks. NOT a regression (the pre-fix engine produced 2 blocks here as well, and additionally left the legacy markers live), and outside the literal Success Criterion, which concerns the two legacy pairs and now passes in both orderings. But the spec states a document ends with exactly one Change Log, and this is the remaining path to violating it."
+    suggested_action: "Include the current pair in the collapse sweep so the invariant is unconditional rather than legacy-only. The primary block is already excluded by construction (both sides are scanned around it)."
+    suggested_owner: dev
+    bug_ref: "task.42.bug.3.duplicate-current-block-never-collapsed.md"
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 1141
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+re_review_context:
+  previous_gate: "task.42.gate.1.change-log-spec-and-engine.yml (FAIL, 60/100)"
+  scope: "shared/resources/change-log.js and its test file — the only non-generated, non-doc files changed since gate 1"
+  previous_issues:
+    - id: TASK-42-BUG-1
+      status: FIXED
+      verification: "End-scan now walks matchAll and skips protected candidates. extractEntries returns 2 before the write and 3 after; fences stay balanced; the fenced line is not promoted to a heading. Two regression tests added, both fail against the pre-fix engine."
+    - id: TASK-42-BUG-2
+      status: FIXED
+      verification: "Selection is positional (lowest start index) and the collapse sweeps both sides. The github-first ordering now yields one block, zero legacy markers, rows in date order. The dual-pair test is parameterised over both orderings."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. Pure string manipulation; the one constructed regex still interpolates only a 2-3 bounded integer."
+  performance:
+    status: PASS
+    notes: "The two-sided collapse adds one extra protectedRanges pass over the head slice per write. Suite 34.6s vs 34.4s — noise. No test slowed by more than a second."
+  reliability:
+    status: CONCERNS
+    notes: "Both silent-failure paths from cycle 1 are closed and pinned by tests that fail against the pre-fix engine. One reachable exception to the single-log invariant remains (BUG-3), but it is bounded, non-silent in effect (two visible blocks), and strictly better than the pre-fix behaviour."
+  maintainability:
+    status: PASS
+    notes: "Improved. Both fixes carry comments explaining the reasoning error rather than just the change ('the guard was written as a property of finding the heading rather than of reading the document'), which is the form that prevents recurrence. insideFence renamed to insideProtected."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK-42-BUG-3 — include the current marker pair in the collapse sweep"
+      refs: ["shared/resources/change-log.js:436"]
+  future:
+    - action: "Normalise the blank-line seam left when a collapsed block is removed — currently up to 3 consecutive blank lines. Cosmetic; markdown renders identically."
+      refs: ["shared/resources/change-log.js:443"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "TASK-42-BUG-3 fixed, or accepted as a known bounded limitation with a documented rationale"

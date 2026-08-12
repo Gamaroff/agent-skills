@@ -94,7 +94,11 @@ test("parseFrontmatter — missing close tag returns full content as body", () =
 // ---------------------------------------------------------------------------
 // upsertChangelog
 // ---------------------------------------------------------------------------
-test("upsertChangelog — inserts when no changelog exists, before first ## section", () => {
+// Previously asserted the changelog "must precede ## Section". That WAS the defect:
+// inserting before the first `##` is how a Change Log ended up above the Epic Goal.
+// Task.42's Breaking Change 2 replaces that fallback with a doc-type anchor, falling
+// back to end-of-document. `upsertChangelog` passes no docType, so this takes the EOF path.
+test("upsertChangelog — inserts at EOF when no changelog and no anchor exists", () => {
   const src = `# Title\n\nIntro.\n\n## Section\n\nbody\n`;
   const out = lib.upsertChangelog(
     src,
@@ -103,8 +107,8 @@ test("upsertChangelog — inserts when no changelog exists, before first ## sect
   assert.ok(out.includes(lib.CL_START));
   assert.ok(out.includes(lib.CL_END));
   assert.ok(
-    out.indexOf(lib.CL_START) < out.indexOf("## Section"),
-    "changelog must precede ## Section",
+    out.indexOf(lib.CL_START) > out.indexOf("## Section"),
+    "changelog must NOT be inserted above the first body section",
   );
 });
 

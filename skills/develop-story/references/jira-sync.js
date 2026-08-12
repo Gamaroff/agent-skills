@@ -407,110 +407,65 @@ function makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch }) {
 }
 
 // ---------------------------------------------------------------------------
-// Changelog
+// Changelog — delegated to change-log.js
 // ---------------------------------------------------------------------------
-const CL_START = "<!-- jira-sync-changelog-start -->";
-const CL_END = "<!-- jira-sync-changelog-end -->";
+// The implementation moved to `change-log.js`, which is tracker-agnostic and is
+// the canonical engine for every document type (spec: document-change-log.md).
+// What stays here is a back-compat surface: the three `sync-jira-*` scripts and
+// the publishing-fidelity test call these names with these signatures, and this
+// task must not break them. Task.45 rewires those callers to use `change-log.js`
+// directly, at which point this block can go.
+//
+// Behaviour differences the wrappers absorb:
+//   - the new engine writes FOUR columns; `upsertChangelog` still accepts the old
+//     preformatted 2-column row string and parses it back into an entry object.
+//   - the new marker pair is `change-log-*`; the old `jira-sync-changelog-*` pair
+//     is recognised as legacy and migrated in place on first write.
+const CL = require("./change-log.js");
+
+// Not changelog-specific despite having lived in this block: `escapeRe` is used by
+// the section extractor and the frontmatter key rewriter, and is exported. It stays
+// here rather than moving with the changelog code.
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const RE_CL_BLOCK = new RegExp(
-  `${escapeRe(CL_START)}[\\s\\S]*?${escapeRe(CL_END)}`,
-);
-const RE_CL_INNER = new RegExp(
-  `${escapeRe(CL_START)}([\\s\\S]*?)${escapeRe(CL_END)}`,
-);
 
-const RE_ENTRY_ROW = /^\|\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s*\|/;
+// `CL_START` / `CL_END` name the markers the changelog block is ACTUALLY wrapped
+// in, so they follow the engine to the unified pair. Exporting the old
+// jira-specific strings under these names would be actively misleading — nothing
+// writes them any more. The superseded pairs remain reachable, and are migrated
+// in place on first write, via `CL.LEGACY_MARKER_PAIRS`.
+const CL_START = CL.CL_START;
+const CL_END = CL.CL_END;
+const LEGACY_MARKER_PAIRS = CL.LEGACY_MARKER_PAIRS;
 
+const RE_ENTRY_ROW = CL.RE_ENTRY_ROW;
+const isEntryRow = CL.isEntryRow;
+const bodyStart = CL.bodyStart;
+const extractEntries = CL.extractEntries;
+const findHandWrittenChangelog = CL.findChangeLog;
+
+// Old signature: a single summary string, timestamped "YYYY-MM-DD HH:MM". Kept so
+// existing callers compile; the row it produces is migrated to four columns the
+// first time it passes through `upsertChangelog`.
 function fmtEntry(summary) {
   const now = new Date().toISOString().slice(0, 16).replace("T", " ");
   return `| ${now} | ${summary} |`;
 }
 
+// Old signature: `buildChangelogBlock(entries)` → a 2-column block. Now emits the
+// canonical 4-column block; entries already in 4-column form pass through
+// unchanged, and 2-column rows are widened.
 function buildChangelogBlock(entries) {
-  return (
-    `${CL_START}\n## Change Log\n\n` +
-    `| Date (UTC) | Change |\n|------------|--------|\n` +
-    entries.join("\n") +
-    `\n${CL_END}`
+  return CL.buildChangeLogBlock(
+    CL.migrateLegacyEntries(entries, { legacyAuthor: "sync-jira" }),
   );
 }
 
-function isEntryRow(l) {
-  return RE_ENTRY_ROW.test(l);
-}
-
-function extractEntries(content) {
-  const m = content.match(RE_CL_INNER);
-  if (m) return m[1].split("\n").filter(isEntryRow);
-  const hand = findHandWrittenChangelog(content);
-  if (!hand) return [];
-  return content.slice(hand.start, hand.end).split("\n").filter(isEntryRow);
-}
-
-// Index of the first character AFTER the YAML frontmatter block, or 0 when there
-// is none. Every heading search below starts here.
-//
-// Without it, `/^## /m` matches inside frontmatter: a value that quotes a heading
-// name — a `description:` block scalar mentioning `## Change Log`, say — becomes
-// the insertion point, and the changelog is written INTO the YAML. The document
-// still parses, so nothing errors and nothing warns; the changelog silently
-// becomes part of a field's value and is published to Jira as such.
-function bodyStart(content) {
-  if (!content.startsWith("---")) return 0;
-  const close = content.indexOf("\n---", 3);
-  if (close === -1) return 0;
-  const nl = content.indexOf("\n", close + 1);
-  return nl === -1 ? content.length : nl + 1;
-}
-
-function findHandWrittenChangelog(content) {
-  const from = bodyStart(content);
-  const scope = content.slice(from);
-  const m = scope.match(/^## Change Log[ \t]*\n+/m);
-  if (!m) return null;
-  const start = from + scope.indexOf(m[0]);
-  const after = content.slice(start + m[0].length);
-  const next = after.match(/^## /m);
-  const end = next
-    ? start + m[0].length + after.indexOf(next[0])
-    : content.length;
-  return { start, end };
-}
-
+// Old signature: `upsertChangelog(content, newEntry)` where `newEntry` is a
+// preformatted row string. The precise author (`sync-jira-story` vs `-task` vs
+// `-epic`) is not knowable here — the calling script has it, and supplies it in
+// task.45. "sync-jira" is the honest interim value.
 function upsertChangelog(content, newEntry) {
-  if (RE_CL_BLOCK.test(content)) {
-    const entries = [...extractEntries(content), newEntry];
-    return content.replace(RE_CL_BLOCK, buildChangelogBlock(entries));
-  }
-  const hand = findHandWrittenChangelog(content);
-  if (hand) {
-    const existing = content
-      .slice(hand.start, hand.end)
-      .split("\n")
-      .filter(isEntryRow);
-    const entries = [...existing, newEntry];
-    const trailing = hand.end < content.length ? "\n\n" : "\n";
-    return (
-      content.slice(0, hand.start) +
-      buildChangelogBlock(entries) +
-      trailing +
-      content.slice(hand.end)
-    );
-  }
-  // Search from the end of frontmatter, not byte 0 — see bodyStart().
-  const from = bodyStart(content);
-  const scope = content.slice(from);
-  const sec = scope.match(/^## /m);
-  if (sec) {
-    const idx = from + scope.indexOf(sec[0]);
-    return (
-      content.slice(0, idx) +
-      buildChangelogBlock([newEntry]) +
-      "\n\n" +
-      content.slice(idx)
-    );
-  }
-  return content.trimEnd() + "\n\n" + buildChangelogBlock([newEntry]) + "\n";
+  return CL.upsertChangeLog(content, CL.parseLegacyRow(newEntry, "sync-jira"));
 }
 
 // ---------------------------------------------------------------------------
@@ -4092,6 +4047,7 @@ module.exports = {
   // changelog
   CL_START,
   CL_END,
+  LEGACY_MARKER_PAIRS,
   fmtEntry,
   buildChangelogBlock,
   isEntryRow,

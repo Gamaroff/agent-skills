@@ -66,6 +66,26 @@ updated: 2026-01-15
 
 > **OKF mapping:** `updated` (ISO 8601) is this repo's OKF `timestamp`; the tracker URL (`github_url`/`jira_url`) is OKF `resource`. Full conformance + field mapping: [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
 
+## Required body sections
+
+`docs/templates/epic-template.md` produces a document with these level-2 sections, in this order:
+
+1. **Epic Goal** — the outcome the epic delivers
+2. **Background & Context** — why now, and what exists already
+3. **Epic Description** — scope, in/out, affected systems
+4. **Stories Breakdown** — the story overview table and per-story detail
+5. **Technical Architecture** — components, data, integration points
+6. **Dependencies** — upstream and downstream
+7. **Risks & Mitigation**
+8. **Testing Strategy**
+9. **Definition of Done** — epic-level completion criteria
+10. **Estimated Timeline**
+11. **Success Metrics**
+12. **Resources & References**
+13. **Notes & Updates** — free-form notes, containing `### Change Log`
+
+**Change Log** is an append-only table of what changed about the document — four columns (`Date`, `Version`, `Description`, `Author`), newest at the bottom, every entry bumping frontmatter `updated:` in the same edit. In the epic template it is nested as `### Change Log` under `## Notes & Updates`; readers accept H2 or H3 and preserve whichever level they find. When absent it is inserted before `## Notes & Updates`. Spec: [`document-change-log.md`](../../shared/resources/document-change-log.md).
+
 ## Status lifecycle
 
 See [`status-lifecycle.md`](./status-lifecycle.md). Epic status reflects the rolled-up state of its stories — `finalise` does not auto-advance epic status; it's set by the human or by a higher-level skill when all stories are accepted.
