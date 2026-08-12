@@ -5,7 +5,7 @@ type: task
 description: "Establish one canonical Change Log section format for PRD/epic/story/task documents, backed by a shared engine extracted from jira-sync.js, and record it in the standards."
 tags: [change-log, documentation, shared-resources]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 created: 2026-08-12
 updated: 2026-08-12
@@ -16,7 +16,7 @@ github_issue: 201
 
 # [Task 42] Canonical Change Log spec and shared engine
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.42.review.1.change-log-spec-and-engine.md` implemented 2026-08-12
 
@@ -770,6 +770,35 @@ standards document that reads badly.
 - [`docs/standards/`](../../standards/) — the five document standards
 - Follow-on tasks: task.43 (templates + creation), task.44 (review + edit), task.45
   (pipeline + sync)
+
+---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-12
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.42.qa.1.change-log-spec-and-engine.md](./task.42.qa.1.change-log-spec-and-engine.md)
+- **Gate File**: [task.42.gate.1.change-log-spec-and-engine.yml](./task.42.gate.1.change-log-spec-and-engine.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1137 (all passing)
+- **Phases Verified**: 5/5 complete; 2 with concerns
+- **Critical Issues**: 2 HIGH
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+
+### Key Findings
+
+Two high-confidence correctness bugs, both in the fence guard this task introduced:
+
+- **[TASK-42-BUG-1](./task.42.bug.1.heading-block-end-scan-ignores-fences.md)** — the guard is applied where a Change Log block *starts* but not where it *ends*. A fenced `##` inside a Change Log section terminates the block early, consuming the opening fence and stranding a row outside the log.
+- **[TASK-42-BUG-2](./task.42.bug.2.dual-legacy-collapse-is-order-dependent.md)** — dual-legacy collapse depends on document order. With the github block before the jira block, both survive — failing the "no duplication" Success Criterion. The existing test covers only the working ordering.
+
+The architecture, extraction, spec and documentation are sound; both fixes are localised.
 
 ---
 

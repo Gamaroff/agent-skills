@@ -19,7 +19,9 @@
 //   2. End-of-block overrun.    The old end-scan looked only for `/^## /m`, so an H3
 //                               log ran to the next H2 and swallowed its sibling
 //                               subsections. Now the scan ends at the next heading of
-//                               the SAME OR SHALLOWER level.
+//                               the SAME OR SHALLOWER level — and is filtered through
+//                               the same protected ranges as the start-scan, because
+//                               guarding only one end of a block guards neither.
 //   3. Top-of-body fallback.    "Insert before the first `##`" is how a Change Log
 //                               ended up above the Epic Goal. Now a doc-type anchor,
 //                               falling back to EOF — never to the top.
@@ -187,7 +189,7 @@ function protectedRanges(content) {
   return [...fencedRanges(content), ...inlineCodeRanges(content)];
 }
 
-const insideFence = (ranges, index) =>
+const insideProtected = (ranges, index) =>
   ranges.some(([start, end]) => index >= start && index < end);
 
 // ---------------------------------------------------------------------------
@@ -225,6 +227,19 @@ function migrateLegacyRow(row, { legacyAuthor = "", docType = "" } = {}) {
   const cells = rowCells(row);
   if (cells.length >= 4) return row;
 
+  // A 3-cell row is not a shape either marker pair ever wrote — both legacy
+  // writers emitted exactly `| date | change |`. Treating it as 2-column would
+  // silently drop cell 3, so append the surplus to the description instead:
+  // widening must never lose text, whatever odd row a hand edit produced.
+  if (cells.length === 3) {
+    return fmtEntry({
+      date: (cells[0] || "").slice(0, 10),
+      version: "",
+      description: [cells[1], cells[2]].filter(Boolean).join(" — "),
+      author: legacyAuthor && docType ? `${legacyAuthor}-${docType}` : legacyAuthor,
+    });
+  }
+
   const date = (cells[0] || "").slice(0, 10); // drop the legacy HH:MM
   const description = cells[1] || "";
   const author = legacyAuthor && docType ? `${legacyAuthor}-${docType}` : legacyAuthor;
@@ -251,7 +266,7 @@ function findMarkerBlock(content, ranges, start, end) {
     const m = slice.match(re);
     if (!m) return null;
     const idx = from + m.index;
-    if (!insideFence(ranges, idx)) {
+    if (!insideProtected(ranges, idx)) {
       return { start: idx, end: idx + m[0].length };
     }
     from = idx + m[0].length;
@@ -261,27 +276,35 @@ function findMarkerBlock(content, ranges, start, end) {
 /**
  * Locate the document's Change Log.
  *
- * Order: current marker pair → either legacy pair → heading. Returns
- * `{ start, end, level, legacyAuthor, hasMarkers }` or `null`.
+ * A marker block wins over a hand-written heading. Among marker blocks, the one
+ * that appears **earliest in the document** wins — NOT the first pair in
+ * `LEGACY_MARKER_PAIRS` order. Selecting by array order made the result depend on
+ * a constant's declaration rather than on the document: with the github block
+ * physically before the jira block, the jira block was chosen, and the collapse
+ * pass below (which only sees the text after the chosen block) never saw the
+ * github one, so both survived. Which pair appears first in a real document is
+ * arbitrary — it depends on which tracker it was synced to first.
+ *
+ * Returns `{ start, end, level, legacyAuthor, hasMarkers }` or `null`.
  */
 function findChangeLog(content) {
   const ranges = protectedRanges(content);
 
+  const candidates = [];
   const current = findMarkerBlock(content, ranges, CL_START, CL_END);
-  if (current) {
-    return { ...current, level: headingLevelWithin(content, current), legacyAuthor: "", hasMarkers: true };
-  }
-
+  if (current) candidates.push({ ...current, legacyAuthor: "" });
   for (const pair of LEGACY_MARKER_PAIRS) {
     const found = findMarkerBlock(content, ranges, pair.start, pair.end);
-    if (found) {
-      return {
-        ...found,
-        level: headingLevelWithin(content, found),
-        legacyAuthor: pair.author,
-        hasMarkers: true,
-      };
-    }
+    if (found) candidates.push({ ...found, legacyAuthor: pair.author });
+  }
+
+  if (candidates.length) {
+    const best = candidates.reduce((a, b) => (b.start < a.start ? b : a));
+    return {
+      ...best,
+      level: headingLevelWithin(content, best),
+      hasMarkers: true,
+    };
   }
 
   // Hand-written heading, scoped past frontmatter.
@@ -293,7 +316,7 @@ function findChangeLog(content) {
     if (!m) return null;
 
     const start = searchFrom + m.index;
-    if (insideFence(ranges, start)) {
+    if (insideProtected(ranges, start)) {
       searchFrom = start + m[0].length;
       continue;
     }
@@ -302,12 +325,22 @@ function findChangeLog(content) {
     // End at the next heading of the SAME OR SHALLOWER level. An H3 log under
     // `## Notes & Updates` ends at the next `###` or `##`, whichever comes first —
     // the old code scanned only for `## ` and swallowed sibling subsections.
-    const after = content.slice(start + m[0].length);
-    const nextRe = new RegExp(`^#{1,${level}}[ \\t]`, "m");
-    const next = after.match(nextRe);
-    const end = next
-      ? start + m[0].length + next.index
-      : content.length;
+    //
+    // The end-scan is guarded by the SAME protected ranges as the start-scan
+    // above. It has to be: a fenced `## Example` inside the section is not a
+    // heading, and ending the block there consumes the opening fence on rewrite,
+    // leaves an orphaned closing fence, and strands the rows below it outside the
+    // log. Guarding only the start was a real defect (TASK-42-BUG-1).
+    const bodyOffset = start + m[0].length;
+    const after = content.slice(bodyOffset);
+    const nextRe = new RegExp(`^#{1,${level}}[ \\t]`, "gm");
+    let end = content.length;
+    for (const nm of after.matchAll(nextRe)) {
+      const abs = bodyOffset + nm.index;
+      if (insideProtected(ranges, abs)) continue;
+      end = abs;
+      break;
+    }
 
     return { start, end, level, legacyAuthor: "", hasMarkers: false };
   }
@@ -368,25 +401,38 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
 
     // A document synced to both trackers carries a second legacy block. Collapse
     // it into this one rather than leaving two logs behind.
-    const rest = collapseOtherLegacyBlocks(
+    //
+    // Scan BOTH sides of the chosen block. Scanning only the tail assumed the
+    // chosen block was always the earliest, which stopped being true the moment
+    // the other pair appeared first in the document (TASK-42-BUG-2). `findChangeLog`
+    // now picks the earliest block, so in practice `head` is usually clean — but
+    // sweeping both sides is what makes that an optimisation rather than a
+    // correctness dependency.
+    const head = collapseOtherLegacyBlocks(
+      content.slice(0, found.start),
+      docType,
+      found.legacyAuthor,
+    );
+    const tail = collapseOtherLegacyBlocks(
       content.slice(found.end),
       docType,
       found.legacyAuthor,
     );
+    const merged = [...head.entries, ...tail.entries];
 
     // Only when rows from a second block are being merged in do the historical
     // rows get sorted — otherwise the two blocks' histories would interleave
     // wrongly. In the ordinary single-block case the existing order is preserved
     // untouched, because the log is append-only and its order is its history.
-    const history = rest.entries.length
-      ? [...migrated, ...rest.entries].sort(byDate)
+    const history = merged.length
+      ? [...migrated, ...merged].sort(byDate)
       : migrated;
 
     const block = buildChangeLogBlock([...history, newRow], {
       level: found.level,
     });
     const trailing = found.end < content.length ? "\n\n" : "\n";
-    return content.slice(0, found.start) + block + trailing + rest.content;
+    return head.content + block + trailing + tail.content;
   }
 
   const anchor = ANCHORS[docType];
@@ -395,7 +441,7 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     const ranges = protectedRanges(content);
     const scope = content.slice(from);
     const m = scope.match(anchor);
-    if (m && !insideFence(ranges, from + m.index)) {
+    if (m && !insideProtected(ranges, from + m.index)) {
       const idx = from + m.index;
       return (
         content.slice(0, idx) +
@@ -413,8 +459,9 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
 // rows sharing a date keep their original relative order.
 const byDate = (a, b) => rowCells(a)[0].localeCompare(rowCells(b)[0]);
 
-// Remove any *other* legacy block from the remainder of the document and return
-// its rows, so a dual-synced document ends with exactly one Change Log.
+// Remove any *other* legacy block from a slice of the document and return its
+// rows, so a dual-synced document ends with exactly one Change Log. Called for
+// the text on each side of the chosen block.
 function collapseOtherLegacyBlocks(rest, docType, alreadyMigrated) {
   const entries = [];
   let out = rest;
@@ -512,7 +559,7 @@ module.exports = {
   fencedRanges,
   inlineCodeRanges,
   protectedRanges,
-  insideFence,
+  insideProtected,
   // rows and blocks
   fmtEntry,
   buildChangeLogBlock,

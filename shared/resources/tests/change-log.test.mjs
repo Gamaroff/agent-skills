@@ -224,39 +224,71 @@ test("D: a legacy github-sync block migrates the same way", () => {
   assert.ok(!out.includes("github-sync-changelog-start"));
 });
 
-test("D: a document with BOTH legacy pairs collapses to one block, rows in date order", () => {
-  const doc = [
-    "# Story",
-    "",
-    "<!-- jira-sync-changelog-start -->",
-    "## Change Log",
-    "",
-    "| 2026-04-28 09:40 | Jira story created |",
-    "<!-- jira-sync-changelog-end -->",
-    "",
-    "## Middle Section",
-    "",
-    "<!-- github-sync-changelog-start -->",
-    "## Change Log",
-    "",
-    "| 2026-03-01 12:00 | GitHub issue created |",
-    "<!-- github-sync-changelog-end -->",
-    "",
-    "## Dev Agent Record",
-    "",
-  ].join("\n");
+// Parameterised over BOTH document orderings. Testing only one is what let
+// TASK-42-BUG-2 through: `findChangeLog` selected by LEGACY_MARKER_PAIRS array
+// order rather than document position, so with github first, the github block was
+// never examined and both blocks survived — while this test, built jira-first,
+// stayed green.
+const JIRA_BLOCK = [
+  "<!-- jira-sync-changelog-start -->",
+  "## Change Log",
+  "",
+  "| 2026-04-28 09:40 | Jira story created |",
+  "<!-- jira-sync-changelog-end -->",
+];
+const GITHUB_BLOCK = [
+  "<!-- github-sync-changelog-start -->",
+  "## Change Log",
+  "",
+  "| 2026-03-01 12:00 | GitHub issue created |",
+  "<!-- github-sync-changelog-end -->",
+];
 
-  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "story" });
+for (const [label, first, second] of [
+  ["jira first", JIRA_BLOCK, GITHUB_BLOCK],
+  ["github first", GITHUB_BLOCK, JIRA_BLOCK],
+]) {
+  test(`D: BOTH legacy pairs collapse to one block, rows in date order (${label})`, () => {
+    const doc = [
+      "# Story",
+      "",
+      ...first,
+      "",
+      "## Middle Section",
+      "",
+      ...second,
+      "",
+      "## Dev Agent Record",
+      "",
+    ].join("\n");
 
-  assert.equal(out.match(/Change Log/g).length, 1, "collapses to one block");
-  assert.ok(!out.includes("github-sync-changelog-start"));
-  assert.ok(!out.includes("jira-sync-changelog-start"));
-  assert.ok(
-    out.indexOf("GitHub issue created") < out.indexOf("Jira story created"),
-    "merged rows are ordered by date (2026-03-01 before 2026-04-28)",
-  );
-  assert.match(out, /^## Middle Section$/m, "unrelated section survives");
-});
+    const out = CL.upsertChangeLog(doc, ENTRY, { docType: "story" });
+
+    assert.equal(
+      out.match(/^#{2,3} Change Log$/gm).length,
+      1,
+      "collapses to exactly one block",
+    );
+    assert.ok(!out.includes("github-sync-changelog-start"), "github markers gone");
+    assert.ok(!out.includes("jira-sync-changelog-start"), "jira markers gone");
+    assert.ok(
+      out.indexOf("GitHub issue created") < out.indexOf("Jira story created"),
+      "merged rows ordered by date (2026-03-01 before 2026-04-28)",
+    );
+    assert.match(
+      out,
+      /\| 2026-03-01 \|  \| GitHub issue created \| sync-github-story \|/,
+      "github row widened with inferred author",
+    );
+    assert.match(
+      out,
+      /\| 2026-04-28 \|  \| Jira story created \| sync-jira-story \|/,
+      "jira row widened with inferred author",
+    );
+    assert.match(out, /^## Middle Section$/m, "unrelated section survives");
+    assert.match(out, /^## Dev Agent Record$/m, "anchor section survives");
+  });
+}
 
 test("D: an already-canonical 4-column row is never rewritten", () => {
   const row = "| 2026-05-11 | 1.0 | Initial draft | create-story |";
@@ -554,6 +586,92 @@ test("F: a real unbackticked marker beside inline-code mentions is still found",
 test("F: inlineCodeRanges pairs equal-length backtick runs only", () => {
   const ranges = CL.inlineCodeRanges("a `one` b ``two`` c");
   assert.equal(ranges.length, 2);
+});
+
+test("F: a fenced heading INSIDE the Change Log does not end the block (TASK-42-BUG-1)", () => {
+  // The start-scan was guarded but the end-scan was not, so the block ended at a
+  // fenced `##`. On rewrite that consumed the opening fence, left an orphaned
+  // closing fence (mis-pairing every later fence in the file), and stranded the
+  // rows below it OUTSIDE the log, where the next write would not carry them.
+  const doc = [
+    "# Doc",
+    "",
+    "## Change Log",
+    "",
+    "| Date | Version | Description | Author |",
+    "|------|---------|-------------|--------|",
+    "| 2026-01-01 | 1.0 | First | create-task |",
+    "",
+    "```markdown",
+    "## Example heading in a fence",
+    "```",
+    "",
+    "| 2026-02-02 |  | Second | qa-task |",
+    "",
+  ].join("\n");
+
+  assert.equal(CL.extractEntries(doc).length, 2, "both rows are inside the block");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+
+  assert.equal(CL.extractEntries(out).length, 3, "both rows survive, plus the new one");
+  assert.match(out, /\| 2026-02-02 \|  \| Second \| qa-task \|/, "row not stranded");
+  assert.equal(
+    (out.match(/^```/gm) || []).length % 2,
+    0,
+    "fences stay balanced — no orphaned closing fence",
+  );
+  assert.doesNotMatch(
+    out,
+    /^## Example heading in a fence$/m,
+    "the fenced line is not promoted to a real heading",
+  );
+
+  // Residual, and correct: non-row content that sits INSIDE the section is not
+  // preserved, because regenerating a block has always replaced everything
+  // between its bounds with markers + heading + table. That is what a Change Log
+  // section is. The defect was never "the fence is rewritten" — it was that the
+  // block ENDED at the fence, which stranded the rows below it outside the log
+  // and left the closing fence orphaned. Both are asserted above.
+});
+
+test("F: an H3 log with a fenced heading inside still ends at the next real sibling", () => {
+  const doc = [
+    "## Notes & Updates",
+    "",
+    "### Change Log",
+    "",
+    "| 2026-01-01 |  | First | create-epic |",
+    "",
+    "```markdown",
+    "### Fenced sibling",
+    "```",
+    "",
+    "| 2026-02-02 |  | Second | review-epic |",
+    "",
+    "### Real Sibling",
+    "",
+    "Kept.",
+    "",
+  ].join("\n");
+
+  assert.equal(CL.extractEntries(doc).length, 2);
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "epic" });
+  assert.equal(CL.extractEntries(out).length, 3);
+  assert.match(out, /^### Real Sibling$/m);
+  assert.match(out, /Kept\./);
+  assert.match(out, /^### Change Log$/m, "level preserved");
+});
+
+test("D: a 3-cell legacy row keeps all of its text", () => {
+  // Neither legacy writer emitted 3 cells, so this only arises from a hand edit.
+  // Widening must not silently drop the third cell.
+  const [row] = CL.migrateLegacyEntries(["| 2026-01-01 | Desc | Extra |"], {
+    legacyAuthor: "sync-jira",
+    docType: "task",
+  });
+  assert.match(row, /Desc/);
+  assert.match(row, /Extra/, "the third cell must not be dropped");
 });
 
 // ---------------------------------------------------------------------------
