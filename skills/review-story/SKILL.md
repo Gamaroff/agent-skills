@@ -597,6 +597,36 @@ Name the outstanding roles so the human knows who to chase:
 
 > **Never sign on a stakeholder's behalf.** This applies in validate-and-apply mode too: the auto-fix pass may create a missing section (roles only, from the roster) but must **never** write into a Signature or Date cell. An unsigned document stays unsigned until a human commits their name.
 
+4b. **Change Log** (conditional — canonical spec: [`document-change-log.md`](references/document-change-log.md)):
+
+Read `change-log.enabled` from `skills-config.yaml`. It defaults to **`true`**, unlike sign-off — a log is a record of what happened, not a gate on a human. **Skip this check entirely when `change-log.enabled: false`, or when `change-log.enforcement: off`.**
+
+The Change Log already appears in the Section Presence list above; this check adds the second half — whether the log is *current*, not merely present:
+
+- **Presence** — the document has a `## Change Log` section with the four canonical columns and at least one row.
+- **Currency** — the newest row is consistent with frontmatter `status`. Flag **only** when `status` has advanced past `draft` **and** no row mentions a review, a status change, or an implementation event. A story at `ready-for-development` whose log stops at `Initial draft` is stale: a review promoted it and recorded nothing.
+
+> **Define currency narrowly, and do not widen it.** The check compares the newest row against `status:` — not against the story's actual diff. A reviewer who edits prose without adding a row is not caught, and that is accepted at `advisory`. The failure mode being avoided is the opposite one: a heuristic eager enough to flag legitimately quiet documents trains reviewers to ignore the finding, and an ignored check is a check that does not exist. A no-findings review still writes a row (Step 10), so the quiet case is already covered by a writer rather than exempted here.
+
+Severity is driven by `change-log.enforcement`:
+
+| `enforcement`        | Missing or stale                                | Effect on the pipeline                                                                                                    |
+| -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `advisory` (default) | **Important** issue + readiness-score deduction | None — verdict may still be GO, `develop-story` proceeds                                                                  |
+| `blocking`           | **Critical** issue → NO-GO                      | Do **not** promote the story out of `draft` — `develop-story` gates on `Status:`, so leaving it unpromoted is what actually stops the run |
+| `off`                | not checked                                     | None                                                                                                                      |
+
+Reviewer output — name what is stale and what would fix it:
+
+```markdown
+- **[Important]** Change Log is stale — newest row is `1.0 Initial draft` (2026-05-11) but
+  status is `ready-for-development`. Enforcement is `advisory`, so this does not block development.
+```
+
+Under `blocking`, the same finding is `[Critical]` and the closing sentence becomes `Enforcement is 'blocking' — development cannot begin until the log is current.`
+
+> **Expect legacy documents to report exactly one Important finding.** There is no backfill: every document written before the Change Log spec existed has no section. `advisory` is the default precisely so those documents score one point lower and report one extra finding while still returning GO. A missing section on an old document is not a defect in that document — it is the adoption boundary.
+
 5. **Title Format**:
    - When the story `title` frontmatter (or the `# ` heading) embeds a story-id prefix, it MUST use the canonical bracket form `[Story N.M] Name` — never the colon form `Story N.M: Name` nor the hyphen form `Story N-M: Name`.
    - Detect by matching `^\s*Story\s+[\d.\-]+\s*:` against the title/heading value; also flag a bare `Story N.M` / `Story N-M` prefix that lacks the brackets.
@@ -782,7 +812,7 @@ Name the outstanding roles so the human knows who to chase:
 - **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage; unsigned sign-off when `sign-off.enforcement: advisory` (the default)
 - **Optional**: Missing optional sections or subsections
 
-**Output**: Section compliance report with specific issues listed. Card-preflight findings count toward the **Template Compliance** score — a document that cannot produce a usable card is not template-compliant, whatever else it satisfies.
+**Output**: Section compliance report with specific issues listed. Card-preflight findings count toward the **Template Compliance** score — a document that cannot produce a usable card is not template-compliant, whatever else it satisfies. A missing or stale **Change Log** (check 4b) also deducts from this score under `change-log.enforcement: advisory`, and is named in that row's note.
 
 ---
 
@@ -2094,10 +2124,11 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
 
    **If "Yes, update status"**:
    - Update story document `Status:` field to "Ready for Development"
-   - Add entry to Change Log table:
+   - Append a row to the Change Log table and bump frontmatter `updated` in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version, and `Author` is the skill name in lowercase — `review-story`, not `Review-Story`:
      ```markdown
-     | [date] | [version] | Review passed - ready for development | Review-Story |
+     | YYYY-MM-DD | [version] | Review passed (9/10) — ready for development | review-story |
      ```
+   - Skip when `change-log.enabled: false` in `skills-config.yaml`
    - Confirm update to user: "✅ Story status updated to 'Ready for Development'. You can now run `/develop` to begin implementation."
 
    **After status edit — sync to tracker (non-blocking)**:

@@ -228,6 +228,21 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
   - `type: epic` present and non-empty → **Critical** if missing or empty (OKF's one hard requirement).
   - `description` present (one-sentence summary) → **Important** if missing.
   - `tags` is a YAML list (when present) and `resource` is a valid URI (when present) → **Optional** if malformed. Absence is not a finding.
+- **Change Log — presence and currency** (conditional; canonical spec: [`document-change-log.md`](references/document-change-log.md)). Read `change-log.enabled` from `skills-config.yaml`; it defaults to **`true`**, unlike sign-off — a log is a record of what happened, not a gate on a human. Skip entirely when `change-log.enabled: false` or `change-log.enforcement: off`. Otherwise check two things:
+  - **Presence** — a `## Change Log` section with the four canonical columns and at least one row.
+  - **Currency** — the newest row is consistent with frontmatter `status`. Flag **only** when `status` has advanced past `draft` **and** no row mentions a review or status change. Define this narrowly: a heuristic eager enough to flag legitimately quiet epics trains reviewers to ignore it, and an ignored check is a check that does not exist. A no-findings review still writes a row (Step 11), so the quiet case is covered by a writer rather than exempted here.
+
+  Severity is driven by `change-log.enforcement`:
+
+  | `enforcement`        | Missing or stale                                | Effect                                                          |
+  | -------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
+  | `advisory` (default) | **Important** issue + readiness-score deduction | None — verdict may still be GO                                  |
+  | `blocking`           | **Critical** issue → NO-GO                      | Story-writing should not begin until the log is current          |
+  | `off`                | not checked                                     | None                                                            |
+
+  Reviewer output: `- **[Important]** Change Log is stale — newest row is \`1.0 Initial draft\` (2026-05-11) but status is \`in-progress\`. Enforcement is \`advisory\`, so this does not block story writing.`
+
+  **Expect legacy epics to report exactly one Important finding.** There is no backfill, and `advisory` is the default precisely so those documents score one point lower while still returning GO.
 
 **Tracker Card Preflight**:
 
@@ -442,7 +457,7 @@ Score each dimension 1–5:
 
 | Dimension                  | 1 (Poor)                            | 3 (Adequate)                             | 5 (Excellent)                                      |
 | -------------------------- | ----------------------------------- | ---------------------------------------- | -------------------------------------------------- |
-| **Template Compliance**    | Multiple missing sections           | Most sections present                    | All sections complete, no placeholders             |
+| **Template Compliance**    | Multiple missing sections           | Most sections present                    | All sections complete, no placeholders, Change Log present and current |
 | **Registry Integrity**     | Not in registry or wrong number     | In registry but stale                    | Registry entry accurate and current                |
 | **Architecture Alignment** | Multiple violations                 | Minor deviations                         | Fully compliant with all arch docs                 |
 | **Scope Clarity**          | Vague deliverables, no out-of-scope | Deliverables listed, out-of-scope sparse | Crystal clear deliverables and explicit exclusions |
@@ -674,6 +689,12 @@ If yes:
 - Update `status` if user confirmed a change during the review
 - Do NOT change any other content
 
+**When the `status` changes**, append a Change Log row to the epic recording the transition, and bump frontmatter `updated` in the same edit. Format: [document-change-log.md](references/document-change-log.md). A status transition leaves `Version` blank — only the verdict row in Step 11 bumps it:
+
+| 2026-08-12 |  | Status → ready-for-development | review-epic |
+
+Skip when `change-log.enabled: false`.
+
 ---
 
 ### Step 11 — Apply Findings to Epic
@@ -713,6 +734,14 @@ options:
    - Add the following line immediately after the `**Last Updated**` status line:
      `**Review**: ✅ All review recommendations from \`epic.[N].review.[n].[name].md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
    - Update the `last_reviewed` YAML frontmatter field to today's date if not already done in Step 10
+
+7. **Append a Change Log row** recording the review outcome, and bump frontmatter `updated` to today in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name. Illustrative row:
+
+   | 2026-08-12 | 1.1 | Review passed (8/10) — 3 fixes applied, scope overlap with epic 2 noted | review-epic |
+
+   Describe **what the review found and changed**, not that a review happened. Skip when `change-log.enabled: false` in `skills-config.yaml`.
+
+   > Write this row **regardless of tracker platform**. Step 11.5's Jira sync also appends a row on the Jira path, but that is a *sync* record, not the *review* record — and the GitHub and no-tracker paths get nothing at all without this step. This is the write that makes the local file the authoritative history the [tracker card contract](references/tracker-card-summary.md) already claims it is.
 
 **If "No — I will apply them manually"**:
 

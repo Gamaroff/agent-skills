@@ -134,6 +134,14 @@ Top blockers: {1-3 lines, or "none"}
 
 When applying, use `Edit` on `BUG_FILE` to: tighten reproduction steps, fill environment/expected/actual, add missing frequency/reproducible fields, correct severity/priority, and repair parent linkage / registry rows. After each: `✅ Fixed: {issue}`. If a fix needs information you don't have: `⏭ Skipped: {issue} — needs your input`.
 
+**When you correct severity or priority**, append a row to the bug's `## Status History` table recording it, and bump frontmatter `updated` in the same edit. Severity and priority decide who gets paged, so a silent correction is the one edit here that most needs a trace.
+
+| 2026-08-12 | New | review-bug | Severity Medium → High; priority P3 → P1 — affects checkout |
+
+Leave the `Status` cell at the bug's **current** lifecycle status — this step never transitions a bug, and the row records a field correction, not a transition.
+
+> **Bugs use `## Status History`, not a Change Log.** The columns differ (`Date`, `Status`, `Changed By`, `Notes`), the section already exists in `create-bug-report/assets/bug-report-template.md`, and it is the richer table because it carries the `Status` column a bug's history is actually about. [`document-change-log.md`](references/document-change-log.md) excludes bug reports for exactly this reason — do not add a second table.
+
 **Never**: change the bug lifecycle `status`, edit the codebase, or fabricate reproduction detail that isn't derivable from the report/evidence. If reproducibility cannot be established even after edits, the recommendation stays **NEEDS DETAIL** (or STALE) — do not upgrade it to READY.
 
 ## Step 7: Tracker Comment (graceful — non-blocking)

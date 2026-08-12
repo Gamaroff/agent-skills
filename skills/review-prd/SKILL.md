@@ -223,7 +223,21 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 - No unfilled placeholders: `{{...}}`, `[TBD]`, `[TODO]`, `YYYY-MM-DD`
 - PRD filename follows `prd.[kebab-name].md` convention
 - Directory follows `prd.[kebab-name]/` convention
-- Change Log exists and has at least one entry
+- **Change Log — presence and currency** (conditional; canonical spec: [`document-change-log.md`](references/document-change-log.md)). Read `change-log.enabled` from `skills-config.yaml`; it defaults to **`true`**, unlike sign-off. Skip entirely when `change-log.enabled: false` or `change-log.enforcement: off`. Otherwise check two things:
+  - **Presence** — a Change Log section with at least one row. **PRDs keep `### Change Log` nested under §1** — accept H3 (and optional section numbering, e.g. `### 1.5 Change Log`); do not flag it for not being H2. A PRD predating the four-column table may still have five columns; that is expected and is not a finding.
+  - **Currency** — the newest row is consistent with frontmatter `status`. Flag **only** when `status` has advanced past `draft` **and** no row mentions a review or status change. Define this narrowly: a heuristic eager enough to flag legitimately quiet documents trains reviewers to ignore it, and an ignored check is a check that does not exist. A no-findings review still writes a row (Step 12), so the quiet case is covered by a writer rather than exempted here.
+
+  Severity is driven by `change-log.enforcement`:
+
+  | `enforcement`        | Missing or stale                                | Effect                                                        |
+  | -------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+  | `advisory` (default) | **Important** issue + readiness-score deduction | None — verdict may still be GO                                |
+  | `blocking`           | **Critical** issue → NO-GO                      | Downstream epic/story work should not begin until it is current |
+  | `off`                | not checked                                     | None                                                          |
+
+  Reviewer output: `- **[Important]** Change Log is stale — newest row is \`1.0 Initial draft\` (2026-05-11) but status is \`approved\`. Enforcement is \`advisory\`, so this does not block downstream work.`
+
+  **Expect legacy PRDs to report exactly one Important finding.** There is no backfill, and `advisory` is the default precisely so those documents score one point lower while still returning GO.
 - YAML frontmatter present with `status`, `version`, `created`, `updated` fields
 - **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)): `type: prd` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement); `description` (one-sentence summary) present → **Important** if missing; `tags` is a list / `resource` is a URI when present → **Optional** if malformed
 
@@ -768,9 +782,14 @@ options:
    - In the Recommended Actions list, prefix each applied recommendation with `✅ ` and each skipped one with `⏭️ skipped —` followed by the reason
 
    **In the PRD file** (`prd.[name].md`):
-   - Add the following line in the Change Log:
-     `| Review fixes applied | YYYY-MM-DD | [version] | Applied [N] recommendations from review-prd | Claude |`
-   - Update the `updated` YAML frontmatter field to today's date
+   - Append the following row to the Change Log — four columns, canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name, not `Claude`:
+     `| YYYY-MM-DD | [version] | Applied [N] recommendations from review-prd | review-prd |`
+   - Update the `updated` YAML frontmatter field to today's date **in the same edit** — a row that does not move `updated` leaves the PRD claiming it was last touched before its own most recent recorded change
+   - Skip both when `change-log.enabled: false` in `skills-config.yaml`
+
+   > **PRDs keep `### Change Log` nested under §1** — do not promote it to `##`. The level found is the level preserved.
+   >
+   > **A PRD created before the four-column table may still have five columns.** Append four columns anyway and do **not** rewrite the header or any existing row: the log is append-only, and widening a legacy table is a deliberate manual one-time edit. The result renders visibly ragged until someone does that, which is expected and documented — not a defect to fix mid-review.
 
 **If "No — I will apply them manually"**:
 

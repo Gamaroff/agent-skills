@@ -255,21 +255,29 @@ If validation fails, present findings to user:
    - If editing multiple sections, apply changes in order
    - Use precise string matching from original file
 
-2. **Post-edit validation**:
+2. **Append a Change Log row** (mandatory) describing the change, and bump frontmatter `updated` in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A scope or AC edit bumps the minor version; `Author` is the skill name:
+
+   | 2026-08-12 | 1.2 | AC3 added — offline retry on 5xx | edit-story |
+
+   **Describe the substance, not the act.** `AC3 added — offline retry on 5xx`, never `Story edited`. A log of "edited" rows is not a history — it is a record that something happened, which the git log already gives you for free. The row exists to answer *what changed about this requirement*.
+
+   Skip only when `change-log.enabled: false` in `skills-config.yaml`.
+
+3. **Post-edit validation**:
    - Read modified file
    - Verify YAML frontmatter is still valid (if present)
    - Verify all required sections still present
    - Verify file is syntactically correct markdown
 
-3. **Confirm success to user**:
+4. **Confirm success to user**:
    > "Story file successfully updated!
    >
    > File: {filepath}
    > Changes applied: {summary}
+   > Change Log row added: {the row}
    >
    > Next steps:
    >
-   > - Consider updating Change Log section if not already done
    > - If status changed, ensure File List is updated
    > - If acceptance criteria changed, consider impact on tests"
 
@@ -529,7 +537,7 @@ Result: Story successfully updated with validation and safety checks
 
 - **Story files live in epic's `stories/` subdirectory** - Per documentation structure requirements
 - **YAML frontmatter is optional** - Some stories use markdown-based metadata instead
-- **Change Log should be updated** - Consider adding entry for significant edits
+- **Change Log entry is mandatory, not optional** - Step 5 writes the row describing what changed; see [document-change-log.md](references/document-change-log.md)
 - **File List should match reality** - If changes affect implementation files
 - **Status transitions matter** - Ensure status changes align with actual progress
 - **Always use Edit tool, never Write** - Preserve file history and enable safe rollbacks

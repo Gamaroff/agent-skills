@@ -248,6 +248,71 @@ for (const skill of ["create-story", "create-task", "review-story", "review-task
   });
 }
 
+// ===========================================================================
+// change-log — the four review skills document the config gate and link the spec
+// ===========================================================================
+for (const skill of ["review-story", "review-task", "review-epic", "review-prd"]) {
+  test(`change-log — ${skill} documents the config gate and links the spec`, () => {
+    const { content } = loadSkill(skill);
+    assert.match(content, /change-log\.enabled/, "must gate on change-log.enabled");
+    assert.match(content, /change-log\.enforcement/, "must grade per change-log.enforcement");
+    // Bundling rewrites `shared/resources/X` → `references/X` in place, so accept
+    // either form; what matters is that the canonical spec is referenced at all.
+    assert.match(
+      content,
+      /(shared\/resources|references)\/document-change-log\.md/,
+      "must reference the canonical change-log spec",
+    );
+    // `advisory` must be the documented default. A wrong default here halts every
+    // consumer pipeline at review: under `blocking` the gate withholds the status
+    // promotion, and develop-* gates on Status, so every legacy document stops the run.
+    assert.match(
+      content,
+      /advisory[^\n]*default|default[^\n]*advisory/i,
+      "must document `advisory` as the default enforcement level",
+    );
+  });
+}
+
+// The skills that mutate a document must say they write the row. Without this,
+// the grading above checks for a section that nothing ever populates.
+for (const skill of [
+  "review-story",
+  "review-task",
+  "review-epic",
+  "review-prd",
+  "edit-story",
+  "edit-epic",
+  "correct-course",
+  "change-management",
+  "shard-doc",
+  "shard-prd",
+  "enforce-standards",
+  "epic-registry-manager",
+]) {
+  test(`change-log — ${skill} instructs writing a row and links the spec`, () => {
+    const { content } = loadSkill(skill);
+    assert.match(
+      content,
+      /(shared\/resources|references)\/document-change-log\.md/,
+      "must reference the canonical change-log spec rather than restating the columns",
+    );
+    assert.match(content, /Change Log/, "must mention the Change Log section");
+  });
+}
+
+// review-bug is the deliberate exception: bugs carry Status History, never a
+// Change Log. Assert the exclusion holds, so a future edit cannot quietly add one.
+test("change-log — review-bug writes Status History, not a Change Log", () => {
+  const { content } = loadSkill("review-bug");
+  assert.match(content, /Status History/, "must instruct writing a Status History row");
+  assert.match(
+    content,
+    /not a Change Log|no Change Log|instead of a Change Log/i,
+    "must state explicitly that bugs do not carry a Change Log",
+  );
+});
+
 test("create-story — naming convention examples are accepted by validator", () => {
   const lib = require(path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"));
   assert.equal(lib.validateStoryFilename("story.178.8.example-feature.md").ok, true);

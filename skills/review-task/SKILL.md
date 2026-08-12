@@ -504,6 +504,36 @@ Name the outstanding roles so the human knows who to chase:
 
 > **Never sign on a stakeholder's behalf.** The auto-fix pass may create a missing section (roles only, from the roster) but must **never** write into a Signature or Date cell. An unsigned document stays unsigned until a human commits their name.
 
+4b. **Change Log** (conditional — canonical spec: [`document-change-log.md`](references/document-change-log.md)):
+
+Read `change-log.enabled` from `skills-config.yaml`. It defaults to **`true`**, unlike sign-off — a log is a record of what happened, not a gate on a human. **Skip this check entirely when `change-log.enabled: false`, or when `change-log.enforcement: off`.**
+
+Otherwise check exactly two things:
+
+- **Presence** — the document has a `## Change Log` section with the four canonical columns and at least one row.
+- **Currency** — the newest row is consistent with frontmatter `status`. Flag **only** when `status` has advanced past `planned` **and** no row mentions a review, a status change, or an implementation event. A task at `ready-for-development` whose log stops at `Initial draft` is stale: a review promoted it and recorded nothing.
+
+> **Define currency narrowly, and do not widen it.** The check compares the newest row against `status:` — not against the document's actual diff. A reviewer who edits prose without adding a row is not caught, and that is accepted at `advisory`. The failure mode being avoided is the opposite one: a heuristic eager enough to flag legitimately quiet documents trains reviewers to ignore the finding, and an ignored check is a check that does not exist. A no-findings review still writes a row (Step 8.5), so the quiet case is already covered by a writer rather than exempted here.
+
+Severity is driven by `change-log.enforcement`:
+
+| `enforcement`        | Missing or stale                                | Effect on the pipeline                                                                                                     |
+| -------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `advisory` (default) | **Important** issue + readiness-score deduction | None — verdict may still be GO, `develop-task` proceeds                                                                    |
+| `blocking`           | **Critical** issue → NO-GO                      | Do **not** promote the task out of `planned` in Step 9 — `develop-task` gates on `Status:`, so leaving it unpromoted is what actually stops the run |
+| `off`                | not checked                                     | None                                                                                                                       |
+
+Reviewer output — name what is stale and what would fix it:
+
+```markdown
+- **[Important]** Change Log is stale — newest row is `1.0 Initial draft` (2026-05-11) but
+  status is `ready-for-development`. Enforcement is `advisory`, so this does not block development.
+```
+
+Under `blocking`, the same finding is `[Critical]` and the closing sentence becomes `Enforcement is 'blocking' — development cannot begin until the log is current.`
+
+> **Expect legacy documents to report exactly one Important finding.** There is no backfill: every document written before the Change Log spec existed has no section. `advisory` is the default precisely so those documents score one point lower and report one extra finding while still returning GO. A missing section on an old document is not a defect in that document — it is the adoption boundary.
+
 5. **Tracker Issue Linkage**:
 
    **Detection**: source the canonical resolver once per skill invocation, then branch on `TRACKER` — see `references/platform-detection.md`:
@@ -691,7 +721,7 @@ Name the outstanding roles so the human knows who to chase:
 - **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage; unsigned sign-off when `sign-off.enforcement: advisory` (the default)
 - **Optional**: Missing optional sections or metadata; a numbered `## 12. Stakeholder Sign-off` heading
 
-**Output**: Template compliance report with specific issues listed. Card-preflight findings count toward the **Template Compliance** score — a document that cannot produce a usable card is not template-compliant, whatever else it satisfies.
+**Output**: Template compliance report with specific issues listed. Card-preflight findings count toward the **Template Compliance** score — a document that cannot produce a usable card is not template-compliant, whatever else it satisfies. A missing or stale **Change Log** (check 4b) also deducts from this score under `change-log.enforcement: advisory`, and is named in that row's note.
 
 **Questions to Collect** (for batch asking):
 
@@ -1419,6 +1449,14 @@ options:
      - Add `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD` to the report's opening summary
      - In the task file, add `**Review**: ✅ All review recommendations from \`[report-filename]\` implemented YYYY-MM-DD` immediately after the `**Status**:` line
 
+4. **Append a Change Log row** to the task recording the review outcome, and bump frontmatter `updated` to today in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name. Illustrative row:
+
+   | 2026-08-12 | 1.1 | Review passed (9/10) — ready for development | review-task |
+
+   Describe **what the review found and changed**, not that a review happened. Skip when `change-log.enabled: false` in `skills-config.yaml`.
+
+   > Write this row **regardless of tracker platform**. Step 8.6's Jira sync also appends a row on the Jira path, but that is a *sync* record, not the *review* record — and the GitHub and no-tracker paths get nothing at all without this step. This is the write that makes the local file the authoritative history the [tracker card contract](references/tracker-card-summary.md) already claims it is.
+
 3. **If "No, I will fix manually"**:
    - Acknowledge and proceed to Step 9
    - Remind user: "The full issue list is in the report above. Run `/review-task` again after making changes."
@@ -1500,6 +1538,11 @@ On non-zero exit → log warning `⚠️ sync-jira-task failed — Jira descript
 
    **If "Yes, fixes complete"**:
    - Update task document `Status:` field to "Ready for Development"
+   - **Append a Change Log row** recording the transition, and bump frontmatter `updated` in the same edit. Format: [document-change-log.md](references/document-change-log.md). A status transition leaves `Version` blank — only the Step 8.5 verdict row bumps it:
+
+     | 2026-08-12 |  | Status → ready-for-development | review-task |
+
+     This row is **separate from the Step 8.5 verdict row** and both may appear. A review can pass without promoting — the sign-off gate below can withhold the promotion — so the log needs to show which of the two actually happened. Skip when `change-log.enabled: false`.
    - Confirm update to user: "Task status updated to 'Ready for Development'. You can now run `/develop` to begin implementation."
 
    **If "Partially complete"**:

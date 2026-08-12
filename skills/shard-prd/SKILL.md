@@ -168,7 +168,23 @@ Create `index.md` in sharded folder:
 - [Section Name 1](./section-name-1.md)
 - [Section Name 2](./section-name-2.md)
 - [Section Name 3](./section-name-3.md)
+
+## Change Log
+
+| Date       | Version | Description                                | Author    |
+| ---------- | ------- | ------------------------------------------ | --------- |
+| 2026-08-12 | 1.0     | Sharded from `prd.checkout.md` — 7 sections | shard-prd |
 ```
+
+**The index carries the Change Log; the shards do not.** Sharding destroys the source document's structure, so the index is the only place a reader can learn where these files came from. Canonical format: [document-change-log.md](references/document-change-log.md).
+
+Give each shard a one-line provenance note instead, immediately under its title:
+
+```markdown
+> Sharded from [`prd.checkout.md`](./index.md) on 2026-08-12.
+```
+
+> **Do not copy the source PRD's Change Log into every shard.** That multiplies one history into N copies, none of which is authoritative, and every future edit to any shard makes the other N−1 wrong. One log on the index, provenance notes on the shards.
 
 #### Step 5: Preserve Special Content
 
