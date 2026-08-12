@@ -76,6 +76,15 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Edit epic 178 — change the priority to High" | `edit-epic` |
 | "Edit story 2.3 — add an acceptance criterion" | `edit-story` |
 
+## Sprint & ceremony
+
+| Say something like… | Activates |
+|---|---|
+| "Start the sprint" / "Close sprint 7" / "Move the leftovers to the backlog" | `jira-sprint-manager` |
+| "Prepare for sprint review" / "Compile the demo agenda" / "Generate release notes" | `jira-sprint-review-prep` |
+| "Write a sprint retro" / "Do a retrospective for sprint 7" / "What happened last sprint" / "Retro for Ada's work last sprint" | `jira-sprint-retrospective` |
+| "Standup prep" / "What did I do yesterday" / "EOD summary" | `jira-standup-auditor` |
+
 ## Discovery & meta
 
 | Say something like… | Activates |

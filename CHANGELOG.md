@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`jira-sprint-retrospective` — the sprint-level record nothing was keeping.** `jira-sprint-manager` computes closure and velocity data and prints it; `jira-sprint-review-prep` computes a scope-creep audit and prints that. Both write to stdout, so a sprint's shape survives exactly as long as the terminal does. And neither reads `assignee` — between them they touch the field zero times — so neither can answer "what did this person's sprint look like", which is the question a retrospective is usually asked.
+
+  The skill compiles the sprint from the Agile API, collects commit figures from `git log`, and writes a dated document into the repository at `retrospective.location` (default `docs/development/sprints`), creating the directory and its index on first run. Deterministic content — figures, item rows, the measurement section — is rendered by script; the findings, keep/change and next-sprint ordering are left as marked slots for the caller, because a script cannot decide what a sprint meant and filler is worse than a gap.
+
+  Two classifications are **changelog-based, not date-based**, which is the part worth stealing: `addedMidSprint` asks when an issue *joined the sprint*, not when it was created, so an issue filed months ago and pulled in on day six counts as discovery. `carriedOver` is its mirror — joined at or before the start, having come from another sprint — and is new; nothing in the repo computed carry-over before.
+
+  `--people` scopes the document, matching case-insensitively on display name, email or accountId and falling back to a substring match only when it resolves to exactly one person. **An unmatched or ambiguous name halts and prints the real roster.** A typo that silently rendered an empty retrospective would read as a quiet sprint, which is a worse failure than an error. Unassigned issues are counted and listed rather than dropped — work nobody owns is what a retrospective should surface.
+
+  Per-person commit figures require an explicit `retrospective.identities` map from Jira display name to git email. There is deliberately **no name-matching fallback**: without the map the figures cover the whole repository and the document says so. Inferring an identity from a display name is wrong for anyone using a nickname or a different email domain, and a misattributed commit count in a retrospective is worse than an absent one. The first cut of the renderer got this wrong in exactly that way — it printed the repository-wide total under a "per-author" label — and the fixture test now pins the distinction.
+
+- **`generate_catalog.py`: a `Sprint & Ceremony` category.** `jira-sprint-manager`, `jira-sprint-review-prep` and `jira-standup-auditor` were all falling through to `Other`, along with the new skill. They are a coherent family and now read as one. Same for `docs/reference/commands.md` and `docs/reference/activation-phrases.md`, which carried no rows for any of the four.
+
 - **`--check-card`: an offline preflight that catches a thin tracker card before it publishes.** The card is built from a handful of named `## ` headings, so a document whose headings do not match publishes a thin or empty card **and the sync still reports success**. There is no error to raise, which is how 28 task cards once shipped with empty bodies and ~98% of stories published their acceptance criteria and nothing else. Summarising narrowed the surface further — a task card now reads 3 headings where it read 11, so a mismatch has fewer places to hide.
 
   `sync-jira-{story,task,epic} --file <doc.md> --check-card` renders the card offline — no auth, no network, no writes — and reports per-block status plus findings with their fixes. Exit 0 = every block resolves, exit 1 = findings. `--json` emits `{ok, findings, blocks}`. Codes: `missing`, `empty`, `no-body`, and `no-table` for an epic Stories Breakdown with no overview table.
@@ -37,6 +49,15 @@ All notable changes to this project will be documented in this file. Format foll
   - **`shared/resources/tracker-card-summary.md` is now the single spec** for both platforms. The GitHub path had two hand-maintained copies of its body contract — the create template in `ensure-story-github-issue` and the update prose in `sync-github-story` — and they had **already drifted**: the prose named `User Story / Acceptance Criteria / Description` while the template emitted `## Overview` + `## Acceptance Criteria`. Every writer now links the spec rather than restating it. That includes the two independent builders that had gone their own way: `review-task`'s inline REST call and `jira-epic-creator`.
 
   `capDescriptionAdf()` stays as a backstop, but after summarisation it should never fire.
+
+### Fixed
+
+- **`jira-sprint-lib.sh`: pagination died with "Argument list too long" on large sprints.** Both paginators merged each page into a running array held in a **shell variable**, passed back to jq via `--argjson`. That routes the entire accumulated result through argv, which fails past roughly 256 KB on macOS — and it fails at the merge, so the caller sees a jq error rather than anything suggesting a size limit. A 30-issue sprint fetched with `expand=changelog` and a `description` field is already over. Both paginators now accumulate into a temp file and merge with `--slurpfile`, which reads from disk and has no such ceiling. `jira-sprint-manager` and `jira-sprint-review-prep` were one large sprint away from the same failure.
+
+- **Sprint scope-creep detection compared timestamps as strings, and Jira does not emit them in one form.** `compile-sprint-review-data.sh` documents the assumption that `changelog.created` and `sprint.startDate` share an ISO-8601 form (`+0000`). Observed live, they do not: sprint meta returned `2026-08-05T14:32:41.210Z` while changelog entries returned `2026-08-05T16:03:00.440+0200`. Lexically `16:03` sorts after `14:32`, so an issue that joined at **14:03Z — half an hour before the sprint started** — was classified as mid-sprint discovery.
+
+  The failure is total rather than marginal: on that board every issue in the sprint read as creep and the committed column was empty, which is not a subtly wrong number but a useless one. `jira-sprint-retrospective` parses both timestamps to epoch seconds and compares numerically; jq's `fromdateiso8601` handles only `Z`, so the offset form is parsed by hand. Pinned by a fixture whose timestamps invert under string comparison. **`jira-sprint-review-prep` still has the string comparison** and is left alone here — fixing it changes numbers that team's agendas already quote, so it wants its own change with its own note.
+
 
 ## [v0.37.4] - 2026-08-09
 

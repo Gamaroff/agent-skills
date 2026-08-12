@@ -93,6 +93,19 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 
 Which family fires is resolved per-run, not chosen by hand — see [platform detection](../../shared/resources/platform-detection.md) and [tracker workflow](./tracker-workflow.md).
 
+## Sprint & ceremony
+
+| Command | What it does | Reference |
+|---|---|---|
+| `/jira-sprint-manager` | Start, close and audit sprints; move leftover scope | [`jira-sprint-manager`](../../skills/jira-sprint-manager/SKILL.md) |
+| `/jira-sprint-review-prep` | Compile a sprint review agenda or release notes (stdout) | [`jira-sprint-review-prep`](../../skills/jira-sprint-review-prep/SKILL.md) |
+| `/jira-sprint-retrospective` | Write a sprint retrospective document into the repo, optionally scoped to named people | [`jira-sprint-retrospective`](../../skills/jira-sprint-retrospective/SKILL.md) |
+| `/jira-standup-auditor` | Compile an async daily standup from Jira + git activity | [`jira-standup-auditor`](../../skills/jira-standup-auditor/SKILL.md) |
+
+Review prep and the retrospective differ in what survives: review prep prints an agenda for a
+ceremony, the retrospective writes a dated document into the repository and is the only one of the
+family that reads `assignee`.
+
 ## Discovery & meta
 
 | Command | What it does | Reference |
