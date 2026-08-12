@@ -1171,6 +1171,135 @@ function buildCardSections(body, specs, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Card preflight
+// ---------------------------------------------------------------------------
+
+/**
+ * Check a document against its card spec WITHOUT syncing anything.
+ *
+ * The card is generated from a handful of named headings, so a document whose
+ * headings do not match the spec publishes a thin or empty card — and the sync
+ * still reports success. That is how 28 task cards shipped with empty bodies and
+ * ~98% of stories published their acceptance criteria and nothing else: the
+ * failure is silent by nature, because there is no error to raise. Summarising
+ * narrowed the surface further (a task card reads 3 headings where it once read
+ * 11), so a mismatch now has fewer places to hide.
+ *
+ * The fix always belongs in the DOCUMENT, which is why this is a preflight for
+ * the review skills rather than a guard inside the sync: no amount of code can
+ * invent a Summary that the file does not contain.
+ *
+ * Returns `{ ok, findings: [{severity, section, code, message, fix}], blocks }`.
+ * `severity` is "critical" (the card loses a whole block) or "important" (the
+ * block publishes, but degraded).
+ */
+function checkCardSections(body, specs, opts = {}) {
+  const { docLabel = "the document" } = opts;
+  const findings = [];
+  const blocks = [];
+
+  for (const spec of specs) {
+    const alts = Array.isArray(spec.names) ? spec.names : [spec.names];
+    const found = extractBodySections(body, [alts]);
+    const raw = found.length ? found[0].content : null;
+
+    if (!raw) {
+      // An optional section that is simply absent is not a defect.
+      if (spec.optional) {
+        blocks.push({ heading: spec.heading, status: "absent-optional" });
+        continue;
+      }
+      findings.push({
+        severity: "critical",
+        section: spec.heading,
+        code: "missing",
+        message: `No heading found for the "${spec.heading}" block — the card will publish nothing for it.`,
+        fix: `Add one of these level-2 headings to ${docLabel}: ${alts.map((a) => `## ${a}`).join(", ")}. Numbering (## 3. Name) is accepted.`,
+      });
+      blocks.push({ heading: spec.heading, status: "missing" });
+      continue;
+    }
+
+    const content = spec.transform ? spec.transform(raw) : raw;
+    const { text, omitted, kind } = summariseSection(content, {
+      maxItems: spec.maxItems,
+      maxSentences: spec.maxSentences,
+    });
+
+    if (!text) {
+      // Present but unusable — almost always a section that is nothing but a
+      // table or a code block, which has no prose lead to summarise.
+      findings.push({
+        severity: spec.optional ? "important" : "critical",
+        section: spec.heading,
+        code: "empty",
+        message: `The "${spec.heading}" section exists but yields no summary — it has no prose or list content the card can use.`,
+        fix: `Give it a short opening sentence or a bullet list. Tables and code blocks alone cannot be summarised.`,
+      });
+      blocks.push({ heading: spec.heading, status: "empty" });
+      continue;
+    }
+
+    blocks.push({
+      heading: spec.heading,
+      status: "ok",
+      kind,
+      chars: text.length,
+      omitted,
+    });
+  }
+
+  const published = blocks.filter((b) => b.status === "ok");
+  if (!published.length) {
+    findings.push({
+      severity: "critical",
+      section: "(whole card)",
+      code: "no-body",
+      message:
+        "No section resolved — the card would publish an empty body. The document and the card's heading list disagree.",
+      fix: `Check that ${docLabel}'s '## ' headings match the names above.`,
+    });
+  }
+
+  return {
+    ok: findings.length === 0,
+    findings,
+    blocks,
+  };
+}
+
+// Render a checkCardSections result for a terminal.
+function formatCardCheck(result, opts = {}) {
+  const { title = "Card preflight" } = opts;
+  const icon = { ok: "✅", missing: "🚨", empty: "🚨", "absent-optional": "·" };
+  const lines = [`${title}`, ""];
+
+  for (const b of result.blocks) {
+    const mark = icon[b.status] || "•";
+    if (b.status === "ok") {
+      const more = b.omitted ? `, ${b.omitted} omitted → "+N more" link` : "";
+      const detail = b.note != null ? b.note : `${b.chars} chars${more}`;
+      lines.push(`  ${mark} ${b.heading.padEnd(20)} ${detail}`);
+    } else if (b.status === "absent-optional") {
+      lines.push(`  ${mark} ${b.heading.padEnd(20)} not present (optional)`);
+    } else {
+      lines.push(`  ${mark} ${b.heading.padEnd(20)} ${b.status.toUpperCase()}`);
+    }
+  }
+
+  if (result.findings.length) {
+    lines.push("");
+    for (const f of result.findings) {
+      lines.push(`  ${f.severity === "critical" ? "🚨" : "⚠️ "} ${f.section}: ${f.message}`);
+      lines.push(`     Fix: ${f.fix}`);
+    }
+  } else {
+    lines.push("", "  No problems found.");
+  }
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Priority + labels
 // ---------------------------------------------------------------------------
 const PRIORITY_MAP = {
@@ -3948,6 +4077,8 @@ module.exports = {
   summariseSection,
   summaryBlockNodes,
   buildCardSections,
+  checkCardSections,
+  formatCardCheck,
   // priority / labels
   PRIORITY_MAP,
   normalisePriority,

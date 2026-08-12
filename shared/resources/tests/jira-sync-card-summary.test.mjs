@@ -393,3 +393,108 @@ test("G: the real create-task template produces a card an order of magnitude und
   }
   assert.equal(TASK_CARD_SECTIONS.length, 3);
 });
+
+// ---------------------------------------------------------------------------
+// H — card preflight (--check-card)
+// ---------------------------------------------------------------------------
+
+// The preflight exists because a heading mismatch is SILENT: the sync succeeds,
+// reports no problem, and publishes a thin or empty card. It is a review-time
+// gate rather than a sync-time guard because the fix always belongs in the
+// document — no code can invent a Summary the file does not contain.
+
+const TASK_SPECS = require(
+  join(repoRoot, "skills/sync-jira-task/scripts/sync-jira-task.js"),
+).TASK_CARD_SECTIONS;
+
+test("H: a document matching the spec passes clean", () => {
+  const r = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\n- one\n",
+    TASK_SPECS,
+  );
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.findings, []);
+  assert.equal(r.blocks.find((b) => b.heading === "Summary").status, "ok");
+});
+
+test("H: a missing required section is Critical and names the accepted headings", () => {
+  const r = lib.checkCardSections("## Overview\n\nA summary.\n", TASK_SPECS, {
+    docLabel: "the task document",
+  });
+  assert.equal(r.ok, false);
+  const f = r.findings.find((x) => x.section === "Success Criteria");
+  assert.equal(f.severity, "critical");
+  assert.equal(f.code, "missing");
+  assert.match(f.fix, /## Success Criteria/, "the fix must name the heading to add");
+  assert.match(f.fix, /Numbering/, "and say numbering is accepted");
+});
+
+// Absent-and-optional is not a defect. Reporting it would train a reviewer to
+// dismiss the findings that matter.
+test("H: an absent OPTIONAL section produces no finding", () => {
+  const r = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\n- one\n",
+    TASK_SPECS,
+  );
+  assert.ok(!r.findings.some((f) => f.section === "Breaking Changes"));
+  assert.equal(
+    r.blocks.find((b) => b.heading === "Breaking Changes").status,
+    "absent-optional",
+  );
+});
+
+test("H: a section present but unsummarisable is reported as empty", () => {
+  const r = lib.checkCardSections(
+    "## Overview\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n## Success Criteria\n\n- one\n",
+    TASK_SPECS,
+  );
+  const f = r.findings.find((x) => x.section === "Summary");
+  assert.equal(f.code, "empty");
+  assert.match(f.message, /no summary/i);
+});
+
+test("H: a document sharing no headings reports no-body, not just per-section misses", () => {
+  const r = lib.checkCardSections("## Goal\n\ntext\n\n## Steps\n\n- a\n", TASK_SPECS);
+  assert.ok(r.findings.some((f) => f.code === "no-body"));
+  assert.ok(r.findings.every((f) => f.severity === "critical"));
+});
+
+test("H: the formatter renders findings with their fixes", () => {
+  const r = lib.checkCardSections("## Overview\n\nA summary.\n", TASK_SPECS);
+  const out = lib.formatCardCheck(r, { title: "Card preflight" });
+  assert.match(out, /Success Criteria/);
+  assert.match(out, /Fix:/);
+  assert.match(out, /MISSING/);
+});
+
+// Every real task document in this repo must either pass or fail for a reason a
+// reader can act on. A preflight that cried wolf would be turned off.
+test("H: the real task corpus produces no spurious findings", () => {
+  const { execSync } = require("node:child_process");
+  // A task CARD is `docs/tasks/task.N.name/task.N.name.md` — basename equals its
+  // directory. Everything else in the folder (plans, reviews, QA write-ups,
+  // dated validation runs) is a sibling artifact that no card is built from,
+  // and a suffix blocklist misses the ones nobody thought of.
+  const files = execSync(`ls ${repoRoot}/docs/tasks/task.*/task.*.md`, {
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter((f) => {
+      const parts = f.split("/");
+      return parts.at(-1) === `${parts.at(-2)}.md`;
+    });
+
+  const failing = [];
+  for (const f of files) {
+    const body = readFileSync(f, "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+    const r = lib.checkCardSections(body, TASK_SPECS);
+    if (!r.ok) failing.push(f.split("/").pop());
+  }
+  assert.ok(files.length > 20, "the corpus should be substantial");
+  // task.2 genuinely has no `## Success Criteria` heading — a true positive.
+  assert.ok(
+    failing.length <= 1,
+    `expected at most the one known-bad document, got: ${failing.join(", ")}`,
+  );
+});

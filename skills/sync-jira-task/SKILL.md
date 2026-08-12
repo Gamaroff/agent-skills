@@ -309,6 +309,7 @@ the authoritative log.
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
 | `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Used by `finalise` (passes the durable integration branch) so a closed issue doesn't link to a deleted feature branch. |
+| `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-task` to catch a heading mismatch before it publishes a thin card. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--force` | | Override the concurrent-edit guard |
 | `--json` | | Suppress human output; emit a single JSON object on completion |

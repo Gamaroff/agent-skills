@@ -387,7 +387,7 @@ function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
     file: null, summary: null, priority: null, labels: null, docBranch: null,
-    dryRun: false, noWrite: false, force: false, json: false, quiet: false,
+    checkCard: false, dryRun: false, noWrite: false, force: false, json: false, quiet: false,
     failOnStatusSkip: false,
     probeWorkflow: false,
     writeRecord: "",
@@ -399,6 +399,7 @@ function parseArgs(argv) {
       case "--priority": case "-p": opts.priority = args[++i]; break;
       case "--labels":   case "-l": opts.labels   = args[++i]; break;
       case "--doc-branch": opts.docBranch = args[++i]; break;
+      case "--check-card": opts.checkCard = true; break;
       case "--dry-run":  opts.dryRun  = true; break;
       case "--no-write": opts.noWrite = true; break;
       case "--force":    opts.force   = true; break;
@@ -438,13 +439,27 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
   if (!args.file) {
     output.err("Error: --file is required");
-    output.err("Usage: sync-jira-story --file <story.md> [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet]");
+    output.err("Usage: sync-jira-story --file <story.md> [--check-card] [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet]");
     return { exitCode: 1 };
   }
   const filePath = path.resolve(args.file);
   if (!fs.existsSync(filePath)) {
     output.err(`Error: File not found: ${filePath}`);
     return { exitCode: 1 };
+  }
+
+  // --check-card: preflight the DOCUMENT against the card spec and exit. No
+  // auth, no network, no writes — a review-time gate, not a sync mode.
+  if (args.checkCard) {
+    const { body } = lib.parseFrontmatter(fs.readFileSync(filePath, "utf8"));
+    const check = lib.checkCardSections(body, STORY_CARD_SECTIONS, { docLabel: "the story document" });
+
+    if (args.json) {
+      output.emit({ action: "check-card", file: filePath, ...check });
+    } else {
+      output.info(lib.formatCardCheck(check, { title: `Card preflight — ${path.basename(filePath)}` }));
+    }
+    return { exitCode: check.findings.length ? 1 : 0 };
   }
 
   const content = fs.readFileSync(filePath, "utf-8");

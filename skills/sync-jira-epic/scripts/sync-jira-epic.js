@@ -524,6 +524,7 @@ function parseArgs(argv) {
     priority: null,
     labels: null,
     docBranch: null,
+    checkCard: false,
     dryRun: false,
     force: false,
     json: false,
@@ -555,6 +556,7 @@ function parseArgs(argv) {
       case "--doc-branch":
         opts.docBranch = args[++i];
         break;
+      case "--check-card": opts.checkCard = true; break;
       case "--dry-run":
         opts.dryRun = true;
         break;
@@ -644,7 +646,7 @@ async function run({
   if (!args.file) {
     output.err("Error: --file is required");
     output.err(
-      "Usage: sync-jira-epic --file <epic.md> [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]",
+      "Usage: sync-jira-epic --file <epic.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]",
     );
     return { exitCode: 1 };
   }
@@ -652,6 +654,42 @@ async function run({
   if (!fs.existsSync(filePath)) {
     output.err(`Error: File not found: ${filePath}`);
     return { exitCode: 1 };
+  }
+
+  // --check-card: preflight the DOCUMENT against the card spec and exit. No
+  // auth, no network, no writes — a review-time gate, not a sync mode.
+  if (args.checkCard) {
+    const { body } = lib.parseFrontmatter(fs.readFileSync(filePath, "utf8"));
+    const check = lib.checkCardSections(body, EPIC_CARD_SECTIONS, { docLabel: "the epic document" });
+
+    // Epics carry one block no spec list can describe: the Stories Breakdown
+    // overview table. Absent, the card cannot say which stories exist.
+    const storiesTable = lib.firstTableIn(
+      (lib.extractBodySections(body, ["Stories Breakdown"])[0] || {}).content || "",
+    );
+    if (!storiesTable) {
+      check.findings.push({
+        severity: "important",
+        section: "Stories Breakdown",
+        code: "no-table",
+        message: "No overview table found under '## Stories Breakdown' — the card cannot show which stories exist.",
+        fix: "Add a pipe table of the epic's stories (commonly under a '### Stories Overview' sub-heading).",
+      });
+      check.ok = false;
+      check.blocks.push({ heading: "Stories Breakdown", status: "missing" });
+    } else {
+      // Report ROWS, not characters: "0 chars" for a table that is plainly
+      // present reads as a failure. Minus the header and separator rows.
+      const rows = Math.max(0, storiesTable.split("\n").filter((l) => l.trim()).length - 2);
+      check.blocks.push({ heading: "Stories Breakdown", status: "ok", note: `${rows} stories in the overview table` });
+    }
+
+    if (args.json) {
+      output.emit({ action: "check-card", file: filePath, ...check });
+    } else {
+      output.info(lib.formatCardCheck(check, { title: `Card preflight — ${path.basename(filePath)}` }));
+    }
+    return { exitCode: check.findings.length ? 1 : 0 };
   }
 
   const auth = lib.getAuth();

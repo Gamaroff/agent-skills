@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`--check-card`: an offline preflight that catches a thin tracker card before it publishes.** The card is built from a handful of named `## ` headings, so a document whose headings do not match publishes a thin or empty card **and the sync still reports success**. There is no error to raise, which is how 28 task cards once shipped with empty bodies and ~98% of stories published their acceptance criteria and nothing else. Summarising narrowed the surface further — a task card now reads 3 headings where it read 11, so a mismatch has fewer places to hide.
+
+  `sync-jira-{story,task,epic} --file <doc.md> --check-card` renders the card offline — no auth, no network, no writes — and reports per-block status plus findings with their fixes. Exit 0 = every block resolves, exit 1 = findings. `--json` emits `{ok, findings, blocks}`. Codes: `missing`, `empty`, `no-body`, and `no-table` for an epic Stories Breakdown with no overview table.
+
+  `review-story`, `review-task` and `review-epic` run it in their template-compliance step and treat `missing` / `empty` / `no-body` as **Critical**. In review-story's scored `--validate` gate it lowers **Template Compliance** rather than adding a dimension — a document that cannot produce a usable card is not template-compliant. Deliberately *not* checked: card length. The builder caps it and every omission carries a `+N more` link, so a long document cannot produce a long card; a review-time length check would only re-verify the builder.
+
+  The fix always belongs in the **document**, which is why this is a review gate and not a sync-time guard: no code can invent a Summary the file does not contain. Run against the repo's own corpus it flags exactly one true positive (`task.2`, which has no `## Success Criteria`) across 41 tasks, 17 stories and 4 epics — zero false positives, pinned by a test that runs the real corpus.
+
 ### Changed
 
 - **Tracker cards were mirroring the document instead of pointing at it.** A Jira task card published all **eleven** `## ` sections of the task document verbatim — Overview, Motivation, Technical Background, Scope, Breaking Changes, Implementation Plan, Files Summary, Testing Strategy, Success Criteria, Risk Assessment, Rollback Plan — plus the document's entire Change Log as a table, re-rendered on every sync. Story cards published their full uncapped acceptance criteria; epic cards published every per-story `###` subsection of the Stories Breakdown.

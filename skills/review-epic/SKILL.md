@@ -229,6 +229,36 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
   - `description` present (one-sentence summary) → **Important** if missing.
   - `tags` is a YAML list (when present) and `resource` is a valid URI (when present) → **Optional** if malformed. Absence is not a finding.
 
+**Tracker Card Preflight**:
+
+The tracker card is a **summary that points at this epic**, not a copy of it —
+see [`references/tracker-card-summary.md`](./references/tracker-card-summary.md).
+It is built from a couple of named `## ` headings plus the Stories Breakdown
+overview table, so an epic whose headings do not match that list publishes a thin
+or empty card **and the sync still reports success**. There is no error to raise,
+which is why this is checked here rather than left to the sync.
+
+Run the preflight (no auth, no network, no writes — it only reads the file):
+
+```bash
+node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js --file "{epic-file-path}" --check-card
+```
+
+Exit 0 = every card block resolves. Exit 1 = at least one finding, printed with
+the exact fix. Add `--json` for a machine-readable `{ok, findings, blocks}`.
+
+- A `missing` or `no-body` finding → **Critical**. The card loses a whole block,
+  or publishes an empty description. The fix is always in the **epic document** —
+  rename or add the heading; no sync-side change can invent content the file does
+  not have.
+- An `empty` finding → **Critical**. The heading exists but holds only a table or
+  code block, so there is no prose to summarise.
+- A `no-table` finding on Stories Breakdown → **Important**. The card cannot show
+  which stories exist. Add a pipe table (commonly under `### Stories Overview`).
+- Exit 0 → no finding. Do **not** raise anything about card length: the builder
+  caps it (4-sentence summary, overview table only) and announces every omission
+  with a `+N more` link, so a long epic cannot produce a long card.
+
 **Collect all issues** — do NOT ask questions yet. Proceed to Step 3.
 
 ---

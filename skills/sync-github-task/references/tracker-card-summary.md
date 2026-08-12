@@ -130,6 +130,26 @@ Three rules that are easy to get wrong:
   every sync trains operators to ignore the warning that matters — the one
   saying the document and the section list disagree about a heading name.
 
+## Preflight
+
+A heading mismatch is silent: the sync succeeds, reports no problem, and
+publishes a thin or empty card. Check the document before that happens:
+
+```bash
+node .agents/skills/sync-jira-task/scripts/sync-jira-task.js --file <doc.md> --check-card
+```
+
+No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 =
+findings, each printed with its fix. `--json` gives `{ok, findings, blocks}`.
+Finding codes: `missing` (no heading matched), `empty` (heading present but
+nothing summarisable under it), `no-body` (nothing resolved at all), `no-table`
+(epic Stories Breakdown has no overview table).
+
+`review-story`, `review-task` and `review-epic` run this in their template
+compliance step and treat `missing` / `empty` / `no-body` as **Critical**. The
+fix always belongs in the document — no code can invent a Summary the file does
+not contain.
+
 The GitHub path is assembled by the model from a template in each
 `ensure-*-github-issue` skill. Same blocks, same caps, markdown instead of ADF,
 criteria as `- [ ]` checkboxes.
