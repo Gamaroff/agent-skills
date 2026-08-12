@@ -94,6 +94,18 @@ Required YAML fields: epic_number, title, domain, status, priority, estimated_st
 
 Use template from \`/docs/templates/epic-template.md\`.
 
+**Seed the epic's Change Log with row one**, exactly as \`create-epic\` does. This skill creates epic files directly, bypassing \`create-epic\`, so an epic born here would otherwise start life with no history at all. Canonical format: [document-change-log.md](references/document-change-log.md).
+
+\`\`\`markdown
+## Change Log
+
+| Date       | Version | Description   | Author                |
+| ---------- | ------- | ------------- | --------------------- |
+| 2026-08-12 | 1.0     | Initial draft | epic-registry-manager |
+\`\`\`
+
+The registry row added in Step 6 is a **separate concern and not a Change Log matter** — the registry tracks epic numbering across the repo, the Change Log tracks what changed about this one epic document. Skip when \`change-log.enabled: false\` in \`skills-config.yaml\`.
+
 ### Step 6: Update Epic Registry
 
 Add entry to \`/docs/development/epic-registry.md\` sorted by epic number.

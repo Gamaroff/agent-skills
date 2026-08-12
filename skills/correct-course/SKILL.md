@@ -239,9 +239,29 @@ Create consolidated document with:
 - Analysis summary (trigger, impact, path forward)
 - Specific proposed edits for all affected artifacts
 - Impact assessment (scope, timeline)
+- **A "Change Log rows to add" block** (see below)
 - Next steps and handoff requirements
 
 **Document Location**: `docs/change-proposals/sprint-change-{date}-{issue}.md`
+
+#### "Change Log rows to add" block
+
+This skill does **not** apply edits — it emits a proposal that a PO or SM applies by hand. So it cannot write the Change Log rows itself; what it can do is hand over the exact text, one row per affected artifact, so the human applying the edits does not have to derive them. Append this subsection after the per-artifact edit sections:
+
+```markdown
+## Change Log rows to add
+
+Paste one row into each artifact's Change Log when applying the edits above, and bump that
+document's frontmatter `updated` in the same edit.
+Canonical format: [document-change-log.md](references/document-change-log.md).
+
+| Artifact | Row |
+|---|---|
+| `story.4.2.checkout.md` | `\| 2026-08-12 \| 1.3 \| AC2 relaxed — offline retry deferred to epic 5 \| correct-course \|` |
+| `epic.4.checkout.md`    | `\| 2026-08-12 \| 1.2 \| Story 4.2 descoped per sprint change proposal \| correct-course \|` |
+```
+
+Describe the substance of each change, not that a proposal was applied. Omit the block entirely when `change-log.enabled: false` in `skills-config.yaml`.
 
 ---
 

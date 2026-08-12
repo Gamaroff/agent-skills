@@ -1,0 +1,63 @@
+schema: 1
+task: 'task.44.change-log-review-and-edit'
+task_title: 'Review and edit skills log their document mutations'
+gate: PASS
+status_reason: 'TASK-44-BUG-1 fixed and verified in cycle 1: the Step 8.5 block was moved after item 3 (sequence now 1,2,3,4) and the ambiguity closed explicitly rather than left to inference. All five phases delivered; the highest-risk area (Phase 4 grading) is correctly specified with advisory as the default mapping to Important in all four review skills, confirmed live on a legacy document.'
+reviewer: 'QA Engineer'
+updated: '2026-08-12T20:52:00Z'
+
+top_issues:
+  - id: TASK-44-BUG-1
+    issue: 'review-task Step 8.5 Change Log item mis-numbered (1,2,4,3) and placed between the Yes and No branches, making the write appear conditional on fixes having been applied'
+    severity: medium
+    category: maintainability
+    bug_ref: 'task.44.bug.1.review-task-step-8-5-list-numbering.md'
+    suggested_action: 'Move the item after the "No, I will fix manually" block so the sequence reads 1,2,3,4; optionally add "regardless of which option was chosen above"'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-08-12'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-08-12'
+  total_iterations: 1
+  fix_commit: '91557db'
+  verification_method: 'List-order extraction (now 1,2,3,4); three targeted greps confirming the unconditional phrasing, the quiet-case statement and the named 4b dependency; full suite 1175/1175; bundle idempotent; regression sweep over all five structurally-edited files.'
+
+evidence:
+  tests_reviewed: 1175
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No security surface. Prose-only changes to skill instructions; no auth, crypto, secrets or dependency changes. No new runtime dependencies.'
+  performance:
+    status: PASS
+    notes: "Task's own criterion is that review-step eval scenarios do not slow by more than a second. Both 02-review-task and 02-review-story are green. No runtime code changed."
+  reliability:
+    status: PASS
+    notes: 'Tiered rollback documented and credible: change-log.enforcement:off is a one-line consumer config change requiring no revert, and Phase 4 can be reverted alone because Phases 1-3 are pure additions. advisory default verified as the actual specified default in all four review skills.'
+  maintainability:
+    status: PASS
+    notes: 'Every one of the 14 skills links shared/resources/document-change-log.md rather than restating the column list — the stated anti-drift goal. 21 new protocol tests pin the contract. The single numbering defect is recorded as TASK-44-BUG-1 rather than double-counted here.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consider a protocol test asserting numbered-list sequence integrity in skill files — this defect class is invisible to every existing check and was only caught by reading the rendered order'
+      refs: ['tests/skill-protocol.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

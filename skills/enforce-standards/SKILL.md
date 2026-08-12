@@ -412,6 +412,15 @@ For each item in the approved plan:
     - Update test imports to match new paths
     - Rename `.test.ts` to `.spec.ts` if needed
 
+7.  **Append a Change Log row — documents only**:
+    - **Applies only when the moved or renamed file is a PRD, epic, story, or task document.** Source-file renames, component renames, test moves and import-reference rewrites get nothing: they are code, and `git log` is already their history.
+    - When it does apply, append a row to the moved document's own Change Log recording the rename, and bump its frontmatter `updated` in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A mechanical rename is not an authoring decision, so leave `Version` blank:
+
+      | 2026-08-12 |  | Renamed from `epic_163_account_security.md` per file-naming standard | enforce-standards |
+
+    - Record the **old filename**. After the move it is the one thing no longer recoverable from the document itself, and it is exactly what someone following a stale link needs.
+    - Skip when `change-log.enabled: false` in `skills-config.yaml`.
+
 ### 4.3 Handle Edge Cases
 
 #### Private Components in `_components/`

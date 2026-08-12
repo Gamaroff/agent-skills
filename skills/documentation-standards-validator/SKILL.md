@@ -24,6 +24,19 @@ This skill defines the mechanical checks below; each consuming repo implements t
 
 The seven checks, all validated against a repo's documentation conventions: (1) status vocabulary, (2) frontmatter key completeness, (3) Change Log header — canonical format: `references/document-change-log.md`, (4) FR-tag presence (warn-level), (5) registry⇔PRD Epic-List parity, (6) epic `estimated_stories` vs active story dirs, (7) stray `PROGRESS*.md` under epics.
 
+**(3) Change Log header — definition.** The document carries a `## Change Log` heading (or `### Change Log` for PRDs, where it nests under §1) satisfying all four of:
+
+1. **Heading** — `Change Log` is the entire heading text after any optional section numbering (`### 1.5 Change Log` and `## 12. Change Log` both pass). Accept H2 or H3; the level found is the level preserved. A match inside a fenced code block or an inline code span does **not** count — documentation about the Change Log necessarily contains pictures of one.
+2. **Columns** — exactly four, in order: `Date`, `Version`, `Description`, `Author`.
+3. **Rows** — at least one, with `Date` as `YYYY-MM-DD`. `Version` may be blank (machine writers leave it so); `Author` is the skill name or a person's name.
+4. **Freshness** — frontmatter `updated` is not older than the newest row's `Date`. A row that did not move `updated` leaves the document claiming it was last touched before its own most recent recorded change.
+
+**Bug reports are exempt** — they carry `## Status History` instead, which has different columns (`Date`, `Status`, `Changed By`, `Notes`) and is the richer table for a bug. Do not flag a bug report for a missing Change Log, and do not add one.
+
+Gate this check on `change-log.enabled` in `skills-config.yaml` (defaults to `true`), and grade it per `change-log.enforcement` (`advisory` by default). Adoption is going-forward only with no backfill, so expect documents predating the spec to fail check (3) — under `advisory` that is one finding, not a blocker.
+
+> As stated above, this skill ships **no linter**. The deliverable for every check, including this one, is a definition precise enough for a consuming repo to implement against its own layout — not a script.
+
 When creating or reviewing a story/epic/task, apply these checks to the affected documents and fix any violation before finishing.
 
 ## File Naming Standards

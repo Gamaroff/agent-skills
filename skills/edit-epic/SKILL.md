@@ -373,17 +373,26 @@ Request user approval:
    - If editing multiple sections, apply changes in order
    - Use precise string matching from original file
 
-2. **Post-edit validation**:
+2. **Append a Change Log row** (mandatory) describing the change, and bump frontmatter `updated` in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A scope edit bumps the minor version; `Author` is the skill name:
+
+   | 2026-08-12 | 1.3 | Story 4.2 removed from scope — 3 child stories re-pointed | edit-epic |
+
+   **Describe the substance, not the act.** `Story 4.2 removed from scope`, never `Epic edited`. **When the cascade analysis in Step 4 found affected child stories, name the cascade in the row** — the count of re-pointed stories is the part a reader of this epic most needs and is least able to reconstruct later.
+
+   Skip only when `change-log.enabled: false` in `skills-config.yaml`.
+
+3. **Post-edit validation**:
    - Read modified file
    - Verify YAML frontmatter is still valid
    - Verify all required sections still present
    - Verify file is syntactically correct markdown
 
-3. **Confirm success to user**:
+4. **Confirm success to user**:
    > "Epic file successfully updated!
    >
    > File: {filepath}
    > Changes applied: {summary}
+   > Change Log row added: {the row}
    >
    > Next steps:
    > {if cascade conflicts were flagged}
