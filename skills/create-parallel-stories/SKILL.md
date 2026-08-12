@@ -220,6 +220,15 @@ For every split, in one commit, update the parent epic's:
 3. The **mermaid** diagram (if present) — new nodes + dependency edges.
 4. **Dependency** notes and **Definition of Done** counts.
 5. The superseded parent story → `status: superseded` + a "Superseded by X/Y" banner on its main, plan, and any validate/review companion files (canon §3).
+6. The epic's **`## Change Log`** — append one row recording the split, so this mandatory mutation
+   leaves a trace instead of changing the epic silently. Canonical format:
+   `references/document-change-log.md` (append-only, newest last, four columns). Leave
+   `Version` blank — this is a machine-written row — and bump the epic's frontmatter `updated:` in
+   the same edit:
+
+   ```markdown
+   | {today} |  | Stories 1-1/1-2 added — estimated_stories 4 → 6 | create-parallel-stories |
+   ```
 
 **Verify before committing:** count the active (non-superseded) story directories under the epic's `stories/` folder and confirm the epic's `estimated_stories` frontmatter value matches exactly. If the repo has a docs gate that covers this check, run it too.
 

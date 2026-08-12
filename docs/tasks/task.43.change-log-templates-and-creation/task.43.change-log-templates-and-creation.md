@@ -5,7 +5,7 @@ type: task
 description: "Give every PRD, epic, story, and task template the canonical Change Log section, and make the create-* skills seed its first row."
 tags: [change-log, templates, documentation]
 category: documentation
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-08-12
 updated: 2026-08-12
@@ -16,7 +16,9 @@ github_issue: 202
 
 # [Task 43] Templates and creation skills emit the canonical Change Log
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.43.review.1.change-log-templates-and-creation.md` implemented 2026-08-12
 
 **GitHub Issue:** [#202](https://github.com/Gamaroff/agent-skills/issues/202)
 
@@ -78,10 +80,29 @@ Log containing one row.
    `skills/brownfield-prd-template/resources/brownfield-prd-tmpl.yaml:118` against four
    everywhere else.
 
-5. **Three epic-template copies, one already drifted.** `docs/templates/epic-template.md`
-   (709 lines), `skills/epic-registry-manager/references/epic-template.md` (709, byte-equal),
-   and `skills/documentation-standards-validator/references/epic-template.md` (706 — drifted).
+5. **Three epic-template copies, and all three have drifted apart.** Compare hashes, not line
+   counts — equal line counts hide a difference, which is how this went unnoticed:
+
+   | Copy | Lines | md5 |
+   |---|---|---|
+   | `docs/templates/epic-template.md` (canonical) | 709 | `546b4bfd9d6a7f923d4ce9c41f444c2d` |
+   | `skills/epic-registry-manager/references/epic-template.md` | 709 | `4acc1c4adc2447859a8b4f4a60df55e7` |
+   | `skills/documentation-standards-validator/references/epic-template.md` | 706 | `55a13925287f18062b77efb20096dc64` |
+
+   - **canonical ↔ `documentation-standards-validator`: 9 lines.** Three frontmatter fields
+     absent (`type`, `description`, `tags`) plus six stale reference links
+     (`product-requirements.md`, `technical-implementation.md`, `DEVELOPER-QUICK-START.md`,
+     `implementation-phases.md`, `IMPLEMENTATION-STATUS.md`, `CROSS-REFERENCE-GUIDE.md`).
+   - **canonical ↔ `epic-registry-manager`: 18 lines.** A wholly *different frontmatter schema* —
+     `epic_type`, `estimated_sprints`, `dependencies`, `completion_percentage`, `blocked_by`,
+     `team`, `start_date`, `target_date`, a quoted `'[Epic N] Epic Name'` title, and an uppercase
+     `NOT_STARTED | IN_PROGRESS | PARTIALLY_COMPLETE | COMPLETE` status enum, in place of the
+     canonical `epic_number` / `type` / `description` / `tags` / `domain` / `📋 Planned` shape —
+     plus the same six stale links.
+
    No test locks them, unlike the story-template pair at `tests/skill-protocol.test.js:174`.
+   Consequence for Phase 2: byte-locking these three is **not** a copy-paste. It replaces
+   `epic-registry-manager`'s frontmatter schema, which is a decision, not a side-effect.
 
 ### Benefits
 
@@ -89,8 +110,12 @@ Log containing one row.
    predictable place.
 2. `develop`'s existing "update the task change log" instruction stops pointing at nothing.
 3. The sync engine finds and extends an existing block instead of inventing one.
-4. Byte-locking the template copies kills a live drift, and prevents the next one.
-5. Protocol tests make a regression fail in CI rather than in a consumer repo.
+4. Byte-locking the template copies kills two live drifts, and prevents the next one.
+5. It also clears a live standards violation: the `documentation-standards-validator` epic copy
+   carries no `type:` field, which [`shared/resources/open-knowledge-format.md`](../../../shared/resources/open-knowledge-format.md)
+   makes OKF's one hard requirement and the `review-*` skills grade as **Critical**. Reconciling
+   toward the canonical fixes it — reconciling the other way would entrench it.
+6. Protocol tests make a regression fail in CI rather than in a consumer repo.
 
 ---
 
@@ -231,23 +256,38 @@ it is a manual edit; nothing forces it. `review-epic`'s compliance list is updat
 **Risk**: Medium — the 11-section contract is asserted in two places.
 **Files**: `skills/create-task/resources/task-template.md`, `skills/review-task/resources/task-template.md`
 
-- [ ] Insert an unnumbered `## Change Log` after `## Stakeholder Sign-off`, before
+- [x] Insert an unnumbered `## Change Log` after `## Stakeholder Sign-off`, before
       `## Progress Tracking`, with the canonical 4-column table and one placeholder row
-- [ ] Confirm `countMandatorySections()` still returns 11
-- [ ] Resolve the known frontmatter drift between the two copies and make them byte-identical
+- [x] Confirm `countMandatorySections()` still returns 11
+- [x] Resolve the known frontmatter drift between the two copies and make them byte-identical
 
 ### Phase 2: Epic templates
 
-**Risk**: Medium — three copies, one already drifted.
+**Risk**: Medium — three copies, all three mutually drifted, and one carries a different
+frontmatter schema.
 **Files**: `docs/templates/epic-template.md`,
 `skills/epic-registry-manager/references/epic-template.md`,
 `skills/documentation-standards-validator/references/epic-template.md`
 
-- [ ] Replace the bulleted `### Change Log` under `## Notes & Updates` with a top-level
+**Decision — `docs/templates/epic-template.md` is the winner.** It is the OKF-conformant copy
+(it alone carries `type` / `description` / `tags`), and it is already the compliance baseline
+`review-epic/SKILL.md:177` loads. Both other copies reconcile toward it. This **replaces**
+`epic-registry-manager`'s frontmatter schema — that is intended, not incidental, and the
+verification step below is what makes it safe.
+
+- [x] Replace the bulleted `### Change Log` under `## Notes & Updates` with a top-level
       `## Change Log` table placed immediately before `## Notes & Updates`
-- [ ] Diff the 706-line `documentation-standards-validator` copy against the 709-line
-      canonical, identify the 3-line drift, and reconcile toward the canonical
-- [ ] Make all three byte-identical
+- [x] Reconcile the `documentation-standards-validator` copy (9 lines adrift: 3 absent
+      frontmatter fields + 6 stale reference links) toward the canonical
+- [x] Reconcile the `epic-registry-manager` copy (18 lines adrift: a different frontmatter
+      schema + the same 6 stale links) toward the canonical
+- [x] **Before locking**, grep `skills/epic-registry-manager/` for any instruction that reads
+      the schema being replaced — `epic_type`, `estimated_sprints`, `dependencies`,
+      `completion_percentage`, `blocked_by`, `team`, `start_date`, `target_date`, or the
+      uppercase `NOT_STARTED`/`IN_PROGRESS`/`PARTIALLY_COMPLETE`/`COMPLETE` status enum. Any hit
+      is a consumer of the old schema and must be updated in the same phase, or the skill will
+      instruct against a template that no longer matches.
+- [x] Make all three byte-identical, and assert it in `tests/skill-protocol.test.js` (Phase 5)
 
 ### Phase 3: Story and PRD templates
 
@@ -257,11 +297,11 @@ it is a manual edit; nothing forces it. `review-epic`'s compliance list is updat
 `skills/prd-template/resources/prd-tmpl.yaml`,
 `skills/create-story/resources/story-template.yaml`, `skills/review-story/resources/story-template.yaml`
 
-- [ ] Story markdown template: bulleted `### Change Log` → top-level `## Change Log` table,
+- [x] Story markdown template: bulleted `### Change Log` → top-level `## Change Log` table,
       positioned to match the YAML template (after sign-off, before Dev Agent Record)
-- [ ] Brownfield PRD: 5 columns → 4, plus the canonical instruction
-- [ ] Greenfield PRD: add the canonical instruction (columns already correct)
-- [ ] Story YAML pair: add the canonical instruction; keep byte-identical
+- [x] Brownfield PRD: 5 columns → 4, plus the canonical instruction
+- [x] Greenfield PRD: add the canonical instruction (columns already correct)
+- [x] Story YAML pair: add the canonical instruction; keep byte-identical
 
 ### Phase 4: Creation skills seed row one
 
@@ -270,14 +310,14 @@ it is a manual edit; nothing forces it. `review-epic`'s compliance list is updat
 `skills/create-doc/SKILL.md`, `skills/create-parallel-stories/SKILL.md`, `skills/create-prd/SKILL.md`
 **Depends on**: Phases 1–3
 
-- [ ] `create-epic`: add `## Change Log` to the inline epic structure at `:146`, and a step
+- [x] `create-epic`: add `## Change Log` to the inline epic structure at `:146`, and a step
       seeding `| {today} | 1.0 | Initial draft | create-epic |`
-- [ ] `create-task`: seed the first row in step 4 (model: `create-story/SKILL.md:819`)
-- [ ] `create-doc:138`: turn "Update change log if applicable" into a concrete instruction
+- [x] `create-task`: seed the first row in step 4 (model: `create-story/SKILL.md:819`)
+- [x] `create-doc:138`: turn "Update change log if applicable" into a concrete instruction
       naming the canonical format
-- [ ] `create-parallel-stories` §2.3: the mandatory parent-epic mutation writes a row on the epic
-- [ ] `create-prd`: brownfield epic-append mode (`:501`) writes a row on the PRD
-- [ ] Each skill links `shared/resources/document-change-log.md` rather than restating the format
+- [x] `create-parallel-stories` §2.3: the mandatory parent-epic mutation writes a row on the epic
+- [x] `create-prd`: brownfield epic-append mode (`:501`) writes a row on the PRD
+- [x] Each skill links `shared/resources/document-change-log.md` rather than restating the format
 
 ### Phase 5: Tests, evals, bundle
 
@@ -286,13 +326,13 @@ it is a manual edit; nothing forces it. `review-epic`'s compliance list is updat
 `evals/create-task/scenarios/01-happy/scenario.json`
 **Depends on**: Phases 1–4
 
-- [ ] Protocol tests mirroring the sign-off block at `tests/skill-protocol.test.js:157-230`:
+- [x] Protocol tests mirroring the sign-off block at `tests/skill-protocol.test.js:157-230`:
       section present in each template; unnumbered on tasks; 11-count unchanged; the three
       epic copies byte-identical; the task pair byte-identical
-- [ ] Eval assertions: `fileMatches` on `\n## Change Log\n` and `fileDoesNotMatch` on
+- [x] Eval assertions: `fileMatches` on `\n## Change Log\n` and `fileDoesNotMatch` on
       `\n## \d+\. Change Log`, following `evals/create-task/scenarios/04-sign-off-enabled`
-- [ ] `npm run bundle`, then confirm a second run is a no-op
-- [ ] `npm run generate-catalog` if any skill description changed
+- [x] `npm run bundle`, then confirm a second run is a no-op
+- [x] `npm run generate-catalog` if any skill description changed
 
 ---
 
@@ -303,8 +343,10 @@ it is a manual edit; nothing forces it. `review-epic`'s compliance list is updat
 1. ✅ `skills/create-task/resources/task-template.md` — add unnumbered `## Change Log`
 2. ✅ `skills/review-task/resources/task-template.md` — same; byte-lock to (1)
 3. ✅ `docs/templates/epic-template.md` — promote and tabulate
-4. ✅ `skills/epic-registry-manager/references/epic-template.md` — same
-5. ✅ `skills/documentation-standards-validator/references/epic-template.md` — same + resolve 3-line drift
+4. ✅ `skills/epic-registry-manager/references/epic-template.md` — same + resolve 18-line drift
+   (frontmatter schema replaced; check the skill for consumers of the old keys)
+5. ✅ `skills/documentation-standards-validator/references/epic-template.md` — same + resolve
+   9-line drift (restores the absent `type` / `description` / `tags`)
 6. ✅ `skills/documentation-standards-validator/references/story-template.md` — promote and tabulate
 7. ✅ `skills/brownfield-prd-template/resources/brownfield-prd-tmpl.yaml` — 5 cols → 4
 8. ✅ `skills/prd-template/resources/prd-tmpl.yaml` — instruction text
@@ -316,19 +358,60 @@ it is a manual edit; nothing forces it. `review-epic`'s compliance list is updat
 14. ✅ `skills/create-parallel-stories/SKILL.md` — parent-epic row
 15. ✅ `skills/create-prd/SKILL.md` — brownfield append row
 
+### Files Modified Beyond the Original Plan (discovered during implementation)
+
+Each was a direct consequence of a planned change; none widened the task's goal.
+
+16. ✅ `skills/documentation-standards-validator/references/prd-structure-guide.md` — documented the
+    **old** epic frontmatter schema that Phase 2 replaced (`epic_type`, `estimated_sprints`,
+    `NOT_STARTED …`). Found by the pre-lock consumer grep the review added to Phase 2. Left
+    unchanged, the skill would have contradicted its own template.
+17. ✅ `skills/prd-template/SKILL.md` — links the canonical spec. Required by the Migration success
+    criterion ("each touched skill links `shared/resources/document-change-log.md`") and it is also
+    what makes the bundler copy the spec into this skill's `references/`; the `.yaml` templates alone
+    are never scanned by `bundle_skill.py`, which walks only `.md`/`.js`/`.mjs`/`.sh`.
+18. ✅ `skills/brownfield-prd-template/SKILL.md` — same reason.
+19. ✅ `skills/documentation-standards-validator/SKILL.md` — same reason; its check (3) is the
+    Change Log header check, which now names the canonical format.
+
 ### Files to Modify (Tests)
 
-16. ✅ `tests/skill-protocol.test.js`
-17. ✅ `evals/create-story/scenarios/01-happy/scenario.json`
-18. ✅ `evals/create-task/scenarios/01-happy/scenario.json`
+20. ✅ `tests/skill-protocol.test.js` — 13 new assertions
+21. ✅ `evals/create-story/scenarios/01-happy/scenario.json` — 3 new assertions
+22. ✅ `evals/create-task/scenarios/01-happy/scenario.json` — 3 new assertions
+23. ✅ `evals/create-story/scenarios/01-happy/replay/docs/stories/story.178.8.example-feature.md` —
+    replay fixture; it **is** the recorded output the assertions run against, so it must carry the
+    section the skill now emits
+24. ✅ `evals/create-task/scenarios/01-happy/replay/docs/tasks/task.42.cache-lib-simplification.md` —
+    same
+
+### Files Added (generated by `npm run bundle`, not hand-written)
+
+25. ✅ `references/document-change-log.md` inside each of `create-doc`, `create-epic`, `create-prd`,
+    `create-story`, `create-task`, `create-parallel-stories`, `prd-template`,
+    `brownfield-prd-template`, `documentation-standards-validator`
 
 ### Files to Modify (Documentation)
 
-19. ✅ `CHANGELOG.md`
+26. ✅ `CHANGELOG.md`
 
 ### Files to Delete
 
 None.
+
+### Out of Scope, Found During Implementation
+
+- `skills/create-architecture-doc/resources/templates/brownfield-architecture-tmpl.yaml:74` carries the
+  same legacy five-column `[Change, Date, Version, Description, Author]` form the brownfield PRD
+  template had — while its three sibling architecture templates (`architecture-tmpl.yaml`,
+  `fullstack-architecture-tmpl.yaml`, `front-end-architecture-tmpl.yaml`) already use the canonical
+  four. **Deliberately not changed here**: architecture documents are outside this task's declared
+  scope and outside the canonical spec, which covers "a PRD, epic, story, or task document"
+  (`shared/resources/document-change-log.md:8`). Worth its own small task.
+- `skills/epic-registry-manager/SKILL.md:103` shows a registry example row with Status `NOT_STARTED`,
+  while the live `docs/development/epic-registry.md` uses `✅ Accepted` / `📋 Planned`. Pre-existing
+  and unrelated to the frontmatter schema this task replaced — that is a registry-table column, not
+  epic frontmatter.
 
 ---
 
@@ -374,32 +457,35 @@ Not applicable — template and prose changes only.
 
 ### Functional
 
-- [ ] `create-task`'s template contains an unnumbered `## Change Log` between Stakeholder
+- [x] `create-task`'s template contains an unnumbered `## Change Log` between Stakeholder
       Sign-off and Progress Tracking
-- [ ] `create-epic`'s inline structure contains `## Change Log`
-- [ ] All three epic templates carry a top-level `## Change Log` table and are byte-identical
-- [ ] Both story templates and both PRD templates use the canonical four columns
-- [ ] A document created by each of `create-{prd,epic,story,task}` opens with exactly one
+- [x] `create-epic`'s inline structure contains `## Change Log`
+- [x] All three epic templates carry a top-level `## Change Log` table and are byte-identical,
+      reconciled toward `docs/templates/epic-template.md` per the Phase 2 decision — with
+      `epic-registry-manager`'s replaced frontmatter schema confirmed to have no remaining
+      consumer in that skill
+- [x] Both story templates and both PRD templates use the canonical four columns
+- [x] A document created by each of `create-{prd,epic,story,task}` opens with exactly one
       Change Log row
 
 ### Performance
 
-- [ ] No measurable change to `create-*` runtime; assert only that the eval suites do not
+- [x] No measurable change to `create-*` runtime; assert only that the eval suites do not
       slow by more than a second
 
 ### Code Quality
 
-- [ ] `npm test` passes, including the re-asserted 11-section count
-- [ ] `npm run eval:create-story && npm run eval:create-task` pass
-- [ ] `npm run bundle` idempotent; no `references/` file hand-edited
-- [ ] `npm run generate-catalog` re-run if any description changed
+- [x] `npm test` passes, including the re-asserted 11-section count
+- [x] `npm run eval:create-story && npm run eval:create-task` pass
+- [x] `npm run bundle` idempotent; no `references/` file hand-edited
+- [x] `npm run generate-catalog` re-run if any description changed
 
 ### Migration
 
-- [ ] Each touched skill links `shared/resources/document-change-log.md` rather than
+- [x] Each touched skill links `shared/resources/document-change-log.md` rather than
       restating the format
-- [ ] `CHANGELOG.md` updated
-- [ ] The 3-line epic-template drift is resolved and locked
+- [x] `CHANGELOG.md` updated
+- [x] The 3-line epic-template drift is resolved and locked
 
 ---
 
@@ -420,10 +506,11 @@ Not applicable — template and prose changes only.
 ### Medium Risk Areas
 
 2. **The three epic-template copies drift further**
-   - **Risk**: one copy gets the promotion and another does not. The
-     `documentation-standards-validator` copy is already 3 lines adrift, which is how this
-     class of bug announces itself.
-   - **Probability**: High if unguarded
+   - **Risk**: one copy gets the promotion and another does not. Both non-canonical copies are
+     *already* adrift — 9 lines and 18 lines respectively — which is how this class of bug
+     announces itself. The 18-line case is a different frontmatter schema, so a careless
+     reconciliation silently rewrites what `epic-registry-manager` tells authors to emit.
+   - **Probability**: High if unguarded — it has already happened twice
    - **Impact**: Medium
    - **Mitigation**: byte-lock all three in `tests/skill-protocol.test.js`, mirroring the
      story-template pair lock at `:174`, which exists because the task pair had already drifted.
@@ -493,19 +580,106 @@ malformed.
 ## Progress Tracking
 
 ### Phase 1: Task template
-- [ ] Not started
+- [x] Complete — unnumbered `## Change Log` added between Stakeholder Sign-off and Progress
+      Tracking in both copies; `countMandatorySections()` re-verified at 11; the pair is now
+      byte-identical (the `review-task` copy had been missing the whole YAML frontmatter block
+      and used a legacy `**Task ID**:` header)
 
 ### Phase 2: Epic templates
-- [ ] Not started
+- [x] Complete — bulleted `### Change Log` replaced by a top-level `## Change Log` table placed
+      immediately before `## Notes & Updates`; all three copies reconciled toward the canonical
+      and byte-locked. Pre-lock grep found one real consumer of the replaced frontmatter schema
+      (`documentation-standards-validator/references/prd-structure-guide.md`), updated in the
+      same phase
 
 ### Phase 3: Story and PRD templates
-- [ ] Not started
+- [x] Complete — legacy story markdown template promoted and tabulated (placed before
+      `## QA Testing Results`, the plan's documented fallback, as the file has neither a
+      Sign-off nor a Dev Agent Record heading); brownfield PRD 5 columns → 4; both PRD
+      templates and the story YAML pair carry the canonical instruction
 
 ### Phase 4: Creation skills seed row one
-- [ ] Not started
+- [x] Complete — `create-epic` (inline structure + Post-Creation Validation), `create-task`
+      (step 4.2), `create-story` (Author cell now the skill name), `create-doc` (concrete
+      first-save + revision-append instruction), `create-parallel-stories` (§2.3 bullet 6 —
+      the mandatory parent-epic mutation now leaves a trace), `create-prd` (brownfield
+      extend mode)
 
 ### Phase 5: Tests, evals, bundle
-- [ ] Not started
+- [x] Complete — 13 protocol tests added (`npm test`: 1158/1158 pass); 6 eval assertions added
+      across both `01-happy` scenarios with their replay fixtures updated
+      (`eval:create-task` 12/12, `eval:create-story` 15/15); `npm run bundle` idempotent and
+      every byte-lock verified to survive it; `generate-catalog` not required (no skill
+      `description:` changed)
+
+---
+
+## Implementation Record
+
+**Started**: 2026-08-12
+**Completed**: 2026-08-12
+**Branch**: `feature/task.43.change-log-templates-and-creation`
+
+### Implementation Summary
+
+All five phases landed. Every PRD / epic / story / task template now emits the canonical four-column
+Change Log; all six `create-*` skills seed row one and link the canonical spec instead of restating the
+columns; both duplicate-template families are byte-locked in CI; and the drift the task set out to kill
+turned out to be twice the size described and was resolved with an explicit schema decision.
+
+### Implementation Approach
+
+**Placement follows the sign-off precedent, not a new rule.** On tasks the section is unnumbered and
+sits between `## Stakeholder Sign-off` and `## Progress Tracking`; `countMandatorySections()` matches
+literal numbered strings, so the tail section is invisible to it. Verified at 11 immediately after the
+Phase 1 edit — the cheapest signal for the task's highest-impact risk — and re-asserted in the test
+suite. On epics the log was promoted out of `## Notes & Updates` to its own H2 immediately above it,
+with Open Questions and Decisions Made left behind. PRDs keep `### Change Log` under §1.
+
+**The canonical-spec reference is written as the plain `shared/resources/document-change-log.md` path
+inside an HTML comment**, not as the relative markdown link the plan sketched. Two reasons: the coding
+standard requires the explicit path form ("never use symlinks or relative paths"), and a relative link
+cannot be correct in three files at three different depths while they stay byte-identical. Putting it in
+a comment also mirrors how the sign-off block carries its spec pointer, and keeps a path that means
+nothing from a consumer's `docs/tasks/` out of every generated document.
+
+**Byte-locking and bundling interact, and the interaction was verified rather than assumed.**
+`bundle_skill.py` excludes `references/` from its in-place rewrite (Pass 1, and therefore Pass 3), so
+the two bundled epic copies keep the literal `shared/resources/...` string and stay byte-equal to
+`docs/templates/epic-template.md`. The `create-task` / `review-task` template pair *is* rewritten — but
+identically in both, because both live under `resources/`. Every lock was re-checked with `cmp` after
+bundling, and the bundle was confirmed idempotent by content hash.
+
+**The Phase 2 schema decision.** The task claimed two of the three epic copies were byte-equal; they
+were not, and the `epic-registry-manager` copy carried an entirely different frontmatter schema that an
+equal line count had hidden. Reconciling toward the canonical replaces that schema, so the pre-lock
+consumer grep the review added ran first: it found `prd-structure-guide.md` documenting the old shape,
+which was updated in the same phase. `epic-registry-manager/SKILL.md:103`'s `NOT_STARTED` is a registry
+*table* value, not frontmatter, and is left alone.
+
+### Testing Results
+
+| Suite | Result |
+|---|---|
+| `node --test tests/skill-protocol.test.js` | 36/36 pass (13 new) |
+| `npm test` (full) | **1158/1158 pass**, 0 fail |
+| `npm run eval:create-task` | 12/12 assertions pass |
+| `npm run eval:create-story` | 15/15 assertions pass |
+| `countMandatorySections()` | 11 — unchanged |
+| `npm run bundle` twice | idempotent (no content or status delta) |
+| Byte-locks after bundling | task pair ✅, epic trio ✅, story YAML pair ✅ |
+
+### Deferred Work
+
+None within scope. Two items found outside it are recorded under §7 "Out of Scope, Found During
+Implementation": the brownfield **architecture** template's five-column log, and the stale
+`NOT_STARTED` registry example. Task.44 remains the owner of `review-prd`'s five-column writer, exactly
+as this task's Risk 4 anticipated.
+
+### Notes
+
+No Change Log was added to this task document itself — §4 excludes backfilling existing documents, and
+the pipeline-side writers are task.45's scope.
 
 ---
 

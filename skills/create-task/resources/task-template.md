@@ -384,6 +384,22 @@ Development must not begin until every required role below has signed. To sign, 
 
 ---
 
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
+  Canonical spec: references/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  EVERY new row bumps frontmatter `updated:` in the same edit.
+-->
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| YYYY-MM-DD | 1.0     | Initial draft | create-task |
+
+---
+
 ## Progress Tracking
 
 ### Phase 1: [Phase Name]

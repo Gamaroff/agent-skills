@@ -260,7 +260,17 @@ _(Repeat structure for Stories [N].2 and [N].3)_
 - Story [N].3: ❌ Not Started
 
 **Update Progress**: Calculate as (completed stories / total stories) × 100
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| {{today}}  | 1.0     | Initial draft | create-epic |
 ```
+
+> **Change Log**: append-only, newest row last, four columns exactly as above. Canonical format:
+> `references/document-change-log.md` — link it rather than restating the columns. Seed row one
+> at creation with today's date, and keep frontmatter `updated:` equal to that date.
 
 ## Visual Diagram (conditional, via `mermaid-architect`)
 
@@ -337,6 +347,9 @@ After generating the epic file, invoke `documentation-standards-validator` to co
 - All required YAML frontmatter fields are present (epic_number, title, `type: epic`, domain, status, priority, estimated_stories, created, target_completion; `description` recommended, `tags` optional — see [OKF conformance](references/open-knowledge-format.md))
 - Status indicator uses the standard icon (✅ 🔄 ⚠️ ❌ 📋)
 - File placed in correct location (`${PRD_ROOT}/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
+- `## Change Log` is present with exactly one row (`| {today} | 1.0 | Initial draft | create-epic |`),
+  and frontmatter `updated:` matches that row's date — canonical format:
+  `references/document-change-log.md`
 
 ## Regenerate the PRD Epic Index
 

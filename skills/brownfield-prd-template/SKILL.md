@@ -59,7 +59,9 @@ The brownfield PRD template (`resources/brownfield-prd-tmpl.yaml`) emphasizes:
 - Available Documentation Analysis
 - Enhancement Scope Definition (type, description, impact assessment)
 - Goals and Background Context
-- Change Log
+- Change Log — four columns (`Date`, `Version`, `Description`, `Author`), append-only, newest row
+  last, nested as `### Change Log` under §1. Canonical format:
+  `references/document-change-log.md`
 
 ### Section 2: Requirements (MANDATORY ELICITATION)
 

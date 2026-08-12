@@ -39,7 +39,9 @@ The greenfield PRD template (`resources/prd-tmpl.yaml`) provides a comprehensive
 
 - **Goals:** Bullet list of desired outcomes
 - **Background Context:** 1-2 paragraphs explaining what this solves and why
-- **Change Log:** Version tracking table
+- **Change Log:** Version tracking table — four columns (`Date`, `Version`, `Description`, `Author`),
+  append-only, newest row last, nested as `### Change Log` under §1. Canonical format:
+  `references/document-change-log.md`
 
 **Critical Guidance:**
 

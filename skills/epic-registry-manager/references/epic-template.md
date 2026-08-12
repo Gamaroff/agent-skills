@@ -14,18 +14,18 @@
 
 ---
 
-title: '[Epic N] Epic Name'
-prd_source: '{{PRD_SOURCE_PATH}}' # repo-relative PRD path, or 'brownfield-enhancement'
-epic_type: 'system_implementation | feature_enhancement | infrastructure | integration'
-priority: 'critical | high | medium | low'
-estimated_sprints: N
-dependencies: ['epic-X', 'epic-Y']
-status: 'NOT_STARTED | IN_PROGRESS | PARTIALLY_COMPLETE | COMPLETE'
-completion_percentage: 0-100
-blocked_by: ['epic-X'] # Optional, only if blocked
-team: ['developer-1', 'developer-2', 'designer', 'qa']
-start_date: 'YYYY-MM-DD' # Optional
-target_date: 'YYYY-MM-DD' # Optional
+epic_number: N
+title: "[Epic Name]"
+type: epic
+description: "[One-sentence summary of what this epic delivers]"
+tags: []
+domain: "[Domain]"
+status: "📋 Planned"
+priority: "Critical | High | Medium | Low"
+estimated_stories: N
+created: YYYY-MM-DD
+target_completion: YYYY-MM-DD
+prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative PRD path, or "brownfield-enhancement"
 
 ---
 
@@ -657,9 +657,9 @@ Epic [N] is complete when all criteria below are met:
 
 ### Related Documentation
 
-- [Product Requirements](../../product-requirements.md) - Source requirements
-- [Technical Implementation](../../technical-implementation.md) - Architecture details
-- [Developer Quick Start](../../DEVELOPER-QUICK-START.md) - Implementation guide
+- [Product Requirements](../../prd.[name].md) - Source PRD this epic decomposes
+- [Architecture](../../../../architecture/index.md) - Architecture index for the project
+- [Coding standards](../../../../architecture/concepts/coding-standards.md) - Loaded into every pipeline run
 - [[Specification]](../../[spec-name].md) - Feature specification
 
 ### Related Epics
@@ -669,24 +669,28 @@ Epic [N] is complete when all criteria below are met:
 
 ### Project Resources
 
-- [Implementation Phases](../../implementation-phases.md) - Overall roadmap
-- [Implementation Status](../../IMPLEMENTATION-STATUS.md) - Current progress
-- [Cross-Reference Guide](../../CROSS-REFERENCE-GUIDE.md) - Navigation help
+- [Project completion roadmap](../../../../development/project-completion-roadmap.md) - Ordered backlog `develop-next` selects from
+- [Epic registry](../../../../development/epic-registry.md) - Global epic numbering
+- [Task registry](../../../../tasks/task-registry.md) - Global task numbering
+
+---
+
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Canonical spec: shared/resources/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  EVERY new row bumps frontmatter `updated:` in the same edit.
+-->
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| YYYY-MM-DD | 1.0     | Initial draft | create-epic |
 
 ---
 
 ## Notes & Updates
-
-### Change Log
-
-**[Date]**: [Change description]
-
-- [Detail 1]
-- [Detail 2]
-
-**[Date]**: [Change description]
-
-- [Detail 1]
 
 ### Open Questions
 

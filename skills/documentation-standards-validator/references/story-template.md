@@ -698,13 +698,6 @@ Before marking this story as "Ready for QA", verify:
 
 ## Notes & Updates
 
-### Change Log
-
-**[Date]**: [Change description]
-
-- [Detail 1]
-- [Detail 2]
-
 ### Questions & Decisions
 
 **Open Questions**:
@@ -721,6 +714,23 @@ Before marking this story as "Ready for QA", verify:
 
 **Quick Links**:
 [Acceptance Criteria](#acceptance-criteria) | [Technical Requirements](#technical-requirements) | [Testing](#testing-strategy) | [Definition of Done](#definition-of-done)
+
+---
+
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Canonical spec: shared/resources/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  EVERY new row bumps frontmatter `updated:` in the same edit.
+  Placed here to match story-template.yaml's ordering — the log sits with the
+  document-lifecycle tail, immediately before the QA/dev record sections.
+-->
+
+## Change Log
+
+| Date       | Version | Description   | Author       |
+| ---------- | ------- | ------------- | ------------ |
+| YYYY-MM-DD | 1.0     | Initial draft | create-story |
 
 ---
 

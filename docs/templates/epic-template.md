@@ -675,18 +675,22 @@ Epic [N] is complete when all criteria below are met:
 
 ---
 
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Canonical spec: shared/resources/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  EVERY new row bumps frontmatter `updated:` in the same edit.
+-->
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| YYYY-MM-DD | 1.0     | Initial draft | create-epic |
+
+---
+
 ## Notes & Updates
-
-### Change Log
-
-**[Date]**: [Change description]
-
-- [Detail 1]
-- [Detail 2]
-
-**[Date]**: [Change description]
-
-- [Detail 1]
 
 ### Open Questions
 
