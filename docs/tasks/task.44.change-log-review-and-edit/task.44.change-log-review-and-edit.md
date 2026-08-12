@@ -5,10 +5,12 @@ type: task
 description: "Make every review-*, edit-*, and change-management skill append a Change Log row when it mutates a document, and have review-* grade the section's presence and currency."
 tags: [change-log, review, documentation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-12
 updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 211
 assignee:
 estimated_effort_hours: 16
 github_issue: 203
@@ -16,7 +18,7 @@ github_issue: 203
 
 # [Task 44] Review and edit skills log their document mutations
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.44.review.1.change-log-review-and-edit.md` implemented 2026-08-12
 
@@ -515,6 +517,37 @@ structural-rewrite skill missing its row.
 | 2026-08-12 |         | QA gate CONCERNS (90/100) — 1 medium: review-task Step 8.5 list order | qa-task     |
 | 2026-08-12 |         | TASK-44-BUG-1 fixed — Step 8.5 block moved, scope made unconditional | qa-fix      |
 | 2026-08-12 |         | QA gate PASS (100/100) after 1 fix cycle                      | qa-task     |
+| 2026-08-12 | 1.2     | DoD passed — accepted; CI green on head 75bd814               | finalise    |
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.44.qa.1.change-log-review-and-edit.md`
+**Gate File**: `task.44.gate.1.change-log-review-and-edit.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (after 1 fix cycle)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 41/41 checkboxes ticked, each with cited evidence
+✅ **CI:** 3/3 checks green (`test`, `link-check`, `validate`) — on the **exact head commit** `75bd814`, not an ancestor
+✅ **Tests:** `npm test` 1175/1175; 21 new protocol tests; both review-step eval scenarios green
+✅ **PR:** #211 OPEN, MERGEABLE
+✅ **Documentation:** `CHANGELOG.md` updated; 14/14 skills link the canonical spec rather than restating it
+✅ **Security Review:** PASS — no auth, crypto, secret or dependency surface; the two grep hits were the QA report's own prose asserting the absence
+⚠️ **Compliance Review:** NOT_APPLICABLE — skills-library repo, no GDPR/PCI/WCAG/HIPAA surface
+✅ **Bundle:** `npm run bundle` idempotent; all 14 bundled copies byte-identical, no hand-edited `references/` file
+
+**The migration risk was verified live, not argued.** This task's own document predated task.43's template, so its Step 2 review exercised exactly the legacy path the change is riskiest for — returning one Important finding with a GO verdict at 9/10 under default config. `advisory` is confirmed correct as the default.
+
+**Detailed Verification Log:** See `task.44.dod.1.change-log-review-and-edit.md` for complete evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-08-12
 
 ---
 
