@@ -235,6 +235,30 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cy
 
 ### 5b. Run QA Fix (shared)
 
+#### Signal the `changes-requested` stage (when `TRACKER_ISSUE` is set)
+
+Run on **entering** each fix cycle, before invoking `/qa-fix` — the gate has come back with issues and the card is going back for rework. Branch on `TRACKER`:
+
+```bash
+# TRACKER=jira
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+  --issue {TRACKER_ISSUE} --stage changes-requested --json
+
+# TRACKER=github
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \
+  --issue {TRACKER_ISSUE} --stage changes-requested --json
+```
+
+> **This one fires per cycle — the opposite of the rule for `in-qa` a few sections above.** The distinction is not an oversight, so do not "correct" it to match: `in-qa` marks a phase the card enters **once**, and re-announcing it every cycle would tell a board reader nothing they cannot already see. `changes-requested` marks a state the card **re-enters**, once per gate that comes back with issues — a board that shows it on cycle 1 and then goes quiet through cycles 2–5 is actively telling the team something false.
+
+`changes-requested` is **off by default** and, like `blocked`, is an **unranked side-state**: a consumer names it under `pipeline:` but usually not under `statuses:`. Being unranked is what lets a card re-enter it without the backward-move guard rejecting the second and subsequent moves. Its default candidates deliberately exclude "In Progress" — see the comment on `CHANGES_REQUESTED_CANDIDATES` in `jira-sync.js` for why naming a ranked development column here would make the guard fight itself.
+
+Expect `reason: "stage-disabled"` until a project opts in, and `no-option` / `no-transition` on a board that has no such column. All are correct outcomes; the CLI exits 0 for each and the loop continues either way. Never let this call block a fix cycle.
+
+Log in Decisions Log, once per cycle: "QA Cycle {N} — changes-requested: {landed status / disabled / skip reason}."
+
+#### Invoke qa-fix
+
 Invoke the `/qa-fix` skill with the path to the most recent **gate file** (the `.yml` file located using the sort command above). The gate file is the authoritative source of issues for qa-fix.
 
 After fixes are applied:

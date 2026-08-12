@@ -362,7 +362,31 @@ merge gate (Step 3) and roadmap tick (Step 4) verbatim per item:
    On merge failure (conflict, protection): mark the item `halted`, report, continue. Mark
    `merged: true`. Story/task PRs target `<baseBranch>` directly — no epic integration
    branch.
-4. **Tick the roadmap immediately**, on `<baseBranch>` in the **main tree** (`git pull`
+4. **Signal the `pr-merged` stage for _this_ item**, after its merge succeeds and before its
+   tick. Read the issue key from **this item's** document frontmatter — never from a
+   batch-level variable:
+
+   ```bash
+   # Inside the per-item loop body — NOT once per batch.
+   # TRACKER=github
+   node .agents/skills/develop-batch/references/gh-stage.js \
+     --issue "$ITEM_TRACKER_ISSUE" --stage pr-merged --json
+   # TRACKER=jira
+   node .agents/skills/develop-batch/references/jira-stage.js \
+     --issue "$ITEM_TRACKER_ISSUE" --stage pr-merged --json
+   ```
+
+   > **This is the one place in the batch lane where a scoping slip moves the wrong card.**
+   > The lane merges many PRs in sequence; firing `pr-merged` once for the batch would move
+   > whichever item's issue happened to be in scope at the time — on a shared board, someone
+   > else's card — or move a single card once per merge. Both are silent: the CLI reports
+   > success either way, because it was asked about a real issue. Key the call on the item
+   > being merged, inside the loop body, and never hoist it.
+
+   Off by default and non-blocking, exactly as in `develop-next` — `stage-disabled`,
+   `no-option` and `no-transition` all exit 0 and the tick proceeds. See
+   `develop-next` Step 3 for the `done` / `pr-merged` ordering note.
+5. **Tick the roadmap immediately**, on `<baseBranch>` in the **main tree** (`git pull`
    first — the merge just advanced the remote):
    - Tick the item `[x]` and rewrite its row in the roadmap's accepted-row convention
      (copy an existing ✅ row's format; if none exists yet, use

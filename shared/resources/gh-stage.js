@@ -586,6 +586,10 @@ function parseArgs(argv) {
     addToBoard: false,
     probeBoard: false,
     writeLadder: false,
+    initWorkflow: false,
+    force: false,
+    check: false,
+    offline: false,
     board: "",
     field: "",
     issueType: "",
@@ -615,6 +619,18 @@ function parseArgs(argv) {
         break;
       case "--write-ladder":
         opts.writeLadder = true;
+        break;
+      case "--init-workflow":
+        opts.initWorkflow = true;
+        break;
+      case "--force":
+        opts.force = true;
+        break;
+      case "--check":
+        opts.check = true;
+        break;
+      case "--offline":
+        opts.offline = true;
         break;
       case "--add-to-board":
         opts.addToBoard = true;
@@ -650,7 +666,13 @@ const USAGE = `Usage: gh-stage --issue <N> --stage <${tw.MOMENTS.join("|")}>
               [--json] [--quiet] [--dry-run] [--strict] [--allow-regress]
               [--add-to-board] [--board <number|name>] [--field <name>]
        gh-stage --probe-board [--write-ladder] [--board <number|name>]
-              (read-only; --write-ladder writes tracker-workflow.yaml only when absent)`;
+              (read-only; --write-ladder writes tracker-workflow.yaml only when absent)
+       gh-stage --init-workflow [--force] [--board <number|name>]
+              (writes a full tracker-workflow.yaml from the live board; refuses
+               to overwrite without --force)
+       gh-stage --check [--offline] [--board <number|name>]
+              (validates tracker-workflow.yaml; EXITS NON-ZERO ON FAILURE —
+               the only mode in this family that does. --offline skips the board)`;
 
 function run({
   argv = process.argv,
@@ -699,6 +721,15 @@ function run({
     return { exitCode: 2 };
   }
 
+  // --init-workflow is a probe that writes; --check is a probe that grades.
+  // Both reuse the probe path wholesale rather than re-reading the board, so
+  // neither can disagree with what --probe-board reports.
+  if (args.initWorkflow) {
+    args.probeBoard = true;
+    args.writeLadder = true;
+  }
+  if (args.check) args.probeBoard = true;
+
   if (!args.probeBoard) {
     if (!args.issue || !args.stage) {
       output.err("Error: --issue and --stage are both required");
@@ -715,6 +746,26 @@ function run({
   }
 
   const workflow = tw.loadWorkflow(repoRoot ? { repoRoot } : {});
+
+  // --check is the ONE mode in this family that exits non-zero on failure.
+  //
+  // Every other entry point exits 0 on every documented skip, because pipeline
+  // steps run inside shells where a non-zero exit would kill the run. --check
+  // does not run inside a pipeline step — it runs in CI, where a green exit on a
+  // broken file IS the failure. Do not "harmonise" this. (There is a test
+  // asserting the non-zero exit; if you are here because that test failed, the
+  // test is right.)
+  //
+  // The schema half runs here, before any network or credential concern, so
+  // `--offline` genuinely issues no board call rather than making one and
+  // ignoring it.
+  let checkWarnings = 0;
+  if (args.check) {
+    const off = checkWorkflowOffline({ workflow, args, output });
+    if (off.done) return off.result;
+    checkWarnings = off.warnings;
+  }
+
   const statusField = args.field || resolveStatusFieldName(root);
   const projectYml = readProjectYml(root);
   // Kept SEPARATE from args.board. Folding `--board` into this made the second
@@ -728,6 +779,27 @@ function run({
   // second transport. One warning, exit 0, and the message must not imply a
   // fallback exists.
   if (!ghAvailable(exec)) {
+    // --check exits 0 here ON PURPOSE, and it is the one place the inverted exit
+    // code does NOT apply. A fork's PR cannot hold the repo secret, so failing on
+    // a missing credential would penalise exactly the contributors least able to
+    // fix it. The schema half has already run and passed by this point; only the
+    // board comparison is being skipped. `--check --offline` is the way to assert
+    // the half that never needs credentials.
+    if (args.check) {
+      output.info(
+        "⏭️  gh is unavailable or not authenticated — skipping the board half of " +
+          "--check and exiting 0. The schema half passed. Use `--check --offline` " +
+          "to assert only that half deliberately.",
+      );
+      const payload = {
+        reason: "no-credentials",
+        checked: true,
+        errors: 0,
+        warnings: checkWarnings,
+      };
+      if (args.json) output.emit({ ...payload, exitCode: 0 });
+      return { exitCode: 0, ...payload };
+    }
     output.info(
       "ℹ️  gh is unavailable or not authenticated — no board change attempted.",
     );
@@ -755,6 +827,7 @@ function run({
       projectYml,
       configuredBoard,
       onWarn,
+      checkWarnings,
     });
 
   // Omission from `pipeline:` is the only way to switch a moment off, so a null
@@ -1103,14 +1176,19 @@ function probeBoard({
   projectYml,
   configuredBoard,
   onWarn,
+  checkWarnings = 0,
 }) {
   // Probing needs an issue only as a handle to reach the board through. Any
   // issue on the board answers the question "what are this board's columns?".
   const issue = args.issue || "";
   if (!issue) {
-    output.err(
-      "Error: --probe-board needs --issue <N> (any issue already on the board)",
-    );
+    const need = args.check
+      ? "--check needs --issue <N> (any issue already on the board) to read it. " +
+        "Use --check --offline to validate the file without a board."
+      : args.initWorkflow
+        ? "--init-workflow needs --issue <N> (any issue already on the board)"
+        : "--probe-board needs --issue <N> (any issue already on the board)";
+    output.err(`Error: ${need}`);
     return { exitCode: 2 };
   }
 
@@ -1192,6 +1270,18 @@ function probeBoard({
     }
   }
 
+  // --check grades the probe it just ran and returns its own exit code. It must
+  // come before the ladder write: a --check run never writes anything.
+  if (args.check)
+    return checkDrift({
+      moments,
+      optionNames,
+      boardTitle: item.projectTitle,
+      warnings: checkWarnings,
+      args,
+      output,
+    });
+
   let ladderWritten = null;
   if (args.writeLadder)
     ladderWritten = writeLadder({
@@ -1199,6 +1289,10 @@ function probeBoard({
       optionNames,
       output,
       dryRun: args.dryRun,
+      force: args.force,
+      // Only --init-workflow asks for the full file. Bare --write-ladder keeps
+      // writing a statuses-only ladder, exactly as it always has.
+      moments: args.initWorkflow ? moments : null,
     });
 
   const payload = {
@@ -1223,12 +1317,23 @@ function probeBoard({
  * :3771-3781 do the same job) — a hand-authored ladder encodes intent a board
  * read cannot recover.
  */
-function writeLadder({ root, optionNames, output, dryRun = false }) {
+function writeLadder({
+  root,
+  optionNames,
+  output,
+  dryRun = false,
+  // --init-workflow adds these two. Defaulted so the --write-ladder call site is
+  // byte-for-byte unchanged: same guard, same body, same return shape.
+  force = false,
+  moments = null,
+}) {
   const target = path.join(root, tw.DEFAULT_WORKFLOW_PATH);
-  if (fs.existsSync(target)) {
+  if (fs.existsSync(target) && !force) {
     output.warn(
       `⚠️  ${tw.DEFAULT_WORKFLOW_PATH} already exists — leaving it untouched. ` +
-        "Delete it first if you want the board's order written fresh.",
+        (moments
+          ? "Pass --force to overwrite it."
+          : "Delete it first if you want the board's order written fresh."),
     );
     return { written: false, reason: "exists", path: target };
   }
@@ -1236,14 +1341,15 @@ function writeLadder({ root, optionNames, output, dryRun = false }) {
     output.warn("⚠️  board offered no options — nothing to write.");
     return { written: false, reason: "no-options", path: target };
   }
-  const body =
-    "# Generated by `gh-stage --probe-board --write-ladder`.\n" +
-    "# A Projects board's option order IS its workflow order, so this ladder is\n" +
-    "# the board's own Status options, read in board order. Edit freely — this\n" +
-    "# file is never overwritten once it exists.\n" +
-    "statuses:\n" +
-    optionNames.map((n) => `  - ${JSON.stringify(n)}`).join("\n") +
-    "\n";
+  const body = moments
+    ? renderWorkflowFile(optionNames, moments)
+    : "# Generated by `gh-stage --probe-board --write-ladder`.\n" +
+      "# A Projects board's option order IS its workflow order, so this ladder is\n" +
+      "# the board's own Status options, read in board order. Edit freely — this\n" +
+      "# file is never overwritten once it exists.\n" +
+      "statuses:\n" +
+      optionNames.map((n) => `  - ${JSON.stringify(n)}`).join("\n") +
+      "\n";
   // --dry-run is a no-write contract for the whole CLI, not just for the board.
   // A filesystem write is still a write, and a caller checking "did --dry-run
   // touch anything" would have been wrong about this one.
@@ -1271,14 +1377,202 @@ function writeLadder({ root, optionNames, output, dryRun = false }) {
   }
 }
 
+/**
+ * `--check` — validate tracker-workflow.yaml, exiting NON-ZERO on failure.
+ *
+ * Two tiers, because they fail for different reasons and CI wants different
+ * things from them:
+ *
+ *   --offline   schema self-consistency only. No network, no credentials, no
+ *               board read. This is what most consumer CI should run: it is the
+ *               half that can never flake, and it catches the typo class
+ *               (unknown moment, duplicate rung, flow sequence).
+ *   (default)   the above, plus a live board read: every status an enabled
+ *               moment names must actually exist as an option, and the file's
+ *               board must be the board this repo points at. This is the half
+ *               that catches a RENAMED COLUMN, which is the most common way a
+ *               working setup breaks and the one that breaks silently.
+ *
+ * Missing credentials exit 0 with a loud skip, deliberately: a fork's PR cannot
+ * have the secret, and failing it on that basis would make the check hostile to
+ * exactly the contributors least able to fix it.
+ */
+function checkWorkflowOffline({ workflow, args, output }) {
+  const findings = tw.validateWorkflow(workflow) || [];
+  const errors = findings.filter((f) => f.level === "error");
+  const warns = findings.filter((f) => f.level === "warn");
+
+  for (const f of findings) {
+    const tag = f.level === "error" ? "❌" : f.level === "warn" ? "⚠️ " : "ℹ️ ";
+    output.info(`${tag} ${f.message}`);
+  }
+
+  if (workflow.source !== "file") {
+    output.info(
+      `ℹ️  No ${tw.DEFAULT_WORKFLOW_PATH} — using the built-in default ladder. ` +
+        "Nothing to check. Generate one with `gh-stage --init-workflow`.",
+    );
+    const payload = { reason: "no-file", checked: false, errors: 0, warnings: 0 };
+    if (args.json) output.emit({ ...payload, exitCode: 0 });
+    return { done: true, result: { exitCode: 0, ...payload } };
+  }
+
+  // Fail now if the schema half found anything — a file that does not parse
+  // cleanly cannot be meaningfully compared against a board.
+  if (errors.length || args.offline) {
+    const payload = {
+      reason: errors.length ? "invalid" : "ok-offline",
+      checked: true,
+      offline: !!args.offline,
+      errors: errors.length,
+      warnings: warns.length,
+      messages: findings.map((f) => `${f.level}: ${f.message}`),
+    };
+    const code = errors.length ? 1 : 0;
+    if (args.json) output.emit({ ...payload, exitCode: code });
+    else if (!errors.length) output.info("✅ tracker-workflow.yaml is self-consistent.");
+    return { done: true, result: { exitCode: code, ...payload } };
+  }
+
+  // Schema half passed and the caller wants the board half too. The board read
+  // is not duplicated here — run() continues into the ordinary probe path, which
+  // already owns every piece of that plumbing, and `checkDrift` below grades its
+  // result. Duplicating it was the first draft, and it re-derived owner/repo,
+  // board selection and option matching in a second place that could disagree.
+  return { done: false, warnings: warns.length };
+}
+
+/**
+ * Grade a completed probe for drift. The board half of `--check`.
+ *
+ * A renamed column is the failure this exists for: the file still parses, every
+ * moment still names a status, and nothing moves. It is invisible until someone
+ * notices cards sitting still.
+ */
+function checkDrift({ moments, optionNames, boardTitle, warnings, args, output }) {
+  const drift = [];
+  for (const [m, spec] of Object.entries(moments)) {
+    if (spec.verdict === "no-option") {
+      drift.push({
+        moment: m,
+        wanted: spec.targets,
+        message:
+          `\`${m}\` targets [${spec.targets.join(", ")}], which no column on ` +
+          `"${boardTitle}" matches. Board columns: ${optionNames.join(" → ")}`,
+      });
+    }
+  }
+
+  for (const d of drift) output.err(`❌ ${d.message}`);
+
+  if (drift.length) {
+    output.err("");
+    output.err("Fix it by regenerating the file from the live board:");
+    output.err("  gh-stage --init-workflow --force");
+    output.err("…or edit the named statuses by hand to match the columns above.");
+  } else {
+    output.info(
+      `✅ tracker-workflow.yaml matches "${boardTitle}" — every enabled moment ` +
+        "resolves to a real column.",
+    );
+  }
+
+  const payload = {
+    reason: drift.length ? "drift" : "ok",
+    checked: true,
+    board: boardTitle,
+    options: optionNames,
+    errors: drift.length,
+    warnings: warnings || 0,
+    drift,
+  };
+  const code = drift.length ? 1 : 0;
+  if (args.json) output.emit({ ...payload, exitCode: code });
+  return { exitCode: code, ...payload };
+}
+
+/**
+ * Render a complete tracker-workflow.yaml from a live board read.
+ *
+ * `moments` is the probe's own moment→option map, so what this file says a
+ * moment targets is exactly what the probe just reported it resolving to. A
+ * moment that resolved to nothing is emitted COMMENTED OUT rather than omitted
+ * silently: the author needs to see that the moment exists and that their board
+ * has no column for it, which a missing line does not convey.
+ *
+ * Nothing here is inferred beyond the board read. `documentStatus:` maps the
+ * lifecycle onto first/middle/last rungs, which is a guess — it is labelled as
+ * one in the file it writes.
+ */
+function renderWorkflowFile(optionNames, moments) {
+  const q = (n) => JSON.stringify(n);
+  const first = optionNames[0];
+  const last = optionNames[optionNames.length - 1];
+  const resolved = (m) =>
+    moments && moments[m] && moments[m].verdict === "resolved"
+      ? moments[m].option
+      : null;
+
+  const lines = [];
+  lines.push("# Generated by `gh-stage --init-workflow` from the live board.");
+  lines.push("#");
+  lines.push("# Schema and worked examples: docs/reference/tracker-workflow.md");
+  lines.push("# Verify at any time:  gh-stage --probe-board");
+  lines.push("# Check in CI:         gh-stage --check --offline");
+  lines.push("");
+  lines.push("# The ladder, in board order. Order IS the workflow: a rung's index is its");
+  lines.push("# rank, and the rungs between two positions are the path between them.");
+  lines.push("statuses:");
+  for (const n of optionNames) lines.push(`  - ${q(n)}`);
+  lines.push("");
+  lines.push("# Which status each pipeline moment targets. Omission is disablement —");
+  lines.push("# there is no `enabled: false` and no second place to switch a moment off.");
+  lines.push("# A status named here but absent from `statuses:` is an off-ladder");
+  lines.push("# side-state: entered directly, never walked to.");
+  lines.push("pipeline:");
+  for (const m of tw.MOMENTS) {
+    const opt = resolved(m);
+    if (opt) {
+      lines.push(`  ${m}: ${q(opt)}`);
+      continue;
+    }
+    // Commented, with the moment's own reason. `changes-requested` and
+    // `pr-merged` are off by default, so they resolve to nothing on a fresh
+    // read even on a board that has a perfectly good column for them.
+    const why =
+      m === "changes-requested"
+        ? "off by default; fires once per QA fix cycle. Keep it OFF `statuses:` — a ranked target makes the 2nd move backward and the guard rejects it"
+        : m === "pr-merged"
+          ? "off by default; fires after the PR merges, from /develop-next and /develop-batch. To gate on a real merge, omit `done:` above and let this be the last move"
+          : "no matching column on this board — add the column and this line together";
+    lines.push(`  # ${m}: ...   # ${why}`);
+  }
+  lines.push("");
+  lines.push("# Local document status -> board status, for the /sync-* skills.");
+  lines.push("# GUESSED from ladder position — check these against how your team");
+  lines.push("# actually uses the board.");
+  lines.push("documentStatus:");
+  lines.push(`  draft: ${q(first)}`);
+  lines.push(`  planned: ${q(first)}`);
+  lines.push(`  ready-for-development: ${q(first)}`);
+  lines.push(`  in-progress: ${q(resolved("work-started") || first)}`);
+  lines.push(`  ready-for-review: ${q(resolved("in-review") || resolved("work-started") || first)}`);
+  lines.push(`  accepted: ${q(resolved("done") || last)}`);
+  lines.push(`  cancelled: ${q(resolved("done") || last)}`);
+  return lines.join("\n") + "\n";
+}
+
 if (require.main === module) {
   try {
     const r = run();
     process.exit(r.exitCode || 0);
   } catch (e) {
-    // Even an unexpected throw must not kill a pipeline step.
     console.error(`⚠️  gh-stage failed: ${e && e.message}`);
-    process.exit(0);
+    // Even an unexpected throw must not kill a pipeline step — EXCEPT under
+    // --check, whose whole contract is that a problem it cannot rule out is a
+    // failure. Swallowing a throw to 0 there would produce the one outcome
+    // --check exists to prevent: a green CI run over a file nobody validated.
+    process.exit(process.argv.includes("--check") ? 1 : 0);
   }
 }
 
@@ -1293,6 +1587,9 @@ module.exports = {
   readBoard,
   ensureOnBoard,
   writeLadder,
+  renderWorkflowFile,
+  checkWorkflowOffline,
+  checkDrift,
   withRetry,
   makeOutput,
   USAGE,

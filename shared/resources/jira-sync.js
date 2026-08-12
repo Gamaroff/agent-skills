@@ -1809,6 +1809,28 @@ const MERGE_CANDIDATES = Object.freeze([
   "Ready for Merge",
   "Awaiting Merge",
 ]);
+// Deliberately EXCLUDES "In Progress". A board that sends a rejected review back
+// to its development column is common, but naming it here would make the guard
+// fight itself: `in-review` (rank 30) → "In Progress" (rank 20) is a backward
+// move, so it would be blocked on every board that ranks both — and silently
+// permitted on every board that ranks neither. A consumer whose board really
+// does reuse "In Progress" for rework names it explicitly under `pipeline:`,
+// where the intent is visible and `--allow-regress` is the documented escape.
+const CHANGES_REQUESTED_CANDIDATES = Object.freeze([
+  "Changes Requested",
+  "Rework",
+  "Needs Work",
+  "Reopened",
+]);
+// "Ready for Showcase" is included on purpose: it is a real, reachable column on
+// live boards that no moment has ever targeted, which is precisely the gap
+// `pr-merged` exists to fill.
+const PR_MERGED_CANDIDATES = Object.freeze([
+  "Merged",
+  "Ready for Release",
+  "Awaiting Release",
+  "Ready for Showcase",
+]);
 
 // ---------------------------------------------------------------------------
 // Pipeline stages
@@ -1825,9 +1847,9 @@ const MERGE_CANDIDATES = Object.freeze([
 // /develop-story firing different transitions for the same board position —
 // exactly the drift this file exists to prevent.
 //
-// `defaultEnabled: false` on the three new stages is load-bearing. Consumers
-// upgrade by `rm -rf`ing the skill directory and copying a new one; a stage
-// that defaults on would start moving cards into columns that project has
+// `defaultEnabled: false` on the five off-by-default stages is load-bearing.
+// Consumers upgrade by `rm -rf`ing the skill directory and copying a new one; a
+// stage that defaults on would start moving cards into columns that project has
 // never used, with no one having asked for it. Opting in is one line in the
 // workflow record.
 //
@@ -1835,6 +1857,20 @@ const MERGE_CANDIDATES = Object.freeze([
 // pipeline re-running an earlier step must not drag a card backwards. `null`
 // means unranked — `blocked` is exempt in both directions, since it is a
 // side-state rather than a point on the ladder.
+//
+// KEY ORDER IS SEMANTIC. `STAGE_NAMES` is `Object.keys` of this map, and
+// `describeAlternatives` reads "every stage after this one" straight off that
+// order to explain a skip. The keys therefore run in pipeline order, not
+// alphabetical and not rank order — `changes-requested` and `pr-merged` are
+// unranked but still sit at the point in the run where they fire.
+//
+// `changes-requested` and `pr-merged` are unranked for the same reason `blocked`
+// is: neither is a position on the forward ladder. `changes-requested` is a
+// state a card RE-ENTERS, once per fix cycle, so ranking it would make the second
+// entry a backward move the guard rejects. `pr-merged` fires after `done` on the
+// boards that want it, but "after done" is not a rung the built-in ladder has —
+// a consumer whose own `statuses:` lists a post-merge column ranks it there, and
+// the ladder path resolves it by position without needing a default rank here.
 const DEFAULT_STAGE_MAP = Object.freeze({
   "work-started": {
     candidates: IN_PROGRESS_CANDIDATES,
@@ -1846,10 +1882,20 @@ const DEFAULT_STAGE_MAP = Object.freeze({
     rank: 30,
     defaultEnabled: true,
   },
+  "changes-requested": {
+    candidates: CHANGES_REQUESTED_CANDIDATES,
+    rank: null,
+    defaultEnabled: false,
+  },
   "in-qa": { candidates: QA_CANDIDATES, rank: 40, defaultEnabled: false },
   "ready-for-merge": {
     candidates: MERGE_CANDIDATES,
     rank: 50,
+    defaultEnabled: false,
+  },
+  "pr-merged": {
+    candidates: PR_MERGED_CANDIDATES,
+    rank: null,
     defaultEnabled: false,
   },
   blocked: {

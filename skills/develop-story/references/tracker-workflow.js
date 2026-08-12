@@ -50,9 +50,12 @@ const DEFAULT_WORKFLOW_PATH = "tracker-workflow.yaml";
 // ---------------------------------------------------------------------------
 // A CLOSED set, because each moment is a line of code in a step file. Config
 // chooses which status a moment targets; it can never invent a new moment.
-// `changes-requested` and `pr-merged` are declared here but not wired until
-// task.41 — a consumer setting them today gets a no-op, which is why the shipped
-// template leaves them out.
+//
+// All eight are wired as of task.41: `changes-requested` fires per QA fix cycle
+// from the shared QA-loop step file, and `pr-merged` fires from the orchestrators
+// that actually merge (`/develop-next`, `/develop-batch`) — not from the develop
+// pipelines, which finish while the PR is still open. Both remain absent from
+// DEFAULT_PIPELINE, so they fire nowhere until a consumer names a status for them.
 const MOMENTS = Object.freeze([
   "work-started",
   "in-review",
@@ -123,9 +126,12 @@ const DEFAULT_LADDER = Object.freeze([
 // names. A board using unconventional names gets an off-ladder miss that
 // validateWorkflow reports and tells the author how to fix.
 //
-// The three moments absent here are absent on purpose: `in-qa`, `ready-for-merge`
-// and `blocked` are `defaultEnabled: false` in DEFAULT_STAGE_MAP today, and
-// omission is how this format spells "off".
+// The five moments absent here are absent on purpose: `changes-requested`,
+// `in-qa`, `ready-for-merge`, `pr-merged` and `blocked` are all
+// `defaultEnabled: false` in DEFAULT_STAGE_MAP, and omission is how this format
+// spells "off". Count them against DEFAULT_STAGE_MAP rather than trusting this
+// sentence — it said "three" for a release after `changes-requested` and
+// `pr-merged` joined MOMENTS, which is exactly the drift `--check` now catches.
 const DEFAULT_PIPELINE = Object.freeze({
   "work-started": "In Progress",
   "in-review": "In Review",

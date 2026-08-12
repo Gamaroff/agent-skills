@@ -377,6 +377,99 @@ ${tracker_block}"
   record_step "skills-config" "ok" "written"
 }
 
+# ── 5b. tracker-workflow.yaml ────────────────────────────────────────────────
+# The consumer-owned status ladder. Unlike skills-config.yaml above, this one
+# NEVER offers to overwrite: the file encodes a board's real column names, which
+# a consumer has hand-tuned against a live board and the wizard cannot re-derive
+# from answers to its prompts. Losing it is silent — the pipelines keep running
+# and simply stop moving cards. So the only two outcomes here are "written" and
+# "kept (existing)".
+#
+# Runs AFTER install_skills, not with the other config steps: the live-probe path
+# below invokes a CLI that install_skills puts on disk. With no skills installed
+# there is nothing to probe with, and the generic template is all we could write.
+write_tracker_workflow() {
+  heading "tracker-workflow.yaml"
+
+  if [[ -f "tracker-workflow.yaml" ]]; then
+    info "tracker-workflow.yaml already exists — kept untouched"
+    record_step "tracker-workflow" "ok" "kept (existing)"
+    return
+  fi
+
+  # Prefer the real board over a generic ladder. Both CLIs refuse to overwrite
+  # without --force, so this is safe even if the file appeared since the check.
+  local _cli=""
+  case "${VCS:-github}" in
+    github) _cli=".agents/skills/develop-task/references/gh-stage.js" ;;
+    *)      _cli="" ;;
+  esac
+  [[ "${TRACKER:-github}" == "jira" ]] && _cli=".agents/skills/develop-task/references/jira-stage.js"
+
+  if [[ "$DRY_RUN" != true && -n "$_cli" && -f "$_cli" ]] \
+     && node "$_cli" --init-workflow >/dev/null 2>&1; then
+    ok "tracker-workflow.yaml — generated from your live board"
+    record_step "tracker-workflow" "ok" "generated from board"
+    return
+  fi
+
+  # Fallback: a generic ladder. Say so LOUDLY. A template whose columns do not
+  # match the board resolves nothing, and the failure mode is silence — the
+  # pipelines run, report success, and move no cards.
+  write_file "tracker-workflow.yaml" "$(cat <<'TRACKER_WORKFLOW_EOF'
+# tracker-workflow.yaml — GENERATED FROM A TEMPLATE, NOT FROM YOUR BOARD.
+#
+# Full reference:   docs/reference/tracker-workflow.md
+# Annotated sample: docs/examples/tracker-workflow.default.yaml
+#
+# Edit `statuses:` to your board's columns, IN BOARD ORDER, then point each
+# moment at the column it should move a card to. Check your work with:
+#
+#   node .agents/skills/develop-task/references/gh-stage.js --probe-board
+#   node .agents/skills/develop-task/references/jira-stage.js --print-plan --stage work-started
+#   node .agents/skills/develop-task/references/gh-stage.js --check      # in CI
+
+# The ladder, in board order. Order IS the workflow: a rung's index is its rank,
+# and the rungs between two positions are the path from one to the other.
+statuses:
+  - Backlog
+  - In Progress
+  - In Review
+  - Done
+
+# Which status each pipeline moment targets. Omit a moment to disable it —
+# omission is the only way to switch one off. A status named here but absent
+# from `statuses:` above is an off-ladder side-state, entered directly.
+pipeline:
+  work-started: In Progress
+  in-review: In Review
+  done: Done
+  # in-qa: ...              # ← add the column and the line together
+  # ready-for-merge: ...
+  # blocked: Blocked        # ← off-ladder side-state
+  # changes-requested: ...  # ← fires once per QA fix cycle; keep it OFF `statuses:`
+  # pr-merged: ...          # ← fires after the PR merges, from /develop-next
+
+# Local document status -> board status, for the /sync-* skills.
+documentStatus:
+  draft: Backlog
+  planned: Backlog
+  ready-for-development: Backlog
+  in-progress: In Progress
+  ready-for-review: In Review
+  accepted: Done
+  cancelled: Done
+TRACKER_WORKFLOW_EOF
+)"
+  ok "tracker-workflow.yaml"
+  warn "Wrote a GENERIC ladder — your board's real columns are almost certainly different."
+  warn "A ladder that does not match the board resolves nothing, and fails SILENTLY."
+  warn "Edit it before your first pipeline run, or regenerate from the live board:"
+  warn "  node .agents/skills/develop-task/references/gh-stage.js --init-workflow --force"
+  record_warning "tracker-workflow.yaml is a generic template — edit it to match your board before the first pipeline run"
+  record_step "tracker-workflow" "ok" "template (edit before first run)"
+}
+
 # ── 6. registries ────────────────────────────────────────────────────────────
 create_registries() {
   heading "Registries"
@@ -865,6 +958,9 @@ main() {
   create_registries
   scaffold_docs
   install_skills
+  # After install_skills on purpose — it prefers probing the live board with a
+  # CLI that install_skills is what puts on disk.
+  write_tracker_workflow
   install_hooks
   print_summary
 }

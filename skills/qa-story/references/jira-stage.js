@@ -44,6 +44,8 @@
  * as unverified rather than claiming a destination it cannot observe.
  */
 
+const fs = require("fs");
+const path = require("path");
 const lib = require("./jira-sync.js");
 const tw = require("./tracker-workflow.js");
 
@@ -65,6 +67,10 @@ function parseArgs(argv) {
     // never fire, because the condition it branches on is unreachable.
     from: "",
     issueType: "",
+    initWorkflow: false,
+    force: false,
+    check: false,
+    offline: false,
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -87,6 +93,18 @@ function parseArgs(argv) {
         break;
       case "--print-plan":
         opts.printPlan = true;
+        break;
+      case "--init-workflow":
+        opts.initWorkflow = true;
+        break;
+      case "--force":
+        opts.force = true;
+        break;
+      case "--check":
+        opts.check = true;
+        break;
+      case "--offline":
+        opts.offline = true;
         break;
       case "--json":
         opts.json = true;
@@ -118,7 +136,14 @@ function parseArgs(argv) {
 const USAGE = `Usage: jira-stage --issue <KEY> --stage <${lib.STAGE_NAMES.join("|")}>
               [--json] [--quiet] [--dry-run] [--strict] [--allow-regress] [--worklog <1m>]
        jira-stage --stage <${lib.STAGE_NAMES.join("|")}> --print-plan
-              [--from <status>] [--issue-type <type>]   (no credentials, no network)`;
+              [--from <status>] [--issue-type <type>]   (no credentials, no network)
+       jira-stage --init-workflow [--force] [--dry-run]
+              (writes tracker-workflow.yaml, converting an existing
+               jira.workflowRecord when one exists; refuses to overwrite
+               without --force)
+       jira-stage --check [--offline]
+              (validates tracker-workflow.yaml; EXITS NON-ZERO ON FAILURE —
+               the only mode in this family that does)`;
 
 // A skip is only actionable if the operator can see what the board DID offer.
 // Flagging transitions that lead somewhere a LATER stage wants is the useful
@@ -282,6 +307,17 @@ async function run({
     if (args.json) output.emit({ ...payload, stage: args.stage, exitCode });
     return { exitCode, ...payload };
   };
+
+  // --init-workflow and --check are file-level modes: they take no --stage and
+  // no --issue, because neither is about one card. Handled before the
+  // stage/issue validation below, which would otherwise reject them.
+  if (args.initWorkflow || args.check) {
+    const workflow = tw.loadWorkflow(repoRoot ? { repoRoot } : {});
+    const root = repoRoot || gitToplevel();
+    return args.check
+      ? checkWorkflow({ root, args, output, workflow, repoRoot })
+      : initWorkflow({ root, args, output, workflow, repoRoot });
+  }
 
   // --print-plan needs no issue: it reads a config file, not a board.
   if ((!args.issue && !args.printPlan) || !args.stage) {
@@ -577,10 +613,299 @@ if (require.main === module) {
   run()
     .then((r) => process.exit(r.exitCode || 0))
     .catch((e) => {
-      // Even an unexpected throw must not kill a pipeline step.
       console.error(`⚠️  jira-stage failed: ${e && e.message}`);
-      process.exit(0);
+      // Even an unexpected throw must not kill a pipeline step — EXCEPT under
+      // --check, whose whole contract is that a problem it cannot rule out is a
+      // failure. Swallowing a throw to 0 there would produce the one outcome
+      // --check exists to prevent: a green CI run over a file nobody validated.
+      process.exit(process.argv.includes("--check") ? 1 : 0);
     });
+}
+
+// ---------------------------------------------------------------------------
+// File-level modes: --init-workflow and --check
+// ---------------------------------------------------------------------------
+
+function gitToplevel() {
+  try {
+    return require("child_process")
+      .execSync("git rev-parse --show-toplevel", {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      .trim();
+  } catch (_) {
+    return process.cwd();
+  }
+}
+
+/**
+ * Convert an existing `jira.workflowRecord` JSON into the YAML ladder.
+ *
+ * The record is the pre-task.37 way of saying the same thing, and a consumer
+ * upgrading should not have to re-derive by hand what they already told the
+ * probe. Two things are preserved rather than recomputed, both because they
+ * encode a decision a human made and a board read cannot recover:
+ *
+ *   • `reason:` strings become YAML comments beside the moment they explain.
+ *     `buildWorkflowRecord` (jira-sync.js:3744) already treats these as sacred
+ *     across regenerations; dropping them here would undo that at the one moment
+ *     the consumer is least able to notice.
+ *   • `enabled: false` becomes omission — the YAML format's only way to say off.
+ */
+function recordToLadder(record) {
+  const stages = (record && record.stages) || {};
+  const ranked = Object.entries(stages)
+    .filter(([, s]) => s && s.rank != null)
+    .sort((a, b) => a[1].rank - b[1].rank);
+
+  const statuses = [];
+  for (const [, s] of ranked) {
+    const first = (s.candidates || [])[0];
+    if (first && !statuses.includes(first)) statuses.push(first);
+  }
+
+  const pipeline = [];
+  for (const stage of lib.STAGE_NAMES) {
+    const s = stages[stage];
+    if (!s) continue;
+    const first = (s.candidates || [])[0];
+    const reason = s.reason ? `   # ${s.reason}` : "";
+    if (s.enabled && first) pipeline.push(`  ${stage}: ${JSON.stringify(first)}${reason}`);
+    else pipeline.push(`  # ${stage}: ${first ? JSON.stringify(first) : "..."}${reason || "   # disabled in the JSON record"}`);
+  }
+  return { statuses, pipeline };
+}
+
+function renderJiraWorkflowFile({ record, statusesByType }) {
+  const q = (n) => JSON.stringify(n);
+  const lines = [];
+  const converted = record ? recordToLadder(record) : null;
+
+  // Prefer the record's own ranked ladder; fall back to a live status list.
+  let statuses = converted && converted.statuses.length ? converted.statuses : null;
+  if (!statuses && statusesByType) {
+    const first = Object.values(statusesByType)[0];
+    if (first && first.length) statuses = first.slice();
+  }
+  statuses = statuses || ["To Do", "In Progress", "Done"];
+
+  lines.push(
+    record
+      ? "# Generated by `jira-stage --init-workflow` from an existing jira.workflowRecord."
+      : "# Generated by `jira-stage --init-workflow`.",
+  );
+  lines.push("#");
+  lines.push("# Schema and worked examples: docs/reference/tracker-workflow.md");
+  lines.push("# Check in CI:  jira-stage --check --offline");
+  if (record && record.project) lines.push(`# Source record project: ${record.project}`);
+  lines.push("");
+  lines.push("# The ladder, in board order. Order IS the workflow: a rung's index is its");
+  lines.push("# rank, and the rungs between two positions are the path between them.");
+  lines.push("statuses:");
+  for (const s of statuses) lines.push(`  - ${q(s)}`);
+  lines.push("");
+  lines.push("# Which status each pipeline moment targets. Omission is disablement.");
+  lines.push("pipeline:");
+  if (converted) {
+    lines.push(...converted.pipeline);
+  } else {
+    lines.push(`  work-started: ${q(statuses[1] || statuses[0])}`);
+    lines.push(`  done: ${q(statuses[statuses.length - 1])}`);
+    for (const m of tw.MOMENTS) {
+      if (m === "work-started" || m === "done") continue;
+      lines.push(`  # ${m}: ...   # add the column and this line together`);
+    }
+  }
+  return lines.join("\n") + "\n";
+}
+
+function initWorkflow({ root, args, output, repoRoot }) {
+  const target = path.join(root, tw.DEFAULT_WORKFLOW_PATH);
+  if (fs.existsSync(target) && !args.force) {
+    output.warn(
+      `⚠️  ${tw.DEFAULT_WORKFLOW_PATH} already exists — leaving it untouched. ` +
+        "Pass --force to overwrite it.",
+    );
+    const payload = { reason: "exists", written: false, path: target };
+    if (args.json) output.emit({ ...payload, exitCode: 0 });
+    return { exitCode: 0, ...payload };
+  }
+
+  // A record, when one exists, beats anything this can infer: it is the output
+  // of a real probe of this very board, plus whatever a human then hand-edited.
+  const record = lib.loadWorkflowRecord(repoRoot);
+  const body = renderJiraWorkflowFile({
+    record: record && record.stages ? record : null,
+    statusesByType: record && record.statusesByIssueType,
+  });
+
+  if (args.dryRun) {
+    output.info(`🔎 would write ${tw.DEFAULT_WORKFLOW_PATH} (skipped: --dry-run):`);
+    output.info(body.replace(/^/gm, "   "));
+    const payload = { reason: "dry-run", written: false, path: target };
+    if (args.json) output.emit({ ...payload, exitCode: 0 });
+    return { exitCode: 0, ...payload };
+  }
+
+  try {
+    fs.writeFileSync(target, body);
+    // Same cache concern as gh-stage's writeLadder: this process already called
+    // loadWorkflow before the file existed, so the built-in default is memoised
+    // under this exact path.
+    tw.clearWorkflowCache();
+  } catch (e) {
+    output.err(`⚠️  Could not write ${tw.DEFAULT_WORKFLOW_PATH}: ${e.message}`);
+    const payload = { reason: "write-failed", written: false, path: target };
+    if (args.json) output.emit({ ...payload, exitCode: 0 });
+    return { exitCode: 0, ...payload };
+  }
+
+  if (record && record.stages) {
+    output.info(
+      `✅ wrote ${tw.DEFAULT_WORKFLOW_PATH} from the existing workflow record ` +
+        "(reasons preserved as comments, `enabled: false` became omission).",
+    );
+  } else {
+    output.info(`✅ wrote ${tw.DEFAULT_WORKFLOW_PATH}.`);
+    output.warn(
+      "⚠️  No workflow record to convert — this is a GENERIC ladder and your " +
+        "board's real columns are almost certainly different. A ladder that does " +
+        "not match resolves nothing, and fails SILENTLY. Edit it, or run " +
+        "`jira-sync --probe-workflow --write-record` first and re-run with --force.",
+    );
+  }
+  const payload = { reason: "written", written: true, path: target, fromRecord: !!(record && record.stages) };
+  if (args.json) output.emit({ ...payload, exitCode: 0 });
+  return { exitCode: 0, ...payload };
+}
+
+/**
+ * `--check` — validate tracker-workflow.yaml, exiting NON-ZERO on failure.
+ *
+ * See the identical contract note in gh-stage.js.
+ *
+ * --check is the ONE mode in this family that exits non-zero on failure.
+ *
+ * It runs in CI, not inside a pipeline step, and a green exit over a broken file
+ * is the whole failure being guarded against. Do not "harmonise" it with the
+ * other modes, all of which exit 0 on every documented skip because a non-zero
+ * exit inside a pipeline step would kill the run.
+ *
+ * The Jira board half needs credentials the CLI may not have; without them it
+ * exits 0 with a loud skip, so a fork's PR cannot fail on a secret it cannot
+ * hold. `--offline` asserts the schema half alone and is what most consumer CI
+ * should run.
+ */
+function checkWorkflow({ root, args, output, workflow, repoRoot }) {
+  const findings = tw.validateWorkflow(workflow) || [];
+  const errors = findings.filter((f) => f.level === "error");
+  const warns = findings.filter((f) => f.level === "warn");
+
+  for (const f of findings) {
+    const tag = f.level === "error" ? "❌" : f.level === "warn" ? "⚠️ " : "ℹ️ ";
+    output.info(`${tag} ${f.message}`);
+  }
+
+  if (workflow.source !== "file") {
+    output.info(
+      `ℹ️  No ${tw.DEFAULT_WORKFLOW_PATH} — using the built-in default ladder. ` +
+        "Nothing to check. Generate one with `jira-stage --init-workflow`.",
+    );
+    const payload = { reason: "no-file", checked: false, errors: 0, warnings: 0 };
+    if (args.json) output.emit({ ...payload, exitCode: 0 });
+    return { exitCode: 0, ...payload };
+  }
+
+  if (errors.length) {
+    const payload = {
+      reason: "invalid",
+      checked: true,
+      errors: errors.length,
+      warnings: warns.length,
+      messages: findings.map((f) => `${f.level}: ${f.message}`),
+    };
+    if (args.json) output.emit({ ...payload, exitCode: 1 });
+    return { exitCode: 1, ...payload };
+  }
+
+  if (args.offline) {
+    output.info("✅ tracker-workflow.yaml is self-consistent.");
+    const payload = { reason: "ok-offline", checked: true, offline: true, errors: 0, warnings: warns.length };
+    if (args.json) output.emit({ ...payload, exitCode: 0 });
+    return { exitCode: 0, ...payload };
+  }
+
+  // Board half. The record is the local snapshot of what the board offered when
+  // it was last probed — comparing against it catches a file copied between
+  // repos, and a status no issue type on this project has.
+  const record = lib.loadWorkflowRecord(repoRoot);
+  if (!record || !record.statusesByIssueType) {
+    output.info(
+      "⏭️  No workflow record to compare against — skipping the board half of " +
+        "--check and exiting 0. The schema half passed. Run " +
+        "`jira-sync --probe-workflow --write-record` to enable the board half, " +
+        "or use `--check --offline` to assert only the schema half deliberately.",
+    );
+    const payload = { reason: "no-record", checked: true, errors: 0, warnings: warns.length };
+    if (args.json) output.emit({ ...payload, exitCode: 0 });
+    return { exitCode: 0, ...payload };
+  }
+
+  const known = new Set();
+  for (const list of Object.values(record.statusesByIssueType))
+    for (const s of list || []) known.add(String(s).trim().toLowerCase());
+
+  const drift = [];
+  for (const m of tw.MOMENTS) {
+    const spec = tw.resolveMoment(m, workflow, { issueType: args.issueType });
+    if (!spec) continue;
+    const hit = spec.targets.some((t) => known.has(String(t).trim().toLowerCase()));
+    if (!hit)
+      drift.push({
+        moment: m,
+        wanted: spec.targets,
+        message:
+          `\`${m}\` targets [${spec.targets.join(", ")}], which no status on ` +
+          `project "${record.project || "?"}" has. Known statuses: ` +
+          [...known].join(", "),
+      });
+  }
+
+  // A file copied between repos is the other thing this catches, and it is worth
+  // naming separately — the moments may all resolve while the file describes an
+  // entirely different project.
+  const envProject = process.env.JIRA_PROJECT_KEY;
+  if (envProject && record.project && envProject !== record.project) {
+    drift.push({
+      moment: "(project)",
+      message:
+        `the workflow record names project "${record.project}" but JIRA_PROJECT_KEY ` +
+        `is "${envProject}" — this file may have been copied from another repo`,
+    });
+  }
+
+  for (const d of drift) output.err(`❌ ${d.message}`);
+  if (drift.length) {
+    output.err("");
+    output.err("Fix it by regenerating from a fresh probe:");
+    output.err("  jira-sync --probe-workflow --write-record");
+    output.err("  jira-stage --init-workflow --force");
+  } else {
+    output.info("✅ tracker-workflow.yaml matches the probed board.");
+  }
+
+  const payload = {
+    reason: drift.length ? "drift" : "ok",
+    checked: true,
+    project: record.project,
+    errors: drift.length,
+    warnings: warns.length,
+    drift,
+  };
+  const code = drift.length ? 1 : 0;
+  if (args.json) output.emit({ ...payload, exitCode: code });
+  return { exitCode: code, ...payload };
 }
 
 module.exports = {
@@ -589,5 +914,9 @@ module.exports = {
   describeAlternatives,
   resolveMomentSpec,
   planHops,
+  recordToLadder,
+  renderJiraWorkflowFile,
+  initWorkflow,
+  checkWorkflow,
   USAGE,
 };
