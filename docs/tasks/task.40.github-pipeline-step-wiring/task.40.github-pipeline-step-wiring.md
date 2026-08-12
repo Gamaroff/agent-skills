@@ -584,29 +584,31 @@ missing file.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2)
+**QA Cycles**: 2
 
-### QA Report
-- **Full Report**: [task.40.qa.1.github-pipeline-step-wiring.md](./task.40.qa.1.github-pipeline-step-wiring.md)
-- **Gate File**: [task.40.gate.1.github-pipeline-step-wiring.yml](./task.40.gate.1.github-pipeline-step-wiring.yml)
-- **Traceability Matrix**: `.summaries/qa-traceability-matrix.md` (working artifact — gitignored, not committed)
+### QA Reports
+- **Cycle 1**: [task.40.qa.1.github-pipeline-step-wiring.md](./task.40.qa.1.github-pipeline-step-wiring.md) — CONCERNS 90/100 · [gate.1](./task.40.gate.1.github-pipeline-step-wiring.yml)
+- **Cycle 2**: [task.40.qa.2.github-pipeline-step-wiring.md](./task.40.qa.2.github-pipeline-step-wiring.md) — **PASS 100/100** · [gate.2](./task.40.gate.2.github-pipeline-step-wiring.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 1070 passing, 0 failing (baseline 1065)
+- **Tests Executed**: 1070 passing, 0 failing (baseline 1065; +5 new guards)
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security PASS, Performance PASS, Reliability CONCERNS, Maintainability PASS
+- **NFR Status**: Security PASS, Performance PASS, Reliability PASS, Maintainability PASS
 
 ### Key Findings
-One MEDIUM issue (`TASK-40-QA1-01`): the reason-to-action table in `finalise/SKILL.md` documents 7 reasons, but 6 more are reachable from a plain `--stage done` call — while the prose beneath it instructs the agent to read `reason`. Three LOW observations recorded. Zero HIGH.
+Cycle 1 found one MEDIUM (`finalise` reason table documented 7 of 13 reachable reasons while the prose told the agent to read `reason`) and three LOW. All addressed in qa-fix cycle 1; cycle 2 verified each and upgraded Reliability CONCERNS → PASS.
+
+Two consumer tests remain deliberately **deferred and unchecked** in §8 — they need a scratch board with bespoke column names; board #1 has three columns and no rung above review, so neither non-default column names nor a live backward-move refusal can be demonstrated here.
 
 ---
 
-## Implementation Record
+## Implementation Record## Implementation Record
 
 **Started**: 2026-08-12 · **Completed**: 2026-08-12 · **Branch**: `feature/task.40.github-pipeline-step-wiring`
 

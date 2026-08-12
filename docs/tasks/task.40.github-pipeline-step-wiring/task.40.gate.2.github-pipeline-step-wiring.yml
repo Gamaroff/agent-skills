@@ -1,0 +1,114 @@
+schema: 1
+task: 'task.40.github-pipeline-step-wiring'
+task_title: 'Wire gh-stage.js into the pipeline step files'
+gate: PASS
+status_reason: 'Re-review of cycle 1. The MEDIUM reason-table gap is closed — all 13 reasons reachable from a --stage call are documented plus a catch-all, and the out-of-scope reasons are explained rather than silently omitted. Both LOW items also addressed. 1070 tests passing, bundle idempotent, guards re-verified in both directions.'
+reviewer: 'QA Engineer'
+updated: '2026-08-12T17:05:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 1070
+  phases_verified: '5/5'
+  qa_cycles: 2
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  success_criteria: '12/13 fully satisfied; F5 guarded by test, live proof deferred (board topology — see accepted_deferrals)'
+
+re_review_context:
+  previous_gate: 'task.40.gate.1.github-pipeline-step-wiring.yml (CONCERNS, 90/100)'
+  issues_verified:
+    - id: 'TASK-40-QA1-01'
+      severity: medium
+      status: FIXED
+      verification: >-
+        All 13 reasons reachable from a plain --stage call are now documented
+        (transitioned, already, stage-disabled, would-regress, no-option,
+        no-options, no-status-field, ambiguous-board, board-unreadable,
+        no-repo-context, no-credentials, not-on-board, mutation-failed), each
+        individually confirmed present. A catch-all row was added so a reason
+        introduced later cannot be undefined. The four reasons that cannot occur
+        at this call site (probe, write-failed, exists, dry-run) are explicitly
+        named as impossible rather than silently omitted, which is the stronger
+        fix. Exactly one table header remains — the first patch left a duplicate
+        table and it was removed before commit.
+    - id: 'LOW-1 (guard file-scoped)'
+      status: FIXED
+      verification: >-
+        Guard rescoped from file to the fenced block holding the mutation.
+        Re-verified in BOTH directions on a second file (step-4): a Status
+        mutation inside a code block fails the suite; prose mentioning "Status"
+        does not. This closes the exact false-positive class that the
+        --allow-regress guard hit during development.
+    - id: 'LOW-2 (Priority propagation retry)'
+      status: FIXED
+      verification: >-
+        Ordering requirement documented — the Priority query must run after the
+        work-started call, since it carries no item-add or propagation retry and
+        relies on ensureOnBoard having already added and read back the item. The
+        silent-no-op failure mode is named explicitly.
+    - id: 'LOW-3 (not-on-board escalation untested)'
+      status: ACCEPTED
+      verification: >-
+        Not fixed, deliberately. Consistent with how every other escalation in
+        finalise is handled (documented branch, no executable assertion), so
+        fixing only this one would be inconsistent rather than safer.
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1. No credential handling touched; no secrets in the diff.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1. Net reduction in gh invocations; --add-to-board at exactly one site.'
+  reliability:
+    status: PASS
+    notes: >-
+      Upgraded from CONCERNS. The escalation path is now fully specified for
+      every reachable reason, and the catch-all means an unrecognised value is
+      handled as a warning rather than mistaken for success. Board mutations
+      retry; the false-pass post-condition is gone.
+  maintainability:
+    status: PASS
+    notes: >-
+      Unchanged from cycle 1, and improved: the rescoped guard removes a latent
+      false-positive that would have surfaced as a confusing CI failure on an
+      unrelated future edit.
+
+accepted_deferrals:
+  - item: 'F5 — backward move refused at QA start, proven live'
+    reason: >-
+      Requires a board with a rung above the review column to advance a card to.
+      Board #1 has three columns and in-review is disabled, so the scenario
+      cannot be constructed here. The absence of --allow-regress is guarded and
+      mutation-tested; the rank logic itself is covered by task.39's suite.
+    recorded_at: 'task document §8, left unchecked'
+  - item: 'Full /develop-task run against a scratch board with bespoke column names'
+    reason: >-
+      No such board exists. The live board exercises the same code path but
+      cannot demonstrate non-default column names.
+    recorded_at: 'task document §8, left unchecked'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Run the two deferred consumer tests once a scratch board with bespoke column names exists'
+      refs: ['docs/tasks/task.40.github-pipeline-step-wiring/task.40.github-pipeline-step-wiring.md']
+    - action: >-
+        Consider applying the same block-scoping treatment to any future
+        content guard. Two of the five guards in this file needed it, which
+        suggests proximity/file-wide matching is the wrong default for guards
+        over prose-and-code documents.
+      refs: ['evals/shared/tests/transition-protocol-parity.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
