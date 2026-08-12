@@ -155,6 +155,7 @@ test("each pipeline site positively invokes gh-stage.js for its moment", () => {
     ["develop-pipeline-step-0-resolve-and-prepare.md", "work-started"],
     ["develop-pipeline-step-4-create-pr.md", "in-review"],
     ["develop-pipeline-step-5-6-qa-loop.md", "in-review"],
+    ["develop-pipeline-step-5-6-qa-loop.md", "changes-requested"],
     ["develop-pipeline-step-7-finalise.md", "done"],
   ];
   for (const [file, stage] of sites) {
@@ -182,6 +183,89 @@ test("each pipeline site positively invokes gh-stage.js for its moment", () => {
     /\.agents\/skills\/finalise\/references\/gh-stage\.js/,
     "finalise must reference its own bundled copy, not the develop-* brace path",
   );
+});
+
+// ── task.41: the two moments wired last, and the QA-loop parity they complete ──
+
+test("`pr-merged` fires from the orchestrators that merge, and from nowhere else", () => {
+  // It cannot fire from a develop-* pipeline: those finish while the PR is still
+  // open. Only /develop-next and /develop-batch reach a merged PR.
+  for (const skill of ["develop-next", "develop-batch"]) {
+    const src = readFileSync(
+      join(repoRoot, "skills", skill, "SKILL.md"),
+      "utf-8",
+    );
+    assert.match(
+      src,
+      /--stage pr-merged/,
+      `skills/${skill}/SKILL.md must signal pr-merged after its merge`,
+    );
+  }
+  for (const f of shippedMarkdown()) {
+    const name = String(f);
+    if (name.includes("develop-next") || name.includes("develop-batch")) continue;
+    const src = readFileSync(f, "utf-8");
+    // Prose may *discuss* the moment (the QA loop's ordering note does); only a
+    // fenced invocation is a call site.
+    for (const block of src.matchAll(/```[a-z]*\n([\s\S]*?)```/g)) {
+      assert.ok(
+        !/--stage pr-merged/.test(block[1]),
+        `${name} invokes --stage pr-merged, but only the merging orchestrators may`,
+      );
+    }
+  }
+});
+
+test("`--stage pr-merged` sits INSIDE develop-batch's per-item merge loop", () => {
+  // The Critical risk in task.41 §10: develop-batch merges serially in a loop.
+  // Hoisting this call out of the loop moves whichever card was last in scope —
+  // on a shared board, someone else's — and reports success either way.
+  const src = readFileSync(
+    join(repoRoot, "skills", "develop-batch", "SKILL.md"),
+    "utf-8",
+  );
+  const loopStart = src.indexOf("merge one PR at a time");
+  const loopEnd = src.indexOf("## Step 4 — Clean up worktrees");
+  assert.ok(loopStart > -1 && loopEnd > loopStart, "per-item merge lane not found");
+  const body = src.slice(loopStart, loopEnd);
+  assert.match(
+    body,
+    /--stage pr-merged/,
+    "pr-merged must be invoked inside the per-item serial merge lane",
+  );
+  assert.match(
+    body,
+    /ITEM_TRACKER_ISSUE/,
+    "the call must be keyed on THIS item's issue, never a batch-level variable",
+  );
+});
+
+test("every pipeline with a verify/QA loop signals the same moments", () => {
+  // The task.41 parity requirement. develop-bug's verify loop is the analogue of
+  // the story/task QA loop — same entry, same passing exit — and signalled
+  // nothing at all for a whole release because it is skill-native and nobody
+  // noticed the shared step file had moved on without it.
+  const loops = [
+    join(sharedDir, "develop-pipeline-step-5-6-qa-loop.md"),
+    join(
+      repoRoot,
+      "skills",
+      "develop-bug",
+      "references",
+      "develop-bug-step-5-6-verify-loop.md",
+    ),
+  ];
+  for (const f of loops) {
+    const src = readFileSync(f, "utf-8");
+    for (const stage of ["in-qa", "changes-requested", "ready-for-merge"]) {
+      assert.match(
+        src,
+        new RegExp(`--stage ${stage}`),
+        `${f} must signal ${stage} — every verify/QA loop signals the same moments, ` +
+          "or states in prose why not",
+      );
+    }
+  }
 });
 
 test("no pipeline step passes --allow-regress", () => {

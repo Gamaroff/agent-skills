@@ -17,6 +17,26 @@ Each cycle = one **Verify** (5a) + one **Fix** (5b, only when Verify fails).
 
 A PR exists from Step 4, so `/qa-fix` (which requires an active PR) applies cleanly in 5b.
 
+### Signal the `in-qa` stage (when `TRACKER_ISSUE` is set)
+
+Run **once**, before the first cycle — not per cycle. Branch on `TRACKER`:
+
+```bash
+# TRACKER=jira
+node .agents/skills/develop-bug/references/jira-stage.js \
+  --issue {TRACKER_ISSUE} --stage in-qa --json
+
+# TRACKER=github
+node .agents/skills/develop-bug/references/gh-stage.js \
+  --issue {TRACKER_ISSUE} --stage in-qa --json
+```
+
+> **A bug's verify loop is a QA loop.** It has the same shape as the story/task QA loop — one entry, a bounded set of cycles, a passing exit — so it signals the same moments. This pipeline signalled none of them for a full release, purely because this file is skill-native and the shared step file moved on without it. That asymmetry bit exactly one person: the consumer who turned `in-qa` on and found it worked for stories and tasks but not bugs, with no explanation anywhere. Keep the three moments here in step with `shared/resources/develop-pipeline-step-5-6-qa-loop.md`; a parity test in `evals/shared/tests/transition-protocol-parity.test.mjs` now asserts it.
+
+`in-qa` is **off by default**. Expect `reason: "stage-disabled"` until a project opts in — that is a success, not a warning. A consumer who wants bugs to skip these columns omits them under a `byIssueType` overlay for the bug issue type.
+
+Log in Decisions Log: "{TRACKER} {TRACKER_ISSUE} — in-qa: {landed status / disabled / skip reason}."
+
 ---
 
 ## 5a. Verify
@@ -67,11 +87,43 @@ Update the **bug file**: in the current `### Iteration {N}` under `## Developer 
 **Decision**: Closed (finalised in Step 7)
 ```
 
-Add a Status History row: `| {date} | Ready for QA | develop-bug | Fix verified — bug scenario gone |`. Do **not** set status `closed` yet — Step 7 owns the close + Resolution Summary. Exit the loop and proceed to Step 7.
+Add a Status History row: `| {date} | Ready for QA | develop-bug | Fix verified — bug scenario gone |`. Do **not** set status `closed` yet — Step 7 owns the close + Resolution Summary.
+
+**Signal the `ready-for-merge` stage** (when `TRACKER_ISSUE` is set) — the gate has cleared and the PR is ready:
+
+```bash
+# TRACKER=jira
+node .agents/skills/develop-bug/references/jira-stage.js \
+  --issue {TRACKER_ISSUE} --stage ready-for-merge --json
+
+# TRACKER=github
+node .agents/skills/develop-bug/references/gh-stage.js \
+  --issue {TRACKER_ISSUE} --stage ready-for-merge --json
+```
+
+Off by default; non-blocking; exits 0 on every documented skip. Log in Decisions Log: "{TRACKER} {TRACKER_ISSUE} — ready-for-merge: {landed status / disabled / skip reason}."
+
+Exit the loop and proceed to Step 7.
 
 ---
 
 ## 5b. Fix (on FAIL — reopen + qa-fix)
+
+0. **Signal the `changes-requested` stage** (when `TRACKER_ISSUE` is set), on entering the fix cycle, before `/qa-fix`:
+
+   ```bash
+   # TRACKER=jira
+   node .agents/skills/develop-bug/references/jira-stage.js \
+     --issue {TRACKER_ISSUE} --stage changes-requested --json
+
+   # TRACKER=github
+   node .agents/skills/develop-bug/references/gh-stage.js \
+     --issue {TRACKER_ISSUE} --stage changes-requested --json
+   ```
+
+   > Fires **per cycle**, unlike `in-qa` above which fires once. `in-qa` marks a phase the card enters once; `changes-requested` marks a state it re-enters on every failed verification, and a board that shows it on cycle 1 and then goes quiet is telling the team something false. Same rule, same rationale, as the story/task QA loop.
+
+   Off by default; non-blocking. Log per cycle: "Verify Cycle {N} — changes-requested: {landed status / disabled / skip reason}."
 
 1. **Reopen the bug**: set frontmatter `status: reopened`, body `**Status:** ⚠️ Reopened`. Append a new `### Iteration {N+1}` to the Developer Fix Cycle with a **Re-Investigation** note quoting the concrete failure (failing test name/output, regression, or review-code finding). Add a Status History row.
 

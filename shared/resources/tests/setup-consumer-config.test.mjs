@@ -383,3 +383,195 @@ test("setup-consumer.sh still vendors the epic-index generator from shared/resou
     "destination changed — re-check the scripts/ trap this header guards",
   );
 });
+
+// ── task.41: tracker-workflow.yaml scaffolding ───────────────────────────────
+//
+// The never-overwrite guard is the whole safety story here. tracker-workflow.yaml
+// encodes a board's real column names — hand-tuned against a live board, and not
+// re-derivable from anything the wizard asks. Clobbering it is SILENT: the
+// pipelines keep running and simply stop moving cards.
+
+/** Run just the workflow writer in a scratch dir, returning {out, body}. */
+function runWorkflowWriter(seed) {
+  const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-"));
+  try {
+    if (seed !== undefined) writeFileSync(path.join(dir, "tracker-workflow.yaml"), seed);
+    const out = execFileSync(
+      "bash",
+      ["-c", `source '${WIZARD}'; write_tracker_workflow; print_summary 2>/dev/null || true`],
+      {
+        cwd: dir,
+        input: "\n",
+        env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", VCS: "github", TRACKER: "github" },
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    let body = null;
+    try {
+      body = readFileSync(path.join(dir, "tracker-workflow.yaml"), "utf-8");
+    } catch (_) {}
+    return { out, body };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("scaffolds tracker-workflow.yaml when absent", () => {
+  const { body } = runWorkflowWriter(undefined);
+  assert.ok(body, "a fresh run must write the file");
+  assert.match(body, /^statuses:/m);
+  assert.match(body, /^pipeline:/m);
+  assert.match(body, /work-started:/);
+  // The template must announce that it IS a template — a generic ladder that
+  // does not match the board resolves nothing, and fails silently.
+  assert.match(body, /GENERATED FROM A TEMPLATE, NOT FROM YOUR BOARD/);
+});
+
+test("NEVER overwrites an existing tracker-workflow.yaml, and says it kept it", () => {
+  const mine = "statuses:\n  - My Very Own Column\n";
+  const { out, body } = runWorkflowWriter(mine);
+  assert.equal(body, mine, "an existing ladder must survive byte-identical");
+  assert.match(out, /kept \(existing\)|already exists/);
+});
+
+test("a re-run leaves the scaffolded file byte-identical", () => {
+  // The consumer test from §8: run the wizard twice, second run is a no-op.
+  const first = runWorkflowWriter(undefined).body;
+  const second = runWorkflowWriter(first);
+  assert.equal(second.body, first, "the second run must not rewrite the file");
+});
+
+test("the scaffolded template parses as a valid workflow", () => {
+  const { body } = runWorkflowWriter(undefined);
+  const tw = require(path.join(REPO, "shared", "resources", "tracker-workflow.js"));
+  const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-parse-"));
+  try {
+    writeFileSync(path.join(dir, "tracker-workflow.yaml"), body);
+    const wf = tw.loadWorkflow({ repoRoot: dir });
+    assert.equal(wf.source, "file");
+    const errors = (tw.validateWorkflow(wf) || []).filter((f) => f.level === "error");
+    assert.deepEqual(errors, [], "the file the wizard writes must pass --check --offline");
+    // And its enabled moments must actually resolve on its own ladder.
+    assert.ok(tw.resolveMoment("work-started", wf));
+    assert.equal(tw.resolveMoment("work-started", wf).offLadder, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the two opt-in moments are commented out in the scaffolded template", () => {
+  // A consumer who upgrades must see no new card movement until they opt in.
+  const { body } = runWorkflowWriter(undefined);
+  for (const m of ["changes-requested", "pr-merged"]) {
+    assert.ok(
+      new RegExp(`^\\s*#\\s*${m}:`, "m").test(body),
+      `${m} must be present but COMMENTED — visible, and off`,
+    );
+    assert.ok(
+      !new RegExp(`^ {2}${m}:`, "m").test(body),
+      `${m} must not be live in a scaffolded file`,
+    );
+  }
+});
+
+// ── task.41 / TASK-41-BUG-3: the live-probe branch ───────────────────────────
+//
+// The tests above all run where `.agents/skills/…` does not exist, so `-f
+// "$_cli"` is false and every one of them takes the heredoc path. That left the
+// probe branch — the branch that decides whether a consumer ends up with a file
+// at all — with ZERO coverage, which is exactly why TASK-41-BUG-1 shipped green.
+//
+// These three pin the wizard's CONTRACT WITH THE CLI: what it must do for each
+// of the three outcomes the CLI can produce. A stub is the right tool — it needs
+// no credentials and no board, and it fails loudly if anyone re-introduces
+// exit-code inference.
+
+/**
+ * Run the workflow writer with a stub CLI installed at the path
+ * write_tracker_workflow resolves for GitHub.
+ *
+ * @param body shell body for the stub (decides exit code and whether it writes)
+ */
+function runWithStubCli(body) {
+  const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-stub-"));
+  const cliDir = path.join(dir, ".agents", "skills", "develop-task", "references");
+  execFileSync("mkdir", ["-p", cliDir]);
+  const cli = path.join(cliDir, "gh-stage.js");
+  writeFileSync(cli, body);
+  execFileSync("chmod", ["+x", cli]);
+  try {
+    const out = execFileSync(
+      "bash",
+      ["-c", `source '${WIZARD}'; write_tracker_workflow`],
+      {
+        cwd: dir,
+        input: "\n",
+        env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", VCS: "github", TRACKER: "github" },
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    let body2 = null;
+    try {
+      body2 = readFileSync(path.join(dir, "tracker-workflow.yaml"), "utf-8");
+    } catch (_) {}
+    return { out, body: body2 };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("probe branch: a CLI that exits 0 WITHOUT writing still leaves a file (TASK-41-BUG-1)", () => {
+  // The regression. `gh-stage.js --init-workflow` exits 0 on `no-credentials`
+  // (gh not authenticated — not a wizard prerequisite) and `no-repo-context`,
+  // writing nothing. The wizard used to read that 0 as success, report
+  // "generated from your live board", and return — leaving the consumer with no
+  // workflow file at all.
+  const { out, body } = runWithStubCli('#!/usr/bin/env node\nprocess.exit(0);\n');
+  assert.ok(body, "the wizard MUST fall through to the template when nothing was written");
+  assert.match(body, /^statuses:/m);
+  assert.ok(
+    !/generated from your live board/.test(out),
+    "must not claim board provenance for a file the CLI did not write",
+  );
+});
+
+test("probe branch: a CLI that writes a record-derived file is reported as board-derived", () => {
+  const { out, body } = runWithStubCli(
+    '#!/usr/bin/env node\n' +
+      'require("fs").writeFileSync("tracker-workflow.yaml", "statuses:\\n  - From Board\\n");\n' +
+      'console.log(JSON.stringify({ reason: "written", written: true, fromRecord: true }));\n',
+  );
+  assert.match(body, /From Board/, "the CLI's file must be kept, not overwritten by the template");
+  assert.match(out, /generated from your live board/);
+});
+
+test("probe branch: a CLI that writes a GENERIC file is labelled as a template, loudly", () => {
+  // TASK-41-BUG-2: jira-stage writes a generic ladder when it has no record to
+  // convert. Reporting that as board-derived hides a ladder that resolves
+  // nothing, and the wizard's own `>/dev/null 2>&1` swallowed the CLI's warning.
+  const { out, body } = runWithStubCli(
+    '#!/usr/bin/env node\n' +
+      'require("fs").writeFileSync("tracker-workflow.yaml", "statuses:\\n  - Generic\\n");\n' +
+      'console.log(JSON.stringify({ reason: "written", written: true, fromRecord: false }));\n',
+  );
+  assert.match(body, /Generic/);
+  assert.ok(
+    !/generated from your live board/.test(out),
+    "a generic ladder must NOT be reported as board-derived",
+  );
+  assert.match(out, /GENERIC ladder/, "the warning the redirect used to swallow must surface");
+});
+
+test("probe branch: a CLI that exits non-zero falls through to the template", () => {
+  const { out, body } = runWithStubCli('#!/usr/bin/env node\nprocess.exit(2);\n');
+  assert.ok(body, "a failing probe must still leave a usable file");
+  assert.match(body, /GENERATED FROM A TEMPLATE/);
+  assert.ok(!/generated from your live board/.test(out));
+});
+
+test("the scaffolded template ends with a newline", () => {
+  const { body } = runWorkflowWriter(undefined);
+  assert.ok(body.endsWith("\n"), "command substitution strips the heredoc's trailing newline");
+});

@@ -586,7 +586,7 @@ walking on GitHub — are in
 ## `project.yml` — board identity
 
 Separate from `skills-config.yaml`, at the repo root, and read by the GitHub skills for **board
-identity** rather than behaviour. It has never been documented here; it looks like this:
+identity** rather than behaviour. It looks like this:
 
 ```yaml
 github:

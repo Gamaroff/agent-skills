@@ -5,10 +5,13 @@ type: task
 description: "Add the changes-requested and pr-merged moments, scaffold tracker-workflow.yaml on install without ever overwriting, add --init-workflow and a CI --check, and close the develop-bug QA-stage gap."
 tags: [pipeline, scaffolding, setup, github, jira, documentation]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
+risk_level: medium
 created: 2026-08-03
-updated: 2026-08-03
+updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 208
 assignee:
 estimated_effort_hours: 16
 github_issue: 189
@@ -16,7 +19,9 @@ github_issue: 189
 
 # Technical Task: New moments, scaffolding, and the `develop-bug` gap
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.41.review.1.pipeline-moments-and-scaffolding.md` implemented 2026-08-12
 
 **GitHub Issue:** [#189](https://github.com/Gamaroff/agent-skills/issues/189)
 
@@ -32,8 +37,8 @@ The capstone of the tracker-workflow series. Three things:
 2. **Scaffolding** — `setup-consumer.sh` writes `tracker-workflow.yaml` when absent and never
    overwrites when present; `--init-workflow` for consumers who upgrade a skill directory without
    re-running the wizard; `--check` for CI.
-3. **The `develop-bug` gap** — it has no QA-loop step file, so it never signals `in-qa` or
-   `ready-for-merge`. That is an oversight, not a decision.
+3. **The `develop-bug` gap** — its verify loop exists but signals no stage at all, so it never fires
+   `in-qa` or `ready-for-merge`. That is an oversight, not a decision.
 
 ---
 
@@ -48,11 +53,13 @@ The capstone of the tracker-workflow series. Three things:
    hand-write it from documentation.
 3. **A consumer who upgrades without the wizard has no route to the file.** Consumers upgrade by
    `rm -rf`ing one skill directory and copying a new one; the installer is not necessarily involved.
-4. **No CI check.** `jira-sync.js:1812` claims records are "meant to be `--check`ed in CI"; no such
+4. **No CI check.** `jira-sync.js:2433` claims records are "meant to be `--check`ed in CI"; no such
    flag exists. A renamed board column is the most common way this breaks, and it breaks silently.
-5. **`develop-bug` signals four of the moments, not six.** It has no
-   `develop-pipeline-step-5-6-qa-loop.md` in its references, so a consumer who turns `in-qa` on
-   finds it works for stories and tasks but not bugs, with no explanation anywhere.
+5. **`develop-bug` signals four of the moments, not six.** Its verify loop
+   (`develop-bug-step-5-6-verify-loop.md`) signals **no** stage at all — it is the bug-flavoured
+   equivalent of the story/task QA loop but never grew the `--stage` calls that file has — so a
+   consumer who turns `in-qa` on finds it works for stories and tasks but not bugs, with no
+   explanation anywhere.
 6. **Two READMEs describe the pre-v0.34.0 world.** `skills/develop-{story,task}/README.md` still
    claim three MCP transitions fired from "Phase 0c-reg" and contradict their own line 45.
 
@@ -89,8 +96,16 @@ flag on three `sync-jira-*` skills.
 | `done` | Step 7, by `/finalise` | |
 
 Scaffolding: `setup-consumer.sh` reuses its own existing "already exists → `kept (existing)`"
-pattern (L307-317). `--init-workflow` on both stage CLIs writes the file, preferring a live probe of
-the real board over the static template, and refusing to overwrite without `--force`.
+pattern (L322-331 for `skills-config.yaml`; L261-266 for `.env`). It emits the file via an **inline
+heredoc**, as it does for every other file it writes — it sources no external template, and it runs
+in the *consumer* repo, where this repo's `docs/examples/` is not on disk.
+
+`--init-workflow` on both stage CLIs writes the file, preferring a live probe of the real board over
+the static template, and refusing to overwrite without `--force`. On the GitHub side this **extends
+the existing `gh-stage.js --probe-board --write-ladder`** (usage string L652-653, `writeLadder()`
+L1226), which already writes `tracker-workflow.yaml` only when absent — `--init-workflow` adds
+`--force` and JSON-record conversion on top. `--write-ladder` keeps working; §5 promises no breaking
+changes.
 
 ### Important Clarifications
 
@@ -117,7 +132,9 @@ existing `jira.workflowRecord` JSON into the YAML ladder.
 ✅ `--check [--offline]` on both CLIs, exiting non-zero on drift.
 ✅ `develop-bug`: signal `in-qa` and `ready-for-merge` from its verify loop.
 ✅ Both stale READMEs corrected, with a self-policing checklist row.
-✅ `docs/reference/configuration.md`: the missing `project.yml` section.
+✅ `docs/reference/configuration.md`: **verify and correct** the `project.yml` section. It already
+exists (L586-608, added ahead of this task) — the remaining work is deleting its now-false
+"It has never been documented here" clause (L589), not writing the section.
 
 ### Out of Scope
 
@@ -155,15 +172,18 @@ behaviour is an unexplained inconsistency.
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
+**Files**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `shared/resources/tracker-workflow.js`
 
 **Changes**:
 
-- [ ] Fire on entering a QA fix cycle (§5b, before `/qa-fix`), both trackers
-- [ ] Fires per cycle — unlike `in-qa`, which fires once — because it marks a state the card
+- [x] Fire on entering a QA fix cycle (§5b, before `/qa-fix`), both trackers
+- [x] Fires per cycle — unlike `in-qa`, which fires once — because it marks a state the card
       re-enters. Say so explicitly, since the adjacent rule is the opposite
-- [ ] Default candidates deliberately exclude "In Progress", which would drag cards backwards on
+- [x] Default candidates deliberately exclude "In Progress", which would drag cards backwards on
       most boards
+- [x] Update the stale comment at `tracker-workflow.js:125-127` — it says "The three moments absent
+      here are absent on purpose: `in-qa`, `ready-for-merge` and `blocked`", but `DEFAULT_PIPELINE`
+      omits **five** of the eight. Wiring these two is what makes that count actively wrong
 
 **Dependencies**: task.37; tasks 38/40 for the respective trackers
 
@@ -177,10 +197,10 @@ behaviour is an unexplained inconsistency.
 
 **Changes**:
 
-- [ ] Fire at the post-merge tick, after `gh pr merge` succeeds and before the roadmap tick
-- [ ] Both trackers; non-blocking, exit 0 on every skip
-- [ ] `develop-batch` merges serially — fire per item, not once per batch
-- [ ] Note the ordering relative to `done`: Step 7 moves to `done` while the PR is still open, so a
+- [x] Fire at the post-merge tick, after `gh pr merge` succeeds and before the roadmap tick
+- [x] Both trackers; non-blocking, exit 0 on every skip
+- [x] `develop-batch` merges serially — fire per item, not once per batch
+- [x] Note the ordering relative to `done`: Step 7 moves to `done` while the PR is still open, so a
       board wanting a merge gate should leave `done` out of `pipeline:` and let `pr-merged` be the
       last automated move
 
@@ -193,20 +213,30 @@ behaviour is an unexplained inconsistency.
 **Risk Level**: Medium
 
 **Files**: `scripts/setup-consumer.sh`, `shared/resources/jira-stage.js`,
-`shared/resources/gh-stage.js`, `assets/tracker-workflow.default.yaml`
+`shared/resources/gh-stage.js`, `docs/examples/tracker-workflow.default.yaml`
 
 **Changes**:
 
-- [ ] `setup-consumer.sh` writes `tracker-workflow.yaml` only when absent; reports
-      `kept (existing)` otherwise, reusing the L307-317 pattern
-- [ ] Offer a live probe (`--probe-workflow` / `--probe-board`) to generate from the real board;
+- [x] `setup-consumer.sh` writes `tracker-workflow.yaml` only when absent; reports
+      `kept (existing)` otherwise, reusing the L322-331 / L261-266 pattern
+- [x] Emit the file via an **inline heredoc** (as `.env` and `skills-config.yaml` already are).
+      Do **not** read a template file from disk: the wizard runs in the consumer repo, where this
+      repo's `docs/examples/` does not exist. Keep the heredoc content and
+      `docs/examples/tracker-workflow.default.yaml` (the annotated human reference, which already
+      exists) in sync — there is no third copy
+- [x] Offer a live probe (`--probe-workflow` / `--probe-board`) to generate from the real board;
       fall back to the static template with no credentials
-- [ ] `--init-workflow [--force]` on both CLIs; refuses to overwrite without `--force`
-- [ ] Convert an existing `jira.workflowRecord` JSON into the YAML ladder, so migration is one
-      command
-- [ ] Record the outcome in the wizard's step summary
+- [x] `--init-workflow [--force]` on both CLIs; refuses to overwrite without `--force`.
+      **GitHub**: extend the existing `--write-ladder` (already never-overwrite) rather than adding a
+      parallel flag; keep `--write-ladder` working. **Jira**: `jira-stage.js` has no probe of its own —
+      import `probeWorkflow()` from `jira-sync.js:3522` (exported at `:4112`). The two CLIs are not
+      symmetric here
+- [x] Convert an existing `jira.workflowRecord` JSON into the YAML ladder, so migration is one
+      command — follow the preserve-intent precedent in `buildWorkflowRecord` (`jira-sync.js:3744`)
+- [x] Record the outcome in the wizard's step summary
 
-**Dependencies**: tasks 38 and 39 (both probes must exist)
+**Dependencies**: tasks 38 and 39 (both probes must exist — GitHub's on `gh-stage.js`, Jira's on
+`jira-sync.js`)
 
 ---
 
@@ -219,17 +249,17 @@ behaviour is an unexplained inconsistency.
 
 **Changes**:
 
-- [ ] Parses; every `pipeline:` key is a known moment; no duplicate rungs
-- [ ] Every status named by an enabled moment exists on the board
-- [ ] Every enabled moment resolves to something reachable (Jira: from at least one sampled
+- [x] Parses; every `pipeline:` key is a known moment; no duplicate rungs
+- [x] Every status named by an enabled moment exists on the board
+- [x] Every enabled moment resolves to something reachable (Jira: from at least one sampled
       position; GitHub: matches an option)
-- [ ] The file's project/site (Jira) or owner/repo/board (GitHub) matches the environment — catches
+- [x] The file's project/site (Jira) or owner/repo/board (GitHub) matches the environment — catches
       a file copied between repos
-- [ ] Drift: re-probe and print a diff plus the exact command that fixes it
-- [ ] **Exits non-zero on failure** — with a comment saying why this inverts the family contract
-- [ ] Without credentials, exits **0** with a loud skip, so a fork's PR does not fail on a secret it
+- [x] Drift: re-probe and print a diff plus the exact command that fixes it
+- [x] **Exits non-zero on failure** — with a comment saying why this inverts the family contract
+- [x] Without credentials, exits **0** with a loud skip, so a fork's PR does not fail on a secret it
       cannot have
-- [ ] `--offline`: schema self-consistency only, no network — what most consumer CI will run
+- [x] `--offline`: schema self-consistency only, no network — what most consumer CI will run
 
 **Dependencies**: Phase 3
 
@@ -244,15 +274,20 @@ behaviour is an unexplained inconsistency.
 
 **Changes**:
 
-- [ ] `develop-bug` signals `in-qa` on verify-loop entry and `ready-for-merge` on a passing exit
-- [ ] Parity test: every pipeline with a verify/QA loop signals the same moments, or states in prose
+- [x] `develop-bug` signals `in-qa` on verify-loop entry and `ready-for-merge` on a passing exit.
+      The file exists and currently signals **nothing** — `grep '--stage'` over it returns zero hits,
+      against three in the story/task loop (`in-qa` L32, `in-review` L45, `ready-for-merge` L201)
+- [x] Parity test: every pipeline with a verify/QA loop signals the same moments, or states in prose
       why not
-- [ ] READMEs: replace the pre-v0.34.0 tracker tables; add rows for the opt-in moments
-- [ ] Add a row to each README's "Verification Checklist (for diagram maintainers)": every tracker
+- [x] READMEs: replace the pre-v0.34.0 tracker tables (`develop-story/README.md:475-479`,
+      `develop-task/README.md:457-461` — both still say "Phase 0c-reg" and list raw MCP verbs,
+      contradicting their own line 45); add rows for the opt-in moments
+- [x] Add a row to each README's "Verification Checklist (for diagram maintainers)": every tracker
       operation named in these tables must map to a `--stage` invocation or a named script, never a
       raw API verb — that is what makes the staleness self-policing
-- [ ] `configuration.md`: the `project.yml` section that has never existed
-- [ ] `CHANGELOG.md`
+- [x] `configuration.md`: the `project.yml` section **already exists** (L586-608). Delete its
+      now-false "It has never been documented here" clause (L589); write no new section
+- [x] `CHANGELOG.md`
 
 **Dependencies**: Phases 1-4
 
@@ -277,10 +312,20 @@ behaviour is an unexplained inconsistency.
 
 ### Files to Modify (Documentation)
 
-10. ✅ `assets/tracker-workflow.default.yaml`
-11. ✅ `docs/reference/tracker-workflow.md`, `docs/reference/configuration.md` (incl. `project.yml`)
+10. ✅ `docs/examples/tracker-workflow.default.yaml` — the annotated starter template. It **already
+    exists**; keep it in sync with the heredoc `setup-consumer.sh` emits. There is no
+    `assets/tracker-workflow.default.yaml` and none should be created
+11. ✅ `docs/reference/tracker-workflow.md`; `docs/reference/configuration.md` — the latter only to
+    correct the existing `project.yml` section (L586-608), not to add one
 12. ✅ `skills/develop-{story,task}/README.md`
 13. ✅ `CHANGELOG.md`
+
+### Files to Add
+
+None. Every file this task touches already exists — the two new *moments* are new call sites in
+existing files, not new files. Noted explicitly because the original draft filed a
+non-existent `assets/tracker-workflow.default.yaml` under "Modify", which would have produced a
+second competing template.
 
 ### Files to Delete
 
@@ -296,12 +341,12 @@ None.
 
 **Actions**:
 
-- [ ] Unknown moment key → error
-- [ ] Duplicate rung → error
-- [ ] A `pipeline:` target that is neither a rung nor a plausible side-state → warning
-- [ ] `--offline` performs schema checks only, issuing no network call
-- [ ] `--init-workflow` refuses to overwrite; `--force` overwrites
-- [ ] JSON-record → YAML-ladder conversion round-trips
+- [x] Unknown moment key → error
+- [x] Duplicate rung → error
+- [x] A `pipeline:` target that is neither a rung nor a plausible side-state → warning
+- [x] `--offline` performs schema checks only, issuing no network call
+- [x] `--init-workflow` refuses to overwrite; `--force` overwrites
+- [x] JSON-record → YAML-ladder conversion round-trips
 
 **Command**: `node --test 'shared/resources/tests/*.test.mjs'`
 
@@ -313,10 +358,10 @@ None.
 
 **Actions**:
 
-- [ ] `--stage changes-requested` appears in the QA loop step file, per cycle
-- [ ] `--stage pr-merged` appears in both orchestrators' post-merge ticks
-- [ ] Neither is in the default `pipeline:` map — a consumer without the file sees no new calls
-- [ ] `develop-bug` signals the same moments as the story/task loops
+- [x] `--stage changes-requested` appears in the QA loop step file, per cycle
+- [x] `--stage pr-merged` appears in both orchestrators' post-merge ticks
+- [x] Neither is in the default `pipeline:` map — a consumer without the file sees no new calls
+- [x] `develop-bug` signals the same moments as the story/task loops
 
 **Command**: `npm test`
 
@@ -328,8 +373,8 @@ None.
 
 **Actions**:
 
-- [ ] `--check` exits non-zero on drift, 0 on a clean file, and **0** with no credentials
-- [ ] Every other mode still exits 0 on every documented skip
+- [x] `--check` exits non-zero on drift, 0 on a clean file, and **0** with no credentials
+- [x] Every other mode still exits 0 on every documented skip
 
 ---
 
@@ -352,9 +397,9 @@ chatty, fire once on first entry — but measure before deciding.
 
 **Actions**:
 
-- [ ] Fresh `setup-consumer.sh` run produces a working `tracker-workflow.yaml`
-- [ ] Re-run leaves an existing file untouched and reports `kept (existing)`
-- [ ] A full `/develop-task` run against a scratch board with a post-merge showcase column lands the
+- [x] Fresh `setup-consumer.sh` run produces a working `tracker-workflow.yaml`
+- [x] Re-run leaves an existing file untouched and reports `kept (existing)`
+- [x] A full `/develop-task` run against a scratch board with a post-merge showcase column lands the
       card in it after merge
 
 ---
@@ -363,29 +408,30 @@ chatty, fire once on first entry — but measure before deciding.
 
 ### Functional
 
-- [ ] `changes-requested` and `pr-merged` fire at their moments, both trackers
-- [ ] Neither fires for a consumer with no `tracker-workflow.yaml`
-- [ ] `setup-consumer.sh` scaffolds when absent and never overwrites
-- [ ] `--init-workflow` converts an existing JSON record
-- [ ] `--check` exits non-zero on drift and 0 without credentials
-- [ ] `develop-bug` signals the same moments as the other two pipelines
+- [x] `changes-requested` and `pr-merged` fire at their moments, both trackers
+- [x] Neither fires for a consumer with no `tracker-workflow.yaml`
+- [x] `setup-consumer.sh` scaffolds when absent and never overwrites
+- [x] `--init-workflow` converts an existing JSON record
+- [x] `--check` exits non-zero on drift and 0 without credentials
+- [x] `develop-bug` signals the same moments as the other two pipelines
 
 ### Performance
 
-- [ ] At most 5 additional API calls per run, only when opted in
-- [ ] `--check --offline` issues no network call
+- [x] At most 5 additional API calls per run, only when opted in
+- [x] `--check --offline` issues no network call
 
 ### Code Quality
 
-- [ ] Shared validation lives in `tracker-workflow.js`, not duplicated per CLI
-- [ ] The inverted `--check` exit code is commented as deliberate
-- [ ] Edits in `shared/resources/` only; bundles regenerated
+- [x] Shared validation lives in `tracker-workflow.js`, not duplicated per CLI
+- [x] The inverted `--check` exit code is commented as deliberate
+- [x] Edits in `shared/resources/` only; bundles regenerated
 
 ### Migration
 
-- [ ] `CHANGELOG.md` covers both moments, scaffolding, `--check`, and the `develop-bug` fix
-- [ ] READMEs corrected and given the self-policing checklist row
-- [ ] `configuration.md` documents `project.yml` for the first time
+- [x] `CHANGELOG.md` covers both moments, scaffolding, `--check`, and the `develop-bug` fix
+- [x] READMEs corrected and given the self-policing checklist row
+- [x] `configuration.md`'s existing `project.yml` section corrected (stale "never been documented"
+      clause removed) — the section itself already landed before this task
 
 ---
 
@@ -483,31 +529,31 @@ in CI.
 
 ### Phase 1: `changes-requested`
 
-- [ ] Wired into the QA fix cycle, both trackers
-- [ ] Per-cycle firing documented as deliberate
+- [x] Wired into the QA fix cycle, both trackers
+- [x] Per-cycle firing documented as deliberate
 
 ### Phase 2: `pr-merged`
 
-- [ ] Wired into `develop-next` and `develop-batch` post-merge ticks
-- [ ] Fires per item inside the serial merge loop
+- [x] Wired into `develop-next` and `develop-batch` post-merge ticks
+- [x] Fires per item inside the serial merge loop
 
 ### Phase 3: Scaffolding
 
-- [ ] `setup-consumer.sh` writes when absent, never overwrites
-- [ ] `--init-workflow [--force]` on both CLIs
-- [ ] JSON-record → YAML conversion
+- [x] `setup-consumer.sh` writes when absent, never overwrites
+- [x] `--init-workflow [--force]` on both CLIs
+- [x] JSON-record → YAML conversion
 
 ### Phase 4: `--check`
 
-- [ ] All validation rules
-- [ ] Non-zero on drift; 0 without credentials; `--offline` mode
+- [x] All validation rules
+- [x] Non-zero on drift; 0 without credentials; `--offline` mode
 
 ### Phase 5: Parity, READMEs, docs
 
-- [ ] `develop-bug` signals `in-qa` + `ready-for-merge`
-- [ ] QA-loop parity test
-- [ ] READMEs corrected + checklist row
-- [ ] `project.yml` documented
+- [x] `develop-bug` signals `in-qa` + `ready-for-merge`
+- [x] QA-loop parity test
+- [x] READMEs corrected + checklist row
+- [x] `project.yml` section corrected (already exists — remove stale clause)
 
 ---
 
@@ -515,12 +561,90 @@ in CI.
 
 - **Depends on**: task.37 (moments declared), task.38 (Jira execution), task.39 (`gh-stage.js`),
   task.40 (step wiring)
-- **Scaffolding precedent**: `scripts/setup-consumer.sh:307-317` — the existing
-  "already exists → keep" pattern
-- **Preserve-intent precedent**: `jira-sync.js:2731` (`buildWorkflowRecord`)
-- **The unmet claim**: `jira-sync.js:1812` — "meant to be `--check`ed in CI"
-- **Stale READMEs**: `skills/develop-story/README.md:25,475-478`,
-  `skills/develop-task/README.md:23,457-460`
+- **Scaffolding precedent**: `scripts/setup-consumer.sh:322-331` (`skills-config.yaml`) and
+  `:261-266` (`.env`) — the existing "already exists → `kept (existing)`" pattern
+- **Existing never-overwrite writer**: `shared/resources/gh-stage.js` — `--probe-board
+  [--write-ladder]` (usage L652-653, `writeLadder()` L1226). `--init-workflow` extends this
+- **Jira probe**: `shared/resources/jira-sync.js:3522` (`probeWorkflow`, exported L4112) — **not**
+  on `jira-stage.js`
+- **Preserve-intent precedent**: `jira-sync.js:3744` (`buildWorkflowRecord`; called L3725,
+  exported L4118)
+- **The unmet claim**: `jira-sync.js:2433` — "meant to be `--check`ed in CI"
+- **Stale READMEs**: `skills/develop-story/README.md:25,475-479`,
+  `skills/develop-task/README.md:23,457-461`
+- **Moments declared, unwired**: `shared/resources/tracker-workflow.js:52-63` (`MOMENTS`);
+  `DEFAULT_PIPELINE` L128-132 and `DEFAULT_RUNG_FOR_MOMENT` L147-153 both omit the two new ones —
+  verified, the "neither fires by default" guarantee holds
+
+---
+
+## QA Testing Results
+
+**QA Status**: ✅ PASS (cycle 2)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-12
+**Quality Score**: 96/100 (cycle 2; 60/100 at cycle 1)
+**Gate Decision**: PASS
+**QA Cycles**: 2
+
+### QA Report
+- **Final Report**: [task.41.qa.2.pipeline-moments-and-scaffolding.md](./task.41.qa.2.pipeline-moments-and-scaffolding.md) (cycle 2)
+- **Final Gate**: [task.41.gate.2.pipeline-moments-and-scaffolding.yml](./task.41.gate.2.pipeline-moments-and-scaffolding.yml) — PASS
+- **Cycle 1**: [qa.1](./task.41.qa.1.pipeline-moments-and-scaffolding.md) / [gate.1](./task.41.gate.1.pipeline-moments-and-scaffolding.yml) — FAIL
+
+### Test Coverage Summary
+- **Tests Executed**: 1104 (1099 at cycle 1, +5 added by qa-fix)
+- **Phases Verified**: 5/5 (4/5 at cycle 1 — Phase 3 failed and was fixed)
+- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW at cycle 1 — all fixed, verified and closed at cycle 2
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS (CONCERNS at cycle 1), Maintainability: PASS
+
+### Bug Reports
+- [TASK-41-BUG-1](./task.41.bug.1.init-workflow-silent-noop-skips-scaffolding.md) — HIGH — ✅ Closed
+- [TASK-41-BUG-2](./task.41.bug.2.generic-ladder-mislabelled-as-board-derived.md) — MEDIUM — ✅ Closed
+- [TASK-41-BUG-3](./task.41.bug.3.scaffolding-probe-branch-untested.md) — MEDIUM — ✅ Closed
+
+### Key Findings
+
+Phases 1, 2, 4 and 5 passed cycle 1. Phase 3 (scaffolding) failed on a defect of
+exactly the class this task exists to remove: `write_tracker_workflow()` inferred
+"the file was written" from an exit code that this CLI family deliberately returns
+as 0 on write-nothing skips, so an unauthenticated `gh` left the consumer with no
+`tracker-workflow.yaml` while the wizard reported success. Root cause was a
+contract misread, not a logic slip — and the probe branch had no test coverage,
+which is why it shipped green.
+
+Fixed by testing the artifact rather than the exit code, labelling generic ladders
+honestly via the `fromRecord` field the CLI already returned, and adding four
+stub-CLI tests that pin the wizard's contract with the CLI across every outcome it
+can produce.
+
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final QA Report**: `task.41.qa.2.pipeline-moments-and-scaffolding.md`
+**Final Gate**: `task.41.gate.2.pipeline-moments-and-scaffolding.yml`
+**Gate Status**: ✅ PASS · **Quality Score**: 96/100 · **QA Cycles**: 2
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 15/15 met (F1–F6, P1–P2, Q1–Q3, M1–M3)
+✅ **Tests:** 1104 pass / 0 fail (+24 added by this task, +5 by qa-fix); `npm run eval:all` exit 0
+✅ **CI:** SUCCESS on the final commit — `link-check`, `test`, `validate` all green, head verified identical to `b0105d0`
+✅ **PR:** [#208](https://github.com/Gamaroff/agent-skills/pull/208) — OPEN, MERGEABLE
+✅ **Documentation:** CHANGELOG, `tracker-workflow.md` (+132), shipped template, both develop READMEs, `configuration.md`
+✅ **Security:** No secrets introduced; `--issue` numeric validation still guards every GraphQL path; `--check` provably read-only; JSON parsing degrades to the conservative branch
+⚠️ **Compliance:** NOT_APPLICABLE — developer tooling, no personal data / payments / UI surface
+✅ **Bugs:** 3 raised at QA cycle 1 (1 HIGH, 2 MEDIUM) — all fixed, verified and closed
+
+**Residual (non-blocking):** the GitHub live-probe branch is unreachable from the wizard by construction (handled and commented); the Jira `--check` board half compares against a local record rather than a live probe.
+
+**Detailed Verification Log:** See [`task.41.dod.1.pipeline-moments-and-scaffolding.md`](./task.41.dod.1.pipeline-moments-and-scaffolding.md) for full evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-08-12
 
 ---
 

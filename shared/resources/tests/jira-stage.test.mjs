@@ -80,11 +80,45 @@ const T = (id, name, to, fields = {}) => ({
 
 // --- stage vocabulary ------------------------------------------------------
 
-test("the three new stages are OFF by default, the three legacy ones ON", () => {
+test("the five opt-in stages are OFF by default, the three legacy ones ON", () => {
   const on = STAGE_NAMES.filter((s) => resolveStage({ stage: s }).enabled);
   const off = STAGE_NAMES.filter((s) => !resolveStage({ stage: s }).enabled);
   assert.deepEqual(on.sort(), ["done", "in-review", "work-started"]);
-  assert.deepEqual(off.sort(), ["blocked", "in-qa", "ready-for-merge"]);
+  // `changes-requested` and `pr-merged` joined this list in task.41 when they
+  // were wired. Being wired is not being enabled: a consumer who upgrades
+  // without touching their config must see no new card movement at all.
+  assert.deepEqual(off.sort(), [
+    "blocked",
+    "changes-requested",
+    "in-qa",
+    "pr-merged",
+    "ready-for-merge",
+  ]);
+});
+
+test("every stage is unranked or ranked, and only the ladder positions are ranked", () => {
+  // The unranked set is the side-state set. `changes-requested` must stay in it:
+  // it is re-entered once per fix cycle, and a rank would make the second entry a
+  // backward move the monotonicity guard rejects — silently capping the signal at
+  // one cycle. `pr-merged` must stay in it because "after done" is not a rung the
+  // built-in six-rung ladder has.
+  const unranked = STAGE_NAMES.filter((s) => DEFAULT_STAGE_MAP[s].rank == null);
+  assert.deepEqual(unranked.sort(), ["blocked", "changes-requested", "pr-merged"]);
+});
+
+test("STAGE_NAMES runs in pipeline order, which describeAlternatives depends on", () => {
+  // `describeAlternatives` slices "every stage after this one" straight off this
+  // order to explain a skip, so the order is behaviour, not presentation.
+  assert.deepEqual(STAGE_NAMES.slice(), [
+    "work-started",
+    "in-review",
+    "changes-requested",
+    "in-qa",
+    "ready-for-merge",
+    "pr-merged",
+    "blocked",
+    "done",
+  ]);
 });
 
 test("overlapping stages alias the document-status candidate lists exactly", () => {
@@ -1678,4 +1712,149 @@ test("parseArgs accepts the new flags and defaults them off", () => {
   assert.equal(full.printPlan, true);
   assert.equal(full.from, "In Progress");
   assert.equal(full.issueType, "Story");
+});
+
+// ── task.41: --init-workflow (incl. JSON-record conversion) and --check ──────
+
+const jcli = require(join(__dirname, "..", "jira-stage.js"));
+const { mkdirSync, readFileSync: readF, existsSync: existsF } = require("node:fs");
+
+/** A repo with an existing jira.workflowRecord at its default path. */
+function withRecord(record, extra = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "jira-init-"));
+  mkdirSync(join(dir, "docs", "development"), { recursive: true });
+  writeFileSync(
+    join(dir, "docs", "development", "jira-workflow.json"),
+    JSON.stringify(record, null, 2),
+  );
+  for (const [name, body] of Object.entries(extra)) writeFileSync(join(dir, name), body);
+  _tmpDirs.push(dir);
+  return dir;
+}
+
+const SAMPLE_RECORD = {
+  version: 1,
+  project: "PROJ",
+  site: "example.atlassian.net",
+  statusesByIssueType: { Task: ["Backlog", "In Progress", "Code Review", "Done"] },
+  stages: {
+    "work-started": { enabled: true, rank: 20, candidates: ["In Progress"] },
+    "in-review": {
+      enabled: true,
+      rank: 30,
+      candidates: ["Code Review"],
+      reason: "we call it Code Review, not In Review",
+    },
+    "in-qa": { enabled: false, rank: 40, candidates: ["QA"] },
+    done: { enabled: true, rank: 60, candidates: ["Done"], terminal: true },
+  },
+};
+
+test("recordToLadder orders rungs by rank and preserves hand-authored reasons", () => {
+  const { statuses, pipeline } = jcli.recordToLadder(SAMPLE_RECORD);
+  assert.deepEqual(statuses, ["In Progress", "Code Review", "QA", "Done"]);
+
+  const line = (m) => pipeline.find((l) => l.includes(`${m}:`));
+  // `enabled: false` becomes OMISSION — the YAML format's only way to say off.
+  assert.match(line("in-qa"), /^ {2}# in-qa:/, "a disabled stage must be commented out");
+  assert.ok(!/^ {2}# /.test(line("work-started")), "an enabled stage must be live");
+  // The reason is intent a board read cannot recover. buildWorkflowRecord treats
+  // these as sacred across regenerations; dropping them here would undo that.
+  assert.match(line("in-review"), /# we call it Code Review, not In Review/);
+});
+
+test("--init-workflow converts an existing JSON record, and the result round-trips", async () => {
+  const root = withRecord(SAMPLE_RECORD);
+  const r = await jcli.run({
+    argv: ["node", "jira-stage", "--init-workflow"],
+    repoRoot: root,
+  });
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.fromRecord, true, "a record must beat the generic template");
+
+  const body = readF(join(root, "tracker-workflow.yaml"), "utf-8");
+  assert.match(body, /from an existing jira\.workflowRecord/);
+  assert.match(body, /^ {2}work-started: "In Progress"$/m);
+  assert.match(body, /^ {2}# in-qa: "QA"/m);
+
+  // Round-trip: what it wrote must validate cleanly against itself.
+  const check = await jcli.run({
+    argv: ["node", "jira-stage", "--check", "--offline"],
+    repoRoot: root,
+  });
+  assert.equal(check.exitCode, 0, "a file this CLI generated must pass its own --check");
+});
+
+test("--init-workflow refuses to overwrite; --force overwrites", async () => {
+  const mine = "statuses:\n  - Mine\n";
+  const root = withRecord(SAMPLE_RECORD, { "tracker-workflow.yaml": mine });
+
+  const refused = await jcli.run({
+    argv: ["node", "jira-stage", "--init-workflow"],
+    repoRoot: root,
+  });
+  assert.equal(refused.exitCode, 0, "refusing is not an error");
+  assert.equal(refused.reason, "exists");
+  assert.equal(
+    readF(join(root, "tracker-workflow.yaml"), "utf-8"),
+    mine,
+    "a hand-authored ladder must survive byte-identical",
+  );
+
+  const forced = await jcli.run({
+    argv: ["node", "jira-stage", "--init-workflow", "--force"],
+    repoRoot: root,
+  });
+  assert.equal(forced.written, true);
+  assert.match(readF(join(root, "tracker-workflow.yaml"), "utf-8"), /work-started/);
+});
+
+test("--init-workflow --dry-run writes nothing", async () => {
+  const root = withRecord(SAMPLE_RECORD);
+  const r = await jcli.run({
+    argv: ["node", "jira-stage", "--init-workflow", "--dry-run"],
+    repoRoot: root,
+  });
+  assert.equal(r.reason, "dry-run");
+  assert.equal(existsF(join(root, "tracker-workflow.yaml")), false);
+});
+
+test("--check exits NON-ZERO on a broken file, 0 on a clean one", async () => {
+  const bad = withLadder(
+    "statuses:\n  - Todo\n  - In Progress\n  - Todo\npipeline:\n  nope: Todo\n",
+  );
+  const rBad = await jcli.run({ argv: ["node", "jira-stage", "--check", "--offline"], repoRoot: bad });
+  assert.equal(rBad.exitCode, 1, "the inverted contract — a broken file MUST fail");
+
+  const good = withLadder("statuses:\n  - Todo\n  - Done\npipeline:\n  done: Done\n");
+  const rGood = await jcli.run({ argv: ["node", "jira-stage", "--check", "--offline"], repoRoot: good });
+  assert.equal(rGood.exitCode, 0);
+});
+
+test("--check exits 0 when there is no record to compare against", async () => {
+  const root = withLadder("statuses:\n  - Todo\n  - Done\npipeline:\n  done: Done\n");
+  const r = await jcli.run({ argv: ["node", "jira-stage", "--check"], repoRoot: root });
+  assert.equal(r.exitCode, 0, "no record is a skip, not a failure");
+  assert.equal(r.reason, "no-record");
+});
+
+test("--check catches a status no issue type on the project has", async () => {
+  const root = withRecord(SAMPLE_RECORD, {
+    "tracker-workflow.yaml":
+      "statuses:\n  - Backlog\n  - Nonexistent Column\n  - Done\npipeline:\n  work-started: Nonexistent Column\n  done: Done\n",
+  });
+  const r = await jcli.run({ argv: ["node", "jira-stage", "--check"], repoRoot: root });
+  assert.equal(r.exitCode, 1);
+  assert.equal(r.reason, "drift");
+  assert.ok(r.drift.some((d) => d.moment === "work-started"));
+});
+
+test("the inverted --check exit code is documented and shimmed on the Jira side too", () => {
+  const src = readF(join(__dirname, "..", "jira-stage.js"), "utf-8");
+  assert.match(src, /ONE mode in this family that exits non-zero/);
+  assert.match(
+    src,
+    /process\.exit\(process\.argv\.includes\("--check"\) \? 1 : 0\)/,
+    "the async shim must not swallow a --check failure to exit 0",
+  );
 });

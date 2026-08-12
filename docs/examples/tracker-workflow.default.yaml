@@ -51,19 +51,35 @@ statuses:
 # The moments are a closed set — each one is a point in the pipeline where a step
 # signals progress. Config chooses the target; it cannot invent a new moment.
 #
-#   work-started     branch created, development begins
-#   in-review        pull request opened
-#   in-qa            QA review starts
-#   ready-for-merge  QA passed, awaiting merge
-#   blocked          a pipeline gate failed and needs a human
-#   done             Definition of Done met, work accepted
+#   work-started       branch created, development begins
+#   in-review          pull request opened
+#   changes-requested  a QA gate came back with issues; fires ONCE PER FIX CYCLE
+#   in-qa              QA review starts
+#   ready-for-merge    QA passed, awaiting merge
+#   pr-merged          the PR actually landed on the base branch
+#   blocked            a pipeline gate failed and needs a human
+#   done               Definition of Done met, work accepted
 pipeline:
   work-started: In Progress
   in-review: Waiting for Review
   in-qa: Ready for Testing
   done: Done
-  # blocked: Blocked        # ← off-ladder side-state; uncomment if your board has one
-  # ready-for-merge: ...    # ← omitted here; add the column and the line together
+  # blocked: Blocked            # ← off-ladder side-state; uncomment if your board has one
+  # ready-for-merge: ...        # ← omitted here; add the column and the line together
+  # changes-requested: Rework   # ← off-ladder side-state. Re-entered every fix cycle, so
+  #                             #   leave it OFF the `statuses:` ladder: a ranked target
+  #                             #   makes the 2nd and later moves backward ones the guard
+  #                             #   rejects, silently capping the signal at one cycle.
+  # pr-merged: Ready for Showcase
+  #                             # ← fires from /develop-next and /develop-batch AFTER the
+  #                             #   merge, not from the develop pipelines — those finish
+  #                             #   while the PR is still open.
+  #
+  # ORDERING, `done` vs `pr-merged`: the develop pipeline moves a card to `done` at
+  # finalise, while the PR is still open. If you want a card to WAIT in a merge or
+  # showcase queue until the code actually lands, omit `done:` entirely and let
+  # `pr-merged` be the last automated move. Naming both is coherent only when your
+  # post-merge column sits after Done on the ladder.
 
 # ── Document status mapping (optional) ───────────────────────────────────────
 # Local document status -> board status, used by the /sync-* skills. The local

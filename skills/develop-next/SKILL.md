@@ -189,6 +189,26 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 
    > **Parsing note (Bitbucket):** the merge response embeds rendered HTML that can contain raw control characters, which makes some `jq` invocations fail on the _response_ even though the merge itself succeeded. **Never retry a merge on a parse error** — re-query `GET …/pullrequests/${PR_ID}` and check `.state` first, or you risk a duplicate merge attempt against an already-merged PR.
 
+3. **Signal the `pr-merged` stage** (only after the merge actually succeeded, and before the Step 4 tick). Skip silently when the item has no linked tracker issue. Read `TRACKER` and the item's issue key from the merged document's frontmatter (`github_issue:` / `jira_key:`):
+
+   ```bash
+   # TRACKER=jira
+   node .agents/skills/develop-next/references/jira-stage.js \
+     --issue "$TRACKER_ISSUE" --stage pr-merged --json
+
+   # TRACKER=github
+   node .agents/skills/develop-next/references/gh-stage.js \
+     --issue "$TRACKER_ISSUE" --stage pr-merged --json
+   ```
+
+   **This moment exists because it is the only one that can fire here.** The develop pipelines finish while the PR is still open — Step 7 (`/finalise`) moves the card to `done` with nothing merged yet. `pr-merged` is the first and only signal that the code is actually on `<baseBranch>`.
+
+   > **Ordering, which is genuinely confusing:** a board that wants a card to sit in a merge or showcase queue until the PR really lands should **omit `done:` from `pipeline:` entirely** and let `pr-merged` be the last automated move. Leaving both on means the card reaches `done` at Step 7 and then moves again after the merge — which is coherent only if the post-merge column sits *after* Done on that board's ladder.
+
+   `pr-merged` is **off by default** — absent from the built-in `pipeline:` map, so it fires nowhere until a consumer names a status for it. Non-blocking: the CLI exits 0 for `stage-disabled`, `no-option`, `no-transition` and `not-on-board` alike. **Never let it block the roadmap tick** — the merge has already happened and is not undone by a board that would not move.
+
+   Log in the run report: "pr-merged: {landed status / disabled / skip reason}."
+
    Story PRs normally target `<baseBranch>` (default `develop`) directly, and nothing special happens when an epic's last story merges.
 
    > **Epics using an integration branch are only partly automated.** If a story's epic declares

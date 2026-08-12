@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **The last two moments are wired: `changes-requested` and `pr-merged`.** task.37 declared all eight moments; six of them fired. The two that did not were the two covering the parts of a run the board previously could not see at all — a card sat frozen in review through up to five QA fix cycles, and nothing whatsoever fired when the PR actually merged, which is the only moment at which "the code is on `develop`" is known.
+
+  `changes-requested` fires from the shared QA-loop step file on entering each fix cycle, before `/qa-fix`. **It fires once per cycle**, which is the exact opposite of the rule stated a few lines above it for `in-qa`, so both the step file and the reference doc now say why: `in-qa` marks a phase the card enters once, and re-announcing it every cycle tells a board reader nothing new; `changes-requested` marks a state the card *re-enters*, and a board that shows it on cycle 1 and then goes quiet through cycles 2–5 is actively saying something false.
+
+  It is also an **unranked side-state**, like `blocked` — and that is load-bearing rather than incidental. Ranking it would make the second and later entries backward moves, which the monotonicity guard rejects, silently capping the signal at one cycle. Its default candidates deliberately exclude `In Progress` for the same reason: naming a ranked development column would make the guard fight itself.
+
+  `pr-merged` fires from `/develop-next` and `/develop-batch` after the merge succeeds and before the roadmap tick — **not** from the develop pipelines, which finish while the PR is still open. In `/develop-batch` it fires *inside* the per-item serial merge loop, keyed on that item's own issue; a test asserts the call sits in the loop body, because hoisting it would move whichever card happened to be last in scope — on a shared board, someone else's — and report success either way.
+
+  Both are **absent from the default `pipeline:` map**, so they fire nowhere until a consumer names a status for them. Same discipline as v0.34.0's three opt-in moments: consumers upgrade by replacing a skill directory wholesale, and a moment that defaulted on would start moving cards into columns nobody asked about.
+
+  A board wanting a real merge gate should now **omit `done:` entirely** and let `pr-merged` be the last automated move — Step 7 reaches `done` while the PR is still open, so naming both is coherent only when the post-merge column sits after Done on the ladder.
+
+- **`tracker-workflow.yaml` is scaffolded on install, and never overwritten.** `setup-consumer.sh` writes it when absent and reports `kept (existing)` otherwise, reusing the pattern it already uses for `.env` and `skills-config.yaml`. It emits the file via an inline heredoc like everything else it writes — it deliberately does **not** read a template off disk, because the wizard runs in the consumer's repo where this repo's `docs/examples/` does not exist. When it falls back to the generic ladder it says so loudly, three times, because a ladder that does not match the board resolves nothing and the failure is silence: the pipelines run, report success, and move no cards.
+
+- **`--init-workflow [--force]` on both stage CLIs**, for consumers who upgrade a skill directory without re-running the wizard. On GitHub it **extends the existing `--probe-board --write-ladder`** rather than duplicating it — `--write-ladder` still writes a statuses-only ladder exactly as before, while `--init-workflow` writes a full file with a `pipeline:` block resolved from the same board read the probe just reported, so the two can never disagree. On Jira it converts an existing `jira.workflowRecord` into the YAML ladder: rungs ordered by rank, `enabled: false` becoming **omission** (the format's only way to say off), and each `reason:` string preserved as a **YAML comment** — the same preserve-hand-authored-intent discipline `buildWorkflowRecord` already applies, honoured at the one moment a consumer is least able to notice it being dropped.
+
+  Both refuse to overwrite without `--force`. Moments that resolve to nothing are emitted **commented out** rather than silently omitted: the author needs to see that the moment exists and their board has no column for it.
+
+- **`--check [--offline]` on both stage CLIs** — the CI check `jira-sync.js` has been promising in a comment since v0.34.0. `--offline` validates schema self-consistency (parses; every `pipeline:` key is a real moment; no duplicate rungs) and issues no network call at all — a test asserts zero calls, not just zero writes. The full `--check` adds a live board read and catches the case the offline half structurally cannot: **a renamed column**. That is the most common way a working setup breaks, and it breaks silently — the file still parses, every moment still names a status, and nothing moves.
+
+  > **`--check` is the one mode in this family that exits non-zero on failure.** Every other entry point exits 0 on every documented skip, because pipeline steps run inside shells where a non-zero exit would kill the run. `--check` runs in CI, where a green exit over a broken file is the whole failure. The inversion is commented at both call sites, the module shims are guarded so an unexpected throw under `--check` still exits 1, and tests assert all of it — because a future contributor harmonising it would produce a CI check that cannot fail.
+
+  Two cases exit **0** deliberately: no file at all (nothing to check), and no credentials. The second matters — a fork's PR cannot hold the repo secret, and failing on that basis would penalise exactly the contributors least able to fix it.
+
+### Fixed
+
+- **`develop-bug` signalled four of the eight moments; it now signals the same six as the story and task pipelines.** Its verify loop is the analogue of a QA loop — same entry, same bounded cycles, same passing exit — but it is a skill-native file, so when the shared QA-loop step file grew `--stage` calls this one did not, and a `grep` over it returned zero stage invocations for a whole release. It now signals `in-qa` on entry, `changes-requested` per fix cycle, and `ready-for-merge` on a passing exit.
+
+  This was an oversight, not a decision, and it bit exactly one person: the consumer who turned `in-qa` on and found it worked for stories and tasks but not bugs, with no explanation anywhere. A parity test now asserts that every pipeline with a verify/QA loop signals the same moments.
+
+- **Both develop READMEs described the pre-v0.34.0 world.** `skills/develop-{story,task}/README.md` still claimed three MCP transitions fired from "Phase 0c-reg" — a phase whose tracker signal moved to Step 1 releases ago, and which each README's own line 45 already said had moved. The tracker tables now name **moments** and the CLI that fires them, mark the five opt-in ones, and list `pr-merged` as firing from the merging orchestrators rather than the pipeline.
+
+  Each README's "Verification Checklist (for diagram maintainers)" gains the row that makes this self-policing: every tracker operation named in those tables must map to a `--stage` invocation or a named script, **never a raw API verb**. A raw verb there *is* the drift — it means the table is describing a status literal the pipeline no longer names. That is why they were wrong for a full release.
+
+- **`tracker-workflow.js` claimed three moments were absent from the default pipeline map when five were.** The comment was written when it was true and was not updated when `changes-requested` and `pr-merged` joined `MOMENTS`. Corrected, and pointed at `DEFAULT_STAGE_MAP` as the thing to count rather than the sentence.
+
+- **`docs/reference/configuration.md`'s `project.yml` section said "It has never been documented here"** — inside the section documenting it.
+
 ### Changed
 
 - **The five inline GitHub board blocks are now `gh-stage.js` calls — a consumer's `tracker-workflow.yaml` finally drives their board.** `gh-stage.js` shipped inert in task.39; this is what wires it in. Roughly 240 lines of duplicated `gh api graphql` prose across `develop-pipeline-step-{0,4,5-6,7}*.md` and `skills/finalise/SKILL.md` collapse to one-line invocations that read identically to the adjacent `jira-stage.js` calls.
