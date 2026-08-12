@@ -5,10 +5,12 @@ type: task
 description: "Add a deterministic CLI that sets a GitHub Projects v2 Status field from the tracker-workflow ladder, with a mandatory backward-move guard and a read-only board probe. Nothing is wired to it yet."
 tags: [github, projects-v2, pipeline, workflow]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-03
 updated: 2026-08-12
+completed_date: 2026-08-12
+pr_number: 206
 assignee:
 estimated_effort_hours: 16
 github_issue: 187
@@ -16,7 +18,7 @@ github_issue: 187
 
 # Technical Task: `gh-stage.js` — a GitHub Projects board engine
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.39.review.1.github-board-stage-engine.md` implemented 2026-08-12
 
@@ -274,35 +276,53 @@ the run.
 
 ## 7. Files Summary
 
+> Refreshed at finalise (2026-08-12) after five QA cycles. The figures below are the branch's actual
+> state, not the implementation-time estimates — those had drifted by two fixtures, 255 lines and
+> 15 tests, all added by the QA loop.
+
 ### Files Added (Core Implementation)
 
-1. ✅ `shared/resources/gh-stage.js` — **new**, 1,044 lines
+1. ✅ `shared/resources/gh-stage.js` — **new**, 1,299 lines
 
 ### Files Added (Tests)
 
-2. ✅ `shared/resources/tests/gh-stage.test.mjs` — **new**, 50 tests
-3. ✅ `shared/resources/tests/fixtures/gh-bespoke-columns.json` — **new**
-4. ✅ `shared/resources/tests/fixtures/gh-done-case-variants.json` — **new**
-5. ✅ `shared/resources/tests/fixtures/gh-issue-on-two-boards.json` — **new**
-6. ✅ `shared/resources/tests/fixtures/gh-mutation-error.json` — **new**
-7. ✅ `shared/resources/tests/fixtures/gh-no-status-field.json` — **new**
-8. ✅ `shared/resources/tests/fixtures/gh-not-on-board.json` — **new**
-9. ✅ `shared/resources/tests/fixtures/gh-status-unset.json` — **new**
-10. ✅ `shared/resources/tests/fixtures/gh-two-boards-done-ids.json` — **new**
+2. ✅ `shared/resources/tests/gh-stage.test.mjs` — **new**, 1,257 lines, **65 tests**
+
+### Files Added (Fixtures — 10)
+
+3. ✅ `gh-bespoke-columns.json` — non-default columns; proves the ladder does anything at all
+4. ✅ `gh-card-done.json` — **added in QA cycle 1**; a card at Done, which is what makes the
+   backward-move refusal test a real refusal rather than a forward move
+5. ✅ `gh-done-case-variants.json` — `done` beside `Done`
+6. ✅ `gh-issue-on-two-boards.json` — the multi-board rule
+7. ✅ `gh-mutation-error.json` — the retry path, testable with no network
+8. ✅ `gh-no-status-field.json` — skip, not a crash
+9. ✅ `gh-not-on-board.json` — `nodes: []`
+10. ✅ `gh-status-unset.json` — `fieldValueByName: null`
+11. ✅ `gh-status-verify.json` — **added in QA cycle 1**; shares an `itemId` with `gh-status-unset`,
+    which is what makes the verify-re-read assertion non-vacuous
+12. ✅ `gh-two-boards-done-ids.json` — per-project option ids
 
 ### Files Modified (Documentation)
 
-11. ✅ `docs/reference/tracker-workflow.md` — new `## GitHub execution semantics` section; the
-    top-of-file status note corrected (it said GitHub execution was still pending)
-12. ✅ `docs/reference/configuration.md` — `github.projectStatusField` and `github.projectBoard` in
-    the schema block and the key-reference table; new `## GitHub board status field` and
-    `## project.yml — board identity` sections; `GH_PROJECT_STATUS_FIELD` in the env-var table
-13. ✅ `CHANGELOG.md` — `### Added`
+13. ✅ `docs/reference/tracker-workflow.md` — new `## GitHub execution semantics` section; corrected
+    the stale top-of-file status note; board-selection precedence rewritten twice as QA sharpened it
+14. ✅ `docs/reference/configuration.md` — `github.projectStatusField`, `github.projectBoard`,
+    `GH_PROJECT_STATUS_FIELD`; new `## GitHub board status field` and `## project.yml — board identity`
+    sections
+15. ✅ `CHANGELOG.md` — `### Added`
 
 ### Files Modified (This task's own documents)
 
-14. ✅ `task.39.github-board-stage-engine.md` — citation fixes from the Step 2 review; checkboxes
-15. ✅ `task.39.plan.github-board-stage-engine.md` — citation fixes; the `candidates` source paragraph
+16. ✅ `task.39.github-board-stage-engine.md` — review citation fixes, checkboxes, QA results, this section
+17. ✅ `task.39.plan.github-board-stage-engine.md` — citation fixes; the `candidates` source paragraph
+
+### Files Added (Process artefacts)
+
+18. ✅ `task.39.review.1.*.md` — `/review-task` report
+19. ✅ `task.39.qa.1.*.md`, `task.39.qa.2.*.md` — QA reports (cycle 1; cycles 2–5 consolidated)
+20. ✅ `task.39.gate.1` … `task.39.gate.5.*.yml` — one gate per QA cycle
+21. ✅ `task.39.dod.1.*.md` — this run's Definition of Done verification
 
 ### Files Deleted
 
@@ -314,8 +334,8 @@ None in this task. Task.40 deletes the inline GraphQL.
 - The five pipeline step files — task.40 wires them. Nothing calls `gh-stage.js` yet.
 - `shared/resources/tracker-workflow.js` — the `"Todo"` ladder gap (Motivation #5) is deferred; see
   Known Issues.
-- Bundled `skills/*/references/` — `npm run bundle` was run and reported no drift, because no skill
-  references `gh-stage.js` yet.
+- Bundled `skills/*/references/` — `npm run bundle` reports no drift, because no skill references
+  `gh-stage.js` yet.
 
 ---
 
@@ -582,7 +602,7 @@ essentially everything here is a forward fix.
 
 ### Phase 4: Fixtures and tests
 
-- [x] 8 captured fixtures with a documented capture recipe
+- [x] 10 captured fixtures with a documented capture recipe (8 at implementation, 2 added by QA)
 - [x] Unit, integration and contract suites
 
 ---
@@ -665,6 +685,32 @@ real caller.
 
 - Adding `"Todo"` to `DEFAULT_LADDER` rung 0 — deliberately out of scope; see Known Issues.
 - Wiring the five inline GraphQL blocks to this CLI — task.40, as scoped.
+
+---
+
+## Definition of Done — PASSED ✅
+
+**Status:** ACCEPTED · **Accepted:** 2026-08-12 · **PR:** [#206](https://github.com/Gamaroff/agent-skills/pull/206)
+
+**QA Gate:** ✅ PASS (100/100) after 5 cycles · **CI:** ✅ SUCCESS on head `eb2eb0b`
+
+All Definition of Done criteria verified:
+
+- ✅ **Success Criteria** — 16/16, each traced to code *and* a non-vacuous test
+- ✅ **CI** — `test` and `link-check` both green. Sampled as PENDING first and **acceptance withheld** until it resolved, rather than assumed
+- ✅ **Tests** — 65/65 in-suite; **1065/1065** full repo suite, 0 failures
+- ✅ **Documentation** — `tracker-workflow.md` gains GitHub execution semantics; `configuration.md` gains both keys plus a `project.yml` section it never had; `CHANGELOG.md` `### Added`
+- ✅ **Security** — no shell invocation (argv arrays only), `--issue` validated on every path, auth delegated wholly to `gh`, no new dependencies, fail-closed board selection
+- ⚠️ **Compliance** — NOT APPLICABLE (no personal data, no payment surface, no UI), verified area by area rather than skipped
+
+**One finding, fixed before acceptance:** §7 Files Summary was stale after five QA cycles — it omitted
+the two fixtures QA added and reported 1,044 lines / 50 tests against an actual 1,299 / 65.
+`CHANGELOG.md` carried the same figures. Both corrected.
+
+**Deferred, deliberately:** the `"Todo"` ladder gap (changes a shared default), task.40 wiring, and the
+scratch-board ritual (needs a real board on the account). All recorded in Known Issues with reasons.
+
+**Detailed Verification Log:** [`task.39.dod.1.github-board-stage-engine.md`](./task.39.dod.1.github-board-stage-engine.md)
 
 ---
 
