@@ -1320,11 +1320,17 @@ async function run({
     });
 
     if (!isUpdate) {
+      // No `epic_bitbucket_url` here. It used to be printed for the author to
+      // paste into each story, which is this card's defect arriving by hand: an
+      // absolute URL pinned to whichever branch the sync ran on, dead the moment
+      // that branch is deleted, and invisible to a link checker. `sync-jira-story`
+      // writes the `**Epic File**` link itself, relative, so there is nothing to
+      // copy. The key is still *read* as a fallback for a value already set.
       output.info(
         "\n📌 Story reminder:\n" +
           `   jira_epic: "${result.issueKey}"\n` +
-          (epicBbUrl ? `   epic_bitbucket_url: "${epicBbUrl}"\n` : "") +
-          "   Add cross-reference links to both the Jira epic and Bitbucket epic file in each story body.",
+          "   Point each story's `epic_source` at this epic's path — sync-jira-story\n" +
+          "   writes the Jira epic and Epic File links into the story body from there.",
       );
     }
   }

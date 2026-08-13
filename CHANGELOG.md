@@ -26,7 +26,9 @@ All notable changes to this project will be documented in this file. Format foll
 
   One behavioural improvement falls out: the body line used to be gated on a Bitbucket URL having resolved, so a repo with no Bitbucket remote got no document link at all. A relative link needs nothing but the file's own path, so it is always written.
 
-  `updateTaskFile`, `updateStoryFile` and `updateEpicFile` are now exported — the write-back had **no** test coverage whatsoever, which is how two scripts came to write a body line that no test ever read.
+  `updateTaskFile`, `updateStoryFile` and `updateEpicFile` are now exported and each carries a suite — the write-back had **no** test coverage whatsoever, which is how two scripts came to write a body line that no test ever read. The story and epic suites are the substantive ones: two links per document, both crossing directories, and the epic's rule that a hand-authored **relative** `**Parent PRD**` link wins over the computed one while an authored **absolute** link does not.
+
+  **`sync-jira-epic` also stops telling you to hand-write the URL.** Its post-create Story reminder printed `epic_bitbucket_url: "<absolute branch-pinned URL>"` for the author to paste into every story — the same defect arriving by hand, and one no test or link checker would ever catch. It now points at `epic_source` instead, which is what `sync-jira-story` builds the relative `**Epic File**` link from. The key is still *read*, so a value already set keeps resolving.
 
 ## [v0.38.0] - 2026-08-13
 
