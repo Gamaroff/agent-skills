@@ -237,6 +237,47 @@ test("halt: a roadmap with no parseable rows at all", () => {
   assert.match(r.haltReason, /no parseable checkbox rows/);
 });
 
+// A roadmap whose every phase has been archived at close is COMPLETE, not
+// malformed. Its only remaining rows sit under Deferred / Housekeeping / Change
+// Log, all excluded by design — so it parses to zero candidates, exactly like a
+// file that is not a roadmap. Conflating the two turned the roadmap's own
+// housekeeping rule ("archive accepted rows at each phase close") into a HALT:
+// after the final archive, /develop-next reported "is this a roadmap?" instead
+// of "nothing left to do".
+
+test("complete: an all-archived roadmap stops, it does not halt", () => {
+  const r = select(
+    [
+      "# Roadmap",
+      "",
+      "## Deferred / human-gated",
+      "",
+      "- [ ] **T99-fixtures** needs a live board · manual",
+      "",
+      "## Housekeeping",
+      "",
+      "- [ ] Archive accepted rows at each phase close",
+      "",
+    ].join("\n"),
+  );
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.deepEqual(r.lint.errors, [], "an archived roadmap must lint clean");
+});
+
+test("complete: excluded rows are counted, so the not-a-roadmap guard still fires", () => {
+  // The guard must keep catching a genuinely wrong path. The discriminator is
+  // whether ANY checkbox row was seen, not whether any survived exclusion.
+  const notARoadmap = select("# Notes\n\nProse only.\n");
+  assert.equal(notARoadmap.status, "halt");
+
+  const archived = parseRoadmap(
+    "# R\n\n## Housekeeping\n\n- [ ] a row\n",
+  );
+  assert.equal(archived.rows.length, 0, "excluded rows are not candidates");
+  assert.equal(archived.excludedRows, 1, "but they are counted");
+});
+
 // ── 10: real-world roadmap shape (synthetic, exercises every messy structure) ─
 
 test("10: lints clean against a real-world-shaped roadmap", () => {

@@ -2,8 +2,12 @@
 
 How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[x]` rows satisfy
 `deps:`. This is a **living backlog** — completed items are archived to
-`roadmap-history.md` (created at the first phase close), so a `deps:` entry naming no current row means
-_already shipped_, not an error.
+[`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
+_already shipped_, not an error. Resolve any such reference there.
+
+**Phases 1 and 2 are complete and archived.** There is no current frontier: the rows below are
+deferred or human-gated and are invisible to selection, so `select-next.mjs` reports
+`roadmap-complete` until a new phase is added.
 
 Selection is executed by `select-next.mjs`, never by eye:
 
@@ -33,84 +37,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `change-log`       | `shared/resources/change-log.js`, `document-change-log.md`              |
 | `templates`        | `skills/*/resources/*template*`, `docs/templates/*`, `create-*/SKILL.md` |
 | `review-skills`    | `skills/review-*/SKILL.md`, `skills/edit-*/SKILL.md`                    |
-
----
-
-## PHASE 1 — tracker workflow: consumer-owned status ladder
-
-A hand-authored `tracker-workflow.yaml` in the consumer repo declares the project's statuses **in
-order** and maps each pipeline moment to one of them. Order is rank (a resumed run cannot drag a
-card backwards) and order is the walk path (a gate column needs no graph authored).
-
-Ordered so risk front-loads into the reversible parts: T36 is a pure deletion of generated text;
-T37–T39 were inert until T40 wired the first live behaviour change. **As of T40 the GitHub path
-is live** — a consumer's `tracker-workflow.yaml` now drives their board.
-
-**The series is complete as of T41.** All eight moments have a call site, the file is scaffolded on
-install without ever overwriting one, `--check` fails CI on drift, and all three develop pipelines
-signal the same moments. Both moments T41 added remain **off by default** — absent from the built-in
-`pipeline:` map — so a consumer who upgrades and changes nothing sees no new card movement.
-
-### Independent fix
-
-- [x] **T36** Stop `setup-consumer.sh` generating a narrowing `jira.statusMap` · deps: none · touches: setup-consumer!, docs-config~ · /develop-task docs/tasks/task.36.setup-consumer-statusmap-fix/task.36.setup-consumer-statusmap-fix.md
-
-### Engine
-
-- [x] **T37** `tracker-workflow.yaml` config engine + promoted YAML parser · deps: none · touches: workflow-engine!, docs-config~ · /develop-task docs/tasks/task.37.tracker-workflow-config-engine/task.37.tracker-workflow-config-engine.md
-
-### Per-tracker execution ‖ (dependency-independent once T37 lands)
-
-- [x] **T38** Jira: walk the status ladder + last-rung terminal restriction · deps: T37 · touches: jira-sync!, workflow-engine~, docs-config~ · /develop-task docs/tasks/task.38.jira-ladder-walking/task.38.jira-ladder-walking.md
-- [x] **T39** `gh-stage.js` — GitHub Projects board engine · deps: T37 · touches: gh-stage!, workflow-engine~, docs-config~ · /develop-task docs/tasks/task.39.github-board-stage-engine/task.39.github-board-stage-engine.md
-
-### Wiring — first live behaviour change
-
-- [x] **T40** Replace the five inline GitHub GraphQL board blocks with `gh-stage.js` calls · deps: T39 · touches: pipeline-steps!, bundles!, gh-stage~ · /develop-task docs/tasks/task.40.github-pipeline-step-wiring/task.40.github-pipeline-step-wiring.md
-
-### Capstone
-
-- [x] **T41** New pipeline moments, workflow-file scaffolding, `--check`, `develop-bug` parity · deps: T38, T40 · touches: orchestrators!, pipeline-steps!, setup-consumer!, bundles!, docs-config~ · /develop-task docs/tasks/task.41.pipeline-moments-and-scaffolding/task.41.pipeline-moments-and-scaffolding.md
-
----
-
-## PHASE 2 — document history: one canonical section across PRD / epic / story / task
-
-<!-- Heading names in this phase deliberately avoid the words "change log", "deferred",
-     "human-gated" and "housekeeping": select-next.mjs excludes any section whose heading
-     matches EXCLUDED_HEADING_RE, and a matching heading drops its rows silently, with no
-     lint warning. A `## PHASE …` heading is exempt (the phase branch resets the flag), but
-     `###` sub-headings are not. -->
-
-
-Stakeholders want a readable history of changes on the work-item documents. A Change Log already
-exists in four incompatible shapes, on two of the four document types, written by nine skills that
-disagree — plus a placement bug that inserts a duplicate block above the Epic Goal. This is a
-consolidation. Series rationale: `.agents/plans/document-change-log-series.md`.
-
-Strictly sequential — each row depends on the one above it. T42 ships back-compat wrappers so no
-caller changes until T45 removes them.
-
-> **Dogfooding note.** T43–T45 modify skills this pipeline runs on itself: T43 the `create-task` /
-> `review-task` templates, T44 `review-task`'s grading (invoked at Step 2 of every later run), T45
-> the `develop-pipeline-step-*` docs and the `sync-jira-*` scripts. Each task's changes take effect
-> for the next task's run — which is why T45 is gated below.
-
-### Foundation
-
-- [x] **T42** Canonical Change Log spec + shared engine extracted from `jira-sync.js` · deps: none · touches: jira-sync!, change-log!, docs-config~, bundles~ · /develop-task docs/tasks/task.42.change-log-spec-and-engine/task.42.change-log-spec-and-engine.md
-
-### Emit
-
-- [x] **T43** Templates and `create-*` skills emit the canonical section · deps: T42 · touches: templates!, bundles~ · /develop-task docs/tasks/task.43.change-log-templates-and-creation/task.43.change-log-templates-and-creation.md
-
-### Record and grade
-
-- [x] **T44** `review-*` / `edit-*` skills log their document mutations · deps: T43 · touches: review-skills!, bundles~ · /develop-task docs/tasks/task.44.change-log-review-and-edit/task.44.change-log-review-and-edit.md
-
-### Capstone — operator gate
-
-- [x] **T45** Pipeline, QA, finalise, and tracker sync write the Change Log · deps: T44 · touches: pipeline-steps!, jira-sync!, bundles! · gate cleared 2026-08-12 — T44's `change-log.enforcement: advisory` default was verified against a pre-T43 document (`task.22`): check 4b graded its non-canonical Change Log **Important, not Critical**, verdict **GO** at 9/10, so this row's own Step 2 review did not HALT on the new check · ✅ **accepted + merged** ([PR #213](https://github.com/Gamaroff/agent-skills/pull/213), QA PASS 95/100 after 1 fix cycle) — the run also closed a pre-existing T42 engine defect that silently dropped Change Log rows it could not parse · /develop-task docs/tasks/task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md
 
 ---
 
@@ -144,3 +70,4 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 | 2026-08-12 | T42 accepted — PR #209 merged (`5b94058`). **Phase 2 has its foundation**: one canonical Change Log spec (`document-change-log.md`) and one engine (`change-log.js`, tracker-agnostic, dependency-free) replacing four incompatible table shapes and a Jira-only implementation. Three long-standing defects die with the extraction — H2-only heading match (which inserted a *second* block above the Epic Goal), an end-scan that swallowed sibling subsections, and the top-of-body insertion fallback — plus a new guard: a marker or heading inside a fenced block **or inline code span** is an example, not a section. No skill behaviour changes; `jira-sync.js` keeps every old export as a wrapper. 14/15 success criteria met; 1 recorded as **not met with reasoning** rather than reworded, because it contradicted the task's own breaking changes. 3 QA cycles, 6 defects closed (2 HIGH, 1 MEDIUM, 3 LOW); tests 1104 → 1144. Found on the way: **every one of the six defects was the same mistake** — a rule stated correctly in the spec, then applied to a subset of the places it governs — and the inline-code half of the fence guard was found by pointing the finished engine at the document that specified it. **T43 is now unblocked** |
 | 2026-08-12 | T43 accepted — PR #210 merged (`7dd5e24`). **Every template now emits the canonical section and every `create-*` skill seeds row one**, so a newly created PRD / epic / story / task opens with one Change Log row. Placement follows the sign-off precedent: unnumbered on tasks (the 11-section count re-asserted in the same test block), promoted out of `## Notes & Updates` to its own H2 on epics, and left nested as `### Change Log` on PRDs. All 12 success criteria met, no waivers. 2 QA cycles, 4 findings closed; tests 1144 → 1158. **The documented drift was half the real drift**: two epic-template copies were described as byte-equal and were not — one carried a wholly different frontmatter schema hidden behind an identical line count, so `wc -l` had been mistaken for equality. Phase 2 therefore *replaced* a schema rather than copying three lines, which is a decision; the review made it explicit and added the pre-lock consumer grep that then caught `prd-structure-guide.md` documenting the old shape. **Every defect QA found was in the new instructions, not the templates** — two told an agent to bump a frontmatter `updated:` field its document type does not have, and fixing the first surfaced a second instance the code review had missed; the invariant is now swept for. Two residuals named rather than silently shipped: `review-prd` still writes a five-cell row into the now-four-column brownfield table (**a blocking condition on T44**, as this task's own Risk 4 predicted), and the brownfield *architecture* template carries the same five-column form while its three siblings do not — outside the canonical spec's scope. **T44 is now unblocked** |
 | 2026-08-13 | T45 accepted — PR #213 merged (`1aba9f1`). **Phase 2 is complete.** The pipeline now records itself and the sync stops narrating: `develop`, `qa-story`/`qa-task`, `qa-fix` and `finalise` write milestone rows, while the six sync skills narrow from a row per body-hash refresh to two events — issue created, status transition. One marker pair replaces two; the task.42 compatibility wrappers are deleted rather than left orphaned. 20/21 success criteria met; **live-Jira verification recorded as not met** (no credentials, GitHub-tracked repo) rather than quietly ticked. 2 QA cycles, 3 bugs closed; tests 1175 → 1185. The demonstration is the document itself: task.45's own Change Log is eight rows written by the code it ships, with `Version` moving only at creation, review and acceptance. Found on the way, and the reason this row is long: **the engine silently deleted every Change Log row it could not parse** — `upsertChangeLog` regenerated blocks from rows passing a date-first predicate, so a log ordered `\| Version \| Date \|` lost its entire history on first write. This repo's own roadmap template shipped with that ordering. Pre-existing in T42 and not a regression here, but T45 routes five more writers into that path, and "never drops a row it parsed" was the mitigation T45 claimed for its own Critical risk — true, and hollow, since the rows it drops are the ones it fails to parse. Fixed, with the template corrected. Two further T42 engine defects (content loss on the hand-written-heading path; the same-pair collapse skip) were **named and left** rather than folded in mid-QA-cycle. Also caught: a bulk section-replacement regex whose next-heading lookahead matched a heading *inside a fenced sample*, leaving orphaned legacy blocks and unbalanced fences in all six sync skills — the same context-blind class of error recurred once more during finalise and was caught by a guard count |
+| 2026-08-13 | **Phases 1 and 2 archived** to `roadmap-history.md` at phase close, per the standing Housekeeping row — the first time that file has been cut, so the header no longer promises a document that did not exist. Ten accepted rows (T36–T45) moved verbatim, keeping their `touches:` tags and acceptance annotations so a `deps:` naming any of them still resolves. The two `-fixtures` rows stay here, deferred and human-gated. This Change Log is deliberately **not** split: it is append-only and it is this document's own history, so the archive references it rather than copying ten long entries out of it. No frontier remains — `select-next.mjs` reports `roadmap-complete` until a new phase is added |

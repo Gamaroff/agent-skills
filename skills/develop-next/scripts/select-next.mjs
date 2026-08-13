@@ -108,6 +108,10 @@ export function parseRoadmap(text) {
     rows: [], // see row shape below
     flows: {}, // epicNum -> [ [ids…], … ] (→-separated segments; ‖ within)
     epicSections: {}, // epicNum -> { name, depth, rowIds: [] }
+    // Checkbox rows seen but dropped for sitting in an excluded section. Kept so
+    // "this file has no rows at all" can be told apart from "every row is archived
+    // or deferred" — the first is the wrong file, the second is a finished roadmap.
+    excludedRows: 0,
     errors: [],
     warnings: [],
   };
@@ -162,7 +166,12 @@ export function parseRoadmap(text) {
 
     const rm = line.match(ROW_RE);
     if (!rm) return;
-    if (excluded) return; // Deferred/Housekeeping/Change Log rows are never candidates
+    if (excluded) {
+      // Never a candidate — but count it, so a roadmap whose every row has been
+      // archived at phase close is not mistaken for a file that is not a roadmap.
+      model.excludedRows += 1;
+      return;
+    }
     const indent = rm[1].length;
     const rest = rm[3];
     const ticked = rm[2].toLowerCase() === "x";
@@ -282,11 +291,20 @@ function index(model) {
 }
 
 function lintModel(model) {
-  // A roadmap that parses to nothing is the one genuinely fatal case.
-  if (model.rows.length === 0) {
+  // A roadmap that parses to nothing is the one genuinely fatal case — it means
+  // this is almost certainly not a roadmap, or the path is wrong.
+  //
+  // But "no candidate rows" is NOT that. When every phase has been archived at
+  // close, the only rows left are Deferred / Housekeeping / Change Log ones, which
+  // are excluded by design — so a complete, correctly-maintained roadmap parses to
+  // zero candidates. Erroring there turns the roadmap's own housekeeping rule into
+  // a HALT: `/develop-next` reports "is this a roadmap?" instead of "nothing left
+  // to do". `excludedRows` is what tells the two apart.
+  if (model.rows.length === 0 && model.excludedRows === 0) {
     model.errors.push("no parseable checkbox rows found — is this a roadmap?");
     return;
   }
+  if (model.rows.length === 0) return; // archived/deferred-only: valid and complete
   for (const [id, rows] of model.idInstances) {
     if (rows.length < 2) continue;
     const outstanding = rows.filter((r) => !r.ticked && !r.skip);
