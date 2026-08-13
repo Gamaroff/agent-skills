@@ -161,7 +161,7 @@ Flow:
 11. **Create** (POST, with parent/Epic Link auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`). On update, `description` is sent only when body or metadata hash changed.
 12. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning. Fetch fresh `updated` + `status` in a single GET.
 13. If frontmatter `status` differs from current Jira status, fetch transitions and POST a status transition.
-14. Update local file (skipped under `--no-write` or when diff was empty): in-place frontmatter for `jira_key`, `jira_url`, `jira_epic`, `epic_bitbucket_url`, `story_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Story**` / `**Jira Epic**` / `**Story File**` / `**Epic File**` links (code-block samples are skipped). Append a Change Log row only for issue creation or a status transition — never for a body update.
+14. Update local file (skipped under `--no-write` or when diff was empty): in-place frontmatter for `jira_key`, `jira_url`, `jira_epic`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Story**` / `**Jira Epic**` / `**Story File**` / `**Epic File**` links (code-block samples are skipped) — the document links are **relative**, not absolute Bitbucket URLs. `story_bitbucket_url` / `epic_bitbucket_url` are no longer written, though `epic_bitbucket_url` is still READ as a fallback. Append a Change Log row only for issue creation or a status transition — never for a body update.
 
 ### 5. Report to User
 
@@ -282,8 +282,6 @@ After sync the script writes (in-place, preserving order):
 jira_key: "PROJ-47"
 jira_url: "https://yourorg.atlassian.net/browse/PROJ-47"
 jira_epic: "PROJ-14"
-epic_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prd/.../epic.N.name.md"
-story_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prd/.../story.N.M.slug.md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
 jira_last_body_hash: "f4b2c1d9a0e72b58"
 jira_last_meta_hash: "a91c0aef33eb1d04"
@@ -337,8 +335,6 @@ the authoritative log.
   "jira_key": "PROJ-47",
   "jira_url": "https://yourorg.atlassian.net/browse/PROJ-47",
   "jira_epic": "PROJ-14",
-  "epic_bitbucket_url": "https://bitbucket.org/.../epic.md",
-  "story_bitbucket_url": "https://bitbucket.org/.../story.md",
   "change_summary": "Updated: summary, description",
   "jira_last_synced_at": "2026-04-28T11:05:33.123+0000",
   "jira_last_body_hash": "f4b2c1d9a0e72b58",
@@ -355,7 +351,7 @@ On error: `{ "error": "<message>" }` and a non-zero exit code.
 | Missing `jira_epic` in frontmatter | Add `jira_epic: "RB-XX"` or run `/sync-jira-epic` first |
 | Missing env vars (live) | Add to `.env` and retry |
 | Missing env vars (dry-run) | Warning only — preview proceeds |
-| `epic_source` not resolvable | If the existing frontmatter already has an `epic_bitbucket_url`, that value is reused (so the link is preserved across moves of the parent epic file). Otherwise, the epic Bitbucket link is omitted and sync continues. |
+| `epic_source` not resolvable | If the existing frontmatter already has an `epic_bitbucket_url`, that value is reused for the **Jira** link (so it is preserved across moves of the parent epic file). The relative `**Epic File**` body line is omitted, since there is no path to compute it from. Sync continues. |
 | Bitbucket URL not detected | Set `BITBUCKET_REPO_URL`; links omitted but sync continues |
 | File not found | Verify story file path |
 | `401 Unauthorized` | Verify `JIRA_USER_EMAIL` and `JIRA_API_TOKEN` |
