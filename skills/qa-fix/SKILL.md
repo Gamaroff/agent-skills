@@ -499,7 +499,9 @@ Options:
 
 - Wait for user responses to clarifying questions
 - Update fix plan based on user decisions
-- Document chosen approach in story Change Log
+- Record the chosen approach in the Dev Agent Record — **not** as its own Change Log row. The
+  Change Log gets exactly one row on loop exit (see the authorised-sections list below); a row per
+  decision is the churn this format exists to avoid.
 
 **Guidance**:
 
@@ -556,7 +558,13 @@ Iterate until:
   - Debug Log References (commands/results like lint/test output)
   - Completion Notes List (what changed, why, how)
   - File List (all added/modified/deleted files)
-- ✅ Change Log (new dated entry describing applied fixes)
+- ✅ Change Log — ONE row on **exiting** the fix loop, not one per finding and not one per cycle.
+  Put the iteration count in the Description; the per-cycle detail belongs in the implementation
+  report. Blank `Version` (only `/finalise` bumps it), `Author` = `qa-fix`. Bump frontmatter
+  `updated` in the same edit. Canonical format:
+  [document-change-log.md](references/document-change-log.md):
+
+  `| 2026-05-14 |  | QA findings fixed — gate PASS (9/10), 2 iterations | qa-fix |`
 - ✅ Status (see Status Rule below)
 - ✅ Bug Reports section (update bug statuses when fixes applied)
 
@@ -744,14 +752,15 @@ Cross-reference: `finalise` uses the same MCP call shape at lines 827-832 (`cont
 - **QA findings contain ambiguities or multiple options** (Step 2a)
   - Use AskUserQuestion to clarify approach before implementing
   - Do not proceed with fixes until user provides clear direction
-  - Document chosen approach in Change Log
+  - Record the chosen approach in the Dev Agent Record (the single Change Log row is written on
+    loop exit and summarises the cycle, not each decision)
 
 ## Completion Checklist
 
 Before marking complete:
 
 - ✅ **Ambiguities resolved**: All unclear or multi-option QA findings clarified with user
-- ✅ **User decisions documented**: Chosen approaches recorded in Change Log
+- ✅ **User decisions documented**: Chosen approaches recorded in the Dev Agent Record
 - ✅ Lint: 0 problems
 - ✅ Tests: all pass
 - ✅ All blocker/critical bug reports addressed
@@ -765,7 +774,7 @@ Before marking complete:
 - ✅ Story file updated (authorized sections only)
 - ✅ Story Bug Reports section updated with current statuses
 - ✅ File List complete and accurate
-- ✅ Change Log entry added
+- ✅ Change Log: exactly ONE row added for this fix loop, with the iteration count in the Description
 - ✅ Status set correctly per Status Rule
 - ✅ **Post Fix Summary to PR** (Step 7 — BLOCKING): Confirm platform-appropriate comment call (`gh pr comment` on GitHub / Bitbucket REST on Bitbucket) exited with code 0. Workflow is not done until this is verified.
 - ✅ **Jira comment** (non-blocking): If `TRACKER=jira` and `jira_key` present in story/task frontmatter, `addCommentToJiraIssue` MCP was attempted; failure is logged but does not block completion.

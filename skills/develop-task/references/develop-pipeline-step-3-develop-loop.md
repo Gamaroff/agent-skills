@@ -156,6 +156,22 @@ Main reads only the triage summary (counts + ≤10 failure bullets + `next_file`
 
 Update Pipeline Progress: ✅ develop.
 
+#### Change Log
+
+On **exiting** the develop loop — not per iteration — `/develop` appends **one** row to the work
+item recording what was implemented:
+
+| 2026-05-14 |  | Implemented — 12 files, 34 tests | develop |
+
+Leave `Version` blank; only `/finalise` bumps it. Put the scale of the change in the Description
+(files touched, tests added) rather than a narrative — the narrative already lives in the
+implementation report, which records every loop pass. One row per develop run is the rule that
+keeps a five-iteration loop from producing five rows.
+
+The write belongs to `/develop`, not to this step document. This step states the contract; the
+skill performs it. Duplicating the write in both places is how a document ends up with two rows
+for one event. Canonical format: [document-change-log.md](document-change-log.md).
+
 **Post development completion to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty). Execute this before the lock-advance Bash call — it is a tool call, not prose, and does not violate the no-prose-before-lock-advance rule:
 
 #### develop-story

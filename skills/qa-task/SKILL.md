@@ -749,6 +749,23 @@ Add a QA Results section to the task document:
 - FAIL → Status: "In Progress" (requires fixes before re-review)
 - WAIVED → Status: "Completed" (with waiver notes)
 
+**Append the verdict row to `## Change Log`** — in the same edit as the QA Results section and the
+status update, bumping frontmatter `updated`:
+
+```markdown
+| 2026-05-14 |  | QA gate CONCERNS (6/10) — 2 findings | qa-task |
+```
+
+One row per QA cycle. `Version` stays blank — only `/finalise` bumps it. Name the decision, the
+score and the finding count; the detail lives in the QA report the row links to. A clean cycle
+still writes a row — the verdict is the event, not the findings. If the task predates the Change
+Log template and has no such section, create it after `## 11. Rollback Plan` with the four
+canonical columns. Canonical format:
+[document-change-log.md](references/document-change-log.md).
+
+**Never write the gate `.yml` from here** — it belongs to `qa-gate` alone, and `qa-gate` never
+touches the document. See [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md).
+
 ### Step 13: Post PR Comment — Best-effort, non-blocking
 
 **PR-comment authorship contract**:

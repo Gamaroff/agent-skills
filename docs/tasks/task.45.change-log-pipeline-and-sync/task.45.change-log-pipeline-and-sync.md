@@ -5,10 +5,10 @@ type: task
 description: "Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto the canonical Change Log, unifying the marker pairs and narrowing sync rows to milestones."
 tags: [change-log, pipeline, tracker-sync]
 category: refactoring
-status: planned
+status: in-progress
 priority: High
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-13
 assignee:
 estimated_effort_hours: 16
 github_issue: 204
@@ -16,7 +16,9 @@ github_issue: 204
 
 # [Task 45] Pipeline, QA, finalise, and tracker sync write the Change Log
 
-**Status:** Planned
+**Status:** In Progress
+
+**Review**: ✅ All review recommendations from `task.45.review.1.change-log-pipeline-and-sync.md` implemented 2026-08-13
 
 **GitHub Issue:** [#204](https://github.com/Gamaroff/agent-skills/issues/204)
 
@@ -33,8 +35,8 @@ body-hash refresh, using two incompatible marker pairs, in a format no other wri
 This task closes both ends: the pipeline starts logging milestones, and the sync stops
 logging noise.
 
-**Scope**: Two shared pipeline step documents, `develop`, three QA skills, `finalise`, six
-sync skills, three sync scripts, and six `ensure-*-issue` sub-routines.
+**Scope**: Three shared pipeline step documents, `develop`, three QA skills, `finalise`, six
+sync skills, three sync scripts, and three `ensure-*-jira-issue` sub-routines.
 
 **Key deliverables**:
 
@@ -69,8 +71,8 @@ reviewed, tracked, implemented, QA'd, accepted — in eight rows, not eighty.
 
 4. **`finalise` is the largest silent mutation in the repo.** Step 7 (`:756`) sets
    `status: accepted`, `completed_date` and `pr_number`, and appends an entire
-   `## Definition of Done - PASSED ✅` section. Step 8 (`:1222`) appends
-   `## Definition of Done - Gaps Identified`. Neither writes a Change Log row. The single
+   `## Definition of Done - PASSED ✅` section. Step 8 (`:1200`, append instruction at `:1249`)
+   appends `## Definition of Done - Gaps Identified`. Neither writes a Change Log row. The single
    most important event in a document's life — acceptance — leaves no trace in its history.
 
 5. **Sync writes a row on every update.** `sync-jira-story/SKILL.md:164` and its five
@@ -161,7 +163,8 @@ implementation, the QA verdict) via the rows above.
 ### Important Clarifications
 
 - **`develop-bug` keeps `## Status History`.** It already writes a rich per-iteration record
-  (`:161`, `:173`, `:177`) into the bug template's own section. No Change Log is added;
+  (Status History rows at `:163` and `:179`, under the Step headers at `:161`, `:173`, `:177`)
+  into the bug template's own section. No Change Log is added;
   the spec cross-references it.
 - **`qa-gate` still writes only the `.yml`.** It must not touch the document — the
   anti-pattern is explicit (`qa-fix/SKILL.md:599`, `docs/reference/anti-patterns.md`).
@@ -181,7 +184,7 @@ implementation, the QA verdict) via the rows above.
 ✅ `skills/finalise/SKILL.md` — Steps 7 and 8
 ✅ `skills/sync-jira-{story,epic,task}` — SKILL.md + `scripts/*.js`
 ✅ `skills/sync-github-{story,epic,task}` — SKILL.md
-✅ Six `ensure-*-issue` skills — remove stale side-effect notes
+✅ Three `ensure-*-jira-issue` skills — narrow stale side-effect notes
 ✅ `skills/develop-bug/SKILL.md` — cross-reference only
 
 ### Out of Scope
@@ -199,8 +202,9 @@ implementation, the QA verdict) via the rows above.
 
 ### Breaking Change 1: one marker pair replaces two
 
-**Before**: `<!-- jira-sync-changelog-start -->` (`jira-sync.js:411`) and
-`<!-- github-sync-changelog-start -->` (`sync-github-story/SKILL.md:213` and siblings).
+**Before**: `<!-- jira-sync-changelog-start -->` and `<!-- github-sync-changelog-start -->`. Both
+literals now live in the engine's `LEGACY_MARKER_PAIRS` at `change-log.js:57-58`; the sync skills
+restate the old pair in prose at `sync-github-story/SKILL.md:213` and siblings.
 
 **After**: `<!-- change-log-start -->` / `<!-- change-log-end -->` only.
 
@@ -235,10 +239,18 @@ string (`sync-jira-story.js:378`, `sync-jira-epic.js:503`, `sync-jira-task.js:25
 **Affected**: the three sync scripts and the compatibility wrappers task.42 left in
 `jira-sync.js`.
 
-**Migration path**: this task is what those wrappers were for. Update the three call sites,
-then delete the wrappers and the `skipChangelog` flag plumbing
-(`sync-jira-epic.js:887`) that the narrowed rules make redundant. `shared/resources/tests/jira-sync-publishing-fidelity.test.mjs`
-must stay green.
+**Migration path**: this task is what those wrappers were for — `jira-sync.js:415-416` says so in
+as many words ("Task.45 rewires those callers to use change-log.js directly, at which point this
+block can go"). Update the three call sites, then delete the wrappers and the `skipChangelog` flag
+plumbing (`sync-jira-epic.js:448`, `:503`, `:887`) that the narrowed rules make redundant.
+
+**The wrapper has four further consumers, and they must move in the same commit.**
+`shared/resources/tests/jira-sync-publishing-fidelity.test.mjs:40` imports `upsertChangelog` by
+name and calls it at `:198` — that suite must be **rewritten** to the structured-entry signature,
+not merely kept green. And each sync script re-exports the wrapper for its own test seam
+(`sync-jira-story.js:788`, `sync-jira-epic.js:1296`, `sync-jira-task.js:635`); a developer working
+only from the call-site line numbers above will not see them, and will ship a module exporting a
+function that no longer exists.
 
 ---
 
@@ -252,11 +264,11 @@ must stay green.
 **Files**: `shared/resources/develop-pipeline-step-3-develop-loop.md`,
 `-step-5-6-qa-loop.md`, `-step-7-finalise.md`
 
-- [ ] Step 3: on exiting the develop loop, append the implementation-complete row
-- [ ] Step 5-6: the QA verdict row is written by `qa-story` / `qa-task`; the step document
+- [x] Step 3: on exiting the develop loop, append the implementation-complete row
+- [x] Step 5-6: the QA verdict row is written by `qa-story` / `qa-task`; the step document
       states the contract and does not duplicate the write
-- [ ] Step 7: the accepted row is written by `finalise`; same
-- [ ] Each links `shared/resources/document-change-log.md`
+- [x] Step 7: the accepted row is written by `finalise`; same
+- [x] Each links `shared/resources/document-change-log.md`
 
 ### Phase 2: `develop` and the QA skills
 
@@ -265,13 +277,15 @@ must stay green.
 `skills/qa-fix/SKILL.md`
 **Depends on**: Phase 1
 
-- [ ] `develop` story path (`:582`) and task path (`:719`): point at the real section,
+- [x] `develop` story path (`:582`) and task path (`:719`): point at the real section,
       canonical format, one row on completion rather than per task
-- [ ] Confirm `Change Log` stays on the authorised-sections lists (`:509`, `:850`)
-- [ ] `qa-story` (`:1273`): append the verdict row alongside `## QA Testing Results`
-- [ ] `qa-task` Step 12 (`:720`): same
-- [ ] `qa-fix` (`:559`): align to the canonical format and Author cell
-- [ ] `qa-gate` unchanged — it must never touch the document
+- [x] Confirm `Change Log` stays on the authorised-sections lists (`:509`, `:850`)
+- [x] `qa-story` (`:1273`): append the verdict row alongside `## QA Testing Results`.
+      **The same contract is restated three more times** — `:928-937`, `:1440`, `:2384`. Patching
+      only `:1273` leaves three copies telling the model the pre-canonical story
+- [x] `qa-task` Step 12 (`:720`): same
+- [x] `qa-fix` (`:559`): align to the canonical format and Author cell
+- [x] `qa-gate` unchanged — it must never touch the document
 
 ### Phase 3: `finalise`
 
@@ -279,10 +293,13 @@ must stay green.
 **Files**: `skills/finalise/SKILL.md`
 **Depends on**: Phase 1
 
-- [ ] Step 7 (`:756`): append `| {today} | {bumped} | DoD passed — accepted (PR #{n}) | finalise |`
+- [x] Step 7 (`:756`): append `| {today} | {bumped} | DoD passed — accepted (PR #{n}) | finalise |`
       in the same edit that sets `status: accepted`, `completed_date` and `updated`
-- [ ] Step 8 (`:1222`): append a gaps row; status unchanged, so no Version bump
-- [ ] This is the only writer that bumps Version during a pipeline run
+- [x] Step 8 (header `:1200`, append instruction `:1249`): append a gaps row; status unchanged,
+      so no Version bump
+- [x] `:158` already scans for the literal `## Definition of Done - PASSED ✅` heading — check the
+      new row does not break that idempotence path on a re-run
+- [x] This is the only writer that bumps Version during a pipeline run
 
 ### Phase 4: Tracker sync
 
@@ -293,12 +310,29 @@ must stay green.
 
 - [ ] Three Jira scripts call `change-log.js` directly with the structured entry
 - [ ] Narrow to issue-created and status-transition rows; drop the body-update row
-- [ ] Delete the `skipChangelog` plumbing made redundant
-- [ ] Remove the wrappers task.42 left in `jira-sync.js`
+- [ ] Delete the `skipChangelog` plumbing made redundant (3 sites, all in `sync-jira-epic.js`:
+      the param default `:448`, the guard `:503`, the no-op fast path `:887`)
+- [ ] Remove the wrappers task.42 left in `jira-sync.js` (`:408-467`, exported at `:4056`)
+- [ ] **Same commit as the wrapper deletion — four surfaces break otherwise.** `upsertChangelog`
+      is not only called at the three sites above; it is imported by name and re-exported for
+      test seams. Deleting the wrapper without these leaves modules exporting a function that no
+      longer exists, and `npm test` goes red:
+      - `shared/resources/tests/jira-sync-publishing-fidelity.test.mjs:40` — imports it by name,
+        exercises it at `:198`. This suite must be **rewritten** to the new call signature, not
+        merely observed to stay green
+      - `skills/sync-jira-story/scripts/sync-jira-story.js:788` — re-exports `upsertChangelog`
+      - `skills/sync-jira-epic/scripts/sync-jira-epic.js:1296` — same
+      - `skills/sync-jira-task/scripts/sync-jira-task.js:635` — same
 - [ ] Three GitHub SKILL.md files: replace the three duplicated format specs with a link to
       the canonical spec and the same narrowed rules
-- [ ] Six `ensure-*-issue`: drop the now-inaccurate side-effect notes
-      (`ensure-story-jira-issue:102`, `ensure-task-jira-issue:96`, `ensure-epic-jira-issue:91`)
+- [ ] **Three** `ensure-*-jira-issue`: **narrow**, do not delete, the side-effect notes
+      (`ensure-story-jira-issue:102`, `ensure-task-jira-issue:96`, `ensure-epic-jira-issue:91`).
+      Each says the delegate "may also advance the status **and append a Change Log entry**" —
+      and under this task's own §3 table *both still happen*: issue creation writes a row and a
+      status transition writes a row. The note is more accurate after this task, not less.
+      Delete only the hypothetical `--no-status-transition` flag it floats, and reword the
+      remainder from an apology into documented, intended behaviour.
+      The three `ensure-*-github-issue` siblings carry **no such note** — nothing to edit there.
 - [ ] `develop-bug`: one cross-reference line — Status History stands
 
 ### Phase 5: Tests, bundle, live verification
@@ -326,13 +360,14 @@ must stay green.
 5. ✅ `skills/qa-story/SKILL.md` — `:1273`
 6. ✅ `skills/qa-task/SKILL.md` — `:720`
 7. ✅ `skills/qa-fix/SKILL.md` — `:559`
-8. ✅ `skills/finalise/SKILL.md` — `:756`, `:1222`
+8. ✅ `skills/finalise/SKILL.md` — `:756`, `:1249`
 9. ✅ `skills/sync-jira-story/scripts/sync-jira-story.js` — `:378`
 10. ✅ `skills/sync-jira-epic/scripts/sync-jira-epic.js` — `:503`, `:887`
 11. ✅ `skills/sync-jira-task/scripts/sync-jira-task.js` — `:258`
 12. ✅ `skills/sync-jira-{story,epic,task}/SKILL.md` — format spec → link; narrowed rules
 13. ✅ `skills/sync-github-{story,epic,task}/SKILL.md` — same
-14. ✅ `skills/ensure-{story,task,epic}-{jira,github}-issue/SKILL.md` — stale notes
+14. ✅ `skills/ensure-{story,task,epic}-jira-issue/SKILL.md` — narrow the side-effect notes
+    (3 files, not 6 — the `*-github-issue` siblings carry no such note)
 15. ✅ `skills/develop-bug/SKILL.md` — cross-reference
 16. ✅ `shared/resources/jira-sync.js` — remove the task.42 wrappers
 
@@ -343,7 +378,10 @@ must stay green.
 
 ### Files to Modify (Documentation)
 
-19. ✅ `shared/resources/document-change-log.md` — mark the moment table implemented
+19. ✅ `shared/resources/document-change-log.md` — **verify** the moment table (`:139-148`) matches
+    shipped behaviour; no edit expected. The table has columns `Moment | Written by | Version |
+    Example Description` and carries no implementation-status marker to flip — it is already
+    written as a forward contract. Edit only if this task's implementation diverges from it.
 20. ✅ `CHANGELOG.md`
 
 ### Files to Delete
@@ -422,7 +460,8 @@ None.
 
 ### Migration
 
-- [ ] `shared/resources/document-change-log.md`'s moment table matches shipped behaviour
+- [ ] `shared/resources/document-change-log.md`'s moment table (`:139-148`) verified against
+      shipped behaviour — no marker to flip; edit only on divergence
 - [ ] `CHANGELOG.md` records both breaking changes
 - [ ] Live verification against a real Jira issue completed and recorded in the DoD
 
@@ -434,7 +473,7 @@ None.
 
 1. **A sync bug corrupts the log on a live tracker-synced document**
    - **Risk**: the migration path rewrites a block wrongly and loses existing rows. Sync
-     failures in this codebase are historically *silent* — `CHANGELOG.md:377` records four
+     failures in this codebase are historically *silent* — `CHANGELOG.md:527` records four
      consecutive Jira cards published with empty bodies and a `✅ Task updated` each time.
      A log that loses rows would fail the same way.
    - **Probability**: Medium
@@ -477,10 +516,13 @@ None.
 
 ### Low Risk Areas
 
-5. **Six `ensure-*-issue` side-effect notes go stale in the other direction**
+5. **The three `ensure-*-jira-issue` side-effect notes go stale in the other direction**
    - **Probability**: Low
    - **Impact**: Low
-   - **Mitigation**: they are deleted, not rewritten.
+   - **Mitigation**: they are **narrowed, not deleted**. Deleting would discard information that
+     stays true: under the narrowed rules the delegate still appends a row on issue creation and
+     on a status transition, which is exactly what `ensure-*` triggers. Only the hypothetical
+     `--no-status-transition` flag goes.
 
 ---
 
@@ -525,16 +567,34 @@ per completion; a stale cross-reference.
 
 ---
 
+<!--
+  Append-only. Newest row LAST. Four columns, exactly as below.
+  Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
+  Canonical spec: shared/resources/document-change-log.md
+  Authoring/review/edit skills bump Version; machine writers leave it blank.
+  EVERY new row bumps frontmatter `updated:` in the same edit.
+-->
+
+## Change Log
+
+| Date       | Version | Description                                                                                                                                                     | Author      |
+| ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 2026-08-12 | 1.0     | Initial draft                                                                                                                                                   | create-task |
+| 2026-08-13 | 1.1     | Review passed (8/10) — ready for development; 7 Important fixes applied: 4 wrapper-deletion surfaces that break `npm test` named in §5/§6, deliverable #19 restated as verification (no marker exists to flip), `ensure-*` notes narrowed not deleted and scope corrected 6→3, `qa-story`'s 3 further edit sites named, citations fixed (`CHANGELOG.md` 377→527 ×2, `finalise` 1222→1249, legacy marker → `change-log.js:57-58`), Change Log section added | review-task |
+| 2026-08-13 |         | Status → ready-for-development                                                                                                                                  | review-task |
+
+---
+
 ## Progress Tracking
 
 ### Phase 1: Pipeline step documents
-- [ ] Not started
+- [x] Complete — step-3 (implementation row on loop exit), step-5-6 (writer contract table + qa-gate carve-out), step-7 (acceptance/gaps rows, sole Version bumper, two-rows-at-acceptance note, idempotence-guard warning) + checklist item
 
 ### Phase 2: `develop` and the QA skills
-- [ ] Not started
+- [x] Complete — `develop` story+task paths rewritten (row moved OUT of the per-task/per-phase loop), `qa-story` all 4 contract sites + authorisation list, `qa-task` Step 12, `qa-fix` normalised to one row per loop exit with 4 loose references realigned
 
 ### Phase 3: `finalise`
-- [ ] Not started
+- [x] Complete — acceptance row added as Step 7 sub-step 3 (same edit as the frontmatter change, minor Version bump, idempotence-guard warning, two-rows-at-acceptance note); gaps row added as Step 8 sub-step 3 (blank Version). Step numbering repaired in both — Step 7 had a pre-existing duplicate `6.`
 
 ### Phase 4: Tracker sync
 - [ ] Not started
@@ -552,8 +612,8 @@ per completion; a stale cross-reference.
   why sync churn was removed from cards; the same argument narrows the log
 - [`shared/resources/develop-pipeline-step-*.md`](../../../shared/resources/) — the step
   documents both develop pipelines delegate to
-- [`CHANGELOG.md`](../../../CHANGELOG.md) line 377 — the silent-publish failure class this
-  task must not reproduce
+- [`CHANGELOG.md`](../../../CHANGELOG.md) line 527 — the silent-publish failure class this
+  task must not reproduce (related: line 150, the 28 task cards that shipped with empty bodies)
 - Prior tasks: task.42, task.43, task.44. This completes the series.
 
 ---

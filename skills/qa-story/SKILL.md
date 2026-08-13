@@ -927,7 +927,9 @@ You are **AUTHORIZED** to update the following sections in story/task files:
 
 - `## QA Testing Results` section (gate decision, quality score, test coverage summary, key findings, links to QA artifacts)
 - `## QA Completion Summary` section (final QA status, test results summary, deployment readiness, final notes)
+- `## Change Log` section (append-only — one verdict row per QA cycle; never rewrite existing rows)
 - Story/Task `status` field in frontmatter (based on gate decision)
+- Frontmatter `updated` (bumped in the same edit as any Change Log row)
 
 **DO NOT modify**: Story content, Acceptance Criteria, Dev Notes, Developer sections, or any other sections.
 
@@ -937,6 +939,18 @@ You are **AUTHORIZED** to update the following sections in story/task files:
 2. If testing is complete, update `## QA Completion Summary` section
 3. Update story/task status based on gate decision
 4. Include links to detailed QA report and gate files for full details
+5. Append ONE `## Change Log` row recording the gate decision, in the same edit, and bump
+   frontmatter `updated`:
+
+   | 2026-05-14 |  | QA gate CONCERNS (6/10) — 2 findings | qa-story |
+
+   Leave `Version` blank — only `/finalise` bumps it. A cycle that finds nothing still writes its
+   row (`QA gate PASS (9/10) — no findings`): the verdict is the event being recorded, not the
+   findings. Canonical format: [document-change-log.md](references/document-change-log.md).
+
+   **Never write the gate `.yml` from here** — that file belongs to `qa-gate` alone. The converse
+   also holds: `qa-gate` never touches the document. See
+   [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md).
 
 **QA Report Location and Naming:**
 
@@ -1331,7 +1345,20 @@ After review:
    - FAIL → Status: "Reopened" (requires fixes)
    - WAIVED → Status: "Ready for Done" (with waiver notes)
 
-   **For Tasks - Update similar sections** in task file with QA assessment results
+   d. **Append the verdict row to `## Change Log`** — in the same edit as (a)–(c), bumping
+   frontmatter `updated`:
+
+   ```markdown
+   | 2026-05-14 |  | QA gate CONCERNS (6/10) — 2 findings | qa-story |
+   ```
+
+   One row per QA cycle. `Version` stays blank — only `/finalise` bumps it. Name the decision, the
+   score and the finding count; the detail lives in the QA report this row sits alongside. A clean
+   cycle still writes a row. Canonical format:
+   [document-change-log.md](references/document-change-log.md).
+
+   **For Tasks - Update similar sections** in task file with QA assessment results (the Change Log
+   row is written by `qa-task` in its Step 12, with `Author` = `qa-task`)
 
 4. Recommend next action based on gate decision
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List
@@ -1439,6 +1466,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] Gate YAML file created and saved (co-located with story/task)
 - [ ] Story/task `## QA Testing Results` section updated with gate status, quality score, and links to artifacts
 - [ ] Story/task status updated (`Ready for Done` / `Reopened` / etc.) per gate decision
+- [ ] `## Change Log` row appended recording the gate verdict (blank `Version`, `Author` = `qa-story` / `qa-task`), with frontmatter `updated` bumped in the same edit
 - [ ] Bug report files created for all HIGH and MEDIUM severity issues (if any)
 - [ ] Story Bug Reports section updated with current bug statuses (if any)
 - [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (step 6 — BLOCKING): confirm exit code 0 after up to 3 attempts
@@ -2381,7 +2409,7 @@ docs/
 4. **Risk-Aware**: Depth of review scales with risk signals - more thorough for auth/payment/security, lighter for well-tested features
 5. **Actionable Feedback**: Concrete recommendations with clear ownership, synthesized from all quality checks
 6. **Refactor When Safe**: Improve code quality during review (with tests)
-7. **Document Results in Story/Task File**: Update QA Testing Results and QA Completion Summary sections with gate decision, quality score, key findings, and deployment readiness
+7. **Document Results in Story/Task File**: Update QA Testing Results and QA Completion Summary sections with gate decision, quality score, key findings, and deployment readiness — and append one `## Change Log` row recording the verdict, so the document's own history shows the QA cycle and not just its outcome
 8. **Given-When-Then for Mapping**: Document test coverage, not test code
 9. **Interactive When Needed**: Use AskUserQuestion for unclear scope or thresholds
 10. **Integrated Outputs**: All assessments (direct tools + agents when used) feed into unified gate decision
