@@ -11,3 +11,11 @@ status: ready-for-review
 ## 6. Implementation Plan
 
 - [x] Phase 1: example phase
+
+<!-- change-log-start -->
+## Change Log
+
+| Date       | Version | Description | Author |
+| ---------- | ------- | ----------- | ------ |
+| 2026-08-13 |         | Implemented — 3 files, 5 tests | develop |
+<!-- change-log-end -->

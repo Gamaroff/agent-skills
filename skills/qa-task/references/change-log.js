@@ -392,10 +392,28 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
   const found = findChangeLog(content);
 
   if (found) {
-    const existing = content
-      .slice(found.start, found.end)
-      .split("\n")
-      .filter(isEntryRow);
+    const blockLines = content.slice(found.start, found.end).split("\n");
+    const existing = blockLines.filter(isEntryRow);
+
+    // Rows the parser does not recognise are PRESERVED, not dropped.
+    //
+    // The block is regenerated from `existing`, so anything `isEntryRow` rejects
+    // would otherwise vanish silently. That is not hypothetical: a log written
+    // `| Version | Date | Change | Author |` — the column order this repo's own
+    // roadmap template shipped with — has a non-date first cell in every row, so
+    // every historical row failed the test and the regenerated block contained
+    // only the new one. Losing history is the single worst outcome for this
+    // module, and it is worse than emitting a slightly irregular table.
+    //
+    // Header and separator lines are excluded because the regenerated block
+    // supplies its own.
+    const unparsed = blockLines.filter(
+      (l) =>
+        /^\s*\|/.test(l) &&
+        !isEntryRow(l) &&
+        !/^\s*\|[\s\-:|]+\|\s*$/.test(l) &&
+        !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(l),
+    );
     const migrated = found.legacyAuthor
       ? migrateLegacyEntries(existing, { legacyAuthor: found.legacyAuthor, docType })
       : existing;
@@ -429,7 +447,10 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
       ? [...migrated, ...merged].sort(byDate)
       : migrated;
 
-    const block = buildChangeLogBlock([...history, newRow], {
+    // Unparsed rows lead: they are older history the parser could not read, and
+    // the log is append-only, so nothing may be emitted above them that would
+    // reorder them relative to what follows.
+    const block = buildChangeLogBlock([...unparsed, ...history, newRow], {
       level: found.level,
     });
     // Normalise both seams: the head may now end in blank lines where a swept
@@ -543,16 +564,19 @@ function bumpUpdated(content, date) {
 }
 
 // ---------------------------------------------------------------------------
-// Legacy row parsing — for the jira-sync.js back-compat shim
+// Legacy row parsing
 // ---------------------------------------------------------------------------
 
 /**
  * Parse a preformatted legacy row back into an entry object.
  *
- * The three `sync-jira-*` scripts pass `upsertChangelog(content, row)` where `row`
- * is already a formatted 2-column string. Rather than change those call sites in
- * this task, the shim parses the row back out and delegates. Task.45 rewires them
- * to call `upsertChangeLog` directly with a real entry object.
+ * The `sync-jira-*` scripts no longer call this — task.45 moved them onto
+ * `upsertChangeLog` with structured entries, and the shim they went through was
+ * deleted with it. What keeps this function alive is the documents themselves:
+ * rows written by the old 2-column writers are still on disk, and
+ * `migrateLegacyEntries` parses each one through here when a block is first
+ * rewritten under the unified markers. It is a *reader* of history now, not an
+ * adapter for callers.
  */
 function parseLegacyRow(row, author = "") {
   const cells = rowCells(String(row));

@@ -29,11 +29,11 @@ test("parseFrontmatter — preserves body containing horizontal rule", () => {
 });
 
 // ---------------------------------------------------------------------------
-// upsertChangelog
+// upsertChangeLog (change-log.js engine, called directly since task.45)
 // ---------------------------------------------------------------------------
-test("upsertChangelog — wraps existing hand-written ## Change Log", () => {
+test("upsertChangeLog — wraps existing hand-written ## Change Log", () => {
   const src = `# Title\n\n## Change Log\n\n| Date (UTC) | Change |\n|------------|--------|\n| 2026-01-01 09:00 | Manual entry |\n\n## Other\n\nstuff\n`;
-  const out = lib.upsertChangelog(src, lib.fmtEntry("Auto entry"));
+  const out = lib.upsertChangeLog(src, { date: "2026-07-31", description: "Auto entry", author: "sync-jira" });
   assert.equal(out.match(/## Change Log/g).length, 1);
   assert.match(out, /Manual entry/);
   assert.match(out, /Auto entry/);

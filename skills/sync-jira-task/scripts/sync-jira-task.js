@@ -24,6 +24,7 @@
 const fs = require("fs");
 const path = require("path");
 const lib = require("../references/jira-sync.js");
+const CL = require("../references/change-log.js");
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -230,7 +231,7 @@ function collectIssueFields({ summary, args, frontmatter, descAdf, taskTypeId, p
 // ---------------------------------------------------------------------------
 // File write-back
 // ---------------------------------------------------------------------------
-function updateTaskFile({ filePath, issueKey, issueUrl, taskBbUrl, changeEntry, lastSyncedAt, bodyHash, metaHash, output }) {
+function updateTaskFile({ filePath, issueKey, issueUrl, taskBbUrl, changeLogEntries, lastSyncedAt, bodyHash, metaHash, output }) {
   let content = fs.readFileSync(filePath, "utf-8");
 
   content = lib.upsertFrontmatterKeys(content, {
@@ -255,7 +256,20 @@ function updateTaskFile({ filePath, issueKey, issueUrl, taskBbUrl, changeEntry, 
   content = upsertLine(content, /^\*\*Jira Task\*\*:.*$/m, `**Jira Task**: [${issueKey}](${issueUrl})`);
   if (taskBbUrl) content = upsertLine(content, /^\*\*Task File\*\*:.*$/m, `**Task File**: [View on Bitbucket](${taskBbUrl})`);
 
-  content = lib.upsertChangelog(content, changeEntry);
+  // A Change Log row is written for exactly two events — issue created, and
+  // status transition. A body, summary or label update writes none: Jira keeps a
+  // full issue history with actor and timestamp, and the document now records
+  // *why* the body changed via its review/develop/QA rows.
+  //
+  // Marker migration rides along inside upsertChangeLog and therefore cannot fire
+  // on the no-op path: no entry, no call, no migration. The write below is
+  // unconditional — frontmatter timestamps are refreshed regardless — so what an
+  // empty list buys is not a skipped write but an unchanged one: no new row, no
+  // marker rewrite, byte-identical content, empty `git diff`. That is the property
+  // that keeps consecutive no-op syncs from churning history.
+  for (const entry of changeLogEntries) {
+    content = CL.upsertChangeLog(content, entry, { docType: "task" });
+  }
   fs.writeFileSync(filePath, content, "utf-8");
   output.info(`\n📝 Updated local task file: ${filePath}`);
 }
@@ -407,7 +421,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   if (args.dryRun) output.info("   Mode:       DRY RUN — no Jira calls or file writes");
   if (args.force)  output.info("   Mode:       --force — concurrent-edit guard disabled");
 
-  let result, changeSummary, changeEntry, current = null;
+  let result, changeSummary, current = null;
 
   if (isUpdate) {
     if (!args.dryRun) {
@@ -432,7 +446,6 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         })
       : ["summary", "description", "priority", "labels"];
     changeSummary = changedFields.length ? `Updated: ${changedFields.join(", ")}` : "Sync (no field changes detected)";
-    changeEntry = lib.fmtEntry(changeSummary);
 
     const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output });
     const fields = collectIssueFields({
@@ -487,7 +500,6 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     }
   } else {
     changeSummary = "Initial Jira task created";
-    changeEntry = lib.fmtEntry(changeSummary);
     const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output });
 
     if (args.dryRun) {
@@ -571,7 +583,13 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       issueKey: result.issueKey,
       issueUrl: result.issueUrl,
       taskBbUrl,
-      changeEntry,
+      changeLogEntries: lib.buildChangeLogEntries({
+        created: !isUpdate,
+        issueKey: result.issueKey,
+        statusOutcome,
+        author: "sync-jira-task",
+        docNoun: "task",
+      }),
       lastSyncedAt: result.updated,
       bodyHash: newBodyHash,
       metaHash: newMetaHash,
@@ -632,12 +650,14 @@ if (require.main === module) {
     parseFrontmatter:        lib.parseFrontmatter,
     rewriteFrontmatter:      lib.rewriteFrontmatter,
     upsertFrontmatterKeys:   lib.upsertFrontmatterKeys,
-    upsertChangelog:         lib.upsertChangelog,
-    extractEntries:          lib.extractEntries,
-    findHandWrittenChangelog: lib.findHandWrittenChangelog,
-    buildChangelogBlock:     lib.buildChangelogBlock,
-    fmtEntry:                lib.fmtEntry,
-    isEntryRow:              lib.isEntryRow,
+    // Change Log: policy from jira-sync, mechanics straight from the engine.
+    buildChangeLogEntries:   lib.buildChangeLogEntries,
+    upsertChangeLog:         CL.upsertChangeLog,
+    extractEntries:          CL.extractEntries,
+    findChangeLog:           CL.findChangeLog,
+    buildChangeLogBlock:     CL.buildChangeLogBlock,
+    fmtEntry:                CL.fmtEntry,
+    isEntryRow:              CL.isEntryRow,
     diffFields:              lib.diffFields,
     normalisePriority:       lib.normalisePriority,
     sanitiseLabels:          lib.sanitiseLabels,
@@ -658,7 +678,7 @@ if (require.main === module) {
     resolveDocBranch:        lib.resolveDocBranch,
     loadDocBranchSetting:        lib.loadDocBranchSetting,
     parseTopLevelScalar:        lib.parseTopLevelScalar,
-    CL_START:                lib.CL_START,
-    CL_END:                  lib.CL_END,
+    CL_START:                CL.CL_START,
+    CL_END:                  CL.CL_END,
   };
 }

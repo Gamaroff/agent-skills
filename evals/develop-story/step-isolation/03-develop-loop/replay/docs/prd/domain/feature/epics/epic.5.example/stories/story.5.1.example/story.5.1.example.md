@@ -17,3 +17,11 @@ epic: epic.5.example
 ## Dev Notes
 
 Standard implementation. Implementation complete.
+
+<!-- change-log-start -->
+## Change Log
+
+| Date       | Version | Description | Author |
+| ---------- | ------- | ----------- | ------ |
+| 2026-08-13 |         | Implemented — 3 files, 5 tests | develop |
+<!-- change-log-end -->

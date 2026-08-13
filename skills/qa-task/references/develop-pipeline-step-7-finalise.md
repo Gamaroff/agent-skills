@@ -91,6 +91,37 @@ Log "Story accepted" in Decisions Log.
 
 Log "Task completed" in Decisions Log.
 
+### Change Log (shared)
+
+`/finalise` appends the acceptance row **in the same edit** that sets `status: accepted`,
+`completed_date` and `pr_number` — acceptance is the single most important event in a document's
+life, and splitting the two writes is how one lands without the other. This step document states
+the contract; `/finalise` performs the write. Canonical format:
+[document-change-log.md](document-change-log.md).
+
+| 2026-05-15 | 1.2 | DoD passed — accepted (PR #204) | finalise |
+
+**`/finalise` is the only pipeline writer that bumps `Version`**, and it bumps the minor. Every
+other pipeline row — `develop`, `qa-story`/`qa-task`, `qa-fix`, and the tracker syncs — leaves the
+cell blank. Bumping per step would make `Version` a step counter instead of a document revision.
+
+On the gaps path (`## If DoD Gaps Are Found` above) the row is written too, but the status is
+deliberately unchanged, so **no Version bump**:
+
+| 2026-05-15 |  | DoD incomplete — 3 gaps identified | finalise |
+
+> **Two rows at acceptance is correct, not a duplicate.** Step 7 also re-runs
+> `sync-jira-{story,task}`, and under the narrowed sync rules that sync writes a row only when it
+> transitions the status — which at acceptance it does. So an accepted document ends with
+> `DoD passed — accepted (PR #204)` from `finalise` and `Status → done` from the sync. They record
+> two different events: the local acceptance decision, and the tracker reaching its terminal
+> column.
+
+> **Keep the Description clear of the literal `Definition of Done ... PASSED`.** The prior-run
+> idempotence guard greps `^## Definition of Done.*(PASSED|✅)` to decide whether finalise has
+> already run. A Change Log row echoing that phrasing at the start of a line would be counted by
+> that check.
+
 ---
 
 ## Post DoD Body to PR (REQUIRED — lite and standard modes alike)
@@ -239,6 +270,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] `/finalise` skill was invoked (not inlined with `Write`)
 - [ ] `*.dod.{N}.*.md` file exists in the story/task directory
 - [ ] Story/task `status:` (frontmatter) AND `Status:` (body) both read `accepted` / `Accepted`
+- [ ] Change Log carries the acceptance row with a bumped minor `Version`, written in the same edit as the frontmatter change
 - [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
 - [ ] Tracker issue `## Document` link re-pointed to the durable branch by `/finalise` (before close/transition)
 - [ ] Tracker issue commented (GitHub `gh issue comment` or Jira `addCommentToJiraIssue`)

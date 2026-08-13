@@ -14,6 +14,7 @@
 const fs = require("fs");
 const path = require("path");
 const lib = require("../references/jira-sync.js");
+const CL = require("../references/change-log.js");
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -355,7 +356,7 @@ function upsertInlineLine(text, pattern, newLine) {
   });
 }
 
-function updateStoryFile({ filePath, issueKey, issueUrl, epicKey, epicBbUrl, storyBbUrl, changeEntry, lastSyncedAt, bodyHash, metaHash, baseUrl, output }) {
+function updateStoryFile({ filePath, issueKey, issueUrl, epicKey, epicBbUrl, storyBbUrl, changeLogEntries, lastSyncedAt, bodyHash, metaHash, baseUrl, output }) {
   let content = fs.readFileSync(filePath, "utf-8");
 
   content = lib.upsertFrontmatterKeys(content, {
@@ -375,7 +376,14 @@ function updateStoryFile({ filePath, issueKey, issueUrl, epicKey, epicBbUrl, sto
   if (storyBbUrl) content = upsertInlineLine(content, /^\*\*Story File\*\*:.*$/m, `**Story File**: [View on Bitbucket](${storyBbUrl})`);
   if (epicBbUrl)  content = upsertInlineLine(content, /^\*\*Epic File\*\*:.*$/m,  `**Epic File**: [View on Bitbucket](${epicBbUrl})`);
 
-  content = lib.upsertChangelog(content, changeEntry);
+  // Exactly two events earn a row — issue created, and status transition. See
+  // `buildChangeLogEntries` in jira-sync.js for why a body update earns none.
+  // An empty list means no call, and therefore no legacy-marker migration. The
+  // write itself is unconditional, so the guarantee is byte-identical content and
+  // an empty `git diff` on a no-op — not a skipped write.
+  for (const entry of changeLogEntries) {
+    content = CL.upsertChangeLog(content, entry, { docType: "story" });
+  }
   fs.writeFileSync(filePath, content, "utf-8");
   output.info(`\n📝 Updated local story file: ${filePath}`);
 }
@@ -544,7 +552,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   if (args.noWrite) output.info("   Mode:       --no-write — Jira sync runs but local file is not modified");
   if (args.force)   output.info("   Mode:       --force — concurrent-edit guard disabled");
 
-  let result, changeSummary, changeEntry, current = null, skippedNoChanges = false, postCreateStatus = null;
+  let result, changeSummary, current = null, skippedNoChanges = false, postCreateStatus = null;
 
   if (isUpdate) {
     if (!args.dryRun) {
@@ -573,7 +581,6 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
 
     if (skippedNoChanges) {
       changeSummary = "Sync (no field changes detected)";
-      changeEntry = null;
       output.info(`\nℹ️  No field changes vs Jira — skipping PUT, write-back, and changelog entry. Status transition still runs if frontmatter status differs.`);
       result = {
         issueKey: existingJiraKey,
@@ -582,7 +589,6 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       };
     } else {
       changeSummary = `Updated: ${changedFields.join(", ")}`;
-      changeEntry = lib.fmtEntry(changeSummary);
 
       const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver, output });
       // Send `description` only when body or metadata actually changed, to avoid
@@ -644,7 +650,6 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     }
   } else {
     changeSummary = "Initial Jira story created";
-    changeEntry = lib.fmtEntry(changeSummary);
     const descAdf = buildDescriptionAdf({ body, frontmatter, epicBbUrl, storyBbUrl, relatedDocLinks, linkResolver, output });
 
     if (args.dryRun) {
@@ -705,7 +710,24 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   }
 
   // Write-back
-  const shouldWriteFile = result?.issueKey && !args.dryRun && !args.noWrite && !skippedNoChanges;
+  //
+  // `changeLogEntries` is computed BEFORE the write gate because it can force the
+  // write. A body-unchanged sync that nonetheless transitioned the status has a
+  // real row to record, and the old `!skippedNoChanges` gate suppressed the write
+  // entirely — so the status row could never land on exactly the path that earns
+  // it. The no-op case is still a genuine no-op: no create, no transition, empty
+  // list, no write.
+  const changeLogEntries = lib.buildChangeLogEntries({
+    created: !isUpdate,
+    issueKey: result?.issueKey,
+    statusOutcome,
+    author: "sync-jira-story",
+    docNoun: "story",
+  });
+
+  const shouldWriteFile =
+    result?.issueKey && !args.dryRun && !args.noWrite &&
+    (!skippedNoChanges || changeLogEntries.length > 0);
   if (shouldWriteFile) {
     updateStoryFile({
       filePath,
@@ -714,7 +736,7 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       epicKey,
       epicBbUrl,
       storyBbUrl,
-      changeEntry,
+      changeLogEntries,
       lastSyncedAt: result.updated,
       bodyHash: newBodyHash,
       metaHash: newMetaHash,
@@ -785,12 +807,14 @@ if (require.main === module) {
     parseFrontmatter:        lib.parseFrontmatter,
     rewriteFrontmatter:      lib.rewriteFrontmatter,
     upsertFrontmatterKeys:   lib.upsertFrontmatterKeys,
-    upsertChangelog:         lib.upsertChangelog,
-    extractEntries:          lib.extractEntries,
-    findHandWrittenChangelog: lib.findHandWrittenChangelog,
-    buildChangelogBlock:     lib.buildChangelogBlock,
-    fmtEntry:                lib.fmtEntry,
-    isEntryRow:              lib.isEntryRow,
+    // Change Log: policy from jira-sync, mechanics straight from the engine.
+    buildChangeLogEntries:   lib.buildChangeLogEntries,
+    upsertChangeLog:         CL.upsertChangeLog,
+    extractEntries:          CL.extractEntries,
+    findChangeLog:           CL.findChangeLog,
+    buildChangeLogBlock:     CL.buildChangeLogBlock,
+    fmtEntry:                CL.fmtEntry,
+    isEntryRow:              CL.isEntryRow,
     diffFields:              lib.diffFields,
     normalisePriority:       lib.normalisePriority,
     sanitiseLabels:          lib.sanitiseLabels,
@@ -811,7 +835,7 @@ if (require.main === module) {
     resolveDocBranch:        lib.resolveDocBranch,
     loadDocBranchSetting:        lib.loadDocBranchSetting,
     parseTopLevelScalar:        lib.parseTopLevelScalar,
-    CL_START:                lib.CL_START,
-    CL_END:                  lib.CL_END,
+    CL_START:                CL.CL_START,
+    CL_END:                  CL.CL_END,
   };
 }

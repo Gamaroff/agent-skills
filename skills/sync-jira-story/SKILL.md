@@ -1,6 +1,6 @@
 ---
 name: sync-jira-story
-description: Sync a local story markdown file to Jira — creates the story if it has no jira_key, updates it if jira_key is already set. Links the Jira story to its parent Jira epic (team-managed `parent` or classic Epic Link customfield, auto-detected with retry). Adds the story to the project backlog (Scrum boards only). Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Maintains a Change Log in the local story file. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this story in Jira", "update this story in Jira", "sync story to Jira", "push story changes to Jira", or "publish story to Jira".
+description: Sync a local story markdown file to Jira — creates the story if it has no jira_key, updates it if jira_key is already set. Links the Jira story to its parent Jira epic (team-managed `parent` or classic Epic Link customfield, auto-detected with retry). Adds the story to the project backlog (Scrum boards only). Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Writes a Change Log row on issue creation and on status transition only (not on body updates). Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this story in Jira", "update this story in Jira", "sync story to Jira", "push story changes to Jira", or "publish story to Jira".
 ---
 
 # sync-jira-story
@@ -12,7 +12,7 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 | `jira_key` present? | Action |
 |---|---|
 | Absent | **Pre-flight search by sync label**, then **Create** as child of `jira_epic` if no match. Writes `jira_key` back to file. |
-| Present | **Update** existing Jira story via atomic PUT, append to Change Log. |
+| Present | **Update** existing Jira story via atomic PUT. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-task`:** stories are **linked to a parent Jira epic** (required `jira_epic` frontmatter). Issue type sent as `Story`. Project style is auto-detected (team-managed `parent` field vs classic Epic Link customfield), with retry on the opposite linkage if Jira rejects the first attempt.
 
@@ -161,7 +161,7 @@ Flow:
 11. **Create** (POST, with parent/Epic Link auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`). On update, `description` is sent only when body or metadata hash changed.
 12. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning. Fetch fresh `updated` + `status` in a single GET.
 13. If frontmatter `status` differs from current Jira status, fetch transitions and POST a status transition.
-14. Update local file (skipped under `--no-write` or when diff was empty): in-place frontmatter for `jira_key`, `jira_url`, `jira_epic`, `epic_bitbucket_url`, `story_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Story**` / `**Jira Epic**` / `**Story File**` / `**Epic File**` links (code-block samples are skipped). Append Change Log entry.
+14. Update local file (skipped under `--no-write` or when diff was empty): in-place frontmatter for `jira_key`, `jira_url`, `jira_epic`, `epic_bitbucket_url`, `story_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Story**` / `**Jira Epic**` / `**Story File**` / `**Epic File**` links (code-block samples are skipped). Append a Change Log row only for issue creation or a status transition — never for a body update.
 
 ### 5. Report to User
 
@@ -248,20 +248,31 @@ On create, the script:
 
 On **update**, parent linkage is **not** re-sent — Jira rejects parent edits on team-managed tracking issues, and re-parenting is rare. Move stories between epics manually in Jira if needed.
 
-## Change Log Format
-
-```markdown
-<!-- jira-sync-changelog-start -->
 ## Change Log
 
-| Date (UTC)       | Change                              |
-|------------------|-------------------------------------|
-| 2026-04-28 09:40 | Initial Jira story created          |
-| 2026-04-28 11:05 | Updated: summary, description       |
-<!-- jira-sync-changelog-end -->
-```
+The format is not restated here — it is defined once in
+[document-change-log.md](references/document-change-log.md), and the engine that
+writes it is `references/change-log.js`. Markers are `<!-- change-log-start -->` /
+`<!-- change-log-end -->`; a document still carrying the superseded
+`<!-- jira-sync-changelog-* -->` pair is migrated in place on the first sync that
+writes for another reason.
 
-If your story already has a hand-written `## Change Log` heading without HTML markers, the first sync **wraps it in markers in place** and preserves any existing `| date | change |` rows — no duplication. Entry rows are matched by a strict regex `^\|\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s*\|`, so unrelated body markdown tables can't pollute the changelog.
+**A row is written for exactly two events:**
+
+| Event | Row |
+| --- | --- |
+| Issue created | `\| 2026-08-12 \|  \| Jira story created (PROJ-42) \| sync-jira-story \|` |
+| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-jira-story \|` |
+
+**A body, summary, priority or label update writes no row.** Jira keeps a full
+issue history with actor and timestamp — strictly better than a local row naming
+only which fields moved — and the document records *why* the body changed through
+its own review, develop and QA rows. `jira_last_synced_at` in frontmatter still
+records the last sync time.
+
+A sync that changes nothing writes nothing at all: no row, no marker migration,
+no file write. Migration happens inside the row write, so it can never fire on the
+no-op path and churn every document on every sync.
 
 ## Story File Format
 

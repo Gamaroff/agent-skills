@@ -187,6 +187,30 @@ If the matrix was not generated (lite mode, no Success Criteria table, or mapper
 Skill(qa-task, args="code_review_blocking=true")
 ```
 
+### Change Log (shared — who writes what)
+
+Two skills write rows across this loop, and **this step document writes none**. It states the
+contract; the skills perform the writes. Canonical format:
+[document-change-log.md](document-change-log.md).
+
+| Writer     | When                          | Row                                                     |
+| ---------- | ----------------------------- | ------------------------------------------------------- |
+| `qa-story` / `qa-task` | each QA cycle, alongside its QA Results section | `\| 2026-05-14 \|  \| QA gate CONCERNS (6/10) — 2 findings \| qa-story \|` |
+| `qa-fix`   | on **exiting** the fix loop   | `\| 2026-05-14 \|  \| QA findings fixed — gate PASS (9/10), 2 iterations \| qa-fix \|` |
+
+Three rules make this loop's history readable rather than a churn log:
+
+- **`Version` stays blank.** Only `/finalise` bumps it, at acceptance.
+- **`qa-fix` writes once per loop exit, not once per finding or per cycle.** Put the iteration
+  count in the Description. The per-cycle detail already lives in the QA Iteration History section
+  of the implementation report, which is its proper home.
+- **`qa-gate` writes nothing to the document — ever.** It owns the `.yml` and only the `.yml`.
+  The verdict row is written by `qa-story` / `qa-task`, which already own document sections. See
+  [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md).
+
+A QA cycle that finds nothing still writes its verdict row: the verdict is the event being
+recorded, not the findings.
+
 ### Outcome branching (shared)
 
 After completion, find and read the latest gate file:

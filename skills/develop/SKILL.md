@@ -579,8 +579,14 @@ After status validation passes:
    - Key technical details (algorithms, data flows)
    - Integration points and dependencies
 12. Update story File List section (all new/modified/deleted files)
-13. Update Change Log with date and summary of changes
-14. Repeat until all tasks complete
+13. Repeat until all tasks complete
+14. (Once, after ALL tasks are complete — not inside the loop) Append ONE Change Log row to the
+    story's `## Change Log` section summarising the implementation, and bump frontmatter `updated`
+    in the same edit:
+    `| {today} |  | Implemented — {N} files, {M} tests | develop |`
+    Leave `Version` blank — only `/finalise` bumps it. One row per develop run, never one per
+    task: the per-task narrative already lives in the Dev Agent Record. Canonical format:
+    [document-change-log.md](references/document-change-log.md).
 ```
 
 **Testing Checkpoints** (Execute at these milestones):
@@ -716,8 +722,15 @@ After status validation passes:
    - Key technical details (algorithms, data flows)
    - Integration points and dependencies
 10. Update task Files Summary section (all new/modified/deleted files)
-11. Update task change log with date and summary of changes
-12. Repeat until all phases complete
+11. Repeat until all phases complete
+12. (Once, after ALL phases are complete — not inside the loop) Append ONE row to the task's
+    `## Change Log` section — the unnumbered section that sits after `## 11. Rollback Plan` — and
+    bump frontmatter `updated` in the same edit:
+    `| {today} |  | Implemented — {N} files, {M} tests | develop |`
+    Leave `Version` blank — only `/finalise` bumps it. One row per develop run, never one per
+    phase. If the task predates the Change Log template and has no such section, create it with
+    the four canonical columns. Canonical format:
+    [document-change-log.md](references/document-change-log.md).
 ```
 
 **Blocking Conditions** (HALT and ask user):

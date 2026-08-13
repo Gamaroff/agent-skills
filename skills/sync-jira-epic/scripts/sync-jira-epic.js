@@ -14,6 +14,7 @@
 const fs = require("fs");
 const path = require("path");
 const lib = require("../references/jira-sync.js");
+const CL = require("../references/change-log.js");
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -440,12 +441,11 @@ function updateEpicFile({
   issueUrl,
   epicBbUrl,
   prdBbUrl,
-  changeEntry,
+  changeLogEntries,
   lastSyncedAt,
   bodyHash,
   metaHash,
   output,
-  skipChangelog = false,
 }) {
   try {
     let content = fs.readFileSync(filePath, "utf-8");
@@ -500,7 +500,13 @@ function updateEpicFile({
         `**Epic File**: [View on Bitbucket](${epicBbUrl})`,
       );
 
-    if (!skipChangelog) content = lib.upsertChangelog(content, changeEntry);
+    // Two events earn a row — issue created, and status transition. The
+    // `skipChangelog` flag this replaced existed to suppress a row on the no-op
+    // path; the narrowed rules make that suppression automatic, since a no-op
+    // produces an empty list and therefore no call at all.
+    for (const entry of changeLogEntries) {
+      content = CL.upsertChangeLog(content, entry, { docType: "epic" });
+    }
     fs.writeFileSync(filePath, content, "utf-8");
     output.info(`\n📝 Updated local epic file: ${filePath}`);
   } catch (err) {
@@ -823,7 +829,6 @@ async function run({
 
   let result,
     changeSummary,
-    changeEntry,
     current = null;
 
   if (isUpdate) {
@@ -863,28 +868,82 @@ async function run({
     changeSummary = changedFields.length
       ? `Updated: ${changedFields.join(", ")}`
       : "Sync (no field changes detected)";
-    changeEntry = lib.fmtEntry(changeSummary);
 
-    // No-change fast path: skip PUT and skip the local changelog row too —
-    // an empty no-op shouldn't pollute the change log. Frontmatter timestamp
-    // and hashes are still refreshed so the next run sees a clean baseline.
+    // No-change fast path: skip the PUT. The body has not moved, so there is
+    // nothing to publish.
+    //
+    // The status transition still runs here, and must. This path returns before
+    // the main transition block below, so an epic whose frontmatter status moved
+    // while its card body did not would otherwise never transition at all — the
+    // status would silently diverge from the board on exactly the sync that was
+    // meant to carry it. `sync-jira-story` and `sync-jira-task` have always
+    // transitioned on this path; the epic's early return made it the odd one out.
     if (current && changedFields.length === 0 && !args.force) {
       output.info(
         "\nℹ️  No field changes detected — skipping Jira update. Re-run with --force to push anyway.",
       );
       const issueUrl = `${auth.baseUrl}/browse/${existingJiraKey}`;
+
+      let skipStatusOutcome = null;
+      if (!args.dryRun && frontmatter.status) {
+        skipStatusOutcome = await lib.syncDocumentStatus({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey: existingJiraKey,
+          localStatus: frontmatter.status,
+          currentStatus: current?.status || null,
+          docKind: "epic",
+          output,
+        });
+      }
+
+      // Nothing was created and usually nothing transitioned, so this is normally
+      // an empty list — no upsert call, no marker migration, no file rewrite. A
+      // transition on this path is the one case that earns a row.
+      const skipEntries = lib.buildChangeLogEntries({
+        created: false,
+        issueKey: existingJiraKey,
+        statusOutcome: skipStatusOutcome,
+        author: "sync-jira-epic",
+        docNoun: "epic",
+      });
+
+      // A successful transition bumps Jira's own `updated` field, so `current.updated`
+      // — read before the transition — is already stale. Persisting it would make the
+      // NEXT sync's concurrent-edit guard see `jiraUpdated > jira_last_synced_at` and
+      // abort with "Jira issue updated since last local sync", requiring --force to
+      // recover. Re-read the timestamp whenever we actually moved the card.
+      let skipSyncedAt = current.updated;
+      if (skipStatusOutcome?.transitioned) {
+        try {
+          skipSyncedAt = await lib.fetchUpdatedTimestampStrict({
+            http,
+            baseUrl: auth.baseUrl,
+            email: auth.email,
+            token: auth.token,
+            issueKey: existingJiraKey,
+          });
+        } catch (e) {
+          output.warn(
+            `⚠️  Could not re-read updated timestamp after transition: ${e.message}. ` +
+            `Next sync may require --force.`,
+          );
+        }
+      }
+
       updateEpicFile({
         filePath,
         issueKey: existingJiraKey,
         issueUrl,
         epicBbUrl,
         prdBbUrl,
-        changeEntry,
-        lastSyncedAt: current.updated,
+        changeLogEntries: skipEntries,
+        lastSyncedAt: skipSyncedAt,
         bodyHash: newBodyHash,
         metaHash: newMetaHash,
         output,
-        skipChangelog: true,
       });
       if (args.json) {
         output.emit({
@@ -899,7 +958,21 @@ async function run({
           jira_last_meta_hash: newMetaHash,
         });
       }
-      return { exitCode: 0, isUpdate: true, skipped: true };
+      // Report the transition the same way the main path does. Returning a bare
+      // exitCode 0 here would make a failed or skipped transition on this path
+      // completely silent — no "Status NOT synced" warning, `--fail-on-status-skip`
+      // ignored, and `statusOutcome` absent from the returned shape that callers
+      // read. Now that this path really does transition, it owes the same report.
+      const skipStatusExit = lib.summariseStatusOutcome(skipStatusOutcome, {
+        output,
+        failOnSkip: args.failOnStatusSkip,
+      });
+      return {
+        exitCode: skipStatusExit,
+        isUpdate: true,
+        skipped: true,
+        statusOutcome: skipStatusOutcome,
+      };
     }
 
     const descAdf = buildDescriptionAdf({
@@ -961,7 +1034,6 @@ async function run({
     }
   } else {
     changeSummary = "Initial Jira epic created";
-    changeEntry = lib.fmtEntry(changeSummary);
     const descAdf = buildDescriptionAdf({
       body,
       frontmatter,
@@ -1200,7 +1272,13 @@ async function run({
       issueUrl: result.issueUrl,
       epicBbUrl,
       prdBbUrl,
-      changeEntry,
+      changeLogEntries: lib.buildChangeLogEntries({
+        created: !isUpdate,
+        issueKey: result.issueKey,
+        statusOutcome,
+        author: "sync-jira-epic",
+        docNoun: "epic",
+      }),
       lastSyncedAt: result.updated,
       bodyHash: newBodyHash,
       metaHash: newMetaHash,
@@ -1293,12 +1371,14 @@ if (require.main === module) {
     parseFrontmatter: lib.parseFrontmatter,
     rewriteFrontmatter: lib.rewriteFrontmatter,
     upsertFrontmatterKeys: lib.upsertFrontmatterKeys,
-    upsertChangelog: lib.upsertChangelog,
-    extractEntries: lib.extractEntries,
-    findHandWrittenChangelog: lib.findHandWrittenChangelog,
-    buildChangelogBlock: lib.buildChangelogBlock,
-    fmtEntry: lib.fmtEntry,
-    isEntryRow: lib.isEntryRow,
+    // Change Log: policy from jira-sync, mechanics straight from the engine.
+    buildChangeLogEntries: lib.buildChangeLogEntries,
+    upsertChangeLog: CL.upsertChangeLog,
+    extractEntries: CL.extractEntries,
+    findChangeLog: CL.findChangeLog,
+    buildChangeLogBlock: CL.buildChangeLogBlock,
+    fmtEntry: CL.fmtEntry,
+    isEntryRow: CL.isEntryRow,
     diffFields: lib.diffFields,
     normalisePriority: lib.normalisePriority,
     sanitiseLabels: lib.sanitiseLabels,
@@ -1320,7 +1400,7 @@ if (require.main === module) {
     resolveDocBranch: lib.resolveDocBranch,
     loadDocBranchSetting: lib.loadDocBranchSetting,
     parseTopLevelScalar: lib.parseTopLevelScalar,
-    CL_START: lib.CL_START,
-    CL_END: lib.CL_END,
+    CL_START: CL.CL_START,
+    CL_END: CL.CL_END,
   };
 }

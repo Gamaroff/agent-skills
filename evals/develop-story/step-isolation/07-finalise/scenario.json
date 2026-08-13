@@ -4,7 +4,25 @@
   "description": "Step 7: finalise produces DoD summary and marks story accepted.",
   "prompt": "Run step 7 (finalise) of the develop-story pipeline for story.5.1.example.",
   "assertions": [
-    { "fn": "fileExists",  "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.dod.1.example.md"] },
-    { "fn": "fileMatches", "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.example.md", "accepted"] }
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.dod.1.example.md"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.example.md",
+        "accepted"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.example.md",
+        "\\| \\d{4}-\\d{2}-\\d{2} \\|\\s*[\\d.]+\\s*\\| DoD passed[^|]*\\| finalise \\|"
+      ]
+    }
   ]
 }

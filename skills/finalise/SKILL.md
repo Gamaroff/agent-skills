@@ -806,7 +806,34 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    ---
    ```
 
-3. **Add DoD Verification Section to Document Body:**
+3. **Append the acceptance row to `## Change Log`** — in the **same edit** as the frontmatter
+   change above. Acceptance is the single most important event in a document's life; splitting the
+   status write from the log write is how one lands without the other.
+
+   ```markdown
+   | 2026-05-15 | 1.2 | DoD passed — accepted (PR #204) | finalise |
+   ```
+
+   **`/finalise` is the only pipeline writer that bumps `Version`** — bump the **minor**. Every
+   other pipeline row (`develop`, `qa-story`/`qa-task`, `qa-fix`, the tracker syncs) leaves the
+   cell blank, so `Version` tracks document revisions rather than counting pipeline steps.
+   Canonical format: [document-change-log.md](references/document-change-log.md).
+
+   Two constraints on the Description:
+
+   - **Keep the literal `Definition of Done ... PASSED` out of it.** The prior-run idempotence
+     guard greps `^## Definition of Done.*(PASSED|✅)`; a row echoing that phrasing at line start
+     would be miscounted as a completed run.
+   - **Expect a second row from the sync, and do not treat it as a duplicate.** Step 7 re-runs
+     `sync-jira-{story,task}`, which under the narrowed rules writes a row only when it transitions
+     the status — which at acceptance it does. The accepted document ends with
+     `DoD passed — accepted (PR #204)` from `finalise` and `Status → done` from the sync: the local
+     acceptance decision, and the tracker reaching its terminal column.
+
+   If the document predates the Change Log template and has no such section, create it — for a
+   task, after `## 11. Rollback Plan`.
+
+4. **Add DoD Verification Section to Document Body:**
    - Add a "## Definition of Done - PASSED ✅" section to the document
    - Summarize all verified criteria
    - **If QA reports exist**, include QA findings and reference the QA report
@@ -863,16 +890,16 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    **Story marked as ACCEPTED on:** 2025-02-01
    ```
 
-4. **Reference Running Summary in DoD Section:**
+5. **Reference Running Summary in DoD Section:**
    - Add a reference to the detailed running summary file
    - Example: "**Detailed Verification Log:** See `story.311.1.dod.1.example-system.md` for complete verification evidence and timestamps."
 
-5. **Generate Sprint Review Summary:**
+6. **Generate Sprint Review Summary:**
    - Use the template from `assets/sprint-review-summary-template.md`
    - Fill in all sections with information from the story/task document and PR
    - Save summary as: `{story-directory}/sprint-review-summary.md`
 
-6. **Add Canonical PR Comment (idempotent via marker):**
+7. **Add Canonical PR Comment (idempotent via marker):**
 
    **PR-comment authorship contract**:
 
@@ -975,7 +1002,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    **Failure handling**: All `⚠️` paths are non-blocking. The implementation report in git is the durable audit trail.
 
-7. **Move Tracker Issue to Done:**
+8. **Move Tracker Issue to Done:**
 
    **Detect tracker platform** — resolver already sourced above (`TRACKER` is set):
    - When `TRACKER=jira` → **Jira path**
@@ -1245,7 +1272,19 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - Keep the current status (e.g., `in_progress`, `code_review`, `testing`)
    - Do NOT mark as `accepted`
 
-3. **Add Gap Report to Document Body:**
+3. **Append the gaps row to `## Change Log`** — and bump frontmatter `updated`:
+
+   ```markdown
+   | 2026-05-15 |  | DoD incomplete — 3 gaps identified | finalise |
+   ```
+
+   **`Version` stays blank here.** The status is deliberately unchanged on this path, so there is
+   no revision to bump — the minor bump belongs only to the acceptance row in Step 7. A gaps row
+   records that finalise ran and what it found, which is exactly the history a reader needs when
+   the next run does accept. Canonical format:
+   [document-change-log.md](references/document-change-log.md).
+
+4. **Add Gap Report to Document Body:**
    - Add a "## Definition of Done - Gaps Identified" section
    - List all specific gaps by category
    - **If QA reports exist**, include QA gate findings and top issues
@@ -1309,7 +1348,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Detailed Verification Log:** See `story.311.2.dod.1.transaction-event-history.md` for complete verification evidence and timestamps.
    ```
 
-4. **Add PR Comment (if PR exists):**
+5. **Add PR Comment (if PR exists):**
    - Use the active `$PLATFORM` branch to notify about gaps (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6)
    - Request changes to address gaps
 
@@ -1342,7 +1381,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Full gap report:** See story document for complete details and next steps.
    ```
 
-5. **Communicate to User:**
+6. **Communicate to User:**
    - Display a clear message that the story is NOT ready for acceptance
    - List all gaps in a readable format
    - Suggest next steps to close the gaps

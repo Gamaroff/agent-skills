@@ -831,3 +831,237 @@ test("an unrelated four-column body table is not absorbed into the log", () => {
   assert.match(out, /\| a\.js \| src  \| me    \| none  \|/, "table untouched");
   assert.equal(CL.extractEntries(out).length, 1, "only the new row is an entry");
 });
+
+// ---------------------------------------------------------------------------
+// H — narrowed tracker-sync rules (task.45)
+// ---------------------------------------------------------------------------
+// The policy lives in `jira-sync.js`'s `buildChangeLogEntries`; the guarantee it
+// buys lives here. The property under test throughout is that a sync which
+// changes nothing writes nothing — including markers. Migration is a side effect
+// of writing a row, so "no row" and "no rewrite" are the same statement.
+
+const JS = require("../jira-sync.js");
+
+const syncArgs = (over = {}) => ({
+  created: false,
+  issueKey: "PROJ-42",
+  statusOutcome: null,
+  author: "sync-jira-task",
+  docNoun: "task",
+  date: "2026-08-13",
+  ...over,
+});
+
+test("H: a body-only sync writes no row", () => {
+  // The single most important case. `transitioned: false` covers no-target,
+  // already-in-target and no-available-transition alike — none is an event.
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({ statusOutcome: { transitioned: false, reason: "no-target" } }),
+  );
+  assert.deepEqual(entries, [], "a body/summary/label update must earn no row");
+});
+
+test("H: issue creation writes exactly one row", () => {
+  const entries = JS.buildChangeLogEntries(syncArgs({ created: true }));
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].description, "Jira task created (PROJ-42)");
+  assert.equal(entries[0].author, "sync-jira-task");
+  assert.equal(entries[0].version, undefined, "sync rows never bump Version");
+});
+
+test("H: a status transition writes exactly one row naming the landed status", () => {
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({ statusOutcome: { transitioned: true, to: "In Progress" } }),
+  );
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].description, "Status → In Progress");
+});
+
+test("H: create + transition in one run writes both rows, creation first", () => {
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({ created: true, statusOutcome: { transitioned: true, to: "To Do" } }),
+  );
+  assert.equal(entries.length, 2);
+  assert.match(entries[0].description, /created/);
+  assert.match(entries[1].description, /Status →/);
+});
+
+test("H: a transition reporting no landed status writes no row", () => {
+  // `transitioned` without `to` would render "Status → undefined". Guard it.
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({ statusOutcome: { transitioned: true, to: null } }),
+  );
+  assert.deepEqual(entries, []);
+});
+
+test("H: migration does not fire when nothing else is being written", () => {
+  // Guards the no-op fast path. If this fails, every sync rewrites every
+  // document — the exact defect `37bcf3f` fixed for hashBody, reintroduced via
+  // markers. The mechanism is structural: migration lives inside upsertChangeLog,
+  // so an empty entry list means the document is never passed through it.
+  const legacy = [
+    "---",
+    "id: task.1",
+    "---",
+    "",
+    "# Task",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "",
+    "| Date (UTC) | Change |",
+    "|------------|--------|",
+    "| 2026-01-01 09:00 | Initial Jira task created |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+    "## Progress Tracking",
+    "",
+  ].join("\n");
+
+  const entries = JS.buildChangeLogEntries(syncArgs());
+  assert.deepEqual(entries, [], "precondition: a no-op sync earns no entries");
+
+  // Simulate the caller loop faithfully: no entries means no call at all.
+  let out = legacy;
+  for (const e of entries) out = CL.upsertChangeLog(out, e, { docType: "task" });
+
+  assert.equal(out, legacy, "a no-op sync must leave the file byte-identical");
+  assert.match(out, /jira-sync-changelog-start/, "legacy markers survive untouched");
+});
+
+test("H: migration DOES fire on the first sync that writes for another reason", () => {
+  // The other half of the guarantee: deferring migration must not mean never.
+  const legacy = [
+    "---",
+    "id: task.1",
+    "---",
+    "",
+    "# Task",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "",
+    "| Date (UTC) | Change |",
+    "|------------|--------|",
+    "| 2026-01-01 09:00 | Initial Jira task created |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+    "## Progress Tracking",
+    "",
+  ].join("\n");
+
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({ statusOutcome: { transitioned: true, to: "Done" } }),
+  );
+  assert.equal(entries.length, 1);
+
+  let out = legacy;
+  for (const e of entries) out = CL.upsertChangeLog(out, e, { docType: "task" });
+
+  assert.doesNotMatch(out, /jira-sync-changelog-start/, "legacy pair migrated away");
+  assert.match(out, /<!-- change-log-start -->/, "canonical pair adopted");
+  assert.match(out, /Initial Jira task created/, "historical row preserved");
+  assert.match(out, /Status → Done/, "new row appended");
+});
+
+test("H: both legacy marker pairs in one document collapse to a single block", () => {
+  // The dual-sync case: a document synced to Jira AND GitHub grew two blocks.
+  const dual = [
+    "# Task",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "",
+    "| Date (UTC) | Change |",
+    "|------------|--------|",
+    "| 2026-01-01 09:00 | Jira task created |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+    "<!-- github-sync-changelog-start -->",
+    "## Change Log",
+    "",
+    "| Date (UTC) | Change |",
+    "|------------|--------|",
+    "| 2026-02-02 10:00 | GitHub issue created |",
+    "<!-- github-sync-changelog-end -->",
+    "",
+    "## Progress Tracking",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(
+    dual,
+    { date: "2026-08-13", description: "Status → Done", author: "sync-jira-task" },
+    { docType: "task" },
+  );
+
+  assert.equal(
+    (out.match(/## Change Log/g) || []).length,
+    1,
+    "exactly one Change Log heading must survive",
+  );
+  assert.doesNotMatch(out, /jira-sync-changelog-start/);
+  assert.doesNotMatch(out, /github-sync-changelog-start/);
+  // Neither history is discarded — losing rows is worse than never having had them.
+  assert.match(out, /Jira task created/);
+  assert.match(out, /GitHub issue created/);
+  assert.match(out, /Status → Done/);
+});
+
+test("H: rows the parser cannot read are preserved, never dropped", () => {
+  // The worst outcome this module can produce is silent history loss. A log
+  // written `| Version | Date | Change | Author |` — the column order this repo's
+  // own roadmap template shipped with — has a non-date first cell in every row, so
+  // every historical row fails `isEntryRow`. Regenerating the block from parsed
+  // rows alone deleted all of them, with no warning.
+  const doc = [
+    "# Roadmap",
+    "",
+    "## Change Log",
+    "",
+    "| Version | Date | Change | Author |",
+    "|---|---|---|---|",
+    "| 1.0 | 2026-01-01 | Initial roadmap | me |",
+    "| 1.1 | 2026-02-01 | Added phase 3 | me |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+
+  assert.match(out, /Initial roadmap/, "unparseable historical row was dropped");
+  assert.match(out, /Added phase 3/, "unparseable historical row was dropped");
+  assert.match(out, /Review passed/, "the new row must still be appended");
+  assert.equal(
+    (out.match(/## Change Log/g) || []).length,
+    1,
+    "still exactly one Change Log",
+  );
+});
+
+test("H: preserved rows keep their original relative order, ahead of the new row", () => {
+  // The log is append-only and its order is its history, so recovered rows must
+  // not be reordered against each other or float below a newer entry.
+  const doc = [
+    "# Roadmap",
+    "",
+    "## Change Log",
+    "",
+    "| Version | Date | Change | Author |",
+    "|---|---|---|---|",
+    "| 1.0 | 2026-01-01 | first | me |",
+    "| 1.1 | 2026-02-01 | second | me |",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.ok(
+    out.indexOf("first") < out.indexOf("second"),
+    "preserved rows reordered against each other",
+  );
+  assert.ok(
+    out.indexOf("second") < out.indexOf("Review passed"),
+    "the new row must land last",
+  );
+});

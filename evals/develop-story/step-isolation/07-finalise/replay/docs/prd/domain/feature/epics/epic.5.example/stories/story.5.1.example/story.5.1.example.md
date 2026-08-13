@@ -13,3 +13,11 @@ epic: epic.5.example
 
 - [x] Feature works end-to-end
 - [x] Tests pass
+
+<!-- change-log-start -->
+## Change Log
+
+| Date       | Version | Description | Author |
+| ---------- | ------- | ----------- | ------ |
+| 2026-08-13 | 1.1     | DoD passed — accepted (PR #42) | finalise |
+<!-- change-log-end -->

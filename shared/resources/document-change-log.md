@@ -85,6 +85,26 @@ preserved on rewrite: an H3 log stays H3.
 A document that was synced to both trackers grew two independent blocks. On first write through
 this engine they **collapse into one**, rows merged in date order, with no duplication.
 
+**Migration is a side effect of writing a row, never a write of its own.** It happens inside
+`upsertChangeLog`, so a sync that earns no row never passes the document through the engine and
+never rewrites it. This is load-bearing rather than incidental: migrating unconditionally would
+make every sync rewrite every document, churning git history and firing writes that change
+nothing — the same defect `37bcf3f` fixed by hashing only what is published. A document therefore
+migrates exactly once, on the first sync that was already writing for another reason.
+
+### What a sync logs, and what it does not
+
+The tracker syncs write a row for **two events only**: the issue being created, and a status
+transition driven from frontmatter. A body, summary, title, priority, label or milestone update
+writes **nothing**.
+
+This is deliberate and it is not a loss of history. Both trackers keep a full issue history with
+actor and timestamp — strictly better than a local row naming only which fields moved — and the
+document now records *why* the body changed through its own review, develop, QA and acceptance
+rows. `jira_last_synced_at` in frontmatter still records the last sync time. Before this rule, a
+document taken through one pipeline run accumulated roughly a dozen `Updated: summary, description`
+rows: the same churn that got the Change Log removed from tracker cards entirely.
+
 ### An example is not a Change Log
 
 Every match — marker pair or heading — is ignored when it falls inside:
@@ -142,7 +162,7 @@ the `Author` cell and whether `Version` moves.
 | Review verdict | `review-{prd,epic,story,task}` | bump minor | `Review passed (9/10) — ready for development` |
 | Scope or AC edit | `edit-{epic,story}`, `correct-course` | bump minor | `AC3 added — offline retry` |
 | Tracker issue created | `sync-*`, `ensure-*` | — | `Jira story created (PROJ-42)` |
-| Status transition | `review-*`, `develop`, `finalise` | — | `Status → in-progress` |
+| Status transition | `review-*`, `develop`, `finalise`, `sync-*` | — | `Status → in-progress` |
 | Implementation complete | `develop` | — | `Implemented — 12 files, 34 tests` |
 | QA verdict | `qa-story`, `qa-task` | — | `QA gate PASS (8/10)` |
 | Accepted | `finalise` | bump minor | `DoD passed — accepted` |

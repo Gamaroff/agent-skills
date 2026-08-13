@@ -1,6 +1,6 @@
 ---
 name: sync-jira-task
-description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Maintains a Change Log in the local task file. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
+description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Writes a Change Log row on issue creation and on status transition only (not on body updates). Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
 ---
 
 # sync-jira-task
@@ -12,7 +12,7 @@ One-way sync of a local technical task markdown file to Jira. Auto-detects creat
 | `jira_key` present? | Action |
 |---|---|
 | Absent | **Pre-flight search by sync label**, then **Create** if no match. Writes `jira_key` back to file. |
-| Present | **Update** existing Jira task via atomic PUT, append to Change Log. |
+| Present | **Update** existing Jira task via atomic PUT. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-story`:** tasks are **standalone** — not associated with any Jira epic. No `jira_epic` field, no parent/Epic Link wiring, no epic Bitbucket URL. Issue type sent as `Task`.
 
@@ -160,7 +160,7 @@ Flow:
 8. **Create** (POST) or **Update** (atomic PUT with `returnIssue=true`).
 9. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning.
 10. If frontmatter `status` differs from current Jira status, fetch transitions and POST a status transition.
-11. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `task_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Task**` / `**Task File**` links. Append Change Log entry.
+11. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `task_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Task**` / `**Task File**` links. Append a Change Log row only for issue creation or a status transition — never for a body update.
 
 ### 5. Report to User
 
@@ -230,20 +230,31 @@ GET /rest/api/3/search?jql=project="RB" AND labels="synced-from-task.1.cache-lib
 
 If a matching issue exists (because a prior POST succeeded but the local file did not get its `jira_key` written), the script switches to update mode against that key. Every create automatically appends the `synced-from-<dir>` label to enable this lookup on subsequent runs.
 
-## Change Log Format
-
-```markdown
-<!-- jira-sync-changelog-start -->
 ## Change Log
 
-| Date (UTC)       | Change                                |
-|------------------|---------------------------------------|
-| 2026-04-28 09:40 | Initial Jira task created             |
-| 2026-04-28 11:05 | Updated: summary, description, status |
-<!-- jira-sync-changelog-end -->
-```
+The format is not restated here — it is defined once in
+[document-change-log.md](references/document-change-log.md), and the engine that
+writes it is `references/change-log.js`. Markers are `<!-- change-log-start -->` /
+`<!-- change-log-end -->`; a document still carrying the superseded
+`<!-- jira-sync-changelog-* -->` pair is migrated in place on the first sync that
+writes for another reason.
 
-Entry rows are matched by a strict regex `^\|\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s*\|`, so unrelated body markdown tables can't pollute the changelog.
+**A row is written for exactly two events:**
+
+| Event | Row |
+| --- | --- |
+| Issue created | `\| 2026-08-12 \|  \| Jira task created (PROJ-42) \| sync-jira-task \|` |
+| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-jira-task \|` |
+
+**A body, summary, priority or label update writes no row.** Jira keeps a full
+issue history with actor and timestamp — strictly better than a local row naming
+only which fields moved — and the document records *why* the body changed through
+its own review, develop and QA rows. `jira_last_synced_at` in frontmatter still
+records the last sync time.
+
+A sync that changes nothing writes nothing at all: no row, no marker migration,
+no file write. Migration happens inside the row write, so it can never fire on the
+no-op path and churn every document on every sync.
 
 ## Task File Format
 

@@ -160,6 +160,12 @@ See [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-re
 
 ### Step 3: Investigate & Fix (reproduce + fix)
 
+> **Bug reports use `## Status History`, not a Change Log.** They are the one document type
+> deliberately excluded from the canonical Change Log — the per-iteration record this step already
+> writes is richer than a log row, and adding a second history would mean maintaining two. Nothing
+> in this pipeline appends a Change Log row to a bug file. See
+> [document-change-log.md](references/document-change-log.md) §Exclusions.
+
 See [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md): set bug status `new → in-progress` and open `### Iteration 1`; **reproduce** the failure (run the failing test / repro, establishing the fails-without property) and **locate the root cause** via Explore; implement the fix + a **regression test that fails without the fix** → write **Investigation** and **Fix Implementation** into the bug's Developer Fix Cycle → add a Status History row → set bug status `ready-for-qa`. Bounded loop + test-failure triage as in [`references/develop-pipeline-step-3-develop-loop.md`](references/develop-pipeline-step-3-develop-loop.md). If the bug proves **not reproducible** here (despite review-bug passing), HALT — do not fabricate a fix.
 
 ### Step 4: Create PR

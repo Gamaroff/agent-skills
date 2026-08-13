@@ -1,6 +1,6 @@
 ---
 name: sync-github-task
-description: Sync a local technical task markdown file to GitHub Issues — creates the task issue if it has no github_issue, updates it if github_issue is already set. Standalone task — NOT linked to a parent epic issue (milestone carries the relationship if any). Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Maintains a Change Log in the local task file. GitHub-only sibling of sync-jira-task. Use when the user says "create this task in GitHub", "sync task to GitHub", "push task changes to GitHub", or "publish task to GitHub".
+description: Sync a local technical task markdown file to GitHub Issues — creates the task issue if it has no github_issue, updates it if github_issue is already set. Standalone task — NOT linked to a parent epic issue (milestone carries the relationship if any). Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Writes a Change Log row on issue creation and on status transition only (not on body updates). GitHub-only sibling of sync-jira-task. Use when the user says "create this task in GitHub", "sync task to GitHub", "push task changes to GitHub", or "publish task to GitHub".
 ---
 
 # sync-github-task
@@ -12,7 +12,7 @@ One-way sync of a local technical task markdown file to GitHub Issues. Auto-dete
 | `github_issue` present? | Action |
 |---|---|
 | Absent / null | **Pre-flight dedup search by title**, then **Create** (no parent linkage; milestone resolved from frontmatter / epic-registry / standalone default) if no match. Writes `github_issue` back to file. |
-| Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`, append Change Log row. |
+| Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-github-story`:** tasks are **standalone** — no parent epic issue lookup, no sub-issue linking. Milestone is the only relationship to a higher-level work item, mirroring `sync-jira-task`'s "no jira_epic" stance.
 
@@ -140,7 +140,7 @@ Append a Change Log row describing what changed:
 | YYYY-MM-DD HH:MM | Updated: title, body, milestone, priority |
 ```
 
-Skip-when-no-diff: if title, body, labels, and milestone are all identical to the remote state, skip `gh issue edit`, skip the Change Log entry, and proceed to Step 5.
+Skip-when-no-diff: if title, body, labels, and milestone are all identical to the remote state, skip `gh issue edit`, write no Change Log row, and proceed to Step 5.
 
 ### 5. Status Reconciliation (open vs closed)
 
@@ -177,20 +177,30 @@ fi
 - ✅ Change log entry appended (or `no-diff, skipped`)
 - ✅ Task frontmatter updated (on create only)
 
-## Change Log Format
-
-```markdown
-<!-- github-sync-changelog-start -->
 ## Change Log
 
-| Date (UTC)       | Change                                |
-|------------------|---------------------------------------|
-| 2026-05-12 09:40 | Initial GitHub issue created (#42)    |
-| 2026-05-12 11:05 | Updated: title, body, milestone       |
-<!-- github-sync-changelog-end -->
-```
+The format is not restated here — it is defined once in
+[document-change-log.md](references/document-change-log.md). Markers are
+`<!-- change-log-start -->` / `<!-- change-log-end -->`; a document still carrying
+the superseded `<!-- github-sync-changelog-* -->` pair is migrated in place on the
+first sync that writes for another reason. A document synced to both trackers had
+grown two blocks under two marker pairs; they collapse into one, rows preserved in
+date order.
 
-If the task already has a hand-written `## Change Log` heading without HTML markers, the first sync wraps it in markers in place and preserves any existing `| date | change |` rows.
+**A row is written for exactly two events:**
+
+| Event | Row |
+| --- | --- |
+| Issue created | `\| 2026-08-12 \|  \| GitHub issue created (#204) \| sync-github-task \|` |
+| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-github-task \|` |
+
+**A title, body, label or milestone update writes no row.** GitHub keeps its own
+issue history with actor and timestamp, and the document records *why* the body
+changed through its own review, develop and QA rows.
+
+A sync that changes nothing writes nothing at all — no row, and no marker
+migration. Migration rides along with a row write and must never be performed as a
+standalone edit, or every sync rewrites every document.
 
 ## Frontmatter Fields Written
 

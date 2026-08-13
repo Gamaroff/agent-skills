@@ -1,0 +1,122 @@
+schema: 1
+task: 'task.45.change-log-pipeline-and-sync'
+task_title: 'Pipeline, QA, finalise, and tracker sync write the Change Log'
+gate: FAIL
+status_reason: 'Implementation is sound and the two Critical risk areas verify clean, but the Phase 4 section replacement terminated inside a code fence and left an orphaned legacy block — duplicate heading, 2-column table, legacy marker and an unbalanced fence — in all six sync SKILL.md files, falsifying two success criteria.'
+reviewer: 'QA Engineer'
+updated: '2026-08-13T10:20:00Z'
+
+top_issues:
+  - issue: 'Orphaned legacy Change Log block left in all six sync SKILL.md files; code fences unbalanced'
+    severity: high
+    bug_ref: 'task.45.bug.1.orphaned-legacy-block-in-six-sync-skills.md'
+    finding: >-
+      The replacement regex used a next-H2 lookahead that matched a `## Change Log` heading
+      inside the old fenced sample, so it stopped early. Every one of the six files went from
+      even to odd code-fence parity, meaning the remainder of each renders as one code block.
+      Falsifies the success criteria "All six sync skills use <!-- change-log-start --> only"
+      (the legacy `-end` marker survives) and "No sync SKILL.md embeds a column list".
+    suggested_action: >-
+      Delete the surviving tail in each of the six files — from the duplicate `## Change Log`
+      heading through the trailing "Entry rows are matched by a strict regex" sentence,
+      including the stray fence. Re-verify with a check that greps `changelog-end` as well as
+      `changelog-start`, counts `^## Change Log$`, and asserts even fence parity.
+    suggested_owner: dev
+    status: open
+
+  - issue: '"Zero file writes" claim overstates the guarantee the code provides'
+    severity: medium
+    bug_ref: 'task.45.bug.2.zero-file-writes-claim-overstated.md'
+    finding: >-
+      `fs.writeFileSync` is unconditional in all three `updateXFile` functions, so a no-op sync
+      does perform a write. The real guarantee — no Change Log row, no marker migration, content
+      byte-identical, empty `git diff` — is verified and holds. Three code comments and one
+      ticked success criterion assert the stronger, false claim.
+    suggested_action: >-
+      Reword the three comments and success criterion :463 to the accurate guarantee (no row, no
+      migration, byte-identical content) rather than changing behaviour. Also correct the §8
+      baseline sentence, which misdescribes the pre-change epic fast path.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 1183
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No security surface. No auth, crypto, secret handling or dependency changes. Tracker
+      credentials are read exactly as before; no new network calls beyond the epic fast-path
+      status transition, which uses the same authenticated helper as the main path.
+  performance:
+    status: PASS
+    notes: >-
+      The change strictly reduces work: sync rows drop from one-per-body-hash-change to two
+      milestone events only. Verified directly that a no-op sync produces zero entries and
+      leaves the document byte-identical with legacy markers intact, so marker migration cannot
+      fire standalone and cannot churn git history. The `skipChangelog` suppression flag is
+      correctly redundant under the new rules. (BUG-2 concerns the wording of this guarantee,
+      not the behaviour.)
+  reliability:
+    status: PASS
+    notes: >-
+      The Critical risk in the task's own §10 — row loss — verifies clean on the riskiest path.
+      A document carrying both legacy marker pairs collapses to exactly one Change Log with all
+      four rows preserved in correct date order. 1183/1183 tests pass, including 8 new tests for
+      the narrowed rules, and both eval suites are green with new assertions that the
+      implementation and acceptance rows actually appear. Three-tier rollback plan documented
+      with a correctly-placed partial boundary (revert Phase 4, keep 1-3).
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      BUG-1 leaves all six sync skills stating the narrowed rules and then immediately showing
+      the superseded 2-column format under a duplicate heading, with the remainder of each file
+      rendering as code. These files are read by agents as instructions, so contradictory and
+      structurally broken content is a direct maintainability cost. Three stale
+      `// upsertChangelog` section comments also remain in the per-skill test files. Everything
+      else in the change improves maintainability substantially — one engine, one marker pair,
+      three prose reimplementations removed.
+
+recommendations:
+  immediate:
+    - action: 'Remove the orphaned legacy block from all six sync SKILL.md files and restore fence parity'
+      refs:
+        - 'skills/sync-jira-task/SKILL.md'
+        - 'skills/sync-jira-story/SKILL.md'
+        - 'skills/sync-jira-epic/SKILL.md'
+        - 'skills/sync-github-task/SKILL.md'
+        - 'skills/sync-github-story/SKILL.md'
+        - 'skills/sync-github-epic/SKILL.md'
+    - action: 'Correct the "zero file writes" wording in three comments and success criterion :463'
+      refs:
+        - 'skills/sync-jira-task/scripts/sync-jira-task.js'
+        - 'skills/sync-jira-story/scripts/sync-jira-story.js'
+        - 'shared/resources/jira-sync.js'
+        - 'docs/tasks/task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md'
+  future:
+    - action: 'Refresh the three stale `// upsertChangelog` section comments in the per-skill test files'
+      refs:
+        - 'skills/sync-jira-task/tests/sync-jira-task.test.js'
+        - 'skills/sync-jira-story/tests/sync-jira-story.test.js'
+        - 'skills/sync-jira-epic/tests/sync-jira-epic.test.js'
+    - action: >-
+        Run the deferred live-Jira verification in a Jira-tracked repo before relying on the
+        narrowing there. Correctly disclosed and left unticked — not a silent gap.
+      refs: ['docs/tasks/task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-45-BUG-1 fixed and fence parity restored in all six sync SKILL.md files'
+    - 'TASK-45-BUG-2 wording corrected so no claim overstates the implemented guarantee'
