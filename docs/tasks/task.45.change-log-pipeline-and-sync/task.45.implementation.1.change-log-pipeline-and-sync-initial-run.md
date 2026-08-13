@@ -34,7 +34,7 @@ Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.45.*` exists in git                               | Branch created at `cdcb75c`, pushed with tracking. Board: Todo → In Progress ✅ | —                    |
 | 2. review-task             | ✅ Done    | `task.45.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10. 0 Critical / 7 Important (all applied) / 3 Optional. Planned → Ready for Development. Report: `task.45.review.1.change-log-pipeline-and-sync.md` | 2 Explore pre-pass agents (architecture alignment: `aligned`; already-implemented: `not-started`) |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 5 phases. 3 commits (`6cfd5dd`, `9683f40`, `714c3f8`), 117 files. `npm test` 1183/1183; both eval suites green; bundle idempotent | Pre-develop surface map (Explore) — 13 areas, 2 plumbing gaps found |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.45.qa.{N}.*.md`; `task.45.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.45.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
@@ -70,9 +70,31 @@ Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto
 - **One internal contradiction** — the `ensure-*` side-effect notes were slated for deletion as "now-inaccurate", but under the task's own §3 table both the creation row and the status-transition row survive, so the notes stay true. Changed to narrow-not-delete, and the scope corrected from 6 files to 3 (the `*-github-issue` siblings carry no such note).
 - No clarifying questions were put to the user (autonomous run); each was resolved against the repository and recorded in the review report's User Decisions section.
 
+### Step 3 — develop — 2026-08-13
+
+- Planned/Draft gate auto-answered **"Yes, ready to implement"** — review-task validated in Step 2.
+- High-risk gate: not triggered (`risk_level` absent). qa-planning auto-skipped.
+- Alignment: **greenfield** — pre-pass confirmed all six deliverables genuinely not-started, so no alignment conflict arose and the "align code to document" default was never needed.
+- Pre-develop surface map reused from the Explore subagent; plan file read and **corrected** (4 stale references).
+- Prose half (Phases 1–3) committed separately at `6cfd5dd` — the deliberate partial-rollback boundary from §11.
+- **Three findings that changed the implementation from what the plan specified:**
+  1. `CL.migrateLegacyMarkers()` does not exist. Migration is internal to `upsertChangeLog` (`change-log.js:398-429`), so the "never migrate on the no-op path" requirement is satisfied **by construction** — an empty entry list means no call. The plan's `if (willWrite)` guard was both impossible and unnecessary.
+  2. **Story Gap A** — `shouldWriteFile` was gated on `!skippedNoChanges`, suppressing the file write on exactly the path that earns a status row. Relaxed to `(!skippedNoChanges || changeLogEntries.length > 0)`.
+  3. **Epic Gap B (pre-existing bug)** — the no-change fast path returned at `:902`, before the transition block at `:1180`, so an epic whose frontmatter status moved while its body did not never transitioned at all. The transition now runs inside the fast path. This made epic consistent with story and task for the first time.
+- **Wrapper removal touched five surfaces, not one.** Beyond the fidelity test the review flagged, all three sync scripts re-export `upsertChangelog` for test seams and all three per-skill suites call it. All migrated; no shim left behind.
+- `parseLegacyRow` deliberately **kept** — no longer an adapter for callers, but the reader that parses old 2-column rows off disk during migration. Its docblock was rewritten to say so.
+- Pre-existing duplicate step numbering in `finalise` Step 7 (two `6.`s) and Step 8 (two `4.`s) surfaced by inserting sub-steps; both repaired.
+- **Live Jira verification DEFERRED** — no credentials in this environment (`JIRA_URL` unset; this repo is GitHub-tracked). Recorded as an open success criterion rather than silently ticked. Tests H1–H8 pin the behaviour it would have checked.
+
 ---
 
 ## Issues Log
+
+### Deferred — live Jira verification (Phase 5, §9 Migration)
+
+The task requires syncing a real task to Jira twice to confirm zero writes on a no-op, no row on a body change, and exactly one row on a status transition. This environment has no Jira credentials and the repo is GitHub-tracked, so the check could not be run. It is left **unticked** in §9 and Phase 5 rather than marked done.
+
+Mitigation: the two properties that matter are pinned by unit tests — `H: migration does not fire when nothing else is being written` asserts the document is byte-identical after a no-op, and `H: migration DOES fire on the first sync that writes for another reason` asserts deferral does not become never. Run the live check before relying on the narrowing in a Jira-tracked consumer repo.
 
 _Problems encountered and how they were resolved or escalated._
 
