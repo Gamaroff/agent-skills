@@ -1007,3 +1007,61 @@ test("H: both legacy marker pairs in one document collapse to a single block", (
   assert.match(out, /GitHub issue created/);
   assert.match(out, /Status → Done/);
 });
+
+test("H: rows the parser cannot read are preserved, never dropped", () => {
+  // The worst outcome this module can produce is silent history loss. A log
+  // written `| Version | Date | Change | Author |` — the column order this repo's
+  // own roadmap template shipped with — has a non-date first cell in every row, so
+  // every historical row fails `isEntryRow`. Regenerating the block from parsed
+  // rows alone deleted all of them, with no warning.
+  const doc = [
+    "# Roadmap",
+    "",
+    "## Change Log",
+    "",
+    "| Version | Date | Change | Author |",
+    "|---|---|---|---|",
+    "| 1.0 | 2026-01-01 | Initial roadmap | me |",
+    "| 1.1 | 2026-02-01 | Added phase 3 | me |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+
+  assert.match(out, /Initial roadmap/, "unparseable historical row was dropped");
+  assert.match(out, /Added phase 3/, "unparseable historical row was dropped");
+  assert.match(out, /Review passed/, "the new row must still be appended");
+  assert.equal(
+    (out.match(/## Change Log/g) || []).length,
+    1,
+    "still exactly one Change Log",
+  );
+});
+
+test("H: preserved rows keep their original relative order, ahead of the new row", () => {
+  // The log is append-only and its order is its history, so recovered rows must
+  // not be reordered against each other or float below a newer entry.
+  const doc = [
+    "# Roadmap",
+    "",
+    "## Change Log",
+    "",
+    "| Version | Date | Change | Author |",
+    "|---|---|---|---|",
+    "| 1.0 | 2026-01-01 | first | me |",
+    "| 1.1 | 2026-02-01 | second | me |",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.ok(
+    out.indexOf("first") < out.indexOf("second"),
+    "preserved rows reordered against each other",
+  );
+  assert.ok(
+    out.indexOf("second") < out.indexOf("Review passed"),
+    "the new row must land last",
+  );
+});

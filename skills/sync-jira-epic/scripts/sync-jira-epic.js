@@ -910,6 +910,29 @@ async function run({
         docNoun: "epic",
       });
 
+      // A successful transition bumps Jira's own `updated` field, so `current.updated`
+      // — read before the transition — is already stale. Persisting it would make the
+      // NEXT sync's concurrent-edit guard see `jiraUpdated > jira_last_synced_at` and
+      // abort with "Jira issue updated since last local sync", requiring --force to
+      // recover. Re-read the timestamp whenever we actually moved the card.
+      let skipSyncedAt = current.updated;
+      if (skipStatusOutcome?.transitioned) {
+        try {
+          skipSyncedAt = await lib.fetchUpdatedTimestampStrict({
+            http,
+            baseUrl: auth.baseUrl,
+            email: auth.email,
+            token: auth.token,
+            issueKey: existingJiraKey,
+          });
+        } catch (e) {
+          output.warn(
+            `⚠️  Could not re-read updated timestamp after transition: ${e.message}. ` +
+            `Next sync may require --force.`,
+          );
+        }
+      }
+
       updateEpicFile({
         filePath,
         issueKey: existingJiraKey,
@@ -917,7 +940,7 @@ async function run({
         epicBbUrl,
         prdBbUrl,
         changeLogEntries: skipEntries,
-        lastSyncedAt: current.updated,
+        lastSyncedAt: skipSyncedAt,
         bodyHash: newBodyHash,
         metaHash: newMetaHash,
         output,
@@ -935,7 +958,21 @@ async function run({
           jira_last_meta_hash: newMetaHash,
         });
       }
-      return { exitCode: 0, isUpdate: true, skipped: true };
+      // Report the transition the same way the main path does. Returning a bare
+      // exitCode 0 here would make a failed or skipped transition on this path
+      // completely silent — no "Status NOT synced" warning, `--fail-on-status-skip`
+      // ignored, and `statusOutcome` absent from the returned shape that callers
+      // read. Now that this path really does transition, it owes the same report.
+      const skipStatusExit = lib.summariseStatusOutcome(skipStatusOutcome, {
+        output,
+        failOnSkip: args.failOnStatusSkip,
+      });
+      return {
+        exitCode: skipStatusExit,
+        isUpdate: true,
+        skipped: true,
+        statusOutcome: skipStatusOutcome,
+      };
     }
 
     const descAdf = buildDescriptionAdf({

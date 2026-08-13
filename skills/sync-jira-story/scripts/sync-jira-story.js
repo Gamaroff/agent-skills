@@ -378,8 +378,9 @@ function updateStoryFile({ filePath, issueKey, issueUrl, epicKey, epicBbUrl, sto
 
   // Exactly two events earn a row — issue created, and status transition. See
   // `buildChangeLogEntries` in jira-sync.js for why a body update earns none.
-  // An empty list means no call, and therefore no legacy-marker migration and no
-  // rewrite: that is what holds a no-op sync at zero file writes.
+  // An empty list means no call, and therefore no legacy-marker migration. The
+  // write itself is unconditional, so the guarantee is byte-identical content and
+  // an empty `git diff` on a no-op — not a skipped write.
   for (const entry of changeLogEntries) {
     content = CL.upsertChangeLog(content, entry, { docType: "story" });
   }

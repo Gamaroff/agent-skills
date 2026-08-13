@@ -29,7 +29,7 @@ test("parseFrontmatter — preserves body containing horizontal rule", () => {
 });
 
 // ---------------------------------------------------------------------------
-// upsertChangelog
+// upsertChangeLog (change-log.js engine, called directly since task.45)
 // ---------------------------------------------------------------------------
 test("upsertChangeLog — wraps existing hand-written ## Change Log", () => {
   const src = `# Title\n\n## Change Log\n\n| Date (UTC) | Change |\n|------------|--------|\n| 2026-01-01 09:00 | Manual entry |\n\n## Other\n\nstuff\n`;

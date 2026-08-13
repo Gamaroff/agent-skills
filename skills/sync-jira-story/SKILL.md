@@ -274,17 +274,6 @@ A sync that changes nothing writes nothing at all: no row, no marker migration,
 no file write. Migration happens inside the row write, so it can never fire on the
 no-op path and churn every document on every sync.
 
-## Change Log
-
-| Date (UTC)       | Change                              |
-|------------------|-------------------------------------|
-| 2026-04-28 09:40 | Initial Jira story created          |
-| 2026-04-28 11:05 | Updated: summary, description       |
-<!-- jira-sync-changelog-end -->
-```
-
-If your story already has a hand-written `## Change Log` heading without HTML markers, the first sync **wraps it in markers in place** and preserves any existing `| date | change |` rows — no duplication. Entry rows are matched by a strict regex `^\|\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s*\|`, so unrelated body markdown tables can't pollute the changelog.
-
 ## Story File Format
 
 After sync the script writes (in-place, preserving order):

@@ -433,17 +433,19 @@ Beyond the plan's list, these were touched because the work required them:
 
 - **Scope**: sync payload size
 - **Metric**: `hashBody` churn. Narrowing the rows means fewer document writes per run;
-  confirm a no-op sync remains a genuine no-op and does not now rewrite the file to migrate
-  markers on every call. **Marker migration must happen once, on the first sync that writes
+  confirm a no-op sync leaves the file byte-identical and does not rewrite it to migrate markers
+  on every call. **Marker migration must happen once, on the first sync that writes
   for another reason** — not as a standalone write
-- **Baseline**: the no-op fast path at `sync-jira-epic.js:887` today performs zero writes
+- **Baseline**: the no-op fast path at `sync-jira-epic.js:887` skips the Jira PUT but still calls
+  `updateEpicFile`, which writes. The measurable baseline is therefore an empty `git diff`, not a
+  zero write count
 
 ### Consumer Tests
 
 - **Scope**: live tracker behaviour
 - **Risk area**: a migration that rewrites a document on every sync would defeat the fast
   path and churn git history. Verify against a real Jira task: two consecutive syncs with no
-  change produce zero file writes
+  change leave the file byte-identical
 
 ---
 
@@ -460,7 +462,9 @@ Beyond the plan's list, these were touched because the work required them:
 
 ### Performance
 
-- [x] A no-op sync still performs zero file writes
+- [x] A no-op sync writes no Change Log row and leaves the file byte-identical (empty `git diff`).
+      The write itself is unconditional — frontmatter timestamps refresh regardless — so the
+      guarantee is unchanged content, not a skipped write. Verified by test H.
 - [x] Marker migration happens at most once per document, never on the no-op path
 
 ### Code Quality
@@ -505,7 +509,7 @@ Beyond the plan's list, these were touched because the work required them:
    - **Probability**: Medium
    - **Impact**: High
    - **Mitigation**: migrate only on a sync that is already writing for another reason.
-     Assert zero writes on two consecutive no-op syncs, in both a unit test and the live check.
+     Assert byte-identical content on two consecutive no-op syncs, in both a unit test and the live check.
    - **Rollback**: gate migration behind an explicit flag.
 
 ### Medium Risk Areas
@@ -555,7 +559,7 @@ Beyond the plan's list, these were touched because the work required them:
 4. Inspect any document synced since the merge; the canonical block remains valid under the
    reverted code because task.42's reader accepts it.
 
-**Validation**: two consecutive syncs of one real task produce zero file writes and no new row.
+**Validation**: two consecutive syncs of one real task leave the file byte-identical (empty `git diff`) with no new row.
 
 ### Partial Rollback (1-2 hours)
 
@@ -624,6 +628,7 @@ Both self-identified Critical risks verify clean — dual-legacy-pair collapse p
 | 2026-08-13 |         | Status → ready-for-development                                                                                                                                  | review-task |
 | 2026-08-13 |         | Implemented — all 5 phases; 30 files, 8 new tests (1183/1183 passing). Closed two plumbing gaps the plan missed (story write-gate suppressed the status row; epic fast path never transitioned — pre-existing) and migrated 5 wrapper-consumer surfaces, not 1 | develop     |
 | 2026-08-13 |         | QA gate FAIL (70/100) — 1 high, 1 medium: orphaned legacy block in six sync skills, overstated zero-writes claim | qa-task     |
+| 2026-08-13 |         | QA findings fixed — 3 bugs closed in 1 iteration: orphaned legacy block removed from six sync skills, zero-writes wording corrected, and row loss on unparsed Change Log rows fixed in the engine (+2 regression tests) | qa-fix      |
 
 ---
 

@@ -262,8 +262,11 @@ function updateTaskFile({ filePath, issueKey, issueUrl, taskBbUrl, changeLogEntr
   // *why* the body changed via its review/develop/QA rows.
   //
   // Marker migration rides along inside upsertChangeLog and therefore cannot fire
-  // on the no-op path: no entry, no call, no rewrite. That is what keeps two
-  // consecutive no-op syncs at zero file writes.
+  // on the no-op path: no entry, no call, no migration. The write below is
+  // unconditional — frontmatter timestamps are refreshed regardless — so what an
+  // empty list buys is not a skipped write but an unchanged one: no new row, no
+  // marker rewrite, byte-identical content, empty `git diff`. That is the property
+  // that keeps consecutive no-op syncs from churning history.
   for (const entry of changeLogEntries) {
     content = CL.upsertChangeLog(content, entry, { docType: "task" });
   }

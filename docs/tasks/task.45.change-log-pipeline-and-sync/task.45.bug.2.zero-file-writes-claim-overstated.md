@@ -4,7 +4,7 @@
 **Bug ID**: TASK-45-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-08-13
 
@@ -60,3 +60,10 @@ Take option **(a)** — correct the wording. Option (b) changes behaviour on a p
 2. Reword success criterion `:463` to *"A no-op sync writes no Change Log row and leaves the file byte-identical (empty `git diff`)"* and keep it ticked, since that is verified by test H.
 3. Correct the §8 baseline sentence, which misdescribes the pre-change epic fast path.
 4. Leave the deferred live-Jira criterion unticked as it already is.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-08-13 | New | QA Engineer | Filed at gate 1 (FAIL) |
+| 2026-08-13 | Ready for QA | qa-fix | Fixed in cycle 1 |

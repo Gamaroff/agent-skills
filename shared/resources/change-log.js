@@ -391,10 +391,28 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
   const found = findChangeLog(content);
 
   if (found) {
-    const existing = content
-      .slice(found.start, found.end)
-      .split("\n")
-      .filter(isEntryRow);
+    const blockLines = content.slice(found.start, found.end).split("\n");
+    const existing = blockLines.filter(isEntryRow);
+
+    // Rows the parser does not recognise are PRESERVED, not dropped.
+    //
+    // The block is regenerated from `existing`, so anything `isEntryRow` rejects
+    // would otherwise vanish silently. That is not hypothetical: a log written
+    // `| Version | Date | Change | Author |` — the column order this repo's own
+    // roadmap template shipped with — has a non-date first cell in every row, so
+    // every historical row failed the test and the regenerated block contained
+    // only the new one. Losing history is the single worst outcome for this
+    // module, and it is worse than emitting a slightly irregular table.
+    //
+    // Header and separator lines are excluded because the regenerated block
+    // supplies its own.
+    const unparsed = blockLines.filter(
+      (l) =>
+        /^\s*\|/.test(l) &&
+        !isEntryRow(l) &&
+        !/^\s*\|[\s\-:|]+\|\s*$/.test(l) &&
+        !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(l),
+    );
     const migrated = found.legacyAuthor
       ? migrateLegacyEntries(existing, { legacyAuthor: found.legacyAuthor, docType })
       : existing;
@@ -428,7 +446,10 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
       ? [...migrated, ...merged].sort(byDate)
       : migrated;
 
-    const block = buildChangeLogBlock([...history, newRow], {
+    // Unparsed rows lead: they are older history the parser could not read, and
+    // the log is append-only, so nothing may be emitted above them that would
+    // reorder them relative to what follows.
+    const block = buildChangeLogBlock([...unparsed, ...history, newRow], {
       level: found.level,
     });
     // Normalise both seams: the head may now end in blank lines where a swept

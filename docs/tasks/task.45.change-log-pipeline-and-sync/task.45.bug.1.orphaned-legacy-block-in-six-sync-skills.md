@@ -4,7 +4,7 @@
 **Bug ID**: TASK-45-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-08-13
 
@@ -85,3 +85,10 @@ done; done
 All three must read `legacy=0 dup=1 fence-parity=0`.
 
 **Do not repeat the fence-blind regex.** Anchor the deletion on the literal end of the old block, or operate line-range-wise after locating the fence boundaries.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-08-13 | New | QA Engineer | Filed at gate 1 (FAIL) |
+| 2026-08-13 | Ready for QA | qa-fix | Fixed in cycle 1 |

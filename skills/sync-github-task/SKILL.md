@@ -202,17 +202,6 @@ A sync that changes nothing writes nothing at all — no row, and no marker
 migration. Migration rides along with a row write and must never be performed as a
 standalone edit, or every sync rewrites every document.
 
-## Change Log
-
-| Date (UTC)       | Change                                |
-|------------------|---------------------------------------|
-| 2026-05-12 09:40 | Initial GitHub issue created (#42)    |
-| 2026-05-12 11:05 | Updated: title, body, milestone       |
-<!-- github-sync-changelog-end -->
-```
-
-If the task already has a hand-written `## Change Log` heading without HTML markers, the first sync wraps it in markers in place and preserves any existing `| date | change |` rows.
-
 ## Frontmatter Fields Written
 
 After sync the skill writes (in-place, preserving order):

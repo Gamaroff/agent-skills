@@ -434,9 +434,12 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * and QA rows.
  *
  * Returning `[]` is the load-bearing case. `upsertChangeLog` performs legacy
- * marker migration as a side effect of writing, so an empty list means no call,
- * no migration and no file rewrite — which is what keeps two consecutive no-op
- * syncs at zero writes rather than churning every document on every sync.
+ * marker migration as a side effect of writing a row, so an empty list means no
+ * call and no migration. The callers' `fs.writeFileSync` is unconditional — they
+ * refresh frontmatter timestamps either way — so what this buys is not a skipped
+ * write but an unchanged one: no new row, no marker rewrite, byte-identical
+ * content and an empty `git diff`. That is what stops consecutive no-op syncs
+ * churning every document's history.
  *
  * @param {object}  o
  * @param {boolean} o.created         true when this run created the issue
