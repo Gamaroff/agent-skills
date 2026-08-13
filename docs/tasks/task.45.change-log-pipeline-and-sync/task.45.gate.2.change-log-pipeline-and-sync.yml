@@ -1,0 +1,119 @@
+schema: 1
+task: 'task.45.change-log-pipeline-and-sync'
+task_title: 'Pipeline, QA, finalise, and tracker sync write the Change Log'
+gate: PASS
+status_reason: 'All three cycle-1 bugs verified fixed, including a reproducible row-loss defect in the engine that the diff review surfaced late. Both Critical risks now verify clean, and the two success criteria that were false are true.'
+reviewer: 'QA Engineer'
+updated: '2026-08-13T11:05:00Z'
+
+top_issues:
+  - issue: 'Orphaned legacy Change Log block left in all six sync SKILL.md files; code fences unbalanced'
+    severity: high
+    bug_ref: 'task.45.bug.1.orphaned-legacy-block-in-six-sync-skills.md'
+    status: closed
+    fixed_date: '2026-08-13'
+    verification: >-
+      All six files verify legacy=0, dup=1, fence-parity=0. Deleted by explicit line range with
+      start and end lines asserted before cutting, rather than a second fence-blind regex.
+    suggested_owner: dev
+
+  - issue: '"Zero file writes" claim overstates the guarantee the code provides'
+    severity: medium
+    bug_ref: 'task.45.bug.2.zero-file-writes-claim-overstated.md'
+    status: closed
+    fixed_date: '2026-08-13'
+    verification: >-
+      No occurrence of the overstated claim remains in any script, shared resource or the task
+      document. Reworded to the verified guarantee — no row, no marker migration, byte-identical
+      content, empty git diff. Behaviour deliberately unchanged.
+    suggested_owner: dev
+
+  - issue: 'upsertChangeLog silently deleted every Change Log row it could not parse'
+    severity: high
+    bug_ref: 'task.45.bug.3.row-loss-on-unparsed-rows.md'
+    status: closed
+    fixed_date: '2026-08-13'
+    verification: >-
+      Reproduction now preserves both historical rows and appends the new one, under a single
+      heading. Canonical documents are unaffected (no duplication, row count correct) and the
+      no-op path remains byte-identical. Two regression tests added. The roadmap template that
+      shipped the triggering column order is corrected.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 1185
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No security surface. The epic fast path gained one authenticated re-read of the issue
+      timestamp, using the same helper and credentials as the main path.
+  performance:
+    status: PASS
+    notes: >-
+      Unchanged from cycle 1 and still verified: a no-op sync produces zero entries and leaves
+      the document byte-identical, so marker migration cannot fire standalone. The row-preservation
+      fix adds one linear scan of an already-loaded block — negligible, and only on the write path.
+  reliability:
+    status: PASS
+    notes: >-
+      Materially stronger than at cycle 1. The Critical row-loss risk is now genuinely closed
+      rather than merely asserted: the engine no longer discards rows it cannot parse, which is
+      what the task's own §10 mitigation claimed but did not deliver. Two epic fast-path defects
+      introduced by making that path transition are also fixed — a stale timestamp that would have
+      tripped the next sync's concurrent-edit guard, and a silent return that swallowed transition
+      failures. 1185/1185 tests, both eval suites green.
+  maintainability:
+    status: PASS
+    notes: >-
+      The cycle-1 CONCERNS is resolved. All six sync skills now carry exactly one Change Log
+      section with balanced fences and no contradictory legacy block. Stale wrapper comments in the
+      test files refreshed. Two further pre-existing engine defects are explicitly recorded as
+      out-of-scope follow-ups rather than silently carried.
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-08-13'
+  total_iterations: 1
+  verification_method: 'Direct reproduction of each defect plus full suite and eval runs'
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Fix content loss on the hand-written-heading path — a `## Change Log` without markers has
+        its whole span replaced, destroying prose and nested `###` subsections. Pre-existing
+        task.42 defect; needs its own change with tests.
+      refs: ['shared/resources/change-log.js']
+    - action: >-
+        Fix `collapseOtherLegacyBlocks` skipping the chosen block's own pair, which leaves two
+        blocks of the same legacy pair for one write. Self-healing, LOW. Pre-existing.
+      refs: ['shared/resources/change-log.js']
+    - action: >-
+        Add run()-level tests with a stubbed fetchImpl for the two behaviours this task changed but
+        did not directly test: the story write gate on the skipped-but-transitioned path, and the
+        epic fast-path transition.
+      refs: ['skills/sync-jira-story/tests/', 'skills/sync-jira-epic/tests/']
+    - action: >-
+        Run the deferred live-Jira verification in a Jira-tracked repo. Correctly disclosed and
+        left unticked throughout — not a silent gap.
+      refs: ['docs/tasks/task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - >-
+      Live-Jira verification remains unrun. Behaviour is pinned by tests H1-H10, but a
+      Jira-tracked consumer should run the three-step live check before relying on the narrowing.

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-45-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-08-13
 
@@ -92,3 +92,4 @@ All three must read `legacy=0 dup=1 fence-parity=0`.
 | --- | --- | --- | --- |
 | 2026-08-13 | New | QA Engineer | Filed at gate 1 (FAIL) |
 | 2026-08-13 | Ready for QA | qa-fix | Fixed in cycle 1 |
+| 2026-08-13 | Closed | QA Engineer | Verified fixed at gate 2 (PASS 95/100) |

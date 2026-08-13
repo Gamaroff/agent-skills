@@ -5,7 +5,7 @@ type: task
 description: "Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto the canonical Change Log, unifying the marker pairs and narrowing sync rows to milestones."
 tags: [change-log, pipeline, tracker-sync]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 created: 2026-08-12
 updated: 2026-08-13
@@ -16,7 +16,7 @@ github_issue: 204
 
 # [Task 45] Pipeline, QA, finalise, and tracker sync write the Change Log
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.45.review.1.change-log-pipeline-and-sync.md` implemented 2026-08-13
 
@@ -586,28 +586,29 @@ per completion; a stale cross-reference.
 
 ## QA Testing Results
 
-**QA Status**: ❌ FAIL
+**QA Status**: ✅ PASS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-13
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.45.qa.1.change-log-pipeline-and-sync.md](./task.45.qa.1.change-log-pipeline-and-sync.md)
-- **Gate File**: [task.45.gate.1.change-log-pipeline-and-sync.yml](./task.45.gate.1.change-log-pipeline-and-sync.yml)
+- **Full Report**: [task.45.qa.2.change-log-pipeline-and-sync.md](./task.45.qa.2.change-log-pipeline-and-sync.md) (cycle 2; cycle 1 at `task.45.qa.1.*`)
+- **Gate File**: [task.45.gate.2.change-log-pipeline-and-sync.yml](./task.45.gate.2.change-log-pipeline-and-sync.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 1183 (all passing) + 16 eval scenarios
-- **Phases Verified**: 4/5 fully; Phase 4 partial
-- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Tests Executed**: 1185 (all passing) + 16 eval scenarios
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 open (3 bugs fixed in 1 cycle)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Both self-identified Critical risks verify clean — dual-legacy-pair collapse preserves every row in date order, and a no-op sync leaves the document byte-identical. The gate fails on delivery, not design: the Phase 4 section replacement terminated inside a code fence, leaving an orphaned legacy block and **unbalanced code fences in all six sync SKILL.md files**, which falsifies two ticked success criteria.
+All three bugs closed in one cycle. The most consequential — TASK-45-BUG-3, surfaced by the diff code review after gate 1 — was a reproducible **row-loss** defect in the engine: `upsertChangeLog` deleted every Change Log row it could not parse, and this repo's roadmap template shipped with the triggering column order. Pre-existing in task.42, fixed here because this task routes five more writers into that path and because "never drops a row" is the mitigation it claims for its own Critical risk.
 
 ### Bug Reports
-- [TASK-45-BUG-1](./task.45.bug.1.orphaned-legacy-block-in-six-sync-skills.md) — HIGH, orphaned legacy block in six sync skills
-- [TASK-45-BUG-2](./task.45.bug.2.zero-file-writes-claim-overstated.md) — MEDIUM, overstated zero-writes claim
+- [TASK-45-BUG-1](./task.45.bug.1.orphaned-legacy-block-in-six-sync-skills.md) — HIGH — ✅ Closed
+- [TASK-45-BUG-2](./task.45.bug.2.zero-file-writes-claim-overstated.md) — MEDIUM — ✅ Closed
+- [TASK-45-BUG-3](./task.45.bug.3.row-loss-on-unparsed-rows.md) — HIGH — ✅ Closed (engine row loss)
 
 ---
 
@@ -629,6 +630,7 @@ Both self-identified Critical risks verify clean — dual-legacy-pair collapse p
 | 2026-08-13 |         | Implemented — all 5 phases; 30 files, 8 new tests (1183/1183 passing). Closed two plumbing gaps the plan missed (story write-gate suppressed the status row; epic fast path never transitioned — pre-existing) and migrated 5 wrapper-consumer surfaces, not 1 | develop     |
 | 2026-08-13 |         | QA gate FAIL (70/100) — 1 high, 1 medium: orphaned legacy block in six sync skills, overstated zero-writes claim | qa-task     |
 | 2026-08-13 |         | QA findings fixed — 3 bugs closed in 1 iteration: orphaned legacy block removed from six sync skills, zero-writes wording corrected, and row loss on unparsed Change Log rows fixed in the engine (+2 regression tests) | qa-fix      |
+| 2026-08-13 |         | QA gate PASS (95/100) after 1 fix cycle — 3 bugs closed, both Critical risks verified clean | qa-task     |
 
 ---
 

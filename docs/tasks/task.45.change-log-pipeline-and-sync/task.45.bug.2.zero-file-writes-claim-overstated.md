@@ -4,7 +4,7 @@
 **Bug ID**: TASK-45-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-08-13
 
@@ -67,3 +67,4 @@ Take option **(a)** — correct the wording. Option (b) changes behaviour on a p
 | --- | --- | --- | --- |
 | 2026-08-13 | New | QA Engineer | Filed at gate 1 (FAIL) |
 | 2026-08-13 | Ready for QA | qa-fix | Fixed in cycle 1 |
+| 2026-08-13 | Closed | QA Engineer | Verified fixed at gate 2 (PASS 95/100) |

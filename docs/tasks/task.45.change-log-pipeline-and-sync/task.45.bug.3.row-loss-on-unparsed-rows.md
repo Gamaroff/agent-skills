@@ -4,7 +4,7 @@
 **Bug ID**: TASK-45-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 3b diff code review)
 **Date Found**: 2026-08-13
 
@@ -91,3 +91,4 @@ Both deserve their own change against the engine, with tests.
 | 2026-08-13 | New | QA Engineer | Found by Step 3b diff code review; reproduced |
 | 2026-08-13 | In Progress | qa-fix | Root cause confirmed in `upsertChangeLog` |
 | 2026-08-13 | Ready for QA | qa-fix | Preservation implemented, 2 regression tests, template corrected |
+| 2026-08-13 | Closed | QA Engineer | Verified fixed at gate 2 (PASS 95/100) |
