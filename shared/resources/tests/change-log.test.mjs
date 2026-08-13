@@ -886,12 +886,56 @@ test("H: create + transition in one run writes both rows, creation first", () =>
   assert.match(entries[1].description, /Status →/);
 });
 
-test("H: a transition reporting no landed status writes no row", () => {
-  // `transitioned` without `to` would render "Status → undefined". Guard it.
+test("H: a transition with no reported destination still writes a row, naming the transition", () => {
+  // This test previously asserted NO row, which traded a wrong value for a missing
+  // one. `transitioned: true` means the card moved; only the destination NAME is
+  // unknown. Dropping the row loses a real event irrecoverably, so the row is
+  // written and says exactly what is known.
   const entries = JS.buildChangeLogEntries(
-    syncArgs({ statusOutcome: { transitioned: true, to: null } }),
+    syncArgs({
+      statusOutcome: { transitioned: true, to: null, via: "Start Progress" },
+    }),
   );
-  assert.deepEqual(entries, []);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].description, 'Status changed via "Start Progress"');
+  assert.doesNotMatch(
+    entries[0].description,
+    /Status → /,
+    "must not claim a landed status it was never given",
+  );
+});
+
+test("H: a transition with neither destination nor transition name degrades to a bare row", () => {
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({ statusOutcome: { transitioned: true } }),
+  );
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].description, "Status changed");
+  assert.doesNotMatch(entries[0].description, /undefined|null/);
+});
+
+test("H: the ladder walker's `landed` field is honoured when `to` is absent", () => {
+  // `walkLadder` reports its destination as `landed`, not `to`. Reading only `to`
+  // would silently drop every multi-hop walk's row if the walker were ever wired
+  // into syncDocumentStatus.
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({ statusOutcome: { transitioned: true, landed: "In Review" } }),
+  );
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].description, "Status → In Review");
+});
+
+test("H: a landed status is preferred over the transition name", () => {
+  const entries = JS.buildChangeLogEntries(
+    syncArgs({
+      statusOutcome: {
+        transitioned: true,
+        to: "In Progress",
+        via: "Start Progress",
+      },
+    }),
+  );
+  assert.equal(entries[0].description, "Status → In Progress");
 });
 
 test("H: migration does not fire when nothing else is being written", () => {

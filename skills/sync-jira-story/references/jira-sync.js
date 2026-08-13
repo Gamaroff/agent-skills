@@ -465,10 +465,25 @@ function buildChangeLogEntries({ created, issueKey, statusOutcome, author, docNo
   // `transitioned` is false for the no-target, already-there and no-transition
   // outcomes alike — all of which are "nothing moved", and none of which is an
   // event worth a row.
-  if (statusOutcome?.transitioned && statusOutcome.to) {
+  //
+  // `transitioned: true` means the card DID move, so it always earns a row. What
+  // varies is how precisely we can name where it landed:
+  //   `to`     — the landed status, when Jira reported one (the normal case)
+  //   `landed` — the ladder walker's equivalent field, for a multi-hop walk
+  //   `via`    — the transition fired; known even when the destination is not
+  //
+  // Gating the row on `to` alone would drop a real event whenever Jira omitted the
+  // destination, which is the failure this module exists to prevent: a missing row
+  // is unrecoverable, while an imprecise one still tells the reader what happened.
+  if (statusOutcome?.transitioned) {
+    const landed = statusOutcome.to || statusOutcome.landed;
     entries.push({
       date: day,
-      description: `Status → ${statusOutcome.to}`,
+      description: landed
+        ? `Status → ${landed}`
+        : statusOutcome.via
+          ? `Status changed via "${statusOutcome.via}"`
+          : "Status changed",
       author,
     });
   }
@@ -3126,13 +3141,38 @@ async function transitionToStatus({
     };
   }
 
-  const landed = (match.to && match.to.name) || match.name;
+  // `match.to.name` is the STATUS this transition lands in. `match.name` is the
+  // TRANSITION — a verb ("Start Progress"), not a state ("In Progress"). They are
+  // different things and Jira returns both, so falling back from one to the other
+  // does not degrade gracefully: it reports a verb as though it were the status.
+  //
+  // That fallback used to be `(match.to && match.to.name) || match.name`, which
+  // was invisible in the normal case (Jira populates `to`) and wrong in the case
+  // it existed to handle. Since task.45 this value is written into the document's
+  // permanent Change Log, so a wrong noun there outlives the sync that produced it.
+  //
+  // When `to` is absent we simply do not know the destination, and say so. `via`
+  // carries the transition actually fired, which is always known and is the honest
+  // thing to record — the card did move, and losing that event would be worse than
+  // naming it imprecisely.
+  const landed = (match.to && match.to.name) || null;
   if (output)
     output.info(
-      `   🔀 Transitioned ${issueKey}: "${current}" → "${landed}" (matched ${rule})` +
+      `   🔀 Transitioned ${issueKey}: "${current}" → ` +
+        (landed
+          ? `"${landed}"`
+          : `(destination not reported by Jira; fired "${match.name}")`) +
+        ` (matched ${rule})` +
         (loggedWork ? ` [logged ${worklogTimeSpent}]` : ""),
     );
-  return { transitioned: true, from: current, to: landed, rule, loggedWork };
+  return {
+    transitioned: true,
+    from: current,
+    to: landed,
+    via: match.name,
+    rule,
+    loggedWork,
+  };
 }
 
 // The hops a moment implies from a given position: the rungs the ladder declares

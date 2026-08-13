@@ -469,11 +469,17 @@ async function run({
       // Only the final rung can be terminal — see walkLadder.
       terminal: hops.length === 1 ? spec.terminal : false,
     });
-    const to = r.match ? (r.match.to && r.match.to.name) || r.match.name : null;
+    // Same distinction transitionToStatus draws: `to.name` is the destination
+    // STATUS, `name` is the TRANSITION. A preview that prints the verb as though
+    // it were the destination tells the operator this stage lands somewhere it
+    // does not, which is worse than admitting the payload did not say.
+    const to = r.match && r.match.to ? r.match.to.name : null;
     output.info(
       `🔎 ${args.issue} [${issueType}] @ "${currentStatus}" — stage ${args.stage}: ` +
         (r.match
-          ? `would move to "${to}" (via ${r.rule})`
+          ? to
+            ? `would move to "${to}" (via ${r.rule})`
+            : `would fire "${r.match.name}" (destination not reported; via ${r.rule})`
           : `skip (${r.reason})`),
     );
     for (let i = 1; i < hops.length; i++) {
