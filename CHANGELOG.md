@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.38.0] - 2026-08-13
+
 ### Added
 
 - **The develop pipelines assert that reported work exists on the remote.** A pipeline reported a "PR-ready branch pushed" whose branch carried zero commits with every file still uncommitted, and separately claimed a trunk fix was "isolated in its own commit" when no such commit existed. `develop-batch` relayed both claims to two sibling lanes and planned the merge order around them. The merge gate's head-SHA check would have refused the merge, so nothing broken could ship — but it runs at merge time, by which point the false claims had already shaped the batch.
