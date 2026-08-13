@@ -1,6 +1,6 @@
 ---
 name: sync-jira-epic
-description: Sync a local epic markdown file to Jira — creates the epic if it has no jira_key, updates it if jira_key is already set. Top-level work item (no parent). Embeds Bitbucket links to the parent PRD and epic file in the Jira description (rendered via ADF). Renders the Stories Breakdown overview table as a real ADF table in Jira. Maintains a Change Log in the local epic file. Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this epic in Jira", "update this epic in Jira", "sync epic to Jira", "push epic changes to Jira", or "publish epic to Jira".
+description: Sync a local epic markdown file to Jira — creates the epic if it has no jira_key, updates it if jira_key is already set. Top-level work item (no parent). Embeds Bitbucket links to the parent PRD and epic file in the Jira description (rendered via ADF). Renders the Stories Breakdown overview table as a real ADF table in Jira. Writes a Change Log row on issue creation and on status transition only (not on body updates). Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this epic in Jira", "update this epic in Jira", "sync epic to Jira", "push epic changes to Jira", or "publish epic to Jira".
 ---
 
 # sync-jira-epic
@@ -12,7 +12,7 @@ One-way sync of a local epic markdown file to Jira. Auto-detects create vs updat
 | `jira_key` present? | Action |
 |---|---|
 | Absent | **Pre-flight search by sync label**, then **Create** if no match. Writes `jira_key` back to file. |
-| Present | **Update** existing Jira epic via atomic PUT, append to Change Log. |
+| Present | **Update** existing Jira epic via atomic PUT. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-story`:** epics are **top-level** — no parent issue. Issue type sent as `Epic`. Sets the Epic Name customfield (`customfield_10011` by default) on create, with auto-retry that drops the field if the project rejects it (typical of team-managed projects).
 
@@ -145,10 +145,10 @@ Flow:
 7. Build a Jira ADF description: Summary → Metadata → Stories Breakdown overview table → Source links.
 8. Resolve cached `Epic` issue type id (or fetch + cache).
 9. **Create** (POST, with Epic-Name-field auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`).
-10. **No-change fast path:** on update, if no fields changed, skip the PUT but still record a local Change Log entry. Use `--force` to push anyway.
+10. **No-change fast path:** on update, if no fields changed, skip the PUT. The status transition still runs on this path — an epic whose frontmatter status moved while its card body did not must still reach the board, and a transition here is the one thing that earns a Change Log row. If nothing transitioned either, the run writes no row and no file at all. Use `--force` to push the PUT anyway.
 11. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning.
 12. If frontmatter `status` differs from current Jira status, fetch transitions and POST a status transition.
-13. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `prd_bitbucket_url`, `epic_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Epic**` / `**Parent PRD**` / `**Epic File**` links. Append Change Log entry.
+13. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `prd_bitbucket_url`, `epic_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Epic**` / `**Parent PRD**` / `**Epic File**` links. Append a Change Log row only for issue creation or a status transition — never for a body update.
 
 ### 4. Report to User
 
@@ -251,10 +251,32 @@ Override the field id with `JIRA_EPIC_NAME_FIELD`, or set it to `none` to skip t
 
 If your epic markdown has a `## Stories Breakdown` section with a pipe-table, the script extracts the rows and renders them as an **ADF table** in the Jira description (header row + data rows). Plain pipes are not rendered as tables in Jira ADF — this is an explicit conversion.
 
-## Change Log Format
+## Change Log
 
-```markdown
-<!-- jira-sync-changelog-start -->
+The format is not restated here — it is defined once in
+[document-change-log.md](references/document-change-log.md), and the engine that
+writes it is `references/change-log.js`. Markers are `<!-- change-log-start -->` /
+`<!-- change-log-end -->`; a document still carrying the superseded
+`<!-- jira-sync-changelog-* -->` pair is migrated in place on the first sync that
+writes for another reason.
+
+**A row is written for exactly two events:**
+
+| Event | Row |
+| --- | --- |
+| Issue created | `\| 2026-08-12 \|  \| Jira epic created (PROJ-42) \| sync-jira-epic \|` |
+| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-jira-epic \|` |
+
+**A body, summary, priority or label update writes no row.** Jira keeps a full
+issue history with actor and timestamp — strictly better than a local row naming
+only which fields moved — and the document records *why* the body changed through
+its own review, develop and QA rows. `jira_last_synced_at` in frontmatter still
+records the last sync time.
+
+A sync that changes nothing writes nothing at all: no row, no marker migration,
+no file write. Migration happens inside the row write, so it can never fire on the
+no-op path and churn every document on every sync.
+
 ## Change Log
 
 | Date (UTC)       | Change                                |

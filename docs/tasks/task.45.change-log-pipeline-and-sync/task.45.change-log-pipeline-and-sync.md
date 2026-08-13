@@ -5,7 +5,7 @@ type: task
 description: "Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto the canonical Change Log, unifying the marker pairs and narrowing sync rows to milestones."
 tags: [change-log, pipeline, tracker-sync]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 created: 2026-08-12
 updated: 2026-08-13
@@ -16,7 +16,7 @@ github_issue: 204
 
 # [Task 45] Pipeline, QA, finalise, and tracker sync write the Change Log
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.45.review.1.change-log-pipeline-and-sync.md` implemented 2026-08-13
 
@@ -308,12 +308,12 @@ function that no longer exists.
 `skills/sync-github-{story,epic,task}/SKILL.md`, six `ensure-*-issue` SKILL.md
 **Depends on**: Phases 1–3
 
-- [ ] Three Jira scripts call `change-log.js` directly with the structured entry
-- [ ] Narrow to issue-created and status-transition rows; drop the body-update row
-- [ ] Delete the `skipChangelog` plumbing made redundant (3 sites, all in `sync-jira-epic.js`:
+- [x] Three Jira scripts call `change-log.js` directly with the structured entry
+- [x] Narrow to issue-created and status-transition rows; drop the body-update row
+- [x] Delete the `skipChangelog` plumbing made redundant (3 sites, all in `sync-jira-epic.js`:
       the param default `:448`, the guard `:503`, the no-op fast path `:887`)
-- [ ] Remove the wrappers task.42 left in `jira-sync.js` (`:408-467`, exported at `:4056`)
-- [ ] **Same commit as the wrapper deletion — four surfaces break otherwise.** `upsertChangelog`
+- [x] Remove the wrappers task.42 left in `jira-sync.js` (`:408-467`, exported at `:4056`)
+- [x] **Same commit as the wrapper deletion — four surfaces break otherwise.** `upsertChangelog`
       is not only called at the three sites above; it is imported by name and re-exported for
       test seams. Deleting the wrapper without these leaves modules exporting a function that no
       longer exists, and `npm test` goes red:
@@ -323,9 +323,9 @@ function that no longer exists.
       - `skills/sync-jira-story/scripts/sync-jira-story.js:788` — re-exports `upsertChangelog`
       - `skills/sync-jira-epic/scripts/sync-jira-epic.js:1296` — same
       - `skills/sync-jira-task/scripts/sync-jira-task.js:635` — same
-- [ ] Three GitHub SKILL.md files: replace the three duplicated format specs with a link to
+- [x] Three GitHub SKILL.md files: replace the three duplicated format specs with a link to
       the canonical spec and the same narrowed rules
-- [ ] **Three** `ensure-*-jira-issue`: **narrow**, do not delete, the side-effect notes
+- [x] **Three** `ensure-*-jira-issue`: **narrow**, do not delete, the side-effect notes
       (`ensure-story-jira-issue:102`, `ensure-task-jira-issue:96`, `ensure-epic-jira-issue:91`).
       Each says the delegate "may also advance the status **and append a Change Log entry**" —
       and under this task's own §3 table *both still happen*: issue creation writes a row and a
@@ -333,19 +333,18 @@ function that no longer exists.
       Delete only the hypothetical `--no-status-transition` flag it floats, and reword the
       remainder from an apology into documented, intended behaviour.
       The three `ensure-*-github-issue` siblings carry **no such note** — nothing to edit there.
-- [ ] `develop-bug`: one cross-reference line — Status History stands
+- [x] `develop-bug`: one cross-reference line — Status History stands
 
 ### Phase 5: Tests, bundle, live verification
 
 **Risk**: Medium.
 **Depends on**: Phases 1–4
 
-- [ ] Extend `shared/resources/tests/change-log.test.mjs` with the narrowed sync rules
-- [ ] `shared/resources/tests/jira-sync-publishing-fidelity.test.mjs` green
-- [ ] `npm test`, `npm run eval:develop-story`, `npm run eval:develop-task`
-- [ ] `npm run bundle`; second run a no-op
-- [ ] Live: sync one real task to Jira twice with no body change and confirm no new row;
-      change the body and confirm still no row; transition the status and confirm one row
+- [x] Extend `shared/resources/tests/change-log.test.mjs` with the narrowed sync rules
+- [x] `shared/resources/tests/jira-sync-publishing-fidelity.test.mjs` green (migrated to the structured signature)
+- [x] `npm test` (1183/1183), `npm run eval:develop-story`, `npm run eval:develop-task`
+- [x] `npm run bundle`; second run a no-op — verified
+- [ ] **DEFERRED — Live Jira check.** No Jira credentials available in this environment; this repo is GitHub-tracked (`JIRA_URL` unset). The behaviour is pinned by unit tests H1-H8, including the two that matter (no-op writes nothing; migration fires only on a real write). Run before relying on the narrowing in a Jira-tracked consumer repo.
 
 ---
 
@@ -387,6 +386,19 @@ function that no longer exists.
 ### Files to Delete
 
 None.
+
+### Actually Modified (30 files, recorded at implementation)
+
+Beyond the plan's list, these were touched because the work required them:
+
+| File | Why it was not in the plan |
+| --- | --- |
+| `skills/sync-jira-story/tests/sync-jira-story.test.js` | calls `upsertChangelog` — a wrapper consumer the plan did not enumerate |
+| `skills/sync-jira-epic/tests/sync-jira-epic.test.js` | same |
+| `skills/sync-jira-task/tests/sync-jira-task.test.js` | same |
+| `evals/develop-{task,story}/step-isolation/{03-develop-loop,07-finalise}/` | fixtures + assertions pinning the new rows (8 files) |
+| `skills/finalise/SKILL.md` (step renumbering) | inserting sub-steps exposed a **pre-existing** duplicate `6.` in Step 7 and a duplicate `4.` in Step 8 |
+| `shared/resources/change-log.js` | its `parseLegacyRow` docblock described the deleted shim as the caller |
 
 ---
 
@@ -439,31 +451,32 @@ None.
 
 ### Functional
 
-- [ ] A full `/develop-story` run produces implementation, QA and accepted rows in the story
-- [ ] `finalise` writes the accepted row in the same edit that sets `status: accepted`
-- [ ] All six sync skills use `<!-- change-log-start -->` only
-- [ ] A document carrying either legacy pair migrates in place on its next sync, once
-- [ ] A body-only sync writes no Change Log row; a status transition writes one
-- [ ] `develop-bug` still uses Status History, unchanged
+- [x] A full `/develop-story` run produces implementation, QA and accepted rows in the story
+- [x] `finalise` writes the accepted row in the same edit that sets `status: accepted`
+- [x] All six sync skills use `<!-- change-log-start -->` only
+- [x] A document carrying either legacy pair migrates in place on its next sync, once
+- [x] A body-only sync writes no Change Log row; a status transition writes one
+- [x] `develop-bug` still uses Status History, unchanged
 
 ### Performance
 
-- [ ] A no-op sync still performs zero file writes
-- [ ] Marker migration happens at most once per document, never on the no-op path
+- [x] A no-op sync still performs zero file writes
+- [x] Marker migration happens at most once per document, never on the no-op path
 
 ### Code Quality
 
-- [ ] `npm test` green, including all three Jira suites
-- [ ] `npm run eval:develop-story` and `eval:develop-task` green
-- [ ] The task.42 wrappers in `jira-sync.js` are deleted, not left orphaned
-- [ ] No sync SKILL.md embeds a column list
+- [x] `npm test` green, including all three Jira suites (1183/1183)
+- [x] `npm run eval:develop-story` and `eval:develop-task` green
+- [x] The task.42 wrappers in `jira-sync.js` are deleted, not left orphaned
+- [x] No sync SKILL.md embeds a column list
 
 ### Migration
 
-- [ ] `shared/resources/document-change-log.md`'s moment table (`:139-148`) verified against
-      shipped behaviour — no marker to flip; edit only on divergence
-- [ ] `CHANGELOG.md` records both breaking changes
-- [ ] Live verification against a real Jira issue completed and recorded in the DoD
+- [x] `shared/resources/document-change-log.md`'s moment table verified against shipped behaviour —
+      one divergence found and fixed (`sync-*` added to the status-transition row), plus a new
+      section documenting what a sync logs and why migration never runs standalone
+- [x] `CHANGELOG.md` records both breaking changes
+- [ ] **DEFERRED** — live Jira verification; no credentials in this environment (see Phase 5)
 
 ---
 
@@ -582,6 +595,7 @@ per completion; a stale cross-reference.
 | 2026-08-12 | 1.0     | Initial draft                                                                                                                                                   | create-task |
 | 2026-08-13 | 1.1     | Review passed (8/10) — ready for development; 7 Important fixes applied: 4 wrapper-deletion surfaces that break `npm test` named in §5/§6, deliverable #19 restated as verification (no marker exists to flip), `ensure-*` notes narrowed not deleted and scope corrected 6→3, `qa-story`'s 3 further edit sites named, citations fixed (`CHANGELOG.md` 377→527 ×2, `finalise` 1222→1249, legacy marker → `change-log.js:57-58`), Change Log section added | review-task |
 | 2026-08-13 |         | Status → ready-for-development                                                                                                                                  | review-task |
+| 2026-08-13 |         | Implemented — all 5 phases; 30 files, 8 new tests (1183/1183 passing). Closed two plumbing gaps the plan missed (story write-gate suppressed the status row; epic fast path never transitioned — pre-existing) and migrated 5 wrapper-consumer surfaces, not 1 | develop     |
 
 ---
 
@@ -597,10 +611,12 @@ per completion; a stale cross-reference.
 - [x] Complete — acceptance row added as Step 7 sub-step 3 (same edit as the frontmatter change, minor Version bump, idempotence-guard warning, two-rows-at-acceptance note); gaps row added as Step 8 sub-step 3 (blank Version). Step numbering repaired in both — Step 7 had a pre-existing duplicate `6.`
 
 ### Phase 4: Tracker sync
-- [ ] Not started
+- [x] Complete — three Jira scripts call the engine with structured entries; rows narrowed to created + status-transition; `skipChangelog` deleted; wrappers removed from `jira-sync.js` and replaced by `buildChangeLogEntries` (policy, not a shim); all six SKILL.md format specs replaced with a link + narrowed rules; three `ensure-*-jira-issue` notes narrowed; `develop-bug` cross-reference added
+- [x] **Two plumbing gaps closed that the plan did not anticipate** — story's `shouldWriteFile` suppressed the write on exactly the path a status row is earned; epic's fast path returned before the transition block, so epic never transitioned on a body-unchanged sync (pre-existing)
+- [x] **Five wrapper-consumer surfaces migrated**, not the one the plan named — the fidelity test plus three script re-exports plus all three per-skill test suites
 
 ### Phase 5: Tests, bundle, live verification
-- [ ] Not started
+- [x] Complete — 8 new narrowed-sync tests (group H) in `change-log.test.mjs`; fidelity suite migrated; 4 eval fixtures extended with implementation/acceptance row assertions; `npm test` 1183/1183; both eval suites green; bundle idempotent. **Live Jira verification deferred — no Jira credentials in this environment (`JIRA_URL` unset; this repo is GitHub-tracked).**
 
 ---
 

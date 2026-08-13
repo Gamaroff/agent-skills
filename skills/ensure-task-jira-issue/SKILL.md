@@ -1,6 +1,6 @@
 ---
 name: ensure-task-jira-issue
-description: 'Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-task (which handles backlog add, ADF rendering, and change log), and writes jira_key + jira_url to the task frontmatter. Tasks are standalone — NOT linked to a Jira epic. Sets TASK_JIRA_KEY (e.g. "PROJ-456") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Jira sibling of ensure-task-github-issue. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.'
+description: 'Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-task (which handles backlog add, ADF rendering, and the Change Log rows for creation and status transition), and writes jira_key + jira_url to the task frontmatter. Tasks are standalone — NOT linked to a Jira epic. Sets TASK_JIRA_KEY (e.g. "PROJ-456") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Jira sibling of ensure-task-github-issue. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.'
 type: internal
 ---
 
@@ -93,7 +93,11 @@ node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
 
 > **Standalone**: tasks are NOT linked to a Jira epic. No parent-epic resolution step.
 >
-> **Side-effect note**: `sync-jira-task` may also advance the task's Jira status from frontmatter and append a Change Log entry. These are accepted side effects for this sub-routine — a future `--no-status-transition` flag on `sync-jira-task` would decouple them (out of scope here).
+> **What the delegate also does**: `sync-jira-task` advances the task's Jira status from
+> frontmatter and appends a Change Log row for that transition, plus one for the issue creation
+> itself. Both are intended, documented behaviour — a creation row and a status row are exactly the
+> two events the narrowed sync rules record. See
+> [document-change-log.md](references/document-change-log.md).
 
 **If `sync-jira-task` exits with a non-zero status or reports an auth error**:
 - Log warning: `sync-jira-task delegation failed — setting TASK_JIRA_KEY=""`

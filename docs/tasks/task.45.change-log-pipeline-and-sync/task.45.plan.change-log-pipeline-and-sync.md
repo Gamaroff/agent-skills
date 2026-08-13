@@ -112,7 +112,7 @@ step that bumps Version:
 | 2026-05-15 | 1.2 | DoD passed — accepted (PR #204) | finalise |
 ```
 
-**`:1222`** (Step 8, gaps path) — status is deliberately unchanged there, so no Version bump:
+**`:1249`** (Step 8, gaps path — header at `:1200`) — status is deliberately unchanged there, so no Version bump:
 
 ```markdown
 | 2026-05-15 |  | DoD incomplete — 3 gaps identified | finalise |
@@ -166,9 +166,12 @@ sync rewrites the document, defeating the fast path and churning git history. Th
 exact defect `37bcf3f` fixed by making `hashBody` hash only what is published:
 
 ```js
-// Migrate ONLY when we are already writing for another reason. A sync that
-// changes nothing must write nothing — including markers.
-if (willWrite) content = CL.migrateLegacyMarkers(content);
+// NO GUARD IS NEEDED, and `migrateLegacyMarkers` does not exist. Migration runs
+// INSIDE upsertChangeLog (change-log.js:398-429). Simply do not call it unless a
+// row is earned, and the no-op path can never migrate:
+for (const entry of changeLogEntries) {          // empty on a no-op sync
+  content = CL.upsertChangeLog(content, entry, { docType: "task" });
+}
 ```
 
 Assert it: two consecutive no-op syncs must produce zero file writes.
@@ -192,11 +195,13 @@ GitHub keeps its own issue history, and the document records why the body change
 | 2026-08-12 |  | GitHub issue created (#204) | sync-github-story |
 ```
 
-**The six `ensure-*-issue` skills** carry a side-effect note that becomes wrong:
+**The three `ensure-*-jira-issue` skills** carry a side-effect note to NARROW, not delete — under
+the narrowed rules both the creation row and the status row still fire, so the note stays true.
+The three `ensure-*-github-issue` siblings have no such note:
 `ensure-story-jira-issue:102`, `ensure-task-jira-issue:96`, `ensure-epic-jira-issue:91` each
 say the delegate "may also advance the status and append a Change Log entry" and float a
-hypothetical `--no-status-transition` flag. Delete the notes — appending a creation row is
-now the documented, intended behaviour, not a side effect to apologise for.
+hypothetical `--no-status-transition` flag. Delete only that flag clause and reframe the rest as
+documented, intended behaviour rather than a side effect to apologise for.
 
 **`skills/develop-bug/SKILL.md`** — one line only, near its Status History writes at `:161`:
 bugs use `## Status History`, not a Change Log; see the spec. No behaviour change.
@@ -267,7 +272,7 @@ npm run bundle && git diff --stat    # empty
 - **`shared/resources/jira-sync.js:772` `extractBodySections`** and the `hashBody` change in
   commit `37bcf3f` — the precedent for "hash and write only what actually changed". The
   migration guard is the same idea applied to markers.
-- **`CHANGELOG.md:377`** — the four-cards-published-empty incident. Two subsystems disagreed
+- **`CHANGELOG.md:527`** — the four-cards-published-empty incident. Two subsystems disagreed
   about a heading contract and the sync reported `✅` each time. Any Change Log defect will
   fail the same silent way, which is why the live check is non-negotiable.
 - **`skills/qa-story/SKILL.md:926`** — the authorisation block listing writable sections.

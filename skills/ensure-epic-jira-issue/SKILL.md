@@ -88,7 +88,11 @@ node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
 - Create the Jira epic if it does not exist
 - Write `jira_key` (and `jira_url` of shape `{JIRA_URL}/browse/{KEY}`) back to the epic frontmatter
 
-> **Side-effect note**: `sync-jira-epic` may also advance the epic's Jira status from frontmatter and append a Change Log entry. These are accepted side effects for this task — a future `--no-status-transition` flag on `sync-jira-epic` would decouple them (out of scope here).
+> **What the delegate also does**: `sync-jira-epic` advances the epic's Jira status from
+> frontmatter and appends a Change Log row for that transition, plus one for the issue creation
+> itself. Both are intended, documented behaviour — a creation row and a status row are exactly the
+> two events the narrowed sync rules record. See
+> [document-change-log.md](references/document-change-log.md).
 
 **If `sync-jira-epic` exits with a non-zero status or reports an auth error**:
 - Log warning: `sync-jira-epic delegation failed — setting EPIC_JIRA_KEY=""`

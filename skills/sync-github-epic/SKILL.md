@@ -1,6 +1,6 @@
 ---
 name: sync-github-epic
-description: Sync a local epic markdown file to GitHub Issues — creates the epic issue if it has no github_issue, updates it if github_issue is already set. Top-level work item (no parent); the epic's milestone (`Epic {N} — {title}`) carries the relationship to its stories/tasks. Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Maintains a Change Log in the local epic file. GitHub-only sibling of sync-jira-epic. Use when the user says "create this epic in GitHub", "sync epic to GitHub", "push epic changes to GitHub", or "publish epic to GitHub".
+description: Sync a local epic markdown file to GitHub Issues — creates the epic issue if it has no github_issue, updates it if github_issue is already set. Top-level work item (no parent); the epic's milestone (`Epic {N} — {title}`) carries the relationship to its stories/tasks. Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Writes a Change Log row on issue creation and on status transition only (not on body updates). GitHub-only sibling of sync-jira-epic. Use when the user says "create this epic in GitHub", "sync epic to GitHub", "push epic changes to GitHub", or "publish epic to GitHub".
 ---
 
 # sync-github-epic
@@ -12,7 +12,7 @@ One-way sync of a local epic markdown file to GitHub Issues. Auto-detects create
 | `github_issue` present? | Action |
 |---|---|
 | Absent / null | **Pre-flight dedup search by title**, then **Create** (top-level epic issue, milestone auto-created) if no match. Writes `github_issue` back to file. |
-| Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`, append Change Log row. |
+| Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-epic`:** GitHub Issues are markdown-native, so no ADF translation; auth/retry/rate-limit are handled by the `gh` CLI; "status transitions" map to `gh issue close` / `gh issue reopen`, since GitHub only has `open`/`closed`. Labels carry the priority signal, and the epic milestone (`Epic {N} — {title}`) is the hierarchical anchor that child stories/tasks attach to — there is no GitHub equivalent of a Jira Epic-Name customfield.
 
@@ -175,7 +175,7 @@ Append a Change Log row describing what changed:
 | YYYY-MM-DD HH:MM | Updated: title, body, milestone, priority |
 ```
 
-Skip-when-no-diff: if title, body, labels, and milestone are all identical to the remote state, skip `gh issue edit`, skip the Change Log entry, and proceed to Step 5.
+Skip-when-no-diff: if title, body, labels, and milestone are all identical to the remote state, skip `gh issue edit`, write no Change Log row, and proceed to Step 5.
 
 ### 5. Status Reconciliation (open vs closed)
 
@@ -213,12 +213,31 @@ fi
 - ✅ Epic frontmatter updated (on create only)
 - 📌 Story reminder: child stories synced via `/sync-github-story` auto-link to this epic issue as sub-issues
 
-## Change Log Format
+## Change Log
 
-The Change Log lives in the epic markdown body, wrapped in HTML markers so re-runs can find and append to it without duplicating the heading:
+The format is not restated here — it is defined once in
+[document-change-log.md](references/document-change-log.md). Markers are
+`<!-- change-log-start -->` / `<!-- change-log-end -->`; a document still carrying
+the superseded `<!-- github-sync-changelog-* -->` pair is migrated in place on the
+first sync that writes for another reason. A document synced to both trackers had
+grown two blocks under two marker pairs; they collapse into one, rows preserved in
+date order.
 
-```markdown
-<!-- github-sync-changelog-start -->
+**A row is written for exactly two events:**
+
+| Event | Row |
+| --- | --- |
+| Issue created | `\| 2026-08-12 \|  \| GitHub issue created (#204) \| sync-github-epic \|` |
+| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-github-epic \|` |
+
+**A title, body, label or milestone update writes no row.** GitHub keeps its own
+issue history with actor and timestamp, and the document records *why* the body
+changed through its own review, develop and QA rows.
+
+A sync that changes nothing writes nothing at all — no row, and no marker
+migration. Migration rides along with a row write and must never be performed as a
+standalone edit, or every sync rewrites every document.
+
 ## Change Log
 
 | Date (UTC)       | Change                              |

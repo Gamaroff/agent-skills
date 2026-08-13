@@ -1,6 +1,6 @@
 ---
 name: sync-github-story
-description: Sync a local story markdown file to GitHub Issues — creates the story issue if it has no github_issue, updates it if github_issue is already set. Links the story as a sub-issue of its parent epic (auto-resolves parent epic GitHub issue via ensure-epic-github-issue). Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Maintains a Change Log in the local story file. GitHub-only sibling of sync-jira-story. Use when the user says "create this story in GitHub", "sync story to GitHub", "push story changes to GitHub", or "publish story to GitHub".
+description: Sync a local story markdown file to GitHub Issues — creates the story issue if it has no github_issue, updates it if github_issue is already set. Links the story as a sub-issue of its parent epic (auto-resolves parent epic GitHub issue via ensure-epic-github-issue). Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Writes a Change Log row on issue creation and on status transition only (not on body updates). GitHub-only sibling of sync-jira-story. Use when the user says "create this story in GitHub", "sync story to GitHub", "push story changes to GitHub", or "publish story to GitHub".
 ---
 
 # sync-github-story
@@ -12,7 +12,7 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 | `github_issue` present? | Action |
 |---|---|
 | Absent / null | **Pre-flight dedup search by title**, then **Create** (linked as sub-issue of parent epic) if no match. Writes `github_issue` back to file. |
-| Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`, append Change Log row. |
+| Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-story`:** GitHub Issues are markdown-native, so no ADF translation; auth/retry/rate-limit are handled by `gh` CLI; "status transitions" map to `gh issue close` / `gh issue reopen`, since GitHub only has `open`/`closed`. Labels carry the priority signal.
 
@@ -174,7 +174,7 @@ Append a Change Log row describing what changed:
 | YYYY-MM-DD HH:MM | Updated: title, body, priority |
 ```
 
-Skip-when-no-diff: if title, body, and labels are all identical to the remote state, skip `gh issue edit`, skip the Change Log entry, and proceed to Step 6.
+Skip-when-no-diff: if title, body, and labels are all identical to the remote state, skip `gh issue edit`, write no Change Log row, and proceed to Step 6.
 
 ### 6. Status Reconciliation (open vs closed)
 
@@ -210,12 +210,31 @@ fi
 - ✅ Change log entry appended (or `no-diff, skipped`)
 - ✅ Story frontmatter updated (on create only)
 
-## Change Log Format
+## Change Log
 
-The Change Log lives in the story markdown body, wrapped in HTML markers so re-runs can find and append to it without duplicating the heading:
+The format is not restated here — it is defined once in
+[document-change-log.md](references/document-change-log.md). Markers are
+`<!-- change-log-start -->` / `<!-- change-log-end -->`; a document still carrying
+the superseded `<!-- github-sync-changelog-* -->` pair is migrated in place on the
+first sync that writes for another reason. A document synced to both trackers had
+grown two blocks under two marker pairs; they collapse into one, rows preserved in
+date order.
 
-```markdown
-<!-- github-sync-changelog-start -->
+**A row is written for exactly two events:**
+
+| Event | Row |
+| --- | --- |
+| Issue created | `\| 2026-08-12 \|  \| GitHub issue created (#204) \| sync-github-story \|` |
+| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-github-story \|` |
+
+**A title, body, label or milestone update writes no row.** GitHub keeps its own
+issue history with actor and timestamp, and the document records *why* the body
+changed through its own review, develop and QA rows.
+
+A sync that changes nothing writes nothing at all — no row, and no marker
+migration. Migration rides along with a row write and must never be performed as a
+standalone edit, or every sync rewrites every document.
+
 ## Change Log
 
 | Date (UTC)       | Change                              |
