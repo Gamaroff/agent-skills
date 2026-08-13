@@ -87,7 +87,34 @@ grep -qE "^\*\*Finished:\*\* [0-9]" "$REPORT" || { echo "❌ Step 8 incomplete: 
 # 4. Pipeline Progress table has no ⏳ Pending rows
 grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progress still has ⏳ Pending rows"; exit 1; } || true
 
+# 5. The work actually exists on the remote — commits present, tree clean,
+#    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD.
+#    Run it UNPIPED and read its own exit status; see the note below.
+bash .agents/skills/{skill}/references/verify-push-state.sh --base "${BASE_BRANCH:?}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
+VERIFY_EXIT=$?
+[ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
+
 echo "✅ Step 8 post-conditions verified"
 ```
 
-These checks address regressions #3 and #4 from the live-github-test (impl report stuck at "In Progress / Finished: —", lock file not removed). Treat the bash assertions as binding — emit the Phase 2 Completion banner only after all four pass.
+Checks 1–4 address regressions #3 and #4 from the live-github-test (impl report stuck at "In Progress / Finished: —", lock file not removed). Treat the bash assertions as binding — emit the Phase 2 Completion banner only after all five pass.
+
+---
+
+## Why check 5 exists, and why it is mechanical rather than an instruction
+
+On 2026-08-13 a pipeline reported a "PR-ready branch pushed" and, separately, that a trunk fix had been "isolated in its own commit so the orchestrator can drop it at rebase". **Neither was true.** The branch ref existed on the remote but pointed at the base tip — **0 commits** — and every file was still an uncommitted working-tree modification. The orchestrator relayed that claim to two sibling pipelines and planned a merge around it.
+
+The develop-batch merge gate's head-SHA check would have refused the merge, so nothing broken could ship. But that check runs at **merge** time, and the false claim was acted on well before it. That gap is the cost, and it is why this assertion belongs at **report** time.
+
+**Do not "fix" this class of problem by strengthening the prose.** The prompt already said to report the PR; adding "and be accurate" changes nothing, because the failure is not disobedience — it is reporting an intention as an accomplishment without looking. Only a mechanical check whose output is pasted into the report closes it.
+
+**Paste the script's output verbatim into the final report.** A summary of a verification is not a verification.
+
+⚠️ **Read the script's own exit status — never a pipeline's.** The same session produced *three* separate false passes from exactly that mistake: `npm test 2>&1 | tail -80` reported `tail`'s exit 0 over a suite that had failed, and twice more from wrapper scripts whose status came from a trailing `grep`/`echo`. If the output is large, redirect to a file and read the file:
+
+```bash
+bash .../verify-push-state.sh --base "$BASE_BRANCH" > /tmp/verify.log 2>&1; VERIFY_EXIT=$?
+```
+
+`{skill}` above is the pipeline's own skill directory (`develop-story`, `develop-task` or `develop-bug`) — each vendors its own copy of the script under `references/`.

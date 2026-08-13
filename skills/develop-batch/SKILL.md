@@ -314,10 +314,32 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
 
    | Report | Action | Slot |
    | ------ | ------ | ---- |
-   | Green (PR number, `accepted`) | record `prNumber`, `pipelineDone: true` | freed |
+   | Green (PR number, `accepted`) | **verify before believing** (below), then record `prNumber`, `pipelineDone: true` | freed |
    | **HALT** — its own gate failed (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, rebase/merge conflict) | `halted: true` + `haltKind` + the report verbatim; the worktree is **left in place for inspection**; one item's HALT **must not sink the rest of the batch** | freed |
    | **Interrupted** — something *external* stopped it mid-flight (plan mode, permission denial, compaction, user interrupt, tool outage) | `interrupted: true`, `attempts++`; re-queue at the tail and **re-place** it | freed |
    | Interrupted past `maxResumeAttempts` | `halted: true`, `haltKind: "interrupted-exhausted"` | freed |
+
+   **A green report is a claim, not evidence — verify it before setting `pipelineDone`.**
+   Run the same assertion the pipeline runs, from the orchestrator, against the item's
+   worktree:
+
+   ```bash
+   bash <skillsDir>/develop-batch/references/verify-push-state.sh \
+        --base <baseBranch> --pr <PR#>      # cwd = the item's worktree
+   ```
+
+   Non-zero → treat the report as **false**, not as green: do **not** set `pipelineDone`,
+   and re-queue the item as `interrupted` with the script's output recorded, so the
+   pipeline resumes and finishes the work it reported.
+
+   This is not defensive paranoia about subagents; it is a measured failure. On
+   2026-08-13 a lane reported a "PR-ready branch pushed" whose branch carried **0
+   commits** with every file uncommitted, and separately claimed a trunk fix was
+   "isolated in its own commit" when no such commit existed. The orchestrator relayed
+   both claims to two sibling lanes and planned the merge order around them. Step 3's
+   head-SHA check would have refused the merge — but it runs at *merge* time, and the
+   false claims had already shaped the batch by then. **Verifying at report time is what
+   closes the gap**, and it costs one subsecond command per item.
 
    The halt-vs-interrupt call is `schedule.mjs`'s `classifyStop`, not a judgement call: a
    report is **interrupted** only when it stopped *without* emitting one of the pipeline's
