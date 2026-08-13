@@ -1858,3 +1858,73 @@ test("the inverted --check exit code is documented and shimmed on the Jira side 
     "the async shim must not swallow a --check failure to exit 0",
   );
 });
+
+// --- landed status vs transition name --------------------------------------
+//
+// Jira returns two different names per transition: `name` is the TRANSITION (a
+// verb, "Start Progress") and `to.name` is the STATUS it lands in ("In
+// Progress"). `transitionToStatus` used to fall back from the second to the
+// first, which is invisible in the normal case — Jira populates `to` — and wrong
+// in exactly the case the fallback existed for. Since task.45 that value is
+// written into the document's permanent Change Log.
+
+test("a landed status is reported as the status, never as the transition name", async () => {
+  const { http } = stubHttp({
+    transitions: [T("1", "Start Progress", "In Progress")],
+  });
+  const res = await transitionToStatus({
+    http,
+    baseUrl: "https://x",
+    email: "e",
+    token: "t",
+    issueKey: "K-1",
+    targetStatus: ["In Progress"],
+    currentStatus: "To Do",
+    output: silent,
+  });
+  assert.equal(res.transitioned, true);
+  assert.equal(res.to, "In Progress", "must report the destination STATUS");
+  assert.equal(res.via, "Start Progress", "must also report the transition fired");
+  assert.notEqual(res.to, "Start Progress", "the verb must never be the status");
+});
+
+test("a transition payload with no `to` reports the status as unknown, not as the verb", async () => {
+  // The regression: `(match.to && match.to.name) || match.name` put "Start
+  // Progress" — a verb — into `to`, and from there into permanent history as
+  // `Status → Start Progress`.
+  const { http } = stubHttp({
+    transitions: [{ id: "1", name: "Start Progress", fields: {} }], // no `to`
+  });
+  const res = await transitionToStatus({
+    http,
+    baseUrl: "https://x",
+    email: "e",
+    token: "t",
+    issueKey: "K-1",
+    targetStatus: ["Start Progress"], // matches on transition name
+    currentStatus: "To Do",
+    output: silent,
+  });
+  assert.equal(res.transitioned, true, "the card did move");
+  assert.equal(res.to, null, "an unknown destination is null, not a guess");
+  assert.equal(res.via, "Start Progress", "the transition fired is still known");
+});
+
+test("matching on the transition name still reports the real destination when Jira gives one", async () => {
+  // Candidate matches `t.name`, but `t.to.name` differs — the status must win.
+  const { http } = stubHttp({
+    transitions: [T("1", "Start Progress", "In Progress")],
+  });
+  const res = await transitionToStatus({
+    http,
+    baseUrl: "https://x",
+    email: "e",
+    token: "t",
+    issueKey: "K-1",
+    targetStatus: ["Start Progress"],
+    currentStatus: "To Do",
+    output: silent,
+  });
+  assert.equal(res.to, "In Progress");
+  assert.match(res.rule, /name="Start Progress"/);
+});
