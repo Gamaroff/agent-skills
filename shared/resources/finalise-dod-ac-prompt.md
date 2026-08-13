@@ -34,6 +34,12 @@ For each AC item extracted in Step 1:
 2. For each modified file path: search for code that implements the AC (grep key terms from the AC description).
 3. Also search for a test file (`.spec.ts`, `.test.ts`, `.spec.js`) that covers the AC — grep for the same key terms.
 4. **Citation rule**: A `PASS` requires BOTH a non-null `code_citation` AND a non-null `test_citation`. Missing either → `FAIL`. No exceptions.
+5. **Execution rule**: the cited test must actually run in a lane that gates this change. A test that exists but never executes on the PR is not evidence — it is a citation. Determine the lane from the test's path and the project's CI config (e.g. a `paths-ignore`d job, a suite excluded by the runner's default scope, a directory the per-PR job does not select). If the cited test does not run per-PR, set `status: FAIL` and name the lane in `note`, even though the file exists.
+
+⚠️ **A ticked AC checkbox is a claim, not evidence.** Verify against the diff and the test lane; never treat the story's own checkbox as satisfying either rule. Both failure modes below have occurred and neither was caught by the checkbox:
+
+- An AC ticked complete with **no test written at all**. When the assertion was finally written it went **red immediately**, having concealed a live defect for the whole period it was assumed present.
+- A test written and cited, but placed in a **smoke/e2e directory excluded from the per-PR job** — so it would never have guarded the PR it was authored for.
 
 Tasks / refactoring work: `test_citation` may be `NOT_APPLICABLE` if the task explicitly states "no unit tests applicable" (cite that line) — mark status `PASS` with note.
 
@@ -65,6 +71,7 @@ ac_traceability:
       status: PASS | FAIL
       code_citation: "path/to/file.ts:NN"   # null if not found
       test_citation: "path/to/file.spec.ts:NN"  # null if not found, or "NOT_APPLICABLE: reason"
+      test_runs_per_pr: true | false            # false → status must be FAIL; name the lane in note
       note: "optional explanation"
   docs:
     - item: "description of doc item"
@@ -76,3 +83,5 @@ ac_traceability:
 ```
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null citation → `status: FAIL`. `NOT_APPLICABLE` must have a `note`.
+
+**Execution rule**: for acceptance criteria, `status: PASS` additionally requires `test_runs_per_pr: true`. A cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane named in `note`.

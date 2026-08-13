@@ -530,6 +530,41 @@ Use this summary to ensure fixes follow existing patterns rather than introducin
 - Maintain test co-location (.spec.ts files next to source)
 - **Pattern before change**: Before modifying each file, spend one Read() to confirm the existing pattern in that file — do not assume from memory. After implementing each fix, summarize what changed in 2-3 lines and move on; do not retain the full file content.
 
+### Step 3.5: Adversarial pass over the fixes themselves
+
+**A fix is new code, not the closure of a finding.** Do not let "the finding is addressed" stand in
+for "the change is correct". This step is cheap and it catches a defect class the suite structurally
+cannot: a change that is right in the steady state and wrong in a transition.
+
+**Why this exists.** On one privacy-critical story, **three of six HIGH findings were introduced by
+the fixes to earlier findings**, with a fourth of the same shape surfacing at the DoD gate. Every one
+was a correct steady-state change that broke a transition, and **none was catchable by the suite as it
+stood** — each was found only by re-reading the changed code adversarially. The fix for "browsing
+broadcast as playing" made *teardown* announce a tile as play; the fix for an ordering bug *dropped* a
+delta arriving mid-computation; those two combined *stranded* a socket that could no longer retry; and
+the fix that made a preference absolute in *content* leaked it in *timing*.
+
+For each fix that touches emission, subscription, caching or any lifecycle, probe these four
+explicitly — they are the states the original finding never mentioned:
+
+| Transition | Ask |
+| ---------- | --- |
+| **Bulk teardown** | On unmount/disconnect/cleanup, does this emit, persist or announce something it should not? |
+| **In-flight computation** | If input arrives *while* the operation is running, is it applied, queued, or silently dropped? |
+| **Error path** | When the operation fails, is state left recoverable — or stranded so retry is impossible? |
+| **Reconnect** | After a drop and re-establish, does it converge to correct state, or resume from a stale one? |
+
+**Review the combination, not only each fix.** At least one real defect of this shape was caused by
+two earlier fixes that were each correct alone. After the last fix in a cycle, re-read the full diff
+as one change.
+
+**Weight by surface, not by finding count.** On privacy, security, auth or payment paths a regression
+is **silent** — nothing goes red — so this pass is mandatory. Elsewhere it is proportionate: skip it
+for typos, copy changes and pure test edits.
+
+Record anything found as a new finding in this cycle rather than fixing it silently, so the cycle
+count reflects what actually happened.
+
 ### Step 4: Validate
 
 ```bash
