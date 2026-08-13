@@ -110,7 +110,7 @@ caller changes until T45 removes them.
 
 ### Capstone — operator gate
 
-- [ ] **T45** Pipeline, QA, finalise, and tracker sync write the Change Log · deps: T44 · touches: pipeline-steps!, jira-sync!, bundles! · manual — before running, confirm T44 shipped `change-log.enforcement: advisory` as the default: run `/review-task --validate` against a pre-T43 document (e.g. `docs/tasks/task.22.finalise-dod-parallel-checks/task.22.finalise-dod-parallel-checks.md`) and check it returns **GO** with one Important finding, not NO-GO. A blocking default would HALT this row's own pipeline at Step 2. Then drop the `manual` marker and re-run. · /develop-task docs/tasks/task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md
+- [ ] **T45** Pipeline, QA, finalise, and tracker sync write the Change Log · deps: T44 · touches: pipeline-steps!, jira-sync!, bundles! · gate cleared 2026-08-12 — T44's `change-log.enforcement: advisory` default was verified against a pre-T43 document (`task.22`): check 4b graded its non-canonical Change Log **Important, not Critical**, verdict **GO** at 9/10, so this row's own Step 2 review cannot HALT on the new check · /develop-task docs/tasks/task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md
 
 ---
 
