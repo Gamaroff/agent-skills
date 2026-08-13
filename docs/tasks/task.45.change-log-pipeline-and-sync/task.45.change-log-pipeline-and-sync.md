@@ -5,10 +5,12 @@ type: task
 description: "Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto the canonical Change Log, unifying the marker pairs and narrowing sync rows to milestones."
 tags: [change-log, pipeline, tracker-sync]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-08-12
 updated: 2026-08-13
+completed_date: 2026-08-13
+pr_number: 213
 assignee:
 estimated_effort_hours: 16
 github_issue: 204
@@ -16,7 +18,7 @@ github_issue: 204
 
 # [Task 45] Pipeline, QA, finalise, and tracker sync write the Change Log
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.45.review.1.change-log-pipeline-and-sync.md` implemented 2026-08-13
 
@@ -584,6 +586,39 @@ per completion; a stale cross-reference.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.45.gate.2.change-log-pipeline-and-sync.yml` — ✅ **PASS**, 95/100
+**QA Cycles**: 2 (1 fix cycle) · **Bugs**: 3 filed, 3 closed, 0 open
+**CI**: ✅ SUCCESS on head `3dbb34f` — the exact PR head, not an ancestor
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria** — 20 of 21 met; 1 deferred with disclosure (below)
+✅ **Tests** — `npm test` 1185/1185; `eval:develop-story` and `eval:develop-task` 8/8 each; `npm run bundle` idempotent
+✅ **PR** — #213 → `develop`, all three checks green
+✅ **Documentation** — CHANGELOG (3 breaking changes), canonical spec updated, six sync skills now link it rather than restating it
+✅ **Security** — no new attack surface; one added authenticated call using the existing helper
+⚠️ **Compliance** — N/A (internal developer tooling; no regulated surface)
+
+### Known Accepted Condition
+
+⚠️ **Live Jira verification not run** — no Jira credentials in this environment and the repo is GitHub-tracked. Carried openly through review, both QA cycles and gate 2 rather than silently ticked; unticked in §9 and Phase 5. The behaviour is pinned by tests H1–H10, including the two that assert byte-identity on a no-op and that migration still fires on the first real write. Gate 2: staging APPROVED, production CONDITIONAL on this check.
+
+### Carried-Forward Follow-ups (non-blocking)
+
+Two pre-existing task.42 engine defects, documented in `task.45.bug.3` and deliberately not fixed here: content loss on the hand-written-heading path (MEDIUM), and the same-pair collapse skip (LOW).
+
+**Detailed Verification Log:** See `task.45.dod.1.change-log-pipeline-and-sync.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-08-13
+
+---
+
 ## QA Testing Results
 
 **QA Status**: ✅ PASS (cycle 2)
@@ -631,6 +666,7 @@ All three bugs closed in one cycle. The most consequential — TASK-45-BUG-3, su
 | 2026-08-13 |         | QA gate FAIL (70/100) — 1 high, 1 medium: orphaned legacy block in six sync skills, overstated zero-writes claim | qa-task     |
 | 2026-08-13 |         | QA findings fixed — 3 bugs closed in 1 iteration: orphaned legacy block removed from six sync skills, zero-writes wording corrected, and row loss on unparsed Change Log rows fixed in the engine (+2 regression tests) | qa-fix      |
 | 2026-08-13 |         | QA gate PASS (95/100) after 1 fix cycle — 3 bugs closed, both Critical risks verified clean | qa-task     |
+| 2026-08-13 | 1.2     | DoD verified — accepted (PR #213), CI green on head 3dbb34f; live-Jira check deferred as a disclosed condition | finalise    |
 
 ---
 

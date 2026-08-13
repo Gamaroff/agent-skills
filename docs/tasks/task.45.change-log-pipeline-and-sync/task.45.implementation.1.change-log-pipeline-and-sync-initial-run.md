@@ -3,7 +3,7 @@
 **Task**: `task.45.change-log-pipeline-and-sync.md`
 **Run Number**: 1
 **Started**: 2026-08-13 08:54
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto
 | 2. review-task             | ✅ Done    | `task.45.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10. 0 Critical / 7 Important (all applied) / 3 Optional. Planned → Ready for Development. Report: `task.45.review.1.change-log-pipeline-and-sync.md` | 2 Explore pre-pass agents (architecture alignment: `aligned`; already-implemented: `not-started`) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 5 phases. 3 commits (`6cfd5dd`, `9683f40`, `714c3f8`), 117 files. `npm test` 1183/1183; both eval suites green; bundle idempotent | Pre-develop surface map (Explore) — 13 areas, 2 plumbing gaps found |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #213](https://github.com/Gamaroff/agent-skills/pull/213) → `develop`. Issue #204 commented. Implementation report excluded from the PR body | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.45.qa.{N}.*.md`; `task.45.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.45.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.45.qa.{N}.*.md`; `task.45.gate.{N}.*.yml`; PR comment posted     | Cycle 1: FAIL 70/100 (2 bugs). qa-fix closed 3 (a third, BUG-3, surfaced by the diff review). Cycle 2: PASS 95/100 | Step 3b diff code review (Explore) — found the engine row-loss defect |
+| 7. finalise                | ✅ Done    | `task.45.dod.{N}.*.md`; task `status: accepted`                        | **ACCEPTED**. CI was PENDING at first sample — waited for completion rather than assuming; SUCCESS on head `3dbb34f` (exact PR head). Issue #204 closed + verified; board already Done | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -108,9 +108,31 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: _pending_
-**Final Status**: _pending_
+**Finished**: 2026-08-13 11:30
+**Final Status**: Completed
 **Branch**: `feature/task.45.change-log-pipeline-and-sync` (base `develop`, created at `cdcb75c`)
 **PR**: [#213](https://github.com/Gamaroff/agent-skills/pull/213) — `feature/task.45.change-log-pipeline-and-sync` → `develop`
-**QA Iterations**: _pending_
-**DoD Summary**: _pending (Step 7)_
+**QA Iterations**: 2 (1 fix cycle) — gate 1 FAIL 70/100 -> gate 2 PASS 95/100
+**DoD Summary**: `task.45.dod.1.change-log-pipeline-and-sync.md` — ACCEPTED
+
+### Step 5-6 — QA loop — 2026-08-13
+
+- **Cycle 1: FAIL (70/100).** Two issues found by direct verification rather than diff reading: an orphaned legacy block left in all six sync SKILL.md files (HIGH — fence parity went even to odd, so the remainder of each file rendered as code, and two ticked success criteria were false), and an overstated "zero file writes" claim (MEDIUM).
+- The Step 3b diff code review **returned after the gate was written** and surfaced a third, more serious defect: `upsertChangeLog` silently deleted every Change Log row it could not parse. Reproduced immediately. This repo's own roadmap template shipped with the triggering `| Version | Date |` column order.
+- **qa-fix cycle 1 closed all three**, plus two consequences of Step 3's epic fast-path change that the review caught: a stale `lastSyncedAt` that would have tripped the next sync's concurrent-edit guard, and a bare `exitCode: 0` that swallowed transition failures.
+- BUG-3 was a **pre-existing task.42 defect**, not a regression here. Fixed anyway because this task routes five more writers into that path, and because "never drops a row" is the mitigation the task claims for its own Critical risk 1 — a claim that was true and hollow, since the rows it drops are the ones it fails to parse.
+- **Two further pre-existing engine defects were deliberately NOT fixed** (content loss on the hand-written-heading path; same-pair collapse skip). Recorded in `task.45.bug.3` and the gate's `future` list rather than quietly expanding this PR into engine surgery mid-QA-cycle.
+- **Cycle 2: PASS (95/100).** Each fix re-verified by reproduction, and BUG-3's fix checked for collateral damage against the canonical, no-op and dual-pair paths since it touches shared engine code on every writer's path.
+
+### Step 7 — finalise — 2026-08-13
+
+- **CI was `PENDING` at first sample** (`test` job IN_PROGRESS). Waited for completion rather than rounding a running job up to green — the gate is explicit that pending is not acceptance. Resolved to `SUCCESS` on head `3dbb34f`, which matches the PR head exactly, so the green run covers the final code rather than an ancestor.
+- No prior acceptance block existed (`PRIOR_DOD = 0`) — nothing inherited from an earlier run.
+- Acceptance row appended to `## Change Log` **in the same edit** as the frontmatter change, per this task's own new Step 7 instruction, with the literal "Definition of Done ... PASSED" kept out of the Description so the idempotence guard still counts exactly 1.
+- **A misplaced insert was caught and reverted during this step.** The first attempt to add the DoD section anchored on `## QA Testing Results` and matched a *prose mention* of that string inside section 2 (Motivation), injecting the block mid-section — the same context-blind class of error as BUG-1. Detected by the guard count reading 0, reverted, section 2 restored verbatim, and re-inserted line-wise against the real heading.
+- Issue #204 closed and verified `CLOSED`. Board card reported `already` in Done — closing the issue had moved it; no mutation needed.
+- **Live Jira verification recorded as a known accepted condition, not ticked.** Carried openly at every stage.
+
+### Outcome
+
+The task demonstrates itself: its own Change Log is eight rows written by the code it ships — draft, review, status, implemented, QA fail, QA fixed, QA pass, accepted — with `Version` moving only at creation, review and acceptance. That is precisely the shape section 3 set out to produce.
