@@ -33,11 +33,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
 const lib = require(join(__dirname, "..", "jira-sync.js"));
 
+// The Change Log engine is called directly. Task.45 removed the `upsertChangelog`
+// wrapper this suite used to import from jira-sync.js — the wrapper existed only
+// to accept a preformatted 2-column row, and there are no 2-column writers left.
+const CL = require(join(__dirname, "..", "change-log.js"));
+
 const {
   extractBodySections,
   capDescriptionAdf,
   adfTextLength,
-  upsertChangelog,
   formatYamlScalar,
   adf,
   JIRA_TEXT_LIMIT,
@@ -172,7 +176,15 @@ test("B: trimming drops WHOLE blocks — never a half-emitted one", () => {
 // Four columns since the changelog moved to `change-log.js` (task.42). The engine
 // widens a legacy 2-column row on read, so the old fixture would still have been
 // accepted — this is the canonical shape it is widened *to*.
-const ROW = "| 2026-07-31 |  | Updated: description | sync-jira-story |";
+// The entry is now structured; the row is what the engine renders from it. Deriving
+// ROW via `fmtEntry` rather than restating the string keeps these assertions honest
+// if the column layout ever moves.
+const ENTRY = {
+  date: "2026-07-31",
+  description: "Updated: description",
+  author: "sync-jira-story",
+};
+const ROW = CL.fmtEntry(ENTRY);
 
 test("C: a heading name quoted in frontmatter does not capture the changelog", () => {
   // The live shape: a `description:` value that mentions a heading. Before the
@@ -195,7 +207,7 @@ test("C: a heading name quoted in frontmatter does not capture the changelog", (
     "",
   ].join("\n");
 
-  const out = upsertChangelog(doc, ROW);
+  const out = CL.upsertChangeLog(doc, ENTRY);
   const fmEnd = out.indexOf("\n---", 3);
   const frontmatter = out.slice(0, fmEnd);
 
@@ -214,13 +226,13 @@ test("C: a heading name quoted in frontmatter does not capture the changelog", (
 // heading". That WAS the defect: inserting before the first `##` is how a Change
 // Log ended up above the Epic Goal, at the top of the document body. Task.42's
 // Breaking Change 2 replaces that fallback with a doc-type anchor, falling back to
-// end-of-document. `upsertChangelog` (the legacy shim) passes no docType, so these
-// documents take the EOF path — which is the point: an unknown doc type appends
-// somewhere harmless instead of guessing the top.
+// end-of-document. These calls pass no `docType`, so the documents take the EOF
+// path — which is the point: an unknown doc type appends somewhere harmless
+// instead of guessing the top.
 
 test("C: a document with no anchor gets the changelog appended at EOF, never at the top", () => {
   const doc = "---\nid: task.1\n---\n\n# Task 1\n\n## Overview\n\ntext\n";
-  const out = upsertChangelog(doc, ROW);
+  const out = CL.upsertChangeLog(doc, ENTRY);
   assert.ok(out.includes(ROW));
   assert.ok(
     out.indexOf(ROW) > out.indexOf("## Overview"),
@@ -230,7 +242,7 @@ test("C: a document with no anchor gets the changelog appended at EOF, never at 
 });
 
 test("C: a document with no frontmatter is unaffected", () => {
-  const out = upsertChangelog("# Task\n\n## Overview\n\ntext\n", ROW);
+  const out = CL.upsertChangeLog("# Task\n\n## Overview\n\ntext\n", ENTRY);
   assert.ok(out.includes(ROW));
   assert.ok(out.indexOf(ROW) > out.indexOf("## Overview"));
 });

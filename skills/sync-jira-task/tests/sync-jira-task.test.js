@@ -98,11 +98,11 @@ test("parseFrontmatter — missing close tag returns full content as body", () =
 // inserting before the first `##` is how a Change Log ended up above the Epic Goal.
 // Task.42's Breaking Change 2 replaces that fallback with a doc-type anchor, falling
 // back to end-of-document. `upsertChangelog` passes no docType, so this takes the EOF path.
-test("upsertChangelog — inserts at EOF when no changelog and no anchor exists", () => {
+test("upsertChangeLog — inserts at EOF when no changelog and no anchor exists", () => {
   const src = `# Title\n\nIntro.\n\n## Section\n\nbody\n`;
-  const out = lib.upsertChangelog(
+  const out = lib.upsertChangeLog(
     src,
-    lib.fmtEntry("Initial Jira task created"),
+    { date: "2026-07-31", description: "Initial Jira task created", author: "sync-jira" },
   );
   assert.ok(out.includes(lib.CL_START));
   assert.ok(out.includes(lib.CL_END));
@@ -112,19 +112,19 @@ test("upsertChangelog — inserts at EOF when no changelog and no anchor exists"
   );
 });
 
-test("upsertChangelog — appends entry within existing markers", () => {
-  const initial = lib.upsertChangelog(
+test("upsertChangeLog — appends entry within existing markers", () => {
+  const initial = lib.upsertChangeLog(
     `# T\n\n## S\n\nbody\n`,
-    lib.fmtEntry("Entry one"),
+    { date: "2026-07-31", description: "Entry one", author: "sync-jira" },
   );
-  const out = lib.upsertChangelog(initial, lib.fmtEntry("Entry two"));
+  const out = lib.upsertChangeLog(initial, { date: "2026-07-31", description: "Entry two", author: "sync-jira" });
   assert.match(out, /Entry one/);
   assert.match(out, /Entry two/);
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
   assert.equal(out.match(new RegExp(lib.CL_END, "g")).length, 1);
 });
 
-test("upsertChangelog — preserves entries from hand-written `## Change Log` heading without markers", () => {
+test("upsertChangeLog — preserves entries from hand-written `## Change Log` heading without markers", () => {
   const src = `# Title
 
 ## Change Log
@@ -137,7 +137,7 @@ test("upsertChangelog — preserves entries from hand-written `## Change Log` he
 
 stuff
 `;
-  const out = lib.upsertChangelog(src, lib.fmtEntry("New auto entry"));
+  const out = lib.upsertChangeLog(src, { date: "2026-07-31", description: "New auto entry", author: "sync-jira" });
   assert.equal(
     out.match(/## Change Log/g).length,
     1,
@@ -150,11 +150,11 @@ stuff
   assert.match(out, /## Other Section/);
 });
 
-test("upsertChangelog — idempotent format on repeated wrapping", () => {
+test("upsertChangeLog — idempotent format on repeated wrapping", () => {
   let out = `# T\n\nbody\n`;
-  out = lib.upsertChangelog(out, lib.fmtEntry("a"));
-  out = lib.upsertChangelog(out, lib.fmtEntry("b"));
-  out = lib.upsertChangelog(out, lib.fmtEntry("c"));
+  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "a", author: "sync-jira" });
+  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "b", author: "sync-jira" });
+  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "c", author: "sync-jira" });
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
   assert.equal(out.match(new RegExp(lib.CL_END, "g")).length, 1);
 });

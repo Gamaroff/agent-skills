@@ -407,65 +407,70 @@ function makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch }) {
 }
 
 // ---------------------------------------------------------------------------
-// Changelog — delegated to change-log.js
+// Change Log — the narrowed sync rules
 // ---------------------------------------------------------------------------
-// The implementation moved to `change-log.js`, which is tracker-agnostic and is
-// the canonical engine for every document type (spec: document-change-log.md).
-// What stays here is a back-compat surface: the three `sync-jira-*` scripts and
-// the publishing-fidelity test call these names with these signatures, and this
-// task must not break them. Task.45 rewires those callers to use `change-log.js`
-// directly, at which point this block can go.
+// The engine is `change-log.js`, which is tracker-agnostic and canonical for
+// every document type (spec: document-change-log.md). What lives here is the
+// Jira-specific *policy*: which sync events earn a row.
 //
-// Behaviour differences the wrappers absorb:
-//   - the new engine writes FOUR columns; `upsertChangelog` still accepts the old
-//     preformatted 2-column row string and parses it back into an entry object.
-//   - the new marker pair is `change-log-*`; the old `jira-sync-changelog-*` pair
-//     is recognised as legacy and migrated in place on first write.
+// The task.42 compatibility wrappers (`fmtEntry`, `buildChangelogBlock`,
+// `upsertChangelog` and the marker/predicate aliases) were removed here — the
+// three sync scripts now call `change-log.js` directly with a structured entry,
+// which is what those wrappers were holding the door open for.
 const CL = require("./change-log.js");
 
-// Not changelog-specific despite having lived in this block: `escapeRe` is used by
-// the section extractor and the frontmatter key rewriter, and is exported. It stays
-// here rather than moving with the changelog code.
+// Not changelog-specific despite having lived in the old block: `escapeRe` is used
+// by the section extractor and the frontmatter key rewriter, and is exported.
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// `CL_START` / `CL_END` name the markers the changelog block is ACTUALLY wrapped
-// in, so they follow the engine to the unified pair. Exporting the old
-// jira-specific strings under these names would be actively misleading — nothing
-// writes them any more. The superseded pairs remain reachable, and are migrated
-// in place on first write, via `CL.LEGACY_MARKER_PAIRS`.
-const CL_START = CL.CL_START;
-const CL_END = CL.CL_END;
-const LEGACY_MARKER_PAIRS = CL.LEGACY_MARKER_PAIRS;
+/**
+ * Decide which Change Log rows a sync run has earned.
+ *
+ * A row is written for exactly two events: the issue being created, and the
+ * status being transitioned. A body, summary, priority or label update writes
+ * **none** — Jira keeps a full issue history with actor and timestamp, which is
+ * strictly better than a local row saying only which fields moved, and the
+ * document now records *why* the body changed through its own review, develop
+ * and QA rows.
+ *
+ * Returning `[]` is the load-bearing case. `upsertChangeLog` performs legacy
+ * marker migration as a side effect of writing, so an empty list means no call,
+ * no migration and no file rewrite — which is what keeps two consecutive no-op
+ * syncs at zero writes rather than churning every document on every sync.
+ *
+ * @param {object}  o
+ * @param {boolean} o.created         true when this run created the issue
+ * @param {string}  o.issueKey        e.g. "PROJ-42"
+ * @param {object}  [o.statusOutcome] result of `syncDocumentStatus`
+ * @param {string}  o.author          the calling skill, e.g. "sync-jira-task"
+ * @param {string}  o.docNoun         "story" | "task" | "epic" — for the prose
+ * @param {string}  [o.date]          ISO date; defaults to today
+ * @returns {Array<{date, description, author}>} zero, one or two entries
+ */
+function buildChangeLogEntries({ created, issueKey, statusOutcome, author, docNoun, date }) {
+  const day = date || new Date().toISOString().slice(0, 10);
+  const entries = [];
 
-const RE_ENTRY_ROW = CL.RE_ENTRY_ROW;
-const isEntryRow = CL.isEntryRow;
-const bodyStart = CL.bodyStart;
-const extractEntries = CL.extractEntries;
-const findHandWrittenChangelog = CL.findChangeLog;
+  if (created) {
+    entries.push({
+      date: day,
+      description: `Jira ${docNoun} created (${issueKey})`,
+      author,
+    });
+  }
 
-// Old signature: a single summary string, timestamped "YYYY-MM-DD HH:MM". Kept so
-// existing callers compile; the row it produces is migrated to four columns the
-// first time it passes through `upsertChangelog`.
-function fmtEntry(summary) {
-  const now = new Date().toISOString().slice(0, 16).replace("T", " ");
-  return `| ${now} | ${summary} |`;
-}
+  // `transitioned` is false for the no-target, already-there and no-transition
+  // outcomes alike — all of which are "nothing moved", and none of which is an
+  // event worth a row.
+  if (statusOutcome?.transitioned && statusOutcome.to) {
+    entries.push({
+      date: day,
+      description: `Status → ${statusOutcome.to}`,
+      author,
+    });
+  }
 
-// Old signature: `buildChangelogBlock(entries)` → a 2-column block. Now emits the
-// canonical 4-column block; entries already in 4-column form pass through
-// unchanged, and 2-column rows are widened.
-function buildChangelogBlock(entries) {
-  return CL.buildChangeLogBlock(
-    CL.migrateLegacyEntries(entries, { legacyAuthor: "sync-jira" }),
-  );
-}
-
-// Old signature: `upsertChangelog(content, newEntry)` where `newEntry` is a
-// preformatted row string. The precise author (`sync-jira-story` vs `-task` vs
-// `-epic`) is not knowable here — the calling script has it, and supplies it in
-// task.45. "sync-jira" is the honest interim value.
-function upsertChangelog(content, newEntry) {
-  return CL.upsertChangeLog(content, CL.parseLegacyRow(newEntry, "sync-jira"));
+  return entries;
 }
 
 // ---------------------------------------------------------------------------
@@ -4044,17 +4049,9 @@ module.exports = {
   buildBitbucketUrl,
   resolveRelativeLink,
   makeRelativeLinkResolver,
-  // changelog
-  CL_START,
-  CL_END,
-  LEGACY_MARKER_PAIRS,
-  fmtEntry,
-  buildChangelogBlock,
-  isEntryRow,
-  RE_ENTRY_ROW,
-  extractEntries,
-  findHandWrittenChangelog,
-  upsertChangelog,
+  // change log — policy only; the engine is change-log.js, imported directly by
+  // callers that need to read or write a block
+  buildChangeLogEntries,
   // adf
   adf,
   textToAdfNodes,

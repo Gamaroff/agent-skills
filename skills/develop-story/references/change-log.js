@@ -543,16 +543,19 @@ function bumpUpdated(content, date) {
 }
 
 // ---------------------------------------------------------------------------
-// Legacy row parsing — for the jira-sync.js back-compat shim
+// Legacy row parsing
 // ---------------------------------------------------------------------------
 
 /**
  * Parse a preformatted legacy row back into an entry object.
  *
- * The three `sync-jira-*` scripts pass `upsertChangelog(content, row)` where `row`
- * is already a formatted 2-column string. Rather than change those call sites in
- * this task, the shim parses the row back out and delegates. Task.45 rewires them
- * to call `upsertChangeLog` directly with a real entry object.
+ * The `sync-jira-*` scripts no longer call this — task.45 moved them onto
+ * `upsertChangeLog` with structured entries, and the shim they went through was
+ * deleted with it. What keeps this function alive is the documents themselves:
+ * rows written by the old 2-column writers are still on disk, and
+ * `migrateLegacyEntries` parses each one through here when a block is first
+ * rewritten under the unified markers. It is a *reader* of history now, not an
+ * adapter for callers.
  */
 function parseLegacyRow(row, author = "") {
   const cells = rowCells(String(row));
