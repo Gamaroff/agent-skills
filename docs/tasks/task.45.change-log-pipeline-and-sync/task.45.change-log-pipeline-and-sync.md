@@ -5,7 +5,7 @@ type: task
 description: "Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto the canonical Change Log, unifying the marker pairs and narrowing sync rows to milestones."
 tags: [change-log, pipeline, tracker-sync]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: High
 created: 2026-08-12
 updated: 2026-08-13
@@ -16,7 +16,7 @@ github_issue: 204
 
 # [Task 45] Pipeline, QA, finalise, and tracker sync write the Change Log
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.45.review.1.change-log-pipeline-and-sync.md` implemented 2026-08-13
 
@@ -580,6 +580,33 @@ per completion; a stale cross-reference.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: ❌ FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-13
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.45.qa.1.change-log-pipeline-and-sync.md](./task.45.qa.1.change-log-pipeline-and-sync.md)
+- **Gate File**: [task.45.gate.1.change-log-pipeline-and-sync.yml](./task.45.gate.1.change-log-pipeline-and-sync.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1183 (all passing) + 16 eval scenarios
+- **Phases Verified**: 4/5 fully; Phase 4 partial
+- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Both self-identified Critical risks verify clean — dual-legacy-pair collapse preserves every row in date order, and a no-op sync leaves the document byte-identical. The gate fails on delivery, not design: the Phase 4 section replacement terminated inside a code fence, leaving an orphaned legacy block and **unbalanced code fences in all six sync SKILL.md files**, which falsifies two ticked success criteria.
+
+### Bug Reports
+- [TASK-45-BUG-1](./task.45.bug.1.orphaned-legacy-block-in-six-sync-skills.md) — HIGH, orphaned legacy block in six sync skills
+- [TASK-45-BUG-2](./task.45.bug.2.zero-file-writes-claim-overstated.md) — MEDIUM, overstated zero-writes claim
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
   Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
@@ -596,6 +623,7 @@ per completion; a stale cross-reference.
 | 2026-08-13 | 1.1     | Review passed (8/10) — ready for development; 7 Important fixes applied: 4 wrapper-deletion surfaces that break `npm test` named in §5/§6, deliverable #19 restated as verification (no marker exists to flip), `ensure-*` notes narrowed not deleted and scope corrected 6→3, `qa-story`'s 3 further edit sites named, citations fixed (`CHANGELOG.md` 377→527 ×2, `finalise` 1222→1249, legacy marker → `change-log.js:57-58`), Change Log section added | review-task |
 | 2026-08-13 |         | Status → ready-for-development                                                                                                                                  | review-task |
 | 2026-08-13 |         | Implemented — all 5 phases; 30 files, 8 new tests (1183/1183 passing). Closed two plumbing gaps the plan missed (story write-gate suppressed the status row; epic fast path never transitioned — pre-existing) and migrated 5 wrapper-consumer surfaces, not 1 | develop     |
+| 2026-08-13 |         | QA gate FAIL (70/100) — 1 high, 1 medium: orphaned legacy block in six sync skills, overstated zero-writes claim | qa-task     |
 
 ---
 

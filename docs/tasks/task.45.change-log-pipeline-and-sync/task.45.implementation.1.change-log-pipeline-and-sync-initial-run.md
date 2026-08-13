@@ -35,7 +35,7 @@ Wire the develop/QA/finalise pipeline steps and the six tracker-sync skills onto
 | 1. create-branch           | ✅ Done    | Branch `feature/task.45.*` exists in git                               | Branch created at `cdcb75c`, pushed with tracking. Board: Todo → In Progress ✅ | —                    |
 | 2. review-task             | ✅ Done    | `task.45.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10. 0 Critical / 7 Important (all applied) / 3 Optional. Planned → Ready for Development. Report: `task.45.review.1.change-log-pipeline-and-sync.md` | 2 Explore pre-pass agents (architecture alignment: `aligned`; already-implemented: `not-started`) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 5 phases. 3 commits (`6cfd5dd`, `9683f40`, `714c3f8`), 117 files. `npm test` 1183/1183; both eval suites green; bundle idempotent | Pre-develop surface map (Explore) — 13 areas, 2 plumbing gaps found |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #213](https://github.com/Gamaroff/agent-skills/pull/213) → `develop`. Issue #204 commented. Implementation report excluded from the PR body | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.45.qa.{N}.*.md`; `task.45.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.45.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -111,6 +111,6 @@ _Track each QA review/fix cycle._
 **Finished**: _pending_
 **Final Status**: _pending_
 **Branch**: `feature/task.45.change-log-pipeline-and-sync` (base `develop`, created at `cdcb75c`)
-**PR**: _pending (Step 4)_
+**PR**: [#213](https://github.com/Gamaroff/agent-skills/pull/213) — `feature/task.45.change-log-pipeline-and-sync` → `develop`
 **QA Iterations**: _pending_
 **DoD Summary**: _pending (Step 7)_
