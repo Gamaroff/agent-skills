@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-14
-**Next Available Task Number:** **48**
+**Next Available Task Number:** **50**
 
 ## How to use
 
@@ -87,11 +87,14 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 45 | [Pipeline, QA, finalise, and tracker sync write the Change Log](task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md) | planned | refactoring | High | 2026-08-12 | [#204](https://github.com/Gamaroff/agent-skills/issues/204) | task.42, task.43, task.44 |
 | 46 | [Write relative document links, and stop a fenced `# ` truncating a Jira description](task.46.relative-doc-links-and-fence-aware-sections/task.46.relative-doc-links-and-fence-aware-sections.md) | accepted | refactoring | High | 2026-08-13 | [#216](https://github.com/Gamaroff/agent-skills/issues/216) | none |
 | 47 | [The `--json` samples under-document the payload, and nothing checked](task.47.json-output-sample-fidelity/task.47.json-output-sample-fidelity.md) | in-progress | documentation | Medium | 2026-08-14 | — | task.46 |
+| 48 | [Credentials may live at `.secrets/tooling.env`, and a missing one no longer fails silently](task.48.credential-file-discovery/task.48.credential-file-discovery.md) | in-progress | infrastructure | High | 2026-08-14 | — | none |
+| 49 | [`setup-consumer.sh` still seeds credentials into `.env`, teaching new consumers the old location](task.49.setup-consumer-secrets-path/task.49.setup-consumer-secrets-path.md) | planned | infrastructure | Medium | 2026-08-14 | — | task.48 |
 
 ---
 
 ## Notes
 
 - Task 6 has no tracker issue — pre-dates the tracker-on-creation requirement; backfill via `/sync-jira-task` or `gh issue create` if needed.
+- Task 48's document was written **after** its implementation, to give the branch that already carried the number a registry entry. Task 49 is the half that task 48 deliberately deferred. Neither has a tracker issue yet.
 - Tasks 32-34 are the **Evals Infrastructure** milestone ([#1](https://github.com/Gamaroff/agent-skills/milestone/1)).
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
