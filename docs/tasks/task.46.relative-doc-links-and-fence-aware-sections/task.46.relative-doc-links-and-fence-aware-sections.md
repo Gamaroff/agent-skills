@@ -5,11 +5,11 @@ type: task
 description: 'Two defects in the Jira sync path, both silent. The three sync scripts stamped an absolute branch-pinned Bitbucket URL into every document they touched — once in frontmatter, once in a body line — and those links died when the branch was deleted, with nothing in any repo able to catch it. Separately, `sectionRe` ended a section at the first line beginning `# `, which a shell comment inside a fenced code block satisfies, so content after it vanished from the Jira description with no warning. Both are fixed here: document links are relative and absolutised only at ADF-render time, and section extraction walks lines with a CommonMark-correct fence tracker.'
 tags: [jira-sync, links, markdown, technical-debt]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-13
-updated: 2026-08-13
+updated: 2026-08-14
 estimated_effort_hours: 6
 ---
 
