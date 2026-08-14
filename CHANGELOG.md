@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The develop-pipeline Stop hook named the *next* step, skipping the pending one.** The hook fires when the assistant tries to stop mid-pipeline and returns a `decision: "block"` reason telling the orchestrator what to run. It computed that as `current_step + 1`, which skips a step whenever it fires **during** a step rather than between steps.
+
+  Observed four times on a single story: it asked for `/qa-story` with no PR in existence, `/qa-fix` against findings that did not exist, and — worst — `/finalise` against a CONCERNS gate with an open bug and a running CI lane. `/finalise` is the step that writes `status: accepted`, so that fourth misfire would have marked a story accepted on evidence that did not exist. All four were declined by hand; an unattended run has nobody to decline them.
+
+  No arithmetic is right in both cases, because the lock reads `N` whether the run stalled *during* step N (run N) or *after* it (run N+1) — there is no completion flag. The two errors are not symmetric, though, and that asymmetry is the fix: assuming "after" when it was "during" **skips** a step silently, surfacing later as a missing artifact or, at step 7, as an unearned acceptance; assuming "during" when it was "after" merely **re-asserts** a finished step, which the steps are written to absorb idempotently. The hook now names `current_step`, and the reason text tells the reader not to skip ahead on the strength of the message if that step genuinely did finish.
+
+  **The hook had no tests, which is how four misfires went unnoticed.** `shared/resources/develop-pipeline-on-stop.test.sh` is new — 13 tests, with the four observed misfires as the regression corpus. Each asserts both that the correct step is named *and* that the skipped-to step is not; asserting only the first would pass for a hook that named every step at once. Mutation-proven rather than merely green: reverting to `current_step + 1` turns 7 of the 13 red, and the allow-path tests correctly stay green under that mutation.
+
 - **The `--json` output samples under-documented the payload, in all three `sync-jira-*` skills.** Documenting the v0.39.0 change removed the `*_bitbucket_url` keys from the `--json` samples as well as the frontmatter ones. The frontmatter edit was right — the scripts genuinely stopped writing those keys. The `--json` edit was wrong: all three still emit them there, because that payload reports the absolute URL used for the **Jira** link, built at ADF-render time, rather than anything written to the file. Same key name, different lifetime; one edit treated the name as the identity and got it wrong three times.
 
   Nothing caught it, because every existing test asserts on behaviour and none compared a documented payload against the emitted one. A consumer scripting against `--json` would have found the extra keys only by printing them.
