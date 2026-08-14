@@ -912,9 +912,14 @@ const CARD_MAX_CHARS = 600;
 const RE_SUBHEADING = /^#{3,6}\s+/;
 const RE_FENCE = /^\s*(```|~~~)/;
 
-// Fence-aware section extraction — the function `extractBodySections` actually
-// uses. `sectionRe` is kept and still exported because callers match it directly,
-// but a regular expression cannot know whether the `# ` it matched sits inside a
+// Fence-aware section extraction — the function `extractBodySections` and
+// `sync-jira-epic`'s `extractStoriesTable` actually use. Those were the last two
+// callers to match `sectionRe` for extraction, so it is now exported for its
+// tests alone: they pin its shape (notably the absence of an `m` flag) because
+// it is still the reference for what a section heading looks like, and any
+// future extractor must agree with it on everything except fences.
+//
+// A regular expression cannot know whether the `# ` it matched sits inside a
 // fenced code block, and `sectionRe`'s lookahead `(?=\n## |\n# |$)` ends a section
 // at the first line beginning `# `.
 //

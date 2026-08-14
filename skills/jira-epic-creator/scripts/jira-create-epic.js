@@ -61,13 +61,102 @@ async function parseFrontmatter(content) {
 const CARD_MAX_SENTENCES = 4;
 
 function summariseForCard(text) {
-  const firstPara = text.trim().split(/\n\s*\n/)[0].replace(/\n+/g, " ").trim();
-  const sentences = firstPara.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [firstPara];
+  const firstPara = text
+    .trim()
+    .split(/\n\s*\n/)[0]
+    .replace(/\n+/g, " ")
+    .trim();
+  const sentences = firstPara.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [
+    firstPara,
+  ];
   const kept = sentences.slice(0, CARD_MAX_SENTENCES).join(" ").trim();
   const omitted = sentences.length - CARD_MAX_SENTENCES;
   // Never trim silently: a reader not told they are seeing part of something
   // believes they saw all of it.
-  return omitted > 0 ? `${kept}\n\n(+${omitted} more in the epic document)` : kept;
+  return omitted > 0
+    ? `${kept}\n\n(+${omitted} more in the epic document)`
+    : kept;
+}
+
+// Track fenced code blocks by CommonMark's rules, so a `#` inside one is never
+// read as markdown structure.
+//
+// Three rules matter, and each one is a bug that has actually happened:
+//   - a backtick fence's info string may NOT contain a backtick, which is what
+//     makes ```` ``` ```` an inline code span rather than an opening fence.
+//     Toggling on any backtick run inverts the parity for the rest of the
+//     document, and every later heading disappears;
+//   - a closing fence needs the same character with a run at least as long as
+//     the opening one, so ``` inside a ```` block is content;
+//   - a closing fence carries no info string.
+//
+// Indentation is capped at 3 spaces per CommonMark; deeper is an indented code
+// block, which cannot be confused with a heading anyway.
+function makeFenceTracker() {
+  let open = null; // { char, len }
+  return function isFenceLine(line) {
+    const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!m) return open !== null;
+    const char = m[1][0];
+    const len = m[1].length;
+    const info = m[2];
+
+    if (open === null) {
+      if (char === "`" && info.includes("`")) return false; // inline code span
+      open = { char, len };
+      return true;
+    }
+    if (char === open.char && len >= open.len && info.trim() === "") {
+      open = null;
+      return true;
+    }
+    return true; // a fence-looking line inside a block is just content
+  };
+}
+
+// The Stories Breakdown OVERVIEW table, or null when the section is absent.
+//
+// Kept inline rather than importing the canonical helper, because this script is
+// standalone and requiring that module would pull the whole Jira client into a
+// skill that does not otherwise use it. (Naming that module's path in a comment
+// is also enough to make the bundler vendor it here — pass 1 scans prose for
+// shared-resource paths — so the path is spelled out nowhere in this file.)
+//
+// This walks lines rather than matching a regex, and that is the whole point.
+// The pattern this replaced ended the section at a lookahead for `\n# `, which a
+// shell comment at column 0 inside a ```bash block satisfies — so the table was
+// silently truncated, or lost entirely, with nothing on stderr to say so. A
+// regex cannot tell a heading from a comment; only tracking fences can.
+//
+// Two behaviours are carried over deliberately:
+//   - the heading is line-anchored and tolerates numbering (`## 5. Stories
+//     Breakdown`), so `### Stories Breakdown` cannot win;
+//   - the section is cut at the first `### Story N.M` subsection. Those hold the
+//     per-story detail that belongs in the epic document, and a line of their
+//     prose containing a `|` would otherwise leak in as a bogus table row.
+// Both of those tests now also skip fenced lines, for the same reason as above.
+function extractStoriesBreakdown(body) {
+  const lines = String(body ?? "").split("\n");
+  const heading = /^## (?:\d+[.)]\s*)?Stories Breakdown[ \t]*$/;
+  const isFenceLine = makeFenceTracker();
+  let start = -1;
+  const out = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const fenced = isFenceLine(line);
+    if (start === -1) {
+      if (!fenced && heading.test(line)) start = i + 1;
+      continue;
+    }
+    if (!fenced) {
+      if (line.startsWith("## ") || line.startsWith("# ")) break;
+      if (/^#{3,6}\s+/.test(line)) break; // the overview table only
+    }
+    out.push(line);
+  }
+
+  return start === -1 ? null : out.join("\n");
 }
 
 function extractEpicDescription(body, frontmatter) {
@@ -105,53 +194,32 @@ function extractEpicDescription(body, frontmatter) {
   }
 
   // Extract Stories Breakdown table if present.
-  //
-  // Kept inline rather than calling the shared jira-sync helper's `sectionRe`,
-  // because this script is standalone and requiring that module would pull the
-  // whole Jira client into a skill that does not otherwise use it. (Naming that
-  // module's path in a comment is also enough to make the bundler vendor it here
-  // — pass 1 scans prose for shared-resource paths — so the path is spelled out
-  // nowhere in this file.) The pattern must stay in step with the canonical one;
-  // see the comment on `sectionRe` there for why each piece is present:
-  //   (?:^|\n)  line-anchored, so `### Stories Breakdown` cannot win
-  //   \d+[.)]   optional numbering, e.g. `## 5. Stories Breakdown`
-  // This copy also previously required exactly `\n\n` after the heading, so a
-  // single newline before the table silently yielded no stories at all.
-  const storiesMatch = body.match(
-    /(?:^|\n)## (?:\d+[.)]\s*)?Stories Breakdown[ \t]*\n([\s\S]*?)(?=\n## |\n# |$)/,
-  );
-  if (storiesMatch) {
-    // Overview table only — cut at the first `### Story N.M` subsection. Those
-    // subsections are the detail that belongs in the epic file, and a line of
-    // their prose containing a `|` would otherwise leak in as a bogus row.
-    const subIdx = storiesMatch[1].search(/(?:^|\n)#{3,6}\s+/);
-    const tableContent = (subIdx >= 0 ? storiesMatch[1].slice(0, subIdx) : storiesMatch[1]).trim();
-    if (tableContent.includes("|")) {
-      // Convert markdown table to Jira wiki markup
-      const lines = tableContent.split("\n").filter((line) => line.trim());
-      const jiraRows = [];
+  const tableContent = (extractStoriesBreakdown(body) || "").trim();
+  if (tableContent.includes("|")) {
+    // Convert markdown table to Jira wiki markup
+    const lines = tableContent.split("\n").filter((line) => line.trim());
+    const jiraRows = [];
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        // Skip separator lines (|---|)
-        if (line.match(/^\|[-\s|]+\|$/)) continue;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      // Skip separator lines (|---|)
+      if (line.match(/^\|[-\s|]+\|$/)) continue;
 
-        // Convert markdown row to Jira wiki markup
-        // | a | b | -> |a|b|
-        const cells = line
-          .split("|")
-          .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1) // Remove first and last empty from split
-          .map((cell) => cell.trim());
+      // Convert markdown row to Jira wiki markup
+      // | a | b | -> |a|b|
+      const cells = line
+        .split("|")
+        .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1) // Remove first and last empty from split
+        .map((cell) => cell.trim());
 
-        if (cells.length > 0) {
-          const jiraRow = "|" + cells.join("|") + "|";
-          jiraRows.push(jiraRow);
-        }
+      if (cells.length > 0) {
+        const jiraRow = "|" + cells.join("|") + "|";
+        jiraRows.push(jiraRow);
       }
+    }
 
-      if (jiraRows.length > 0) {
-        sections.push("Stories:\n" + jiraRows.join("\n"));
-      }
+    if (jiraRows.length > 0) {
+      sections.push("Stories:\n" + jiraRows.join("\n"));
     }
   }
 
@@ -486,7 +554,20 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("Unexpected error:", err);
-  process.exit(1);
-});
+// Guarded so the extraction helpers can be required by a test without running
+// the script. The absence of that guard is why this file's copy of the section
+// extractor was never covered, and an uncovered copy is how it kept the old
+// truncating behaviour after the canonical one was fixed.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Unexpected error:", err);
+    process.exit(1);
+  });
+} else {
+  module.exports = {
+    extractStoriesBreakdown,
+    extractEpicDescription,
+    makeFenceTracker,
+    normaliseEpicSummary,
+  };
+}

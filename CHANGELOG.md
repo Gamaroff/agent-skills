@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Prettier is now repo policy for JavaScript.** `.prettierrc` pins the settings (they are Prettier 3's defaults, which is what the code already follows), `.prettierignore` scopes the tool to JS only, and `npm run format` / `npm run format:check` are wired up.
+
+  This exists because of what QA found in the change below: the two largest script diffs were **96% reformatting** — `sync-jira-task.js` changed 647 lines of which 27 were functional, `sync-jira-story.js` 788 of which 35 were. The reformat itself was correct and the tests were green; the problem is that it was incidental rather than policy, so it buried the functional change in a card whose blast radius is every tracked document in every consumer repo, and would have churned again the next time someone with format-on-save opened those files.
+
+  Markdown, YAML and JSON are excluded deliberately — this repo's documents are hand-wrapped, with tables and ASCII diagrams that a reformat would make harder to read, not easier. Generated `skills/*/references/` copies are excluded too: formatting them independently of their source is how the copies drift from it. A repo-wide `npm run format` sweep is **not** included here — 15 pre-existing test files remain unformatted, and sweeping them would repeat the mistake this entry documents.
+
 ### Fixed
 
 - **A `# ` inside a fenced code block silently truncated the Jira description.** `sectionRe`'s lookahead is `(?=\n## |\n# |$)`, and a regular expression cannot tell a heading from a shell comment — so a `# every absolute URL, grouped by ref` line inside a ` ```bash ` block **ended the section there**. Every heading and paragraph after it was dropped from the published description, with nothing on stderr and nothing in the output to show it had happened. Invisible from both ends: the document looked complete and the description looked deliberate. Measured on one card, a Technical Background section went from **13,965 characters to 2,283**, discarding a dependency table and an entire open-questions block. The workaround in the wild was indenting the comment two spaces, which is a thing every author had to remember forever.
@@ -27,6 +35,10 @@ All notable changes to this project will be documented in this file. Format foll
   One behavioural improvement falls out: the body line used to be gated on a Bitbucket URL having resolved, so a repo with no Bitbucket remote got no document link at all. A relative link needs nothing but the file's own path, so it is always written.
 
   `updateTaskFile`, `updateStoryFile` and `updateEpicFile` are now exported and each carries a suite — the write-back had **no** test coverage whatsoever, which is how two scripts came to write a body line that no test ever read. The story and epic suites are the substantive ones: two links per document, both crossing directories, and the epic's rule that a hand-authored **relative** `**Parent PRD**` link wins over the computed one while an authored **absolute** link does not.
+
+  **The same truncation is fixed in `jira-epic-creator`.** `scripts/jira-create-epic.js` kept its own inline copy of the extraction pattern — deliberately, because the script is standalone and importing the shared library would pull the whole Jira client into a skill that does not otherwise use it — and that copy carried the identical `(?=\n## |\n# |$)` lookahead, so a fenced `#` truncated an epic's Stories Breakdown table the same silent way. It now walks lines with the same three CommonMark rules, and the fence check applies to the `### Story N.M` cut as well, so a `###` inside a fenced block no longer ends the table early. The script gained a `require.main` guard and exports, because it had neither — which is exactly why the copy was never covered and kept the old behaviour after the canonical one was fixed. 11 tests.
+
+  **One behaviour change worth naming.** In `sync-jira-epic`, an epic whose `prd_source` does not resolve to a file but which carries a cached `prd_bitbucket_url` now gets **no** `**Parent PRD**` body line, where it previously got an absolute one. Writing that cached URL back into the document is the defect this release removes, and there is no path to build a relative link from. The Jira card is unaffected — it still receives the link.
 
   **`sync-jira-epic` also stops telling you to hand-write the URL.** Its post-create Story reminder printed `epic_bitbucket_url: "<absolute branch-pinned URL>"` for the author to paste into every story — the same defect arriving by hand, and one no test or link checker would ever catch. It now points at `epic_source` instead, which is what `sync-jira-story` builds the relative `**Epic File**` link from. The key is still *read*, so a value already set keeps resolving.
 

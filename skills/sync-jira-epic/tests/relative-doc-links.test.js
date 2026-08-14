@@ -100,7 +100,11 @@ test("epic: neither epic_bitbucket_url nor prd_bitbucket_url is written", () => 
 
   assert.equal(frontmatter.epic_bitbucket_url, undefined);
   assert.equal(frontmatter.prd_bitbucket_url, undefined);
-  assert.equal(frontmatter.jira_key, "PROJ-1", "jira_key must still be written");
+  assert.equal(
+    frontmatter.jira_key,
+    "PROJ-1",
+    "jira_key must still be written",
+  );
 });
 
 test("epic: a hand-set prd_bitbucket_url survives the write", () => {

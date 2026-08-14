@@ -125,12 +125,35 @@ Three rules settle it:
 by `extractBodySections` and `extractStoriesTable`; the `toRelativeDocLink` helper;
 tests for both defects; the three `SKILL.md` documents; the bundled copies.
 
+**Added during QA cycle 1** (see [the QA report](./task.46.qa.1.relative-doc-links-and-fence-aware-sections.md)):
+
+- **`jira-epic-creator`'s inline copy of the extraction pattern.** It carried the
+  identical `(?=\n## |\n# |$)` lookahead under a comment instructing maintainers to
+  keep it in step with the canonical one — so leaving it would have meant shipping a
+  fix alongside a written instruction to undo it. Fixed inline (the script is
+  standalone by design and cannot import the shared library), with a `require.main`
+  guard, exports, and 11 tests. It had none of those, which is why the copy was never
+  covered.
+- **A declared Prettier policy.** The reformat below is real and was undeclared:
+  `.prettierrc`, `.prettierignore` and `npm run format` make it repo policy rather
+  than one author's editor settings.
+
+**Reformatting — declared, not incidental.** The three sync scripts are reformatted
+wholesale in this card. Measured by normalising both sides of the diff with
+`prettier@3`: `sync-jira-task.js` changes 647 lines of which **27** are functional,
+`sync-jira-story.js` 788 of which **35** are. That is the cost of adopting the policy
+on these files, paid once. It sits uneasily beside the reviewability argument for
+leaving `dropHeadingLines` alone below, and that tension is the honest state of this
+card rather than something to argue away.
+
 **Out of scope:**
 
 - **Removing existing `*_bitbucket_url` values from consumer documents.** Their call.
 - **`dropHeadingLines` / `firstTableIn`**, which still use the naive `RE_FENCE`. They
   operate on already-extracted content where the parity bug has no observed effect;
-  noted rather than changed, so this card's diff stays reviewable.
+  noted rather than changed.
+- **A repo-wide `npm run format` sweep.** 15 pre-existing test files are unformatted.
+  Sweeping them here would repeat the mistake this card just documented — a follow-up.
 - **GitHub sync equivalents** — they do not write Bitbucket URLs.
 
 ## Implementation Plan
@@ -251,8 +274,54 @@ done.
 - [x] Step 8 — tests, `npm run bundle`, full suite green
 - [ ] Release and consumer pull-through
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-14
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.46.qa.1.relative-doc-links-and-fence-aware-sections.md](./task.46.qa.1.relative-doc-links-and-fence-aware-sections.md)
+- **Gate File**: [task.46.gate.1.relative-doc-links-and-fence-aware-sections.yml](./task.46.gate.1.relative-doc-links-and-fence-aware-sections.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1,242 (0 failures)
+- **Steps Verified**: 8/8
+- **Success Criteria Met**: 11/11
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+No correctness bugs and no regressions — both defects are fixed and covered by tests that assert
+the absence of the old behaviour, not merely the presence of the new. Two MEDIUM maintainability
+findings gate the review:
+
+- [TASK-46-BUG-1](./task.46.bug.1.undeclared-reformat-hides-functional-change.md) — an undeclared
+  Prettier reformat makes up 96% of the two largest script diffs (27 functional lines in 647,
+  35 in 788), hiding the change a reviewer most needs to read.
+- [TASK-46-BUG-2](./task.46.bug.2.fence-defect-survives-in-jira-epic-creator.md) — the same
+  fence-truncation regex survives in `jira-epic-creator`, under a comment instructing maintainers
+  to keep it in step with the canonical pattern this task just moved.
+
+Status stays `ready-for-review`: CONCERNS does not reopen the work (only FAIL does), and
+`accepted` belongs to `/finalise`.
+
 ## References
 
 - [`shared/resources/jira-sync.js`](../../../shared/resources/jira-sync.js) — `extractSection`, `makeFenceTracker`, `toRelativeDocLink`, `resolveRelativeLink`
 - [`skills/sync-jira-task/SKILL.md`](../../../skills/sync-jira-task/SKILL.md) — "Why document links are relative"
 - [task.42](../task.42.change-log-spec-and-engine/task.42.change-log-spec-and-engine.md) — the card whose ```` ``` ```` exposed the fence-parity trap
+
+<!-- change-log-start -->
+## Change Log
+
+| Date       | Version | Description                                          | Author  |
+|------------|---------|------------------------------------------------------|---------|
+| 2026-08-14 |         | QA gate CONCERNS (80/100) — 2 medium findings, 0 bugs | qa-task |
+| 2026-08-14 |         | QA findings fixed — both mediums closed, 1 iteration  | qa-fix  |
+<!-- change-log-end -->

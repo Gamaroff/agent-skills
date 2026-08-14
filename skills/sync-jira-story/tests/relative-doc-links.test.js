@@ -89,7 +89,11 @@ test("story: neither story_bitbucket_url nor epic_bitbucket_url is written", () 
 
   assert.equal(frontmatter.story_bitbucket_url, undefined);
   assert.equal(frontmatter.epic_bitbucket_url, undefined);
-  assert.equal(frontmatter.jira_key, "PROJ-2", "jira_key must still be written");
+  assert.equal(
+    frontmatter.jira_key,
+    "PROJ-2",
+    "jira_key must still be written",
+  );
   assert.equal(
     frontmatter.jira_epic,
     "PROJ-1",
@@ -177,7 +181,11 @@ test("story: an unresolvable epic_source omits the Epic File line rather than gu
   const written = update(file, null, { epicFilePath: null });
 
   assert.doesNotMatch(written, /^\*\*Epic File\*\*:/m);
-  assert.match(written, /^\*\*Story File\*\*: \[/m, "the story link still lands");
+  assert.match(
+    written,
+    /^\*\*Story File\*\*: \[/m,
+    "the story link still lands",
+  );
 });
 
 // ---------------------------------------------------------------------------
