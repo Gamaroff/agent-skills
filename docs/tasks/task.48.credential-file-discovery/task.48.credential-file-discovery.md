@@ -5,7 +5,7 @@ type: task
 description: 'Both credential loaders — shared/resources/jira-sync.js (bundled into 14 skills) and shared/resources/gh-stage.js (8) — read a hardcoded repo-root .env and returned silently when it was missing. An Nx consumer cannot keep tooling tokens in a root .env, because Nx loads workspace .env files into process.env of every task it runs; a different path is the fix and no flag substitutes for it. Both loaders now search .secrets/tooling.env then .env in each root they know about, merging every candidate. jira-sync.js additionally warns on stderr when the required keys are still unset, ending a failure mode where every tracker sync ran, reported success, and updated nothing.'
 tags: [credentials, jira-sync, gh-stage, nx, testing]
 category: infrastructure
-status: in-progress
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-14
@@ -162,7 +162,7 @@ reads `.env` exactly as it did in v0.39.1.
 - [x] Step 3 — `gh-stage.js` path change, no warning
 - [x] Step 4 — tests, mutation-proven
 - [x] Step 5 — `npm run bundle` across 22 copies
-- [ ] Release and consumer pull-through
+- [x] Release and consumer pull-through — v0.40.0
 
 ## References
 
