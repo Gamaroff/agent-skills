@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-14
-**Next Available Task Number:** **47**
+**Next Available Task Number:** **48**
 
 ## How to use
 
@@ -86,6 +86,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 44 | [Review and edit skills log their document mutations](task.44.change-log-review-and-edit/task.44.change-log-review-and-edit.md) | planned | refactoring | High | 2026-08-12 | [#203](https://github.com/Gamaroff/agent-skills/issues/203) | task.42, task.43 |
 | 45 | [Pipeline, QA, finalise, and tracker sync write the Change Log](task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md) | planned | refactoring | High | 2026-08-12 | [#204](https://github.com/Gamaroff/agent-skills/issues/204) | task.42, task.43, task.44 |
 | 46 | [Write relative document links, and stop a fenced `# ` truncating a Jira description](task.46.relative-doc-links-and-fence-aware-sections/task.46.relative-doc-links-and-fence-aware-sections.md) | accepted | refactoring | High | 2026-08-13 | [#216](https://github.com/Gamaroff/agent-skills/issues/216) | none |
+| 47 | [The `--json` samples under-document the payload, and nothing checked](task.47.json-output-sample-fidelity/task.47.json-output-sample-fidelity.md) | in-progress | documentation | Medium | 2026-08-14 | — | task.46 |
 
 ---
 

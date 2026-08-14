@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `--json` output samples under-documented the payload, in all three `sync-jira-*` skills.** Documenting the v0.39.0 change removed the `*_bitbucket_url` keys from the `--json` samples as well as the frontmatter ones. The frontmatter edit was right — the scripts genuinely stopped writing those keys. The `--json` edit was wrong: all three still emit them there, because that payload reports the absolute URL used for the **Jira** link, built at ADF-render time, rather than anything written to the file. Same key name, different lifetime; one edit treated the name as the identity and got it wrong three times.
+
+  Nothing caught it, because every existing test asserts on behaviour and none compared a documented payload against the emitted one. A consumer scripting against `--json` would have found the extra keys only by printing them.
+
+  The keys are restored, each sample now carries a line saying why it differs from the frontmatter sample, and `tests/json-output-fidelity.test.js` compares the two in both directions so a sample cannot drift from its script again.
+
+  **The guard caught a real subtlety on its first run — against correct documentation.** Selecting the payload by the first `change_summary` key matched `sync-jira-epic`'s no-change fast path (`action: "skip"`), which legitimately omits the URL keys. Selection is now the main path's exact signature, and a second assertion holds every other document-sync payload to a *subset* of the documented keys — so a secondary path cannot invent an undocumented field, while the skip path is not forced to pad itself with nulls to satisfy a test. Mutation-tested in both directions before being trusted.
+
 ## [v0.39.0] - 2026-08-14
 
 ### Added
