@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.40.0] - 2026-08-14
+
 ### Changed
 
 - **Credentials may now live at `.secrets/tooling.env`, and it takes precedence over `.env`.** Both loaders — `shared/resources/jira-sync.js` (bundled into 14 skills) and `shared/resources/gh-stage.js` (8) — search `.secrets/tooling.env` then `.env`, in each repo root they know about.
