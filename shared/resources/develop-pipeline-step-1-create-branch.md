@@ -137,13 +137,21 @@ cat > .claude/state/develop-pipeline.lock <<EOF
   "pr_url": "",
   "tracker": "{TRACKER}",
   "tracker_issue": "{TRACKER_ISSUE}",
-  "current_step": 1,
+  "current_step": 2,
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
 ```
 
 The lock file is read by `.agents/skills/develop-story/scripts/on-precompact.sh` if compaction fires.
+
+> ⚠️ **`current_step` is created at `2`, not `1`, and that is deliberate.** The field names the
+> step that is **PENDING** — Step 1 has just finished by the time this lock is written, so the
+> pending step is 2. This matches the Step Transition Protocol, which writes `{N+1}` after step N
+> completes, and it is what `on-stop.sh` reads to decide which step to re-prompt. Creating it at
+> `1` made the value mean "last completed step" here and "next pending step" everywhere else — one
+> field, two conventions — and the Stop hook, having only one reader, skipped a step whenever it
+> fired mid-step. Observed four times on one story before it was found.
 
 #### develop-task
 
@@ -159,7 +167,7 @@ cat > .claude/state/develop-pipeline.lock <<EOF
   "pr_url": "",
   "tracker": "{TRACKER}",
   "tracker_issue": "{TRACKER_ISSUE}",
-  "current_step": 1,
+  "current_step": 2,
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
