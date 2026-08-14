@@ -85,7 +85,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 43 | [Templates and creation skills emit the canonical Change Log](task.43.change-log-templates-and-creation/task.43.change-log-templates-and-creation.md) | planned | documentation | High | 2026-08-12 | [#202](https://github.com/Gamaroff/agent-skills/issues/202) | task.42 |
 | 44 | [Review and edit skills log their document mutations](task.44.change-log-review-and-edit/task.44.change-log-review-and-edit.md) | planned | refactoring | High | 2026-08-12 | [#203](https://github.com/Gamaroff/agent-skills/issues/203) | task.42, task.43 |
 | 45 | [Pipeline, QA, finalise, and tracker sync write the Change Log](task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md) | planned | refactoring | High | 2026-08-12 | [#204](https://github.com/Gamaroff/agent-skills/issues/204) | task.42, task.43, task.44 |
-| 46 | [Write relative document links, and stop a fenced `# ` truncating a Jira description](task.46.relative-doc-links-and-fence-aware-sections/task.46.relative-doc-links-and-fence-aware-sections.md) | ready-for-review | refactoring | High | 2026-08-13 | — | none |
+| 46 | [Write relative document links, and stop a fenced `# ` truncating a Jira description](task.46.relative-doc-links-and-fence-aware-sections/task.46.relative-doc-links-and-fence-aware-sections.md) | accepted | refactoring | High | 2026-08-13 | — | none |
 
 ---
 
