@@ -109,9 +109,17 @@ one-time reviewability gain, while leaving the recurrence cause untouched.
 - `docs/tasks/task.46.../task.46.relative-doc-links-and-fence-aware-sections.md` — Scope declaration
 - `CHANGELOG.md` — Added entry
 
-**Deliberately NOT done**: a repo-wide `npm run format` sweep. 15 pre-existing test files are
-unformatted; sweeping them into this PR would bury this card's functional change a second time,
-in the very commit that documents why not to. Left as a follow-up.
+**Deliberately NOT done**: a repo-wide `npm run format` sweep. **50 files** are currently
+unformatted — 10 in `shared/resources/tests`, 8 in `evals/shared/tests`, 7 in `shared/resources`,
+4 in `tests/`, and the rest scattered. Sweeping them into this PR would bury this card's
+functional change a second time, in the very commit that documents why not to. Left as a
+follow-up.
+
+> **Corrected in QA cycle 2.** This section first said "15 pre-existing test files" — that was the
+> count for the `sync-jira-*` subset only, not the repo. The real figure is 50. A consequence
+> follows that the first draft did not state: **`npm run format:check` fails today.** That is
+> intended — it reports real drift — but it must not be wired into CI until the sweep lands, and
+> saying so is the difference between a known state and a surprise.
 
 **Verification Steps for QA**:
 

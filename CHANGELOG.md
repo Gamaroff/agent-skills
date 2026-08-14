@@ -10,7 +10,9 @@ All notable changes to this project will be documented in this file. Format foll
 
   This exists because of what QA found in the change below: the two largest script diffs were **96% reformatting** — `sync-jira-task.js` changed 647 lines of which 27 were functional, `sync-jira-story.js` 788 of which 35 were. The reformat itself was correct and the tests were green; the problem is that it was incidental rather than policy, so it buried the functional change in a card whose blast radius is every tracked document in every consumer repo, and would have churned again the next time someone with format-on-save opened those files.
 
-  Markdown, YAML and JSON are excluded deliberately — this repo's documents are hand-wrapped, with tables and ASCII diagrams that a reformat would make harder to read, not easier. Generated `skills/*/references/` copies are excluded too: formatting them independently of their source is how the copies drift from it. A repo-wide `npm run format` sweep is **not** included here — 15 pre-existing test files remain unformatted, and sweeping them would repeat the mistake this entry documents.
+  Markdown, YAML and JSON are excluded deliberately — this repo's documents are hand-wrapped, with tables and ASCII diagrams that a reformat would make harder to read, not easier. Generated `skills/*/references/` copies are excluded too: formatting them independently of their source is how the copies drift from it.
+
+  A repo-wide `npm run format` sweep is **not** included here. **50 files are currently unformatted** — mostly test suites (`shared/resources/tests`, `evals/shared/tests`, `tests/`) plus 7 files in `shared/resources` — and sweeping them into this release would repeat the mistake this entry documents. `npm run format:check` therefore **fails today, by design**: it is an accurate signal of remaining drift, not a gate to wire into CI until the sweep lands.
 
 ### Fixed
 

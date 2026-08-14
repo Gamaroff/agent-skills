@@ -152,8 +152,10 @@ card rather than something to argue away.
 - **`dropHeadingLines` / `firstTableIn`**, which still use the naive `RE_FENCE`. They
   operate on already-extracted content where the parity bug has no observed effect;
   noted rather than changed.
-- **A repo-wide `npm run format` sweep.** 15 pre-existing test files are unformatted.
-  Sweeping them here would repeat the mistake this card just documented — a follow-up.
+- **A repo-wide `npm run format` sweep.** **50 files** are currently unformatted —
+  mostly test suites, plus 7 in `shared/resources`. Sweeping them here would repeat
+  the mistake this card just documented. `npm run format:check` fails today as a
+  result, by design: an accurate drift signal, not yet a CI gate. Follow-up card.
 - **GitHub sync equivalents** — they do not write Bitbucket URLs.
 
 ## Implementation Plan
@@ -276,40 +278,48 @@ done.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-14
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS (cycle 2) — cycle 1 was CONCERNS, 80/100
+**QA Cycles**: 2
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.46.qa.1.relative-doc-links-and-fence-aware-sections.md](./task.46.qa.1.relative-doc-links-and-fence-aware-sections.md)
-- **Gate File**: [task.46.gate.1.relative-doc-links-and-fence-aware-sections.yml](./task.46.gate.1.relative-doc-links-and-fence-aware-sections.yml)
+| Cycle | Gate | Score | Report | Gate file |
+| ----- | ---- | ----- | ------ | --------- |
+| 1 | CONCERNS | 80/100 | [qa.1](./task.46.qa.1.relative-doc-links-and-fence-aware-sections.md) | [gate.1](./task.46.gate.1.relative-doc-links-and-fence-aware-sections.yml) |
+| 2 | **PASS** | 95/100 | [qa.2](./task.46.qa.2.relative-doc-links-and-fence-aware-sections.md) | [gate.2](./task.46.gate.2.relative-doc-links-and-fence-aware-sections.yml) |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 1,242 (0 failures)
+- **Tests Executed**: 1,253 (0 failures)
 - **Steps Verified**: 8/8
 - **Success Criteria Met**: 11/11
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-No correctness bugs and no regressions — both defects are fixed and covered by tests that assert
-the absence of the old behaviour, not merely the presence of the new. Two MEDIUM maintainability
-findings gate the review:
+No correctness bugs and no regressions in either cycle. Both defects are fixed and covered by
+tests that assert the absence of the old behaviour, not merely the presence of the new.
+
+Cycle 1 raised two MEDIUM maintainability findings, both now closed:
 
 - [TASK-46-BUG-1](./task.46.bug.1.undeclared-reformat-hides-functional-change.md) — an undeclared
-  Prettier reformat makes up 96% of the two largest script diffs (27 functional lines in 647,
-  35 in 788), hiding the change a reviewer most needs to read.
+  Prettier reformat made up 96% of the two largest script diffs (27 functional lines in 647, 35
+  in 788). Resolved by adopting Prettier as repo policy and declaring the reformat in Scope.
 - [TASK-46-BUG-2](./task.46.bug.2.fence-defect-survives-in-jira-epic-creator.md) — the same
-  fence-truncation regex survives in `jira-epic-creator`, under a comment instructing maintainers
-  to keep it in step with the canonical pattern this task just moved.
+  fence-truncation regex survived in `jira-epic-creator` under a comment telling maintainers to
+  keep it in step with the canonical pattern. Fixed inline, plus a second instance of the same
+  blind spot found while fixing, plus the `require.main` guard and exports that made the file
+  testable at all.
 
-Status stays `ready-for-review`: CONCERNS does not reopen the work (only FAIL does), and
-`accepted` belongs to `/finalise`.
+Cycle 2 found one LOW — the cycle-1 fix documentation understated the unformatted-file count
+(15 vs the real 50) and did not state that `npm run format:check` fails until the deferred sweep
+lands. Corrected in-cycle, in all three places, with the correction recorded rather than
+overwritten.
 
 ## References
 
@@ -324,4 +334,5 @@ Status stays `ready-for-review`: CONCERNS does not reopen the work (only FAIL do
 |------------|---------|------------------------------------------------------|---------|
 | 2026-08-14 |         | QA gate CONCERNS (80/100) — 2 medium findings, 0 bugs | qa-task |
 | 2026-08-14 |         | QA findings fixed — both mediums closed, 1 iteration  | qa-fix  |
+| 2026-08-14 |         | QA gate PASS (95/100) — 0 findings, 2 cycles          | qa-task |
 <!-- change-log-end -->

@@ -1,0 +1,71 @@
+schema: 1
+task: 'task.46.relative-doc-links-and-fence-aware-sections'
+task_title: 'Write relative document links, and stop a fenced `# ` truncating a Jira description'
+gate: PASS
+status_reason: 'Both cycle-1 MEDIUM findings are closed and verified. The reformat is now declared repo policy with a scoped config; the jira-epic-creator copy walks lines with the same CommonMark rules, is testable for the first time, and its 11 tests run. One inaccuracy in the cycle-1 fix documentation was found and corrected in this cycle rather than carried. 1,253 tests green.'
+reviewer: 'QA Engineer'
+updated: '2026-08-14T06:05:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 1253
+  phases_verified: '8/8'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-08-14'
+  total_iterations: 1
+  verification_method: 'Automated tests (1,253) + prettier --check over the change set + CLI smoke test of the guarded entry point'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      Unchanged from cycle 1. The added devDependency (prettier) is a formatter that runs only on
+      demand; it is not required by any shipped script.
+  performance:
+    status: PASS
+    notes: >-
+      Unchanged. The new line-walking extractor in jira-create-epic.js replaces two regex passes
+      with one walk over the same body — marginally less work, against a network-bound operation.
+  reliability:
+    status: PASS
+    notes: >-
+      The `require.main` guard added to jira-create-epic.js was smoke-tested: run with no
+      environment, the script still reaches its own argument validation and exits 1 with
+      "Missing required environment variables". The guard did not silently disable the CLI, which
+      is the obvious way that change could have gone wrong.
+  maintainability:
+    status: PASS
+    notes: >-
+      Both cycle-1 findings are resolved at the cause rather than the symptom. The reformat is now
+      policy with a config that pins settings explicitly, so a future Prettier major cannot
+      re-churn the repo. jira-create-epic.js gained a main guard and exports, which is what made
+      the defect testable at all — the copy survived the original fix precisely because nothing in
+      that file could be required. The misleading "keep it in step with the canonical one" comment
+      is gone.
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Repo-wide `npm run format` sweep (50 files), then wire `format:check` into CI. Deliberately deferred — see the task Scope.'
+      refs: ['package.json']
+    - action: 'Close the remaining naive RE_FENCE users (dropHeadingLines / firstTableIn) — declared out of scope here'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'Consider a shared fence tracker. Three copies now exist (jira-sync.js, jira-create-epic.js, and the rules restated in tests); jira-epic-creator cannot import the shared library by design, so this needs a smaller extraction point rather than a straight import.'
+      refs: ['shared/resources/jira-sync.js', 'skills/jira-epic-creator/scripts/jira-create-epic.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
