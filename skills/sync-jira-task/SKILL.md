@@ -9,10 +9,10 @@ description: Sync a local technical task markdown file to Jira — creates the t
 
 One-way sync of a local technical task markdown file to Jira. Auto-detects create vs update from `jira_key` in frontmatter.
 
-| `jira_key` present? | Action |
-|---|---|
-| Absent | **Pre-flight search by sync label**, then **Create** if no match. Writes `jira_key` back to file. |
-| Present | **Update** existing Jira task via atomic PUT. A Change Log row is written only if the status transitioned. |
+| `jira_key` present? | Action                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Absent              | **Pre-flight search by sync label**, then **Create** if no match. Writes `jira_key` back to file.          |
+| Present             | **Update** existing Jira task via atomic PUT. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-story`:** tasks are **standalone** — not associated with any Jira epic. No `jira_epic` field, no parent/Epic Link wiring, no epic Bitbucket URL. Issue type sent as `Task`.
 
@@ -58,19 +58,19 @@ One-way sync of a local technical task markdown file to Jira. Auto-detects creat
 
 The script auto-loads `<repo-root>/.env`. Shell exports take precedence.
 
-| Variable | Description |
-|---|---|
-| `JIRA_URL` | Jira base URL (e.g. `https://yourorg.atlassian.net`) |
-| `JIRA_API_TOKEN` | Jira API token |
-| `JIRA_USER_EMAIL` | Jira account email |
-| `JIRA_PROJECT_KEY` | Project key (e.g. `RB`) |
-| `JIRA_BOARD_ID` | Board ID for backlog placement (Scrum boards only — skipped on Kanban) |
+| Variable           | Description                                                            |
+| ------------------ | ---------------------------------------------------------------------- |
+| `JIRA_URL`         | Jira base URL (e.g. `https://yourorg.atlassian.net`)                   |
+| `JIRA_API_TOKEN`   | Jira API token                                                         |
+| `JIRA_USER_EMAIL`  | Jira account email                                                     |
+| `JIRA_PROJECT_KEY` | Project key (e.g. `RB`)                                                |
+| `JIRA_BOARD_ID`    | Board ID for backlog placement (Scrum boards only — skipped on Kanban) |
 
 ### Optional Environment Variables
 
-| Variable | Description |
-|---|---|
-| `BITBUCKET_REPO_URL` | Override Bitbucket base URL (auto-detected from git remote) |
+| Variable                  | Description                                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BITBUCKET_REPO_URL`      | Override Bitbucket base URL (auto-detected from git remote)                                                                                                                     |
 | `JIRA_DEV_ESTIMATE_FIELD` | Custom field id to mirror `estimated_effort_hours` into (e.g. `customfield_10594`). Takes precedence over `jira.devEstimateField` in `skills-config.yaml`. Unset → not written. |
 
 ### Finding Your Board ID
@@ -98,16 +98,16 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 ### Task frontmatter fields
 
 ```yaml
-title: 'Task 1: Cache-lib Architecture Simplification'
-priority: 'High'                    # mapped to live Jira priorities
-category: 'refactoring'
-estimated_effort_hours: 24          # → timetracking.originalEstimate (+ jira.devEstimateField if configured)
-status: '🚧 In Progress'             # emoji stripped, mapped to Jira transition
-labels: ['cache', 'refactor']       # synced-from-* label appended automatically
-assignee: '5b10a2844c20165700ede21g' # Jira accountId (optional)
-components: ['Cache']                # optional
-fix_versions: ['1.0.0']              # optional
-due_date: '2026-05-15'               # ISO date (optional)
+title: "Task 1: Cache-lib Architecture Simplification"
+priority: "High" # mapped to live Jira priorities
+category: "refactoring"
+estimated_effort_hours: 24 # → timetracking.originalEstimate (+ jira.devEstimateField if configured)
+status: "🚧 In Progress" # emoji stripped, mapped to Jira transition
+labels: ["cache", "refactor"] # synced-from-* label appended automatically
+assignee: "5b10a2844c20165700ede21g" # Jira accountId (optional)
+components: ["Cache"] # optional
+fix_versions: ["1.0.0"] # optional
+due_date: "2026-05-15" # ISO date (optional)
 ```
 
 ## Workflow
@@ -160,7 +160,7 @@ Flow:
 8. **Create** (POST) or **Update** (atomic PUT with `returnIssue=true`).
 9. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning.
 10. If frontmatter `status` differs from current Jira status, fetch transitions and POST a status transition.
-11. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `task_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Task**` / `**Task File**` links. Append a Change Log row only for issue creation or a status transition — never for a body update.
+11. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Task**` / `**Task File**` links — the document link is **relative**, not an absolute Bitbucket URL (see [Why document links are relative](#why-document-links-are-relative)). `task_bitbucket_url` is no longer written. Append a Change Log row only for issue creation or a status transition — never for a body update.
 
 ### 5. Report to User
 
@@ -174,12 +174,12 @@ Flow:
 
 ## Concurrent-Edit Guard
 
-| Situation | Behaviour |
-|---|---|
-| Jira `updated` ≤ stored | Sync proceeds normally |
-| Jira `updated` > stored | **Aborts**; pass `--force` to override |
-| `--force` | Warning, sync proceeds, overwrites Jira |
-| First sync (no stored timestamp) | Guard skipped |
+| Situation                        | Behaviour                               |
+| -------------------------------- | --------------------------------------- |
+| Jira `updated` ≤ stored          | Sync proceeds normally                  |
+| Jira `updated` > stored          | **Aborts**; pass `--force` to override  |
+| `--force`                        | Warning, sync proceeds, overwrites Jira |
+| First sync (no stored timestamp) | Guard skipped                           |
 
 ## Status Transitions
 
@@ -187,14 +187,14 @@ Frontmatter `status` is normalised by stripping emoji and lower-casing, then res
 **ordered list of candidate Jira status names** (overlaid with any `jira.statusMap` overrides from
 `skills-config.yaml`). Candidates exist because Jira workflows name the same stage differently:
 
-| Local status | Candidates, tried in order |
-|---|---|
-| `draft`, `planned` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development` |
+| Local status            | Candidates, tried in order                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `draft`, `planned`      | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development`                                   |
 | `ready-for-development` | `To Do`, `Backlog`, `Open`, `New`, `Selected for Development`, `Ready`, `Ready for Development` |
-| `in-progress` | `In Progress`, `Doing`, `Started`, `Development` |
-| `ready-for-review` | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review` |
-| `accepted` | `Done`, `Closed`, `Resolved`, `Complete`, `Completed` |
-| `cancelled` | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed` |
+| `in-progress`           | `In Progress`, `Doing`, `Started`, `Development`                                                |
+| `ready-for-review`      | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review`   |
+| `accepted`              | `Done`, `Closed`, `Resolved`, `Complete`, `Completed`                                           |
+| `cancelled`             | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed`                                       |
 
 The script fetches `/rest/api/3/issue/{key}/transitions?expand=transitions.fields` and picks a
 transition by: already-in-a-candidate → no-op; then `to.name` across all candidates; then transition
@@ -241,14 +241,14 @@ writes for another reason.
 
 **A row is written for exactly two events:**
 
-| Event | Row |
-| --- | --- |
-| Issue created | `\| 2026-08-12 \|  \| Jira task created (PROJ-42) \| sync-jira-task \|` |
-| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-jira-task \|` |
+| Event                                     | Row                                                                     |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| Issue created                             | `\| 2026-08-12 \|  \| Jira task created (PROJ-42) \| sync-jira-task \|` |
+| Status transition driven from frontmatter | `\| 2026-08-12 \|  \| Status → in-progress \| sync-jira-task \|`        |
 
 **A body, summary, priority or label update writes no row.** Jira keeps a full
 issue history with actor and timestamp — strictly better than a local row naming
-only which fields moved — and the document records *why* the body changed through
+only which fields moved — and the document records _why_ the body changed through
 its own review, develop and QA rows. `jira_last_synced_at` in frontmatter still
 records the last sync time.
 
@@ -262,11 +262,11 @@ Before sync (minimal):
 
 ```yaml
 ---
-title: 'Task 1: Cache-lib Architecture Simplification'
-priority: 'High'
-category: 'refactoring'
+title: "Task 1: Cache-lib Architecture Simplification"
+priority: "High"
+category: "refactoring"
 estimated_effort_hours: 24
-status: '📋 Planned'
+status: "📋 Planned"
 ---
 ```
 
@@ -275,13 +275,41 @@ After sync the script writes (in-place, preserving order):
 ```yaml
 jira_key: "PROJ-47"
 jira_url: "https://yourorg.atlassian.net/browse/PROJ-47"
-task_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/tasks/task.1.../task.1....md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
 jira_last_body_hash: "f4b2c1d9a0e72b58"
 jira_last_meta_hash: "a91c0aef33eb1d04"
 ```
 
 Note: no `jira_epic` is written (tasks are standalone). Any `jira_epic` already in the file is left untouched but ignored.
+
+## Why document links are relative
+
+The `**Task File**` line written into the document is a **relative** link:
+
+```markdown
+**Task File**: [task.62.absolute-bitbucket-url-removal.md](./task.62.absolute-bitbucket-url-removal.md)
+```
+
+It used to be an absolute `https://bitbucket.org/<ws>/<repo>/src/<ref>/<path>` URL,
+and `task_bitbucket_url` carried the same value in frontmatter. Both named
+**whichever branch the sync ran on**. When that branch was deleted after merge the
+link died — while the file itself sat perfectly safe on the default branch.
+
+Nothing catches this. A repository link checker resolves _relative_ paths; an
+absolute URL is not inspected at all, so the rot accumulates with a green build.
+One consumer measured **1,889** such URLs across **614** documents, 44 already
+returning 404, having never seen a failing check.
+
+A relative link cannot rot, and is validated by any ordinary link checker on every
+pull request. **Jira loses nothing**: `resolveRelativeLink` rewrites relative hrefs
+to absolute Bitbucket URLs when the ADF description is rendered, so the card still
+links straight to the file.
+
+`task_bitbucket_url` is **no longer written**, but it is still **read** where a
+sibling skill documents it as a fallback (`sync-jira-epic` resolves `prd_source`
+that way). An existing value keeps working; the tools simply stop minting new ones.
+Removing the key from documents that already carry one is a consumer's decision,
+not this script's.
 
 ## Description sections rendered
 
@@ -293,13 +321,13 @@ and enforced in code by `buildCardSections()` in `references/jira-sync.js`.
 What lands on a task card — **three** sections, where this list once named
 eleven, i.e. the whole task document republished verbatim on every sync:
 
-| Block | Source |
-|-------|--------|
-| Summary | `## Overview` |
-| Success Criteria | `## Success Criteria`, **first 5 items** |
+| Block            | Source                                                                  |
+| ---------------- | ----------------------------------------------------------------------- |
+| Summary          | `## Overview`                                                           |
+| Success Criteria | `## Success Criteria`, **first 5 items**                                |
 | Breaking Changes | `## Breaking Changes`, **first 3 items** — omitted entirely when absent |
-| Metadata | category, estimated hours, status |
-| Source Documents | task file, co-located siblings (runbooks, reports) |
+| Metadata         | category, estimated hours, status                                       |
+| Source Documents | task file, co-located siblings (runbooks, reports)                      |
 
 Motivation, Technical Background, Scope, Implementation Plan, Files Summary,
 Testing Strategy, Risk Assessment and Rollback Plan are **not** published — they
@@ -313,18 +341,18 @@ the authoritative log.
 
 ## Script Options
 
-| Flag | Short | Description |
-|---|---|---|
-| `--file` | `-f` | Path to task markdown file (required) |
-| `--summary` | `-s` | Override task summary/title |
-| `--priority` | `-p` | Override priority |
-| `--labels` | `-l` | Comma-separated labels |
-| `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Used by `finalise` (passes the durable integration branch) so a closed issue doesn't link to a deleted feature branch. |
-| `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-task` to catch a heading mismatch before it publishes a thin card. |
-| `--dry-run` | | Preview only — no Jira calls, no file writes |
-| `--force` | | Override the concurrent-edit guard |
-| `--json` | | Suppress human output; emit a single JSON object on completion |
-| `--quiet` | | Suppress info logs (warnings still printed) |
+| Flag           | Short | Description                                                                                                                                                                                                                                                                                                                |
+| -------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--file`       | `-f`  | Path to task markdown file (required)                                                                                                                                                                                                                                                                                      |
+| `--summary`    | `-s`  | Override task summary/title                                                                                                                                                                                                                                                                                                |
+| `--priority`   | `-p`  | Override priority                                                                                                                                                                                                                                                                                                          |
+| `--labels`     | `-l`  | Comma-separated labels                                                                                                                                                                                                                                                                                                     |
+| `--doc-branch` |       | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Used by `finalise` (passes the durable integration branch) so a closed issue doesn't link to a deleted feature branch.                                                                             |
+| `--check-card` |       | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-task` to catch a heading mismatch before it publishes a thin card. |
+| `--dry-run`    |       | Preview only — no Jira calls, no file writes                                                                                                                                                                                                                                                                               |
+| `--force`      |       | Override the concurrent-edit guard                                                                                                                                                                                                                                                                                         |
+| `--json`       |       | Suppress human output; emit a single JSON object on completion                                                                                                                                                                                                                                                             |
+| `--quiet`      |       | Suppress info logs (warnings still printed)                                                                                                                                                                                                                                                                                |
 
 ### `--json` output shape
 
@@ -335,7 +363,6 @@ the authoritative log.
   "file": "/abs/path/task.md",
   "jira_key": "PROJ-47",
   "jira_url": "https://yourorg.atlassian.net/browse/PROJ-47",
-  "task_bitbucket_url": "https://bitbucket.org/.../task.md",
   "change_summary": "Updated: summary, description, metadata",
   "jira_last_synced_at": "2026-04-28T11:05:33.123+0000",
   "jira_last_body_hash": "f4b2c1d9a0e72b58",
@@ -347,20 +374,20 @@ On error: `{ "error": "<message>" }` and a non-zero exit code.
 
 ## Error Handling
 
-| Error | Resolution |
-|---|---|
-| Missing env vars (live) | Add to `.env` and retry |
-| Missing env vars (dry-run) | Warning only — preview proceeds |
-| Bitbucket URL not detected | Set `BITBUCKET_REPO_URL`; link omitted but sync continues |
-| File not found | Verify task file path |
-| `401 Unauthorized` | Verify `JIRA_USER_EMAIL` and `JIRA_API_TOKEN` |
-| `403 Forbidden` | Token lacks permission for issue/project |
-| `404 Not Found` | Issue key in `jira_key` does not exist (or no view permission) |
-| Concurrent-edit guard tripped | Pull manual Jira edits into the markdown, or pass `--force` |
-| Task issue type not found | Throws — verify `Task` is enabled for project |
-| Backlog move failed (Kanban) | Warning only — task still created |
-| 5xx / network error | Retried twice with backoff before failing |
-| Status transition unavailable | Warning only — sync still succeeds |
+| Error                         | Resolution                                                     |
+| ----------------------------- | -------------------------------------------------------------- |
+| Missing env vars (live)       | Add to `.env` and retry                                        |
+| Missing env vars (dry-run)    | Warning only — preview proceeds                                |
+| Bitbucket URL not detected    | Set `BITBUCKET_REPO_URL`; link omitted but sync continues      |
+| File not found                | Verify task file path                                          |
+| `401 Unauthorized`            | Verify `JIRA_USER_EMAIL` and `JIRA_API_TOKEN`                  |
+| `403 Forbidden`               | Token lacks permission for issue/project                       |
+| `404 Not Found`               | Issue key in `jira_key` does not exist (or no view permission) |
+| Concurrent-edit guard tripped | Pull manual Jira edits into the markdown, or pass `--force`    |
+| Task issue type not found     | Throws — verify `Task` is enabled for project                  |
+| Backlog move failed (Kanban)  | Warning only — task still created                              |
+| 5xx / network error           | Retried twice with backoff before failing                      |
+| Status transition unavailable | Warning only — sync still succeeds                             |
 
 ## Architecture
 

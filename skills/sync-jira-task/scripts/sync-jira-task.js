@@ -44,7 +44,13 @@ const CL = require("../references/change-log.js");
 const TASK_CARD_SECTIONS = [
   { heading: "Summary", names: ["Overview"] },
   { heading: "Success Criteria", names: ["Success Criteria"] },
-  { heading: "Breaking Changes", names: ["Breaking Changes"], maxItems: 3, maxSentences: 2, optional: true },
+  {
+    heading: "Breaking Changes",
+    names: ["Breaking Changes"],
+    maxItems: 3,
+    maxSentences: 2,
+    optional: true,
+  },
 ];
 
 const ISSUE_TYPE = "Task";
@@ -53,12 +59,14 @@ const SYNC_LABEL_PREFIX = "synced-from-";
 // Optional Jira custom field id for estimated dev hours (e.g. "Dev Estimate
 // (hour)"). Resolved from JIRA_DEV_ESTIMATE_FIELD env var, else
 // `jira.devEstimateField` in skills-config.yaml. Empty → the field is skipped.
-const DEV_ESTIMATE_FIELD = process.env.JIRA_DEV_ESTIMATE_FIELD || lib.loadDevEstimateField();
+const DEV_ESTIMATE_FIELD =
+  process.env.JIRA_DEV_ESTIMATE_FIELD || lib.loadDevEstimateField();
 
 // Default Jira assignee accountId, from `jira.defaultAssignee` in skills-config.yaml.
 // Frontmatter `assignee` overrides it. Empty -> the field is never sent, which leaves
 // any existing Jira assignee alone rather than clearing it.
-const DEFAULT_ASSIGNEE = process.env.JIRA_DEFAULT_ASSIGNEE || lib.loadDefaultAssignee();
+const DEFAULT_ASSIGNEE =
+  process.env.JIRA_DEFAULT_ASSIGNEE || lib.loadDefaultAssignee();
 
 const TIMETRACKING_ERROR_RE = /timetracking|time tracking|original.?estimate/i;
 
@@ -75,24 +83,34 @@ function formatJiraTimeEstimate(value) {
 // ---------------------------------------------------------------------------
 // Description builder (task-specific)
 // ---------------------------------------------------------------------------
-function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output = null }) {
+function buildDescriptionAdf({
+  body,
+  frontmatter,
+  taskBbUrl,
+  relatedDocLinks,
+  linkResolver,
+  output = null,
+}) {
   const content = [];
 
   // The document's Change Log is deliberately NOT published here. Jira keeps its
   // own issue history, and the local file holds the authoritative log — a third
   // copy on the card added length on every sync and told a reader nothing new.
 
-  content.push(...lib.buildCardSections(body, TASK_CARD_SECTIONS, {
-    sourceUrl: taskBbUrl || null,
-    docLabel: "the task document",
-    linkResolver,
-    output,
-  }));
+  content.push(
+    ...lib.buildCardSections(body, TASK_CARD_SECTIONS, {
+      sourceUrl: taskBbUrl || null,
+      docLabel: "the task document",
+      linkResolver,
+      output,
+    }),
+  );
 
   const meta = [];
-  if (frontmatter.category)               meta.push(`Category: ${frontmatter.category}`);
-  if (frontmatter.estimated_effort_hours) meta.push(`Estimated Hours: ${frontmatter.estimated_effort_hours}`);
-  if (frontmatter.status)                 meta.push(`Status: ${frontmatter.status}`);
+  if (frontmatter.category) meta.push(`Category: ${frontmatter.category}`);
+  if (frontmatter.estimated_effort_hours)
+    meta.push(`Estimated Hours: ${frontmatter.estimated_effort_hours}`);
+  if (frontmatter.status) meta.push(`Status: ${frontmatter.status}`);
   if (meta.length) {
     content.push(lib.adf.heading(3, "Metadata"));
     content.push(lib.adf.paragraph(lib.adf.text(meta.join(" | "))));
@@ -103,17 +121,26 @@ function buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, li
   // — not a block they scroll past before reaching the summary.
   const sourceLinks = [];
   if (taskBbUrl) sourceLinks.push({ label: "Task document", href: taskBbUrl });
-  if (relatedDocLinks && relatedDocLinks.length) sourceLinks.push(...relatedDocLinks);
+  if (relatedDocLinks && relatedDocLinks.length)
+    sourceLinks.push(...relatedDocLinks);
   if (sourceLinks.length) {
     content.push(lib.adf.heading(3, "Source Documents"));
-    content.push(lib.adf.bulletList(...sourceLinks.map(l =>
-      lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))))));
+    content.push(
+      lib.adf.bulletList(
+        ...sourceLinks.map((l) =>
+          lib.adf.listItem(lib.adf.paragraph(lib.adf.link(l.label, l.href))),
+        ),
+      ),
+    );
   }
 
   // Guard Jira's ~32,767-char description limit: over it the PUT is rejected
   // wholesale and the issue silently keeps its previous description. After
   // summarisation this should never fire; it stays as a backstop.
-  return lib.capDescriptionAdf(lib.adf.doc(...content), { sourceUrl: taskBbUrl || null, output });
+  return lib.capDescriptionAdf(lib.adf.doc(...content), {
+    sourceUrl: taskBbUrl || null,
+    output,
+  });
 }
 
 // Hash exactly what gets PUBLISHED, not the raw sections.
@@ -127,7 +154,11 @@ function hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver }) {
     docLabel: "the task document",
     linkResolver,
   });
-  return lib.hashStable({ sections, taskBbUrl, relatedDocLinks: (relatedDocLinks || []).map(l => l.href) });
+  return lib.hashStable({
+    sections,
+    taskBbUrl,
+    relatedDocLinks: (relatedDocLinks || []).map((l) => l.href),
+  });
 }
 
 function hashMeta(frontmatter) {
@@ -155,10 +186,11 @@ function labelForRelatedDoc(filename) {
 function findRelatedDocs(filePath) {
   const dir = path.dirname(filePath);
   const self = path.basename(filePath);
-  return fs.readdirSync(dir)
-    .filter(f => f.toLowerCase().endsWith(".md") && f !== self)
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.toLowerCase().endsWith(".md") && f !== self)
     .sort()
-    .map(f => path.join(dir, f));
+    .map((f) => path.join(dir, f));
 }
 
 // ---------------------------------------------------------------------------
@@ -177,10 +209,15 @@ function syncLabelFor(filePath) {
 // already-correct "[Task N] …" summary is returned unchanged.
 function normaliseTaskSummary(summary, fallbackId) {
   const bracket = summary.match(/^\s*\[Task\s+([\d.]+)\]\s*(.*)$/i);
-  const colon   = summary.match(/^\s*Task\s+([\d.]+)\s*:\s*(.*)$/i);
+  const colon = summary.match(/^\s*Task\s+([\d.]+)\s*:\s*(.*)$/i);
   let taskId = null;
-  if (bracket)    { taskId = bracket[1]; summary = bracket[2].trim(); }
-  else if (colon) { taskId = colon[1];   summary = colon[2].trim(); }
+  if (bracket) {
+    taskId = bracket[1];
+    summary = bracket[2].trim();
+  } else if (colon) {
+    taskId = colon[1];
+    summary = colon[2].trim();
+  }
   taskId = taskId || fallbackId;
   return taskId ? `[Task ${taskId}] ${summary}` : summary;
 }
@@ -188,8 +225,22 @@ function normaliseTaskSummary(summary, fallbackId) {
 // ---------------------------------------------------------------------------
 // Field collection from frontmatter / args
 // ---------------------------------------------------------------------------
-function collectIssueFields({ summary, args, frontmatter, descAdf, taskTypeId, projectKey, livePriorities, output, syncLabel }) {
-  const priority = lib.normalisePriority(args.priority || frontmatter.priority, livePriorities, output);
+function collectIssueFields({
+  summary,
+  args,
+  frontmatter,
+  descAdf,
+  taskTypeId,
+  projectKey,
+  livePriorities,
+  output,
+  syncLabel,
+}) {
+  const priority = lib.normalisePriority(
+    args.priority || frontmatter.priority,
+    livePriorities,
+    output,
+  );
   const labelInput = args.labels || frontmatter.labels;
   const cleanLabels = lib.sanitiseLabels(labelInput) || [];
   if (!cleanLabels.includes(syncLabel)) cleanLabels.push(syncLabel);
@@ -203,20 +254,36 @@ function collectIssueFields({ summary, args, frontmatter, descAdf, taskTypeId, p
   if (projectKey) fields.project = { key: projectKey };
   if (priority) fields.priority = { name: priority };
 
-  const assigneeId = lib.resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE, output);
+  const assigneeId = lib.resolveAssignee(
+    frontmatter.assignee,
+    DEFAULT_ASSIGNEE,
+    output,
+  );
   if (assigneeId) fields.assignee = { accountId: assigneeId };
-  if (frontmatter.due_date)    fields.duedate = String(frontmatter.due_date);
+  if (frontmatter.due_date) fields.duedate = String(frontmatter.due_date);
   if (frontmatter.components) {
-    const comps = Array.isArray(frontmatter.components) ? frontmatter.components : [frontmatter.components];
-    fields.components = comps.filter(Boolean).map(name => ({ name: String(name) }));
+    const comps = Array.isArray(frontmatter.components)
+      ? frontmatter.components
+      : [frontmatter.components];
+    fields.components = comps
+      .filter(Boolean)
+      .map((name) => ({ name: String(name) }));
   }
   if (frontmatter.fix_versions) {
-    const fvs = Array.isArray(frontmatter.fix_versions) ? frontmatter.fix_versions : [frontmatter.fix_versions];
-    fields.fixVersions = fvs.filter(Boolean).map(name => ({ name: String(name) }));
+    const fvs = Array.isArray(frontmatter.fix_versions)
+      ? frontmatter.fix_versions
+      : [frontmatter.fix_versions];
+    fields.fixVersions = fvs
+      .filter(Boolean)
+      .map((name) => ({ name: String(name) }));
   }
 
   const estimate = formatJiraTimeEstimate(frontmatter.estimated_effort_hours);
-  if (estimate) fields.timetracking = { originalEstimate: estimate, remainingEstimate: estimate };
+  if (estimate)
+    fields.timetracking = {
+      originalEstimate: estimate,
+      remainingEstimate: estimate,
+    };
 
   // Mirror the numeric estimate onto a configured custom field (e.g. "Dev
   // Estimate (hour)"). Numeric field → raw number; non-numeric values skipped.
@@ -231,13 +298,33 @@ function collectIssueFields({ summary, args, frontmatter, descAdf, taskTypeId, p
 // ---------------------------------------------------------------------------
 // File write-back
 // ---------------------------------------------------------------------------
-function updateTaskFile({ filePath, issueKey, issueUrl, taskBbUrl, changeLogEntries, lastSyncedAt, bodyHash, metaHash, output }) {
+function updateTaskFile({
+  filePath,
+  issueKey,
+  issueUrl,
+  taskBbUrl,
+  changeLogEntries,
+  lastSyncedAt,
+  bodyHash,
+  metaHash,
+  output,
+}) {
   let content = fs.readFileSync(filePath, "utf-8");
 
+  // `task_bitbucket_url` is deliberately NOT written. It pinned an absolute
+  // Bitbucket URL to whichever branch the sync ran on, and when that branch was
+  // deleted after merge the link died while the file itself was perfectly safe on
+  // the default branch. Nothing validates an absolute URL, so the rot accumulated
+  // silently — measured in one consumer at 879 such frontmatter values across 614
+  // documents. The document links below are relative instead, which the repo's own
+  // link checker validates and which cannot rot; Jira still receives a working
+  // absolute link because `resolveRelativeLink` absolutises at ADF-render time.
+  // Existing keys are left in place rather than stripped — removing a key a
+  // consumer may read (see sync-jira-epic's `prd_source` fallback) is their call,
+  // not this script's.
   content = lib.upsertFrontmatterKeys(content, {
     jira_key: issueKey,
     jira_url: issueUrl,
-    task_bitbucket_url: taskBbUrl || null,
     jira_last_synced_at: lastSyncedAt || null,
     jira_last_body_hash: bodyHash || null,
     jira_last_meta_hash: metaHash || null,
@@ -253,8 +340,19 @@ function updateTaskFile({ filePath, issueKey, issueUrl, taskBbUrl, changeLogEntr
     return text.trimEnd() + "\n\n" + newLine + "\n";
   };
 
-  content = upsertLine(content, /^\*\*Jira Task\*\*:.*$/m, `**Jira Task**: [${issueKey}](${issueUrl})`);
-  if (taskBbUrl) content = upsertLine(content, /^\*\*Task File\*\*:.*$/m, `**Task File**: [View on Bitbucket](${taskBbUrl})`);
+  content = upsertLine(
+    content,
+    /^\*\*Jira Task\*\*:.*$/m,
+    `**Jira Task**: [${issueKey}](${issueUrl})`,
+  );
+  // Relative to the document's own directory, so it is just the filename. Jira
+  // still gets an absolute link: `resolveRelativeLink` rewrites it at render time.
+  const taskFileName = path.basename(filePath);
+  content = upsertLine(
+    content,
+    /^\*\*Task File\*\*:.*$/m,
+    `**Task File**: [${taskFileName}](./${taskFileName})`,
+  );
 
   // A Change Log row is written for exactly two events — issue created, and
   // status transition. A body, summary or label update writes none: Jira keeps a
@@ -280,29 +378,68 @@ function updateTaskFile({ filePath, issueKey, issueUrl, taskBbUrl, changeLogEntr
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
-    file: null, summary: null, priority: null, labels: null, docBranch: null,
-    checkCard: false, dryRun: false, force: false, json: false, quiet: false,
+    file: null,
+    summary: null,
+    priority: null,
+    labels: null,
+    docBranch: null,
+    checkCard: false,
+    dryRun: false,
+    force: false,
+    json: false,
+    quiet: false,
     failOnStatusSkip: false,
     probeWorkflow: false,
     writeRecord: "",
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
-      case "--file":     case "-f": opts.file     = args[++i]; break;
-      case "--summary":  case "-s": opts.summary  = args[++i]; break;
-      case "--priority": case "-p": opts.priority = args[++i]; break;
-      case "--labels":   case "-l": opts.labels   = args[++i]; break;
-      case "--doc-branch": opts.docBranch = args[++i]; break;
-      case "--check-card": opts.checkCard = true; break;
-      case "--dry-run":  opts.dryRun = true; break;
-      case "--force":    opts.force  = true; break;
-      case "--json":     opts.json   = true; break;
-      case "--quiet":    opts.quiet  = true; break;
-      case "--fail-on-status-skip": opts.failOnStatusSkip = true; break;
-      case "--probe-workflow":      opts.probeWorkflow    = true; break;
-      case "--write-record": opts.writeRecord = args[++i]; break;
+      case "--file":
+      case "-f":
+        opts.file = args[++i];
+        break;
+      case "--summary":
+      case "-s":
+        opts.summary = args[++i];
+        break;
+      case "--priority":
+      case "-p":
+        opts.priority = args[++i];
+        break;
+      case "--labels":
+      case "-l":
+        opts.labels = args[++i];
+        break;
+      case "--doc-branch":
+        opts.docBranch = args[++i];
+        break;
+      case "--check-card":
+        opts.checkCard = true;
+        break;
+      case "--dry-run":
+        opts.dryRun = true;
+        break;
+      case "--force":
+        opts.force = true;
+        break;
+      case "--json":
+        opts.json = true;
+        break;
+      case "--quiet":
+        opts.quiet = true;
+        break;
+      case "--fail-on-status-skip":
+        opts.failOnStatusSkip = true;
+        break;
+      case "--probe-workflow":
+        opts.probeWorkflow = true;
+        break;
+      case "--write-record":
+        opts.writeRecord = args[++i];
+        break;
       default:
-        if (args[i].startsWith("-")) throw new Error(`Unknown option: ${args[i]}`);
+        if (args[i].startsWith("-"))
+          throw new Error(`Unknown option: ${args[i]}`);
     }
   }
   return opts;
@@ -311,7 +448,10 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 // Run (testable; takes injectable fetch)
 // ---------------------------------------------------------------------------
-async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefined" ? fetch : null) } = {}) {
+async function run({
+  argv = process.argv,
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null,
+} = {}) {
   lib.loadDotEnv();
   const args = parseArgs(argv);
   const output = lib.makeOutput({ json: args.json, quiet: args.quiet });
@@ -319,20 +459,32 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   if (args.probeWorkflow) {
     const auth = lib.getAuth();
     if (!auth.ok) {
-      output.err(`Error: Missing required environment variables: ${auth.missing.join(", ")}`);
+      output.err(
+        `Error: Missing required environment variables: ${auth.missing.join(", ")}`,
+      );
       return { exitCode: 1 };
     }
-    const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
+    const http = lib.makeHttp({
+      fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+    });
     await lib.probeWorkflow({
-      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      projectKey: auth.project, docKind: "task", writePath: args.writeRecord, output,
+      http,
+      baseUrl: auth.baseUrl,
+      email: auth.email,
+      token: auth.token,
+      projectKey: auth.project,
+      docKind: "task",
+      writePath: args.writeRecord,
+      output,
     });
     return { exitCode: 0 };
   }
 
   if (!args.file) {
     output.err("Error: --file is required");
-    output.err("Usage: sync-jira-task --file <task.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet]");
+    output.err(
+      "Usage: sync-jira-task --file <task.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet]",
+    );
     return { exitCode: 1 };
   }
   const filePath = path.resolve(args.file);
@@ -345,12 +497,18 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   // auth, no network, no writes — a review-time gate, not a sync mode.
   if (args.checkCard) {
     const { body } = lib.parseFrontmatter(fs.readFileSync(filePath, "utf8"));
-    const check = lib.checkCardSections(body, TASK_CARD_SECTIONS, { docLabel: "the task document" });
+    const check = lib.checkCardSections(body, TASK_CARD_SECTIONS, {
+      docLabel: "the task document",
+    });
 
     if (args.json) {
       output.emit({ action: "check-card", file: filePath, ...check });
     } else {
-      output.info(lib.formatCardCheck(check, { title: `Card preflight — ${path.basename(filePath)}` }));
+      output.info(
+        lib.formatCardCheck(check, {
+          title: `Card preflight — ${path.basename(filePath)}`,
+        }),
+      );
     }
     return { exitCode: check.findings.length ? 1 : 0 };
   }
@@ -358,23 +516,42 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const auth = lib.getAuth();
   if (!auth.ok) {
     if (args.dryRun) {
-      output.warn(`⚠️  Dry-run: missing env vars (${auth.missing.join(", ")}) — values will be required for live sync.`);
+      output.warn(
+        `⚠️  Dry-run: missing env vars (${auth.missing.join(", ")}) — values will be required for live sync.`,
+      );
     } else {
-      output.err(`Error: Missing required environment variables: ${auth.missing.join(", ")}`);
-      output.err("Set: JIRA_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL, JIRA_PROJECT_KEY (and JIRA_BOARD_ID for backlog).");
+      output.err(
+        `Error: Missing required environment variables: ${auth.missing.join(", ")}`,
+      );
+      output.err(
+        "Set: JIRA_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL, JIRA_PROJECT_KEY (and JIRA_BOARD_ID for backlog).",
+      );
       return { exitCode: 1 };
     }
   }
-  if (!auth.boardId) output.warn("⚠️  JIRA_BOARD_ID not set — task created but not moved to backlog.");
+  if (!auth.boardId)
+    output.warn(
+      "⚠️  JIRA_BOARD_ID not set — task created but not moved to backlog.",
+    );
 
   const repoRoot = lib.getRepoRoot();
   const bbBase = lib.getBitbucketRepoBase();
-  if (!bbBase) output.warn("⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.");
-  const branch = bbBase ? (lib.resolveDocBranch(args.docBranch)) : null;
-  const taskBbUrl = bbBase ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch) : null;
-  const linkResolver = lib.makeRelativeLinkResolver({ filePath, repoRoot, bbBase, branch });
+  if (!bbBase)
+    output.warn(
+      "⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.",
+    );
+  const branch = bbBase ? lib.resolveDocBranch(args.docBranch) : null;
+  const taskBbUrl = bbBase
+    ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch)
+    : null;
+  const linkResolver = lib.makeRelativeLinkResolver({
+    filePath,
+    repoRoot,
+    bbBase,
+    branch,
+  });
   const relatedDocLinks = bbBase
-    ? findRelatedDocs(filePath).map(p => ({
+    ? findRelatedDocs(filePath).map((p) => ({
         label: labelForRelatedDoc(path.basename(p)),
         href: lib.buildBitbucketUrl(p, repoRoot, bbBase, branch),
       }))
@@ -383,21 +560,43 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   const content = fs.readFileSync(filePath, "utf-8");
   const { frontmatter, body } = lib.parseFrontmatter(content);
 
-  let summary = args.summary || frontmatter.summary || frontmatter.title || body.match(/^# (.+)$/m)?.[1];
+  let summary =
+    args.summary ||
+    frontmatter.summary ||
+    frontmatter.title ||
+    body.match(/^# (.+)$/m)?.[1];
   if (!summary) {
-    output.err("Error: Could not determine summary (set frontmatter title or # heading).");
+    output.err(
+      "Error: Could not determine summary (set frontmatter title or # heading).",
+    );
     return { exitCode: 1 };
   }
   // Normalise to the canonical "[Task N] {title}" bracket form (see helper).
-  summary = normaliseTaskSummary(summary, path.basename(filePath).match(/^task\.([\d.]+)\./i)?.[1]);
+  summary = normaliseTaskSummary(
+    summary,
+    path.basename(filePath).match(/^task\.([\d.]+)\./i)?.[1],
+  );
 
-  const http = lib.makeHttp({ fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null) });
-  const livePriorities = (auth.ok && !args.dryRun)
-    ? await lib.resolveLivePriorities({ http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token })
-    : null;
+  const http = lib.makeHttp({
+    fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+  });
+  const livePriorities =
+    auth.ok && !args.dryRun
+      ? await lib.resolveLivePriorities({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+        })
+      : null;
 
   const syncLabel = syncLabelFor(filePath);
-  const newBodyHash = hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver });
+  const newBodyHash = hashBody({
+    body,
+    taskBbUrl,
+    relatedDocLinks,
+    linkResolver,
+  });
   const newMetaHash = hashMeta(frontmatter);
 
   let existingJiraKey = frontmatter.jira_key;
@@ -405,63 +604,112 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   // Pre-flight idempotency check (only if creating)
   if (!existingJiraKey && auth.ok && !args.dryRun) {
     const found = await lib.findExistingByLabel({
-      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      projectKey: auth.project, label: syncLabel,
+      http,
+      baseUrl: auth.baseUrl,
+      email: auth.email,
+      token: auth.token,
+      projectKey: auth.project,
+      label: syncLabel,
     });
     if (found) {
-      output.warn(`ℹ️  Found existing issue ${found.key} with label "${syncLabel}" — switching to update.`);
+      output.warn(
+        `ℹ️  Found existing issue ${found.key} with label "${syncLabel}" — switching to update.`,
+      );
       existingJiraKey = found.key;
     }
   }
 
   const isUpdate = !!existingJiraKey;
-  output.info(`\n${isUpdate ? "🔄 Updating" : "➕ Creating"} Jira task${isUpdate ? ` ${existingJiraKey}` : ""}…`);
+  output.info(
+    `\n${isUpdate ? "🔄 Updating" : "➕ Creating"} Jira task${isUpdate ? ` ${existingJiraKey}` : ""}…`,
+  );
   output.info(`   File:       ${filePath}`);
   output.info(`   Standalone: yes (no parent epic)`);
-  if (args.dryRun) output.info("   Mode:       DRY RUN — no Jira calls or file writes");
-  if (args.force)  output.info("   Mode:       --force — concurrent-edit guard disabled");
+  if (args.dryRun)
+    output.info("   Mode:       DRY RUN — no Jira calls or file writes");
+  if (args.force)
+    output.info("   Mode:       --force — concurrent-edit guard disabled");
 
-  let result, changeSummary, current = null;
+  let result,
+    changeSummary,
+    current = null;
 
   if (isUpdate) {
     if (!args.dryRun) {
       current = await lib.fetchIssue({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey: existingJiraKey,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: existingJiraKey,
       });
       lib.guardConcurrentEdit({
         jiraUpdated: current.updated,
         lastSyncedAt: frontmatter.jira_last_synced_at,
-        force: args.force, output,
+        force: args.force,
+        output,
       });
     }
 
     const changedFields = current
       ? lib.diffFields({
           prev: current,
-          next: { summary, priority: lib.normalisePriority(args.priority || frontmatter.priority, livePriorities), labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [] },
+          next: {
+            summary,
+            priority: lib.normalisePriority(
+              args.priority || frontmatter.priority,
+              livePriorities,
+            ),
+            labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [],
+          },
           prevBodyHash: frontmatter.jira_last_body_hash,
           newBodyHash,
           prevMetaHash: frontmatter.jira_last_meta_hash,
           newMetaHash,
         })
       : ["summary", "description", "priority", "labels"];
-    changeSummary = changedFields.length ? `Updated: ${changedFields.join(", ")}` : "Sync (no field changes detected)";
+    changeSummary = changedFields.length
+      ? `Updated: ${changedFields.join(", ")}`
+      : "Sync (no field changes detected)";
 
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output });
+    const descAdf = buildDescriptionAdf({
+      body,
+      frontmatter,
+      taskBbUrl,
+      relatedDocLinks,
+      linkResolver,
+      output,
+    });
     const fields = collectIssueFields({
-      summary, args, frontmatter, descAdf, taskTypeId: null, projectKey: null, livePriorities, output, syncLabel,
+      summary,
+      args,
+      frontmatter,
+      descAdf,
+      taskTypeId: null,
+      projectKey: null,
+      livePriorities,
+      output,
+      syncLabel,
     });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would UPDATE ${existingJiraKey} ===`);
       output.info(`  Changes: ${changeSummary}`);
-      result = { issueKey: existingJiraKey, issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`, updated: null };
+      result = {
+        issueKey: existingJiraKey,
+        issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+        updated: null,
+      };
     } else {
       let putResp;
       try {
         putResp = await lib.putIssueAtomic({
-          http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-          issueKey: existingJiraKey, fields,
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey: existingJiraKey,
+          fields,
         });
       } catch (e) {
         // Strip whichever optional field Jira rejected, then retry once. A
@@ -470,25 +718,43 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         const stripped = { ...fields };
         let retry = false;
         if (stripped.timetracking && TIMETRACKING_ERROR_RE.test(msg)) {
-          output.warn(`⚠️  Jira rejected timetracking field on update — retrying without estimate.`);
+          output.warn(
+            `⚠️  Jira rejected timetracking field on update — retrying without estimate.`,
+          );
           delete stripped.timetracking;
           retry = true;
         }
-        if (DEV_ESTIMATE_FIELD && stripped[DEV_ESTIMATE_FIELD] !== undefined && msg.includes(DEV_ESTIMATE_FIELD)) {
-          output.warn(`⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} on update — retrying without the dev-estimate field.`);
+        if (
+          DEV_ESTIMATE_FIELD &&
+          stripped[DEV_ESTIMATE_FIELD] !== undefined &&
+          msg.includes(DEV_ESTIMATE_FIELD)
+        ) {
+          output.warn(
+            `⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} on update — retrying without the dev-estimate field.`,
+          );
           delete stripped[DEV_ESTIMATE_FIELD];
           retry = true;
         }
         if (!retry) throw e;
         putResp = await lib.putIssueAtomic({
-          http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-          issueKey: existingJiraKey, fields: stripped,
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey: existingJiraKey,
+          fields: stripped,
         });
       }
       const { updated } = putResp;
-      const finalUpdated = updated || await lib.fetchUpdatedTimestampStrict({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey: existingJiraKey,
-      });
+      const finalUpdated =
+        updated ||
+        (await lib.fetchUpdatedTimestampStrict({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey: existingJiraKey,
+        }));
       result = {
         issueKey: existingJiraKey,
         issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
@@ -500,7 +766,14 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
     }
   } else {
     changeSummary = "Initial Jira task created";
-    const descAdf = buildDescriptionAdf({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver, output });
+    const descAdf = buildDescriptionAdf({
+      body,
+      frontmatter,
+      taskBbUrl,
+      relatedDocLinks,
+      linkResolver,
+      output,
+    });
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would CREATE Jira task ===`);
@@ -510,11 +783,24 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       result = { issueKey: null, issueUrl: null, updated: null };
     } else {
       const taskTypeId = await lib.getIssueTypeId({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-        projectKey: auth.project, typeName: ISSUE_TYPE, repoRoot,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        projectKey: auth.project,
+        typeName: ISSUE_TYPE,
+        repoRoot,
       });
       const fields = collectIssueFields({
-        summary, args, frontmatter, descAdf, taskTypeId, projectKey: auth.project, livePriorities, output, syncLabel,
+        summary,
+        args,
+        frontmatter,
+        descAdf,
+        taskTypeId,
+        projectKey: auth.project,
+        livePriorities,
+        output,
+        syncLabel,
       });
 
       const postHeaders = {
@@ -522,9 +808,12 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         "Content-Type": "application/json",
         Accept: "application/json",
       };
-      const postCreate = (f) => http(`${auth.baseUrl}/rest/api/3/issue`, {
-        method: "POST", headers: postHeaders, body: JSON.stringify({ fields: f }),
-      });
+      const postCreate = (f) =>
+        http(`${auth.baseUrl}/rest/api/3/issue`, {
+          method: "POST",
+          headers: postHeaders,
+          body: JSON.stringify({ fields: f }),
+        });
       let resp = await postCreate(fields);
       if (!resp.ok && resp.status === 400) {
         // Strip whichever optional field Jira rejected and retry. `current`
@@ -532,14 +821,23 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         let current = fields;
         let errText = await lib.parseJiraError(resp);
         if (current.timetracking && TIMETRACKING_ERROR_RE.test(errText)) {
-          output.warn(`⚠️  Jira rejected timetracking field — retrying create without estimate.`);
+          output.warn(
+            `⚠️  Jira rejected timetracking field — retrying create without estimate.`,
+          );
           current = { ...current };
           delete current.timetracking;
           resp = await postCreate(current);
           if (!resp.ok) errText = await lib.parseJiraError(resp);
         }
-        if (!resp.ok && DEV_ESTIMATE_FIELD && current[DEV_ESTIMATE_FIELD] !== undefined && errText.includes(DEV_ESTIMATE_FIELD)) {
-          output.warn(`⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} — retrying create without the dev-estimate field.`);
+        if (
+          !resp.ok &&
+          DEV_ESTIMATE_FIELD &&
+          current[DEV_ESTIMATE_FIELD] !== undefined &&
+          errText.includes(DEV_ESTIMATE_FIELD)
+        ) {
+          output.warn(
+            `⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} — retrying create without the dev-estimate field.`,
+          );
           current = { ...current };
           delete current[DEV_ESTIMATE_FIELD];
           resp = await postCreate(current);
@@ -547,12 +845,19 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${errText}`);
       }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`);
+      if (!resp.ok)
+        throw new Error(
+          `HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`,
+        );
       const created = await resp.json();
       const issueKey = created.key;
       const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
       const updated = await lib.fetchUpdatedTimestampStrict({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token, issueKey,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey,
       });
       result = { issueKey, issueUrl, updated };
       output.info(`\n✅ Task created: ${issueKey}`);
@@ -560,8 +865,13 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
       output.info(`   Standalone (no parent epic)`);
 
       await lib.moveToBacklog({
-        http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-        boardId: auth.boardId, issueKey, output,
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        boardId: auth.boardId,
+        issueKey,
+        output,
       });
     }
   }
@@ -570,9 +880,15 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   let statusOutcome = null;
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
     statusOutcome = await lib.syncDocumentStatus({
-      http, baseUrl: auth.baseUrl, email: auth.email, token: auth.token,
-      issueKey: result.issueKey, localStatus: frontmatter.status,
-      currentStatus: current?.status || null, docKind: "task", output,
+      http,
+      baseUrl: auth.baseUrl,
+      email: auth.email,
+      token: auth.token,
+      issueKey: result.issueKey,
+      localStatus: frontmatter.status,
+      currentStatus: current?.status || null,
+      docKind: "task",
+      output,
     });
   }
 
@@ -613,21 +929,34 @@ async function run({ argv = process.argv, fetchImpl = (typeof fetch !== "undefin
   }
 
   const statusExit = lib.summariseStatusOutcome(statusOutcome, {
-    output, failOnSkip: args.failOnStatusSkip,
+    output,
+    failOnSkip: args.failOnStatusSkip,
   });
 
-  return { exitCode: statusExit, result, changeSummary, isUpdate, taskBbUrl, statusOutcome };
+  return {
+    exitCode: statusExit,
+    result,
+    changeSummary,
+    isUpdate,
+    taskBbUrl,
+    statusOutcome,
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Entry / exports
 // ---------------------------------------------------------------------------
 if (require.main === module) {
-  run().then(r => process.exit(r.exitCode || 0)).catch(e => {
-    if (process.argv.includes("--json")) process.stdout.write(JSON.stringify({ error: e.message }, null, 2) + "\n");
-    else console.error("Unexpected error:", e.message || e);
-    process.exit(1);
-  });
+  run()
+    .then((r) => process.exit(r.exitCode || 0))
+    .catch((e) => {
+      if (process.argv.includes("--json"))
+        process.stdout.write(
+          JSON.stringify({ error: e.message }, null, 2) + "\n",
+        );
+      else console.error("Unexpected error:", e.message || e);
+      process.exit(1);
+    });
 } else {
   module.exports = {
     run,
@@ -642,43 +971,49 @@ if (require.main === module) {
     loadDevEstimateField: lib.loadDevEstimateField,
     parseJiraScalar: lib.parseJiraScalar,
     collectIssueFields,
+    updateTaskFile,
     findRelatedDocs,
     labelForRelatedDoc,
     TASK_CARD_SECTIONS,
     STATUS_MAP: lib.DEFAULT_STATUS_MAP,
     // Re-export lib pieces used by existing tests
-    parseFrontmatter:        lib.parseFrontmatter,
-    rewriteFrontmatter:      lib.rewriteFrontmatter,
-    upsertFrontmatterKeys:   lib.upsertFrontmatterKeys,
+    parseFrontmatter: lib.parseFrontmatter,
+    rewriteFrontmatter: lib.rewriteFrontmatter,
+    upsertFrontmatterKeys: lib.upsertFrontmatterKeys,
     // Change Log: policy from jira-sync, mechanics straight from the engine.
-    buildChangeLogEntries:   lib.buildChangeLogEntries,
-    upsertChangeLog:         CL.upsertChangeLog,
-    extractEntries:          CL.extractEntries,
-    findChangeLog:           CL.findChangeLog,
-    buildChangeLogBlock:     CL.buildChangeLogBlock,
-    fmtEntry:                CL.fmtEntry,
-    isEntryRow:              CL.isEntryRow,
-    diffFields:              lib.diffFields,
-    normalisePriority:       lib.normalisePriority,
-    sanitiseLabels:          lib.sanitiseLabels,
-    textToParagraphs:        lib.textToAdfNodes,
-    textToAdfNodes:          lib.textToAdfNodes,
-    blockToAdf:              lib.blockToAdf,
-    guardConcurrentEdit:     lib.guardConcurrentEdit,
-    parseJiraError:          lib.parseJiraError,
-    hashStable:              lib.hashStable,
-    hashDescriptionInput:    ({ body, frontmatter, taskBbUrl, relatedDocLinks, linkResolver }) =>
-                               hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver }),
-    stripRemotePrefix:       lib.stripRemotePrefix,
-    resolveRelativeLink:      lib.resolveRelativeLink,
+    buildChangeLogEntries: lib.buildChangeLogEntries,
+    upsertChangeLog: CL.upsertChangeLog,
+    extractEntries: CL.extractEntries,
+    findChangeLog: CL.findChangeLog,
+    buildChangeLogBlock: CL.buildChangeLogBlock,
+    fmtEntry: CL.fmtEntry,
+    isEntryRow: CL.isEntryRow,
+    diffFields: lib.diffFields,
+    normalisePriority: lib.normalisePriority,
+    sanitiseLabels: lib.sanitiseLabels,
+    textToParagraphs: lib.textToAdfNodes,
+    textToAdfNodes: lib.textToAdfNodes,
+    blockToAdf: lib.blockToAdf,
+    guardConcurrentEdit: lib.guardConcurrentEdit,
+    parseJiraError: lib.parseJiraError,
+    hashStable: lib.hashStable,
+    hashDescriptionInput: ({
+      body,
+      frontmatter,
+      taskBbUrl,
+      relatedDocLinks,
+      linkResolver,
+    }) => hashBody({ body, taskBbUrl, relatedDocLinks, linkResolver }),
+    stripRemotePrefix: lib.stripRemotePrefix,
+    resolveRelativeLink: lib.resolveRelativeLink,
     makeRelativeLinkResolver: lib.makeRelativeLinkResolver,
     getCurrentBranchUpstream: lib.getCurrentBranchUpstream,
-    getDefaultBranch:        lib.getDefaultBranch,
-    gitDefaultBranch:        lib.gitDefaultBranch,
-    resolveDocBranch:        lib.resolveDocBranch,
-    loadDocBranchSetting:        lib.loadDocBranchSetting,
-    parseTopLevelScalar:        lib.parseTopLevelScalar,
-    CL_START:                CL.CL_START,
-    CL_END:                  CL.CL_END,
+    getDefaultBranch: lib.getDefaultBranch,
+    gitDefaultBranch: lib.gitDefaultBranch,
+    resolveDocBranch: lib.resolveDocBranch,
+    loadDocBranchSetting: lib.loadDocBranchSetting,
+    parseTopLevelScalar: lib.parseTopLevelScalar,
+    CL_START: CL.CL_START,
+    CL_END: CL.CL_END,
   };
 }

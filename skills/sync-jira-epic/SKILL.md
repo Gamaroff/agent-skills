@@ -148,7 +148,7 @@ Flow:
 10. **No-change fast path:** on update, if no fields changed, skip the PUT. The status transition still runs on this path — an epic whose frontmatter status moved while its card body did not must still reach the board, and a transition here is the one thing that earns a Change Log row. If nothing transitioned either, the run writes no row and no file at all. Use `--force` to push the PUT anyway.
 11. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning.
 12. If frontmatter `status` differs from current Jira status, fetch transitions and POST a status transition.
-13. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `prd_bitbucket_url`, `epic_bitbucket_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Epic**` / `**Parent PRD**` / `**Epic File**` links. Append a Change Log row only for issue creation or a status transition — never for a body update.
+13. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Epic**` / `**Parent PRD**` / `**Epic File**` links — the document links are **relative**, not absolute Bitbucket URLs. `epic_bitbucket_url` / `prd_bitbucket_url` are no longer written; `prd_bitbucket_url` is still READ as the `prd_source` fallback in step 3. Append a Change Log row only for issue creation or a status transition — never for a body update.
 
 ### 4. Report to User
 
@@ -158,7 +158,7 @@ Flow:
 - ✅ Status transition (if applicable)
 - ✅ Change log entry appended
 - ✅ Epic frontmatter updated (incl. `jira_last_synced_at` + body/meta hashes)
-- 📌 Story reminder: `jira_epic` + `epic_bitbucket_url` to copy into stories
+- 📌 Story reminder: `jira_epic` to copy into stories
 
 ### 5. Regenerate the PRD Epic Index
 
@@ -286,8 +286,6 @@ After sync the script writes (in-place, preserving order):
 ```yaml
 jira_key: "PROJ-14"
 jira_url: "https://yourorg.atlassian.net/browse/PROJ-14"
-epic_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prd/.../epic.N.name.md"
-prd_bitbucket_url: "https://bitbucket.org/org/repo/src/main/docs/prd/.../prd.<feature>.md"
 jira_last_synced_at: "2026-04-28T11:05:33.123+0000"
 jira_last_body_hash: "f4b2c1d9a0e72b58"
 jira_last_meta_hash: "a91c0aef33eb1d04"
@@ -342,8 +340,6 @@ guidance, not information for a card reader.
   "file": "/abs/path/epic.md",
   "jira_key": "PROJ-14",
   "jira_url": "https://yourorg.atlassian.net/browse/PROJ-14",
-  "epic_bitbucket_url": "https://bitbucket.org/.../epic.md",
-  "prd_bitbucket_url": "https://bitbucket.org/.../prd.md",
   "change_summary": "Updated: summary, description",
   "jira_last_synced_at": "2026-04-28T11:05:33.123+0000",
   "jira_last_body_hash": "f4b2c1d9a0e72b58",

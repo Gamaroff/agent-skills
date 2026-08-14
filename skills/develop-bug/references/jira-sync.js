@@ -373,6 +373,23 @@ function getBitbucketRepoBase() {
   return null;
 }
 
+// A repo-relative markdown href from one document to another — the local-file
+// counterpart of `buildBitbucketUrl`.
+//
+// Absolute Bitbucket URLs name a branch, so they die when that branch is deleted
+// and nothing in a repo validates them. A relative href is validated by any
+// ordinary link checker and cannot rot. Jira loses nothing: `resolveRelativeLink`
+// turns these back into absolute URLs when the description is rendered.
+//
+// Always POSIX separators (markdown, not a filesystem path), and always explicitly
+// prefixed — a bare `task.62.md` is a valid relative link but reads like a word,
+// and `./task.62.md` does not.
+function toRelativeDocLink(fromFile, toFile) {
+  const rel = path.relative(path.dirname(fromFile), toFile).replace(/\\/g, "/");
+  if (!rel) return "./" + path.basename(toFile);
+  return rel.startsWith(".") ? rel : "./" + rel;
+}
+
 function buildBitbucketUrl(absPath, repoRoot, bbBase, branch) {
   const rel = path.relative(repoRoot, absPath).replace(/\\/g, "/");
   const ref = branch || "HEAD";
@@ -450,7 +467,14 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * @param {string}  [o.date]          ISO date; defaults to today
  * @returns {Array<{date, description, author}>} zero, one or two entries
  */
-function buildChangeLogEntries({ created, issueKey, statusOutcome, author, docNoun, date }) {
+function buildChangeLogEntries({
+  created,
+  issueKey,
+  statusOutcome,
+  author,
+  docNoun,
+  date,
+}) {
   const day = date || new Date().toISOString().slice(0, 10);
   const entries = [];
 
@@ -755,9 +779,9 @@ function extractBodySections(body, sectionNames, output = null) {
     const alts = Array.isArray(entry) ? entry : [entry];
     let hit = null;
     for (const alt of alts) {
-      const m = body.match(sectionRe(alt));
-      if (m && m[1].trim()) {
-        hit = m[1].trim();
+      const content = extractSection(body, alt);
+      if (content && content.trim()) {
+        hit = content.trim();
         break;
       }
     }
@@ -889,12 +913,103 @@ const CARD_MAX_CHARS = 600;
 const RE_SUBHEADING = /^#{3,6}\s+/;
 const RE_FENCE = /^\s*(```|~~~)/;
 
+// Fence-aware section extraction — the function `extractBodySections` and
+// `sync-jira-epic`'s `extractStoriesTable` actually use. Those were the last two
+// callers to match `sectionRe` for extraction, so it is now exported for its
+// tests alone: they pin its shape (notably the absence of an `m` flag) because
+// it is still the reference for what a section heading looks like, and any
+// future extractor must agree with it on everything except fences.
+//
+// A regular expression cannot know whether the `# ` it matched sits inside a
+// fenced code block, and `sectionRe`'s lookahead `(?=\n## |\n# |$)` ends a section
+// at the first line beginning `# `.
+//
+// So a shell comment inside a ```bash block silently TERMINATED the section: every
+// heading and paragraph after it was dropped from the Jira description, with no
+// warning on stderr and nothing in the output to show content had gone missing.
+// Invisible from both ends — the document looked complete, the description looked
+// deliberate. Measured on one card: a Technical Background section cut from 13,965
+// characters to 2,283, discarding a dependency table and an entire open-questions
+// block. The workaround in the wild is indenting the comment two spaces so it no
+// longer starts at column 0, which is a thing authors must remember forever.
+//
+// The symptom is also indistinguishable from `CONTENT_LIMIT_EXCEEDED` truncation,
+// so the first instinct is to blame document size and start deleting prose.
+//
+// Walking lines costs one pass and removes the whole class of problem.
+//
+// Returns the section's raw content, or null when the heading is not present.
+// Callers `.trim()`. An unterminated fence is treated as running to end-of-body,
+// which matches how every markdown renderer handles it.
+// Track fences by CommonMark's rules rather than "a line starting with three
+// backticks". Returns a predicate: true when the line is a fence delimiter or
+// sits inside a fenced block, and so must not be read as markdown structure.
+//
+// Toggling on any ``` run is not good enough, and a real card proved it. A doc
+// explaining fences wrote ```` ``` ```` — four backticks wrapping three, the
+// normal way to show a fence inside prose. Naive toggling opened a block there
+// and every later fence flipped the parity, so the second half of the document
+// looked permanently "inside a fence" and its headings became invisible. The
+// card then published with sections missing — the same silent-truncation failure
+// this function exists to remove, arriving from the other direction.
+//
+// The three rules that matter:
+//   - a backtick fence's info string may NOT contain a backtick, which is exactly
+//     what makes ```` ``` ```` an inline code span and not an opening fence;
+//   - a closing fence must use the same character and a run at least as long as
+//     the opening one, so ``` inside a ```` block is content;
+//   - a closing fence takes no info string.
+//
+// Indentation is capped at 3 spaces, per CommonMark. Anything more deeply
+// indented is an indented code block — and cannot be mistaken for a heading
+// anyway, since the heading test below anchors on column 0.
+function makeFenceTracker() {
+  let open = null; // { char, len }
+  return function isFenceLine(line) {
+    const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!m) return open !== null;
+    const char = m[1][0];
+    const len = m[1].length;
+    const info = m[2];
+
+    if (open === null) {
+      if (char === "`" && info.includes("`")) return false; // an inline code span
+      open = { char, len };
+      return true;
+    }
+    if (char === open.char && len >= open.len && info.trim() === "") {
+      open = null;
+      return true;
+    }
+    return true; // a fence-looking line inside a block is just content
+  };
+}
+
+function extractSection(body, name) {
+  const lines = String(body ?? "").split("\n");
+  const heading = new RegExp(`^## (?:\\d+[.)]\\s*)?${escapeRe(name)}[ \\t]*$`);
+  const isFenceLine = makeFenceTracker();
+  let start = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (isFenceLine(line)) continue; // a '#' inside a fence is code, not a heading
+    if (start === -1) {
+      if (heading.test(line)) start = i + 1;
+    } else if (line.startsWith("## ") || line.startsWith("# ")) {
+      return lines.slice(start, i).join("\n");
+    }
+  }
+  return start === -1 ? null : lines.slice(start).join("\n");
+}
+
 // Split prose into sentences without a full parser.
 //
 // Terminator followed by whitespace + an uppercase-ish opener. The negative
 // lookbehind list covers the abbreviations that actually show up in these
 // documents; a missed split yields a slightly longer summary, never a wrong one.
-const RE_ABBREV = /(?:\b(?:e\.g|i\.e|etc|vs|approx|Dr|Mr|Ms|Mrs|St|No|Fig|cf)\.)$/i;
+const RE_ABBREV =
+  /(?:\b(?:e\.g|i\.e|etc|vs|approx|Dr|Mr|Ms|Mrs|St|No|Fig|cf)\.)$/i;
 
 function splitSentences(text) {
   const out = [];
@@ -981,10 +1096,8 @@ function isListSection(lines) {
  * read the whole thing, which is worse than any amount of verbosity.
  */
 function summariseSection(content, opts = {}) {
-  const {
-    maxItems = CARD_MAX_LIST_ITEMS,
-    maxSentences = CARD_MAX_SENTENCES,
-  } = opts;
+  const { maxItems = CARD_MAX_LIST_ITEMS, maxSentences = CARD_MAX_SENTENCES } =
+    opts;
   const raw = String(content || "").trim();
   if (!raw) return { text: "", omitted: 0, kind: "empty" };
 
@@ -1055,7 +1168,8 @@ function summariseSection(content, opts = {}) {
   if (text.length > CARD_MAX_CHARS) {
     const cut = text.slice(0, CARD_MAX_CHARS);
     const brk = cut.lastIndexOf(" ");
-    text = (brk > CARD_MAX_CHARS * 0.6 ? cut.slice(0, brk) : cut).trimEnd() + "…";
+    text =
+      (brk > CARD_MAX_CHARS * 0.6 ? cut.slice(0, brk) : cut).trimEnd() + "…";
     omitted = Math.max(omitted, 1);
   }
   return { text, omitted: Math.max(0, omitted), kind: "prose" };
@@ -1078,7 +1192,10 @@ function summaryBlockNodes(opts = {}) {
     maxItems,
     maxSentences,
   } = opts;
-  const { text, omitted } = summariseSection(content, { maxItems, maxSentences });
+  const { text, omitted } = summariseSection(content, {
+    maxItems,
+    maxSentences,
+  });
   if (!text) return [];
 
   const nodes = [];
@@ -1109,19 +1226,29 @@ function summaryBlockNodes(opts = {}) {
  * saying the document and the section list disagree about a heading name.
  */
 function buildCardSections(body, specs, opts = {}) {
-  const { sourceUrl = null, docLabel, linkResolver = null, output = null } = opts;
+  const {
+    sourceUrl = null,
+    docLabel,
+    linkResolver = null,
+    output = null,
+  } = opts;
   // Warn only for required sections: extract those with `output`, the optional
   // ones silently.
   const required = specs.filter((s) => !s.optional);
   const optional = specs.filter((s) => s.optional);
   const found = [
-    ...extractBodySections(body, required.map((s) => s.names), output),
-    ...extractBodySections(body, optional.map((s) => s.names)),
+    ...extractBodySections(
+      body,
+      required.map((s) => s.names),
+      output,
+    ),
+    ...extractBodySections(
+      body,
+      optional.map((s) => s.names),
+    ),
   ];
   // extractBodySections keys results by the FIRST alias; map back to the spec.
-  const byFirstAlias = new Map(
-    found.map((f) => [f.name, f.content]),
-  );
+  const byFirstAlias = new Map(found.map((f) => [f.name, f.content]));
 
   const nodes = [];
   for (const spec of specs) {
@@ -1268,7 +1395,9 @@ function formatCardCheck(result, opts = {}) {
   if (result.findings.length) {
     lines.push("");
     for (const f of result.findings) {
-      lines.push(`  ${f.severity === "critical" ? "🚨" : "⚠️ "} ${f.section}: ${f.message}`);
+      lines.push(
+        `  ${f.severity === "critical" ? "🚨" : "⚠️ "} ${f.section}: ${f.message}`,
+      );
       lines.push(`     Fix: ${f.fix}`);
     }
   } else {
@@ -4103,6 +4232,8 @@ module.exports = {
   tableLinesToAdf,
   inlineMarkdownToAdf,
   sectionRe,
+  extractSection,
+  toRelativeDocLink,
   extractBodySections,
   escapeRe,
   // description size guard

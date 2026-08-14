@@ -21,7 +21,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "bash shared/resources/resolve-platform.test.sh && bash shared/resources/advance-pipeline-lock.test.sh && bash shared/resources/develop-pipeline-on-precompact.test.sh && bash shared/resources/verify-push-state.test.sh && bash skills/jira-sprint-review-prep/tests/fixture.test.sh && bash skills/jira-sprint-retrospective/tests/fixture.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'skills/develop-bug/tests/*.test.js' 'skills/review-bug/tests/*.test.js' 'skills/sync-jira-epic/tests/*.test.js' 'skills/sync-jira-story/tests/*.test.js' 'skills/sync-jira-task/tests/*.test.js' 'skills/scaffold-tracker-workflow/tests/*.test.js' 'tests/*.test.js' 'shared/resources/tests/*.test.mjs' 'evals/shared/tests/*.test.mjs' 'evals/develop-task/protocol/*.test.mjs' 'evals/develop-story/protocol/*.test.mjs' 'evals/develop-next/protocol/*.test.mjs' 'evals/develop-next/unit/*.test.mjs' 'evals/develop-batch/protocol/*.test.mjs' 'evals/develop-batch/unit/*.test.mjs'",
+    "test": "bash shared/resources/resolve-platform.test.sh && bash shared/resources/advance-pipeline-lock.test.sh && bash shared/resources/develop-pipeline-on-precompact.test.sh && bash shared/resources/verify-push-state.test.sh && bash skills/jira-sprint-review-prep/tests/fixture.test.sh && bash skills/jira-sprint-retrospective/tests/fixture.test.sh && node --test 'skills/create-task/tests/*.test.js' 'skills/create-story/tests/*.test.js' 'skills/develop-bug/tests/*.test.js' 'skills/review-bug/tests/*.test.js' 'skills/sync-jira-epic/tests/*.test.js' 'skills/sync-jira-story/tests/*.test.js' 'skills/sync-jira-task/tests/*.test.js' 'skills/scaffold-tracker-workflow/tests/*.test.js' 'skills/jira-epic-creator/tests/*.test.js' 'tests/*.test.js' 'shared/resources/tests/*.test.mjs' 'evals/shared/tests/*.test.mjs' 'evals/develop-task/protocol/*.test.mjs' 'evals/develop-story/protocol/*.test.mjs' 'evals/develop-next/protocol/*.test.mjs' 'evals/develop-next/unit/*.test.mjs' 'evals/develop-batch/protocol/*.test.mjs' 'evals/develop-batch/unit/*.test.mjs'",
     "test:platform": "bash shared/resources/resolve-platform.test.sh",
     "eval:create-task": "node evals/shared/runner.mjs evals/create-task/scenarios/01-happy",
     "eval:create-task:all": "for s in evals/create-task/scenarios/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
@@ -41,7 +41,9 @@
     "eval:develop-batch": "node --test 'evals/develop-batch/protocol/*.test.mjs' 'evals/develop-batch/unit/*.test.mjs'",
     "eval:all": "for s in evals/create-task/scenarios/*/ evals/create-story/scenarios/*/ evals/develop-task/step-isolation/*/ evals/develop-story/step-isolation/*/ evals/develop-next/step-isolation/*/; do node evals/shared/runner.mjs \"$s\" || exit 1; done",
     "validate": "python3 skills/create-skill/scripts/quick_validate.py",
-    "validate:all": "printf '\\033[1mValidating skills\u2026\\033[0m\\n\\n'; pass=0; fail=0; for d in skills/*/; do if [ -f \"${d}SKILL.md\" ]; then if python3 skills/create-skill/scripts/quick_validate.py \"$d\"; then pass=$((pass+1)); else fail=$((fail+1)); fi; fi; done; echo ''; if [ $fail -eq 0 ]; then printf \"  \\033[32m\u25cf\\033[0m \\033[1m%d\\033[0m passed  \\033[2m0 failed\\033[0m\\n\" $pass; else printf \"  \\033[32m\u25cf\\033[0m \\033[1m%d\\033[0m passed  \\033[31m\u25cf\\033[0m \\033[1m%d\\033[0m failed\\n\" $pass $fail; fi; echo ''; [ $fail -eq 0 ]",
+    "validate:all": "printf '\\033[1mValidating skills…\\033[0m\\n\\n'; pass=0; fail=0; for d in skills/*/; do if [ -f \"${d}SKILL.md\" ]; then if python3 skills/create-skill/scripts/quick_validate.py \"$d\"; then pass=$((pass+1)); else fail=$((fail+1)); fi; fi; done; echo ''; if [ $fail -eq 0 ]; then printf \"  \\033[32m●\\033[0m \\033[1m%d\\033[0m passed  \\033[2m0 failed\\033[0m\\n\" $pass; else printf \"  \\033[32m●\\033[0m \\033[1m%d\\033[0m passed  \\033[31m●\\033[0m \\033[1m%d\\033[0m failed\\n\" $pass $fail; fi; echo ''; [ $fail -eq 0 ]",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "generate-catalog": "python3 skills/create-skill/scripts/generate_catalog.py",
     "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
     "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py",
@@ -50,6 +52,7 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.138"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.138",
+    "prettier": "^3.9.6"
   }
 }

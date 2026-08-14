@@ -113,10 +113,12 @@ function splitTableRow(line) {
 function extractStoriesTable(body) {
   // Use the shared helper rather than an inlined copy of the same pattern — the
   // duplicate here silently kept the pre-fix behaviour (no numbering tolerated,
-  // not line-anchored) after the canonical one was corrected.
-  const m = body.match(lib.sectionRe("Stories Breakdown"));
-  if (!m) return null;
-  const raw = m[1].trim();
+  // not line-anchored) after the canonical one was corrected. `extractSection`
+  // rather than `sectionRe` for the same reason: a `# ` inside a fenced block in
+  // this section would otherwise end it early and drop the table.
+  const section = lib.extractSection(body, "Stories Breakdown");
+  if (section === null) return null;
+  const raw = section.trim();
   if (!raw.includes("|")) return null;
 
   // Separator rows: optional leading/trailing pipe surrounding only `-`, `:`, ` `, `|`.
@@ -441,6 +443,7 @@ function updateEpicFile({
   issueUrl,
   epicBbUrl,
   prdBbUrl,
+  prdFilePath,
   changeLogEntries,
   lastSyncedAt,
   bodyHash,
@@ -450,11 +453,15 @@ function updateEpicFile({
   try {
     let content = fs.readFileSync(filePath, "utf-8");
 
+    // `epic_bitbucket_url` / `prd_bitbucket_url` are deliberately NOT written —
+    // they pinned an absolute URL to whichever branch the sync ran on and died
+    // when that branch was deleted. See the note in sync-jira-task.js. Both are
+    // still READ (`prd_bitbucket_url` is the documented `prd_source` fallback
+    // below), so a value a consumer sets by hand keeps working — this only stops
+    // the tool minting new ones on every run.
     content = lib.upsertFrontmatterKeys(content, {
       jira_key: issueKey,
       jira_url: issueUrl,
-      epic_bitbucket_url: epicBbUrl || null,
-      prd_bitbucket_url: prdBbUrl || null,
       jira_last_synced_at: lastSyncedAt || null,
       jira_last_body_hash: bodyHash || null,
       jira_last_meta_hash: metaHash || null,
@@ -475,30 +482,37 @@ function updateEpicFile({
       /^\*\*Jira Epic\*\*:.*$/m,
       `**Jira Epic**: [${issueKey}](${issueUrl})`,
     );
-    if (prdBbUrl) {
-      // Keep any in-repo RELATIVE link already on this line and APPEND the
-      // Bitbucket one. Replacing the line wholesale dropped the only link that
-      // resolves when the repo is read as files — in an editor, on a checkout,
-      // in a diff — trading a working link for a remote-only one. The result is
-      // still valid Markdown pointing somewhere real, so no check would catch it.
+    // Both links are relative now, so the "keep the relative one, append the
+    // Bitbucket one" dance this replaced is gone — there is only one link, and it
+    // is the one that resolves when the repo is read as files. Jira still gets an
+    // absolute URL; `resolveRelativeLink` rewrites it at ADF-render time.
+    //
+    // An existing hand-authored relative link is still preferred over a computed
+    // one: it may point at a differently-named PRD than `prd_source` resolves to,
+    // and overwriting that would be the tool second-guessing the author.
+    if (prdFilePath || prdBbUrl) {
       const existing = content.match(/^\*\*Parent PRD\*\*:(.*)$/m);
-      const relLink = existing
+      const authored = existing
         ? (existing[1].match(/\[[^\]]*\]\((?!https?:)[^)]+\)/) || [])[0]
         : null;
-      content = upsertLine(
-        content,
-        /^\*\*Parent PRD\*\*:.*$/m,
-        relLink
-          ? `**Parent PRD**: ${relLink} · [View on Bitbucket](${prdBbUrl})`
-          : `**Parent PRD**: [View on Bitbucket](${prdBbUrl})`,
-      );
+      const link =
+        authored ||
+        (prdFilePath
+          ? `[${path.basename(prdFilePath)}](${lib.toRelativeDocLink(filePath, prdFilePath)})`
+          : null);
+      if (link)
+        content = upsertLine(
+          content,
+          /^\*\*Parent PRD\*\*:.*$/m,
+          `**Parent PRD**: ${link}`,
+        );
     }
-    if (epicBbUrl)
-      content = upsertLine(
-        content,
-        /^\*\*Epic File\*\*:.*$/m,
-        `**Epic File**: [View on Bitbucket](${epicBbUrl})`,
-      );
+    const epicFileName = path.basename(filePath);
+    content = upsertLine(
+      content,
+      /^\*\*Epic File\*\*:.*$/m,
+      `**Epic File**: [${epicFileName}](./${epicFileName})`,
+    );
 
     // Two events earn a row — issue created, and status transition. The
     // `skipChangelog` flag this replaced existed to suppress a row on the no-op
@@ -562,7 +576,9 @@ function parseArgs(argv) {
       case "--doc-branch":
         opts.docBranch = args[++i];
         break;
-      case "--check-card": opts.checkCard = true; break;
+      case "--check-card":
+        opts.checkCard = true;
+        break;
       case "--dry-run":
         opts.dryRun = true;
         break;
@@ -666,19 +682,23 @@ async function run({
   // auth, no network, no writes — a review-time gate, not a sync mode.
   if (args.checkCard) {
     const { body } = lib.parseFrontmatter(fs.readFileSync(filePath, "utf8"));
-    const check = lib.checkCardSections(body, EPIC_CARD_SECTIONS, { docLabel: "the epic document" });
+    const check = lib.checkCardSections(body, EPIC_CARD_SECTIONS, {
+      docLabel: "the epic document",
+    });
 
     // Epics carry one block no spec list can describe: the Stories Breakdown
     // overview table. Absent, the card cannot say which stories exist.
     const storiesTable = lib.firstTableIn(
-      (lib.extractBodySections(body, ["Stories Breakdown"])[0] || {}).content || "",
+      (lib.extractBodySections(body, ["Stories Breakdown"])[0] || {}).content ||
+        "",
     );
     if (!storiesTable) {
       check.findings.push({
         severity: "important",
         section: "Stories Breakdown",
         code: "no-table",
-        message: "No overview table found under '## Stories Breakdown' — the card cannot show which stories exist.",
+        message:
+          "No overview table found under '## Stories Breakdown' — the card cannot show which stories exist.",
         fix: "Add a pipe table of the epic's stories (commonly under a '### Stories Overview' sub-heading).",
       });
       check.ok = false;
@@ -686,14 +706,25 @@ async function run({
     } else {
       // Report ROWS, not characters: "0 chars" for a table that is plainly
       // present reads as a failure. Minus the header and separator rows.
-      const rows = Math.max(0, storiesTable.split("\n").filter((l) => l.trim()).length - 2);
-      check.blocks.push({ heading: "Stories Breakdown", status: "ok", note: `${rows} stories in the overview table` });
+      const rows = Math.max(
+        0,
+        storiesTable.split("\n").filter((l) => l.trim()).length - 2,
+      );
+      check.blocks.push({
+        heading: "Stories Breakdown",
+        status: "ok",
+        note: `${rows} stories in the overview table`,
+      });
     }
 
     if (args.json) {
       output.emit({ action: "check-card", file: filePath, ...check });
     } else {
-      output.info(lib.formatCardCheck(check, { title: `Card preflight — ${path.basename(filePath)}` }));
+      output.info(
+        lib.formatCardCheck(check, {
+          title: `Card preflight — ${path.basename(filePath)}`,
+        }),
+      );
     }
     return { exitCode: check.findings.length ? 1 : 0 };
   }
@@ -721,9 +752,7 @@ async function run({
     output.warn(
       "⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.",
     );
-  const branch = bbBase
-    ? lib.resolveDocBranch(args.docBranch)
-    : null;
+  const branch = bbBase ? lib.resolveDocBranch(args.docBranch) : null;
   const epicBbUrl = bbBase
     ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch)
     : null;
@@ -743,9 +772,12 @@ async function run({
   const content = fs.readFileSync(filePath, "utf-8");
   const { frontmatter, body } = lib.parseFrontmatter(content);
 
+  // Resolved outside the `bbBase` guard: the local **Parent PRD** link is relative
+  // and needs the path whether or not a Bitbucket base was resolvable.
+  const prdFilePath = resolvePrdPath(frontmatter.prd_source, repoRoot);
+
   let prdBbUrl = null;
   if (bbBase) {
-    const prdFilePath = resolvePrdPath(frontmatter.prd_source, repoRoot);
     if (prdFilePath)
       prdBbUrl = lib.buildBitbucketUrl(prdFilePath, repoRoot, bbBase, branch);
     else if (frontmatter.prd_source)
@@ -928,7 +960,7 @@ async function run({
         } catch (e) {
           output.warn(
             `⚠️  Could not re-read updated timestamp after transition: ${e.message}. ` +
-            `Next sync may require --force.`,
+              `Next sync may require --force.`,
           );
         }
       }
@@ -939,6 +971,7 @@ async function run({
         issueUrl,
         epicBbUrl,
         prdBbUrl,
+        prdFilePath,
         changeLogEntries: skipEntries,
         lastSyncedAt: skipSyncedAt,
         bodyHash: newBodyHash,
@@ -1272,6 +1305,7 @@ async function run({
       issueUrl: result.issueUrl,
       epicBbUrl,
       prdBbUrl,
+      prdFilePath,
       changeLogEntries: lib.buildChangeLogEntries({
         created: !isUpdate,
         issueKey: result.issueKey,
@@ -1286,11 +1320,17 @@ async function run({
     });
 
     if (!isUpdate) {
+      // No `epic_bitbucket_url` here. It used to be printed for the author to
+      // paste into each story, which is this card's defect arriving by hand: an
+      // absolute URL pinned to whichever branch the sync ran on, dead the moment
+      // that branch is deleted, and invisible to a link checker. `sync-jira-story`
+      // writes the `**Epic File**` link itself, relative, so there is nothing to
+      // copy. The key is still *read* as a fallback for a value already set.
       output.info(
         "\n📌 Story reminder:\n" +
           `   jira_epic: "${result.issueKey}"\n` +
-          (epicBbUrl ? `   epic_bitbucket_url: "${epicBbUrl}"\n` : "") +
-          "   Add cross-reference links to both the Jira epic and Bitbucket epic file in each story body.",
+          "   Point each story's `epic_source` at this epic's path — sync-jira-story\n" +
+          "   writes the Jira epic and Epic File links into the story body from there.",
       );
     }
   }
@@ -1343,6 +1383,7 @@ if (require.main === module) {
     });
 } else {
   module.exports = {
+    updateEpicFile,
     run,
     parseArgs,
     buildDescriptionAdf,

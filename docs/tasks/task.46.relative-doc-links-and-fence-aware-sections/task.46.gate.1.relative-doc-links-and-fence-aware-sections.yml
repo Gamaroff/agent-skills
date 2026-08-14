@@ -1,0 +1,105 @@
+schema: 1
+task: 'task.46.relative-doc-links-and-fence-aware-sections'
+task_title: 'Write relative document links, and stop a fenced `# ` truncating a Jira description'
+gate: CONCERNS
+status_reason: 'Both defects are fixed correctly and fully covered — no correctness bugs found. Gated on two maintainability issues: 96% of the two largest script diffs is an undeclared Prettier reformat that hides the 62 functional lines inside it, and an inline copy of the defective extraction regex survives unfixed in jira-epic-creator under a comment instructing maintainers to keep it in step with the canonical one.'
+reviewer: 'QA Engineer'
+updated: '2026-08-14T05:35:00Z'
+
+top_issues:
+  - id: TASK-46-BUG-1
+    issue: 'Undeclared wholesale Prettier reformat inflates the diff ~5x and hides the functional change'
+    severity: medium
+    finding: >-
+      sync-jira-task.js changes 647 lines of which 27 are functional (96% reformatting);
+      sync-jira-story.js changes 788 of which 35 are functional (96%). Measured by
+      normalising both sides of the diff with prettier@3 and re-diffing. The repo has no
+      .prettierrc, no format script, and no format step in .githooks/pre-commit, so the
+      reformat is neither enforced nor reproducible by the next editor of these files.
+    suggested_action: >-
+      Either split the reformat into its own commit ahead of the functional one so the PR
+      diff reads, or declare it in the task Scope and add a prettier config + format script
+      so the formatting is repo policy rather than one author's editor.
+    suggested_owner: dev
+  - id: TASK-46-BUG-2
+    issue: 'The same fence-truncation regex survives unfixed in jira-epic-creator'
+    severity: medium
+    finding: >-
+      skills/jira-epic-creator/scripts/jira-create-epic.js:120-122 carries an inline copy of
+      the section-extraction pattern with the identical `(?=\n## |\n# |$)` lookahead, so a
+      `# ` at column 0 inside a fenced block in an epic's Stories Breakdown truncates it the
+      same silent way. The comment above it (lines 109-119) instructs maintainers that the
+      pattern "must stay in step with the canonical one" — this change moves the canonical
+      one and leaves the copy behind without updating that instruction. Not listed in the
+      task's Out of Scope, which names only dropHeadingLines/firstTableIn and the GitHub
+      sync equivalents.
+    suggested_action: >-
+      Fix the copy (it cannot import the shared module by design — inline a line-walking
+      equivalent), or declare it out of scope in the task document and correct the stale
+      "stay in step" comment so it does not mislead the next maintainer.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 1242
+  phases_verified: '8/8'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No auth, crypto, or credential path touched. No new dependencies. The change removes
+      URLs from written documents rather than adding any, and every network call site is
+      untouched.
+  performance:
+    status: PASS
+    notes: >-
+      extractSection replaces one regex match with a single line-walk per section — O(n) in
+      body length, run a handful of times per sync against a network-bound operation. No
+      measurable change; no hot path involved.
+  reliability:
+    status: PASS
+    notes: >-
+      Rollback plan is accurate and genuinely revertible (one commit + npm run bundle; no
+      state, migration, or deployed artifact). Error paths are unchanged, including
+      updateEpicFile's swallow-and-warn, which is now test-covered for the first time. The
+      body link is no longer gated on a Bitbucket URL resolving, which strictly widens the
+      set of repos that get a working link.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      Two issues, both in top_issues. The undeclared reformat makes the functional change
+      practically unreviewable in the PR, and directly contradicts the task's own stated
+      reason for leaving dropHeadingLines/firstTableIn alone ("so this card's diff stays
+      reviewable"). The jira-epic-creator copy leaves a known defect in a sibling path under
+      a comment that now instructs the opposite of what the code does. Offsetting these:
+      write-back coverage went from zero to three suites, and every new function carries a
+      comment explaining the failure it prevents.
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Split or declare the Prettier reformat; add a prettier config + format script if it is to be repo policy'
+      refs:
+        ['skills/sync-jira-task/scripts/sync-jira-task.js', 'skills/sync-jira-story/scripts/sync-jira-story.js']
+    - action: 'Fix or explicitly de-scope the duplicate extraction regex in jira-epic-creator'
+      refs: ['skills/jira-epic-creator/scripts/jira-create-epic.js']
+    - action: 'Correct the extractSection comment — sectionRe is now exported for tests only, no caller matches it directly'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'Note the sync-jira-epic behaviour change: an unresolvable prd_source with a cached prd_bitbucket_url now omits the Parent PRD body line'
+      refs: ['skills/sync-jira-epic/scripts/sync-jira-epic.js']
+    - action: 'Close the remaining naive RE_FENCE users (dropHeadingLines / firstTableIn) — already declared out of scope here'
+      refs: ['shared/resources/jira-sync.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Neither top issue affects runtime behaviour — both are reviewability and maintenance debt. Merging as-is is defensible; the conditions are that TASK-46-BUG-2 is either fixed or explicitly de-scoped before the stale comment misleads someone, and that the reformat decision is recorded rather than left implicit.'
