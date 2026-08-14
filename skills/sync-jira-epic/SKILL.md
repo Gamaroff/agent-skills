@@ -340,12 +340,19 @@ guidance, not information for a card reader.
   "file": "/abs/path/epic.md",
   "jira_key": "PROJ-14",
   "jira_url": "https://yourorg.atlassian.net/browse/PROJ-14",
+  "epic_bitbucket_url": "https://bitbucket.org/org/repo/src/main/docs/prd/.../epic.N.name.md",
+  "prd_bitbucket_url": "https://bitbucket.org/org/repo/src/main/docs/prd/.../prd.<feature>.md",
   "change_summary": "Updated: summary, description",
   "jira_last_synced_at": "2026-04-28T11:05:33.123+0000",
   "jira_last_body_hash": "f4b2c1d9a0e72b58",
   "jira_last_meta_hash": "a91c0aef33eb1d04"
 }
 ```
+
+The `*_bitbucket_url` keys report the absolute Bitbucket URL used for the **Jira** link,
+built at render time. They are **not** written to the document — the file gets a relative
+link (see [Why document links are relative](../sync-jira-task/SKILL.md#why-document-links-are-relative)).
+The two look identical and are not, which is how they were once wrongly deleted from here.
 
 `action` is `"skip"` when the no-change fast path triggered. On error: `{ "error": "<message>" }` and a non-zero exit code.
 
