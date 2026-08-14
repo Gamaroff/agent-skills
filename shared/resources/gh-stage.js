@@ -85,29 +85,52 @@ function makeOutput({ json = false, quiet = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// .env loading
+// Credential file loading
 // ---------------------------------------------------------------------------
-// Also a local copy (jira-sync.js:~40-74). `gh` carries its own auth, so this is
-// only here for the config keys below — but a consumer who sets
-// GH_PROJECT_STATUS_FIELD in .env rather than the shell should still be heard.
+// Candidate files, in precedence order — kept identical to jira-sync.js's
+// CREDENTIAL_FILES so a consumer has ONE credential location, not one per tool.
+// `.secrets/tooling.env` leads because Nx auto-loads workspace `.env` files into
+// every task's environment; `.secrets/` is outside the names Nx generates, so it
+// is never auto-loaded. `.env` stays second — never replaced — so consumers who
+// have not migrated keep working.
+const CREDENTIAL_FILES = [".secrets/tooling.env", ".env"];
+
+// Also a local copy (jira-sync.js). `gh` carries its own auth, so this is only
+// here for the config keys below — a consumer who sets GH_PROJECT_STATUS_FIELD
+// in a credential file rather than the shell should still be heard.
 // Never overwrites an already-set key, and swallows everything.
+//
+// NO "missing credentials" warning here, deliberately, and this is the one place
+// this module diverges from jira-sync.js. The only key this loader supplies is
+// GH_PROJECT_STATUS_FIELD, which is optional, falls back to skills-config.yaml
+// and then to a default — so its absence is the NORMAL case, not a fault. A
+// warning here would fire on essentially every GitHub consumer and mean nothing,
+// and a warning that is usually noise is one nobody reads when it is not.
+// jira-sync.js warns because its keys are required and their absence is silent;
+// that asymmetry is the point, not an oversight.
 function loadDotEnv(repoRoot) {
   try {
     const root = repoRoot || repoRootOf();
     if (!root) return;
-    const envPath = path.join(root, ".env");
-    if (!fs.existsSync(envPath)) return;
-    for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
-      const t = line.trim();
-      if (!t || t.startsWith("#")) continue;
-      const eq = t.indexOf("=");
-      if (eq < 1) continue;
-      const key = t.slice(0, eq).trim();
-      const val = t
-        .slice(eq + 1)
-        .trim()
-        .replace(/^["']|["']$/g, "");
-      if (!(key in process.env)) process.env[key] = val;
+    // Every candidate is merged rather than stopping at the first that exists:
+    // a consumer mid-migration has some keys in one file and some in the other,
+    // and the `!(key in process.env)` guard already makes the earlier file
+    // authoritative per key. This can only ADD a key, never lose one.
+    for (const rel of CREDENTIAL_FILES) {
+      const envPath = path.join(root, rel);
+      if (!fs.existsSync(envPath)) continue;
+      for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+        const t = line.trim();
+        if (!t || t.startsWith("#")) continue;
+        const eq = t.indexOf("=");
+        if (eq < 1) continue;
+        const key = t.slice(0, eq).trim();
+        const val = t
+          .slice(eq + 1)
+          .trim()
+          .replace(/^["']|["']$/g, "");
+        if (!(key in process.env)) process.env[key] = val;
+      }
     }
   } catch (_) {}
 }
@@ -1669,6 +1692,8 @@ if (require.main === module) {
 
 module.exports = {
   run,
+  loadDotEnv,
+  CREDENTIAL_FILES,
   parseArgs,
   resolveOption,
   describeAlternatives,

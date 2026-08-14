@@ -36,41 +36,141 @@ const GIT_EXEC_OPTS = {
 };
 
 // ---------------------------------------------------------------------------
-// .env loader
+// Credential file loader
 // ---------------------------------------------------------------------------
-function loadDotEnv() {
+// Candidate credential files, in precedence order WITHIN each root.
+//
+// `.secrets/tooling.env` comes first because Nx loads workspace `.env` files
+// into the environment of every task it runs. In an Nx consumer, tokens kept in
+// the root `.env` are therefore in `process.env` of every application process
+// started or tested through Nx, before any application code executes — measured
+// in one consumer on 2026-08-09, and not fixable from the application side
+// (`NX_LOAD_DOT_ENV_FILES=false` loads the file into the CLI process before the
+// flag is consulted, and children inherit it). `.secrets/` sits outside the
+// `.env.*` / `.*.env` names Nx generates from target and configuration names,
+// so it is never auto-loaded. A path is the fix; a flag is not.
+//
+// `.env` stays in the list, and stays SECOND rather than being replaced. Every
+// consumer that has not migrated has only `.env`, and dropping it would take
+// their tracker syncs from working to doing nothing — which, given how quietly
+// this function used to fail, they would not notice.
+const CREDENTIAL_FILES = [".secrets/tooling.env", ".env"];
+
+// Keys without which a Jira call cannot succeed. Used ONLY to decide whether a
+// missing credential is worth warning about — a consumer who exports these in
+// their shell needs no file at all and must not be nagged for not having one.
+const REQUIRED_CREDENTIAL_KEYS = ["JIRA_URL", "JIRA_API_TOKEN"];
+
+let _warnedNoCredentials = false;
+
+/** Repo roots to search, nearest context first. */
+function credentialSearchRoots() {
+  const roots = [];
+  const add = (r) => {
+    if (r && !roots.includes(r)) roots.push(r);
+  };
   try {
-    const root = execSync(
-      "git rev-parse --show-toplevel",
+    add(execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim());
+  } catch (_) {}
+  // Inside a linked worktree, --show-toplevel is the WORKTREE root. Credential
+  // files are gitignored and `git worktree add` copies no ignored file, so a
+  // worktree has none of its own — every /develop-batch agent would silently
+  // degrade to "no credentials". --git-common-dir points at the main repo's
+  // .git, whose parent does have them.
+  try {
+    const commonDir = execSync(
+      "git rev-parse --path-format=absolute --git-common-dir",
       GIT_EXEC_OPTS,
     ).trim();
-    let envPath = path.join(root, ".env");
-    // Inside a linked worktree, --show-toplevel is the WORKTREE root. `.env` is
-    // gitignored and `git worktree add` copies no ignored files, so a worktree
-    // has none — every /develop-batch agent would silently degrade to
-    // "no credentials". --git-common-dir points at the main repo's .git, whose
-    // parent does have it.
-    if (!fs.existsSync(envPath)) {
-      const commonDir = execSync(
-        "git rev-parse --path-format=absolute --git-common-dir",
-        GIT_EXEC_OPTS,
-      ).trim();
-      envPath = path.join(path.dirname(commonDir), ".env");
-    }
-    if (!fs.existsSync(envPath)) return;
-    for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
-      const t = line.trim();
-      if (!t || t.startsWith("#")) continue;
-      const eq = t.indexOf("=");
-      if (eq < 1) continue;
-      const key = t.slice(0, eq).trim();
-      const val = t
-        .slice(eq + 1)
-        .trim()
-        .replace(/^["']|["']$/g, "");
-      if (!(key in process.env)) process.env[key] = val;
+    if (commonDir) add(path.dirname(commonDir));
+  } catch (_) {}
+  return roots;
+}
+
+function parseEnvFileInto(absPath, target) {
+  for (const line of fs.readFileSync(absPath, "utf-8").split("\n")) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const eq = t.indexOf("=");
+    if (eq < 1) continue;
+    const key = t.slice(0, eq).trim();
+    const val = t
+      .slice(eq + 1)
+      .trim()
+      .replace(/^["']|["']$/g, "");
+    if (!(key in target)) target[key] = val;
+  }
+}
+
+/**
+ * Load credentials from the first definition of each key across every candidate
+ * file, nearest root first. Returns `{ searched, loaded }` (absolute paths).
+ *
+ * Every readable candidate is merged rather than stopping at the first that
+ * exists: a consumer mid-migration has some keys in one file and some in the
+ * other, and `!(key in target)` already makes the earlier file authoritative
+ * per key. Merging can only ADD a key relative to the previous one-file
+ * behaviour — it can never lose one, which is what makes this safe to ship to
+ * consumers who have never heard of `.secrets/`.
+ */
+function loadDotEnv() {
+  const searched = [];
+  const loaded = [];
+  try {
+    for (const root of credentialSearchRoots()) {
+      for (const rel of CREDENTIAL_FILES) {
+        const abs = path.join(root, rel);
+        if (searched.includes(abs)) continue;
+        searched.push(abs);
+        if (!fs.existsSync(abs)) continue;
+        parseEnvFileInto(abs, process.env);
+        loaded.push(abs);
+      }
     }
   } catch (_) {}
+  warnIfCredentialsMissing(searched, loaded);
+  return { searched, loaded };
+}
+
+/**
+ * The defect this ends: for as long as `loadDotEnv()` returned silently on a
+ * missing file, a relocated, unseeded or absent credential file made every
+ * `/sync-jira-*` and every `/develop-*` tracker stage run, report success, and
+ * update nothing. A 401 is diagnosable. A silent no-op is not — it is
+ * indistinguishable from "there was nothing to do", which is why it survived so
+ * long, and why a consumer cannot safely move its credential file until this
+ * warning exists.
+ *
+ * Deliberately a warning on stderr rather than a throw. This function runs
+ * before any caller has said what it needs, and some commands need no
+ * credentials at all; throwing here would break them for no reason. stderr also
+ * keeps `--json` stdout clean for machine consumers.
+ *
+ * The condition is "the credentials are missing", not "the file is missing" —
+ * a file that exists but omits the keys produces exactly the same silent no-op,
+ * and a shell that exports them needs no file at all.
+ */
+function warnIfCredentialsMissing(searched, loaded) {
+  if (_warnedNoCredentials) return;
+  const missing = REQUIRED_CREDENTIAL_KEYS.filter((k) => !process.env[k]);
+  if (!missing.length) return;
+  _warnedNoCredentials = true;
+  const lines = [
+    `⚠ agent-skills: ${missing.join(", ")} not set — Jira calls will fail, or appear to succeed while updating nothing.`,
+    `    searched: ${searched.length ? searched.join(", ") : "(no repo root resolved)"}`,
+    `    loaded:   ${loaded.length ? loaded.join(", ") : "(none)"}`,
+  ];
+  if (!loaded.length) {
+    lines.push(
+      `    fix: create ${CREDENTIAL_FILES[0]} at the repo root (see .env.example), or export the keys in your shell.`,
+    );
+  }
+  process.stderr.write(lines.join("\n") + "\n");
+}
+
+/** Test seam — the warning is once-per-process by design. */
+function _resetCredentialWarning() {
+  _warnedNoCredentials = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -4202,6 +4302,11 @@ async function fetchUpdatedTimestamp({
 module.exports = {
   // env / output
   loadDotEnv,
+  CREDENTIAL_FILES,
+  REQUIRED_CREDENTIAL_KEYS,
+  credentialSearchRoots,
+  parseEnvFileInto,
+  _resetCredentialWarning,
   makeOutput,
   // frontmatter
   parseFrontmatter,
