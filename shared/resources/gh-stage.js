@@ -85,29 +85,52 @@ function makeOutput({ json = false, quiet = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// .env loading
+// Credential file loading
 // ---------------------------------------------------------------------------
-// Also a local copy (jira-sync.js:~40-74). `gh` carries its own auth, so this is
-// only here for the config keys below — but a consumer who sets
-// GH_PROJECT_STATUS_FIELD in .env rather than the shell should still be heard.
+// Candidate files, in precedence order — kept identical to jira-sync.js's
+// CREDENTIAL_FILES so a consumer has ONE credential location, not one per tool.
+// `.secrets/tooling.env` leads because Nx auto-loads workspace `.env` files into
+// every task's environment; `.secrets/` is outside the names Nx generates, so it
+// is never auto-loaded. `.env` stays second — never replaced — so consumers who
+// have not migrated keep working.
+const CREDENTIAL_FILES = [".secrets/tooling.env", ".env"];
+
+// Also a local copy (jira-sync.js). `gh` carries its own auth, so this is only
+// here for the config keys below — a consumer who sets GH_PROJECT_STATUS_FIELD
+// in a credential file rather than the shell should still be heard.
 // Never overwrites an already-set key, and swallows everything.
+//
+// NO "missing credentials" warning here, deliberately, and this is the one place
+// this module diverges from jira-sync.js. The only key this loader supplies is
+// GH_PROJECT_STATUS_FIELD, which is optional, falls back to skills-config.yaml
+// and then to a default — so its absence is the NORMAL case, not a fault. A
+// warning here would fire on essentially every GitHub consumer and mean nothing,
+// and a warning that is usually noise is one nobody reads when it is not.
+// jira-sync.js warns because its keys are required and their absence is silent;
+// that asymmetry is the point, not an oversight.
 function loadDotEnv(repoRoot) {
   try {
     const root = repoRoot || repoRootOf();
     if (!root) return;
-    const envPath = path.join(root, ".env");
-    if (!fs.existsSync(envPath)) return;
-    for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
-      const t = line.trim();
-      if (!t || t.startsWith("#")) continue;
-      const eq = t.indexOf("=");
-      if (eq < 1) continue;
-      const key = t.slice(0, eq).trim();
-      const val = t
-        .slice(eq + 1)
-        .trim()
-        .replace(/^["']|["']$/g, "");
-      if (!(key in process.env)) process.env[key] = val;
+    // Every candidate is merged rather than stopping at the first that exists:
+    // a consumer mid-migration has some keys in one file and some in the other,
+    // and the `!(key in process.env)` guard already makes the earlier file
+    // authoritative per key. This can only ADD a key, never lose one.
+    for (const rel of CREDENTIAL_FILES) {
+      const envPath = path.join(root, rel);
+      if (!fs.existsSync(envPath)) continue;
+      for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+        const t = line.trim();
+        if (!t || t.startsWith("#")) continue;
+        const eq = t.indexOf("=");
+        if (eq < 1) continue;
+        const key = t.slice(0, eq).trim();
+        const val = t
+          .slice(eq + 1)
+          .trim()
+          .replace(/^["']|["']$/g, "");
+        if (!(key in process.env)) process.env[key] = val;
+      }
     }
   } catch (_) {}
 }
@@ -426,11 +449,16 @@ function normalizeItem(node, statusField) {
  * play; it must not veto a move on the single board an issue actually sits on,
  * which would refuse every issue that lives anywhere else.
  */
-function selectBoard(items, { board, configured, projectYml, partial = false }) {
+function selectBoard(
+  items,
+  { board, configured, projectYml, partial = false },
+) {
   if (items.length === 0) return { item: null, reason: "not-on-board" };
 
   const yml = projectYml || {};
-  const candidates = items.map((i) => `${i.projectTitle} (#${i.projectNumber})`);
+  const candidates = items.map(
+    (i) => `${i.projectTitle} (#${i.projectNumber})`,
+  );
   const match = (hint) => {
     const h = String(hint).trim();
     return items.find(
@@ -709,7 +737,9 @@ function run({
   // Surfaced when a board read returns errors for SOME board but usable nodes
   // for others — a warning, because the card we care about may still be movable.
   const onWarn = (m) =>
-    output.warn(`⚠️  board read reported errors (continuing with what resolved): ${m}`);
+    output.warn(
+      `⚠️  board read reported errors (continuing with what resolved): ${m}`,
+    );
 
   // --probe-board reads a board; every other mode moves one card on it.
   // Hoisted out of the non-probe branch: EVERY path that reaches the network
@@ -878,7 +908,14 @@ function run({
             boardNum: addBoardNum,
             sleepMs: sleepImpl,
           })
-        : readBoard({ exec, owner, repo, issue: args.issue, statusField, onWarn });
+        : readBoard({
+            exec,
+            owner,
+            repo,
+            issue: args.issue,
+            statusField,
+            onWarn,
+          });
   } catch (e) {
     output.warn(`⚠️  Could not read the board: ${e.message}`);
     return emit({ transitioned: false, reason: "board-unreadable" }, 0);
@@ -948,7 +985,11 @@ function run({
       `⚠️  board "${item.projectTitle}" has no "${statusField}" single-select field — skipping.`,
     );
     return emit(
-      { transitioned: false, reason: "no-status-field", board: item.projectTitle },
+      {
+        transitioned: false,
+        reason: "no-status-field",
+        board: item.projectTitle,
+      },
       args.strict ? 1 : 0,
     );
   }
@@ -995,9 +1036,18 @@ function run({
   // rankOf returns null for every bespoke column and the guard is inert.
   // Unranked either side → no opinion, allow (same semantics as the Jira
   // monotonicity guard at jira-sync.js:2933-2957).
-  const curRank = tw.rankOf(item.current, workflow, { issueType: args.issueType });
-  const tgtRank = tw.rankOf(r.match.name, workflow, { issueType: args.issueType });
-  if (!args.allowRegress && curRank != null && tgtRank != null && curRank > tgtRank) {
+  const curRank = tw.rankOf(item.current, workflow, {
+    issueType: args.issueType,
+  });
+  const tgtRank = tw.rankOf(r.match.name, workflow, {
+    issueType: args.issueType,
+  });
+  if (
+    !args.allowRegress &&
+    curRank != null &&
+    tgtRank != null &&
+    curRank > tgtRank
+  ) {
     output.info(
       `⏭️  ${label} is already at "${item.current}" (rank ${curRank}), past ` +
         `"${r.match.name}" (rank ${tgtRank}) — not moving it backwards.`,
@@ -1068,7 +1118,13 @@ function run({
   let observed = null;
   let verifyError = null;
   try {
-    const after = readBoard({ exec, owner, repo, issue: args.issue, statusField });
+    const after = readBoard({
+      exec,
+      owner,
+      repo,
+      issue: args.issue,
+      statusField,
+    });
     const same = after.find((i) => i.itemId === item.itemId);
     if (same) observed = same.current || "";
     else verifyError = "the item was not in the verify read";
@@ -1113,7 +1169,14 @@ function run({
 function repoContext(exec, field) {
   try {
     return String(
-      exec(["repo", "view", "--json", field, "-q", `.${field}${field === "owner" ? ".login" : ""}`]),
+      exec([
+        "repo",
+        "view",
+        "--json",
+        field,
+        "-q",
+        `.${field}${field === "owner" ? ".login" : ""}`,
+      ]),
     ).trim();
   } catch (_) {
     return "";
@@ -1358,7 +1421,12 @@ function writeLadder({
       `🔎 would write ${tw.DEFAULT_WORKFLOW_PATH} with ${optionNames.length} rungs ` +
         `(skipped: --dry-run):\n${body.replace(/^/gm, "   ")}`,
     );
-    return { written: false, reason: "dry-run", path: target, statuses: optionNames };
+    return {
+      written: false,
+      reason: "dry-run",
+      path: target,
+      statuses: optionNames,
+    };
   }
   try {
     fs.writeFileSync(target, body);
@@ -1369,10 +1437,14 @@ function writeLadder({
     // into a real move) sees the pre-write ladder forever, which is the cache's
     // own documented failure mode at tracker-workflow.js:392-393.
     tw.clearWorkflowCache();
-    output.info(`✅ wrote ${tw.DEFAULT_WORKFLOW_PATH} with ${optionNames.length} rungs.`);
+    output.info(
+      `✅ wrote ${tw.DEFAULT_WORKFLOW_PATH} with ${optionNames.length} rungs.`,
+    );
     return { written: true, path: target, statuses: optionNames };
   } catch (e) {
-    output.warn(`⚠️  Could not write ${tw.DEFAULT_WORKFLOW_PATH}: ${e.message}`);
+    output.warn(
+      `⚠️  Could not write ${tw.DEFAULT_WORKFLOW_PATH}: ${e.message}`,
+    );
     return { written: false, reason: "write-failed", path: target };
   }
 }
@@ -1412,7 +1484,12 @@ function checkWorkflowOffline({ workflow, args, output }) {
       `ℹ️  No ${tw.DEFAULT_WORKFLOW_PATH} — using the built-in default ladder. ` +
         "Nothing to check. Generate one with `gh-stage --init-workflow`.",
     );
-    const payload = { reason: "no-file", checked: false, errors: 0, warnings: 0 };
+    const payload = {
+      reason: "no-file",
+      checked: false,
+      errors: 0,
+      warnings: 0,
+    };
     if (args.json) output.emit({ ...payload, exitCode: 0 });
     return { done: true, result: { exitCode: 0, ...payload } };
   }
@@ -1430,7 +1507,8 @@ function checkWorkflowOffline({ workflow, args, output }) {
     };
     const code = errors.length ? 1 : 0;
     if (args.json) output.emit({ ...payload, exitCode: code });
-    else if (!errors.length) output.info("✅ tracker-workflow.yaml is self-consistent.");
+    else if (!errors.length)
+      output.info("✅ tracker-workflow.yaml is self-consistent.");
     return { done: true, result: { exitCode: code, ...payload } };
   }
 
@@ -1449,7 +1527,14 @@ function checkWorkflowOffline({ workflow, args, output }) {
  * moment still names a status, and nothing moves. It is invisible until someone
  * notices cards sitting still.
  */
-function checkDrift({ moments, optionNames, boardTitle, warnings, args, output }) {
+function checkDrift({
+  moments,
+  optionNames,
+  boardTitle,
+  warnings,
+  args,
+  output,
+}) {
   const drift = [];
   for (const [m, spec] of Object.entries(moments)) {
     if (spec.verdict === "no-option") {
@@ -1469,7 +1554,9 @@ function checkDrift({ moments, optionNames, boardTitle, warnings, args, output }
     output.err("");
     output.err("Fix it by regenerating the file from the live board:");
     output.err("  gh-stage --init-workflow --force");
-    output.err("…or edit the named statuses by hand to match the columns above.");
+    output.err(
+      "…or edit the named statuses by hand to match the columns above.",
+    );
   } else {
     output.info(
       `✅ tracker-workflow.yaml matches "${boardTitle}" — every enabled moment ` +
@@ -1513,7 +1600,8 @@ const UNRESOLVED_MOMENT_NOTE = Object.freeze({
     "off by default; fires once per QA fix cycle. Keep it OFF `statuses:` — a ranked target makes the 2nd move backward and the guard rejects it",
   "pr-merged":
     "off by default; fires after the PR merges, from /develop-next and /develop-batch. To gate on a real merge, omit `done:` above and let this be the last move",
-  _default: "no matching column on this board — add the column and this line together",
+  _default:
+    "no matching column on this board — add the column and this line together",
 });
 
 function renderWorkflowFile(optionNames, moments) {
@@ -1528,18 +1616,30 @@ function renderWorkflowFile(optionNames, moments) {
   const lines = [];
   lines.push("# Generated by `gh-stage --init-workflow` from the live board.");
   lines.push("#");
-  lines.push("# Schema and worked examples: docs/reference/tracker-workflow.md");
+  lines.push(
+    "# Schema and worked examples: docs/reference/tracker-workflow.md",
+  );
   lines.push("# Verify at any time:  gh-stage --probe-board");
   lines.push("# Check in CI:         gh-stage --check --offline");
   lines.push("");
-  lines.push("# The ladder, in board order. Order IS the workflow: a rung's index is its");
-  lines.push("# rank, and the rungs between two positions are the path between them.");
+  lines.push(
+    "# The ladder, in board order. Order IS the workflow: a rung's index is its",
+  );
+  lines.push(
+    "# rank, and the rungs between two positions are the path between them.",
+  );
   lines.push("statuses:");
   for (const n of optionNames) lines.push(`  - ${q(n)}`);
   lines.push("");
-  lines.push("# Which status each pipeline moment targets. Omission is disablement —");
-  lines.push("# there is no `enabled: false` and no second place to switch a moment off.");
-  lines.push("# A status named here but absent from `statuses:` is an off-ladder");
+  lines.push(
+    "# Which status each pipeline moment targets. Omission is disablement —",
+  );
+  lines.push(
+    "# there is no `enabled: false` and no second place to switch a moment off.",
+  );
+  lines.push(
+    "# A status named here but absent from `statuses:` is an off-ladder",
+  );
   lines.push("# side-state: entered directly, never walked to.");
   lines.push("pipeline:");
   for (const m of tw.MOMENTS) {
@@ -1551,18 +1651,26 @@ function renderWorkflowFile(optionNames, moments) {
     // Commented, with the moment's own reason. `changes-requested` and
     // `pr-merged` are off by default, so they resolve to nothing on a fresh
     // read even on a board that has a perfectly good column for them.
-    lines.push(`  # ${m}: ...   # ${UNRESOLVED_MOMENT_NOTE[m] || UNRESOLVED_MOMENT_NOTE._default}`);
+    lines.push(
+      `  # ${m}: ...   # ${UNRESOLVED_MOMENT_NOTE[m] || UNRESOLVED_MOMENT_NOTE._default}`,
+    );
   }
   lines.push("");
-  lines.push("# Local document status -> board status, for the /sync-* skills.");
-  lines.push("# GUESSED from ladder position — check these against how your team");
+  lines.push(
+    "# Local document status -> board status, for the /sync-* skills.",
+  );
+  lines.push(
+    "# GUESSED from ladder position — check these against how your team",
+  );
   lines.push("# actually uses the board.");
   lines.push("documentStatus:");
   lines.push(`  draft: ${q(first)}`);
   lines.push(`  planned: ${q(first)}`);
   lines.push(`  ready-for-development: ${q(first)}`);
   lines.push(`  in-progress: ${q(resolved("work-started") || first)}`);
-  lines.push(`  ready-for-review: ${q(resolved("in-review") || resolved("work-started") || first)}`);
+  lines.push(
+    `  ready-for-review: ${q(resolved("in-review") || resolved("work-started") || first)}`,
+  );
   lines.push(`  accepted: ${q(resolved("done") || last)}`);
   lines.push(`  cancelled: ${q(resolved("done") || last)}`);
   return lines.join("\n") + "\n";
@@ -1584,6 +1692,8 @@ if (require.main === module) {
 
 module.exports = {
   run,
+  loadDotEnv,
+  CREDENTIAL_FILES,
   parseArgs,
   resolveOption,
   describeAlternatives,

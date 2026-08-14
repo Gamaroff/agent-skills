@@ -4,17 +4,41 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Credentials may now live at `.secrets/tooling.env`, and it takes precedence over `.env`.** Both loaders — `shared/resources/jira-sync.js` (bundled into 14 skills) and `shared/resources/gh-stage.js` (8) — search `.secrets/tooling.env` then `.env`, in each repo root they know about.
+
+  This exists because of what a workspace `.env` costs an Nx consumer. Nx loads workspace `.env` files into the environment of **every task it runs**, so tooling tokens kept in the root `.env` are in `process.env` of every application process started or tested through Nx, before any application code executes. Measured in one consumer on 2026-08-09. It is not fixable from the application side: `NX_LOAD_DOT_ENV_FILES=false` loads the file into the CLI's own process before the flag is consulted and children inherit it, and `@nestjs/config` has no `skipProcessEnv` — `ConfigService.get()` consults `process.env` unconditionally. A different **path** is the fix; a flag is not. `.secrets/` sits outside the `.env.*` / `.*.env` names Nx generates from target and configuration names, so it is never auto-loaded.
+
+  **`.env` is second, not replaced, and that is load-bearing.** Every consumer that has not migrated has only `.env`. Given how quietly this loader used to fail (below), dropping it would have taken their tracker syncs from working to silently doing nothing.
+
+  **Every candidate is merged rather than stopping at the first that exists.** A consumer mid-migration has some keys in one file and some in the other, and the pre-existing `!(key in process.env)` guard already makes the earlier file authoritative per key. Merging can therefore only **add** a key relative to the old one-file behaviour — never lose one. The shell still beats every file.
+
+  No consumer action is required. A repo with only `.env` behaves exactly as before.
+
+### Fixed
+
+- **`loadDotEnv()` failed silently, so a missing or relocated credential file made every tracker sync report success while updating nothing.** It `return`ed on a missing file and wrapped everything in `catch (_) {}`. A 401 is diagnosable; a silent no-op is not — it is indistinguishable from "there was nothing to do", which is how it survived this long, and why a consumer could not safely move its credential file at all. `jira-sync.js` now writes a warning to **stderr** naming what it searched, what it loaded, and which keys are still unset.
+
+  **The condition is "the credentials are missing", not "the file is missing".** A file that exists but omits the keys produces the identical silent no-op and now warns too, and it says the file _was_ read — otherwise the reader hunts for a missing file they already have. Conversely a consumer who exports the keys in their shell needs no file and is never nagged: a warning that is usually noise is one nobody reads when it is not.
+
+  Deliberately a warning, not a throw. `loadDotEnv()` runs before any caller has said what it needs, and some commands need no credentials; throwing would break them for no reason. stderr keeps `--json` stdout clean for machine consumers. It fires once per process.
+
+  **`gh-stage.js` gets the path change but deliberately no warning**, and this is the one place the two loaders diverge. The only key it supplies is `GH_PROJECT_STATUS_FIELD` — optional, with a `skills-config.yaml` fallback and then a default — so its absence is the _normal_ case, not a fault. A warning there would fire on essentially every GitHub consumer and mean nothing. `jira-sync.js` warns because its keys are required and their absence is silent; the asymmetry is the point.
+
+  `shared/resources/tests/credential-file-discovery.test.mjs` is new — 15 tests across precedence, merge-not-first-file, shell-wins, the silent no-op, file-present-keys-absent, no-false-alarm, and the `gh-stage` asymmetry. **Mutation-proven rather than merely green**: swapping the precedence order turns 2 red, stopping at the first existing file turns 1 red, restoring the silent return turns 4 red, and overwriting already-set keys turns 2 red.
+
 ## [v0.39.1] - 2026-08-14
 
 ### Fixed
 
-- **The develop-pipeline Stop hook named the *next* step, skipping the pending one.** The hook fires when the assistant tries to stop mid-pipeline and returns a `decision: "block"` reason telling the orchestrator what to run. It computed that as `current_step + 1`, which skips a step whenever it fires **during** a step rather than between steps.
+- **The develop-pipeline Stop hook named the _next_ step, skipping the pending one.** The hook fires when the assistant tries to stop mid-pipeline and returns a `decision: "block"` reason telling the orchestrator what to run. It computed that as `current_step + 1`, which skips a step whenever it fires **during** a step rather than between steps.
 
   Observed four times on a single story: it asked for `/qa-story` with no PR in existence, `/qa-fix` against findings that did not exist, and — worst — `/finalise` against a CONCERNS gate with an open bug and a running CI lane. `/finalise` is the step that writes `status: accepted`, so that fourth misfire would have marked a story accepted on evidence that did not exist. All four were declined by hand; an unattended run has nobody to decline them.
 
-  No arithmetic is right in both cases, because the lock reads `N` whether the run stalled *during* step N (run N) or *after* it (run N+1) — there is no completion flag. The two errors are not symmetric, though, and that asymmetry is the fix: assuming "after" when it was "during" **skips** a step silently, surfacing later as a missing artifact or, at step 7, as an unearned acceptance; assuming "during" when it was "after" merely **re-asserts** a finished step, which the steps are written to absorb idempotently. The hook now names `current_step`, and the reason text tells the reader not to skip ahead on the strength of the message if that step genuinely did finish.
+  No arithmetic is right in both cases, because the lock reads `N` whether the run stalled _during_ step N (run N) or _after_ it (run N+1) — there is no completion flag. The two errors are not symmetric, though, and that asymmetry is the fix: assuming "after" when it was "during" **skips** a step silently, surfacing later as a missing artifact or, at step 7, as an unearned acceptance; assuming "during" when it was "after" merely **re-asserts** a finished step, which the steps are written to absorb idempotently. The hook now names `current_step`, and the reason text tells the reader not to skip ahead on the strength of the message if that step genuinely did finish.
 
-  **The hook had no tests, which is how four misfires went unnoticed.** `shared/resources/develop-pipeline-on-stop.test.sh` is new — 13 tests, with the four observed misfires as the regression corpus. Each asserts both that the correct step is named *and* that the skipped-to step is not; asserting only the first would pass for a hook that named every step at once. Mutation-proven rather than merely green: reverting to `current_step + 1` turns 7 of the 13 red, and the allow-path tests correctly stay green under that mutation.
+  **The hook had no tests, which is how four misfires went unnoticed.** `shared/resources/develop-pipeline-on-stop.test.sh` is new — 13 tests, with the four observed misfires as the regression corpus. Each asserts both that the correct step is named _and_ that the skipped-to step is not; asserting only the first would pass for a hook that named every step at once. Mutation-proven rather than merely green: reverting to `current_step + 1` turns 7 of the 13 red, and the allow-path tests correctly stay green under that mutation.
 
 - **The `--json` output samples under-documented the payload, in all three `sync-jira-*` skills.** Documenting the v0.39.0 change removed the `*_bitbucket_url` keys from the `--json` samples as well as the frontmatter ones. The frontmatter edit was right — the scripts genuinely stopped writing those keys. The `--json` edit was wrong: all three still emit them there, because that payload reports the absolute URL used for the **Jira** link, built at ADF-render time, rather than anything written to the file. Same key name, different lifetime; one edit treated the name as the identity and got it wrong three times.
 
@@ -22,7 +46,7 @@ All notable changes to this project will be documented in this file. Format foll
 
   The keys are restored, each sample now carries a line saying why it differs from the frontmatter sample, and `tests/json-output-fidelity.test.js` compares the two in both directions so a sample cannot drift from its script again.
 
-  **The guard caught a real subtlety on its first run — against correct documentation.** Selecting the payload by the first `change_summary` key matched `sync-jira-epic`'s no-change fast path (`action: "skip"`), which legitimately omits the URL keys. Selection is now the main path's exact signature, and a second assertion holds every other document-sync payload to a *subset* of the documented keys — so a secondary path cannot invent an undocumented field, while the skip path is not forced to pad itself with nulls to satisfy a test. Mutation-tested in both directions before being trusted.
+  **The guard caught a real subtlety on its first run — against correct documentation.** Selecting the payload by the first `change_summary` key matched `sync-jira-epic`'s no-change fast path (`action: "skip"`), which legitimately omits the URL keys. Selection is now the main path's exact signature, and a second assertion holds every other document-sync payload to a _subset_ of the documented keys — so a secondary path cannot invent an undocumented field, while the skip path is not forced to pad itself with nulls to satisfy a test. Mutation-tested in both directions before being trusted.
 
 ## [v0.39.0] - 2026-08-14
 
@@ -64,7 +88,7 @@ All notable changes to this project will be documented in this file. Format foll
 
   **One behaviour change worth naming.** In `sync-jira-epic`, an epic whose `prd_source` does not resolve to a file but which carries a cached `prd_bitbucket_url` now gets **no** `**Parent PRD**` body line, where it previously got an absolute one. Writing that cached URL back into the document is the defect this release removes, and there is no path to build a relative link from. The Jira card is unaffected — it still receives the link.
 
-  **`sync-jira-epic` also stops telling you to hand-write the URL.** Its post-create Story reminder printed `epic_bitbucket_url: "<absolute branch-pinned URL>"` for the author to paste into every story — the same defect arriving by hand, and one no test or link checker would ever catch. It now points at `epic_source` instead, which is what `sync-jira-story` builds the relative `**Epic File**` link from. The key is still *read*, so a value already set keeps resolving.
+  **`sync-jira-epic` also stops telling you to hand-write the URL.** Its post-create Story reminder printed `epic_bitbucket_url: "<absolute branch-pinned URL>"` for the author to paste into every story — the same defect arriving by hand, and one no test or link checker would ever catch. It now points at `epic_source` instead, which is what `sync-jira-story` builds the relative `**Epic File**` link from. The key is still _read_, so a value already set keeps resolving.
 
 ## [v0.38.0] - 2026-08-13
 
