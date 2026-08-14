@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.39.1] - 2026-08-14
+
 ### Fixed
 
 - **The develop-pipeline Stop hook named the *next* step, skipping the pending one.** The hook fires when the assistant tries to stop mid-pipeline and returns a `decision: "block"` reason telling the orchestrator what to run. It computed that as `current_step + 1`, which skips a step whenever it fires **during** a step rather than between steps.
