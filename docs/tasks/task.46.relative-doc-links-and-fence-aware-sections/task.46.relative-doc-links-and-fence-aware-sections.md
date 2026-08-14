@@ -13,11 +13,14 @@ updated: 2026-08-14
 completed_date: 2026-08-14
 pr_number: 215
 estimated_effort_hours: 6
+github_issue: 216
 ---
 
 # [Task 46] Write relative document links, and stop a fenced `# ` truncating a Jira description
 
 **Task File**: [task.46.relative-doc-links-and-fence-aware-sections.md](./task.46.relative-doc-links-and-fence-aware-sections.md)
+
+**GitHub Issue:** [#216](https://github.com/Gamaroff/agent-skills/issues/216) — filed retroactively; the task shipped in v0.39.0 before it had one
 
 ## Overview
 
@@ -371,4 +374,6 @@ board card moved. Recorded rather than skipped silently.
 | 2026-08-14 |         | QA findings fixed — both mediums closed, 1 iteration  | qa-fix  |
 | 2026-08-14 |         | QA gate PASS (95/100) — 0 findings, 2 cycles          | qa-task |
 | 2026-08-14 | 1.1     | DoD verified — accepted (PR #215)                     | finalise |
+| 2026-08-14 |         | GitHub issue created (#216)                           | sync-github-task |
+| 2026-08-14 |         | Status → closed (frontmatter: accepted)               | sync-github-task |
 <!-- change-log-end -->
