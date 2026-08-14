@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.39.0] - 2026-08-14
+
 ### Added
 
 - **Prettier is now repo policy for JavaScript.** `.prettierrc` pins the settings (they are Prettier 3's defaults, which is what the code already follows), `.prettierignore` scopes the tool to JS only, and `npm run format` / `npm run format:check` are wired up.
