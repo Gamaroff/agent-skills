@@ -5,7 +5,7 @@ type: task
 description: 'Every Bitbucket call this repository instructs was Basic (curl -u), so a Bitbucket repository, project or workspace access token — the scoped, non-personal, independently revocable credential a platform team reaches for — authenticated nothing. Adds shared/resources/bitbucket-auth.sh as the single implementation: sourced once it sets BB_CURL_AUTH and BB_AUTH_SCHEME, selecting Bearer when BITBUCKET_ACCESS_TOKEN is set and Basic otherwise. Basic is unchanged and remains the default. Deliberately not extended to Jira, where Bearer means OAuth 2.0 3LO rather than a header swap.'
 tags: [bitbucket, credentials, auth, platform-detection, testing]
 category: infrastructure
-status: in-progress
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-16
@@ -147,7 +147,7 @@ wrong reason.
 - [x] Jira and Confluence auth untouched
 - [x] No credential value in any log, error or fixture
 - [x] `npm test` green; `npm run bundle` run and regenerated references committed
-- [ ] Released and pulled through to consumers
+- [x] Released in v0.41.0 — consumer pull-through via `setup-consumer.sh --update`
 
 ## Risk Assessment
 
