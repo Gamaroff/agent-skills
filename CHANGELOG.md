@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.41.0] - 2026-08-16
+
 ### Added
 
 - **Bitbucket REST auth now supports Bearer as well as Basic, selected by variable name.** Set `BITBUCKET_ACCESS_TOKEN` — a repository, project or workspace access token — and every Bitbucket call sends `Authorization: Bearer`. Leave it unset and nothing changes: `BITBUCKET_USERNAME` plus `BITBUCKET_API_TOKEN` (or the legacy `BITBUCKET_APP_PASSWORD`) still send `--user`, exactly as before. **Existing Basic setups are unaffected and need no change.**
