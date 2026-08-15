@@ -31,7 +31,7 @@ Read once per run from the consumer project's `skills-config.yaml` (`developNext
 
 Apply any project-wide command conventions from the consumer project's own CLAUDE.md when running these (e.g. a required `env` prefix for `gh`).
 
-**Hosting platform.** Steps 1 and 3 support **GitHub** (via `gh`) and **Bitbucket** (via the REST API), resolved per-run by `references/resolve-platform.sh` in Step 0. Bitbucket requires `BITBUCKET_USERNAME` and `BITBUCKET_API_TOKEN` (an Atlassian API token with Bitbucket scopes; `BITBUCKET_APP_PASSWORD` is honoured as a fallback) in the environment, plus `curl` and `jq`.
+**Hosting platform.** Steps 1 and 3 support **GitHub** (via `gh`) and **Bitbucket** (via the REST API), resolved per-run by `references/resolve-platform.sh` in Step 0. Bitbucket requires a REST credential in the environment — either `BITBUCKET_ACCESS_TOKEN` (a repository/project/workspace access token, sent as Bearer) or `BITBUCKET_USERNAME` plus `BITBUCKET_API_TOKEN` (an Atlassian API token with Bitbucket scopes, sent as Basic; `BITBUCKET_APP_PASSWORD` is honoured as a fallback), resolved by `references/bitbucket-auth.sh` — plus `curl` and `jq`.
 
 ## Run state (crash safety + single-flight)
 
@@ -73,8 +73,13 @@ Written at selection, updated after each of Steps 2–4, **deleted only in Step 
      BB_WORKSPACE=${BB_PATH%%/*}
      BB_REPO=${BB_PATH##*/}
      BB_API="https://api.bitbucket.org/2.0"
-     [ -n "$BITBUCKET_USERNAME" ] && [ -n "${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" ] || {
-       echo "BITBUCKET_USERNAME / BITBUCKET_API_TOKEN not set — Step 3 cannot merge"; HALT; }
+     # Resolve the REST credential once for the whole run. Sets BB_CURL_AUTH
+     # (curl args) and BB_AUTH_SCHEME; non-zero when neither an access token
+     # (Bearer) nor a username + API token (Basic) is set. HALT rather than
+     # continue: an unauthenticated Bitbucket call returns 404, so Step 3 would
+     # report "no PR found" instead of "no credentials".
+     source references/bitbucket-auth.sh || {
+       echo "No Bitbucket credential resolved — Step 3 cannot merge"; HALT; }
    fi
    ```
 
@@ -98,7 +103,7 @@ Act on the JSON `status`:
 
     ```bash
     if [ "$VCS" = "bitbucket" ]; then
-      curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" --get \
+      curl -sf "${BB_CURL_AUTH[@]}" --get \
         --data-urlencode 'q=source.branch.name="<branch>" AND state="MERGED"' \
         "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests" | jq -r '.values[0].id // empty'
     else
@@ -128,10 +133,10 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 
      ```bash
      if [ "$VCS" = "bitbucket" ]; then
-       PR_HEAD=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+       PR_HEAD=$(curl -sf "${BB_CURL_AUTH[@]}" \
          "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}" \
          | jq -r '.source.commit.hash')
-       PR_STATE=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+       PR_STATE=$(curl -sf "${BB_CURL_AUTH[@]}" \
          "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}" \
          | jq -r '.state')
      else
@@ -173,7 +178,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
        > /tmp/dn-merge.json
      MERGE_RESULT=$(curl -s -X POST \
        -H "Content-Type: application/json" \
-       -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+       "${BB_CURL_AUTH[@]}" \
        --data-binary @/tmp/dn-merge.json \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/merge")
      rm -f /tmp/dn-merge.json

@@ -596,11 +596,18 @@ before reading the body** — that is the whole difficulty here, for the reason 
 ```bash
 BB_API="https://api.bitbucket.org/2.0"
 HEAD_SHA=$(git rev-parse HEAD)
-AUTH="${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}"
-
 # Capture body AND status separately. `curl -s` alone cannot tell 403 from 200-with-no-results.
-BB_CODE=$(curl -s -o /tmp/bb-pipelines.json -w '%{http_code}' -u "$AUTH" \
-  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pipelines/?sort=-created_on&pagelen=20")
+#
+# bitbucket-auth.sh picks Bearer or Basic by variable name and fails non-zero
+# when neither is set. Skip the call entirely in that case: an unauthenticated
+# request would come back 404 and read as "no pipelines" — the same trap the
+# 403 branch below exists for.
+if source references/bitbucket-auth.sh; then
+  BB_CODE=$(curl -s -o /tmp/bb-pipelines.json -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pipelines/?sort=-created_on&pagelen=20")
+else
+  BB_CODE="000"   # no credential — falls into the UNKNOWN branch below, never "NONE"
+fi
 
 if [ "$BB_CODE" = "403" ]; then
   # NOT "no CI". The token lacks read:pipeline:bitbucket. Every other call can
@@ -973,9 +980,14 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    _Bitbucket:_
 
    ```bash
+   # Bearer or Basic, chosen by variable name. Non-blocking like the rest of
+   # this step: without a credential the comment cannot be posted, and a 404
+   # from an unauthenticated call would otherwise look like a missing PR.
+   source references/bitbucket-auth.sh || echo "⚠️ No Bitbucket credential — PR comment skipped"
+
    # Search for existing canonical comment by marker
    EXISTING_COMMENT_ID=$(curl -sf \
-     -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+     "${BB_CURL_AUTH[@]}" \
      "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
      | jq -r '.values[] | select(.content.raw | startswith("<!-- finalise-canonical-summary -->")) | .id' \
      | head -1)
@@ -983,7 +995,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$BODY" '{content: {raw: $raw}}')
    if [ -n "$EXISTING_COMMENT_ID" ]; then
      curl -sf -X PUT \
-       -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+       "${BB_CURL_AUTH[@]}" \
        -H "Content-Type: application/json" \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments/${EXISTING_COMMENT_ID}" \
        -d "$BB_COMMENT_PAYLOAD" >/dev/null \
@@ -991,7 +1003,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
        || echo "⚠️ PR comment edit failed — attempting new comment"
    else
      curl -sf -X POST \
-       -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+       "${BB_CURL_AUTH[@]}" \
        -H "Content-Type: application/json" \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
        -d "$BB_COMMENT_PAYLOAD" >/dev/null \

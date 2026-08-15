@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Bitbucket REST auth now supports Bearer as well as Basic, selected by variable name.** Set `BITBUCKET_ACCESS_TOKEN` — a repository, project or workspace access token — and every Bitbucket call sends `Authorization: Bearer`. Leave it unset and nothing changes: `BITBUCKET_USERNAME` plus `BITBUCKET_API_TOKEN` (or the legacy `BITBUCKET_APP_PASSWORD`) still send `--user`, exactly as before. **Existing Basic setups are unaffected and need no change.**
+
+  This exists because the credential type is often not the tooling's decision. A platform team taking central control of token issuance reaches for a scoped, non-personal, independently revocable Bitbucket access token — and those authenticate with Bearer. Until now this repository had no Bearer path for Bitbucket anywhere: every call it instructs was `curl -u`, so a correctly scoped access token authenticated *nothing*, and the only way to keep the tooling working was to argue for the weaker credential. Supporting both makes the choice theirs.
+
+  **The scheme is chosen by variable name, never by inspecting the token.** Sniffing an `ATATT…` prefix to guess would be the obvious shortcut and is the wrong one: Atlassian's credential formats have already changed once inside this project's lifetime — app passwords were removed on 2026-07-28 — and a prefix heuristic silently mis-authenticates the day they change again. A variable name is a decision the operator made; a prefix is a guess about a vendor. Bearer wins when both are set, so an explicit opt-in is not overridden by stale Basic variables left in a `.env`.
+
+  `shared/resources/bitbucket-auth.sh` is new and is the single implementation — sourced once, it sets `BB_CURL_AUTH` (the curl argument vector) and `BB_AUTH_SCHEME` (`bearer` | `basic` | `none`). Every Bitbucket call path in the repository now goes through it: **15** `curl` sites — 14 across `create-pr`, `create-issue`, `develop-next`, `finalise` and `qa-fix`, plus one in `shared/resources/tracker-state-poller-subagent.md` — resolved at 9 source points. It is bundled into **29** skills.
+
+  **It returns non-zero rather than emitting a half-formed credential, and that is the point.** Bitbucket answers an unauthenticated request to a private repo with **404, not 401** — it hides the repository rather than refusing the caller. So `--user user:` with no token, an empty `Authorization: Bearer`, or simply the wrong scheme all come back as an empty list that reads exactly like "there is nothing there". The three preconditions that used to guard this by hand each checked only the Basic variables and would have rejected a valid access token. The rule the docs now state everywhere: **read the status code, never the length of the list.**
+
+  Deliberately **not** extended to Jira or Confluence, though it looks like the symmetrical change. Atlassian API tokens for Jira are Basic by design — scoped tokens included — so Bearer gains nothing there, and Bearer on Jira means OAuth 2.0 3LO, which is not a header swap: it also moves the base URL to `api.atlassian.com/ex/jira/{cloudId}/…` and adds refresh-token rotation. `authHeader()` in `jira-sync.js` is untouched.
+
+  `shared/resources/bitbucket-auth.test.sh` is new — 35 assertions across scheme selection, both Basic variable names, precedence, the empty-variable and username-without-token near-misses, quoting of tokens containing spaces and colons, and silence on the happy path. **Mutation-proven rather than merely green**: swapping the precedence turns 2 red, dropping the `BITBUCKET_APP_PASSWORD` fallback turns 3 red, emitting a half-formed `--user` turns 2 red, treating an empty `BITBUCKET_ACCESS_TOKEN` as set turns 4 red, and making the no-credential path succeed turns 4 red. No test asserts on a token's contents — only on the scheme selected and the exact argument vector.
+
 ## [v0.40.0] - 2026-08-14
 
 ### Changed

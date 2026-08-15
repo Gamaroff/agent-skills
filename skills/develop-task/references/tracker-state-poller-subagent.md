@@ -125,16 +125,23 @@ fi
 Derive `{WORKSPACE}` and `{REPO_SLUG}` from git remote URL (`git remote get-url origin`), e.g. `git@bitbucket.org:{workspace}/{slug}.git`.
 
 ```bash
-BB_TOKEN="${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}"   # new name preferred; old honoured
-BB_RESP=$(curl -s -u "${BITBUCKET_USERNAME}:${BB_TOKEN}" \
-  "https://api.bitbucket.org/2.0/repositories/{WORKSPACE}/{REPO_SLUG}/pullrequests/{PR_NUMBER}" 2>&1)
-if echo "$BB_RESP" | jq -e '.id' >/dev/null 2>&1; then
-  PR_URL=$(echo "$BB_RESP" | jq -r '.links.html.href')
-  PR_STATE=$(echo "$BB_RESP" | jq -r '.state')                      # OPEN|MERGED|DECLINED
-  PR_REVIEWS=0; PR_APPROVED=false                                   # Bitbucket approval via participants
-else
+# Bearer or Basic, chosen by variable name — see references/platform-detection.md
+if ! source references/bitbucket-auth.sh; then
+  # Distinguish "no credential" from "PR not found". Without the credential a
+  # private repo answers 404, which would otherwise be logged as a missing PR.
   PR_STATE="unknown"; PR_URL=""; PR_REVIEWS=0; PR_APPROVED=false
-  ERRORS+=("Bitbucket PR {PR_NUMBER}: $(echo "$BB_RESP" | jq -r '.error.message // "unknown error"' 2>/dev/null)")
+  ERRORS+=("Bitbucket: no credential resolved — PR state not polled")
+else
+  BB_RESP=$(curl -s "${BB_CURL_AUTH[@]}" \
+    "https://api.bitbucket.org/2.0/repositories/{WORKSPACE}/{REPO_SLUG}/pullrequests/{PR_NUMBER}" 2>&1)
+  if echo "$BB_RESP" | jq -e '.id' >/dev/null 2>&1; then
+    PR_URL=$(echo "$BB_RESP" | jq -r '.links.html.href')
+    PR_STATE=$(echo "$BB_RESP" | jq -r '.state')                    # OPEN|MERGED|DECLINED
+    PR_REVIEWS=0; PR_APPROVED=false                                 # Bitbucket approval via participants
+  else
+    PR_STATE="unknown"; PR_URL=""; PR_REVIEWS=0; PR_APPROVED=false
+    ERRORS+=("Bitbucket PR {PR_NUMBER}: $(echo "$BB_RESP" | jq -r '.error.message // "unknown error"' 2>/dev/null)")
+  fi
 fi
 ```
 

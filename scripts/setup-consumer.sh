@@ -217,6 +217,14 @@ collect_env_vars() {
     # emits "${line%%=*}=" per entry, so a bare comment pushed in here would come
     # out as "# ...text...=" — a malformed line in a file meant for humans.
     ENV_LINES+=("BITBUCKET_APP_PASSWORD=${BITBUCKET_API_TOKEN}")
+    # The Bearer alternative is deliberately not prompted for. It REPLACES the
+    # pair above rather than adding to it, so offering it as a third prompt
+    # invites setting both; and writing an empty BITBUCKET_ACCESS_TOKEN= line
+    # would put the exact shape that produces a valid-looking empty Bearer
+    # header into every consumer's .env. Mention it, let them add it by hand.
+    info "Bearer alternative: set BITBUCKET_ACCESS_TOKEN (a repository/project/workspace"
+    info "  access token) by hand instead of the pair above — it replaces them, and wins"
+    info "  if both are set. See docs/reference/configuration.md#bitbucket."
   fi
 
   # Jira creds

@@ -21,7 +21,7 @@ Skills auto-detect your platform via `skills-config.yaml` + env vars + git remot
 | --------- | ------------- | -------------------------------------------------------------------------------------------------------- |
 | GitHub    | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration              |
 | GitHub    | Jira          | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported                         |
-| Bitbucket | Jira          | `BITBUCKET_USERNAME`, `BITBUCKET_API_TOKEN`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira          | `BITBUCKET_ACCESS_TOKEN` (or `BITBUCKET_USERNAME` + `BITBUCKET_API_TOKEN`), `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
 ### How to pick a row
 
@@ -66,15 +66,22 @@ export JIRA_BOARD_ID=1          # Scrum boards only
 
 | Variable                 | Required | Description                                                                                                                                            |
 | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BITBUCKET_USERNAME`     | ✅       | Basic Auth username — your Atlassian account email                                                                                                     |
-| `BITBUCKET_API_TOKEN`    | ✅       | Atlassian API token **with Bitbucket scopes ticked** — create at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens)        |
+| `BITBUCKET_ACCESS_TOKEN` | Bearer path | A repository, project or workspace access token, sent as `Authorization: Bearer`. **Replaces** the two rows below rather than supplementing them — an access token has no username |
+| `BITBUCKET_USERNAME`     | Basic path | Basic Auth username — your Atlassian account email                                                                                                     |
+| `BITBUCKET_API_TOKEN`    | Basic path | Atlassian API token **with Bitbucket scopes ticked** — create at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens)        |
 | `BITBUCKET_APP_PASSWORD` | optional | Legacy **name** for the same value, still read as a fallback. Atlassian removed app passwords themselves on 2026-07-28 — set this to the API token too. |
 | `BITBUCKET_REPO_URL`     | optional | Override auto-detected repo base URL (rarely needed)                                                                                                   |
 
 ```bash
+# Basic — an Atlassian API token plus your account email
 export BITBUCKET_USERNAME=you@example.com
 export BITBUCKET_API_TOKEN=ATATT...
+
+# …or Bearer — a repository/project/workspace access token, on its own
+export BITBUCKET_ACCESS_TOKEN=ATCTT...
 ```
+
+Set one or the other. `BITBUCKET_ACCESS_TOKEN` wins if both are present.
 
 > **Tick the Bitbucket scopes when you create the token.** A scopeless Atlassian token
 > authenticates fine against Jira and fails against Bitbucket — and because Bitbucket hides

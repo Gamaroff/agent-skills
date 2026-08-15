@@ -24,8 +24,10 @@ Use this skill when:
 
 **Bitbucket:**
 
-- `BITBUCKET_USERNAME` and `BITBUCKET_API_TOKEN` environment variables must be set
-  (`BITBUCKET_APP_PASSWORD` is still honoured as a fallback — see the note below)
+- A Bitbucket REST credential must be set — **either** `BITBUCKET_ACCESS_TOKEN` (a repository,
+  project or workspace access token, sent as Bearer) **or** `BITBUCKET_USERNAME` plus
+  `BITBUCKET_API_TOKEN` (sent as Basic; `BITBUCKET_APP_PASSWORD` is still honoured as a fallback —
+  see the note below). `references/bitbucket-auth.sh` picks between them by variable name.
 - `curl` and `jq` must be available
 
 **Both:**
@@ -112,6 +114,9 @@ if [ "$PLATFORM" = "bitbucket" ]; then
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
+  # Resolve the REST credential once. Sets BB_CURL_AUTH (curl args) and
+  # BB_AUTH_SCHEME (bearer|basic); non-zero when neither credential is set.
+  source references/bitbucket-auth.sh || exit 1
 elif [ "$PLATFORM" = "github" ]; then
   REPO_SLUG=$(echo "$REMOTE_URL" \
     | sed -E 's|.*github\.com[:/]||; s|\.git$||')
@@ -159,10 +164,10 @@ gh auth status
 _Bitbucket:_
 
 ```bash
-if [ -z "$BITBUCKET_USERNAME" ] || [ -z "${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" ]; then
-  echo "Error: BITBUCKET_USERNAME and BITBUCKET_API_TOKEN must be set"
-  exit 1
-fi
+# BB_CURL_AUTH was resolved in the platform-detection step above; re-source here
+# if this block is run standalone. Either credential type is acceptable —
+# Bearer (BITBUCKET_ACCESS_TOKEN) or Basic (BITBUCKET_USERNAME + token).
+source references/bitbucket-auth.sh || exit 1
 # Verify credentials against the REPOSITORY, not ${BB_API}/user.
 #
 # GET /2.0/user needs the read:user scope, which tokens scoped for PR work
@@ -170,7 +175,7 @@ fi
 # Probing it here would abort create-pr for a perfectly good credential.
 # (develop-next documents the same hazard; this used to contradict it.)
 AUTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+  "${BB_CURL_AUTH[@]}" \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}")
 # 404 here means unauthenticated, not missing: Bitbucket hides private repos
 # from anonymous callers rather than returning 401.
@@ -326,7 +331,7 @@ printf '%s' "$PR_BODY" > "$PR_BODY_FILE"
 PR_RESPONSE=$(curl -s -X POST \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests" \
   -H "Content-Type: application/json" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+  "${BB_CURL_AUTH[@]}" \
   -d "$(jq -n \
     --arg title "$PR_TITLE" \
     --arg desc "$(cat "$PR_BODY_FILE")" \
@@ -558,7 +563,13 @@ Then retry /create-pr
 ```
 Error: Bitbucket credentials not set or invalid.
 
-Set the following environment variables:
+Set EITHER an access token (Bearer):
+  export BITBUCKET_ACCESS_TOKEN=your-repository-or-workspace-access-token
+
+Created from Bitbucket → Repository/Project/Workspace settings →
+Access tokens. It carries its own scopes and has no username.
+
+OR an Atlassian API token (Basic):
   export BITBUCKET_USERNAME=your-atlassian-account-email
   export BITBUCKET_API_TOKEN=your-atlassian-api-token
 
@@ -571,6 +582,9 @@ authenticates against Jira and fails against Bitbucket.
 App passwords were REMOVED by Atlassian on 2026-07-28. The older
 variable name BITBUCKET_APP_PASSWORD is still read as a fallback,
 but it too must now hold an API token.
+
+BITBUCKET_ACCESS_TOKEN wins if both are set — it replaces the
+username/token pair rather than supplementing it.
 
 Then retry /create-pr
 ```
@@ -612,7 +626,7 @@ Check for an existing PR before creating:
 ```bash
 EXISTING=$(curl -s \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${CURRENT_BRANCH}%22%20AND%20state%3D%22OPEN%22" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+  "${BB_CURL_AUTH[@]}" \
   | jq -r '.values[0].links.html.href // empty')
 ```
 

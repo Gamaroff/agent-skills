@@ -769,28 +769,43 @@ Full reference (hook catalogue, lock-file format, escape valves, interaction dia
 
 ### Bitbucket
 
+**Two credential types are supported. Pick one; you do not need both.**
+
 | Variable                 | Example                          | Required | Purpose                                                                             |
 | ------------------------ | -------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| `BITBUCKET_USERNAME`     | `jsmith@example.com`             | Yes      | Basic Auth username — your Atlassian account email                                  |
-| `BITBUCKET_API_TOKEN`    | `ATATT...`                       | Yes      | Atlassian API token **with Bitbucket scopes ticked**. Create at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `BITBUCKET_ACCESS_TOKEN` | `ATCTT...`                       | Bearer path | A repository, project or workspace access token, sent as `Authorization: Bearer`. Create from the corresponding Bitbucket settings → Access tokens page. **Replaces** the two variables below rather than supplementing them |
+| `BITBUCKET_USERNAME`     | `jsmith@example.com`             | Basic path | Basic Auth username — your Atlassian account email. Unused on the Bearer path       |
+| `BITBUCKET_API_TOKEN`    | `ATATT...`                       | Basic path | Atlassian API token **with Bitbucket scopes ticked**. Create at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
 | `BITBUCKET_APP_PASSWORD` | `ATATT...`                       | No       | Legacy **name**, still read as a fallback. Set it to the same API token — app passwords themselves were removed by Atlassian on 2026-07-28 |
 | `BITBUCKET_REPO_URL`     | `https://bitbucket.org/org/repo` | No       | Override if git remote auto-detect fails                                            |
 
-Four things about the Bitbucket credential are easy to get wrong, and each fails
+Five things about the Bitbucket credential are easy to get wrong, and each fails
 quietly rather than loudly:
 
-- **It is an API token, not an app password.** Only the older variable *name* survives.
-- **The token needs Bitbucket scopes.** A scopeless token works against Jira and fails
-  against Bitbucket, which reads as an outage rather than a permissions problem.
-- **Bitbucket uses Basic auth (`curl -u`), never Bearer.** Bearer belongs to repository
-  and workspace access tokens — a different credential in a different context.
-- **An unauthenticated call returns 404, not 401**, because Bitbucket hides private
-  repositories from anonymous callers. A missing credential therefore looks like an
-  *empty result*. Never read an empty listing as evidence until a repo-root probe
-  has returned 200.
+- **An Atlassian API token is Basic; an access token is Bearer.** They are different
+  credential types, not two spellings of one. Only the older `APP_PASSWORD` variable
+  *name* survives from before the 2026-07-28 removal.
+- **The API token needs Bitbucket scopes.** A scopeless token works against Jira and
+  fails against Bitbucket, which reads as an outage rather than a permissions problem.
+- **The scheme is chosen by variable *name*, never by the token's value.** Setting
+  `BITBUCKET_ACCESS_TOKEN` selects Bearer; leaving it unset selects Basic. Nothing
+  inspects an `ATATT` prefix to guess — a heuristic would mis-authenticate silently
+  the next time Atlassian changes a format, and it has changed one already.
+- **An access token has no username.** `BITBUCKET_USERNAME` belongs only to the Basic
+  path; setting it alongside an access token does nothing.
+- **An unauthenticated — or wrongly-schemed — call returns 404, not 401**, because
+  Bitbucket hides private repositories from anonymous callers. A missing credential,
+  an empty one, and the wrong scheme all look like an *empty result*, and like each
+  other. **Read the status code, never the length of the list.** Never read an empty
+  listing as evidence until a repo-root probe has returned 200.
 
-Skills resolve the credential as `${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}`,
-so setting either name works and setting both is harmless.
+Skills resolve all of this through the shared helper
+[`shared/resources/bitbucket-auth.sh`](../../shared/resources/bitbucket-auth.sh) — sourced once,
+it sets `BB_CURL_AUTH` (curl arguments) and `BB_AUTH_SCHEME` (`bearer` | `basic` | `none`), and
+returns non-zero rather than emitting a half-formed credential. On the Basic path it reads
+`${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}`, so either name works and setting both is
+harmless. `BITBUCKET_ACCESS_TOKEN` wins when both credential types are present, so an explicit
+opt-in is never overridden by stale Basic variables left in a `.env`.
 
 ### GitHub
 
