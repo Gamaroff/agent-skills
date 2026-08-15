@@ -162,10 +162,10 @@ elif echo "$REMOTE_URL" | grep -qi "bitbucket\.org"; then
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
 
-  # Verify credentials
-  if [ -z "$BITBUCKET_USERNAME" ] || [ -z "${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" ]; then
-    echo "Error: BITBUCKET_USERNAME and BITBUCKET_API_TOKEN must be set" && exit 1
-  fi
+  # Resolve the REST credential once: BITBUCKET_ACCESS_TOKEN → Bearer, else
+  # BITBUCKET_USERNAME + BITBUCKET_API_TOKEN (or the legacy APP_PASSWORD) →
+  # Basic. Sets BB_CURL_AUTH; non-zero and loud when neither is set.
+  source references/bitbucket-auth.sh || exit 1
 else
   PLATFORM="unknown"
 fi
@@ -319,7 +319,7 @@ Map type and priority to Bitbucket values:
 ISSUE_RESPONSE=$(curl -s -X POST \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/issues" \
   -H "Content-Type: application/json" \
-  -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+  "${BB_CURL_AUTH[@]}" \
   -d "$(jq -n \
     --arg title "[Story 180.3] Debounce timing needs adjustment" \
     --arg content "$(cat "$body_file")" \
@@ -567,7 +567,13 @@ Then retry /create-issue
 ```
 Error: Bitbucket credentials not set or invalid.
 
-Set the following environment variables:
+Set EITHER an access token (Bearer):
+  export BITBUCKET_ACCESS_TOKEN=your-repository-or-workspace-access-token
+
+Created from Bitbucket → Repository/Project/Workspace settings →
+Access tokens. It carries its own scopes and has no username.
+
+OR an Atlassian API token (Basic):
   export BITBUCKET_USERNAME=your-atlassian-account-email
   export BITBUCKET_API_TOKEN=your-atlassian-api-token
 
@@ -580,6 +586,9 @@ authenticates against Jira and fails against Bitbucket.
 App passwords were REMOVED by Atlassian on 2026-07-28. The older
 variable name BITBUCKET_APP_PASSWORD is still read as a fallback,
 but it too must now hold an API token.
+
+BITBUCKET_ACCESS_TOKEN wins if both are set — it replaces the
+username/token pair rather than supplementing it.
 
 Then retry /create-issue
 ```

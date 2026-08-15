@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-08-14
-**Next Available Task Number:** **50**
+**Last Updated:** 2026-08-16
+**Next Available Task Number:** **51**
 
 ## How to use
 
@@ -89,6 +89,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 47 | [The `--json` samples under-document the payload, and nothing checked](task.47.json-output-sample-fidelity/task.47.json-output-sample-fidelity.md) | in-progress | documentation | Medium | 2026-08-14 | — | task.46 |
 | 48 | [Credentials may live at `.secrets/tooling.env`, and a missing one no longer fails silently](task.48.credential-file-discovery/task.48.credential-file-discovery.md) | accepted | infrastructure | High | 2026-08-14 | — | none |
 | 49 | [`setup-consumer.sh` still seeds credentials into `.env`, teaching new consumers the old location](task.49.setup-consumer-secrets-path/task.49.setup-consumer-secrets-path.md) | planned | infrastructure | Medium | 2026-08-14 | — | task.48 |
+| 50 | [Bitbucket REST auth supports Bearer as well as Basic, chosen by variable name](task.50.bitbucket-bearer-auth/task.50.bitbucket-bearer-auth.md) | in-progress | infrastructure | High | 2026-08-16 | — | none |
 
 ---
 

@@ -34,7 +34,7 @@ Platform-specific — pick the row that matches your project. Skills auto-detect
 | --------- | ------------- | -------------------------------------------------------------------------------------------------------- |
 | GitHub    | GitHub Issues | `gh` CLI authenticated (`gh auth status`); `project.yml` at repo root for board integration              |
 | GitHub    | Jira          | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported                         |
-| Bitbucket | Jira          | `BITBUCKET_USERNAME`, `BITBUCKET_API_TOKEN`, `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
+| Bitbucket | Jira          | `BITBUCKET_ACCESS_TOKEN` (or `BITBUCKET_USERNAME` + `BITBUCKET_API_TOKEN`), `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
 Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc.
 
@@ -51,7 +51,7 @@ Pick the check that matches your platform:
 gh auth status
 
 # Bitbucket VCS
-[ -n "$BITBUCKET_USERNAME" ] && [ -n "${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" ] && echo "bitbucket auth ok"
+source shared/resources/bitbucket-auth.sh && echo "bitbucket auth ok ($BB_AUTH_SCHEME)"
 
 # Jira tracker (run in addition to VCS check above)
 [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo "jira auth ok"
@@ -193,7 +193,7 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 | Symptom                                 | Likely cause                                  | Fix                                                                                       |
 | --------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `gh auth status` not logged in          | `gh` not configured                           | Run `gh auth login`                                                                       |
-| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `curl -s -o /dev/null -w '%{http_code}' -u "$BITBUCKET_USERNAME:$BITBUCKET_API_TOKEN" https://api.bitbucket.org/2.0/user` (expect 200) |
+| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `source shared/resources/bitbucket-auth.sh && curl -s -o /dev/null -w '%{http_code}' "${BB_CURL_AUTH[@]}" https://api.bitbucket.org/2.0/user` (expect 200) |
 | Jira issue creation fails               | Wrong `JIRA_URL` or token                     | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
 | Skill picked wrong platform             | Auto-detect mis-fired                         | Set explicit `tracker:` / `vcs:` in `skills-config.yaml`                                  |
 | Phase 0 prompts differ from table above | Skill version drift                           | Check `.agents/skills/develop-story/` version                                             |

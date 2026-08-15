@@ -22,13 +22,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 |---|---|
 | GitHub | `gh auth status` — re-run `gh auth login` if expired |
 | Jira | `curl -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/myself"` — should return your user JSON, not a 401 |
-| Bitbucket | `curl -u "$BITBUCKET_USERNAME:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" "https://api.bitbucket.org/2.0/user"` |
+| Bitbucket | `source shared/resources/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" "https://api.bitbucket.org/2.0/user"` — the helper picks Bearer or Basic; `echo $BB_AUTH_SCHEME` says which |
 
-**Bitbucket answers a bad credential with 404, not 401** — it hides private repositories from anonymous callers, so a missing or unscoped token reads as an *empty result* rather than an auth error. Probe the repo root and check the status code before believing an empty listing:
+**Bitbucket answers a bad credential with 404, not 401** — it hides private repositories from anonymous callers, so a missing token, an unscoped one, or the *wrong scheme* (Bearer sent where Basic was expected, or the reverse) all read as an *empty result* rather than an auth error, and are indistinguishable from each other. **Read the status code, never the length of the list.** Probe the repo root before believing an empty listing:
 
 ```bash
+source shared/resources/bitbucket-auth.sh || echo "no credential resolved"
+echo "scheme: $BB_AUTH_SCHEME"
 curl -s -o /dev/null -w '%{http_code}\n' \
-  -u "$BITBUCKET_USERNAME:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+  "${BB_CURL_AUTH[@]}" \
   "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}"   # expect 200
 ```
 

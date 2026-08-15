@@ -162,8 +162,9 @@ For tasks:
 
 | Variable              | Required when        | Purpose                                                                                                                                                                                                     |
 | --------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BITBUCKET_USERNAME`  | `PLATFORM=bitbucket` | Bitbucket REST API auth (username)                                                                                                                                                                          |
-| `BITBUCKET_API_TOKEN` | `PLATFORM=bitbucket` | Bitbucket REST API auth — an Atlassian API token (`ATATT…`) with Bitbucket scopes ticked. `BITBUCKET_APP_PASSWORD` is read as a fallback; app passwords themselves were removed by Atlassian on 2026-07-28. |
+| `BITBUCKET_ACCESS_TOKEN` | `PLATFORM=bitbucket`, Bearer | Bitbucket REST API auth via **Bearer** — a repository, project or workspace access token. Optional; **replaces** the username/token pair rather than supplementing it, and wins if both are set. |
+| `BITBUCKET_USERNAME`  | `PLATFORM=bitbucket`, Basic | Bitbucket REST API auth (username). Not used on the Bearer path — an access token has no username.                                                                                             |
+| `BITBUCKET_API_TOKEN` | `PLATFORM=bitbucket`, Basic | Bitbucket REST API auth — an Atlassian API token (`ATATT…`) with Bitbucket scopes ticked. `BITBUCKET_APP_PASSWORD` is read as a fallback; app passwords themselves were removed by Atlassian on 2026-07-28. |
 | `JIRA_URL`            | Jira comment desired | Enables Jira MCP comment when set (e.g. `https://myorg.atlassian.net`)                                                                                                                                      |
 
 Cross-reference: `create-pr` and `finalise` use the same variables — set them once in your shell profile.
@@ -183,6 +184,9 @@ if [ "$PLATFORM" = "bitbucket" ]; then
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
+  # Resolve the REST credential once. Sets BB_CURL_AUTH (curl args) and
+  # BB_AUTH_SCHEME (bearer|basic); non-zero when neither credential is set.
+  source references/bitbucket-auth.sh || exit 1
 elif [ "$PLATFORM" = "github" ]; then
   : # gh CLI handles GitHub; no extra vars needed
 else
@@ -230,7 +234,7 @@ Before starting fixes:
 
    elif [ "$PLATFORM" = "bitbucket" ]; then
      ENCODED_BRANCH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$BRANCH" 2>/dev/null || echo "$BRANCH")
-     BB_PR_JSON=$(curl -sf -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+     BB_PR_JSON=$(curl -sf "${BB_CURL_AUTH[@]}" \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${ENCODED_BRANCH}%22+AND+state%3D%22OPEN%22")
      if [ $? -ne 0 ] || [ "$(echo "$BB_PR_JSON" | jq '.values | length')" -eq 0 ]; then
        echo "⚠️ No open Bitbucket PR found for branch ${BRANCH}"
@@ -737,7 +741,7 @@ if [ "$PLATFORM" = "github" ]; then
 elif [ "$PLATFORM" = "bitbucket" ]; then
   BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$COMMENT_BODY" '{content: {raw: $raw}}')
   curl -sf -X POST \
-    -u "${BITBUCKET_USERNAME}:${BITBUCKET_API_TOKEN:-$BITBUCKET_APP_PASSWORD}" \
+    "${BB_CURL_AUTH[@]}" \
     -H "Content-Type: application/json" \
     "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
     -d "$BB_COMMENT_PAYLOAD" >/dev/null
