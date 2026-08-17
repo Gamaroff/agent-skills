@@ -11,11 +11,14 @@ risk_level: medium
 created: 2026-08-14
 updated: 2026-08-14
 estimated_effort_hours: 4
+github_issue: 227
 ---
 
 # [Task 48] Credentials may live at `.secrets/tooling.env`, and a missing one no longer fails silently
 
 **Task File**: [task.48.credential-file-discovery.md](./task.48.credential-file-discovery.md)
+
+**GitHub Issue**: [#227](https://github.com/Gamaroff/agent-skills/issues/227)
 
 ## Overview
 

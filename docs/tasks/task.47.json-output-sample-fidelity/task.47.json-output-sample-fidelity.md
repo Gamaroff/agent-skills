@@ -11,11 +11,14 @@ risk_level: low
 created: 2026-08-14
 updated: 2026-08-17
 estimated_effort_hours: 2
+github_issue: 226
 ---
 
 # [Task 47] The `--json` samples under-document the payload, and nothing checked
 
 **Task File**: [task.47.json-output-sample-fidelity.md](./task.47.json-output-sample-fidelity.md)
+
+**GitHub Issue**: [#226](https://github.com/Gamaroff/agent-skills/issues/226)
 
 ## Overview
 

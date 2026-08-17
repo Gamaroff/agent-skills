@@ -11,11 +11,14 @@ risk_level: low
 created: 2026-08-17
 updated: 2026-08-17
 estimated_effort_hours: 8
+github_issue: 230
 ---
 
 # [Task 52] One deferred-mutation record, four renderings of it
 
 **Task File**: [task.52.deferred-mutation-record-and-renderers.md](./task.52.deferred-mutation-record-and-renderers.md)
+
+**GitHub Issue**: [#230](https://github.com/Gamaroff/agent-skills/issues/230)
 
 ## Overview
 

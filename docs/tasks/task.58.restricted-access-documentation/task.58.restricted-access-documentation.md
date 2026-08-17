@@ -11,11 +11,14 @@ risk_level: low
 created: 2026-08-17
 updated: 2026-08-17
 estimated_effort_hours: 8
+github_issue: 236
 ---
 
 # [Task 58] Document restricted tracker access for someone who has never heard of it
 
 **Task File**: [task.58.restricted-access-documentation.md](./task.58.restricted-access-documentation.md)
+
+**GitHub Issue**: [#236](https://github.com/Gamaroff/agent-skills/issues/236)
 
 ## Overview
 
