@@ -1,0 +1,117 @@
+schema: 1
+task: 'task.51.access-mode-config-and-resolver'
+task_title: '[Task 51] Declare tracker access level in config, and reject an unrecognised one loudly'
+gate: FAIL
+status_reason: >-
+  Cycle 5 found two HIGH — one a regression introduced by the cycle-4 fix (a duplicate inside an
+  at-site merge source escalated a declared `manual` to `full`, silently), one pre-existing (NUL
+  omitted from the transport refusal). Both are fixed and verified against every reported shape,
+  with four mutations red and the suite at 166/166. The gate stays FAIL because this is the
+  pipeline's fifth cycle: the fixes have targeted verification but no independent adversarial pass,
+  and across five cycles every fix round has introduced at least one new defect. Self-certifying the
+  last round against that base rate would be the one claim this task has repeatedly shown to be
+  unsafe. Escalating to the user instead.
+reviewer: 'QA Engineer'
+updated: '2026-08-17T21:15:00Z'
+
+re_review_of: 'task.51.gate.4.access-mode-config-and-resolver.yml'
+
+previous_issues:
+  - id: 'BUG-12 record forgery'
+    status: closed
+    verified: 'Escalate, downgrade, forged shape record, injection from vcs:, zsh, bundled copy — all rc=1. CR/LF/FS/GS fail closed. 1 MB payloads, format strings and literal sentinel spellings all round-trip then fail validation.'
+  - id: 'MED-9 lone separator'
+    status: closed
+  - id: 'MED-10 merge override'
+    status: closed
+    verified: 'Override works and the local value wins; multi-merge sequence, nested merge and recursive anchors all resolve. But the fix opened D1 below.'
+  - id: 'LOW-11 numeric index'
+    status: closed
+    verified: '01, 1.0, " 1", +1, 1e0, 0x1, 00000001, tab- and newline-bearing indices all fail to match.'
+  - id: 'LOW-12 backticked label'
+    status: closed
+    verified: 'Suite emits zero shell warnings.'
+
+top_issues:
+  - id: TASK-51-BUG-13
+    severity: high
+    status: fixed-pending-independent-verification
+    finding: >-
+      Moving the duplicate scan before flatten_mapping (the cycle-4 fix for merge-key override) meant
+      a merge source defined AT the merge site is never constructed in its own right and so never
+      scanned. `access:\n  <<: {tracker: manual, tracker: full}` resolved to full, exit 0, silent —
+      regression against 678a194, which rejected it. Four shapes reproduced plus a duplicated `<<`
+      key. The existing dupe-under-merge fixture could not catch any of them: it places the duplicate
+      in the local mapping, which was never the gap.
+    fix: 'Scan recurses into merge-tagged value nodes (MappingNode, SequenceNode-of-MappingNode); a second `<<` in one mapping is rejected.'
+    verified: 'All five shapes rc=1; legal override and multi-merge sequence still resolve; mutations 39 and 40 red.'
+
+  - id: TASK-51-BUG-14
+    severity: high
+    status: fixed-pending-independent-verification
+    finding: >-
+      The cycle-4 refusal covered US and RS but not NUL — twelve lines below a comment naming NUL as
+      the byte command substitution strips. `access.tracker: "\0"` arrived as an empty payload and
+      read as unconfigured → full, exit 0, no warning, while the awk tier rejected the same file.
+      Pre-existing rather than a regression, but it falsified the cycle-4 claim that the refusal was
+      complete.
+    fix: 'All three transport-hostile bytes refused; the comment corrected.'
+    verified: 'Both tiers rc=1 for a NUL-only and an embedded-NUL value; mutation 41 red.'
+
+  - id: TASK-51-LOW-13
+    severity: low
+    status: fixed
+    finding: 'The refusal named no key, deviating from the standard every other rejection in the file meets. Halt-loop indices were positionally coupled to the spec list, so reordering a spec would silently drop a value out of the halt in the permissive direction.'
+    verified: 'Message names the key; loop covers all six indices; mutation 42 red.'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 1453   # 1287 node + 166 shell assertions
+  suites: 'tracker-access 166/166 · npm test 1287/1287 · test:platform 6/6 · validate:all 115/115 · retrospective + sprint-review fixtures pass'
+  repo_self_check: "the repo's own config resolves identically across all six shell × tier combinations"
+  ci: 'PR #246 — test, validate, link-check green as of the cycle-4 push'
+  mutations_this_cycle: '4 of 4 red'
+  mutations_cumulative: '42 run across five cycles; every invariant has at least one witness'
+  bundle: 'idempotent; 36 read-config.sh and 28 resolve-platform.sh copies current'
+  warnings: 'suite emits none'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      Every known escalation path is closed and covered. CONCERNS rather than PASS only because the
+      last fixes have not had an independent adversarial pass, and this task's history is that such
+      a pass has found something every time.
+  performance:
+    status: PASS
+    notes: '2 python spawns, ~209-290 ms per source; within noise of the cycle-4 measurement.'
+  reliability:
+    status: CONCERNS
+    notes: 'No known defect outstanding. Same caveat as security.'
+  maintainability:
+    status: PASS
+    notes: >-
+      Upgraded from CONCERNS. The wire format is now typed, framed and validated with the reasoning
+      recorded in the file; the awk tier refuses what it cannot read rather than guessing; there is
+      one nested reader and one null helper. The comments record what each mechanism is defending
+      against, including the attempts that failed.
+
+recommendations:
+  immediate:
+    - action: 'Independent adversarial review of the cycle-5 diff before merge — the fixes are verified against their own reproductions but nothing else'
+      refs: ['shared/resources/read-config.sh', 'shared/resources/resolve-platform.sh']
+  future:
+    - action: 'Consider splitting the sequence: the resolver + reader are separable from the 18 call-site guards and the documentation sweep, and the guards carry the wide blast radius'
+    - action: 'Re-bundle skills/qa-task/references/resolve-paths.sh — stale pre-extraction copy predating this branch'
+      refs: ['skills/qa-task/references/resolve-paths.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions:
+    - 'One independent adversarial pass over the cycle-5 diff finds nothing new'
+    - 'Human review of the PR, given five cycles of fix-induced defects'
