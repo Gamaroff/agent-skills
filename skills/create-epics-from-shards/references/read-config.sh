@@ -56,6 +56,40 @@ import sys, yaml
 class _StrictLoader(yaml.SafeLoader):
     pass
 
+def _scan_keys(loader, node):
+    """Reject a duplicate among the keys of ONE mapping node, as written."""
+    seen = set()
+    merges = 0
+    for k, _ in node.value:
+        if getattr(k, "tag", None) == "tag:yaml.org,2002:merge":
+            # A mapping may carry at most one `<<`. Two of them last-wins silently, so an operator
+            # merging a restrictive default and then a permissive one gets the permissive one with
+            # no diagnostic — the same escalation as a duplicate ordinary key.
+            merges += 1
+            if merges > 1:
+                raise ValueError("duplicate merge key: <<")
+            continue
+        key = loader.construct_object(k, deep=True)
+        if key in seen:
+            raise ValueError("duplicate key: %r" % (key,))
+        seen.add(key)
+
+def _scan_merge_sources(loader, node):
+    """Scan mappings that appear AS a merge source at this site.
+
+    A merge source defined at the merge site — `<<: {a: 1, a: 2}`, or an anchor declared right
+    there, or a sequence of such — is spliced in by flatten_mapping without ever being constructed
+    in its own right, so it never reaches the duplicate check. Its duplicates then resolve
+    last-wins, silently: a declared `manual` became `full`. A NAMED node is already covered,
+    because it is constructed where it is defined."""
+    for k, v in node.value:
+        if getattr(k, "tag", None) != "tag:yaml.org,2002:merge":
+            continue
+        for sub in (v.value if isinstance(v, yaml.SequenceNode) else [v]):
+            if isinstance(sub, yaml.MappingNode):
+                _scan_keys(loader, sub)
+                _scan_merge_sources(loader, sub)
+
 def _no_dupes(loader, node):
     # Scan the keys AS WRITTEN, before flatten_mapping runs. Order matters twice over:
     #   * scanning before means a `<<` merge key is skipped explicitly rather than blowing up for
@@ -63,14 +97,8 @@ def _no_dupes(loader, node):
     #   * scanning before ALSO means an inherited key and a local key that overrides it are not
     #     mistaken for a duplicate — flatten_mapping PREPENDS the merged pairs, and overriding is
     #     the entire purpose of `<<`.
-    seen = set()
-    for k, _ in node.value:
-        if getattr(k, "tag", None) == "tag:yaml.org,2002:merge":
-            continue
-        key = loader.construct_object(k, deep=True)
-        if key in seen:
-            raise ValueError("duplicate key: %r" % (key,))
-        seen.add(key)
+    _scan_keys(loader, node)
+    _scan_merge_sources(loader, node)
     loader.flatten_mapping(node)
     # Generator, not a plain return: construct_yaml_map yields the dict before filling it, which is
     # what lets a recursive anchor resolve. Returning a finished dict broke those.
@@ -160,9 +188,13 @@ elif mode == "bulk":
         # An unescaped framing is only safe if the payload cannot contain a separator. Without this
         # a value could inject a whole record — records are emitted in index order, and the decoder
         # takes the FIRST match, so a payload in record N lands ahead of every real record after it
-        # and wins. That silently turned a declared `manual` into `full`. Refusing costs nothing:
-        # YAML rejects these bytes raw, and no legal value (enum or filesystem path) contains one.
-        if "\x1f" in payload or "\x1e" in payload:
+        # and wins. That silently turned a declared `manual` into `full`.
+        #
+        # NUL is here for a different reason than US/RS: it frames nothing, but bash and zsh DELETE
+        # it during command substitution, so `access.tracker: "\0"` arrived as an empty payload and
+        # read as unconfigured — full, exit 0, no warning. Three bytes the transport cannot carry;
+        # refusing costs nothing, since no legal value (enum or filesystem path) contains any of them.
+        if any(c in payload for c in ("\x1f", "\x1e", "\x00")):
             kind, payload = "s", "__ERR__"
         # A block scalar always carries a trailing newline; `$( )` used to strip it, so stripping
         # here keeps the bulk path and the individual readers agreeing on the same file.

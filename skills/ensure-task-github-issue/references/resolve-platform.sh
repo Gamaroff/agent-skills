@@ -181,11 +181,21 @@ if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.
   # An __ERR__ signal means the reader REFUSED the payload (it carried a framing separator). That is
   # a corrupt value, not an absent one, so it must fail closed — degrading it to `auto` would turn a
   # poisoned value into silent platform detection, which is the fall-through this task exists to end.
-  for _rp_i in 2 3 5 6; do
+  # Every index, not just the config-derived ones. 1 (status) and 4 (shape) cannot be __ERR__ by
+  # construction, so covering them is free — and it removes a positional coupling to the spec list
+  # above, where inserting or reordering a spec would otherwise silently drop a value out of the
+  # halt, in the permissive direction.
+  for _rp_i in 1 2 3 4 5 6; do
     if [ "$(_rp_sig "$_rp_i")" = "__ERR__" ]; then
-      printf '❌ %s: a configured value contains a character that cannot be read safely.\n' "$SKILLS_CONFIG_FILE" >&2
-      printf '   Remove any \\x1e / \\x1f escape from the value and re-run.\n' >&2
-      unset _rp_i
+      case "$_rp_i" in
+        2) _rp_k=tracker ;; 3) _rp_k=vcs ;;
+        5) _rp_k=access.tracker ;; 6) _rp_k=access.vcs ;;
+        *) _rp_k="a configured key" ;;
+      esac
+      printf '❌ %s: %s: the value contains a character that cannot be read safely.\n' \
+        "$SKILLS_CONFIG_FILE" "$_rp_k" >&2
+      printf '   Remove any \\x00 / \\x1e / \\x1f escape from the value and re-run.\n' >&2
+      unset _rp_i _rp_k
       return 1
     fi
   done
