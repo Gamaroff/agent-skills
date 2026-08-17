@@ -659,6 +659,60 @@ D=$(fixture dupe-under-merge 'defaults: &d\n  vcs: full\naccess:\n  <<: *d\n  tr
 run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
 assert_rc "a genuine duplicate beside a merge key is still rejected" "$RC" "1"
 
+# --- 31. Duplicates inside a merge SOURCE, and a duplicated merge key --------------------------
+# Moving the dup scan before flatten_mapping (to make `<<` override legal) meant a merge source
+# defined AT the merge site was never constructed in its own right and so never scanned. Its
+# duplicates then resolved last-wins, silently: a declared `manual` read as `full`, exit 0.
+# The earlier dupe-under-merge fixture cannot catch this — it puts the duplicate in the LOCAL
+# mapping, which was always covered.
+echo "  31. Duplicates inside a merge source"
+for shape in \
+  'access:\n  <<: {tracker: manual, tracker: full}\n' \
+  'access:\n  <<: &d\n    tracker: manual\n    tracker: full\n' \
+  'access:\n  <<: [{tracker: manual, tracker: full}]\n' ; do
+  D=$(fixture "mergedupe-$RANDOM" "tracker: jira\n$shape")
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+  assert_rc "duplicate inside a merge source → rejected" "$RC" "1"
+  if [ "$AT" = "full" ]; then bad "…and must not resolve to full" "AT=full"; else ok "…and does not resolve to full"; fi
+done
+
+# The same shape at the root reaches the identity keys; with an access: block it must halt.
+D=$(fixture mergedupe-root 'tracker: jira\n<<: {tracker: jira, tracker: github}\naccess:\n  tracker: manual\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "duplicate in a root-level merge source + access: → halts" "$RC" "1"
+
+# A mapping may carry at most one `<<`; two of them last-wins silently.
+D=$(fixture two-merge-keys 'a: &a\n  tracker: manual\nb: &b\n  tracker: full\naccess:\n  <<: *a\n  <<: *b\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "two << keys in one mapping → rejected" "$RC" "1"
+
+# …while the legal forms keep working.
+D=$(fixture merge-legal-seq 'a: &a\n  tracker: manual\nb: &b\n  vcs: full\naccess:\n  <<: [*a, *b]\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_eq "multi-merge sequence still resolves" "$AT" "manual"
+
+# --- 32. NUL is the third byte the transport cannot carry ---------------------------------------
+# bash and zsh DELETE NUL during command substitution, so a value of "\0" arrived as empty and read
+# as unconfigured → full, exit 0, no warning. The refusal covered US and RS but not NUL, twelve
+# lines below a comment naming NUL as unusable.
+echo "  32. NUL payloads"
+D=$(fixture nul-access 'tracker: jira\nvcs: github\naccess:\n  tracker: "\\0"\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "access.tracker: \"\\0\" [$tier] → refused" "$RC" "1"
+  if [ "$AT" = "full" ]; then bad "NUL payload must not grant full [$tier]" "AT=full"; else ok "NUL payload → not full [$tier]"; fi
+done
+
+D=$(fixture nul-embedded 'tracker: "jir\\0a"\nvcs: github\n')
+run_case "$D"
+assert_rc "an embedded NUL → refused, not silently a different value" "$RC" "1"
+
+# --- 33. A refusal names the offending key -------------------------------------------------------
+echo "  33. Refusal diagnostics"
+D=$(fixture sep-named 'tracker: "jira\\x1fgithub"\n')
+run_case "$D"
+assert_stderr_has "the refusal names the key" "tracker:"
+
 # --- Summary -----------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

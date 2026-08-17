@@ -437,6 +437,8 @@ Rollback triggers: any consumer report of a halt on a config that is legal per t
 | 2026-08-17 |  | QA findings fixed cycle 3 — 3 HIGH + 2 MEDIUM + 2 LOW; escaping layer replaced with typed US/RS records; suite 119 → 138 | qa-fix |
 | 2026-08-17 |  | QA gate FAIL (60/100) cycle 4 — record forgery via escaped separators; merge-key override half-landed | qa-task |
 | 2026-08-17 |  | QA findings fixed cycle 4 — 1 HIGH + 2 MEDIUM + 2 LOW; encoder refuses separator-bearing payloads; suite 138 → 151 | qa-fix |
+| 2026-08-17 |  | QA gate FAIL cycle 5 — duplicate inside an at-site merge source escalated silently; NUL omitted from the refusal | qa-task |
+| 2026-08-17 |  | QA findings fixed cycle 5 — 2 HIGH + 2 LOW; merge-source recursion, NUL refusal, named diagnostics; suite 151 → 166 | qa-fix |
 | 2026-08-17 |  | Implemented — 57 files (5 shared sources, 15 SKILL.md call sites, 4 docs, setup wizard, package.json, 36 bundled reference trees), 61 tests, 12 mutations watched failing | develop |
 
 ## References
