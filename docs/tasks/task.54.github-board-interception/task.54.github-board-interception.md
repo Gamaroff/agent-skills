@@ -88,6 +88,9 @@ task.56. PR operations — VCS, out of scope for the sequence.
 | `shared/resources/resolve-platform.sh` | `tracker_write` + alias |
 | `skills/finalise/SKILL.md` | reason table + escalation reuse |
 | `shared/resources/tests/gh-stage.test.mjs` | extend |
+| `docs/reference/tracker-workflow.md` | `--print-plan` on the GitHub path; the `deferred` reason |
+| `shared/resources/platform-detection.md` | `tracker_write` and its alias |
+| `docs/reference/troubleshooting.md` | "the board column did not change" |
 
 ## Testing Strategy
 
@@ -118,6 +121,8 @@ graphql mutation through → the no-write test → red · drop the alias → the
 - [ ] `tracker_call_with_retry` still works under its old name
 - [ ] `finalise` treats `deferred` as a recorded outcome and escalates via the existing path
 - [ ] `full` mode byte-identical; existing suite green unchanged
+- [ ] `--print-plan` is documented alongside the Jira one, so the two CLIs read as siblings
+- [ ] `tracker_write` is documented in the canonical resolver spec, with the alias's reason
 - [ ] Every invariant watched failing; `npm test`, `validate:all` green; `npm run bundle` committed
 
 ## Risk Assessment

@@ -76,6 +76,8 @@ three `sync-jira-*` skills' `--json` payloads; the two orchestrator HALTs.
 | `skills/sync-jira-{story,task,epic}/SKILL.md` | `--json` samples |
 | `skills/develop-next/SKILL.md`, `skills/develop-batch/SKILL.md` | Step 0 HALT |
 | `shared/resources/tests/jira-interception.test.mjs` | **new** |
+| `docs/reference/configuration.md` | the `deferred` reason; the orchestrator restriction |
+| `docs/reference/troubleshooting.md` | "my Jira card did not move" and "develop-next refused" |
 
 ## Testing Strategy
 
@@ -108,6 +110,8 @@ that test → red.
 - [ ] Deferred creates return the existing `--dry-run` null shape
 - [ ] `develop-next` / `develop-batch` refuse below `access.vcs: approve`, with a useful message
 - [ ] `--json` samples updated alongside the payloads
+- [ ] The `deferred` reason and the orchestrator restriction are documented where a reader will
+      hit them — a capability that refuses without a documented reason reads as a bug
 - [ ] Every invariant watched failing; `npm test`, `validate:all` green; `npm run bundle` committed
 
 ## Risk Assessment

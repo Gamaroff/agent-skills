@@ -88,6 +88,8 @@ drawn there.
 | `skills/create-issue/SKILL.md`, `skills/review-{story,task}/SKILL.md` | route through the CLI |
 | `skills/jira-sprint-manager/SKILL.md` | `reason` branches |
 | `tests/mutation-call-site-coverage.test.js` | **new** repo-wide guard |
+| `docs/reference/troubleshooting.md` | the two-run convergence, and why no placeholder key is written |
+| `docs/reference/configuration.md` | which kinds are covered, and which return values are not |
 
 ## Testing Strategy
 
@@ -114,6 +116,8 @@ make `ensure-*` halt on an empty id → the non-blocking test → red · unwrap 
 - [ ] A second run with the key present converges without creating a duplicate
 - [ ] Blocking records are called out in both the checklist and the inline summary
 - [ ] The repo-wide guard fails when a bare mutating `gh` verb appears in canonical prose
+- [ ] The two-run convergence is documented where a consumer will meet it, not only in this task
+      document — a run that appears to do nothing twice is indistinguishable from a broken one
 - [ ] `full` mode byte-identical; existing suites green unchanged
 - [ ] Every invariant watched failing; `npm test`, `validate:all` green; `npm run bundle` committed
 

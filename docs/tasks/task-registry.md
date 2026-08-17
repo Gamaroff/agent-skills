@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-17
-**Next Available Task Number:** **58**
+**Next Available Task Number:** **59**
 
 ## How to use
 
@@ -97,13 +97,14 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 55 | [Build the Jira comment endpoint that does not exist, and retire ~20 prose comment sites](task.55.tracker-comment-cli/task.55.tracker-comment-cli.md) | planned | refactoring | High | 2026-08-17 | — | task.53 |
 | 56 | [One CLI for the GitHub issue lifecycle, and honest handling of value-returning mutations](task.56.tracker-issue-cli/task.56.tracker-issue-cli.md) | planned | refactoring | Medium | 2026-08-17 | — | task.54, task.55 |
 | 57 | [Read-only verification, and `/tracker-reconcile` so the checklist is a ledger](task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md) | planned | infrastructure | Medium | 2026-08-17 | — | task.52 |
+| 58 | [Document restricted tracker access for someone who has never heard of it](task.58.restricted-access-documentation/task.58.restricted-access-documentation.md) | planned | documentation | High | 2026-08-17 | — | task.51-57 |
 
 ---
 
 ## Notes
 
 - Task 6 has no tracker issue — pre-dates the tracker-on-creation requirement; backfill via `/sync-jira-task` or `gh issue create` if needed.
-- Tasks 51-57 are the **restricted tracker access** sequence — one shippable unit each, in dependency order. Design: `.agents/plans/restricted-tracker-access.md`. Ship 51 → 52 first; 53 and 54 are independent of each other.
+- Tasks 51-58 are the **restricted tracker access** sequence — one shippable unit each, in dependency order. Design: `.agents/plans/restricted-tracker-access.md`. Ship 51 → 52 first; 53 and 54 are independent of each other. Task 58 is the narrative documentation layer and runs last — the per-unit reference docs stay with their own unit.
 - Task 48's document was written **after** its implementation, to give the branch that already carried the number a registry entry. Task 49 is the half that task 48 deliberately deferred. Neither has a tracker issue yet.
 - Tasks 32-34 are the **Evals Infrastructure** milestone ([#1](https://github.com/Gamaroff/agent-skills/milestone/1)).
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
