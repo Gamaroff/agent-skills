@@ -1,0 +1,350 @@
+schema: 1
+task: 'task.51.access-mode-config-and-resolver'
+task_title: '[Task 51] Declare tracker access level in config, and reject an unrecognised one loudly'
+gate: FAIL
+status_reason: >-
+  The independent adversarial pass gate 5 asked for was run, by three reviewers given the code but
+  not cycle 5's reasoning, with every reported finding re-reproduced in main context before being
+  recorded here. It did not come back clean. Thirteen defects, of which EIGHT are HIGH and one is a
+  regression introduced by the cycle-5 fix itself — confirming, rather than closing, the base rate
+  the escalation record described. Four independent silent-escalation routes turn a declared
+  `manual` into `full` at exit 0, the simplest of which needs no unusual YAML at all: a config in
+  the canonical documented shape that is merely UNREADABLE resolves to `full`, because the
+  fail-closed gate greps the same file it just failed to parse. Separately, the awk tier is the
+  DEFAULT tier on a stock macOS host (/usr/bin/python3 ships without pyyaml), and on that tier the
+  documented `tracker: {workflowFile: ...}` form halts every one of the 13 guarded call sites. The
+  suite is green at 166/166 throughout, because its merge-key value assertions all force the python
+  tier.
+reviewer: 'QA Engineer — independent adversarial pass (cycle 6)'
+updated: '2026-08-17T19:45:00Z'
+
+re_review_of: 'task.51.gate.5.access-mode-config-and-resolver.yml'
+
+review_method: >-
+  Three independent Explore reviewers with disjoint lenses (escalation paths, false rejections,
+  test-validity/mutation audit), none given the cycle-5 commit message, gate, or bug files. Every
+  finding below was then independently re-executed in main context against the working tree; nothing
+  rests on a reviewer's word. Regression claims were verified by running the same fixture against the
+  reader checked out at the parent commit (0da9bbc).
+
+previous_issues:
+  - id: 'TASK-51-BUG-13 merge-source duplicate scan'
+    status: closed-with-regression
+    verified: >-
+      The reported shapes are genuinely closed — `access:\n  <<: {tracker: manual, tracker: full}`
+      and its anchor and sequence variants all rc=1 under the python tier. But the accompanying
+      "at most one <<" guard overreached; see D2 below.
+  - id: 'TASK-51-BUG-14 NUL in transport refusal'
+    status: closed
+    verified: 'A NUL-only and an embedded-NUL value are refused under both tiers. Confirmed independently.'
+  - id: 'TASK-51-LOW-13 refusal names the key'
+    status: closed
+
+top_issues:
+  - id: TASK-51-BUG-15
+    severity: high
+    status: open
+    category: false-rejection
+    finding: >-
+      The awk tier is not a rare fallback — it is the DEFAULT on a stock macOS host, because
+      /usr/bin/python3 ships without pyyaml. On that tier `read_config_key`'s awk splits on `-F': *'`
+      and takes $2, so the DOCUMENTED flow form `tracker: {workflowFile: .github/tracker-workflow.yaml}`
+      yields the field `{workflowFile`, which reaches validate_enum and is rejected. With this task's
+      own `|| exit 1` guards now on 13 call sites, that aborts the run.
+    evidence: >-
+      Reproduced with NO env var set and PATH=/usr/bin:/bin:
+      `rc=1 T={workflowFile`, message `tracker: "{workflowFile" is not a recognised value`.
+      Same file under the python tier: `rc=0 T=github AT=manual`.
+    why_missed: >-
+      docs/reference/configuration.md:288 prints this exact flow form, and the task's own acceptance
+      table requires status 0 "asserted under both tiers" — but tracker-access.test.sh:165 asserts
+      only the BLOCK spelling (`tracker:\n  workflowFile: ...`), which does pass. The documented
+      spelling is untested.
+    refs: ['shared/resources/read-config.sh:342', 'docs/reference/configuration.md:288', 'shared/resources/tracker-access.test.sh:165']
+
+  - id: TASK-51-BUG-16
+    severity: high
+    status: open
+    category: regression
+    finding: >-
+      The cycle-5 "a mapping may carry at most one `<<`" guard rejects a legal composition. Its
+      rationale holds for OVERLAPPING merge sources, where pyyaml genuinely last-wins silently. For
+      DISJOINT sources pyyaml merges both deterministically and unambiguously, and that config is now
+      refused — a false rejection that halts the run.
+    evidence: >-
+      Fixture `a: &a {tracker: manual}` / `b: &b {vcs: full}` / `access: {<<: *a, <<: *b}`;
+      pyyaml resolves it to {'tracker': 'manual', 'vcs': 'full'}.
+      Reader at parent commit 0da9bbc: `rc=0 AT=manual AV=full`. Reader at HEAD: `rc=1`.
+      Regression confirmed by running the same fixture against both readers.
+    refs: ['shared/resources/read-config.sh:63-70']
+
+  - id: TASK-51-BUG-17
+    severity: high
+    status: open
+    category: silent-escalation
+    finding: >-
+      The fail-closed branch decides "did this consumer opt into access?" with a line-anchored
+      `grep -q '^access:'`. That matches only block-form `access:` at column 0. A malformed config
+      that declares access in any other legal spelling — root flow mapping, quoted `"access":`, or
+      supplied through a merge key — misses the grep, so the branch falls through to platform
+      detection and a declared `manual` resolves to `full` with exit 0.
+    evidence: >-
+      `{access: {tracker: manual}, x: 1, x: 2}` → rc=0 AT=full.
+      `"access":\n  tracker: manual` + duplicate → rc=0 AT=full.
+      `<<: {access: {tracker: manual, tracker: full}}` → rc=0 AT=full.
+      Control, block form with the same malformation → rc=1. The warning printed says only
+      "could not be parsed — falling back to platform detection"; nothing states that a declared
+      access level was discarded.
+    refs: ['shared/resources/resolve-platform.sh:216']
+
+  - id: TASK-51-BUG-18
+    severity: high
+    status: open
+    category: silent-escalation
+    finding: >-
+      The awk tier cannot see YAML merge keys or a quoted mapping key, so an access level supplied
+      through `<<`/anchor, or declared under `"access":`, reads as absent and takes the permissive
+      default. Unlike BUG-17 this needs no malformed YAML and emits no warning at all — the config is
+      well-formed, the declared value is `manual`, and the resolver exits 0 with `full`.
+    evidence: >-
+      `defaults: &d {tracker: manual}` + `access:\n  <<: *d` → python AT=manual, awk AT=full, both rc=0.
+      `access:\n  <<: {tracker: manual}` → python AT=manual, awk AT=full.
+      `"access":\n  tracker: manual` (well-formed) → python AT=manual, awk AT=full.
+      Control `access:\n  tracker: manual` → both tiers AT=manual.
+    why_missed: >-
+      Every merge-key VALUE assertion in the suite forces AGENT_SKILLS_CONFIG_TIER=python
+      (lines 655, 676, 692). The single loop that does cover both tiers (650-653) asserts only
+      `rc=0` — and these configs DO return 0 under awk; they simply resolve to the wrong value.
+      The assertion passes while the escalation is live.
+    refs: ['shared/resources/read-config.sh', 'shared/resources/tracker-access.test.sh:650-692']
+
+  - id: TASK-51-BUG-23
+    severity: high
+    status: open
+    category: silent-escalation
+    finding: >-
+      An UNREADABLE config escalates. The canonical, documented, fully supported shape
+      (`access:\n  tracker: manual`) made unreadable — chmod 000, root-owned, a bad mount — resolves
+      to `full` at exit 0. This is BUG-17's root cause reached by a trigger that needs no unusual
+      YAML at all: the fail-closed gate answers "is access configured?" by grepping the very file it
+      has just failed to read, so the gate fails open exactly when it is needed. The warning printed
+      talks about platform detection and never mentions access.
+    evidence: >-
+      Canonical config, readable → `rc=0 AT=manual`. Identical file after `chmod 000` →
+      `⚠️ could not be parsed — falling back to platform detection`, `rc=0 AT=full`.
+      Both tiers, both shells.
+    refs: ['shared/resources/resolve-platform.sh:216']
+
+  - id: TASK-51-BUG-24
+    severity: high
+    status: open
+    category: silent-escalation
+    finding: >-
+      `SKILLS_CONFIG_FILE` is an unvalidated env-var escalation route. read-config.sh:41 makes the
+      config path env-overridable, and pointing it at any empty or absent file discards a committed
+      restriction entirely — silently, both tiers, no stderr. This directly falsifies the guarantee
+      written in the file's own header, that "a stray env var can never loosen a config that
+      deliberately restricts". The `AGENT_SKILLS_ACCESS_*` env vars are correctly hardened with
+      most-restrictive-wins; this sibling variable bypasses that logic by changing which file is read
+      rather than what it says.
+    evidence: >-
+      On-disk config declares `tracker: manual`. `SKILLS_CONFIG_FILE=/dev/null` → `rc=0 AT=full`,
+      no output. `SKILLS_CONFIG_FILE=/nonexistent.yaml` → `rc=0 AT=full`. Without the env var →
+      `rc=0 AT=manual`.
+    refs: ['shared/resources/read-config.sh:41']
+
+  - id: TASK-51-BUG-25
+    severity: high
+    status: open
+    category: code-execution
+    finding: >-
+      Tier 1 imports attacker-controlled code from the working directory. `_config_probe` and
+      `_config_py_run` invoke `python -c`, which prepends the CWD to sys.path (verified:
+      `sys.path[0] == ''`). A file named `yaml.py` beside skills-config.yaml is therefore imported
+      instead of PyYAML, giving both arbitrary code execution on merely sourcing the resolver and
+      total control of the resolved access value.
+    evidence: >-
+      With `access:\n  tracker: manual` on disk and a stub `yaml.py` present: `rc=0 AT=full`, no
+      stderr, and the stub's side-effect file was written — confirming execution, not just a wrong
+      value.
+    caveat: >-
+      Requires write access to the working directory, which is a high bar for a repo the operator
+      owns. It is NOT a high bar in this project's own domain, where agents routinely operate inside
+      repositories they did not author. The distinction that matters: skills-config.yaml is DATA and
+      this reader is carefully hardened against it (record forgery, NUL, separators); `yaml.py` is
+      CODE and bypasses every one of those defences.
+    fix_hint: '`python3 -I` (isolated) or `-P` (no CWD on sys.path) closes it in one flag.'
+    refs: ['shared/resources/read-config.sh']
+
+  - id: TASK-51-BUG-26
+    severity: high
+    status: open
+    category: silent-escalation
+    finding: >-
+      BUG-18 is one instance of a structural failure, not an isolated bug. The awk tier anchors on the
+      literal regexes `^access:` and `^[[:space:]]+tracker:`, so every alternative legal spelling of
+      the key or its block is an open case. Sixteen distinct shapes were reproduced resolving a
+      declared restriction to `full` at exit 0 with empty stderr, including: a quoted key, a space
+      before the colon (`access :`), a UTF-8 BOM, a column-0 comment inside the block, a flow map on
+      the next line, a child at deeper indentation, a duplicate block where the restrictive one is
+      SECOND, and a named-anchor merge. Three of them (`access:\n  manual`, `"access": manual`,
+      `"access":\n  vcs: manual`) additionally bypass the explicit scalar-access and access.vcs halts.
+    evidence: >-
+      Reproduced under forced awk and on a genuine awk-only host (PATH shims making python exit 127,
+      no tier forcing), bash and zsh alike. The existing suite's §22 covers only restrictive-FIRST
+      duplicates and §30 asserts only `rc=0` on the awk tier, never the resolved value.
+    note: >-
+      The listed sixteen are a partial enumeration, not a complete one. Adding sixteen awk rules would
+      not close the class — the tier approximates a grammar with anchored regexes.
+    refs: ['shared/resources/read-config.sh:302-308', 'shared/resources/read-config.sh:404-406', 'shared/resources/read-config.sh:433']
+
+  - id: TASK-51-BUG-19
+    severity: medium
+    status: open
+    category: false-rejection
+    finding: >-
+      The tier-2 block-scalar header detector requires the `|`/`>` indicator to follow a `:` and end
+      the line, so it misses three legal header spellings: a sequence item (`- |`, no colon at all),
+      a header carrying a trailing comment (`key: | # why`), and an anchored header (`key: &n |`).
+      The free-form body is then graded as YAML and the leading-colon rule condemns it. The adjacent
+      case that DOES work — a block scalar nested inside a sequence item — is the one that was fixed.
+    evidence: >-
+      All verified legal via yaml.safe_load, all rc=1 under awk and rc=0 under python:
+      sequence-item header, comment-bearing header, anchored header. Explicit-key syntax
+      (`? long key` / `: some value`) is likewise valid YAML in block context and is condemned by the
+      same leading-colon rule.
+    refs: ['shared/resources/read-config.sh:278', 'shared/resources/read-config.sh:279']
+
+  - id: TASK-51-BUG-20
+    severity: medium
+    status: open
+    category: false-rejection
+    finding: >-
+      `config_child_shape`'s awk fallback grades anything non-space after `access:` as a scalar, so an
+      anchor (`access: &acc`), an alias, or an explicit tag (`access: !!map`) trips the
+      "expected a mapping, found a scalar" halt — while the value IS a mapping. `access: {` was
+      special-cased; `access: &` was the adjacent case never added. Related: the awk tier hands raw
+      YAML tokens (`*alias`, `!!str manual`) to validate_enum, which reports them as if the operator
+      had typed them as values.
+    evidence: '`access: &acc` with mapping children → awk rc=1, python rc=0 AT=manual.'
+    refs: ['shared/resources/read-config.sh:302-308', 'shared/resources/resolve-platform.sh:257-261']
+
+  - id: TASK-51-BUG-21
+    severity: medium
+    status: open
+    category: false-rejection
+    finding: >-
+      `_scan_keys` runs on every mapping node in the document, so a duplicate key anywhere — including
+      a section this reader never consumes — marks the whole file malformed, and with an `access:`
+      block present that is a hard halt. The blast radius is the entire config file, not the four keys
+      the resolver reads.
+    evidence: >-
+      `access: {tracker: manual}` plus an unrelated `prd:` section with a duplicated child →
+      python rc=1 (halt), awk rc=0 AT=manual. pyyaml's safe_load accepts the file.
+    refs: ['shared/resources/read-config.sh:58-74']
+
+  - id: TASK-51-BUG-22
+    severity: medium
+    status: open
+    category: tier-disagreement
+    finding: >-
+      A UTF-8 BOM before the first key flips identity resolution between tiers: python reads
+      `tracker: jira`, awk reads it as absent and detects `github`. Exit 0 on both — a silent
+      identity switch rather than a rejection.
+    refs: ['shared/resources/read-config.sh']
+
+  - id: TASK-51-LOW-14
+    severity: low
+    status: open
+    category: diagnostics
+    finding: >-
+      The messages for BUG-19, BUG-21 and BUG-16 all say "access is configured but unreadable" or
+      "could not be parsed", when the file parses cleanly and the offending text is a block-scalar
+      body, an explicit key, or a duplicate in an unrelated section. The operator is directed to
+      inspect `access:`, which is not the problem. BUG-20's message asserts a scalar where the value
+      is a mapping.
+
+waiver:
+  active: false
+
+quality_score: 25
+
+evidence:
+  suites: 'tracker-access 166/166 · npm test not re-run this cycle · CI green on PR #246'
+  suite_status_note: >-
+    The suite is GREEN while every defect above is live. That is the finding, not the reassurance.
+  independent_reproduction: 'all 15 findings re-executed in main context; regression claims diffed against parent commit 0da9bbc'
+  host_profile: >-
+    /usr/bin/python3 has no pyyaml — verified. The session PATH resolves python3 to
+    /usr/local/bin/python3, which does. So this repo's own developers exercise tier 1 while a stock
+    consumer host exercises tier 2, and the two tiers disagree on legal input.
+  bundle: 'idempotent — npm run bundle leaves git status clean. 36 read-config.sh and 28 resolve-platform.sh copies current (differ from source only by the AUTO-GENERATED banner).'
+  call_site_guards: '13/13 executable `source ... resolve-platform.sh` lines in skills/*/SKILL.md carry || exit 1; prose forms likewise'
+
+nfr_validation:
+  security:
+    status: FAIL
+    notes: >-
+      Four independent silent-escalation routes turn a declared `manual` into `full` at exit 0:
+      BUG-17 (fail-closed grep misses legal key spellings), BUG-18/BUG-26 (awk tier cannot see them
+      either), BUG-23 (an unreadable file in the canonical shape), and BUG-24 (SKILLS_CONFIG_FILE
+      redirects the read). BUG-24 falsifies a guarantee written in the file's own header. BUG-25 is a
+      code-execution vector: `python -c` puts the CWD on sys.path, so a repo-root `yaml.py` is
+      imported instead of PyYAML and controls the result outright. This is the exact invariant the
+      task exists to protect, breached by four routes the task's own defences do not cover.
+  reliability:
+    status: FAIL
+    notes: >-
+      On a stock macOS host the documented config form aborts every guarded call site (BUG-15), and
+      a legal merge composition that worked one commit ago is now refused (BUG-16).
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 5; no new measurement taken.'
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The code is well-commented and the reasoning is recorded. The structural problem is that the
+      awk tier re-implements YAML with line-oriented heuristics, and each cycle has closed one
+      spelling while leaving its siblings open. That is a design limit, not a coding slip.
+
+recommendations:
+  immediate:
+    - action: >-
+        Do not merge. Two one-line fixes are worth taking regardless of any redesign: add `-I` (or
+        `-P`) to the python invocations, closing BUG-25 outright; and make an unreadable or
+        env-redirected config fail closed rather than open (BUG-23, BUG-24).
+      refs: ['shared/resources/read-config.sh:41', 'shared/resources/resolve-platform.sh:216']
+    - action: >-
+        Fix BUG-15 — it breaks the documented configuration on the default tier of a stock host, and
+        it is independent of everything the last five cycles touched.
+      refs: ['shared/resources/read-config.sh:342']
+    - action: >-
+        Revert the "at most one <<" guard to fire only on OVERLAPPING sources, or drop it — the
+        escalation it closes is already covered by the merge-source duplicate scan.
+      refs: ['shared/resources/read-config.sh:63-70']
+    - action: >-
+        Replace the `grep -q '^access:'` opt-in probe with one that cannot miss a legal spelling.
+      refs: ['shared/resources/resolve-platform.sh:216']
+    - action: >-
+        Make the suite's tier coverage structural: assert the resolved VALUE under every tier, not
+        just the exit code. Today value assertions force python, which is why four HIGH defects sit
+        behind a green suite.
+      refs: ['shared/resources/tracker-access.test.sh:650-692']
+  future:
+    - action: >-
+        Reconsider the two-tier design. Six cycles have now found defects concentrated almost entirely
+        in the awk tier's attempt to approximate a YAML parser. Options worth costing: vendor a
+        minimal pure-python YAML subset parser, require pyyaml and fail loudly without it, or restrict
+        the awk tier to a documented strict subset and reject anything outside it rather than guessing.
+    - action: 'Re-run the fixture matrix under gawk/mawk — only macOS BWK awk was exercised, and [[:space:]] handling of \r differs.'
+    - action: 'Re-bundle skills/qa-task/references/resolve-paths.sh — stale orphan, pre-existing on develop, not caused by this branch.'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'BUG-15 fixed — the documented config form must work on the default tier of a stock host'
+    - 'BUG-16 reverted or narrowed — no legal merge composition may be refused'
+    - 'BUG-17 and BUG-18 closed — no path may resolve more permissive than declared'
+    - 'Suite asserts resolved values under every tier, so the above cannot regress unseen'
+    - 'Human review of the PR, given six cycles of fix-induced defects'

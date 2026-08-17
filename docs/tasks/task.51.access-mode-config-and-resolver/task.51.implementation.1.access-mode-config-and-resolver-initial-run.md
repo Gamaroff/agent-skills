@@ -40,7 +40,7 @@ Add an `access:` block to `skills-config.yaml` resolved into `ACCESS_TRACKER` / 
 | 2. review-task             | ✅ Done    | `task.51.review.{N}.{name}.md` exists (or skip logged)                 | Skipped — already reviewed; report at `task.51.review.1.access-mode-config-and-resolver.md` | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 10 phases. 1287/1287 node tests, 61/61 new `tracker-access.test.sh`, 12/12 mutations red, `validate:all` 115/115, Prettier clean, bundle idempotent. | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #246](https://github.com/Gamaroff/agent-skills/pull/246) → `develop`. Two commits: `48097e9` functional (28 files), `053226f` bundle regen (113 files). Issue #225 commented. | — |
-| 5–6. qa-task / qa-fix loop | ⚠️ Halted |  `task.51.qa.{N}.*.md`; `task.51.gate.{N}.*.yml`; PR comment posted     | Cycle 1 QA: **FAIL 40/100** — 5 HIGH, 4 MEDIUM, 5 LOW. Gate + report + 5 bug files written; posted to PR #246 and issue #225. qa-fix next. | 3 Explore agents (diff review, success-criteria, NFR) |
+| 5–6. qa-task / qa-fix loop | ⚠️ Halted |  `task.51.qa.{N}.*.md`; `task.51.gate.{N}.*.yml`; PR comment posted     | Cycles 1–5 FAIL (40 → 55 → 55 → 60 → 70). **Cycle 6 — independent adversarial pass: FAIL 45/100**, 4 HIGH incl. one cycle-5 regression. Halted per user directive (halt on findings, do not loop). | 3 Explore agents cycle 1; 3 independent adversarial reviewers cycle 6 |
 | 7. finalise                | ⛔ Not reached | `task.51.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⛔ Not reached | All artifacts committed and pushed                                     |       | —                    |
 
@@ -203,14 +203,114 @@ and issue #225. Task status returned to `in-progress`.
 
 ---
 
+### Cycle 6 — independent adversarial pass — 2026-08-17 — Gate: FAIL (45/100)
+
+Run on user directive after the cycle-5 escalation, which asked for exactly this and stated that a
+clean result would make the work mergeable. It was not clean.
+
+**Method.** Three independent Explore reviewers with disjoint lenses — escalation paths, false
+rejections, test-validity/mutation audit — none given the cycle-5 commit message, gate, or bug files,
+so they would read the mechanism rather than its author's reasoning about it. Every finding was
+re-executed in main context before being recorded; regression claims were verified against the reader
+checked out at the parent commit `0da9bbc`.
+
+**8 HIGH, 4 MEDIUM, 1 LOW.** Artifacts: `task.51.gate.6.*.yml`, `task.51.qa.6.*.md`.
+
+| ID | Defect |
+|---|---|
+| BUG-15 | **`/usr/bin/python3` has no pyyaml**, so the awk tier is the *default* on a stock macOS host — not a fallback. There the documented `tracker: {workflowFile: …}` form yields `T={workflowFile` → enum rejection → `rc=1`, aborting all 13 guarded call sites |
+| BUG-16 | **Cycle-5 regression.** The "at most one `<<`" guard also refuses a legal *disjoint* merge, which pyyaml resolves unambiguously. Verified: `rc=0 AT=manual` at `0da9bbc`, `rc=1` at HEAD |
+| BUG-17 | Fail-closed branch's line-anchored `grep -q '^access:'` misses flow / quoted / merge spellings → malformed config + declared `manual` → `full`, exit 0 |
+| BUG-18 | awk tier blind to merge keys and quoted mapping keys → a **well-formed** config declaring `manual` resolves `full`, exit 0, no warning |
+| BUG-23 | **The simplest one.** A config in the canonical documented shape, merely made *unreadable* (`chmod 000`, root-owned, bad mount), resolves `full` at exit 0 — the fail-closed gate greps the very file it just failed to parse, so it fails open exactly when needed |
+| BUG-24 | `SKILLS_CONFIG_FILE=/dev/null` discards a committed restriction silently on both tiers — falsifying the guarantee written in `read-config.sh`'s own header that "a stray env var can never loosen a config that deliberately restricts" |
+| BUG-25 | `python -c` prepends CWD to `sys.path` (verified `sys.path[0]==''`), so a repo-root `yaml.py` is imported instead of PyYAML — arbitrary code execution plus total control of the resolved value. One flag (`python3 -I`) closes it |
+| BUG-26 | BUG-18 generalised: the awk tier anchors on `^access:` / `^\s+tracker:`, so 16 legal spellings (quoted key, `access :`, BOM, col-0 comment, next-line flow map, deeper child, restrictive-duplicate-second, named-anchor merge, …) resolve `full` silently. Three also bypass the explicit scalar-access and `access.vcs` halts |
+
+**Why the suite missed all four.** Green at 166/166 throughout. Sections 30–31 force
+`AGENT_SKILLS_CONFIG_TIER=python` for every assertion that checks a resolved *value* (`:655`, `:676`,
+`:692`); the one loop covering both tiers asserts only `rc=0` — which these configs do return under
+awk, they just resolve to the wrong value. The exit-code assertion passes while the escalation is live.
+This is the same "cross-tier test that forces a tier" pattern the cycle-5 escalation named as
+recurring, reappearing in the tests written to close it.
+
+**Verified sound**: 13/13 call-site guards; bundle idempotent with no bundle-only divergence; the
+cycle-5 NUL refusal and merge-source scan genuinely closed; the stale `qa-task/references/
+resolve-paths.sh` confirmed pre-existing on `develop`, not caused by this branch.
+
+**Deviation logged**: no bug files written for cycle 6 — all thirteen findings are recorded in full in
+the gate's `top_issues` with evidence and refs, and the pipeline is halting rather than entering a fix
+cycle, so separate files would add ceremony without traceability. Two of the three reviewers
+(false-rejections, escalation-paths) returned and are folded in above; the mutation/test-validity audit
+had not returned when the halt was written. Its findings would concern the suite's ability to hold
+these invariants, not new product defects, and belong in a cycle-7 gate.
+
+---
+
 ## Completion
 
-**Finished**: 2026-08-17 21:20
-**Final Status**: Escalated — QA loop limit (5 cycles) reached with no clean gate
+**Finished**: 2026-08-17 21:20 (cycles 1–5) · 2026-08-17 22:05 (cycle 6)
+**Final Status**: Escalated — independent adversarial pass returned FAIL; halted on findings per user directive
 **Branch**: `feature/task.51.access-mode-config-and-resolver`
 **PR**: [#246](https://github.com/Gamaroff/agent-skills/pull/246)
-**QA Iterations**: 5 (all FAIL; every fix round verified, none independently re-verified after the last)
+**QA Iterations**: 6 (all FAIL: 40 → 55 → 55 → 60 → 70 → 45)
 **DoD Summary**: not produced — Step 7 not reached
+
+---
+
+## Escalation Addendum — Cycle 6 — 2026-08-17
+
+### What the independent pass settled
+
+Gate 5's open question was whether the cycle-5 fixes were sound or merely unexamined. The answer is
+that they were unexamined *and* one of them was wrong: BUG-16 is a false rejection that cycle 5
+introduced, verified against the parent commit. **Six consecutive cycles have now ended with the
+round's own fixes introducing at least one new defect.** That is no longer a run of bad luck; it is
+the observed behaviour of this change under this method.
+
+### The finding that reframes the task
+
+BUG-15 is not in the cycle-5 diff, and no review of that diff would have found it. The two-tier reader
+treats python as the normal path and awk as a fallback, but **on a stock macOS consumer host the awk
+tier is the only tier**, because `/usr/bin/python3` ships without pyyaml. This repo's own developers
+resolve `python3` to a Homebrew build that *has* pyyaml. So the tier consumers actually run is the one
+this project least exercises — and the two tiers disagree on legal input, including the configuration
+form the project's own reference doc prints.
+
+BUG-15, BUG-18 and BUG-26 live in that tier. But the cycle's simplest defects do not, and that is the
+more uncomfortable result: BUG-23 (an unreadable file), BUG-24 (`SKILLS_CONFIG_FILE`) and BUG-25
+(`yaml.py` shadowing) all escalate on **both** tiers, on a canonical config, with no unusual YAML
+involved. Fixing the awk tier would leave all three standing.
+
+### Why a seventh cycle is not the recommendation
+
+Across six cycles the defects concentrate almost entirely in the awk tier's attempt to approximate a
+YAML parser with line-oriented heuristics. Each cycle closes one spelling — the block form, then the
+flow form, then the multi-line flow form, then the anchored form — and leaves its siblings open,
+because there is no finite list of spellings to close. That is what having a grammar means. Fixing the
+nine findings above would very likely produce a tenth in an adjacent spelling.
+
+Three options worth costing before more fixing:
+
+1. **Require pyyaml, fail loudly without it.** Deletes the tier disagreement outright. Costs a
+   dependency on hosts that presently work by accident.
+2. **Vendor a minimal pure-python YAML-subset parser.** Keeps zero-dependency operation; replaces
+   heuristics with a grammar.
+3. **Restrict the awk tier to a documented strict subset and refuse anything outside it** rather than
+   guessing. Converts every silent escalation above into a loud, correct refusal.
+
+Gate 5's split recommendation also stands and gains force: the 18 call-site guards are precisely what
+turn the awk tier's misreadings into aborted runs, so landing the resolver separately — and the guards
+only once it is proven — bounds the blast radius.
+
+### State of the work
+
+- **Pushed**: 14 commits, PR #246, CI green. Tree clean, bundle idempotent.
+- **Suite**: 166/166 green — with four HIGH defects live. The suite's tier coverage is the first thing
+  to fix regardless of which option above is chosen: assert resolved *values* under every tier, not
+  just exit codes.
+- **No fix applied this cycle.** The pipeline halted on findings by directive rather than entering a
+  seventh fix loop.
 
 ---
 
