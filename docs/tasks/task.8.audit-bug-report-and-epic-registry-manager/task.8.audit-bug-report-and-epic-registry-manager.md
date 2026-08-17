@@ -4,7 +4,7 @@ title: "Audit create-bug-report and epic-registry-manager for GitHub-only assump
 type: task
 category: refactoring
 priority: Medium
-status: ✅ Accepted
+status: accepted
 created: 2026-05-05
 completed_date: 2026-05-06
 updated: 2026-05-06

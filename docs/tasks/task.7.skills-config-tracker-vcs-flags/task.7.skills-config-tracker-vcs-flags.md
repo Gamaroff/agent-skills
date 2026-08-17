@@ -4,7 +4,7 @@ title: "skills-config: document explicit tracker and vcs flags"
 type: task
 category: documentation
 priority: Low
-status: Accepted
+status: accepted
 completed_date: 2026-05-06
 pr_number: 13
 created: 2026-05-05

@@ -5,11 +5,11 @@ type: task
 description: 'Documenting the task.46 change removed the *_bitbucket_url keys from the --json output samples in all three sync-jira-* SKILL.md files. Removing them from the frontmatter samples was right — the scripts genuinely stopped writing those keys. Removing them from the --json samples was wrong: all three still emit them there, because that payload reports the URL used for the Jira link rather than anything written to the file. Two identically-named things with different lifetimes, edited as if they were one. Restores the keys, says in each document why the two differ, and adds a guard so a sample cannot drift from its script again.'
 tags: [documentation, jira-sync, testing]
 category: documentation
-status: in-progress
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-08-17
 estimated_effort_hours: 2
 ---
 
@@ -138,7 +138,7 @@ adding a key the script never emits fails 1. Restored, all 7 pass.
 - [x] Step 2 — distinguishing note added
 - [x] Step 3 — `tests/json-output-fidelity.test.js` added
 - [x] Step 4 — mutation-tested in both directions
-- [ ] Release and consumer pull-through
+- [x] Release and consumer pull-through — shipped in v0.39.1
 
 ## References
 

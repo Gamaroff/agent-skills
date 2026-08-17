@@ -4,7 +4,7 @@ title: "Consolidate PR-comment fan-out under finalise"
 type: task
 category: refactoring
 priority: Medium
-status: ✅ Accepted
+status: accepted
 completed_date: 2026-05-06
 created: 2026-05-06
 assignee: TBD
