@@ -46,9 +46,9 @@ python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
 
 `develop` is the integration branch. `main` only receives release-ready code, promoted by `scripts/release.sh` — which depends on that direction, since it advances `main` from `develop` and never the reverse.
 
-Only three branches may open a PR into `main`: `develop` (release promotion), `hotfix/*`, and `release/*`. The **Branch Policy** workflow rejects anything else and tells you how to retarget. It exists because six feature PRs merged straight into `main` on 2026-08-14–17, putting `main` ahead of `develop` and inverting the promotion direction; `release.sh` guarded the release end but nothing guarded this one.
+Only three branches may open a PR into `main`: `develop` (release promotion), `hotfix/*`, and `release/*`. The **Branch Policy** workflow rejects anything else and tells you how to retarget, and `main` is protected so a rejected PR cannot be merged anyway. This exists because six feature PRs merged straight into `main` on 2026-08-14–17, putting `main` ahead of `develop` and inverting the promotion direction; `release.sh` guarded the release end but nothing guarded this one.
 
-Note that `gh pr create` without `--base` uses the repo's **default** branch. Pass it explicitly:
+`develop` is the repo's **default branch**, so `gh pr create` with no `--base` already targets it and the common case needs no flag. Pass it explicitly when you want to be sure:
 
 ```bash
 gh pr create --base develop
