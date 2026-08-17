@@ -26,6 +26,10 @@ Before cutting a repo release:
 
 This repo uses **`develop`** as the integration branch. Feature work and PRs land on `develop`; **`main`** only receives release-ready code. `scripts/release.sh` enforces this: it refuses to run on any branch except `main`.
 
+That guard covers the release end. The entry end is covered by the **Branch Policy** workflow ([`.github/workflows/branch-policy.yml`](../../.github/workflows/branch-policy.yml)), which fails any PR into `main` whose head is not `develop`, `hotfix/*`, or `release/*`.
+
+> **Why both.** `release.sh` assumes the promotion direction is one-way — it advances `main` from `develop`. A feature PR merged straight into `main` inverts that: `main` gains commits `develop` lacks, and the fast-forward the script relies on is no longer available. This happened six times between 2026-08-14 and 2026-08-17 before the workflow existed. Note also that `gh pr create` with no `--base` targets the repo's **default** branch, which is `main` — so the misroute is the accidental default, not a slip.
+
 The promotion path before each release starts by making sure develop is clean and pushed:
 
 ```bash
