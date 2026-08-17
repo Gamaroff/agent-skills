@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-17
-**Next Available Task Number:** **59**
+**Next Available Task Number:** **60**
 
 ## How to use
 
@@ -98,6 +98,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 56 | [One CLI for the GitHub issue lifecycle, and honest handling of value-returning mutations](task.56.tracker-issue-cli/task.56.tracker-issue-cli.md) | planned | refactoring | Medium | 2026-08-17 | — | task.54, task.55 |
 | 57 | [Read-only verification, and `/tracker-reconcile` so the checklist is a ledger](task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md) | planned | infrastructure | Medium | 2026-08-17 | — | task.52 |
 | 58 | [Document restricted tracker access for someone who has never heard of it](task.58.restricted-access-documentation/task.58.restricted-access-documentation.md) | planned | documentation | High | 2026-08-17 | — | task.51-57 |
+| 59 | [Finish the Prettier adoption — sweep the 50 stragglers, then guard the boundary](task.59.prettier-sweep-and-format-guard/task.59.prettier-sweep-and-format-guard.md) | planned | infrastructure | Medium | 2026-08-17 | [#237](https://github.com/Gamaroff/agent-skills/issues/237) | none |
 
 ---
 
@@ -107,6 +108,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Task 47 was accepted retroactively on 2026-08-17 and has no DoD file.** Its work shipped in v0.39.1 but the card was never closed. No Definition of Done was generated now: the task was hand-driven rather than run through `/develop-task` (it has no implementation report either, the same shape as tasks 48 and 50), so a DoD written today would attest to a review that never happened. An honest gap beats a manufactured artifact. Its guard test, `tests/json-output-fidelity.test.js`, is the durable evidence the work is sound.
 - **Statuses were audited against document frontmatter on 2026-08-17.** Fifteen rows were stale: 32-35 read `draft` and 39-45 read `planned` while every one of those documents said `accepted` and carried a DoD; 47 read `in-progress` in both places. Tasks 7, 8 and 10 carried `Accepted` / `✅ Accepted` in frontmatter, which must be lowercase-kebab-case — the Title Case form belongs in the body's `**Status:**` line only.
 - Tasks 51-58 are the **restricted tracker access** sequence — one shippable unit each, in dependency order. Design: `.agents/plans/restricted-tracker-access.md`. Ship 51 → 52 first; 53 and 54 are independent of each other. Task 58 is the narrative documentation layer and runs last — the per-unit reference docs stay with their own unit.
+- **Task 59 has a merge-ordering constraint, not a dependency — and it applies to JavaScript only.** Its Prettier sweep rewrites ~103 `.js` files, so a branch touching any of them conflicts on every line. Markdown, YAML and JSON are `.prettierignore`d, so **doc-only branches are unaffected** — which covers most of the 51-58 sequence. Land or rebase in-flight *code* work before merging 59. (Checked 2026-08-17: nothing was at risk. Task 49 had already merged as [#223](https://github.com/Gamaroff/agent-skills/pull/223) and task 51's branch was markdown-only, merged as [#238](https://github.com/Gamaroff/agent-skills/pull/238).)
 - Task 48's document was written **after** its implementation, to give the branch that already carried the number a registry entry. Task 49 is the half that task 48 deliberately deferred. Neither has a tracker issue yet.
 - Tasks 32-34 are the **Evals Infrastructure** milestone ([#1](https://github.com/Gamaroff/agent-skills/milestone/1)).
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
