@@ -271,6 +271,155 @@ for tier in python awk; do
   assert_eq "resolve-paths [$tier tier] → default roots" "$OUT" "docs/prd|docs/architecture"
 done
 
+# --- 11. Every real call site is guarded (repo-wide, not a self-built caller) ------------------
+# The §9 case above builds its OWN caller.sh, so it proves the assertion works — it can never prove
+# that the repo's call sites are guarded. Deleting `|| exit 1` from skills/create-pr/SKILL.md left
+# this suite at 61/61 green, which is exactly how an unguarded site in `review-code` shipped.
+# This scans the real files. It must also see `. path` dot-sources, which a grep for `source ` misses.
+echo "  11. Call-site guard coverage (repo-wide)"
+REPO_ROOT="$(cd "$HERE/.." && cd .. && pwd)"
+# Matches the sourcing form ANYWHERE in the line, not just at line start — three of the call sites
+# are prose sentences ("Branch on the tracker resolved by `source ... || exit 1`"), and an anchored
+# pattern silently skips them, which is the same blind spot that let an unguarded site ship.
+# `source=` is excluded: that is a shellcheck directive, not a sourcing.
+UNGUARDED=$(grep -rnoE '(^|[^=[:alnum:]_])source[[:space:]]+[^`]*resolve-platform\.sh([[:space:]]*\|\|[[:space:]]*exit 1)?' \
+  "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -v 'exit 1' || true)
+UNGUARDED="$UNGUARDED$(grep -rnoE '\.[[:space:]]+"\$\(dirname[^"]*"/references/resolve-platform\.sh"([[:space:]]*\|\|[[:space:]]*exit 1)?' \
+  "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -v 'exit 1' || true)"
+if [ -z "$UNGUARDED" ]; then
+  ok "every source/dot-source of resolve-platform.sh in skills/*/SKILL.md carries || exit 1"
+else
+  bad "unguarded resolve-platform.sh call site(s)" "$(echo "$UNGUARDED" | head -5)"
+fi
+
+# Nobody may EXECUTE the resolver: `bash …/resolve-platform.sh` never exports to the caller, and on
+# a rejection prints a `return` error and exits 0 — fail-open.
+EXECUTED=$(grep -rnE '(^|[^a-zA-Z-])bash[[:space:]]+[^|;&]*resolve-platform\.sh' \
+  "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null || true)
+if [ -z "$EXECUTED" ]; then
+  ok "no skill executes resolve-platform.sh instead of sourcing it"
+else
+  bad "resolve-platform.sh is executed, not sourced" "$(echo "$EXECUTED" | head -3)"
+fi
+
+# --- 12. The resolver works under zsh, not only bash -------------------------------------------
+# Every run_case above goes through `bash -c`. That is structurally why a bash-only `${!var}` shipped
+# and broke every call site on macOS, where the login shell — and the shell skills run their blocks
+# in — is zsh.
+echo "  12. zsh parity"
+if command -v zsh >/dev/null 2>&1; then
+  D=$(fixture zsh-clean "")
+  ZOUT=$(env -i PATH="$PATH" HOME="$HOME" zsh -c "
+    cd '$D'; source '$RESOLVER'; echo \"RC=\$? AT=\$ACCESS_TRACKER T=\$TRACKER\"" 2>&1)
+  assert_eq "zsh, no config → same as bash" \
+    "$(echo "$ZOUT" | sed -n 's/^RC=//p')" "0 AT=full T=github"
+
+  D=$(fixture zsh-access 'access:\n  tracker: manual\n')
+  ZOUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_ACCESS_TRACKER=command zsh -c "
+    cd '$D'; source '$RESOLVER'; echo \"RC=\$? AT=\$ACCESS_TRACKER\"" 2>&1)
+  assert_eq "zsh, env override resolves most-restrictive" \
+    "$(echo "$ZOUT" | sed -n 's/^RC=//p')" "0 AT=manual"
+
+  D=$(fixture zsh-bad 'tracker: jria\n')
+  env -i PATH="$PATH" HOME="$HOME" zsh -c "cd '$D'; source '$RESOLVER'" >/dev/null 2>&1
+  assert_rc "zsh, invalid value → non-zero" "$?" "1"
+else
+  echo "  SKIP  zsh parity (zsh not on this host)"
+fi
+
+# --- 13. Shapes that must not silently resolve to `full` ---------------------------------------
+echo "  13. No silent escalation"
+D=$(fixture access-scalar 'access: manual\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "scalar \`access: manual\` [$tier] → rejected, not silently full" "$RC" "1"
+done
+
+# The inline flow form is the notation the task document itself uses. It resolved correctly under
+# python and silently to `full` under awk — a tier-dependent privilege escalation.
+D=$(fixture access-flow 'access: {tracker: manual}\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_eq "flow-form \`access: {tracker: manual}\` [$tier] → manual" "$AT" "manual"
+done
+
+D=$(fixture access-flow-two 'access: {tracker: read-only, vcs: full}\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_eq "flow-form, two children [$tier] → read-only" "$AT" "read-only"
+done
+
+# --- 14. Valid YAML the tier-2 lint must not reject --------------------------------------------
+# Each of these parses cleanly under pyyaml. The lint used to grade them `malformed`, which with an
+# `access:` block present is a hard halt — on exactly the hosts where awk is the only tier.
+echo "  14. Tier-2 lint false positives"
+LINT_OK_CASES="root-sequence|access:\n  tracker: manual\ndevLoadAlwaysFiles:\n- docs/a.md\n
+quoted-key|access:\n  tracker: manual\n\"my key\": 1\n
+slash-key|access:\n  tracker: manual\npaths/root: x\n
+digit-key|access:\n  tracker: manual\n2fa: on\n"
+echo "$LINT_OK_CASES" | while IFS='|' read -r name yaml; do
+  [ -z "$name" ] && continue
+  D=$(fixture "lint-$name" "$yaml")
+  OUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+    cd '$D'; source '$RESOLVER' >/dev/null 2>&1; echo \"\$?:\$ACCESS_TRACKER\"")
+  if [ "$OUT" = "0:manual" ]; then
+    echo "  PASS  valid YAML ($name) not graded malformed [awk tier]"
+  else
+    echo "  FAIL  valid YAML ($name) [awk tier] — expected '0:manual', got '$OUT'"
+    echo "$name" >> "$TMPDIR_TEST/lint-failures"
+  fi
+done
+if [ -f "$TMPDIR_TEST/lint-failures" ]; then
+  FAIL=$((FAIL + $(wc -l < "$TMPDIR_TEST/lint-failures")))
+else
+  PASS=$((PASS + 4))
+fi
+
+# Genuinely broken YAML must still fail closed when access: is present.
+D=$(fixture lint-broken 'access:\n : bad: yaml\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "leading-colon + access: [$tier] → still fails closed" "$RC" "1"
+done
+
+# --- 15. YAML nulls mean "not configured", not a bad value -------------------------------------
+echo "  15. Null spellings"
+for spelling in null '~'; do
+  D=$(fixture "null-$RANDOM" "tracker: $spelling\n")
+  for tier in python awk; do
+    run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+    assert_rc "tracker: $spelling [$tier] → status 0 (means unset)" "$RC" "0"
+    assert_eq "tracker: $spelling [$tier] → detects" "$T" "github"
+  done
+done
+
+# --- 16. A forced tier that is unavailable must SKIP loudly, not pass silently ------------------
+# `config_python` returns 1 when pyyaml is absent, so a forced-python case would otherwise exercise
+# the awk path and report green with zero coverage of the tier it names.
+echo "  16. Forced-tier honesty"
+if bash -c "source '$READER'; config_python" >/dev/null 2>&1; then
+  ok "python tier genuinely available — forced-python cases above are real"
+else
+  echo "  SKIP  forced-python cases exercised the awk path (no python+pyyaml on this host)"
+fi
+
+# --- 17. A declared-but-unenforced mode says so --------------------------------------------------
+# Nothing intercepts a mutation yet. An operator who sets `manual` and sees a completely normal run
+# would reasonably conclude they were protected.
+echo "  17. Not-yet-enforced notice"
+D=$(fixture notice 'access:\n  tracker: manual\n')
+run_case "$D"
+assert_rc         "non-full mode → still status 0"        "$RC" "0"
+assert_stderr_has "non-full mode → warns it is not enforced" "NOT YET ENFORCED"
+
+D=$(fixture notice-full "")
+run_case "$D"
+if grep -q "NOT YET ENFORCED" "$STDERR_FILE"; then
+  bad "full mode → no notice" "warned on the default, which would make the notice noise"
+else
+  ok "full mode → no notice"
+fi
+
 # --- Summary -----------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

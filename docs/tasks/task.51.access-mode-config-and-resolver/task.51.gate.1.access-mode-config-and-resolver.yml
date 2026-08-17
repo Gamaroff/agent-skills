@@ -1,0 +1,186 @@
+schema: 1
+task: 'task.51.access-mode-config-and-resolver'
+task_title: '[Task 51] Declare tracker access level in config, and reject an unrecognised one loudly'
+gate: FAIL
+status_reason: >-
+  Five HIGH defects. The change adds strict validation to close a silent fall-through, then
+  introduces three new silent-or-fatal paths around it: the resolver returns 1 on every config under
+  zsh (the shell skills actually run in), the tier-2 lint grades valid YAML as malformed, and two
+  legal `access:` spellings silently resolve to the permissive default. One call site is still
+  unguarded, and the mutation that was supposed to prove the guards does not test them.
+reviewer: 'QA Engineer'
+updated: '2026-08-17T15:05:00Z'
+
+top_issues:
+  - id: TASK-51-BUG-1
+    severity: high
+    finding: >-
+      `resolve-platform.sh:94` uses `${!env_name:-}`, a bash-only indirect expansion. Under zsh the
+      resolver returns 1 on EVERY config, valid or not — a regression against develop, which returns
+      0. The Bash tool runs /bin/zsh, so this is the primary execution path, and the `|| exit 1`
+      guards this task added turn it into a hard abort at every guarded call site.
+    suggested_action: 'Use `eval "env_val=\${$env_name:-}"` (validated in both shells); add zsh coverage.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.1.zsh-indirect-expansion.md'
+
+  - id: TASK-51-BUG-2
+    severity: high
+    finding: >-
+      `read-config.sh:97` accepts a non-indented line only as `/^[A-Za-z_][A-Za-z0-9_.-]*:/`, so a
+      root-level block sequence, a quoted key, or a key containing `/` or a space is graded
+      `malformed`. With an `access:` block present that is a hard halt — on exactly the hosts where
+      awk is the only tier. Same file resolves cleanly under python: the outcome depends on whether
+      the machine has pyyaml.
+    suggested_action: 'Narrow the lint to the leading-`:` shape it was built for; accept `^- ` and odd keys.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.2.awk-lint-rejects-valid-yaml.md'
+
+  - id: TASK-51-BUG-3
+    severity: high
+    finding: >-
+      `tracker: null` and `tracker: ~` — the documented spelling of "no override", working before this
+      task — now halt. Tier 1 maps null to `auto`, but the short-circuit at `read-config.sh:128` only
+      returns early for a non-`auto` value, so awk runs and returns the literal `null`, which
+      validation rejects. Same for `vcs: null`.
+    suggested_action: 'Make tier 1 authoritative when it ran; emit a distinct sentinel for absent/null.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.3.tracker-null-rejected.md'
+
+  - id: TASK-51-BUG-4
+    severity: high
+    finding: >-
+      `skills/review-code/SKILL.md:96` dot-sources the resolver unguarded, so the body runs past a
+      rejected access value with ACCESS_TRACKER left EMPTY — worse than the permissive default the
+      task set out to prevent. The real count is 19 sites across 16 skills, not "16 across 15";
+      qa-task and qa-story hold two each, and a `.`-style dot-source evades a `source ` grep. The
+      wrong count is replicated into CHANGELOG, platform-detection.md, README, the Change Log row and
+      all 28 bundled copies. Related: jira-sprint-retrospective:144 executes rather than sources,
+      printing a `return` error and exiting 0.
+    suggested_action: 'Guard review-code:96; fix the retrospective site; correct the count; re-bundle.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.4.unguarded-call-site-and-wrong-count.md'
+
+  - id: TASK-51-BUG-5
+    severity: high
+    finding: >-
+      Two legal `access:` shapes silently resolve to `full`: the scalar form (`access: manual`) is
+      discarded because only the child scalar is read, and the flow-mapping form
+      (`access: {tracker: manual}`) yields `manual` under python but `full` under awk. The flow form
+      is the notation the task document itself uses throughout its Testing Strategy, yet the suite
+      only exercises the block form. Separately, the "remove `|| exit 1` from a call site" mutation is
+      self-deceiving — it mutates the test's own caller, so removing the guard from a REAL call site
+      leaves the suite at 61/61 green (verified). The grep assertion the Risk Assessment claims
+      mitigates this does not exist.
+    suggested_action: 'Reject non-mapping `access:`; teach awk the flow form or fail closed; add the real grep assertion.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.5.silent-access-escalation-and-fake-mutation.md'
+
+  - id: TASK-51-MED-1
+    severity: medium
+    finding: >-
+      `SKILLS_CONFIG_FILE` is interpolated unescaped into three `python3 -c` programs
+      (`read-config.sh:64,114,162`). Demonstrated code execution via a crafted path. The previous code
+      hardcoded the filename; making it a variable opened this. Requires control of an env var, so it
+      is escalation of an existing foothold rather than a fresh remote hole — but it is a new boundary.
+    suggested_action: 'Pass the path via argv/os.environ instead of splicing it into the program text.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-2
+    severity: medium
+    finding: >-
+      `config_python` re-probes on every call, so one `source resolve-platform.sh` spawns 10 python3
+      processes and costs 1140–1458 ms versus 75–267 ms before — 15–17x slower, roughly +18 s of pure
+      resolver latency per pipeline run across 16 sites.
+    suggested_action: 'Memoise the probe; ideally collapse the three heredocs into one python call.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-3
+    severity: medium
+    finding: >-
+      Two Risk Assessment mitigations are claimed but not implemented: the one-line notice on a
+      non-`full` value, and the grep assertion over `skills/*/SKILL.md`. Undeclared behaviour changes
+      absent from the Breaking Changes table: the resolver now exports TRACKER/VCS, and now honours
+      SKILLS_CONFIG_FILE. `shared/resources/README.md` is internally inconsistent (28 vs 15/16).
+    suggested_action: 'Implement or retract each claim; declare the two behaviour changes.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-4
+    severity: medium
+    finding: >-
+      Forced-python-tier tests are host-dependent: when pyyaml is absent `config_python` returns 1 and
+      the case silently exercises the awk path, passing green with no SKIP marker — unlike the probe
+      test, which skips explicitly. The task calls the mapping-form disagreement "the highest-likelihood
+      regression"; its guard is therefore host-dependent.
+    suggested_action: 'SKIP loudly when the forced tier is unavailable.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 40
+# 100 − (20 × 1 NFR FAIL: reliability) − (10 × 2 NFR CONCERNS: security, performance) = 60,
+# then −20 for the five HIGH functional defects, which sit outside the NFR axis and are the
+# substance of this gate. Reporting 60 would misdescribe a build that halts on macOS.
+
+evidence:
+  tests_reviewed: 1348   # 1287 node + 61 new shell assertions
+  phases_verified: '10/10 landed; 1 (call-site guards) incomplete — 18 of 19'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    phases_with_issues: [3, 4, 5, 9]
+  criteria_verified: '7 PASS, 2 CONCERNS, 2 FAIL, 1 unverifiable (mutation run)'
+  suites:
+    npm_test: 'exit 0 — 1287/1287 node, all shell suites green'
+    tracker_access: '61 passed, 0 failed'
+    validate_all: '115 passed, 0 failed'
+    format_check: 'clean'
+    bundle: 'idempotent; 36 read-config.sh copies in sync'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      yaml.safe_load holds — a hostile config cannot execute code. But SKILLS_CONFIG_FILE splicing
+      into the python heredocs is a demonstrated new execution vector (TASK-51-MED-1).
+  performance:
+    status: CONCERNS
+    notes: '10 python spawns per source; 1140–1458 ms vs 75–267 ms; ~+18 s per pipeline run.'
+  reliability:
+    status: FAIL
+    notes: >-
+      Three independent ways a legal config now fails: zsh (BUG-1), lint false positives (BUG-2),
+      `tracker: null` (BUG-3). None covered by the 61 passing assertions.
+  maintainability:
+    status: PASS
+    notes: >-
+      Reader consolidation is a genuine win — one definition repo-wide, 28 bundled copies with no
+      drift, and unusually good "why" comments. The awk lint is the least readable part and its rule
+      order is load-bearing.
+
+recommendations:
+  immediate:
+    - action: 'Portable indirect expansion + zsh coverage in the suite'
+      refs: ['shared/resources/resolve-platform.sh:94', 'shared/resources/tracker-access.test.sh']
+    - action: 'Narrow the tier-2 lint so valid YAML is never graded malformed'
+      refs: ['shared/resources/read-config.sh:84-100']
+    - action: 'Stop `tracker: null` falling through tier 1 to awk'
+      refs: ['shared/resources/read-config.sh:107-134']
+    - action: 'Guard review-code:96, fix the retrospective execute-site, correct 16→19/15→16 everywhere, re-bundle'
+      refs: ['skills/review-code/SKILL.md:96', 'skills/jira-sprint-retrospective/SKILL.md:144']
+    - action: 'Reject non-mapping `access:`; handle the flow form or fail closed; add the real grep assertion and fix mutation #10'
+      refs: ['shared/resources/resolve-platform.sh:92', 'shared/resources/read-config.sh:172']
+  future:
+    - action: 'Memoise config_python and collapse the three python heredocs into one call'
+      refs: ['shared/resources/read-config.sh:33-43']
+    - action: 'Pass the config path via argv rather than splicing it into python source'
+      refs: ['shared/resources/read-config.sh:64,114,162']
+    - action: 'Guard the sibling source; quote $ACCESS_MODES against a caller IFS; attribute env-tier errors to the environment not the file'
+      refs: ['shared/resources/resolve-platform.sh:56,98,83']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'All five HIGH defects fixed and covered by tests that fail without the fix'
+    - 'Suite exercises zsh, and forced tiers SKIP loudly when unavailable'
+    - 'Guard coverage asserted by a grep over skills/*/SKILL.md, not by a self-built caller'

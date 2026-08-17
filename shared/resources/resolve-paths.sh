@@ -44,7 +44,12 @@ if [ -z "$_rp_self" ] && [ -n "${ZSH_VERSION:-}" ]; then
 fi
 [ -n "$_rp_self" ] || _rp_self="$0"
 # shellcheck source=read-config.sh
-source "$(dirname "$_rp_self")/read-config.sh"
+source "$(dirname "$_rp_self")/read-config.sh" || {
+  printf '⚠️  read-config.sh not found beside %s — using default roots.\n' "$_rp_self" >&2
+  PRD_ROOT="docs/prd"; ARCH_ROOT="docs/architecture"; export PRD_ROOT ARCH_ROOT
+  unset _rp_self
+  return 0
+}
 unset _rp_self
 
 PRD_ROOT=$(read_nested_config_key prd prdShardedLocation)

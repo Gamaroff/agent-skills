@@ -93,7 +93,7 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
 1. Source the platform helper and resolve the tracker:
    ```bash
    # shellcheck source=references/resolve-platform.sh
-   . "$(dirname "$0")/references/resolve-platform.sh"   # adjust to the bundled path in this install
+   . "$(dirname "$0")/references/resolve-platform.sh" || exit 1   # adjust to the bundled path in this install
    ```
 2. **GitHub** (`TRACKER=github`): post each finding as an inline review comment at its `file_line`; fall back to a single summary comment via `tracker_call_with_retry gh pr comment "$PR_URL"` when line anchoring fails or there is no PR.
 3. **Bitbucket / Jira**: post a summary comment via the platform's PR-comment path (mirror `/qa-story` step 6).

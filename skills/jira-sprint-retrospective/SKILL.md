@@ -141,7 +141,7 @@ description — do not invent detail the tracker does not carry.
 
 ### 6. Merged-PR counts, best effort
 
-Optional. Determine the platform with `bash ./references/resolve-platform.sh` (sets `VCS`), then query
+Optional. Determine the platform with `source ./references/resolve-platform.sh || exit 1` (sets `VCS`) — **source it, do not execute it**: run as `bash …` the variables never reach the caller, and a rejected config prints a `return` error and exits 0. Then query
 that platform's API for pull requests merged inside the sprint window and write the count into the
 `retro:pr-counts` slot along with the query used. **If credentials are missing or the call fails,
 delete the slot and say nothing** — an unmeasured count must never be implied.

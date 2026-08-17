@@ -22,10 +22,11 @@ Reference files in skill `.md` files using the exact path `shared/resources/<fil
 Bundled-copy counts above are what `npm run bundle` produces and will change as skills are added —
 re-derive with `ls skills/*/references/<file> | wc -l` rather than trusting them.
 
-Fifteen skills source `resolve-platform.sh` directly (16 call sites; `create-epic` has two):
-`create-epic`, `create-pr`, `create-story`, `create-task`, `develop-next`, `qa-fix`, `qa-story`,
-`qa-task`, `review-bug`, `review-epic`, `review-story`, `review-task`, `sync-github-epic`,
-`sync-github-story`, `sync-github-task`. The wider bundled-copy count is larger because other
+Sixteen skills source `resolve-platform.sh` directly (18 sourcing forms; `create-epic`, `qa-task`
+and `qa-story` have two each):
+`create-epic`, `create-pr`, `create-story`, `create-task`, `develop-next`, `jira-sprint-retrospective`,
+`qa-fix`, `qa-story`, `qa-task`, `review-bug`, `review-code`, `review-epic`, `review-story`,
+`review-task`, `sync-github-epic`, `sync-github-story`, `sync-github-task`. The wider bundled-copy count is larger because other
 skills reference `platform-detection.md`, which pulls the script in transitively.
 
 ### GitHub Project Boards

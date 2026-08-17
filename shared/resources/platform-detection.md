@@ -119,21 +119,37 @@ the resolution, kept short precisely so it cannot silently drift out of step wit
 a verbatim duplicate does.
 
 ```bash
-# Identity — first match wins, then validate against a per-key legal set.
-TRACKER=$(read_config_key tracker)             # "__MAP__" ⇒ tracker.workflowFile form
-[ "$TRACKER" = "__MAP__" ] && TRACKER="auto"
-validate_enum tracker "$TRACKER" jira github auto || return 1
-[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "$JIRA_URL" ] && echo jira || echo github)
+# One batched read — six questions, one python spawn. Falls back to the individual readers when
+# tier 1 is unavailable.
+config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested:access.vcs
 
-VCS=$(read_config_key vcs)
-validate_enum vcs "$VCS" github bitbucket auto || return 1
+# Identity — first match wins, then validate against a per-key legal set.
+# validate_enum takes the SOURCE first, so an env-var rejection does not misdirect the operator to
+# a config file that does not contain the value.
+[ "$TRACKER" = "__MAP__" ] && TRACKER="auto"   # tracker.workflowFile form ⇒ detect
+validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
+[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "${JIRA_URL:-}" ] && echo jira || echo github)
+
+validate_enum "$SKILLS_CONFIG_FILE" vcs "$VCS" github bitbucket auto || return 1
 [ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null \
   | grep -qi bitbucket.org && echo bitbucket || echo github)
 
-# Access — both tiers read and validated, then the MORE RESTRICTIVE wins.
+# Access — reject a shape the per-system reader cannot honour (a scalar `access: manual` would
+# otherwise read as nothing and resolve to the permissive default), then read both tiers and take
+# the MORE RESTRICTIVE.
+[ "$(config_child_shape access)" = "scalar" ] && return 1
 ACCESS_TRACKER=$(resolve_access tracker) || return 1   # manual<command<approve<read-only<full
 ACCESS_VCS=$(resolve_access vcs) || return 1           # rejected unless `full`
 ```
+
+Two portability rules the resolver learned the hard way, both of which broke every call site on
+macOS before they were fixed:
+
+- **No `${!var}`.** Bash-only indirect expansion; zsh raises `bad substitution`. Use
+  `eval "v=\${$name:-}"`, which works in both.
+- **No unquoted `$LIST` relying on word splitting.** zsh does not split unquoted parameter
+  expansions, so a legal-set string arrives as one candidate and rejects everything. Pass the set
+  as separate literal arguments.
 
 Two tiers, and they are not interchangeable: only python+pyyaml can tell a mapping from a scalar or
 a parse failure from an absent key. The tier-1 probe tries `python3` then `python` — it used to
@@ -206,8 +222,10 @@ Five things about this credential are easy to get wrong:
 
 ## Skills migrated to the helper
 
-Fifteen skills source `resolve-platform.sh`, across sixteen call sites (`create-epic` has two).
-All sixteen use the guarded `|| exit 1` form.
+Sixteen skills source `resolve-platform.sh`, across **eighteen** sourcing forms — `create-epic`,
+`qa-task` and `qa-story` each have two, and three of the eighteen are prose sentences rather than
+fenced snippets. All eighteen use the guarded `|| exit 1` form, and nothing **executes** the
+resolver (`bash …/resolve-platform.sh` never exports to the caller and exits 0 on a rejection).
 
 - `create-epic` (×2), `create-pr`, `create-story`, `create-task`, `develop-next`, `qa-fix`,
   `qa-story`, `qa-task`, `review-bug`, `review-epic`, `review-story`, `review-task`,
@@ -217,8 +235,12 @@ This list is hand-maintained and has drifted before (it read "All 8 leaf skills"
 15). Re-derive it rather than trusting it:
 
 ```bash
-grep -rn 'resolve-platform\.sh' --include='SKILL.md' skills/ | grep -E '(source|\. )' 
+grep -rnoE '(^|[^=[:alnum:]_])source[[:space:]]+[^`]*resolve-platform\.sh' skills/*/SKILL.md
 ```
+
+`shared/resources/tracker-access.test.sh` §11 asserts this repo-wide and fails when any site loses
+its guard — including the prose ones, which an anchored pattern silently skips. That assertion is
+the reason the list can be trusted; before it existed, an unguarded site shipped unnoticed.
 
 Skills that are platform-agnostic (no resolver needed):
 
