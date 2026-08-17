@@ -5,7 +5,7 @@ type: task
 description: 'Prettier became repo policy on 2026-08-14 but the repo-wide sweep was deliberately deferred, so `npm run format:check` fails today on 50 files and nothing enforces the policy. This task runs the sweep as an isolated commit, re-bundles the shared resources it touches, adds a `.git-blame-ignore-revs` covering the pure-formatting commits, wires `format:check` into CI, and closes the two documentation gaps issue #179 left open — the unannounced reformat in the v0.29.5 changelog entry, and a contributor note that formatter hooks must not bundle a reformat into a functional commit.'
 tags: [tooling, formatting, ci, technical-debt]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-08-17
@@ -16,7 +16,7 @@ github_issue: 237
 
 # [Task 59] Finish the Prettier adoption — sweep the 50 stragglers, then guard the boundary
 
-**Status:** Planned
+**Status:** Accepted
 
 **Task File**: [task.59.prettier-sweep-and-format-guard.md](./task.59.prettier-sweep-and-format-guard.md)
 
@@ -538,13 +538,29 @@ path to `.prettierignore` with a comment saying why. Both keep the gate intact.
 
 ## Progress Tracking
 
-- [ ] Phase 1 — The sweep
-- [ ] Phase 2 — The guard
-- [ ] Phase 3 — The record
-- [ ] PR opened
-- [ ] CI green
-- [ ] PR merged
-- [ ] Issue #179 closed with a resolution comment
+- [x] Phase 1 — The sweep (`99c556b`)
+- [x] Phase 2 — The guard (`dd74778`)
+- [x] Phase 3 — The record (`2e1adee`)
+- [x] PR opened ([#240](https://github.com/Gamaroff/agent-skills/pull/240))
+- [x] CI green — `test`, `validate`, `link-check`; the new Formatting step ran and passed in position
+- [x] PR merged (`26e4aff` → `develop`)
+- [x] Issue [#179](https://github.com/Gamaroff/agent-skills/issues/179) closed with a resolution comment
+
+### Outcome against the baseline
+
+| Check | Before | After |
+| ----- | ------ | ----- |
+| `npm test` | 1287 / 0 | 1287 / 0 |
+| `npm run validate:all` | 115 / 0 | 115 / 0 |
+| `npm run format:check` | fails, 50 files | passes |
+| `npm run bundle` re-run | — | no-op |
+
+**Two deviations from this document, both benign:**
+
+1. **Bundled copies were 56, not the estimated ~53** — 106 files in the sweep commit rather than ~103. The estimate counted copies of the five unformatted bundle sources; the actual regeneration is what `npm run bundle` decides.
+2. **The pre-flight JS-exposure check found nothing at risk**, so no branch had to be landed or rebased first. This confirmed the correction already recorded in Breaking Changes #2 — the two branches originally named as blockers never were.
+
+One process note worth keeping: the first attempt at the formatting-only proof reported **57 false positives**. The harness shelled out through pipelines that `nvm` was injecting help text into, corrupting the captured output. Re-run in-process against Prettier's API it was clean at zero. A verification harness can fail in ways that look exactly like the defect it is checking for.
 
 ---
 
@@ -553,6 +569,7 @@ path to `.prettierignore` with a comment saying why. Both keep the gate intact.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-17 | 1.0     | Initial draft | create-task |
+| 2026-08-17 | 1.1     | Implemented and merged (#240). Status → accepted. Recorded outcome, two deviations, and the false-positive verification harness. | develop-task |
 
 ---
 
