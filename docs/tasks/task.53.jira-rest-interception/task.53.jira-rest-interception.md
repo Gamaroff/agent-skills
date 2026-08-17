@@ -11,11 +11,14 @@ risk_level: high
 created: 2026-08-17
 updated: 2026-08-17
 estimated_effort_hours: 10
+github_issue: 231
 ---
 
 # [Task 53] Intercept Jira REST mutations in two layers — a fail-closed net and a legible one
 
 **Task File**: [task.53.jira-rest-interception.md](./task.53.jira-rest-interception.md)
+
+**GitHub Issue**: [#231](https://github.com/Gamaroff/agent-skills/issues/231)
 
 ## Overview
 

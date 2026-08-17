@@ -11,11 +11,14 @@ risk_level: medium
 created: 2026-08-14
 updated: 2026-08-17
 estimated_effort_hours: 3
+github_issue: 228
 ---
 
 # [Task 49] `setup-consumer.sh` still seeds credentials into `.env`, teaching new consumers the old location
 
 **Task File**: [task.49.setup-consumer-secrets-path.md](./task.49.setup-consumer-secrets-path.md)
+
+**GitHub Issue**: [#228](https://github.com/Gamaroff/agent-skills/issues/228)
 
 ## Overview
 

@@ -11,11 +11,14 @@ risk_level: high
 created: 2026-08-17
 updated: 2026-08-17
 estimated_effort_hours: 12
+github_issue: 234
 ---
 
 # [Task 56] One CLI for the GitHub issue lifecycle, and honest handling of the mutations that return a value
 
 **Task File**: [task.56.tracker-issue-cli.md](./task.56.tracker-issue-cli.md)
+
+**GitHub Issue**: [#234](https://github.com/Gamaroff/agent-skills/issues/234)
 
 ## Overview
 

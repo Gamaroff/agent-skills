@@ -11,11 +11,14 @@ risk_level: high
 created: 2026-08-17
 updated: 2026-08-17
 estimated_effort_hours: 12
+github_issue: 233
 ---
 
 # [Task 55] Build the Jira comment endpoint that does not exist, and stop routing ~20 comments through prose
 
 **Task File**: [task.55.tracker-comment-cli.md](./task.55.tracker-comment-cli.md)
+
+**GitHub Issue**: [#233](https://github.com/Gamaroff/agent-skills/issues/233)
 
 ## Overview
 

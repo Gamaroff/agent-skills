@@ -11,11 +11,14 @@ risk_level: medium
 created: 2026-08-17
 updated: 2026-08-17
 estimated_effort_hours: 8
+github_issue: 232
 ---
 
 # [Task 54] Intercept GitHub board mutations, and give `gh-stage.js` the credential-free plan its sibling already has
 
 **Task File**: [task.54.github-board-interception.md](./task.54.github-board-interception.md)
+
+**GitHub Issue**: [#232](https://github.com/Gamaroff/agent-skills/issues/232)
 
 ## Overview
 

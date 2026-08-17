@@ -11,11 +11,14 @@ risk_level: medium
 created: 2026-08-16
 updated: 2026-08-16
 estimated_effort_hours: 5
+github_issue: 229
 ---
 
 # [Task 50] Bitbucket REST auth supports Bearer as well as Basic, chosen by variable name
 
 **Task File**: [task.50.bitbucket-bearer-auth.md](./task.50.bitbucket-bearer-auth.md)
+
+**GitHub Issue**: [#229](https://github.com/Gamaroff/agent-skills/issues/229)
 
 ## Overview
 

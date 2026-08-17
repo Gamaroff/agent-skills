@@ -11,11 +11,14 @@ risk_level: medium
 created: 2026-08-17
 updated: 2026-08-17
 estimated_effort_hours: 12
+github_issue: 235
 ---
 
 # [Task 57] Read-only verification, and `/tracker-reconcile` so the checklist is a ledger rather than a receipt
 
 **Task File**: [task.57.readonly-verification-and-reconcile.md](./task.57.readonly-verification-and-reconcile.md)
+
+**GitHub Issue**: [#235](https://github.com/Gamaroff/agent-skills/issues/235)
 
 ## Overview
 
