@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.42.0] - 2026-08-17
+
 ### Changed
 
 - **The setup wizard now seeds credentials into `.secrets/tooling.env`, not the repo-root `.env`.** v0.40.0 taught both loaders to search `.secrets/tooling.env` first and `.env` second; `scripts/setup-consumer.sh` was left behind, so every consumer onboarded since has been started in the location that release exists to move away from. An Nx workspace loads a root `.env` into the environment of every task it runs, putting tooling tokens into every application process before any application code executes.
