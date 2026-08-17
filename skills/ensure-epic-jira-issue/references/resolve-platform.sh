@@ -107,11 +107,21 @@ validate_enum() {
 resolve_access() {
   local system="$1" cfg env_name env_val resolved
 
+  # LOW-6: whitelist rather than relying on the uppercasing to mangle hostile input, since this
+  # function stays defined in the caller's shell after sourcing and its value reaches an `eval`.
   case "$system" in
     tracker) cfg="${_RP_ACC_T-$(read_nested_config_key access tracker)}" ;;
     vcs)     cfg="${_RP_ACC_V-$(read_nested_config_key access vcs)}" ;;
-    *)       cfg=$(read_nested_config_key access "$system") ;;
+    *)       printf '❌ resolve_access: unknown system "%s".\n' "$system" >&2; return 1 ;;
   esac
+
+  # The awk tier says so when it meets `access:` written in a form it cannot read on one line.
+  # Refusing is the point: reading it as "absent" is what silently granted `full`.
+  if [ "$cfg" = "__UNREADABLE__" ]; then
+    printf '❌ %s: access is written as a multi-line flow mapping, which this host cannot read.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   Install python3 + pyyaml, or write the block form:\n     access:\n       %s: <mode>\n' "$system" >&2
+    return 1
+  fi
   env_name="AGENT_SKILLS_ACCESS_$(printf '%s' "$system" | tr '[:lower:]' '[:upper:]')"
   # Portable indirect read. `${!name}` is bash-only and aborts under zsh with `bad substitution`,
   # which made this function — and so every guarded call site — fail on EVERY config on macOS.
@@ -143,9 +153,17 @@ resolve_access() {
 # Six questions, one python spawn. Asking them one at a time cost ~500 ms per source, multiplied by
 # every call site in a pipeline run. Falls back to the individual readers when tier 1 is
 # unavailable — the awk tier has to answer each question separately anyway.
-_RP_BULK=""
+# Cleared unconditionally first. These used to be unset only on the success path, so after a
+# failing source they persisted in the caller's shell — and because the access lookups use
+# `${_RP_ACC_T-…}` (unset-only), a stale empty string suppressed the awk read entirely. A second
+# source in the same shell then resolved against the first repo's config.
+_RP_BULK=""; _RP_STATUS=""; _RP_TRACKER=""; _RP_VCS=""; _RP_SHAPE=""
+unset _RP_ACC_T _RP_ACC_V 2>/dev/null || true
+
 if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested:access.vcs 2>/dev/null); then
-  _rp_line() { printf '%s\n' "$_RP_BULK" | sed -n "$1p"; }
+  # Index-addressed, not positional: each answer arrives as `<n>\t<value>` with newlines escaped,
+  # so a multi-line value can no longer shift every later answer.
+  _rp_line() { printf '%s\n' "$_RP_BULK" | sed -n "s/^$1"$'\t'"//p"; }
   _RP_STATUS=$([ "$(_rp_line 1)" = "ok" ] && echo ok || echo malformed)
   [ -f "$SKILLS_CONFIG_FILE" ] || _RP_STATUS=missing
   _RP_TRACKER=$(_rp_line 2)

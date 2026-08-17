@@ -48,10 +48,30 @@ _CONFIG_PY=""
 # where YAML semantics are decided. Sentinels are chosen to be impossible YAML scalars.
 _CONFIG_PY_PROG='
 import sys, yaml
+
+# YAML says last-wins on a duplicate key; that is technically correct and operationally awful here.
+# A copy-pasted second `access:` block made the first one vanish, silently resolving a declared
+# `manual` back to `full` — and the same shape flipped `tracker:`. Treat a duplicate as the config
+# error it is, so the malformed branch fails closed rather than quietly picking one.
+class _StrictLoader(yaml.SafeLoader):
+    pass
+
+def _no_dupes(loader, node, deep=False):
+    seen = set()
+    for k, _ in node.value:
+        key = loader.construct_object(k, deep=deep)
+        if key in seen:
+            raise ValueError("duplicate key: %r" % (key,))
+        seen.add(key)
+    return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)
+
+_StrictLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_dupes)
+
 path, mode = sys.argv[1], sys.argv[2]
 try:
     with open(path) as f:
-        d = yaml.safe_load(f)
+        d = yaml.load(f, Loader=_StrictLoader)
 except Exception:
     print("__ERR__"); sys.exit(0)
 if d is None:
@@ -90,7 +110,12 @@ def answer(spec):
         return "__NONE__" if v is None else (
             ("true" if v else "false") if isinstance(v, bool) else
             "__MAP__" if isinstance(v, (dict, list)) else str(v))
-    return "__NONE__"
+    return "__ERR__"   # unknown spec — fail closed, never "absent"
+
+def one_line(v):
+    """One answer, guaranteed one line. A value containing a newline would otherwise emit extra
+    lines and shift every later answer, which silently escalated access.tracker to `full`."""
+    return v.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r")
 
 if mode == "status":
     print("ok")
@@ -107,10 +132,15 @@ elif mode == "nested":
         emit(p.get(sys.argv[4]))
 elif mode == "bulk":
     # One spawn, many answers. Each remaining argv is a spec — status | key:K | shape:P |
-    # nested:P.C — and one line comes back per spec, in order. Generic: this file knows nothing
-    # about which keys a particular caller wants.
-    for spec in sys.argv[3:]:
-        print(answer(spec))
+    # nested:P.C. Each answer comes back as `<index>\t<value>`, INDEX-ADDRESSED rather than
+    # positional, and with newlines escaped so one answer is always exactly one line.
+    #
+    # The first version returned bare lines and the caller read them with `sed -n "$Np"`. Any value
+    # containing a newline emitted extra lines and shifted every later answer — three specs in,
+    # five lines out — which resolved `access.tracker: manual` to `full`, silently, on the
+    # authoritative tier. Position is not a safe key when the payload is arbitrary.
+    for i, spec in enumerate(sys.argv[3:], 1):
+        print("%d\t%s" % (i, one_line(answer(spec))))
 '
 
 # _config_probe — populate $_CONFIG_PY; return 0 when tier 1 is usable.
@@ -218,6 +248,19 @@ config_child_shape() {
   ' "$SKILLS_CONFIG_FILE" 2>/dev/null
 }
 
+# _config_denull <value> — echo "" for any YAML null spelling, otherwise the value unchanged.
+#
+# Shared by BOTH readers. It lived inline in read_config_key first and the nested reader was left
+# without it, so `access.tracker: null` halted every guarded call site on an awk-only host and
+# `architectureShardedLocation: ~` produced ARCH_ROOT=~ — which unquoted expands to $HOME. One
+# definition is the fix; two call sites of one helper cannot drift the way two copies did.
+_config_denull() {
+  case "$1" in
+    null | Null | NULL | '~' | '') echo "" ;;
+    *) echo "$1" ;;
+  esac
+}
+
 read_config_key() {
   local key="$1" val=""
   # Tier 1 is authoritative when it runs — including when it says "absent".
@@ -244,12 +287,7 @@ read_config_key() {
     print v
     exit
   }" "$SKILLS_CONFIG_FILE" 2>/dev/null)
-  # YAML's null spellings all mean "not configured", the same as an absent key. Tier 1 already
-  # returns them as such; without this, awk hands back the literal text `null` and strict validation
-  # rejects a config that is both legal and previously working.
-  case "$val" in
-    null | Null | NULL | '~') val="" ;;
-  esac
+  val=$(_config_denull "$val")
   [ -z "$val" ] && val="auto"
   echo "$val"
 }
@@ -275,6 +313,11 @@ read_nested_config_key() {
   # wrote `access: {tracker: manual}` silently got the permissive default on any host without pyyaml.
   val=$(awk -v p="$parent" -v c="$child" '
     $0 ~ "^"p":[[:space:]]*\\{" {
+      # A flow map that does not close on this line is beyond what awk should attempt. Emitting
+      # nothing here read as "not configured" and resolved access to `full` — a silent escalation.
+      # Say so instead; the caller halts. This tier is documented as not a parser, and the right
+      # response to syntax it cannot read is to refuse, not to guess.
+      if ($0 !~ /\}/) { print "__UNREADABLE__"; exit }
       line = $0
       sub(/^[^{]*\{/, "", line)
       sub(/\}.*$/, "", line)
@@ -303,7 +346,7 @@ read_nested_config_key() {
       exit
     }
   ' "$SKILLS_CONFIG_FILE" 2>/dev/null)
-  echo "$val"
+  _config_denull "$val"
 }
 
 
