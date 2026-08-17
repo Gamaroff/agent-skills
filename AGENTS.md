@@ -87,7 +87,7 @@ Canonical spec: [`docs/reference/tracker-workflow.md`](./docs/reference/tracker-
 
 Skills that interact with remote trackers or PRs use a resolver order to pick the platform — explicit config → env vars → git remote → default GitHub. Canonical spec: [`shared/resources/platform-detection.md`](./shared/resources/platform-detection.md).
 
-All leaf skills that branch on platform source `shared/resources/resolve-platform.sh` before the branch. `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
+All leaf skills that branch on platform source `shared/resources/resolve-platform.sh` before the branch, **guarded as `source … || exit 1`** — it validates the `tracker:`/`vcs:`/`access:` keys and returns non-zero on an unrecognised value, which a bare `source` would print and then ignore. It also sets `ACCESS_TRACKER`/`ACCESS_VCS` (how much access the agent has, resolved most-restrictive-wins across config and env — a separate axis from which platform). `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
 
 ## File Naming
 

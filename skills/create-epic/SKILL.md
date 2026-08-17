@@ -112,7 +112,7 @@ Use `PRD_SOURCE_PATH` to populate the `prd_source:` frontmatter field. Never lea
 Then build `PRD_URL` — a full web URL for the body link that works in any markdown renderer (GitHub, Bitbucket, VS Code preview):
 
 ```bash
-source references/resolve-platform.sh   # sets VCS=github|bitbucket
+source references/resolve-platform.sh || exit 1   # sets VCS=github|bitbucket
 
 # Resolve current branch; fall back to the repo default when HEAD is detached
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -293,7 +293,7 @@ After the epic file is fully written and the registry updated, ask the user whet
 **Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # TRACKER = jira | github   (empty/unknown if neither is configured)
 ```
 

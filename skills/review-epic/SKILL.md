@@ -782,7 +782,7 @@ On non-zero exit → log warning `⚠️ sync-jira-epic failed — Jira descript
 **Detect platform** (if not already sourced this run) using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # TRACKER = jira | github   (empty/unknown if neither is configured)
 ```
 

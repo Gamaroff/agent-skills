@@ -5,7 +5,7 @@ type: task
 description: 'Adds an `access:` block to skills-config.yaml declaring how much access the agent has to each system — full | read-only | approve | command | manual — resolved into ACCESS_TRACKER / ACCESS_VCS by resolve-platform.sh alongside the existing TRACKER / VCS. Identity stays separate from access: the tracker is still Jira, and the instructions emitted later need to know that. Unlike the existing keys, an unrecognised value fails loudly rather than falling through to a default, because the failure mode here is handing credentials to a run the operator meant to lock down. First unit of the restricted-tracker-access sequence (tasks 51-58); useful on its own because it also closes the silent fall-through on the existing tracker/vcs keys, and because making a rejection actually halt a run requires guarding all 16 resolver call sites — today none of them check.'
 tags: [config, platform-detection, access-control, restricted-access]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-08-17
@@ -231,6 +231,14 @@ reader (and fixing its dead `python` tier), the setup wizard prompt, and documen
 | `docs/reference/configuration.md` | schema block + key table; corrected `tracker` row |
 | `scripts/setup-consumer.sh` | access-level prompt |
 | `package.json` | `test` chain + `test:tracker-access` |
+| `shared/resources/README.md` | new `read-config.sh` / `tracker-access.test.sh` rows; corrected the stale sourcing-skills list (named 10, several wrong) |
+| `AGENTS.md`, `docs/architecture/concepts/coding-standards.md` | both stated the **unguarded** `source` form as the house standard — corrected, so a new skill copying them inherits the guard |
+| `CHANGELOG.md` | Added + Fixed entries; the three breaking changes named |
+
+Added during implementation, beyond the plan above: the three documentation sites that stated the
+unguarded form. Leaving them would have made the guard true of the 16 existing call sites and false
+of the next one written from the docs — the same drift that let `platform-detection.md` keep saying
+"All 8 leaf skills" long after it was 15 (also corrected).
 
 `shared/resources/` changes require `npm run bundle` and committing the regenerated
 `skills/*/references/` copies — which for this task includes the bundled `resolve-platform.sh`,
@@ -285,22 +293,22 @@ whichever the host happens to provide.
 
 ## Success Criteria
 
-- [ ] `ACCESS_TRACKER` / `ACCESS_VCS` resolve config and env independently, then take the **more
+- [x] `ACCESS_TRACKER` / `ACCESS_VCS` resolve config and env independently, then take the **more
       restrictive** of the two; `full` when neither is set
-- [ ] An env var can lock a run down but **cannot escalate** a config that restricts
-- [ ] An unrecognised value on any of the four keys **fails loudly**, naming key, value and legal set,
+- [x] An env var can lock a run down but **cannot escalate** a config that restricts
+- [x] An unrecognised value on any of the four keys **fails loudly**, naming key, value and legal set,
       with the legal set taken **per key** — `tracker: bitbucket` and `vcs: jira` are both rejected
-- [ ] A rejection **actually halts the run** — verified end-to-end through a guarded call site, not
+- [x] A rejection **actually halts the run** — verified end-to-end through a guarded call site, not
       only by the resolver's return code
-- [ ] All 16 call sites use `source … || exit 1`, and the canonical snippet in
+- [x] All 16 call sites use `source … || exit 1`, and the canonical snippet in
       `platform-detection.md` shows the guarded form
-- [ ] A mapping-valued `tracker:` (`workflowFile`) resolves as `auto` under **both** tiers
-- [ ] A consumer with no `access:` block and a legal `tracker:`/`vcs:` is byte-identical to today
-- [ ] Malformed YAML **without** an `access:` line still degrades to defaults; **with** one it halts
-- [ ] `access.vcs` other than `full` is rejected with a message naming the reason
-- [ ] One nested-key reader exists, shared by both resolvers, and its tier-1 probe finds `python3`
-- [ ] Every invariant watched failing under mutation
-- [ ] `npm test`, `npm run validate:all` green; `npm run bundle` run and references committed
+- [x] A mapping-valued `tracker:` (`workflowFile`) resolves as `auto` under **both** tiers
+- [x] A consumer with no `access:` block and a legal `tracker:`/`vcs:` is byte-identical to today
+- [x] Malformed YAML **without** an `access:` line still degrades to defaults; **with** one it halts
+- [x] `access.vcs` other than `full` is rejected with a message naming the reason
+- [x] One nested-key reader exists, shared by both resolvers, and its tier-1 probe finds `python3`
+- [x] Every invariant watched failing under mutation
+- [x] `npm test`, `npm run validate:all` green; `npm run bundle` run and references committed
 
 ## Risk Assessment
 
@@ -334,18 +342,18 @@ Rollback triggers: any consumer report of a halt on a config that is legal per t
 
 ## Progress Tracking
 
-- [ ] 1. `read-config.sh` extracted, `python3` probe fixed
-- [ ] 2. `resolve-paths.sh` sources it; roots verified unchanged
-- [ ] 3. `validate_enum`, per-key legal sets, mapping-form handling, most-restrictive access resolution
-- [ ] 4. Malformed-YAML fail-closed branch
-- [ ] 5. 16 call sites guarded + canonical snippet updated
-- [ ] 6. `configuration.md` schema block, key table, corrected `tracker` row
-- [ ] 7. `platform-detection.md` outputs, precedence rule, guarded form
-- [ ] 8. `setup-consumer.sh` access prompt
-- [ ] 9. `tracker-access.test.sh` written; every mutation watched failing
-- [ ] 10. `package.json` chain + focused script
-- [ ] `npm run bundle`; regenerated references committed
-- [ ] `npm test` and `npm run validate:all` green
+- [x] 1. `read-config.sh` extracted, `python3` probe fixed
+- [x] 2. `resolve-paths.sh` sources it; roots verified unchanged
+- [x] 3. `validate_enum`, per-key legal sets, mapping-form handling, most-restrictive access resolution
+- [x] 4. Malformed-YAML fail-closed branch
+- [x] 5. 16 call sites guarded + canonical snippet updated
+- [x] 6. `configuration.md` schema block, key table, corrected `tracker` row
+- [x] 7. `platform-detection.md` outputs, precedence rule, guarded form
+- [x] 8. `setup-consumer.sh` access prompt
+- [x] 9. `tracker-access.test.sh` written; every mutation watched failing
+- [x] 10. `package.json` chain + focused script
+- [x] `npm run bundle`; regenerated references committed
+- [x] `npm test` and `npm run validate:all` green
 
 ## Change Log
 
@@ -354,6 +362,7 @@ Rollback triggers: any consumer report of a halt on a config that is legal per t
 | 2026-08-17 | 1.0 | Initial draft | create-task |
 | 2026-08-17 | 1.1 | Review (6/10 → revised): halt mechanism did not exist at any of the 16 call sites; env/config precedence stated two contradictory ways; strict validation would reject the documented `tracker.workflowFile` mapping form. Adopted most-restrictive-wins access resolution, per-key legal sets, mapping→`auto`, fail-closed on malformed YAML with `access:`, shared nested reader with `python3` probe. Call-site guards added to scope; estimate 4h → 8h. Added Technical Background, Breaking Changes, Progress Tracking, Change Log | review-task |
 | 2026-08-17 |  | Status → ready-for-development | review-task |
+| 2026-08-17 |  | Implemented — 57 files (5 shared sources, 15 SKILL.md call sites, 4 docs, setup wizard, package.json, 36 bundled reference trees), 61 tests, 12 mutations watched failing | develop |
 
 ## References
 

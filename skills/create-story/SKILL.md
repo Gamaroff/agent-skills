@@ -385,7 +385,7 @@ After the story document is fully written, ask the user whether to sync it to an
 **Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # TRACKER = jira | github   (empty/unknown if neither is configured)
 ```
 

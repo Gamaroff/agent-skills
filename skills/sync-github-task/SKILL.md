@@ -57,7 +57,7 @@ grep -L 'github_issue:' $(find docs/tasks -name 'task.*.md' \
 ### 2. Source the Platform Resolver and Confirm GitHub
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # Expect TRACKER=github. If TRACKER=jira, abort and tell the user to run /sync-jira-task.
 ```
 

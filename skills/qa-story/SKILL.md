@@ -1368,7 +1368,7 @@ After review:
 
    ```bash
    # shellcheck source=references/resolve-platform.sh
-   . "$(dirname "$0")/references/resolve-platform.sh"  # adjust path to wherever the bundled helper lives in this skill install
+   . "$(dirname "$0")/references/resolve-platform.sh" || exit 1  # adjust path to wherever the bundled helper lives in this skill install
 
    tracker_call_with_retry gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
 
@@ -1422,7 +1422,7 @@ After review:
 
 6b. **Comment on Tracker Issue (graceful — non-blocking)**
 
-Branch on the tracker resolved by `source references/resolve-platform.sh` (which sets `TRACKER=github|jira`).
+Branch on the tracker resolved by `source references/resolve-platform.sh || exit 1` (which sets `TRACKER=github|jira`). Keep the `|| exit 1` — the resolver returns non-zero on an unrecognised `tracker:`, `vcs:` or `access:` value, and sourcing it bare would continue past the rejection with a default.
 
 **GitHub path** (when `TRACKER=github`) — extract `github_issue` from the story/task document YAML frontmatter (read in Prerequisites). If present, post a summary comment to the linked Issue (also wrapped in `tracker_call_with_retry`):
 

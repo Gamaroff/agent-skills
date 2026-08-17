@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`access:` in `skills-config.yaml` declares how much access the agent has to each system**, resolved into `ACCESS_TRACKER` / `ACCESS_VCS` by `resolve-platform.sh` alongside the existing `TRACKER` / `VCS`. Five values per system — `full` (default) · `read-only` · `approve` · `command` · `manual`. This is the vocabulary for the restricted-tracker-access sequence, for consumers whose security team will not issue a tracker write token to a locally running agent.
+
+  **It ships no behaviour change on its own.** Nothing intercepts a mutation yet; setting `access: {tracker: manual}` resolves the variable and changes nothing else. It lands first, and separately, to fix the output contract before any caller depends on it — and because it closes a live bug on the way.
+
+  Identity stays a separate axis from access. `tracker:` answers *which* system, `access.tracker` answers *how much the agent may do to it*. Collapsing them into `tracker: manual` would discard exactly the information the feature depends on: emitting "move RAPP-605 to In Review" needs to know it is Jira.
+
+  Access resolves **most-restrictive-wins** across config and `AGENT_SKILLS_ACCESS_TRACKER`, against the order `manual < command < approve < read-only < full` — a deliberate departure from the config → env → detect order used for identity. Picking the wrong tracker is a mistake; picking the wrong access is an escalation. A run or a CI environment can lock itself down without editing committed config, and a stray env var can never loosen a config that deliberately restricts.
+
+### Fixed
+
+- **An unrecognised `tracker:` or `vcs:` value now halts instead of silently meaning `github`.** `read_config_key` returned any value verbatim and every downstream branch was `if TRACKER = jira … else … github`, so `tracker: jria` resolved to **github** and the run pushed to the wrong system without a word. Legal sets are validated **per key** — `tracker` is `{jira, github, auto}`, `vcs` is `{github, bitbucket, auto}` — because one shared set would accept `tracker: bitbucket` and `vcs: jira`, misconfigurations of exactly the class being closed.
+
+  A **mapping**-valued `tracker:` is the documented `tracker.workflowFile` form, not a typo, and resolves as `auto`. The two parser tiers disagreed on it natively (pyyaml returned the dict, awk returned empty); strict validation would have made that disagreement fatal on precisely the machines where tier 1 runs, so it is now asserted under both tiers.
+
+- **All 16 resolver call sites are guarded with `|| exit 1`.** A validator that writes to stderr and returns non-zero halts nothing unless a caller checks, and none of them did — so shipping validation alone would have reproduced the silent-permissive failure it exists to prevent, by a different route. The canonical snippet in `platform-detection.md` now shows the guarded form so new skills inherit it.
+
+- **The nested-config reader's tier-1 probe now finds `python3`.** `read_nested_config_key` invoked a bare `python`, which macOS has not shipped since 12.3, so tier 1 was dead on most machines and awk was silently the only tier. The reader is extracted to `shared/resources/read-config.sh` and shared by both resolvers rather than duplicated — one copy, one place to fix.
+
+- **A malformed `skills-config.yaml` containing an `access:` line now halts** rather than degrading to defaults. The blanket degrade rule is right for identity, where the default is *detect*; for access the default is `full`, so the same rule would silently re-grant credentials on a truncated file. Consumers with no `access:` block are unaffected and still degrade exactly as before.
+
+  **Breaking, deliberately, in three places:** an out-of-domain `tracker:`/`vcs:` value halts; the resolver can now exit non-zero and 16 call sites propagate it; a malformed config with an `access:` line halts. A consumer with no `access:` block and a legal `tracker:`/`vcs:` is byte-identical to today.
+
 ### Changed
 
 - **The repo is now Prettier-clean, and CI keeps it that way.** Adopting Prettier as policy in v0.39.0 deliberately stopped short of the repo-wide sweep — running it inside the very PR that documented why not to bury a functional change would have been self-refuting. The consequence was that `npm run format:check` failed on **50 files** from the day it was added and nothing enforced the policy it described. A check that has never once passed is not a check.
