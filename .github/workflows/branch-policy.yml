@@ -1,0 +1,61 @@
+name: Branch Policy
+
+# `main` only receives release-ready code (docs/contributing/releases.md).
+# scripts/release.sh enforces that at the release end — it refuses to run
+# anywhere but `main` — but nothing stopped a feature PR from targeting `main`
+# in the first place. Six did on 2026-08-14..17, which is what put `main` ahead
+# of `develop` and broke the promotion direction the release script assumes.
+#
+# This is the missing half: reject a PR into `main` from anything other than a
+# branch that is allowed to land there.
+#
+# Metadata only — no checkout, no dependencies, runs in seconds.
+
+on:
+  pull_request:
+    branches: [main]
+    # `edited` matters: without it, a PR opened against `develop` and later
+    # retargeted at `main` would never be re-evaluated, which is the exact
+    # path a misroute takes when someone "fixes" the base in the UI.
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  base-branch:
+    name: PR into main comes from an allowed branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check head branch
+        env:
+          # Via env rather than inline `${{ }}` interpolation — a branch name is
+          # attacker-controlled on a fork PR, and interpolating it directly into
+          # the shell would be a script-injection hole.
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            # The release promotion path (docs/contributing/releases.md).
+            develop) ;;
+            # Cut from `main`, lands on `main` — see the create-branch skill's
+            # branch-type table, and releases.md on reconciling one afterwards.
+            hotfix/*) ;;
+            # Standard Gitflow: a release branch closes into `main`.
+            release/*) ;;
+            *)
+              echo "::error::PR into 'main' from '$HEAD_REF' — not an allowed source branch."
+              echo ""
+              echo "This repo uses 'develop' as the integration branch. 'main' only receives"
+              echo "release-ready code, and scripts/release.sh depends on that direction:"
+              echo "it promotes develop -> main, never the reverse."
+              echo ""
+              echo "Allowed into 'main': develop, hotfix/*, release/*"
+              echo ""
+              echo "Feature and task work belongs on 'develop'. Retarget this PR:"
+              echo "  gh pr edit <number> --base develop"
+              echo ""
+              echo "See docs/contributing/releases.md ('Branch flow')."
+              exit 1
+              ;;
+          esac
+          echo "✓ '$HEAD_REF' may target 'main'."

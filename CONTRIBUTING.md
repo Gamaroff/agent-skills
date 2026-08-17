@@ -36,10 +36,25 @@ python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
 
 ## Pull Requests
 
+- **Target `develop`, not `main`** — see below
 - One skill or change per PR
 - Keep SKILL.md descriptions generic — no project-specific names or private infra
 - Run `npm run generate-catalog` after adding or editing skills (regenerates `docs/reference/skill-catalog.md`)
 - Run `quick_validate.py` before submitting
+
+### Base branch
+
+`develop` is the integration branch. `main` only receives release-ready code, promoted by `scripts/release.sh` — which depends on that direction, since it advances `main` from `develop` and never the reverse.
+
+Only three branches may open a PR into `main`: `develop` (release promotion), `hotfix/*`, and `release/*`. The **Branch Policy** workflow rejects anything else and tells you how to retarget. It exists because six feature PRs merged straight into `main` on 2026-08-14–17, putting `main` ahead of `develop` and inverting the promotion direction; `release.sh` guarded the release end but nothing guarded this one.
+
+Note that `gh pr create` without `--base` uses the repo's **default** branch. Pass it explicitly:
+
+```bash
+gh pr create --base develop
+```
+
+Full model: [`docs/contributing/releases.md`](./docs/contributing/releases.md#branch-flow).
 
 ### Before you open a PR
 
