@@ -2,7 +2,7 @@
 
 **Task**: `task.51.access-mode-config-and-resolver.md`
 **Cycle**: 6 — the independent adversarial pass gate 5 asked for
-**Gate**: **FAIL** (25/100) — `task.51.gate.6.access-mode-config-and-resolver.yml`
+**Gate**: **FAIL** (20/100) — `task.51.gate.6.access-mode-config-and-resolver.yml`
 **Date**: 2026-08-17
 
 ---
@@ -67,7 +67,7 @@ rc=1   T={workflowFile
 ```
 
 `read_config_key`'s awk splits on `-F': *'` and takes `$2`. With this task's own `|| exit 1` guards now
-on 13 call sites, that aborts the run. The task's acceptance table requires this form to return status 0
+on 15 call sites, that aborts the run. The task's acceptance table requires this form to return status 0
 "asserted under both tiers"; `tracker-access.test.sh:165` asserts only the *block* spelling of the same
 key, which passes.
 
@@ -75,7 +75,7 @@ key, which passes.
 
 ## Findings
 
-Eight HIGH, four MEDIUM, one LOW. Full detail in the gate file.
+Ten HIGH, four MEDIUM, one LOW. Full detail in the gate file.
 
 | ID | Sev | Defect |
 |---|---|---|
@@ -87,6 +87,8 @@ Eight HIGH, four MEDIUM, one LOW. Full detail in the gate file.
 | BUG-24 | HIGH | `SKILLS_CONFIG_FILE=/dev/null` discards a committed restriction, silently, both tiers — falsifying a guarantee in the file's own header |
 | BUG-25 | HIGH | `python -c` puts CWD on `sys.path`; a repo-root `yaml.py` is imported instead of PyYAML → arbitrary code execution and full control of the result |
 | BUG-26 | HIGH | BUG-18 generalised: 16 distinct legal spellings defeat the awk tier's anchored regexes; 3 also bypass the explicit scalar-access and `access.vcs` halts |
+| BUG-27 | HIGH | `access.tracker`'s **shape** is never validated. A nesting typo (`tracker:` → `mode: manual`) resolves `full` on both tiers, silently |
+| BUG-28 | HIGH | Mutation audit: **11 surviving mutations**. The repo-wide call-site assertion's dot-source half matches zero lines; the enum vocabulary and rank ordering are unpinned; every `[python]` tier label is unproven |
 | BUG-19 | MED | Block-scalar header detector misses sequence-item, comment-bearing and anchored spellings → legal bodies condemned |
 | BUG-20 | MED | `access: &anchor` / `!!map` graded "a scalar" → false halt |
 | BUG-21 | MED | A duplicate key in an *unrelated* section halts the whole config |
@@ -149,9 +151,13 @@ close it.
 
 Not everything is broken, and a clean bill on these is what makes the failures above credible:
 
-- **Call-site guards**: 13/13 executable `source …resolve-platform.sh` lines across 12 `SKILL.md` files
-  carry `|| exit 1`; the prose forms in `qa-task`, `qa-story`, `review-bug` and
-  `jira-sprint-retrospective` likewise.
+- **Call-site guards**: 15/15 executable call sites carry `|| exit 1` — 13 `source` lines plus 2
+  dot-source lines (`skills/review-code/SKILL.md:96`, `skills/qa-story/SKILL.md:1371`); the prose forms
+  in `qa-task`, `qa-story`, `review-bug` and `jira-sprint-retrospective` likewise. The **code** is
+  fully guarded. Only 13 of the 15 are *enforced by a test* — see BUG-28. An earlier count of 13/13 in
+  this review was itself wrong for the same reason the suite's is: a `\S*resolve-platform\.sh` pattern
+  cannot cross the space inside `"$(dirname "$0")`. Two independent greps sharing one blind spot is
+  why this is recorded rather than left as a footnote.
 - **Bundling**: idempotent. `npm run bundle` leaves `git status` clean. All 36 `read-config.sh` and 28
   `resolve-platform.sh` bundled copies differ from source by exactly the AUTO-GENERATED banner, so no
   bundle-only divergence exists — but equally, every defect above is replicated byte-identically into
@@ -197,7 +203,7 @@ silently (BUG-24), and a `yaml.py` in the repo root replaces the parser outright
 
 ## Recommendation
 
-**Do not merge.** Eight HIGH defects — one a regression from the round being reviewed, four of them
+**Do not merge.** Ten HIGH defects — one a regression from the round being reviewed, four of them
 independent silent escalations of exactly the invariant this task exists to protect, and one a code
 execution vector.
 

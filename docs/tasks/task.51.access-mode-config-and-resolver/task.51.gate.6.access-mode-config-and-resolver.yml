@@ -5,14 +5,14 @@ gate: FAIL
 status_reason: >-
   The independent adversarial pass gate 5 asked for was run, by three reviewers given the code but
   not cycle 5's reasoning, with every reported finding re-reproduced in main context before being
-  recorded here. It did not come back clean. Thirteen defects, of which EIGHT are HIGH and one is a
+  recorded here. It did not come back clean. Fifteen defects, of which TEN are HIGH and one is a
   regression introduced by the cycle-5 fix itself — confirming, rather than closing, the base rate
   the escalation record described. Four independent silent-escalation routes turn a declared
   `manual` into `full` at exit 0, the simplest of which needs no unusual YAML at all: a config in
   the canonical documented shape that is merely UNREADABLE resolves to `full`, because the
   fail-closed gate greps the same file it just failed to parse. Separately, the awk tier is the
   DEFAULT tier on a stock macOS host (/usr/bin/python3 ships without pyyaml), and on that tier the
-  documented `tracker: {workflowFile: ...}` form halts every one of the 13 guarded call sites. The
+  documented `tracker: {workflowFile: ...}` form halts every one of the 15 guarded call sites. The
   suite is green at 166/166 throughout, because its merge-key value assertions all force the python
   tier.
 reviewer: 'QA Engineer — independent adversarial pass (cycle 6)'
@@ -50,7 +50,7 @@ top_issues:
       /usr/bin/python3 ships without pyyaml. On that tier `read_config_key`'s awk splits on `-F': *'`
       and takes $2, so the DOCUMENTED flow form `tracker: {workflowFile: .github/tracker-workflow.yaml}`
       yields the field `{workflowFile`, which reaches validate_enum and is rejected. With this task's
-      own `|| exit 1` guards now on 13 call sites, that aborts the run.
+      own `|| exit 1` guards now on 15 call sites, that aborts the run.
     evidence: >-
       Reproduced with NO env var set and PATH=/usr/bin:/bin:
       `rc=1 T={workflowFile`, message `tracker: "{workflowFile" is not a recognised value`.
@@ -198,6 +198,53 @@ top_issues:
       not close the class — the tier approximates a grammar with anchored regexes.
     refs: ['shared/resources/read-config.sh:302-308', 'shared/resources/read-config.sh:404-406', 'shared/resources/read-config.sh:433']
 
+  - id: TASK-51-BUG-27
+    severity: high
+    status: open
+    category: silent-escalation
+    finding: >-
+      The shape of `access.tracker` is never validated. `config_child_shape` validates the shape of
+      `access` (that is the scalar-access halt), but nothing validates its CHILD. A mapping- or
+      sequence-valued child returns `__MAP__`, which `read_nested_config_key_strict` maps to `""` —
+      indistinguishable from "not configured" — and unconfigured means `full`. The most realistic
+      trigger in the whole cycle is an ordinary nesting typo.
+    evidence: >-
+      `access:\n  tracker:\n    mode: manual` → `rc=0 AT=full` on BOTH tiers, silent. The operator
+      wrote something plainly restrictive and received full access.
+      `access:\n  tracker: [manual]` → python `rc=0 AT=full`, awk `rc=1`.
+      `access:\n  - tracker: manual` → python `rc=1`, awk `rc=0 AT=full`.
+      The latter two are tier-dependent escalation — the exact failure mode the flow-form test's own
+      comment says it exists to close, one level further down the tree.
+    refs: ['shared/resources/read-config.sh', 'shared/resources/resolve-platform.sh:257-261']
+
+  - id: TASK-51-BUG-28
+    severity: high
+    status: open
+    category: test-integrity
+    finding: >-
+      A mutation audit (35 mutations, each with a full-suite run, on a faithful mirror so the
+      repo-wide call-site scan genuinely resolves) found ELEVEN surviving mutations — invariants with
+      no witness. The suite cannot currently hold the guarantees this task is built on, which is why
+      eight HIGH defects sit behind a green 166/166.
+    surviving_mutations_of_note: >-
+      (1) The repo-wide call-site assertion is HALF-BLIND. Its second regex, for `. path` dot-sources,
+      matches ZERO lines repo-wide — `[^"]*` cannot cross the quote inside `"$0"`. Deleting `|| exit 1`
+      from a real dot-source call site leaves the suite green. The `source` half works; the dot-source
+      half is decorative, and the test's own comment claims exactly the coverage it lacks.
+      (2) Narrowing the fail-closed `grep -q '^access:'` to `'^access:$'` is undetected and directly
+      exploitable — corroborating BUG-17 by mutation as well as by fixture.
+      (3) The legal-mode vocabulary is asserted by a SUBSTRING check on stderr, so widening the enum
+      to a sixth mode is undetectable. (4) `access_rank`'s ordering is unpinned: `command` can be
+      re-ranked above `approve`/`read-only` with the suite green, which would let a config value beat
+      a more restrictive env value. (Ordering is CORRECT today — verified `config=approve` +
+      `env=command` → `command`. It is untested, not broken.)
+      (5) Removing all four `AGENT_SKILLS_CONFIG_TIER=python` force-guards is invisible, so every
+      "[python]" tier label in the suite is unproven — the "[awk]" labels are genuinely load-bearing.
+      (6) The `__UNREADABLE__` multi-line-flow-map branch can be deleted entirely and its test still
+      passes, because the sentinel then fails enum validation instead. Fail-closed either way, but the
+      mechanism and its remediation message are unguarded.
+    refs: ['shared/resources/tracker-access.test.sh:287-288', 'shared/resources/tracker-access.test.sh']
+
   - id: TASK-51-BUG-19
     severity: medium
     status: open
@@ -267,7 +314,7 @@ top_issues:
 waiver:
   active: false
 
-quality_score: 25
+quality_score: 20
 
 evidence:
   suites: 'tracker-access 166/166 · npm test not re-run this cycle · CI green on PR #246'
@@ -279,7 +326,15 @@ evidence:
     /usr/local/bin/python3, which does. So this repo's own developers exercise tier 1 while a stock
     consumer host exercises tier 2, and the two tiers disagree on legal input.
   bundle: 'idempotent — npm run bundle leaves git status clean. 36 read-config.sh and 28 resolve-platform.sh copies current (differ from source only by the AUTO-GENERATED banner).'
-  call_site_guards: '13/13 executable `source ... resolve-platform.sh` lines in skills/*/SKILL.md carry || exit 1; prose forms likewise'
+  call_site_guards: >-
+    15/15 executable call sites carry `|| exit 1` — 13 `source` lines plus 2 dot-source lines
+    (`skills/review-code/SKILL.md:96`, `skills/qa-story/SKILL.md:1371`); prose forms likewise. The
+    CODE is fully guarded. But only 13 of the 15 are actually ENFORCED by a test: the suite's
+    dot-source regex matches zero lines (BUG-28). An initial count of 13/13 in this review was itself
+    wrong for the same reason — the reviewer's grep used `\S*resolve-platform\.sh`, which cannot cross
+    the space inside `"$(dirname "$0")`. Two independent greps sharing one blind spot is the reason
+    this is recorded here rather than left as a footnote.
+  mutation_audit: '35 mutations, full-suite run each, on a mirror where the repo-wide scan genuinely resolves; 11 survived'
 
 nfr_validation:
   security:

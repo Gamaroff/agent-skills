@@ -214,7 +214,7 @@ so they would read the mechanism rather than its author's reasoning about it. Ev
 re-executed in main context before being recorded; regression claims were verified against the reader
 checked out at the parent commit `0da9bbc`.
 
-**8 HIGH, 4 MEDIUM, 1 LOW.** Artifacts: `task.51.gate.6.*.yml`, `task.51.qa.6.*.md`.
+**10 HIGH, 4 MEDIUM, 1 LOW.** Artifacts: `task.51.gate.6.*.yml`, `task.51.qa.6.*.md`.
 
 | ID | Defect |
 |---|---|
@@ -238,22 +238,31 @@ recurring, reappearing in the tests written to close it.
 cycle-5 NUL refusal and merge-source scan genuinely closed; the stale `qa-task/references/
 resolve-paths.sh` confirmed pre-existing on `develop`, not caused by this branch.
 
-**Deviation logged**: no bug files written for cycle 6 — all thirteen findings are recorded in full in
+| BUG-27 | **The most realistic trigger in the cycle.** The *shape* of `access.tracker` is never validated — only the shape of `access` is. A plain nesting typo (`access:\n  tracker:\n    mode: manual`) returns `__MAP__` → `""` → "not configured" → `full`, exit 0, **both tiers**. A sequence-valued child escalates on one tier and halts on the other |
+| BUG-28 | Mutation audit: **11 surviving mutations** — invariants with no witness. The repo-wide call-site assertion's dot-source half matches **zero lines** repo-wide, so deleting a guard from a real dot-source call site leaves the suite green. The legal-mode vocabulary is asserted by a *substring* check (a sixth mode is undetectable); `access_rank`'s ordering is unpinned; all four `TIER=python` force-guards can be removed unnoticed, making every `[python]` label unproven |
+
+**Correction to this report's own earlier claim.** An earlier Step-5 note recorded "13/13 call sites
+guarded". The real count is **15** — 13 `source` lines plus two dot-source lines
+(`skills/review-code/SKILL.md:96`, `skills/qa-story/SKILL.md:1371`). All 15 *are* guarded, so the
+conclusion held, but the count came from a `\S*resolve-platform\.sh` grep that cannot cross the space
+inside `"$(dirname "$0")` — the identical blind spot that makes the suite's own dot-source assertion
+match nothing (BUG-28). Two independent greps sharing one blind spot is why it is recorded rather than
+quietly amended.
+
+**Deviation logged**: no bug files written for cycle 6 — all fifteen findings are recorded in full in
 the gate's `top_issues` with evidence and refs, and the pipeline is halting rather than entering a fix
-cycle, so separate files would add ceremony without traceability. Two of the three reviewers
-(false-rejections, escalation-paths) returned and are folded in above; the mutation/test-validity audit
-had not returned when the halt was written. Its findings would concern the suite's ability to hold
-these invariants, not new product defects, and belong in a cycle-7 gate.
+cycle, so separate files would add ceremony without traceability. All three reviewers returned and are
+folded in above.
 
 ---
 
 ## Completion
 
 **Finished**: 2026-08-17 21:20 (cycles 1–5) · 2026-08-17 22:05 (cycle 6)
-**Final Status**: Escalated — independent adversarial pass returned FAIL; halted on findings per user directive
+**Final Status**: Escalated — independent adversarial pass returned FAIL (10 HIGH); halted on findings per user directive
 **Branch**: `feature/task.51.access-mode-config-and-resolver`
 **PR**: [#246](https://github.com/Gamaroff/agent-skills/pull/246)
-**QA Iterations**: 6 (all FAIL: 40 → 55 → 55 → 60 → 70 → 45)
+**QA Iterations**: 6 (all FAIL: 40 → 55 → 55 → 60 → 70 → 20)
 **DoD Summary**: not produced — Step 7 not reached
 
 ---
