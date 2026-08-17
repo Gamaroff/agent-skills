@@ -45,7 +45,8 @@ const readme = await readFile(README_PATH, "utf-8");
 // Prose/blockquote wrapping inserts `\n   > ` mid-sentence. Collapse each line break
 // (with any blockquote-continuation marker) into a space before phrase checks, while
 // preserving inline `>` in tokens like `<baseBranch>`.
-const flatten = (s) => s.replace(/\n[ \t]*>?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
+const flatten = (s) =>
+  s.replace(/\n[ \t]*>?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
 const flat = flatten(skill);
 const readmeFlat = flatten(readme);
 
@@ -166,7 +167,11 @@ test("no consumer-project facts leak into the library skill", async () => {
     ["references/execution-resources.md", reference],
   ]) {
     for (const re of banned) {
-      assert.doesNotMatch(content, re, `${name} still contains consumer-specific fact ${re}`);
+      assert.doesNotMatch(
+        content,
+        re,
+        `${name} still contains consumer-specific fact ${re}`,
+      );
     }
   }
 });
@@ -191,7 +196,10 @@ test("config keys documented in SKILL.md and configuration reference", async () 
   ]) {
     assert.ok(skill.includes(key), `SKILL.md missing ${key}`);
   }
-  for (const key of ["developBatch.maxParallel", "developBatch.requireTouches"]) {
+  for (const key of [
+    "developBatch.maxParallel",
+    "developBatch.requireTouches",
+  ]) {
     assert.ok(configDoc.includes(key), `configuration.md missing ${key}`);
   }
 });
@@ -260,8 +268,18 @@ test("plan mode is called out as a preflight stop", () => {
 });
 
 test("state schema carries the new fields and drops the ad-hoc ones", () => {
-  for (const key of ['"resource"', '"testCommand"', '"attempts"', '"interrupted"', '"haltKind"']) {
-    assert.match(skill, new RegExp(key.replace(/["]/g, '"')), `state schema missing ${key}`);
+  for (const key of [
+    '"resource"',
+    '"testCommand"',
+    '"attempts"',
+    '"interrupted"',
+    '"haltKind"',
+  ]) {
+    assert.match(
+      skill,
+      new RegExp(key.replace(/["]/g, '"')),
+      `state schema missing ${key}`,
+    );
   }
   // `wave` and `lane` were operator improvisation that never had semantics.
   assert.doesNotMatch(skill, /"wave"\s*:/);
@@ -279,13 +297,19 @@ test("the merge lane stays serial AND deferred until development finishes", () =
 
 test("Step 5.5 re-batches only on real progress", () => {
   assert.match(flat, /Step 5\.5/);
-  assert.match(flat, /ticked \*\*zero\*\* roadmap rows|the previous batch ticked/i);
+  assert.match(
+    flat,
+    /ticked \*\*zero\*\* roadmap rows|the previous batch ticked/i,
+  );
   // Mid-Step-2 top-up of hard-excluded rows is unsafe and must be refused.
   assert.match(flat, /Do not attempt this mid-Step-2/i);
 });
 
 test("execution-resources reference exists and documents the probe contract", async () => {
-  const ref = await readFile(path.join(SKILL_DIR, "references", "execution-resources.md"), "utf-8");
+  const ref = await readFile(
+    path.join(SKILL_DIR, "references", "execution-resources.md"),
+    "utf-8",
+  );
   assert.match(ref, /freeSlots/);
   assert.match(ref, /can only ever subtract/i);
   assert.match(ref, /never stalls a batch/i);

@@ -50,7 +50,9 @@ const CONSUMER_PROVIDED_NPM_SCRIPTS = new Set([
 
 /** Illustrative paths — teaching syntax, not naming a shipped file. */
 function isIllustrative(p) {
-  return p.startsWith("/") || p.startsWith("~") || p.includes("{") || p.includes("<");
+  return (
+    p.startsWith("/") || p.startsWith("~") || p.includes("{") || p.includes("<")
+  );
 }
 
 /**
@@ -70,13 +72,16 @@ function bundlePathFor(rawPath, docPath) {
   if (!p.includes("/")) return null;
 
   const consumerInstall = p.match(/^\.agents\/skills\/(.+)$/);
-  if (consumerInstall) return path.join(REPO_ROOT, "skills", consumerInstall[1]);
+  if (consumerInstall)
+    return path.join(REPO_ROOT, "skills", consumerInstall[1]);
 
   if (p.startsWith("shared/resources/")) return path.join(REPO_ROOT, p);
 
   // Anchor to the repo-relative path: the repo root itself ends in "agent-skills",
   // so an unanchored /skills\// would match inside the root's own name.
-  const skillMatch = path.relative(REPO_ROOT, docPath).match(/^skills\/([^/]+)\//);
+  const skillMatch = path
+    .relative(REPO_ROOT, docPath)
+    .match(/^skills\/([^/]+)\//);
   if (skillMatch) {
     const skillDir = path.join(REPO_ROOT, "skills", skillMatch[1]);
     if (p.startsWith("references/")) return path.join(skillDir, p);
@@ -148,7 +153,7 @@ test("every interpreter invocation in skill prose points at a file that ships", 
     [],
     `Prose instructs running scripts that do not exist. Either ship the script, or ` +
       `rewrite the prose so it does not tell the reader to run it:\n  ` +
-      failures.join("\n  ")
+      failures.join("\n  "),
   );
 });
 
@@ -179,14 +184,21 @@ test("every doc reference in skill prose resolves to a doc that ships", () => {
     if (EXEMPT.has(rel)) continue;
     const isShared = rel.startsWith("shared/");
 
-    for (const m of content.matchAll(/`(?:\.\/)?((?:references|docs)\/[A-Za-z0-9_./-]+\.md)`/g)) {
+    for (const m of content.matchAll(
+      /`(?:\.\/)?((?:references|docs)\/[A-Za-z0-9_./-]+\.md)`/g,
+    )) {
       const ref = m[1];
       if (isIllustrative(ref)) continue;
 
       if (ref.startsWith("docs/")) {
         // Our own standards/reference tree. Consumer doc trees live under docs/ too
         // (docs/stories, docs/tasks, docs/prd), so check only dirs we own.
-        if (!/^docs\/(standards|reference|operations|contributing|runbooks)\//.test(ref)) continue;
+        if (
+          !/^docs\/(standards|reference|operations|contributing|runbooks)\//.test(
+            ref,
+          )
+        )
+          continue;
         if (!fs.existsSync(path.join(REPO_ROOT, ref))) {
           failures.push(`${rel} → \`${ref}\``);
         }
@@ -201,13 +213,16 @@ test("every doc reference in skill prose resolves to a doc that ships", () => {
         // bundle, so the output is identical AND the dependency is declared.
         if (fs.existsSync(path.join(REPO_ROOT, "shared", "resources", name))) {
           failures.push(
-            `${rel} → \`${ref}\` (write it as \`shared/resources/${name}\` so the bundler ships it)`
+            `${rel} → \`${ref}\` (write it as \`shared/resources/${name}\` so the bundler ships it)`,
           );
         }
         continue;
       }
       const skill = rel.match(/^skills\/([^/]+)\//);
-      if (skill && !fs.existsSync(path.join(REPO_ROOT, "skills", skill[1], ref))) {
+      if (
+        skill &&
+        !fs.existsSync(path.join(REPO_ROOT, "skills", skill[1], ref))
+      ) {
         failures.push(`${rel} → \`${ref}\``);
       }
     }
@@ -217,12 +232,15 @@ test("every doc reference in skill prose resolves to a doc that ships", () => {
     failures,
     [],
     `Prose points a reader at a doc that is not there. An unreadable reference fails ` +
-      `silently — the agent proceeds without the rules:\n  ` + failures.join("\n  ")
+      `silently — the agent proceeds without the rules:\n  ` +
+      failures.join("\n  "),
   );
 });
 
 test("every `npm run` instruction is either ours or a classified consumer script", () => {
-  const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"));
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"),
+  );
   const ours = new Set(Object.keys(pkg.scripts || {}));
   const failures = [];
 
@@ -232,7 +250,8 @@ test("every `npm run` instruction is either ours or a classified consumer script
     let m;
     while ((m = re.exec(content)) !== null) {
       const script = m[1];
-      if (ours.has(script) || CONSUMER_PROVIDED_NPM_SCRIPTS.has(script)) continue;
+      if (ours.has(script) || CONSUMER_PROVIDED_NPM_SCRIPTS.has(script))
+        continue;
       failures.push(`${path.relative(REPO_ROOT, doc)} → \`npm run ${script}\``);
     }
   }
@@ -244,6 +263,6 @@ test("every `npm run` instruction is either ours or a classified consumer script
       `classified as consumer-provided in CONSUMER_PROVIDED_NPM_SCRIPTS. If agent-skills ` +
       `is meant to provide it, ship it; if the consumer provides it, add it to the ` +
       `allowlist with that intent:\n  ` +
-      failures.join("\n  ")
+      failures.join("\n  "),
   );
 });

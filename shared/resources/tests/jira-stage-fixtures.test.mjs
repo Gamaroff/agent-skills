@@ -290,10 +290,19 @@ function replayWalk({ fixtures, from, targets, workflow, ...rest }) {
     if ((opts.method || "GET") === "GET") {
       const list = load(fixtures[Math.min(g, fixtures.length - 1)]);
       g++;
-      return { ok: true, status: 200, json: async () => ({ transitions: list }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ transitions: list }),
+      };
     }
     posts.push(JSON.parse(opts.body));
-    return { ok: true, status: 204, json: async () => ({}), text: async () => "" };
+    return {
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+      text: async () => "",
+    };
   };
   return lib
     .walkLadder({
@@ -402,7 +411,11 @@ pipeline:
   const doneCategory = load("rapp-story-in-progress.json").filter(
     (t) => t.to && t.to.statusCategory && t.to.statusCategory.key === "done",
   );
-  assert.equal(doneCategory.length, 1, "precondition: exactly one, so rule 4 would be unambiguous");
+  assert.equal(
+    doneCategory.length,
+    1,
+    "precondition: exactly one, so rule 4 would be unambiguous",
+  );
 
   // Rebuild the ladder so the gate is NOT reachable in one hop either, forcing
   // the question "is there another way to finish?" that rule 4 used to answer.

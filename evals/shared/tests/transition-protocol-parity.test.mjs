@@ -203,7 +203,8 @@ test("`pr-merged` fires from the orchestrators that merge, and from nowhere else
   }
   for (const f of shippedMarkdown()) {
     const name = String(f);
-    if (name.includes("develop-next") || name.includes("develop-batch")) continue;
+    if (name.includes("develop-next") || name.includes("develop-batch"))
+      continue;
     const src = readFileSync(f, "utf-8");
     // Prose may *discuss* the moment (the QA loop's ordering note does); only a
     // fenced invocation is a call site.
@@ -226,7 +227,10 @@ test("`--stage pr-merged` sits INSIDE develop-batch's per-item merge loop", () =
   );
   const loopStart = src.indexOf("merge one PR at a time");
   const loopEnd = src.indexOf("## Step 4 — Clean up worktrees");
-  assert.ok(loopStart > -1 && loopEnd > loopStart, "per-item merge lane not found");
+  assert.ok(
+    loopStart > -1 && loopEnd > loopStart,
+    "per-item merge lane not found",
+  );
   const body = src.slice(loopStart, loopEnd);
   assert.match(
     body,
@@ -463,7 +467,10 @@ pipeline:
 test("the prose states the one-hop limit and the terminal override", () => {
   // Both are rules a model can only follow if they are actually written down.
   assert.match(protocol, /multi-hop walk the MCP fallback cannot perform/);
-  assert.match(protocol, /MUST NOT\*\* perform more than one transition per invocation/);
+  assert.match(
+    protocol,
+    /MUST NOT\*\* perform more than one transition per invocation/,
+  );
   assert.match(protocol, /isLastRung/);
   assert.match(protocol, /--print-plan/);
   assert.match(protocol, /--from/);

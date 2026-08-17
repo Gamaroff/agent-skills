@@ -21,7 +21,10 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const REPO = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
 const WIZARD = path.join(REPO, "scripts", "setup-consumer.sh");
 
 const {
@@ -50,16 +53,12 @@ const HISTORICAL_BLOCK = {
 function generateConfig(tracker) {
   const dir = mkdtempSync(path.join(tmpdir(), "setup-consumer-"));
   try {
-    execFileSync(
-      "bash",
-      ["-c", `source '${WIZARD}'; write_skills_config`],
-      {
-        cwd: dir,
-        input: "\n\n\n",
-        env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", TRACKER: tracker },
-        stdio: ["pipe", "ignore", "ignore"],
-      },
-    );
+    execFileSync("bash", ["-c", `source '${WIZARD}'; write_skills_config`], {
+      cwd: dir,
+      input: "\n\n\n",
+      env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", TRACKER: tracker },
+      stdio: ["pipe", "ignore", "ignore"],
+    });
     return readFileSync(path.join(dir, "skills-config.yaml"), "utf-8");
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -83,8 +82,16 @@ test("the wizard emits no active jira.statusMap", () => {
     !/^\s*statusMap:/m.test(out),
     "setup-consumer.sh must not generate an active jira.statusMap — it narrows the candidate lists",
   );
-  assert.match(out, /#\s*statusMap/, "the commented guidance should still be present");
-  assert.match(out, /--probe-workflow/, "the guidance should point at the probe");
+  assert.match(
+    out,
+    /#\s*statusMap/,
+    "the commented guidance should still be present",
+  );
+  assert.match(
+    out,
+    /--probe-workflow/,
+    "the guidance should point at the probe",
+  );
 });
 
 test("the wizard's github config carries no jira block at all", () => {
@@ -129,11 +136,15 @@ test("the generated jira config parses under every hand-rolled reader", () => {
       }).trim();
 
     assert.equal(
-      sh(`source '${path.join(REPO, "shared/resources/resolve-platform.sh")}'; echo "$TRACKER"`),
+      sh(
+        `source '${path.join(REPO, "shared/resources/resolve-platform.sh")}'; echo "$TRACKER"`,
+      ),
       "jira",
     );
     assert.equal(
-      sh(`source '${path.join(REPO, "shared/resources/resolve-paths.sh")}'; echo "$PRD_ROOT"`),
+      sh(
+        `source '${path.join(REPO, "shared/resources/resolve-paths.sh")}'; echo "$PRD_ROOT"`,
+      ),
       "docs/prd",
     );
     assert.equal(
@@ -201,14 +212,25 @@ test("detectNarrowingStatusMap ignores an empty or absent map", () => {
 // one status is the one closest to noticing the problem, and gating on "every
 // entry" would keep the warning silent for exactly them.
 test("advice fires for a PARTIALLY narrowed map, not only the full fingerprint", () => {
-  const partial = { ...HISTORICAL_BLOCK, "ready-for-review": "Waiting for Review" };
-  assert.equal(detectNarrowingStatusMap(partial).wholeMap, false, "precondition");
+  const partial = {
+    ...HISTORICAL_BLOCK,
+    "ready-for-review": "Waiting for Review",
+  };
+  assert.equal(
+    detectNarrowingStatusMap(partial).wholeMap,
+    false,
+    "precondition",
+  );
   assert.equal(detectNarrowingStatusMap(partial).keys.length, 6);
 
   const advice = narrowingStatusMapAdvice(partial);
   assert.notEqual(advice, "", "6 narrowed entries must not be silent");
   assert.match(advice, /6 jira\.statusMap entries/);
-  assert.doesNotMatch(advice, /Every jira\.statusMap entry/, "that is the whole-map wording");
+  assert.doesNotMatch(
+    advice,
+    /Every jira\.statusMap entry/,
+    "that is the whole-map wording",
+  );
   // Phrased as a question, not a verdict — a partial map may be deliberate.
   assert.match(advice, /Deliberate\?/);
 });
@@ -232,21 +254,34 @@ test("targeted advice names the candidates the override discarded", () => {
   const advice = narrowingStatusMapAdvice(HISTORICAL_BLOCK, {
     localStatus: "ready-for-review",
   });
-  assert.match(advice, /pins "ready-for-review" to the single name "In Review"/);
-  for (const discarded of ["Code Review", "Waiting for Review", "Peer Review"]) {
+  assert.match(
+    advice,
+    /pins "ready-for-review" to the single name "In Review"/,
+  );
+  for (const discarded of [
+    "Code Review",
+    "Waiting for Review",
+    "Peer Review",
+  ]) {
     assert.match(advice, new RegExp(`"${discarded}"`));
   }
 });
 
 test("targeted advice stays silent for a status that is not narrowed", () => {
-  const partial = { ...HISTORICAL_BLOCK, "ready-for-review": "Waiting for Review" };
+  const partial = {
+    ...HISTORICAL_BLOCK,
+    "ready-for-review": "Waiting for Review",
+  };
   // This status was hand-fixed, so it is not the reason for any skip.
   assert.equal(
     narrowingStatusMapAdvice(partial, { localStatus: "ready-for-review" }),
     "",
   );
   // A sibling still pinned to candidates[0] does speak up.
-  assert.notEqual(narrowingStatusMapAdvice(partial, { localStatus: "accepted" }), "");
+  assert.notEqual(
+    narrowingStatusMapAdvice(partial, { localStatus: "accepted" }),
+    "",
+  );
 });
 
 test("a status skip surfaces the narrowing advice inline", () => {
@@ -271,7 +306,11 @@ ${Object.entries(HISTORICAL_BLOCK)
     assert.equal(exit, 0, "advice must not change the exit code");
     assert.equal(warnings.length, 1);
     assert.match(warnings[0], /Status NOT synced for PROJ-1/);
-    assert.match(warnings[0], /pins "ready-for-review"/, "the diagnosis must be inline");
+    assert.match(
+      warnings[0],
+      /pins "ready-for-review"/,
+      "the diagnosis must be inline",
+    );
   });
 });
 
@@ -368,10 +407,7 @@ test("setup-consumer.sh still vendors the epic-index generator from shared/resou
   // If this ever changes to copy a bundled copy instead, the source-header
   // requirement above becomes unnecessary — and this test is what will say so,
   // rather than the header quietly outliving its reason.
-  const sh = readFileSync(
-    WIZARD,
-    "utf8",
-  );
+  const sh = readFileSync(WIZARD, "utf8");
   assert.match(
     sh,
     /shared\/resources\/generate-prd-epic-index\.mjs/,
@@ -395,14 +431,23 @@ test("setup-consumer.sh still vendors the epic-index generator from shared/resou
 function runWorkflowWriter(seed) {
   const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-"));
   try {
-    if (seed !== undefined) writeFileSync(path.join(dir, "tracker-workflow.yaml"), seed);
+    if (seed !== undefined)
+      writeFileSync(path.join(dir, "tracker-workflow.yaml"), seed);
     const out = execFileSync(
       "bash",
-      ["-c", `source '${WIZARD}'; write_tracker_workflow; print_summary 2>/dev/null || true`],
+      [
+        "-c",
+        `source '${WIZARD}'; write_tracker_workflow; print_summary 2>/dev/null || true`,
+      ],
       {
         cwd: dir,
         input: "\n",
-        env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", VCS: "github", TRACKER: "github" },
+        env: {
+          ...process.env,
+          SETUP_CONSUMER_NO_MAIN: "1",
+          VCS: "github",
+          TRACKER: "github",
+        },
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -444,14 +489,22 @@ test("a re-run leaves the scaffolded file byte-identical", () => {
 
 test("the scaffolded template parses as a valid workflow", () => {
   const { body } = runWorkflowWriter(undefined);
-  const tw = require(path.join(REPO, "shared", "resources", "tracker-workflow.js"));
+  const tw = require(
+    path.join(REPO, "shared", "resources", "tracker-workflow.js"),
+  );
   const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-parse-"));
   try {
     writeFileSync(path.join(dir, "tracker-workflow.yaml"), body);
     const wf = tw.loadWorkflow({ repoRoot: dir });
     assert.equal(wf.source, "file");
-    const errors = (tw.validateWorkflow(wf) || []).filter((f) => f.level === "error");
-    assert.deepEqual(errors, [], "the file the wizard writes must pass --check --offline");
+    const errors = (tw.validateWorkflow(wf) || []).filter(
+      (f) => f.level === "error",
+    );
+    assert.deepEqual(
+      errors,
+      [],
+      "the file the wizard writes must pass --check --offline",
+    );
     // And its enabled moments must actually resolve on its own ladder.
     assert.ok(tw.resolveMoment("work-started", wf));
     assert.equal(tw.resolveMoment("work-started", wf).offLadder, false);
@@ -495,7 +548,13 @@ test("the two opt-in moments are commented out in the scaffolded template", () =
  */
 function runWithStubCli(body) {
   const dir = mkdtempSync(path.join(tmpdir(), "setup-tw-stub-"));
-  const cliDir = path.join(dir, ".agents", "skills", "develop-task", "references");
+  const cliDir = path.join(
+    dir,
+    ".agents",
+    "skills",
+    "develop-task",
+    "references",
+  );
   execFileSync("mkdir", ["-p", cliDir]);
   const cli = path.join(cliDir, "gh-stage.js");
   writeFileSync(cli, body);
@@ -507,7 +566,12 @@ function runWithStubCli(body) {
       {
         cwd: dir,
         input: "\n",
-        env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", VCS: "github", TRACKER: "github" },
+        env: {
+          ...process.env,
+          SETUP_CONSUMER_NO_MAIN: "1",
+          VCS: "github",
+          TRACKER: "github",
+        },
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -528,8 +592,13 @@ test("probe branch: a CLI that exits 0 WITHOUT writing still leaves a file (TASK
   // writing nothing. The wizard used to read that 0 as success, report
   // "generated from your live board", and return — leaving the consumer with no
   // workflow file at all.
-  const { out, body } = runWithStubCli('#!/usr/bin/env node\nprocess.exit(0);\n');
-  assert.ok(body, "the wizard MUST fall through to the template when nothing was written");
+  const { out, body } = runWithStubCli(
+    "#!/usr/bin/env node\nprocess.exit(0);\n",
+  );
+  assert.ok(
+    body,
+    "the wizard MUST fall through to the template when nothing was written",
+  );
   assert.match(body, /^statuses:/m);
   assert.ok(
     !/generated from your live board/.test(out),
@@ -539,11 +608,15 @@ test("probe branch: a CLI that exits 0 WITHOUT writing still leaves a file (TASK
 
 test("probe branch: a CLI that writes a record-derived file is reported as board-derived", () => {
   const { out, body } = runWithStubCli(
-    '#!/usr/bin/env node\n' +
+    "#!/usr/bin/env node\n" +
       'require("fs").writeFileSync("tracker-workflow.yaml", "statuses:\\n  - From Board\\n");\n' +
       'console.log(JSON.stringify({ reason: "written", written: true, fromRecord: true }));\n',
   );
-  assert.match(body, /From Board/, "the CLI's file must be kept, not overwritten by the template");
+  assert.match(
+    body,
+    /From Board/,
+    "the CLI's file must be kept, not overwritten by the template",
+  );
   assert.match(out, /generated from your live board/);
 });
 
@@ -552,7 +625,7 @@ test("probe branch: a CLI that writes a GENERIC file is labelled as a template, 
   // convert. Reporting that as board-derived hides a ladder that resolves
   // nothing, and the wizard's own `>/dev/null 2>&1` swallowed the CLI's warning.
   const { out, body } = runWithStubCli(
-    '#!/usr/bin/env node\n' +
+    "#!/usr/bin/env node\n" +
       'require("fs").writeFileSync("tracker-workflow.yaml", "statuses:\\n  - Generic\\n");\n' +
       'console.log(JSON.stringify({ reason: "written", written: true, fromRecord: false }));\n',
   );
@@ -561,11 +634,17 @@ test("probe branch: a CLI that writes a GENERIC file is labelled as a template, 
     !/generated from your live board/.test(out),
     "a generic ladder must NOT be reported as board-derived",
   );
-  assert.match(out, /GENERIC ladder/, "the warning the redirect used to swallow must surface");
+  assert.match(
+    out,
+    /GENERIC ladder/,
+    "the warning the redirect used to swallow must surface",
+  );
 });
 
 test("probe branch: a CLI that exits non-zero falls through to the template", () => {
-  const { out, body } = runWithStubCli('#!/usr/bin/env node\nprocess.exit(2);\n');
+  const { out, body } = runWithStubCli(
+    "#!/usr/bin/env node\nprocess.exit(2);\n",
+  );
   assert.ok(body, "a failing probe must still leave a usable file");
   assert.match(body, /GENERATED FROM A TEMPLATE/);
   assert.ok(!/generated from your live board/.test(out));
@@ -573,5 +652,8 @@ test("probe branch: a CLI that exits non-zero falls through to the template", ()
 
 test("the scaffolded template ends with a newline", () => {
   const { body } = runWorkflowWriter(undefined);
-  assert.ok(body.endsWith("\n"), "command substitution strips the heredoc's trailing newline");
+  assert.ok(
+    body.endsWith("\n"),
+    "command substitution strips the heredoc's trailing newline",
+  );
 });

@@ -26,7 +26,11 @@ function writeFile(dir, rel, content) {
 
 test("branchExists: returns ok when branch matches .eval/branches.json", () => {
   const dir = makeTmpDir();
-  writeFile(dir, ".eval/branches.json", JSON.stringify(["develop", "feature/task.42.example"]));
+  writeFile(
+    dir,
+    ".eval/branches.json",
+    JSON.stringify(["develop", "feature/task.42.example"]),
+  );
   const r = A.branchExists(dir, "^feature/task\\.42");
   assert.ok(r.ok, r.reason);
 });
@@ -60,23 +64,36 @@ test("branchExists: returns !ok on malformed branches.json", () => {
 
 const STEP_EVENTS = [
   { skill: "create-branch", status: "started", timestamp: 1 },
-  { skill: "review-task",   status: "started", timestamp: 2 },
-  { skill: "develop",       status: "started", timestamp: 3 },
-  { skill: "create-pr",     status: "started", timestamp: 4 },
-  { skill: "qa-task",       status: "started", timestamp: 5 },
-  { skill: "finalise",      status: "started", timestamp: 6 },
+  { skill: "review-task", status: "started", timestamp: 2 },
+  { skill: "develop", status: "started", timestamp: 3 },
+  { skill: "create-pr", status: "started", timestamp: 4 },
+  { skill: "qa-task", status: "started", timestamp: 5 },
+  { skill: "finalise", status: "started", timestamp: 6 },
 ];
 
 test("pipelineStepsRan: ok when all steps present in order", () => {
   const dir = makeTmpDir();
-  const p = writeFile(dir, ".eval/pipeline-events.json", JSON.stringify(STEP_EVENTS));
-  const r = A.pipelineStepsRan(p, ["create-branch", "review-task", "develop", "create-pr"]);
+  const p = writeFile(
+    dir,
+    ".eval/pipeline-events.json",
+    JSON.stringify(STEP_EVENTS),
+  );
+  const r = A.pipelineStepsRan(p, [
+    "create-branch",
+    "review-task",
+    "develop",
+    "create-pr",
+  ]);
   assert.ok(r.ok, r.reason);
 });
 
 test("pipelineStepsRan: fails when step missing", () => {
   const dir = makeTmpDir();
-  const p = writeFile(dir, ".eval/pipeline-events.json", JSON.stringify(STEP_EVENTS));
+  const p = writeFile(
+    dir,
+    ".eval/pipeline-events.json",
+    JSON.stringify(STEP_EVENTS),
+  );
   const r = A.pipelineStepsRan(p, ["create-branch", "qa-fix"]);
   assert.ok(!r.ok);
   assert.ok(r.reason.includes("qa-fix"));
@@ -84,7 +101,11 @@ test("pipelineStepsRan: fails when step missing", () => {
 
 test("pipelineStepsRan: fails when step out of order", () => {
   const dir = makeTmpDir();
-  const p = writeFile(dir, ".eval/pipeline-events.json", JSON.stringify(STEP_EVENTS));
+  const p = writeFile(
+    dir,
+    ".eval/pipeline-events.json",
+    JSON.stringify(STEP_EVENTS),
+  );
   // create-pr comes before develop in expected — should fail
   const r = A.pipelineStepsRan(p, ["create-pr", "develop"]);
   assert.ok(!r.ok);
@@ -115,7 +136,11 @@ test("loopBoundedAt: ok when count <= maxIter", () => {
 
 test("loopBoundedAt: fails when count > maxIter", () => {
   const dir = makeTmpDir();
-  const events = Array.from({ length: 6 }, (_, i) => ({ skill: "qa-fix", status: "started", timestamp: i }));
+  const events = Array.from({ length: 6 }, (_, i) => ({
+    skill: "qa-fix",
+    status: "started",
+    timestamp: i,
+  }));
   const p = writeFile(dir, ".eval/events.json", JSON.stringify(events));
   const r = A.loopBoundedAt(p, "qa-fix", 5);
   assert.ok(!r.ok);
@@ -135,21 +160,37 @@ test("loopBoundedAt: ok when skill never ran", () => {
 
 test("prCreated: ok for skipped receipt (no GH_TOKEN)", () => {
   const dir = makeTmpDir();
-  const p = writeFile(dir, ".eval/gh-receipt.json", JSON.stringify({ skipped: true, reason: "GH_TOKEN not set" }));
+  const p = writeFile(
+    dir,
+    ".eval/gh-receipt.json",
+    JSON.stringify({ skipped: true, reason: "GH_TOKEN not set" }),
+  );
   assert.ok(A.prCreated(p).ok);
 });
 
 test("prCreated: ok when base branch matches", () => {
   const dir = makeTmpDir();
-  const p = writeFile(dir, ".eval/gh-receipt.json",
-    JSON.stringify({ skipped: false, pr: { number: 1, url: "u", baseRefName: "main", title: "feat: task.42" } }));
+  const p = writeFile(
+    dir,
+    ".eval/gh-receipt.json",
+    JSON.stringify({
+      skipped: false,
+      pr: { number: 1, url: "u", baseRefName: "main", title: "feat: task.42" },
+    }),
+  );
   assert.ok(A.prCreated(p, { base: "main" }).ok);
 });
 
 test("prCreated: fails when base branch differs", () => {
   const dir = makeTmpDir();
-  const p = writeFile(dir, ".eval/gh-receipt.json",
-    JSON.stringify({ skipped: false, pr: { number: 1, url: "u", baseRefName: "develop", title: "feat" } }));
+  const p = writeFile(
+    dir,
+    ".eval/gh-receipt.json",
+    JSON.stringify({
+      skipped: false,
+      pr: { number: 1, url: "u", baseRefName: "develop", title: "feat" },
+    }),
+  );
   const r = A.prCreated(p, { base: "main" });
   assert.ok(!r.ok);
   assert.ok(r.reason.includes("main"));

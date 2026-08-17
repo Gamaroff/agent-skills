@@ -22,7 +22,11 @@ const execAsync = promisify(execFile);
  * @param {string}   [opts.branch]         default branch name, default "develop"
  * @returns {Promise<Sandbox>}
  */
-export async function createSandbox({ fixtureFiles = {}, initialCommit = true, branch = "develop" } = {}) {
+export async function createSandbox({
+  fixtureFiles = {},
+  initialCommit = true,
+  branch = "develop",
+} = {}) {
   const sandboxPath = await mkdtemp(join(tmpdir(), "agent-skills-eval-"));
 
   const run = async (cmd, args = []) => {

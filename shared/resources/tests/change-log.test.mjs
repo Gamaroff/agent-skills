@@ -75,7 +75,9 @@ test("A: an H3 Change Log under a parent heading is updated in place, not duplic
 });
 
 test("A: a numbered heading is found and its level preserved", () => {
-  const doc = ["# PRD", "", "### 1.5 Change Log", "", "No rows yet.", ""].join("\n");
+  const doc = ["# PRD", "", "### 1.5 Change Log", "", "No rows yet.", ""].join(
+    "\n",
+  );
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "prd" });
 
   assert.match(out, /^### Change Log$/m);
@@ -100,7 +102,9 @@ test("A: an H2 log stays H2", () => {
 });
 
 test("A: 'Change Log Format' is not a Change Log heading", () => {
-  const doc = ["# Doc", "", "## Change Log Format", "", "Prose.", ""].join("\n");
+  const doc = ["# Doc", "", "## Change Log Format", "", "Prose.", ""].join(
+    "\n",
+  );
   assert.equal(CL.findChangeLog(doc), null);
 });
 
@@ -201,7 +205,10 @@ test("D: a legacy jira-sync block is migrated in place, rows widened, no duplica
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "story" });
 
   assert.equal(out.match(/Change Log/g).length, 1, "exactly one Change Log");
-  assert.ok(!out.includes("jira-sync-changelog-start"), "legacy marker removed");
+  assert.ok(
+    !out.includes("jira-sync-changelog-start"),
+    "legacy marker removed",
+  );
   assert.match(out, /<!-- change-log-start -->/);
   assert.match(
     out,
@@ -269,7 +276,10 @@ for (const [label, first, second] of [
       1,
       "collapses to exactly one block",
     );
-    assert.ok(!out.includes("github-sync-changelog-start"), "github markers gone");
+    assert.ok(
+      !out.includes("github-sync-changelog-start"),
+      "github markers gone",
+    );
     assert.ok(!out.includes("jira-sync-changelog-start"), "jira markers gone");
     assert.ok(
       out.indexOf("GitHub issue created") < out.indexOf("Jira story created"),
@@ -293,7 +303,10 @@ for (const [label, first, second] of [
 test("D: an already-canonical 4-column row is never rewritten", () => {
   const row = "| 2026-05-11 | 1.0 | Initial draft | create-story |";
   assert.equal(
-    CL.migrateLegacyEntries([row], { legacyAuthor: "sync-jira", docType: "story" })[0],
+    CL.migrateLegacyEntries([row], {
+      legacyAuthor: "sync-jira",
+      docType: "story",
+    })[0],
     row,
   );
 });
@@ -346,9 +359,14 @@ test("E: an unknown docType appends at end of document", () => {
 });
 
 test("E: a missing anchor falls back to EOF rather than guessing", () => {
-  const doc = ["# Story", "", "## Overview", "", "No Dev Agent Record here.", ""].join(
-    "\n",
-  );
+  const doc = [
+    "# Story",
+    "",
+    "## Overview",
+    "",
+    "No Dev Agent Record here.",
+    "",
+  ].join("\n");
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "story" });
   assert.ok(out.trimEnd().endsWith(CL.CL_END));
 });
@@ -402,10 +420,17 @@ test("F: a fenced heading is ignored and the samples are left byte-identical", (
     "",
   ].join("\n");
 
-  assert.equal(CL.findChangeLog(doc), null, "a fenced heading is not a section");
+  assert.equal(
+    CL.findChangeLog(doc),
+    null,
+    "a fenced heading is not a section",
+  );
 
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
-  assert.ok(out.includes(sample), "the fenced sample must survive byte-identical");
+  assert.ok(
+    out.includes(sample),
+    "the fenced sample must survive byte-identical",
+  );
   assert.ok(
     out.indexOf(CL.CL_START) < out.indexOf("## Progress Tracking"),
     "the real block goes at the task anchor",
@@ -428,9 +453,16 @@ test("F: a fenced LEGACY marker pair is not migrated", () => {
     "```",
   ].join("\n");
 
-  const doc = ["# Task 42", "", "## Background", "", sample, "", "## Progress Tracking", ""].join(
-    "\n",
-  );
+  const doc = [
+    "# Task 42",
+    "",
+    "## Background",
+    "",
+    sample,
+    "",
+    "## Progress Tracking",
+    "",
+  ].join("\n");
 
   assert.equal(CL.findChangeLog(doc), null);
 
@@ -453,9 +485,16 @@ test("F: a fenced NEW marker pair is ignored too", () => {
     "```",
   ].join("\n");
 
-  const doc = ["# Spec", "", "## Example", "", sample, "", "## Progress Tracking", ""].join(
-    "\n",
-  );
+  const doc = [
+    "# Spec",
+    "",
+    "## Example",
+    "",
+    sample,
+    "",
+    "## Progress Tracking",
+    "",
+  ].join("\n");
 
   assert.equal(CL.findChangeLog(doc), null);
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
@@ -478,9 +517,13 @@ test("F: a ~~~ fence is respected the same as a backtick fence", () => {
 });
 
 test("F: a fenced example AND a real log — only the real one is updated", () => {
-  const sample = ["```markdown", "## Change Log", "", "| 2020-01-01 |  | Example | x |", "```"].join(
-    "\n",
-  );
+  const sample = [
+    "```markdown",
+    "## Change Log",
+    "",
+    "| 2020-01-01 |  | Example | x |",
+    "```",
+  ].join("\n");
 
   const doc = [
     "# Task",
@@ -500,8 +543,10 @@ test("F: a fenced example AND a real log — only the real one is updated", () =
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
 
   assert.ok(out.includes(sample), "fenced example untouched");
-  assert.ok(!out.includes("| 2020-01-01 |  | Example | x |\n| 2026-08-12"),
-    "new row must not be appended into the example");
+  assert.ok(
+    !out.includes("| 2020-01-01 |  | Example | x |\n| 2026-08-12"),
+    "new row must not be appended into the example",
+  );
   assert.match(out, /\| 2026-05-11 \| 1\.0 \| Initial draft \| create-task \|/);
   assert.match(out, /\| 2026-08-12 \|  \| Review passed \| review-epic \|/);
 });
@@ -539,16 +584,31 @@ test("F: markers NAMED in inline code spans are not a marker block", () => {
     "- [ ] Create `change-log.js` with `CL_START`/`CL_END` = `<!-- change-log-start -->` /\n" +
     "      `<!-- change-log-end -->` plus a `LEGACY_MARKER_PAIRS` table";
 
-  const doc = ["# Task 42", "", "## Implementation Plan", "", bullet, "", "## Progress Tracking", ""].join(
-    "\n",
+  const doc = [
+    "# Task 42",
+    "",
+    "## Implementation Plan",
+    "",
+    bullet,
+    "",
+    "## Progress Tracking",
+    "",
+  ].join("\n");
+
+  assert.equal(
+    CL.findChangeLog(doc),
+    null,
+    "inline-code mentions are not a block",
   );
 
-  assert.equal(CL.findChangeLog(doc), null, "inline-code mentions are not a block");
-
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
-  assert.ok(out.includes(bullet), "the checklist bullet must survive byte-identical");
   assert.ok(
-    out.indexOf(CL.CL_START + "\n## Change Log") < out.indexOf("## Progress Tracking"),
+    out.includes(bullet),
+    "the checklist bullet must survive byte-identical",
+  );
+  assert.ok(
+    out.indexOf(CL.CL_START + "\n## Change Log") <
+      out.indexOf("## Progress Tracking"),
     "the real block still goes at the task anchor",
   );
 });
@@ -574,12 +634,18 @@ test("F: a real unbackticked marker beside inline-code mentions is still found",
   const found = CL.findChangeLog(doc);
   assert.ok(found, "the genuine block must be found");
   assert.ok(
-    doc.slice(found.start).startsWith("<!-- change-log-start -->\n## Change Log"),
+    doc
+      .slice(found.start)
+      .startsWith("<!-- change-log-start -->\n## Change Log"),
     "found the real block, not the prose mention",
   );
 
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
-  assert.match(out, /The markers are `<!-- change-log-start -->` and/, "prose intact");
+  assert.match(
+    out,
+    /The markers are `<!-- change-log-start -->` and/,
+    "prose intact",
+  );
   assert.equal(CL.extractEntries(out).length, 2);
 });
 
@@ -610,12 +676,24 @@ test("F: a fenced heading INSIDE the Change Log does not end the block (TASK-42-
     "",
   ].join("\n");
 
-  assert.equal(CL.extractEntries(doc).length, 2, "both rows are inside the block");
+  assert.equal(
+    CL.extractEntries(doc).length,
+    2,
+    "both rows are inside the block",
+  );
 
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
 
-  assert.equal(CL.extractEntries(out).length, 3, "both rows survive, plus the new one");
-  assert.match(out, /\| 2026-02-02 \|  \| Second \| qa-task \|/, "row not stranded");
+  assert.equal(
+    CL.extractEntries(out).length,
+    3,
+    "both rows survive, plus the new one",
+  );
+  assert.match(
+    out,
+    /\| 2026-02-02 \|  \| Second \| qa-task \|/,
+    "row not stranded",
+  );
   assert.equal(
     (out.match(/^```/gm) || []).length % 2,
     0,
@@ -707,7 +785,10 @@ for (const [label, first, second] of [
       1,
       "exactly one opening marker",
     );
-    assert.ok(!out.includes("jira-sync-changelog-start"), "legacy markers gone");
+    assert.ok(
+      !out.includes("jira-sync-changelog-start"),
+      "legacy markers gone",
+    );
     assert.equal(CL.extractEntries(out).length, 3, "all rows preserved");
     assert.match(out, /Jira story created/, "legacy row kept");
     assert.match(out, /Current row/, "already-canonical row kept");
@@ -730,7 +811,11 @@ test("D: collapsing a block leaves no more than one blank line at the seam", () 
   ].join("\n");
 
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "story" });
-  assert.doesNotMatch(out, /\n{3,}/, "no run of 3+ newlines anywhere in the output");
+  assert.doesNotMatch(
+    out,
+    /\n{3,}/,
+    "no run of 3+ newlines anywhere in the output",
+  );
 });
 
 test("D: a 3-cell legacy row keeps all of its text", () => {
@@ -766,9 +851,15 @@ test("G: bumpUpdated sets updated and leaves created alone", () => {
 });
 
 test("G: bumpUpdated adds the key after created when absent", () => {
-  const doc = ["---", "id: task.42", "created: 2026-01-01", "---", "", "# Task", ""].join(
-    "\n",
-  );
+  const doc = [
+    "---",
+    "id: task.42",
+    "created: 2026-01-01",
+    "---",
+    "",
+    "# Task",
+    "",
+  ].join("\n");
   const out = CL.bumpUpdated(doc, "2026-08-12");
   assert.match(out, /^created: 2026-01-01\nupdated: 2026-08-12$/m);
 });
@@ -779,9 +870,15 @@ test("G: bumpUpdated leaves a document with no frontmatter unchanged", () => {
 });
 
 test("G: bumpUpdated does not touch an `updated:` that appears in the body", () => {
-  const doc = ["---", "id: t", "updated: 2026-01-01", "---", "", "updated: not-frontmatter", ""].join(
-    "\n",
-  );
+  const doc = [
+    "---",
+    "id: t",
+    "updated: 2026-01-01",
+    "---",
+    "",
+    "updated: not-frontmatter",
+    "",
+  ].join("\n");
   const out = CL.bumpUpdated(doc, "2026-08-12");
   assert.match(out, /^updated: not-frontmatter$/m, "body line untouched");
   assert.equal(out.match(/updated: 2026-08-12/g).length, 1);
@@ -793,19 +890,31 @@ test("G: bumpUpdated does not touch an `updated:` that appears in the body", () 
 
 test("fmtEntry emits four cells with a blank version by default", () => {
   assert.equal(
-    CL.fmtEntry({ date: "2026-08-12", description: "Thing happened", author: "finalise" }),
+    CL.fmtEntry({
+      date: "2026-08-12",
+      description: "Thing happened",
+      author: "finalise",
+    }),
     "| 2026-08-12 |  | Thing happened | finalise |",
   );
 });
 
 test("extractEntries reads back exactly what upsertChangeLog wrote", () => {
   let doc = "# Task\n\n## Progress Tracking\n\n- [ ] Phase 1\n";
-  doc = CL.upsertChangeLog(doc, { date: "2026-01-01", description: "One", author: "a" }, {
-    docType: "task",
-  });
-  doc = CL.upsertChangeLog(doc, { date: "2026-02-02", description: "Two", author: "b" }, {
-    docType: "task",
-  });
+  doc = CL.upsertChangeLog(
+    doc,
+    { date: "2026-01-01", description: "One", author: "a" },
+    {
+      docType: "task",
+    },
+  );
+  doc = CL.upsertChangeLog(
+    doc,
+    { date: "2026-02-02", description: "Two", author: "b" },
+    {
+      docType: "task",
+    },
+  );
 
   const entries = CL.extractEntries(doc);
   assert.equal(entries.length, 2);
@@ -829,7 +938,11 @@ test("an unrelated four-column body table is not absorbed into the log", () => {
 
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
   assert.match(out, /\| a\.js \| src  \| me    \| none  \|/, "table untouched");
-  assert.equal(CL.extractEntries(out).length, 1, "only the new row is an entry");
+  assert.equal(
+    CL.extractEntries(out).length,
+    1,
+    "only the new row is an entry",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -879,7 +992,10 @@ test("H: a status transition writes exactly one row naming the landed status", (
 
 test("H: create + transition in one run writes both rows, creation first", () => {
   const entries = JS.buildChangeLogEntries(
-    syncArgs({ created: true, statusOutcome: { transitioned: true, to: "To Do" } }),
+    syncArgs({
+      created: true,
+      statusOutcome: { transitioned: true, to: "To Do" },
+    }),
   );
   assert.equal(entries.length, 2);
   assert.match(entries[0].description, /created/);
@@ -967,10 +1083,15 @@ test("H: migration does not fire when nothing else is being written", () => {
 
   // Simulate the caller loop faithfully: no entries means no call at all.
   let out = legacy;
-  for (const e of entries) out = CL.upsertChangeLog(out, e, { docType: "task" });
+  for (const e of entries)
+    out = CL.upsertChangeLog(out, e, { docType: "task" });
 
   assert.equal(out, legacy, "a no-op sync must leave the file byte-identical");
-  assert.match(out, /jira-sync-changelog-start/, "legacy markers survive untouched");
+  assert.match(
+    out,
+    /jira-sync-changelog-start/,
+    "legacy markers survive untouched",
+  );
 });
 
 test("H: migration DOES fire on the first sync that writes for another reason", () => {
@@ -1000,9 +1121,14 @@ test("H: migration DOES fire on the first sync that writes for another reason", 
   assert.equal(entries.length, 1);
 
   let out = legacy;
-  for (const e of entries) out = CL.upsertChangeLog(out, e, { docType: "task" });
+  for (const e of entries)
+    out = CL.upsertChangeLog(out, e, { docType: "task" });
 
-  assert.doesNotMatch(out, /jira-sync-changelog-start/, "legacy pair migrated away");
+  assert.doesNotMatch(
+    out,
+    /jira-sync-changelog-start/,
+    "legacy pair migrated away",
+  );
   assert.match(out, /<!-- change-log-start -->/, "canonical pair adopted");
   assert.match(out, /Initial Jira task created/, "historical row preserved");
   assert.match(out, /Status → Done/, "new row appended");
@@ -1035,7 +1161,11 @@ test("H: both legacy marker pairs in one document collapse to a single block", (
 
   const out = CL.upsertChangeLog(
     dual,
-    { date: "2026-08-13", description: "Status → Done", author: "sync-jira-task" },
+    {
+      date: "2026-08-13",
+      description: "Status → Done",
+      author: "sync-jira-task",
+    },
     { docType: "task" },
   );
 
@@ -1074,7 +1204,11 @@ test("H: rows the parser cannot read are preserved, never dropped", () => {
 
   const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
 
-  assert.match(out, /Initial roadmap/, "unparseable historical row was dropped");
+  assert.match(
+    out,
+    /Initial roadmap/,
+    "unparseable historical row was dropped",
+  );
   assert.match(out, /Added phase 3/, "unparseable historical row was dropped");
   assert.match(out, /Review passed/, "the new row must still be appended");
   assert.equal(

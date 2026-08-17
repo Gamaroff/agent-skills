@@ -89,7 +89,10 @@ test("the create-task template resolves every section the CARD publishes", () =>
     "utf8",
   );
   const required = TASK_CARD_SECTIONS.filter((s) => !s.optional);
-  const got = extractBodySections(template, required.map((s) => s.names));
+  const got = extractBodySections(
+    template,
+    required.map((s) => s.names),
+  );
   assert.deepEqual(
     names(got),
     required.map((s) => s.names[0]),
@@ -299,7 +302,9 @@ test("`assignee: TBD` is dropped and warned about, not sent", () => {
   // This exact value shipped in the task template. Passed through as an
   // accountId it returns a bare HTTP 400 with nothing naming the cause.
   const warnings = [];
-  const got = resolveAssignee("TBD", "", { warn: m => warnings.push(String(m)) });
+  const got = resolveAssignee("TBD", "", {
+    warn: (m) => warnings.push(String(m)),
+  });
 
   assert.equal(got, "", "a placeholder must never be sent");
   assert.equal(warnings.length, 1);
@@ -316,11 +321,28 @@ test("a placeholder configured as the default is also refused", () => {
 });
 
 test("placeholders are matched case- and whitespace-insensitively", () => {
-  for (const v of ["TBD", "tbd", "  Tbd  ", "N/A", "none", "unassigned", "-", "?"]) {
-    assert.equal(isAssigneePlaceholder(v), true, `${JSON.stringify(v)} should be a placeholder`);
+  for (const v of [
+    "TBD",
+    "tbd",
+    "  Tbd  ",
+    "N/A",
+    "none",
+    "unassigned",
+    "-",
+    "?",
+  ]) {
+    assert.equal(
+      isAssigneePlaceholder(v),
+      true,
+      `${JSON.stringify(v)} should be a placeholder`,
+    );
   }
   for (const v of [ACCOUNT, "5b10a2844c20165700ede21g", "alice"]) {
-    assert.equal(isAssigneePlaceholder(v), false, `${JSON.stringify(v)} should not be`);
+    assert.equal(
+      isAssigneePlaceholder(v),
+      false,
+      `${JSON.stringify(v)} should not be`,
+    );
   }
 });
 

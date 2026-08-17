@@ -5,7 +5,9 @@ import { wrapDriver } from "../lib/pipeline-recorder.mjs";
 function makeStubDriver(toolEvents = []) {
   return {
     name: "stub",
-    async isAvailable() { return { ok: true }; },
+    async isAvailable() {
+      return { ok: true };
+    },
     async run(ctx) {
       for (const e of toolEvents) {
         ctx.onToolUse?.(e);
@@ -25,7 +27,7 @@ test("wrapDriver: records Skill tool-use events in order", async () => {
   const toolEvents = [
     { tool: "Skill", input: { skill: "create-branch", args: "task.42" } },
     { tool: "Skill", input: { skill: "review-task", args: undefined } },
-    { tool: "Bash",  input: { command: "ls" } }, // non-Skill should be ignored
+    { tool: "Bash", input: { command: "ls" } }, // non-Skill should be ignored
     { tool: "Skill", input: { skill: "develop", args: "task.42.md" } },
   ];
 
@@ -37,8 +39,8 @@ test("wrapDriver: records Skill tool-use events in order", async () => {
   assert.equal(events[0].skill, "create-branch");
   assert.equal(events[1].skill, "review-task");
   assert.equal(events[2].skill, "develop");
-  assert.ok(events.every(e => e.status === "started"));
-  assert.ok(events.every(e => typeof e.timestamp === "number"));
+  assert.ok(events.every((e) => e.status === "started"));
+  assert.ok(events.every((e) => typeof e.timestamp === "number"));
 });
 
 test("wrapDriver: forwards onToolUse to original handler", async () => {

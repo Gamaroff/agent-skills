@@ -65,7 +65,8 @@ const jira = require(join(__dirname, "..", "jira-sync.js"));
 const { parseYamlSubset } = require(join(__dirname, "..", "yaml-subset.js"));
 
 /** Build a workflow from YAML text, without touching the filesystem. */
-const fromYaml = (text) => buildWorkflow(parseYamlSubset(text), { source: "file", path: "<test>" });
+const fromYaml = (text) =>
+  buildWorkflow(parseYamlSubset(text), { source: "file", path: "<test>" });
 
 /** A ladder with a bespoke gate column, used across several groups. */
 const BESPOKE = `
@@ -119,17 +120,29 @@ test("default snapshot — the ladder reproduces jira-sync's candidate lists, ru
         "order is preference order, so a reordering is a behaviour change",
     );
   }
-  assert.equal(DEFAULT_LADDER.length, 6, "six rungs: new, in-progress, review, qa, merge, done");
+  assert.equal(
+    DEFAULT_LADDER.length,
+    6,
+    "six rungs: new, in-progress, review, qa, merge, done",
+  );
 });
 
 test("default snapshot — ladder order matches DEFAULT_STAGE_MAP's rank order", () => {
   // The ladder's index IS its rank, so the two orderings must agree or the
   // backward-move guard changes its mind about which way is forwards.
   const M = jira.DEFAULT_STAGE_MAP;
-  const ranks = ["work-started", "in-review", "in-qa", "ready-for-merge", "done"].map(
-    (s) => M[s].rank,
+  const ranks = [
+    "work-started",
+    "in-review",
+    "in-qa",
+    "ready-for-merge",
+    "done",
+  ].map((s) => M[s].rank);
+  assert.deepEqual(
+    ranks,
+    [20, 30, 40, 50, 60],
+    "the ranks this ladder was derived from",
   );
-  assert.deepEqual(ranks, [20, 30, 40, 50, 60], "the ranks this ladder was derived from");
   const sorted = ranks.slice().sort((a, b) => a - b);
   assert.deepEqual(ranks, sorted, "ladder order must be ascending rank order");
 });
@@ -151,7 +164,9 @@ test("default snapshot — exactly the defaultEnabled stages are wired, and no o
 test("default snapshot — the three enabled moments resolve to the same candidate lists", () => {
   // The end-to-end form of the contract: not just the ladder data, but what
   // resolveMoment actually hands a caller.
-  const wf = loadWorkflow({ repoRoot: mkdtempSync(join(tmpdir(), "tw-none-")) });
+  const wf = loadWorkflow({
+    repoRoot: mkdtempSync(join(tmpdir(), "tw-none-")),
+  });
   const M = jira.DEFAULT_STAGE_MAP;
   for (const stage of ["work-started", "in-review", "done"]) {
     const r = resolveMoment(stage, wf);
@@ -166,9 +181,15 @@ test("default snapshot — the three enabled moments resolve to the same candida
 });
 
 test("default snapshot — the three default-off moments resolve to null", () => {
-  const wf = loadWorkflow({ repoRoot: mkdtempSync(join(tmpdir(), "tw-none-")) });
+  const wf = loadWorkflow({
+    repoRoot: mkdtempSync(join(tmpdir(), "tw-none-")),
+  });
   for (const stage of ["in-qa", "ready-for-merge", "blocked"]) {
-    assert.equal(resolveMoment(stage, wf), null, `${stage} is defaultEnabled:false today`);
+    assert.equal(
+      resolveMoment(stage, wf),
+      null,
+      `${stage} is defaultEnabled:false today`,
+    );
   }
 });
 
@@ -186,7 +207,10 @@ test("default snapshot — MOMENTS is the closed set, including the two not yet 
   // Every stage jira-sync knows must exist as a moment, or a wired stage would
   // have no moment to be configured through.
   for (const stage of jira.STAGE_NAMES) {
-    assert.ok(MOMENTS.includes(stage), `stage "${stage}" must have a matching moment`);
+    assert.ok(
+      MOMENTS.includes(stage),
+      `stage "${stage}" must have a matching moment`,
+    );
   }
 });
 
@@ -245,7 +269,9 @@ test("CR-1 — an unconventional ladder with no pipeline block warns and says wh
   const wf = fromYaml("statuses:\n  - Backlog\n  - Doing\n  - Shipped\n");
   const warns = validateWorkflow(wf).filter((w) => w.level === "warn");
   assert.ok(
-    warns.some((w) => /falls back to the built-in default target/.test(w.message)),
+    warns.some((w) =>
+      /falls back to the built-in default target/.test(w.message),
+    ),
     "an unauthored default moment that misses the ladder must be reported",
   );
   assert.ok(
@@ -276,9 +302,17 @@ test("rank — a rung's index is its rank", () => {
 test("rank — a bespoke column is ranked, where DEFAULT_STATUS_RANK has no opinion", () => {
   // The motivating bug: `resolveStatusRank("READY FOR SHOWCASE")` returns null
   // today, so a resumed run can drag a card back out of that column.
-  assert.equal(jira.resolveStatusRank("READY FOR SHOWCASE", {}), null, "the status quo");
+  assert.equal(
+    jira.resolveStatusRank("READY FOR SHOWCASE", {}),
+    null,
+    "the status quo",
+  );
   const wf = fromYaml(BESPOKE);
-  assert.equal(rankOf("READY FOR SHOWCASE", wf), 5, "declaring it in order is all it takes");
+  assert.equal(
+    rankOf("READY FOR SHOWCASE", wf),
+    5,
+    "declaring it in order is all it takes",
+  );
 });
 
 test("rank — off-ladder returns null (no opinion, guard allows)", () => {
@@ -291,7 +325,11 @@ test("rank — matching is case-insensitive and emoji-stripped", () => {
   const wf = fromYaml(BESPOKE);
   assert.equal(rankOf("in progress", wf), 2);
   assert.equal(rankOf("IN PROGRESS", wf), 2);
-  assert.equal(rankOf("🚧 In Progress", wf), 2, "GitHub columns routinely carry emoji");
+  assert.equal(
+    rankOf("🚧 In Progress", wf),
+    2,
+    "GitHub columns routinely carry emoji",
+  );
   assert.equal(rankOf("  In Progress  ", wf), 2);
 });
 
@@ -322,7 +360,11 @@ pipeline:
   work-started: Doing
 `);
   assert.equal(rankOf("In Progress", wf), 1);
-  assert.equal(rankOf("Doing", wf), 1, "an alternative ranks the same as the first name");
+  assert.equal(
+    rankOf("Doing", wf),
+    1,
+    "an alternative ranks the same as the first name",
+  );
   assert.equal(rankOf("Development", wf), 1);
 
   const r = resolveMoment("work-started", wf);
@@ -395,7 +437,11 @@ pipeline:
   work-started: In Progress
 `);
   assert.ok(resolveMoment("work-started", wf));
-  assert.equal(resolveMoment("done", wf), null, "declared nowhere, so it does not fire");
+  assert.equal(
+    resolveMoment("done", wf),
+    null,
+    "declared nowhere, so it does not fire",
+  );
   assert.equal(resolveMoment("in-qa", wf), null);
 });
 
@@ -576,7 +622,10 @@ test("overlay — statuses are REPLACED, not merged", () => {
 
 test("overlay — a moment can be nulled out for one issue type only", () => {
   const wf = fromYaml(OVERLAY);
-  assert.equal(resolveMoment("in-qa", wf, { issueType: "IT / DevOps Task" }), null);
+  assert.equal(
+    resolveMoment("in-qa", wf, { issueType: "IT / DevOps Task" }),
+    null,
+  );
   assert.ok(resolveMoment("in-qa", wf), "still enabled for every other type");
 });
 
@@ -593,8 +642,13 @@ test("overlay — an unknown issue type falls through to the base ladder", () =>
 
 test("overlay — planMove walks the overlaid ladder for that type", () => {
   const wf = fromYaml(OVERLAY);
-  const hops = planMove("In Progress", "Done", wf, { issueType: "IT / DevOps Task" });
-  assert.deepEqual(hops.map((r) => r.names[0]), ["In Review"]);
+  const hops = planMove("In Progress", "Done", wf, {
+    issueType: "IT / DevOps Task",
+  });
+  assert.deepEqual(
+    hops.map((r) => r.names[0]),
+    ["In Review"],
+  );
 });
 
 // ── 5b. QA CR-5: inherited targets resolved against the ladder in play ───────
@@ -651,11 +705,15 @@ byIssueType:
 `);
   const warns = validateWorkflow(wf).filter((w) => w.level === "warn");
   assert.ok(
-    warns.some((w) => /in-qa.*Ops Request.*inherits the base target/.test(w.message)),
+    warns.some((w) =>
+      /in-qa.*Ops Request.*inherits the base target/.test(w.message),
+    ),
     `expected a warn naming the inherited moment; got: ${JSON.stringify(warns)}`,
   );
   assert.ok(
-    warns.some((w) => /set it to `~` to disable it for this type/.test(w.message)),
+    warns.some((w) =>
+      /set it to `~` to disable it for this type/.test(w.message),
+    ),
     "and it must name both fixes",
   );
 });
@@ -664,9 +722,15 @@ test("CR-5 — an inherited miss falls back to the default rung's aliases", () =
   // A board spelled with legitimate DEFAULT_LADDER aliases needs no `pipeline:`
   // block at all. Before this, `work-started` targeted the single name
   // "In Progress", missed, and became a side-state.
-  const wf = fromYaml("statuses:\n  - Backlog\n  - Doing\n  - Review\n  - Done\n");
+  const wf = fromYaml(
+    "statuses:\n  - Backlog\n  - Doing\n  - Review\n  - Done\n",
+  );
   const ws = resolveMoment("work-started", wf);
-  assert.equal(ws.offLadder, false, "'Doing' is an alias on the same default rung as 'In Progress'");
+  assert.equal(
+    ws.offLadder,
+    false,
+    "'Doing' is an alias on the same default rung as 'In Progress'",
+  );
   assert.equal(ws.rank, 1);
   assert.deepEqual(ws.targets, ["Doing"]);
 
@@ -694,7 +758,11 @@ pipeline:
   done: Ready for Showcase
 `);
   const r = resolveMoment("done", wf);
-  assert.equal(r.offLadder, true, "an explicit choice must not be silently rerouted to 'Closed'");
+  assert.equal(
+    r.offLadder,
+    true,
+    "an explicit choice must not be silently rerouted to 'Closed'",
+  );
   assert.deepEqual(r.targets, ["Ready for Showcase"]);
 });
 
@@ -718,9 +786,15 @@ byIssueType:
 });
 
 test("CR-5 — `blocked` stays off-ladder; it has no default rung to alias through", () => {
-  const wf = fromYaml("statuses:\n  - In Progress\n  - Done\npipeline:\n  blocked: Blocked\n");
+  const wf = fromYaml(
+    "statuses:\n  - In Progress\n  - Done\npipeline:\n  blocked: Blocked\n",
+  );
   const r = resolveMoment("blocked", wf);
-  assert.equal(r.offLadder, true, "blocked is a side-state by nature — an inherited miss is correct");
+  assert.equal(
+    r.offLadder,
+    true,
+    "blocked is a side-state by nature — an inherited miss is correct",
+  );
 });
 
 test("CR-6 — an overlay that yields no usable rung inherits nothing", () => {
@@ -755,7 +829,10 @@ byIssueType:
 
 test("CR-6 — a usable overlay still inherits, so the CR-5 fix is intact", () => {
   const wf = fromYaml(OVERLAY);
-  assert.equal(resolveMoment("in-review", wf, { issueType: "IT / DevOps Task" }).rank, 2);
+  assert.equal(
+    resolveMoment("in-review", wf, { issueType: "IT / DevOps Task" }).rank,
+    2,
+  );
 });
 
 test("CR-7 — a by-design side-state does not draw a per-type warning", () => {
@@ -812,7 +889,9 @@ byIssueType:
 `);
   assert.ok(
     validateWorkflow(wf).some(
-      (w) => w.level === "warn" && /in-qa.*Ops Request.*inherits the base target/.test(w.message),
+      (w) =>
+        w.level === "warn" &&
+        /in-qa.*Ops Request.*inherits the base target/.test(w.message),
     ),
   );
 });
@@ -841,7 +920,10 @@ byIssueType:
     resolveMoment("done", wf),
     "the overlay restates the base ladder, so nothing about this type is different",
   );
-  assert.equal(resolveMoment("done", wf, { issueType: "Ops Request" }).offLadder, true);
+  assert.equal(
+    resolveMoment("done", wf, { issueType: "Ops Request" }).offLadder,
+    true,
+  );
 });
 
 test("CR-9 — a moment with no default rung still warns when its base target IS on-ladder", () => {
@@ -872,7 +954,9 @@ byIssueType:
     validateWorkflow(wf).some(
       (w) =>
         w.level === "warn" &&
-        /changes-requested.*Ops Request.*inherits the base target "In Review"/.test(w.message),
+        /changes-requested.*Ops Request.*inherits the base target "In Review"/.test(
+          w.message,
+        ),
     ),
     "'In Review' is on the base ladder and absent from this type's — that is a real miss",
   );
@@ -897,7 +981,10 @@ byIssueType:
       - Closed
 `);
   const warns = validateWorkflow(wf).filter((w) => w.level === "warn");
-  assert.ok(!warns.some((w) => /blocked/.test(w.message)), "no warning about a deliberate side-state");
+  assert.ok(
+    !warns.some((w) => /blocked/.test(w.message)),
+    "no warning about a deliberate side-state",
+  );
 });
 
 test("CR-10 — one ladder scan serves rankOf, resolveMoment and planMove", () => {
@@ -906,7 +993,11 @@ test("CR-10 — one ladder scan serves rankOf, resolveMoment and planMove", () =
   // inputs rather than trusting that they still match by inspection.
   const wf = fromYaml(BESPOKE);
   for (const probe of ["🚧 In Progress", "  in progress  ", "IN PROGRESS"]) {
-    assert.equal(rankOf(probe, wf), 2, `rankOf mishandled ${JSON.stringify(probe)}`);
+    assert.equal(
+      rankOf(probe, wf),
+      2,
+      `rankOf mishandled ${JSON.stringify(probe)}`,
+    );
     assert.deepEqual(
       planMove(probe, "Done", wf).map((r) => r.names[0]),
       ["Waiting for Review", "Ready for Testing", "Ready for Showcase"],
@@ -932,8 +1023,14 @@ documentStatus:
   ready-for-development: Selected for Development
   accepted: Done
 `);
-  assert.equal(resolveDocumentStatus("ready-for-development", wf), "Selected for Development");
-  assert.equal(resolveDocumentStatus("READY-FOR-DEVELOPMENT", wf), "Selected for Development");
+  assert.equal(
+    resolveDocumentStatus("ready-for-development", wf),
+    "Selected for Development",
+  );
+  assert.equal(
+    resolveDocumentStatus("READY-FOR-DEVELOPMENT", wf),
+    "Selected for Development",
+  );
   assert.equal(resolveDocumentStatus("accepted", wf), "Done");
   assert.equal(resolveDocumentStatus("nonexistent", wf), null);
 });
@@ -954,7 +1051,10 @@ test("flow collections — `statuses: [A, B, C]` is rejected and falls back to d
       "'[Backlog, In Progress, Done]' is the worst possible outcome",
   );
   const errs = validateWorkflow(wf).filter((w) => w.level === "error");
-  assert.ok(errs.some((e) => /flow sequence/i.test(e.message)), "and it must say why");
+  assert.ok(
+    errs.some((e) => /flow sequence/i.test(e.message)),
+    "and it must say why",
+  );
 });
 
 test("flow collections — a rung's `names: [A, B]` is rejected with a specific warning", () => {
@@ -964,7 +1064,11 @@ statuses:
   - names: [In Progress, Doing]
   - Done
 `);
-  assert.deepEqual(wf.ladder.map((r) => r.names[0]), ["Backlog", "Done"], "the bad rung is dropped");
+  assert.deepEqual(
+    wf.ladder.map((r) => r.names[0]),
+    ["Backlog", "Done"],
+    "the bad rung is dropped",
+  );
   const errs = validateWorkflow(wf).filter((w) => w.level === "error");
   assert.ok(errs.some((e) => /flow sequence/i.test(e.message)));
 });
@@ -1005,7 +1109,10 @@ test("validate — an off-ladder pipeline target is info, not an error", () => {
 });
 
 test("validate — a clean bespoke workflow produces no errors", () => {
-  assert.deepEqual(validateWorkflow(fromYaml(BESPOKE)).filter((w) => w.level === "error"), []);
+  assert.deepEqual(
+    validateWorkflow(fromYaml(BESPOKE)).filter((w) => w.level === "error"),
+    [],
+  );
 });
 
 test("validate — never throws, even on nonsense", () => {
@@ -1029,12 +1136,17 @@ function repoWith(files) {
 test("load — a missing file yields the default ladder, source 'default', with a pointer", () => {
   const wf = loadWorkflow({ repoRoot: repoWith({}) });
   assert.equal(wf.source, "default");
-  assert.deepEqual(wf.ladder, DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })));
+  assert.deepEqual(
+    wf.ladder,
+    DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })),
+  );
   assert.ok(wf.warnings.some((w) => /built-in default ladder/.test(w.message)));
 });
 
 test("load — a present file is used, source 'file'", () => {
-  const wf = loadWorkflow({ repoRoot: repoWith({ "tracker-workflow.yaml": BESPOKE }) });
+  const wf = loadWorkflow({
+    repoRoot: repoWith({ "tracker-workflow.yaml": BESPOKE }),
+  });
   assert.equal(wf.source, "file");
   assert.equal(rankOf("Ready for Showcase", wf), 5);
 });
@@ -1053,7 +1165,8 @@ test("load — a SCALAR `tracker:` does not crash the loader", () => {
   // `tracker` is documented today as a scalar platform override (`tracker: jira`).
   // A consumer who set it that way must fall back to the default path, not throw.
   const root = repoWith({
-    "skills-config.yaml": "tracker: jira\nprd:\n  prdShardedLocation: docs/prd\n",
+    "skills-config.yaml":
+      "tracker: jira\nprd:\n  prdShardedLocation: docs/prd\n",
     "tracker-workflow.yaml": BESPOKE,
   });
   const wf = loadWorkflow({ repoRoot: root });
@@ -1062,18 +1175,28 @@ test("load — a SCALAR `tracker:` does not crash the loader", () => {
 });
 
 test("load — malformed content yields defaults rather than throwing", () => {
-  const root = repoWith({ "tracker-workflow.yaml": "!!!! not : valid : yaml : at all\n\t\x00" });
+  const root = repoWith({
+    "tracker-workflow.yaml": "!!!! not : valid : yaml : at all\n\t\x00",
+  });
   let wf;
   assert.doesNotThrow(() => {
     wf = loadWorkflow({ repoRoot: root });
   });
-  assert.deepEqual(wf.ladder, DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })));
+  assert.deepEqual(
+    wf.ladder,
+    DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })),
+  );
 });
 
 test("load — a file whose statuses are the wrong shape yields defaults + an error", () => {
-  const root = repoWith({ "tracker-workflow.yaml": "statuses: just-a-string\n" });
+  const root = repoWith({
+    "tracker-workflow.yaml": "statuses: just-a-string\n",
+  });
   const wf = loadWorkflow({ repoRoot: root });
-  assert.deepEqual(wf.ladder, DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })));
+  assert.deepEqual(
+    wf.ladder,
+    DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })),
+  );
   assert.ok(validateWorkflow(wf).some((w) => w.level === "error"));
 });
 
@@ -1091,8 +1214,13 @@ test("load — an unreadable file yields defaults rather than throwing", () => {
 });
 
 test("load — an empty file yields defaults", () => {
-  const wf = loadWorkflow({ repoRoot: repoWith({ "tracker-workflow.yaml": "" }) });
-  assert.deepEqual(wf.ladder, DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })));
+  const wf = loadWorkflow({
+    repoRoot: repoWith({ "tracker-workflow.yaml": "" }),
+  });
+  assert.deepEqual(
+    wf.ladder,
+    DEFAULT_LADDER.map((r) => ({ names: r.names.slice() })),
+  );
 });
 
 test("load — every exported function tolerates the default workflow", () => {
@@ -1129,7 +1257,11 @@ test("cache — the file is read once per process, not once per resolution", () 
   } finally {
     fsMod.readFileSync = orig;
   }
-  assert.equal(reads, 1, `expected exactly one read of the workflow file, saw ${reads}`);
+  assert.equal(
+    reads,
+    1,
+    `expected exactly one read of the workflow file, saw ${reads}`,
+  );
 });
 
 test("cache — a cached workflow cannot be poisoned by a caller mutating it", () => {
@@ -1139,7 +1271,11 @@ test("cache — a cached workflow cannot be poisoned by a caller mutating it", (
   a.ladder.length = 0;
   a.pipeline["work-started"] = "Nonsense";
   const b = loadWorkflow({ repoRoot: root });
-  assert.equal(b.ladder.length, 7, "the second caller must not inherit the first's mutation");
+  assert.equal(
+    b.ladder.length,
+    7,
+    "the second caller must not inherit the first's mutation",
+  );
   assert.equal(rankOf("Ready for Showcase", b), 5);
 });
 
@@ -1168,13 +1304,19 @@ test("CR-3 — a wrong-shaped `pipeline:` falls back to defaults, as documented"
   // `pipeline` was reset to {} before its shape was checked, so a scalar disabled
   // every moment while the warning said "ignoring it" and the reference doc
   // promised a fallback. Disabling everything silently is the worse failure.
-  const wf = fromYaml("statuses:\n  - Backlog\n  - In Progress\n  - Done\npipeline: In Progress\n");
+  const wf = fromYaml(
+    "statuses:\n  - Backlog\n  - In Progress\n  - Done\npipeline: In Progress\n",
+  );
   assert.ok(
     resolveMoment("work-started", wf),
     "a malformed pipeline block must not silently switch every moment off",
   );
   assert.ok(resolveMoment("done", wf));
-  assert.ok(validateWorkflow(wf).some((w) => w.level === "error" && /must be a mapping/.test(w.message)));
+  assert.ok(
+    validateWorkflow(wf).some(
+      (w) => w.level === "error" && /must be a mapping/.test(w.message),
+    ),
+  );
 });
 
 test("CR-3 — an explicitly empty `pipeline:` really does disable everything", () => {
@@ -1187,7 +1329,10 @@ test("CR-3 — an explicitly empty `pipeline:` really does disable everything", 
 test("cache — clearWorkflowCache lets a rewritten file be re-read", () => {
   const root = repoWith({ "tracker-workflow.yaml": BESPOKE });
   tw.clearWorkflowCache();
-  assert.equal(rankOf("Ready for Showcase", loadWorkflow({ repoRoot: root })), 5);
+  assert.equal(
+    rankOf("Ready for Showcase", loadWorkflow({ repoRoot: root })),
+    5,
+  );
   writeFileSync(join(root, "tracker-workflow.yaml"), "statuses:\n  - Only\n");
   tw.clearWorkflowCache();
   const wf = loadWorkflow({ repoRoot: root });
@@ -1217,12 +1362,18 @@ test("purity — loading the module does not pull jira-sync.js into the graph", 
     "a GitHub-only consumer must never pull the Jira client in behind this module. Loaded:\n" +
       loaded,
   );
-  assert.ok(/yaml-subset\.js/.test(loaded), "but it does load the shared parser it depends on");
+  assert.ok(
+    /yaml-subset\.js/.test(loaded),
+    "but it does load the shared parser it depends on",
+  );
 });
 
 test("purity — the only shell-out is git rev-parse --show-toplevel", () => {
   const { readFileSync } = require("node:fs");
-  const src = readFileSync(join(__dirname, "..", "tracker-workflow.js"), "utf-8");
+  const src = readFileSync(
+    join(__dirname, "..", "tracker-workflow.js"),
+    "utf-8",
+  );
   const calls = [...src.matchAll(/execSync\(\s*"([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(calls, ["git rev-parse --show-toplevel"]);
 });
@@ -1257,12 +1408,21 @@ test("shipped template — the reference doc shows it byte-for-byte", () => {
   // files, which is exactly the shape of thing that drifts unnoticed.
   const { readFileSync } = require("node:fs");
   const docsRoot = join(__dirname, "..", "..", "..", "docs");
-  const template = readFileSync(join(docsRoot, "examples", "tracker-workflow.default.yaml"), "utf-8");
-  const doc = readFileSync(join(docsRoot, "reference", "tracker-workflow.md"), "utf-8");
+  const template = readFileSync(
+    join(docsRoot, "examples", "tracker-workflow.default.yaml"),
+    "utf-8",
+  );
+  const doc = readFileSync(
+    join(docsRoot, "reference", "tracker-workflow.md"),
+    "utf-8",
+  );
 
   const marker = "## The shipped template";
   const start = doc.indexOf(marker);
-  assert.ok(start !== -1, "the reference doc must have a `## The shipped template` section");
+  assert.ok(
+    start !== -1,
+    "the reference doc must have a `## The shipped template` section",
+  );
   const fenceStart = doc.indexOf("```yaml\n", start) + "```yaml\n".length;
   const fenceEnd = doc.indexOf("\n```", fenceStart) + 1;
   const shown = doc.slice(fenceStart, fenceEnd);
@@ -1276,11 +1436,25 @@ test("shipped template — the reference doc shows it byte-for-byte", () => {
 
 test("shipped template — docs/examples/tracker-workflow.default.yaml parses cleanly", () => {
   const { readFileSync } = require("node:fs");
-  const p = join(__dirname, "..", "..", "..", "docs", "examples", "tracker-workflow.default.yaml");
+  const p = join(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "docs",
+    "examples",
+    "tracker-workflow.default.yaml",
+  );
   const wf = fromYaml(readFileSync(p, "utf-8"));
-  assert.deepEqual(validateWorkflow(wf).filter((w) => w.level === "error"), []);
+  assert.deepEqual(
+    validateWorkflow(wf).filter((w) => w.level === "error"),
+    [],
+  );
   for (const moment of Object.keys(wf.pipeline)) {
-    assert.ok(MOMENTS.includes(moment), `template names only real moments (${moment})`);
+    assert.ok(
+      MOMENTS.includes(moment),
+      `template names only real moments (${moment})`,
+    );
   }
   assert.ok(
     !("changes-requested" in wf.pipeline) && !("pr-merged" in wf.pipeline),

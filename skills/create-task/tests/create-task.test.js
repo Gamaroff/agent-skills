@@ -11,7 +11,12 @@ const assert = require("node:assert/strict");
 
 const lib = require("../scripts/lib.js");
 
-const TEMPLATE_PATH = path.join(__dirname, "..", "resources", "task-template.md");
+const TEMPLATE_PATH = path.join(
+  __dirname,
+  "..",
+  "resources",
+  "task-template.md",
+);
 
 // ===========================================================================
 // validateTaskFilename
@@ -24,7 +29,9 @@ test("validateTaskFilename — happy path", () => {
 });
 
 test("validateTaskFilename — multi-digit id", () => {
-  const r = lib.validateTaskFilename("task.42.nestjs-dynamic-module-pattern.md");
+  const r = lib.validateTaskFilename(
+    "task.42.nestjs-dynamic-module-pattern.md",
+  );
   assert.equal(r.ok, true);
   assert.equal(r.id, 42);
 });
@@ -73,19 +80,25 @@ test("validatePlanFilename — rejects missing 'plan' marker", () => {
 test("scanExistingTaskIds — picks up flat files + dirs", () => {
   const ids = lib.scanExistingTaskIds([
     "task.1.foo.md",
-    "task.2.bar",          // directory
+    "task.2.bar", // directory
     "task.5.baz.md",
     "epic.42.unrelated.md", // ignored
-    "README.md",            // ignored
+    "README.md", // ignored
   ]);
-  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 2, 5]);
+  assert.deepEqual(
+    [...ids].sort((a, b) => a - b),
+    [1, 2, 5],
+  );
 });
 
 test("nextTaskId — fills lowest gap", () => {
   assert.equal(lib.nextTaskId([]), 1);
   assert.equal(lib.nextTaskId(["task.1.a.md"]), 2);
   assert.equal(lib.nextTaskId(["task.1.a.md", "task.3.c.md"]), 2);
-  assert.equal(lib.nextTaskId(["task.1.a.md", "task.2.b.md", "task.3.c.md"]), 4);
+  assert.equal(
+    lib.nextTaskId(["task.1.a.md", "task.2.b.md", "task.3.c.md"]),
+    4,
+  );
 });
 
 test("assertUniqueTaskId — HALTs on collision", () => {
@@ -171,7 +184,10 @@ test("populateTaskTemplate — fills title, id, date, metadata", () => {
 });
 
 test("populateTaskTemplate — HALTs on missing required answer", () => {
-  assert.throws(() => lib.populateTaskTemplate("template", {}), /missing required answer/);
+  assert.throws(
+    () => lib.populateTaskTemplate("template", {}),
+    /missing required answer/,
+  );
   assert.throws(
     () => lib.populateTaskTemplate("template", { task_title: "X" }),
     /missing required answer "task_id"/,
@@ -179,15 +195,24 @@ test("populateTaskTemplate — HALTs on missing required answer", () => {
 });
 
 test("populateTaskTemplate — rejects non-string template", () => {
-  assert.throws(() => lib.populateTaskTemplate(null, {}), /template must be string/);
+  assert.throws(
+    () => lib.populateTaskTemplate(null, {}),
+    /template must be string/,
+  );
 });
 
 // ===========================================================================
 // mergeSprintStatus
 // ===========================================================================
 test("mergeSprintStatus — appends to empty file", () => {
-  const out = lib.mergeSprintStatus("", { id: "task.1.foo", status: "ready-for-dev" });
-  assert.match(out, /tasks:\n {2}- id: task\.1\.foo\n {4}status: ready-for-dev/);
+  const out = lib.mergeSprintStatus("", {
+    id: "task.1.foo",
+    status: "ready-for-dev",
+  });
+  assert.match(
+    out,
+    /tasks:\n {2}- id: task\.1\.foo\n {4}status: ready-for-dev/,
+  );
 });
 
 test("mergeSprintStatus — appends to existing tasks list without reordering", () => {
@@ -198,12 +223,19 @@ tasks:
   - id: task.2.bar
     status: in-progress
 `;
-  const out = lib.mergeSprintStatus(input, { id: "task.3.baz", status: "ready-for-dev" });
+  const out = lib.mergeSprintStatus(input, {
+    id: "task.3.baz",
+    status: "ready-for-dev",
+  });
   const lines = out.split("\n");
   // Existing entries unchanged.
   assert.ok(out.includes("# Sprint status — preserved comment"));
-  assert.ok(lines.indexOf("  - id: task.1.foo") < lines.indexOf("  - id: task.2.bar"));
-  assert.ok(lines.indexOf("  - id: task.2.bar") < lines.indexOf("  - id: task.3.baz"));
+  assert.ok(
+    lines.indexOf("  - id: task.1.foo") < lines.indexOf("  - id: task.2.bar"),
+  );
+  assert.ok(
+    lines.indexOf("  - id: task.2.bar") < lines.indexOf("  - id: task.3.baz"),
+  );
   assert.match(out, /- id: task\.3\.baz\n {4}status: ready-for-dev/);
 });
 
@@ -214,7 +246,10 @@ test("mergeSprintStatus — updates status of existing entry in place", () => {
   - id: task.2.bar
     status: ready-for-dev
 `;
-  const out = lib.mergeSprintStatus(input, { id: "task.1.foo", status: "done" });
+  const out = lib.mergeSprintStatus(input, {
+    id: "task.1.foo",
+    status: "done",
+  });
   assert.match(out, /- id: task\.1\.foo\n {4}status: done/);
   // task.2 unchanged.
   assert.match(out, /- id: task\.2\.bar\n {4}status: ready-for-dev/);
@@ -224,9 +259,15 @@ test("mergeSprintStatus — updates status of existing entry in place", () => {
 });
 
 test("mergeSprintStatus — rejects malformed input", () => {
-  assert.throws(() => lib.mergeSprintStatus(null, { id: "x", status: "y" }), /yaml must be string/);
+  assert.throws(
+    () => lib.mergeSprintStatus(null, { id: "x", status: "y" }),
+    /yaml must be string/,
+  );
   assert.throws(() => lib.mergeSprintStatus("", null), /entry must be object/);
-  assert.throws(() => lib.mergeSprintStatus("", { id: "x" }), /requires id \+ status/);
+  assert.throws(
+    () => lib.mergeSprintStatus("", { id: "x" }),
+    /requires id \+ status/,
+  );
 });
 
 // ===========================================================================
@@ -264,8 +305,16 @@ test("populateTaskTemplate — assignee is optional and defaults to the template
     estimated_effort_hours: 1,
   });
 
-  assert.match(out, /^assignee:(?: |$)/m, "the key must survive so it is discoverable");
-  assert.doesNotMatch(out, /^assignee: TBD$/m, "the placeholder that caused the 400 must not return");
+  assert.match(
+    out,
+    /^assignee:(?: |$)/m,
+    "the key must survive so it is discoverable",
+  );
+  assert.doesNotMatch(
+    out,
+    /^assignee: TBD$/m,
+    "the placeholder that caused the 400 must not return",
+  );
 });
 
 test("task template ships no placeholder assignee", () => {
@@ -274,5 +323,9 @@ test("task template ships no placeholder assignee", () => {
   const template = fs.readFileSync(TEMPLATE_PATH, "utf-8");
   const m = template.match(/^assignee:[ \t]*([^\n#]*)/m);
   assert.ok(m, "the template must still declare an assignee key");
-  assert.equal(m[1].trim(), "", "the shipped value must be blank, never a placeholder");
+  assert.equal(
+    m[1].trim(),
+    "",
+    "the shipped value must be blank, never a placeholder",
+  );
 });

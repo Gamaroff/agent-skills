@@ -27,7 +27,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const REPO = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
 const WIZARD = path.join(REPO, "scripts", "setup-consumer.sh");
 const CRED = ".secrets/tooling.env";
 
@@ -42,7 +45,13 @@ const LINES = [
 // the temp directory lets `finally` delete it first, after which every
 // existence check answers "absent" and every absence assertion passes for the
 // wrong reason. Read inside the try, return plain data.
-const SNAPSHOT_PATHS = [CRED, ".env", ".env.example", ".gitignore", ".secrets/tooling.env.example"];
+const SNAPSHOT_PATHS = [
+  CRED,
+  ".env",
+  ".env.example",
+  ".gitignore",
+  ".secrets/tooling.env.example",
+];
 
 // Drive write_env_files in isolation against a throwaway repo root.
 // `seed` pre-creates files; `input` answers the prompts.
@@ -108,7 +117,9 @@ test("the gitignore rule covers .secrets/ AND .env", () => {
 });
 
 test("an existing .gitignore is appended to, not replaced", () => {
-  const gi = runWizard({ seed: { ".gitignore": "node_modules/\ndist/\n" } }).read(".gitignore");
+  const gi = runWizard({
+    seed: { ".gitignore": "node_modules/\ndist/\n" },
+  }).read(".gitignore");
   assert.match(gi, /node_modules\//, "pre-existing rules must survive");
   assert.match(gi, /^\.secrets\/$/m);
   assert.match(gi, /^\.env$/m);
@@ -117,17 +128,28 @@ test("an existing .gitignore is appended to, not replaced", () => {
 test("a .gitignore whose last line is unterminated does not absorb the new rule", () => {
   // "dist/" + ".secrets/" = "dist/.secrets/", a rule matching neither path.
   // Silent, and the credential file it was meant to protect ends up tracked.
-  const gi = runWizard({ seed: { ".gitignore": "node_modules/\ndist/" } }).read(".gitignore");
+  const gi = runWizard({ seed: { ".gitignore": "node_modules/\ndist/" } }).read(
+    ".gitignore",
+  );
   assert.match(gi, /^dist\/$/m, "the unterminated line must stay intact");
   assert.match(gi, /^\.secrets\/$/m, ".secrets/ must be its own line");
-  assert.ok(!/dist\/\.secrets/.test(gi), "the rules must not have been concatenated");
+  assert.ok(
+    !/dist\/\.secrets/.test(gi),
+    "the rules must not have been concatenated",
+  );
 });
 
 test("re-running does not duplicate the gitignore rules", () => {
   // The wizard is re-run on every `--update`; a rule appended each time turns
   // a two-line file into a hundred-line one.
-  const gi = runWizard({ seed: { ".gitignore": ".secrets/\n.env\n" } }).read(".gitignore");
-  assert.equal(gi.match(/^\.secrets\/$/gm).length, 1, ".secrets/ must appear once");
+  const gi = runWizard({ seed: { ".gitignore": ".secrets/\n.env\n" } }).read(
+    ".gitignore",
+  );
+  assert.equal(
+    gi.match(/^\.secrets\/$/gm).length,
+    1,
+    ".secrets/ must appear once",
+  );
   assert.equal(gi.match(/^\.env$/gm).length, 1, ".env must appear once");
 });
 
@@ -144,17 +166,36 @@ test("the tracked .env.example is not swallowed by the .secrets/ rule", () => {
 
 test(".env.example names the new location and says .env still works", () => {
   const ex = runWizard().read(".env.example");
-  assert.match(ex, /Copy to \.secrets\/tooling\.env/, "must name the new destination");
-  assert.match(ex, /fallback/i, "must say a root .env is still read, or a migrating consumer panics");
+  assert.match(
+    ex,
+    /Copy to \.secrets\/tooling\.env/,
+    "must name the new destination",
+  );
+  assert.match(
+    ex,
+    /fallback/i,
+    "must say a root .env is still read, or a migrating consumer panics",
+  );
   assert.match(ex, /^JIRA_API_TOKEN=$/m, "keys only, never values");
-  assert.ok(!/ATATTtoken/.test(ex), "the example must never carry a real value");
+  assert.ok(
+    !/ATATTtoken/.test(ex),
+    "the example must never carry a real value",
+  );
 });
 
 test("an existing .env holding credentials is reported and left byte-identical", () => {
   const original = "JIRA_API_TOKEN=ATATTexisting\nSOMETHING_ELSE=1\n";
   const r = runWizard({ seed: { ".env": original } });
-  assert.equal(r.read(".env"), original, "the wizard must never move or rewrite a live .env");
-  assert.match(r.out, /mv \.env \.secrets\/tooling\.env/, "must print the exact migration command");
+  assert.equal(
+    r.read(".env"),
+    original,
+    "the wizard must never move or rewrite a live .env",
+  );
+  assert.match(
+    r.out,
+    /mv \.env \.secrets\/tooling\.env/,
+    "must print the exact migration command",
+  );
   assert.ok(r.exists(CRED), "the new file is still written alongside it");
 });
 
@@ -172,21 +213,39 @@ test("declining the overwrite keeps an existing .secrets/tooling.env", () => {
   const original = "JIRA_API_TOKEN=ATATTkeepme\n";
   // Prompts: overwrite? -> "n". The write prompt is never reached.
   const r = runWizard({ seed: { [CRED]: original }, input: "n\n" });
-  assert.equal(r.read(CRED), original, "declining must not clobber live credentials");
+  assert.equal(
+    r.read(CRED),
+    original,
+    "declining must not clobber live credentials",
+  );
   // Content alone does not prove the guard ran: with the guard removed, "n"
   // answers the *write* prompt instead and the file is equally untouched. Pin
   // the guard by the branch it takes, or this passes for the wrong reason.
   assert.match(r.out, /already exists/, "the overwrite guard must have fired");
-  assert.match(r.out, /existing file kept/, "must take the kept-existing branch");
+  assert.match(
+    r.out,
+    /existing file kept/,
+    "must take the kept-existing branch",
+  );
 });
 
 test("accepting the overwrite replaces it", () => {
-  const r = runWizard({ seed: { [CRED]: "JIRA_API_TOKEN=ATATTold\n" }, input: "y\n\n" });
-  assert.match(r.read(CRED), /ATATTtoken/, "accepting must write the new values");
+  const r = runWizard({
+    seed: { [CRED]: "JIRA_API_TOKEN=ATATTold\n" },
+    input: "y\n\n",
+  });
+  assert.match(
+    r.read(CRED),
+    /ATATTtoken/,
+    "accepting must write the new values",
+  );
   assert.ok(!/ATATTold/.test(r.read(CRED)), "the old value must be gone");
 });
 
 test("declining the write leaves no credential file at all", () => {
   const r = runWizard({ input: "n\n" });
-  assert.ok(!r.exists(CRED), "a declined write must not produce a half-formed credential file");
+  assert.ok(
+    !r.exists(CRED),
+    "a declined write must not produce a half-formed credential file",
+  );
 });
