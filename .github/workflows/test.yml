@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Ahead of the suite deliberately: a formatting failure should cost
+      # seconds, not a full test run plus the replay evals. Fix with
+      # `npm run format` — prettier is already a devDependency.
+      - name: Formatting
+        run: npm run format:check
+
       - name: Hermetic test suite (L1–L4)
         run: npm test
 

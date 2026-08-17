@@ -174,7 +174,10 @@ function inlineCodeRanges(content) {
       if (used.has(i)) continue;
       for (let j = i + 1; j < runs.length; j++) {
         if (used.has(j) || runs[j].len !== runs[i].len) continue;
-        ranges.push([offset + runs[i].index, offset + runs[j].index + runs[j].len]);
+        ranges.push([
+          offset + runs[i].index,
+          offset + runs[j].index + runs[j].len,
+        ]);
         used.add(i);
         used.add(j);
         break;
@@ -237,13 +240,15 @@ function migrateLegacyRow(row, { legacyAuthor = "", docType = "" } = {}) {
       date: (cells[0] || "").slice(0, 10),
       version: "",
       description: [cells[1], cells[2]].filter(Boolean).join(" — "),
-      author: legacyAuthor && docType ? `${legacyAuthor}-${docType}` : legacyAuthor,
+      author:
+        legacyAuthor && docType ? `${legacyAuthor}-${docType}` : legacyAuthor,
     });
   }
 
   const date = (cells[0] || "").slice(0, 10); // drop the legacy HH:MM
   const description = cells[1] || "";
-  const author = legacyAuthor && docType ? `${legacyAuthor}-${docType}` : legacyAuthor;
+  const author =
+    legacyAuthor && docType ? `${legacyAuthor}-${docType}` : legacyAuthor;
   return fmtEntry({ date, version: "", description, author });
 }
 
@@ -415,7 +420,10 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
         !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(l),
     );
     const migrated = found.legacyAuthor
-      ? migrateLegacyEntries(existing, { legacyAuthor: found.legacyAuthor, docType })
+      ? migrateLegacyEntries(existing, {
+          legacyAuthor: found.legacyAuthor,
+          docType,
+        })
       : existing;
 
     // A document synced to both trackers carries a second legacy block. Collapse
@@ -458,7 +466,9 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     // separators stack up (up to three blank lines observed) and accumulate
     // across writes.
     const trailing = found.end < content.length ? "\n\n" : "\n";
-    return trimSeam(head.content.replace(/\n+$/, "\n") + block + trailing + tail.content);
+    return trimSeam(
+      head.content.replace(/\n+$/, "\n") + block + trailing + tail.content,
+    );
   }
 
   const anchor = ANCHORS[docType];
@@ -512,9 +522,17 @@ function collapseOtherLegacyBlocks(rest, docType, alreadyMigrated) {
 
     // Loop: a slice may hold more than one block of the same pair.
     for (;;) {
-      const found = findMarkerBlock(out, protectedRanges(out), pair.start, pair.end);
+      const found = findMarkerBlock(
+        out,
+        protectedRanges(out),
+        pair.start,
+        pair.end,
+      );
       if (!found) break;
-      const rows = out.slice(found.start, found.end).split("\n").filter(isEntryRow);
+      const rows = out
+        .slice(found.start, found.end)
+        .split("\n")
+        .filter(isEntryRow);
       // Rows from a current-format block are already canonical, so
       // migrateLegacyEntries returns them untouched via its `>= 4 cells` guard.
       entries.push(

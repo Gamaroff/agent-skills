@@ -125,7 +125,10 @@ test("Step 3 now owns reproduce + the new->in-progress transition + non-repro HA
 
 test("Step 3 sets ready-for-qa and requires a failing-without/passing-with regression test", () => {
   assert.match(STEP3, /ready-for-qa/);
-  assert.match(STEP3, /fails? (on the )?(current|pre-fix)|fails on the current code/i);
+  assert.match(
+    STEP3,
+    /fails? (on the )?(current|pre-fix)|fails on the current code/i,
+  );
 });
 
 test("Step 5-6 verify loop is bounded at 5 cycles and reopens on FAIL", () => {

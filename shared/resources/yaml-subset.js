@@ -57,7 +57,10 @@ function significantLines(text) {
   for (const raw of text.split(/\r?\n/)) {
     const noComment = stripComment(raw);
     if (!noComment.trim()) continue;
-    out.push({ indent: noComment.match(/^\s*/)[0].length, text: noComment.trim() });
+    out.push({
+      indent: noComment.match(/^\s*/)[0].length,
+      text: noComment.trim(),
+    });
   }
   return out;
 }
@@ -77,10 +80,18 @@ const KEY_PREFIX_RE = /^(?:"[^"]+"|'[^']+'|[\w.-]+)\s*:/;
 
 function parseBlock(rows, start, indent) {
   // Decide list vs map by the first row at this indent.
-  if (start < rows.length && rows[start].indent === indent && rows[start].text.startsWith("- ")) {
+  if (
+    start < rows.length &&
+    rows[start].indent === indent &&
+    rows[start].text.startsWith("- ")
+  ) {
     const arr = [];
     let i = start;
-    while (i < rows.length && rows[i].indent === indent && rows[i].text.startsWith("- ")) {
+    while (
+      i < rows.length &&
+      rows[i].indent === indent &&
+      rows[i].text.startsWith("- ")
+    ) {
       const inline = rows[i].text.slice(2).trim();
       // `- key: value` starts a map entry whose siblings are indented further.
       if (KEY_PREFIX_RE.test(inline)) {

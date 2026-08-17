@@ -39,7 +39,9 @@ const { parseYamlSubset } = require(join(__dirname, "..", "yaml-subset.js"));
 // ── 1. Contract: the shapes skills-config.yaml actually uses ─────────────────
 
 test("contract — nested maps parse to nested objects", () => {
-  const out = parseYamlSubset(["prd:", "  prdShardedLocation: docs/prd", ""].join("\n"));
+  const out = parseYamlSubset(
+    ["prd:", "  prdShardedLocation: docs/prd", ""].join("\n"),
+  );
   assert.deepEqual(out, { prd: { prdShardedLocation: "docs/prd" } });
 });
 
@@ -62,7 +64,14 @@ test("contract — a list of scalars parses to an array", () => {
 
 test("contract — a list of maps parses to an array of objects", () => {
   const out = parseYamlSubset(
-    ["items:", "  - name: a", "    weight: 2", "  - name: b", "    weight: 3", ""].join("\n"),
+    [
+      "items:",
+      "  - name: a",
+      "    weight: 2",
+      "  - name: b",
+      "    weight: 3",
+      "",
+    ].join("\n"),
   );
   assert.deepEqual(out, {
     items: [
@@ -77,12 +86,22 @@ test("contract — the real dogfood skills-config.yaml parses to its known shape
   // construct this parser cannot read, that is a fact worth failing on.
   const { readFileSync } = require("node:fs");
   const cfg = parseYamlSubset(
-    readFileSync(join(__dirname, "..", "..", "..", "skills-config.yaml"), "utf-8"),
+    readFileSync(
+      join(__dirname, "..", "..", "..", "skills-config.yaml"),
+      "utf-8",
+    ),
   );
   assert.equal(cfg.prd.prdShardedLocation, "docs/prd");
-  assert.equal(cfg.architecture.architectureShardedLocation, "docs/architecture");
+  assert.equal(
+    cfg.architecture.architectureShardedLocation,
+    "docs/architecture",
+  );
   assert.equal(cfg.devLoadAlwaysFiles.length, 3);
-  assert.ok(cfg.devLoadAlwaysFiles.every((f) => typeof f === "string" && f.endsWith(".md")));
+  assert.ok(
+    cfg.devLoadAlwaysFiles.every(
+      (f) => typeof f === "string" && f.endsWith(".md"),
+    ),
+  );
 });
 
 test("contract — scalar coercion: bool, null, ~, int, float, quoted", () => {
@@ -165,7 +184,9 @@ test("limit — flow sequences are NOT supported and come back as strings", () =
 });
 
 test("limit — a flow sequence nested in a list item is a string too", () => {
-  const out = parseYamlSubset(["statuses:", "  - names: [In Progress, Doing]", ""].join("\n"));
+  const out = parseYamlSubset(
+    ["statuses:", "  - names: [In Progress, Doing]", ""].join("\n"),
+  );
   assert.deepEqual(out.statuses, [{ names: "[In Progress, Doing]" }]);
 });
 
@@ -173,7 +194,13 @@ test("limit — a flow sequence nested in a list item is a string too", () => {
 
 test("quoted keys — a double-quoted key containing / and spaces round-trips", () => {
   const out = parseYamlSubset(
-    ['byIssueType:', '  "IT / DevOps Task":', "    pipeline:", "      in-qa: ~", ""].join("\n"),
+    [
+      "byIssueType:",
+      '  "IT / DevOps Task":',
+      "    pipeline:",
+      "      in-qa: ~",
+      "",
+    ].join("\n"),
   );
   assert.deepEqual(out, {
     byIssueType: { "IT / DevOps Task": { pipeline: { "in-qa": null } } },
@@ -181,19 +208,23 @@ test("quoted keys — a double-quoted key containing / and spaces round-trips", 
 });
 
 test("quoted keys — a single-quoted key round-trips", () => {
-  const out = parseYamlSubset(["m:", "  'Sub-task / Bug':", "    a: 1", ""].join("\n"));
+  const out = parseYamlSubset(
+    ["m:", "  'Sub-task / Bug':", "    a: 1", ""].join("\n"),
+  );
   assert.deepEqual(out, { m: { "Sub-task / Bug": { a: 1 } } });
 });
 
 test("quoted keys — a quoted key with an inline scalar value works", () => {
-  const out = parseYamlSubset(['"IT / DevOps Task": In Progress', ""].join("\n"));
+  const out = parseYamlSubset(
+    ['"IT / DevOps Task": In Progress', ""].join("\n"),
+  );
   assert.deepEqual(out, { "IT / DevOps Task": "In Progress" });
 });
 
 test("quoted keys — the quoted key is NOT dropped (the pre-fix behaviour)", () => {
   // Before the extension this produced {} — the whole overlay vanished with no error.
   // Task 37 §10 rated this "Medium probability"; it was certain.
-  const out = parseYamlSubset(['a:', '  "X / Y":', "    b: 1", ""].join("\n"));
+  const out = parseYamlSubset(["a:", '  "X / Y":', "    b: 1", ""].join("\n"));
   assert.notDeepEqual(out.a, {}, "quoted key must not be silently skipped");
 });
 

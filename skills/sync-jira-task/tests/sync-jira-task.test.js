@@ -100,10 +100,11 @@ test("parseFrontmatter — missing close tag returns full content as body", () =
 // back to end-of-document. These calls pass no docType, so this takes the EOF path.
 test("upsertChangeLog — inserts at EOF when no changelog and no anchor exists", () => {
   const src = `# Title\n\nIntro.\n\n## Section\n\nbody\n`;
-  const out = lib.upsertChangeLog(
-    src,
-    { date: "2026-07-31", description: "Initial Jira task created", author: "sync-jira" },
-  );
+  const out = lib.upsertChangeLog(src, {
+    date: "2026-07-31",
+    description: "Initial Jira task created",
+    author: "sync-jira",
+  });
   assert.ok(out.includes(lib.CL_START));
   assert.ok(out.includes(lib.CL_END));
   assert.ok(
@@ -113,11 +114,16 @@ test("upsertChangeLog — inserts at EOF when no changelog and no anchor exists"
 });
 
 test("upsertChangeLog — appends entry within existing markers", () => {
-  const initial = lib.upsertChangeLog(
-    `# T\n\n## S\n\nbody\n`,
-    { date: "2026-07-31", description: "Entry one", author: "sync-jira" },
-  );
-  const out = lib.upsertChangeLog(initial, { date: "2026-07-31", description: "Entry two", author: "sync-jira" });
+  const initial = lib.upsertChangeLog(`# T\n\n## S\n\nbody\n`, {
+    date: "2026-07-31",
+    description: "Entry one",
+    author: "sync-jira",
+  });
+  const out = lib.upsertChangeLog(initial, {
+    date: "2026-07-31",
+    description: "Entry two",
+    author: "sync-jira",
+  });
   assert.match(out, /Entry one/);
   assert.match(out, /Entry two/);
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
@@ -137,7 +143,11 @@ test("upsertChangeLog — preserves entries from hand-written `## Change Log` he
 
 stuff
 `;
-  const out = lib.upsertChangeLog(src, { date: "2026-07-31", description: "New auto entry", author: "sync-jira" });
+  const out = lib.upsertChangeLog(src, {
+    date: "2026-07-31",
+    description: "New auto entry",
+    author: "sync-jira",
+  });
   assert.equal(
     out.match(/## Change Log/g).length,
     1,
@@ -152,9 +162,21 @@ stuff
 
 test("upsertChangeLog — idempotent format on repeated wrapping", () => {
   let out = `# T\n\nbody\n`;
-  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "a", author: "sync-jira" });
-  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "b", author: "sync-jira" });
-  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "c", author: "sync-jira" });
+  out = lib.upsertChangeLog(out, {
+    date: "2026-07-31",
+    description: "a",
+    author: "sync-jira",
+  });
+  out = lib.upsertChangeLog(out, {
+    date: "2026-07-31",
+    description: "b",
+    author: "sync-jira",
+  });
+  out = lib.upsertChangeLog(out, {
+    date: "2026-07-31",
+    description: "c",
+    author: "sync-jira",
+  });
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
   assert.equal(out.match(new RegExp(lib.CL_END, "g")).length, 1);
 });
@@ -353,7 +375,12 @@ Refactor cache layer.
   });
   assert.equal(doc.type, "doc");
   assert.equal(doc.version, 1);
-  assert.deepEqual(headingsOf(doc), ["Summary", "Success Criteria", "Metadata", "Source Documents"]);
+  assert.deepEqual(headingsOf(doc), [
+    "Summary",
+    "Success Criteria",
+    "Metadata",
+    "Source Documents",
+  ]);
   // Links come LAST and the task file leads them.
   const bullet = doc.content.filter((n) => n.type === "bulletList").at(-1);
   assert.ok(bullet, "source-doc bullet list present");
@@ -372,7 +399,10 @@ test("buildDescriptionAdf — never publishes the document's Change Log", () => 
     taskBbUrl: null,
   });
   assert.ok(!headingsOf(doc).includes("Change Log"));
-  assert.ok(!doc.content.some((n) => n.type === "table"), "no changelog table on the card");
+  assert.ok(
+    !doc.content.some((n) => n.type === "table"),
+    "no changelog table on the card",
+  );
 });
 
 test("buildDescriptionAdf — publishes only the card sections, not the whole document", () => {
@@ -405,7 +435,11 @@ High risk: thing.
 
 Revert commit.
 `;
-  const doc = lib.buildDescriptionAdf({ body, frontmatter: {}, taskBbUrl: null });
+  const doc = lib.buildDescriptionAdf({
+    body,
+    frontmatter: {},
+    taskBbUrl: null,
+  });
   assert.deepEqual(headingsOf(doc), ["Summary", "Success Criteria"]);
 });
 
@@ -416,14 +450,16 @@ test("buildDescriptionAdf — Breaking Changes appears only when present, and ne
   const warnings = [];
   const withBc = lib.buildDescriptionAdf({
     body: "## Overview\n\nSummary.\n\n## Breaking Changes\n\n- API v1 removed\n",
-    frontmatter: {}, taskBbUrl: null,
+    frontmatter: {},
+    taskBbUrl: null,
     output: { warn: (m) => warnings.push(String(m)) },
   });
   assert.deepEqual(headingsOf(withBc), ["Summary", "Breaking Changes"]);
 
   const without = lib.buildDescriptionAdf({
     body: "## Overview\n\nSummary.\n",
-    frontmatter: {}, taskBbUrl: null,
+    frontmatter: {},
+    taskBbUrl: null,
     output: { warn: (m) => warnings.push(String(m)) },
   });
   assert.deepEqual(headingsOf(without), ["Summary"]);
@@ -1498,12 +1534,39 @@ test("buildDescriptionAdf — rewrites a relative in-body link via linkResolver"
 // Workflow-agnostic transition resolution
 // ---------------------------------------------------------------------------
 const TR = {
-  start:      { id: "11",  name: "In Progress", to: { name: "In Progress", statusCategory: { key: "indeterminate" } } },
-  implemented:{ id: "21",  name: "Implemented", to: { name: "Waiting for Review", statusCategory: { key: "indeterminate" } } },
-  backToDev:  { id: "101", name: "Selected for Development", to: { name: "Selected for Development", statusCategory: { key: "new" } } },
-  done:       { id: "161", name: "Done", to: { name: "Done", statusCategory: { key: "done" } } },
-  readyTest:  { id: "341", name: "Ready for Testing", to: { name: "Ready for Testing", statusCategory: { key: "indeterminate" } } },
-  cancelled:  { id: "171", name: "Cancel", to: { name: "Cancelled", statusCategory: { key: "done" } } },
+  start: {
+    id: "11",
+    name: "In Progress",
+    to: { name: "In Progress", statusCategory: { key: "indeterminate" } },
+  },
+  implemented: {
+    id: "21",
+    name: "Implemented",
+    to: {
+      name: "Waiting for Review",
+      statusCategory: { key: "indeterminate" },
+    },
+  },
+  backToDev: {
+    id: "101",
+    name: "Selected for Development",
+    to: { name: "Selected for Development", statusCategory: { key: "new" } },
+  },
+  done: {
+    id: "161",
+    name: "Done",
+    to: { name: "Done", statusCategory: { key: "done" } },
+  },
+  readyTest: {
+    id: "341",
+    name: "Ready for Testing",
+    to: { name: "Ready for Testing", statusCategory: { key: "indeterminate" } },
+  },
+  cancelled: {
+    id: "171",
+    name: "Cancel",
+    to: { name: "Cancelled", statusCategory: { key: "done" } },
+  },
 };
 
 test("resolveTransition — matches to.name, candidates in order", () => {
@@ -1569,12 +1632,16 @@ test("resolveTransition — REGRESSION: never infers a non-terminal target from 
   // to "In Progress" and `in-progress` resolve to "Waiting for Review". A wrong
   // transition is worse than none, so non-terminal statuses must skip instead.
   const r = lib_inner.resolveTransition({
-    transitions: [TR.start],            // sole indeterminate transition
+    transitions: [TR.start], // sole indeterminate transition
     candidates: ["In Review", "Code Review"],
     currentStatus: "Selected for Development",
     terminal: false,
   });
-  assert.equal(r.match, null, "must not fall back to the lone In Progress transition");
+  assert.equal(
+    r.match,
+    null,
+    "must not fall back to the lone In Progress transition",
+  );
   assert.equal(r.reason, "no-transition");
 });
 
@@ -1610,32 +1677,45 @@ test("buildTransitionFields — no required fields leaves the payload untouched"
 });
 
 test("buildTransitionFields — fills a required resolution from allowedValues", () => {
-  const out = lib_inner.buildTransitionFields({ id: "161", fields: RESOLUTION_FIELD });
+  const out = lib_inner.buildTransitionFields({
+    id: "161",
+    fields: RESOLUTION_FIELD,
+  });
   assert.deepEqual(out.fields, { resolution: { id: "10000" } });
   assert.deepEqual(out.unfillable, []);
 });
 
 test("buildTransitionFields — a negative local status picks a negative resolution", () => {
-  const out = lib_inner.buildTransitionFields({ id: "161", fields: RESOLUTION_FIELD }, { negative: true });
+  const out = lib_inner.buildTransitionFields(
+    { id: "161", fields: RESOLUTION_FIELD },
+    { negative: true },
+  );
   assert.deepEqual(out.fields, { resolution: { id: "10001" } }); // Won't Do
 });
 
 test("buildTransitionFields — an explicit preference wins", () => {
   const out = lib_inner.buildTransitionFields(
-    { id: "161", fields: RESOLUTION_FIELD }, { resolutionPref: "Duplicate" });
+    { id: "161", fields: RESOLUTION_FIELD },
+    { resolutionPref: "Duplicate" },
+  );
   assert.deepEqual(out.fields, { resolution: { id: "10002" } });
 });
 
 test("buildTransitionFields — unknown preference falls back to what the workflow offers", () => {
   const out = lib_inner.buildTransitionFields(
-    { id: "161", fields: RESOLUTION_FIELD }, { resolutionPref: "Not A Real Resolution" });
+    { id: "161", fields: RESOLUTION_FIELD },
+    { resolutionPref: "Not A Real Resolution" },
+  );
   assert.deepEqual(out.fields, { resolution: { id: "10000" } });
 });
 
 test("buildTransitionFields — a required field it cannot fill is reported, not invented", () => {
   const out = lib_inner.buildTransitionFields({
     id: "161",
-    fields: { ...RESOLUTION_FIELD, customfield_10050: { required: true, allowedValues: [] } },
+    fields: {
+      ...RESOLUTION_FIELD,
+      customfield_10050: { required: true, allowedValues: [] },
+    },
   });
   assert.deepEqual(out.unfillable, ["customfield_10050"]);
 });
@@ -1646,11 +1726,16 @@ test("buildTransitionFields — a required field it cannot fill is reported, not
 function transitionHarness(transitions, { postStatus = 204 } = {}) {
   const calls = [];
   const fetchImpl = async (url, opts) => {
-    calls.push({ url, method: (opts && opts.method) || "GET", body: opts && opts.body });
+    calls.push({
+      url,
+      method: (opts && opts.method) || "GET",
+      body: opts && opts.body,
+    });
     if (!opts || !opts.method || opts.method === "GET")
       return { ok: true, status: 200, json: async () => ({ transitions }) };
     return {
-      ok: postStatus < 400, status: postStatus,
+      ok: postStatus < 400,
+      status: postStatus,
       json: async () => ({ errorMessages: ["Field 'resolution' is required"] }),
       text: async () => "",
     };
@@ -1658,30 +1743,56 @@ function transitionHarness(transitions, { postStatus = 204 } = {}) {
   return { calls, http: lib_inner.makeHttp({ fetchImpl }) };
 }
 
-const BASE = { baseUrl: "https://j", email: "e", token: "t", issueKey: "PROJ-1" };
+const BASE = {
+  baseUrl: "https://j",
+  email: "e",
+  token: "t",
+  issueKey: "PROJ-1",
+};
 
 test("transitionToStatus — asks Jira for the transition field schema", async () => {
   const { calls, http } = transitionHarness([TR.start]);
-  await lib_inner.transitionToStatus({ ...BASE, http, targetStatus: ["In Progress"], currentStatus: "To Do" });
-  assert.match(calls[0].url, /expand=transitions\.fields/,
-    "without the expand, required fields are invisible and the POST 400s blind");
+  await lib_inner.transitionToStatus({
+    ...BASE,
+    http,
+    targetStatus: ["In Progress"],
+    currentStatus: "To Do",
+  });
+  assert.match(
+    calls[0].url,
+    /expand=transitions\.fields/,
+    "without the expand, required fields are invisible and the POST 400s blind",
+  );
 });
 
 test("transitionToStatus — sends a resolution when the transition requires one", async () => {
-  const { calls, http } = transitionHarness([{ ...TR.done, fields: RESOLUTION_FIELD }]);
+  const { calls, http } = transitionHarness([
+    { ...TR.done, fields: RESOLUTION_FIELD },
+  ]);
   const out = await lib_inner.transitionToStatus({
-    ...BASE, http, targetStatus: ["Done"], currentStatus: "In Progress", localStatus: "accepted",
+    ...BASE,
+    http,
+    targetStatus: ["Done"],
+    currentStatus: "In Progress",
+    localStatus: "accepted",
   });
   assert.equal(out.transitioned, true);
   const post = calls.find((c) => c.method === "POST");
-  assert.deepEqual(JSON.parse(post.body), { transition: { id: "161" }, fields: { resolution: { id: "10000" } } });
+  assert.deepEqual(JSON.parse(post.body), {
+    transition: { id: "161" },
+    fields: { resolution: { id: "10000" } },
+  });
 });
 
 test("transitionToStatus — omits `fields` entirely when nothing is required", async () => {
   // Boards without required fields must keep the exact payload they always had.
   const { calls, http } = transitionHarness([TR.start]);
   await lib_inner.transitionToStatus({
-    ...BASE, http, targetStatus: ["In Progress"], currentStatus: "To Do", localStatus: "in-progress",
+    ...BASE,
+    http,
+    targetStatus: ["In Progress"],
+    currentStatus: "To Do",
+    localStatus: "in-progress",
   });
   const post = calls.find((c) => c.method === "POST");
   assert.deepEqual(JSON.parse(post.body), { transition: { id: "11" } });
@@ -1692,28 +1803,50 @@ test("transitionToStatus — refuses to POST when a required field cannot be fil
     { ...TR.done, fields: { approver: { required: true, allowedValues: [] } } },
   ]);
   const out = await lib_inner.transitionToStatus({
-    ...BASE, http, targetStatus: ["Done"], currentStatus: "In Progress", localStatus: "accepted",
+    ...BASE,
+    http,
+    targetStatus: ["Done"],
+    currentStatus: "In Progress",
+    localStatus: "accepted",
   });
   assert.equal(out.transitioned, false);
   assert.equal(out.reason, "required-fields");
   assert.deepEqual(out.unfillable, ["approver"]);
-  assert.equal(calls.filter((c) => c.method === "POST").length, 0, "must not fire a request known to fail");
+  assert.equal(
+    calls.filter((c) => c.method === "POST").length,
+    0,
+    "must not fire a request known to fail",
+  );
 });
 
 test("transitionToStatus — makes no network call at all when already in a candidate status", async () => {
-  const http = lib_inner.makeHttp({ fetchImpl: async () => { throw new Error("should not call fetch"); } });
+  const http = lib_inner.makeHttp({
+    fetchImpl: async () => {
+      throw new Error("should not call fetch");
+    },
+  });
   const out = await lib_inner.transitionToStatus({
-    ...BASE, http, targetStatus: ["To Do", "Selected for Development"],
-    currentStatus: "Selected for Development", localStatus: "planned",
+    ...BASE,
+    http,
+    targetStatus: ["To Do", "Selected for Development"],
+    currentStatus: "Selected for Development",
+    localStatus: "planned",
   });
   assert.equal(out.transitioned, false);
   assert.equal(out.reason, "already");
 });
 
 test("transitionToStatus — a failed POST is reported, never thrown", async () => {
-  const { http } = transitionHarness([{ ...TR.done, fields: RESOLUTION_FIELD }], { postStatus: 400 });
+  const { http } = transitionHarness(
+    [{ ...TR.done, fields: RESOLUTION_FIELD }],
+    { postStatus: 400 },
+  );
   const out = await lib_inner.transitionToStatus({
-    ...BASE, http, targetStatus: ["Done"], currentStatus: "In Progress", localStatus: "accepted",
+    ...BASE,
+    http,
+    targetStatus: ["Done"],
+    currentStatus: "In Progress",
+    localStatus: "accepted",
   });
   assert.equal(out.transitioned, false);
   assert.equal(out.reason, "http-400");
@@ -1725,20 +1858,41 @@ test("transitionToStatus — a failed POST is reported, never thrown", async () 
 test("summariseStatusOutcome — a skip warns and, under --fail-on-status-skip, exits non-zero", () => {
   const warnings = [];
   const output = { warn: (m) => warnings.push(m), info: () => {} };
-  const outcome = { transitioned: false, reason: "no-transition", issueKey: "PROJ-1", localStatus: "accepted", from: "In Progress" };
+  const outcome = {
+    transitioned: false,
+    reason: "no-transition",
+    issueKey: "PROJ-1",
+    localStatus: "accepted",
+    from: "In Progress",
+  };
 
-  assert.equal(lib_inner.summariseStatusOutcome(outcome, { output }), 0, "advisory by default");
+  assert.equal(
+    lib_inner.summariseStatusOutcome(outcome, { output }),
+    0,
+    "advisory by default",
+  );
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /Status NOT synced for PROJ-1/);
 
-  assert.equal(lib_inner.summariseStatusOutcome(outcome, { output, failOnSkip: true }), 1);
+  assert.equal(
+    lib_inner.summariseStatusOutcome(outcome, { output, failOnSkip: true }),
+    1,
+  );
 });
 
 test("summariseStatusOutcome — success, 'already' and 'no-target' are silent and zero", () => {
   const warnings = [];
   const output = { warn: (m) => warnings.push(m), info: () => {} };
-  for (const o of [{ transitioned: true }, { reason: "already" }, { reason: "no-target" }, null]) {
-    assert.equal(lib_inner.summariseStatusOutcome(o, { output, failOnSkip: true }), 0);
+  for (const o of [
+    { transitioned: true },
+    { reason: "already" },
+    { reason: "no-target" },
+    null,
+  ]) {
+    assert.equal(
+      lib_inner.summariseStatusOutcome(o, { output, failOnSkip: true }),
+      0,
+    );
   }
   assert.deepEqual(warnings, []);
 });
@@ -1752,18 +1906,39 @@ test("transitionToStatus — resolves the current status on create before decidi
   const fetchImpl = async (url, opts) => {
     calls.push(url);
     if (url.includes("?fields=status"))
-      return { ok: true, status: 200, json: async () => ({ fields: { status: { name: "Selected for Development" } } }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          fields: { status: { name: "Selected for Development" } },
+        }),
+      };
     if (url.includes("/transitions"))
-      return { ok: true, status: 200, json: async () => ({ transitions: [TR.start, TR.done] }) };
-    return { ok: true, status: 204, json: async () => ({}), text: async () => "" };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ transitions: [TR.start, TR.done] }),
+      };
+    return {
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+      text: async () => "",
+    };
   };
   const out = await lib_inner.transitionToStatus({
-    ...BASE, http: lib_inner.makeHttp({ fetchImpl }),
+    ...BASE,
+    http: lib_inner.makeHttp({ fetchImpl }),
     targetStatus: ["To Do", "Backlog", "Selected for Development"],
-    currentStatus: null, localStatus: "planned",
+    currentStatus: null,
+    localStatus: "planned",
   });
   assert.equal(out.reason, "already");
-  assert.equal(calls.filter((u) => u.includes("/transitions")).length, 0, "no transition fetch needed");
+  assert.equal(
+    calls.filter((u) => u.includes("/transitions")).length,
+    0,
+    "no transition fetch needed",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1800,7 +1975,8 @@ test("parseTopLevelScalar — reads a key from a non-jira top-level block", () =
 });
 
 test("parseTopLevelScalar — does not read across blocks", () => {
-  const cfg = "jira:\n  docBranch: release\ndevelopNext:\n  baseBranch: develop\n";
+  const cfg =
+    "jira:\n  docBranch: release\ndevelopNext:\n  baseBranch: develop\n";
   assert.equal(lib.parseTopLevelScalar(cfg, "jira", "baseBranch"), "");
   assert.equal(lib.parseTopLevelScalar(cfg, "developNext", "docBranch"), "");
 });
@@ -1825,7 +2001,8 @@ test("loadDocBranchSetting — falls back to developNext.baseBranch", () => {
 });
 
 test("loadDocBranchSetting — jira.docBranch wins over developNext.baseBranch", () => {
-  const cfg = "jira:\n  docBranch: release\ndevelopNext:\n  baseBranch: develop\n";
+  const cfg =
+    "jira:\n  docBranch: release\ndevelopNext:\n  baseBranch: develop\n";
   withConfig(cfg, (dir) => {
     assert.equal(lib.loadDocBranchSetting(dir), "release");
   });

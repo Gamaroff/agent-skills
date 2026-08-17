@@ -50,13 +50,13 @@ import {
   readdirSync,
   existsSync,
   statSync,
-} from 'node:fs';
-import { join, basename } from 'node:path';
+} from "node:fs";
+import { join, basename } from "node:path";
 
-const START = '<!-- epics-index-start -->';
-const END = '<!-- epics-index-end -->';
-const CHECK = process.argv.includes('--check');
-const STRICT = process.argv.includes('--strict');
+const START = "<!-- epics-index-start -->";
+const END = "<!-- epics-index-end -->";
+const CHECK = process.argv.includes("--check");
+const STRICT = process.argv.includes("--strict");
 
 /** Read a `--flag <value>` CLI argument (value must not itself be a flag). */
 function argValue(flag) {
@@ -64,11 +64,11 @@ function argValue(flag) {
     const a = process.argv[i];
     if (a === flag) {
       const v = process.argv[i + 1];
-      return v && !v.startsWith('--') ? v : '';
+      return v && !v.startsWith("--") ? v : "";
     }
     if (a.startsWith(`${flag}=`)) return a.slice(flag.length + 1);
   }
-  return '';
+  return "";
 }
 
 /**
@@ -77,16 +77,16 @@ function argValue(flag) {
  * `prd:` block, then the first indented `prdShardedLocation:` within it.
  */
 function prdRootFromConfig() {
-  const CONFIG = 'skills-config.yaml';
-  if (!existsSync(CONFIG)) return '';
+  const CONFIG = "skills-config.yaml";
+  if (!existsSync(CONFIG)) return "";
   let text;
   try {
-    text = readFileSync(CONFIG, 'utf8');
+    text = readFileSync(CONFIG, "utf8");
   } catch {
-    return '';
+    return "";
   }
   let inBlock = false;
-  for (const line of text.split('\n')) {
+  for (const line of text.split("\n")) {
     if (/^prd:\s*(#.*)?$/.test(line)) {
       inBlock = true;
       continue;
@@ -94,18 +94,18 @@ function prdRootFromConfig() {
     if (inBlock && /^\S/.test(line)) inBlock = false;
     if (inBlock) {
       const m = line.match(/^\s+prdShardedLocation:\s*(.+?)\s*$/);
-      if (m) return m[1].replace(/^['"]|['"]$/g, '').trim();
+      if (m) return m[1].replace(/^['"]|['"]$/g, "").trim();
     }
   }
-  return '';
+  return "";
 }
 
-const PRDS_DIR = argValue('--prd-root') || prdRootFromConfig() || 'docs/prd';
+const PRDS_DIR = argValue("--prd-root") || prdRootFromConfig() || "docs/prd";
 
 /** Extract a single frontmatter scalar (order-independent), stripping surrounding quotes. */
 function frontmatterField(src, key) {
-  const m = src.match(new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm'));
-  if (!m) return '';
+  const m = src.match(new RegExp(`^${key}:\\s*(.+?)\\s*$`, "m"));
+  if (!m) return "";
   return unquote(m[1]);
 }
 
@@ -132,8 +132,8 @@ function unquote(value) {
 /** Clean an epic title for display: drop a leading "[Epic N] " prefix, escape table pipes. */
 function cleanTitle(raw) {
   return raw
-    .replace(/^\[Epic\s+\d+\]\s*/i, '')
-    .replace(/\|/g, '\\|')
+    .replace(/^\[Epic\s+\d+\]\s*/i, "")
+    .replace(/\|/g, "\\|")
     .trim();
 }
 
@@ -146,20 +146,20 @@ function listDirs(dir) {
 function buildBlock(epics) {
   const lines = [
     START,
-    '',
-    '## Epics',
-    '',
+    "",
+    "## Epics",
+    "",
     `_Auto-generated index — regenerate with \`node scripts/generate-prd-epic-index.mjs\`._`,
-    '',
-    '| #   | Epic | Status |',
-    '| --- | ---- | ------ |',
+    "",
+    "| #   | Epic | Status |",
+    "| --- | ---- | ------ |",
     ...epics.map(
-      (e) => `| ${e.number} | [${e.title}](${e.link}) | ${e.status || '—'} |`,
+      (e) => `| ${e.number} | [${e.title}](${e.link}) | ${e.status || "—"} |`,
     ),
-    '',
+    "",
     END,
   ];
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /** Insert the block after the first H1, else after the frontmatter, else at top. */
@@ -167,18 +167,18 @@ function insertBlock(src, block) {
   const h1 = src.match(/^#\s.+$/m);
   if (h1) {
     const idx = src.indexOf(h1[0]) + h1[0].length;
-    return src.slice(0, idx) + '\n\n' + block + '\n' + src.slice(idx);
+    return src.slice(0, idx) + "\n\n" + block + "\n" + src.slice(idx);
   }
   const fm = src.match(/^---\n[\s\S]*?\n---\n/);
   if (fm)
     return (
       src.slice(0, fm[0].length) +
-      '\n' +
+      "\n" +
       block +
-      '\n\n' +
+      "\n\n" +
       src.slice(fm[0].length)
     );
-  return block + '\n\n' + src;
+  return block + "\n\n" + src;
 }
 
 if (!existsSync(PRDS_DIR)) {
@@ -193,7 +193,7 @@ const skipped = [];
 for (const prdDir of listDirs(PRDS_DIR)) {
   const p = basename(prdDir);
   const prdFile = join(prdDir, `${p}.md`); // dir is already named prd.<name>, file is <dir>.md
-  const epicsDir = join(prdDir, 'epics');
+  const epicsDir = join(prdDir, "epics");
   if (!existsSync(prdFile) || !existsSync(epicsDir)) continue;
 
   const epics = [];
@@ -201,16 +201,16 @@ for (const prdDir of listDirs(PRDS_DIR)) {
     const d = basename(epicDir);
     const epicFile = join(epicDir, `${d}.md`);
     if (!existsSync(epicFile)) continue; // excludes review/QA siblings
-    const fm = readFileSync(epicFile, 'utf8');
-    const number = parseInt(frontmatterField(fm, 'epic_number'), 10);
+    const fm = readFileSync(epicFile, "utf8");
+    const number = parseInt(frontmatterField(fm, "epic_number"), 10);
     if (Number.isNaN(number)) {
       skipped.push(`${epicFile} (no epic_number)`);
       continue;
     }
     epics.push({
       number,
-      title: cleanTitle(frontmatterField(fm, 'title')) || d,
-      status: frontmatterField(fm, 'status'),
+      title: cleanTitle(frontmatterField(fm, "title")) || d,
+      status: frontmatterField(fm, "status"),
       link: `epics/${d}/${d}.md`,
     });
   }
@@ -218,7 +218,7 @@ for (const prdDir of listDirs(PRDS_DIR)) {
   epics.sort((a, b) => a.number - b.number);
 
   const block = buildBlock(epics);
-  const src = readFileSync(prdFile, 'utf8');
+  const src = readFileSync(prdFile, "utf8");
   const has = src.includes(START) && src.includes(END);
   const next = has
     ? src.replace(new RegExp(`${START}[\\s\\S]*?${END}`), block)
@@ -233,7 +233,7 @@ for (const prdDir of listDirs(PRDS_DIR)) {
   writeFileSync(prdFile, next);
   changed++;
   console.log(
-    `${has ? 'updated' : 'added  '}  ${prdFile}  (${epics.length} epics)`,
+    `${has ? "updated" : "added  "}  ${prdFile}  (${epics.length} epics)`,
   );
 }
 
@@ -253,7 +253,7 @@ if (CHECK) {
   console.log(
     stale
       ? `\n${stale} PRD(s) have a stale epics index.`
-      : '\nAll epics indexes up to date.',
+      : "\nAll epics indexes up to date.",
   );
   process.exit(stale ? 1 : 0);
 }

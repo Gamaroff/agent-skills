@@ -50,7 +50,10 @@ End.
   // Both rules and surrounding paragraphs must survive intact
   assert.ok(body.includes("Section A"));
   assert.ok(body.includes("Section B with second hr"));
-  assert.ok(body.match(/---/g).length >= 2, "expected 2+ horizontal rules in body");
+  assert.ok(
+    body.match(/---/g).length >= 2,
+    "expected 2+ horizontal rules in body",
+  );
   assert.ok(body.includes("End."));
 });
 
@@ -69,7 +72,11 @@ labels:
 body
 `;
   const { frontmatter } = lib.parseFrontmatter(src);
-  assert.deepEqual(frontmatter.acceptance_criteria, ["First criterion", "Second with quotes", "Third"]);
+  assert.deepEqual(frontmatter.acceptance_criteria, [
+    "First criterion",
+    "Second with quotes",
+    "Third",
+  ]);
   assert.deepEqual(frontmatter.labels, ["alpha", "beta"]);
 });
 
@@ -103,7 +110,11 @@ test("parseFrontmatter — missing close tag returns full content as body", () =
 // back to end-of-document. These calls pass no docType, so this takes the EOF path.
 test("upsertChangeLog — inserts at EOF when no changelog and no anchor exists", () => {
   const src = `# Title\n\nIntro.\n\n## Section\n\nbody\n`;
-  const out = lib.upsertChangeLog(src, { date: "2026-07-31", description: "Initial Jira story created", author: "sync-jira" });
+  const out = lib.upsertChangeLog(src, {
+    date: "2026-07-31",
+    description: "Initial Jira story created",
+    author: "sync-jira",
+  });
   assert.ok(out.includes(lib.CL_START));
   assert.ok(out.includes(lib.CL_END));
   assert.ok(
@@ -113,13 +124,21 @@ test("upsertChangeLog — inserts at EOF when no changelog and no anchor exists"
 });
 
 test("upsertChangeLog — appends entry within existing markers", () => {
-  const initial = lib.upsertChangeLog(`# T\n\n## S\n\nbody\n`, { date: "2026-07-31", description: "Entry one", author: "sync-jira" });
-  const out = lib.upsertChangeLog(initial, { date: "2026-07-31", description: "Entry two", author: "sync-jira" });
+  const initial = lib.upsertChangeLog(`# T\n\n## S\n\nbody\n`, {
+    date: "2026-07-31",
+    description: "Entry one",
+    author: "sync-jira",
+  });
+  const out = lib.upsertChangeLog(initial, {
+    date: "2026-07-31",
+    description: "Entry two",
+    author: "sync-jira",
+  });
   assert.match(out, /Entry one/);
   assert.match(out, /Entry two/);
   // Only one CL block
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
-  assert.equal(out.match(new RegExp(lib.CL_END,   "g")).length, 1);
+  assert.equal(out.match(new RegExp(lib.CL_END, "g")).length, 1);
 });
 
 test("upsertChangeLog — preserves entries from hand-written `## Change Log` heading without markers", () => {
@@ -135,9 +154,17 @@ test("upsertChangeLog — preserves entries from hand-written `## Change Log` he
 
 stuff
 `;
-  const out = lib.upsertChangeLog(src, { date: "2026-07-31", description: "New auto entry", author: "sync-jira" });
+  const out = lib.upsertChangeLog(src, {
+    date: "2026-07-31",
+    description: "New auto entry",
+    author: "sync-jira",
+  });
   // Must not duplicate the heading
-  assert.equal(out.match(/## Change Log/g).length, 1, "only one Change Log heading allowed");
+  assert.equal(
+    out.match(/## Change Log/g).length,
+    1,
+    "only one Change Log heading allowed",
+  );
   // Must preserve original entry
   assert.match(out, /Manually written entry/);
   // Must add the new entry
@@ -151,11 +178,23 @@ stuff
 
 test("upsertChangeLog — idempotent format on repeated wrapping", () => {
   let out = `# T\n\nbody\n`;
-  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "a", author: "sync-jira" });
-  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "b", author: "sync-jira" });
-  out = lib.upsertChangeLog(out, { date: "2026-07-31", description: "c", author: "sync-jira" });
+  out = lib.upsertChangeLog(out, {
+    date: "2026-07-31",
+    description: "a",
+    author: "sync-jira",
+  });
+  out = lib.upsertChangeLog(out, {
+    date: "2026-07-31",
+    description: "b",
+    author: "sync-jira",
+  });
+  out = lib.upsertChangeLog(out, {
+    date: "2026-07-31",
+    description: "c",
+    author: "sync-jira",
+  });
   assert.equal(out.match(new RegExp(lib.CL_START, "g")).length, 1);
-  assert.equal(out.match(new RegExp(lib.CL_END,   "g")).length, 1);
+  assert.equal(out.match(new RegExp(lib.CL_END, "g")).length, 1);
 });
 
 // ---------------------------------------------------------------------------
@@ -164,42 +203,78 @@ test("upsertChangeLog — idempotent format on repeated wrapping", () => {
 test("diffFields — identical inputs produce no changes", () => {
   const prev = { summary: "S", priority: "High", labels: ["a", "b"] };
   const next = { summary: "S", priority: "High", labels: ["a", "b"] };
-  const changed = lib.diffFields({ prev, next, prevDescHash: "abc", newDescHash: "abc" });
+  const changed = lib.diffFields({
+    prev,
+    next,
+    prevDescHash: "abc",
+    newDescHash: "abc",
+  });
   assert.deepEqual(changed, []);
 });
 
 test("diffFields — detects each field independently", () => {
   const prev = { summary: "S", priority: "High", labels: ["a"] };
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "T", priority: "High", labels: ["a"] }, prevDescHash: "x", newDescHash: "x" }),
-    ["summary"]
+    lib.diffFields({
+      prev,
+      next: { summary: "T", priority: "High", labels: ["a"] },
+      prevDescHash: "x",
+      newDescHash: "x",
+    }),
+    ["summary"],
   );
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "S", priority: "Low", labels: ["a"] }, prevDescHash: "x", newDescHash: "x" }),
-    ["priority"]
+    lib.diffFields({
+      prev,
+      next: { summary: "S", priority: "Low", labels: ["a"] },
+      prevDescHash: "x",
+      newDescHash: "x",
+    }),
+    ["priority"],
   );
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "S", priority: "High", labels: ["b"] }, prevDescHash: "x", newDescHash: "x" }),
-    ["labels"]
+    lib.diffFields({
+      prev,
+      next: { summary: "S", priority: "High", labels: ["b"] },
+      prevDescHash: "x",
+      newDescHash: "x",
+    }),
+    ["labels"],
   );
   assert.deepEqual(
-    lib.diffFields({ prev, next: { summary: "S", priority: "High", labels: ["a"] }, prevDescHash: "x", newDescHash: "y" }),
-    ["description"]
+    lib.diffFields({
+      prev,
+      next: { summary: "S", priority: "High", labels: ["a"] },
+      prevDescHash: "x",
+      newDescHash: "y",
+    }),
+    ["description"],
   );
 });
 
 test("diffFields — label order does not matter", () => {
   const prev = { summary: "S", priority: "", labels: ["b", "a"] };
   const next = { summary: "S", priority: "", labels: ["a", "b"] };
-  assert.deepEqual(lib.diffFields({ prev, next, prevDescHash: "h", newDescHash: "h" }), []);
+  assert.deepEqual(
+    lib.diffFields({ prev, next, prevDescHash: "h", newDescHash: "h" }),
+    [],
+  );
 });
 
 test("hashDescriptionInput — stable for identical input, differs on body change", () => {
-  const args = { body: "## User Story\n\nAs a user…\n", frontmatter: {}, epicBbUrl: null, storyBbUrl: null };
+  const args = {
+    body: "## User Story\n\nAs a user…\n",
+    frontmatter: {},
+    epicBbUrl: null,
+    storyBbUrl: null,
+  };
   const h1 = lib.hashDescriptionInput(args);
   const h2 = lib.hashDescriptionInput(args);
   assert.equal(h1, h2);
-  const h3 = lib.hashDescriptionInput({ ...args, body: "## User Story\n\nAs a user changed.\n" });
+  const h3 = lib.hashDescriptionInput({
+    ...args,
+    body: "## User Story\n\nAs a user changed.\n",
+  });
   assert.notEqual(h1, h3);
 });
 
@@ -217,7 +292,9 @@ test("normalisePriority — unknown returns undefined and warns", () => {
   // Capture stderr by patching console.warn — simple silence
   const origWarn = console.warn;
   let warned = false;
-  console.warn = () => { warned = true; };
+  console.warn = () => {
+    warned = true;
+  };
   try {
     assert.equal(lib.normalisePriority("urgent-asap"), undefined);
     assert.ok(warned, "warning should have been emitted");
@@ -244,21 +321,24 @@ test("sanitiseLabels — filters empty / whitespace entries", () => {
 // guardConcurrentEdit
 // ---------------------------------------------------------------------------
 test("guardConcurrentEdit — passes when Jira not advanced past last sync", () => {
-  assert.doesNotThrow(() => lib.guardConcurrentEdit({
-    jiraUpdated:  "2026-04-28T10:00:00.000Z",
-    lastSyncedAt: "2026-04-28T10:00:00.000Z",
-    force: false,
-  }));
+  assert.doesNotThrow(() =>
+    lib.guardConcurrentEdit({
+      jiraUpdated: "2026-04-28T10:00:00.000Z",
+      lastSyncedAt: "2026-04-28T10:00:00.000Z",
+      force: false,
+    }),
+  );
 });
 
 test("guardConcurrentEdit — throws when Jira advanced past last sync", () => {
   assert.throws(
-    () => lib.guardConcurrentEdit({
-      jiraUpdated:  "2026-04-28T11:00:00.000Z",
-      lastSyncedAt: "2026-04-28T10:00:00.000Z",
-      force: false,
-    }),
-    /updated since last local sync/
+    () =>
+      lib.guardConcurrentEdit({
+        jiraUpdated: "2026-04-28T11:00:00.000Z",
+        lastSyncedAt: "2026-04-28T10:00:00.000Z",
+        force: false,
+      }),
+    /updated since last local sync/,
   );
 });
 
@@ -266,42 +346,55 @@ test("guardConcurrentEdit — --force overrides the abort", () => {
   const origWarn = console.warn;
   console.warn = () => {};
   try {
-    assert.doesNotThrow(() => lib.guardConcurrentEdit({
-      jiraUpdated:  "2026-04-28T11:00:00.000Z",
-      lastSyncedAt: "2026-04-28T10:00:00.000Z",
-      force: true,
-    }));
+    assert.doesNotThrow(() =>
+      lib.guardConcurrentEdit({
+        jiraUpdated: "2026-04-28T11:00:00.000Z",
+        lastSyncedAt: "2026-04-28T10:00:00.000Z",
+        force: true,
+      }),
+    );
   } finally {
     console.warn = origWarn;
   }
 });
 
 test("guardConcurrentEdit — no last sync (first run) skips guard", () => {
-  assert.doesNotThrow(() => lib.guardConcurrentEdit({
-    jiraUpdated: "2026-04-28T11:00:00.000Z",
-    lastSyncedAt: undefined,
-    force: false,
-  }));
+  assert.doesNotThrow(() =>
+    lib.guardConcurrentEdit({
+      jiraUpdated: "2026-04-28T11:00:00.000Z",
+      lastSyncedAt: undefined,
+      force: false,
+    }),
+  );
 });
 
 // ---------------------------------------------------------------------------
 // buildDescriptionAdf — structural assertions
 // ---------------------------------------------------------------------------
 const headingsOf = (doc) =>
-  doc.content.filter(n => n.type === "heading").map(n => n.content[0].text);
+  doc.content.filter((n) => n.type === "heading").map((n) => n.content[0].text);
 
 test("buildDescriptionAdf — produces a valid ADF doc with summary, criteria and links", () => {
   const doc = lib.buildDescriptionAdf({
     body: "## User Story\n\nAs a developer I want X.\n\n## Acceptance Criteria\n\n- AC1\n- AC2\n",
-    frontmatter: { story_type: "feature_enhancement", estimated_effort_hours: "4", jira_epic: "PROJ-14" },
+    frontmatter: {
+      story_type: "feature_enhancement",
+      estimated_effort_hours: "4",
+      jira_epic: "PROJ-14",
+    },
     epicBbUrl: "https://bitbucket.org/org/repo/src/HEAD/epic.md",
     storyBbUrl: "https://bitbucket.org/org/repo/src/HEAD/story.md",
   });
   assert.equal(doc.type, "doc");
   assert.equal(doc.version, 1);
-  assert.deepEqual(headingsOf(doc), ["Summary", "Acceptance Criteria", "Metadata", "Source Documents"]);
+  assert.deepEqual(headingsOf(doc), [
+    "Summary",
+    "Acceptance Criteria",
+    "Metadata",
+    "Source Documents",
+  ]);
   // Links come LAST and the story file leads them.
-  const bullet = doc.content.filter(n => n.type === "bulletList").at(-1);
+  const bullet = doc.content.filter((n) => n.type === "bulletList").at(-1);
   assert.ok(bullet);
   const linkText = bullet.content[0].content[0].content[0];
   assert.equal(linkText.marks[0].type, "link");
@@ -319,7 +412,10 @@ test("buildDescriptionAdf — never publishes the document's Change Log", () => 
     storyBbUrl: null,
   });
   assert.ok(!headingsOf(doc).includes("Change Log"));
-  assert.ok(!doc.content.some(n => n.type === "table"), "no changelog table on the card");
+  assert.ok(
+    !doc.content.some((n) => n.type === "table"),
+    "no changelog table on the card",
+  );
 });
 
 // `Description` is the LAST alias of the Summary block, not a section of its own:
@@ -327,17 +423,24 @@ test("buildDescriptionAdf — never publishes the document's Change Log", () => 
 test("buildDescriptionAdf — Description is a fallback, not an extra section", () => {
   const both = lib.buildDescriptionAdf({
     body: "## Story\n\nStatement text.\n\n## Description\n\nLong description text.\n",
-    frontmatter: {}, epicBbUrl: null, storyBbUrl: null,
+    frontmatter: {},
+    epicBbUrl: null,
+    storyBbUrl: null,
   });
   assert.deepEqual(headingsOf(both), ["Summary"]);
   assert.equal(both.content[1].content[0].text, "Statement text.");
 
   const onlyDescription = lib.buildDescriptionAdf({
     body: "## Description\n\nLong description text.\n",
-    frontmatter: {}, epicBbUrl: null, storyBbUrl: null,
+    frontmatter: {},
+    epicBbUrl: null,
+    storyBbUrl: null,
   });
   assert.deepEqual(headingsOf(onlyDescription), ["Summary"]);
-  assert.equal(onlyDescription.content[1].content[0].text, "Long description text.");
+  assert.equal(
+    onlyDescription.content[1].content[0].text,
+    "Long description text.",
+  );
 });
 
 test("buildDescriptionAdf — caps acceptance criteria and says how many were dropped", () => {
@@ -348,7 +451,7 @@ test("buildDescriptionAdf — caps acceptance criteria and says how many were dr
     epicBbUrl: null,
     storyBbUrl: "https://bitbucket.org/org/repo/src/HEAD/story.md",
   });
-  const list = doc.content.find(n => n.type === "bulletList");
+  const list = doc.content.find((n) => n.type === "bulletList");
   assert.equal(list.content.length, 5, "5 criteria kept");
   const more = JSON.stringify(doc);
   assert.match(more, /\+7 more in /, "the 7 dropped criteria are announced");
@@ -371,10 +474,11 @@ test("buildDescriptionAdf — omits sections with no body match", () => {
 // ---------------------------------------------------------------------------
 test("parseJiraError — extracts errorMessages and field errors", async () => {
   const fake = {
-    text: async () => JSON.stringify({
-      errorMessages: ["Invalid project."],
-      errors: { priority: "Field 'priority' cannot be set." },
-    }),
+    text: async () =>
+      JSON.stringify({
+        errorMessages: ["Invalid project."],
+        errors: { priority: "Field 'priority' cannot be set." },
+      }),
   };
   const msg = await lib.parseJiraError(fake);
   assert.match(msg, /Invalid project/);
@@ -400,7 +504,7 @@ title: 'X'
 
 After rule.
 `;
-  const out = lib.rewriteFrontmatter(src, fm => fm + "\nadded: \"yes\"");
+  const out = lib.rewriteFrontmatter(src, (fm) => fm + '\nadded: "yes"');
   assert.match(out, /added: "yes"/);
   assert.match(out, /After rule\./);
   assert.match(out, /---\n\nAfter rule/, "body horizontal rule preserved");
@@ -450,26 +554,38 @@ test("mapStatus — covers the full canonical lifecycle (no passthrough)", () =>
 test("mapStatus — honours a project-supplied status map (custom workflow vocab)", () => {
   // frontmatter status is lowercase-kebab; the map is keyed accordingly
   const custom = { "ready-for-development": "Selected for Development" };
-  assert.equal(lib.mapStatus("ready-for-development", custom), "Selected for Development");
-  assert.equal(lib.mapStatus("📋 Ready-for-development", custom), "Selected for Development");
+  assert.equal(
+    lib.mapStatus("ready-for-development", custom),
+    "Selected for Development",
+  );
+  assert.equal(
+    lib.mapStatus("📋 Ready-for-development", custom),
+    "Selected for Development",
+  );
   // unmapped keys still pass through emoji-stripped
   assert.equal(lib.mapStatus("Code Review", custom), "Code Review");
 });
 
 test("loadStatusMap — merges skills-config.yaml jira.statusMap over defaults", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-"));
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
-    "jira:\n  statusMap:\n    ready-for-development: Selected for Development\n    accepted: Shipped\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    ready-for-development: Selected for Development\n    accepted: Shipped\n",
+  );
   const map = lib.loadStatusMap(dir);
   assert.equal(map["ready-for-development"], "Selected for Development"); // override wins
-  assert.equal(map["accepted"], "Shipped");                              // override wins
-  assert.equal(map["in-progress"][0], "In Progress");                       // default retained
+  assert.equal(map["accepted"], "Shipped"); // override wins
+  assert.equal(map["in-progress"][0], "In Progress"); // default retained
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("loadStatusMap — falls back to defaults when no config present", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-none-"));
   const map = lib.loadStatusMap(dir);
   assert.equal(map["ready-for-development"][0], "To Do");
@@ -481,37 +597,90 @@ test("loadStatusMap — falls back to defaults when no config present", () => {
 // parseJiraScalar / loadDevEstimateField — Jira custom field id config
 // ---------------------------------------------------------------------------
 test("parseJiraScalar — reads a scalar key under jira:", () => {
-  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594\n", "devEstimateField"), "customfield_10594");
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  devEstimateField: customfield_10594\n",
+      "devEstimateField",
+    ),
+    "customfield_10594",
+  );
 });
 
 test("parseJiraScalar — does not collide with deeper statusMap children", () => {
-  const cfg = "jira:\n  statusMap:\n    devEstimateField: NotThis\n  devEstimateField: customfield_42\n";
+  const cfg =
+    "jira:\n  statusMap:\n    devEstimateField: NotThis\n  devEstimateField: customfield_42\n";
   assert.equal(lib.parseJiraScalar(cfg, "devEstimateField"), "customfield_42");
 });
 
 test("parseJiraScalar — strips quotes and returns '' when absent", () => {
-  assert.equal(lib.parseJiraScalar('jira:\n  devEstimateField: "customfield_99"\n', "devEstimateField"), "customfield_99");
-  assert.equal(lib.parseJiraScalar("jira:\n  statusMap:\n    accepted: Done\n", "devEstimateField"), "");
-  assert.equal(lib.parseJiraScalar("prd:\n  prdShardedLocation: docs/prd\n", "devEstimateField"), "");
+  assert.equal(
+    lib.parseJiraScalar(
+      'jira:\n  devEstimateField: "customfield_99"\n',
+      "devEstimateField",
+    ),
+    "customfield_99",
+  );
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  statusMap:\n    accepted: Done\n",
+      "devEstimateField",
+    ),
+    "",
+  );
+  assert.equal(
+    lib.parseJiraScalar(
+      "prd:\n  prdShardedLocation: docs/prd\n",
+      "devEstimateField",
+    ),
+    "",
+  );
 });
 
 test("parseJiraScalar — strips a trailing inline comment, preserves in-value '#'", () => {
   // the reported bug: scaffolded config carries a trailing comment
-  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: customfield_10594  # optional — Jira field id\n", "devEstimateField"), "customfield_10594");
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  devEstimateField: customfield_10594  # optional — Jira field id\n",
+      "devEstimateField",
+    ),
+    "customfield_10594",
+  );
   // quoted value with a trailing comment
-  assert.equal(lib.parseJiraScalar('jira:\n  devEstimateField: "customfield_10594"  # c\n', "devEstimateField"), "customfield_10594");
+  assert.equal(
+    lib.parseJiraScalar(
+      'jira:\n  devEstimateField: "customfield_10594"  # c\n',
+      "devEstimateField",
+    ),
+    "customfield_10594",
+  );
   // a '#' that is part of the value (no preceding space) is preserved
-  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField: abc#def\n", "devEstimateField"), "abc#def");
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  devEstimateField: abc#def\n",
+      "devEstimateField",
+    ),
+    "abc#def",
+  );
   // a comment-only value collapses to ''
-  assert.equal(lib.parseJiraScalar("jira:\n  devEstimateField:  # nothing set\n", "devEstimateField"), "");
+  assert.equal(
+    lib.parseJiraScalar(
+      "jira:\n  devEstimateField:  # nothing set\n",
+      "devEstimateField",
+    ),
+    "",
+  );
 });
 
 test("loadStatusMap — tolerates inline comments on the statusMap opener and value lines", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-comment-"));
   // mirrors the setup-consumer scaffold shape (trailing comment after `statusMap:`)
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
-    "jira:  # tracker block\n  statusMap:                          # local document status -> Jira status\n    ready-for-development: Selected for Development  # dev queue\n    accepted: Done\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:  # tracker block\n  statusMap:                          # local document status -> Jira status\n    ready-for-development: Selected for Development  # dev queue\n    accepted: Done\n",
+  );
   const map = lib.loadStatusMap(dir);
   assert.equal(map["ready-for-development"], "Selected for Development");
   assert.equal(map["accepted"], "Done"); // config override -> stays a scalar
@@ -520,18 +689,28 @@ test("loadStatusMap — tolerates inline comments on the statusMap opener and va
 });
 
 test("loadDevEstimateField — reads jira.devEstimateField from skills-config.yaml", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-"));
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"), "jira:\n  devEstimateField: customfield_10594\n  statusMap:\n    accepted: Done\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  devEstimateField: customfield_10594\n  statusMap:\n    accepted: Done\n",
+  );
   assert.equal(lib.loadDevEstimateField(dir), "customfield_10594");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("loadDevEstimateField — returns '' when config or key absent", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "devest-none-"));
   assert.equal(lib.loadDevEstimateField(dir), "");
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"), "jira:\n  statusMap:\n    accepted: Done\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    accepted: Done\n",
+  );
   assert.equal(lib.loadDevEstimateField(dir), "");
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -544,21 +723,34 @@ test("collectIssueFields — writes the dev-estimate custom field when configure
   const freshLib = require(modPath);
   try {
     const numeric = freshLib.collectIssueFields({
-      args: {}, frontmatter: { title: "S", estimated_effort_hours: 4 },
+      args: {},
+      frontmatter: { title: "S", estimated_effort_hours: 4 },
       descAdf: { type: "doc", content: [] },
-      storyTypeId: null, projectKey: null,
-      livePriorities: null, output: { warn() {}, info() {} },
-      syncLabel: "synced-from-foo", epicKey: null, useEpicLink: false,
+      storyTypeId: null,
+      projectKey: null,
+      livePriorities: null,
+      output: { warn() {}, info() {} },
+      syncLabel: "synced-from-foo",
+      epicKey: null,
+      useEpicLink: false,
     });
     assert.equal(numeric.customfield_10594, 4);
-    assert.deepEqual(numeric.timetracking, { originalEstimate: "4h", remainingEstimate: "4h" });
+    assert.deepEqual(numeric.timetracking, {
+      originalEstimate: "4h",
+      remainingEstimate: "4h",
+    });
 
     const nonNumeric = freshLib.collectIssueFields({
-      args: {}, frontmatter: { title: "S", estimated_effort_hours: "1d 4h" },
+      args: {},
+      frontmatter: { title: "S", estimated_effort_hours: "1d 4h" },
       descAdf: { type: "doc", content: [] },
-      storyTypeId: null, projectKey: null,
-      livePriorities: null, output: { warn() {}, info() {} },
-      syncLabel: "synced-from-foo", epicKey: null, useEpicLink: false,
+      storyTypeId: null,
+      projectKey: null,
+      livePriorities: null,
+      output: { warn() {}, info() {} },
+      syncLabel: "synced-from-foo",
+      epicKey: null,
+      useEpicLink: false,
     });
     assert.equal(nonNumeric.customfield_10594, undefined); // non-numeric → custom field skipped
   } finally {
@@ -570,14 +762,22 @@ test("collectIssueFields — writes the dev-estimate custom field when configure
 
 test("collectIssueFields — omits the dev-estimate custom field when unconfigured", () => {
   const fields = lib.collectIssueFields({
-    args: {}, frontmatter: { title: "S", estimated_effort_hours: 4 },
+    args: {},
+    frontmatter: { title: "S", estimated_effort_hours: 4 },
     descAdf: { type: "doc", content: [] },
-    storyTypeId: null, projectKey: null,
-    livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-foo", epicKey: null, useEpicLink: false,
+    storyTypeId: null,
+    projectKey: null,
+    livePriorities: null,
+    output: { warn() {}, info() {} },
+    syncLabel: "synced-from-foo",
+    epicKey: null,
+    useEpicLink: false,
   });
   assert.equal(fields.customfield_10594, undefined);
-  assert.deepEqual(fields.timetracking, { originalEstimate: "4h", remainingEstimate: "4h" });
+  assert.deepEqual(fields.timetracking, {
+    originalEstimate: "4h",
+    remainingEstimate: "4h",
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -585,15 +785,17 @@ test("collectIssueFields — omits the dev-estimate custom field when unconfigur
 // ---------------------------------------------------------------------------
 test("syncLabelFor — derives label from parent dir name", () => {
   assert.equal(
-    lib.syncLabelFor("/abs/docs/prd/x/epics/epic.1.foo/stories/story.1.2.bar/story.1.2.bar.md"),
-    "synced-from-story.1.2.bar"
+    lib.syncLabelFor(
+      "/abs/docs/prd/x/epics/epic.1.foo/stories/story.1.2.bar/story.1.2.bar.md",
+    ),
+    "synced-from-story.1.2.bar",
   );
 });
 
 test("syncLabelFor — replaces whitespace with dashes (no Jira labels with spaces)", () => {
   assert.equal(
     lib.syncLabelFor("/abs/docs/some dir with spaces/file.md"),
-    "synced-from-some-dir-with-spaces"
+    "synced-from-some-dir-with-spaces",
   );
 });
 
@@ -602,11 +804,16 @@ test("syncLabelFor — replaces whitespace with dashes (no Jira labels with spac
 // ---------------------------------------------------------------------------
 test("collectIssueFields — team-managed sets parent.key, NOT customfield_10014", () => {
   const fields = lib.collectIssueFields({
-    args: {}, frontmatter: { title: "S", priority: "high" },
+    args: {},
+    frontmatter: { title: "S", priority: "high" },
     descAdf: { type: "doc", content: [] },
-    storyTypeId: "10001", projectKey: "RB",
-    livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-foo", epicKey: "PROJ-14", useEpicLink: false,
+    storyTypeId: "10001",
+    projectKey: "RB",
+    livePriorities: null,
+    output: { warn() {}, info() {} },
+    syncLabel: "synced-from-foo",
+    epicKey: "PROJ-14",
+    useEpicLink: false,
   });
   assert.deepEqual(fields.parent, { key: "PROJ-14" });
   assert.equal(fields.customfield_10014, undefined);
@@ -617,11 +824,16 @@ test("collectIssueFields — team-managed sets parent.key, NOT customfield_10014
 
 test("collectIssueFields — classic sets customfield_10014, NOT parent", () => {
   const fields = lib.collectIssueFields({
-    args: {}, frontmatter: { title: "S" },
+    args: {},
+    frontmatter: { title: "S" },
     descAdf: { type: "doc", content: [] },
-    storyTypeId: "10001", projectKey: "RB",
-    livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-foo", epicKey: "PROJ-14", useEpicLink: true,
+    storyTypeId: "10001",
+    projectKey: "RB",
+    livePriorities: null,
+    output: { warn() {}, info() {} },
+    syncLabel: "synced-from-foo",
+    epicKey: "PROJ-14",
+    useEpicLink: true,
   });
   assert.equal(fields.customfield_10014, "PROJ-14");
   assert.equal(fields.parent, undefined);
@@ -629,12 +841,17 @@ test("collectIssueFields — classic sets customfield_10014, NOT parent", () => 
 
 test("collectIssueFields — includeDescription:false omits description (used on label/summary-only updates)", () => {
   const fields = lib.collectIssueFields({
-    args: {}, frontmatter: { title: "S" },
+    args: {},
+    frontmatter: { title: "S" },
     descAdf: { type: "doc", content: [] },
     includeDescription: false,
-    storyTypeId: null, projectKey: null,
-    livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-foo", epicKey: null, useEpicLink: false,
+    storyTypeId: null,
+    projectKey: null,
+    livePriorities: null,
+    output: { warn() {}, info() {} },
+    syncLabel: "synced-from-foo",
+    epicKey: null,
+    useEpicLink: false,
   });
   assert.equal(fields.description, undefined);
   assert.equal(fields.summary, "S");
@@ -642,20 +859,30 @@ test("collectIssueFields — includeDescription:false omits description (used on
 
 test("collectIssueFields — sync label always injected when missing, not duplicated", () => {
   const f1 = lib.collectIssueFields({
-    args: { labels: "alpha,beta" }, frontmatter: { title: "S" },
+    args: { labels: "alpha,beta" },
+    frontmatter: { title: "S" },
     descAdf: { type: "doc", content: [] },
-    storyTypeId: null, projectKey: null,
-    livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-x", epicKey: null, useEpicLink: false,
+    storyTypeId: null,
+    projectKey: null,
+    livePriorities: null,
+    output: { warn() {}, info() {} },
+    syncLabel: "synced-from-x",
+    epicKey: null,
+    useEpicLink: false,
   });
   assert.deepEqual(f1.labels, ["alpha", "beta", "synced-from-x"]);
 
   const f2 = lib.collectIssueFields({
-    args: { labels: "alpha,synced-from-x" }, frontmatter: { title: "S" },
+    args: { labels: "alpha,synced-from-x" },
+    frontmatter: { title: "S" },
     descAdf: { type: "doc", content: [] },
-    storyTypeId: null, projectKey: null,
-    livePriorities: null, output: { warn() {}, info() {} },
-    syncLabel: "synced-from-x", epicKey: null, useEpicLink: false,
+    storyTypeId: null,
+    projectKey: null,
+    livePriorities: null,
+    output: { warn() {}, info() {} },
+    syncLabel: "synced-from-x",
+    epicKey: null,
+    useEpicLink: false,
   });
   assert.deepEqual(f2.labels, ["alpha", "synced-from-x"]);
 });
@@ -675,7 +902,7 @@ Some prose.
   const out = lib.upsertInlineLine(
     src,
     /^\*\*Jira Story\*\*:.*$/m,
-    "**Jira Story**: [PROJ-99](https://real/PROJ-99)"
+    "**Jira Story**: [PROJ-99](https://real/PROJ-99)",
   );
   // Code-block sample preserved verbatim
   assert.match(out, /SAMPLE-1/);
@@ -695,7 +922,7 @@ Body.
   const out = lib.upsertInlineLine(
     src,
     /^\*\*Jira Story\*\*:.*$/m,
-    "**Jira Story**: [NEW-1](https://x/NEW-1)"
+    "**Jira Story**: [NEW-1](https://x/NEW-1)",
   );
   assert.match(out, /NEW-1/);
   assert.doesNotMatch(out, /OLD-1/);
@@ -706,7 +933,7 @@ test("upsertInlineLine — inserts after first H1 when no existing line", () => 
   const out = lib.upsertInlineLine(
     src,
     /^\*\*Jira Story\*\*:.*$/m,
-    "**Jira Story**: [PROJ-1](https://x/PROJ-1)"
+    "**Jira Story**: [PROJ-1](https://x/PROJ-1)",
   );
   assert.match(out, /^# Story 1\.2: Foo\n\n\*\*Jira Story\*\*: \[PROJ-1\]/);
 });
@@ -716,7 +943,7 @@ test("upsertInlineLine — inserts after first H1 when no existing line", () => 
 // ---------------------------------------------------------------------------
 test("withCodeBlocksMasked — round-trips multiple fenced blocks", () => {
   const src = "Pre.\n\n```\nA\n```\n\nMid.\n\n```js\nB\n```\n\nEnd.";
-  const out = lib.withCodeBlocksMasked(src, m => m.replace(/Mid/g, "MIDDLE"));
+  const out = lib.withCodeBlocksMasked(src, (m) => m.replace(/Mid/g, "MIDDLE"));
   assert.match(out, /MIDDLE/);
   assert.match(out, /```\nA\n```/);
   assert.match(out, /```js\nB\n```/);
@@ -731,7 +958,7 @@ function makeMockResp({ status = 200, body = "{}", headers = {} } = {}) {
     status,
     text: async () => body,
     json: async () => JSON.parse(body),
-    headers: { get: k => headers[k.toLowerCase()] || null },
+    headers: { get: (k) => headers[k.toLowerCase()] || null },
   };
 }
 
@@ -742,15 +969,27 @@ test("createStoryWithRetry — 400 mentioning parent flips to Epic Link customfi
     if (calls.length === 1) {
       return makeMockResp({
         status: 400,
-        body: JSON.stringify({ errors: { parent: "Field 'parent' cannot be set on this issue type." } }),
+        body: JSON.stringify({
+          errors: {
+            parent: "Field 'parent' cannot be set on this issue type.",
+          },
+        }),
       });
     }
-    return makeMockResp({ status: 201, body: JSON.stringify({ key: "PROJ-99" }) });
+    return makeMockResp({
+      status: 201,
+      body: JSON.stringify({ key: "PROJ-99" }),
+    });
   };
   const auth = { baseUrl: "https://j", email: "e", token: "t" };
   const fields = { summary: "S", parent: { key: "PROJ-14" } };
   const out = { warn() {}, info() {} };
-  const resp = await lib.createStoryWithRetry({ http, auth, fields, output: out });
+  const resp = await lib.createStoryWithRetry({
+    http,
+    auth,
+    fields,
+    output: out,
+  });
   assert.equal(resp.status, 201);
   assert.equal(calls.length, 2);
   assert.deepEqual(calls[0].parent, { key: "PROJ-14" });
@@ -765,32 +1004,42 @@ test("createStoryWithRetry — 400 mentioning epic_link flips to parent and retr
     if (calls.length === 1) {
       return makeMockResp({
         status: 400,
-        body: JSON.stringify({ errors: { customfield_10014: "Epic Link is not valid." } }),
+        body: JSON.stringify({
+          errors: { customfield_10014: "Epic Link is not valid." },
+        }),
       });
     }
-    return makeMockResp({ status: 201, body: JSON.stringify({ key: "PROJ-99" }) });
+    return makeMockResp({
+      status: 201,
+      body: JSON.stringify({ key: "PROJ-99" }),
+    });
   };
   const fields = { summary: "S", customfield_10014: "PROJ-14" };
   const resp = await lib.createStoryWithRetry({
-    http, auth: { baseUrl: "https://j", email: "e", token: "t" },
-    fields, output: { warn() {}, info() {} },
+    http,
+    auth: { baseUrl: "https://j", email: "e", token: "t" },
+    fields,
+    output: { warn() {}, info() {} },
   });
   assert.equal(resp.status, 201);
   assert.deepEqual(calls[1].parent, { key: "PROJ-14" });
 });
 
 test("createStoryWithRetry — non-parent 400 errors propagate immediately", async () => {
-  const http = async () => makeMockResp({
-    status: 400,
-    body: JSON.stringify({ errors: { summary: "Summary too long." } }),
-  });
+  const http = async () =>
+    makeMockResp({
+      status: 400,
+      body: JSON.stringify({ errors: { summary: "Summary too long." } }),
+    });
   await assert.rejects(
-    () => lib.createStoryWithRetry({
-      http, auth: { baseUrl: "https://j", email: "e", token: "t" },
-      fields: { summary: "S", parent: { key: "PROJ-14" } },
-      output: { warn() {}, info() {} },
-    }),
-    /Summary too long/
+    () =>
+      lib.createStoryWithRetry({
+        http,
+        auth: { baseUrl: "https://j", email: "e", token: "t" },
+        fields: { summary: "S", parent: { key: "PROJ-14" } },
+        output: { warn() {}, info() {} },
+      }),
+    /Summary too long/,
   );
 });
 
@@ -818,7 +1067,8 @@ test("makeHttp — retries 429 honoring Retry-After (numeric seconds)", async ()
   const fetchImpl = async () => {
     ts.push(Date.now());
     calls++;
-    if (calls === 1) return makeMockResp({ status: 429, headers: { "retry-after": "0" } });
+    if (calls === 1)
+      return makeMockResp({ status: 429, headers: { "retry-after": "0" } });
     return makeMockResp({ status: 200, body: "{}" });
   };
   const http = sharedLib.makeHttp({ fetchImpl, retries: 2, retryDelayMs: 1 });
@@ -853,20 +1103,26 @@ test("parseRetryAfter — handles seconds and HTTP-date forms", () => {
 // findExistingByLabel — multi-match warning
 // ---------------------------------------------------------------------------
 test("findExistingByLabel — warns and adopts first when multiple issues carry the label", async () => {
-  const http = async () => makeMockResp({
-    status: 200,
-    body: JSON.stringify({
-      issues: [
-        { key: "PROJ-50", fields: { updated: "2026-04-28T10:00:00.000Z" } },
-        { key: "PROJ-51", fields: { updated: "2026-04-28T10:01:00.000Z" } },
-      ],
-    }),
-  });
+  const http = async () =>
+    makeMockResp({
+      status: 200,
+      body: JSON.stringify({
+        issues: [
+          { key: "PROJ-50", fields: { updated: "2026-04-28T10:00:00.000Z" } },
+          { key: "PROJ-51", fields: { updated: "2026-04-28T10:01:00.000Z" } },
+        ],
+      }),
+    });
   const warns = [];
-  const out = { warn: m => warns.push(m), info() {} };
+  const out = { warn: (m) => warns.push(m), info() {} };
   const found = await sharedLib.findExistingByLabel({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    projectKey: "RB", label: "synced-from-foo", output: out,
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    projectKey: "RB",
+    label: "synced-from-foo",
+    output: out,
   });
   assert.equal(found.key, "PROJ-50");
   assert.equal(warns.length, 1);
@@ -875,12 +1131,18 @@ test("findExistingByLabel — warns and adopts first when multiple issues carry 
 });
 
 test("findExistingByLabel — returns null on empty issues array", async () => {
-  const http = async () => makeMockResp({
-    status: 200, body: JSON.stringify({ issues: [] }),
-  });
+  const http = async () =>
+    makeMockResp({
+      status: 200,
+      body: JSON.stringify({ issues: [] }),
+    });
   const found = await sharedLib.findExistingByLabel({
-    http, baseUrl: "https://j", email: "e", token: "t",
-    projectKey: "RB", label: "synced-from-foo",
+    http,
+    baseUrl: "https://j",
+    email: "e",
+    token: "t",
+    projectKey: "RB",
+    label: "synced-from-foo",
   });
   assert.equal(found, null);
 });
@@ -889,7 +1151,13 @@ test("findExistingByLabel — returns null on empty issues array", async () => {
 // parseArgs — --no-write
 // ---------------------------------------------------------------------------
 test("parseArgs — --no-write parsed as boolean flag", () => {
-  const opts = lib.parseArgs(["node", "script", "--file", "x.md", "--no-write"]);
+  const opts = lib.parseArgs([
+    "node",
+    "script",
+    "--file",
+    "x.md",
+    "--no-write",
+  ]);
   assert.equal(opts.noWrite, true);
   assert.equal(opts.dryRun, false);
   assert.equal(opts.file, "x.md");
@@ -905,7 +1173,10 @@ test("parseArgs — --no-write absent defaults to false", () => {
 // ---------------------------------------------------------------------------
 test("stripRemotePrefix — strips remote name, preserves slashes in branch", () => {
   assert.equal(lib.stripRemotePrefix("origin/main"), "main");
-  assert.equal(lib.stripRemotePrefix("origin/feature/story.5.1.foo"), "feature/story.5.1.foo");
+  assert.equal(
+    lib.stripRemotePrefix("origin/feature/story.5.1.foo"),
+    "feature/story.5.1.foo",
+  );
   assert.equal(lib.stripRemotePrefix("upstream/release/1.2"), "release/1.2");
 });
 
@@ -915,7 +1186,14 @@ test("stripRemotePrefix — empty or shape-less ref returns null", () => {
 });
 
 test("parseArgs — --doc-branch overrides the resolved branch", () => {
-  const opts = lib.parseArgs(["node", "script", "--file", "x.md", "--doc-branch", "develop"]);
+  const opts = lib.parseArgs([
+    "node",
+    "script",
+    "--file",
+    "x.md",
+    "--doc-branch",
+    "develop",
+  ]);
   assert.equal(opts.docBranch, "develop");
 });
 
@@ -928,11 +1206,17 @@ test("parseArgs — --doc-branch absent defaults to null", () => {
 // normaliseStorySummary — canonical "[Story N.N] {title}" bracket form
 // ---------------------------------------------------------------------------
 test("normaliseStorySummary — already-bracketed is unchanged (idempotent)", () => {
-  assert.equal(lib.normaliseStorySummary("[Story 1.3] Foo", "9.9"), "[Story 1.3] Foo");
+  assert.equal(
+    lib.normaliseStorySummary("[Story 1.3] Foo", "9.9"),
+    "[Story 1.3] Foo",
+  );
 });
 
 test("normaliseStorySummary — colon-prefixed is rewrapped in brackets", () => {
-  assert.equal(lib.normaliseStorySummary("Story 1.3: Foo", "9.9"), "[Story 1.3] Foo");
+  assert.equal(
+    lib.normaliseStorySummary("Story 1.3: Foo", "9.9"),
+    "[Story 1.3] Foo",
+  );
 });
 
 test("normaliseStorySummary — bare title resolves id from the filename fallback", () => {
@@ -948,11 +1232,13 @@ test("normaliseStorySummary — no id resolvable leaves the summary unchanged", 
 // findRelatedDocs — co-located story artifacts
 // ---------------------------------------------------------------------------
 function makeStoryDir(files) {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-"));
   const storyDir = path.join(dir, "story.2.4.demo");
   fs.mkdirSync(storyDir);
-  files.forEach(f => fs.writeFileSync(path.join(storyDir, f), "x"));
+  files.forEach((f) => fs.writeFileSync(path.join(storyDir, f), "x"));
   return path.join(storyDir, "story.2.4.demo.md");
 }
 
@@ -966,16 +1252,22 @@ test("findRelatedDocs — links durable artifacts and skips point-in-time ones",
     "story.2.4.implementation.1.demo.md",
     "story.2.4.dod.1.demo.md",
     "story.2.4.validate.2026-05-13.md", // dated run — excluded
-    "sprint-review-summary.md",         // point-in-time — excluded
-    "story.2.4.gate.1.demo.yml",        // not markdown — excluded
+    "sprint-review-summary.md", // point-in-time — excluded
+    "story.2.4.gate.1.demo.yml", // not markdown — excluded
   ]);
   const found = lib.findRelatedDocs(card);
-  assert.deepEqual(found.map(d => d.label), [
-    "Implementation plan", "Story review", "QA assessment",
-    "Implementation report", "Definition of Done",
-  ]);
+  assert.deepEqual(
+    found.map((d) => d.label),
+    [
+      "Implementation plan",
+      "Story review",
+      "QA assessment",
+      "Implementation report",
+      "Definition of Done",
+    ],
+  );
   // the card itself is never listed as its own related doc
-  assert.ok(!found.some(d => path.basename(d.file) === "story.2.4.demo.md"));
+  assert.ok(!found.some((d) => path.basename(d.file) === "story.2.4.demo.md"));
 });
 
 test("findRelatedDocs — qualifies repeated artifact types with their instance number", () => {
@@ -985,18 +1277,28 @@ test("findRelatedDocs — qualifies repeated artifact types with their instance 
     "story.2.4.review.2.demo.md",
     "story.2.4.qa.1.demo.md",
   ]);
-  const labels = lib.findRelatedDocs(card).map(d => d.label);
-  assert.deepEqual(labels, ["Story review 1", "Story review 2", "QA assessment"]);
+  const labels = lib.findRelatedDocs(card).map((d) => d.label);
+  assert.deepEqual(labels, [
+    "Story review 1",
+    "Story review 2",
+    "QA assessment",
+  ]);
 });
 
 test("findRelatedDocs — a story folder with no companions yields no links", () => {
-  assert.deepEqual(lib.findRelatedDocs(makeStoryDir(["story.2.4.demo.md"])), []);
+  assert.deepEqual(
+    lib.findRelatedDocs(makeStoryDir(["story.2.4.demo.md"])),
+    [],
+  );
 });
 
 test("relatedDocInfo — unknown artifact types are not linked", () => {
   assert.equal(lib.relatedDocInfo("story.2.4.validate.2026-05-13.md"), null);
   assert.equal(lib.relatedDocInfo("sprint-review-summary.md"), null);
-  assert.equal(lib.relatedDocInfo("story.2.4.plan.demo.md").label, "Implementation plan");
+  assert.equal(
+    lib.relatedDocInfo("story.2.4.plan.demo.md").label,
+    "Implementation plan",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1006,13 +1308,26 @@ const libx = require("../references/jira-sync.js");
 
 test("mapStatusCandidates — a local status yields an ordered candidate list", () => {
   const c = libx.mapStatusCandidates("ready-for-review");
-  assert.equal(c[0], "In Review", "primary candidate is the historical single value");
-  assert.ok(c.includes("Waiting for Review"), "covers the other common review vocabularies");
+  assert.equal(
+    c[0],
+    "In Review",
+    "primary candidate is the historical single value",
+  );
+  assert.ok(
+    c.includes("Waiting for Review"),
+    "covers the other common review vocabularies",
+  );
   assert.ok(c.includes("Code Review"));
 });
 
 test("mapStatusCandidates — mapStatus stays the primary candidate (back-compat)", () => {
-  for (const s of ["planned", "in-progress", "ready-for-review", "accepted", "cancelled"])
+  for (const s of [
+    "planned",
+    "in-progress",
+    "ready-for-review",
+    "accepted",
+    "cancelled",
+  ])
     assert.equal(libx.mapStatus(s), libx.mapStatusCandidates(s)[0]);
 });
 
@@ -1022,7 +1337,9 @@ test("mapStatusCandidates — a scalar override narrows to exactly that name", (
 });
 
 test("mapStatusCandidates — unmapped values pass through as a single candidate", () => {
-  assert.deepEqual(libx.mapStatusCandidates("🔍 Code Review", {}), ["Code Review"]);
+  assert.deepEqual(libx.mapStatusCandidates("🔍 Code Review", {}), [
+    "Code Review",
+  ]);
   assert.equal(libx.mapStatusCandidates(""), null);
 });
 
@@ -1036,33 +1353,65 @@ test("isTerminalLocalStatus — only finished states may use the category fallba
 });
 
 function withConfig(yaml, fn) {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-forms-"));
   fs.writeFileSync(path.join(dir, "skills-config.yaml"), yaml);
-  try { return fn(dir); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  try {
+    return fn(dir);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 test("loadStatusMap — accepts a flow-sequence candidate list", () => {
-  withConfig('jira:\n  statusMap:\n    ready-for-review: [Waiting for Review, "In Review"]  # ours\n', (dir) => {
-    assert.deepEqual(libx.loadStatusMap(dir)["ready-for-review"], ["Waiting for Review", "In Review"]);
-  });
+  withConfig(
+    'jira:\n  statusMap:\n    ready-for-review: [Waiting for Review, "In Review"]  # ours\n',
+    (dir) => {
+      assert.deepEqual(libx.loadStatusMap(dir)["ready-for-review"], [
+        "Waiting for Review",
+        "In Review",
+      ]);
+    },
+  );
 });
 
 test("loadStatusMap — accepts a block-sequence candidate list", () => {
-  withConfig("jira:\n  statusMap:\n    accepted:\n      - Shipped\n      - Done\n    in-progress: Doing\n", (dir) => {
-    const map = libx.loadStatusMap(dir);
-    assert.deepEqual(map["accepted"], ["Shipped", "Done"]);
-    assert.equal(map["in-progress"], "Doing", "sibling scalars still parse after a block list");
-  });
+  withConfig(
+    "jira:\n  statusMap:\n    accepted:\n      - Shipped\n      - Done\n    in-progress: Doing\n",
+    (dir) => {
+      const map = libx.loadStatusMap(dir);
+      assert.deepEqual(map["accepted"], ["Shipped", "Done"]);
+      assert.equal(
+        map["in-progress"],
+        "Doing",
+        "sibling scalars still parse after a block list",
+      );
+    },
+  );
 });
 
 test("loadStatusMap — per-issue-type overrides layer over the flat map", () => {
-  const yaml = "jira:\n  statusMap:\n    accepted: Done\n    epic:\n      accepted: Closed\n      planned: Open\n";
+  const yaml =
+    "jira:\n  statusMap:\n    accepted: Done\n    epic:\n      accepted: Closed\n      planned: Open\n";
   withConfig(yaml, (dir) => {
-    assert.equal(libx.loadStatusMap(dir)["accepted"], "Done", "no type -> flat map only");
-    assert.equal(libx.loadStatusMap(dir, "epic")["accepted"], "Closed", "type layer wins");
+    assert.equal(
+      libx.loadStatusMap(dir)["accepted"],
+      "Done",
+      "no type -> flat map only",
+    );
+    assert.equal(
+      libx.loadStatusMap(dir, "epic")["accepted"],
+      "Closed",
+      "type layer wins",
+    );
     assert.equal(libx.loadStatusMap(dir, "epic")["planned"], "Open");
-    assert.equal(libx.loadStatusMap(dir, "story")["accepted"], "Done", "unknown type falls back");
+    assert.equal(
+      libx.loadStatusMap(dir, "story")["accepted"],
+      "Done",
+      "unknown type falls back",
+    );
     // the nested block must not leak in as if it were a status key
     assert.equal(libx.loadStatusMap(dir)["epic"], undefined);
   });

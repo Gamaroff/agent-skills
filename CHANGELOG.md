@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The repo is now Prettier-clean, and CI keeps it that way.** Adopting Prettier as policy in v0.39.0 deliberately stopped short of the repo-wide sweep — running it inside the very PR that documented why not to bury a functional change would have been self-refuting. The consequence was that `npm run format:check` failed on **50 files** from the day it was added and nothing enforced the policy it described. A check that has never once passed is not a check.
+
+  This sweeps them, plus the **56** `skills/*/references/` copies that `npm run bundle` regenerates from the now-formatted shared sources — 106 files, as an isolated `style:` commit that a reviewer can skip in one keystroke. Order is load-bearing: `format` then `bundle`. The bundled copies are `.prettierignore`d so the formatter skips them; they must be reached by regenerating from their formatted sources, never by formatting the copy, because formatting a copy independently of its source is how the two drift.
+
+  **No behaviour changes, proven rather than asserted.** Both the pre- and post-sweep version of all 106 files were normalised through Prettier in-process and compared: zero functional deltas. `npm test` is 1287/1287 either side, `validate:all` 115/115, and a second `npm run bundle` is a no-op.
+
+  `npm run format:check` is now a step in the Test workflow, placed after `npm ci` and before the suite so a formatting failure costs seconds rather than a full run plus the replay evals. The gate was verified to bite before being trusted: a deliberate violation exits 1 and names the file.
+
+- **`.git-blame-ignore-revs` added**, so pure-formatting commits drop out of `git blame` — verified, not assumed: `gh-stage.js` goes from 113 lines attributed to the earlier `style(gh-stage)` reformat to 0, and `change-log.js` from 25 attributed to this sweep to 0. It lists **only** commits that contain nothing but formatting. `ee12ab7` (v0.29.5) and `08c917b` (task.46) each interleave a reformat with a real functional change, so ignoring them would hide ~296 functional lines along with the noise; they are named in the file with the reason, as a recorded decision rather than an omission. The practical limit is worth stating plainly: `jira-sync.js` gets a clean future, but its history keeps the churn.
+
+- **`CONTRIBUTING.md` now states the rule the tooling cannot enforce.** A formatter config settles *which* style wins; it does nothing about a reformat being bundled into a functional commit, which is what actually made two diffs unreviewable — the second landing while the issue describing the first was still open. Run `npm run format` as its own `style:` commit.
+
 ## [v0.42.0] - 2026-08-17
 
 ### Changed
@@ -670,6 +684,8 @@ Four defects in Jira sync, every one of which **reported success while publishin
 - **`assignee: TBD` shipped in the task template, and the sync passed it to Jira verbatim as an accountId.** Every task card created the intended way and then synced came back `HTTP 400` with nothing in the message naming the cause — the template and the tool disagreed, again, and the failure pointed nowhere. `create-task/scripts/lib.js` made it worse by listing `assignee` as a **required** answer and substituting it unvalidated; its own test asserted `assignee: platform-team`, a team name, which would have failed identically. Now: the template ships the key with a **blank** value and a comment stating it must be an accountId; `populateTaskTemplate` no longer requires it and only substitutes when one is supplied; and `resolveAssignee` refuses a placebo list (`TBD`, `TBA`, `none`, `unassigned`, `unset`, `todo`, `n/a`, `na`, `-`, `?`, case- and whitespace-insensitive) in **either** frontmatter or config, warning with the reason and the three ways to fix it instead of letting Jira reject it. A frontmatter placeholder falls through to the configured default rather than aborting. Two guard tests added: one asserts the shipped template value is blank, one asserts omitting the answer leaves the key present and empty.
 
 ## [v0.29.5] - 2026-07-29
+
+> **Note added 2026-08-17.** This release also contains a whole-file Prettier reformat of `shared/resources/jira-sync.js` and `skills/sync-jira-epic/scripts/*.js` that is unrelated to the fixes below and was not declared at the time. The release commit (`ee12ab7`) carries **5,669 insertions**; roughly **40** of them are the functional change described here. The reformat came from a contributor's editor hook at a point when this repo had no formatter config of its own, so the style applied was not the project's. Nothing is broken by it — Prettier is deterministic and the suite was green — but the diff cannot be reviewed at a glance, and `git bisect` / `git log -L` over `jira-sync.js` hit a wall at this commit. Prettier was subsequently adopted as repo policy in v0.39.0, and the repo swept to match under task.59 — see the `Unreleased` entry at the top of this file. Issue: [#179](https://github.com/Gamaroff/agent-skills/issues/179).
 
 ### Fixed
 

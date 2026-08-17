@@ -28,7 +28,14 @@ const execAsync = promisify(execFile);
  * @param {function} [opts.exec] Injectable exec fn for testing (defaults to execFile)
  * @returns {Promise<GhReceipt>}
  */
-export async function createGhSandbox({ repo, branch, base, title, body = "", exec: execFn = execAsync } = {}) {
+export async function createGhSandbox({
+  repo,
+  branch,
+  base,
+  title,
+  body = "",
+  exec: execFn = execAsync,
+} = {}) {
   const noop = async () => {};
 
   if (!process.env.GH_TOKEN) {
@@ -46,23 +53,53 @@ export async function createGhSandbox({ repo, branch, base, title, body = "", ex
   try {
     await execFn(
       "gh",
-      ["pr", "create", "--repo", repo, "--base", base, "--head", branch, "--title", title, "--body", body],
+      [
+        "pr",
+        "create",
+        "--repo",
+        repo,
+        "--base",
+        base,
+        "--head",
+        branch,
+        "--title",
+        title,
+        "--body",
+        body,
+      ],
       { env },
     );
   } catch (e) {
-    return { skipped: true, reason: `gh pr create failed: ${e.message}`, cleanup: noop };
+    return {
+      skipped: true,
+      reason: `gh pr create failed: ${e.message}`,
+      cleanup: noop,
+    };
   }
 
   let pr;
   try {
     const { stdout } = await execFn(
       "gh",
-      ["pr", "view", "--repo", repo, "--head", branch, "--json", "number,url,baseRefName"],
+      [
+        "pr",
+        "view",
+        "--repo",
+        repo,
+        "--head",
+        branch,
+        "--json",
+        "number,url,baseRefName",
+      ],
       { env },
     );
     pr = JSON.parse(stdout);
   } catch (e) {
-    return { skipped: true, reason: `gh pr view failed: ${e.message}`, cleanup: noop };
+    return {
+      skipped: true,
+      reason: `gh pr view failed: ${e.message}`,
+      cleanup: noop,
+    };
   }
 
   const cleanup = async () => {

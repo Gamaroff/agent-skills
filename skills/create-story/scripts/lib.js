@@ -29,12 +29,20 @@ function validateStoryFilename(name) {
   }
   const m = name.match(STORY_FILENAME_RE);
   if (!m) {
-    if (/_/.test(name)) return { ok: false, reason: "underscores not allowed — use dots/hyphens" };
-    if (/[A-Z]/.test(name)) return { ok: false, reason: "uppercase not allowed — use kebab-case" };
+    if (/_/.test(name))
+      return {
+        ok: false,
+        reason: "underscores not allowed — use dots/hyphens",
+      };
+    if (/[A-Z]/.test(name))
+      return { ok: false, reason: "uppercase not allowed — use kebab-case" };
     if (/^story\.0/.test(name) || /^story\.\d+\.0/.test(name)) {
       return { ok: false, reason: "leading zero in epic/story id not allowed" };
     }
-    return { ok: false, reason: "does not match story.{E}.{S}.{kebab-name}.md" };
+    return {
+      ok: false,
+      reason: "does not match story.{E}.{S}.{kebab-name}.md",
+    };
   }
   return {
     ok: true,
@@ -48,7 +56,10 @@ function validateStoryPlanFilename(name) {
   const re =
     /^story\.(?<epic>[1-9][0-9]*)\.(?<story>[1-9][0-9]*)\.plan\.(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
   if (typeof name !== "string" || !re.test(name)) {
-    return { ok: false, reason: "does not match story.{E}.{S}.plan.{kebab-name}.md" };
+    return {
+      ok: false,
+      reason: "does not match story.{E}.{S}.plan.{kebab-name}.md",
+    };
   }
   const m = name.match(re);
   return {
@@ -88,10 +99,14 @@ function nextStoryId(entries, epicNum) {
 
 function assertUniqueStoryId(epicNum, storyNum, entries) {
   if (!Number.isInteger(epicNum) || epicNum < 1) {
-    throw new Error(`assertUniqueStoryId: epicNum must be positive integer, got ${epicNum}`);
+    throw new Error(
+      `assertUniqueStoryId: epicNum must be positive integer, got ${epicNum}`,
+    );
   }
   if (!Number.isInteger(storyNum) || storyNum < 1) {
-    throw new Error(`assertUniqueStoryId: storyNum must be positive integer, got ${storyNum}`);
+    throw new Error(
+      `assertUniqueStoryId: storyNum must be positive integer, got ${storyNum}`,
+    );
   }
   const ids = scanExistingStoryIds(entries, epicNum);
   if (ids.has(storyNum)) {
@@ -114,14 +129,18 @@ const REQUIRED_STORY_SECTION_IDS = [
 ];
 
 function listTemplateSectionIds(templateYaml) {
-  if (typeof templateYaml !== "string") throw new TypeError("templateYaml must be string");
+  if (typeof templateYaml !== "string")
+    throw new TypeError("templateYaml must be string");
   const ids = [];
   // Match either `- id: foo` (top-level sections) or nested. We only collect
   // top-level section IDs — those under the `sections:` root key at indent 2.
   const lines = templateYaml.split("\n");
   let inSections = false;
   for (const line of lines) {
-    if (/^sections:\s*$/.test(line)) { inSections = true; continue; }
+    if (/^sections:\s*$/.test(line)) {
+      inSections = true;
+      continue;
+    }
     if (!inSections) continue;
     if (/^\S/.test(line)) break; // hit a new top-level key
     const m = line.match(/^ {2}- id:\s*(\S+)\s*$/);

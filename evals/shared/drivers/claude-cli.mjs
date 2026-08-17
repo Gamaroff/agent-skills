@@ -67,7 +67,7 @@ const driver = {
 
   async run(ctx) {
     installSkill(ctx.sandbox, ctx.skill, ctx.skillRoot);
-    const stdin = ctx.answers.map(a => a.answer).join("\n") + "\n";
+    const stdin = ctx.answers.map((a) => a.answer).join("\n") + "\n";
     // -p prints the prompt and runs non-interactively. --add-dir scopes the
     // agent to the sandbox. We pass the skill root as a hint via env so the
     // user can wire skill discovery in their own ~/.claude config.

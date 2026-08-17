@@ -48,7 +48,7 @@ test("every step file exists on disk", async () => {
     const full = path.join(STEP_DIR, file);
     let stat;
     try {
-      stat = await import("node:fs/promises").then(m => m.stat(full));
+      stat = await import("node:fs/promises").then((m) => m.stat(full));
     } catch {
       assert.fail(`step file missing: shared/resources/${file}`);
     }
@@ -73,7 +73,9 @@ test("SKILL.md references step banners for steps 1-8", async () => {
   // Banners look like: === DEVELOP-TASK PIPELINE: STEP {N}/8 ===
   for (let n = 1; n <= 8; n++) {
     assert.ok(
-      content.includes(`Step ${n}`) || content.includes(`STEP ${n}`) || content.includes(`Step ${n}/8`),
+      content.includes(`Step ${n}`) ||
+        content.includes(`STEP ${n}`) ||
+        content.includes(`Step ${n}/8`),
       `SKILL.md does not reference Step ${n}`,
     );
   }
@@ -83,7 +85,7 @@ test("SKILL.md has autonomous-defaults reference or table", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   assert.ok(
     content.includes("develop-pipeline-autonomous-defaults") ||
-    content.includes("Autonomous Decision Defaults"),
+      content.includes("Autonomous Decision Defaults"),
     "SKILL.md missing autonomous-defaults reference",
   );
 });
@@ -93,7 +95,8 @@ test("develop-pipeline-resume-contract.md exists and has per-step table", async 
   const content = await readFile(full, "utf-8");
   assert.ok(content.length > 200, "resume-contract.md is unexpectedly short");
   assert.ok(
-    content.includes("Step") && (content.includes("artifact") || content.includes("branch")),
+    content.includes("Step") &&
+      (content.includes("artifact") || content.includes("branch")),
     "resume-contract.md missing step/artifact table",
   );
 });

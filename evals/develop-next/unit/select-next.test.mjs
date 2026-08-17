@@ -271,9 +271,7 @@ test("complete: excluded rows are counted, so the not-a-roadmap guard still fire
   const notARoadmap = select("# Notes\n\nProse only.\n");
   assert.equal(notARoadmap.status, "halt");
 
-  const archived = parseRoadmap(
-    "# R\n\n## Housekeeping\n\n- [ ] a row\n",
-  );
+  const archived = parseRoadmap("# R\n\n## Housekeeping\n\n- [ ] a row\n");
   assert.equal(archived.rows.length, 0, "excluded rows are not candidates");
   assert.equal(archived.excludedRows, 1, "but they are counted");
 });
@@ -559,10 +557,13 @@ test("11: `T` requires a following digit — 'Task 22' is not the id T22", () =>
 // ── 12: `touches:` parsing + `--batch` parallel worktree packing ─────────────
 
 test("12: parseTouches reads severity marks; +own and - are dropped", () => {
-  assert.deepEqual(parseTouches("x · touches: schema~, leaderboard!, +own · y"), [
-    { tag: "schema", hard: false },
-    { tag: "leaderboard", hard: true },
-  ]);
+  assert.deepEqual(
+    parseTouches("x · touches: schema~, leaderboard!, +own · y"),
+    [
+      { tag: "schema", hard: false },
+      { tag: "leaderboard", hard: true },
+    ],
+  );
   assert.deepEqual(parseTouches("x · touches: routes · y"), [
     { tag: "routes", hard: false },
     // unmarked defaults to soft
@@ -606,16 +607,26 @@ test("12: --batch packs soft-overlapping ready rows, excludes hard conflicts", (
   const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
   assert.equal(b.status, "batch");
   const ids = b.batch.map((r) => r.id);
-  assert.deepEqual(ids, ["8.1", "8.2", "8.3"], "8.1+8.2 soft-share schema (ok); 8.3 first leaderboard wins");
+  assert.deepEqual(
+    ids,
+    ["8.1", "8.2", "8.3"],
+    "8.1+8.2 soft-share schema (ok); 8.3 first leaderboard wins",
+  );
   assert.equal(b.excluded.length, 1);
   assert.equal(b.excluded[0].id, "8.4");
-  assert.match(b.excluded[0].reason, /hard-conflict on 'leaderboard' with 8\.3/);
+  assert.match(
+    b.excluded[0].reason,
+    /hard-conflict on 'leaderboard' with 8\.3/,
+  );
   // 8.5 is dep-blocked, so it never reaches the batch (not an exclusion).
   assert.ok(!ids.includes("8.5") && !b.excluded.some((e) => e.id === "8.5"));
   // the accepted soft overlap is surfaced for the operator
   assert.ok(
     b.softOverlaps.some(
-      (o) => o.tag === "schema" && o.between.includes("8.1") && o.between.includes("8.2"),
+      (o) =>
+        o.tag === "schema" &&
+        o.between.includes("8.1") &&
+        o.between.includes("8.2"),
     ),
   );
 });
@@ -626,7 +637,10 @@ test("12: --batch emits a worktree command per batched row, based off develop", 
   const w = b.worktrees.find((x) => x.id === "8.1");
   assert.equal(w.base, "develop");
   assert.match(w.shell, /^git worktree add .* -b story\/8-1 develop$/);
-  assert.match(w.run, /^\/develop-story docs\/p\/s\/story\.8\.1\.a\/story\.8\.1\.a\.md$/);
+  assert.match(
+    w.run,
+    /^\/develop-story docs\/p\/s\/story\.8\.1\.a\/story\.8\.1\.a\.md$/,
+  );
 });
 
 test("12: --batch advances past a fully-blocked phase, recording it", () => {
@@ -644,7 +658,10 @@ test("12: --batch advances past a fully-blocked phase, recording it", () => {
   );
   const b = selectBatch(m);
   assert.match(b.phase, /PHASE 2/);
-  assert.deepEqual(b.batch.map((r) => r.id), ["8.1"]);
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1"],
+  );
   assert.equal(b.skippedPhases.length, 1);
   assert.match(b.skippedPhases[0].phase, /PHASE 1/);
 });
@@ -676,8 +693,16 @@ const UNANNOTATED_ROADMAP = [
 
 test("13: touchesAnnotated distinguishes a missing field from an explicit +own", () => {
   const m = parseRoadmap(UNANNOTATED_ROADMAP);
-  assert.equal(m.byId.get("9.1").touchesAnnotated, false, "no field → un-annotated");
-  assert.equal(m.byId.get("9.3").touchesAnnotated, true, "+own is a deliberate annotation");
+  assert.equal(
+    m.byId.get("9.1").touchesAnnotated,
+    false,
+    "no field → un-annotated",
+  );
+  assert.equal(
+    m.byId.get("9.3").touchesAnnotated,
+    true,
+    "+own is a deliberate annotation",
+  );
   // both still parse to an empty touches[] — the flag is the only signal
   assert.deepEqual(m.byId.get("9.1").touches, []);
   assert.deepEqual(m.byId.get("9.3").touches, []);
@@ -687,11 +712,23 @@ test("13: --batch warns when ≥2 un-annotated rows are co-scheduled", () => {
   const b = selectBatch(parseRoadmap(UNANNOTATED_ROADMAP));
   assert.equal(b.status, "batch");
   // all three are ready and none hard-conflict, so all are batched
-  assert.deepEqual(b.batch.map((r) => r.id), ["9.1", "9.2", "9.3"]);
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["9.1", "9.2", "9.3"],
+  );
   // only the two field-less rows are reported un-annotated; +own 9.3 is excluded
-  assert.deepEqual(b.unannotated.map((u) => u.id), ["9.1", "9.2"]);
-  const warn = b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w));
-  assert.equal(warn.length, 1, `expected one co-schedule warning; got ${JSON.stringify(b.lint.warnings)}`);
+  assert.deepEqual(
+    b.unannotated.map((u) => u.id),
+    ["9.1", "9.2"],
+  );
+  const warn = b.lint.warnings.filter((w) =>
+    /un-annotated .* co-scheduled/.test(w),
+  );
+  assert.equal(
+    warn.length,
+    1,
+    `expected one co-schedule warning; got ${JSON.stringify(b.lint.warnings)}`,
+  );
   assert.match(warn[0], /9\.1, 9\.2/);
 });
 
@@ -706,24 +743,34 @@ test("13: a single un-annotated row does not warn", () => {
     ].join("\n"),
   );
   const b = selectBatch(m);
-  assert.deepEqual(b.unannotated.map((u) => u.id), ["9.1"]);
+  assert.deepEqual(
+    b.unannotated.map((u) => u.id),
+    ["9.1"],
+  );
   assert.equal(
-    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w)).length,
+    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w))
+      .length,
     0,
     "one un-annotated row is not a co-scheduling risk",
   );
 });
 
 test("13: requireTouches keeps one un-annotated row, defers the rest", () => {
-  const b = selectBatch(parseRoadmap(UNANNOTATED_ROADMAP), { requireTouches: true });
+  const b = selectBatch(parseRoadmap(UNANNOTATED_ROADMAP), {
+    requireTouches: true,
+  });
   // 9.1 (first un-annotated) + 9.3 (annotated) batched; 9.2 deferred
-  assert.deepEqual(b.batch.map((r) => r.id), ["9.1", "9.3"]);
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["9.1", "9.3"],
+  );
   const dropped = b.excluded.find((e) => e.id === "9.2");
   assert.ok(dropped, "9.2 must be deferred");
   assert.match(dropped.reason, /unannotated-touches \(requireTouches\)/);
   // the downgrade resolves the risk → no residual co-schedule warning
   assert.equal(
-    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w)).length,
+    b.lint.warnings.filter((w) => /un-annotated .* co-scheduled/.test(w))
+      .length,
     0,
     "deferring the extra row clears the warning",
   );
@@ -740,6 +787,11 @@ test("13: CLI --batch --require-touches defers un-annotated rows", () => {
   );
   const r = JSON.parse(out);
   assert.equal(r.status, "batch");
-  assert.deepEqual(r.batch.map((b) => b.id), ["9.1", "9.3"]);
-  assert.ok(r.excluded.some((e) => e.id === "9.2" && /requireTouches/.test(e.reason)));
+  assert.deepEqual(
+    r.batch.map((b) => b.id),
+    ["9.1", "9.3"],
+  );
+  assert.ok(
+    r.excluded.some((e) => e.id === "9.2" && /requireTouches/.test(e.reason)),
+  );
 });

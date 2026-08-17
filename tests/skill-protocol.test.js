@@ -109,7 +109,9 @@ test("create-task — protocol declares 11 mandatory sections, template has all 
     path.join(SKILLS_DIR, "create-task", "resources", "task-template.md"),
     "utf-8",
   );
-  const lib = require(path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"));
+  const lib = require(
+    path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"),
+  );
   assert.equal(
     lib.countMandatorySections(template),
     11,
@@ -121,19 +123,35 @@ test("create-task — protocol declares 11 mandatory sections, template has all 
 // create-task — naming convention reference is consistent
 // ===========================================================================
 test("create-task — naming convention examples are accepted by validator", () => {
-  const lib = require(path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"));
-  assert.equal(lib.validateTaskFilename("task.1.cache-lib-simplification.md").ok, true);
-  assert.equal(lib.validateTaskFilename("task.2.nestjs-dynamic-module-pattern.md").ok, true);
+  const lib = require(
+    path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"),
+  );
+  assert.equal(
+    lib.validateTaskFilename("task.1.cache-lib-simplification.md").ok,
+    true,
+  );
+  assert.equal(
+    lib.validateTaskFilename("task.2.nestjs-dynamic-module-pattern.md").ok,
+    true,
+  );
   // SKILL.md explicitly calls out the wrong forms below as invalid.
-  assert.equal(lib.validateTaskFilename("task_1_cache_lib_simplification.md").ok, false);
-  assert.equal(lib.validateTaskFilename("task.1.cacheLibSimplification.md").ok, false);
+  assert.equal(
+    lib.validateTaskFilename("task_1_cache_lib_simplification.md").ok,
+    false,
+  );
+  assert.equal(
+    lib.validateTaskFilename("task.1.cacheLibSimplification.md").ok,
+    false,
+  );
 });
 
 // ===========================================================================
 // create-story — story-template.yaml declares all required sections
 // ===========================================================================
 test("create-story — template declares all required sections", () => {
-  const lib = require(path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"));
+  const lib = require(
+    path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"),
+  );
   const tpl = fs.readFileSync(
     path.join(SKILLS_DIR, "create-story", "resources", "story-template.yaml"),
     "utf-8",
@@ -155,7 +173,9 @@ test("create-story — template declares all required sections", () => {
 const SIGN_OFF_HEADING = "Stakeholder Sign-off";
 
 test("sign-off — story-template.yaml declares the sign-off section and allows editing it", () => {
-  const lib = require(path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"));
+  const lib = require(
+    path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"),
+  );
   const tpl = fs.readFileSync(
     path.join(SKILLS_DIR, "create-story", "resources", "story-template.yaml"),
     "utf-8",
@@ -216,7 +236,9 @@ for (const skill of ["create-task", "review-task"]) {
 }
 
 test("sign-off — create-task keeps the mandatory count at 11 with sign-off present", () => {
-  const lib = require(path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"));
+  const lib = require(
+    path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"),
+  );
   const tpl = fs.readFileSync(
     path.join(SKILLS_DIR, "create-task", "resources", "task-template.md"),
     "utf-8",
@@ -229,7 +251,12 @@ test("sign-off — create-task keeps the mandatory count at 11 with sign-off pre
   );
 });
 
-for (const skill of ["create-story", "create-task", "review-story", "review-task"]) {
+for (const skill of [
+  "create-story",
+  "create-task",
+  "review-story",
+  "review-task",
+]) {
   test(`sign-off — ${skill} documents the config gate and the agents-never-sign rule`, () => {
     const { content } = loadSkill(skill);
     assert.match(content, /sign-off\.enabled/, "must gate on sign-off.enabled");
@@ -251,11 +278,24 @@ for (const skill of ["create-story", "create-task", "review-story", "review-task
 // ===========================================================================
 // change-log — the four review skills document the config gate and link the spec
 // ===========================================================================
-for (const skill of ["review-story", "review-task", "review-epic", "review-prd"]) {
+for (const skill of [
+  "review-story",
+  "review-task",
+  "review-epic",
+  "review-prd",
+]) {
   test(`change-log — ${skill} documents the config gate and links the spec`, () => {
     const { content } = loadSkill(skill);
-    assert.match(content, /change-log\.enabled/, "must gate on change-log.enabled");
-    assert.match(content, /change-log\.enforcement/, "must grade per change-log.enforcement");
+    assert.match(
+      content,
+      /change-log\.enabled/,
+      "must gate on change-log.enabled",
+    );
+    assert.match(
+      content,
+      /change-log\.enforcement/,
+      "must grade per change-log.enforcement",
+    );
     // Bundling rewrites `shared/resources/X` → `references/X` in place, so accept
     // either form; what matters is that the canonical spec is referenced at all.
     assert.match(
@@ -305,7 +345,11 @@ for (const skill of [
 // Change Log. Assert the exclusion holds, so a future edit cannot quietly add one.
 test("change-log — review-bug writes Status History, not a Change Log", () => {
   const { content } = loadSkill("review-bug");
-  assert.match(content, /Status History/, "must instruct writing a Status History row");
+  assert.match(
+    content,
+    /Status History/,
+    "must instruct writing a Status History row",
+  );
   assert.match(
     content,
     /not a Change Log|no Change Log|instead of a Change Log/i,
@@ -314,10 +358,18 @@ test("change-log — review-bug writes Status History, not a Change Log", () => 
 });
 
 test("create-story — naming convention examples are accepted by validator", () => {
-  const lib = require(path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"));
-  assert.equal(lib.validateStoryFilename("story.178.8.example-feature.md").ok, true);
+  const lib = require(
+    path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"),
+  );
+  assert.equal(
+    lib.validateStoryFilename("story.178.8.example-feature.md").ok,
+    true,
+  );
   assert.equal(lib.validateStoryFilename("story_1_2_example.md").ok, false);
-  assert.equal(lib.validateStoryFilename("story.1.2.exampleFeature.md").ok, false);
+  assert.equal(
+    lib.validateStoryFilename("story.1.2.exampleFeature.md").ok,
+    false,
+  );
 });
 
 // ===========================================================================
@@ -347,7 +399,9 @@ for (const name of TARGET_SKILLS) {
     // And mark it as forbidden (❌ or "Forbidden" or "MUST NOT"/"NEVER").
     const lc = content.toLowerCase();
     assert.ok(
-      lc.includes("forbidden") || lc.includes("never") || content.includes("❌"),
+      lc.includes("forbidden") ||
+        lc.includes("never") ||
+        content.includes("❌"),
       "must explicitly mark ~/.claude/plans/ as forbidden",
     );
   });
@@ -364,7 +418,8 @@ const CHANGE_LOG_HEADING = "Change Log";
 const CANONICAL_COLUMNS = /columns: \[Date, Version, Description, Author\]/;
 // Bundling rewrites `shared/resources/X` → `references/X` in place, so accept
 // either form — what matters is that the canonical spec is referenced at all.
-const CHANGE_LOG_SPEC_REF = /(shared\/resources|references)\/document-change-log\.md/;
+const CHANGE_LOG_SPEC_REF =
+  /(shared\/resources|references)\/document-change-log\.md/;
 
 for (const skill of ["create-task", "review-task"]) {
   test(`change-log — ${skill} task template carries an unnumbered Change Log`, () => {
@@ -387,7 +442,9 @@ for (const skill of ["create-task", "review-task"]) {
 }
 
 test("change-log — adding the section does not change the 11-section count", () => {
-  const lib = require(path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"));
+  const lib = require(
+    path.join(SKILLS_DIR, "create-task", "scripts", "lib.js"),
+  );
   const tpl = fs.readFileSync(
     path.join(SKILLS_DIR, "create-task", "resources", "task-template.md"),
     "utf-8",
@@ -411,7 +468,11 @@ test("change-log — create-task and review-task ship byte-identical task templa
     path.join(SKILLS_DIR, "review-task", "resources", "task-template.md"),
     "utf-8",
   );
-  assert.equal(a, b, "task-template.md copies have diverged — re-copy the create-task version");
+  assert.equal(
+    a,
+    b,
+    "task-template.md copies have diverged — re-copy the create-task version",
+  );
 });
 
 test("change-log — all three epic-template copies are byte-identical", () => {
@@ -458,7 +519,12 @@ test("change-log — the epic template promotes the log to H2, above Notes & Upd
 
 test("change-log — the legacy story markdown template carries the canonical section", () => {
   const tpl = fs.readFileSync(
-    path.join(SKILLS_DIR, "documentation-standards-validator", "references", "story-template.md"),
+    path.join(
+      SKILLS_DIR,
+      "documentation-standards-validator",
+      "references",
+      "story-template.md",
+    ),
     "utf-8",
   );
   assert.match(tpl, new RegExp(`^## ${CHANGE_LOG_HEADING}$`, "m"));
@@ -478,7 +544,11 @@ test("change-log — both PRD templates and both story templates use the canonic
     "skills/review-story/resources/story-template.yaml",
   ]) {
     const content = fs.readFileSync(path.join(REPO_ROOT, p), "utf-8");
-    assert.match(content, CANONICAL_COLUMNS, `${p} must use the canonical four columns`);
+    assert.match(
+      content,
+      CANONICAL_COLUMNS,
+      `${p} must use the canonical four columns`,
+    );
     assert.doesNotMatch(
       content,
       /columns: \[Change, Date, Version, Description, Author\]/,

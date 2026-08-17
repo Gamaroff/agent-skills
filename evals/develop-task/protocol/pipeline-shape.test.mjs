@@ -74,7 +74,8 @@ test("SKILL.md: references develop-pipeline-step-*.md for each step", async () =
 test("SKILL.md: has context compression recovery section", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   assert.ok(
-    content.includes("Context Compression Recovery") || content.includes("context was compressed"),
+    content.includes("Context Compression Recovery") ||
+      content.includes("context was compressed"),
     "SKILL.md is missing context compression recovery instructions",
   );
 });
@@ -90,7 +91,8 @@ test("SKILL.md: has graceful pause / pipeline lock section", async () => {
 test("SKILL.md: never stop between steps — hands-free guarantee mentioned", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   assert.ok(
-    content.includes("hands-free") || content.includes("Never stop between steps"),
+    content.includes("hands-free") ||
+      content.includes("Never stop between steps"),
     "SKILL.md missing hands-free / never-stop guarantee",
   );
 });
@@ -98,12 +100,20 @@ test("SKILL.md: never stop between steps — hands-free guarantee mentioned", as
 test("develop-pipeline-step-*.md files 1-7 have a HALT terminator", async () => {
   const files = await readdir(STEP_RESOURCES_DIR);
   // Step 8 is the terminal success step — it cleans up and finishes, no HALT required.
-  const stepFiles = files.filter(f => /^develop-pipeline-step-.*\.md$/.test(f) && !f.includes("step-8"));
+  const stepFiles = files.filter(
+    (f) => /^develop-pipeline-step-.*\.md$/.test(f) && !f.includes("step-8"),
+  );
 
-  assert.ok(stepFiles.length >= 6, `expected at least 6 step files (excl. step-8), found ${stepFiles.length}: ${stepFiles.join(", ")}`);
+  assert.ok(
+    stepFiles.length >= 6,
+    `expected at least 6 step files (excl. step-8), found ${stepFiles.length}: ${stepFiles.join(", ")}`,
+  );
 
   for (const file of stepFiles) {
-    const content = await readFile(path.join(STEP_RESOURCES_DIR, file), "utf-8");
+    const content = await readFile(
+      path.join(STEP_RESOURCES_DIR, file),
+      "utf-8",
+    );
     assert.ok(
       /\bHALT\b|\bSTOP\b/i.test(content),
       `${file} is missing a HALT/STOP terminator`,

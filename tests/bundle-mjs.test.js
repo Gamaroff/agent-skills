@@ -98,14 +98,16 @@ test("mjs: a shared resource imported from a .mjs script is bundled into referen
       ].join("\n"),
     },
     sharedFiles: {
-      "thing.js": 'function parseThing(s) { return s; }\nmodule.exports = { parseThing };\n',
+      "thing.js":
+        "function parseThing(s) { return s; }\nmodule.exports = { parseThing };\n",
     },
   });
 
   assert.ok(
     fx.exists("references/thing.js"),
     "shared/resources/thing.js must be copied into <skill>/references/ — " +
-      "without it the install has no file to resolve to. Bundler said:\n" + fx.stdout,
+      "without it the install has no file to resolve to. Bundler said:\n" +
+      fx.stdout,
   );
 });
 
@@ -127,7 +129,8 @@ test("mjs: the ESM import path is rewritten to ../references/", () => {
     rewritten,
     /from "\.\.\/references\/thing\.js"/,
     "the import specifier must point at ../references/thing.js, which is where the " +
-      "bundled copy sits relative to <skill>/scripts/. Got:\n" + rewritten,
+      "bundled copy sits relative to <skill>/scripts/. Got:\n" +
+      rewritten,
   );
   assert.doesNotMatch(
     rewritten,
@@ -175,7 +178,8 @@ test("mjs: transitive sibling imports inside a bundled shared file are followed"
       "scripts/run.mjs": 'import "../../../shared/resources/engine.js";\n',
     },
     sharedFiles: {
-      "engine.js": 'const { p } = require("./parser.js");\nmodule.exports = { p };\n',
+      "engine.js":
+        'const { p } = require("./parser.js");\nmodule.exports = { p };\n',
       "parser.js": "module.exports = { p: 1 };\n",
     },
   });
@@ -215,7 +219,8 @@ test("cjs: require() rewriting in .js files is unchanged by the .mjs work", () =
   const fx = bundleFixture({
     skillFiles: {
       "SKILL.md": SKILL_MD,
-      "scripts/run.js": 'const t = require("../../../shared/resources/thing.js");\nmodule.exports = t;\n',
+      "scripts/run.js":
+        'const t = require("../../../shared/resources/thing.js");\nmodule.exports = t;\n',
     },
     sharedFiles: { "thing.js": "module.exports = {};\n" },
   });
@@ -241,8 +246,16 @@ test("mjs: bundling is idempotent — a second run changes nothing", () => {
 
   execFileSync("python3", [BUNDLER, fx.skillDir], { encoding: "utf-8" });
 
-  assert.equal(fx.read("scripts/run.mjs"), afterFirst, "source rewrite must be stable");
-  assert.equal(fx.read("references/thing.js"), bundledFirst, "bundled copy must be stable");
+  assert.equal(
+    fx.read("scripts/run.mjs"),
+    afterFirst,
+    "source rewrite must be stable",
+  );
+  assert.equal(
+    fx.read("references/thing.js"),
+    bundledFirst,
+    "bundled copy must be stable",
+  );
 });
 
 test("mjs: the real develop-batch skill bundles its shared parser with a rewritten path", () => {
@@ -250,7 +263,11 @@ test("mjs: the real develop-batch skill bundles its shared parser with a rewritt
   // than a fixture. Skipped rather than failed when the promotion has not landed,
   // so the file is committable before schedule.mjs is swapped.
   const scriptPath = path.join(
-    REPO_ROOT, "skills", "develop-batch", "scripts", "schedule.mjs",
+    REPO_ROOT,
+    "skills",
+    "develop-batch",
+    "scripts",
+    "schedule.mjs",
   );
   const source = fs.readFileSync(scriptPath, "utf-8");
   if (!/yaml-subset\.js/.test(source)) {
@@ -258,7 +275,11 @@ test("mjs: the real develop-batch skill bundles its shared parser with a rewritt
   }
 
   const bundledParser = path.join(
-    REPO_ROOT, "skills", "develop-batch", "references", "yaml-subset.js",
+    REPO_ROOT,
+    "skills",
+    "develop-batch",
+    "references",
+    "yaml-subset.js",
   );
   assert.ok(
     fs.existsSync(bundledParser),
@@ -282,14 +303,21 @@ test("mjs: the bundled parser matches its shared source (drift guard)", () => {
   // arriving through a different door.
   const shared = path.join(REPO_ROOT, "shared", "resources", "yaml-subset.js");
   const bundled = path.join(
-    REPO_ROOT, "skills", "develop-batch", "references", "yaml-subset.js",
+    REPO_ROOT,
+    "skills",
+    "develop-batch",
+    "references",
+    "yaml-subset.js",
   );
   if (!fs.existsSync(bundled)) return; // promotion not yet wired
 
   // The bundled copy differs from source by exactly one thing: the generated
   // header the bundler injects. Strip it and the two must be identical.
   const strip = (s) =>
-    s.split("\n").filter((l) => !l.includes("AUTO-GENERATED — DO NOT EDIT")).join("\n");
+    s
+      .split("\n")
+      .filter((l) => !l.includes("AUTO-GENERATED — DO NOT EDIT"))
+      .join("\n");
 
   assert.equal(
     strip(fs.readFileSync(bundled, "utf-8")),

@@ -29,7 +29,10 @@ test("createSandbox: writes fixture files and creates initial commit", async () 
 });
 
 test("createSandbox: branchList returns default branch", async () => {
-  const sb = await createSandbox({ branch: "develop", fixtureFiles: { "a.txt": "x" } });
+  const sb = await createSandbox({
+    branch: "develop",
+    fixtureFiles: { "a.txt": "x" },
+  });
   try {
     const branches = await sb.branchList();
     assert.ok(branches.includes("develop"));

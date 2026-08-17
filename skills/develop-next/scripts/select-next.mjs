@@ -576,7 +576,9 @@ function isReady(model, r) {
   if (r.ticked || r.skip || r.manual || r.gated) return false;
   if (!r.command || !/^\/develop-(story|task)$/.test(r.command)) return false;
   if (!r.commandArg) return false;
-  if (r.blockedUntil.some((b) => b === "<unparsed>" || idDone(model, b) !== true))
+  if (
+    r.blockedUntil.some((b) => b === "<unparsed>" || idDone(model, b) !== true)
+  )
     return false;
   if (flowBlockers(model, r).length) return false;
   if (r.deps.some((d) => !depSatisfied(model, d))) return false;
@@ -668,7 +670,11 @@ export function selectBatch(model, opts = {}) {
       }
       // requireTouches: keep at most one un-annotated (+own-default) row per batch;
       // defer the rest so an un-verified write footprint can never over-parallelize.
-      if (requireTouches && !row.touchesAnnotated && batch.some((r) => !r.touchesAnnotated)) {
+      if (
+        requireTouches &&
+        !row.touchesAnnotated &&
+        batch.some((r) => !r.touchesAnnotated)
+      ) {
         excluded.push({
           id: row.id,
           line: row.line,
@@ -699,7 +705,10 @@ export function selectBatch(model, opts = {}) {
         for (const ta of batch[i].touches)
           for (const tb of batch[j].touches)
             if (ta.tag === tb.tag)
-              softOverlaps.push({ tag: ta.tag, between: [batch[i].id, batch[j].id] });
+              softOverlaps.push({
+                tag: ta.tag,
+                between: [batch[i].id, batch[j].id],
+              });
 
     return {
       status: "batch",

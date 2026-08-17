@@ -67,7 +67,8 @@ function makePrd(root, prd, epics) {
   return prdDir;
 }
 
-const readPrd = (prdDir, prd) => readFileSync(join(prdDir, `${prd}.md`), "utf8");
+const readPrd = (prdDir, prd) =>
+  readFileSync(join(prdDir, `${prd}.md`), "utf8");
 
 // ===========================================================================
 // Idempotency
@@ -76,8 +77,18 @@ test("idempotency — second run makes no change", () => {
   const root = tmp();
   try {
     makePrd(root, "prd.alpha", [
-      { dir: "epic.1.foo", title: "[Epic 1] Foo", number: 1, status: "planned" },
-      { dir: "epic.2.bar", title: "[Epic 2] Bar", number: 2, status: "in-progress" },
+      {
+        dir: "epic.1.foo",
+        title: "[Epic 1] Foo",
+        number: 1,
+        status: "planned",
+      },
+      {
+        dir: "epic.2.bar",
+        title: "[Epic 2] Bar",
+        number: 2,
+        status: "in-progress",
+      },
     ]);
     const first = run(root, ["--prd-root", root]);
     assert.equal(first.status, 0, first.stderr);
@@ -101,8 +112,18 @@ test("output shape — markers, table header, sort, relative links", () => {
   const root = tmp();
   try {
     makePrd(root, "prd.alpha", [
-      { dir: "epic.10.ten", title: "[Epic 10] Ten", number: 10, status: "planned" },
-      { dir: "epic.2.two", title: "[Epic 2] Two", number: 2, status: "accepted" },
+      {
+        dir: "epic.10.ten",
+        title: "[Epic 10] Ten",
+        number: 10,
+        status: "planned",
+      },
+      {
+        dir: "epic.2.two",
+        title: "[Epic 2] Two",
+        number: 2,
+        status: "accepted",
+      },
       { dir: "epic.1.one", title: "[Epic 1] One", number: 1 },
     ]);
     assert.equal(run(root, ["--prd-root", root]).status, 0);
@@ -119,7 +140,10 @@ test("output shape — markers, table header, sort, relative links", () => {
     assert.match(out, /\| --- \| ---- \| ------ \|/);
 
     // Relative link shape: [Title](epics/<dir>/<dir>.md)
-    assert.match(out, /\| 1 \| \[One\]\(epics\/epic\.1\.one\/epic\.1\.one\.md\) \| — \|/);
+    assert.match(
+      out,
+      /\| 1 \| \[One\]\(epics\/epic\.1\.one\/epic\.1\.one\.md\) \| — \|/,
+    );
     assert.match(
       out,
       /\| 2 \| \[Two\]\(epics\/epic\.2\.two\/epic\.2\.two\.md\) \| accepted \|/,
@@ -127,11 +151,15 @@ test("output shape — markers, table header, sort, relative links", () => {
 
     // Numeric (not lexical) sort: 1 then 2 then 10.
     const order = ["One", "Two", "Ten"].map((t) => out.indexOf(`[${t}]`));
-    assert.ok(order[0] < order[1] && order[1] < order[2], "epics must sort numerically");
+    assert.ok(
+      order[0] < order[1] && order[1] < order[2],
+      "epics must sort numerically",
+    );
 
     // Block sits after the H1.
     assert.ok(
-      out.indexOf("# prd.alpha PRD") < out.indexOf("<!-- epics-index-start -->"),
+      out.indexOf("# prd.alpha PRD") <
+        out.indexOf("<!-- epics-index-start -->"),
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -169,7 +197,12 @@ test("--check exits 0 when up to date, non-zero on drift", () => {
   const root = tmp();
   try {
     const prdDir = makePrd(root, "prd.alpha", [
-      { dir: "epic.1.foo", title: "[Epic 1] Foo", number: 1, status: "planned" },
+      {
+        dir: "epic.1.foo",
+        title: "[Epic 1] Foo",
+        number: 1,
+        status: "planned",
+      },
     ]);
     // Generate once so the index is current.
     assert.equal(run(root, ["--prd-root", root]).status, 0);
@@ -182,7 +215,10 @@ test("--check exits 0 when up to date, non-zero on drift", () => {
     const epicFile = join(prdDir, "epics", "epic.1.foo", "epic.1.foo.md");
     writeFileSync(
       epicFile,
-      readFileSync(epicFile, "utf8").replace("status: planned", "status: accepted"),
+      readFileSync(epicFile, "utf8").replace(
+        "status: planned",
+        "status: accepted",
+      ),
     );
     const drift = run(root, ["--prd-root", root, "--check"]);
     assert.equal(drift.status, 1, "stale tree → exit 1");
@@ -257,7 +293,10 @@ test("--prd-root overrides config", () => {
     );
     const res = run(root, ["--prd-root", join(root, "custom")]);
     assert.equal(res.status, 0, res.stderr);
-    assert.match(readPrd(join(root, "custom", "prd.beta"), "prd.beta"), /\[Foo\]/);
+    assert.match(
+      readPrd(join(root, "custom", "prd.beta"), "prd.beta"),
+      /\[Foo\]/,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -308,7 +347,11 @@ test("frontmatter — a single-quoted title undoubles YAML's escaped apostrophe"
     const out = readPrd(prdDir, "prd.quoted");
     assert.match(out, /Anna's wallet/, "renders one apostrophe");
     assert.doesNotMatch(out, /Anna''s wallet/, "never leaks YAML's doubling");
-    assert.doesNotMatch(out, /'\[Epic 1\]/, "the wrapping quote is still stripped");
+    assert.doesNotMatch(
+      out,
+      /'\[Epic 1\]/,
+      "the wrapping quote is still stripped",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

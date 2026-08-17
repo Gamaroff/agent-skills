@@ -11,7 +11,12 @@ const assert = require("node:assert/strict");
 
 const lib = require("../scripts/lib.js");
 
-const TEMPLATE_PATH = path.join(__dirname, "..", "resources", "story-template.yaml");
+const TEMPLATE_PATH = path.join(
+  __dirname,
+  "..",
+  "resources",
+  "story-template.yaml",
+);
 
 // ===========================================================================
 // validateStoryFilename
@@ -48,7 +53,9 @@ test("validateStoryFilename — rejects missing parts", () => {
 });
 
 test("validateStoryPlanFilename — happy path", () => {
-  const r = lib.validateStoryPlanFilename("story.178.8.plan.example-feature.md");
+  const r = lib.validateStoryPlanFilename(
+    "story.178.8.plan.example-feature.md",
+  );
   assert.equal(r.ok, true);
   assert.equal(r.epic, 178);
   assert.equal(r.story, 8);
@@ -56,7 +63,10 @@ test("validateStoryPlanFilename — happy path", () => {
 });
 
 test("validateStoryPlanFilename — rejects missing 'plan' marker", () => {
-  assert.equal(lib.validateStoryPlanFilename("story.1.2.example-feature.md").ok, false);
+  assert.equal(
+    lib.validateStoryPlanFilename("story.1.2.example-feature.md").ok,
+    false,
+  );
 });
 
 // ===========================================================================
@@ -66,14 +76,17 @@ test("scanExistingStoryIds — scoped to given epic", () => {
   const ids = lib.scanExistingStoryIds(
     [
       "story.1.1.foo.md",
-      "story.1.2.bar",     // directory
-      "story.2.1.baz.md",  // different epic — ignored
+      "story.1.2.bar", // directory
+      "story.2.1.baz.md", // different epic — ignored
       "story.1.5.qux.md",
       "README.md",
     ],
     1,
   );
-  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 2, 5]);
+  assert.deepEqual(
+    [...ids].sort((a, b) => a - b),
+    [1, 2, 5],
+  );
 });
 
 test("scanExistingStoryIds — rejects bad epicNum", () => {
@@ -158,7 +171,10 @@ stories:
   - id: story.1.1.alpha
     status: done
 `;
-  const out = lib.mergeSprintStatus(input, { id: "story.1.2.beta", status: "ready-for-dev" });
+  const out = lib.mergeSprintStatus(input, {
+    id: "story.1.2.beta",
+    status: "ready-for-dev",
+  });
   // Existing tasks block untouched.
   assert.match(out, /- id: task\.1\.foo\n {4}status: done/);
   // New story appended at end of stories block.
@@ -172,18 +188,27 @@ test("mergeSprintStatus — updates story status in place", () => {
   - id: story.1.1.alpha
     status: in-progress
 `;
-  const out = lib.mergeSprintStatus(input, { id: "story.1.1.alpha", status: "done" });
+  const out = lib.mergeSprintStatus(input, {
+    id: "story.1.1.alpha",
+    status: "done",
+  });
   assert.match(out, /- id: story\.1\.1\.alpha\n {4}status: done/);
   const dupCount = (out.match(/status:/g) || []).length;
   assert.equal(dupCount, 1, "should not duplicate status line");
 });
 
 test("mergeSprintStatus — creates stories: block if absent", () => {
-  const out = lib.mergeSprintStatus("tasks:\n  - id: task.1.foo\n    status: done\n", {
-    id: "story.1.1.alpha",
-    status: "ready-for-dev",
-  });
-  assert.match(out, /stories:\n {2}- id: story\.1\.1\.alpha\n {4}status: ready-for-dev/);
+  const out = lib.mergeSprintStatus(
+    "tasks:\n  - id: task.1.foo\n    status: done\n",
+    {
+      id: "story.1.1.alpha",
+      status: "ready-for-dev",
+    },
+  );
+  assert.match(
+    out,
+    /stories:\n {2}- id: story\.1\.1\.alpha\n {4}status: ready-for-dev/,
+  );
 });
 
 // ===========================================================================

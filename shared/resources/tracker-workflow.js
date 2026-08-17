@@ -84,9 +84,17 @@ const MOMENT_SET = new Set(MOMENTS);
 // expectations from those constants, so drift fails loudly instead of silently.
 const DEFAULT_LADDER = Object.freeze([
   Object.freeze({
-    names: Object.freeze(["To Do", "Backlog", "Open", "New", "Selected for Development"]),
+    names: Object.freeze([
+      "To Do",
+      "Backlog",
+      "Open",
+      "New",
+      "Selected for Development",
+    ]),
   }),
-  Object.freeze({ names: Object.freeze(["In Progress", "Doing", "Started", "Development"]) }),
+  Object.freeze({
+    names: Object.freeze(["In Progress", "Doing", "Started", "Development"]),
+  }),
   Object.freeze({
     names: Object.freeze([
       "In Review",
@@ -98,7 +106,13 @@ const DEFAULT_LADDER = Object.freeze([
     ]),
   }),
   Object.freeze({
-    names: Object.freeze(["Testing", "Ready for Testing", "In Testing", "QA", "In QA"]),
+    names: Object.freeze([
+      "Testing",
+      "Ready for Testing",
+      "In Testing",
+      "QA",
+      "In QA",
+    ]),
   }),
   Object.freeze({
     names: Object.freeze([
@@ -108,7 +122,15 @@ const DEFAULT_LADDER = Object.freeze([
       "Awaiting Merge",
     ]),
   }),
-  Object.freeze({ names: Object.freeze(["Done", "Closed", "Resolved", "Complete", "Completed"]) }),
+  Object.freeze({
+    names: Object.freeze([
+      "Done",
+      "Closed",
+      "Resolved",
+      "Complete",
+      "Completed",
+    ]),
+  }),
 ]);
 
 // Status NAMES, not rung indices. This is load-bearing: `buildWorkflow` replaces
@@ -236,7 +258,8 @@ function resolveWorkflowFileSetting(repoRoot) {
     if (!fs.existsSync(cfgPath)) return "";
     const cfg = parseYamlSubset(fs.readFileSync(cfgPath, "utf-8"));
     const tracker = cfg && cfg.tracker;
-    if (!tracker || typeof tracker !== "object" || Array.isArray(tracker)) return "";
+    if (!tracker || typeof tracker !== "object" || Array.isArray(tracker))
+      return "";
     const v = tracker.workflowFile;
     return typeof v === "string" && v.trim() ? v.trim() : "";
   } catch (_) {
@@ -276,7 +299,8 @@ function buildWorkflow(doc, meta) {
   if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
     warnings.push({
       level: "warn",
-      message: "tracker-workflow file is not a mapping — using built-in defaults",
+      message:
+        "tracker-workflow file is not a mapping — using built-in defaults",
     });
     base.warnings = warnings;
     return base;
@@ -302,7 +326,11 @@ function buildWorkflow(doc, meta) {
       for (const raw of doc.statuses) {
         const rung = normalizeRung(raw);
         if (!rung) {
-          if (raw && typeof raw === "object" && looksLikeFlowCollection(raw.names)) {
+          if (
+            raw &&
+            typeof raw === "object" &&
+            looksLikeFlowCollection(raw.names)
+          ) {
             warnings.push({
               level: "error",
               message:
@@ -322,7 +350,8 @@ function buildWorkflow(doc, meta) {
       if (!rungs.length) {
         warnings.push({
           level: "error",
-          message: "`statuses:` yielded no usable rungs — using built-in defaults",
+          message:
+            "`statuses:` yielded no usable rungs — using built-in defaults",
         });
       } else {
         ladder = rungs;
@@ -345,7 +374,12 @@ function buildWorkflow(doc, meta) {
       pipeline = {};
       pipelineAuthored = true;
       for (const [moment, target] of Object.entries(p)) {
-        if (target === null || target === undefined || String(target).trim() === "") continue;
+        if (
+          target === null ||
+          target === undefined ||
+          String(target).trim() === ""
+        )
+          continue;
         pipeline[moment] = String(target).trim();
       }
     } else if (p === null) {
@@ -355,31 +389,51 @@ function buildWorkflow(doc, meta) {
     } else {
       warnings.push({
         level: "error",
-        message: "`pipeline:` must be a mapping — ignoring it and using the built-in default moments",
+        message:
+          "`pipeline:` must be a mapping — ignoring it and using the built-in default moments",
       });
     }
   }
 
   // --- documentStatus --------------------------------------------------------
   let documentStatus = {};
-  if (doc.documentStatus && typeof doc.documentStatus === "object" && !Array.isArray(doc.documentStatus)) {
+  if (
+    doc.documentStatus &&
+    typeof doc.documentStatus === "object" &&
+    !Array.isArray(doc.documentStatus)
+  ) {
     for (const [local, target] of Object.entries(doc.documentStatus)) {
-      if (target === null || target === undefined || String(target).trim() === "") continue;
+      if (
+        target === null ||
+        target === undefined ||
+        String(target).trim() === ""
+      )
+        continue;
       documentStatus[local] = String(target).trim();
     }
   } else if (doc.documentStatus !== undefined && doc.documentStatus !== null) {
-    warnings.push({ level: "error", message: "`documentStatus:` must be a mapping — ignoring it" });
+    warnings.push({
+      level: "error",
+      message: "`documentStatus:` must be a mapping — ignoring it",
+    });
   }
 
   // --- byIssueType overlay ---------------------------------------------------
   const byIssueType = {};
-  if (doc.byIssueType && typeof doc.byIssueType === "object" && !Array.isArray(doc.byIssueType)) {
+  if (
+    doc.byIssueType &&
+    typeof doc.byIssueType === "object" &&
+    !Array.isArray(doc.byIssueType)
+  ) {
     for (const [type, spec] of Object.entries(doc.byIssueType)) {
       if (!spec || typeof spec !== "object" || Array.isArray(spec)) continue;
       byIssueType[type] = spec;
     }
   } else if (doc.byIssueType !== undefined && doc.byIssueType !== null) {
-    warnings.push({ level: "error", message: "`byIssueType:` must be a mapping — ignoring it" });
+    warnings.push({
+      level: "error",
+      message: "`byIssueType:` must be a mapping — ignoring it",
+    });
   }
 
   return Object.assign(base, {
@@ -420,7 +474,8 @@ function loadWorkflow(opts) {
   const { repoRoot } = opts || {};
   try {
     const root =
-      repoRoot || execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
+      repoRoot ||
+      execSync("git rev-parse --show-toplevel", GIT_EXEC_OPTS).trim();
     const rel = resolveWorkflowFileSetting(root) || DEFAULT_WORKFLOW_PATH;
     const p = path.isAbsolute(rel) ? rel : path.join(root, rel);
 
@@ -447,7 +502,11 @@ function loadWorkflow(opts) {
   } catch (_) {
     return defaultWorkflow({
       warnings: [
-        { level: "warn", message: "tracker-workflow could not be read — using built-in defaults" },
+        {
+          level: "warn",
+          message:
+            "tracker-workflow could not be read — using built-in defaults",
+        },
       ],
     });
   }
@@ -507,7 +566,8 @@ function resolveLadder(workflow, issueType) {
     // ladder inherits nothing — the base targets were chosen against exactly the
     // ladder still in use, so alias-rerouting them would corrupt an authored
     // choice for one issue type while leaving it correct for every other.
-    if (rungs.length) return { ladder: rungs, fromOverlay: !sameLadder(rungs, base) };
+    if (rungs.length)
+      return { ladder: rungs, fromOverlay: !sameLadder(rungs, base) };
   }
   return { ladder: base, fromOverlay: false };
 }
@@ -632,7 +692,9 @@ function rankOf(status, workflow, opts) {
  * belongs in here rather than at the call site.
  */
 function resolveMoment(moment, workflow, opts) {
-  const key = String(moment || "").trim().toLowerCase();
+  const key = String(moment || "")
+    .trim()
+    .toLowerCase();
   if (!key) return null;
   const issueType = opts && opts.issueType;
 
@@ -646,7 +708,7 @@ function resolveMoment(moment, workflow, opts) {
   // `overlayFor` stays eager and separate because it is a single key lookup; only
   // the ladder build is worth deferring.
   let _ctx = null;
-  const ctx = () => (_ctx || (_ctx = resolveLadder(workflow, issueType)));
+  const ctx = () => _ctx || (_ctx = resolveLadder(workflow, issueType));
 
   // The overlay may null out a moment for one issue type.
   const overlay = overlayFor(workflow, issueType);
@@ -662,7 +724,8 @@ function resolveMoment(moment, workflow, opts) {
   const pipeline = (workflow && workflow.pipeline) || {};
   if (!Object.prototype.hasOwnProperty.call(pipeline, key)) return null;
   const raw = pipeline[key];
-  if (raw === null || raw === undefined || String(raw).trim() === "") return null;
+  if (raw === null || raw === undefined || String(raw).trim() === "")
+    return null;
 
   // Always a status NAME — the built-in default and a loaded file use the same
   // representation, so there is no second code path that can diverge.
@@ -679,7 +742,8 @@ function resolveMoment(moment, workflow, opts) {
   // An overlay that restates the base ladder is neither: `fromOverlay` is false
   // for it, so authored targets stay authored.
   const resolved = ctx();
-  const inherited = resolved.fromOverlay || (workflow && workflow.pipelineAuthored === false);
+  const inherited =
+    resolved.fromOverlay || (workflow && workflow.pipelineAuthored === false);
   return describeTarget(String(raw).trim(), resolved.ladder, key, !!inherited);
 }
 
@@ -756,7 +820,9 @@ function planMove(from, to, workflow, opts) {
 
 /** Map a local document status to a board status via `documentStatus:`. */
 function resolveDocumentStatus(local, workflow) {
-  const key = String(local || "").trim().toLowerCase();
+  const key = String(local || "")
+    .trim()
+    .toLowerCase();
   if (!key) return null;
   const map = (workflow && workflow.documentStatus) || {};
   for (const [k, v] of Object.entries(map)) {
@@ -783,7 +849,8 @@ function validateWorkflow(workflow) {
   // cycles 2, 3 and 4.
   const _baseCache = new Map();
   const baseResolution = (moment) => {
-    if (!_baseCache.has(moment)) _baseCache.set(moment, resolveMoment(moment, workflow));
+    if (!_baseCache.has(moment))
+      _baseCache.set(moment, resolveMoment(moment, workflow));
     return _baseCache.get(moment);
   };
 
@@ -808,8 +875,7 @@ function validateWorkflow(workflow) {
     if (!MOMENT_SET.has(moment)) {
       out.push({
         level: "error",
-        message:
-          `unknown moment "${moment}" in \`pipeline:\` — moments are a closed set: ${MOMENTS.join(", ")}`,
+        message: `unknown moment "${moment}" in \`pipeline:\` — moments are a closed set: ${MOMENTS.join(", ")}`,
       });
       continue;
     }
@@ -876,7 +942,8 @@ function validateWorkflow(workflow) {
     if (!resolveLadder(workflow, type).fromOverlay) continue;
     for (const moment of Object.keys(workflow.pipeline || {})) {
       if (!MOMENT_SET.has(moment)) continue;
-      if (Object.prototype.hasOwnProperty.call(overlayPipeline, moment)) continue;
+      if (Object.prototype.hasOwnProperty.call(overlayPipeline, moment))
+        continue;
       // Skip only when the moment is ALREADY off-ladder for the base — that is a
       // deliberate side-state (`blocked: Blocked`), and warning about it would
       // contradict the base loop, which reports the very same target as info.
