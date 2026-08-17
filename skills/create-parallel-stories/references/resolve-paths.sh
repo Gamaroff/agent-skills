@@ -27,38 +27,26 @@
 # Graceful degrade: python+pyyaml is tried first (full YAML parsing). If pyyaml
 # is unavailable, awk handles the common 2-level nested case. If skills-
 # config.yaml is missing/malformed at both tiers, the default is returned.
+#
+# The reader itself lives in read-config.sh, shared with resolve-platform.sh.
+# This file resolves paths only — it never validates and never returns non-zero,
+# because its defaults (docs/prd, docs/architecture) are safe when unset.
 
-read_nested_config_key() {
-  # Args: $1 = parent key (e.g. "prd"), $2 = child key (e.g. "prdShardedLocation")
-  # Echoes the value or empty string.
-  local parent="$1" child="$2" val=""
-  # Tier 1: python+pyyaml
-  val=$(python -c "
-import yaml
-try:
-    with open('skills-config.yaml') as f:
-        data = yaml.safe_load(f) or {}
-        v = (data.get('$parent') or {}).get('$child', '')
-        print(v if v is not None else '')
-except Exception:
-    print('')
-" 2>/dev/null) || val=""
-  # Tier 2: awk — find '^parent:' then next indented 'child:' line
-  if [ -z "$val" ]; then
-    val=$(awk -v p="$parent" -v c="$child" '
-      $0 ~ "^"p":" { in_block=1; next }
-      in_block && /^[^[:space:]]/ { in_block=0 }
-      in_block && $0 ~ "^[[:space:]]+"c":" {
-        sub("^[[:space:]]+"c":[[:space:]]*", "")
-        gsub(/[[:space:]]+$/, "")
-        gsub(/^["\x27]|["\x27]$/, "")
-        print
-        exit
-      }
-    ' skills-config.yaml 2>/dev/null)
-  fi
-  echo "$val"
-}
+# `read_nested_config_key` lives in read-config.sh, which sits beside this file in both layouts —
+# shared/resources/ in-tree, <skill>/references/ once bundled. It used to be defined here and
+# copied by hand into anything else that needed it; one copy means one place to fix, and the
+# bare-`python` interpreter bug both copies carried is fixed there.
+#
+# BASH_SOURCE is bash-only and macOS logins are zsh, so fall back to zsh's %x prompt expansion.
+# The eval keeps that zsh-only parameter form away from bash's parser.
+_rp_self="${BASH_SOURCE[0]:-}"
+if [ -z "$_rp_self" ] && [ -n "${ZSH_VERSION:-}" ]; then
+  eval '_rp_self="${(%):-%x}"'
+fi
+[ -n "$_rp_self" ] || _rp_self="$0"
+# shellcheck source=read-config.sh
+source "$(dirname "$_rp_self")/read-config.sh"
+unset _rp_self
 
 PRD_ROOT=$(read_nested_config_key prd prdShardedLocation)
 [ -z "$PRD_ROOT" ] && PRD_ROOT="docs/prd"
