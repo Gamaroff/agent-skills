@@ -238,7 +238,7 @@ This list is hand-maintained and has drifted before (it read "All 8 leaf skills"
 grep -rnoE '(^|[^=[:alnum:]_])source[[:space:]]+[^`]*resolve-platform\.sh' skills/*/SKILL.md
 ```
 
-`shared/resources/tracker-access.test.sh` §11 asserts this repo-wide and fails when any site loses
+The repo's own `tracker-access.test.sh` (§11) asserts this repo-wide and fails when any site loses
 its guard — including the prose ones, which an anchored pattern silently skips. That assertion is
 the reason the list can be trusted; before it existed, an unguarded site shipped unnoticed.
 
