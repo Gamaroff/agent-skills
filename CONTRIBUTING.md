@@ -90,3 +90,5 @@ If you fix a regression, add a protocol test under `evals/{skill}/protocol/` or 
 ## Reporting Issues
 
 Open a GitHub issue. Include the skill name, what you asked it to do, and what went wrong.
+
+<!-- branch-policy verification scratch — this branch is deleted after the check -->
