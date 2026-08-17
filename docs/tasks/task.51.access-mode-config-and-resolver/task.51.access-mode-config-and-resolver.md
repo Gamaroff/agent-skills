@@ -431,6 +431,8 @@ Rollback triggers: any consumer report of a halt on a config that is legal per t
 | 2026-08-17 |  | Status → ready-for-development | review-task |
 | 2026-08-17 |  | QA gate FAIL (40/100) — 5 HIGH, 4 MEDIUM, 5 LOW | qa-task |
 | 2026-08-17 |  | QA findings fixed — 5 HIGH + 4 MEDIUM + 3 LOW, 1 iteration; suite 61 → 90 assertions | qa-fix |
+| 2026-08-17 |  | QA gate FAIL (55/100) cycle 2 — original 5 closed; 3 new HIGH introduced by the fixes | qa-task |
+| 2026-08-17 |  | QA findings fixed cycle 2 — 3 HIGH + 2 MEDIUM + 2 LOW; suite 90 → 119 assertions; 8 fix-mutations red | qa-fix |
 | 2026-08-17 |  | Implemented — 57 files (5 shared sources, 15 SKILL.md call sites, 4 docs, setup wizard, package.json, 36 bundled reference trees), 61 tests, 12 mutations watched failing | develop |
 
 ## References

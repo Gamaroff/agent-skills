@@ -420,6 +420,108 @@ else
   ok "full mode → no notice"
 fi
 
+# --- 18. Bulk protocol is index-addressed, not positional ---------------------------------------
+# The first version returned bare lines read with `sed -n "$Np"`. A value containing a newline
+# emitted extra lines and shifted every later answer — three specs in, five lines out — which
+# resolved a declared `manual` to `full`, silently, on the authoritative tier.
+echo "  18. Bulk protocol"
+D=$(fixture bulk-multiline 'summary: |\n  line one\n  line two\ntracker: jira\nvcs: bitbucket\n')
+LINES=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$D'; source '$READER'; config_bulk key:summary key:tracker key:vcs" 2>/dev/null | wc -l | tr -d ' ')
+assert_eq "3 specs → exactly 3 lines, whatever the values contain" "$LINES" "3"
+GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$D'; source '$READER'; config_bulk key:summary key:tracker key:vcs" 2>/dev/null | sed -n 's/^2'$'\t''//p')
+assert_eq "answer 2 is still tracker, not shifted by the multi-line value" "$GOT" "jira"
+
+# End to end: the shape that silently escalated must now not.
+D=$(fixture bulk-escalate 'tracker: "github\\n\\n\\n"\naccess:\n  tracker: manual\n')
+run_case "$D"
+if [ "$AT" = "full" ] && [ "$RC" = "0" ]; then
+  bad "multi-line value must not silently grant full" "got rc=0 ACCESS_TRACKER=full"
+else
+  ok "multi-line value → no silent escalation (rc=$RC, AT=${AT:-unset})"
+fi
+
+# --- 19. Multi-line flow mapping fails closed on the awk tier ------------------------------------
+# §13 covered only the single-line form; the awk rule stripped to the first `}` and called `next`,
+# so a two-line flow map read as "not configured" → full.
+echo "  19. Multi-line flow map"
+for yaml_case in 'access: {\n  tracker: manual}\n' 'access: {\n  tracker: manual,\n  vcs: full\n}\n'; do
+  D=$(fixture "flow-ml-$RANDOM" "$yaml_case")
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+  assert_eq "multi-line flow [python] → manual" "$AT" "manual"
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+  assert_rc "multi-line flow [awk] → fails closed, never full" "$RC" "1"
+  if [ "$AT" = "full" ]; then bad "multi-line flow [awk] must not grant full" "AT=full"; else ok "multi-line flow [awk] → no silent full"; fi
+done
+
+# --- 20. YAML nulls in NESTED keys, and in the path roots ----------------------------------------
+# The null fix was applied to read_config_key and not to read_nested_config_key, so `access.tracker:
+# null` halted on awk hosts and `architectureShardedLocation: ~` yielded ARCH_ROOT=~, which unquoted
+# expands to $HOME.
+echo "  20. Nested nulls"
+for spelling in null NULL '~'; do
+  D=$(fixture "nested-null-$RANDOM" "access:\n  tracker: $spelling\n")
+  for tier in python awk; do
+    run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+    assert_rc "access.tracker: $spelling [$tier] → status 0" "$RC" "0"
+    assert_eq "access.tracker: $spelling [$tier] → full (means unset)" "$AT" "full"
+  done
+done
+
+D=$(fixture roots-null 'prd:\n  prdShardedLocation: null\narchitecture:\n  architectureShardedLocation: ~\n')
+for tier in python awk; do
+  OUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER="$tier" bash -c "
+    cd '$D'; source '$PATHS'; echo \"\$PRD_ROOT|\$ARCH_ROOT\"" 2>/dev/null)
+  assert_eq "null path roots [$tier] → defaults, never the literal null/~" "$OUT" "docs/prd|docs/architecture"
+done
+
+# --- 21. Scratch vars do not leak between sources in one shell -----------------------------------
+# Every other case runs in a fresh `bash -c`, which is structurally blind to this: the _RP_* vars
+# used to survive a failed source and suppress the next one's reads.
+echo "  21. Cross-source hygiene"
+DA=$(fixture leak-a 'tracker: jira\naccess:\n  vcs: manual\n')
+DB=$(fixture leak-b 'tracker: github\naccess:\n  tracker: manual\n')
+# The first source must run on a tier where the batch SUCCEEDS (so the scratch vars get populated)
+# and then fail; the second is forced onto awk so it takes the fallback path and would read stale
+# values. Forcing awk for both — the first version of this test — populates nothing and passes for
+# the wrong reason: mutation-testing the clearing showed it staying green.
+OUT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$DA'; source '$RESOLVER' >/dev/null 2>&1
+  export AGENT_SKILLS_CONFIG_TIER=awk
+  cd '$DB'; source '$RESOLVER' >/dev/null 2>&1
+  echo \"\$?|\$TRACKER|\$ACCESS_TRACKER\"" 2>/dev/null)
+assert_eq "second source in the same shell is unaffected by the first" "$OUT" "0|github|manual"
+
+# Control: the same second repo in a fresh shell must give the identical answer.
+CTRL=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+  cd '$DB'; source '$RESOLVER' >/dev/null 2>&1; echo \"\$?|\$TRACKER|\$ACCESS_TRACKER\"" 2>/dev/null)
+assert_eq "…and matches a fresh-shell control" "$OUT" "$CTRL"
+
+# --- 22. Duplicate keys are a config error, not last-wins ----------------------------------------
+# Also the witness for "tier 1 is authoritative": this is a case where the tiers genuinely disagree,
+# and tier 1's answer must win.
+echo "  22. Duplicate keys"
+D=$(fixture dupe-access 'access:\n  tracker: manual\naccess:\n  vcs: full\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "duplicate access: [python] → rejected, not last-wins" "$RC" "1"
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+if [ "$AT" = "full" ]; then bad "duplicate access: [awk] must not grant full" "AT=full"; else ok "duplicate access: [awk] → restrictive, not full"; fi
+
+# --- 23. Unknown bulk spec fails closed ----------------------------------------------------------
+echo "  23. Unknown bulk spec"
+D=$(fixture bulk-typo 'access:\n  tracker: manual\n')
+GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "cd '$D'; source '$READER'; config_bulk 'nsted:access.tracker'" 2>/dev/null | sed -n 's/^1'$'\t''//p')
+assert_eq "typo'd spec → __ERR__, never __NONE__ (which would read as 'absent')" "$GOT" "__ERR__"
+
+# --- 24. resolve_access rejects an unknown system ------------------------------------------------
+echo "  24. resolve_access whitelist"
+D=$(fixture whitelist "")
+OUT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$D'; source '$RESOLVER' >/dev/null 2>&1
+  resolve_access 'x}; echo PWNED; :' >/dev/null 2>&1; echo \$?" 2>/dev/null | tail -1)
+assert_eq "resolve_access with an unknown system → returns 1" "$OUT" "1"
+
 # --- Summary -----------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
