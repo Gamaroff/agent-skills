@@ -255,15 +255,37 @@ done
 
 Three decisions were taken at task creation (2026-08-17, user):
 
-### 1. `.git-blame-ignore-revs` lists pure-formatting commits only
+### 1. `.git-blame-ignore-revs` lists the pure reformats — and, after measuring, the mixed ones too
 
-`3d7fc25` (`style(gh-stage)`, verified pure) and the sweep commit from this task. `ee12ab7` and
-`08c917b` are **not** listed, because both interleave a reformat with a functional change —
-ignoring them would hide ~296 genuinely functional lines along with the noise.
+**As originally decided**, the file listed only `3d7fc25` (`style(gh-stage)`, verified pure) and
+this task's sweep commit. `ee12ab7` and `08c917b` were excluded because both interleave a reformat
+with a functional change, and ignoring them hides ~296 genuinely functional lines along with the
+noise. The consequence was recorded honestly at the time: #179's complaint about `git blame` on
+`jira-sync.js` would be only *partly* addressed.
 
-The honest consequence: **#179's specific complaint about `git blame` on `jira-sync.js` is only
-partly addressed.** The file's future is clean; its history keeps the churn. The file's header
-comment records this so the next reader does not assume it was an oversight.
+**Revised 2026-08-17, after measuring what "partly" actually meant.** Across the four affected Jira
+files the two commits held **2,376 lines** of blame attribution:
+
+| File | `ee12ab7` | `08c917b` |
+| ---- | --------- | --------- |
+| `shared/resources/jira-sync.js` | 586 | 141 |
+| `skills/sync-jira-story/scripts/sync-jira-story.js` | 0 | 598 |
+| `skills/sync-jira-task/scripts/sync-jira-task.js` | 0 | 491 |
+| `skills/sync-jira-epic/scripts/sync-jira-epic.js` | 487 | 73 |
+
+An 8:1 ratio of noise to signal. Excluding them left blame *technically accurate and practically
+useless* on precisely the files the issue was about — accuracy that answers no question anyone
+asks. Including them drops attribution to **77 lines**, a 97% reduction; the residue is additions
+git cannot re-attribute, which sit close to the functional core.
+
+There is no third option: git cannot ignore part of a commit. Ignoring one re-attributes its added
+lines to whatever last touched the region, so the trade is unavoidable — 2,376 uninformative
+attributions against ~296 wrong ones.
+
+**The cost is documented rather than hidden.** The ignore file's header states which lines are
+affected and carries the `git show` commands that recover their true provenance. The general rule
+does not move: a reformat belongs in its own commit, `CONTRIBUTING.md` says so, and no further
+mixed commit should be added there without measuring the same ratio first.
 
 ### 2. The gate is a step in `test.yml`, not a new workflow or a pre-commit hook
 
@@ -570,6 +592,7 @@ One process note worth keeping: the first attempt at the formatting-only proof r
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-17 | 1.0     | Initial draft | create-task |
 | 2026-08-17 | 1.1     | Implemented and merged (#240). Status → accepted. Recorded outcome, two deviations, and the false-positive verification harness. | develop-task |
+| 2026-08-17 | 1.2     | Blame decision reversed on measured grounds: the two mixed commits are now ignored (2,376 → 77 attributed lines). Cost documented in the ignore file's header. | develop-task |
 
 ---
 

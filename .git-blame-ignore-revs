@@ -1,14 +1,14 @@
-# Commits that are pure reformatting. Activate locally with:
+# Commits whose churn should not surface in `git blame`. Activate locally with:
 #
 #     git config blame.ignoreRevsFile .git-blame-ignore-revs
 #
 # GitHub honours this file automatically in its blame view.
 #
-# Only commits containing NOTHING but formatting belong here. A commit that
-# mixes a reformat with a functional change must not be listed: ignoring it
-# would hide the functional lines' authorship too. Use full 40-character shas —
-# git rejects abbreviated ones, and it does so at blame time rather than when
-# the file is written, so the mistake surfaces late.
+# Use full 40-character shas — git rejects abbreviated ones, and it does so at
+# blame time rather than when the file is written, so the mistake surfaces late.
+
+# ── Pure reformats ───────────────────────────────────────────────────────────
+# These contain nothing but formatting. Ignoring them is free.
 
 # style(gh-stage): reformat to Prettier, no behaviour change
 3d7fc2509b2188b382a6060742cf2def84b2df27
@@ -16,21 +16,31 @@
 # style: apply Prettier repo-wide (task.59)
 99c556b05d107b12501632edf4f00379c2d91046
 
-# ---------------------------------------------------------------------------
-# Deliberately NOT listed.
+# ── Mixed commits — ignored deliberately, with a known cost ──────────────────
+# Each of these interleaves a whole-file reformat with real functional work, so
+# ignoring it also hides the authorship of the functional lines. They are listed
+# anyway, on measured grounds: across the four affected Jira files they carried
+# 2,376 lines of blame attribution, of which roughly 296 are functional. Not
+# ignoring them left blame technically accurate and practically useless on those
+# files, which was the original complaint in #179.
 #
-# Both of these interleave a whole-file reformat with a real functional change,
-# so ignoring them would hide ~296 genuinely functional lines along with the
-# noise. Their history keeps the churn; that is the lesser cost. This is a
-# recorded decision, not an oversight — see issue #179.
+# The cost is real and bounded: those ~296 lines will attribute to whichever
+# commit last touched the surrounding region, which is wrong. Recover the true
+# provenance by reading the commits directly:
 #
-#   ee12ab745fa7cbef9da8f1aaec0bad36f50eb45e
-#     fix(jira-sync): section extraction dropped every numbered heading
-#     2026-07-29, v0.29.5 — 5,669 insertions, ~40 of them functional
+#     git show ee12ab7 -- shared/resources/jira-sync.js
+#     git show 08c917b -- skills/sync-jira-{task,story,epic}/scripts/
 #
-#   08c917bf0792d490173218310dea816d8d339912
-#     fix(jira-sync): write relative document links; stop a fenced `# `
-#     truncating descriptions
-#     2026-08-13, task.46 — ~1,700 lines across the four Jira files,
-#     256 of them functional
-# ---------------------------------------------------------------------------
+# This reverses the narrower decision taken when the file was created; the
+# numbers above are what changed it. Do not add a further mixed commit here
+# without measuring the same ratio first — the general rule remains that a
+# reformat belongs in its own commit, and CONTRIBUTING.md says so.
+
+# fix(jira-sync): section extraction dropped every numbered heading
+# 2026-07-29, v0.29.5 — 5,669 insertions, ~40 of them functional
+ee12ab745fa7cbef9da8f1aaec0bad36f50eb45e
+
+# fix(jira-sync): write relative document links; stop a fenced `# ` truncating
+# descriptions
+# 2026-08-13, task.46 — ~1,700 lines across the four Jira files, 256 functional
+08c917bf0792d490173218310dea816d8d339912
