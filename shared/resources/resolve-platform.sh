@@ -109,8 +109,8 @@ resolve_access() {
   # LOW-6: whitelist rather than relying on the uppercasing to mangle hostile input, since this
   # function stays defined in the caller's shell after sourcing and its value reaches an `eval`.
   case "$system" in
-    tracker) cfg="${_RP_ACC_T-$(read_nested_config_key access tracker)}" ;;
-    vcs)     cfg="${_RP_ACC_V-$(read_nested_config_key access vcs)}" ;;
+    tracker) cfg="${_RP_ACC_T-$(read_nested_config_key_strict access tracker)}" ;;
+    vcs)     cfg="${_RP_ACC_V-$(read_nested_config_key_strict access vcs)}" ;;
     *)       printf '❌ resolve_access: unknown system "%s".\n' "$system" >&2; return 1 ;;
   esac
 
@@ -158,23 +158,30 @@ resolve_access() {
 # source in the same shell then resolved against the first repo's config.
 _RP_BULK=""; _RP_STATUS=""; _RP_TRACKER=""; _RP_VCS=""; _RP_SHAPE=""
 unset _RP_ACC_T _RP_ACC_V 2>/dev/null || true
+# The OUTPUTS too. Every early `return 1` below happens before these are assigned, so a failed
+# source used to leave the previous repo's values — including an exported ACCESS_TRACKER=full —
+# visible to the caller and inherited by every child process it spawns.
+unset TRACKER VCS ACCESS_TRACKER ACCESS_VCS 2>/dev/null || true
 
 if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested:access.vcs 2>/dev/null); then
-  # Index-addressed, not positional: each answer arrives as `<n>\t<value>` with newlines escaped,
-  # so a multi-line value can no longer shift every later answer.
-  _rp_line() { printf '%s\n' "$_RP_BULK" | sed -n "s/^$1"$'\t'"//p"; }
-  _RP_STATUS=$([ "$(_rp_line 1)" = "ok" ] && echo ok || echo malformed)
+  # Typed, NUL-framed records — see config_bulk's wire-format note. `_rp_val` yields a payload only
+  # when the record is a VALUE; a signal (or a config that spells one) never reaches the logic below
+  # as if it were data.
+  _rp_rec() { config_bulk_get "$1" "$_RP_BULK"; }
+  _rp_val() { local r; r=$(_rp_rec "$1"); case "$r" in "v "*) printf '%s' "${r#v }" ;; *) printf '' ;; esac; }
+  _rp_sig() { local r; r=$(_rp_rec "$1"); case "$r" in "s "*) printf '%s' "${r#s }" ;; *) printf '' ;; esac; }
+  _RP_STATUS=$([ "$(_rp_sig 1)" = "ok" ] && echo ok || echo malformed)
   [ -f "$SKILLS_CONFIG_FILE" ] || _RP_STATUS=missing
-  _RP_TRACKER=$(_rp_line 2)
-  _RP_VCS=$(_rp_line 3)
-  _RP_SHAPE=$(_rp_line 4)
-  _RP_ACC_T=$(_rp_line 5)
-  _RP_ACC_V=$(_rp_line 6)
-  # Translate the shared sentinels into what the logic below expects.
-  [ "$_RP_TRACKER" = "__NONE__" ] && _RP_TRACKER=auto
-  [ "$_RP_VCS" = "__NONE__" ] && _RP_VCS=auto
-  case "$_RP_ACC_T" in __NONE__ | __MAP__ | __ERR__) _RP_ACC_T="" ;; esac
-  case "$_RP_ACC_V" in __NONE__ | __MAP__ | __ERR__) _RP_ACC_V="" ;; esac
+
+  # A signal means "not a scalar the config supplied"; a value is used verbatim, whatever it spells.
+  # A SIGNAL of __MAP__ (the tracker.workflowFile form) means "no scalar override" → auto. It is
+  # resolved here so the literal string never enters the logic below: a config whose tracker VALUE
+  # spells __MAP__ must stay data and be rejected by validation, not be read as that signal.
+  _RP_TRACKER=$(_rp_val 2); [ -n "$_RP_TRACKER" ] || _RP_TRACKER=auto
+  _RP_VCS=$(_rp_val 3);     [ -n "$_RP_VCS" ]     || _RP_VCS=auto
+  _RP_SHAPE=$(_rp_val 4); [ -n "$_RP_SHAPE" ] || _RP_SHAPE=absent
+  _RP_ACC_T=$(_rp_val 5)
+  _RP_ACC_V=$(_rp_val 6)
 else
   _RP_STATUS=""   # empty ⇒ the helpers below are consulted individually
 fi
@@ -193,15 +200,26 @@ if [ "${_RP_STATUS:-$(config_file_status)}" = "malformed" ]; then
 fi
 
 # ── Identity ────────────────────────────────────────────────────────────────
-TRACKER="${_RP_TRACKER:-$(read_config_key tracker)}"
+if [ -n "$_RP_TRACKER" ]; then
+  # From the typed bulk read: a mapping already became `auto`, so anything here is DATA — including
+  # a value that happens to spell __MAP__, which must reach validation and be rejected.
+  TRACKER="$_RP_TRACKER"
+else
+  TRACKER=$(read_config_key tracker)
+  # Fallback path only: this reader still signals a mapping in-band.
+  [ "$TRACKER" = "__MAP__" ] && TRACKER="auto"
+fi
 # A mapping-valued `tracker:` is the documented `tracker.workflowFile` form (see
 # docs/reference/tracker-workflow.md). It is not a platform override and must not be graded as
 # one — it means "no scalar override", i.e. detect.
-[ "$TRACKER" = "__MAP__" ] && TRACKER="auto"
 validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
 [ "$TRACKER" = "auto" ] && TRACKER=$([ -n "${JIRA_URL:-}" ] && echo jira || echo github)
 
-VCS="${_RP_VCS:-$(read_config_key vcs)}"
+if [ -n "$_RP_VCS" ]; then
+  VCS="$_RP_VCS"
+else
+  VCS=$(read_config_key vcs)
+fi
 # `vcs:` has no documented mapping form, so a mapping is a mistake — but say so precisely rather
 # than reporting the literal `__MAP__` sentinel as the offending value.
 [ "$VCS" = "__MAP__" ] && VCS="(a mapping)"
@@ -244,7 +262,7 @@ if [ "$ACCESS_TRACKER" != "full" ]; then
 fi
 
 unset _RP_BULK _RP_STATUS _RP_TRACKER _RP_VCS _RP_SHAPE _RP_ACC_T _RP_ACC_V
-unset -f _rp_line 2>/dev/null || true
+unset -f _rp_rec _rp_val _rp_sig 2>/dev/null || true
 
 export TRACKER VCS ACCESS_TRACKER ACCESS_VCS
 

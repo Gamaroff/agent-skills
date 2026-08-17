@@ -55,14 +55,21 @@ import sys, yaml
 class _StrictLoader(yaml.SafeLoader):
     pass
 
-def _no_dupes(loader, node, deep=False):
+def _no_dupes(loader, node):
+    # flatten_mapping FIRST. It resolves `<<` merge keys the way SafeLoader does; without it the
+    # merge key still carries tag:yaml.org,2002:merge, has no constructor, and raises — which graded
+    # a legal config `malformed` and hard-halted every call site.
+    loader.flatten_mapping(node)
     seen = set()
     for k, _ in node.value:
-        key = loader.construct_object(k, deep=deep)
+        key = loader.construct_object(k, deep=True)
         if key in seen:
             raise ValueError("duplicate key: %r" % (key,))
         seen.add(key)
-    return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)
+    # Generator, not a plain return: construct_yaml_map yields the dict before filling it, which is
+    # what lets a recursive anchor resolve. Returning a finished dict broke those.
+    for data in yaml.SafeLoader.construct_yaml_map(loader, node):
+        yield data
 
 _StrictLoader.add_constructor(
     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_dupes)
@@ -89,57 +96,67 @@ def emit(v):
         print(v)
 
 def answer(spec):
+    """Return (kind, payload). The KIND comes from provenance, never from what the payload spells —
+    inferring it from the text meant a config containing the literal `__MAP__` was classified as a
+    signal and obeyed, which is the forgery this framing exists to stop."""
     kind, _, rest = spec.partition(":")
     if kind == "status":
-        return "ok"
+        return ("s", "ok")
     if kind == "key":
-        v = d.get(rest)
-        return "__NONE__" if v is None else (
-            ("true" if v else "false") if isinstance(v, bool) else
-            "__MAP__" if isinstance(v, (dict, list)) else str(v))
+        return _scalar(d.get(rest))
     if kind == "shape":
         p = d.get(rest)
-        return "absent" if p is None else ("mapping" if isinstance(p, dict) else "scalar")
+        return ("v", "absent" if p is None else ("mapping" if isinstance(p, dict) else "scalar"))
     if kind == "nested":
         parent, _, child = rest.partition(".")
         p = d.get(parent)
         if not isinstance(p, dict):
-            return "__NONE__"
-        v = p.get(child)
-        return "__NONE__" if v is None else (
-            ("true" if v else "false") if isinstance(v, bool) else
-            "__MAP__" if isinstance(v, (dict, list)) else str(v))
-    return "__ERR__"   # unknown spec — fail closed, never "absent"
+            return ("s", "__NONE__")
+        return _scalar(p.get(child))
+    return ("s", "__ERR__")   # unknown spec — fail closed, never "absent"
 
-def one_line(v):
-    """One answer, guaranteed one line. A value containing a newline would otherwise emit extra
-    lines and shift every later answer, which silently escalated access.tracker to `full`."""
-    return v.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r")
+def _scalar(v):
+    if v is None:
+        return ("s", "__NONE__")
+    if isinstance(v, bool):
+        return ("v", "true" if v else "false")
+    if isinstance(v, (dict, list)):
+        return ("s", "__MAP__")
+    return ("v", str(v))
 
 if mode == "status":
     print("ok")
 elif mode == "key":
-    emit(d.get(sys.argv[3]))
+    print(answer("key:" + sys.argv[3])[1])
 elif mode == "shape":
-    p = d.get(sys.argv[3])
-    print("absent" if p is None else ("mapping" if isinstance(p, dict) else "scalar"))
+    print(answer("shape:" + sys.argv[3])[1])
 elif mode == "nested":
-    p = d.get(sys.argv[3])
-    if not isinstance(p, dict):
-        print("__NONE__")
-    else:
-        emit(p.get(sys.argv[4]))
+    print(answer("nested:%s.%s" % (sys.argv[3], sys.argv[4]))[1])
 elif mode == "bulk":
-    # One spawn, many answers. Each remaining argv is a spec — status | key:K | shape:P |
-    # nested:P.C. Each answer comes back as `<index>\t<value>`, INDEX-ADDRESSED rather than
-    # positional, and with newlines escaped so one answer is always exactly one line.
+    # One spawn, many answers, NUL-framed and TYPED: each record is
+    #     <index> US <kind> US <payload> RS          US = 0x1f, RS = 0x1e, kind ∈ {v, s}
+    # `v` = a value the config actually contains; `s` = a signal from this reader.
     #
-    # The first version returned bare lines and the caller read them with `sed -n "$Np"`. Any value
-    # containing a newline emitted extra lines and shifted every later answer — three specs in,
-    # five lines out — which resolved `access.tracker: manual` to `full`, silently, on the
-    # authoritative tier. Position is not a safe key when the payload is arbitrary.
+    # Two earlier attempts failed here and both failures were the same mistake in different clothes:
+    # putting data and control on one untyped channel. Bare lines let a multi-line value shift every
+    # later answer. Escaping fixed the shifting but added an encoder with no decoder, and mangled the
+    # trailing newline every block scalar carries, so a working config started halting.
+    #
+    # ASCII US/RS need no escaping: they survive command substitution (NUL does not — bash strips it,
+    # which is why the obvious choice is unusable here) and do not occur in a real config. And they
+    # are belt to the kind bytes braces: a value that somehow contained a separator could at worst
+    # truncate its own record, which then fails enum validation loudly. A config containing the
+    # literal text `__MAP__` arrives as DATA and is validated like any other value, rather than being
+    # obeyed as a signal.
+    out = []
     for i, spec in enumerate(sys.argv[3:], 1):
-        print("%d\t%s" % (i, one_line(answer(spec))))
+        kind, payload = answer(spec)
+        # A block scalar always carries a trailing newline; `$( )` used to strip it, so stripping
+        # here keeps the bulk path and the individual readers agreeing on the same file.
+        if kind == "v":
+            payload = payload.rstrip("\n")
+        out.append("%d\x1f%s\x1f%s\x1e" % (i, kind, payload))
+    sys.stdout.write("".join(out))
 '
 
 # _config_probe — populate $_CONFIG_PY; return 0 when tier 1 is usable.
@@ -255,8 +272,8 @@ config_child_shape() {
 # definition is the fix; two call sites of one helper cannot drift the way two copies did.
 _config_denull() {
   case "$1" in
-    null | Null | NULL | '~' | '') echo "" ;;
-    *) echo "$1" ;;
+    null | Null | NULL | '~' | '') printf '' ;;
+    *) printf '%s' "$1" ;;
   esac
 }
 
@@ -293,7 +310,13 @@ read_config_key() {
 
 read_nested_config_key() {
   # Args: $1 = parent key (e.g. "prd"), $2 = child key (e.g. "prdShardedLocation")
-  # Echoes the value or empty string.
+  # Echoes the value or empty string — NEVER a sentinel.
+  #
+  # `__UNREADABLE__` (awk met a flow map it cannot read on one line) is meaningful only to the
+  # access path, which halts on it. It used to be returned for ANY parent, so resolve-paths.sh —
+  # which by contract never fails — produced PRD_ROOT=__UNREADABLE__, consumed by 34 files, and
+  # render-retro.sh got as far as `mkdir -p "__UNREADABLE__"`. Callers that want the signal ask for
+  # it explicitly via read_nested_config_key_strict.
   local parent="$1" child="$2" val="" raw
   if raw=$(_config_py_run nested "$parent" "$child"); then
     case "$raw" in
@@ -345,11 +368,38 @@ read_nested_config_key() {
       exit
     }
   ' "$SKILLS_CONFIG_FILE" 2>/dev/null)
+  [ "$val" = "__UNREADABLE__" ] && val=""
   _config_denull "$val"
+}
+
+# read_nested_config_key_strict <parent> <child> — as above, but MAY echo `__UNREADABLE__` when the
+# awk tier meets a flow mapping it cannot read on one line. Only the access path opts in: for a key
+# with a safe default (the path roots) the default is the right answer, whereas silently defaulting
+# an access control is the failure this whole task exists to prevent.
+read_nested_config_key_strict() {
+  local parent="$1" child="$2" raw
+  if raw=$(_config_py_run nested "$parent" "$child"); then
+    case "$raw" in
+      __NONE__ | __MAP__) echo ""; return 0 ;;
+      __ERR__ | "")       : ;;
+      *)                  printf '%s\n' "$raw"; return 0 ;;
+    esac
+  fi
+  [ "${AGENT_SKILLS_CONFIG_TIER:-}" = "python" ] && { echo ""; return 0; }
+  awk -v p="$parent" '
+    $0 ~ "^"p":[[:space:]]*\\{" { if ($0 !~ /\}/) { print "__UNREADABLE__" } exit }
+  ' "$SKILLS_CONFIG_FILE" 2>/dev/null | grep -q . && { echo "__UNREADABLE__"; return 0; }
+  read_nested_config_key "$parent" "$child"
 }
 
 
 # config_bulk <spec>... — answer several questions in ONE python spawn.
+#
+# WIRE FORMAT (read this before consuming it): a NUL-framed stream of typed records,
+#     <index> US <kind> US <payload> RS             kind: v = value from the config, s = signal
+# US/RS (0x1f/0x1e) do not occur in a real config and survive command substitution, so nothing needs
+# escaping; the kind byte is what stops a value from ever being read as a signal. Use `config_bulk_get` to read a record rather than open-coding the framing — an earlier
+# version shipped an encoder with no decoder and the two drifted immediately.
 #
 # Specs: `status` | `key:<K>` | `shape:<P>` | `nested:<P>.<C>`. Prints one line per spec, in order,
 # using the same sentinels as the individual readers (`__NONE__`, `__MAP__`, `__ERR__`).
@@ -362,5 +412,12 @@ read_nested_config_key() {
 config_bulk() {
   _config_py_run bulk "$@"
 }
+# config_bulk_get <index> <stream> — echo `<kind> <payload>` for one record, or nothing.
+# The kind byte is what keeps a config value spelling `__MAP__` from being obeyed as a signal.
+config_bulk_get() {
+  printf '%s' "$2" | awk -v want="$1" -v RS="$(printf '\036')" -v FS="$(printf '\037')" '
+    $1 == want { printf "%s %s", $2, $3; exit }'
+}
+
 # Probe once, here, in the sourcing shell — see _config_probe for why this cannot be lazy.
 _config_probe || true

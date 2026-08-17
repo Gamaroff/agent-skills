@@ -426,12 +426,41 @@ fi
 # resolved a declared `manual` to `full`, silently, on the authoritative tier.
 echo "  18. Bulk protocol"
 D=$(fixture bulk-multiline 'summary: |\n  line one\n  line two\ntracker: jira\nvcs: bitbucket\n')
-LINES=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
-  cd '$D'; source '$READER'; config_bulk key:summary key:tracker key:vcs" 2>/dev/null | wc -l | tr -d ' ')
-assert_eq "3 specs → exactly 3 lines, whatever the values contain" "$LINES" "3"
 GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
-  cd '$D'; source '$READER'; config_bulk key:summary key:tracker key:vcs" 2>/dev/null | sed -n 's/^2'$'\t''//p')
-assert_eq "answer 2 is still tracker, not shifted by the multi-line value" "$GOT" "jira"
+  cd '$D'; source '$READER'
+  B=\$(config_bulk key:summary key:tracker key:vcs)
+  config_bulk_get 2 \"\$B\"" 2>/dev/null)
+assert_eq "answer 2 is still tracker, not shifted by the multi-line value" "$GOT" "v jira"
+GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$D'; source '$READER'
+  B=\$(config_bulk key:summary key:tracker key:vcs)
+  config_bulk_get 3 \"\$B\"" 2>/dev/null)
+assert_eq "answer 3 is still vcs" "$GOT" "v bitbucket"
+
+# The kind byte is the point: a config that SPELLS a sentinel is delivered as data, so it reaches
+# enum validation and is rejected, instead of being obeyed as a control signal.
+D=$(fixture forge-sentinel 'tracker: __MAP__\n')
+GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$D'; source '$READER'; B=\$(config_bulk key:tracker); config_bulk_get 1 \"\$B\"" 2>/dev/null)
+assert_eq "a config value spelling __MAP__ arrives as DATA, not a signal" "$GOT" "v __MAP__"
+run_case "$D"
+assert_rc "…and is therefore rejected as an unrecognised tracker" "$RC" "1"
+
+for forged in __NONE__ __ERR__ __UNREADABLE__; do
+  D=$(fixture "forge-$forged" "access: {tracker: $forged}\n")
+  run_case "$D"
+  if [ "$AT" = "full" ] && [ "$RC" = "0" ]; then
+    bad "forged $forged must not silently grant full" "rc=0 AT=full"
+  else
+    ok "forged $forged → not a silent full (rc=$RC, AT=${AT:-unset})"
+  fi
+done
+
+# A block scalar carries a trailing newline that `$( )` used to strip; the bulk path must agree.
+D=$(fixture block-scalar 'access:\n  tracker: |\n    manual\n')
+run_case "$D"
+assert_eq "block-scalar access.tracker resolves, not halts" "$AT" "manual"
+assert_rc "block-scalar access.tracker → status 0" "$RC" "0"
 
 # End to end: the shape that silently escalated must now not.
 D=$(fixture bulk-escalate 'tracker: "github\\n\\n\\n"\naccess:\n  tracker: manual\n')
@@ -511,8 +540,9 @@ if [ "$AT" = "full" ]; then bad "duplicate access: [awk] must not grant full" "A
 # --- 23. Unknown bulk spec fails closed ----------------------------------------------------------
 echo "  23. Unknown bulk spec"
 D=$(fixture bulk-typo 'access:\n  tracker: manual\n')
-GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "cd '$D'; source '$READER'; config_bulk 'nsted:access.tracker'" 2>/dev/null | sed -n 's/^1'$'\t''//p')
-assert_eq "typo'd spec → __ERR__, never __NONE__ (which would read as 'absent')" "$GOT" "__ERR__"
+GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$D'; source '$READER'; B=\$(config_bulk 'nsted:access.tracker'); config_bulk_get 1 \"\$B\"" 2>/dev/null)
+assert_eq "typo'd spec → __ERR__ signal, never __NONE__ (which would read as 'absent')" "$GOT" "s __ERR__"
 
 # --- 24. resolve_access rejects an unknown system ------------------------------------------------
 echo "  24. resolve_access whitelist"
@@ -521,6 +551,63 @@ OUT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
   cd '$D'; source '$RESOLVER' >/dev/null 2>&1
   resolve_access 'x}; echo PWNED; :' >/dev/null 2>&1; echo \$?" 2>/dev/null | tail -1)
 assert_eq "resolve_access with an unknown system → returns 1" "$OUT" "1"
+
+# --- 25. Legal YAML the strict loader must still accept ------------------------------------------
+# The duplicate-key loader called construct_object before flatten_mapping, so a `<<` merge key had
+# no constructor and a legal config was graded malformed — a hard halt with an access: block.
+echo "  25. Merge keys and anchors"
+D=$(fixture merge-key 'common: &c\n  vcs: github\ntracker: jira\n<<: *c\naccess:\n  tracker: manual\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "merge key `<<:` → status 0, not malformed" "$RC" "0"
+assert_eq "merge key → access still read"             "$AT" "manual"
+
+D=$(fixture anchor-plain 'base: &b docs/p\nprd:\n  prdShardedLocation: *b\ntracker: jira\naccess:\n  tracker: manual\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "anchor/alias → status 0" "$RC" "0"
+
+# Duplicates must still be rejected — the loader has one job and it must keep doing it.
+# A duplicate is a parse failure, so the established rule applies: degrade without an `access:`
+# block, halt with one. Asserting a bare rc=1 here would contradict the malformed-YAML contract.
+D=$(fixture dupe-noaccess 'tracker: jira\ntracker: github\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "duplicate key, no access: → degrades like any parse failure" "$RC" "0"
+assert_eq "…and does not silently pick one of the duplicates"          "$T"  "github"
+
+D=$(fixture dupe-access 'tracker: jira\ntracker: github\naccess:\n  tracker: manual\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "duplicate key WITH access: → halts" "$RC" "1"
+
+# --- 26. Sentinels never escape to callers with a safe default ------------------------------------
+# `__UNREADABLE__` is meaningful only to the access path. It reached PRD_ROOT/ARCH_ROOT — consumed by
+# 34 files — and render-retro.sh got as far as `mkdir -p "__UNREADABLE__"`.
+echo "  26. Sentinel containment"
+D=$(fixture flow-prd 'prd: {\n  prdShardedLocation: docs/custom }\ntracker: jira\n')
+for tier in python awk; do
+  OUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER="$tier" bash -c "
+    cd '$D'; source '$PATHS'; echo \"\$PRD_ROOT|\$ARCH_ROOT\"" 2>/dev/null)
+  case "$OUT" in
+    *__UNREADABLE__*) bad "path roots [$tier] leak a sentinel" "got '$OUT'" ;;
+    *) ok "path roots [$tier] never expose a sentinel (got '$OUT')" ;;
+  esac
+done
+
+# --- 27. Exported outputs do not survive a refused resolve ---------------------------------------
+echo "  27. Output-variable hygiene"
+DA=$(fixture out-a 'access:\n  tracker: full\n')
+DB=$(fixture out-b 'access:\n  tracker: manual\naccess:\n  vcs: full\n')
+OUT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$DA'; source '$RESOLVER' >/dev/null 2>&1
+  cd '$DB'; source '$RESOLVER' >/dev/null 2>&1 || true
+  echo \"AT=[\$ACCESS_TRACKER]\"" 2>/dev/null)
+assert_eq "a refused resolve does not leave the previous repo's mode exported" "$OUT" "AT=[]"
+
+# --- 28. printf, not echo: a value of -n must not vanish -----------------------------------------
+echo "  28. Values that look like echo flags"
+for v in -n -e -E; do
+  D=$(fixture "echoflag-$RANDOM" "tracker: $v\n")
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+  assert_rc "tracker: $v → rejected loudly, not swallowed into detection" "$RC" "1"
+done
 
 # --- Summary -----------------------------------------------------------------
 echo ""
