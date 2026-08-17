@@ -56,16 +56,21 @@ class _StrictLoader(yaml.SafeLoader):
     pass
 
 def _no_dupes(loader, node):
-    # flatten_mapping FIRST. It resolves `<<` merge keys the way SafeLoader does; without it the
-    # merge key still carries tag:yaml.org,2002:merge, has no constructor, and raises — which graded
-    # a legal config `malformed` and hard-halted every call site.
-    loader.flatten_mapping(node)
+    # Scan the keys AS WRITTEN, before flatten_mapping runs. Order matters twice over:
+    #   * scanning before means a `<<` merge key is skipped explicitly rather than blowing up for
+    #     want of a constructor (which graded a legal config malformed);
+    #   * scanning before ALSO means an inherited key and a local key that overrides it are not
+    #     mistaken for a duplicate — flatten_mapping PREPENDS the merged pairs, and overriding is
+    #     the entire purpose of `<<`.
     seen = set()
     for k, _ in node.value:
+        if getattr(k, "tag", None) == "tag:yaml.org,2002:merge":
+            continue
         key = loader.construct_object(k, deep=True)
         if key in seen:
             raise ValueError("duplicate key: %r" % (key,))
         seen.add(key)
+    loader.flatten_mapping(node)
     # Generator, not a plain return: construct_yaml_map yields the dict before filling it, which is
     # what lets a recursive anchor resolve. Returning a finished dict broke those.
     for data in yaml.SafeLoader.construct_yaml_map(loader, node):
@@ -151,6 +156,13 @@ elif mode == "bulk":
     out = []
     for i, spec in enumerate(sys.argv[3:], 1):
         kind, payload = answer(spec)
+        # An unescaped framing is only safe if the payload cannot contain a separator. Without this
+        # a value could inject a whole record — records are emitted in index order, and the decoder
+        # takes the FIRST match, so a payload in record N lands ahead of every real record after it
+        # and wins. That silently turned a declared `manual` into `full`. Refusing costs nothing:
+        # YAML rejects these bytes raw, and no legal value (enum or filesystem path) contains one.
+        if "\x1f" in payload or "\x1e" in payload:
+            kind, payload = "s", "__ERR__"
         # A block scalar always carries a trailing newline; `$( )` used to strip it, so stripping
         # here keeps the bulk path and the individual readers agreeing on the same file.
         if kind == "v":
@@ -415,8 +427,10 @@ config_bulk() {
 # config_bulk_get <index> <stream> — echo `<kind> <payload>` for one record, or nothing.
 # The kind byte is what keeps a config value spelling `__MAP__` from being obeyed as a signal.
 config_bulk_get() {
+  # String comparison, not awk's default numeric strnum compare — otherwise 01, 1.0, " 1", +1 and
+  # 1e0 all match index 1, which widened the record-forgery surface.
   printf '%s' "$2" | awk -v want="$1" -v RS="$(printf '\036')" -v FS="$(printf '\037')" '
-    $1 == want { printf "%s %s", $2, $3; exit }'
+    ($1 "") == (want "") { printf "%s %s", $2, $3; exit }'
 }
 
 # Probe once, here, in the sourcing shell — see _config_probe for why this cannot be lazy.

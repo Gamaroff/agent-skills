@@ -558,7 +558,7 @@ assert_eq "resolve_access with an unknown system → returns 1" "$OUT" "1"
 echo "  25. Merge keys and anchors"
 D=$(fixture merge-key 'common: &c\n  vcs: github\ntracker: jira\n<<: *c\naccess:\n  tracker: manual\n')
 run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
-assert_rc "merge key `<<:` → status 0, not malformed" "$RC" "0"
+assert_rc 'merge key <<: → status 0, not malformed' "$RC" "0"
 assert_eq "merge key → access still read"             "$AT" "manual"
 
 D=$(fixture anchor-plain 'base: &b docs/p\nprd:\n  prdShardedLocation: *b\ntracker: jira\naccess:\n  tracker: manual\n')
@@ -608,6 +608,56 @@ for v in -n -e -E; do
   run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
   assert_rc "tracker: $v → rejected loudly, not swallowed into detection" "$RC" "1"
 done
+
+# --- 29. A config value cannot forge a record ----------------------------------------------------
+# The framing is unescaped, which is only safe because the encoder refuses separator-bearing
+# payloads. Without that refusal a value could inject a record: records are emitted in index order
+# and the decoder takes the FIRST match, so a payload in record N lands ahead of every real record
+# after it. That silently turned a declared `manual` into `full`.
+echo "  29. Record forgery"
+D=$(fixture forge-escalate 'tracker: "jira\\x1e5\\x1fv\\x1ffull"\nvcs: github\naccess:\n  tracker: manual\n')
+run_case "$D"
+if [ "$AT" = "full" ]; then bad "forged record must not grant full" "AT=full"; else ok "forged record → not full (rc=$RC, AT=${AT:-unset})"; fi
+assert_rc "forged record → fails closed" "$RC" "1"
+
+D=$(fixture forge-shape 'tracker: "jira\\x1e4\\x1fv\\x1fmapping"\naccess: manual\n')
+run_case "$D"
+assert_rc "forged shape record cannot bypass the scalar-access halt" "$RC" "1"
+
+D=$(fixture forge-downgrade 'tracker: "jira\\x1e5\\x1fv\\x1fmanual"\naccess:\n  tracker: full\n')
+run_case "$D"
+assert_rc "forgery in either direction fails closed" "$RC" "1"
+
+# A lone separator must be refused too — it used to truncate a value into a DIFFERENT legal one.
+D=$(fixture lone-sep 'tracker: "jira\\x1fgithub"\nvcs: github\n')
+run_case "$D"
+assert_rc "a lone separator → refused, not silently truncated" "$RC" "1"
+
+# The index must be compared as a string; otherwise 01 / 1.0 / " 1" / +1 are extra spellings of the
+# same attack.
+for spelling in 01 1.0 ' 1' +1; do
+  GOT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+    source '$READER'; config_bulk_get '$spelling' \"\$(printf '1\\037v\\037real\\036')\"" 2>/dev/null)
+  assert_eq "index spelling '$spelling' does not match index 1" "$GOT" ""
+done
+
+# --- 30. The `<<` OVERRIDE form, which is the whole point of a merge key --------------------------
+# The dup scan ran after flatten_mapping, which PREPENDS merged pairs, so an inherited key plus the
+# local key overriding it read as a duplicate. The earlier merge-key test passed because it only
+# exercised a merge that adds a key never present locally.
+echo "  30. Merge-key override"
+D=$(fixture merge-override 'defaults: &d\n  tracker: read-only\n  vcs: full\naccess:\n  <<: *d\n  tracker: manual\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "<<: override [$tier] → status 0"        "$RC" "0"
+done
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_eq "<<: override → the LOCAL value wins"      "$AT" "manual"
+
+# A real duplicate must still be caught, override support notwithstanding.
+D=$(fixture dupe-under-merge 'defaults: &d\n  vcs: full\naccess:\n  <<: *d\n  tracker: manual\n  tracker: full\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "a genuine duplicate beside a merge key is still rejected" "$RC" "1"
 
 # --- Summary -----------------------------------------------------------------
 echo ""

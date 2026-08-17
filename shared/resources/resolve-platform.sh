@@ -177,6 +177,19 @@ if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.
   # A SIGNAL of __MAP__ (the tracker.workflowFile form) means "no scalar override" → auto. It is
   # resolved here so the literal string never enters the logic below: a config whose tracker VALUE
   # spells __MAP__ must stay data and be rejected by validation, not be read as that signal.
+  # An __ERR__ signal means the reader REFUSED the payload (it carried a framing separator). That is
+  # a corrupt value, not an absent one, so it must fail closed — degrading it to `auto` would turn a
+  # poisoned value into silent platform detection, which is the fall-through this task exists to end.
+  for _rp_i in 2 3 5 6; do
+    if [ "$(_rp_sig "$_rp_i")" = "__ERR__" ]; then
+      printf '❌ %s: a configured value contains a character that cannot be read safely.\n' "$SKILLS_CONFIG_FILE" >&2
+      printf '   Remove any \\x1e / \\x1f escape from the value and re-run.\n' >&2
+      unset _rp_i
+      return 1
+    fi
+  done
+  unset _rp_i
+
   _RP_TRACKER=$(_rp_val 2); [ -n "$_RP_TRACKER" ] || _RP_TRACKER=auto
   _RP_VCS=$(_rp_val 3);     [ -n "$_RP_VCS" ]     || _RP_VCS=auto
   _RP_SHAPE=$(_rp_val 4); [ -n "$_RP_SHAPE" ] || _RP_SHAPE=absent
