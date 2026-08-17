@@ -77,6 +77,14 @@ append_line() {
   if [[ "$DRY_RUN" == true ]]; then
     echo -e "${YELLOW}[dry-run]${NC} would append to $path: $line"
   elif ! grep -qF "$line" "$path" 2>/dev/null; then
+    # Terminate an unterminated last line first. Without this, appending
+    # ".secrets/" to a .gitignore ending in "dist/" (no newline) yields
+    # "dist/.secrets/" — a rule that ignores neither path, silently.
+    # $( ) strips a trailing newline, so a non-empty result means the last
+    # byte was not one.
+    if [[ -s "$path" ]] && [[ -n "$(tail -c 1 "$path")" ]]; then
+      echo "" >> "$path"
+    fi
     echo "$line" >> "$path"
   fi
 }
@@ -247,57 +255,116 @@ collect_env_vars() {
   record_step "Credentials" "ok" "$VCS + $TRACKER credentials collected"
 }
 
-# ── 4. .env files ────────────────────────────────────────────────────────────
+# ── 4. Credential files ──────────────────────────────────────────────────────
+# Credentials are written to .secrets/tooling.env, NOT the repo-root .env.
+#
+# Nx loads workspace `.env` files into the environment of EVERY task it runs, so
+# tooling tokens kept in a root .env sit in process.env of every application
+# process started or tested through Nx, before any application code executes. It
+# is not fixable application-side: NX_LOAD_DOT_ENV_FILES=false loads the file
+# into the CLI's own process before the flag is consulted, and @nestjs/config has
+# no skipProcessEnv. A different PATH is the fix; a flag is not. `.secrets/` sits
+# outside the `.env.*` / `.*.env` names Nx generates from target and configuration
+# names, so it is never auto-loaded.
+#
+# v0.40.0 taught both loaders to search .secrets/tooling.env first and .env
+# second. `.env` is still READ, so an unmigrated consumer keeps working — what
+# changes here is only where a NEW consumer's credentials land. Until this, the
+# wizard taught every new consumer the location that release exists to move away
+# from.
+CRED_FILE=".secrets/tooling.env"
+
+# Credentials in a legacy repo-root .env: report, and never move the file.
+#
+# It holds live credentials, and a wizard that relocates one under the user's
+# feet is one bad path expansion away from destroying the only copy. Nothing is
+# broken either — the loaders still read .env, second — so this is advice, not
+# repair. Print the command; let a human run it.
+_report_env_migration() {
+  [[ ! -f ".env" ]] && return 0
+  local keys="JIRA_URL|JIRA_API_TOKEN|BITBUCKET_API_TOKEN|BITBUCKET_APP_PASSWORD|BITBUCKET_ACCESS_TOKEN|GH_TOKEN"
+  grep -qE "^[[:space:]]*(${keys})=" .env 2>/dev/null || return 0
+
+  warn "A repo-root .env holds tooling credentials."
+  info "  Nothing is broken — the loaders read ${CRED_FILE} first and .env second."
+  info "  But an Nx workspace loads a root .env into every task it runs, which is"
+  info "  why the preferred location moved. To migrate, by hand:"
+  info "    mkdir -p .secrets && mv .env ${CRED_FILE}"
+  record_warning "Credentials found in a repo-root .env — consider moving them to ${CRED_FILE}"
+}
+
 write_env_files() {
   [[ ${#ENV_LINES[@]} -eq 0 ]] && return
 
-  heading "Writing .env files"
+  heading "Writing credential files"
 
-  # .env.example — keys only, no values
-  local example_content="# agent-skills environment variables\n# Copy to .env and fill in real values\n"
+  # .env.example — keys only, no values.
+  #
+  # It stays at the repo ROOT rather than moving inside .secrets/. It is a
+  # TRACKED file describing an untracked one, and the .gitignore rule written
+  # below ignores `.secrets/` wholesale — an example living in there would be
+  # swallowed by the very rule that protects the real file.
+  local example_content="# agent-skills environment variables\n"
+  example_content+="# Copy to ${CRED_FILE} and fill in real values.\n"
+  example_content+="# A repo-root .env is still read as a fallback, second, so an existing\n"
+  example_content+="# .env keeps working — see docs/reference/configuration.md.\n"
   for line in "${ENV_LINES[@]}"; do
     example_content+="${line%%=*}=\n"
   done
   if [[ -f ".env.example" ]] && [[ "$DRY_RUN" == false ]]; then
     info ".env.example already exists — skipped"
+    # An example written by an older wizard still says "Copy to .env". Say so
+    # rather than overwriting a file the consumer may have customised.
+    if grep -q "Copy to \.env and" .env.example 2>/dev/null; then
+      record_warning ".env.example names the old credential location — update its header to ${CRED_FILE}"
+    fi
   else
     write_file ".env.example" "$(printf '%b' "$example_content")"
     ok ".env.example"
   fi
 
-  if [[ -f ".env" ]]; then
-    warn ".env already exists."
+  _report_env_migration
+
+  if [[ -f "$CRED_FILE" ]]; then
+    warn "$CRED_FILE already exists."
     ask "Overwrite? [y/N]:"
     read -r _ow_env
     if [[ ! "${_ow_env:-N}" =~ ^[Yy]$ ]]; then
-      info "Skipped .env — existing file kept"
-      record_step "Env files" "ok" ".env kept (existing)"
+      info "Skipped $CRED_FILE — existing file kept"
+      record_step "Credential files" "ok" "$CRED_FILE kept (existing)"
       return
     fi
   fi
 
-  ask "Write live credentials to .env? [Y/n]:"
+  ask "Write live credentials to ${CRED_FILE}? [Y/n]:"
   read -r _write_env
   if [[ "${_write_env:-Y}" =~ ^[Yy]$ ]]; then
     local env_content=""
     for line in "${ENV_LINES[@]}"; do
       env_content+="${line}\n"
     done
-    write_file ".env" "$(printf '%b' "$env_content")"
-    ok ".env written"
+    write_file "$CRED_FILE" "$(printf '%b' "$env_content")"
+    ok "$CRED_FILE written"
 
-    # .gitignore
-    if [[ -f ".gitignore" ]] || [[ "$DRY_RUN" == true ]]; then
-      append_line ".gitignore" ".env"
-      ok ".env added to .gitignore"
-    else
-      write_file ".gitignore" ".env\n"
-      ok ".gitignore created with .env"
-    fi
-    record_step "Env files" "ok" ".env written"
+    # .gitignore — BOTH names, and this is not optional.
+    #
+    # `.secrets/` is where credentials now land; writing them to a path with no
+    # ignore rule would be strictly worse than leaving them in .env, which is
+    # exactly why this and the path change had to ship together. `.env` stays
+    # because the loaders still read it and a migrating consumer may still have
+    # one.
+    # Create-then-append rather than a separate write branch. `write_file` uses
+    # printf '%s', so the old `write_file ".gitignore" ".env\n"` wrote the two
+    # characters backslash-n and produced a one-line file reading `.env\n` —
+    # which ignores nothing. append_line terminates its own lines correctly.
+    [[ -f ".gitignore" ]] || touch_file ".gitignore"
+    append_line ".gitignore" ".secrets/"
+    append_line ".gitignore" ".env"
+    ok ".secrets/ and .env added to .gitignore"
+    record_step "Credential files" "ok" "$CRED_FILE written"
   else
-    info "Skipped .env — fill in .env.example manually"
-    record_step "Env files" "ok" ".env.example only"
+    info "Skipped $CRED_FILE — fill in .env.example manually"
+    record_step "Credential files" "ok" ".env.example only"
   fi
 }
 

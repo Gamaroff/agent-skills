@@ -36,7 +36,7 @@ Task quickstart still needs VCS auth (PR creation); tracker auth is only needed 
 
 ### Persisting env vars
 
-Place credentials in a `.env` file at your project root (add `.env` to `.gitignore`) and load with `source .env`, or export them from your shell profile (`~/.zshrc` / `~/.bashrc`). Skills read from the shell environment — there is no separate secrets store.
+Place credentials in `.secrets/tooling.env` at your project root (add `.secrets/` to `.gitignore`) and load with `source .secrets/tooling.env`, or export them from your shell profile (`~/.zshrc` / `~/.bashrc`). A repo-root `.env` is still read as a fallback, so an existing one keeps working — `.secrets/` is preferred because an Nx workspace auto-loads a root `.env` into every task it runs, putting tooling tokens into every application process. Skills read from the shell environment — there is no separate secrets store.
 
 **GitHub** — no env vars needed; auth is handled by the `gh` CLI:
 
@@ -97,7 +97,7 @@ Tracker sync is **opt-in** — the creation and review skills (`create-story`, `
 
 **Recommended for new projects.** An interactive script that walks through the full setup — prerequisites, platform, credentials, config, registries, skills, and hooks — in one session.
 
-**Safe to re-run.** Existing files are detected and you'll be prompted before any overwrite. Existing `.env` values appear as defaults (secrets show as `[currently set — Enter to keep]`), so you can re-run to update one credential without retyping the rest.
+**Safe to re-run.** Existing files are detected and you'll be prompted before any overwrite. Existing credential values appear as defaults (secrets show as `[currently set — Enter to keep]`), so you can re-run to update one credential without retyping the rest.
 
 ```bash
 # From your project root — curl and run directly:
@@ -133,7 +133,7 @@ The full wizard runs all 9 steps. The `--update` flag runs only steps 1 and 8 �
 
 ```
 .env.example                          # credential keys, no values
-.env                                  # live credentials (if confirmed)
+.secrets/tooling.env                  # live credentials (if confirmed)
 skills-config.yaml                    # project configuration
 docs/development/epic-registry.md                 # empty — populated by /create-epic
 docs/tasks/task-registry.md           # empty — populated by /create-task

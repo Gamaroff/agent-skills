@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The setup wizard now seeds credentials into `.secrets/tooling.env`, not the repo-root `.env`.** v0.40.0 taught both loaders to search `.secrets/tooling.env` first and `.env` second; `scripts/setup-consumer.sh` was left behind, so every consumer onboarded since has been started in the location that release exists to move away from. An Nx workspace loads a root `.env` into the environment of every task it runs, putting tooling tokens into every application process before any application code executes.
+
+  **Nothing breaks for an existing consumer.** `.env` is still read, second. What changes is only where a *new* consumer's credentials land, and the wizard now writes **both** `.secrets/` and `.env` to `.gitignore` — the two had to ship together, because writing a live token to a path with no ignore rule would be strictly worse than leaving it where it was.
+
+  A pre-existing `.env` holding tooling credentials is **detected and reported, never moved**. It holds live secrets, and a wizard that relocates one under the user's feet is one bad path expansion away from destroying the only copy. The exact `mv` is printed; a human runs it. A `.env` holding no tooling credential produces no advice at all — a consumer may legitimately keep application config there, and advice that is usually noise is advice nobody reads.
+
+  `.env.example` deliberately stays at the repo root rather than moving inside `.secrets/`. It is a tracked file describing an untracked one, and the new `.secrets/` rule would otherwise swallow the example describing the file it protects.
+
+### Fixed
+
+- **`.gitignore` creation wrote the two characters `\n` instead of a newline.** `write_file` uses `printf '%s'`, so the wizard's `write_file ".gitignore" ".env\n"` produced a one-line file reading `.env\n` — a rule matching nothing. Only reachable when the consumer repo had no `.gitignore` at all, which is exactly the fresh-project case the wizard exists for. That path now creates the file and uses `append_line`, which terminates its own lines.
+
+- **`append_line` concatenated onto an unterminated last line.** A `.gitignore` ending `dist/` with no trailing newline became `dist/.secrets/` — a rule ignoring neither path, silently, with the credential file it was meant to protect left tracked. It now terminates the previous line first. This affected every caller, not just the credential path.
+
+  `shared/resources/tests/setup-consumer-credentials.test.mjs` is new — 12 tests over the destination path, both gitignore rules, the unterminated-line case, re-run idempotency, the untouched legacy `.env`, the no-credential quiet case, and the overwrite guard. **Mutation-proven rather than merely green**: writing back to `.env` turns 7 red, dropping the `.secrets/` rule 7, dropping the `.env` rule 5, removing the newline guard 3, making `append_line` unconditional 3, moving the live `.env` 3, and reverting the example header 1.
+
+  Two of those tests were themselves wrong first, and the mutation pass is what caught it. The harness returned closures reading a temp directory that `finally` had already deleted, so every absence assertion passed against nothing; and the overwrite-guard test proved nothing, because with the guard removed the same keystroke declines the *write* prompt and leaves the file equally untouched. Both now pin the branch actually taken.
+
 ## [v0.41.0] - 2026-08-16
 
 ### Added

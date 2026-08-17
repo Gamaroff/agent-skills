@@ -5,11 +5,11 @@ type: task
 description: 'task.48 taught both credential loaders to read .secrets/tooling.env in preference to .env, but the onboarding wizard was left alone: write_env_files() still writes live credentials to .env, its .env.example header still says "Copy to .env", and the only gitignore line it appends is .env. Nothing is broken — .env is still read — but every repo onboarded from here starts in the location task.48 exists to move away from. Moving it needs the .secrets/ gitignore rule written in the same change, and needs --update to leave an already-migrated consumer alone, which is why it was split out.'
 tags: [credentials, setup-consumer, onboarding, nx]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-08-17
 estimated_effort_hours: 3
 ---
 
@@ -97,13 +97,13 @@ against a missing rule is the failure mode that matters here.
 
 ## Success Criteria
 
-- [ ] A fresh consumer's credentials land in `.secrets/tooling.env`
-- [ ] `.gitignore` covers `.secrets/` and still covers `.env`
-- [ ] The tracked example file is not swallowed by the new ignore rule
-- [ ] `--update` against an existing `.env` reports and prints the migration command, and changes
+- [x] A fresh consumer's credentials land in `.secrets/tooling.env`
+- [x] `.gitignore` covers `.secrets/` and still covers `.env`
+- [x] The tracked example file is not swallowed by the new ignore rule
+- [x] `--update` against an existing `.env` reports and prints the migration command, and changes
       nothing
-- [ ] The example header names the new location and says `.env` is still read
-- [ ] Every assertion watched failing under mutation
+- [x] The example header names the new location and says `.env` is still read
+- [x] Every assertion watched failing under mutation
 
 ## Risk Assessment
 
