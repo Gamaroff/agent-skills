@@ -916,3 +916,349 @@ test("§15 the fixture journals exist and are not gitignored", () => {
     assert.equal(ignored, false, `${name} is gitignored and would never be committed`);
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// §16. QA cycle 1 regressions
+//
+// Every test below pins a defect QA found in code this suite already covered.
+// The common cause was fixtures that happened not to contain the triggering
+// shape — no `dependsOn` edge in the dedup fixture, no 32-character run in the
+// hostile-body fixture, no second body in the identity tests, no second
+// redaction pass over argv. The lesson these encode: assert COUNTS and
+// BYTE-EQUALITY, not presence and relative order.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── BUG-1 / BUG-13: the checklist listed dependants twice ──────────────────
+
+test("§16 BUG-1 the checklist lists each record exactly once, even under dependsOn", () => {
+  const { records } = loadFixture("handover-depends-chain.jsonl");
+  const md = hr.render(records, "md", { env: CLEAN_ENV });
+
+  assert.equal(
+    md.split("- [ ]").length - 1,
+    records.length,
+    "one unticked checkbox per outstanding record — a dependant rendered both " +
+      "nested and standalone makes an operator perform it twice",
+  );
+  for (const rec of records) {
+    assert.equal(
+      md.split(`id \`${rec.id}\``).length - 1,
+      1,
+      `${rec.id} appears more than once in the checklist`,
+    );
+  }
+});
+
+test("§16 BUG-13 renderMarkdown is idempotent on a shared model and does not mutate records", () => {
+  const { records } = loadFixture("handover-depends-chain.jsonl");
+  const before = JSON.stringify(records);
+
+  const model = hr.buildModel(records);
+  assert.equal(
+    hr.renderMarkdown(model),
+    hr.renderMarkdown(model),
+    "rendering the same model twice must produce the same bytes — writing a " +
+      "marker onto the records made the second render drop all nesting",
+  );
+  assert.equal(JSON.stringify(records), before, "the caller's records were mutated");
+  assert.ok(!hr.render(records, "json", { env: CLEAN_ENV }).includes("_rendered"));
+});
+
+// ── BUG-3: the generated script must never execute record content ──────────
+
+test("§16 BUG-3a a newline in `intent` cannot escape the script comment", () => {
+  const rec = dm.buildRecord(
+    {
+      kind: "github.issue.comment",
+      intent: "Post the summary\nrm -rf ~/important",
+      target: { issue: "1", url: "https://x/1" },
+      command: { argv: ["gh", "issue", "comment", "1"] },
+    },
+    { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
+  );
+  const sh = hr.render([rec], "sh", { env: CLEAN_ENV });
+  for (const line of sh.split("\n")) {
+    assert.ok(
+      line.trim() !== "rm -rf ~/important",
+      "the injected text reached file scope, where it runs on every invocation " +
+        "including the dry run",
+    );
+  }
+});
+
+test("§16 BUG-3b hostile record content cannot execute during a dry run", () => {
+  withTmp((dir) => {
+    const marker = join(dir, "PWNED");
+    const rec = dm.buildRecord(
+      {
+        kind: "jira.sprint.set-state",
+        intent: `y \`touch ${marker}\``,
+        // No command.argv — takes the `echo "✋ …"` fallback, which is where the
+        // unescaped double-quoted interpolation lived.
+        target: { sprint: `\`touch ${marker}\``, url: "https://x/2" },
+      },
+      { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
+    );
+    const f = join(dir, "handover.sh");
+    fs.writeFileSync(f, hr.render([rec], "sh", { env: CLEAN_ENV }));
+
+    execFileSync("bash", ["-n", f]);
+    try {
+      execFileSync("bash", [f], { stdio: "ignore" });
+    } catch {
+      /* a non-zero exit is fine; a side effect is not */
+    }
+    assert.equal(
+      fs.existsSync(marker),
+      false,
+      "the dry run executed command substitution from record content",
+    );
+  });
+});
+
+test("§16 BUG-3c hostile content cannot execute via the run_step description either", () => {
+  // The sibling of BUG-3b for the path a record WITH command.argv takes. Both
+  // interpolate the headline into the script; both must single-quote it.
+  withTmp((dir) => {
+    const marker = join(dir, "PWNED_RUNSTEP");
+    const rec = dm.buildRecord(
+      {
+        kind: "github.issue.comment",
+        intent: "Post it",
+        target: { issue: `\`touch ${marker}\``, url: "https://x/1" },
+        desired: { status: `$(touch ${marker})` },
+        command: { argv: ["true", "comment"] },
+      },
+      { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
+    );
+    const f = join(dir, "handover.sh");
+    fs.writeFileSync(f, hr.render([rec], "sh", { env: CLEAN_ENV }));
+
+    execFileSync("bash", ["-n", f]);
+    try {
+      execFileSync("bash", [f], { stdio: "ignore" });
+    } catch {
+      /* non-zero exit is acceptable; a side effect is not */
+    }
+    assert.equal(
+      fs.existsSync(marker),
+      false,
+      "the run_step description executed command substitution from record content",
+    );
+  });
+});
+
+// ── BUG-4: identity must separate two payloads to the same object ──────────
+
+test("§16 BUG-4 two comments to one issue with different bodies are two records", () => {
+  const mk = (intent, stdin) =>
+    dm.buildRecord(
+      {
+        kind: "github.issue.comment",
+        intent,
+        target: { issue: "230", url: "https://x/230" },
+        command: {
+          argv: ["gh", "issue", "comment", "230", "--body-file", "-"],
+          stdin,
+        },
+      },
+      { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
+    );
+  const a = mk("Post the DoD summary", "DoD body");
+  const b = mk("Post the QA gate result", "QA body");
+
+  assert.notEqual(
+    a.id,
+    b.id,
+    "identical argv made two distinct comments collapse to one id, and dedupe " +
+      "then silently discarded one — the invisible drift this sequence removes",
+  );
+  assert.equal(hr.dedupe([a, b]).length, 2);
+  assert.equal(hr.render([a, b], "md", { env: CLEAN_ENV }).split("- [ ]").length - 1, 2);
+
+  // Identity must still be stable for genuinely identical input (resume).
+  assert.equal(mk("Post the DoD summary", "DoD body").id, a.id);
+});
+
+// ── BUG-5: redaction must be idempotent ───────────────────────────────────
+
+test("§16 BUG-5 a variable name survives the second redaction pass", () => {
+  const env = { GITHUB_TOKEN: "ghp_abcdefghijklmnopqrstuvwxyz0123456789" };
+  const table = dm.buildEnvTable(env);
+
+  const once = dm.redactArgv(["gh", "--token", env.GITHUB_TOKEN], table);
+  assert.deepEqual(once, ["gh", "--token", "$GITHUB_TOKEN"]);
+  assert.deepEqual(
+    dm.redactArgv(once, table),
+    once,
+    "write-then-render redacted twice and masked the name to «redacted», " +
+      "handing the operator a script that cannot run",
+  );
+
+  // End-to-end: the name must survive the full write → render path.
+  const rec = dm.buildRecord(
+    {
+      kind: "github.issue.comment",
+      intent: "Post it",
+      target: { issue: "1", url: "https://x/1" },
+      command: { argv: ["gh", "--token", env.GITHUB_TOKEN], stdin: null },
+    },
+    { env, now: "2026-08-18T00:00:00Z" },
+  );
+  const sh = hr.render([rec], "sh", { env });
+  assert.match(sh, /\$GITHUB_TOKEN/);
+  assert.ok(!sh.includes(env.GITHUB_TOKEN));
+});
+
+// ── BUG-2 / BUG-6 / BUG-11 / BUG-12: redaction must not corrupt real content ──
+
+test("§16 BUG-2 legitimate content round-trips — SHAs, base64, URLs, branch names", () => {
+  const t = dm.buildEnvTable({});
+  const cases = [
+    "See commit 9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c",
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk",
+    "https://github.com/my-organisation/my-repository/issues/230",
+    "feature/task.52.deferred-mutation-record-and-renderers",
+  ];
+  for (const c of cases) {
+    assert.equal(dm.redactString(c, t), c, `redaction corrupted: ${c}`);
+  }
+
+  // And through the full path into every format.
+  const body = cases.join("\n");
+  const rec = dm.buildRecord(
+    {
+      kind: "github.issue.comment",
+      intent: "Post a body full of legitimate long tokens",
+      target: { issue: "230", url: "https://x/230" },
+      command: {
+        argv: ["gh", "issue", "comment", "230", "--body-file", "-"],
+        stdin: body,
+      },
+    },
+    { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
+  );
+  assert.equal(rec.command.stdin, body, "the writer corrupted the body");
+  const b64 = /printf %s '([A-Za-z0-9+/=]+)'/.exec(hr.render([rec], "sh", { env: CLEAN_ENV }));
+  assert.equal(Buffer.from(b64[1], "base64").toString("utf8"), body);
+});
+
+test("§16 BUG-6 `-u`/`-p` are only secret-bearing for clients that use them that way", () => {
+  const t = dm.buildEnvTable({});
+  assert.deepEqual(dm.redactArgv(["git", "push", "-u", "origin", "HEAD"], t), [
+    "git", "push", "-u", "origin", "HEAD",
+  ]);
+  assert.deepEqual(dm.redactArgv(["mkdir", "-p", "docs/tasks"], t), [
+    "mkdir", "-p", "docs/tasks",
+  ]);
+  // curl still masks — that is the case the rule exists for.
+  assert.deepEqual(dm.redactArgv(["curl", "-u", "admin:s3cretpass"], t), [
+    "curl", "-u", "«redacted»",
+  ]);
+  // An explicit secret flag masks for ANY client, however short the value.
+  assert.deepEqual(dm.redactArgv(["gh", "--token", "abc"], t), [
+    "gh", "--token", "«redacted»",
+  ]);
+});
+
+test("§16 BUG-11 keys, URL userinfo and short secrets are redacted; config words are not", () => {
+  const t = dm.buildEnvTable({});
+  assert.deepEqual(
+    dm.redactDeep({ "ghp_abcdefghijklmnopqrstuvwxyz0123456789": "v" }, t),
+    { "«redacted»": "v" },
+    "a credential used as an object KEY survived into md, summary and json",
+  );
+  assert.equal(
+    dm.redactString("https://user:hunter2@example.com", t),
+    "https://user:«redacted»@example.com",
+  );
+  assert.equal(
+    dm.redactString("pw is hunter2", dm.buildEnvTable({ JIRA_PASSWORD: "hunter2" })),
+    "pw is $JIRA_PASSWORD",
+    "a 7-character secret fell under the old 8-character floor",
+  );
+  assert.equal(
+    dm.redactString("mode is manual", dm.buildEnvTable({ AUTH_MODE: "manual" })),
+    "mode is manual",
+    "a config word must not be swept just because its variable name matches",
+  );
+});
+
+test("§16 BUG-12 GIT_AUTHOR_* is not treated as a secret", () => {
+  const t = dm.buildEnvTable({ GIT_AUTHOR_NAME: "Gareth Armstrong" });
+  assert.equal(
+    dm.redactString("Reviewed by Gareth Armstrong on the board", t),
+    "Reviewed by Gareth Armstrong on the board",
+    "an unanchored /AUTH/ matched GIT_AUTHOR_NAME, which git sets in every hook",
+  );
+});
+
+// ── BUG-8 / BUG-9: script and roster robustness ───────────────────────────
+
+test("§16 BUG-8 the confirm gate skips rather than aborting when there is no tty", () => {
+  // Harmless commands on purpose: this test runs the script under --apply, and
+  // the point being asserted is control flow, not the mutations themselves.
+  const irreversible = dm.buildRecord(
+    {
+      kind: "github.pr.merge",
+      intent: "Merge the pull request",
+      target: { pr: "42", url: "https://x/42" },
+      command: { argv: ["true", "merge"] },
+    },
+    { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
+  );
+  const after = dm.buildRecord(
+    {
+      kind: "github.board.field-set",
+      intent: "Move the card to Done",
+      target: { issue: "230", url: "https://x/230" },
+      desired: { Status: "Done" },
+      command: { argv: ["true", "after-the-gate"] },
+    },
+    { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
+  );
+
+  const sh = hr.render([irreversible, after], "sh", { env: CLEAN_ENV });
+  assert.match(sh, /\[ ! -e \/dev\/tty \]/, "no tty guard on the confirm gate");
+
+  withTmp((dir) => {
+    const f = join(dir, "handover.sh");
+    fs.writeFileSync(f, sh);
+    // No tty and stdin closed. Under `set -euo pipefail` a bare
+    // `read … < /dev/tty` exits non-zero here, which used to kill the script at
+    // the first irreversible action and silently skip every later one.
+    const out = execFileSync("bash", [f, "--apply"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.match(out, /skipped/, "the confirm gate did not report a skip");
+    // `run_step` echoes the headline, not the intent, and does not echo argv
+    // under --apply. The headline is what proves the later step was reached.
+    assert.match(
+      out,
+      /Set the board field/,
+      "the script stopped at the confirm gate instead of continuing past it",
+    );
+  });
+});
+
+test("§16 BUG-9 a reformatted roster row is refused, not silently truncated", () => {
+  withTmp((dir) => {
+    const doc = join(dir, "tracker-access-record.md");
+    const real = fs.readFileSync(join(SHARED, "tracker-access-record.md"), "utf8");
+    // Bold one kind — the shape a well-meaning edit produces.
+    fs.writeFileSync(
+      doc,
+      real.replace(
+        "| `github.issue.create` |",
+        "| **`github.issue.create`** |",
+      ),
+    );
+    assert.throws(
+      () => dm.loadRoster({ docPath: doc }),
+      /does not parse as a kind|expected 20/,
+      "a truncated roster used to pass parsing and then fail at defer() time, " +
+        "inside a gate that swallows the throw and records nothing",
+    );
+  });
+});

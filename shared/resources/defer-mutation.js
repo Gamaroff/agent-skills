@@ -58,6 +58,10 @@ const SCHEMA_VERSION = 1;
 const DEFAULT_JOURNAL = ".claude/state/tracker-actions.jsonl";
 const ROSTER_DOC = "tracker-access-record.md";
 
+// Asserted, not merely non-zero. A reformatted row used to truncate the roster
+// silently; pinning the count turns that into an immediate, explicit failure.
+const EXPECTED_KIND_COUNT = 20;
+
 const ACCESS_MODES = Object.freeze([
   "full",
   "read-only",
@@ -114,7 +118,13 @@ function parseRoster(text) {
       if (!line.trim()) inKindTable = false;
       continue;
     }
-    if (cells[0] === "`kind`") {
+    // Match the roster table's FULL header, not just its first cell. The field
+    // reference table earlier in the doc has a data row whose first cell is
+    // literally `kind` (`| `kind` | string | yes | Must appear in the roster |`),
+    // which a first-cell-only test reads as the start of a roster table — and
+    // then treats `consequence`, `produces` and the rest of that table's rows as
+    // malformed kinds.
+    if (cells[0] === "`kind`" && /consequence/i.test(cells[1] || "")) {
       inKindTable = true;
       continue;
     }
@@ -124,6 +134,20 @@ function parseRoster(text) {
 
     const m = /^`([a-z0-9]+(?:\.[a-z0-9-]+)+)`$/.exec(cells[0]);
     if (!m) {
+      // A cell that merely ends the table (prose, a totals row) is fine. A cell
+      // that LOOKS like a kind but does not parse is not: bolding one row used
+      // to silently drop every kind below it, `roster.size` stayed non-zero so
+      // nothing complained, and `defer()` then threw "unknown kind" inside the
+      // stage-CLI gate — which swallows the throw into a warning and returns
+      // `deferred` with NO record. The board move was neither performed nor
+      // recorded. Refuse loudly instead.
+      if (cells[0].includes("`")) {
+        throw new Error(
+          `${ROSTER_DOC}: row "${cells[0]}" sits in a kind table but does not ` +
+            `parse as a kind. Keep the shape documented under "The 20 kinds" — ` +
+            `a single backtick-quoted token, no other markup.`,
+        );
+      }
       inKindTable = false;
       continue;
     }
@@ -144,10 +168,13 @@ function parseRoster(text) {
     roster.set(kind, { kind, consequence, produces });
   }
 
-  if (roster.size === 0) {
+  if (roster.size !== EXPECTED_KIND_COUNT) {
     throw new Error(
-      `${ROSTER_DOC}: no kinds parsed. The roster table shape changed — see the ` +
-        `note under "The 20 kinds".`,
+      `${ROSTER_DOC}: parsed ${roster.size} kinds, expected ${EXPECTED_KIND_COUNT}. ` +
+        `Either the roster table shape changed (see the note under "The 20 kinds") ` +
+        `or a kind was added/removed without updating EXPECTED_KIND_COUNT in ` +
+        `defer-mutation.js. Both halves must move together — that is what stops a ` +
+        `silent truncation from looking like a smaller roster.`,
     );
   }
   return roster;
@@ -190,9 +217,18 @@ function loadRoster(opts = {}) {
 // Redaction
 // ---------------------------------------------------------------------------
 
-const SECRET_ENV_NAME = /TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|_PAT\b|AUTH/i;
+// Anchored to whole `_`-delimited segments. An unanchored /AUTH/ matched
+// GIT_AUTHOR_NAME — which git sets in every hook context — so an operator's own
+// name was swept out of intents and checklist fields and replaced with
+// `$GIT_AUTHOR_NAME`. AUTHOR is excluded explicitly for that reason.
+const SECRET_ENV_NAME =
+  /(^|_)(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIALS?|API_?KEY|APIKEY|PAT|AUTH)(_|$)/i;
+const NOT_SECRET_ENV_NAME = /AUTHOR/i;
 
-// Flags whose FOLLOWING argv element is a secret.
+// Flags whose FOLLOWING argv element is a secret — but only for clients that
+// actually use them that way. `-u` and `-p` used to be masked unconditionally,
+// which turned `git push -u origin HEAD` into `git push -u «redacted» HEAD` and
+// `mkdir -p docs/tasks` into `mkdir -p «redacted»`.
 const SECRET_FLAGS = new Set([
   "--token",
   "--password",
@@ -201,14 +237,27 @@ const SECRET_FLAGS = new Set([
   "--apikey",
   "--secret",
   "--auth",
-  "-p",
-  "-u",
 ]);
+
+// `-u` / `-p` are secret-bearing ONLY for these clients.
+const SHORT_FLAG_CLIENTS = new Set([
+  "curl",
+  "wget",
+  "mysql",
+  "mysqldump",
+  "psql",
+  "mongo",
+  "mongosh",
+  "redis-cli",
+  "svn",
+]);
+const SHORT_SECRET_FLAGS = new Set(["-u", "-p"]);
 
 const REDACTED = "«redacted»";
 
-// Known secret shapes that no env sweep will catch (a token pasted inline, a
-// header built by hand). Ordered most-specific first.
+// Unambiguous secret shapes. These are safe to apply to EVERY string, because
+// nothing else looks like them — a `ghp_…` or an `ATATT…` in a comment body is a
+// leaked token, not prose.
 const SECRET_SHAPES = [
   /\b(?:ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9]{16,}\b/g,
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
@@ -216,11 +265,12 @@ const SECRET_SHAPES = [
   /\b(?:Bearer|bearer)\s+[A-Za-z0-9._\-=+/]{12,}/g,
   /\b(?:Basic|basic)\s+[A-Za-z0-9+/=]{12,}/g,
   /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g,
-  // A long unbroken high-entropy run. Deliberately last and deliberately
-  // conservative: 32+ chars with no separator is not something a human types
-  // into an intent line, but IS what every token looks like.
-  /\b[A-Za-z0-9+/=_-]{32,}\b/g,
 ];
+
+// Credentials embedded in a URL's userinfo. Only the password half is masked —
+// the user half is usually a username or an email and is worth keeping.
+const URL_USERINFO = /(\/\/[^/\s:@]+):([^/\s@]+)@/g;
+
 
 /**
  * Build the env-sweep replacement table: secret VALUE → `$NAME`.
@@ -237,8 +287,14 @@ function buildEnvTable(env) {
   const pairs = [];
   for (const [name, value] of Object.entries(env || {})) {
     if (!value || typeof value !== "string") continue;
-    if (value.length < 8) continue;
-    if (!SECRET_ENV_NAME.test(name)) continue;
+    if (!SECRET_ENV_NAME.test(name) || NOT_SECRET_ENV_NAME.test(name)) continue;
+    // Length floor with an escape hatch for short-but-real secrets. A flat
+    // 8-char floor let `JIRA_PASSWORD=hunter2` through; sweeping everything ≥1
+    // char instead would replace `AUTH_MODE=full`'s value wherever the word
+    // "full" appeared. Requiring a digit below 12 characters separates a
+    // password from a config word without a hand-maintained deny-list.
+    if (value.length < 6) continue;
+    if (value.length < 12 && !/\d/.test(value)) continue;
     pairs.push([value, `$${name}`]);
   }
   pairs.sort((a, b) => b[0].length - a[0].length);
@@ -254,27 +310,37 @@ function sweepEnv(str, envTable) {
   return out;
 }
 
-/** Replace known secret shapes with the mask. */
+/** Replace unambiguous secret shapes with the mask. Safe on any string. */
 function sweepShapes(str) {
   let out = str;
   for (const re of SECRET_SHAPES) {
     re.lastIndex = 0;
-    out = out.replace(re, (m) =>
-      // Never mask a value the env sweep already turned into a variable name.
-      m.startsWith("$") ? m : REDACTED,
-    );
+    out = out.replace(re, (m) => (m.includes("$") ? m : REDACTED));
   }
+  URL_USERINFO.lastIndex = 0;
+  out = out.replace(URL_USERINFO, (m, prefix, pass) =>
+    pass.startsWith("$") ? m : `${prefix}:${REDACTED}@`,
+  );
   return out;
 }
 
 /**
  * Redact one string: env sweep first (so names survive), then shape match.
+ *
+ * Applies only the UNAMBIGUOUS rules — never the high-entropy heuristic, which
+ * belongs to credential-bearing positions alone (see `maskOrName`).
+ *
  * @param {string} str
  * @param {Array<[string,string]>} envTable
  */
 function redactString(str, envTable) {
   if (typeof str !== "string" || !str) return str;
   return sweepShapes(sweepEnv(str, envTable));
+}
+
+/** True when a value has already been through redaction. */
+function alreadyRedacted(raw) {
+  return raw === REDACTED || /^\$[A-Za-z_][A-Za-z0-9_]*$/.test(raw);
 }
 
 /**
@@ -286,8 +352,26 @@ function redactString(str, envTable) {
  * one we must not emit. Masking is the fail-closed answer.
  */
 function maskOrName(raw, envTable) {
-  const swept = redactString(String(raw), envTable);
-  return swept === String(raw) ? REDACTED : swept;
+  const s = String(raw);
+
+  // IDEMPOTENCY. Redaction runs twice by design — once in `defer()` on write,
+  // once in `render()` on read as defence in depth. Without this guard the
+  // second pass saw the `$GITHUB_TOKEN` the first pass produced, found it
+  // unchanged by the sweeps, concluded "unrecognised value in a secret
+  // position", and masked it to «redacted» — handing the operator a script
+  // containing `--token «redacted»` that cannot run, in the one mode whose
+  // entire purpose is a runnable script.
+  if (alreadyRedacted(s)) return s;
+
+  const swept = redactString(s, envTable);
+  if (swept !== s) return swept; // env named it, or a shape matched it
+
+  // Nothing recognised it. Every path that reaches here is already a
+  // credential-bearing position — the value after an explicit secret flag, the
+  // value after `-u`/`-p` for a client that uses them for credentials, or an
+  // auth header's value — so fail closed and mask, whatever it looks like. A
+  // three-character token is still a token.
+  return REDACTED;
 }
 
 /**
@@ -302,6 +386,14 @@ function maskOrName(raw, envTable) {
  */
 function redactArgv(argv, envTable) {
   if (!Array.isArray(argv)) return argv;
+  // `-u` / `-p` mean credentials for curl and the database clients, and mean
+  // "set upstream" / "make parents" for git and mkdir. Deciding by argv[0] is
+  // what stops `git push -u origin HEAD` becoming `git push -u «redacted» HEAD`.
+  const client = String(argv[0] || "")
+    .split("/")
+    .pop();
+  const shortFlagsAreSecret = SHORT_FLAG_CLIENTS.has(client);
+
   const out = [];
   for (let i = 0; i < argv.length; i++) {
     const cur = String(argv[i]);
@@ -320,9 +412,11 @@ function redactArgv(argv, envTable) {
       (cur === "-H" || cur === "--header") &&
       next !== undefined &&
       /^(authorization|proxy-authorization|x-api-key)\s*:/i.test(next);
+    const isShortSecret =
+      shortFlagsAreSecret && SHORT_SECRET_FLAGS.has(cur);
 
     if (next === undefined) continue;
-    if (!SECRET_FLAGS.has(cur) && !isAuthHeader) continue;
+    if (!SECRET_FLAGS.has(cur) && !isShortSecret && !isAuthHeader) continue;
 
     if (isAuthHeader) {
       // Keep the header NAME, redact only its value — `Authorization: Bearer
@@ -356,7 +450,12 @@ function redactDeep(value, envTable, keyPath = "") {
   }
   const out = {};
   for (const [k, v] of Object.entries(value)) {
-    out[k] = redactDeep(v, envTable, keyPath ? `${keyPath}.${k}` : k);
+    // Keys are redacted too. `desired` and `target` are free-form objects, and a
+    // credential used as a KEY (a header map, a field name taken from input)
+    // otherwise survived untouched into describeDesired() and the raw json
+    // records array.
+    const safeKey = redactString(k, envTable);
+    out[safeKey] = redactDeep(v, envTable, keyPath ? `${keyPath}.${k}` : k);
   }
   return out;
 }
@@ -427,21 +526,37 @@ function stableStringify(value) {
  */
 function computeId(rec) {
   const targetKey = stableStringify(rec.target || null);
-  let fingerprint;
-  if (rec.desired !== null && rec.desired !== undefined) {
-    fingerprint = stableStringify(rec.desired);
-  } else if (rec.manual && Array.isArray(rec.manual.fields)) {
-    fingerprint = stableStringify(
-      rec.manual.fields.map((f) => [f && f.name, f && f.value]),
-    );
-  } else if (rec.command && Array.isArray(rec.command.argv)) {
-    fingerprint = rec.command.argv.join(" ");
-  } else {
-    fingerprint = rec.intent || "";
-  }
+
+  // The fingerprint must separate two mutations that differ only in their
+  // PAYLOAD. It previously fell back to `command.argv` alone, so posting the DoD
+  // summary and posting the QA gate result to the same issue — identical argv
+  // (`gh issue comment 230 --body-file -`), different bodies — produced the same
+  // id, and `dedupe` silently discarded one of them. A wanted tracker action
+  // vanished from all four renderings with nothing to signal it, which is the
+  // precise invisible-drift failure this whole sequence exists to remove, and
+  // strictly worse than the status quo it replaces (where a failed mutation at
+  // least becomes a warning line).
+  //
+  // `intent` and `command.stdin` are therefore ALWAYS part of the fingerprint,
+  // not a fallback. Two records are the same action only if they say the same
+  // thing and carry the same payload.
+  const parts = [
+    rec.intent || "",
+    rec.desired !== null && rec.desired !== undefined
+      ? stableStringify(rec.desired)
+      : "",
+    rec.manual && Array.isArray(rec.manual.fields)
+      ? stableStringify(rec.manual.fields.map((f) => [f && f.name, f && f.value]))
+      : "",
+    rec.command && Array.isArray(rec.command.argv)
+      ? rec.command.argv.join(" ")
+      : "",
+    rec.command && rec.command.stdin ? String(rec.command.stdin) : "",
+  ];
+
   return crypto
     .createHash("sha1")
-    .update(`${rec.system}|${rec.kind}|${targetKey}|${fingerprint}`)
+    .update(`${rec.system}|${rec.kind}|${targetKey}|${parts.join(" ")}`)
     .digest("hex")
     .slice(0, 8);
 }

@@ -5,7 +5,7 @@ type: task
 description: 'Defines the record a skill writes when it cannot perform a tracker mutation, the append-only journal it lands in, and the four renderers that turn a journal into a committed markdown checklist, a runnable shell script, a JSON sidecar and an inline summary. Nothing intercepts anything yet — this task is driven entirely by fixture journals, which is the point: the output contract is fixed and mutation-proven before any call site depends on it. The organising idea for the whole sequence is that manual, command, read-only and approve are four renderings of one record, not four features.'
 tags: [restricted-access, schema, renderers, handover]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: medium
 created: 2026-08-17
@@ -413,6 +413,66 @@ None within scope. Out-of-scope by design and unchanged: interception at the oth
 record.
 
 
+## QA Testing Results
+
+**QA Status**: FAIL → fixes applied, awaiting re-review
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-18
+**Quality Score**: 25/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.52.qa.1.deferred-mutation-record-and-renderers.md](./task.52.qa.1.deferred-mutation-record-and-renderers.md)
+- **Gate File**: [task.52.gate.1.deferred-mutation-record-and-renderers.yml](./task.52.gate.1.deferred-mutation-record-and-renderers.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1732 (1338 node + 394 shell) — all green
+- **Phases Verified**: 12/12
+- **Critical Issues**: 7 HIGH, 9 MEDIUM, 2 LOW
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings — all fixed in cycle 1
+
+Seven HIGH defects, all independently reproduced, concentrated in the record-identity and rendering
+layers. The access gates — the only part touching live pipeline paths — passed every check.
+
+| Bug | Issue |
+| --- | ----- |
+| [BUG-3](./task.52.bug.3.generated-script-command-execution.md) | Arbitrary command execution from the committed script, during the **dry run** |
+| [BUG-4](./task.52.bug.4.record-identity-collision.md) | Two comments to one issue collapse to one id — a record is **silently dropped** |
+| [BUG-5](./task.52.bug.5.redaction-not-idempotent.md) | Double redaction turns `$GITHUB_TOKEN` into `«redacted»` — the committed script cannot run |
+| [BUG-2](./task.52.bug.2.redaction-corrupts-legitimate-content.md) | The 32+ char rule eats commit SHAs, base64 blobs, URLs and branch names |
+| [BUG-6](./task.52.bug.6.flag-masking-too-broad.md) | `git push -u origin` → `git push -u «redacted»` |
+| [BUG-1](./task.52.bug.1.md-renderer-duplicates-dependants.md) | The checklist lists every `dependsOn` target twice |
+
+All seven sat in code the test suite covered, and the suite caught none of them — each fixture
+happened not to contain the triggering shape.
+
+### Fixes (qa-fix cycle 1)
+
+All 7 HIGH and 6 of the 9 MEDIUM issues are fixed, each with a regression test **watched failing**.
+`npm test` 1351 node + 394 shell green; `validate:all` 115 green; bundle clean.
+
+| Fix | Change |
+| --- | ------ |
+| BUG-3 | Every string interpolated into the generated script goes through `shQuote`; comments go through a new `shComment` that strips newlines and control characters |
+| BUG-4 | `computeId` folds `intent` and `command.stdin` into the fingerprint — **`intent` is now part of identity and must be deterministic**, documented in the schema |
+| BUG-5 | `maskOrName` treats `$IDENT` and `«redacted»` as terminal, so the write+render double pass is idempotent |
+| BUG-2 | The 32+ char heuristic applies only in credential-bearing positions; the env sweep and prefixed shapes still apply everywhere |
+| BUG-6 | `-u`/`-p` are credential flags only for clients that use them that way |
+| BUG-1 / BUG-13 | The markdown renderer tracks emitted ids in a local `Set` — fixes both the duplication and the record mutation |
+| BUG-8 | The confirm gate skips when `/dev/tty` is unavailable instead of aborting under `set -e` |
+| BUG-9 | `parseRoster` throws on an unparsable kind row and asserts `EXPECTED_KIND_COUNT` |
+| BUG-10 | Both CLIs capture `ACCESS_TRACKER` before `loadDotEnv`, so a dot-env file cannot restrict behind the resolver's back |
+| BUG-11 / BUG-12 | Object keys redacted; URL userinfo masked; env floor lowered with a digit heuristic; `GIT_AUTHOR_*` excluded |
+| BUG-14 | Both gates pass the repo root as `cwd` so the journal lands where the renderer reads it |
+
+**Deferred, with rationale** — BUG-7 (wire `handover-render` into a run-end pipeline step and ship it
+in the bundle) and BUG-15 (read the board before deferring so `satisfied`/`would-regress` are honoured)
+are both *interception* work: they change what call sites do, which is explicitly this task's Out of
+Scope and the subject of tasks 53–57. Recorded in the gate as future actions.
+
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -421,6 +481,8 @@ record.
 | 2026-08-18 | 1.1 | Review cycle 1 (6/10, NEEDS REVISION) — 2 critical + 7 important fixed: in-scope stage-CLI gating added to plan/files/tests/criteria; `.tracker-actions/` gitignore contradiction removed; risk raised to Medium with blast radius and rollback split; 20-kind roster made an explicit deliverable; renderer axis defined as output format and a fourth (`summary`) added; `handover` filename pattern specified for story and task tables; Technical Background, Breaking Changes, Progress Tracking and Change Log added; stale CommonJS/bundler rationale corrected; effort 8h → 14h | review-task |
 | 2026-08-18 |  | Status → ready-for-development | review-task |
 | 2026-08-18 |  | Implemented — 24 files (3 new modules, 1 schema doc, 2 test suites, 9 fixtures, 2 gated CLIs, 5 docs), 51 new tests, all 11 invariants mutation-proven | develop |
+| 2026-08-18 |  | QA cycle 1 — gate FAIL (25/100), 7 HIGH + 9 MEDIUM findings | qa-task |
+| 2026-08-18 |  | QA findings fixed — 7 HIGH + 6 MEDIUM, 1 iteration, each regression mutation-proven | qa-fix |
 
 ## References
 

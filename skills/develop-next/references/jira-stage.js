@@ -287,6 +287,11 @@ async function run({
   // invite editing. Tests pin their own ladder through this.
   repoRoot = undefined,
 } = {}) {
+  // Captured BEFORE loadDotEnv — see the matching note in gh-stage.js. The
+  // resolver owns ACCESS_TRACKER; a dot-env file must not be able to restrict
+  // (or, via a typo, hard-fail) every pipeline step behind the resolver's back.
+  const accessEnv = { ACCESS_TRACKER: process.env.ACCESS_TRACKER };
+
   lib.loadDotEnv();
 
   let args;
@@ -416,13 +421,13 @@ async function run({
   // non-`full` mode still permits reads.
   let access;
   try {
-    access = dm.resolveAccessTracker(process.env);
+    access = dm.resolveAccessTracker(accessEnv);
   } catch (e) {
     output.err(`Error: ${e.message}`);
     return { exitCode: 2 };
   }
   if (access !== "full" && !args.dryRun) {
-    const { spec, moment } = resolveMomentSpec({
+    const { spec } = resolveMomentSpec({
       stage: args.stage,
       issueType: args.issueType,
       record: lib.loadWorkflowRecord(repoRoot),
@@ -471,7 +476,8 @@ async function run({
           cmd: `jira-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
           expect: `status is "${target || args.stage}"`,
         },
-      });
+      // The repo root, not process.cwd() — see gh-stage.js.
+      }, { cwd: repoRoot || gitToplevel() });
       output.info(
         `⏸️  access.tracker=${access} — not transitioning ${args.issue}; recorded as ${rec.id}.`,
       );

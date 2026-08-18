@@ -712,6 +712,18 @@ function run({
   sleepImpl = sleepSync,
 } = {}) {
   const root = repoRootOf(repoRoot);
+
+  // ACCESS_TRACKER is captured from the REAL environment BEFORE loadDotEnv runs.
+  //
+  // loadDotEnv copies .secrets/tooling.env and .env into process.env. Reading the
+  // access mode after it would create a second resolution path that
+  // resolve-platform.sh never sees: a repo whose .env said ACCESS_TRACKER=manual
+  // would make this CLI defer while the resolver reported `full` and printed no
+  // restriction notice, and a typo in that file would make every one of the six
+  // pipeline steps that call this CLI exit 2 with no indication of where the
+  // value came from. The resolver owns this key; the dot-env file does not.
+  const accessEnv = { ACCESS_TRACKER: process.env.ACCESS_TRACKER };
+
   loadDotEnv(root);
 
   let args;
@@ -821,7 +833,7 @@ function run({
   // moving cards.
   let access;
   try {
-    access = dm.resolveAccessTracker(process.env);
+    access = dm.resolveAccessTracker(accessEnv);
   } catch (e) {
     output.err(`Error: ${e.message}`);
     return { exitCode: 2 };
@@ -839,9 +851,10 @@ function run({
       return emit({ transitioned: false, reason: "stage-disabled" }, 0);
     }
     const target = (moment.targets && moment.targets[0]) || null;
-    const issueUrl = `https://github.com/${
-      readProjectYml(root).owner || "OWNER"
-    }/${readProjectYml(root).repo || "REPO"}/issues/${args.issue}`;
+    const gateProjectYml = readProjectYml(root);
+    const issueUrl = `https://github.com/${gateProjectYml.owner || "OWNER"}/${
+      gateProjectYml.repo || "REPO"
+    }/issues/${args.issue}`;
     const field = args.field || resolveStatusFieldName(root);
     try {
       const rec = dm.defer({
@@ -881,7 +894,11 @@ function run({
           cmd: `gh-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
           expect: `${field} is "${target || args.stage}"`,
         },
-      });
+      // The repo root, not process.cwd(). A step invoked from a subdirectory
+      // would otherwise append to <subdir>/.claude/state/tracker-actions.jsonl
+      // while the renderer reads the repo-root journal and reports it empty,
+      // losing the deferred action with no warning.
+      }, { cwd: root });
       output.info(
         `⏸️  access.tracker=${access} — not moving issue #${args.issue}; recorded as ${rec.id}.`,
       );

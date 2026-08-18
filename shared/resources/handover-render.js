@@ -152,7 +152,7 @@ function topoSort(records) {
   const sorted = [];
   const state = new Map(); // id → "visiting" | "done"
 
-  const visit = (rec, stack) => {
+  const visit = (rec) => {
     const st = state.get(rec.id);
     if (st === "done") return;
     if (st === "visiting") {
@@ -171,13 +171,13 @@ function topoSort(records) {
         );
         continue;
       }
-      visit(dep, stack.concat(rec.id));
+      visit(dep);
     }
     state.set(rec.id, "done");
     sorted.push(rec);
   };
 
-  for (const rec of pending) visit(rec, []);
+  for (const rec of pending) visit(rec);
   return { sorted, warnings };
 }
 
@@ -260,14 +260,24 @@ function buildModel(records, ctx = {}) {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-/** POSIX single-quote one argv element. */
+/** POSIX single-quote one argv element. Safe for ANY content. */
 function shQuote(s) {
   return `'${String(s).split("'").join(`'\\''`)}'`;
 }
 
-/** Render an argv array as a copy-pasteable command line. */
-function argvLine(argv) {
-  return (argv || []).map(shQuote).join(" ");
+/**
+ * Reduce a string to something safe to put in a generated `#` comment.
+ *
+ * A newline here is not cosmetic: `# [id] ${intent}` with an interior newline
+ * ends the comment and drops whatever follows at FILE SCOPE, where it executes
+ * on every invocation — including the dry run the documentation presents as
+ * safe, in a script this pipeline COMMITS to the repository. Control characters
+ * go for the same reason.
+ */
+function shComment(s) {
+  return String(s === undefined || s === null ? "" : s)
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[^\x20-\x7e]/g, "·");
 }
 
 function targetLabel(rec) {
@@ -337,16 +347,36 @@ function renderMarkdown(model) {
     L.push("");
   }
 
+  // Which records have already been emitted, at any depth. A record that is the
+  // TARGET of a dependsOn edge is emitted nested beneath its dependency; without
+  // this set the consequence-group loop below emitted it a SECOND time as a
+  // top-level item, so a 3-record chain produced 5 checkboxes and an operator
+  // performed each dependent action twice — creating a duplicate issue where the
+  // kind was irreversible.
+  //
+  // Tracked in a local Set rather than a `_rendered` property on the records,
+  // because writing to the records made renderMarkdown non-idempotent (a second
+  // render saw every child already flagged and dropped all nesting) and mutated
+  // the caller's own objects.
+  const seen = new Set();
+
   for (const [system, recs] of model.bySystem) {
-    L.push(`## ${SYSTEM_LABEL[system] || system}`);
-    L.push("");
+    const body = [];
     for (const consequence of CONSEQUENCE_ORDER) {
-      const group = recs.filter((r) => r.consequence === consequence);
+      const group = recs.filter(
+        (r) => r.consequence === consequence && !seen.has(r.id),
+      );
       if (!group.length) continue;
-      L.push(`### ${CONSEQUENCE_LABEL[consequence]}`);
-      L.push("");
-      for (const rec of group) L.push(...markdownItem(rec, model, 0));
+      const section = [];
+      for (const rec of group) {
+        if (seen.has(rec.id)) continue; // an earlier item in this group nested it
+        section.push(...markdownItem(rec, model, 0, seen));
+      }
+      if (!section.length) continue;
+      body.push(`### ${CONSEQUENCE_LABEL[consequence]}`, "", ...section);
     }
+    if (!body.length) continue;
+    L.push(`## ${SYSTEM_LABEL[system] || system}`, "", ...body);
   }
 
   if (model.failures.length) {
@@ -357,7 +387,7 @@ function renderMarkdown(model) {
         "something broke, and the same script below will re-run them.",
     );
     L.push("");
-    for (const rec of model.failures) L.push(...markdownItem(rec, model, 0));
+    for (const rec of model.failures) L.push(...markdownItem(rec, model, 0, seen));
   }
 
   if (model.satisfied.length) {
@@ -399,11 +429,15 @@ function renderMarkdown(model) {
   return `${L.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
 }
 
-/** One checklist item, with its dependants nested beneath it. */
-function markdownItem(rec, model, depth) {
+/**
+ * One checklist item, with its dependants nested beneath it.
+ * @param {Set<string>} seen - ids already emitted; mutated as items are added
+ */
+function markdownItem(rec, model, depth, seen) {
   const pad = "  ".repeat(depth);
   const L = [];
   const url = actionUrl(rec);
+  seen.add(rec.id);
 
   L.push(`${pad}- [ ] **${headline(rec)}**`);
   L.push(`${pad}  - ${rec.intent}`);
@@ -448,11 +482,9 @@ function markdownItem(rec, model, depth) {
     (r) => Array.isArray(r.dependsOn) && r.dependsOn.includes(rec.id),
   );
   for (const child of dependants) {
-    if (child._rendered) continue;
-    child._rendered = true;
-    L.push(...markdownItem(child, model, depth + 1));
+    if (seen.has(child.id)) continue;
+    L.push(...markdownItem(child, model, depth + 1, seen));
   }
-  if (depth === 0) rec._rendered = true;
 
   L.push("");
   return L;
@@ -505,17 +537,33 @@ function renderShell(model) {
   L.push("# It contains no credential by construction — only environment variable");
   L.push("# NAMES. Export those yourself before running with --apply.");
   L.push("#");
-  if (ctx.run) L.push(`# Run:         ${ctx.run}`);
-  if (ctx.access) L.push(`# Access mode: ${ctx.access}`);
+  if (ctx.run) L.push(`# Run:         ${shComment(ctx.run)}`);
+  if (ctx.access) L.push(`# Access mode: ${shComment(ctx.access)}`);
   L.push(`# Outstanding: ${model.counts.outstanding}`);
   L.push("");
   L.push("set -euo pipefail");
+  L.push("");
+  // Emitted as a function rather than `sed -n "2,18p" "$0"`: the header length
+  // varies with which context fields are present and with the blank-line
+  // collapse applied afterwards, so a fixed range printed `set -euo pipefail`
+  // as if it were help text.
+  L.push("usage() {");
+  L.push("  cat <<'HANDOVER_USAGE'");
+  L.push("Tracker actions this run could not perform.");
+  L.push("");
+  L.push("  bash <this file>            show the plan (default — changes nothing)");
+  L.push("  bash <this file> --apply    perform it");
+  L.push("");
+  L.push("Contains no credential — only environment variable NAMES. Export those");
+  L.push("yourself before running with --apply.");
+  L.push("HANDOVER_USAGE");
+  L.push("}");
   L.push("");
   L.push('APPLY=0');
   L.push('for arg in "$@"; do');
   L.push('  case "$arg" in');
   L.push('    --apply) APPLY=1 ;;');
-  L.push('    -h|--help) sed -n "2,18p" "$0"; exit 0 ;;');
+  L.push('    -h|--help) usage; exit 0 ;;');
   L.push('    *) echo "unknown argument: $arg" >&2; exit 2 ;;');
   L.push("  esac");
   L.push("done");
@@ -547,7 +595,18 @@ function renderShell(model) {
   L.push("  fi");
   L.push('  echo "⚠️  [$id] IRREVERSIBLE — $desc"');
   L.push('  printf \'    \'; printf \'%q \' "$@"; printf \'\\n\'');
-  L.push('  read -r -p "    Perform this? [y/N] " _reply < /dev/tty');
+  // No controlling tty (CI, a pipe, nohup) must SKIP this action, not kill the
+  // script. Under `set -euo pipefail` a bare `read … < /dev/tty` exits non-zero
+  // when /dev/tty cannot be opened, so an --apply run in CI used to stop at the
+  // first irreversible action and silently skip everything after it.
+  L.push('  if [ ! -e /dev/tty ]; then');
+  L.push('    echo "    no tty — skipped (re-run interactively to perform this)."');
+  L.push("    return 0");
+  L.push("  fi");
+  L.push('  if ! read -r -p "    Perform this? [y/N] " _reply < /dev/tty; then');
+  L.push('    echo "    could not read a reply — skipped."');
+  L.push("    return 0");
+  L.push("  fi");
   L.push('  case "$_reply" in');
   L.push('    [yY]|[yY][eE][sS]) "$@" ;;');
   L.push('    *) echo "    skipped." ;;');
@@ -566,7 +625,7 @@ function renderShell(model) {
     L.push("# passed with --body-file; never interpolated into a command line.");
     L.push("");
     for (const b of bodies) {
-      L.push(`# ${b.preview.replace(/\r/g, "")}…`);
+      L.push(`# ${shComment(b.preview)}…`);
       L.push(`${b.fn}() {`);
       L.push(`  printf %s ${shQuote(b.b64)} | base64 -d > "$WORKDIR/${b.fn}"`);
       L.push("}");
@@ -589,7 +648,7 @@ function renderShell(model) {
     L.push("# ── ⚠️ UNRECORDED ───────────────────────────────────────────────────");
     L.push("# Expected to produce a record and did not. Verify each by hand.");
     for (const kind of model.unrecorded) {
-      L.push(`echo "⚠️  UNRECORDED — ${kind}" >&2`);
+      L.push(`echo ${shQuote(`⚠️  UNRECORDED — ${kind}`)} >&2`);
     }
     L.push("");
   }
@@ -605,11 +664,17 @@ function shellStep(rec) {
   const L = [];
   const cmd = rec.command || {};
   const argv = Array.isArray(cmd.argv) ? cmd.argv : [];
-  const desc = headline(rec).replace(/"/g, '\\"');
+  // Single-quoted, never hand-escaped into a double-quoted word. Escaping only
+  // `"` left backticks and $(…) live: a target label of `` `touch /tmp/x` ``
+  // executed during the DRY RUN. Column names come from the consumer's
+  // tracker-workflow.yaml and --issue is an unvalidated free string, so neither
+  // end of this is trusted input.
+  const desc = shQuote(headline(rec));
 
-  L.push(`# [${rec.id}] ${rec.intent}`);
+  L.push(`# [${rec.id}] ${shComment(rec.intent)}`);
   L.push(`#   kind: ${rec.kind}  ·  consequence: ${rec.consequence}`);
-  if (rec.retry_of) L.push(`#   retry of: ${rec.retry_of} (failed under full access)`);
+  if (rec.retry_of)
+    L.push(`#   retry of: ${shComment(rec.retry_of)} (failed under full access)`);
   if (Array.isArray(rec.dependsOn) && rec.dependsOn.length)
     L.push(`#   after: ${rec.dependsOn.join(", ")}`);
   if (rec.produces) L.push(`#   yields: ${rec.produces}`);
@@ -619,9 +684,11 @@ function shellStep(rec) {
     // a silent gap in the script is indistinguishable from "already handled".
     const url = actionUrl(rec);
     L.push(
-      `echo "✋ [${rec.id}] No command form — do this by hand: ${desc}${
-        url ? ` (${url})` : ""
-      }" >&2`,
+      `echo ${shQuote(
+        `✋ [${rec.id}] No command form — do this by hand: ${headline(rec)}${
+          url ? ` (${url})` : ""
+        }`,
+      )} >&2`,
     );
     L.push("");
     return L;
@@ -643,10 +710,14 @@ function shellStep(rec) {
     .join(" ");
 
   const helper = rec.consequence === "irreversible" ? "confirm_step" : "run_step";
-  L.push(`${helper} ${shQuote(rec.id)} "${desc}" ${quoted}`);
+  L.push(`${helper} ${shQuote(rec.id)} ${desc} ${quoted}`);
 
   if (rec.verify && rec.verify.cmd) {
-    L.push(`#   verify: ${rec.verify.cmd}${rec.verify.expect ? ` → ${rec.verify.expect}` : ""}`);
+    L.push(
+      `#   verify: ${shComment(rec.verify.cmd)}${
+        rec.verify.expect ? ` → ${shComment(rec.verify.expect)}` : ""
+      }`,
+    );
   }
   L.push("");
   return L;
@@ -657,10 +728,6 @@ function shellStep(rec) {
 // ---------------------------------------------------------------------------
 
 function renderJson(model) {
-  const strip = (r) => {
-    const { _rendered, ...rest } = r; // drop the markdown nesting marker
-    return rest;
-  };
   const payload = {
     v: model.v,
     generator: "handover-render.js",
@@ -668,7 +735,7 @@ function renderJson(model) {
     counts: model.counts,
     // Sorted, deduplicated and topologically ordered — a consumer never has to
     // repeat that work, and cannot repeat it differently.
-    records: model.all.map(strip),
+    records: model.all,
     outstanding: model.outstanding.map((r) => r.id),
     satisfied: model.satisfied.map((r) => r.id),
     failures: model.failures.map((r) => r.id),
@@ -925,10 +992,13 @@ function run({ argv = process.argv, env = process.env, cwd = process.cwd() } = {
       process.stdout.write(text);
       continue;
     }
+    // Strip only a KNOWN extension. A blanket /\.[^./]+$/ ate the `{name}`
+    // component of `task.52.handover.1.deferred-mutation`, which file-naming.md
+    // requires, turning it into `task.52.handover.1.md`.
     const outPath =
       formats.length === 1
         ? args.out
-        : args.out.replace(/\.[^./]+$/, "") + "." + format;
+        : `${args.out.replace(/\.(md|sh|json)$/, "")}.${format}`;
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, text, "utf8");
     // 0644 even for the script: reviewable, committable, and not runnable by a
@@ -959,7 +1029,7 @@ module.exports = {
   buildModel,
   isEmpty,
   shQuote,
-  argvLine,
+  shComment,
   headline,
   renderMarkdown,
   renderShell,
