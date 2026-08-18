@@ -1,0 +1,5 @@
+a `backtick` line
+$(rm -rf /)
+EOF
+HANDOVER_EOF
+no trailing newline
