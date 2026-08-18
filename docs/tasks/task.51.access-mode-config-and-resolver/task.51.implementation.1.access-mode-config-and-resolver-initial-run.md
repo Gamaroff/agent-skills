@@ -3,7 +3,7 @@
 **Task**: `task.51.access-mode-config-and-resolver.md`
 **Run Number**: 1
 **Started**: 2026-08-17 14:40
-**Status**: In Progress
+**Status**: Complete — Accepted (conditional)
 
 ---
 
@@ -40,9 +40,9 @@ Add an `access:` block to `skills-config.yaml` resolved into `ACCESS_TRACKER` / 
 | 2. review-task             | ✅ Done    | `task.51.review.{N}.{name}.md` exists (or skip logged)                 | Skipped — already reviewed; report at `task.51.review.1.access-mode-config-and-resolver.md` | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 10 phases. 1287/1287 node tests, 61/61 new `tracker-access.test.sh`, 12/12 mutations red, `validate:all` 115/115, Prettier clean, bundle idempotent. | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #246](https://github.com/Gamaroff/agent-skills/pull/246) → `develop`. Two commits: `48097e9` functional (28 files), `053226f` bundle regen (113 files). Issue #225 commented. | — |
-| 5–6. qa-task / qa-fix loop | ⚠️ Halted |  `task.51.qa.{N}.*.md`; `task.51.gate.{N}.*.yml`; PR comment posted     | Cycles 1–5 FAIL (40 → 55 → 55 → 60 → 70). **Cycle 6 — independent adversarial pass: FAIL 20/100**, 10 HIGH incl. one cycle-5 regression, 4 silent-escalation routes, 1 code-execution vector, and 11 surviving mutations. Halted per user directive (halt on findings, do not loop). | 3 Explore agents cycle 1; 3 independent adversarial reviewers cycle 6 |
-| 7. finalise                | ⛔ Not reached | `task.51.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⛔ Not reached | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.51.qa.{N}.*.md`; `task.51.gate.{N}.*.yml`; PR comment posted | Cycles 1–6 FAIL (40 → 55 → 55 → 60 → 70 → 20). **Cycle 7 (scoped, user-directed): CONCERNS 80/100** — all 6 scoped defects verified closed plus BUG-28; 2 regressions caused by those fixes found and closed in-cycle (BUG-29, BUG-30); 9/9 mutations caught; suite 166 → 285. LIMIT-1 + LIMIT-2 deferred, documented in 3 places and pinned by §41. Loop exits on CONCERNS. | 3 Explore agents cycle 1; 3 adversarial reviewers cycle 6 |
+| 7. finalise                | ✅ Done    | `task.51.dod.{N}.*.md`; task `status: accepted`                        | DoD 12/12 executed; CI green on the final head `7add4ce`; accepted with three conditions. `task.51.dod.1.*.md` + `sprint-review-summary.md` written, canonical PR comment posted, issue #225 closed and verified, board already at Done. | — |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 7 commits this session across cycles 7 and finalise; tree clean; pushed to PR #246. | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent.
 
@@ -258,12 +258,53 @@ folded in above.
 
 ## Completion
 
-**Finished**: 2026-08-17 21:20 (cycles 1–5) · 2026-08-17 22:05 (cycle 6)
-**Final Status**: Escalated — independent adversarial pass returned FAIL (10 HIGH); halted on findings per user directive
-**Branch**: `feature/task.51.access-mode-config-and-resolver`
-**PR**: [#246](https://github.com/Gamaroff/agent-skills/pull/246)
-**QA Iterations**: 6 (all FAIL: 40 → 55 → 55 → 60 → 70 → 20)
-**DoD Summary**: not produced — Step 7 not reached
+**Finished**: 2026-08-18
+**Final Status**: ✅ Complete — Accepted (conditional)
+**QA Iterations**: 7
+**PR**: [#246](https://github.com/Gamaroff/agent-skills/pull/246) — open, CI green, mergeable
+**Tracker**: issue [#225](https://github.com/Gamaroff/agent-skills/issues/225) closed; board at Done
+
+### Completion Summary
+
+`skills-config.yaml` gains an `access:` block resolved into `ACCESS_TRACKER` / `ACCESS_VCS`, with
+per-key strict enum validation, most-restrictive-wins resolution across config and env, fail-closed
+handling for a config that is malformed / unreadable / redirected at nothing, and `|| exit 1` on all
+20 resolver sourcing lines so a rejection actually halts a run. It also closes a pre-existing silent
+fall-through on the existing `tracker:` / `vcs:` keys.
+
+**The honest summary of how it got here.** Seven QA cycles: FAIL 40 → 55 → 55 → 60 → 70 → 20 →
+CONCERNS 80. Six consecutive cycles ended with the round's own fixes introducing at least one new
+defect. Cycle 6 — an independent adversarial pass — returned FAIL 20/100 with 10 HIGH including a
+code-execution vector, and its most useful finding was not any single bug but that **11 of 35
+mutations survived behind a green 166/166 suite**. The suite could not hold the guarantees the task
+was built on, which is why the defects kept getting through.
+
+Cycle 7 changed the method rather than the patch rate: fix what is worth fixing regardless of any
+redesign, make the suite hold the invariants, and *record* the rest instead of patching it. It
+closed seven defects, then found two more its own fixes had introduced and closed those inside the
+same round. Mutation coverage went from 11 surviving of 35 to 0 of 9.
+
+**Two limits remain open, deliberately.** LIMIT-1 — the awk tier reads only the canonical spelling of
+`access:`, and that tier is the default on a stock macOS host — is the one that matters. It is
+accept-eligible only because nothing consumes `ACCESS_TRACKER` yet. **It must be closed before
+task.52 gates a mutation on that value.**
+
+| Artifact | Path |
+| --- | --- |
+| Task document | `task.51.access-mode-config-and-resolver.md` (`status: accepted`) |
+| DoD summary | `task.51.dod.1.access-mode-config-and-resolver.md` |
+| Sprint review | `sprint-review-summary.md` |
+| Final gate | `task.51.gate.7.access-mode-config-and-resolver.yml` (CONCERNS 80/100) |
+| Final QA report | `task.51.qa.7.access-mode-config-and-resolver.md` |
+| Gates 1–6 / QA 1,2,6 | co-located in the task directory |
+| Bug reports 1–8 | co-located in the task directory |
+
+### Outstanding after this pipeline
+
+1. **Create the LIMIT-1 follow-up task** and record it as a prerequisite of task.52.
+2. **Human review of PR #246** — `shared/resources/read-config.sh` and
+   `shared/resources/resolve-platform.sh` are the two files worth reading.
+3. **Merge PR #246** into `develop`.
 
 ---
 
