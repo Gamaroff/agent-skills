@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-17
-**Next Available Task Number:** **60**
+**Next Available Task Number:** **61**
 
 ## How to use
 
@@ -99,6 +99,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 57 | [Read-only verification, and `/tracker-reconcile` so the checklist is a ledger](task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md) | planned | infrastructure | Medium | 2026-08-17 | — | task.52 |
 | 58 | [Document restricted tracker access for someone who has never heard of it](task.58.restricted-access-documentation/task.58.restricted-access-documentation.md) | planned | documentation | High | 2026-08-17 | — | task.51-57 |
 | 59 | [Finish the Prettier adoption — sweep the 50 stragglers, then guard the boundary](task.59.prettier-sweep-and-format-guard/task.59.prettier-sweep-and-format-guard.md) | accepted | infrastructure | Medium | 2026-08-17 | [#237](https://github.com/Gamaroff/agent-skills/issues/237) | none |
+| 60 | [Give the config reader's awk tier a grammar, or make it refuse](task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) | planned | infrastructure | High | 2026-08-18 | [#247](https://github.com/Gamaroff/agent-skills/issues/247) | task.51 |
 
 ---
 
