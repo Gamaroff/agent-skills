@@ -663,6 +663,7 @@ demonstrates the gap — not on speculation, which is how the six-cycle patching
 | 2026-08-18 |         | Implemented — 8 files (2 resolvers, 1 suite, 1 workflow, 4 docs) + 104 bundled copies, tracker-access.test.sh 285 → 371 assertions, 21 mutations audited with 0 survivors | develop |
 | 2026-08-18 |         | QA gate CONCERNS (80/100) — 2 medium, 2 low; duplicate-key escalation survives on tier 2 | qa-task |
 | 2026-08-18 |         | QA findings fixed — 2 medium + 2 low closed, suite 371 → 378, 1 iteration | qa-fix |
+| 2026-08-18 |         | QA gate PASS (95/100) — all cycle-1 findings verified closed, no new findings | qa-task |
 
 ---
 
@@ -730,23 +731,25 @@ demonstrates the gap — not on speculation, which is how the six-cycle patching
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-18
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 80/100)
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.60.qa.1.config-reader-strict-subset.md](./task.60.qa.1.config-reader-strict-subset.md)
-- **Gate File**: [task.60.gate.1.config-reader-strict-subset.yml](./task.60.gate.1.config-reader-strict-subset.yml)
+- **Latest Report**: [task.60.qa.2.config-reader-strict-subset.md](./task.60.qa.2.config-reader-strict-subset.md)
+- **Latest Gate**: [task.60.gate.2.config-reader-strict-subset.yml](./task.60.gate.2.config-reader-strict-subset.yml)
+- Cycle 1: [QA report 1](./task.60.qa.1.config-reader-strict-subset.md) · [gate 1](./task.60.gate.1.config-reader-strict-subset.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 371 (`tracker-access.test.sh`), 1287 (`npm test`), 115 (`validate:all`)
+- **Tests Executed**: 378 (`tracker-access.test.sh`), 1287 (`npm test`), 115 (`validate:all`)
 - **Phases Verified**: 6/6
-- **Critical Issues**: 0 HIGH, 2 MEDIUM, 2 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 0 LOW open (2 MEDIUM + 2 LOW found in cycle 1, all closed)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **QA Cycles**: 2
 
 ### Key Findings
 
@@ -759,9 +762,17 @@ demonstrates the gap — not on speculation, which is how the six-cycle patching
 - Two LOW items: the else-branch indentation in the hoisted refusal, and an undocumented deliberate
   narrowness in the alias rule.
 
+All four were closed in qa-fix cycle 1 and verified in cycle 2 — including nine transition probes
+against the new scanner state, and an assertion in the over-refusal direction (a duplicated key this
+reader never consumes must still degrade, per §38). Mutation total 24, 0 survivors.
+
 The subset, the refusal position, the message, the anti-forgery property and the mutation audit all
-verified sound. See the report's *Verification of the dev's two flagged items* — all three plan
+verified sound. See QA report 1's *Verification of the dev's two flagged items* — all three plan
 deviations were reviewed and confirmed correct.
+
+**Carried forward, non-blocking**: duplicates deeper than the first child level are not refused (not
+an escalation — tier 2 resolves correctly there and tier 1 halts); and `gawk`/`mawk` remain
+unobserved locally, to be confirmed on the first CI run of this branch.
 
 ---
 
