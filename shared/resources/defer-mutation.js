@@ -43,8 +43,10 @@
 //
 // Tested by tests/handover-render.test.mjs and tests/stage-access-gate.test.mjs
 // (`node --test` — see package.json). The path is written relative on purpose:
-// a `shared/resources/…` prefix here would make bundle_skill.py follow it and
-// copy the test suite into every consuming skill.
+// a shared-resources path prefix here would make bundle_skill.py follow it
+// and copy the test suite into every consuming skill. (Spelling that prefix
+// out — even inside a comment, even with an ellipsis — is itself enough to
+// make the bundler chase it, which is how this warning first appeared.)
 // ---------------------------------------------------------------------------
 "use strict";
 
