@@ -454,18 +454,21 @@ else
   echo "  SKIP  forced-python cases exercised the awk path (no python+pyyaml on this host)"
 fi
 
-# --- 17. A declared-but-unenforced mode says so --------------------------------------------------
-# Nothing intercepts a mutation yet. An operator who sets `manual` and sees a completely normal run
-# would reasonably conclude they were protected.
-echo "  17. Not-yet-enforced notice"
+# --- 17. A partially-enforced mode says exactly how far it reaches -------------------------------
+# As of task.52 the two stage CLIs honour the mode; every other tracker call site does not (tasks
+# 53–56). An operator who sets `manual` and sees a normal run would otherwise reasonably conclude
+# they were fully protected. A notice that OVERSTATES coverage is worse than no notice at all, so
+# this asserts the qualified wording, not merely that something was printed.
+echo "  17. Partial-enforcement notice"
 D=$(fixture notice 'access:\n  tracker: manual\n')
 run_case "$D"
 assert_rc         "non-full mode → still status 0"        "$RC" "0"
-assert_stderr_has "non-full mode → warns it is not enforced" "NOT YET ENFORCED"
+assert_stderr_has "non-full mode → warns enforcement is partial" "PARTIALLY ENFORCED"
+assert_stderr_has "non-full mode → names what is still written"  "still proceed normally"
 
 D=$(fixture notice-full "")
 run_case "$D"
-if grep -q "NOT YET ENFORCED" "$STDERR_FILE"; then
+if grep -q "PARTIALLY ENFORCED" "$STDERR_FILE"; then
   bad "full mode → no notice" "warned on the default, which would make the notice noise"
 else
   ok "full mode → no notice"

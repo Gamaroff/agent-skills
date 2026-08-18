@@ -461,12 +461,15 @@ if [ "$ACCESS_VCS" != "full" ]; then
   return 1
 fi
 
-# Say plainly that a restricted mode is declared but not yet enforced. Without this an operator who
-# sets `access: {tracker: manual}` gets a silent, entirely normal-looking run that writes to the
-# tracker exactly as before — believing they are protected. Nothing intercepts a mutation until
-# task.52 and its successors land; until then the value is vocabulary, not a control.
+# Say plainly how far enforcement actually reaches. Without this an operator who sets
+# `access: {tracker: manual}` gets a normal-looking run and reasonably concludes they are fully
+# protected. As of task.52 the two stage CLIs (jira-stage.js, gh-stage.js) honour the mode: they
+# decline the board move, exit 0 with `reason: "deferred"`, and record it for the run-end handover.
+# Every OTHER tracker mutation — issue comments, issue creation, PR comments, sub-issue links — is
+# still performed normally, because interception at those call sites is tasks 53–56. Keep this
+# notice accurate as each one lands; a warning that overstates coverage is worse than none.
 if [ "$ACCESS_TRACKER" != "full" ]; then
-  printf '⚠️  access.tracker=%s is declared but NOT YET ENFORCED — this run still writes to the tracker normally.\n' \
+  printf '⚠️  access.tracker=%s is PARTIALLY ENFORCED — board/status moves are deferred and recorded, but other tracker writes (comments, issue and PR creation) still proceed normally.\n' \
     "$ACCESS_TRACKER" >&2
 fi
 
