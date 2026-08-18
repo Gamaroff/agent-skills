@@ -262,7 +262,13 @@ fi
 _rp_access_may_be_declared() {
   [ -f "$SKILLS_CONFIG_FILE" ] || return 1          # no file at all — nothing was declared
   [ -r "$SKILLS_CONFIG_FILE" ] || return 0          # cannot read it — cannot prove absence
-  grep -qE '(^|[^[:alnum:]_-])["'"'"']?access["'"'"']?[[:space:]]*:' "$SKILLS_CONFIG_FILE" 2>/dev/null && return 0
+  # Two spellings, because YAML has two ways to write a key. The first alternative is the ordinary
+  # one — `access` followed by its colon, after a line start, a brace, a comma or whitespace, with
+  # optional quotes and optional space before the colon. The second is EXPLICIT KEY syntax, where
+  # the colon is on the NEXT line (`? access` / `: {tracker: manual}`) and so cannot appear in the
+  # first pattern at all.
+  grep -qE '(^|[^[:alnum:]_-])["'"'"']?access["'"'"']?[[:space:]]*:|^[[:space:]]*\?[[:space:]]+["'"'"']?access["'"'"']?[[:space:]]*$' \
+    "$SKILLS_CONFIG_FILE" 2>/dev/null && return 0
   # grep itself failing (a binary file, an I/O error) is also "cannot prove absence".
   [ $? -gt 1 ] && return 0
   return 1

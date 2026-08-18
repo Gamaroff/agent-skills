@@ -913,6 +913,29 @@ run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
 assert_rc "overlapping << sequence entries → refused" "$RC" "1"
 if [ "$AT" = "full" ]; then bad "overlapping sequence entries must not grant full" "AT=full"; else ok "overlapping sequence entries → not full"; fi
 
+# A source's INHERITED keys count. A nested merge declared at the merge site contributes `tracker`
+# while spelling only `x`, so pairing it with a permissive source read as disjoint and the permissive
+# one won — silently, exit 0. This is the overlap guard's own blind spot, opened by narrowing it from
+# "at most one `<<`" (which rejected the shape outright) and closed by recursing when the key sets are
+# collected. A NAMED source hid the bug: pyyaml's flatten_mapping mutates an anchored node in place
+# when it is constructed, so its inherited keys are already written on it by the time the alias site
+# is scanned. Only an at-site source exposes it.
+D=$(fixture merge-overlap-nested 'base: &base\n  tracker: manual\nb: &b\n  tracker: full\naccess:\n  <<: {<<: *base, x: 1}\n  <<: *b\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "overlap via a NESTED at-site merge source → refused" "$RC" "1"
+if [ "$AT" = "full" ]; then bad "nested-source overlap must not grant full" "AT=full"; else ok "nested-source overlap → not full"; fi
+
+# …while a nested merge whose inherited keys are genuinely disjoint still resolves.
+D=$(fixture merge-nested-disjoint 'base: &base\n  q: 1\nb: &b\n  tracker: manual\naccess:\n  <<: {<<: *base, x: 1}\n  <<: *b\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "disjoint nested merge source → status 0" "$RC" "0"
+assert_eq "disjoint nested merge source → resolves"  "$AT" "manual"
+
+# The keyset recursion follows aliases, so a recursive anchor must terminate rather than spin.
+D=$(fixture merge-recursive-anchor 'a: &a\n  <<: *a\n  tracker: manual\naccess:\n  tracker: manual\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+if [ -n "$RC" ]; then ok "a recursive anchor terminates (rc=$RC)"; else bad "recursive anchor" "no result — probable hang"; fi
+
 # The halt names the three parser-legal-but-silent shapes it rejects, so an operator whose file has
 # no visible syntax error is not left hunting. The specific reason cannot be surfaced — the reader
 # collapses every parse exception to one sentinel — so the message enumerates instead.
@@ -936,6 +959,19 @@ for shape in \
   assert_rc "malformed + non-canonical access spelling → refused" "$RC" "1"
   if [ "$AT" = "full" ]; then bad "…and must not grant full" "AT=full"; else ok "…and does not grant full"; fi
 done
+
+# EXPLICIT KEY syntax puts the colon on the next line, so it cannot be caught by any pattern that
+# looks for `access` followed by a colon. Rare, but legal, and it declared a restriction that the
+# first version of this probe still missed.
+D=$(fixture spelling-explicit-key '? access\n: {tracker: manual}\nx: 1\nx: 2\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "malformed + explicit-key `? access` → refused" "$RC" "1"
+if [ "$AT" = "full" ]; then bad "…and must not grant full" "AT=full"; else ok "…and does not grant full"; fi
+
+# …and an explicit key that is NOT access must not trip it.
+D=$(fixture spelling-explicit-other '? other\n: 1\nx: 1\nx: 2\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "malformed + explicit-key `? other` → still degrades" "$RC" "0"
 
 # The over-match is deliberate and bounded: a file with NO access key at all still degrades with a
 # warning rather than halting, which is what keeps a consumer who never opted in from being locked

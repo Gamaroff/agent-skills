@@ -84,6 +84,33 @@ import yaml
 class _StrictLoader(yaml.SafeLoader):
     pass
 
+def _merge_source_keys(loader, mapping, seen=None):
+    """Every key ONE mapping node contributes, including those it inherits through its own `<<`.
+
+    The recursion is the point. Collecting only the keys written directly on the source made a
+    nested merge invisible to the overlap check below: `<<: {<<: *restrictive, x: 1}` contributes
+    `tracker` but spells only `x`, so pairing it with a permissive source read as disjoint and the
+    permissive one won, silently, at exit 0. A NAMED source happened to be covered by accident —
+    flatten_mapping mutates the anchored node in place when it is constructed, so its inherited keys
+    are already written on it by the time the alias site is scanned — but a source declared AT the
+    merge site is never constructed in its own right and so was never flattened.
+
+    `seen` guards a recursive anchor, which is legal YAML and would otherwise spin here."""
+    if seen is None:
+        seen = set()
+    if id(mapping) in seen:
+        return set()
+    seen.add(id(mapping))
+    ks = set()
+    for k, v in mapping.value:
+        if getattr(k, "tag", None) == "tag:yaml.org,2002:merge":
+            for sub in (v.value if isinstance(v, yaml.SequenceNode) else [v]):
+                if isinstance(sub, yaml.MappingNode):
+                    ks |= _merge_source_keys(loader, sub, seen)
+            continue
+        ks.add(loader.construct_object(k, deep=True))
+    return ks
+
 def _merge_source_keysets(loader, node):
     """The key sets each source of ONE `<<` contributes, as written.
 
@@ -91,14 +118,8 @@ def _merge_source_keysets(loader, node):
     time the composer is done, so no dereferencing is needed here."""
     sets = []
     for sub in (node.value if isinstance(node, yaml.SequenceNode) else [node]):
-        if not isinstance(sub, yaml.MappingNode):
-            continue
-        ks = set()
-        for k, _ in sub.value:
-            if getattr(k, "tag", None) == "tag:yaml.org,2002:merge":
-                continue
-            ks.add(loader.construct_object(k, deep=True))
-        sets.append(ks)
+        if isinstance(sub, yaml.MappingNode):
+            sets.append(_merge_source_keys(loader, sub))
     return sets
 
 def _scan_keys(loader, node):
