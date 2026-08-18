@@ -320,52 +320,64 @@ whichever the host happens to provide.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-08-17
-**Quality Score**: 40/100
-**Gate Decision**: FAIL
+**Testing Date**: 2026-08-18
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+**QA Cycles**: 7
 
 ### QA Report
-- **Full Report**: [task.51.qa.1.access-mode-config-and-resolver.md](./task.51.qa.1.access-mode-config-and-resolver.md)
-- **Gate File**: [task.51.gate.1.access-mode-config-and-resolver.yml](./task.51.gate.1.access-mode-config-and-resolver.yml)
+
+- **Full Report**: [task.51.qa.7.access-mode-config-and-resolver.md](./task.51.qa.7.access-mode-config-and-resolver.md)
+- **Gate File**: [task.51.gate.7.access-mode-config-and-resolver.yml](./task.51.gate.7.access-mode-config-and-resolver.yml)
+- **Prior cycles**: gates [1](./task.51.gate.1.access-mode-config-and-resolver.yml) · [2](./task.51.gate.2.access-mode-config-and-resolver.yml) · [3](./task.51.gate.3.access-mode-config-and-resolver.yml) · [4](./task.51.gate.4.access-mode-config-and-resolver.yml) · [5](./task.51.gate.5.access-mode-config-and-resolver.yml) · [6](./task.51.gate.6.access-mode-config-and-resolver.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 1348 (1287 node + 61 new shell assertions) — all green
-- **Phases Verified**: 10/10 landed, 4 with defects
-- **Critical Issues**: 5 HIGH, 4 MEDIUM, 5 LOW
-- **NFR Status**: Security: CONCERNS, Performance: CONCERNS, Reliability: FAIL, Maintainability: PASS
 
-### Bug Reports
+- **Tests Executed**: 1572+ — 285 `tracker-access` shell assertions (61 → 90 → 119 → 138 → 151 → 166 → 285 across cycles) plus 1287 node tests, 6 resolver, 35 bitbucket-auth, 3 + 13 pipeline hooks, 9 push-state
+- **Phases Verified**: 10/10
+- **Mutation audit**: 9 mutations, 9 caught (gate 6 found 11 surviving out of 35)
+- **Open Issues**: 0 HIGH · 1 MEDIUM deferred · 1 LOW deferred
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
-All five HIGH defects fixed in qa-fix cycle 1 and awaiting QA verification:
+### Cycle 7 — what changed
 
-| Bug | Status |
-|---|---|
-| [BUG-1 zsh indirect expansion](./task.51.bug.1.zsh-indirect-expansion.md) | ✅ Ready for QA |
-| [BUG-2 awk lint rejects valid YAML](./task.51.bug.2.awk-lint-rejects-valid-yaml.md) | ✅ Ready for QA |
-| [BUG-3 `tracker: null` rejected](./task.51.bug.3.tracker-null-rejected.md) | ✅ Ready for QA |
-| [BUG-4 unguarded call site / wrong count](./task.51.bug.4.unguarded-call-site-and-wrong-count.md) | ✅ Ready for QA |
-| [BUG-5 silent access escalation / fake mutation](./task.51.bug.5.silent-access-escalation-and-fake-mutation.md) | ✅ Ready for QA |
+Six defects closed, each verified against the pre-fix reader and then against HEAD:
 
-### Key Findings
+| Gate-6 ID | Defect | Status |
+| --- | --- | --- |
+| BUG-25 | `python -c` imported a CWD `yaml.py` — code execution on sourcing the resolver | ✅ Closed |
+| BUG-23 | An unreadable config in the canonical shape escalated to `full` | ✅ Closed |
+| BUG-24 | `SKILLS_CONFIG_FILE=/dev/null` discarded a committed restriction silently | ✅ Closed |
+| BUG-17 | The `^access:` opt-in grep missed most legal spellings of the key | ✅ Closed |
+| BUG-15 | The awk `-F': *'` split broke the documented `tracker: {workflowFile: …}` form on the default tier of a stock macOS host | ✅ Closed |
+| BUG-16 | The cycle-5 `<<` guard falsely rejected disjoint merge sources | ✅ Closed |
+| BUG-28 | 11 surviving mutations; the call-site scan's dot-source regex matched zero lines | ✅ Closed |
 
-Every automated signal was green and none of them saw the defects. Five HIGH issues:
+**Two regressions caused by these fixes were found and closed inside the same cycle** — the first
+time in seven cycles that has happened rather than the regression surfacing in the next gate:
 
-1. [BUG-1](./task.51.bug.1.zsh-indirect-expansion.md) — `${!env_name}` is bash-only; the resolver
-   returns 1 on **every** config under zsh, which is the shell skills actually run in.
-2. [BUG-2](./task.51.bug.2.awk-lint-rejects-valid-yaml.md) — the tier-2 lint grades valid YAML
-   `malformed`, hard-halting on any host without pyyaml.
-3. [BUG-3](./task.51.bug.3.tracker-null-rejected.md) — `tracker: null`, legal and previously working,
-   now halts.
-4. [BUG-4](./task.51.bug.4.unguarded-call-site-and-wrong-count.md) — `review-code:96` is still
-   unguarded and the count is 19 sites / 16 skills, not 16 / 15.
-5. [BUG-5](./task.51.bug.5.silent-access-escalation-and-fake-mutation.md) — scalar and flow-form
-   `access:` silently resolve to `full`, and the guard mutation graded its own homework.
+- **BUG-29** (MEDIUM, silent escalation) — the narrowed merge guard collected only keys written
+  directly on each source, so a nested merge declared at the merge site contributed `tracker` while
+  spelling only `x`. Confirmed against parent commit `5f51973`, which rejected the shape. Fixed by
+  recursing through a source's own `<<`.
+- **BUG-30** (LOW, silent escalation) — the broadened probe still missed explicit-key syntax
+  (`? access` / `: {…}`), where the colon is on the next line. Pre-existing, not a regression.
 
-The design is sound; the verification was not. Fixed in cycle 1 — suite grew 61 → 90 assertions,
-now covering zsh, both YAML dialects, the lint's false-positive shapes, null spellings, and a
-call-site guard assertion that actually greps the repo. Status → `ready-for-review` for re-review.
+### Known limits — deferred by operator decision
+
+See the **Known limits** section above. Two remain open, both documented and pinned by test:
+
+- **LIMIT-1** (MEDIUM) — the awk tier reads only the canonical spelling of `access:`. On a stock
+  macOS host, where awk is the only tier, a merge key, a quoted key, or a mapping-valued child reads
+  as unset and resolves to `full` at exit 0. Pinned by `tracker-access.test.sh` §41.
+- **LIMIT-2** (LOW) — the parse-failure reason is not surfaced. Mitigated by a halt message that
+  enumerates the shapes this reader rejects.
+
+**Condition on acceptance**: LIMIT-1 must be closed before any skill actually gates a mutation on
+`ACCESS_TRACKER` (task.52 onward). While nothing reads the value, a wrong value is a wrong value;
+once a consumer gates on it, the same wrong value is an unintended write.
 
 ---
 
@@ -493,6 +505,7 @@ Rollback triggers: any consumer report of a halt on a config that is legal per t
 | 2026-08-17 |  | Implemented — 57 files (5 shared sources, 15 SKILL.md call sites, 4 docs, setup wizard, package.json, 36 bundled reference trees), 61 tests, 12 mutations watched failing | develop |
 | 2026-08-17 |  | QA gate FAIL (20/100) cycle 6 — independent adversarial pass: 10 HIGH incl. 4 silent-escalation routes, 1 code-execution vector, 1 cycle-5 regression; 11 surviving mutations | qa-task |
 | 2026-08-18 |  | QA findings fixed cycle 7 (scoped, user-directed) — 6 HIGH closed: python isolated from CWD, unreadable + redirected config fail closed, `access:` opt-in probe broadened, documented `tracker:` mapping form works on the awk tier, over-broad `<<` guard narrowed to overlapping sources, `vcs:` mapping disagreement closed. Suite 166 → 277; call-site scan no longer blind to dot-sources; all five fixes mutation-witnessed. Awk-tier spelling class recorded under Known limits rather than patched | qa-fix |
+| 2026-08-18 |  | QA gate CONCERNS (80/100) cycle 7 — all 6 scoped defects verified closed; 2 regressions caused by the fixes found and closed in-cycle (BUG-29 nested-merge overlap, BUG-30 explicit-key spelling); 9/9 mutations caught; suite 277 → 285. 2 deferred limits documented and pinned | qa-task |
 
 ## References
 
