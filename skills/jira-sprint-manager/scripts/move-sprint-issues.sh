@@ -60,4 +60,11 @@ while [ "$moved" -lt "$TOTAL" ]; do
   moved=$(( moved + count ))
 done
 
+# CR-4 — never claim a move that was refused. A deferral is flagged on the last
+# chunk processed; every chunk under a restricted mode takes the same branch.
+if [ "${JSM_DEFERRED:-0}" = "1" ]; then
+  echo "⏸️  $TOTAL issue(s) NOT moved to: $TARGET — access.tracker restricts this run.${JSM_DEFERRED_RECORD:+ Last record: $JSM_DEFERRED_RECORD.}"
+  exit 0
+fi
+
 echo "Moved $TOTAL issue(s) to: $TARGET."

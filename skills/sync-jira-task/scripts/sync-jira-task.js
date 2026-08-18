@@ -633,7 +633,12 @@ async function run({
   let result,
     changeSummary,
     current = null;
-  // Set when the access gate refused a write — see jira-sync.js layer 1.
+  // CR-3 — TWO variables, deliberately. `deferred` is the fact ("we were not
+  // allowed to write"); `deferredRecord` is only how to find the record. A
+  // journal write can fail — recordRefusal warns and returns a null id — and
+  // gating on the id meant the one path that recorded NOTHING was also the one
+  // that wrote the Change Log row and reported success.
+  let deferred = false;
   let deferredRecord = null;
 
   if (isUpdate) {
@@ -706,6 +711,7 @@ async function run({
       let putResp;
       try {
         putResp = await lib.putIssueAtomic({
+          skill: "sync-jira-task",
           http,
           baseUrl: auth.baseUrl,
           email: auth.email,
@@ -739,6 +745,7 @@ async function run({
         }
         if (!retry) throw e;
         putResp = await lib.putIssueAtomic({
+          skill: "sync-jira-task",
           http,
           baseUrl: auth.baseUrl,
           email: auth.email,
@@ -750,6 +757,7 @@ async function run({
       // The deferred UPDATE shape — real key, null timestamp. Reaching for the
       // real `updated` here would tell the next run the issue was touched.
       if (putResp.deferred) {
+        deferred = true;
         deferredRecord = putResp.record;
         result = {
           issueKey: existingJiraKey,
@@ -850,6 +858,7 @@ async function run({
         // The create null shape — identical to --dry-run. NEVER a placeholder
         // key: one would break the idempotent synced-from-* label search and
         // the next run would create a duplicate.
+        deferred = true;
         deferredRecord = resp.deferredRecord;
         result = { issueKey: null, issueUrl: null, updated: null };
         output.info(
@@ -907,6 +916,7 @@ async function run({
         output.info(`   Standalone (no parent epic)`);
 
         await lib.moveToBacklog({
+          skill: "sync-jira-task",
           http,
           baseUrl: auth.baseUrl,
           email: auth.email,
@@ -937,7 +947,7 @@ async function run({
 
   // Write-back. A deferred update changed nothing in Jira, so recording a
   // Change Log row saying it did is the drift this gate exists to prevent.
-  if (result?.issueKey && !args.dryRun && !deferredRecord) {
+  if (result?.issueKey && !args.dryRun && !deferred) {
     updateTaskFile({
       filePath,
       issueKey: result.issueKey,
@@ -969,7 +979,7 @@ async function run({
       jira_last_synced_at: result?.updated || null,
       jira_last_body_hash: newBodyHash,
       jira_last_meta_hash: newMetaHash,
-      reason: deferredRecord ? "deferred" : null,
+      reason: deferred ? "deferred" : null,
       record: deferredRecord,
     });
   }

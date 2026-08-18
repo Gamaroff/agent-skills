@@ -58,4 +58,12 @@ if [ "$JSM_HTTP_STATUS" -ne 200 ]; then
   exit 1
 fi
 
+# CR-4 — never claim a mutation that was refused. jsm_defer returns a 200 so the
+# checks above still pass under `set -euo pipefail`; JSM_DEFERRED is what says
+# the sprint did not actually move.
+if [ "${JSM_DEFERRED:-0}" = "1" ]; then
+  echo "⏸️  Sprint $SPRINT_ID NOT transitioned to: $STATE — access.tracker restricts this run.${JSM_DEFERRED_RECORD:+ Recorded as $JSM_DEFERRED_RECORD.}"
+  exit 0
+fi
+
 echo "Sprint $SPRINT_ID transitioned to: $STATE."

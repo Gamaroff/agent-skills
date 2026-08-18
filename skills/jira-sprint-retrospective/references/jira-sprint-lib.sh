@@ -41,8 +41,35 @@ jsm_auth_header() {
 #   JSM_DEFER_INTENT   one line, imperative, human-facing
 #   JSM_DEFER_TARGET   JSON object, e.g. '{"sprint":"42","url":"…"}'
 #   JSM_DEFER_DESIRED  JSON object, e.g. '{"state":"closed"}'
+# CR-2 — read BOTH names, most-restrictive-wins. `ACCESS_TRACKER` is an OUTPUT of
+# resolve-platform.sh; `AGENT_SKILLS_ACCESS_TRACKER` is the knob an operator sets.
+# This skill's own SKILL.md documents bare `manage-sprint-state.sh <id> closed`
+# invocations that never source the resolver, so reading only the output left the
+# gate resolving to "full" for exactly the person who had declared a restriction.
+# An unrecognised value is REFUSED, never defaulted — the same contract as the
+# resolver and defer-mutation.js.
 jsm_access_mode() {
-  printf '%s' "${ACCESS_TRACKER:-full}"
+  local best="full" v rank_best rank_v
+  for v in "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
+    [ -z "$v" ] && continue
+    case "$v" in
+      manual)    rank_v=0 ;;
+      command)   rank_v=1 ;;
+      approve)   rank_v=2 ;;
+      read-only) rank_v=3 ;;
+      full)      rank_v=4 ;;
+      *)
+        echo "access.tracker=\"$v\" is not a recognised access mode (manual, command, approve, read-only, full). Refusing rather than defaulting to \"full\"." >&2
+        exit 1
+        ;;
+    esac
+    case "$best" in
+      manual) rank_best=0 ;; command) rank_best=1 ;; approve) rank_best=2 ;;
+      read-only) rank_best=3 ;; *) rank_best=4 ;;
+    esac
+    [ "$rank_v" -lt "$rank_best" ] && best="$v"
+  done
+  printf '%s' "$best"
 }
 
 # Record one refused call. MUST leave JSM_HTTP_STATUS and JSM_BODY set: both
@@ -57,14 +84,16 @@ jsm_defer() {
   target=${JSM_DEFER_TARGET:-"{\"url\":\"$url\"}"}
   desired=${JSM_DEFER_DESIRED:-"{\"method\":\"$method\"}"}
 
+  local record_id=""
   if [ -f "$writer" ] && command -v node >/dev/null 2>&1; then
-    node "$writer" \
+    record_id=$(node "$writer" \
       --kind "$kind" \
       --intent "$intent" \
       --access "$(jsm_access_mode)" \
       --target "$target" \
       --desired "$desired" \
-      --skill "jira-sprint-manager" >/dev/null \
+      --skill "jira-sprint-manager" --json 2>/dev/null \
+      | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1) \
       || echo "⚠️  Could not record the deferred $method $url" >&2
   else
     echo "⚠️  Could not record the deferred $method $url — defer-mutation.js not found" >&2
@@ -75,6 +104,12 @@ jsm_defer() {
   # failure branches feed JSM_BODY straight into an error line.
   JSM_HTTP_STATUS=200
   JSM_BODY='{"deferred":true}'
+  # CR-4 — a 200 keeps the caller alive; this tells it the truth. Without it
+  # both scripts print "transitioned to: closed" / "Moved N issue(s)" for a
+  # mutation that never happened, which is the false report this whole gate
+  # exists to prevent. Callers MUST branch on it before any success line.
+  JSM_DEFERRED=1
+  JSM_DEFERRED_RECORD=$record_id
 }
 
 # jsm_curl METHOD URL [JSON_BODY]
@@ -86,6 +121,10 @@ jsm_curl() {
   local url=$2
   local body=${3:-}
   local auth tmp attempt=0 max=4 wait=1
+
+  # Always set, so a caller under `set -u` can branch on it unconditionally.
+  JSM_DEFERRED=0
+  JSM_DEFERRED_RECORD=""
 
   # Fail closed, and BEFORE the retry loop — recording inside it would write one
   # record per attempt for one logical mutation.

@@ -5,7 +5,7 @@ type: task
 description: 'Makes restricted access real for Jira REST. Two layers inside jira-sync.js: the http() factory refuses any non-GET under a non-`full` access mode and records it, so a mutation nobody annotated is loud rather than silently executed; and the semantic mutators record a proper kind, target, intent and desired value, which is what makes manual mode say "set Team to Platform" instead of printing a JSON blob. Adds 5 new Jira mutation kinds to the intercepted set; a 6th (jira.transition) is already owned by task.52''s jira-stage.js gate, taking coverage to 6 of the 9 Jira kinds. Introduces jira.unknown-mutation as a 21st roster kind so layer 1 has something legal to write.'
 tags: [restricted-access, jira, interception, jira-sync]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: high
 created: 2026-08-17
@@ -284,6 +284,35 @@ them in a single commit, a single revert is sufficient.
 - [x] Step 6 — resolver notice + `tracker-access.test.sh` §17
 - [x] Step 7 — tests, `npm run bundle`, docs
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-18
+**Quality Score**: 20/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.53.qa.1.jira-rest-interception.md](./task.53.qa.1.jira-rest-interception.md)
+- **Gate File**: [task.53.gate.1.jira-rest-interception.yml](./task.53.gate.1.jira-rest-interception.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1379 (0 failures)
+- **Phases Verified**: 7/7
+- **Critical Issues**: 3 high, 2 medium, 4 low
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings
+
+The net holds — no mutation reaches the network on any gated path, proven against a stub that throws
+on any write. Three high-severity paths one layer up report a refused mutation as a **success**, and
+two of them write that false success into a document: the transition chain reads the synthetic `202`
+as a completed transition (**CR-1**); the two hand-rolled gates read an env var their own documented
+invocation never sets, so they are inert (**CR-2**); and the write-back guard keys off the record id
+rather than the deferral, so a failed journal write reports success (**CR-3**).
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -292,6 +321,8 @@ them in a single commit, a single revert is sufficient.
 | 2026-08-18 | 1.1 | Review (5/10) — 4 critical, 7 important fixed: added the `jira.unknown-mutation` roster kind as a deliverable; removed the unreachable `access.vcs: approve` HALTs; corrected the false `jsm_curl` side-effect-free premise; dropped the transition chain from layer 2 as already owned by `jira-stage.js`; corrected the kind arithmetic to 5 new / 6 of 9; realigned record vocabulary to the shipped schema; added 8 missing files, Technical Background, Breaking Changes, Progress Tracking and this log | review-task |
 | 2026-08-18 |  | Status → ready-for-development | review-task |
 | 2026-08-18 |  | Implemented — 22 files, 19 new tests (suite 1352 → 1371); 6 invariants watched failing | develop |
+| 2026-08-18 |  | QA gate FAIL (20/100) — 3 high, 2 medium, 4 low; the net holds, the callers do not | qa-task |
+| 2026-08-18 |  | QA findings fixed — 5 bugs + 3 cleanups + 1 QA note, 1 iteration; 7 further invariants watched failing | qa-fix |
 
 ## References
 

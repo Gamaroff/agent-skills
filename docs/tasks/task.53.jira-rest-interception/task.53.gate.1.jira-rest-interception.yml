@@ -1,0 +1,122 @@
+schema: 1
+task: 'task.53.jira-rest-interception'
+task_title: '[Task 53] Intercept Jira REST mutations in two layers — a fail-closed net and a legible one'
+gate: FAIL
+status_reason: 'The net holds — no mutation reaches the network — but three high-severity paths report a refused mutation as a success, and two of them write that false success to a document. Layer 1 is correct; the callers are not yet deferral-aware.'
+reviewer: 'QA Engineer'
+updated: '2026-08-18T20:00:00Z'
+
+top_issues:
+  - id: CR-1
+    issue: 'The transition chain treats the synthetic 202 as a successful transition'
+    severity: high
+    finding: >-
+      transitionToStatus branches on `if (!resp.ok)`, and a deferred response is
+      `ok: true`, so a refused POST /transitions falls into the success branch:
+      it logs "🔀 Transitioned" and returns `transitioned: true`. syncDocumentStatus
+      is reached from four call sites outside jira-stage.js (sync-jira-epic.js:923
+      and :1351, sync-jira-story.js:1128, sync-jira-task.js:925), so
+      buildChangeLogEntries then emits a "Status → X" row that IS written to disk
+      on the epic skip path and the story skippedNoChanges path — neither sets
+      deferredRecord, so the write-back guard never fires.
+    suggested_action: 'Short-circuit the transition chain on resp.deferred to {transitioned:false, reason:"deferred"}, and treat that reason as "nothing moved" in buildChangeLogEntries and summariseStatusOutcome.'
+    suggested_owner: dev
+  - id: CR-2
+    issue: 'The two hand-rolled gates read an env var their documented invocation never sets'
+    severity: high
+    finding: >-
+      jsm_access_mode reads ${ACCESS_TRACKER:-full} and jira-create-epic.js reads
+      process.env.ACCESS_TRACKER, but ACCESS_TRACKER only exists after sourcing
+      resolve-platform.sh — the operator-facing knob is AGENT_SKILLS_ACCESS_TRACKER.
+      jira-sprint-manager/SKILL.md documents a bare `manage-sprint-state.sh <id> closed`,
+      and neither script sources the resolver, so a project with access.tracker: manual
+      following the documented steps gets a real sprint close with the gate silently
+      resolving to "full".
+    suggested_action: 'Resolve the mode in the gates themselves — read AGENT_SKILLS_ACCESS_TRACKER as well as ACCESS_TRACKER, most-restrictive-wins, matching the resolver contract.'
+    suggested_owner: dev
+  - id: CR-3
+    issue: 'The write-back guard keys off the record id, so a failed journal write reports success'
+    severity: high
+    finding: >-
+      recordRefusal swallows a failed dm.defer and returns deferredRecord: null.
+      The three sync scripts gate their write-back on `!deferredRecord` rather than
+      on the deferral itself, so the one path with ZERO records — journal unwritable,
+      roster load failure — is also the one that writes the Change Log row, stamps
+      jira_last_synced_at, and reports `reason: null` in --json.
+    suggested_action: 'Carry the boolean through (putIssueAtomic already returns deferred: true) and gate write-back and the JSON reason on the flag; keep the record id as reporting detail only.'
+    suggested_owner: dev
+  - id: CR-4
+    issue: 'Both sprint scripts print a success line for a refused mutation'
+    severity: medium
+    finding: >-
+      jsm_defer returns JSM_HTTP_STATUS=200, which both callers read as success, so a
+      refused call still prints "Sprint 42 transitioned to: closed." and "Moved N
+      issue(s) to: TARGET." Worse, the new §8b tests assert those exact lines, locking
+      the false report in as expected behaviour.
+    suggested_action: 'Set a JSM_DEFERRED sentinel alongside the 200 and have both scripts print a deferred line instead of the success line; update §8b to assert the deferred wording.'
+    suggested_owner: dev
+  - id: CR-5
+    issue: 'The reworded resolver notice overstates coverage'
+    severity: medium
+    finding: >-
+      The notice now claims "all Jira writes and board/status moves are deferred and
+      recorded", but create-issue/SKILL.md:244 and review-task/SKILL.md:593/:620/:1653
+      still create and update Jira issues with raw `curl -X POST ${JIRA_URL}/rest/api/2/issue`
+      that no gate touches, as do the Atlassian MCP write tools. This is the exact failure
+      the notice's own preceding comment calls "worse than none".
+    suggested_action: 'Narrow the wording to the paths actually gated and name the raw-curl and MCP writes as still proceeding.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 20
+
+evidence:
+  tests_reviewed: 1379
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [3, 4, 6]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No credential reaches a record: buildRecord redacts before hashing, endpointOf drops the query string so a token in a URL cannot land in an intent, and no request body is ever journalled. The gate resolves ACCESS_TRACKER at require time, before loadDotEnv, so a dot-env file cannot escalate a restriction.'
+  performance:
+    status: PASS
+    notes: 'One string compare and at most one regex per request under a restricted mode; in full mode one destructure per call. No measurable cost. Suite runtime unchanged (66s baseline).'
+  reliability:
+    status: FAIL
+    notes: 'CR-1 and CR-3: a refused mutation is reported as a success and, on two paths, written to the local document as though it had happened. That is precisely the invisible drift the feature exists to remove, reintroduced one layer above the gate. CR-2 makes the two hand-rolled gates inert under their own documented invocation.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The layers are well commented and the roster change is pinned by tests at all five sites. But CR-4 shows a test asserting behaviour that is wrong, and CR-6 a require fallback the bundler rewrote into a duplicate of its own try branch — both are cases where the guard reads as protection but is not.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 — make the transition chain deferral-aware end to end'
+      refs: ['shared/resources/jira-sync.js', 'skills/sync-jira-{story,task,epic}/scripts/*.js']
+    - action: 'CR-2 — read AGENT_SKILLS_ACCESS_TRACKER in both hand-rolled gates'
+      refs: ['shared/resources/jira-sprint-lib.sh', 'skills/jira-epic-creator/scripts/jira-create-epic.js']
+    - action: 'CR-3 — gate write-back on the deferral flag, not the record id'
+      refs: ['skills/sync-jira-{story,task,epic}/scripts/*.js', 'shared/resources/jira-sync.js']
+    - action: 'CR-4 — sprint scripts must not print a success line for a refusal'
+      refs: ['skills/jira-sprint-manager/scripts/*.sh', 'shared/resources/tests/jira-interception.test.mjs']
+    - action: 'CR-5 — narrow the PARTIALLY ENFORCED notice to what is actually gated'
+      refs: ['shared/resources/resolve-platform.sh', 'shared/resources/tracker-access.test.sh']
+  future:
+    - action: 'CR-6 — the require fallback is a duplicate of its own try branch (the bundler rewrote it)'
+      refs: ['skills/jira-epic-creator/scripts/jira-create-epic.js']
+    - action: 'CR-7 — jira.issue.update and jira.backlog.add records are attributed to "jira-sync" rather than the calling skill'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'CR-8 — summariseFields loses timetracking.originalEstimate and renders a null name as the string "null"'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'QA-1 — makeHttp now throws on an unrecognised ACCESS_TRACKER at factory time, failing read-only paths (--probe-workflow, scaffold-tracker-workflow) that never write'
+      refs: ['shared/resources/jira-sync.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'CR-1, CR-2 and CR-3 fixed and re-reviewed'

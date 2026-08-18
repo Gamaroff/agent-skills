@@ -16,21 +16,49 @@ const path = require("path");
 // in the task document rather than left implicit — this script has drifted from
 // the shared library before. Routing it through jira-sync.js is worth doing and
 // is not this change.
+// CR-6 — ONE require, not a try/catch pair. The bundler rewrites
+// `shared/resources/X` to `references/X` inside skill scripts too, so the
+// "in-tree fallback" this used to carry was rewritten into a byte-identical
+// copy of its own try branch: a catch that could never succeed where the try
+// had already failed.
 let dm = null;
 try {
   dm = require("../references/defer-mutation.js");
 } catch (_) {
-  try {
-    dm = require("../references/defer-mutation.js");
-  } catch (_2) {
-    dm = null;
-  }
+  dm = null;
 }
 
-/** The access mode in force, resolved the same way every other gate does. */
+// CR-2 — read BOTH names, most-restrictive-wins. `ACCESS_TRACKER` is an OUTPUT
+// of resolve-platform.sh, which this script never sources; the knob an operator
+// actually sets is `AGENT_SKILLS_ACCESS_TRACKER`. Reading only the output left
+// the gate resolving to "full" for exactly the person who had declared a
+// restriction. An unrecognised value is refused, never defaulted.
+const ACCESS_RANK = {
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+};
+
 function accessTracker() {
-  const raw = String(process.env.ACCESS_TRACKER || "").trim();
-  return raw || "full";
+  const seen = [
+    process.env.ACCESS_TRACKER,
+    process.env.AGENT_SKILLS_ACCESS_TRACKER,
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  if (!seen.length) return "full";
+  for (const v of seen) {
+    if (!(v in ACCESS_RANK)) {
+      console.error(
+        `Error: access.tracker="${v}" is not a recognised access mode. ` +
+          `Known: ${Object.keys(ACCESS_RANK).join(", ")}.`,
+      );
+      process.exit(1);
+    }
+  }
+  return seen.reduce((a, b) => (ACCESS_RANK[b] < ACCESS_RANK[a] ? b : a));
 }
 
 async function parseFrontmatter(content) {

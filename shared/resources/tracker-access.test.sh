@@ -466,8 +466,9 @@ run_case "$D"
 assert_rc         "non-full mode → still status 0"        "$RC" "0"
 assert_stderr_has "non-full mode → warns enforcement is partial" "PARTIALLY ENFORCED"
 assert_stderr_has "non-full mode → names what is still written"  "still proceed normally"
-assert_stderr_has "non-full mode → names Jira as now covered"    "all Jira writes"
-assert_stderr_has "non-full mode → names GitHub as the gap"      "GitHub issue and PR writes"
+assert_stderr_has "non-full mode → names the gated Jira paths"   "Jira REST via jira-sync.js"
+assert_stderr_has "non-full mode → names GitHub as a gap"        "GitHub issue and PR writes"
+assert_stderr_has "non-full mode → names raw curl / MCP as a gap"  "raw curl or the Atlassian MCP tools"
 
 D=$(fixture notice-full "")
 run_case "$D"

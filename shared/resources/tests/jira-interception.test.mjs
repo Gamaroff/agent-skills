@@ -723,21 +723,13 @@ test("§7c the three sync scripts guard their write-back and their key on `defer
       path.join(REPO, "skills", skill, "scripts", script),
       "utf8",
     );
-    assert.match(
-      src,
-      /!deferredRecord/,
-      `${skill}: the write-back gate must exclude a deferral — a Change Log row ` +
-        `saying the issue was updated when it was not is the drift this removes`,
-    );
+    // The write-back gate and the --json reason are asserted in §13 (CR-3),
+    // which pins the FLAG rather than the record id: gating on the id let a
+    // failed journal write report success.
     assert.match(
       src,
       /result = \{ issueKey: null, issueUrl: null, updated: null \}/,
       `${skill}: a deferred create must return the null triple, never a placeholder key`,
-    );
-    assert.match(
-      src,
-      /reason: deferredRecord \? "deferred" : null/,
-      `${skill}: --json`,
     );
   }
 });
@@ -838,7 +830,15 @@ test("§8b move-sprint-issues.sh completes under `set -euo pipefail` and records
       0,
       `the script aborted — a deferral became a failed run:\n${r.stdout}\n${r.stderr}`,
     );
-    assert.match(r.stdout, /Moved 2 issue\(s\) to: 42/);
+    // CR-4 — the script must NOT claim the move happened. The previous version
+    // of this assertion pinned the success line, which made the test protect the
+    // defect rather than catch it.
+    assert.match(r.stdout, /NOT moved to: 42/);
+    assert.doesNotMatch(
+      r.stdout,
+      /^Moved 2 issue/m,
+      "a refused move must never print the success line",
+    );
 
     const recs = journal(dir);
     assert.equal(recs.length, 1, "one chunk, one record");
@@ -857,7 +857,13 @@ test("§8b manage-sprint-state.sh completes and records jira.sprint.set-state", 
       0,
       `the script aborted — its \`-ne 200\` branch fired:\n${r.stdout}\n${r.stderr}`,
     );
-    assert.match(r.stdout, /transitioned to: closed/);
+    // CR-4 — same contract for the state transition.
+    assert.match(r.stdout, /NOT transitioned to: closed/);
+    assert.doesNotMatch(
+      r.stdout,
+      /^Sprint 42 transitioned to/m,
+      "a refused transition must never print the success line",
+    );
 
     const recs = journal(dir);
     assert.equal(
@@ -920,9 +926,10 @@ test("§9 jira-create-epic.js records and makes no network call under a restrict
 
 // ── 10. The resolver says what is now true ─────────────────────────────────
 
-test("§10 the PARTIALLY ENFORCED notice names Jira as covered and GitHub as the gap", () => {
+test("§10 the PARTIALLY ENFORCED notice exists and is qualified", () => {
+  // The exact wording — what IS gated and what is not — is pinned in §13 (CR-5).
   const src = fs.readFileSync(path.join(SHARED, "resolve-platform.sh"), "utf8");
-  assert.match(src, /all Jira writes and board\/status moves are deferred/);
+  assert.match(src, /PARTIALLY ENFORCED/);
   assert.match(src, /GitHub issue and PR writes/);
 });
 
@@ -1034,4 +1041,354 @@ test("§12 every bundled copy of a file this change touches carries the change",
       `${path.relative(REPO, f)} has no access gate`,
     );
   }
+});
+
+// ── 13. The QA cycle 1 findings, each with a test that fails without its fix ─
+
+test("§13 CR-1 a refused transition is not reported as a transition", async () => {
+  await withTmp(async (dir) => {
+    const calls = [];
+    const http = lib.makeHttp({
+      fetchImpl: async (url, opts = {}) => {
+        calls.push({ url, method: opts.method });
+        if ((opts.method || "GET") !== "GET") {
+          throw new Error(`a write reached the network: ${url}`);
+        }
+        // The transitions GET the chain makes before posting.
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          async json() {
+            return {
+              transitions: [
+                { id: "31", name: "Start", to: { name: "In Progress" } },
+              ],
+            };
+          },
+        };
+      },
+      access: "manual",
+      cwd: dir,
+    });
+
+    const res = await lib.transitionToStatus({
+      http,
+      baseUrl: BASE,
+      email: "a@b.c",
+      token: "t",
+      issueKey: "PROJ-1",
+      targetStatus: ["In Progress"],
+      currentStatus: "To Do",
+      localStatus: "in-progress",
+      output: { info() {}, warn() {} },
+    });
+
+    assert.equal(res.transitioned, false, "a refusal is not a transition");
+    assert.equal(res.reason, "deferred");
+    assert.equal(res.to, null, "nothing landed anywhere");
+    assert.ok(calls.every((c) => (c.method || "GET") === "GET"));
+
+    // The consequence that made this HIGH: the outcome drives a Change Log row
+    // that is written to disk.
+    const rows = lib.buildChangeLogEntries({
+      created: false,
+      issueKey: "PROJ-1",
+      statusOutcome: { ...res, localStatus: "in-progress", issueKey: "PROJ-1" },
+      author: "sync-jira-story",
+      docNoun: "story",
+    });
+    assert.deepEqual(
+      rows,
+      [],
+      "a document must not record a status change Jira never made",
+    );
+  });
+});
+
+test("§13 CR-1 a deferred transition is not a --fail-on-status-skip failure", () => {
+  const lines = [];
+  const rc = lib.summariseStatusOutcome(
+    {
+      transitioned: false,
+      reason: "deferred",
+      record: "abc123",
+      issueKey: "PROJ-1",
+      localStatus: "in-progress",
+    },
+    {
+      output: { info: (m) => lines.push(m), warn: (m) => lines.push(m) },
+      failOnSkip: true,
+    },
+  );
+  assert.equal(rc, 0, "behaving exactly as configured is not a failure");
+  assert.ok(
+    lines.some((l) => /Recorded as abc123/.test(l)),
+    "the operator is pointed at the record",
+  );
+  assert.ok(
+    !lines.some((l) => /Move it by hand, or see the guidance/.test(l)),
+    "a deferral is not a skip and must not be described as one",
+  );
+});
+
+test("§13 CR-2 the operator-facing env var restricts on its own", async () => {
+  await withTmp(async (dir) => {
+    // AGENT_SKILLS_ACCESS_TRACKER is the knob a person sets; ACCESS_TRACKER is
+    // an OUTPUT of resolve-platform.sh, which these scripts never source.
+    assert.equal(
+      lib.mostRestrictiveAccess({ AGENT_SKILLS_ACCESS_TRACKER: "manual" }),
+      "manual",
+    );
+    // Most-restrictive-wins, in both orders — a stray env var may lock a run
+    // down, never loosen it.
+    assert.equal(
+      lib.mostRestrictiveAccess({
+        ACCESS_TRACKER: "full",
+        AGENT_SKILLS_ACCESS_TRACKER: "manual",
+      }),
+      "manual",
+    );
+    assert.equal(
+      lib.mostRestrictiveAccess({
+        ACCESS_TRACKER: "manual",
+        AGENT_SKILLS_ACCESS_TRACKER: "full",
+      }),
+      "manual",
+    );
+    assert.equal(lib.mostRestrictiveAccess({}), "full");
+    assert.throws(
+      () => lib.mostRestrictiveAccess({ ACCESS_TRACKER: "bogus" }),
+      /not a recognised access mode/,
+      "a typo must refuse, never default to full",
+    );
+    assert.deepEqual(journal(dir), []);
+  });
+});
+
+test("§13 CR-2 the sprint gate honours AGENT_SKILLS_ACCESS_TRACKER alone", async () => {
+  await withTmp(async (dir) => {
+    const r = spawnSync(
+      "bash",
+      [
+        path.join(
+          REPO,
+          "skills",
+          "jira-sprint-manager",
+          "scripts",
+          "manage-sprint-state.sh",
+        ),
+        "42",
+        "closed",
+      ],
+      {
+        encoding: "utf8",
+        cwd: dir,
+        env: {
+          // Deliberately NOT setting ACCESS_TRACKER: this is the documented
+          // bare invocation, which never sources resolve-platform.sh.
+          ...process.env,
+          ACCESS_TRACKER: "",
+          AGENT_SKILLS_ACCESS_TRACKER: "manual",
+          JIRA_INSTANCE: "acme.atlassian.net",
+          JIRA_USER_EMAIL: "a@b.c",
+          JIRA_API_TOKEN: "t",
+        },
+        timeout: 30000,
+      },
+    );
+    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    assert.match(
+      r.stdout,
+      /NOT transitioned/,
+      "the gate must fire on the operator knob alone",
+    );
+    assert.equal(journal(dir).length, 1);
+    assert.equal(journal(dir)[0].kind, "jira.sprint.set-state");
+  });
+});
+
+test("§13 CR-3 a deferral with an unwritable journal still reports as deferred", async () => {
+  await withTmp(async (dir) => {
+    // Point the journal at a path that cannot be created, so dm.defer throws
+    // and recordRefusal returns a null record id. The refusal must still be a
+    // refusal: the id is reporting detail, not the fact.
+    const notADir = path.join(dir, "wall");
+    fs.writeFileSync(notADir, "not a directory");
+    const http = lib.makeHttp({
+      fetchImpl: throwOnWrite(),
+      access: "manual",
+      cwd: notADir,
+    });
+    const res = await lib.putIssueAtomic({
+      http,
+      baseUrl: BASE,
+      email: "a@b.c",
+      token: "t",
+      issueKey: "PROJ-1",
+      fields: { summary: "x" },
+    });
+    assert.equal(res.deferred, true, "the boolean is the fact");
+    assert.equal(
+      res.record,
+      null,
+      "the id is absent — the journal write failed",
+    );
+    assert.equal(res.updated, null);
+  });
+});
+
+test("§13 CR-3 the sync scripts gate on the flag, not the record id", () => {
+  for (const [skill, script] of [
+    ["sync-jira-story", "sync-jira-story.js"],
+    ["sync-jira-task", "sync-jira-task.js"],
+    ["sync-jira-epic", "sync-jira-epic.js"],
+  ]) {
+    const src = fs.readFileSync(
+      path.join(REPO, "skills", skill, "scripts", script),
+      "utf8",
+    );
+    assert.match(
+      src,
+      /!deferred\b/,
+      `${skill}: write-back must gate on the flag`,
+    );
+    assert.doesNotMatch(
+      src,
+      /!deferredRecord/,
+      `${skill}: gating on the id makes a failed journal write report success`,
+    );
+    assert.match(
+      src,
+      /reason: deferred \? "deferred" : null/,
+      `${skill}: --json reason must follow the flag too`,
+    );
+  }
+});
+
+test("§13 QA-1 an unrecognised mode fails a write, not a read", () => {
+  // A subprocess, and that is the point: the mode is captured at REQUIRE time so
+  // a dot-env file cannot escalate it, which also means mutating process.env
+  // after the require would prove nothing.
+  const driver = `
+    const lib = require(${JSON.stringify(path.join(SHARED, "jira-sync.js"))});
+    const calls = [];
+    const http = lib.makeHttp({
+      fetchImpl: async (url, opts = {}) => {
+        calls.push(opts.method || "GET");
+        return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({}) };
+      },
+    });
+    console.log("FACTORY-OK");
+    http("https://x/rest/api/3/issue/PROJ-1", {})
+      .then((r) => {
+        console.log("GET", r.status);
+        return http("https://x/rest/api/3/issue/PROJ-1", { method: "PUT" });
+      })
+      .then(() => console.log("PUT-LEAKED"))
+      .catch((e) => console.log("PUT-REFUSED", e.message.slice(0, 60)))
+      .then(() => console.log("CALLS", JSON.stringify(calls)));
+  `;
+  const r = spawnSync(process.execPath, ["-e", driver], {
+    encoding: "utf8",
+    env: { ...process.env, ACCESS_TRACKER: "bogus" },
+    timeout: 20000,
+  });
+  assert.match(
+    r.stdout,
+    /FACTORY-OK/,
+    "the factory must not throw — read-only callers (--probe-workflow, " +
+      "scaffold-tracker-workflow) build an http() and never write",
+  );
+  assert.match(r.stdout, /GET 200/, "a read is never gated");
+  assert.match(
+    r.stdout,
+    /PUT-REFUSED .*not a recognised/,
+    "a write refuses loudly",
+  );
+  assert.doesNotMatch(r.stdout, /PUT-LEAKED/);
+  assert.match(
+    r.stdout,
+    /CALLS \["GET"\]/,
+    "the refused write never reached the transport",
+  );
+});
+
+test("§13 CR-7 a deferred update names the calling skill, not the library", async () => {
+  await withTmp(async (dir) => {
+    const http = lib.makeHttp({
+      fetchImpl: throwOnWrite(),
+      access: "manual",
+      cwd: dir,
+    });
+    await lib.putIssueAtomic({
+      http,
+      baseUrl: BASE,
+      email: "a@b.c",
+      token: "t",
+      issueKey: "PROJ-1",
+      fields: { summary: "x" },
+      skill: "sync-jira-story",
+    });
+    await lib.moveToBacklog({
+      http,
+      baseUrl: BASE,
+      email: "a@b.c",
+      token: "t",
+      boardId: "42",
+      issueKey: "PROJ-1",
+      output: { info() {}, warn() {} },
+      skill: "sync-jira-story",
+    });
+    const recs = journal(dir);
+    assert.equal(recs.length, 2);
+    for (const r of recs) {
+      assert.equal(
+        r.skill,
+        "sync-jira-story",
+        "the handover renderer groups by skill — one run must not split in two",
+      );
+    }
+  });
+});
+
+test("§13 CR-8 summariseFields keeps a value a human could type, and drops one they could not", () => {
+  const out = lib.summariseFields({
+    summary: "Rename the widget",
+    timetracking: { originalEstimate: "3d" },
+    assignee: { name: null },
+    labels: ["a", null, "b"],
+    description: { type: "doc", content: [] },
+  });
+  assert.equal(out.summary, "Rename the widget");
+  assert.equal(
+    out.timetracking,
+    "3d",
+    "a field these scripts send must survive",
+  );
+  assert.equal(
+    out.assignee,
+    "(structured value — see the work-item document)",
+    'a null name must not render as the string "null"',
+  );
+  assert.equal(out.labels, "a, b", "an empty member is not a value to type");
+  assert.equal(
+    out.description,
+    "(structured value — see the work-item document)",
+  );
+});
+
+test("§13 CR-5 the notice names what is gated and what is not", () => {
+  const src = fs.readFileSync(path.join(SHARED, "resolve-platform.sh"), "utf8");
+  assert.match(src, /Jira REST via jira-sync\.js/, "name the gated path");
+  assert.match(
+    src,
+    /raw curl or the Atlassian MCP tools/,
+    "and the Jira writes that are NOT gated — create-issue and review-task still curl directly",
+  );
+  assert.doesNotMatch(
+    src,
+    /all Jira writes/,
+    "the previous wording overstated coverage, which the notice itself calls worse than none",
+  );
 });

@@ -33,11 +33,46 @@ const tw = require("./tracker-workflow.js");
 // every skill that carries this file.
 const dm = require("./defer-mutation.js");
 
-// ACCESS_TRACKER captured at require time, BEFORE anything can call
+// The access mode captured at require time, BEFORE anything can call
 // loadDotEnv(). A dot-env file must not be able to escalate a restriction the
-// operator declared into a tracker write. Same contract as jira-stage.js:289.
+// operator declared into a tracker write.
+//
+// CR-2 — read BOTH names, most-restrictive-wins. `ACCESS_TRACKER` is an OUTPUT
+// of resolve-platform.sh; `AGENT_SKILLS_ACCESS_TRACKER` is the knob an operator
+// actually sets. These scripts are documented as bare `node …` invocations that
+// never source the resolver, so reading only the output left the gate resolving
+// to "full" for exactly the person who had declared a restriction.
+const ACCESS_RANK = Object.freeze({
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+});
+
+function mostRestrictiveAccess(env = process.env) {
+  const seen = [env.ACCESS_TRACKER, env.AGENT_SKILLS_ACCESS_TRACKER]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  if (!seen.length) return "full";
+  // An unrecognised value is REFUSED, never defaulted — defaulting a typo to
+  // "full" turns a declared restriction into an unintended tracker write.
+  for (const v of seen) {
+    if (!(v in ACCESS_RANK)) {
+      throw new Error(
+        `access.tracker="${v}" is not a recognised access mode. ` +
+          `Known: ${Object.keys(ACCESS_RANK).join(", ")}. Refusing rather than ` +
+          `defaulting to "full", because that would silently escalate a declared ` +
+          `restriction into a tracker write.`,
+      );
+    }
+  }
+  return seen.reduce((a, b) => (ACCESS_RANK[b] < ACCESS_RANK[a] ? b : a));
+}
+
 const ACCESS_ENV_AT_LOAD = Object.freeze({
   ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+  AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
 });
 
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
@@ -1723,9 +1758,26 @@ function summariseFields(fields) {
   const oneLine = (v) => {
     if (v === null || v === undefined) return null;
     if (typeof v !== "object") return short(v);
-    if (Array.isArray(v)) return short(v.map((x) => oneLine(x)).join(", "));
+    if (Array.isArray(v)) {
+      // CR-8 — drop empty members rather than stringifying them. A null in a
+      // labels array used to render as a gap (", , x"), which reads as a value
+      // the operator is expected to type.
+      const parts = v
+        .map((x) => oneLine(x))
+        .filter((x) => x !== null && x !== "");
+      return parts.length ? short(parts.join(", ")) : null;
+    }
+    // CR-8 — `timetracking` is a field THESE scripts send, and it carries no
+    // name/value/key/id, so it used to be discarded as "structured". The value
+    // is exactly the kind a human could type, so name the shape explicitly.
+    if (v.originalEstimate !== undefined || v.remainingEstimate !== undefined) {
+      const est = v.originalEstimate ?? v.remainingEstimate;
+      return est === null || est === undefined ? null : short(est);
+    }
     const named = v.name ?? v.value ?? v.key ?? v.id;
-    return named === undefined
+    // CR-8 — `?? ` treats an explicit null as "present", so `{name: null}` used
+    // to render as the literal string "null". An unusable value is not a value.
+    return named === undefined || named === null
       ? "(structured value — see the work-item document)"
       : short(named);
   };
@@ -1751,8 +1803,18 @@ function makeHttp({
   cwd = undefined,
   output = undefined,
 } = {}) {
-  const accessMode = access || dm.resolveAccessTracker(ACCESS_ENV_AT_LOAD);
   const ctx = { run, step, skill, cwd, output };
+
+  // QA-1 — resolved lazily, and only when a write is actually attempted. An
+  // unrecognised mode must refuse, but refusing at FACTORY time also killed
+  // read-only callers that never write (`--probe-workflow`,
+  // scaffold-tracker-workflow), which no requirement asks for.
+  let resolved = access || null;
+  const accessFor = (method) => {
+    if (method === "GET") return "full"; // a read is never gated
+    if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    return resolved;
+  };
 
   return async function http(url, opts = {}) {
     // `defer` is ours, not fetch's. Strip it so the request the transport sees
@@ -1763,11 +1825,15 @@ function makeHttp({
     // Layer 1 sits ABOVE the retry loop on purpose. Recording inside it would
     // write one record per attempt for one logical mutation, and a 429 would
     // then read as three separate things a human must go and do.
-    if (method !== "GET" && accessMode !== "full" && !isReadViaPost(url)) {
+    if (
+      method !== "GET" &&
+      !isReadViaPost(url) &&
+      accessFor(method) !== "full"
+    ) {
       return recordRefusal({
         url,
         method,
-        access: accessMode,
+        access: resolved,
         system,
         annotation,
         ctx,
@@ -2055,6 +2121,10 @@ async function moveToBacklog({
   boardId,
   issueKey,
   output,
+  // CR-7 — optional; when absent the record falls back to the makeHttp ctx,
+  // which is the library name. Additive, so every existing call site is
+  // unaffected.
+  skill = undefined,
 }) {
   if (!boardId) {
     if (output)
@@ -2088,6 +2158,10 @@ async function moveToBacklog({
           ui_url: `${baseUrl}/browse/${issueKey}`,
         },
         desired: { backlog: `board ${boardId}` },
+        // CR-7 — name the CALLING skill, not the library. The handover renderer
+        // groups by skill, so falling back to "jira-sync" split one logical run
+        // across two attributions.
+        skill,
       },
     });
     // A refusal is not a move. Reporting "📋 Moved to backlog" here would be the
@@ -3517,6 +3591,30 @@ async function transitionToStatus({
   };
 
   let resp = await post(null);
+
+  // CR-1 — the access gate refused this transition. Everything below reads
+  // `resp.ok`, and a deferral IS ok, so without this branch a refused POST
+  // falls into the success path: it logs "🔀 Transitioned" and returns
+  // `transitioned: true`. `syncDocumentStatus` has four call sites outside
+  // jira-stage.js, and its outcome drives a "Status → X" Change Log row that is
+  // written to disk — a document recording a status change Jira never made.
+  if (resp.deferred) {
+    if (output)
+      output.info(
+        `   ⏸️  Transition deferred for ${issueKey}: "${current}" → "${match.name}" — recorded as ${resp.deferredRecord}`,
+      );
+    return {
+      transitioned: false,
+      deferred: true,
+      reason: "deferred",
+      record: resp.deferredRecord,
+      from: current,
+      to: null,
+      via: match.name,
+      rule,
+    };
+  }
+
   let loggedWork = false;
 
   // Retry once, with a worklog, when the workflow turns out to have a
@@ -3967,6 +4065,19 @@ function summariseStatusOutcome(
   const { transitioned, reason } = outcome;
   if (transitioned || reason === "already" || reason === "no-target") return 0;
 
+  // CR-1 — a deferral is not a skip. The move was refused by policy and WRITTEN
+  // DOWN, so there is a record to act on; treating it as a skip would both
+  // misdescribe it ("move it by hand, or see the guidance above") and, under
+  // --fail-on-status-skip, fail a run that behaved exactly as configured.
+  if (reason === "deferred") {
+    if (output)
+      output.info(
+        `   ⏸️  Status for ${outcome.issueKey || "the issue"} was not moved — access.tracker restricts this run` +
+          (outcome.record ? `. Recorded as ${outcome.record}.` : "."),
+      );
+    return 0;
+  }
+
   if (output) {
     const where = outcome.from ? ` It is still "${outcome.from}".` : "";
     // A narrowed statusMap is the likeliest cause of a skip on a board that
@@ -4387,6 +4498,7 @@ async function putIssueAtomic({
   token,
   issueKey,
   fields,
+  skill = undefined, // CR-7 — see moveToBacklog
 }) {
   const resp = await http(
     `${baseUrl}/rest/api/3/issue/${issueKey}?returnIssue=true`,
@@ -4408,6 +4520,7 @@ async function putIssueAtomic({
           ui_url: `${baseUrl}/browse/${issueKey}`,
         },
         desired: summariseFields(fields),
+        skill, // CR-7 — the calling skill, not the library
       },
     },
   );
@@ -4589,6 +4702,7 @@ module.exports = {
   authHeader,
   makeHttp,
   isReadViaPost,
+  mostRestrictiveAccess,
   summariseFields,
   endpointOf,
   parseRetryAfter,
