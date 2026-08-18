@@ -115,11 +115,19 @@ resolve_access() {
     *)       printf '❌ resolve_access: unknown system "%s".\n' "$system" >&2; return 1 ;;
   esac
 
-  # The awk tier says so when it meets `access:` written in a form it cannot read on one line.
-  # Refusing is the point: reading it as "absent" is what silently granted `full`.
-  if [ "$cfg" = "__UNREADABLE__" ]; then
-    printf '❌ %s: access is written as a multi-line flow mapping, which this host cannot read.\n' "$SKILLS_CONFIG_FILE" >&2
-    printf '   Install python3 + pyyaml, or write the block form:\n     access:\n       %s: <mode>\n' "$system" >&2
+  # A mapping where a mode belongs. `access:` -> `tracker:` -> `mode: manual` is a nesting typo,
+  # and BOTH tiers used to read it as absent — pyyaml because the strict reader collapsed its
+  # `__MAP__` signal to "", awk because an empty child value is indistinguishable from a null
+  # unless you look at the next line. Absent means `full`, so the typo silently granted everything
+  # it was written to withhold. Refusing is the point.
+  #
+  # The multi-line-flow-mapping branch that used to sit here (`__UNREADABLE__`, added narrowly in
+  # task.51) is GONE, not running beside this one: the tier-2 subset scan sees that construct
+  # file-wide and the hoisted check below halts on it before this function is ever reached.
+  if [ "$cfg" = "__MAP__" ]; then
+    printf '❌ %s: access.%s is a mapping; expected one of the five modes.\n' "$SKILLS_CONFIG_FILE" "$system" >&2
+    printf '   Write the mode directly:\n     access:\n       %s: manual\n' "$system" >&2
+    printf '   Legal values for access.%s: manual command approve read-only full\n' "$system" >&2
     return 1
   fi
   env_name="AGENT_SKILLS_ACCESS_$(printf '%s' "$system" | tr '[:lower:]' '[:upper:]')"
@@ -185,7 +193,15 @@ if [ "${_CONFIG_FILE_ORIGIN:-default}" = "env" ]; then
   fi
 fi
 
+_RP_PARSE_REASON=""
 if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested:access.vcs 2>/dev/null); then
+  # A parse failure short-circuits the whole program before a single record is framed, so it
+  # arrives as a bare line rather than a record. It now carries `<line>:<reason>` with it — the
+  # malformed halt below reports that instead of listing the shapes this reader rejects and
+  # inviting the operator to guess which one is theirs.
+  case "$_RP_BULK" in
+    __ERR__:*) _RP_PARSE_REASON="${_RP_BULK#__ERR__:}" ;;
+  esac
   # Typed, NUL-framed records — see config_bulk's wire-format note. `_rp_val` yields a payload only
   # when the record is a VALUE; a signal (or a config that spells one) never reaches the logic below
   # as if it were data.
@@ -233,8 +249,26 @@ if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.
     [ "$(_rp_sig 3)" = "__MAP__" ] && _RP_VCS="__MAP__" || _RP_VCS=auto
   fi
   _RP_SHAPE=$(_rp_val 4); [ -n "$_RP_SHAPE" ] || _RP_SHAPE=absent
-  _RP_ACC_T=$(_rp_val 5)
-  _RP_ACC_V=$(_rp_val 6)
+  # `_rp_val` yields nothing for a signal, so a `__MAP__` at index 5 or 6 used to arrive here as an
+  # empty string — indistinguishable from "the key is not there", which resolves to `full`. That is
+  # the tier-1 half of the same escalation the subset scan closes on tier 2: read from the SIGNAL,
+  # not the value, so the shape is refused rather than defaulted. A config whose access.tracker
+  # VALUE spells `__MAP__` is a value, carries kind `v`, and is rejected by enum validation instead.
+  #
+  # ONE record read per index, matched on the kind byte, rather than `_rp_val` followed by `_rp_sig`.
+  # Each of those helpers spawns its own awk, so asking twice cost two spawns per key on the tier-1
+  # path — for an answer the single record already carries. Measured: it is the difference between
+  # this file costing 13 awk invocations per source and 15.
+  _rp_acc() {
+    local r; r=$(_rp_rec "$1")
+    case "$r" in
+      "v "*)       printf '%s' "${r#v }" ;;
+      "s __MAP__") printf '__MAP__' ;;
+      *)           printf '' ;;
+    esac
+  }
+  _RP_ACC_T=$(_rp_acc 5)
+  _RP_ACC_V=$(_rp_acc 6)
 else
   _RP_STATUS=""   # empty ⇒ the helpers below are consulted individually
 fi
@@ -288,17 +322,90 @@ if [ "${_RP_STATUS:-$(config_file_status)}" = "malformed" ]; then
     printf '❌ %s: access may be configured, and the file could not be parsed.\n' "$SKILLS_CONFIG_FILE" >&2
     printf '   The access level therefore cannot be determined. Refusing to fall back to `full` —\n' >&2
     printf '   fix the YAML and re-run.\n' >&2
-    printf '   Beyond ordinary syntax errors, this reader also rejects three things a YAML parser\n' >&2
-    printf '   would accept but resolve silently, in the permissive direction:\n' >&2
-    printf '     • a duplicate key in ANY mapping in the file (last-wins would hide the first);\n' >&2
-    printf '     • two `<<` merge sources that define the SAME key (disjoint ones are fine);\n' >&2
-    printf '     • a value containing a NUL, or an ASCII US/RS byte.\n' >&2
+    # Name the actual cause when the reader could supply one. This replaces the enumerated list of
+    # shapes ("duplicate key / two overlapping merge sources / a NUL byte") added in task.51: the
+    # list existed only because the sentinel carried no reason, and an operator reading three
+    # candidate causes still has to work out which is theirs.
+    if [ -n "$_RP_PARSE_REASON" ]; then
+      _rp_line="${_RP_PARSE_REASON%%:*}"
+      _rp_why="${_RP_PARSE_REASON#*:}"
+      if [ "$_rp_line" = "0" ]; then
+        printf '   Cause: %s\n' "$_rp_why" >&2
+      else
+        printf '   Cause: line %s: %s\n' "$_rp_line" "$_rp_why" >&2
+      fi
+      unset _rp_line _rp_why
+    else
+      printf '   Beyond ordinary syntax errors this reader also rejects a duplicate key, two `<<`\n' >&2
+      printf '   merge sources defining the same key, and a value containing a NUL or an ASCII\n' >&2
+      printf '   US/RS byte — each of which a YAML parser would resolve silently and permissively.\n' >&2
+    fi
     printf '   If `access` appears only inside a comment, the file still needs fixing — but the\n' >&2
     printf '   halt itself will go away once it parses.\n' >&2
     unset -f _rp_access_may_be_declared 2>/dev/null || true
     return 1
   fi
   printf '⚠️  %s could not be parsed — falling back to platform detection.\n' "$SKILLS_CONFIG_FILE" >&2
+fi
+
+# ── Tier 2 met something outside its documented subset ──────────────────────
+# ONE site, ONE message, covering every key this file consumes.
+#
+# It sits ABOVE the identity block deliberately, and that position is the whole point. Identity
+# runs first: `TRACKER=$(read_config_key tracker)` a few lines below would receive
+# `__UNSUPPORTED__`, validate_enum would reject it, and the run would halt with
+#
+#     ❌ skills-config.yaml: tracker: "__UNSUPPORTED__" is not a recognised value.
+#        Legal values for tracker: jira github auto
+#
+# — no line, no construct, and neither migration path, on a config whose `tracker:` may be
+# perfectly fine. The message below is the ENTIRE migration path for this breaking change, so a
+# refusal that does not print it is a refusal that has failed. A suite asserting `rc=1` alone would
+# have called that a pass; the stderr assertions in tracker-access.test.sh §42 are what hold it here.
+#
+# It reads the scan verdict GLOBAL directly and never a reader stdout. Tier 2 answers on a plain
+# channel with no kind byte, so a config whose `tracker:` VALUE spells `__UNSUPPORTED__` would be
+# indistinguishable from the signal there — the `__MAP__` forgery class task.51 spent three QA
+# cycles closing, with no framing to lean on on this tier. Read the verdict; the forgery stays data
+# and fails enum validation like any other bad value.
+#
+# GATED on the same fail-closed probe the malformed branch uses, for the same reason and with the
+# same asymmetry. The default for ACCESS is `full`, so a file that may declare a restriction and
+# cannot be read correctly must HALT. The default for IDENTITY is *detect*, which is neither
+# permissive nor a guess — so a file that provably declares no access degrades with a warning, as a
+# malformed file always has (platform-detection.md, "Malformed or unreachable skills-config.yaml").
+# Halting there would lock a consumer out of a working repo over a key nobody read, which is the
+# over-refusal this task was warned about at review time and the failure mode R-1 names.
+#
+# `_rp_access_may_be_declared` over-matches on purpose — `access` inside a comment counts — so the
+# gate itself fails closed, and it greps the file independently of the reader that just refused it.
+if _config_subset_refuses; then
+  _rp_line="${_CONFIG_SUBSET_VERDICT%%:*}"
+  _rp_what="${_CONFIG_SUBSET_VERDICT#*:}"
+  if ! _rp_access_may_be_declared; then
+    printf '⚠️  %s:%s: %s is outside what the no-dependency config reader can parse — falling back\n' \
+      "$SKILLS_CONFIG_FILE" "$_rp_line" "$_rp_what" >&2
+    printf '   to platform detection. No access level is declared here, so nothing is at risk; the\n' >&2
+    printf '   identity default is detection, not a guess.\n' >&2
+    unset _rp_line _rp_what
+    unset -f _rp_access_may_be_declared 2>/dev/null || true
+    _CONFIG_SUBSET_VERDICT="-"
+  else
+  printf '❌ %s:%s: this file uses %s, which the no-dependency config reader cannot parse.\n' \
+    "$SKILLS_CONFIG_FILE" "$_rp_line" "$_rp_what" >&2
+  printf '\n' >&2
+  printf '   This host has no python3 + pyyaml, so the reader is running in its limited mode.\n' >&2
+  printf '   Rather than guess — and risk resolving a declared access restriction to `full` —\n' >&2
+  printf '   it is refusing. Two ways forward:\n' >&2
+  printf '\n' >&2
+  printf '     1. Rewrite the file in the documented subset:\n' >&2
+  printf '        shared/resources/platform-detection.md → "Tier 2 — the strict subset"\n' >&2
+  printf '     2. Install pyyaml (`pip install pyyaml`); the full-YAML tier accepts this file\n' >&2
+  printf '        as written.\n' >&2
+  unset _rp_line _rp_what
+  unset -f _rp_access_may_be_declared 2>/dev/null || true
+  return 1
+  fi
 fi
 unset -f _rp_access_may_be_declared 2>/dev/null || true
 
@@ -364,8 +471,8 @@ if [ "$ACCESS_TRACKER" != "full" ]; then
     "$ACCESS_TRACKER" >&2
 fi
 
-unset _RP_BULK _RP_STATUS _RP_TRACKER _RP_VCS _RP_SHAPE _RP_ACC_T _RP_ACC_V
-unset -f _rp_rec _rp_val _rp_sig 2>/dev/null || true
+unset _RP_BULK _RP_STATUS _RP_TRACKER _RP_VCS _RP_SHAPE _RP_ACC_T _RP_ACC_V _RP_PARSE_REASON
+unset -f _rp_rec _rp_val _rp_sig _rp_acc 2>/dev/null || true
 
 export TRACKER VCS ACCESS_TRACKER ACCESS_VCS
 
