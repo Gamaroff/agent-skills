@@ -45,6 +45,15 @@ assert_rc() {
   [ "$got" = "$exp" ] && ok "$name" || bad "$name" "expected exit $exp, got $got — stderr: $(tr '\n' ' ' < "$STDERR_FILE")"
 }
 
+# Exact WHOLE-LINE match. `assert_stderr_has` is a substring check, so an assertion on the legal
+# vocabulary passed unchanged when a sixth mode was appended to the enum — the mutation audit found
+# it survived. Anything asserting a closed set has to compare the whole line.
+assert_stderr_exact_line() {
+  local name="$1" line="$2"
+  grep -qxF -- "$line" "$STDERR_FILE" && ok "$name" \
+    || bad "$name" "stderr had no line exactly equal to '$line' — got: $(tr '\n' ' ' < "$STDERR_FILE")"
+}
+
 assert_stderr_has() {
   local name="$1" needle="$2"
   grep -qF -- "$needle" "$STDERR_FILE" && ok "$name" \
@@ -103,10 +112,18 @@ assert_eq "legal tracker/vcs → ACCESS_TRACKER=full"  "$AT" "full"
 
 # --- 2. Each of the five modes resolves to itself ----------------------------
 echo "  2. The five modes"
+# Asserted under BOTH tiers, on the resolved VALUE. This used to run on whatever tier the host
+# happened to provide, which on a developer machine is python and on a stock macOS consumer host is
+# awk — so the suite proved the modes resolve on the tier its authors run and said nothing about the
+# tier its users run. Every value assertion in this file that both tiers can answer is now spelled
+# this way; where a shape is genuinely tier-dependent it is called out as such (see §36).
 for mode in manual command approve read-only full; do
   D=$(fixture "mode-$mode" "access:\n  tracker: $mode\n")
-  run_case "$D"
-  assert_eq "access.tracker: $mode → ACCESS_TRACKER=$mode" "$AT" "$mode"
+  for tier in python awk; do
+    run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+    assert_rc "access.tracker: $mode [$tier] → status 0"              "$RC" "0"
+    assert_eq "access.tracker: $mode [$tier] → ACCESS_TRACKER=$mode"  "$AT" "$mode"
+  done
 done
 
 D=$(fixture mode-partial 'access:\n  tracker: manual\n')
@@ -206,7 +223,11 @@ for tier in python awk; do
   D=$(fixture "malformed-access-$tier" 'access:\n : bad: yaml\n')
   run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
   assert_rc         "malformed WITH access: [$tier tier] → non-zero" "$RC" "1"
-  assert_stderr_has "malformed WITH access: [$tier tier] → says unreadable" "unreadable"
+  # The message says "could not be parsed", not "unreadable": this file DOES parse as bytes and is
+  # readable — it is malformed. Reserving "unreadable" for the permissions case (§34) is what makes
+  # the two diagnostics point an operator at the right problem.
+  assert_stderr_has "malformed WITH access: [$tier tier] → says it could not be parsed" "could not be parsed"
+  assert_stderr_has "malformed WITH access: [$tier tier] → refuses the full fallback" "Refusing to fall back"
 done
 
 # --- 9. A rejection actually halts a guarded call site (end-to-end) ----------
@@ -282,10 +303,40 @@ REPO_ROOT="$(cd "$HERE/.." && cd .. && pwd)"
 # are prose sentences ("Branch on the tracker resolved by `source ... || exit 1`"), and an anchored
 # pattern silently skips them, which is the same blind spot that let an unguarded site ship.
 # `source=` is excluded: that is a shellcheck directive, not a sourcing.
-UNGUARDED=$(grep -rnoE '(^|[^=[:alnum:]_])source[[:space:]]+[^`]*resolve-platform\.sh([[:space:]]*\|\|[[:space:]]*exit 1)?' \
-  "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -v 'exit 1' || true)
-UNGUARDED="$UNGUARDED$(grep -rnoE '\.[[:space:]]+"\$\(dirname[^"]*"/references/resolve-platform\.sh"([[:space:]]*\|\|[[:space:]]*exit 1)?' \
-  "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -v 'exit 1' || true)"
+SOURCE_RE='(^|[^=[:alnum:]_])source[[:space:]]+[^`]*resolve-platform\.sh'
+# The dot-source form is ANCHORED to line start (after optional indentation or a markdown list /
+# quote marker), because a `.` command only ever appears there. The previous pattern tried to spell
+# out the exact `. "$(dirname "$0")/references/…"` invocation and used `[^"]*`, which cannot cross
+# the quote inside `"$0"` — so it matched ZERO lines repo-wide while its name and the comment above
+# it claimed full dot-source coverage. Deleting `|| exit 1` from either real dot-source site left
+# the suite green. An unanchored `\.` is not the fix either: it matches the full stop in any prose
+# sentence that later mentions the file, which produced four false "unguarded" hits.
+DOTSRC_RE='^[[:space:]]*([-*>][[:space:]]+)?\.[[:space:]]+[^`]*resolve-platform\.sh'
+
+SOURCE_HITS=$(grep -rhE "$SOURCE_RE" "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -c . || true)
+DOTSRC_HITS=$(grep -rhE "$DOTSRC_RE" "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -c . || true)
+
+# A COVERAGE FLOOR, asserted before the guard check. This is the assertion whose absence let the
+# blind regex above pass as a clean bill of health for a whole cycle: a pattern that matches nothing
+# reports "no unguarded call sites" in exactly the same words as a pattern that matches everything.
+# The floors are deliberately below the current counts (18 and 2) so that legitimately removing a
+# call site does not fail the suite — but a pattern that goes blind, or a bulk edit that strips the
+# sourcing lines wholesale, cannot pass.
+if [ "$SOURCE_HITS" -ge 13 ]; then
+  ok "call-site scan sees the source-form sites ($SOURCE_HITS found, floor 13)"
+else
+  bad "call-site scan has gone blind to source-form sites" "found $SOURCE_HITS, expected >= 13"
+fi
+if [ "$DOTSRC_HITS" -ge 2 ]; then
+  ok "call-site scan sees the dot-source sites ($DOTSRC_HITS found, floor 2)"
+else
+  bad "call-site scan has gone blind to dot-source sites" "found $DOTSRC_HITS, expected >= 2"
+fi
+
+# Whole lines, not -o fragments: the guard sits AFTER the path (and after its closing quote), so a
+# fragment that stops at `resolve-platform.sh` can never contain it.
+UNGUARDED=$(grep -rnE "$SOURCE_RE" "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -v 'exit 1' || true)
+UNGUARDED="$UNGUARDED$(grep -rnE "$DOTSRC_RE" "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null | grep -v 'exit 1' || true)"
 if [ -z "$UNGUARDED" ]; then
   ok "every source/dot-source of resolve-platform.sh in skills/*/SKILL.md carries || exit 1"
 else
@@ -712,6 +763,259 @@ echo "  33. Refusal diagnostics"
 D=$(fixture sep-named 'tracker: "jira\\x1fgithub"\n')
 run_case "$D"
 assert_stderr_has "the refusal names the key" "tracker:"
+
+# --- 34. The config file itself: unreadable, and redirected ---------------------------------------
+# Two escalation routes that need no unusual YAML at all. Both resolved a declared `manual` to
+# `full` at exit 0, on both tiers, on the canonical documented shape.
+echo "  34. Config-file integrity"
+
+# An UNREADABLE file. The fail-closed branch used to answer "is access configured?" by grepping the
+# very file the parser had just failed to read; the grep failed too, so the gate fell through to
+# platform detection — failing open at exactly the moment it existed to fail closed.
+D=$(fixture unreadable-access 'access:\n  tracker: manual\n')
+for tier in python awk; do
+  chmod 644 "$D/skills-config.yaml"
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_eq "control: readable canonical config [$tier] → manual" "$AT" "manual"
+  chmod 000 "$D/skills-config.yaml"
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "unreadable config [$tier] → refused"                 "$RC" "1"
+  if [ "$AT" = "full" ]; then bad "unreadable config must not grant full [$tier]" "AT=full"; else ok "unreadable config → not full [$tier]"; fi
+  assert_stderr_has "unreadable config [$tier] → names the real problem" "cannot be read"
+  chmod 644 "$D/skills-config.yaml"
+done
+
+# A REDIRECT that lands on nothing. `SKILLS_CONFIG_FILE` makes the config path env-overridable, and
+# pointing it at an absent file — or at /dev/null, which is not a regular file and so read as "no
+# config at all" — discarded a committed restriction silently. That falsified the guarantee written
+# in read-config.sh's own header, that a stray env var can never loosen a config that restricts.
+D=$(fixture redirect-away 'access:\n  tracker: manual\n')
+for target in /dev/null /nonexistent-config-51.yaml; do
+  for tier in python awk; do
+    run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier" "SKILLS_CONFIG_FILE=$target"
+    assert_rc "SKILLS_CONFIG_FILE=$target [$tier] → refused" "$RC" "1"
+    if [ "$AT" = "full" ]; then bad "redirect-to-nothing must not grant full [$tier]" "AT=full"; else ok "SKILLS_CONFIG_FILE=$target [$tier] → not full"; fi
+  done
+done
+
+# …while a redirect at a REAL config is still honoured. The rule is "may point elsewhere, may not
+# point nowhere" — narrow on purpose, because this is the form cross-repo callers legitimately use.
+D2=$(fixture redirect-target 'access:\n  tracker: read-only\n')
+D3=$(fixture redirect-from '')
+for tier in python awk; do
+  run_case "$D3" "AGENT_SKILLS_CONFIG_TIER=$tier" "SKILLS_CONFIG_FILE=$D2/skills-config.yaml"
+  assert_rc "redirect at a real config [$tier] → status 0"        "$RC" "0"
+  assert_eq "redirect at a real config [$tier] → read-only wins"  "$AT" "read-only"
+done
+
+# --- 35. The parser may not be replaced by the directory it is reading ---------------------------
+# `python -c` prepends the CURRENT DIRECTORY to sys.path, so a file named yaml.py beside
+# skills-config.yaml was imported instead of PyYAML: arbitrary code execution on merely SOURCING the
+# resolver, and total control of the resolved value. This reader is hardened against the config as
+# data — record forgery, NUL, separators — and all of that is worth nothing if the parser itself can
+# be swapped out. The distinction that matters: skills-config.yaml is DATA, yaml.py is CODE.
+echo "  35. Parser substitution"
+D=$(fixture yaml-shadow 'access:\n  tracker: manual\n')
+cat > "$D/yaml.py" <<'STUB'
+import os
+open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "EXECUTED"), "w").write("x")
+class SafeLoader: pass
+class resolver:
+    class BaseResolver: DEFAULT_MAPPING_TAG = "x"
+class MappingNode: pass
+class SequenceNode: pass
+def load(*a, **k): return {}
+def safe_load(*a, **k): return {}
+STUB
+rm -f "$D/EXECUTED"
+run_case "$D"
+if [ -f "$D/EXECUTED" ]; then bad "a repo-root yaml.py must not be imported" "the stub ran — code execution"; else ok "a repo-root yaml.py is not imported"; fi
+assert_rc "yaml.py present → status 0"                    "$RC" "0"
+assert_eq "yaml.py present → the REAL value still wins"   "$AT" "manual"
+
+# The same vector as a package directory rather than a module file.
+D=$(fixture yaml-shadow-pkg 'access:\n  tracker: manual\n')
+mkdir -p "$D/yaml"
+cat > "$D/yaml/__init__.py" <<'STUB'
+import os
+open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "EXECUTED"), "w").write("x")
+STUB
+rm -f "$D/EXECUTED"
+run_case "$D"
+if [ -f "$D/EXECUTED" ]; then bad "a repo-root yaml/ package must not be imported" "the stub ran"; else ok "a repo-root yaml/ package is not imported"; fi
+assert_eq "yaml/ package present → the REAL value still wins" "$AT" "manual"
+
+# --- 36. The documented mapping form of `tracker:` on BOTH tiers ---------------------------------
+# docs/reference/configuration.md prints `tracker: {workflowFile: …}`. The awk reader split on
+# `-F': *'` and took $2, which truncates at the SECOND colon, so that form yielded the field
+# `{workflowFile` — rejected by validate_enum, and with this task's `|| exit 1` guards on every call
+# site that aborted the run. It aborted it on the DEFAULT tier of a stock macOS host, where
+# /usr/bin/python3 ships without pyyaml and awk is therefore the only tier. The suite covered only
+# the BLOCK spelling, which happened to work.
+echo "  36. tracker: mapping forms, both tiers"
+for shape in \
+  'tracker: {workflowFile: .github/tracker-workflow.yaml}\n' \
+  'tracker:\n  workflowFile: .github/tracker-workflow.yaml\n' \
+  'tracker: {workflowFile: .github/tracker-workflow.yaml}  # why\n' ; do
+  D=$(fixture "trackermap-$RANDOM" "${shape}access:\n  tracker: manual\n")
+  for tier in python awk; do
+    run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+    assert_rc "mapping-valued tracker: [$tier] → status 0"          "$RC" "0"
+    assert_eq "mapping-valued tracker: [$tier] → TRACKER detects"   "$T"  "github"
+    assert_eq "mapping-valued tracker: [$tier] → access preserved"  "$AT" "manual"
+  done
+done
+
+# A mapping-valued `vcs:` has no documented form and must still be rejected — on both tiers, and by
+# its meaning rather than by leaking the reader's internal sentinel.
+D=$(fixture vcsmap 'vcs: {a: b}\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc         "mapping-valued vcs: [$tier] → refused"       "$RC" "1"
+  assert_stderr_has "mapping-valued vcs: [$tier] → says mapping"  "(a mapping)"
+done
+
+# --- 37. Disjoint merge sources are legal; overlapping ones are not ------------------------------
+# "A mapping may carry at most one `<<`" was too blunt and refused a legal composition. The
+# escalation it was reaching for is real but narrower: it is OVERLAPPING sources that pyyaml
+# resolves last-wins and silently. Disjoint sources merge deterministically, and `<<: [*a, *b]` is
+# the documented way to say the same thing — refusing one spelling of it while accepting the other
+# is a false rejection, and a false rejection halts the run just as hard as a bad value.
+echo "  37. Merge-source overlap"
+D=$(fixture merge-disjoint 'a: &a\n  tracker: manual\nb: &b\n  vcs: full\naccess:\n  <<: *a\n  <<: *b\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "two DISJOINT << sources → status 0"       "$RC" "0"
+assert_eq "two DISJOINT << sources → tracker merged" "$AT" "manual"
+assert_eq "two DISJOINT << sources → vcs merged"     "$AV" "full"
+
+D=$(fixture merge-disjoint-flow 'a: &a {tracker: read-only}\nb: &b {vcs: full}\naccess: {<<: *a, <<: *b}\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "two DISJOINT << sources, flow form → status 0" "$RC" "0"
+assert_eq "two DISJOINT << sources, flow form → merged"   "$AT" "read-only"
+
+D=$(fixture merge-overlap 'a: &a\n  tracker: manual\nb: &b\n  tracker: full\naccess:\n  <<: *a\n  <<: *b\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "two OVERLAPPING << sources → still refused" "$RC" "1"
+if [ "$AT" = "full" ]; then bad "overlapping sources must not grant full" "AT=full"; else ok "overlapping sources → not full"; fi
+
+# Non-adjacent overlap: three sources where the FIRST and THIRD clash. A guard that only compared
+# each source with the one before it would wave this through.
+D=$(fixture merge-overlap-nonadjacent 'a: &a {tracker: manual}\nb: &b {vcs: full}\nc: &c {tracker: full}\naccess: {<<: *a, <<: *b, <<: *c}\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "non-adjacent overlapping << sources → refused" "$RC" "1"
+
+# Overlap inside a merge SEQUENCE is refused on the same rule. YAML does define this one — within
+# `<<: [*a, *b]` the EARLIER entry wins — but it is deterministic in the direction most operators
+# guess wrong, which for an access control is the same silent escalation by another spelling. One
+# rule for overlap regardless of how the sources are written; disjoint entries still resolve (§37).
+D=$(fixture merge-seq-overlap 'a: &a {tracker: manual}\nb: &b {tracker: full}\naccess:\n  <<: [*a, *b]\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "overlapping << sequence entries → refused" "$RC" "1"
+if [ "$AT" = "full" ]; then bad "overlapping sequence entries must not grant full" "AT=full"; else ok "overlapping sequence entries → not full"; fi
+
+# The halt names the three parser-legal-but-silent shapes it rejects, so an operator whose file has
+# no visible syntax error is not left hunting. The specific reason cannot be surfaced — the reader
+# collapses every parse exception to one sentinel — so the message enumerates instead.
+assert_stderr_has "the malformed halt names duplicate keys"      "duplicate key in ANY mapping"
+assert_stderr_has "the malformed halt names overlapping merges"  "define the SAME key"
+
+# --- 38. Non-canonical spellings of the `access:` key, on a malformed file ------------------------
+# The fail-closed gate matched `^access:` — block form, column 0, nothing else. Every other legal
+# spelling of the key missed it, so a malformed file that declared a restriction fell through to
+# detection and resolved `full` at exit 0. The replacement probe asks the question the branch
+# actually needs — "can I PROVE this file declares no access?" — and answers "no" whenever it cannot.
+echo "  38. access: key spellings on a malformed file"
+for shape in \
+  '{access: {tracker: manual}, x: 1, x: 2}\n' \
+  '"access":\n  tracker: manual\nx: 1\nx: 2\n' \
+  'access :\n  tracker: manual\nx: 1\nx: 2\n' \
+  '<<: {access: {tracker: manual, tracker: full}}\n' \
+  'defaults: &d\n  access:\n    tracker: manual\nmain:\n  <<: *d\nx: 1\nx: 2\n' ; do
+  D=$(fixture "spelling-$RANDOM" "$shape")
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+  assert_rc "malformed + non-canonical access spelling → refused" "$RC" "1"
+  if [ "$AT" = "full" ]; then bad "…and must not grant full" "AT=full"; else ok "…and does not grant full"; fi
+done
+
+# The over-match is deliberate and bounded: a file with NO access key at all still degrades with a
+# warning rather than halting, which is what keeps a consumer who never opted in from being locked
+# out by someone else's broken YAML.
+D=$(fixture malformed-no-access-at-all 'tracker: github\nx: 1\nx: 2\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "malformed, no access key [$tier] → still degrades" "$RC" "0"
+  assert_eq "malformed, no access key [$tier] → full"           "$AT" "full"
+done
+
+# --- 39. The ordering of the modes, pinned behaviourally -----------------------------------------
+# access_rank's ordering had no witness: `command` could be re-ranked above `approve` and `read-only`
+# with the suite green, which would let a permissive config value beat a more restrictive env value —
+# the exact inversion most-restrictive-wins exists to prevent. Pinned here through resolution rather
+# than by calling the function, so it survives the function being renamed or inlined. Each adjacent
+# pair is asserted in BOTH directions, which fixes the total order.
+echo "  39. Most-restrictive-wins ordering"
+while read -r cfg env_v want; do
+  [ -n "$cfg" ] || continue
+  D=$(fixture "rank-$cfg-$env_v" "access:\n  tracker: $cfg\n")
+  run_case "$D" "AGENT_SKILLS_ACCESS_TRACKER=$env_v"
+  assert_eq "config=$cfg env=$env_v → $want" "$AT" "$want"
+done <<'PAIRS'
+command   manual     manual
+manual    command    manual
+approve   command    command
+command   approve    command
+read-only approve    approve
+approve   read-only  approve
+full      read-only  read-only
+read-only full       read-only
+PAIRS
+
+# --- 40. The legal vocabulary is a CLOSED set ----------------------------------------------------
+# Asserted as a whole line. The substring check this replaces passed unchanged when a sixth mode was
+# appended to the enum, so the suite could not tell an intentional vocabulary from a widened one.
+echo "  40. Closed vocabulary"
+D=$(fixture bad-mode 'access:\n  tracker: sudo\n')
+run_case "$D"
+assert_rc "an unrecognised mode → refused" "$RC" "1"
+assert_stderr_exact_line "the legal set is exactly the five modes" \
+  "   Legal values for access.tracker: manual command approve read-only full"
+
+D=$(fixture bad-tracker 'tracker: gitlab\n')
+run_case "$D"
+assert_stderr_exact_line "the legal tracker set is exactly three" \
+  "   Legal values for tracker: jira github auto"
+
+# --- 41. KNOWN LIMIT: the awk tier reads only the canonical spelling of `access:` -----------------
+# NOT an endorsement — a recorded, deferred defect, kept visible so it cannot drift unnoticed.
+#
+# The awk tier anchors on the literal regexes `^access:` and `^[[:space:]]+tracker:`, so a merge
+# key, an anchor, or a quoted key reads as ABSENT there and takes the permissive default, while the
+# python tier reads the declared value. That is a silent escalation on a well-formed file, and it is
+# NOT closed by this cycle. Closing it means giving the tier a grammar rather than more regexes —
+# see the follow-up recorded in the task document under "Known limits".
+#
+# These assertions pin the DIVERGENCE so that (a) it is impossible to claim the tiers agree, and
+# (b) any change to it is deliberate. WHEN ONE OF THESE FAILS, THE LIMIT HAS BEEN FIXED: delete the
+# block, do not "repair" it back to the escalating value.
+echo "  41. KNOWN LIMIT — awk tier and non-canonical access spellings"
+for shape in \
+  'defaults: &d {tracker: manual}\naccess:\n  <<: *d\n' \
+  'access:\n  <<: {tracker: manual}\n' \
+  '"access":\n  tracker: manual\n' ; do
+  D=$(fixture "knownlimit-$RANDOM" "$shape")
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+  assert_eq "KNOWN LIMIT: python tier reads it"  "$AT" "manual"
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+  assert_eq "KNOWN LIMIT: awk tier does NOT (escalates — deferred)" "$AT" "full"
+done
+
+# A mapping-valued CHILD (`access:\n  tracker:\n    mode: manual`) is the same class: the shape of
+# access is validated, the shape of its child is not, so a nesting typo reads as unconfigured.
+D=$(fixture knownlimit-child 'access:\n  tracker:\n    mode: manual\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_eq "KNOWN LIMIT: mapping-valued access.tracker reads as unset [$tier]" "$AT" "full"
+done
 
 # --- Summary -----------------------------------------------------------------
 echo ""

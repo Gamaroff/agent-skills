@@ -9,7 +9,7 @@ status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-18
 estimated_effort_hours: 8
 github_issue: 225
 ---
@@ -392,6 +392,57 @@ documents and turn a previously non-fatal path fatal. No mutation path changes.
 | **Extracting the shared reader regresses `PRD_ROOT`/`ARCH_ROOT`** | `resolve-paths.sh` loses its local copy | Its existing behaviour is the regression oracle — assert both roots resolve identically before and after, under both tiers |
 | **Fixing the `python3` probe changes behaviour by reviving a dead tier** | Tier 1 currently never runs on most machines, so its output is effectively untested in practice | Every tier-sensitive case is asserted under **both** tiers explicitly, rather than under whichever the host provides |
 
+## Known limits
+
+Recorded deliberately, after six QA cycles, rather than patched in a seventh. Each is pinned by a
+test so it cannot drift unnoticed, and each is visible to an operator in
+[`platform-detection.md`](../../../shared/resources/platform-detection.md) and
+[`configuration.md`](../../reference/configuration.md).
+
+### The awk tier reads only the canonical spelling of `access:`
+
+Tier 2 anchors on the literal patterns `^access:` and an indented child beneath it. It has no
+grammar, so an access level supplied through a **merge key or anchor**, under a **quoted key**, or
+as a **mapping-valued child** (`access:` → `tracker:` → `mode: manual`, i.e. an ordinary nesting
+typo) reads as *absent* there and takes the permissive default, while tier 1 reads the declared
+value. The file is well-formed, the exit status is 0, and nothing is printed.
+
+This matters more than a fallback normally would: **tier 2 is the default tier on a stock macOS
+host**, because `/usr/bin/python3` ships without pyyaml. This repo's own developers resolve
+`python3` to a build that has it, so the tier consumers run is the one the project least exercises.
+
+**Why it is not fixed here.** Six cycles closed one spelling each — the block form, the flow form,
+the multi-line flow form, the anchored form — and each left its siblings open, because there is no
+finite list of spellings to close. That is what having a grammar means. Three options, to be costed
+before more patching:
+
+1. **Require pyyaml, fail loudly without it.** Deletes the tier disagreement outright. Costs a
+   dependency on hosts that presently work by accident.
+2. **Vendor a minimal pure-python YAML-subset parser.** Keeps zero-dependency operation; replaces
+   heuristics with a grammar.
+3. **Restrict tier 2 to a documented strict subset and refuse anything outside it** rather than
+   guessing. Converts every silent escalation into a loud, correct refusal.
+
+Pinned by `tracker-access.test.sh` §41, which asserts the divergence in both directions. When one of
+those assertions fails, the limit has been fixed — the block should be deleted, not repaired.
+
+### The reason a file was rejected is not surfaced
+
+The reader collapses every parse exception to a single `__ERR__` sentinel, so an operator sees "could
+not be parsed" rather than "duplicate key `tracker` at line 12". The halt message now enumerates the
+three parser-legal-but-silent shapes this reader rejects (duplicate keys, overlapping `<<` sources,
+NUL/US/RS bytes) instead, which is a workaround rather than a fix. Carrying the reason across the
+wire means extending the record format; deferred.
+
+### A redirect at a real but permissive config is honoured
+
+`SKILLS_CONFIG_FILE` may now only point at an existing, readable, regular file — pointing it at
+`/dev/null` or an absent path is refused, which is what closed the silent-discard route. Pointing it
+at a *real* config that happens to be permissive is still honoured, because that is indistinguishable
+from an operator deliberately choosing a different config, and it is the form cross-repo callers use.
+Anyone able to both set arbitrary environment variables and write a file has capabilities that no
+check at this layer can meaningfully constrain.
+
 ## Rollback Plan
 
 `git revert <sha>` then `npm run bundle`. Nothing reads `ACCESS_TRACKER` / `ACCESS_VCS` yet, so a
@@ -440,6 +491,8 @@ Rollback triggers: any consumer report of a halt on a config that is legal per t
 | 2026-08-17 |  | QA gate FAIL cycle 5 — duplicate inside an at-site merge source escalated silently; NUL omitted from the refusal | qa-task |
 | 2026-08-17 |  | QA findings fixed cycle 5 — 2 HIGH + 2 LOW; merge-source recursion, NUL refusal, named diagnostics; suite 151 → 166 | qa-fix |
 | 2026-08-17 |  | Implemented — 57 files (5 shared sources, 15 SKILL.md call sites, 4 docs, setup wizard, package.json, 36 bundled reference trees), 61 tests, 12 mutations watched failing | develop |
+| 2026-08-17 |  | QA gate FAIL (20/100) cycle 6 — independent adversarial pass: 10 HIGH incl. 4 silent-escalation routes, 1 code-execution vector, 1 cycle-5 regression; 11 surviving mutations | qa-task |
+| 2026-08-18 |  | QA findings fixed cycle 7 (scoped, user-directed) — 6 HIGH closed: python isolated from CWD, unreadable + redirected config fail closed, `access:` opt-in probe broadened, documented `tracker:` mapping form works on the awk tier, over-broad `<<` guard narrowed to overlapping sources, `vcs:` mapping disagreement closed. Suite 166 → 277; call-site scan no longer blind to dot-sources; all five fixes mutation-witnessed. Awk-tier spelling class recorded under Known limits rather than patched | qa-fix |
 
 ## References
 

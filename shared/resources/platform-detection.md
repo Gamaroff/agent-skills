@@ -95,18 +95,57 @@ misconfigurations of exactly the class this closes. `tracker: jria` used to reso
 A **mapping-valued** `tracker:` is the documented [`tracker.workflowFile`](../../docs/reference/tracker-workflow.md)
 form, not a typo. It resolves to `auto` (i.e. detect) rather than being graded as a scalar override.
 
-### Malformed `skills-config.yaml`
+### Malformed or unreachable `skills-config.yaml`
 
-| File state                          | Behaviour                                                  |
-| ----------------------------------- | ---------------------------------------------------------- |
-| Missing                             | Detect, as always                                          |
-| Unparseable, **no** `access:` line  | Warn, degrade to detection — as always                     |
-| Unparseable, **with** `access:` line| **Halt.** "access is configured but unreadable"            |
+| File state                                        | Behaviour                                             |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| Missing                                            | Detect, as always                                     |
+| Unparseable, and `access` provably **not** a key   | Warn, degrade to detection — as always                |
+| Unparseable, and `access` **may** be a key         | **Halt.** "access may be configured, and the file could not be parsed" |
+| Present but **unreadable** (permissions, bad mount) | **Halt.** "exists but cannot be read"                 |
+| `SKILLS_CONFIG_FILE` set to an absent or non-regular file | **Halt.** "does not name a readable config file" |
 
 The blanket degrade rule is right for identity, where the default is *detect*. For access the
-default is `full`, so the same rule would silently re-grant credentials on a truncated file.
-Grepping for an `access:` line separates the two cases: a consumer who never opted in is never
-locked out, and one who did is never silently unlocked.
+default is `full`, so the same rule would silently re-grant credentials on a truncated file. The
+probe that separates the two cases has to fail **closed**, and that means answering a narrower
+question than "is access configured?" — it answers **"can I prove this file declares no access?"**,
+and answers *no* whenever it cannot read the file at all.
+
+Three things follow from that framing, each of which the earlier `grep -q '^access:'` got wrong:
+
+- **An unreadable file halts.** The old probe grepped the very file the parser had just failed to
+  read, so on a `chmod 000` config the grep failed too and the branch fell through to detection: the
+  canonical documented `access:\n  tracker: manual` resolved to `full` at exit 0. The gate failed
+  open at precisely the moment it existed to fail closed.
+- **The key is matched in any legal spelling**, not just block form at column 0 — a root flow
+  mapping, a quoted `"access":`, a space before the colon, a leading BOM, or a block supplied
+  through a `<<` merge. The over-match is deliberate: `access` mentioned in a *comment* also counts,
+  and the only consequence is that an already-malformed file halts instead of warning.
+- **`SKILLS_CONFIG_FILE` may redirect, but it may not point nowhere.** The path is env-overridable;
+  pointing it at an absent file or at `/dev/null` (not a regular file, so read as "no config at
+  all") used to discard a committed restriction silently, on both tiers — falsifying the guarantee
+  that a stray env var can never loosen a config that deliberately restricts. Redirecting at a
+  *real* config that happens to be permissive is still honoured: that is a deliberate operator act,
+  and it is the form cross-repo callers legitimately use.
+
+### Known limit — the awk tier reads only the canonical spelling of `access:`
+
+Tier 2 anchors on the literal patterns `^access:` and an indented `tracker:`/`vcs:` beneath it. It
+has no grammar, so an access level supplied through a **merge key or anchor**, under a **quoted
+key**, or as a **mapping-valued child** (`access:\n  tracker:\n    mode: manual` — a nesting typo)
+reads as *absent* there and takes the permissive default, while tier 1 reads the declared value.
+The file is well-formed, the exit status is 0, and nothing is printed.
+
+This matters more than a fallback normally would, because **tier 2 is the default tier on a stock
+macOS host**: `/usr/bin/python3` ships without pyyaml, so a machine that has never installed it
+never reaches tier 1.
+
+It is recorded rather than closed because closing it means giving the tier a grammar, not more
+regexes — each cycle that added one spelling left its siblings open. The options are costed in the
+task document (`docs/tasks/task.51.access-mode-config-and-resolver/`) under **Known limits**. Until
+then: **write `access:` in the canonical block form**, and install `python3` + `pyyaml` on any host
+where the setting is load-bearing. `tracker-access.test.sh` §41 pins the divergence so it cannot
+drift unnoticed.
 
 Its companion for the Bitbucket branch is `shared/resources/bitbucket-auth.sh`, which resolves the REST credential and the auth scheme — see [The Bitbucket credential](#the-bitbucket-credential).
 
