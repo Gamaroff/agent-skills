@@ -39,15 +39,44 @@
 # inputs a real parser grades differently, so any suite covering those must force each tier
 # explicitly — and must SKIP loudly, not silently pass, when the forced tier is unavailable.
 
+# Where the config path came from. An explicit SKILLS_CONFIG_FILE is a redirect, and a redirect that
+# lands on nothing must be refused rather than degraded — see the check in resolve-platform.sh.
+#
+# Decided by comparing against the literal default rather than by "was the variable set?", because
+# this file is sourced more than once per shell (the resolver sources it as a sibling) and after the
+# first source the variable is always set — by this very line. A memoised "was it set the first
+# time?" answer is then wrong for a caller that sets the variable BETWEEN two sources, and wrong in
+# the fail-open direction. Stateless is the fix: the only value this misreads is an explicit
+# `SKILLS_CONFIG_FILE=skills-config.yaml`, which names the default and so behaves identically to
+# leaving it unset.
+if [ -n "${SKILLS_CONFIG_FILE:-}" ] && [ "$SKILLS_CONFIG_FILE" != "skills-config.yaml" ]; then
+  _CONFIG_FILE_ORIGIN=env
+else
+  _CONFIG_FILE_ORIGIN=default
+fi
 SKILLS_CONFIG_FILE="${SKILLS_CONFIG_FILE:-skills-config.yaml}"
 
 # Memoised probe result: "" = not yet probed, "-" = no usable interpreter, else the interpreter.
 _CONFIG_PY=""
+# The isolation flag that interpreter accepts: "-P", "-I", or "" (neither). See _config_probe.
+_CONFIG_PY_ISOLATE=""
+# Prologue prepended to every probe command, for the same reason the shared program carries one.
+_CONFIG_PY_SAFE_PATH='import sys; sys.path[:] = [p for p in sys.path if p not in ("", ".")]; '
 
 # One program, three modes — so a single file read serves every question and there is one place
 # where YAML semantics are decided. Sentinels are chosen to be impossible YAML scalars.
 _CONFIG_PY_PROG='
-import sys, yaml
+import sys
+# `python -c` prepends the CURRENT DIRECTORY to sys.path, so a file named yaml.py beside
+# skills-config.yaml was imported instead of PyYAML — arbitrary code execution on merely sourcing
+# the resolver, and total control of the resolved access value. This reader is carefully hardened
+# against the config as DATA (record forgery, NUL, separators); that hardening is worth nothing if
+# the parser itself can be replaced. `sys` is a builtin module and cannot be shadowed, so this
+# runs before anything importable is touched. _config_probe additionally passes -P/-I where the
+# interpreter supports it, which closes the same hole earlier (at site import) — this line is what
+# covers the interpreters that support neither.
+sys.path[:] = [p for p in sys.path if p not in ("", ".")]
+import yaml
 
 # YAML says last-wins on a duplicate key; that is technically correct and operationally awful here.
 # A copy-pasted second `access:` block made the first one vanish, silently resolving a declared
@@ -56,18 +85,43 @@ import sys, yaml
 class _StrictLoader(yaml.SafeLoader):
     pass
 
+def _merge_source_keysets(loader, node):
+    """The key sets each source of ONE `<<` contributes, as written.
+
+    A source is a mapping node, or a sequence of them. An alias is already the anchored node by the
+    time the composer is done, so no dereferencing is needed here."""
+    sets = []
+    for sub in (node.value if isinstance(node, yaml.SequenceNode) else [node]):
+        if not isinstance(sub, yaml.MappingNode):
+            continue
+        ks = set()
+        for k, _ in sub.value:
+            if getattr(k, "tag", None) == "tag:yaml.org,2002:merge":
+                continue
+            ks.add(loader.construct_object(k, deep=True))
+        sets.append(ks)
+    return sets
+
 def _scan_keys(loader, node):
     """Reject a duplicate among the keys of ONE mapping node, as written."""
     seen = set()
-    merges = 0
-    for k, _ in node.value:
+    merged = []          # key sets contributed by every merge source at this mapping
+    for k, v in node.value:
         if getattr(k, "tag", None) == "tag:yaml.org,2002:merge":
-            # A mapping may carry at most one `<<`. Two of them last-wins silently, so an operator
-            # merging a restrictive default and then a permissive one gets the permissive one with
-            # no diagnostic — the same escalation as a duplicate ordinary key.
-            merges += 1
-            if merges > 1:
-                raise ValueError("duplicate merge key: <<")
+            # OVERLAPPING merge sources are the escalation: pyyaml resolves them last-wins and
+            # silently, so an operator merging a restrictive default and then a permissive one gets
+            # the permissive one with no diagnostic. DISJOINT sources are not — pyyaml merges them
+            # deterministically, `<<: [*a, *b]` is the documented way to compose two blocks, and the
+            # same composition spelled as two `<<` lines means exactly the same thing. Rejecting the
+            # whole shape (an earlier, blunter version of this guard) refused a legal config and
+            # halted the run, which is the opposite failure and just as bad.
+            for ks in _merge_source_keysets(loader, v):
+                for prior in merged:
+                    clash = prior & ks
+                    if clash:
+                        raise ValueError(
+                            "overlapping merge sources define %s" % (sorted(map(repr, clash))[0],))
+                merged.append(ks)
             continue
         key = loader.construct_object(k, deep=True)
         if key in seen:
@@ -215,12 +269,28 @@ _config_probe() {
   [ "${AGENT_SKILLS_CONFIG_TIER:-}" = "awk" ] && return 1
   if [ -z "$_CONFIG_PY" ]; then
     _CONFIG_PY="-"
-    local py
+    local py flag
     for py in python3 python; do
       command -v "$py" >/dev/null 2>&1 || continue
-      "$py" -c 'import yaml' >/dev/null 2>&1 || continue
-      _CONFIG_PY="$py"
-      break
+      # Pick the strongest isolation this interpreter accepts AND under which pyyaml is still
+      # importable. Order matters and so does the second half of that sentence:
+      #   -P  (3.11+) drops only the current directory from sys.path — exactly the hole, nothing else.
+      #   -I  (3.4+)  also ignores PYTHONPATH and user site-packages. That closes the hole one step
+      #               earlier (before `site` runs) but can hide a `pip install --user pyyaml`, and
+      #               demoting such a host to the awk tier would be a worse outcome than the risk —
+      #               hence the import check per flag rather than a blind choice by version.
+      #   ""          neither flag exists; the program's own sys.path prologue is the whole defence.
+      for flag in -P -I ""; do
+        if [ -n "$flag" ]; then
+          "$py" "$flag" -c "${_CONFIG_PY_SAFE_PATH}import yaml" >/dev/null 2>&1 || continue
+        else
+          "$py" -c "${_CONFIG_PY_SAFE_PATH}import yaml" >/dev/null 2>&1 || continue
+        fi
+        _CONFIG_PY="$py"
+        _CONFIG_PY_ISOLATE="$flag"
+        break
+      done
+      [ "$_CONFIG_PY" != "-" ] && break
     done
   fi
   [ "$_CONFIG_PY" != "-" ]
@@ -235,7 +305,14 @@ config_python() {
 _config_py_run() {
   # _config_py_run <mode> [args...] — run the shared program, or return 1 if tier 1 is unavailable.
   _config_probe || return 1
-  "$_CONFIG_PY" -c "$_CONFIG_PY_PROG" "$SKILLS_CONFIG_FILE" "$@" 2>/dev/null
+  # Two explicit branches rather than an unquoted "$flag": an empty unquoted expansion is elided by
+  # both shells, but relying on that is exactly the class of shell subtlety this file has already
+  # been bitten by twice (${!var}, $ACCESS_MODES). Spell it out.
+  if [ -n "$_CONFIG_PY_ISOLATE" ]; then
+    "$_CONFIG_PY" "$_CONFIG_PY_ISOLATE" -c "$_CONFIG_PY_PROG" "$SKILLS_CONFIG_FILE" "$@" 2>/dev/null
+  else
+    "$_CONFIG_PY" -c "$_CONFIG_PY_PROG" "$SKILLS_CONFIG_FILE" "$@" 2>/dev/null
+  fi
 }
 
 # config_file_status — can skills-config.yaml be trusted?
@@ -340,14 +417,28 @@ read_config_key() {
   # Tier 2: simple top-level `key: value`. Strips a trailing inline comment and surrounding quotes —
   # without which `tracker: "jira"` and `tracker: jira  # why` would be rejected by validation, both
   # being legal YAML naming a legal platform.
-  val=$(awk -F': *' "/^${key}:/{
-    v = \$2
+  #
+  # The value is everything after the FIRST colon, taken from the whole line. Splitting on `-F': *'`
+  # and taking $2 truncated at the SECOND colon, so the documented flow form
+  # `tracker: {workflowFile: .github/tracker-workflow.yaml}` (docs/reference/configuration.md)
+  # yielded the field `{workflowFile`, which reached validate_enum and was rejected — and with this
+  # task's `|| exit 1` guards on every call site, that aborted the run. It aborted it on the DEFAULT
+  # tier of a stock macOS host, where /usr/bin/python3 ships without pyyaml, so the awk tier is the
+  # only tier. A flow mapping or sequence is reported as __MAP__, which is what tier 1 already
+  # returns for it and what the resolver reads as "no scalar override" → auto.
+  val=$(awk "/^${key}:/{
+    v = \$0
+    sub(/^[^:]*:[[:space:]]*/, \"\", v)
+    if (v ~ /^[{[]/) { print \"__MAP__\"; exit }
     sub(/[[:space:]]+#.*\$/, \"\", v)
     gsub(/^[[:space:]]+|[[:space:]]+\$/, \"\", v)
     gsub(/^[\"\\047]|[\"\\047]\$/, \"\", v)
     print v
     exit
   }" "$SKILLS_CONFIG_FILE" 2>/dev/null)
+  # __MAP__ is this reader's own signal, not a config value — pass it through untouched so the
+  # caller resolves it exactly as it does the tier-1 answer.
+  [ "$val" = "__MAP__" ] && { echo __MAP__; return 0; }
   val=$(_config_denull "$val")
   [ -z "$val" ] && val="auto"
   echo "$val"

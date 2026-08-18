@@ -164,6 +164,27 @@ unset _RP_ACC_T _RP_ACC_V 2>/dev/null || true
 # visible to the caller and inherited by every child process it spawns.
 unset TRACKER VCS ACCESS_TRACKER ACCESS_VCS 2>/dev/null || true
 
+# ── An explicit SKILLS_CONFIG_FILE must name a real config ──────────────────
+# read-config.sh makes the config path env-overridable. Pointing it at an absent file, or at
+# /dev/null (which is not a regular file, so it reads as "no config at all"), discarded a committed
+# restriction silently on both tiers — falsifying the guarantee in that file's own header that a
+# stray env var can never loosen a config that deliberately restricts. The AGENT_SKILLS_ACCESS_*
+# vars are hardened with most-restrictive-wins; this sibling bypassed that by changing WHICH FILE is
+# read rather than what it says.
+#
+# The rule is narrow on purpose: a redirect may point somewhere else, it may not point nowhere.
+# Redirecting at a real config that happens to be permissive is a deliberate operator act, the same
+# as editing the file — and it is the form the test suites and cross-repo callers legitimately use.
+if [ "${_CONFIG_FILE_ORIGIN:-default}" = "env" ]; then
+  if [ ! -f "$SKILLS_CONFIG_FILE" ] || [ ! -r "$SKILLS_CONFIG_FILE" ]; then
+    printf '❌ SKILLS_CONFIG_FILE=%s does not name a readable config file.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   Refusing to resolve access from a config that is not there: a redirect that lands on\n' >&2
+    printf '   nothing would silently discard any restriction the real config declares. Point it at\n' >&2
+    printf '   a readable file, or unset it to use ./skills-config.yaml.\n' >&2
+    return 1
+  fi
+fi
+
 if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested:access.vcs 2>/dev/null); then
   # Typed, NUL-framed records — see config_bulk's wire-format note. `_rp_val` yields a payload only
   # when the record is a VALUE; a signal (or a config that spells one) never reaches the logic below
@@ -202,7 +223,15 @@ if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.
   unset _rp_i
 
   _RP_TRACKER=$(_rp_val 2); [ -n "$_RP_TRACKER" ] || _RP_TRACKER=auto
-  _RP_VCS=$(_rp_val 3);     [ -n "$_RP_VCS" ]     || _RP_VCS=auto
+  # `tracker:` above may legitimately be a mapping — that is the documented `tracker.workflowFile`
+  # form, which means "no scalar override" → auto. `vcs:` has no mapping form, so collapsing its
+  # __MAP__ signal to `auto` here silently accepted a misconfiguration that the awk tier rejects,
+  # leaving the two tiers disagreeing about the same file. Keep the signal distinguishable so the
+  # validation below can refuse it, in the same words on either tier.
+  _RP_VCS=$(_rp_val 3)
+  if [ -z "$_RP_VCS" ]; then
+    [ "$(_rp_sig 3)" = "__MAP__" ] && _RP_VCS="__MAP__" || _RP_VCS=auto
+  fi
   _RP_SHAPE=$(_rp_val 4); [ -n "$_RP_SHAPE" ] || _RP_SHAPE=absent
   _RP_ACC_T=$(_rp_val 5)
   _RP_ACC_V=$(_rp_val 6)
@@ -211,17 +240,61 @@ else
 fi
 
 # ── Fail-closed branch for an unreadable config ─────────────────────────────
-# Grepping for an `access:` line separates the two cases cleanly: a consumer who never opted in is
-# never locked out by a broken file, and one who did is never silently unlocked by it.
+# Separating "never opted in" from "opted in and now unreadable" is what lets a broken file warn for
+# the first and halt for the second. The probe that draws that line has to fail CLOSED, because
+# getting it wrong in the permissive direction is a silent escalation and getting it wrong in the
+# restrictive direction is a loud, fixable error on a file that is already broken.
+#
+# `grep -q '^access:'` failed closed in neither respect:
+#   * It greps the very file the parser has just failed to read. On a file that is unreadable rather
+#     than malformed — chmod 000, root-owned, a bad mount — the grep fails too, and the branch fell
+#     through to detection. The canonical documented `access:\n  tracker: manual`, merely made
+#     unreadable, resolved to `full` at exit 0. The gate failed open exactly when it was needed.
+#   * `^access:` matches only block form at column 0, so a root flow mapping, a quoted `"access":`,
+#     a space before the colon, a leading BOM, or an access block supplied through a `<<` merge all
+#     missed it, and a declared `manual` again resolved to `full`.
+#
+# _rp_access_may_be_declared answers the question the branch actually needs — "can I PROVE this file
+# declares no access?" — and answers "no, I cannot" whenever it cannot read the file. It matches
+# `access` used as a key in any spelling: after a line start, a brace, a comma, or whitespace, with
+# optional quotes, optional space before the colon. `accessToken:` does not match. A mention inside a
+# comment does, which is a deliberate over-match: the only consequence is that an ALREADY-MALFORMED
+# file halts instead of warning.
+_rp_access_may_be_declared() {
+  [ -f "$SKILLS_CONFIG_FILE" ] || return 1          # no file at all — nothing was declared
+  [ -r "$SKILLS_CONFIG_FILE" ] || return 0          # cannot read it — cannot prove absence
+  grep -qE '(^|[^[:alnum:]_-])["'"'"']?access["'"'"']?[[:space:]]*:' "$SKILLS_CONFIG_FILE" 2>/dev/null && return 0
+  # grep itself failing (a binary file, an I/O error) is also "cannot prove absence".
+  [ $? -gt 1 ] && return 0
+  return 1
+}
+
 if [ "${_RP_STATUS:-$(config_file_status)}" = "malformed" ]; then
-  if grep -q '^access:' "$SKILLS_CONFIG_FILE" 2>/dev/null; then
-    printf '❌ %s: access is configured but unreadable.\n' "$SKILLS_CONFIG_FILE" >&2
-    printf '   The file contains an `access:` block but could not be parsed, so the access level\n' >&2
-    printf '   cannot be determined. Refusing to fall back to `full` — fix the YAML and re-run.\n' >&2
+  if [ -f "$SKILLS_CONFIG_FILE" ] && [ ! -r "$SKILLS_CONFIG_FILE" ]; then
+    printf '❌ %s exists but cannot be read.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   Whether it declares an access level is therefore unknowable, and the default for\n' >&2
+    printf '   access is `full` — so falling back would risk re-granting exactly what the file may\n' >&2
+    printf '   have been written to withhold. Fix the permissions (chmod +r) and re-run.\n' >&2
+    unset -f _rp_access_may_be_declared 2>/dev/null || true
+    return 1
+  fi
+  if _rp_access_may_be_declared; then
+    printf '❌ %s: access may be configured, and the file could not be parsed.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   The access level therefore cannot be determined. Refusing to fall back to `full` —\n' >&2
+    printf '   fix the YAML and re-run.\n' >&2
+    printf '   Beyond ordinary syntax errors, this reader also rejects three things a YAML parser\n' >&2
+    printf '   would accept but resolve silently, in the permissive direction:\n' >&2
+    printf '     • a duplicate key in ANY mapping in the file (last-wins would hide the first);\n' >&2
+    printf '     • two `<<` merge sources that define the SAME key (disjoint ones are fine);\n' >&2
+    printf '     • a value containing a NUL, or an ASCII US/RS byte.\n' >&2
+    printf '   If `access` appears only inside a comment, the file still needs fixing — but the\n' >&2
+    printf '   halt itself will go away once it parses.\n' >&2
+    unset -f _rp_access_may_be_declared 2>/dev/null || true
     return 1
   fi
   printf '⚠️  %s could not be parsed — falling back to platform detection.\n' "$SKILLS_CONFIG_FILE" >&2
 fi
+unset -f _rp_access_may_be_declared 2>/dev/null || true
 
 # ── Identity ────────────────────────────────────────────────────────────────
 if [ -n "$_RP_TRACKER" ]; then
