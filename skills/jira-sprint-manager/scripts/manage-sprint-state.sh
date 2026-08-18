@@ -40,6 +40,13 @@ esac
 
 URL="https://$JIRA_INSTANCE/rest/agile/1.0/sprint/$SPRINT_ID"
 
+# Name the mutation for the access gate, so a restricted run records "close
+# sprint 42" rather than a URL and a payload. See jsm_curl in jira-sprint-lib.sh.
+JSM_DEFER_KIND="jira.sprint.set-state"
+JSM_DEFER_INTENT="Set sprint $SPRINT_ID to state: $STATE"
+JSM_DEFER_TARGET="{\"sprint\":\"$SPRINT_ID\",\"url\":\"$URL\",\"ui_url\":\"https://$JIRA_INSTANCE/jira/software/projects\"}"
+JSM_DEFER_DESIRED="{\"state\":\"$STATE\"}"
+
 # Documented partial update is POST. Some proxies/tenants reject POST → fall back to PUT.
 jsm_curl POST "$URL" "$PAYLOAD"
 if [ "$JSM_HTTP_STATUS" -eq 405 ] || [ "$JSM_HTTP_STATUS" -eq 404 ]; then

@@ -25,6 +25,57 @@ jsm_auth_header() {
   printf 'Authorization: Basic %s' "$b64"
 }
 
+# The access gate for this file (task.53).
+#
+# Under any ACCESS_TRACKER other than `full`, a non-GET through jsm_curl is
+# REFUSED and RECORDED rather than sent. The record is written by the
+# deferred-mutation writer — shared/resources/defer-mutation.js, which the
+# bundler ships next to this file, so `$(dirname "${BASH_SOURCE[0]}")` finds it
+# both in-tree and in an installed skill.
+#
+# A caller names what it is about to do by setting these BEFORE the call; unset,
+# the record is a `jira.unknown-mutation`, which is legible enough to act on and
+# loud enough to notice:
+#   JSM_DEFER_KIND     roster kind, e.g. jira.sprint.set-state
+#   JSM_DEFER_INTENT   one line, imperative, human-facing
+#   JSM_DEFER_TARGET   JSON object, e.g. '{"sprint":"42","url":"…"}'
+#   JSM_DEFER_DESIRED  JSON object, e.g. '{"state":"closed"}'
+jsm_access_mode() {
+  printf '%s' "${ACCESS_TRACKER:-full}"
+}
+
+# Record one refused call. MUST leave JSM_HTTP_STATUS and JSM_BODY set: both
+# callers run under `set -euo pipefail` and branch on them, so returning without
+# them converts a deferral into a failed run.
+jsm_defer() {
+  local method=$1 url=$2
+  local writer kind intent target desired
+  writer="$(dirname "${BASH_SOURCE[0]}")/defer-mutation.js"
+  kind=${JSM_DEFER_KIND:-jira.unknown-mutation}
+  intent=${JSM_DEFER_INTENT:-"Perform $method $url by hand — no semantic annotation, so what it would have changed is not known here"}
+  target=${JSM_DEFER_TARGET:-"{\"url\":\"$url\"}"}
+  desired=${JSM_DEFER_DESIRED:-"{\"method\":\"$method\"}"}
+
+  if [ -f "$writer" ] && command -v node >/dev/null 2>&1; then
+    node "$writer" \
+      --kind "$kind" \
+      --intent "$intent" \
+      --access "$(jsm_access_mode)" \
+      --target "$target" \
+      --desired "$desired" \
+      --skill "jira-sprint-manager" >/dev/null \
+      || echo "⚠️  Could not record the deferred $method $url" >&2
+  else
+    echo "⚠️  Could not record the deferred $method $url — defer-mutation.js not found" >&2
+  fi
+
+  # 200 is accepted by BOTH callers (manage-sprint-state.sh checks -ne 200;
+  # move-sprint-issues.sh accepts 200 or 204). jq-safe body, because the
+  # failure branches feed JSM_BODY straight into an error line.
+  JSM_HTTP_STATUS=200
+  JSM_BODY='{"deferred":true}'
+}
+
 # jsm_curl METHOD URL [JSON_BODY]
 # Sets globals: JSM_HTTP_STATUS, JSM_BODY.
 # Does NOT use command substitution → assignments are visible to caller.
@@ -34,6 +85,14 @@ jsm_curl() {
   local url=$2
   local body=${3:-}
   local auth tmp attempt=0 max=4 wait=1
+
+  # Fail closed, and BEFORE the retry loop — recording inside it would write one
+  # record per attempt for one logical mutation.
+  if [ "$method" != "GET" ] && [ "$(jsm_access_mode)" != "full" ]; then
+    jsm_defer "$method" "$url"
+    return 0
+  fi
+
   auth=$(jsm_auth_header)
   tmp=$(mktemp)
 

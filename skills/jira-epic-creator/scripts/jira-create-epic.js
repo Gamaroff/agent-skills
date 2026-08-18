@@ -7,6 +7,32 @@
 const fs = require("fs");
 const path = require("path");
 
+// The deferred-mutation writer — shared/resources/defer-mutation.js, bundled
+// into this skill's references/ by `npm run bundle`.
+//
+// This file calls global `fetch` directly and does NOT go through
+// jira-sync.js's makeHttp, so LAYER 1'S FAIL-CLOSED GUARANTEE DOES NOT REACH
+// IT. The gate below is a hand-rolled local copy, and that exception is stated
+// in the task document rather than left implicit — this script has drifted from
+// the shared library before. Routing it through jira-sync.js is worth doing and
+// is not this change.
+let dm = null;
+try {
+  dm = require("../references/defer-mutation.js");
+} catch (_) {
+  try {
+    dm = require("../references/defer-mutation.js");
+  } catch (_2) {
+    dm = null;
+  }
+}
+
+/** The access mode in force, resolved the same way every other gate does. */
+function accessTracker() {
+  const raw = String(process.env.ACCESS_TRACKER || "").trim();
+  return raw || "full";
+}
+
 async function parseFrontmatter(content) {
   if (content.startsWith("---")) {
     const parts = content.split("---");
@@ -332,6 +358,46 @@ async function createEpic({
     issueData.fields.labels = Array.isArray(labels)
       ? labels
       : labels.split(",");
+  }
+
+  // The gate. A refused create returns null — the same shape the catch below
+  // already returns, so every caller copes with it today.
+  if (accessTracker() !== "full") {
+    let recordId = null;
+    try {
+      if (!dm)
+        throw new Error("defer-mutation.js not found next to this script");
+      const rec = dm.defer({
+        kind: "jira.issue.create",
+        system: "jira",
+        access: accessTracker(),
+        intent: `Create the Jira epic "${issueData.fields.summary || "(no summary)"}" in ${issueData.fields.project?.key || "the project"}`,
+        target: {
+          name: issueData.fields.summary || "(no summary)",
+          url: `${baseUrl}/rest/api/2/issue`,
+          ui_url: `${baseUrl}/secure/CreateIssue!default.jspa`,
+        },
+        desired: {
+          project: issueData.fields.project?.key || null,
+          issuetype: issueData.fields.issuetype?.name || null,
+          summary: issueData.fields.summary || null,
+          priority: issueData.fields.priority?.name || null,
+          labels: (issueData.fields.labels || []).join(", ") || null,
+        },
+        skill: "jira-epic-creator",
+      });
+      recordId = rec.id;
+    } catch (e) {
+      console.error(
+        `⚠️  Could not record the deferred epic create: ${e.message}`,
+      );
+    }
+    console.log(
+      `\n⏸️  Epic create deferred — access.tracker=${accessTracker()} restricts this run.` +
+        (recordId ? ` Recorded as ${recordId}.` : ""),
+    );
+    console.log(`   Summary: ${issueData.fields.summary || "(no summary)"}`);
+    return null;
   }
 
   // Create the issue

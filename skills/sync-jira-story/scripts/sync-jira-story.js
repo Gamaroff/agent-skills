@@ -359,7 +359,25 @@ async function createStoryWithRetry({ http, auth, fields, output }) {
     Accept: "application/json",
   };
   const attempt = (f) =>
-    http(url, { method: "POST", headers, body: JSON.stringify({ fields: f }) });
+    http(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ fields: f }),
+      // Layer 2 — the summary and fields a human would type into the create
+      // screen, not the request body. The retries below are never reached on a
+      // deferral: the gate answers `ok`, so one logical create writes one record.
+      defer: {
+        kind: "jira.issue.create",
+        intent: `Create the Jira story "${f.summary || "(no summary)"}" in ${auth.project || "the project"}`,
+        target: {
+          name: f.summary || "(no summary)",
+          url: url,
+          ui_url: `${auth.baseUrl}/secure/CreateIssue!default.jspa`,
+        },
+        desired: lib.summariseFields(f),
+        skill: "sync-jira-story",
+      },
+    });
 
   let current = fields;
   let resp = await attempt(current);
@@ -830,6 +848,9 @@ async function run({
     current = null,
     skippedNoChanges = false,
     postCreateStatus = null;
+  // Set when the access gate refused a write. Kept separate from `result` so the
+  // write-back gate can tell "nothing changed" from "we were not allowed to".
+  let deferredRecord = null;
 
   if (isUpdate) {
     if (!args.dryRun) {
@@ -964,24 +985,40 @@ async function run({
             fields: stripped,
           });
         }
-        const { updated } = putResp;
-        const finalUpdated =
-          updated ||
-          (await lib.fetchUpdatedTimestampStrict({
-            http,
-            baseUrl: auth.baseUrl,
-            email: auth.email,
-            token: auth.token,
+        // The deferred UPDATE shape: a real key (we already had one) and a null
+        // timestamp. Do NOT reach for the real `updated` — the issue was not
+        // touched, and a fresh timestamp would tell the next run it was.
+        if (putResp.deferred) {
+          deferredRecord = putResp.record;
+          result = {
             issueKey: existingJiraKey,
-          }));
-        result = {
-          issueKey: existingJiraKey,
-          issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
-          updated: finalUpdated,
-        };
-        output.info(`\n✅ Story updated: ${existingJiraKey}`);
-        output.info(`   URL: ${result.issueUrl}`);
-        output.info(`   Changes: ${changeSummary}`);
+            issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+            updated: null,
+          };
+          output.info(
+            `\n⏸️  Story update deferred — access.tracker restricts this run. Recorded as ${deferredRecord}.`,
+          );
+          output.info(`   Changes: ${changeSummary}`);
+        } else {
+          const { updated } = putResp;
+          const finalUpdated =
+            updated ||
+            (await lib.fetchUpdatedTimestampStrict({
+              http,
+              baseUrl: auth.baseUrl,
+              email: auth.email,
+              token: auth.token,
+              issueKey: existingJiraKey,
+            }));
+          result = {
+            issueKey: existingJiraKey,
+            issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+            updated: finalUpdated,
+          };
+          output.info(`\n✅ Story updated: ${existingJiraKey}`);
+          output.info(`   URL: ${result.issueUrl}`);
+          output.info(`   Changes: ${changeSummary}`);
+        }
       }
     }
   } else {
@@ -1041,35 +1078,47 @@ async function run({
       });
 
       const resp = await createStoryWithRetry({ http, auth, fields, output });
-      const created = await resp.json();
-      const issueKey = created.key;
-      const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
-      // Single GET fetches both `updated` and `status`, sparing a second
-      // /transitions GET when the new issue is already in the target state.
-      const fresh = await lib.fetchIssue({
-        http,
-        baseUrl: auth.baseUrl,
-        email: auth.email,
-        token: auth.token,
-        issueKey,
-      });
-      postCreateStatus = fresh.status;
-      result = { issueKey, issueUrl, updated: fresh.updated };
-      output.info(`\n✅ Story created: ${issueKey}`);
-      output.info(`   URL: ${issueUrl}`);
-      output.info(
-        `   Parent epic: ${epicKey} (${useEpicLink ? "Epic Link customfield" : "team-managed parent"})`,
-      );
+      if (resp.deferred) {
+        // The create null shape — identical to --dry-run. NEVER a placeholder
+        // key: writing one would break the idempotent synced-from-* label
+        // search and the next run would create a duplicate.
+        deferredRecord = resp.deferredRecord;
+        result = { issueKey: null, issueUrl: null, updated: null };
+        output.info(
+          `\n⏸️  Story create deferred — access.tracker restricts this run. Recorded as ${deferredRecord}.`,
+        );
+        output.info(`   Summary: ${summary}`);
+      } else {
+        const created = await resp.json();
+        const issueKey = created.key;
+        const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
+        // Single GET fetches both `updated` and `status`, sparing a second
+        // /transitions GET when the new issue is already in the target state.
+        const fresh = await lib.fetchIssue({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey,
+        });
+        postCreateStatus = fresh.status;
+        result = { issueKey, issueUrl, updated: fresh.updated };
+        output.info(`\n✅ Story created: ${issueKey}`);
+        output.info(`   URL: ${issueUrl}`);
+        output.info(
+          `   Parent epic: ${epicKey} (${useEpicLink ? "Epic Link customfield" : "team-managed parent"})`,
+        );
 
-      await lib.moveToBacklog({
-        http,
-        baseUrl: auth.baseUrl,
-        email: auth.email,
-        token: auth.token,
-        boardId: auth.boardId,
-        issueKey,
-        output,
-      });
+        await lib.moveToBacklog({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          boardId: auth.boardId,
+          issueKey,
+          output,
+        });
+      }
     }
   }
 
@@ -1109,6 +1158,9 @@ async function run({
     result?.issueKey &&
     !args.dryRun &&
     !args.noWrite &&
+    // A deferred update changed nothing in Jira. Writing a Change Log row
+    // saying it did is the drift this gate exists to prevent.
+    !deferredRecord &&
     (!skippedNoChanges || changeLogEntries.length > 0);
   if (shouldWriteFile) {
     updateStoryFile({
@@ -1144,6 +1196,8 @@ async function run({
       jira_last_synced_at: result?.updated || null,
       jira_last_body_hash: newBodyHash,
       jira_last_meta_hash: newMetaHash,
+      reason: deferredRecord ? "deferred" : null,
+      record: deferredRecord,
     });
   }
 

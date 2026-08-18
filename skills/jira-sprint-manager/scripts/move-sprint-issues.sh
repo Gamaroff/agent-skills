@@ -42,6 +42,15 @@ while [ "$moved" -lt "$TOTAL" ]; do
   CHUNK=$(jq --argjson o "$moved" --argjson n "$CHUNK_SIZE" '.[$o:$o+$n]' <<<"$KEYS_JSON")
   PAYLOAD=$(jq -n --argjson keys "$CHUNK" '{issues: $keys}')
 
+  # Name the mutation for the access gate — see jsm_curl in jira-sprint-lib.sh.
+  # `count` is not assigned until after the call, so the size is read from the
+  # chunk itself; referencing it early would abort the script under `set -u`.
+  CHUNK_LEN=$(jq 'length' <<<"$CHUNK")
+  JSM_DEFER_KIND="jira.sprint.move-issues"
+  JSM_DEFER_INTENT="Move $CHUNK_LEN issue(s) to: $TARGET"
+  JSM_DEFER_TARGET="{\"url\":\"$ENDPOINT\",\"name\":\"$TARGET\"}"
+  JSM_DEFER_DESIRED=$(jq -nc --argjson keys "$CHUNK" --arg t "$TARGET" '{target: $t, issues: ($keys | join(", "))}')
+
   jsm_curl POST "$ENDPOINT" "$PAYLOAD"
   if [ "$JSM_HTTP_STATUS" -ne 204 ] && [ "$JSM_HTTP_STATUS" -ne 200 ]; then
     echo "Failed to migrate chunk starting at $moved ($JSM_HTTP_STATUS): $JSM_BODY" >&2

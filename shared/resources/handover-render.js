@@ -68,6 +68,13 @@ const KIND_PRESENTATION = Object.freeze({
   },
   "jira.sprint.set-state": { verb: "Change the state of", noun: "sprint" },
   "jira.transition": { verb: "Transition", noun: "Jira issue" },
+  // The fail-closed catch-all: layer 1 refused a non-GET nobody annotated, so
+  // the wording says only what is known — that a REST call must be replayed by
+  // hand. The record's own `intent` and `desired` carry the method and URL.
+  "jira.unknown-mutation": {
+    verb: "Perform by hand the unrecognised REST call on",
+    noun: "Jira",
+  },
 
   // ── GitHub ──────────────────────────────────────────────────────────────
   "github.issue.create": { verb: "Create", noun: "GitHub issue" },

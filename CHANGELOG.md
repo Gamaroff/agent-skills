@@ -6,6 +6,53 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A restricted `access.tracker` now actually stops Jira REST writes**, in two layers inside the
+  shared `jira-sync.js`. Layer 1 sits at the top of `http()`, **above** the retry loop: under any
+  mode but `full`, a non-GET is refused, recorded, and answered with a synthetic `202` marked
+  `deferred` — so a mutation nobody thought about is loud rather than silently executed, and a
+  429 cannot turn one logical mutation into three records. Layer 2 is an additive `defer:`
+  annotation on the semantic mutators (`putIssueAtomic`, `moveToBacklog`, the four create-POSTs and
+  the epic Team-field PUT), which is what makes `manual` mode say *"Set Team to Platform"* instead
+  of printing a URL and a JSON blob. An ADF description is **named**, never dumped: a checklist
+  item nobody can read is as useless as none.
+
+  `full` is unchanged and remains the default — the gate is a single early branch on a variable
+  that resolves to `full` when `ACCESS_TRACKER` is unset, and the mode is captured at require time,
+  before `loadDotEnv()`, so a dot-env file cannot escalate a declared restriction.
+
+  Five kinds newly covered — `jira.issue.create`, `jira.issue.update`, `jira.backlog.add`,
+  `jira.sprint.move-issues`, `jira.sprint.set-state` — joining `jira.transition`, which the stage
+  CLI already owned, for **6 of the 9** Jira kinds. The three uncovered ones have no call site to
+  intercept.
+
+  Two paths outside the shared library carry their own gate, and the exception is stated rather
+  than implied: `jsm_curl` in `jira-sprint-lib.sh` (whose defer branch **must** set
+  `JSM_HTTP_STATUS=200` and a jq-safe `JSM_BODY`, or a deferral becomes a failed run under
+  `set -euo pipefail`), and `jira-epic-creator.js`, which calls global `fetch` directly and so
+  layer 1 cannot reach.
+
+  The one read wearing a POST — Jira's JQL search — is allowlisted **by URL**. Refusing it would
+  make every sync skill see "no existing issue" and create a duplicate on the next run.
+
+- **`jira.unknown-mutation` is the 21st mutation-record kind**, the catch-all layer 1 writes when
+  no semantic mutator annotated the call. Its consequence is `irreversible`, so it renders as a
+  confirm gate rather than a bare command: nothing knows what the call would have done, and that is
+  the honest default. A record of this kind is also a signal — a mutation path exists that nobody
+  has annotated yet.
+
+### Changed
+
+- **The three `sync-jira-*` skills report `reason: "deferred"`** with the journal `record` id in
+  their `--json` payload. A deferred **create** returns the same null shape as `--dry-run`
+  (`jira_key: null`) and **never** a placeholder key — a placeholder would break the idempotent
+  `synced-from-*` label search and make the next unrestricted run create a duplicate. A deferred
+  **update** returns the real key with `jira_last_synced_at: null`, and the local file is left
+  untouched, because a Change Log row saying the issue was updated when it was not is precisely the
+  drift this sequence exists to remove.
+
+- **The resolver's `PARTIALLY ENFORCED` notice names Jira as covered and GitHub as the remaining
+  gap.** A warning that overstates coverage is worse than none.
+
 - **`access:` in `skills-config.yaml` declares how much access the agent has to each system**, resolved into `ACCESS_TRACKER` / `ACCESS_VCS` by `resolve-platform.sh` alongside the existing `TRACKER` / `VCS`. Five values per system — `full` (default) · `read-only` · `approve` · `command` · `manual`. This is the vocabulary for the restricted-tracker-access sequence, for consumers whose security team will not issue a tracker write token to a locally running agent.
 
   **It ships no behaviour change on its own.** Nothing intercepts a mutation yet; setting `access: {tracker: manual}` resolves the variable and changes nothing else. It lands first, and separately, to fix the output contract before any caller depends on it — and because it closes a live bug on the way.

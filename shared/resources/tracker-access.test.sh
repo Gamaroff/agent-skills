@@ -455,16 +455,19 @@ else
 fi
 
 # --- 17. A partially-enforced mode says exactly how far it reaches -------------------------------
-# As of task.52 the two stage CLIs honour the mode; every other tracker call site does not (tasks
-# 53–56). An operator who sets `manual` and sees a normal run would otherwise reasonably conclude
-# they were fully protected. A notice that OVERSTATES coverage is worse than no notice at all, so
-# this asserts the qualified wording, not merely that something was printed.
+# As of task.53 every Jira REST mutation is intercepted, along with the two stage CLIs; the GitHub
+# issue/PR call sites are not (task.54 onwards). An operator who sets `manual` and sees a normal run
+# would otherwise reasonably conclude they were fully protected. A notice that OVERSTATES coverage
+# is worse than no notice at all, so this asserts the qualified wording — including that Jira is now
+# named as covered — rather than merely that something was printed.
 echo "  17. Partial-enforcement notice"
 D=$(fixture notice 'access:\n  tracker: manual\n')
 run_case "$D"
 assert_rc         "non-full mode → still status 0"        "$RC" "0"
 assert_stderr_has "non-full mode → warns enforcement is partial" "PARTIALLY ENFORCED"
 assert_stderr_has "non-full mode → names what is still written"  "still proceed normally"
+assert_stderr_has "non-full mode → names Jira as now covered"    "all Jira writes"
+assert_stderr_has "non-full mode → names GitHub as the gap"      "GitHub issue and PR writes"
 
 D=$(fixture notice-full "")
 run_case "$D"

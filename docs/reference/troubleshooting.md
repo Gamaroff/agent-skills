@@ -221,6 +221,45 @@ vcs: bitbucket    # or github
 
 See [platform detection](../../shared/resources/platform-detection.md).
 
+## My Jira card did not move, and nothing failed
+
+**Symptom:** a sync or a pipeline step reports success, but the Jira issue was not created,
+not updated, or not transitioned. The `--json` payload carries `"reason": "deferred"`, a
+`record` id, and `jira_key: null` on a create. Output lines start `⏸️`.
+
+**Cause:** `access.tracker` is set to something other than `full`, so the run may not write to
+the tracker. The write was **refused and recorded**, not lost and not silently skipped. As of
+task.53 this covers every Jira REST mutation — the shared `jira-sync.js` HTTP layer, the sprint
+scripts, and `jira-epic-creator.js` — plus the board moves the stage CLIs own. A mutation nobody
+annotated is still refused; it is recorded generically as `jira.unknown-mutation`.
+
+The resolver says so on every restricted run:
+
+```
+⚠️  access.tracker=manual is PARTIALLY ENFORCED — all Jira writes and board/status moves are
+    deferred and recorded, but GitHub issue and PR writes (comments, issue and PR creation)
+    still proceed normally.
+```
+
+**Fix — read what was deferred, then either perform it or lift the restriction:**
+
+```bash
+cat .claude/state/tracker-actions.jsonl | jq -r '.intent'            # what the run wanted to do
+node .agents/skills/develop-task/references/handover-render.js \
+  --format md --format sh                                            # a checklist and a script
+```
+
+Then either work the checklist by hand, or re-run with `access.tracker: full` in
+`skills-config.yaml` (config and env are read independently and the **more restrictive** wins,
+so also check `AGENT_SKILLS_ACCESS_TRACKER`).
+
+**Not this:** a deferred create never writes a placeholder key to frontmatter. That is
+deliberate — a placeholder would break the idempotent `synced-from-*` label search and the next
+unrestricted run would create a duplicate. `jira_key` stays absent until the issue really exists.
+
+Full schema and the roster of mutation kinds:
+[`tracker-access-record.md`](../../shared/resources/tracker-access-record.md).
+
 ## See also
 
 - [Story Development Runbook](../runbooks/story-development.md)

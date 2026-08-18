@@ -60,7 +60,7 @@ const ROSTER_DOC = "tracker-access-record.md";
 
 // Asserted, not merely non-zero. A reformatted row used to truncate the roster
 // silently; pinning the count turns that into an immediate, explicit failure.
-const EXPECTED_KIND_COUNT = 20;
+const EXPECTED_KIND_COUNT = 21;
 
 const ACCESS_MODES = Object.freeze([
   "full",
@@ -144,7 +144,7 @@ function parseRoster(text) {
       if (cells[0].includes("`")) {
         throw new Error(
           `${ROSTER_DOC}: row "${cells[0]}" sits in a kind table but does not ` +
-            `parse as a kind. Keep the shape documented under "The 20 kinds" — ` +
+            `parse as a kind. Keep the shape documented under "The 21 kinds" — ` +
             `a single backtick-quoted token, no other markup.`,
         );
       }
@@ -171,7 +171,7 @@ function parseRoster(text) {
   if (roster.size !== EXPECTED_KIND_COUNT) {
     throw new Error(
       `${ROSTER_DOC}: parsed ${roster.size} kinds, expected ${EXPECTED_KIND_COUNT}. ` +
-        `Either the roster table shape changed (see the note under "The 20 kinds") ` +
+        `Either the roster table shape changed (see the note under "The 21 kinds") ` +
         `or a kind was added/removed without updating EXPECTED_KIND_COUNT in ` +
         `defer-mutation.js. Both halves must move together — that is what stops a ` +
         `silent truncation from looking like a smaller roster.`,
@@ -193,7 +193,7 @@ function splitRow(line) {
 let _rosterCache = null;
 
 /**
- * The 20 kinds, keyed by kind. Memoised — the doc is read once per process.
+ * The 21 kinds, keyed by kind. Memoised — the doc is read once per process.
  * @param {{docPath?: string, force?: boolean}} [opts]
  */
 function loadRoster(opts = {}) {

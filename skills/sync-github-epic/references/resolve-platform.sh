@@ -464,13 +464,15 @@ fi
 
 # Say plainly how far enforcement actually reaches. Without this an operator who sets
 # `access: {tracker: manual}` gets a normal-looking run and reasonably concludes they are fully
-# protected. As of task.52 the two stage CLIs (jira-stage.js, gh-stage.js) honour the mode: they
-# decline the board move, exit 0 with `reason: "deferred"`, and record it for the run-end handover.
-# Every OTHER tracker mutation — issue comments, issue creation, PR comments, sub-issue links — is
-# still performed normally, because interception at those call sites is tasks 53–56. Keep this
-# notice accurate as each one lands; a warning that overstates coverage is worse than none.
+# protected. Coverage as of task.53:
+#   - the two stage CLIs (jira-stage.js, gh-stage.js) decline the board move and record it (task.52);
+#   - EVERY Jira REST mutation through jira-sync.js is refused and recorded, annotated or not,
+#     and so are the sprint scripts and jira-epic-creator.js (task.53);
+#   - GitHub board/issue/PR writes other than the stage CLI — `gh issue comment`, `gh pr create`,
+#     `gh pr comment`, sub-issue links — are still performed normally (task.54 onwards).
+# Keep this notice accurate as each one lands; a warning that overstates coverage is worse than none.
 if [ "$ACCESS_TRACKER" != "full" ]; then
-  printf '⚠️  access.tracker=%s is PARTIALLY ENFORCED — board/status moves are deferred and recorded, but other tracker writes (comments, issue and PR creation) still proceed normally.\n' \
+  printf '⚠️  access.tracker=%s is PARTIALLY ENFORCED — all Jira writes and board/status moves are deferred and recorded, but GitHub issue and PR writes (comments, issue and PR creation) still proceed normally.\n' \
     "$ACCESS_TRACKER" >&2
 fi
 

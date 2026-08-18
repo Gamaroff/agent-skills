@@ -862,6 +862,8 @@ async function run({
   let result,
     changeSummary,
     current = null;
+  // Set when the access gate refused a write — see jira-sync.js layer 1.
+  let deferredRecord = null;
 
   if (isUpdate) {
     if (!args.dryRun) {
@@ -1038,7 +1040,7 @@ async function run({
         updated: null,
       };
     } else {
-      const { updated } = await lib.putIssueAtomic({
+      const putResp = await lib.putIssueAtomic({
         http,
         baseUrl: auth.baseUrl,
         email: auth.email,
@@ -1046,24 +1048,41 @@ async function run({
         issueKey: existingJiraKey,
         fields,
       });
-      const finalUpdated =
-        updated ||
-        (await lib.fetchUpdatedTimestamp({
-          http,
-          baseUrl: auth.baseUrl,
-          email: auth.email,
-          token: auth.token,
+      if (putResp.deferred) {
+        // The deferred UPDATE shape — real key, null timestamp. The `||
+        // new Date()` fallback below would otherwise stamp a sync that never
+        // happened, which is exactly the drift this gate exists to prevent.
+        deferredRecord = putResp.record;
+        result = {
           issueKey: existingJiraKey,
-        })) ||
-        new Date().toISOString();
-      result = {
-        issueKey: existingJiraKey,
-        issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
-        updated: finalUpdated,
-      };
-      output.info(`\n✅ Epic updated: ${existingJiraKey}`);
-      output.info(`   URL: ${result.issueUrl}`);
-      output.info(`   Changes: ${changeSummary}`);
+          issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+          updated: null,
+        };
+        output.info(
+          `\n⏸️  Epic update deferred — access.tracker restricts this run. Recorded as ${deferredRecord}.`,
+        );
+        output.info(`   Changes: ${changeSummary}`);
+      } else {
+        const { updated } = putResp;
+        const finalUpdated =
+          updated ||
+          (await lib.fetchUpdatedTimestamp({
+            http,
+            baseUrl: auth.baseUrl,
+            email: auth.email,
+            token: auth.token,
+            issueKey: existingJiraKey,
+          })) ||
+          new Date().toISOString();
+        result = {
+          issueKey: existingJiraKey,
+          issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+          updated: finalUpdated,
+        };
+        output.info(`\n✅ Epic updated: ${existingJiraKey}`);
+        output.info(`   URL: ${result.issueUrl}`);
+        output.info(`   Changes: ${changeSummary}`);
+      }
     }
   } else {
     changeSummary = "Initial Jira epic created";
@@ -1130,33 +1149,85 @@ async function run({
           Accept: "application/json",
         },
         body: JSON.stringify({ fields }),
+        // Layer 2 — annotated HERE only. The epic-name retry below is the same
+        // logical create; the gate answers `ok`, so that branch is unreachable
+        // on a deferral and one create writes exactly one record.
+        defer: {
+          kind: "jira.issue.create",
+          intent: `Create the Jira epic "${fields.summary || "(no summary)"}" in ${auth.project || "the project"}`,
+          target: {
+            name: fields.summary || "(no summary)",
+            url: `${auth.baseUrl}/rest/api/3/issue`,
+            ui_url: `${auth.baseUrl}/secure/CreateIssue!default.jspa`,
+          },
+          desired: lib.summariseFields(fields),
+          skill: "sync-jira-epic",
+        },
       });
-      if (!resp.ok) {
-        const errText = await lib.parseJiraError(resp);
-        // Retry without epic-name field if Jira rejects it (team-managed projects)
-        if (
-          resp.status === 400 &&
-          epicNameRe.test(errText) &&
-          fields[epicNameField]
-        ) {
-          output.info(
-            `ℹ️  Retrying create without ${epicNameField} (team-managed project): ${errText.slice(0, 120)}`,
-          );
-          delete fields[epicNameField];
-          const retry = await http(`${auth.baseUrl}/rest/api/3/issue`, {
-            method: "POST",
-            headers: {
-              Authorization: lib.authHeader(auth.email, auth.token),
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({ fields }),
-          });
-          if (!retry.ok)
-            throw new Error(
-              `HTTP ${retry.status}: ${await lib.parseJiraError(retry)}`,
+      if (resp.deferred) {
+        // The create null shape — identical to --dry-run. NEVER a placeholder
+        // key: one would break the idempotent synced-from-* label search.
+        deferredRecord = resp.deferredRecord;
+        result = { issueKey: null, issueUrl: null, updated: null };
+        output.info(
+          `\n⏸️  Epic create deferred — access.tracker restricts this run. Recorded as ${deferredRecord}.`,
+        );
+        output.info(`   Summary: ${fields.summary || "(no summary)"}`);
+      } else {
+        if (!resp.ok) {
+          const errText = await lib.parseJiraError(resp);
+          // Retry without epic-name field if Jira rejects it (team-managed projects)
+          if (
+            resp.status === 400 &&
+            epicNameRe.test(errText) &&
+            fields[epicNameField]
+          ) {
+            output.info(
+              `ℹ️  Retrying create without ${epicNameField} (team-managed project): ${errText.slice(0, 120)}`,
             );
-          const created = await retry.json();
+            delete fields[epicNameField];
+            const retry = await http(`${auth.baseUrl}/rest/api/3/issue`, {
+              method: "POST",
+              headers: {
+                Authorization: lib.authHeader(auth.email, auth.token),
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({ fields }),
+            });
+            if (!retry.ok)
+              throw new Error(
+                `HTTP ${retry.status}: ${await lib.parseJiraError(retry)}`,
+              );
+            const created = await retry.json();
+            const issueKey = created.key;
+            const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
+            const updated =
+              (await lib.fetchUpdatedTimestamp({
+                http,
+                baseUrl: auth.baseUrl,
+                email: auth.email,
+                token: auth.token,
+                issueKey,
+              })) || new Date().toISOString();
+            result = { issueKey, issueUrl, updated };
+          } else {
+            throw new Error(`HTTP ${resp.status}: ${errText}`);
+          }
+        } else {
+          const rawText = await resp.text();
+          let created;
+          try {
+            created = JSON.parse(rawText);
+          } catch (_) {
+            output.err(
+              "\n⚠️  Jira returned 2xx but response body was not valid JSON. Raw body:",
+            );
+            output.err(rawText.slice(0, 500));
+            throw new Error(
+              "Could not parse Jira create response — check Jira manually for the new epic",
+            );
+          }
           const issueKey = created.key;
           const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
           const updated =
@@ -1168,114 +1239,107 @@ async function run({
               issueKey,
             })) || new Date().toISOString();
           result = { issueKey, issueUrl, updated };
-        } else {
-          throw new Error(`HTTP ${resp.status}: ${errText}`);
         }
-      } else {
-        const rawText = await resp.text();
-        let created;
-        try {
-          created = JSON.parse(rawText);
-        } catch (_) {
-          output.err(
-            "\n⚠️  Jira returned 2xx but response body was not valid JSON. Raw body:",
-          );
-          output.err(rawText.slice(0, 500));
-          throw new Error(
-            "Could not parse Jira create response — check Jira manually for the new epic",
-          );
-        }
-        const issueKey = created.key;
-        const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
-        const updated =
-          (await lib.fetchUpdatedTimestamp({
-            http,
-            baseUrl: auth.baseUrl,
-            email: auth.email,
-            token: auth.token,
-            issueKey,
-          })) || new Date().toISOString();
-        result = { issueKey, issueUrl, updated };
-      }
 
-      output.info(`\n✅ Epic created: ${result.issueKey}`);
-      output.info(`   URL: ${result.issueUrl}`);
+        output.info(`\n✅ Epic created: ${result.issueKey}`);
+        output.info(`   URL: ${result.issueUrl}`);
 
-      await lib.moveToBacklog({
-        http,
-        baseUrl: auth.baseUrl,
-        email: auth.email,
-        token: auth.token,
-        boardId: auth.boardId,
-        issueKey: result.issueKey,
-        output,
-      });
+        await lib.moveToBacklog({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          boardId: auth.boardId,
+          issueKey: result.issueKey,
+          output,
+        });
 
-      // Set Team field (customfield_10001) so the epic appears on boards filtered by cf[10001].
-      if (auth.boardId) {
-        try {
-          const boardCfgResp = await http(
-            `${auth.baseUrl}/rest/agile/1.0/board/${auth.boardId}/configuration`,
-            {
-              headers: {
-                Authorization: lib.authHeader(auth.email, auth.token),
-                Accept: "application/json",
-              },
-            },
-          );
-          if (boardCfgResp.ok) {
-            const boardCfg = await boardCfgResp.json();
-            const filterId = boardCfg?.filter?.id;
-            if (filterId) {
-              const filterResp = await http(
-                `${auth.baseUrl}/rest/api/3/filter/${filterId}`,
-                {
-                  headers: {
-                    Authorization: lib.authHeader(auth.email, auth.token),
-                    Accept: "application/json",
-                  },
+        // Set Team field (customfield_10001) so the epic appears on boards filtered by cf[10001].
+        if (auth.boardId) {
+          try {
+            const boardCfgResp = await http(
+              `${auth.baseUrl}/rest/agile/1.0/board/${auth.boardId}/configuration`,
+              {
+                headers: {
+                  Authorization: lib.authHeader(auth.email, auth.token),
+                  Accept: "application/json",
                 },
-              );
-              if (filterResp.ok) {
-                const filter = await filterResp.json();
-                const teamMatch = /cf\[10001\]\s+in\s+\(([^)]+)\)/i.exec(
-                  filter.jql || "",
+              },
+            );
+            if (boardCfgResp.ok) {
+              const boardCfg = await boardCfgResp.json();
+              const filterId = boardCfg?.filter?.id;
+              if (filterId) {
+                const filterResp = await http(
+                  `${auth.baseUrl}/rest/api/3/filter/${filterId}`,
+                  {
+                    headers: {
+                      Authorization: lib.authHeader(auth.email, auth.token),
+                      Accept: "application/json",
+                    },
+                  },
                 );
-                if (teamMatch) {
-                  const teamUuid = teamMatch[1]
-                    .split(",")[0]
-                    .trim()
-                    .replace(/^["']|["']$/g, "");
-                  if (teamUuid) {
-                    const teamResp = await http(
-                      `${auth.baseUrl}/rest/api/3/issue/${result.issueKey}`,
-                      {
-                        method: "PUT",
-                        headers: {
-                          Authorization: lib.authHeader(auth.email, auth.token),
-                          "Content-Type": "application/json",
+                if (filterResp.ok) {
+                  const filter = await filterResp.json();
+                  const teamMatch = /cf\[10001\]\s+in\s+\(([^)]+)\)/i.exec(
+                    filter.jql || "",
+                  );
+                  if (teamMatch) {
+                    const teamUuid = teamMatch[1]
+                      .split(",")[0]
+                      .trim()
+                      .replace(/^["']|["']$/g, "");
+                    if (teamUuid) {
+                      const teamResp = await http(
+                        `${auth.baseUrl}/rest/api/3/issue/${result.issueKey}`,
+                        {
+                          method: "PUT",
+                          headers: {
+                            Authorization: lib.authHeader(
+                              auth.email,
+                              auth.token,
+                            ),
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            fields: { customfield_10001: teamUuid },
+                          }),
+                          // Layer 2 — this is the "set Team to Platform" case.
+                          // Unannotated it would render as a PUT and a UUID.
+                          defer: {
+                            kind: "jira.issue.update",
+                            intent: `Set the Team field on ${result.issueKey} so the epic appears on board ${auth.boardId}`,
+                            target: {
+                              issue: result.issueKey,
+                              url: `${auth.baseUrl}/rest/api/3/issue/${result.issueKey}`,
+                              ui_url: `${auth.baseUrl}/browse/${result.issueKey}`,
+                            },
+                            desired: { Team: teamUuid },
+                            skill: "sync-jira-epic",
+                          },
                         },
-                        body: JSON.stringify({
-                          fields: { customfield_10001: teamUuid },
-                        }),
-                      },
-                    );
-                    if (teamResp.status === 204) {
-                      output.info(`   Team field set: ${teamUuid}`);
-                    } else {
-                      output.warn(
-                        `⚠️  Team field update returned HTTP ${teamResp.status} — epic created but may not appear on board`,
                       );
+                      if (teamResp.deferred) {
+                        output.info(
+                          `   ⏸️  Team field deferred — recorded as ${teamResp.deferredRecord}`,
+                        );
+                      } else if (teamResp.status === 204) {
+                        output.info(`   Team field set: ${teamUuid}`);
+                      } else {
+                        output.warn(
+                          `⚠️  Team field update returned HTTP ${teamResp.status} — epic created but may not appear on board`,
+                        );
+                      }
                     }
                   }
                 }
               }
             }
+          } catch (teamErr) {
+            output.warn(
+              `⚠️  Could not set team field: ${teamErr.message} — epic created but may not appear on board`,
+            );
           }
-        } catch (teamErr) {
-          output.warn(
-            `⚠️  Could not set team field: ${teamErr.message} — epic created but may not appear on board`,
-          );
         }
       }
     }
@@ -1297,8 +1361,9 @@ async function run({
     });
   }
 
-  // Write-back
-  if (result?.issueKey && !args.dryRun) {
+  // Write-back. A deferred update changed nothing in Jira, so recording a
+  // Change Log row saying it did is the drift this gate exists to prevent.
+  if (result?.issueKey && !args.dryRun && !deferredRecord) {
     updateEpicFile({
       filePath,
       issueKey: result.issueKey,
@@ -1348,6 +1413,8 @@ async function run({
       jira_last_synced_at: result?.updated || null,
       jira_last_body_hash: newBodyHash,
       jira_last_meta_hash: newMetaHash,
+      reason: deferredRecord ? "deferred" : null,
+      record: deferredRecord,
     });
   }
 

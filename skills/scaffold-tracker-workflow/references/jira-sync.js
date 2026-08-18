@@ -27,6 +27,19 @@ const { execSync } = require("child_process");
 // and a GitHub-only consumer must not pull the Jira client in behind it.
 const tw = require("./tracker-workflow.js");
 
+// The deferred-mutation writer (task.52). Required here so that the access gate
+// below can record what it refuses; the bundler follows this sibling require and
+// ships defer-mutation.js — and, transitively, the roster doc it parses — into
+// every skill that carries this file.
+const dm = require("./defer-mutation.js");
+
+// ACCESS_TRACKER captured at require time, BEFORE anything can call
+// loadDotEnv(). A dot-env file must not be able to escalate a restriction the
+// operator declared into a tracker write. Same contract as jira-stage.js:289.
+const ACCESS_ENV_AT_LOAD = Object.freeze({
+  ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+});
+
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
 // "not in a repo, fall back to defaults". Without "ignore" on stderr that
 // silent fallback prints a `fatal: not a git repository` line per call, which
@@ -1584,21 +1597,193 @@ function authHeader(email, token) {
   return `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
 }
 
+// ---------------------------------------------------------------------------
+// The access gate — layer 1 (task.53)
+// ---------------------------------------------------------------------------
+//
+// Under any `access.tracker` mode other than `full`, a non-GET through this
+// module is REFUSED and RECORDED rather than executed. It is a net, not a
+// description: a mutation path nobody has annotated still cannot reach the
+// network, it just renders generically. Layer 2 (the `defer:` annotation the
+// semantic mutators pass) is what turns "PUT /rest/api/3/issue/PROJ-1 {…}" into
+// "set Team to Platform".
+//
+// The one exception is a read wearing a POST — see READ_VIA_POST.
+
+// Jira takes a JQL query in a request body, so `findExistingByLabel` searches
+// with POST. Refusing it would make every sync skill see "no existing issue"
+// and create a duplicate on the next run — the opposite of safe. Matched by
+// URL, never by "it looked like a read".
+const READ_VIA_POST = [/\/rest\/api\/3\/search(\/|\?|$)/];
+
+function isReadViaPost(url) {
+  const u = String(url || "");
+  return READ_VIA_POST.some((re) => re.test(u));
+}
+
+/** The endpoint path, with the origin and any query string dropped. */
+function endpointOf(url) {
+  const u = String(url || "");
+  const m = /^https?:\/\/[^/]+(\/[^?#]*)/.exec(u);
+  return m ? m[1] : u.split("?")[0];
+}
+
+/**
+ * What a refused mutation returns to its caller.
+ *
+ * `ok: true` and a 202 are deliberate. Callers throw on `!resp.ok`, and a
+ * deferral is not a failure — the work was recorded for a human, not lost. The
+ * `deferred` flag is how a caller that must return a different SHAPE (a create
+ * has no issue key to give back) knows to branch; everything else carries on.
+ */
+function deferredResponse(record) {
+  return {
+    ok: true,
+    status: 202,
+    statusText: "Accepted (deferred)",
+    deferred: true,
+    deferredRecord: record ? record.id : null,
+    headers: { get: () => null },
+    async json() {
+      return {};
+    },
+    async text() {
+      return "";
+    },
+  };
+}
+
+/**
+ * Record one refused mutation and hand back the synthetic response.
+ *
+ * `annotation` is layer 2: `{kind, intent, target, desired, …}` supplied by a
+ * semantic mutator. Absent, the record is a `jira.unknown-mutation` — legible
+ * enough to act on, loud enough to notice, and never executed.
+ */
+function recordRefusal({ url, method, access, system, annotation, ctx }) {
+  const a = annotation || {};
+  let rec = null;
+  try {
+    const input = {
+      kind: a.kind || "jira.unknown-mutation",
+      system: a.system || system,
+      access,
+      intent:
+        a.intent ||
+        `Perform ${method} ${endpointOf(url)} by hand — no semantic annotation, ` +
+          `so what it would have changed is not known here`,
+      target: a.target || { url: String(url), name: endpointOf(url) },
+      desired:
+        a.desired === undefined
+          ? { method, endpoint: endpointOf(url) }
+          : a.desired,
+      skill: a.skill || ctx.skill,
+      step: a.step === undefined ? ctx.step : a.step,
+      run: a.run || ctx.run,
+    };
+    for (const k of [
+      "consequence",
+      "produces",
+      "dependsOn",
+      "manual",
+      "command",
+      "verify",
+      "retry_of",
+    ]) {
+      if (a[k] !== undefined) input[k] = a[k];
+    }
+    rec = dm.defer(input, ctx.cwd ? { cwd: ctx.cwd } : {});
+  } catch (e) {
+    // Same contract as jira-stage.js: a journal we could not write is a
+    // warning, never a licence to perform the mutation anyway.
+    const warn =
+      (ctx.output && ctx.output.warn) ||
+      ((m) => process.stderr.write(`${m}\n`));
+    warn(
+      `⚠️  Could not record the deferred ${method} ${endpointOf(url)}: ${e.message}`,
+    );
+  }
+  return deferredResponse(rec);
+}
+
+/**
+ * Turn a Jira `fields` payload into something a human can act on.
+ *
+ * This is the whole reason layer 2 exists. `PUT /rest/api/3/issue/PROJ-1 {…}`
+ * tells an operator nothing; `Team = Platform` tells them exactly what to type.
+ * A value the shape cannot express in one line (an ADF description, say) is
+ * NAMED rather than dumped — a checklist item nobody can read is as useless as
+ * no checklist item, and the document already holds the prose.
+ */
+function summariseFields(fields) {
+  const short = (v) => {
+    const t = String(v);
+    return t.length > 120 ? `${t.slice(0, 117)}…` : t;
+  };
+  const oneLine = (v) => {
+    if (v === null || v === undefined) return null;
+    if (typeof v !== "object") return short(v);
+    if (Array.isArray(v)) return short(v.map((x) => oneLine(x)).join(", "));
+    const named = v.name ?? v.value ?? v.key ?? v.id;
+    return named === undefined
+      ? "(structured value — see the work-item document)"
+      : short(named);
+  };
+  const out = {};
+  for (const [k, v] of Object.entries(fields || {})) out[k] = oneLine(v);
+  return out;
+}
+
 function makeHttp({
   fetchImpl = fetch,
   timeoutMs = 30000,
   retries = 2,
   retryDelayMs = 500,
   maxRetryAfterMs = 60000,
+  // Additive, and defaulted so every existing call site is unaffected: with
+  // ACCESS_TRACKER unset the resolver answers "full" and the branch below is
+  // never taken.
+  access = null,
+  system = "jira",
+  run = undefined,
+  step = undefined,
+  skill = "jira-sync",
+  cwd = undefined,
+  output = undefined,
 } = {}) {
+  const accessMode = access || dm.resolveAccessTracker(ACCESS_ENV_AT_LOAD);
+  const ctx = { run, step, skill, cwd, output };
+
   return async function http(url, opts = {}) {
+    // `defer` is ours, not fetch's. Strip it so the request the transport sees
+    // is byte-identical to the one it saw before this option existed.
+    const { defer: annotation, ...fetchOpts } = opts;
+    const method = String(fetchOpts.method || "GET").toUpperCase();
+
+    // Layer 1 sits ABOVE the retry loop on purpose. Recording inside it would
+    // write one record per attempt for one logical mutation, and a 429 would
+    // then read as three separate things a human must go and do.
+    if (method !== "GET" && accessMode !== "full" && !isReadViaPost(url)) {
+      return recordRefusal({
+        url,
+        method,
+        access: accessMode,
+        system,
+        annotation,
+        ctx,
+      });
+    }
+
     let attempt = 0;
     let lastErr;
     while (attempt <= retries) {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
-        const resp = await fetchImpl(url, { ...opts, signal: ctrl.signal });
+        const resp = await fetchImpl(url, {
+          ...fetchOpts,
+          signal: ctrl.signal,
+        });
         clearTimeout(t);
         if (resp.status === 429 && attempt < retries) {
           const ra = parseRetryAfter(
@@ -1893,7 +2078,27 @@ async function moveToBacklog({
         Accept: "application/json",
       },
       body: JSON.stringify({ issues: [issueKey] }),
+      // Layer 2 — what the gate records if this run may not write.
+      defer: {
+        kind: "jira.backlog.add",
+        intent: `Move ${issueKey} into the backlog of board ${boardId}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: { backlog: `board ${boardId}` },
+      },
     });
+    // A refusal is not a move. Reporting "📋 Moved to backlog" here would be the
+    // exact invisible drift this gate exists to remove.
+    if (resp.deferred) {
+      if (output)
+        output.info(
+          `   ⏸️  Backlog placement deferred (board ${boardId}) — recorded as ${resp.deferredRecord}`,
+        );
+      return { moved: false, reason: "deferred", record: resp.deferredRecord };
+    }
     if (resp.ok || resp.status === 204) {
       if (output) output.info(`   📋 Moved to backlog (board ${boardId})`);
       return { moved: true };
@@ -4193,8 +4398,25 @@ async function putIssueAtomic({
         Accept: "application/json",
       },
       body: JSON.stringify({ fields }),
+      // Layer 2 — the field names and values, not the request body.
+      defer: {
+        kind: "jira.issue.update",
+        intent: `Set ${Object.keys(fields || {}).join(", ") || "fields"} on ${issueKey}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: summariseFields(fields),
+      },
     },
   );
+  // The deferred UPDATE shape: the caller already holds a real issue key, so
+  // only `updated` is unknown. Identical to the --dry-run update path, which is
+  // why every caller already copes with it.
+  if (resp.deferred) {
+    return { updated: null, deferred: true, record: resp.deferredRecord };
+  }
   if (!resp.ok)
     throw new Error(`HTTP ${resp.status}: ${await parseJiraError(resp)}`);
   if (resp.status === 204) {
@@ -4366,6 +4588,9 @@ module.exports = {
   getAuth,
   authHeader,
   makeHttp,
+  isReadViaPost,
+  summariseFields,
+  endpointOf,
   parseRetryAfter,
   sleep,
   parseJiraError,
