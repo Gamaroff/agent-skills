@@ -47,6 +47,7 @@ const fs = require("fs");
 const path = require("path");
 const lib = require("./jira-sync.js");
 const tw = require("./tracker-workflow.js");
+const dm = require("./defer-mutation.js");
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -390,6 +391,105 @@ async function run({
       exitCode: 0,
     });
     return { exitCode: 0, reason: "plan", hops, spansFrom: !!args.from };
+  }
+
+  // ── ACCESS GATE ───────────────────────────────────────────────────────────
+  //
+  // Under any non-`full` tracker access mode this CLI must not touch Jira. It
+  // records what it wanted, exits 0 with `reason: "deferred"`, and the run-end
+  // handover names the card and its target column.
+  //
+  // PLACEMENT IS THE WHOLE POINT. This sits after arg parsing and after the
+  // credential-free modes (--print-plan, --init-workflow, --check) have already
+  // returned, and immediately BEFORE `lib.getAuth()` on the next line — the
+  // first credential read, itself ahead of the first network call. A gate placed
+  // after the issue fetch would have already told the tracker who is asking.
+  //
+  // The comparison is `!== "full"`, never truthiness or emptiness: an UNSET
+  // variable must read as `full`, because this CLI is invoked from seven skills
+  // and six pipeline steps and a gate that misfires stops every one of them
+  // moving cards. `resolveAccessTracker` holds that contract and refuses an
+  // unrecognised value rather than defaulting either way.
+  //
+  // `--dry-run` is exempt: it is a preview that mutates nothing, and every
+  // non-`full` mode still permits reads.
+  let access;
+  try {
+    access = dm.resolveAccessTracker(process.env);
+  } catch (e) {
+    output.err(`Error: ${e.message}`);
+    return { exitCode: 2 };
+  }
+  if (access !== "full" && !args.dryRun) {
+    const { spec, moment } = resolveMomentSpec({
+      stage: args.stage,
+      issueType: args.issueType,
+      record: lib.loadWorkflowRecord(repoRoot),
+      workflow,
+    });
+    if (!spec.enabled) {
+      // A disabled moment is not a deferral — there was never a mutation to
+      // defer. Report it exactly as an unrestricted run would.
+      output.info(
+        `⏭️  Stage ${args.stage} is not enabled${spec.reason ? ` (${spec.reason})` : ""} — nothing to do.`,
+      );
+      return emit({ transitioned: false, reason: "stage-disabled" }, 0);
+    }
+    const target = spec.candidates && spec.candidates[0];
+    const baseUrl = (process.env.JIRA_URL || "").replace(/\/+$/, "");
+    const issueUrl = baseUrl ? `${baseUrl}/browse/${args.issue}` : "";
+    try {
+      const rec = dm.defer({
+        kind: "jira.transition",
+        system: "jira",
+        access,
+        intent: `Move ${args.issue} to ${target || `the ${args.stage} column`}`,
+        target: { issue: args.issue, url: issueUrl, ui_url: issueUrl },
+        desired: { status: target || null },
+        skill: "jira-stage",
+        step: args.stage,
+        run: process.env.PIPELINE_RUN || "",
+        manual: {
+          deepLink: issueUrl,
+          ui: `Open the issue → Status → ${target || `the ${args.stage} column`}`,
+          fields: [{ name: "Status", value: target || "" }],
+        },
+        command: {
+          argv: [
+            "node",
+            "jira-stage.js",
+            "--issue",
+            String(args.issue),
+            "--stage",
+            args.stage,
+            "--json",
+          ],
+          stdin: null,
+        },
+        verify: {
+          cmd: `jira-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
+          expect: `status is "${target || args.stage}"`,
+        },
+      });
+      output.info(
+        `⏸️  access.tracker=${access} — not transitioning ${args.issue}; recorded as ${rec.id}.`,
+      );
+      return emit(
+        {
+          transitioned: false,
+          reason: "deferred",
+          access,
+          target: target || null,
+          record: rec.id,
+        },
+        0,
+      );
+    } catch (e) {
+      // A journal we cannot write is a real problem, but it is not a reason to
+      // fall through and perform the very mutation the mode forbids.
+      output.warn(`⚠️  Could not record the deferred transition: ${e.message}`);
+      return emit({ transitioned: false, reason: "deferred", access }, 0);
+    }
   }
 
   // Absent credentials is a documented, non-failing outcome: the caller falls

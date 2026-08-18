@@ -1458,10 +1458,30 @@ test("gh-stage.js does not depend on jira-sync.js", () => {
     !requires.some((r) => r.includes("jira-sync")),
     `a GitHub-only consumer must not bundle jira-sync.js; found: ${requires.join(", ")}`,
   );
+  // The sibling list is pinned deliberately: this CLI ships to GitHub-only
+  // consumers, and every require here is bundled with it. `defer-mutation.js`
+  // (task.52) is on the list because the access gate needs it; it pulls in only
+  // node built-ins, so the GitHub-only property above still holds transitively.
   assert.deepEqual(requires.filter((r) => r.startsWith(".")).sort(), [
+    "./defer-mutation.js",
     "./tracker-workflow.js",
     "./yaml-subset.js",
   ]);
+
+  const deferSrc = readFileSync(join(__dirname, "..", "defer-mutation.js"), "utf-8");
+  const deferRequires = [...deferSrc.matchAll(/require\(["']([^"']+)["']\)/g)].map(
+    (m) => m[1],
+  );
+  assert.deepEqual(
+    // A module's own name appears in its usage example; that is a self-reference,
+    // not a dependency.
+    deferRequires.filter(
+      (r) => r.startsWith(".") && !r.endsWith("defer-mutation.js"),
+    ),
+    [],
+    "defer-mutation.js must stay dependency-free, or it drags its deps into " +
+      "every GitHub-only consumer of gh-stage.js",
+  );
 });
 
 // ── task.41: --init-workflow and --check ─────────────────────────────────────
