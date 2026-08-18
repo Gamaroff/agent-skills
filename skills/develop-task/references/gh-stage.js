@@ -723,7 +723,15 @@ function run({
   // restriction notice, and a typo in that file would make every one of the six
   // pipeline steps that call this CLI exit 2 with no indication of where the
   // value came from. The resolver owns this key; the dot-env file does not.
-  const accessEnv = { ACCESS_TRACKER: process.env.ACCESS_TRACKER };
+  //
+  // BOTH names, because the resolver reads both: `ACCESS_TRACKER` is
+  // resolve-platform.sh's output and `AGENT_SKILLS_ACCESS_TRACKER` is the knob
+  // an operator sets. Capturing only the first made the shared resolver blind to
+  // the operator knob no matter how many tiers it grew.
+  const accessEnv = {
+    ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+    AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+  };
 
   loadDotEnv(root);
 

@@ -1563,12 +1563,23 @@ test("§14 C2-CR2 the stage CLI gate is not looser than the gate underneath it",
     ),
     "manual",
   );
-  const stage = fs.readFileSync(path.join(SHARED, "jira-stage.js"), "utf8");
-  assert.match(
-    stage,
-    /resolveAccessTracker/,
-    "the stage CLI must share the resolver, not read one env var",
-  );
+  // Sharing the resolver is not enough: both stage CLIs capture the env BEFORE
+  // loadDotEnv and hand the resolver that snapshot, so a capture naming only
+  // ACCESS_TRACKER makes the shared resolver blind to the operator knob. The
+  // first version of this fix did exactly that, and this assertion is what
+  // catches it — asserting the resolver in isolation did not.
+  for (const cli of ["jira-stage.js", "gh-stage.js"]) {
+    const src = fs.readFileSync(path.join(SHARED, cli), "utf8");
+    assert.match(src, /resolveAccessTracker/, `${cli} must share the resolver`);
+    const capture = /const accessEnv = \{[^}]*\}/s.exec(src);
+    assert.ok(capture, `${cli}: no accessEnv capture found`);
+    assert.match(
+      capture[0],
+      /AGENT_SKILLS_ACCESS_TRACKER/,
+      `${cli}: the capture must carry the operator knob, or the shared resolver ` +
+        `never sees it and this CLI's gate is looser than the net beneath it`,
+    );
+  }
 });
 
 test("§14 C2-CR3 a refused transition alone still reports reason: deferred", () => {
