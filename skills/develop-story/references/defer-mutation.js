@@ -54,6 +54,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { parseYamlSubset } = require("./yaml-subset.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_JOURNAL = ".claude/state/tracker-actions.jsonl";
@@ -496,18 +497,90 @@ function redactDeep(value, envTable, keyPath = "") {
  * @param {Record<string,string>} [env]
  * @returns {"full"|"read-only"|"approve"|"command"|"manual"}
  */
-function resolveAccessTracker(env = process.env) {
-  const raw = String((env && env.ACCESS_TRACKER) || "").trim();
-  if (!raw) return "full";
-  if (!ACCESS_MODES.includes(raw)) {
-    throw new Error(
-      `ACCESS_TRACKER="${raw}" is not a recognised access mode. ` +
-        `Known: ${ACCESS_MODES.join(", ")}. Refusing rather than defaulting to ` +
-        `"full", because that would silently escalate a declared restriction ` +
-        `into a tracker write.`,
-    );
+function resolveAccessTracker(env = process.env, opts = {}) {
+  // THREE tiers, most-restrictive-wins — the same contract resolve-platform.sh
+  // documents, and the reason this function now lives in one place instead of
+  // four. Cycle 2 found what four copies cost: jira-sync.js read one env var,
+  // the stage CLIs read a different one, and NONE of them read the config key an
+  // operator actually edits, so `access: {tracker: manual}` in skills-config.yaml
+  // was ignored by every bare `node …` invocation the skills document.
+  //
+  //   1. ACCESS_TRACKER                — the resolver's own output
+  //   2. AGENT_SKILLS_ACCESS_TRACKER   — the knob an operator sets
+  //   3. access.tracker in skills-config.yaml — the committed declaration
+  //
+  // Most-restrictive-wins rather than first-wins: picking the wrong tracker is a
+  // mistake, picking the wrong access is an escalation. A run may lock itself
+  // down; nothing may loosen a config that deliberately restricts.
+  const candidates = [
+    env && env.ACCESS_TRACKER,
+    env && env.AGENT_SKILLS_ACCESS_TRACKER,
+  ];
+  if (opts.config !== false) candidates.push(readConfiguredAccessTracker(opts));
+
+  const seen = candidates.map((v) => String(v || "").trim()).filter(Boolean);
+  if (!seen.length) return "full";
+
+  // An UNRECOGNISED value is refused rather than defaulted. Defaulting a typo to
+  // `full` would turn a declared restriction into an unintended tracker write —
+  // the failure mode this whole sequence exists to remove.
+  for (const raw of seen) {
+    if (!ACCESS_MODES.includes(raw)) {
+      throw new Error(
+        `ACCESS_TRACKER="${raw}" is not a recognised access mode. ` +
+          `Known: ${ACCESS_MODES.join(", ")}. Refusing rather than defaulting to ` +
+          `"full", because that would silently escalate a declared restriction ` +
+          `into a tracker write.`,
+      );
+    }
   }
-  return raw;
+  return seen.reduce((a, b) => (ACCESS_RANK[b] < ACCESS_RANK[a] ? b : a));
+}
+
+// Permissiveness order, least to most. Mirrors resolve-platform.sh's access_rank.
+const ACCESS_RANK = Object.freeze({
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+});
+
+// `access.tracker` from skills-config.yaml, or "" when absent/unreadable.
+//
+// Memoised per resolved path: the gate is consulted once per mutation and a
+// stat+parse per Jira call is waste. A malformed file reads as ABSENT here on
+// purpose — the strict refusal for that case belongs to read-config.sh, which
+// runs before any of this and halts; duplicating it would mean two different
+// answers to the same question.
+const _cfgAccessCache = new Map();
+
+function readConfiguredAccessTracker({ cwd, configPath } = {}) {
+  try {
+    let file = configPath;
+    if (!file) {
+      let dir = cwd || process.cwd();
+      for (let i = 0; i < 12; i++) {
+        const candidate = path.join(dir, "skills-config.yaml");
+        if (fs.existsSync(candidate)) {
+          file = candidate;
+          break;
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+      }
+    }
+    if (!file) return "";
+    if (_cfgAccessCache.has(file)) return _cfgAccessCache.get(file);
+    const doc = parseYamlSubset(fs.readFileSync(file, "utf8"));
+    const v = doc && doc.access && doc.access.tracker;
+    const out = typeof v === "string" ? v.trim() : "";
+    _cfgAccessCache.set(file, out);
+    return out;
+  } catch (_) {
+    return "";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -836,6 +909,7 @@ Provenance:
 Other:
   --journal <path>      override the journal path
   --list-kinds          print the roster and exit
+  --resolve-access      print the resolved access mode and exit (for shell gates)
   --json                print the written record as JSON
   -h, --help`;
 
@@ -858,6 +932,9 @@ function parseArgs(argv) {
         break;
       case "--json":
         args.json = true;
+        break;
+      case "--resolve-access":
+        args.resolveAccess = true;
         break;
       case "--list-kinds":
         args.listKinds = true;
@@ -1007,6 +1084,20 @@ function run({
     return { exitCode: 2 };
   }
 
+  // The one resolver, reachable from a shell. jira-sprint-lib.sh calls this
+  // rather than carrying a fourth copy of the mode table — and a copy is exactly
+  // what a shell gate cannot keep in step, since the config tier needs a YAML
+  // read that bash has no business doing.
+  if (args.resolveAccess) {
+    try {
+      console.log(resolveAccessTracker());
+      return { exitCode: 0 };
+    } catch (e) {
+      console.error(e.message);
+      return { exitCode: 2 };
+    }
+  }
+
   if (args.listKinds) {
     for (const spec of roster.values()) {
       console.log(`${spec.kind}\t${spec.consequence}\t${spec.produces || "-"}`);
@@ -1092,6 +1183,8 @@ module.exports = {
   CONSEQUENCES,
   CONSEQUENCE_RANK,
   resolveAccessTracker,
+  readConfiguredAccessTracker,
+  ACCESS_RANK,
   parseRoster,
   loadRoster,
   buildEnvTable,

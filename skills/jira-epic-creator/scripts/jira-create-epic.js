@@ -28,37 +28,18 @@ try {
   dm = null;
 }
 
-// CR-2 — read BOTH names, most-restrictive-wins. `ACCESS_TRACKER` is an OUTPUT
-// of resolve-platform.sh, which this script never sources; the knob an operator
-// actually sets is `AGENT_SKILLS_ACCESS_TRACKER`. Reading only the output left
-// the gate resolving to "full" for exactly the person who had declared a
-// restriction. An unrecognised value is refused, never defaulted.
-const ACCESS_RANK = {
-  manual: 0,
-  command: 1,
-  approve: 2,
-  "read-only": 3,
-  full: 4,
-};
-
+// CYCLE-2 CR-5 — delegate to the one resolver rather than keeping a third copy
+// of the mode table. It reads ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and
+// `access.tracker` in skills-config.yaml, most-restrictive-wins, and refuses an
+// unrecognised value rather than defaulting to "full".
 function accessTracker() {
-  const seen = [
-    process.env.ACCESS_TRACKER,
-    process.env.AGENT_SKILLS_ACCESS_TRACKER,
-  ]
-    .map((v) => String(v || "").trim())
-    .filter(Boolean);
-  if (!seen.length) return "full";
-  for (const v of seen) {
-    if (!(v in ACCESS_RANK)) {
-      console.error(
-        `Error: access.tracker="${v}" is not a recognised access mode. ` +
-          `Known: ${Object.keys(ACCESS_RANK).join(", ")}.`,
-      );
-      process.exit(1);
-    }
+  if (!dm) return "full"; // no writer bundled — the gate below still refuses
+  try {
+    return dm.resolveAccessTracker();
+  } catch (e) {
+    console.error(`Error: ${e.message}`);
+    process.exit(1);
   }
-  return seen.reduce((a, b) => (ACCESS_RANK[b] < ACCESS_RANK[a] ? b : a));
 }
 
 async function parseFrontmatter(content) {

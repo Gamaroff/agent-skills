@@ -37,37 +37,15 @@ const dm = require("./defer-mutation.js");
 // loadDotEnv(). A dot-env file must not be able to escalate a restriction the
 // operator declared into a tracker write.
 //
-// CR-2 — read BOTH names, most-restrictive-wins. `ACCESS_TRACKER` is an OUTPUT
-// of resolve-platform.sh; `AGENT_SKILLS_ACCESS_TRACKER` is the knob an operator
-// actually sets. These scripts are documented as bare `node …` invocations that
-// never source the resolver, so reading only the output left the gate resolving
-// to "full" for exactly the person who had declared a restriction.
-const ACCESS_RANK = Object.freeze({
-  manual: 0,
-  command: 1,
-  approve: 2,
-  "read-only": 3,
-  full: 4,
-});
-
-function mostRestrictiveAccess(env = process.env) {
-  const seen = [env.ACCESS_TRACKER, env.AGENT_SKILLS_ACCESS_TRACKER]
-    .map((v) => String(v || "").trim())
-    .filter(Boolean);
-  if (!seen.length) return "full";
-  // An unrecognised value is REFUSED, never defaulted — defaulting a typo to
-  // "full" turns a declared restriction into an unintended tracker write.
-  for (const v of seen) {
-    if (!(v in ACCESS_RANK)) {
-      throw new Error(
-        `access.tracker="${v}" is not a recognised access mode. ` +
-          `Known: ${Object.keys(ACCESS_RANK).join(", ")}. Refusing rather than ` +
-          `defaulting to "full", because that would silently escalate a declared ` +
-          `restriction into a tracker write.`,
-      );
-    }
-  }
-  return seen.reduce((a, b) => (ACCESS_RANK[b] < ACCESS_RANK[a] ? b : a));
+// CYCLE-2 CR-5 — ONE resolver, in defer-mutation.js. This file used to carry
+// its own copy of the mode table, jira-create-epic.js a third and
+// jira-sprint-lib.sh a fourth, and the cost showed up immediately: each read a
+// different subset of the tiers, and none read the `access.tracker` key an
+// operator actually edits. `dm.resolveAccessTracker` reads all three tiers —
+// ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and skills-config.yaml —
+// most-restrictive-wins.
+function mostRestrictiveAccess(env = process.env, opts = {}) {
+  return dm.resolveAccessTracker(env, opts);
 }
 
 const ACCESS_ENV_AT_LOAD = Object.freeze({
@@ -1750,6 +1728,8 @@ function recordRefusal({ url, method, access, system, annotation, ctx }) {
  * NAMED rather than dumped — a checklist item nobody can read is as useless as
  * no checklist item, and the document already holds the prose.
  */
+const EMPTY_VALUE = "(structured value — see the work-item document)";
+
 function summariseFields(fields) {
   const short = (v) => {
     const t = String(v);
@@ -1765,21 +1745,26 @@ function summariseFields(fields) {
       const parts = v
         .map((x) => oneLine(x))
         .filter((x) => x !== null && x !== "");
-      return parts.length ? short(parts.join(", ")) : null;
+      // CYCLE-2 CR-4 — NOT null. describeDesired renders a null with
+      // JSON.stringify, so an empty `components: []` printed
+      // "components = null" in the operator's checklist — the same literal-null
+      // rendering this function was just fixed to stop producing.
+      return parts.length ? short(parts.join(", ")) : EMPTY_VALUE;
     }
     // CR-8 — `timetracking` is a field THESE scripts send, and it carries no
     // name/value/key/id, so it used to be discarded as "structured". The value
     // is exactly the kind a human could type, so name the shape explicitly.
     if (v.originalEstimate !== undefined || v.remainingEstimate !== undefined) {
       const est = v.originalEstimate ?? v.remainingEstimate;
-      return est === null || est === undefined ? null : short(est);
+      // CYCLE-2 CR-4 — an empty string is not an estimate a human can act on.
+      return est === null || est === undefined || String(est).trim() === ""
+        ? EMPTY_VALUE
+        : short(est);
     }
     const named = v.name ?? v.value ?? v.key ?? v.id;
     // CR-8 — `?? ` treats an explicit null as "present", so `{name: null}` used
     // to render as the literal string "null". An unusable value is not a value.
-    return named === undefined || named === null
-      ? "(structured value — see the work-item document)"
-      : short(named);
+    return named === undefined || named === null ? EMPTY_VALUE : short(named);
   };
   const out = {};
   for (const [k, v] of Object.entries(fields || {})) out[k] = oneLine(v);

@@ -322,7 +322,7 @@ rather than the deferral, so a failed journal write reports success (**CR-3**).
 | 2026-08-18 |  | Status → ready-for-development | review-task |
 | 2026-08-18 |  | Implemented — 22 files, 19 new tests (suite 1352 → 1371); 6 invariants watched failing | develop |
 | 2026-08-18 |  | QA gate FAIL (20/100) — 3 high, 2 medium, 4 low; the net holds, the callers do not | qa-task |
-| 2026-08-18 |  | QA findings fixed — 5 bugs + 3 cleanups + 1 QA note, 1 iteration; 7 further invariants watched failing | qa-fix |
+| 2026-08-18 |  | QA cycle 2 — 5 findings in the cycle-1 fixes; access resolution consolidated into one three-tier resolver | qa-fix |
 
 ## References
 

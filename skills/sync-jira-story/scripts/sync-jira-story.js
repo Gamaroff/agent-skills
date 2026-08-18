@@ -1205,8 +1205,13 @@ async function run({
       jira_last_synced_at: result?.updated || null,
       jira_last_body_hash: newBodyHash,
       jira_last_meta_hash: newMetaHash,
-      reason: deferred ? "deferred" : null,
-      record: deferredRecord,
+      // CYCLE-2 CR-3 — THREE deferral sources, not two. The create and the PUT
+      // set the flag directly; a refused status transition is the third, and on
+      // the no-field-changes path it is the ONLY one, so keying `reason` off the
+      // flag alone reported `null` for a run that refused and recorded a write.
+      reason:
+        deferred || statusOutcome?.reason === "deferred" ? "deferred" : null,
+      record: deferredRecord || statusOutcome?.record || null,
     });
   }
 

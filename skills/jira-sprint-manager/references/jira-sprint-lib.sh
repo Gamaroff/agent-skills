@@ -41,27 +41,48 @@ jsm_auth_header() {
 #   JSM_DEFER_INTENT   one line, imperative, human-facing
 #   JSM_DEFER_TARGET   JSON object, e.g. '{"sprint":"42","url":"…"}'
 #   JSM_DEFER_DESIRED  JSON object, e.g. '{"state":"closed"}'
-# CR-2 — read BOTH names, most-restrictive-wins. `ACCESS_TRACKER` is an OUTPUT of
-# resolve-platform.sh; `AGENT_SKILLS_ACCESS_TRACKER` is the knob an operator sets.
-# This skill's own SKILL.md documents bare `manage-sprint-state.sh <id> closed`
-# invocations that never source the resolver, so reading only the output left the
-# gate resolving to "full" for exactly the person who had declared a restriction.
-# An unrecognised value is REFUSED, never defaulted — the same contract as the
-# resolver and defer-mutation.js.
+# CYCLE-2 CR-1/CR-5 — ask the ONE resolver rather than keeping a fourth copy of
+# the mode table here. It reads ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and
+# `access.tracker` in skills-config.yaml, most-restrictive-wins. The config tier
+# is why this cannot stay in bash: an operator who declares the restriction in
+# committed config and sets no env var was previously resolving to "full" in
+# exactly the bare invocation this skill's own SKILL.md documents.
+#
+# Memoised for the life of the shell — the gate is consulted once per call and a
+# node spawn per chunk of a 50-issue move is waste.
+#
+# Returns the mode, or `__INVALID__:<value>`. NOT `exit 1`: this runs inside
+# `$(...)`, where an exit kills only the subshell — the caller printed "Refusing"
+# and then carried on with an empty mode. The caller exits in its own shell.
 jsm_access_mode() {
-  local best="full" v rank_best rank_v
+  if [ -n "${JSM_ACCESS_MODE_CACHE:-}" ]; then
+    printf '%s' "$JSM_ACCESS_MODE_CACHE"
+    return 0
+  fi
+  local writer out rc
+  writer="$(dirname "${BASH_SOURCE[0]}")/defer-mutation.js"
+  if [ -f "$writer" ] && command -v node >/dev/null 2>&1; then
+    out=$(node "$writer" --resolve-access 2>&1)
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      JSM_ACCESS_MODE_CACHE="__INVALID__:$out"
+      printf '%s' "$JSM_ACCESS_MODE_CACHE"
+      return 0
+    fi
+    JSM_ACCESS_MODE_CACHE="$out"
+    printf '%s' "$out"
+    return 0
+  fi
+  # No node and no writer: fall back to the env tier alone, most-restrictive-wins.
+  # Degraded, and deliberately so — a missing writer must not read as "full" when
+  # an env var says otherwise.
+  local best="full" v rank_v rank_best
   for v in "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
     [ -z "$v" ] && continue
     case "$v" in
-      manual)    rank_v=0 ;;
-      command)   rank_v=1 ;;
-      approve)   rank_v=2 ;;
-      read-only) rank_v=3 ;;
-      full)      rank_v=4 ;;
-      *)
-        echo "access.tracker=\"$v\" is not a recognised access mode (manual, command, approve, read-only, full). Refusing rather than defaulting to \"full\"." >&2
-        exit 1
-        ;;
+      manual) rank_v=0 ;; command) rank_v=1 ;; approve) rank_v=2 ;;
+      read-only) rank_v=3 ;; full) rank_v=4 ;;
+      *) printf '%s' "__INVALID__:$v"; return 0 ;;
     esac
     case "$best" in
       manual) rank_best=0 ;; command) rank_best=1 ;; approve) rank_best=2 ;;
@@ -69,6 +90,7 @@ jsm_access_mode() {
     esac
     [ "$rank_v" -lt "$rank_best" ] && best="$v"
   done
+  JSM_ACCESS_MODE_CACHE="$best"
   printf '%s' "$best"
 }
 
@@ -76,7 +98,7 @@ jsm_access_mode() {
 # callers run under `set -euo pipefail` and branch on them, so returning without
 # them converts a deferral into a failed run.
 jsm_defer() {
-  local method=$1 url=$2
+  local method=$1 url=$2 JSM_ACCESS_MODE=${3:-}
   local writer kind intent target desired
   writer="$(dirname "${BASH_SOURCE[0]}")/defer-mutation.js"
   kind=${JSM_DEFER_KIND:-jira.unknown-mutation}
@@ -89,7 +111,7 @@ jsm_defer() {
     record_id=$(node "$writer" \
       --kind "$kind" \
       --intent "$intent" \
-      --access "$(jsm_access_mode)" \
+      --access "${JSM_ACCESS_MODE:-$(jsm_access_mode)}" \
       --target "$target" \
       --desired "$desired" \
       --skill "jira-sprint-manager" --json 2>/dev/null \
@@ -128,8 +150,18 @@ jsm_curl() {
 
   # Fail closed, and BEFORE the retry loop — recording inside it would write one
   # record per attempt for one logical mutation.
-  if [ "$method" != "GET" ] && [ "$(jsm_access_mode)" != "full" ]; then
-    jsm_defer "$method" "$url"
+  local mode
+  mode=$(jsm_access_mode)
+  case "$mode" in
+    __INVALID__:*)
+      # Refuse in the CALLER's shell. An unrecognised mode is not a mode, and
+      # guessing "full" would turn a declared restriction into a tracker write.
+      echo "${mode#__INVALID__:}" >&2
+      exit 1
+      ;;
+  esac
+  if [ "$method" != "GET" ] && [ "$mode" != "full" ]; then
+    jsm_defer "$method" "$url" "$mode"
     return 0
   fi
 

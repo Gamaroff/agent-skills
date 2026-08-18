@@ -1475,16 +1475,46 @@ test("gh-stage.js does not depend on jira-sync.js", () => {
   const deferRequires = [
     ...deferSrc.matchAll(/require\(["']([^"']+)["']\)/g),
   ].map((m) => m[1]);
+  // task.53 widened this from "no siblings at all" to "no siblings that bring
+  // anything with them", which is what the rationale below actually protects.
+  // `yaml-subset.js` is the one entry: the access resolver has to read
+  // `access.tracker` from skills-config.yaml, and a second hand-rolled YAML
+  // reader inside defer-mutation.js is the duplication that let the config tier
+  // go missing from four separate gates in the first place. It is a 151-line
+  // pure parser that gh-stage.js ALREADY requires directly, so on the consumer
+  // this test speaks for it costs nothing at all.
+  const ALLOWED_DEFER_SIBLINGS = ["./yaml-subset.js"];
   assert.deepEqual(
     // A module's own name appears in its usage example; that is a self-reference,
     // not a dependency.
     deferRequires.filter(
-      (r) => r.startsWith(".") && !r.endsWith("defer-mutation.js"),
+      (r) =>
+        r.startsWith(".") &&
+        !r.endsWith("defer-mutation.js") &&
+        !ALLOWED_DEFER_SIBLINGS.includes(r),
     ),
     [],
-    "defer-mutation.js must stay dependency-free, or it drags its deps into " +
-      "every GitHub-only consumer of gh-stage.js",
+    "defer-mutation.js must stay dependency-free apart from the allowlist, or " +
+      "it drags its deps into every GitHub-only consumer of gh-stage.js",
   );
+
+  // The property the allowlist rests on, asserted rather than assumed: each
+  // allowed sibling must itself be a leaf. Without this the allowlist would be
+  // a hole — one entry today, a transitive tree tomorrow.
+  for (const sibling of ALLOWED_DEFER_SIBLINGS) {
+    const src2 = readFileSync(
+      join(__dirname, "..", sibling.replace("./", "")),
+      "utf-8",
+    );
+    const siblingRequires = [
+      ...src2.matchAll(/require\(["']([^"']+)["']\)/g),
+    ].map((m) => m[1]);
+    assert.deepEqual(
+      siblingRequires.filter((r) => r.startsWith(".")),
+      [],
+      `${sibling} must be a leaf — it is bundled into every consumer of defer-mutation.js`,
+    );
+  }
 });
 
 // ── task.41: --init-workflow and --check ─────────────────────────────────────

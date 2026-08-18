@@ -1260,8 +1260,9 @@ test("§13 CR-3 the sync scripts gate on the flag, not the record id", () => {
     );
     assert.match(
       src,
-      /reason: deferred \? "deferred" : null/,
-      `${skill}: --json reason must follow the flag too`,
+      /reason:\s*\n?\s*deferred \|\|/,
+      `${skill}: --json reason must follow the flag (and, per §14, the ` +
+        `transition outcome as well)`,
     );
   }
 });
@@ -1390,5 +1391,242 @@ test("§13 CR-5 the notice names what is gated and what is not", () => {
     src,
     /all Jira writes/,
     "the previous wording overstated coverage, which the notice itself calls worse than none",
+  );
+});
+
+test("§13 CR-2b an unrecognised mode aborts the sprint caller, not just a subshell", () => {
+  // Found during the cycle-2 re-review of the CR-2 fix itself. `jsm_access_mode`
+  // is called as `$(jsm_access_mode)`, and an `exit 1` inside command
+  // substitution kills only the subshell: the caller printed "Refusing" and then
+  // carried on with an empty mode. A refusal that does not refuse is worse than
+  // no refusal, because the message says it did.
+  const r = spawnSync(
+    "bash",
+    [
+      "-c",
+      `set -euo pipefail
+       source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
+       JIRA_INSTANCE=x; JIRA_USER_EMAIL=a@b.c; JIRA_API_TOKEN=t
+       jsm_curl POST "https://x/y" "{}"
+       echo "REACHED-AFTER"`,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, ACCESS_TRACKER: "bogus" },
+      timeout: 20000,
+    },
+  );
+  assert.equal(r.status, 1, "the caller must exit non-zero");
+  assert.match(r.stderr, /not a recognised access mode/);
+  assert.doesNotMatch(
+    r.stdout,
+    /REACHED-AFTER/,
+    "execution must not continue past a refused mode",
+  );
+});
+
+// ── 14. Cycle-2 findings: the fixes were new code, and carried their own bugs ─
+
+test("§14 C2-CR1 a config-declared restriction holds with no env var set at all", async () => {
+  await withTmp(async (dir) => {
+    fs.writeFileSync(
+      path.join(dir, "skills-config.yaml"),
+      "access:\n  tracker: manual\n",
+    );
+    // The env tiers are the ones the first fix taught the gates about. This is
+    // the tier an operator actually edits and commits, and every gate ignored
+    // it — so the documented bare invocation performed the write.
+    assert.equal(
+      dm.resolveAccessTracker(
+        {},
+        { configPath: path.join(dir, "skills-config.yaml") },
+      ),
+      "manual",
+    );
+    // Most-restrictive-wins across all three tiers, in both directions.
+    assert.equal(
+      dm.resolveAccessTracker(
+        { ACCESS_TRACKER: "full" },
+        { configPath: path.join(dir, "skills-config.yaml") },
+      ),
+      "manual",
+      "a permissive env var must never loosen a config that restricts",
+    );
+  });
+});
+
+test("§14 C2-CR1 the sprint script honours a config-only restriction end to end", async () => {
+  await withTmp(async (dir) => {
+    fs.writeFileSync(
+      path.join(dir, "skills-config.yaml"),
+      "access:\n  tracker: manual\n",
+    );
+    const env = { ...process.env };
+    delete env.ACCESS_TRACKER;
+    delete env.AGENT_SKILLS_ACCESS_TRACKER;
+    const r = spawnSync(
+      "bash",
+      [
+        path.join(
+          REPO,
+          "skills",
+          "jira-sprint-manager",
+          "scripts",
+          "manage-sprint-state.sh",
+        ),
+        "42",
+        "closed",
+      ],
+      {
+        encoding: "utf8",
+        cwd: dir,
+        env: {
+          ...env,
+          JIRA_INSTANCE: "acme.atlassian.net",
+          JIRA_USER_EMAIL: "a@b.c",
+          JIRA_API_TOKEN: "t",
+        },
+        timeout: 30000,
+      },
+    );
+    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    assert.match(
+      r.stdout,
+      /NOT transitioned/,
+      "no env var, and the gate still fires",
+    );
+    const recs = journal(dir);
+    assert.equal(recs.length, 1);
+    assert.equal(
+      recs[0].access,
+      "manual",
+      "the record names the mode that was in force",
+    );
+  });
+});
+
+test("§14 C2-CR2 every gate resolves the mode the same way", () => {
+  // The four hand-rolled copies are gone. Anything that still ranks modes
+  // locally is a copy that will drift — which is exactly how the config tier
+  // came to be missing from all four.
+  const shared = fs.readFileSync(
+    path.join(SHARED, "defer-mutation.js"),
+    "utf8",
+  );
+  assert.match(
+    shared,
+    /AGENT_SKILLS_ACCESS_TRACKER/,
+    "the one resolver reads both env names",
+  );
+  assert.match(shared, /readConfiguredAccessTracker/, "and the config tier");
+
+  for (const f of [
+    path.join(SHARED, "jira-sync.js"),
+    path.join(
+      REPO,
+      "skills",
+      "jira-epic-creator",
+      "scripts",
+      "jira-create-epic.js",
+    ),
+  ]) {
+    const src = fs.readFileSync(f, "utf8");
+    assert.match(
+      src,
+      /resolveAccessTracker/,
+      `${path.relative(REPO, f)} must delegate, not re-rank`,
+    );
+    assert.doesNotMatch(
+      src,
+      /const ACCESS_RANK = \{/,
+      `${path.relative(REPO, f)} keeps its own mode table — that is the drift`,
+    );
+  }
+  const sh = fs.readFileSync(path.join(SHARED, "jira-sprint-lib.sh"), "utf8");
+  assert.match(
+    sh,
+    /--resolve-access/,
+    "the shell gate asks the one resolver too",
+  );
+});
+
+test("§14 C2-CR2 the stage CLI gate is not looser than the gate underneath it", () => {
+  // jira-stage.js calls dm.resolveAccessTracker. Before the consolidation it saw
+  // only ACCESS_TRACKER, so with the operator knob alone it read "full", skipped
+  // its purpose-built jira.transition deferral, and fell through to the layer-1
+  // net — which refused the same POST as an untyped jira.unknown-mutation and
+  // turned a --strict run into a failure.
+  assert.equal(
+    dm.resolveAccessTracker(
+      { AGENT_SKILLS_ACCESS_TRACKER: "manual" },
+      { config: false },
+    ),
+    "manual",
+  );
+  const stage = fs.readFileSync(path.join(SHARED, "jira-stage.js"), "utf8");
+  assert.match(
+    stage,
+    /resolveAccessTracker/,
+    "the stage CLI must share the resolver, not read one env var",
+  );
+});
+
+test("§14 C2-CR3 a refused transition alone still reports reason: deferred", () => {
+  // The create and the PUT set the flag directly. A refused TRANSITION is the
+  // third source, and on the no-field-changes path it is the ONLY one — so
+  // keying `reason` off the flag alone reported null for a run that refused and
+  // recorded a write.
+  for (const [skill, script] of [
+    ["sync-jira-story", "sync-jira-story.js"],
+    ["sync-jira-task", "sync-jira-task.js"],
+    ["sync-jira-epic", "sync-jira-epic.js"],
+  ]) {
+    const src = fs.readFileSync(
+      path.join(REPO, "skills", skill, "scripts", script),
+      "utf8",
+    );
+    assert.match(
+      src,
+      /statusOutcome\?\.reason === "deferred"/,
+      `${skill}: --json must see the transition deferral too`,
+    );
+    assert.match(
+      src,
+      /record: deferredRecord \|\| statusOutcome\?\.record/,
+      `${skill}: and point at the record it wrote`,
+    );
+  }
+});
+
+test("§14 C2-CR4 an empty list renders as a named absence, never the string null", () => {
+  const out = lib.summariseFields({
+    components: [],
+    labels: [null],
+    timetracking: { originalEstimate: "" },
+    kept: "x",
+  });
+  for (const k of ["components", "labels", "timetracking"]) {
+    assert.notEqual(
+      out[k],
+      null,
+      `${k}: null is rendered by JSON.stringify as "null"`,
+    );
+    assert.match(out[k], /structured value/, `${k}: name the absence instead`);
+  }
+  assert.equal(out.kept, "x");
+
+  // The consequence, at the renderer that produces the operator's line.
+  const rec = dm.buildRecord({
+    kind: "jira.issue.update",
+    access: "manual",
+    intent: "Set fields on PROJ-1",
+    target: { issue: "PROJ-1" },
+    desired: out,
+  });
+  const md = hr.render([rec], "md", { run: "t", access: "manual" });
+  assert.doesNotMatch(
+    md,
+    /components = null/,
+    "an operator cannot type null into a field",
   );
 });
