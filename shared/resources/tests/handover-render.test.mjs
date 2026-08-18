@@ -1110,6 +1110,36 @@ test("§16 BUG-5 a variable name survives the second redaction pass", () => {
   assert.ok(!sh.includes(env.GITHUB_TOKEN));
 });
 
+test("§16 BUG-5b a variable name nested inside a header value also survives re-redaction", () => {
+  // The bare `--token $NAME` case is covered above. This is the same defect one
+  // nesting level down: `Authorization: Bearer $NAME` is not a bare $IDENT, so
+  // the first idempotency guard missed it and the render pass masked a header
+  // the write pass had correctly named.
+  const env = { JIRA_API_TOKEN: "ATATT3xFfGF0aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789" };
+  const rec = dm.buildRecord(
+    {
+      kind: "jira.transition",
+      intent: "Move it",
+      target: { issue: "P-1", url: "https://x/P-1" },
+      desired: { status: "Done" },
+      command: {
+        argv: ["curl", "-H", `Authorization: Bearer ${env.JIRA_API_TOKEN}`],
+        stdin: null,
+      },
+    },
+    { env, now: "2026-08-18T00:00:00Z" },
+  );
+
+  const sh = hr.render([rec], "sh", { env });
+  assert.ok(!sh.includes(env.JIRA_API_TOKEN), "the secret value leaked");
+  assert.match(
+    sh,
+    /\$JIRA_API_TOKEN/,
+    "the variable NAME was masked by the second pass, leaving the operator with " +
+      "a header they cannot fill in",
+  );
+});
+
 // ── BUG-2 / BUG-6 / BUG-11 / BUG-12: redaction must not corrupt real content ──
 
 test("§16 BUG-2 legitimate content round-trips — SHAs, base64, URLs, branch names", () => {

@@ -339,9 +339,18 @@ function redactString(str, envTable) {
   return sweepShapes(sweepEnv(str, envTable));
 }
 
-/** True when a value has already been through redaction. */
+/**
+ * True when a value has already been through redaction.
+ *
+ * Matches a variable reference ANYWHERE in the string, not just a bare `$NAME`.
+ * The first version tested `/^\$IDENT$/`, which covered `--token $GITHUB_TOKEN`
+ * but not `Authorization: Bearer $JIRA_API_TOKEN` — so an auth header the write
+ * pass had correctly named was masked to `«redacted»` by the render pass, and
+ * the operator lost the one piece of information that made the script runnable.
+ * Same defect as the bare case, one nesting level down.
+ */
 function alreadyRedacted(raw) {
-  return raw === REDACTED || /^\$[A-Za-z_][A-Za-z0-9_]*$/.test(raw);
+  return raw.includes(REDACTED) || /\$[A-Za-z_][A-Za-z0-9_]*/.test(raw);
 }
 
 /**
