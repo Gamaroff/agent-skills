@@ -5,11 +5,13 @@ type: task
 description: 'Defines the record a skill writes when it cannot perform a tracker mutation, the append-only journal it lands in, and the four renderers that turn a journal into a committed markdown checklist, a runnable shell script, a JSON sidecar and an inline summary. Nothing intercepts anything yet — this task is driven entirely by fixture journals, which is the point: the output contract is fixed and mutation-proven before any call site depends on it. The organising idea for the whole sequence is that manual, command, read-only and approve are four renderings of one record, not four features.'
 tags: [restricted-access, schema, renderers, handover]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-17
 updated: 2026-08-18
+completed_date: 2026-08-18
+pr_number: 249
 estimated_effort_hours: 14
 github_issue: 230
 ---
@@ -473,6 +475,36 @@ are both *interception* work: they change what call sites do, which is explicitl
 Scope and the subject of tasks 53–57. Recorded in the gate as future actions.
 
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+| Cycle | Gate | Score |
+| ----- | ---- | ----- |
+| 1 | ❌ FAIL | 25/100 — 7 HIGH + 9 MEDIUM |
+| 2 | ✅ **PASS** | **92/100** |
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 10/10, each verified by execution rather than inspection
+✅ **Tests:** 1352 node + 394 shell, 0 failed — 65 new, every invariant mutation-proven (23 mutations across two cycles)
+✅ **CI:** `test`, `validate`, `link-check` all green on head `8d1d385`
+✅ **PR:** [#249](https://github.com/Gamaroff/agent-skills/pull/249)
+✅ **Documentation:** schema doc + both registries + both report templates
+✅ **Security:** no credential in any output; two command-execution paths closed and **proven closed by execution tests**; no network under any restricted mode
+⚠️ **Compliance:** N/A — developer tooling, no regulated data
+
+**Deferred deliberately:** BUG-7 and BUG-15 are interception work — this task's declared Out of
+Scope and the substance of tasks 53–57. Recorded in gate 2 as `future` actions naming the exact
+files.
+
+**Detailed Verification Log:** [task.52.dod.1.deferred-mutation-record-and-renderers.md](./task.52.dod.1.deferred-mutation-record-and-renderers.md)
+
+**Task marked as ACCEPTED on:** 2026-08-18
+
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -484,6 +516,7 @@ Scope and the subject of tasks 53–57. Recorded in the gate as future actions.
 | 2026-08-18 |  | QA cycle 1 — gate FAIL (25/100), 7 HIGH + 9 MEDIUM findings | qa-task |
 | 2026-08-18 |  | QA findings fixed — 7 HIGH + 6 MEDIUM, 1 iteration, each regression mutation-proven | qa-fix |
 | 2026-08-18 |  | QA cycle 2 — gate PASS (92/100), all HIGH closed, 2 MEDIUM deferred as out-of-scope | qa-task |
+| 2026-08-18 | 1.2 | DoD verified 10/10 — accepted (PR #249) | finalise |
 
 ## References
 
