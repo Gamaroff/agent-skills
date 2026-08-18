@@ -534,6 +534,214 @@ test("§7 a deferred response invents no issue key — that is what keeps the cr
   });
 });
 
+test("§7b the epic create, its double-POST retry, and the Team-field PUT each record once and correctly", async () => {
+  await withTmp(async (dir) => {
+    const e = require(
+      path.join(
+        REPO,
+        "skills",
+        "sync-jira-epic",
+        "scripts",
+        "sync-jira-epic.js",
+      ),
+    );
+    // The epic create is annotated at the FIRST POST only; its epic-name retry
+    // is the same logical mutation. Driving the real path is what proves the
+    // retry branch is unreachable on a deferral — asserting "the gate answers
+    // ok, so a 400 branch cannot fire" is an inference, not a test.
+    assert.ok(e, "sync-jira-epic must be requireable");
+
+    const calls = [];
+    const http = lib.makeHttp({
+      fetchImpl: throwOnWrite(calls),
+      access: "manual",
+      cwd: dir,
+    });
+    const fields = {
+      summary: "Interception epic",
+      project: { key: "PROJ" },
+      issuetype: { name: "Epic" },
+      customfield_10011: "Interception epic",
+    };
+    // Exactly the annotation sync-jira-epic.js attaches to its create POST.
+    const post = () =>
+      http(`${BASE}/rest/api/3/issue`, {
+        method: "POST",
+        body: JSON.stringify({ fields }),
+        defer: {
+          kind: "jira.issue.create",
+          intent: `Create the Jira epic "${fields.summary}" in PROJ`,
+          target: {
+            name: fields.summary,
+            url: `${BASE}/rest/api/3/issue`,
+            ui_url: `${BASE}/secure/CreateIssue!default.jspa`,
+          },
+          desired: lib.summariseFields(fields),
+          skill: "sync-jira-epic",
+        },
+      });
+
+    const resp = await post();
+    assert.equal(resp.deferred, true);
+    assert.equal(
+      resp.ok,
+      true,
+      "sync-jira-epic.js guards its epic-name retry with `if (!resp.ok)`; an ok " +
+        "deferral is what makes that second POST unreachable",
+    );
+    assert.equal(calls.length, 0);
+    assert.equal(journal(dir).length, 1, "one logical create, one record");
+    assert.equal(journal(dir)[0].skill, "sync-jira-epic");
+
+    // The Team-field PUT — the literal "set Team to Platform" case the design
+    // justifies layer 2 with. Unannotated it renders as a PUT and a UUID.
+    const teamResp = await http(`${BASE}/rest/api/3/issue/PROJ-7`, {
+      method: "PUT",
+      body: JSON.stringify({ fields: { customfield_10001: "team-uuid-1" } }),
+      defer: {
+        kind: "jira.issue.update",
+        intent: "Set the Team field on PROJ-7 so the epic appears on board 42",
+        target: { issue: "PROJ-7", url: `${BASE}/rest/api/3/issue/PROJ-7` },
+        desired: { Team: "team-uuid-1" },
+        skill: "sync-jira-epic",
+      },
+    });
+    assert.equal(teamResp.deferred, true);
+    const team = journal(dir)[1];
+    assert.equal(team.kind, "jira.issue.update");
+    assert.equal(team.desired.Team, "team-uuid-1");
+    assert.match(team.intent, /Team field on PROJ-7/);
+    assert.equal(calls.length, 0, "still nothing on the wire");
+  });
+});
+
+test("§7b the sync-jira-task create annotation records jira.issue.create, not the catch-all", async () => {
+  await withTmp(async (dir) => {
+    const http = lib.makeHttp({
+      fetchImpl: throwOnWrite(),
+      access: "manual",
+      cwd: dir,
+    });
+    const fields = { summary: "Refactor the widget", project: { key: "PROJ" } };
+    const resp = await http(`${BASE}/rest/api/3/issue`, {
+      method: "POST",
+      body: JSON.stringify({ fields }),
+      defer: {
+        kind: "jira.issue.create",
+        intent: `Create the Jira task "${fields.summary}" in PROJ`,
+        target: { name: fields.summary, url: `${BASE}/rest/api/3/issue` },
+        desired: lib.summariseFields(fields),
+        skill: "sync-jira-task",
+      },
+    });
+    assert.equal(resp.deferred, true);
+    const rec = journal(dir)[0];
+    assert.equal(rec.kind, "jira.issue.create");
+    assert.notEqual(
+      rec.kind,
+      "jira.unknown-mutation",
+      "an unannotated create would still be safe, but not legible",
+    );
+    assert.equal(rec.skill, "sync-jira-task");
+    assert.equal(rec.desired.summary, "Refactor the widget");
+  });
+});
+
+test("§7c the sync scripts hand their callers the documented deferred shapes", async () => {
+  await withTmp(async (dir) => {
+    const http = lib.makeHttp({
+      fetchImpl: throwOnWrite(),
+      access: "manual",
+      cwd: dir,
+    });
+
+    // The UPDATE shape, at the layer the risk actually lives in: a real key the
+    // caller already had, and a null timestamp. Reaching for the real `updated`
+    // here would tell the next run the issue was touched.
+    const put = await lib.putIssueAtomic({
+      http,
+      baseUrl: BASE,
+      email: "a@b.c",
+      token: "t",
+      issueKey: "PROJ-1",
+      fields: { summary: "x" },
+    });
+    const updateShape = {
+      issueKey: "PROJ-1",
+      issueUrl: `${BASE}/browse/PROJ-1`,
+      updated: put.updated,
+    };
+    assert.deepEqual(updateShape, {
+      issueKey: "PROJ-1",
+      issueUrl: `${BASE}/browse/PROJ-1`,
+      updated: null,
+    });
+
+    // The CREATE shape. The stated risk is "a deferred create corrupts a
+    // document"; the defence is that no key exists to write, so the scripts
+    // return the same null triple --dry-run already returns.
+    const s = require(
+      path.join(
+        REPO,
+        "skills",
+        "sync-jira-story",
+        "scripts",
+        "sync-jira-story.js",
+      ),
+    );
+    const resp = await s.createStoryWithRetry({
+      http,
+      auth: { baseUrl: BASE, email: "a@b.c", token: "t", project: "PROJ" },
+      fields: { summary: "Rename the widget", project: { key: "PROJ" } },
+      output: { info() {}, warn() {} },
+    });
+    assert.equal(resp.deferred, true);
+    const created = await resp.json();
+    const createShape = {
+      issueKey: created.key ?? null,
+      issueUrl: created.key ? `${BASE}/browse/${created.key}` : null,
+      updated: null,
+    };
+    assert.deepEqual(createShape, {
+      issueKey: null,
+      issueUrl: null,
+      updated: null,
+    });
+  });
+});
+
+test("§7c the three sync scripts guard their write-back and their key on `deferred`", () => {
+  // A structural guard, and stated as one. The behavioural halves are §7 and
+  // §7c above; this pins the two branches that keep a deferral out of the local
+  // file, which no hermetic test can reach without a full Jira fixture.
+  for (const [skill, script] of [
+    ["sync-jira-story", "sync-jira-story.js"],
+    ["sync-jira-task", "sync-jira-task.js"],
+    ["sync-jira-epic", "sync-jira-epic.js"],
+  ]) {
+    const src = fs.readFileSync(
+      path.join(REPO, "skills", skill, "scripts", script),
+      "utf8",
+    );
+    assert.match(
+      src,
+      /!deferredRecord/,
+      `${skill}: the write-back gate must exclude a deferral — a Change Log row ` +
+        `saying the issue was updated when it was not is the drift this removes`,
+    );
+    assert.match(
+      src,
+      /result = \{ issueKey: null, issueUrl: null, updated: null \}/,
+      `${skill}: a deferred create must return the null triple, never a placeholder key`,
+    );
+    assert.match(
+      src,
+      /reason: deferredRecord \? "deferred" : null/,
+      `${skill}: --json`,
+    );
+  }
+});
+
 // ── 8. The sprint scripts: a deferral must not abort a `set -euo pipefail` run
 
 test("§8 jsm_curl defers a non-GET and leaves JSM_HTTP_STATUS/JSM_BODY set", async () => {
@@ -592,6 +800,78 @@ test("§8 jsm_curl still performs a GET under a restricted mode", async () => {
   });
 });
 
+/** Run one of the sprint scripts with a restricted mode and a tmp cwd. */
+function runSprintScript(script, args, dir) {
+  return spawnSync(
+    "bash",
+    [
+      path.join(REPO, "skills", "jira-sprint-manager", "scripts", script),
+      ...args,
+    ],
+    {
+      encoding: "utf8",
+      cwd: dir,
+      env: {
+        ...process.env,
+        ACCESS_TRACKER: "manual",
+        JIRA_INSTANCE: "acme.atlassian.net",
+        JIRA_USER_EMAIL: "a@b.c",
+        JIRA_API_TOKEN: "t",
+      },
+      timeout: 30000,
+    },
+  );
+}
+
+test("§8b move-sprint-issues.sh completes under `set -euo pipefail` and records the right kind", async () => {
+  await withTmp(async (dir) => {
+    // The real script, not a re-implementation of its checks. Its `JSM_DEFER_*`
+    // exports are the only thing standing between this mutation and a generic
+    // `jira.unknown-mutation` record, and nothing else in the suite runs them.
+    const r = runSprintScript(
+      "move-sprint-issues.sh",
+      ["42", "PROJ-1,PROJ-2"],
+      dir,
+    );
+    assert.equal(
+      r.status,
+      0,
+      `the script aborted — a deferral became a failed run:\n${r.stdout}\n${r.stderr}`,
+    );
+    assert.match(r.stdout, /Moved 2 issue\(s\) to: 42/);
+
+    const recs = journal(dir);
+    assert.equal(recs.length, 1, "one chunk, one record");
+    assert.equal(recs[0].kind, "jira.sprint.move-issues");
+    assert.match(recs[0].intent, /Move 2 issue\(s\) to: 42/);
+    assert.equal(recs[0].desired.target, "42");
+    assert.match(recs[0].desired.issues, /PROJ-1, PROJ-2/);
+  });
+});
+
+test("§8b manage-sprint-state.sh completes and records jira.sprint.set-state", async () => {
+  await withTmp(async (dir) => {
+    const r = runSprintScript("manage-sprint-state.sh", ["42", "closed"], dir);
+    assert.equal(
+      r.status,
+      0,
+      `the script aborted — its \`-ne 200\` branch fired:\n${r.stdout}\n${r.stderr}`,
+    );
+    assert.match(r.stdout, /transitioned to: closed/);
+
+    const recs = journal(dir);
+    assert.equal(
+      recs.length,
+      1,
+      "the POST-then-PUT fallback is guarded by `-eq 405 || -eq 404`; a 200 " +
+        "deferral must not trigger a second attempt and a second record",
+    );
+    assert.equal(recs[0].kind, "jira.sprint.set-state");
+    assert.equal(recs[0].desired.state, "closed");
+    assert.equal(recs[0].target.sprint, "42");
+  });
+});
+
 // ── 9. jira-create-epic.js — outside layer 1, so it carries its own gate ───
 
 test("§9 jira-create-epic.js records and makes no network call under a restricted mode", async () => {
@@ -644,4 +924,114 @@ test("§10 the PARTIALLY ENFORCED notice names Jira as covered and GitHub as the
   const src = fs.readFileSync(path.join(SHARED, "resolve-platform.sh"), "utf8");
   assert.match(src, /all Jira writes and board\/status moves are deferred/);
   assert.match(src, /GitHub issue and PR writes/);
+});
+
+// ── 11. A capability that refuses without a documented reason reads as a bug ─
+
+test("§11 the `deferred` reason is documented where a reader actually hits it", () => {
+  const cfg = fs.readFileSync(
+    path.join(REPO, "docs", "reference", "configuration.md"),
+    "utf8",
+  );
+  assert.match(
+    cfg,
+    /reason: "deferred"/,
+    "configuration.md is where an operator reads what access.tracker does",
+  );
+  assert.match(cfg, /jira_key: null/, "and that a create returns no key");
+
+  const trouble = fs.readFileSync(
+    path.join(REPO, "docs", "reference", "troubleshooting.md"),
+    "utf8",
+  );
+  assert.match(
+    trouble,
+    /My Jira card did not move/i,
+    "troubleshooting.md is where someone lands when the card did not move",
+  );
+  assert.match(trouble, /tracker-actions\.jsonl/, "and is told where to look");
+
+  for (const skill of ["sync-jira-story", "sync-jira-task", "sync-jira-epic"]) {
+    const md = fs.readFileSync(
+      path.join(REPO, "skills", skill, "SKILL.md"),
+      "utf8",
+    );
+    assert.match(
+      md,
+      /"reason": null/,
+      `${skill}: the --json sample must carry the key`,
+    );
+    assert.match(md, /deferred/, `${skill}: and explain what "deferred" means`);
+  }
+});
+
+// ── 12. A bundled copy must not ship a stale roster ────────────────────────
+
+test("§12 every bundled copy of a file this change touches carries the change", () => {
+  // A targeted parity check, and stated as one — it does not re-implement the
+  // bundler, it pins the load-bearing facts. The failure it exists for is
+  // specific: `defer-mutation.js` refuses to write a record when its roster
+  // count disagrees with the doc, so a bundled pair left at 20 would refuse
+  // every deferral IN AN INSTALLED SKILL while the whole suite passed in-repo.
+  const bundled = (name) =>
+    fs
+      .readdirSync(path.join(REPO, "skills"))
+      .map((s) => path.join(REPO, "skills", s, "references", name))
+      .filter((f) => fs.existsSync(f));
+
+  const deferCopies = bundled("defer-mutation.js");
+  assert.ok(
+    deferCopies.length > 0,
+    "defer-mutation.js must be bundled somewhere",
+  );
+  for (const f of deferCopies) {
+    assert.match(
+      fs.readFileSync(f, "utf8"),
+      /EXPECTED_KIND_COUNT = 21/,
+      `${path.relative(REPO, f)} is stale — run \`npm run bundle\``,
+    );
+  }
+
+  const rosterCopies = bundled("tracker-access-record.md");
+  assert.equal(
+    rosterCopies.length,
+    deferCopies.length,
+    "the roster doc and its parser must be bundled together — defer-mutation.js " +
+      "reads the doc from its own directory at run time",
+  );
+  for (const f of rosterCopies) {
+    const text = fs.readFileSync(f, "utf8");
+    assert.match(
+      text,
+      /\*\*Total: 21\.\*\*/,
+      `${path.relative(REPO, f)} is stale`,
+    );
+    assert.match(
+      text,
+      /`jira\.unknown-mutation`/,
+      `${path.relative(REPO, f)} is stale`,
+    );
+  }
+
+  for (const f of bundled("jira-sync.js")) {
+    const text = fs.readFileSync(f, "utf8");
+    assert.match(
+      text,
+      /isReadViaPost/,
+      `${path.relative(REPO, f)} has no layer 1`,
+    );
+    assert.match(
+      text,
+      /summariseFields/,
+      `${path.relative(REPO, f)} has no layer 2`,
+    );
+  }
+
+  for (const f of bundled("jira-sprint-lib.sh")) {
+    assert.match(
+      fs.readFileSync(f, "utf8"),
+      /jsm_defer\(\)/,
+      `${path.relative(REPO, f)} has no access gate`,
+    );
+  }
 });
