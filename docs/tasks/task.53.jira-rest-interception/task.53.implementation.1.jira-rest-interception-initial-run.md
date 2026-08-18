@@ -37,9 +37,9 @@ annotation), adds `jira.unknown-mutation` as the 21st roster kind, gates `jsm_cu
 | 2. review-task             | ✅ Done    | `task.53.review.{N}.{name}.md` exists (or skip logged)            | Skipped — review 1 already on disk, status ready-for-development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                 | 22 source files; 19 new tests; suite 1352 → 1371, 0 failures; 6 invariants mutation-proven | `.summaries/step-3-surface-map.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                      | PR #250: https://github.com/Gamaroff/agent-skills/pull/250 (OPEN → develop) | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.53.qa.{N}.*.md`; `task.53.gate.{N}.*.yml`; PR comment posted | 5 cycles; gate 1 FAIL → gate 2 CONCERNS (70/100). Escalated — scope decision required | `.summaries/step-5-traceability-mapper.json` |
-| 7. finalise                | ⏸️ Blocked | `task.53.dod.{N}.*.md`; task `status: accepted`                   | Blocked on the escalation below | —                    |
-| 8. commit-changes          | ⏸️ Blocked | All artifacts committed and pushed                                | Blocked on the escalation below | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.53.qa.{N}.*.md`; `task.53.gate.{N}.*.yml`; PR comment posted | 6 cycles; gate 1 FAIL → gate 2 CONCERNS (escalated) → **gate 3 PASS 95/100** after the scope decision | `.summaries/step-5-traceability-mapper.json` |
+| 7. finalise                | ✅ Done    | `task.53.dod.{N}.*.md`; task `status: accepted`                   | DoD 13/13; issue #231 closed; board already Done | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                | 13 commits on the branch | —                    |
 
 ---
 
@@ -175,7 +175,15 @@ cycle 5: three parser-dropped YAML shapes and an unthreaded stage CLI). Three cy
 each been correct and each revealed the next divergence. That is the signature of a duplicated
 contract, not of a bug.
 
-**Recommended next step — a scope decision, which is the user's to make:**
+**RESOLVED 2026-08-19 — option 1 taken.** The JavaScript config tier was lifted into
+[task.61](../task.61.access-mode-config-tier/task.61.access-mode-config-tier.md), which states the
+requirement as **parity with `read-config.sh`** and carries all seven findings from gate 2. Access
+resolution in this task is environment-only — `ACCESS_TRACKER` and `AGENT_SKILLS_ACCESS_TRACKER`,
+most-restrictive-wins — which is task.52's shape widened by the second env name, the one part of the
+QA-added resolution that is pure, tested and free of a duplicated contract. QA cycle 6 then gated
+**PASS (95/100)**.
+
+The options as they stood at the escalation, retained for the record:
 
 1. **(Recommended) Lift the config tier out of this task.** Revert JS access resolution to the
    env-only form task.52 shipped, and file the config tier as its own task with
@@ -189,9 +197,10 @@ contract, not of a bug.
    sets `access.tracker` in config today — which is true of this repo, but is not a property this
    library can assume of its consumers.
 
-**What must NOT happen:** landing without the decision being made explicitly. The residual holes are
-narrow (three YAML shapes and one redirect case resolve a declared restriction to `full`) but they
-are in exactly the axis this sequence exists to make trustworthy.
+**What must NOT happen:** landing without the decision being made explicitly. The residual holes were
+narrow (three YAML shapes and one redirect case resolving a declared restriction to `full`) but they
+were in exactly the axis this sequence exists to make trustworthy — which is why they moved to a task
+that names them rather than being waived here.
 
 ---
 
@@ -241,13 +250,37 @@ added *during QA* to close cycle-2's config-tier gap.
 
 **Action**: Loop limit reached — escalated. See below.
 
+### QA Cycle 6 — 2026-08-19 (after the scope decision)
+
+**Gate Result**: **PASS (95/100)** — `task.53.gate.3.jira-rest-interception.yml`
+**Issues Found**: 0 high, 2 medium, 8 low — all fixed
+
+The decision recorded in the escalation was taken: the JS config tier moved to **task.61**, carrying
+gate 2's seven findings. The final review, against the narrowed change, found **no high-severity
+findings** — the first round in six that did.
+
+Both mediums were refusals that were safe but not legible, and both are worth recording because they
+are the same shape as cycle 1's:
+
+- **G-CR2** — a refused status transition journalled as `jira.unknown-mutation` rather than
+  `jira.transition`: consequence escalated to `irreversible`, attributed to the library, and silent
+  about which status to set. The task's Decisions table had argued against annotating that chain on
+  the premise that `walkLadder` is its only caller; cycle 1 had already disproved the premise.
+- **G-CR1** — `sync-jira-epic`'s skip path has its own `--json` emit that omitted `reason`/`record`,
+  and `makeOutput` suppresses `info` under `--json`, so a refused transition there was invisible to a
+  `--json` consumer entirely.
+- **G-CR9** — `makeHttp({access})` overrode the environment, letting a caller hand itself more access
+  than `ACCESS_TRACKER=manual` allows. Now reduced most-restrictively.
+
+**Action**: Proceeded to finalise. 3 further mutation proofs; suite 1397 → 1400.
+
 ---
 
 ## Completion
 
-**Finished**: 2026-08-18 23:25 (escalated)
-**Final Status**: Escalated — QA loop limit reached (5 cycles), scope decision required
+**Finished**: 2026-08-19 01:25
+**Final Status**: Completed — accepted after a scope decision at the loop limit
 **Branch**: `feature/task.53.jira-rest-interception`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/250
-**QA Iterations**: 5
-**DoD Summary**: not reached
+**QA Iterations**: 6
+**DoD Summary**: `task.53.dod.1.jira-rest-interception.md` — 13/13, gate 3 PASS (95/100)

@@ -5,13 +5,15 @@ type: task
 description: 'Makes restricted access real for Jira REST. Two layers inside jira-sync.js: the http() factory refuses any non-GET under a non-`full` access mode and records it, so a mutation nobody annotated is loud rather than silently executed; and the semantic mutators record a proper kind, target, intent and desired value, which is what makes manual mode say "set Team to Platform" instead of printing a JSON blob. Adds 5 new Jira mutation kinds to the intercepted set; a 6th (jira.transition) is already owned by task.52''s jira-stage.js gate, taking coverage to 6 of the 9 Jira kinds. Introduces jira.unknown-mutation as a 21st roster kind so layer 1 has something legal to write.'
 tags: [restricted-access, jira, interception, jira-sync]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: high
 created: 2026-08-17
-updated: 2026-08-18
+updated: 2026-08-19
+completed_date: 2026-08-19
 estimated_effort_hours: 10
 github_issue: 231
+pr_number: 250
 ---
 
 # [Task 53] Intercept Jira REST mutations in two layers — a fail-closed net and a legible one
@@ -330,6 +332,36 @@ The final round against the net change found **no high-severity issues**. Its tw
 refusals that were safe but not legible — a transition journalled as the catch-all instead of
 `jira.transition`, and the epic skip path's `--json` emit omitting the reason — and both are fixed.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate:** [`task.53.gate.3.jira-rest-interception.yml`](./task.53.gate.3.jira-rest-interception.yml) — **PASS, 95/100**
+**Final report:** [`task.53.qa.2.jira-rest-interception.md`](./task.53.qa.2.jira-rest-interception.md)
+**QA cycles:** 6 (gate 1 FAIL → gate 2 CONCERNS / escalation → gate 3 PASS)
+
+All Definition of Done criteria verified:
+
+✅ **Success criteria:** 13 / 13
+✅ **Tests:** 1400 / 1400 (baseline 1352) · `validate:all` 115/115 · `tracker-access.test.sh` 382/382
+✅ **CI:** SUCCESS on the final head (`test` · `validate` · `link-check`), re-sampled after a PENDING read
+✅ **Security:** no credential can reach a record; a dot-env cannot escalate; a caller cannot escalate; fail-closed on the gate's own failure
+✅ **Documentation:** CHANGELOG, configuration.md, troubleshooting.md, three SKILL.md samples
+⚠️ **Compliance:** NOT_APPLICABLE — a library-internal tracker-client change, no personal data, no UI
+✅ **Rigour:** 26 mutation proofs across six review rounds, four of them adversarial subagent reviews
+
+**Scope boundary:** reading `access.tracker` from `skills-config.yaml` in the JavaScript gates is
+[task.61](../task.61.access-mode-config-tier/task.61.access-mode-config-tier.md), split out by
+explicit decision at the QA loop limit. Access resolution here is environment-only —
+`ACCESS_TRACKER` and `AGENT_SKILLS_ACCESS_TRACKER`, most-restrictive-wins.
+
+**Detailed Verification Log:** see [`task.53.dod.1.jira-rest-interception.md`](./task.53.dod.1.jira-rest-interception.md)
+for complete evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-08-19
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -343,6 +375,7 @@ refusals that were safe but not legible — a transition journalled as the catch
 | 2026-08-18 |  | QA cycles 3–5 — 5 cycles reached without a clean gate; gate 2 CONCERNS (70/100). Escalated: the open findings are all in access-mode resolution, which this document does not scope | qa-task |
 | 2026-08-19 |  | Scope decision — the JS config tier lifted into task.61; access resolution here is env-only, matching what task.52 shipped. All seven open findings move with it | qa-fix |
 | 2026-08-19 |  | QA gate PASS (95/100) — final review found no high-severity findings; 2 medium + 8 cleanups fixed and mutation-proven | qa-task |
+| 2026-08-19 | 1.2 | DoD verified 13/13 — accepted (PR #250) | finalise |
 
 ## References
 
