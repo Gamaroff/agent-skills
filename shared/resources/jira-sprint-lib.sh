@@ -109,6 +109,19 @@ jsm_resolve_access() {
 
   # Env tier only. Degraded — it cannot see `access.tracker` in
   # skills-config.yaml — so it is a fallback, never the normal path.
+  #
+  # And that is exactly why a config file being PRESENT is a refusal here: with
+  # no writer we cannot read the declaration, and answering "full" over a file
+  # that may restrict is the one outcome this gate exists to prevent. (It is
+  # also moot for the mutation itself — with no writer there is nothing to
+  # record the deferral with either.)
+  if [ -f "${SKILLS_CONFIG_FILE:-skills-config.yaml}" ] \
+     && [ -z "${ACCESS_TRACKER:-}" ] && [ -z "${AGENT_SKILLS_ACCESS_TRACKER:-}" ]; then
+    JSM_ACCESS_ERROR="Cannot read access.tracker from ${SKILLS_CONFIG_FILE:-skills-config.yaml}: the deferred-mutation writer is unavailable (node missing, or $writer not bundled). Refusing rather than defaulting to \"full\"."
+    JSM_ACCESS_MODE=""
+    return 1
+  fi
+
   local best="full" v rank_v rank_best
   for v in "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
     [ -z "$v" ] && continue

@@ -54,7 +54,21 @@ function accessTracker() {
     ]
       .map((v) => String(v || "").trim())
       .filter(Boolean);
-    if (!seen.length) return "full";
+    // A config file we cannot read is not an absent restriction. With no writer
+    // bundled there is no way to consult `access.tracker` — and no way to record
+    // a deferral either — so answering "full" over a file that may restrict is
+    // the one outcome this gate exists to prevent.
+    if (!seen.length) {
+      const cfg = process.env.SKILLS_CONFIG_FILE || "skills-config.yaml";
+      if (fs.existsSync(cfg)) {
+        console.error(
+          `Error: cannot read access.tracker from ${cfg} — the deferred-mutation ` +
+            `writer is unavailable. Refusing rather than defaulting to "full".`,
+        );
+        process.exit(1);
+      }
+      return "full";
+    }
     for (const v of seen) {
       // CYCLE-4 CR-13 — own properties only. `in` walks the prototype chain, so
       // ACCESS_TRACKER="constructor" passed validation and was then compared as

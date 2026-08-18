@@ -2028,3 +2028,35 @@ test("§16 C4-CR13 mode membership is an own-property test", () => {
     '`in` walks the prototype chain, so "constructor" passed validation',
   );
 });
+
+test("§16 C5-1 a gate with no writer refuses over a config it cannot read", async () => {
+  await withTmp(async (dir) => {
+    // Found by tracing the property rather than by a review: the no-writer
+    // fallback consults the env tier ONLY, so with no env var set it answered
+    // "full" — over a skills-config.yaml that may well restrict. With no writer
+    // there is also nothing to record a deferral with, so proceeding is the one
+    // outcome that leaves no trace at all.
+    fs.writeFileSync(
+      path.join(dir, "skills-config.yaml"),
+      "access:\n  tracker: manual\n",
+    );
+    const env = { ...process.env, PATH: "/nonexistent" };
+    delete env.ACCESS_TRACKER;
+    delete env.AGENT_SKILLS_ACCESS_TRACKER;
+    const r = spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        `source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
+         if jsm_resolve_access; then echo "MODE=[$JSM_ACCESS_MODE]"; else echo "REFUSED"; fi`,
+      ],
+      { encoding: "utf8", cwd: dir, env, timeout: 20000 },
+    );
+    assert.match(
+      r.stdout,
+      /REFUSED/,
+      'with no node and a config present, the gate must refuse — not answer "full"',
+    );
+    assert.doesNotMatch(r.stdout, /MODE=\[full\]/);
+  });
+});
