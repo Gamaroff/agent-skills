@@ -926,6 +926,7 @@ async function run({
       let skipStatusOutcome = null;
       if (!args.dryRun && frontmatter.status) {
         skipStatusOutcome = await lib.syncDocumentStatus({
+          skill: "sync-jira-epic",
           http,
           baseUrl: auth.baseUrl,
           email: auth.email,
@@ -996,6 +997,12 @@ async function run({
           jira_last_synced_at: current.updated,
           jira_last_body_hash: newBodyHash,
           jira_last_meta_hash: newMetaHash,
+          // The skip path has its own emit, and a deferred status transition is
+          // the ONE deferral it can produce — `makeOutput` suppresses `info`
+          // under --json, so without these keys a refused transition is
+          // completely invisible to a --json consumer.
+          reason: skipStatusOutcome?.reason === "deferred" ? "deferred" : null,
+          record: skipStatusOutcome?.record || null,
         });
       }
       // Report the transition the same way the main path does. Returning a bare
@@ -1358,6 +1365,7 @@ async function run({
   let statusOutcome = null;
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
     statusOutcome = await lib.syncDocumentStatus({
+      skill: "sync-jira-epic",
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,

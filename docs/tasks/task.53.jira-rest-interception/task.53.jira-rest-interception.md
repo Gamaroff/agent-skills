@@ -5,7 +5,7 @@ type: task
 description: 'Makes restricted access real for Jira REST. Two layers inside jira-sync.js: the http() factory refuses any non-GET under a non-`full` access mode and records it, so a mutation nobody annotated is loud rather than silently executed; and the semantic mutators record a proper kind, target, intent and desired value, which is what makes manual mode say "set Team to Platform" instead of printing a JSON blob. Adds 5 new Jira mutation kinds to the intercepted set; a 6th (jira.transition) is already owned by task.52''s jira-stage.js gate, taking coverage to 6 of the 9 Jira kinds. Introduces jira.unknown-mutation as a 21st roster kind so layer 1 has something legal to write.'
 tags: [restricted-access, jira, interception, jira-sync]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: high
 created: 2026-08-17
@@ -295,32 +295,40 @@ them in a single commit, a single revert is sufficient.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS — escalated at the 5-cycle loop limit
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-18
-**Quality Score**: 70/100 (gate 2)
-**Gate Decision**: CONCERNS (gate 2; gate 1 was FAIL)
+**Quality Score**: 95/100 (gate 3)
+**Gate Decision**: PASS (gate 3; gate 1 FAIL → gate 2 CONCERNS → gate 3 PASS)
 
 ### QA Report
 
-- **Full Report**: [task.53.qa.1.jira-rest-interception.md](./task.53.qa.1.jira-rest-interception.md)
-- **Gate File**: [task.53.gate.1.jira-rest-interception.yml](./task.53.gate.1.jira-rest-interception.yml)
+- **Final Report**: [task.53.qa.2.jira-rest-interception.md](./task.53.qa.2.jira-rest-interception.md) · **Final Gate**: [task.53.gate.3.jira-rest-interception.yml](./task.53.gate.3.jira-rest-interception.yml)
+- **Cycle 1**: [task.53.qa.1.jira-rest-interception.md](./task.53.qa.1.jira-rest-interception.md) · [task.53.gate.1.jira-rest-interception.yml](./task.53.gate.1.jira-rest-interception.yml)
+- **Escalation gate**: [task.53.gate.2.jira-rest-interception.yml](./task.53.gate.2.jira-rest-interception.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 1379 (0 failures)
+- **Tests Executed**: 1400 (0 failures; baseline 1352)
 - **Phases Verified**: 7/7
-- **Critical Issues**: 3 high, 2 medium, 4 low
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **QA cycles**: 6 · **Critical Issues**: 0 remaining (gate 1's 3 high all fixed; gate 2's 7 moved to task.61)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-The net holds — no mutation reaches the network on any gated path, proven against a stub that throws
-on any write. Three high-severity paths one layer up report a refused mutation as a **success**, and
-two of them write that false success into a document: the transition chain reads the synthetic `202`
-as a completed transition (**CR-1**); the two hand-rolled gates read an env var their own documented
-invocation never sets, so they are inert (**CR-2**); and the write-back guard keys off the record id
-rather than the deferral, so a failed journal write reports success (**CR-3**).
+Six review rounds. Round one found three high-severity paths where a refused mutation was reported as
+a **success**, and two of them wrote that false success into a document — the transition chain reading
+the synthetic `202` as a completed transition, the write-back gate keyed on a record id rather than the
+deferral, and both sprint scripts printing a success line for a refusal. All are fixed and
+mutation-proven.
+
+Rounds two to five were all in access-mode **resolution**, not in the interception. That subsystem was
+lifted into [task.61](../task.61.access-mode-config-tier/task.61.access-mode-config-tier.md) by
+explicit decision at the loop limit, carrying its seven open findings with it.
+
+The final round against the net change found **no high-severity issues**. Its two mediums were both
+refusals that were safe but not legible — a transition journalled as the catch-all instead of
+`jira.transition`, and the epic skip path's `--json` emit omitting the reason — and both are fixed.
 
 ## Change Log
 
@@ -334,6 +342,7 @@ rather than the deferral, so a failed journal write reports success (**CR-3**).
 | 2026-08-18 |  | QA cycle 2 — 5 findings in the cycle-1 fixes; access resolution consolidated into one three-tier resolver | qa-fix |
 | 2026-08-18 |  | QA cycles 3–5 — 5 cycles reached without a clean gate; gate 2 CONCERNS (70/100). Escalated: the open findings are all in access-mode resolution, which this document does not scope | qa-task |
 | 2026-08-19 |  | Scope decision — the JS config tier lifted into task.61; access resolution here is env-only, matching what task.52 shipped. All seven open findings move with it | qa-fix |
+| 2026-08-19 |  | QA gate PASS (95/100) — final review found no high-severity findings; 2 medium + 8 cleanups fixed and mutation-proven | qa-task |
 
 ## References
 

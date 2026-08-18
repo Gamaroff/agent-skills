@@ -1135,6 +1135,7 @@ async function run({
   let statusOutcome = null;
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
     statusOutcome = await lib.syncDocumentStatus({
+      skill: "sync-jira-story",
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,

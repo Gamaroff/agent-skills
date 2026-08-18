@@ -14,7 +14,7 @@
 // totality test as the other three, because a run-end block that silently omits
 // an action is the same invisible-drift failure as a checklist that does.
 //
-// THE INVARIANT THAT MATTERS MOST IS TOTALITY. Every one of the 20 kinds must
+// THE INVARIANT THAT MATTERS MOST IS TOTALITY. Every one of the 21 kinds must
 // render in all four outputs. There is deliberately NO silent `default:` case
 // anywhere below: an unknown kind raises, and the roster is read from the schema
 // doc rather than a list in this file, so adding a kind without a renderer fails

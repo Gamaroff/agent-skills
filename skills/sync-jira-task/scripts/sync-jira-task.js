@@ -933,6 +933,7 @@ async function run({
   let statusOutcome = null;
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
     statusOutcome = await lib.syncDocumentStatus({
+      skill: "sync-jira-task",
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,

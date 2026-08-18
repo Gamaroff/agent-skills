@@ -146,8 +146,6 @@ jsm_curl() {
 
   # Fail closed, and BEFORE the retry loop — recording inside it would write one
   # record per attempt for one logical mutation.
-  # Fail closed, and BEFORE the retry loop — recording inside it would write one
-  # record per attempt for one logical mutation.
   #
   # A GET is never gated, so a resolver that cannot answer must not stop one:
   # reads are how a skill discovers what it would have changed.

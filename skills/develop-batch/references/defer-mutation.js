@@ -473,25 +473,18 @@ function redactDeep(value, envTable, keyPath = "") {
 // ---------------------------------------------------------------------------
 
 /**
- * The tracker access mode in force, for a node caller.
+ * The access mode in force, from the two environment tiers, most-restrictive-wins.
  *
- * ENVIRONMENT ONLY, and unset reads as `full`. Both halves are deliberate.
+ *   ACCESS_TRACKER              — resolve-platform.sh's own output
+ *   AGENT_SKILLS_ACCESS_TRACKER — the knob an operator sets
  *
- * `resolve-platform.sh` is the single resolver: it reads `access.tracker` from
- * skills-config.yaml, reads the env override, applies most-restrictive-wins,
- * validates the result and EXPORTS `ACCESS_TRACKER`. Re-deriving any of that
- * here would put a second, subtly different resolution path in the tree — which
- * is the exact class of silent escalation task 60 spent a cycle closing. A node
- * script reads the resolver's answer; it does not compute its own.
+ * Ranked `manual < command < approve < read-only < full`, so a run may lock
+ * itself down and nothing may loosen a restriction already declared. An
+ * unrecognised value is REFUSED rather than defaulted, because defaulting a typo
+ * to `full` turns a declared restriction into an unintended tracker write.
  *
- * Unset therefore means "nobody resolved a restriction", which is `full`. That
- * is the safe default for the blast radius that matters: `jira-stage.js` and
- * `gh-stage.js` are called from seven skills and six pipeline steps, and a gate
- * that fires for a full-access consumer stops every one of them moving cards.
- *
- * An UNRECOGNISED value is refused rather than defaulted. Defaulting a typo to
- * `full` would turn a declared restriction into an unintended tracker write —
- * the failure mode this whole sequence exists to remove.
+ * `access.tracker` in skills-config.yaml is deliberately not read here — see the
+ * note in the body.
  *
  * @param {Record<string,string>} [env]
  * @returns {"full"|"read-only"|"approve"|"command"|"manual"}
@@ -1128,7 +1121,6 @@ module.exports = {
   CONSEQUENCES,
   CONSEQUENCE_RANK,
   resolveAccessTracker,
-  ACCESS_RANK,
   parseRoster,
   loadRoster,
   buildEnvTable,

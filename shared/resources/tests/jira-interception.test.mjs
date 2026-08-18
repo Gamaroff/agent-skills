@@ -773,7 +773,7 @@ test("§8 jsm_curl defers a non-GET and leaves JSM_HTTP_STATUS/JSM_BODY set", as
   });
 });
 
-test("§8 jsm_curl still performs a GET under a restricted mode", async () => {
+test("§8 the sprint gate resolves a restricted mode into caller scope", async () => {
   return withTmp(async (dir) => {
     // curl is never reached: an unroutable host would hang, so the assertion is
     // that the gate did NOT short-circuit — the journal stays empty.
@@ -1427,11 +1427,18 @@ test("§14 C2-CR2 every gate resolves the mode the same way", () => {
       /resolveAccessTracker/,
       `${path.relative(REPO, f)} must delegate, not re-rank`,
     );
-    assert.doesNotMatch(
-      src,
-      /const ACCESS_RANK = \{/,
-      `${path.relative(REPO, f)} keeps its own mode table — that is the drift`,
-    );
+    // Any local rank table, however it is spelled — the first version of this
+    // assertion pinned the exact name `ACCESS_RANK`, and a rename to
+    // `ACCESS_RANK_FALLBACK` walked straight past it.
+    const local = /const ACCESS_RANK\w* = \{/.exec(src);
+    if (local) {
+      assert.match(
+        src,
+        /if \(!dm\)/,
+        `${path.relative(REPO, f)} keeps a mode table outside the documented ` +
+          `no-bundle fallback — that is the drift`,
+      );
+    }
   }
   // The shell gate resolves the same two tiers, in the same order, refusing a
   // typo the same way. It does not share the JS resolver — sharing is what a
@@ -1452,10 +1459,7 @@ test("§14 C2-CR2 the stage CLI gate is not looser than the gate underneath it",
   // net — which refused the same POST as an untyped jira.unknown-mutation and
   // turned a --strict run into a failure.
   assert.equal(
-    dm.resolveAccessTracker(
-      { AGENT_SKILLS_ACCESS_TRACKER: "manual" },
-      { config: false },
-    ),
+    dm.resolveAccessTracker({ AGENT_SKILLS_ACCESS_TRACKER: "manual" }),
     "manual",
   );
   // Sharing the resolver is not enough: both stage CLIs capture the env BEFORE
@@ -1611,4 +1615,115 @@ test("§16 C4-CR13 mode membership is an own-property test", () => {
     /hasOwnProperty\.call\(ACCESS_RANK_FALLBACK/,
     '`in` walks the prototype chain, so "constructor" passed validation',
   );
+});
+
+// ── 17. The final gate's findings ──────────────────────────────────────────
+
+test("§17 G-CR2 a refused transition records jira.transition, not the catch-all", async () => {
+  await withTmp(async (dir) => {
+    const calls = [];
+    const http = lib.makeHttp({
+      fetchImpl: async (url, opts = {}) => {
+        calls.push({ url, method: opts.method });
+        if ((opts.method || "GET") !== "GET") {
+          throw new Error(`a write reached the network: ${url}`);
+        }
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          async json() {
+            return {
+              transitions: [
+                { id: "31", name: "In Progress", to: { name: "In Progress" } },
+              ],
+            };
+          },
+        };
+      },
+      access: "manual",
+      cwd: dir,
+    });
+
+    const res = await lib.transitionToStatus({
+      http,
+      baseUrl: BASE,
+      email: "a@b.c",
+      token: "t",
+      issueKey: "PROJ-1",
+      targetStatus: ["In Progress"],
+      currentStatus: "To Do",
+      localStatus: "in-progress",
+      skill: "sync-jira-story",
+      output: { info() {}, warn() {} },
+    });
+    assert.equal(res.reason, "deferred");
+    assert.equal(calls.filter((c) => (c.method || "GET") !== "GET").length, 0);
+
+    const recs = journal(dir);
+    assert.equal(recs.length, 1, "one hop, one record");
+    assert.equal(
+      recs[0].kind,
+      "jira.transition",
+      "the roster has a kind for this exact endpoint — falling through to the " +
+        "catch-all escalated the consequence and lost the target status",
+    );
+    assert.equal(recs[0].desired.status, "In Progress", "which status to set");
+    assert.equal(recs[0].target.issue, "PROJ-1");
+    assert.equal(
+      recs[0].skill,
+      "sync-jira-story",
+      "attributed to the caller, not to the library",
+    );
+    assert.equal(
+      recs[0].consequence,
+      "state-drift",
+      "the roster default — the catch-all would have said irreversible",
+    );
+  });
+});
+
+test("§17 G-CR9 an injected access may restrict, never escalate", async () => {
+  await withTmp(async (dir) => {
+    const driver = `
+      const lib = require(${JSON.stringify(path.join(SHARED, "jira-sync.js"))});
+      const calls = [];
+      const fetchImpl = async (url, opts = {}) => {
+        calls.push(opts.method || "GET");
+        return { ok: true, status: 204, headers: { get: () => null } };
+      };
+      // The environment says manual; the caller asks for full.
+      const http = lib.makeHttp({ fetchImpl, access: "full", cwd: ${JSON.stringify(dir)} });
+      http("https://acme.atlassian.net/rest/api/3/issue/PROJ-1", { method: "PUT" })
+        .then((r) => console.log("DEFERRED", !!r.deferred, "CALLS", JSON.stringify(calls)));
+    `;
+    const r = spawnSync(process.execPath, ["-e", driver], {
+      encoding: "utf8",
+      env: { ...process.env, ACCESS_TRACKER: "manual" },
+      timeout: 20000,
+    });
+    assert.match(
+      r.stdout,
+      /DEFERRED true CALLS \[\]/,
+      "a caller must not be able to hand itself more access than the " +
+        "environment declares — that is the one direction every other tier refuses",
+    );
+  });
+});
+
+test("§17 G-CR1 the epic skip path reports a deferred transition in --json", () => {
+  const src = fs.readFileSync(
+    path.join(REPO, "skills", "sync-jira-epic", "scripts", "sync-jira-epic.js"),
+    "utf8",
+  );
+  // `makeOutput` suppresses `info` under --json, so the ⏸️ lines are invisible
+  // there: the payload is the ONLY channel a --json consumer has.
+  const skipEmit = /output\.emit\(\{\s*action: "skip",[\s\S]*?\}\);/.exec(src);
+  assert.ok(skipEmit, "no skip-path emit found");
+  assert.match(
+    skipEmit[0],
+    /skipStatusOutcome\?\.reason === "deferred"/,
+    "the skip path's own emit must carry the reason too",
+  );
+  assert.match(skipEmit[0], /record: skipStatusOutcome\?\.record/);
 });

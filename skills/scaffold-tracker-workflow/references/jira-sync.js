@@ -1775,6 +1775,15 @@ function summariseFields(fields) {
   return out;
 }
 
+// Permissiveness order, least to most — mirrors resolve-platform.sh's access_rank.
+const ACCESS_ORDER = Object.freeze({
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+});
+
 function makeHttp({
   fetchImpl = fetch,
   timeoutMs = 30000,
@@ -1794,11 +1803,25 @@ function makeHttp({
 } = {}) {
   const ctx = { run, step, skill, cwd, output };
 
-  // QA-1 — resolved lazily, and only when a write is actually attempted. An
+  // Resolved lazily, and only when a write is actually attempted. An
   // unrecognised mode must refuse, but refusing at FACTORY time also killed
   // read-only callers that never write (`--probe-workflow`,
   // scaffold-tracker-workflow), which no requirement asks for.
-  let resolved = access || null;
+  //
+  // An injected `access` may RESTRICT but never escalate: it is reduced against
+  // the environment most-restrictively, the same direction every other tier
+  // moves. A caller passing "full" over `ACCESS_TRACKER=manual` would otherwise
+  // be the one hole the resolver refuses everywhere else.
+  let resolved = null;
+  if (access) {
+    const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    resolved =
+      dm.ACCESS_MODES.indexOf(access) < 0
+        ? access // let the shared resolver produce the refusal message
+        : ACCESS_ORDER[access] <= ACCESS_ORDER[fromEnv]
+          ? access
+          : fromEnv;
+  }
   const accessFor = (method) => {
     if (method === "GET") return "full"; // a read is never gated
     if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
@@ -3365,6 +3388,7 @@ const WORKLOG_VALIDATOR_RE = /time spent|timespent|work ?log|log work/i;
 // record that callers surface in their summary (see the --fail-on-status-skip
 // handling in the sync scripts).
 async function transitionToStatus({
+  skill = undefined, // names the CALLING skill on a deferred transition record
   http,
   baseUrl,
   email,
@@ -3576,6 +3600,28 @@ async function transitionToStatus({
         Accept: "application/json",
       },
       body: JSON.stringify(body),
+      // The `jira.transition` annotation. The task's Decisions table originally
+      // said not to annotate this chain, on the premise that `jira-stage.js`
+      // owns the kind and `walkLadder` is its only caller — QA cycle 1 showed
+      // `syncDocumentStatus` is a SECOND entry point with four call sites, none
+      // of which the stage CLI gates. Unannotated they journalled as
+      // `jira.unknown-mutation`: escalated to `irreversible`, attributed to the
+      // library, and silent about which status to set.
+      //
+      // No double-record risk: the stage CLI's own gate returns before reaching
+      // here, and the deferral short-circuit above this call is the single
+      // record site for one logical hop.
+      defer: {
+        kind: "jira.transition",
+        intent: `Transition ${issueKey} from "${current}" to "${match.name}"`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: { status: match.name },
+        skill,
+      },
     });
   };
 
@@ -4007,6 +4053,9 @@ async function syncDocumentStatus({
   docKind,
   repoRoot,
   output,
+  // Named on a deferred transition record, so a refused status move is
+  // attributed to the calling skill rather than to this library.
+  skill = undefined,
 }) {
   const root =
     repoRoot ||
@@ -4024,6 +4073,7 @@ async function syncDocumentStatus({
     return { transitioned: false, reason: "no-target", localStatus };
 
   const res = await transitionToStatus({
+    skill,
     http,
     baseUrl,
     email,
