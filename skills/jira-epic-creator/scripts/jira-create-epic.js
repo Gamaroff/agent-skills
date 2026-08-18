@@ -17,7 +17,7 @@ const path = require("path");
 // the shared library before. Routing it through jira-sync.js is worth doing and
 // is not this change.
 // CR-6 — ONE require, not a try/catch pair. The bundler rewrites
-// `shared/resources/X` to `references/X` inside skill scripts too, so the
+// a shared-resources path to a references/ one inside skill scripts too, so the
 // "in-tree fallback" this used to carry was rewritten into a byte-identical
 // copy of its own try branch: a catch that could never succeed where the try
 // had already failed.
