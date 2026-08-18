@@ -656,6 +656,17 @@ _Problems encountered and how they were resolved or escalated._
 
 ---
 
+## Tracker Actions Required
+
+_Tracker mutations this run wanted but did not perform — because `access.tracker` restricts this
+run, or because the call failed. Rendered from `.claude/state/tracker-actions.jsonl` by
+`handover-render.js --format summary`; the committed checklist, script and JSON sidecar are the
+`*.handover.{n}.{name}.{md,sh,json}` artifacts beside this report. **Omit this section entirely when
+the journal is empty** — an empty heading reads as "nothing was deferred" in the same shape it would
+read as "the renderer broke"._
+
+---
+
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
@@ -735,6 +746,17 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+---
+
+## Tracker Actions Required
+
+_Tracker mutations this run wanted but did not perform — because `access.tracker` restricts this
+run, or because the call failed. Rendered from `.claude/state/tracker-actions.jsonl` by
+`handover-render.js --format summary`; the committed checklist, script and JSON sidecar are the
+`*.handover.{n}.{name}.{md,sh,json}` artifacts beside this report. **Omit this section entirely when
+the journal is empty** — an empty heading reads as "nothing was deferred" in the same shape it would
+read as "the renderer broke"._
 
 ---
 
