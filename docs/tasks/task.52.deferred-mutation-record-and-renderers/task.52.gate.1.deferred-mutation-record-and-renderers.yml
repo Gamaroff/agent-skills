@@ -1,0 +1,183 @@
+schema: 1
+task: 'task.52.deferred-mutation-record-and-renderers'
+task_title: '[Task 52] One deferred-mutation record, four renderings of it'
+gate: FAIL
+status_reason: 'Seven HIGH defects, all independently reproduced. Two are arbitrary command execution from the COMMITTED, "dry-run-by-default" shell script; one silently drops records (the exact invisible-drift failure the task exists to remove); one makes the committed script unrunnable by double-redacting credentials into «redacted». The architecture, the access gates and the roster are sound — every failure is in the record-identity and rendering layers.'
+reviewer: 'QA Engineer'
+updated: '2026-08-18T16:40:00Z'
+
+top_issues:
+  - id: TASK-52-BUG-3
+    issue: 'A newline in `intent` escapes the script comment and becomes an executable line'
+    severity: high
+    finding: 'shellStep interpolates `intent` into a `#` comment without stripping newlines. buildRecord only .trim()s, so interior newlines survive.'
+    failure_scenario: 'intent "Post the summary\nrm -rf ~/important" renders `# [id] Post the summary` followed by a bare top-level line `rm -rf ~/important`. VERIFIED present in output. It runs on `bash handover.sh` even in DRY RUN, because it is at file scope, not inside run_step.'
+    suggested_action: 'Sanitise every string interpolated into the script; reject interior newlines in buildRecord.'
+    bug_ref: 'task.52.bug.3.generated-script-command-execution.md'
+    suggested_owner: dev
+  - id: TASK-52-BUG-3b
+    issue: 'Backticks in a target label reach an unescaped double-quoted echo — command substitution'
+    severity: high
+    finding: 'The no-argv fallback emits `echo "✋ … ${desc} (${url})"`; desc escapes only the double quote, so backticks and $() are live inside double quotes.'
+    failure_scenario: 'VERIFIED by execution: a record with target.sprint = `touch /tmp/QA_PWNED` and no command.argv produced a script whose DRY RUN created /tmp/QA_PWNED. Column names come from tracker-workflow.yaml and --issue is an unvalidated free string, so neither end is trusted input.'
+    suggested_action: 'Route the description through shQuote (single-quoted) instead of hand-escaping into a double-quoted word.'
+    bug_ref: 'task.52.bug.3.generated-script-command-execution.md'
+    suggested_owner: dev
+  - id: TASK-52-BUG-4
+    issue: 'computeId ignores stdin and intent, so distinct comments collapse to one id and dedupe drops one'
+    severity: high
+    finding: 'The fingerprint falls back to command.argv joined; two comments to the same issue share argv and differ only in stdin/intent.'
+    failure_scenario: 'VERIFIED: "Post the DoD summary" (stdin "DoD body") and "Post the QA gate result" (stdin "QA body") both yield id b3afd88c; dedupe([a,b]) returns 1 of 2. The QA comment is silently omitted from all four renderings — the invisible-drift failure this whole sequence exists to remove.'
+    suggested_action: 'Include a hash of command.stdin and intent in the fingerprint.'
+    bug_ref: 'task.52.bug.4.record-identity-collision.md'
+    suggested_owner: dev
+  - id: TASK-52-BUG-5
+    issue: 'Redaction is not idempotent — the second pass turns $NAME into «redacted», making the committed script unrunnable'
+    severity: high
+    finding: 'defer() redacts on write and render() redacts again on read. maskOrName sees the already-substituted $GITHUB_TOKEN, finds it unchanged by the sweeps, and masks it.'
+    failure_scenario: 'VERIFIED: redactArgv(["--token","$GITHUB_TOKEN"]) → ["--token","«redacted»"]. Under `command` mode the operator is handed a script containing --token «redacted», which cannot run. The §6 test passed only because verify.cmd is a plain string that keeps its $NAME.'
+    suggested_action: 'Treat a value already equal to $IDENT or «redacted» as terminal in maskOrName.'
+    bug_ref: 'task.52.bug.5.redaction-not-idempotent.md'
+    suggested_owner: dev
+  - id: TASK-52-BUG-2
+    issue: 'The generic 32+ char redaction rule corrupts legitimate content'
+    severity: high
+    finding: 'SECRET_SHAPES ends with /\b[A-Za-z0-9+/=_-]{32,}\b/g, applied to every string including command.stdin, intent and manual.fields[].value. The class includes - _ and /, so it eats slugs and paths too.'
+    failure_scenario: 'VERIFIED: a 40-char commit SHA, an embedded base64 blob, a long URL path and the branch name "feature/task.52.deferred-mutation-record-and-renderers" all become «redacted». Since both gates write run and target.url into every record, a repo with a longish org/repo name loses the deep link the handover exists to provide.'
+    suggested_action: 'Scope the generic high-entropy rule to credential-bearing positions only; keep the env sweep and prefixed shapes everywhere.'
+    bug_ref: 'task.52.bug.2.redaction-corrupts-legitimate-content.md'
+    suggested_owner: dev
+  - id: TASK-52-BUG-6
+    issue: '-u and -p are masked unconditionally, corrupting their common non-secret uses'
+    severity: high
+    finding: 'SECRET_FLAGS contains -u and -p, and the following element is masked with no reference to argv[0].'
+    failure_scenario: 'VERIFIED: redactArgv(["git","push","-u","origin","HEAD"]) → ["git","push","-u","«redacted»","HEAD"]. The generated script then runs git push -u «redacted» HEAD. mkdir -p is corrupted the same way.'
+    suggested_action: 'Treat -u/-p as secret-bearing only for known clients (curl, mysql, …), or mask only the part after the first colon for -u.'
+    bug_ref: 'task.52.bug.6.flag-masking-too-broad.md'
+    suggested_owner: dev
+  - id: TASK-52-BUG-1
+    issue: 'renderMarkdown lists every dependsOn target twice'
+    severity: high
+    finding: 'The top-level consequence-group loop calls markdownItem() for every record without consulting the _rendered marker the nested-child loop sets.'
+    failure_scenario: 'VERIFIED: the suite own fixture handover-depends-chain.jsonl (3 records) renders 5 unticked checkboxes. An operator performs each dependent action twice; for an irreversible kind that means a duplicate issue. sh, json and summary are all correct.'
+    suggested_action: 'Skip already-rendered records in the top-level loop; assert one checkbox per outstanding record.'
+    bug_ref: 'task.52.bug.1.md-renderer-duplicates-dependants.md'
+    suggested_owner: dev
+  - id: TASK-52-BUG-7
+    issue: 'handover-render.js is bundled into no skill and invoked by no pipeline step'
+    severity: medium
+    finding: 'Nothing requires it, so bundle_skill.py cannot follow it; only prose mentions it. defer-mutation.js and the roster doc ship to nine skills, the renderer does not.'
+    failure_scenario: 'A bundled develop-story run under `manual` defers board moves into a journal and produces no handover artifact and no run-end summary — records are written that nothing renders.'
+    suggested_action: 'Invoke it at run end and make the bundler ship it.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-8
+    issue: 'The confirm gate aborts the whole script when there is no tty'
+    severity: medium
+    finding: 'read -r -p … < /dev/tty under set -euo pipefail exits non-zero when no controlling tty exists.'
+    failure_scenario: 'An --apply run in CI stops at the first irreversible action and silently skips every later step. The dry run gives no warning because confirm_step returns before the read when APPLY != 1.'
+    suggested_action: 'Guard on [ -e /dev/tty ] and fall through to a skip message.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-9
+    issue: 'parseRoster silently truncates the roster on a reformatted row'
+    severity: medium
+    finding: 'A first cell that does not match the kind regex sets inKindTable = false; the only guard is size === 0.'
+    failure_scenario: 'Bolding one kind at the top of the GitHub table drops all 11 GitHub kinds with no error. defer() then throws "unknown kind" inside the gh-stage gate, which swallows it to a warning and returns deferred with NO record — the board move is neither performed nor recorded.'
+    suggested_action: 'Throw on an unparsable backtick-quoted first cell inside a kind table, and assert the expected total.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-10
+    issue: 'loadDotEnv creates a second ACCESS_TRACKER resolution path the resolver never sees'
+    severity: medium
+    finding: 'Both CLIs call loadDotEnv before the gate, writing .env / .secrets/tooling.env keys into process.env.'
+    failure_scenario: 'A repo whose .env sets ACCESS_TRACKER=manual makes both CLIs defer while resolve-platform.sh resolved full and printed no notice. A typo (Manual) makes both CLIs exit 2 on every invocation from all six pipeline steps.'
+    suggested_action: 'Read ACCESS_TRACKER before loadDotEnv, or exclude ACCESS_* from the dot-env loader.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-11
+    issue: 'Residual redaction holes: object keys, non-string scalars, short env values, URL userinfo'
+    severity: medium
+    finding: 'redactDeep redacts values only; buildEnvTable skips values under 8 chars; no shape matches ://user:pass@.'
+    failure_scenario: 'VERIFIED: a token used as an object KEY survives into md, summary and json. JIRA_PASSWORD=hunter2 (7 chars) is never swept. https://user:hunter2@example.com round-trips unchanged.'
+    suggested_action: 'Redact keys as well as values, lower the length floor, add a userinfo shape.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-12
+    issue: 'SECRET_ENV_NAME matches AUTH as a substring, rewriting unrelated text'
+    severity: medium
+    finding: 'GIT_AUTHOR_NAME / GIT_AUTHOR_EMAIL / GIT_AUTHOR_DATE are set by git in every hook context and match /AUTH/.'
+    failure_scenario: 'VERIFIED: with GIT_AUTHOR_NAME="Gareth Armstrong", "Reviewed by Gareth Armstrong" → "Reviewed by $GIT_AUTHOR_NAME" in all four outputs.'
+    suggested_action: 'Anchor the name patterns and exclude AUTHOR.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-13
+    issue: 'markdownItem mutates the model records, so renderMarkdown is not idempotent on a shared model'
+    severity: medium
+    finding: '_rendered is written onto record objects rather than tracked in a local Set.'
+    failure_scenario: 'renderMarkdown(m) called twice on one model yields different output (nesting lost on the second call). run() builds the model once and loops formats, so --format md --format md produces two different files.'
+    suggested_action: 'Track rendered ids in a Set local to renderMarkdown; strip() then becomes unnecessary.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-14
+    issue: 'The journal path is cwd-relative and the gates do not pass the repo root'
+    severity: medium
+    finding: 'journalPath resolves against process.cwd(); both gates call dm.defer() without a cwd even though they already know root.'
+    failure_scenario: 'A step invoked from a subdirectory appends to <subdir>/.claude/state/tracker-actions.jsonl while the renderer reads the repo-root journal and reports it empty — the deferred move is lost with no warning.'
+    suggested_action: 'Pass { cwd: root } from both gates.'
+    suggested_owner: dev
+  - id: TASK-52-BUG-15
+    issue: 'The gate defers without reading the board, bypassing already / would-regress'
+    severity: medium
+    finding: 'gh-stage defers before the board read that the full path uses to detect a no-op or a backwards move.'
+    failure_scenario: 'A card already at Done, asked for work-started, returns would-regress under full but under manual emits a record telling the operator to drag the card backwards. Reads are permitted in every non-full mode, and the schema has a satisfied field for exactly this.'
+    suggested_action: 'Perform the permitted read before deferring and set satisfied / skip on regress, or document that a gated record is an unverified request.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 25
+
+evidence:
+  tests_reviewed: 1732
+  phases_verified: '12/12'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    phases_with_issues: [1, 2, 4, 11]
+
+nfr_validation:
+  security:
+    status: FAIL
+    notes: 'Two confirmed arbitrary-command-execution paths in the COMMITTED shell script (BUG-3, BUG-3b), both firing during the dry run the documentation presents as safe. Residual redaction holes (BUG-11): object keys, non-string scalars, sub-8-char env values and URL userinfo. Positives that do hold: the env sweep and prefixed shape matchers catch real configured secrets; the gates were verified to attempt NO network call under all four restricted modes with a full credential set present; the gate fails closed if defer() throws; an unrecognised access mode is refused rather than defaulted.'
+  performance:
+    status: PASS
+    notes: 'Roster parsed once and memoised; journal append is one sub-4KiB write; the gate is a string comparison ahead of any I/O. nextOrder() is O(n) per append and topoSort recursion is unbounded (LOW — 15k-record chain overflows the stack), neither reachable at run scale.'
+  reliability:
+    status: FAIL
+    notes: 'BUG-4 silently drops a record whose argv matches another — the precise invisible-drift failure the task exists to remove. BUG-5 makes the committed script unrunnable under `command` mode. BUG-1 duplicates checklist entries. BUG-7 means nothing renders the journal in a bundled skill at all. Genuinely strong elsewhere: malformed lines skipped with distinct warnings, crash leaves a readable prefix, future schema versions refused rather than guessed at, topoSort never drops or double-pushes a record, cycles and dangling edges warn and still render.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The single-sourced roster and the mutation ledger are real strengths, and conventions match the surrounding modules. But parseRoster fails silently on a reformatted row (BUG-9), three dead artifacts remain (unused stack parameter, unused argvLine export, an unreachable startsWith("$") guard), and the test suite has demonstrated blind spots: every one of the seven HIGH defects sits in code the suite covers, and none was caught.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-3/3b — route every string interpolated into the generated script through shQuote; reject interior newlines in buildRecord'
+      refs: ['shared/resources/handover-render.js', 'shared/resources/defer-mutation.js']
+    - action: 'BUG-4 — include stdin and intent in the identity fingerprint'
+      refs: ['shared/resources/defer-mutation.js']
+    - action: 'BUG-5 — make maskOrName idempotent ($IDENT and «redacted» are terminal)'
+      refs: ['shared/resources/defer-mutation.js']
+    - action: 'BUG-2 — scope the generic high-entropy rule to credential-bearing positions'
+      refs: ['shared/resources/defer-mutation.js']
+    - action: 'BUG-6 — make -u/-p client-aware'
+      refs: ['shared/resources/defer-mutation.js']
+    - action: 'BUG-1 — skip already-rendered records in the markdown top-level loop'
+      refs: ['shared/resources/handover-render.js']
+    - action: 'Regression coverage for every one of the above, each watched failing'
+      refs: ['shared/resources/tests/handover-render.test.mjs']
+  future:
+    - action: 'BUG-7 — invoke handover-render at run end and make the bundler ship it'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'BUG-8..15 — tty guard, roster strictness, dot-env precedence, redaction holes, AUTHOR false positive, render idempotency, journal cwd, pre-defer board read'
+      refs: ['shared/resources/defer-mutation.js', 'shared/resources/handover-render.js', 'shared/resources/gh-stage.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'All seven HIGH issues fixed with regression tests, each watched failing'
+    - 'Command-execution paths (BUG-3, BUG-3b) closed and proven closed by execution test'
