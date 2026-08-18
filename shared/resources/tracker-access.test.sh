@@ -698,12 +698,20 @@ done
 # exercised a merge that adds a key never present locally.
 echo "  30. Merge-key override"
 D=$(fixture merge-override 'defaults: &d\n  tracker: read-only\n  vcs: full\naccess:\n  <<: *d\n  tracker: manual\n')
-for tier in python awk; do
-  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
-  assert_rc "<<: override [$tier] → status 0"        "$RC" "0"
-done
 run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc "<<: override [python] → status 0"         "$RC" "0"
 assert_eq "<<: override → the LOCAL value wins"      "$AT" "manual"
+
+# The awk arm is INVERTED as of task.60, and that is a deliverable rather than a regression. This
+# fixture carries an anchor AND a merge key — two constructs outside the documented tier-2 subset.
+# Tier 2 used to read the whole access block as absent and resolve `full`: silently, at exit 0, on
+# the DEFAULT tier of a stock macOS host. It now refuses and says why.
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+assert_rc "<<: override [awk] → REFUSED, not silently full" "$RC" "1"
+assert_eq "<<: override [awk] → grants nothing"             "$AT" ""
+assert_stderr_has "…names the construct"    "an anchor"
+assert_stderr_has "…names the line"         "skills-config.yaml:1:"
+assert_stderr_has "…names both migrations"  "pip install pyyaml"
 
 # A real duplicate must still be caught, override support notwithstanding.
 D=$(fixture dupe-under-merge 'defaults: &d\n  vcs: full\naccess:\n  <<: *d\n  tracker: manual\n  tracker: full\n')
@@ -936,11 +944,22 @@ D=$(fixture merge-recursive-anchor 'a: &a\n  <<: *a\n  tracker: manual\naccess:\
 run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
 if [ -n "$RC" ]; then ok "a recursive anchor terminates (rc=$RC)"; else bad "recursive anchor" "no result — probable hang"; fi
 
-# The halt names the three parser-legal-but-silent shapes it rejects, so an operator whose file has
-# no visible syntax error is not left hunting. The specific reason cannot be surfaced — the reader
-# collapses every parse exception to one sentinel — so the message enumerates instead.
-assert_stderr_has "the malformed halt names duplicate keys"      "duplicate key in ANY mapping"
-assert_stderr_has "the malformed halt names overlapping merges"  "define the SAME key"
+# The halt NAMES THE CAUSE. It used to enumerate the three parser-legal-but-silent shapes this
+# reader rejects and leave the operator to work out which was theirs — a workaround for a sentinel
+# that carried no reason. task.60 gives `__ERR__` a `<line>:<reason>` payload, so the enumeration is
+# retired: the message now reports what actually went wrong.
+assert_stderr_has "the malformed halt names the cause" "   Cause: "
+
+D=$(fixture malformed-dup-cause 'access:\n  tracker: manual\nx: 1\nx: 2\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc         "a duplicate key WITH access: still halts"  "$RC" "1"
+assert_stderr_has "…and the halt names the duplicate"         "duplicate key"
+assert_stderr_has "…and names WHICH key"                      "x"
+
+D=$(fixture malformed-syntax-cause 'access:\n  tracker: manual\nbroken: [1,\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+assert_rc         "a syntax error WITH access: halts"         "$RC" "1"
+assert_stderr_has "…and the halt carries a line number"       "Cause: line "
 
 # --- 38. Non-canonical spellings of the `access:` key, on a malformed file ------------------------
 # The fail-closed gate matched `^access:` — block form, column 0, nothing else. Every other legal
@@ -1021,36 +1040,461 @@ run_case "$D"
 assert_stderr_exact_line "the legal tracker set is exactly three" \
   "   Legal values for tracker: jira github auto"
 
-# --- 41. KNOWN LIMIT: the awk tier reads only the canonical spelling of `access:` -----------------
-# NOT an endorsement — a recorded, deferred defect, kept visible so it cannot drift unnoticed.
-#
-# The awk tier anchors on the literal regexes `^access:` and `^[[:space:]]+tracker:`, so a merge
-# key, an anchor, or a quoted key reads as ABSENT there and takes the permissive default, while the
-# python tier reads the declared value. That is a silent escalation on a well-formed file, and it is
-# NOT closed by this cycle. Closing it means giving the tier a grammar rather than more regexes —
-# see the follow-up recorded in the task document under "Known limits".
-#
-# These assertions pin the DIVERGENCE so that (a) it is impossible to claim the tiers agree, and
-# (b) any change to it is deliberate. WHEN ONE OF THESE FAILS, THE LIMIT HAS BEEN FIXED: delete the
-# block, do not "repair" it back to the escalating value.
-echo "  41. KNOWN LIMIT — awk tier and non-canonical access spellings"
-for shape in \
-  'defaults: &d {tracker: manual}\naccess:\n  <<: *d\n' \
-  'access:\n  <<: {tracker: manual}\n' \
-  '"access":\n  tracker: manual\n' ; do
-  D=$(fixture "knownlimit-$RANDOM" "$shape")
-  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
-  assert_eq "KNOWN LIMIT: python tier reads it"  "$AT" "manual"
+# --- 41. Tier 2 ACCEPTS the documented subset, identically to tier 1 -----------------------------
+# The other half of the refusal matrix below, and the half that actually costs something to get
+# wrong. A subset narrower than what consumers write turns this task into a different outage: every
+# refusal is loud, so an over-narrow subset is not silent — it is a locked door. The review caught a
+# shape-based draft that would have refused this project OWN documented example config, and §43
+# below runs that config as a fixture so it cannot happen again after the fact.
+echo "  41. Tier 2 accepts the documented subset"
+IN_SUBSET="
+access:\n  tracker: manual\n
+access:\n  tracker: \"manual\"\n
+access:\n  tracker: manual  # why\n
+access: {tracker: manual}\n
+access:\n  tracker: manual\ndevLoadAlwaysFiles:\n  - docs/a.md\n  - docs/b.md\n
+access:\n  tracker: manual\njira:\n  statusMap:\n    ready-for-review: [Waiting for Review, In Review]\n
+access:\n  tracker: manual\ndevelopBatch:\n  resources:\n    - name: local\n      probe:\n        command: curl -fsS x\n
+access:\n  tracker: manual\nnote: |\n  free text with &anchors *aliases and <<: merges\n  and a \"quoted key\": here\n
+access:\n  tracker: manual\nworktreeSeedPaths: []\n
+access:\n  tracker: manual\n\"my key\": 1\n
+access:\n  tracker: manual\nbranching:\n  epicIntegration:\n    branchPattern: \"epic/{n}.{slug}\"\n
+access:\n  tracker: manual\nretrospective:\n  identities:\n    - jira: Ada Lovelace\n      git: ada@example.com\n
+# a comment mentioning &anchor *alias and <<: merge\naccess:\n  tracker: manual\n
+"
+IN_N=0
+echo "$IN_SUBSET" | while IFS= read -r shape; do
+  [ -z "$shape" ] && continue
+  IN_N=$((IN_N + 1))
+  D=$(fixture "subset-in-$IN_N" "$shape")
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"; PY_RC="$RC"; PY_AT="$AT"
   run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
-  assert_eq "KNOWN LIMIT: awk tier does NOT (escalates — deferred)" "$AT" "full"
+  # On the VALUE, not the exit code. Every escalating config in task.51 returned 0; a suite
+  # asserting rc=0 passed while the escalation was live.
+  if [ "$AT" = "$PY_AT" ] && [ "$RC" = "$PY_RC" ]; then
+    echo "  PASS  in-subset shape resolves identically on both tiers ($PY_RC/$PY_AT)"
+  else
+    echo "  FAIL  in-subset shape DIVERGES — python $PY_RC/$PY_AT vs awk $RC/$AT"
+    echo "        shape: $shape"
+    echo "x" >> "$TMPDIR_TEST/subset-in-failures"
+  fi
 done
+if [ -f "$TMPDIR_TEST/subset-in-failures" ]; then
+  FAIL=$((FAIL + $(wc -l < "$TMPDIR_TEST/subset-in-failures")))
+else
+  PASS=$((PASS + 13))
+fi
 
-# A mapping-valued CHILD (`access:\n  tracker:\n    mode: manual`) is the same class: the shape of
-# access is validated, the shape of its child is not, so a nesting typo reads as unconfigured.
-D=$(fixture knownlimit-child 'access:\n  tracker:\n    mode: manual\n')
+# --- 42. Tier 2 REFUSES everything outside it ----------------------------------------------------
+# MIGRATED FROM the old §41 "KNOWN LIMIT" block, which pinned this same divergence as a deferred
+# defect: three spelling fixtures (merge via anchor, merge declared at the site, quoted key) that
+# asserted awk resolves `full` where python reads `manual`, plus `knownlimit-child`, which asserted
+# `full` on BOTH tiers. That block carried a standing instruction — when one of these fails, the
+# limit has been fixed; delete the block, do not repair it back to the escalating value. This is
+# that deletion, with the coverage carried across rather than dropped: each fixture is here,
+# inverted, and `knownlimit-child` is now §42b because it was never a tier-2 problem at all.
+echo "  42. Tier 2 refuses everything outside the subset"
+OUT_OF_SUBSET="
+defaults: &d\n  tracker: manual\naccess:\n  <<: *d\n|an anchor
+access:\n  <<: {tracker: manual}\n|a merge key
+defaults: &d {tracker: manual}\naccess: *d\n|an anchor
+\"access\":\n  tracker: manual\n|a quoted key
+access :\n  tracker: manual\n|a space before the colon
+access: {\n  tracker: manual}\n|a flow mapping spanning lines
+access: !!map\n  tracker: manual\n|an explicit tag
+---\naccess:\n  tracker: manual\n|a document separator
+"
+OUT_N=0
+echo "$OUT_OF_SUBSET" | while IFS='|' read -r shape construct; do
+  [ -z "$shape" ] && continue
+  OUT_N=$((OUT_N + 1))
+  D=$(fixture "subset-out-$OUT_N" "$shape")
+
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+  FAILED=0
+  [ "$RC" = "1" ] || { echo "  FAIL  out-of-subset ($construct) [awk] → expected rc=1, got $RC"; FAILED=1; }
+  # The value assertion is the one that matters. `full` here is the escalation this task exists to
+  # end, and it is reachable at rc=0 — so an rc-only suite would not see it.
+  [ "$AT" = "full" ] && { echo "  FAIL  out-of-subset ($construct) [awk] granted full"; FAILED=1; }
+  # The MESSAGE is a deliverable, not a detail: it is the entire migration path for BC-1. Asserting
+  # rc=1 alone would pass just as happily on the wrong halt — the one validate_enum raises from the
+  # identity block, which names neither the line, the construct, nor either way out. These three
+  # assertions are what hold the refusal above the identity block.
+  grep -qF -- "$construct" "$STDERR_FILE"          || { echo "  FAIL  out-of-subset [awk] did not name the construct ($construct)"; FAILED=1; }
+  grep -qF -- "skills-config.yaml:" "$STDERR_FILE" || { echo "  FAIL  out-of-subset ($construct) [awk] did not name the line"; FAILED=1; }
+  grep -qF -- "pip install pyyaml" "$STDERR_FILE"  || { echo "  FAIL  out-of-subset ($construct) [awk] did not offer pyyaml"; FAILED=1; }
+  grep -qF -- "platform-detection.md" "$STDERR_FILE" || { echo "  FAIL  out-of-subset ($construct) [awk] did not point at the subset spec"; FAILED=1; }
+
+  # Tier 1 is a real parser and still accepts every one of these. The refusal is a property of the
+  # no-dependency tier, not a new restriction on the config format.
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
+  [ "$RC" = "0" ]      || { echo "  FAIL  out-of-subset ($construct) [python] → expected rc=0, got $RC"; FAILED=1; }
+  [ "$AT" = "manual" ] || { echo "  FAIL  out-of-subset ($construct) [python] → expected manual, got $AT"; FAILED=1; }
+
+  if [ "$FAILED" = "0" ]; then
+    echo "  PASS  out-of-subset ($construct): awk refuses with the migration path, python still reads it"
+  else
+    echo "x" >> "$TMPDIR_TEST/subset-out-failures"
+  fi
+done
+if [ -f "$TMPDIR_TEST/subset-out-failures" ]; then
+  FAIL=$((FAIL + $(wc -l < "$TMPDIR_TEST/subset-out-failures")))
+else
+  PASS=$((PASS + 8))
+fi
+
+# --- 42b. A mapping-valued access.tracker is refused on BOTH tiers -------------------------------
+# MIGRATED FROM old §41 `knownlimit-child`, which asserted `full` for `for tier in python awk`.
+# This shape escaped BOTH tiers and so was never a tier-2 problem: pyyaml parses it correctly and
+# the STRICT reader then collapsed its `__MAP__` signal to "" — the same empty string it uses for
+# "not configured". A nesting typo therefore read as a config that declares nothing, and nothing
+# means `full`. `__NONE__` and `__MAP__` are now different answers.
+echo "  42b. Mapping-valued access.tracker"
+D=$(fixture mapping-child 'access:\n  tracker:\n    mode: manual\n')
 for tier in python awk; do
   run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
-  assert_eq "KNOWN LIMIT: mapping-valued access.tracker reads as unset [$tier]" "$AT" "full"
+  assert_rc "mapping-valued access.tracker [$tier] → refused" "$RC" "1"
+  if [ "$AT" = "full" ]; then
+    bad "mapping-valued access.tracker [$tier] must not grant full" "AT=full"
+  else
+    ok "mapping-valued access.tracker [$tier] grants nothing"
+  fi
+  assert_stderr_has "…and says it is a mapping [$tier]" "is a mapping"
+done
+
+# A genuine NULL child is a different thing and must still read as absent — the key really is not
+# configured, and `full` is the correct answer. Refusing it would be the over-narrow failure.
+D=$(fixture null-child 'access:\n  tracker:\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "null access.tracker [$tier] → status 0"  "$RC" "0"
+  assert_eq "null access.tracker [$tier] → full"      "$AT" "full"
+done
+
+# --- 42c. `__UNSUPPORTED__` cannot be forged from the config --------------------------------------
+# Tier 2 answers on a plain stdout channel with no kind byte, so if the hoisted refusal in
+# resolve-platform.sh read a READER STDOUT rather than the scan verdict global, a config VALUE
+# spelling the sentinel would be obeyed as the signal. That is the `__MAP__` forgery class task.51
+# spent three QA cycles closing, and this tier has no framing to lean on.
+echo "  42c. The refusal sentinel cannot be forged"
+D=$(fixture forge-unsupported 'tracker: __UNSUPPORTED__\naccess:\n  tracker: manual\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+assert_rc         "a config value spelling __UNSUPPORTED__ → rejected" "$RC" "1"
+assert_stderr_has "…as a VALUE, by enum validation"                    'tracker: "__UNSUPPORTED__" is not a recognised value'
+if [ "$AT" = "full" ]; then bad "forged __UNSUPPORTED__ granted full" "AT=full"; else ok "forged __UNSUPPORTED__ grants nothing"; fi
+
+D=$(fixture forge-unsupported-access 'access:\n  tracker: __UNSUPPORTED__\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+assert_rc "a forged access.tracker value → rejected" "$RC" "1"
+if [ "$AT" = "full" ]; then bad "forged access value granted full" "AT=full"; else ok "forged access value grants nothing"; fi
+
+# --- 42e. The READERS themselves, not only the resolver -------------------------------------------
+# The refusal an operator sees comes from the hoisted check in resolve-platform.sh, so the guards
+# inside the three readers are defence in depth — and defence in depth with no witness is defence
+# that can be deleted with the suite green. A mutation audit found exactly that: removing the guard
+# from read_nested_config_key_strict changed nothing observable through the resolver. These call the
+# readers directly, which is also how a skill that sources read-config.sh alone would meet them.
+echo "  42e. The readers, called directly"
+D=$(fixture reader-direct 'defaults: &d\n  tracker: manual\naccess:\n  <<: *d\nprd:\n  prdShardedLocation: docs/custom\n')
+READ_OUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+  cd '$D'; source '$READER'
+  echo \"strict=\$(read_nested_config_key_strict access tracker)\"
+  echo \"top=\$(read_config_key tracker)\"
+  echo \"nested=\$(read_nested_config_key prd prdShardedLocation)\"
+  echo \"verdict=\$_CONFIG_SUBSET_VERDICT\"" 2>/dev/null)
+assert_eq "strict reader refuses out-of-subset"  "$(echo "$READ_OUT" | sed -n 's/^strict=//p')" "__UNSUPPORTED__"
+assert_eq "top-level reader refuses out-of-subset" "$(echo "$READ_OUT" | sed -n 's/^top=//p')"  "__UNSUPPORTED__"
+# The non-strict reader NEVER emits a sentinel — resolve-paths.sh has no way to act on one and its
+# roots have safe defaults. `__UNREADABLE__` reached PRD_ROOT once and render-retro.sh got as far as
+# `mkdir -p "__UNREADABLE__"`; this is the same split, held by a test this time.
+assert_eq "non-strict reader maps it to empty"   "$(echo "$READ_OUT" | sed -n 's/^nested=//p')" ""
+assert_eq "the verdict names the line and construct" \
+  "$(echo "$READ_OUT" | sed -n 's/^verdict=//p')" '1:an anchor (`&name`)'
+
+# The tier-1 half of the mapping-valued access.tracker fix, called DIRECTLY. Through the resolver
+# this is masked: resolve-platform.sh reads via config_bulk whenever tier 1 is available, so the
+# bulk path's own `__MAP__` check answers first and the strict reader is never reached. A mutation
+# audit found exactly that — collapsing `__MAP__` back to "" here left the suite green — which is
+# why BOTH sites are asserted rather than the one the resolver happens to exercise.
+D=$(fixture reader-direct-map 'access:\n  tracker:\n    mode: manual\n')
+for tier in python awk; do
+  MAPOUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER="$tier" bash -c "
+    cd '$D'; source '$READER'; read_nested_config_key_strict access tracker" 2>/dev/null)
+  assert_eq "strict reader [$tier] reports a mapping, not absence" "$MAPOUT" "__MAP__"
+  # The NON-strict reader must keep collapsing it — resolve-paths.sh never fails by contract, and
+  # `prd`/`architecture` have safe defaults. This is the same split as `__UNREADABLE__` before it.
+  NSOUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER="$tier" bash -c "
+    cd '$D'; source '$READER'; read_nested_config_key access tracker" 2>/dev/null)
+  assert_eq "non-strict reader [$tier] still collapses it to empty" "$NSOUT" ""
+done
+
+# A genuine null must stay absent in the same reader — the distinction is the whole fix, and a
+# guard that answered `__MAP__` for both would refuse a config that declares nothing.
+D=$(fixture reader-direct-null 'access:\n  tracker:\n')
+for tier in python awk; do
+  NULLOUT=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER="$tier" bash -c "
+    cd '$D'; source '$READER'; read_nested_config_key_strict access tracker" 2>/dev/null)
+  assert_eq "strict reader [$tier] reports a null child as absent" "$NULLOUT" ""
+done
+
+# Tier 1 authoritative ⇒ the scan does not run at all, and the verdict must say so rather than
+# leaving a stale answer that the hoisted check would act on.
+VERDICT_PY=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=python bash -c "
+  cd '$D'; source '$READER'; printf '%s' \"\$_CONFIG_SUBSET_VERDICT\"" 2>/dev/null)
+assert_eq "tier 1 authoritative → the subset scan is skipped" "$VERDICT_PY" "-"
+
+# A clean file scans clean. Without this, a scan that crashed and returned nothing would read as
+# "outside the subset" (loud, wrong) or "-" (silent, worse), and neither would be noticed.
+D=$(fixture reader-direct-clean 'access:\n  tracker: manual\n')
+VERDICT_OK=$(env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+  cd '$D'; source '$READER'; printf '%s' \"\$_CONFIG_SUBSET_VERDICT\"" 2>/dev/null)
+assert_eq "an in-subset file scans clean" "$VERDICT_OK" "-"
+
+# Each refused construct, classified on its own. Through the resolver most of these have no
+# INDEPENDENT witness — a legal YAML alias needs an anchor, so the anchor rule always fires on the
+# earlier line and the alias rule can be narrowed to match nothing with the suite green (the
+# mutation audit found exactly that). The scan is a line classifier, so it is asserted as one:
+# feed it the line and check which construct it names.
+scan_verdict() {
+  D=$(fixture "scan-$1" "$2")
+  env -i PATH="$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+    cd '$D'; source '$READER'; printf '%s' \"\$_CONFIG_SUBSET_VERDICT\"" 2>/dev/null
+}
+assert_eq "classifier: anchor"      "$(scan_verdict anchor  'defaults: &d\n')"          '1:an anchor (`&name`)'
+assert_eq "classifier: alias"       "$(scan_verdict alias   'access: *d\n')"            '1:an alias (`*name`)'
+assert_eq "classifier: merge key"   "$(scan_verdict merge   'access:\n  <<: *d\n')"     '2:a merge key (`<<`)'
+assert_eq "classifier: quoted key"  "$(scan_verdict qkey    '"access":\n')"             '1:a quoted key (`"access":`)'
+assert_eq "classifier: spaced key"  "$(scan_verdict spaced  'access :\n')"              '1:a space before the colon (`access :`)'
+assert_eq "classifier: explicit key" "$(scan_verdict qmark  '? access\n')"              '1:an explicit key (`? key`)'
+assert_eq "classifier: flow map"    "$(scan_verdict flowml  'access: {\n')"             '1:a flow mapping spanning lines'
+assert_eq "classifier: tag"         "$(scan_verdict tag     'access: !!map\n')"         '1:an explicit tag (`!tag`)'
+assert_eq "classifier: doc sep"     "$(scan_verdict docsep  '---\naccess:\n')"          '1:a document separator (`---`)'
+assert_eq "classifier: BOM"         "$(scan_verdict bom     '\xef\xbb\xbfaccess:\n')"   '1:a UTF-8 byte-order mark'
+assert_eq "classifier: escaped quoted key" "$(scan_verdict qesc '"acc\\x65ss":\n')"    '1:a quoted key containing an escape'
+
+# An awk that DIES must not read as clean. The scan captures awk stdout, and a failed awk produces
+# none — which is byte-identical to "found nothing", i.e. the permissive answer. This is the same
+# class of mistake as the whole task (absence of evidence reported as evidence of absence), one
+# layer down, so it gets the same treatment: the fallback verdict is a refusal, and it is witnessed.
+AWKDEAD="$TMPDIR_TEST/awkdead"
+mkdir -p "$AWKDEAD"
+printf '#!/bin/sh\nexit 1\n' > "$AWKDEAD/awk"
+chmod +x "$AWKDEAD/awk"
+D=$(fixture scan-awkdead 'access:\n  tracker: manual\n')
+DEAD_VERDICT=$(env -i PATH="$AWKDEAD:$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+  cd '$D'; source '$READER'; printf '%s' \"\$_CONFIG_SUBSET_VERDICT\"" 2>/dev/null)
+if [ -n "$DEAD_VERDICT" ] && [ "$DEAD_VERDICT" != "-" ]; then
+  ok "a failed awk yields a refusal, not a clean verdict (got '$DEAD_VERDICT')"
+else
+  bad "a failed awk read as clean" "verdict='$DEAD_VERDICT' — an empty scan must never mean in-subset"
+fi
+
+# And the resolver must act on it rather than resolving access from a scan that never ran.
+OUT=$(env -i PATH="$AWKDEAD:$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+  cd '$D'; source '$RESOLVER' >/dev/null 2>&1; echo \"\$?:\$ACCESS_TRACKER\"")
+if [ "$OUT" = "0:full" ]; then
+  bad "a failed awk granted full" "$OUT"
+else
+  ok "a failed awk does not resolve access to full (got '$OUT')"
+fi
+
+# And the deliberate NON-matches. The alias rule requires an alphanumeric after `*` precisely so a
+# glob in a path value is not mistaken for one; the anchor rule requires a non-space after `&` so a
+# URL query string is not. Both would be loud false refusals, and both are plausible in a real
+# config — so the looseness is asserted rather than left as a comment.
+assert_eq "classifier: a glob value is not an alias"       "$(scan_verdict glob  'worktreeSeedPaths:\n  - *.env\n  - **/x.md\n')" "-"
+assert_eq "classifier: an ampersand in a URL is not an anchor" "$(scan_verdict amp 'jira:\n  docBranch: https://x/y?a=1&b=2\n')" "-"
+assert_eq "classifier: a quoted key we never read is fine" "$(scan_verdict okey  '"my key": 1\n')" "-"
+assert_eq "classifier: a bare - sequence item is fine"     "$(scan_verdict seq   'devLoadAlwaysFiles:\n  - docs/a.md\n')" "-"
+
+# The scan runs ONCE, at source time. Memoised on first use it would cache into the command
+# substitution each reader runs inside, never reach the parent, and re-run on every call — the
+# mistake that made one `source` cost ten python spawns. Counted through awk invocations.
+AWKCOUNT_DIR="$TMPDIR_TEST/awkcount"
+mkdir -p "$AWKCOUNT_DIR"
+printf '#!/bin/sh\necho x >> "%s/calls"\nexec /usr/bin/awk "$@"\n' "$AWKCOUNT_DIR" > "$AWKCOUNT_DIR/awk"
+chmod +x "$AWKCOUNT_DIR/awk"
+: > "$AWKCOUNT_DIR/calls"
+env -i PATH="$AWKCOUNT_DIR:$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+  cd '$D'; source '$READER'
+  read_nested_config_key_strict access tracker
+  read_nested_config_key_strict access vcs
+  read_config_key tracker
+  read_config_key vcs" >/dev/null 2>&1
+SCAN_CALLS=$(grep -c x "$AWKCOUNT_DIR/calls" 2>/dev/null || echo 0)
+# Four reads, each of which runs its own awk. If the SCAN were lazy it would add one per read
+# instead of one per source, so the count would rise with the number of readers called.
+if [ "$SCAN_CALLS" -le 9 ]; then
+  ok "the subset scan runs once per source, not once per read ($SCAN_CALLS awk calls for 4 reads)"
+else
+  bad "the subset scan looks lazy" "$SCAN_CALLS awk calls for 4 reads — expected at most 9"
+fi
+
+# --- 42d. A file outside the subset that declares NO access still degrades ------------------------
+# The refusal is gated on the same fail-closed probe as the malformed branch, and for the same
+# reason: the default for ACCESS is `full`, so an unreadable declaration must halt, while the
+# default for IDENTITY is *detection*, which is the documented behaviour rather than a guess.
+# Halting a consumer who never opted in, over a construct in a section nobody reads, is the
+# over-refusal this subset was designed to avoid.
+echo "  42d. No access declared → degrade, do not halt"
+D=$(fixture out-of-subset-no-access 'defaults: &d\n  x: 1\ntracker: github\n')
+run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+assert_rc         "outside the subset, no access: → still degrades" "$RC" "0"
+assert_eq         "…and identity still resolves"                    "$T"  "github"
+assert_eq         "…and access is the documented default"           "$AT" "full"
+assert_stderr_has "…but it is not silent"                           "falling back"
+
+# --- 43. The subset accepts this project OWN documented example config ----------------------------
+# The corpus the review named as the one that matters. A shape-based subset would refuse it
+# outright: it carries three- and four-level nesting, a flow sequence, a sequence of mappings and a
+# quoted value containing braces. This repo TWELVE-LINE skills-config.yaml exercises none of that,
+# which is exactly why it could not have caught the problem.
+#
+# Derived from the doc at run time rather than copied, so it cannot drift. Skipped with a notice
+# when the doc is absent — this file is also bundled into skills/*/references/, where it is not.
+echo "  43. The canonical example config from docs/reference/configuration.md"
+CONFIG_DOC="$HERE/../../docs/reference/configuration.md"
+if [ -f "$CONFIG_DOC" ]; then
+  CANON="$TMPDIR_TEST/canonical.yaml"
+  # First fenced yaml block. The doc deliberately shows `tracker:` twice — once as a scalar and
+  # once as the mapping form — with a comment saying YAML cannot hold both and to pick one. That
+  # duplicate is documentation, not a config anyone writes, and the strict loader rejects it (as it
+  # should), so the mapping form is dropped to make the block a config.
+  awk '/^```yaml$/ { on = 1; next } on && /^```$/ { exit } on { print }' "$CONFIG_DOC" \
+    | awk '/^tracker:[[:space:]]*$/ { skip = 1; next } skip && /^[[:space:]]+workflowFile:/ { next } { skip = 0; print }' \
+    > "$CANON"
+  if [ -s "$CANON" ]; then
+    D=$(fixture canonical-config "")
+    cp "$CANON" "$D/skills-config.yaml"
+    run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"; PY_RC="$RC"; PY_AT="$AT"; PY_T="$T"; PY_V="$V"
+    assert_rc "the canonical example config parses on tier 1" "$PY_RC" "0"
+    run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+    assert_rc "the canonical example config is INSIDE the tier-2 subset" "$RC" "0"
+    assert_eq "…and resolves ACCESS_TRACKER identically on both tiers"   "$AT" "$PY_AT"
+    assert_eq "…and TRACKER identically"                                 "$T"  "$PY_T"
+    assert_eq "…and VCS identically"                                     "$V"  "$PY_V"
+  else
+    echo "  SKIP  canonical example config (no fenced yaml block found in $CONFIG_DOC)"
+  fi
+else
+  echo "  SKIP  canonical example config (docs/reference/configuration.md not present — bundled copy)"
+fi
+
+# This repo own config is the second corpus. Small, and it proves little on its own — which is the
+# point of asserting it AFTER the one above rather than instead of it.
+OWN_CONFIG="$HERE/../../skills-config.yaml"
+if [ -f "$OWN_CONFIG" ]; then
+  D=$(fixture own-config "")
+  cp "$OWN_CONFIG" "$D/skills-config.yaml"
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"; PY_AT="$AT"; PY_RC="$RC"
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=awk"
+  assert_rc "this repo own skills-config.yaml is inside the subset" "$RC" "$PY_RC"
+  assert_eq "…and resolves identically on both tiers"               "$AT" "$PY_AT"
+else
+  echo "  SKIP  this repo own skills-config.yaml (not present — bundled copy)"
+fi
+
+# --- 44. The guarded key list matches the live call sites -----------------------------------------
+# The LOCAL rules (a quoted key, a space before the colon) refuse only keys this reader consumes,
+# which makes _CONFIG_GUARDED_KEYS load-bearing: a seventh key added to a call site without being
+# added there would be readable under a spelling the scanner waves through — the hole re-opened for
+# one key, quietly, with the suite green. Pin the list against the call sites themselves.
+echo "  44. The guarded key list covers every reader call site"
+if [ -d "$HERE" ]; then
+  GUARDED=$(env -i PATH="$PATH" HOME="$HOME" bash -c "source '$READER' >/dev/null 2>&1; printf '%s' \"\$_CONFIG_GUARDED_KEYS\"")
+  MISSING=""
+  # Every literal key argument passed to a reader anywhere in shared/resources/. COMMENTS ARE
+  # STRIPPED FIRST — these readers are named constantly in the prose that explains them, and
+  # scraping that prose collects English words instead of key names.
+  # Production resolvers only. The test files name these readers inside assertion STRINGS, which no
+  # comment-stripping can tell from a call — and a suite that scans itself finds its own prose.
+  READER_SOURCES=$(ls "$HERE"/*.sh 2>/dev/null | grep -v '\.test\.sh$')
+  # shellcheck disable=SC2086
+  READER_CALLS=$(sed 's/[[:space:]]#.*$//; s/^[[:space:]]*#.*$//' $READER_SOURCES \
+    | grep -oE '(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+[a-zA-Z][a-zA-Z0-9_]*([[:space:]]+[a-zA-Z][a-zA-Z0-9_]*)?' \
+    | sed -E 's/^(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+//' \
+    | tr ' ' '\n' | sort -u)
+  for key in $READER_CALLS; do
+    [ -n "$key" ] || continue
+    echo "$GUARDED" | tr '|' '\n' | grep -qxF "$key" || MISSING="$MISSING $key"
+  done
+  if [ -z "$MISSING" ]; then
+    ok "every key read by shared/resources/*.sh appears in _CONFIG_GUARDED_KEYS"
+  else
+    bad "a reader call site names a key the subset scan does not guard" "missing:$MISSING"
+  fi
+fi
+
+# --- 45. awk variants: BWK awk, gawk, mawk --------------------------------------------------------
+# The scan is one awk program and awk is three implementations. A regex or an octal escape that
+# works on the macOS BWK awk and not on mawk would refuse a clean config on Debian, or accept a
+# merge key on macOS — a divergence in the permissive direction. Forced by shimming `awk` on PATH,
+# because that is what the scan actually invokes.
+echo "  45. awk variants"
+for variant in gawk mawk; do
+  if ! command -v "$variant" >/dev/null 2>&1; then
+    echo "  SKIP  $variant not installed on this host (CI installs both — see .github/workflows/test.yml)"
+    continue
+  fi
+  ASHIM="$TMPDIR_TEST/awkshim-$variant"
+  mkdir -p "$ASHIM"
+  printf '#!/bin/sh\nexec %s "$@"\n' "$(command -v "$variant")" > "$ASHIM/awk"
+  chmod +x "$ASHIM/awk"
+
+  D=$(fixture "awkvar-in-$variant" 'access:\n  tracker: manual\njira:\n  statusMap:\n    ready-for-review: [A, B]\n')
+  OUT=$(env -i PATH="$ASHIM:$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+    cd '$D'; source '$RESOLVER' >/dev/null 2>&1; echo \"\$?:\$ACCESS_TRACKER\"")
+  assert_eq "[$variant] in-subset config resolves" "$OUT" "0:manual"
+
+  D=$(fixture "awkvar-out-$variant" 'defaults: &d\n  tracker: manual\naccess:\n  <<: *d\n')
+  OUT=$(env -i PATH="$ASHIM:$PATH" HOME="$HOME" AGENT_SKILLS_CONFIG_TIER=awk bash -c "
+    cd '$D'; source '$RESOLVER' >/dev/null 2>&1; echo \"\$?:\$ACCESS_TRACKER\"")
+  assert_eq "[$variant] out-of-subset config is refused" "$OUT" "1:"
+done
+
+# --- 46. A real awk-only host, not a forced tier --------------------------------------------------
+# Forcing AGENT_SKILLS_CONFIG_TIER tests the branch. It does not test what a consumer runs: a stock
+# macOS host where /usr/bin/python3 ships without pyyaml and awk is simply the only tier there is.
+# Shim the interpreters away instead, and run it under zsh too — macOS logins are zsh, and task.51
+# cycle 1 shipped a bash-only ${!var} that broke every call site on the shell consumers actually use.
+echo "  46. A host with no python at all"
+PYSHIM="$TMPDIR_TEST/pyshim"
+mkdir -p "$PYSHIM"
+printf '#!/bin/sh\nexit 127\n' > "$PYSHIM/python3"
+cp "$PYSHIM/python3" "$PYSHIM/python"
+chmod +x "$PYSHIM/python3" "$PYSHIM/python"
+
+for sh in bash zsh; do
+  if ! command -v "$sh" >/dev/null 2>&1; then
+    echo "  SKIP  $sh not on this host"
+    continue
+  fi
+  # PATH is re-asserted INSIDE the -c body, not only in the env. A login shell runs its startup
+  # files first, and on macOS /etc/zshrc prepends /usr/local/bin — which put a REAL python3 back in
+  # front of the shim and quietly turned this into a tier-1 test that passed for the wrong reason.
+  # Setting it here means the shim survives whatever the host startup files do.
+  SHIMPATH="PATH=$PYSHIM:/usr/bin:/bin; export PATH;"
+
+  D=$(fixture "nopython-in-$sh" 'access:\n  tracker: manual\n')
+  OUT=$(env -i PATH="$PYSHIM:/usr/bin:/bin" HOME="$HOME" "$sh" -c "
+    $SHIMPATH cd '$D'; source '$RESOLVER' >/dev/null 2>&1; echo \"\$?:\$ACCESS_TRACKER\"")
+  assert_eq "[$sh, no python] in-subset access resolves" "$OUT" "0:manual"
+
+  D=$(fixture "nopython-out-$sh" 'defaults: &d\n  tracker: manual\naccess:\n  <<: *d\n')
+  OUT=$(env -i PATH="$PYSHIM:/usr/bin:/bin" HOME="$HOME" "$sh" -c "
+    $SHIMPATH cd '$D'; source '$RESOLVER' >/dev/null 2>&1; echo \"\$?:\$ACCESS_TRACKER\"")
+  assert_eq "[$sh, no python] out-of-subset access is REFUSED, never full" "$OUT" "1:"
+
+  # The shim must actually be the interpreter on PATH. Without this the two assertions above pass
+  # identically on a host where tier 1 is alive, proving nothing about the tier consumers run.
+  WHICH_PY=$(env -i PATH="$PYSHIM:/usr/bin:/bin" HOME="$HOME" "$sh" -c "$SHIMPATH command -v python3")
+  assert_eq "[$sh, no python] the shim is the python3 on PATH" "$WHICH_PY" "$PYSHIM/python3"
+
+  # End to end: a guarded call site, which is how every skill sources this. `|| exit 1` is what
+  # turns the refusal into a halt; without it the caller prints the message and carries on.
+  RC_GUARDED=$(env -i PATH="$PYSHIM:/usr/bin:/bin" HOME="$HOME" "$sh" -c "
+    $SHIMPATH cd '$D'; ( source '$RESOLVER' || exit 1; echo unreachable ) >/dev/null 2>&1; echo \$?")
+  assert_eq "[$sh, no python] a guarded call site exits 1" "$RC_GUARDED" "1"
 done
 
 # --- Summary -----------------------------------------------------------------

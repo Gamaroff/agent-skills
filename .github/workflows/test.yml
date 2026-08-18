@@ -21,6 +21,15 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
 
+      # shared/resources/read-config.sh reads skills-config.yaml through an awk tier when pyyaml is
+      # absent, and awk is three implementations. tracker-access.test.sh §45 runs the subset scan
+      # under each: a regex or an octal escape that works on the macOS BWK awk but not on mawk would
+      # refuse a clean config on Debian, or accept a merge key on macOS — a divergence in the
+      # permissive direction, on the tier a stock consumer host actually runs. The section skips
+      # with a printed notice when a variant is missing, so without this step it silently covers one.
+      - name: Install awk variants
+        run: sudo apt-get install -y --no-install-recommends gawk mawk
+
       - name: Install dependencies
         run: npm ci
 
