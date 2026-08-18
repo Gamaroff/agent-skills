@@ -286,11 +286,11 @@ them in a single commit, a single revert is sufficient.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS — escalated at the 5-cycle loop limit
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-18
-**Quality Score**: 20/100
-**Gate Decision**: FAIL
+**Quality Score**: 70/100 (gate 2)
+**Gate Decision**: CONCERNS (gate 2; gate 1 was FAIL)
 
 ### QA Report
 
@@ -323,6 +323,7 @@ rather than the deferral, so a failed journal write reports success (**CR-3**).
 | 2026-08-18 |  | Implemented — 22 files, 19 new tests (suite 1352 → 1371); 6 invariants watched failing | develop |
 | 2026-08-18 |  | QA gate FAIL (20/100) — 3 high, 2 medium, 4 low; the net holds, the callers do not | qa-task |
 | 2026-08-18 |  | QA cycle 2 — 5 findings in the cycle-1 fixes; access resolution consolidated into one three-tier resolver | qa-fix |
+| 2026-08-18 |  | QA cycles 3–5 — 5 cycles reached without a clean gate; gate 2 CONCERNS (70/100). Escalated: the open findings are all in access-mode resolution, which this document does not scope | qa-task |
 
 ## References
 
