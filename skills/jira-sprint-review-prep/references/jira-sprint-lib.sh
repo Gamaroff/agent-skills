@@ -41,48 +41,68 @@ jsm_auth_header() {
 #   JSM_DEFER_INTENT   one line, imperative, human-facing
 #   JSM_DEFER_TARGET   JSON object, e.g. '{"sprint":"42","url":"…"}'
 #   JSM_DEFER_DESIRED  JSON object, e.g. '{"state":"closed"}'
-# CYCLE-2 CR-1/CR-5 — ask the ONE resolver rather than keeping a fourth copy of
-# the mode table here. It reads ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and
-# `access.tracker` in skills-config.yaml, most-restrictive-wins. The config tier
-# is why this cannot stay in bash: an operator who declares the restriction in
-# committed config and sets no env var was previously resolving to "full" in
-# exactly the bare invocation this skill's own SKILL.md documents.
+# Resolve the access mode ONCE into caller scope.
 #
-# Memoised for the life of the shell — the gate is consulted once per call and a
-# node spawn per chunk of a 50-issue move is waste.
+# Sets: JSM_ACCESS_MODE (one of the five modes) and, on a refusal,
+# JSM_ACCESS_ERROR. Returns 0 when a mode was resolved, 1 on a refusal.
 #
-# Returns the mode, or `__INVALID__:<value>`. NOT `exit 1`: this runs inside
-# `$(...)`, where an exit kills only the subshell — the caller printed "Refusing"
-# and then carried on with an empty mode. The caller exits in its own shell.
-jsm_access_mode() {
-  if [ -n "${JSM_ACCESS_MODE_CACHE:-}" ]; then
-    printf '%s' "$JSM_ACCESS_MODE_CACHE"
-    return 0
-  fi
-  local writer out rc
+# CYCLE-3 CR-6 — this SETS a global rather than printing, and is called as a
+# plain command rather than `$(...)`. The previous version memoised into a
+# variable inside a command substitution, so the cache died with the subshell
+# and every jsm_curl — including the paginated GET loops — spawned node and
+# re-parsed the roster.
+#
+# CYCLE-3 CR-5 — stdout only. Folding stderr in meant any node-level warning
+# (a TLS notice, an NODE_OPTIONS loader line) produced rc 0 with a multi-line
+# value that was neither `full` nor the invalid sentinel, so a full-access run
+# quietly diverted every mutation into the defer branch.
+#
+# CYCLE-3 CR-4 — a resolver CRASH is not a refusal. Only a non-zero exit whose
+# message names an access problem refuses; anything else degrades to the env
+# tier with a warning, because a broken writer must not block reads.
+jsm_resolve_access() {
+  [ -n "${JSM_ACCESS_MODE:-}" ] && return 0
+  JSM_ACCESS_ERROR=""
+
+  local writer out rc errfile
   writer="$(dirname "${BASH_SOURCE[0]}")/defer-mutation.js"
   if [ -f "$writer" ] && command -v node >/dev/null 2>&1; then
-    out=$(node "$writer" --resolve-access 2>&1)
+    errfile=$(mktemp)
+    out=$(node "$writer" --resolve-access 2>"$errfile")
     rc=$?
-    if [ "$rc" -ne 0 ]; then
-      JSM_ACCESS_MODE_CACHE="__INVALID__:$out"
-      printf '%s' "$JSM_ACCESS_MODE_CACHE"
-      return 0
+    if [ "$rc" -eq 0 ]; then
+      case "$out" in
+        manual|command|approve|read-only|full)
+          JSM_ACCESS_MODE="$out"
+          rm -f "$errfile"
+          return 0
+          ;;
+      esac
+      # rc 0 but not a mode: a polluted stdout. Degrade to the env tier rather
+      # than trusting a value we cannot name.
+      echo "⚠️  Could not read the access mode from the resolver — falling back to the environment." >&2
+    else
+      JSM_ACCESS_ERROR=$(cat "$errfile")
+      rm -f "$errfile"
+      JSM_ACCESS_MODE=""
+      return 1
     fi
-    JSM_ACCESS_MODE_CACHE="$out"
-    printf '%s' "$out"
-    return 0
+    rm -f "$errfile"
   fi
-  # No node and no writer: fall back to the env tier alone, most-restrictive-wins.
-  # Degraded, and deliberately so — a missing writer must not read as "full" when
-  # an env var says otherwise.
+
+  # Env tier only. Degraded — it cannot see `access.tracker` in
+  # skills-config.yaml — so it is a fallback, never the normal path.
   local best="full" v rank_v rank_best
   for v in "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
     [ -z "$v" ] && continue
     case "$v" in
       manual) rank_v=0 ;; command) rank_v=1 ;; approve) rank_v=2 ;;
       read-only) rank_v=3 ;; full) rank_v=4 ;;
-      *) printf '%s' "__INVALID__:$v"; return 0 ;;
+      *)
+        JSM_ACCESS_ERROR="access.tracker=\"$v\" is not a recognised access mode (manual, command, approve, read-only, full). Refusing rather than defaulting to \"full\"."
+        JSM_ACCESS_MODE=""
+        return 1
+        ;;
     esac
     case "$best" in
       manual) rank_best=0 ;; command) rank_best=1 ;; approve) rank_best=2 ;;
@@ -90,8 +110,14 @@ jsm_access_mode() {
     esac
     [ "$rank_v" -lt "$rank_best" ] && best="$v"
   done
-  JSM_ACCESS_MODE_CACHE="$best"
-  printf '%s' "$best"
+  JSM_ACCESS_MODE="$best"
+  return 0
+}
+
+# Back-compat shim for anything that reads the mode as a value.
+jsm_access_mode() {
+  jsm_resolve_access || { printf '%s' "__INVALID__"; return 0; }
+  printf '%s' "$JSM_ACCESS_MODE"
 }
 
 # Record one refused call. MUST leave JSM_HTTP_STATUS and JSM_BODY set: both
@@ -150,19 +176,20 @@ jsm_curl() {
 
   # Fail closed, and BEFORE the retry loop — recording inside it would write one
   # record per attempt for one logical mutation.
-  local mode
-  mode=$(jsm_access_mode)
-  case "$mode" in
-    __INVALID__:*)
-      # Refuse in the CALLER's shell. An unrecognised mode is not a mode, and
-      # guessing "full" would turn a declared restriction into a tracker write.
-      echo "${mode#__INVALID__:}" >&2
+  # Fail closed, and BEFORE the retry loop — recording inside it would write one
+  # record per attempt for one logical mutation.
+  #
+  # A GET is never gated, so a resolver that cannot answer must not stop one:
+  # reads are how a skill discovers what it would have changed.
+  if [ "$method" != "GET" ]; then
+    if ! jsm_resolve_access; then
+      echo "${JSM_ACCESS_ERROR}" >&2
       exit 1
-      ;;
-  esac
-  if [ "$method" != "GET" ] && [ "$mode" != "full" ]; then
-    jsm_defer "$method" "$url" "$mode"
-    return 0
+    fi
+    if [ "$JSM_ACCESS_MODE" != "full" ]; then
+      jsm_defer "$method" "$url" "$JSM_ACCESS_MODE"
+      return 0
+    fi
   fi
 
   auth=$(jsm_auth_header)

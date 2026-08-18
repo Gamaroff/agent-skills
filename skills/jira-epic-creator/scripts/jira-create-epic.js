@@ -32,8 +32,41 @@ try {
 // of the mode table. It reads ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and
 // `access.tracker` in skills-config.yaml, most-restrictive-wins, and refuses an
 // unrecognised value rather than defaulting to "full".
+const ACCESS_RANK_FALLBACK = {
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+};
+
 function accessTracker() {
-  if (!dm) return "full"; // no writer bundled — the gate below still refuses
+  // CYCLE-3 CR-2 — a missing writer used to return "full", and the gate below
+  // reads `accessTracker() !== "full"`, so a broken bundle turned a declared
+  // restriction into a live epic create. The comment claiming "the gate below
+  // still refuses" was simply wrong. Degrade to the env tier instead: it cannot
+  // see the config tier, but it can never answer "full" over a restriction the
+  // environment declares.
+  if (!dm) {
+    const seen = [
+      process.env.ACCESS_TRACKER,
+      process.env.AGENT_SKILLS_ACCESS_TRACKER,
+    ]
+      .map((v) => String(v || "").trim())
+      .filter(Boolean);
+    if (!seen.length) return "full";
+    for (const v of seen) {
+      if (!(v in ACCESS_RANK_FALLBACK)) {
+        console.error(
+          `Error: access.tracker="${v}" is not a recognised access mode.`,
+        );
+        process.exit(1);
+      }
+    }
+    return seen.reduce((x, y) =>
+      ACCESS_RANK_FALLBACK[y] < ACCESS_RANK_FALLBACK[x] ? y : x,
+    );
+  }
   try {
     return dm.resolveAccessTracker();
   } catch (e) {

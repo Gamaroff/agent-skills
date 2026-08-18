@@ -545,41 +545,108 @@ const ACCESS_RANK = Object.freeze({
   full: 4,
 });
 
-// `access.tracker` from skills-config.yaml, or "" when absent/unreadable.
+// `access.tracker` from skills-config.yaml. Returns "" ONLY when the key is
+// genuinely absent; anything present-but-unusable THROWS.
 //
-// Memoised per resolved path: the gate is consulted once per mutation and a
-// stat+parse per Jira call is waste. A malformed file reads as ABSENT here on
-// purpose — the strict refusal for that case belongs to read-config.sh, which
-// runs before any of this and halts; duplicating it would mean two different
-// answers to the same question.
+// CYCLE-3 CR-1 — the first version swallowed every failure as "absent", which
+// resolves to `full`. That is fail-OPEN on exactly the input that matters: a
+// flow mapping (`access: {tracker: manual}`) parses to the STRING
+// "{tracker: manual}", so `.tracker` was undefined and a declared restriction
+// silently granted everything it was written to withhold. resolve-platform.sh
+// refuses each of these cases explicitly; so does this now.
+//
+// CYCLE-3 CR-3 — path resolution matches read-config.sh rather than inventing
+// its own: SKILLS_CONFIG_FILE wins, otherwise the search stops at the repo root
+// instead of climbing into a parent repo or $HOME.
 const _cfgAccessCache = new Map();
 
-function readConfiguredAccessTracker({ cwd, configPath } = {}) {
-  try {
-    let file = configPath;
-    if (!file) {
-      let dir = cwd || process.cwd();
-      for (let i = 0; i < 12; i++) {
-        const candidate = path.join(dir, "skills-config.yaml");
-        if (fs.existsSync(candidate)) {
-          file = candidate;
-          break;
-        }
-        const parent = path.dirname(dir);
-        if (parent === dir) break;
-        dir = parent;
-      }
+function findConfigFile({ cwd, configPath, env = process.env } = {}) {
+  if (configPath) return configPath;
+  // Honoured, and honoured strictly: read-config.sh refuses to let an explicit
+  // redirect land on nothing, because changing WHICH file is read would
+  // otherwise bypass the most-restrictive-wins guarantee.
+  if (env.SKILLS_CONFIG_FILE) {
+    if (!fs.existsSync(env.SKILLS_CONFIG_FILE)) {
+      throw new Error(
+        `SKILLS_CONFIG_FILE="${env.SKILLS_CONFIG_FILE}" does not exist. ` +
+          `Refusing to fall back to detection: a redirect that lands on nothing ` +
+          `would discard a committed access restriction.`,
+      );
     }
-    if (!file) return "";
-    if (_cfgAccessCache.has(file)) return _cfgAccessCache.get(file);
-    const doc = parseYamlSubset(fs.readFileSync(file, "utf8"));
-    const v = doc && doc.access && doc.access.tracker;
-    const out = typeof v === "string" ? v.trim() : "";
-    _cfgAccessCache.set(file, out);
-    return out;
-  } catch (_) {
+    return env.SKILLS_CONFIG_FILE;
+  }
+  let dir = cwd || process.cwd();
+  for (;;) {
+    const candidate = path.join(dir, "skills-config.yaml");
+    if (fs.existsSync(candidate)) return candidate;
+    // Stop at the repo root. Climbing past it finds an unrelated project's
+    // config — which would either block a repo that declared nothing, or read
+    // `full` for one that declared a restriction one directory down.
+    if (fs.existsSync(path.join(dir, ".git"))) return "";
+    const parent = path.dirname(dir);
+    if (parent === dir) return "";
+    dir = parent;
+  }
+}
+
+function readConfiguredAccessTracker(opts = {}) {
+  const file = findConfigFile(opts);
+  if (!file) return "";
+  if (_cfgAccessCache.has(file)) {
+    const hit = _cfgAccessCache.get(file);
+    if (hit instanceof Error) throw hit;
+    return hit;
+  }
+  const fail = (why) => {
+    const e = new Error(
+      `${file}: access.tracker ${why}. Refusing rather than defaulting to ` +
+        `"full", because that would silently escalate a declared restriction ` +
+        `into a tracker write.`,
+    );
+    _cfgAccessCache.set(file, e);
+    throw e;
+  };
+
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch (e) {
+    fail(`could not be read (${e.code || e.message})`);
+  }
+
+  let doc;
+  try {
+    doc = parseYamlSubset(text);
+  } catch (e) {
+    fail(`is in a file that does not parse (${e.message})`);
+  }
+
+  const access = doc && doc.access;
+  // No `access:` key at all is the ordinary case, and means "unrestricted".
+  if (access === undefined || access === null) {
+    _cfgAccessCache.set(file, "");
     return "";
   }
+  // A STRING here means the subset parser met a flow mapping it does not
+  // support — `access: {tracker: manual}`. Reading that as absent is the
+  // fail-open this guard exists for.
+  if (typeof access !== "object" || Array.isArray(access)) {
+    fail(
+      `could not be read: \`access:\` is not a block mapping. Write it as\n` +
+        `     access:\n       tracker: manual`,
+    );
+  }
+  const v = access.tracker;
+  if (v === undefined || v === null) {
+    _cfgAccessCache.set(file, "");
+    return "";
+  }
+  if (typeof v !== "string") {
+    fail(`is not one of the five modes (found ${JSON.stringify(v)})`);
+  }
+  const out = v.trim();
+  _cfgAccessCache.set(file, out);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1070,6 +1137,23 @@ function run({
     return { exitCode: 2 };
   }
 
+  // The one resolver, reachable from a shell. jira-sprint-lib.sh calls this
+  // rather than carrying a fourth copy of the mode table — and a copy is exactly
+  // what a shell gate cannot keep in step, since the config tier needs a YAML
+  // read that bash has no business doing.
+  // CYCLE-3 CR-4 — answered BEFORE loadRoster. A roster read error used to
+  // exit 2 here, which the shell gate could not tell from a refused mode, so it
+  // aborted every call including GETs.
+  if (args.resolveAccess) {
+    try {
+      console.log(resolveAccessTracker());
+      return { exitCode: 0 };
+    } catch (e) {
+      console.error(e.message);
+      return { exitCode: 2 };
+    }
+  }
+
   if (args.help) {
     console.log(USAGE);
     return { exitCode: 0 };
@@ -1081,20 +1165,6 @@ function run({
   } catch (e) {
     console.error(`Error: ${e.message}`);
     return { exitCode: 2 };
-  }
-
-  // The one resolver, reachable from a shell. jira-sprint-lib.sh calls this
-  // rather than carrying a fourth copy of the mode table — and a copy is exactly
-  // what a shell gate cannot keep in step, since the config tier needs a YAML
-  // read that bash has no business doing.
-  if (args.resolveAccess) {
-    try {
-      console.log(resolveAccessTracker());
-      return { exitCode: 0 };
-    } catch (e) {
-      console.error(e.message);
-      return { exitCode: 2 };
-    }
   }
 
   if (args.listKinds) {

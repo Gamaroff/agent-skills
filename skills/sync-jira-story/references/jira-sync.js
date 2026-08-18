@@ -1729,6 +1729,10 @@ function recordRefusal({ url, method, access, system, annotation, ctx }) {
  * no checklist item, and the document already holds the prose.
  */
 const EMPTY_VALUE = "(structured value — see the work-item document)";
+// CYCLE-3 CR-7 — an empty collection in a Jira update is not an unrenderable
+// value, it is an INSTRUCTION: clear the field. Pointing the operator at a
+// document that holds nothing to copy describes the wrong thing entirely.
+const CLEARED_VALUE = "(cleared)";
 
 function summariseFields(fields) {
   const short = (v) => {
@@ -1749,7 +1753,7 @@ function summariseFields(fields) {
       // JSON.stringify, so an empty `components: []` printed
       // "components = null" in the operator's checklist — the same literal-null
       // rendering this function was just fixed to stop producing.
-      return parts.length ? short(parts.join(", ")) : EMPTY_VALUE;
+      return parts.length ? short(parts.join(", ")) : CLEARED_VALUE;
     }
     // CR-8 — `timetracking` is a field THESE scripts send, and it carries no
     // name/value/key/id, so it used to be discarded as "structured". The value
@@ -1758,7 +1762,7 @@ function summariseFields(fields) {
       const est = v.originalEstimate ?? v.remainingEstimate;
       // CYCLE-2 CR-4 — an empty string is not an estimate a human can act on.
       return est === null || est === undefined || String(est).trim() === ""
-        ? EMPTY_VALUE
+        ? CLEARED_VALUE
         : short(est);
     }
     const named = v.name ?? v.value ?? v.key ?? v.id;

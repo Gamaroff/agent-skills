@@ -1622,7 +1622,9 @@ test("§14 C2-CR4 an empty list renders as a named absence, never the string nul
       null,
       `${k}: null is rendered by JSON.stringify as "null"`,
     );
-    assert.match(out[k], /structured value/, `${k}: name the absence instead`);
+    // §15 (C3-CR7) pins the wording: an empty collection is an instruction to
+    // clear the field, not an unrenderable value.
+    assert.match(out[k], /cleared/, `${k}: name what is being asked for`);
   }
   assert.equal(out.kept, "x");
 
@@ -1639,5 +1641,175 @@ test("§14 C2-CR4 an empty list renders as a named absence, never the string nul
     md,
     /components = null/,
     "an operator cannot type null into a field",
+  );
+});
+
+// ── 15. Cycle-3 findings: the consolidation's own defects ──────────────────
+
+test("§15 C3-CR1 a present-but-unusable restriction refuses; a genuinely absent one does not", async () => {
+  await withTmp(async (dir) => {
+    const cfg = path.join(dir, "skills-config.yaml");
+
+    // The case that made this HIGH. `access: {tracker: manual}` is a flow
+    // mapping, which the subset parser reads as the STRING "{tracker: manual}"
+    // — so `.tracker` was undefined, the tier answered "absent", and a declared
+    // restriction resolved to `full`.
+    fs.writeFileSync(cfg, "access: {tracker: manual}\n");
+    assert.throws(
+      () => dm.readConfiguredAccessTracker({ configPath: cfg }),
+      /not a block mapping|Refusing/,
+      "reading an unparseable restriction as absent is fail-OPEN",
+    );
+
+    // Absent is still absent — the ordinary case must not become an error.
+    const cfg2 = path.join(dir, "b", "skills-config.yaml");
+    fs.mkdirSync(path.dirname(cfg2));
+    fs.writeFileSync(cfg2, "tracker: jira\nvcs: github\n");
+    assert.equal(dm.readConfiguredAccessTracker({ configPath: cfg2 }), "");
+
+    // A non-scalar mode refuses rather than being coerced.
+    const cfg3 = path.join(dir, "c", "skills-config.yaml");
+    fs.mkdirSync(path.dirname(cfg3));
+    fs.writeFileSync(cfg3, "access:\n  tracker:\n    mode: manual\n");
+    assert.throws(
+      () => dm.readConfiguredAccessTracker({ configPath: cfg3 }),
+      /Refusing/,
+    );
+  });
+});
+
+test("§15 C3-CR3 the config search honours SKILLS_CONFIG_FILE and stops at the repo root", async () => {
+  await withTmp(async (dir) => {
+    // A parent config must NOT reach into a repo that declared nothing: the
+    // walk stops at the first directory carrying a .git entry.
+    fs.writeFileSync(
+      path.join(dir, "skills-config.yaml"),
+      "access:\n  tracker: manual\n",
+    );
+    const repo = path.join(dir, "inner");
+    fs.mkdirSync(repo);
+    fs.writeFileSync(path.join(repo, ".git"), "gitdir: elsewhere");
+    assert.equal(
+      dm.readConfiguredAccessTracker({ cwd: repo }),
+      "",
+      "an unrelated parent's restriction must not bind this repo",
+    );
+
+    // And an explicit redirect that lands on nothing refuses rather than
+    // silently falling back to detection.
+    assert.throws(
+      () =>
+        dm.readConfiguredAccessTracker({
+          cwd: repo,
+          env: { SKILLS_CONFIG_FILE: path.join(dir, "nope.yaml") },
+        }),
+      /does not exist/,
+    );
+  });
+});
+
+test("§15 C3-CR4 a resolver crash does not block a GET", async () => {
+  await withTmp(async (dir) => {
+    // --resolve-access is answered before the roster is loaded, so a roster
+    // problem cannot masquerade as a refused mode. Point the roster doc at
+    // nothing and confirm the resolver still answers.
+    const r = spawnSync(
+      process.execPath,
+      [path.join(SHARED, "defer-mutation.js"), "--resolve-access"],
+      { encoding: "utf8", cwd: dir, env: { ...process.env }, timeout: 20000 },
+    );
+    assert.equal(r.status, 0);
+    assert.match(r.stdout.trim(), /^(full|manual|command|approve|read-only)$/);
+
+    // And the shell gate leaves reads alone even when resolution refuses.
+    const sh = `
+      set -euo pipefail
+      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
+      jsm_resolve_access || echo "REFUSED"
+      echo "MODE=\${JSM_ACCESS_MODE:-none}"
+    `;
+    const r2 = spawnSync("bash", ["-c", sh], {
+      encoding: "utf8",
+      cwd: dir,
+      env: { ...process.env },
+      timeout: 20000,
+    });
+    assert.equal(r2.status, 0, `${r2.stdout}\n${r2.stderr}`);
+  });
+});
+
+test("§15 C3-CR5 a polluted stdout does not divert a full-access run", async () => {
+  await withTmp(async (dir) => {
+    // A node-level warning on stderr used to be folded into the value, so a
+    // full-access run saw neither `full` nor the invalid sentinel and diverted
+    // every mutation into the defer branch with a garbage --access.
+    const sh = `
+      set -euo pipefail
+      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
+      jsm_resolve_access
+      echo "MODE=[$JSM_ACCESS_MODE]"
+    `;
+    const r = spawnSync("bash", ["-c", sh], {
+      encoding: "utf8",
+      cwd: dir,
+      env: { ...process.env, NODE_OPTIONS: "--trace-warnings" },
+      timeout: 20000,
+    });
+    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    assert.match(
+      r.stdout,
+      /MODE=\[(full|manual|command|approve|read-only)\]/,
+      "the mode must be exactly one of the five, never a captured warning",
+    );
+  });
+});
+
+test("§15 C3-CR6 the mode is resolved once, into caller scope", async () => {
+  await withTmp(async (dir) => {
+    // The previous version memoised inside `$(...)`, so the cache died with the
+    // subshell and every call re-spawned node.
+    const sh = `
+      set -euo pipefail
+      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
+      jsm_resolve_access
+      first="$JSM_ACCESS_MODE"
+      jsm_resolve_access
+      echo "CACHED=[\${JSM_ACCESS_MODE:-unset}] SAME=$([ "$first" = "$JSM_ACCESS_MODE" ] && echo yes || echo no)"
+    `;
+    const r = spawnSync("bash", ["-c", sh], {
+      encoding: "utf8",
+      cwd: dir,
+      env: { ...process.env },
+      timeout: 20000,
+    });
+    assert.match(
+      r.stdout,
+      /CACHED=\[(full|manual|command|approve|read-only)\] SAME=yes/,
+      "the resolved mode must survive in the caller's shell",
+    );
+  });
+});
+
+test("§15 C3-CR2 a missing writer degrades closed, not open", () => {
+  const src = fs.readFileSync(
+    path.join(
+      REPO,
+      "skills",
+      "jira-epic-creator",
+      "scripts",
+      "jira-create-epic.js",
+    ),
+    "utf8",
+  );
+  assert.doesNotMatch(
+    src,
+    /if \(!dm\) return "full"/,
+    'a missing writer must not assert "full" — the gate reads `!== "full"`, so ' +
+      "that turned a broken bundle into a live epic create",
+  );
+  assert.match(
+    src,
+    /ACCESS_RANK_FALLBACK/,
+    "it must fall back to the env tier instead",
   );
 });
