@@ -174,7 +174,7 @@ Cross-reference: `create-pr` and `finalise` use the same variables — set them 
 Run once before the PR existence check. All downstream branches use `$PLATFORM` and `$TRACKER`. See `references/platform-detection.md` for the full resolver spec.
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # TRACKER = jira | github; VCS = github | bitbucket
 PLATFORM="$VCS"
 

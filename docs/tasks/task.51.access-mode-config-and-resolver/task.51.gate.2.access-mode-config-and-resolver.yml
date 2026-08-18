@@ -1,0 +1,185 @@
+schema: 1
+task: 'task.51.access-mode-config-and-resolver'
+task_title: '[Task 51] Declare tracker access level in config, and reject an unrecognised one loudly'
+gate: FAIL
+status_reason: >-
+  All five cycle-1 HIGH defects are genuinely fixed and independently verified. But three of the
+  fixes introduced new HIGH defects of the same class they closed — two silent access escalations
+  and one hard halt — and all three are green under the 90-assertion suite. The pattern, twice
+  running, is that a change is correct in the case it was written for and wrong in an adjacent one.
+reviewer: 'QA Engineer'
+updated: '2026-08-17T16:20:00Z'
+
+re_review_of: 'task.51.gate.1.access-mode-config-and-resolver.yml'
+
+previous_issues:
+  - id: TASK-51-BUG-1
+    status: closed
+    verified: 'zsh clean/access/env-override/invalid — all four match bash. Mutations 12 and 13 both red.'
+  - id: TASK-51-BUG-2
+    status: closed
+    verified: 'root sequence, quoted key, slash key all resolve on the awk tier; broken YAML still fails closed. Mutation 14 red. 13 further malformed shapes attacked — none yields a silent full.'
+  - id: TASK-51-BUG-3
+    status: partial
+    verified: 'Top-level `tracker: null`/`~` fixed under both tiers (mutation 15 red). The same fix was NOT applied to the nested reader — see TASK-51-BUG-8.'
+  - id: TASK-51-BUG-4
+    status: closed
+    verified: '18 sourcing forms / 16 skills / 0 unguarded. review-code:96 guarded; retrospective:144 now sources rather than executes. Guard assertion negative-controlled at 90→89.'
+  - id: TASK-51-BUG-5
+    status: partial
+    verified: 'Scalar `access:` rejected on both tiers; single-line flow form agrees across tiers (mutations 17, 18 red). Multi-line flow form still escalates — see TASK-51-BUG-7.'
+
+top_issues:
+  - id: TASK-51-BUG-6
+    severity: high
+    finding: >-
+      `config_bulk` promises one line per spec but emits one line per LINE of each value, and
+      `_rp_line` addresses answers positionally via `sed -n "$1p"`. Demonstrated: three specs in,
+      five lines out. With `tracker: "github\n\n\n"` and `access.tracker: manual`, the resolver
+      returns rc=0 with ACCESS_TRACKER=full — a silent escalation with no warning, on the
+      authoritative tier. Introduced by the cycle-1 performance fix.
+    suggested_action: 'Index-prefix each answer and escape newlines; address by index, not line number.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.6.bulk-protocol-line-shift.md'
+
+  - id: TASK-51-BUG-7
+    severity: high
+    finding: >-
+      The new awk flow-map rule strips to the first `}` then calls `next`, so a flow mapping spanning
+      two lines is unreachable. `access: {\n  tracker: manual}` gives manual under python and full
+      under awk — the tier-dependent escalation §13 was written to prevent, with §13 only covering
+      the single-line form.
+    suggested_action: 'Fail closed on an unclosed flow map rather than extending the awk parser.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.7.multiline-flow-map-escalation.md'
+
+  - id: TASK-51-BUG-8
+    severity: high
+    finding: >-
+      YAML-null normalisation was added to `read_config_key` and not to `read_nested_config_key`.
+      `access.tracker: null` halts every guarded call site on an awk-only host. Wider blast radius
+      than access: `prdShardedLocation: null` yields PRD_ROOT=null, and
+      `architectureShardedLocation: ~` yields ARCH_ROOT=~, which unquoted expands to $HOME.
+    suggested_action: 'Normalise nulls once, in a place both readers share; extend §15 to nested keys and the path roots.'
+    suggested_owner: dev
+    bug_ref: 'task.51.bug.8.nested-null-not-normalised.md'
+
+  - id: TASK-51-MED-5
+    severity: medium
+    finding: >-
+      The `_RP_*` scratch vars and `_rp_line` are unset only on the success path, and the
+      tier-1-unavailable branch resets only `_RP_STATUS`. After a failing source they persist in the
+      caller's shell, and because `${_RP_ACC_T-...}` uses `-` (unset-only) a stale empty string
+      suppresses the awk read entirely. Demonstrated across two repos in one shell: expected
+      rc=0/github/manual, got rc=1/jira/full. The suite runs every case in a fresh `bash -c`, so it
+      structurally cannot see this.
+    suggested_action: 'Initialise all seven vars before the batch, and unset them on the failure paths too.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-6
+    severity: medium
+    finding: >-
+      Making tier 1 authoritative turned a duplicated `access:` key — valid YAML, realistic
+      copy-paste error — into a silent escalation. pyyaml last-wins makes access.tracker absent;
+      the old fall-through let awk find the first block. Pre-fix `0/manual`, post-fix `0/full`. The
+      same shape flips identity: `tracker: jira` plus a duplicate null `tracker:` gave jira before,
+      github now.
+    suggested_action: 'Reject duplicate keys in the tier-1 loader — the remedy is detection, not restoring the fall-through.'
+    suggested_owner: dev
+
+  - id: TASK-51-LOW-6
+    severity: low
+    finding: >-
+      `resolve_access` stays defined in the caller's shell and its `*)` branch makes it look
+      general-purpose, so attacker-controlled text can reach the `eval`. Execution not achieved (the
+      uppercasing mangles payloads), but the guarantee should not rest on that.
+    suggested_action: 'Whitelist the system argument: `case "$system" in tracker|vcs) ;; *) return 1 ;; esac`.'
+    suggested_owner: dev
+
+  - id: TASK-51-LOW-7
+    severity: low
+    finding: >-
+      An unrecognised `config_bulk` spec returns `__NONE__`, which for an access read means "not
+      configured" → full. A typo'd spec is indistinguishable from an absent key. `nested:P.C` also
+      splits on the first dot, so a dotted key name is unaddressable.
+    suggested_action: 'Return `__ERR__` for an unknown spec so a typo fails closed.'
+    suggested_owner: dev
+
+  - id: TASK-51-LOW-8
+    severity: low
+    finding: >-
+      Mutation 16 (remove the tier-1 `__NONE__` short-circuit) stays green: the awk null handling
+      independently covers the same inputs, so the "tier 1 is authoritative" invariant has no
+      witness of its own. Defence in depth rather than a defect, but the invariant is unasserted.
+    suggested_action: 'Assert it via a case where the tiers genuinely disagree — the duplicate-key rejection from MED-6 is the natural witness.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 55
+# 100 − (20 × 1 NFR FAIL: reliability) − (10 × 1 NFR CONCERNS: security) = 70, then −15 for three
+# HIGH defects introduced BY the fixes. Up from 40: the original five are genuinely closed, the
+# suite grew 61 → 90, performance recovered, and the guard assertion is now real. Not a pass: two of
+# the three new defects are silent escalations, which is the one outcome this task must never ship.
+
+evidence:
+  tests_reviewed: 1377   # 1287 node + 90 shell assertions
+  phases_verified: '10/10 landed'
+  criteria_verified: '10 PASS, 2 FAIL (7 byte-identical — nested nulls; 11 mutation — see LOW-8)'
+  mutation_battery: '20 mutations run against the fixed code — 18 red, 1 green (LOW-8), 1 harness artifact (re-verified directly against the repo: 90 → 89)'
+  suites:
+    npm_test: 'exit 0 — 1287/1287'
+    tracker_access: '90 passed, 0 failed'
+    test_platform: '6 passed (regression oracle, unchanged)'
+    retrospective_fixture: 'pass'
+    validate_all: '115 passed'
+    ci: 'PR #246 — test, validate, link-check all green; MERGEABLE / CLEAN'
+  performance: '10 python spawns and ~1140–1458 ms per source → 2 spawns and ~209 ms'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      The SKILLS_CONFIG_FILE injection vector is closed (path passed as argv; crafted path no longer
+      executes). Residual: LOW-6's eval reachability, and the two silent escalations are security
+      findings in substance even though filed as correctness.
+  performance:
+    status: PASS
+    notes: '2 spawns / ~209 ms per source, from 10 / ~1140–1458 ms. 4.5× the old baseline, but the old baseline never ran tier 1 at all.'
+  reliability:
+    status: FAIL
+    notes: >-
+      Three new ways a legal config misbehaves: two silent escalations (BUG-6, BUG-7) and one hard
+      halt (BUG-8). All three green under the current suite.
+  maintainability:
+    status: PASS
+    notes: >-
+      Genuinely improved — one reader definition, argv not splicing, a real guard assertion, and
+      comments that record why. The awk tier remains the fragile part: three of the four cycle-2
+      defects live there, and each came from teaching it one more YAML shape. That is the signal to
+      stop extending it and fail closed instead.
+
+recommendations:
+  immediate:
+    - action: 'Index-address the bulk protocol and escape newlines'
+      refs: ['shared/resources/resolve-platform.sh:147-159', 'shared/resources/read-config.sh:107-112']
+    - action: 'Fail closed on an unclosed flow map instead of extending the awk parser'
+      refs: ['shared/resources/read-config.sh:275-293']
+    - action: 'Normalise YAML nulls once, shared by both readers; extend §15 to nested keys and path roots'
+      refs: ['shared/resources/read-config.sh:249-251', 'shared/resources/resolve-paths.sh:55-59']
+    - action: 'Initialise and clean up the _RP_* scratch vars on every path'
+      refs: ['shared/resources/resolve-platform.sh:145-162,228-229']
+    - action: 'Reject duplicate keys in the tier-1 loader'
+      refs: ['shared/resources/read-config.sh:48-60']
+  future:
+    - action: 'Whitelist resolve_access system arg; return __ERR__ for an unknown bulk spec'
+      refs: ['shared/resources/resolve-platform.sh:112', 'shared/resources/read-config.sh:71-92']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'BUG-6, BUG-7, BUG-8 fixed, each with a test that fails without the fix'
+    - 'A cross-source test that is not run in a fresh shell, so MED-5 is observable'
+    - 'No remaining path on which a legal config silently yields a more permissive mode than written'

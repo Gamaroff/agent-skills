@@ -1,0 +1,248 @@
+schema: 1
+task: 'task.51.access-mode-config-and-resolver'
+task_title: '[Task 51] Declare tracker access level in config, and reject an unrecognised one loudly'
+gate: CONCERNS
+status_reason: >-
+  The six defects this cycle was scoped to are closed, verified by reproducing each one against the
+  pre-fix reader and then against HEAD. The adversarial pass found TWO new defects introduced by the
+  fixes themselves — one of them a silent escalation opened by the BUG-16 narrowing, confirmed by
+  running the same fixture against the parent commit — and both were fixed and pinned within this
+  cycle rather than carried to a cycle 8. That is the first time in seven cycles the round's own
+  regressions have been caught and closed inside the round. The gate is CONCERNS rather than PASS
+  because the deferred awk-tier spelling class is still live: on a stock macOS host, where awk is the
+  only tier, a declared restriction written with a merge key, a quoted key, or a mapping-valued child
+  still resolves to `full` at exit 0. It is now recorded, documented in three places and pinned by
+  test, which makes it a known limit rather than a silent one — but it is not closed.
+reviewer: 'QA Engineer — cycle 7 (scoped re-review)'
+updated: '2026-08-18T05:10:00Z'
+
+re_review_of: 'task.51.gate.6.access-mode-config-and-resolver.yml'
+
+review_method: >-
+  Direct tools (re-review, focused scope — per the Adaptive Review Strategy). Every finding below was
+  executed in main context; no finding rests on a report. Regression claims were verified by running
+  the same fixture against the reader checked out at the parent commit (5f51973). Each fix was
+  mutation-tested: the fix was reverted in isolation and the suite re-run, so every closure has a
+  witness rather than a count. The differential for the rewritten awk value reader was produced by
+  running the old and new awk programs side by side over a 16-case matrix.
+
+previous_issues:
+  - id: 'TASK-51-BUG-25 python -c imports CWD yaml.py (code execution)'
+    status: closed
+    verified: >-
+      Stub yaml.py and a yaml/ package both fail to execute now; the stub's side-effect file is
+      absent and the real value still resolves. The probe picks the strongest isolation the
+      interpreter accepts AND under which pyyaml still imports (-P → -I → none), and the shared
+      program carries a sys.path prologue covering interpreters that support neither. Verified on
+      three host profiles that none is demoted to the awk tier: normal → -P, `-P` rejected → -I,
+      both rejected → no flag, tier 1 retained in all three.
+  - id: 'TASK-51-BUG-23 unreadable config escalates'
+    status: closed
+    verified: 'chmod 000 on a canonical config → rc=1 on both tiers, both shells. Message names permissions.'
+  - id: 'TASK-51-BUG-24 SKILLS_CONFIG_FILE discards a restriction'
+    status: closed
+    verified: >-
+      /dev/null and an absent path both rc=1; a redirect at a real config still resolves (read-only
+      honoured). Origin detection is stateless rather than memoised — the memoised form was itself
+      fail-open for a caller that sets the variable between two sources, which was caught and fixed
+      before commit.
+  - id: 'TASK-51-BUG-17 fail-closed grep misses legal key spellings'
+    status: closed-with-followup
+    verified: >-
+      Root flow mapping, quoted key, `access :`, and a `<<`-supplied block all rc=1 on a malformed
+      file. One further spelling was found still open during this review — explicit-key syntax
+      (`? access` / `: {...}`), where the colon is on the next line and so cannot appear in any
+      "access followed by a colon" pattern. Fixed in-cycle; see BUG-30.
+  - id: 'TASK-51-BUG-15 awk -F split breaks the documented tracker mapping form'
+    status: closed
+    verified: >-
+      `tracker: {workflowFile: ...}` now rc=0 with TRACKER=github and access preserved, on BOTH
+      tiers. A 16-case old-vs-new differential of the awk reader shows five behaviour changes, all
+      strict improvements: three flow/sequence forms now report __MAP__ (matching tier 1) and two
+      colon-bearing values are now read whole instead of truncated at the second colon. No case
+      regressed.
+  - id: 'TASK-51-BUG-16 blunt "at most one <<" guard falsely rejects disjoint sources'
+    status: closed-with-regression
+    verified: >-
+      Disjoint sources resolve again (block and flow spellings); overlapping sources, including
+      non-adjacent and sequence-entry overlap, are still refused. But the narrowing opened a new
+      silent escalation — see BUG-29, found, confirmed against the parent commit, and fixed in this
+      same cycle.
+  - id: 'vcs mapping tier disagreement (exposed by the BUG-15 fix)'
+    status: closed
+    verified: >-
+      A mapping-valued `vcs:` resolved to `auto` on the python tier while awk rejected it. The bulk
+      path now keeps the __MAP__ signal distinguishable, so both tiers refuse it in the same words.
+
+top_issues:
+  - id: TASK-51-BUG-29
+    severity: medium
+    status: closed-in-cycle
+    category: silent-escalation
+    finding: >-
+      The narrowed merge guard collected only the keys written DIRECTLY on each merge source, so a
+      nested merge declared AT the merge site contributed `tracker` while spelling only `x`. Paired
+      with a permissive source that read as disjoint, the permissive one won — silently, exit 0. A
+      NAMED source hid the bug: pyyaml's flatten_mapping mutates an anchored node in place when it is
+      constructed, so its inherited keys are already written on it by the time the alias site is
+      scanned. Only an at-site source exposes it.
+    evidence: >-
+      `base: &base {tracker: manual}` / `b: &b {tracker: full}` /
+      `access:\n  <<: {<<: *base, x: 1}\n  <<: *b` → rc=0 AT=full. Reader at parent commit 5f51973:
+      rc=1 (the blunt guard rejected the shape outright). Regression confirmed by running the same
+      fixture against both readers.
+    resolution: >-
+      Key collection now recurses through a source's own `<<`, with an id-based seen-set so a
+      recursive anchor terminates. Verified: the fixture rc=1; a genuinely disjoint nested merge
+      still resolves; a recursive anchor returns rather than spinning. Mutation-witnessed — reverting
+      the recursion fails 2 assertions.
+    refs: ['shared/resources/read-config.sh']
+
+  - id: TASK-51-BUG-30
+    severity: low
+    status: closed-in-cycle
+    category: silent-escalation
+    finding: >-
+      The broadened opt-in probe still missed YAML EXPLICIT KEY syntax, where the colon sits on the
+      following line (`? access` / `: {tracker: manual}`) and so cannot match any pattern that looks
+      for `access` followed by a colon. On a malformed file that declared a restriction this way, the
+      branch fell through to detection.
+    evidence: >-
+      `? access` / `: {tracker: manual}` plus a duplicate key → rc=0 AT=full, while pyyaml reads
+      access.tracker=manual. Pre-existing (the old `^access:` missed it too), not a regression.
+    resolution: >-
+      A second alternative in the probe matches the explicit-key spelling. Verified rc=1; a `? other`
+      explicit key does not trip it. Mutation-witnessed — reverting the alternative fails 2 assertions.
+    refs: ['shared/resources/resolve-platform.sh']
+
+  - id: TASK-51-LIMIT-1
+    severity: medium
+    status: open-deferred
+    category: silent-escalation
+    finding: >-
+      The awk tier reads only the canonical spelling of `access:`. A merge key or anchor, a quoted
+      key, or a mapping-valued child (an ordinary nesting typo) reads as ABSENT there and takes the
+      permissive default, while the python tier reads the declared value. Well-formed file, exit 0,
+      no output. This is BUG-18/26/27 from gate 6, deferred by operator decision.
+    why_deferred: >-
+      Six cycles closed one spelling each and left the siblings open, because the tier approximates a
+      grammar with anchored regexes and there is no finite list of spellings to close. Closing it is
+      a design change — require pyyaml, vendor a subset parser, or make tier 2 refuse rather than
+      guess — costed in the task document under "Known limits".
+    mitigation_verified: >-
+      Documented in three places (platform-detection.md "Known limit", configuration.md's
+      access.tracker row, the task document's "Known limits" section) and pinned by
+      tracker-access.test.sh §41, which asserts the divergence in BOTH directions and is labelled so
+      that a failure reads as "the limit has been fixed, delete this block" rather than as a break.
+    refs: ['shared/resources/read-config.sh', 'shared/resources/tracker-access.test.sh:1024']
+
+  - id: TASK-51-LIMIT-2
+    severity: low
+    status: open-deferred
+    category: diagnostics
+    finding: >-
+      The reason a file was rejected is not surfaced. Every parse exception collapses to one
+      `__ERR__` sentinel, so an operator sees "could not be parsed" rather than the offending line.
+      Carrying the reason across the wire means extending the record format.
+    mitigation_verified: >-
+      The halt message now enumerates the three parser-legal-but-silent shapes this reader rejects
+      (duplicate keys, overlapping merge sources, NUL/US/RS bytes), which is a workaround rather than
+      a fix, and is asserted by test. Recorded under "Known limits".
+    refs: ['shared/resources/resolve-platform.sh']
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 285
+  phases_verified: '10/10'
+  suites: >-
+    tracker-access 285/285 (was 166 at gate 6, 277 at commit 09b513c) · node 1287/1287 ·
+    resolve-platform 6/6 · bitbucket-auth 35/35 · pipeline hooks 3/3 + 13/13 · verify-push-state 9/9 ·
+    validate:all 115/115 · Prettier clean · bundle idempotent
+  mutation_audit: >-
+    9 mutations, each with a full-suite run, all CAUGHT. The five cycle-7 fixes (2, 10, 8, 7, 8
+    failures respectively), the two in-cycle regressions (2 and 2), and two invariants that SURVIVED
+    gate 6's audit and now do not: inverting access_rank so `command` outranks `read-only` (2
+    failures) and widening the mode enum to a sixth value (2 failures).
+  call_site_guards: >-
+    15/15 executable call sites carry `|| exit 1`, and now 15/15 are ENFORCED. Gate 6's finding that
+    the suite's dot-source regex matched ZERO lines repo-wide is closed: the pattern is anchored to
+    line start, matched on whole lines rather than -o fragments (the guard sits after the closing
+    quote, which a fragment ending at `.sh` can never contain), and backed by coverage FLOORS so a
+    pattern that goes blind fails loudly instead of reporting "no unguarded call sites". Verified by
+    deleting `|| exit 1` from skills/qa-story/SKILL.md:1371 — previously green, now red.
+  tier_coverage: >-
+    Gate 6's core test-integrity finding is closed. §2 asserts all five modes under BOTH tiers on the
+    resolved VALUE; §34-38 assert values rather than exit codes; §39 pins the mode ordering
+    behaviourally, each adjacent pair in both directions; §40 asserts the legal vocabulary as a whole
+    line. Merge-key value assertions still force python — correctly, since the awk tier cannot see a
+    merge key at all; that divergence is now pinned by §41 rather than hidden by a forced tier.
+  independent_reproduction: >-
+    all findings executed in main context; both regression claims diffed against parent commit 5f51973
+  host_profile: >-
+    Re-verified on three profiles — Homebrew python3 3.13 with pyyaml (-P), a shim rejecting -P (-I),
+    a shim rejecting both (no flag, prologue only) — and on a genuine awk-only host (python shimmed to
+    exit 127), under bash and zsh alike.
+  bundle: 'idempotent — npm run bundle leaves git status clean'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      Substantially improved, not clean. Five escalation routes closed and confirmed closed: the
+      code-execution vector (BUG-25), the unreadable file (BUG-23), the env redirect (BUG-24), the
+      key-spelling class on a malformed file (BUG-17 + BUG-30), and the nested-merge overlap this
+      cycle introduced and then closed (BUG-29). The guarantee in read-config.sh's own header — that
+      a stray env var can never loosen a config that restricts — now holds. What keeps this off PASS
+      is LIMIT-1: on the tier a stock macOS consumer actually runs, three legal spellings of a
+      declared restriction still resolve to `full` at exit 0. Nothing consumes ACCESS_TRACKER yet
+      (task.52 and successors), so the live blast radius is a value that is wrong rather than
+      credentials that are wrongly used — but that changes the day something reads it.
+  reliability:
+    status: PASS
+    notes: >-
+      Both false rejections closed. The documented `tracker: {workflowFile: ...}` form works on the
+      default tier of a stock host (BUG-15), and the legal merge composition that regressed at
+      cycle 5 resolves again (BUG-16), with the overlap protection intact and now covering
+      non-adjacent, sequence and nested sources. Verified under bash and zsh and on an awk-only host.
+  performance:
+    status: PASS
+    notes: >-
+      The isolation flag adds at most two extra probe spawns at source time, once per shell, and only
+      until one succeeds. The memoised single-probe design is unchanged.
+  maintainability:
+    status: PASS
+    notes: >-
+      Every fix carries a comment stating the defect it closes and why the obvious alternative was
+      rejected — including the two this cycle's own fixes caused, which is the record most likely to
+      stop cycle 8 repeating them. The known limits are written down with their options rather than
+      left implicit. Raised from CONCERNS because the suite now holds the invariants: it went from
+      11 surviving mutations at gate 6 to 0 across 9 tried here, and the call-site scan is no longer
+      decorative.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Close LIMIT-1 by giving tier 2 a grammar rather than more regexes. Three options are costed in
+        the task document; the third (restrict tier 2 to a documented strict subset and REFUSE
+        anything outside it) is the cheapest that converts every remaining silent escalation into a
+        loud, correct refusal.
+      refs: ['shared/resources/read-config.sh']
+    - action: >-
+        Do this before task.52 lands. While nothing reads ACCESS_TRACKER, a wrong value is a wrong
+        value; once a consumer gates a mutation on it, the same wrong value is an unintended write.
+    - action: 'Carry the parse-failure reason across the record format so the halt can name the offending line (LIMIT-2).'
+    - action: 'Re-run the fixture matrix under gawk/mawk — only macOS BWK awk has been exercised.'
+    - action: 'Re-bundle skills/qa-task/references/resolve-paths.sh — stale orphan, pre-existing on develop, not caused by this branch.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'LIMIT-1 is understood and accepted as a known limit — consumers on hosts without pyyaml must write `access:` in the canonical block form'
+    - 'LIMIT-1 is closed before any skill actually gates a mutation on ACCESS_TRACKER (task.52 onward)'
+    - 'Human review of the PR, given seven cycles of fix-induced defects — two of which this cycle caused and closed'

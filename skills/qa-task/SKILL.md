@@ -778,7 +778,7 @@ touches the document. See [`docs/reference/anti-patterns.md`](../../docs/referen
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
 
-Use the PR metadata stored in the Prerequisites step. Source the retry helper from `references/resolve-platform.sh` and wrap the comment in `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). Run:
+Use the PR metadata stored in the Prerequisites step. Source the retry helper with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value — and wrap the comment in `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). Run:
 
 ```bash
 tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
@@ -828,7 +828,7 @@ tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECI
 
 ### Step 13b: Comment on Tracker Issue (graceful — non-blocking)
 
-Branch on the tracker resolved by `source references/resolve-platform.sh` (which sets `TRACKER=github|jira`).
+Branch on the tracker resolved by `source references/resolve-platform.sh || exit 1` (which sets `TRACKER=github|jira`). Keep the `|| exit 1` — the resolver returns non-zero on an unrecognised `tracker:`, `vcs:` or `access:` value, and sourcing it bare would continue past the rejection with a default.
 
 **GitHub path** (when `TRACKER=github`) — extract `github_issue` from the task document YAML frontmatter (read in Step 2). If present, post a summary comment to the linked Issue:
 

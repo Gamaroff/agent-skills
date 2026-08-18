@@ -1,51 +1,372 @@
 #!/usr/bin/env bash
-# resolve-platform.sh — source this file to set TRACKER and VCS.
+# resolve-platform.sh — source this file to set TRACKER, VCS, ACCESS_TRACKER and ACCESS_VCS.
 #
 # Usage (in a skill or script):
-#   source shared/resources/resolve-platform.sh
-#   # TRACKER and VCS are now set for the remainder of the shell session.
+#   source shared/resources/resolve-platform.sh || exit 1
+#   # The four variables are now set for the remainder of the shell session.
+#
+# The `|| exit 1` is not optional. This resolver rejects an unrecognised value by writing to
+# stderr and returning non-zero; a caller that sources it bare prints the message and carries on
+# with a default — which for an access control is the exact silent-permissive outcome the
+# validation exists to prevent.
 #
 # Outputs:
-#   TRACKER — "jira" or "github"
-#   VCS     — "github" or "bitbucket"
+#   TRACKER        — "jira" or "github"          (identity: which tracker)
+#   VCS            — "github" or "bitbucket"     (identity: which forge)
+#   ACCESS_TRACKER — full | read-only | approve | command | manual   (access: how much it may do)
+#   ACCESS_VCS     — full                        (only `full` is supported today; see below)
 #
-# Resolver order (per shared/resources/platform-detection.md):
+# Identity and access are separate axes. Knowing the tracker is Jira is what lets a restricted run
+# still emit "move RAPP-605 to In Review" with the right URL and field names, so `manual` is a
+# value of `access.tracker`, never of `tracker`.
+#
+# Resolver order for identity (per shared/resources/platform-detection.md):
 #   1. skills-config.yaml keys (tracker:, vcs:)
 #   2. Env vars (JIRA_URL → jira)
 #   3. Git remote (bitbucket.org → bitbucket)
 #   4. Default: github / github
 #
-# Graceful degrade: python+pyyaml is tried first (full YAML parsing). If pyyaml
-# is unavailable, awk handles the common simple key: value case. If skills-
-# config.yaml is missing/malformed at both tiers, returns "auto" and the
-# env-var / git-remote tier runs — behaviour is unchanged.
+# Resolver order for access — deliberately NOT the same:
+#   Config and env are each read independently, then the MORE RESTRICTIVE of the two wins,
+#   ordering the modes  manual < command < approve < read-only < full  by permissiveness.
+#   Identity uses config → env → detect because picking the wrong tracker is a mistake; access
+#   uses most-restrictive-wins because picking the wrong access is an escalation. A CI job or a
+#   single run can therefore lock itself down without editing committed config, while a stray env
+#   var can never loosen a config that deliberately restricts.
+#
+# Graceful degrade: see read-config.sh for the two tiers. A skills-config.yaml that is missing, or
+# unparseable and carrying no `access:` block, still degrades to detection exactly as it always
+# has. A malformed file that DOES carry an `access:` block fails closed instead — the default for
+# access is `full`, so degrading there would silently re-grant the credentials the operator meant
+# to withhold.
 
-read_config_key() {
-  local key="$1" val=""
-  # Tier 1: python+pyyaml (handles any valid YAML)
-  val=$(python -c "
-import yaml
-try:
-    with open('skills-config.yaml') as f:
-        v = yaml.safe_load(f).get('$key', 'auto')
-        print(v if v is not None else 'auto')
-except Exception:
-    print('auto')
-" 2>/dev/null) || val=""
-  # Tier 2: awk fallback for simple top-level key: value lines (no pyyaml needed)
-  if [ -z "$val" ] || [ "$val" = "auto" ]; then
-    val=$(awk -F': *' "/^${key}:/{gsub(/[[:space:]]+$/, \"\", \$2); print \$2; exit}" \
-      skills-config.yaml 2>/dev/null)
-    [ -z "$val" ] && val="auto"
-  fi
-  echo "$val"
+# Locate this file's own directory so the shared reader can be sourced as a sibling. read-config.sh
+# sits beside this file in both layouts — shared/resources/ in-tree, <skill>/references/ once
+# bundled — so a sibling path is correct in both and needs no rewrite.
+#
+# BASH_SOURCE is bash-only and macOS logins are zsh, so fall back to zsh's %x prompt expansion.
+# The eval keeps that zsh-only parameter form away from bash's parser, which would otherwise
+# reject it as a bad substitution even on the branch it never takes.
+_rp_self="${BASH_SOURCE[0]:-}"
+if [ -z "$_rp_self" ] && [ -n "${ZSH_VERSION:-}" ]; then
+  eval '_rp_self="${(%):-%x}"'
+fi
+[ -n "$_rp_self" ] || _rp_self="$0"
+# shellcheck source=read-config.sh
+source "$(dirname "$_rp_self")/read-config.sh" || {
+  printf '❌ read-config.sh not found beside %s — cannot resolve platform.\n' "$_rp_self" >&2
+  unset _rp_self
+  return 1
+}
+unset _rp_self
+
+# Permissiveness order, least to most — see access_rank below for the canonical ordering.
+#
+# The legal set is passed to validate_enum as SEPARATE LITERAL ARGUMENTS by validate_access_mode,
+# never as one unquoted string relying on word splitting. zsh does not word-split an unquoted
+# parameter expansion, so `$ACCESS_MODES` arrived there as a single candidate and rejected every
+# legal value — and a bash caller that had set IFS would have hit the same thing.
+validate_access_mode() {
+  # validate_access_mode <source-label> <key-label> <value>
+  validate_enum "$1" "$2" "$3" manual command approve read-only full
 }
 
-TRACKER=$(read_config_key tracker)
-[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "$JIRA_URL" ] && echo jira || echo github)
+access_rank() {
+  case "$1" in
+    manual)    echo 0 ;;
+    command)   echo 1 ;;
+    approve)   echo 2 ;;
+    read-only) echo 3 ;;
+    full)      echo 4 ;;
+    *)         echo -1 ;;
+  esac
+}
 
-VCS=$(read_config_key vcs)
+# validate_enum <source-label> <key-label> <value> <legal>...
+# Legal sets are passed PER KEY, never shared. One set across `tracker` and `vcs` would accept
+# `tracker: bitbucket` and `vcs: jira` — misconfigurations of exactly the class being closed here.
+#
+# <source-label> names where the value came from. It used to be hardcoded to the config filename,
+# which sent an operator hunting through skills-config.yaml for a value that was actually set in
+# their environment.
+validate_enum() {
+  local src="$1" key="$2" value="$3"
+  shift 3
+  local legal="$*" candidate
+  for candidate in "$@"; do
+    [ "$value" = "$candidate" ] && return 0
+  done
+  printf '❌ %s: %s: "%s" is not a recognised value.\n' "$src" "$key" "$value" >&2
+  printf '   Legal values for %s: %s\n' "$key" "$legal" >&2
+  return 1
+}
+
+# resolve_access <system>   (system = "tracker" | "vcs")
+# Echoes the resolved mode. Returns 1 if either tier holds an unrecognised value.
+resolve_access() {
+  local system="$1" cfg env_name env_val resolved
+
+  # LOW-6: whitelist rather than relying on the uppercasing to mangle hostile input, since this
+  # function stays defined in the caller's shell after sourcing and its value reaches an `eval`.
+  case "$system" in
+    tracker) cfg="${_RP_ACC_T-$(read_nested_config_key_strict access tracker)}" ;;
+    vcs)     cfg="${_RP_ACC_V-$(read_nested_config_key_strict access vcs)}" ;;
+    *)       printf '❌ resolve_access: unknown system "%s".\n' "$system" >&2; return 1 ;;
+  esac
+
+  # The awk tier says so when it meets `access:` written in a form it cannot read on one line.
+  # Refusing is the point: reading it as "absent" is what silently granted `full`.
+  if [ "$cfg" = "__UNREADABLE__" ]; then
+    printf '❌ %s: access is written as a multi-line flow mapping, which this host cannot read.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   Install python3 + pyyaml, or write the block form:\n     access:\n       %s: <mode>\n' "$system" >&2
+    return 1
+  fi
+  env_name="AGENT_SKILLS_ACCESS_$(printf '%s' "$system" | tr '[:lower:]' '[:upper:]')"
+  # Portable indirect read. `${!name}` is bash-only and aborts under zsh with `bad substitution`,
+  # which made this function — and so every guarded call site — fail on EVERY config on macOS.
+  # `env_name` is built from the literals `tracker`/`vcs`, so there is nothing to inject.
+  eval "env_val=\${$env_name:-}"
+
+  # Both tiers are validated. An env var that bypassed validation would be a hole straight
+  # through the check, since it is the tier a CI environment can set most easily.
+  [ -n "$cfg" ] && { validate_access_mode "$SKILLS_CONFIG_FILE" "access.$system" "$cfg" || return 1; }
+  [ -n "$env_val" ] && { validate_access_mode "environment" "$env_name" "$env_val" || return 1; }
+
+  if [ -n "$cfg" ] && [ -n "$env_val" ]; then
+    if [ "$(access_rank "$cfg")" -le "$(access_rank "$env_val")" ]; then
+      resolved="$cfg"
+    else
+      resolved="$env_val"
+    fi
+  elif [ -n "$cfg" ]; then
+    resolved="$cfg"
+  elif [ -n "$env_val" ]; then
+    resolved="$env_val"
+  else
+    resolved="full"
+  fi
+  echo "$resolved"
+}
+
+# ── One batched read of everything this file needs ──────────────────────────
+# Six questions, one python spawn. Asking them one at a time cost ~500 ms per source, multiplied by
+# every call site in a pipeline run. Falls back to the individual readers when tier 1 is
+# unavailable — the awk tier has to answer each question separately anyway.
+# Cleared unconditionally first. These used to be unset only on the success path, so after a
+# failing source they persisted in the caller's shell — and because the access lookups use
+# `${_RP_ACC_T-…}` (unset-only), a stale empty string suppressed the awk read entirely. A second
+# source in the same shell then resolved against the first repo's config.
+_RP_BULK=""; _RP_STATUS=""; _RP_TRACKER=""; _RP_VCS=""; _RP_SHAPE=""
+unset _RP_ACC_T _RP_ACC_V 2>/dev/null || true
+# The OUTPUTS too. Every early `return 1` below happens before these are assigned, so a failed
+# source used to leave the previous repo's values — including an exported ACCESS_TRACKER=full —
+# visible to the caller and inherited by every child process it spawns.
+unset TRACKER VCS ACCESS_TRACKER ACCESS_VCS 2>/dev/null || true
+
+# ── An explicit SKILLS_CONFIG_FILE must name a real config ──────────────────
+# read-config.sh makes the config path env-overridable. Pointing it at an absent file, or at
+# /dev/null (which is not a regular file, so it reads as "no config at all"), discarded a committed
+# restriction silently on both tiers — falsifying the guarantee in that file's own header that a
+# stray env var can never loosen a config that deliberately restricts. The AGENT_SKILLS_ACCESS_*
+# vars are hardened with most-restrictive-wins; this sibling bypassed that by changing WHICH FILE is
+# read rather than what it says.
+#
+# The rule is narrow on purpose: a redirect may point somewhere else, it may not point nowhere.
+# Redirecting at a real config that happens to be permissive is a deliberate operator act, the same
+# as editing the file — and it is the form the test suites and cross-repo callers legitimately use.
+if [ "${_CONFIG_FILE_ORIGIN:-default}" = "env" ]; then
+  if [ ! -f "$SKILLS_CONFIG_FILE" ] || [ ! -r "$SKILLS_CONFIG_FILE" ]; then
+    printf '❌ SKILLS_CONFIG_FILE=%s does not name a readable config file.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   Refusing to resolve access from a config that is not there: a redirect that lands on\n' >&2
+    printf '   nothing would silently discard any restriction the real config declares. Point it at\n' >&2
+    printf '   a readable file, or unset it to use ./skills-config.yaml.\n' >&2
+    return 1
+  fi
+fi
+
+if _RP_BULK=$(config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested:access.vcs 2>/dev/null); then
+  # Typed, NUL-framed records — see config_bulk's wire-format note. `_rp_val` yields a payload only
+  # when the record is a VALUE; a signal (or a config that spells one) never reaches the logic below
+  # as if it were data.
+  _rp_rec() { config_bulk_get "$1" "$_RP_BULK"; }
+  _rp_val() { local r; r=$(_rp_rec "$1"); case "$r" in "v "*) printf '%s' "${r#v }" ;; *) printf '' ;; esac; }
+  _rp_sig() { local r; r=$(_rp_rec "$1"); case "$r" in "s "*) printf '%s' "${r#s }" ;; *) printf '' ;; esac; }
+  _RP_STATUS=$([ "$(_rp_sig 1)" = "ok" ] && echo ok || echo malformed)
+  [ -f "$SKILLS_CONFIG_FILE" ] || _RP_STATUS=missing
+
+  # A signal means "not a scalar the config supplied"; a value is used verbatim, whatever it spells.
+  # A SIGNAL of __MAP__ (the tracker.workflowFile form) means "no scalar override" → auto. It is
+  # resolved here so the literal string never enters the logic below: a config whose tracker VALUE
+  # spells __MAP__ must stay data and be rejected by validation, not be read as that signal.
+  # An __ERR__ signal means the reader REFUSED the payload (it carried a framing separator). That is
+  # a corrupt value, not an absent one, so it must fail closed — degrading it to `auto` would turn a
+  # poisoned value into silent platform detection, which is the fall-through this task exists to end.
+  # Every index, not just the config-derived ones. 1 (status) and 4 (shape) cannot be __ERR__ by
+  # construction, so covering them is free — and it removes a positional coupling to the spec list
+  # above, where inserting or reordering a spec would otherwise silently drop a value out of the
+  # halt, in the permissive direction.
+  for _rp_i in 1 2 3 4 5 6; do
+    if [ "$(_rp_sig "$_rp_i")" = "__ERR__" ]; then
+      case "$_rp_i" in
+        2) _rp_k=tracker ;; 3) _rp_k=vcs ;;
+        5) _rp_k=access.tracker ;; 6) _rp_k=access.vcs ;;
+        *) _rp_k="a configured key" ;;
+      esac
+      printf '❌ %s: %s: the value contains a character that cannot be read safely.\n' \
+        "$SKILLS_CONFIG_FILE" "$_rp_k" >&2
+      printf '   Remove any \\x00 / \\x1e / \\x1f escape from the value and re-run.\n' >&2
+      unset _rp_i _rp_k
+      return 1
+    fi
+  done
+  unset _rp_i
+
+  _RP_TRACKER=$(_rp_val 2); [ -n "$_RP_TRACKER" ] || _RP_TRACKER=auto
+  # `tracker:` above may legitimately be a mapping — that is the documented `tracker.workflowFile`
+  # form, which means "no scalar override" → auto. `vcs:` has no mapping form, so collapsing its
+  # __MAP__ signal to `auto` here silently accepted a misconfiguration that the awk tier rejects,
+  # leaving the two tiers disagreeing about the same file. Keep the signal distinguishable so the
+  # validation below can refuse it, in the same words on either tier.
+  _RP_VCS=$(_rp_val 3)
+  if [ -z "$_RP_VCS" ]; then
+    [ "$(_rp_sig 3)" = "__MAP__" ] && _RP_VCS="__MAP__" || _RP_VCS=auto
+  fi
+  _RP_SHAPE=$(_rp_val 4); [ -n "$_RP_SHAPE" ] || _RP_SHAPE=absent
+  _RP_ACC_T=$(_rp_val 5)
+  _RP_ACC_V=$(_rp_val 6)
+else
+  _RP_STATUS=""   # empty ⇒ the helpers below are consulted individually
+fi
+
+# ── Fail-closed branch for an unreadable config ─────────────────────────────
+# Separating "never opted in" from "opted in and now unreadable" is what lets a broken file warn for
+# the first and halt for the second. The probe that draws that line has to fail CLOSED, because
+# getting it wrong in the permissive direction is a silent escalation and getting it wrong in the
+# restrictive direction is a loud, fixable error on a file that is already broken.
+#
+# `grep -q '^access:'` failed closed in neither respect:
+#   * It greps the very file the parser has just failed to read. On a file that is unreadable rather
+#     than malformed — chmod 000, root-owned, a bad mount — the grep fails too, and the branch fell
+#     through to detection. The canonical documented `access:\n  tracker: manual`, merely made
+#     unreadable, resolved to `full` at exit 0. The gate failed open exactly when it was needed.
+#   * `^access:` matches only block form at column 0, so a root flow mapping, a quoted `"access":`,
+#     a space before the colon, a leading BOM, or an access block supplied through a `<<` merge all
+#     missed it, and a declared `manual` again resolved to `full`.
+#
+# _rp_access_may_be_declared answers the question the branch actually needs — "can I PROVE this file
+# declares no access?" — and answers "no, I cannot" whenever it cannot read the file. It matches
+# `access` used as a key in any spelling: after a line start, a brace, a comma, or whitespace, with
+# optional quotes, optional space before the colon. `accessToken:` does not match. A mention inside a
+# comment does, which is a deliberate over-match: the only consequence is that an ALREADY-MALFORMED
+# file halts instead of warning.
+_rp_access_may_be_declared() {
+  [ -f "$SKILLS_CONFIG_FILE" ] || return 1          # no file at all — nothing was declared
+  [ -r "$SKILLS_CONFIG_FILE" ] || return 0          # cannot read it — cannot prove absence
+  # Two spellings, because YAML has two ways to write a key. The first alternative is the ordinary
+  # one — `access` followed by its colon, after a line start, a brace, a comma or whitespace, with
+  # optional quotes and optional space before the colon. The second is EXPLICIT KEY syntax, where
+  # the colon is on the NEXT line (`? access` / `: {tracker: manual}`) and so cannot appear in the
+  # first pattern at all.
+  grep -qE '(^|[^[:alnum:]_-])["'"'"']?access["'"'"']?[[:space:]]*:|^[[:space:]]*\?[[:space:]]+["'"'"']?access["'"'"']?[[:space:]]*$' \
+    "$SKILLS_CONFIG_FILE" 2>/dev/null && return 0
+  # grep itself failing (a binary file, an I/O error) is also "cannot prove absence".
+  [ $? -gt 1 ] && return 0
+  return 1
+}
+
+if [ "${_RP_STATUS:-$(config_file_status)}" = "malformed" ]; then
+  if [ -f "$SKILLS_CONFIG_FILE" ] && [ ! -r "$SKILLS_CONFIG_FILE" ]; then
+    printf '❌ %s exists but cannot be read.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   Whether it declares an access level is therefore unknowable, and the default for\n' >&2
+    printf '   access is `full` — so falling back would risk re-granting exactly what the file may\n' >&2
+    printf '   have been written to withhold. Fix the permissions (chmod +r) and re-run.\n' >&2
+    unset -f _rp_access_may_be_declared 2>/dev/null || true
+    return 1
+  fi
+  if _rp_access_may_be_declared; then
+    printf '❌ %s: access may be configured, and the file could not be parsed.\n' "$SKILLS_CONFIG_FILE" >&2
+    printf '   The access level therefore cannot be determined. Refusing to fall back to `full` —\n' >&2
+    printf '   fix the YAML and re-run.\n' >&2
+    printf '   Beyond ordinary syntax errors, this reader also rejects three things a YAML parser\n' >&2
+    printf '   would accept but resolve silently, in the permissive direction:\n' >&2
+    printf '     • a duplicate key in ANY mapping in the file (last-wins would hide the first);\n' >&2
+    printf '     • two `<<` merge sources that define the SAME key (disjoint ones are fine);\n' >&2
+    printf '     • a value containing a NUL, or an ASCII US/RS byte.\n' >&2
+    printf '   If `access` appears only inside a comment, the file still needs fixing — but the\n' >&2
+    printf '   halt itself will go away once it parses.\n' >&2
+    unset -f _rp_access_may_be_declared 2>/dev/null || true
+    return 1
+  fi
+  printf '⚠️  %s could not be parsed — falling back to platform detection.\n' "$SKILLS_CONFIG_FILE" >&2
+fi
+unset -f _rp_access_may_be_declared 2>/dev/null || true
+
+# ── Identity ────────────────────────────────────────────────────────────────
+if [ -n "$_RP_TRACKER" ]; then
+  # From the typed bulk read: a mapping already became `auto`, so anything here is DATA — including
+  # a value that happens to spell __MAP__, which must reach validation and be rejected.
+  TRACKER="$_RP_TRACKER"
+else
+  TRACKER=$(read_config_key tracker)
+  # Fallback path only: this reader still signals a mapping in-band.
+  [ "$TRACKER" = "__MAP__" ] && TRACKER="auto"
+fi
+# A mapping-valued `tracker:` is the documented `tracker.workflowFile` form (see
+# docs/reference/tracker-workflow.md). It is not a platform override and must not be graded as
+# one — it means "no scalar override", i.e. detect.
+validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
+[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "${JIRA_URL:-}" ] && echo jira || echo github)
+
+if [ -n "$_RP_VCS" ]; then
+  VCS="$_RP_VCS"
+else
+  VCS=$(read_config_key vcs)
+fi
+# `vcs:` has no documented mapping form, so a mapping is a mistake — but say so precisely rather
+# than reporting the literal `__MAP__` sentinel as the offending value.
+[ "$VCS" = "__MAP__" ] && VCS="(a mapping)"
+validate_enum "$SKILLS_CONFIG_FILE" vcs "$VCS" github bitbucket auto || return 1
 [ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null | grep -qi bitbucket.org && echo bitbucket || echo github)
+
+# ── Access ──────────────────────────────────────────────────────────────────
+# Reject an `access:` written in a shape the per-system reader cannot honour, rather than reading
+# nothing out of it and returning the permissive default. `access: manual` (scalar) used to resolve
+# to `full` with exit 0 — a silent escalation, and the precise failure this validation exists to
+# stop. Checked once here rather than inside resolve_access, which runs twice.
+if [ "${_RP_SHAPE:-$(config_child_shape access)}" = "scalar" ]; then
+  printf '❌ %s: access: expected a mapping of per-system values, found a scalar.\n' "$SKILLS_CONFIG_FILE" >&2
+  printf '   Write it per system, e.g.\n     access:\n       tracker: manual\n' >&2
+  return 1
+fi
+
+ACCESS_TRACKER=$(resolve_access tracker) || return 1
+ACCESS_VCS=$(resolve_access vcs) || return 1
+
+# `access.vcs` is accepted and validated so the schema is stable, but only `full` works today.
+# VCS write is a hard requirement for the whole pipeline: /create-pr returns a PR URL that later
+# steps consume, and /develop-next gates on `gh pr merge`. Rejecting with the reason beats
+# accepting a value that would be silently ignored.
+if [ "$ACCESS_VCS" != "full" ]; then
+  printf '❌ access.vcs: "%s" is accepted as a key but not supported as a value.\n' "$ACCESS_VCS" >&2
+  printf '   VCS write access is a hard requirement: /create-pr returns a PR URL that later\n' >&2
+  printf '   pipeline steps consume, and /develop-next gates on `gh pr merge`. Only `full` is\n' >&2
+  printf '   supported today — remove the key or set `access.vcs: full`.\n' >&2
+  return 1
+fi
+
+# Say plainly that a restricted mode is declared but not yet enforced. Without this an operator who
+# sets `access: {tracker: manual}` gets a silent, entirely normal-looking run that writes to the
+# tracker exactly as before — believing they are protected. Nothing intercepts a mutation until
+# task.52 and its successors land; until then the value is vocabulary, not a control.
+if [ "$ACCESS_TRACKER" != "full" ]; then
+  printf '⚠️  access.tracker=%s is declared but NOT YET ENFORCED — this run still writes to the tracker normally.\n' \
+    "$ACCESS_TRACKER" >&2
+fi
+
+unset _RP_BULK _RP_STATUS _RP_TRACKER _RP_VCS _RP_SHAPE _RP_ACC_T _RP_ACC_V
+unset -f _rp_rec _rp_val _rp_sig 2>/dev/null || true
+
+export TRACKER VCS ACCESS_TRACKER ACCESS_VCS
 
 # tracker_call_with_retry — wrap a non-blocking tracker mutation (gh api,
 # gh issue comment, gh pr comment, gh project, etc.) with 3× exponential

@@ -61,7 +61,7 @@ Written at selection, updated after each of Steps 2–4, **deleted only in Step 
 6. **Resolve the platform.** Steps 1 and 3 talk to the hosting service; resolve `VCS` once here so both branch on the same value. See `references/platform-detection.md` for the full resolver spec.
 
    ```bash
-   source references/resolve-platform.sh
+   source references/resolve-platform.sh || exit 1
    # VCS = github | bitbucket; TRACKER = jira | github
 
    if [ "$VCS" = "bitbucket" ]; then

@@ -538,7 +538,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
    **Detection**: source the canonical resolver once per skill invocation, then branch on `TRACKER` — see `references/platform-detection.md`:
    ```bash
-   source references/resolve-platform.sh
+   source references/resolve-platform.sh || exit 1
    # TRACKER = jira | github
    ```
    When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path.

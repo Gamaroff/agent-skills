@@ -9,7 +9,7 @@ status: planned
 priority: High
 risk_level: low
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-18
 estimated_effort_hours: 8
 github_issue: 230
 ---
@@ -26,7 +26,7 @@ Second of seven tasks (51–57). Establishes the data contract for restricted tr
 output built from it, driven by fixture journals so the contract can be finished and proven before a
 single call site is changed.
 
-Depends on [task.51](../task.51.access-mode-config-and-resolver/task.51.access-mode-config-and-resolver.md)
+Depends on [task.51](../task.51.access-mode-config-and-resolver/task.51.access-mode-config-and-resolver.md) and [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md)
 for `ACCESS_TRACKER`.
 
 ## Motivation
@@ -217,5 +217,6 @@ invariant holds and is watched failing.
 ## References
 
 - [task.51](../task.51.access-mode-config-and-resolver/task.51.access-mode-config-and-resolver.md) — provides `ACCESS_TRACKER`
+- [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) — **prerequisite.** Closes the silent-escalation class in the config reader's no-dependency tier, where a declared restriction can still resolve to `full` at exit 0. Harmless while nothing reads `ACCESS_TRACKER`; this task is the first that does, so a wrong value here becomes an unintended tracker write
 - [`shared/resources/jira-stage.js`](../../../shared/resources/jira-stage.js) `--print-plan` — the credential-free emitter this imitates
 - [`skills/correct-course/SKILL.md`](../../../skills/correct-course/SKILL.md) — the existing paste-ready-proposal idiom

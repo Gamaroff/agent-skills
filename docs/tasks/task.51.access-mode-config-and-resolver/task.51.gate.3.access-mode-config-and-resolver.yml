@@ -1,0 +1,167 @@
+schema: 1
+task: 'task.51.access-mode-config-and-resolver'
+task_title: '[Task 51] Declare tracker access level in config, and reject an unrecognised one loudly'
+gate: FAIL
+status_reason: >-
+  Third consecutive cycle in which the fixes introduce defects of the class they closed. All eight
+  prior findings are verified closed, but the cycle-2 fixes added three more HIGH: the duplicate-key
+  loader rejects legal merge keys, the `__UNREADABLE__` sentinel escapes into PRD_ROOT/ARCH_ROOT and
+  gets mkdir'd, and the bulk encoder's newline escaping turned a working block-scalar config into a
+  hard halt. The instances differ; the cause does not. read-config.sh has grown a hand-rolled
+  serialisation protocol and a partial YAML parser to serve six short enum values, and each added
+  mechanism has produced a new failure surface.
+reviewer: 'QA Engineer'
+updated: '2026-08-17T17:40:00Z'
+
+re_review_of: 'task.51.gate.2.access-mode-config-and-resolver.yml'
+
+previous_issues:
+  - id: 'BUG-1..5 (cycle 1)'
+    status: closed
+    verified: 'zsh end-to-end on all tiers; narrowed lint still accepts root sequences and quoted keys; one reader definition; scalar access still rejected; nulls still mean unset.'
+  - id: 'BUG-6 bulk line shift'
+    status: closed
+    verified: '13-spec bulk: ^1\t does not match 10\t..13\t; a value containing a literal tab cannot forge an index; escaped newlines cannot inject a line.'
+  - id: 'BUG-7 multi-line flow map'
+    status: closed
+    verified: 'python → manual, awk → rc=1. Never full. But the sentinel it introduced leaks — see HIGH-2.'
+  - id: 'BUG-8 nested nulls'
+    status: closed
+    verified: 'null/NULL/~ mean unset for nested keys and path roots, both tiers.'
+  - id: 'MED-5 scratch vars'
+    status: partial
+    verified: '_RP_* are cleared, but the four exported OUTPUT variables are not — see MEDIUM-5.'
+  - id: 'MED-6 duplicate keys'
+    status: partial
+    verified: 'Duplicates rejected at root, nested, flow, 3-deep and inside list items. But the loader also rejects legal merge keys — see HIGH-1.'
+
+top_issues:
+  - id: TASK-51-BUG-9
+    severity: high
+    finding: >-
+      `_no_dupes` calls `construct_object` on every key before `flatten_mapping` runs, so a `<<`
+      merge key still carries `tag:yaml.org,2002:merge`, has no constructor, and raises — grading a
+      legal config `malformed`, which with an `access:` block is a hard halt on the tier that is
+      supposed to be the good one. Being a plain function rather than the two-stage generator also
+      breaks recursive anchors. Introduced by the cycle-2 MED-6 fix.
+    suggested_action: 'flatten_mapping first, then check duplicates, and keep generator semantics via construct_yaml_map.'
+    suggested_owner: dev
+
+  - id: TASK-51-BUG-10
+    severity: high
+    finding: >-
+      `read_nested_config_key` returns `__UNREADABLE__` for ANY parent, but only `resolve_access`
+      knows the sentinel. `resolve-paths.sh` — which by contract never fails — yields
+      PRD_ROOT=__UNREADABLE__ / ARCH_ROOT=__UNREADABLE__, consumed by 34 files; `render-retro.sh`
+      reaches `mkdir -p "__UNREADABLE__"`, creating a junk directory in the consumer repo. It wins
+      even WITH pyyaml installed, because a tier-1 `__ERR__` falls through to awk. Confirmed
+      regression against 050f9fb, which returned the defaults here.
+    suggested_action: 'Keep the sentinel internal to the access path; every other parent maps it to "".'
+    suggested_owner: dev
+
+  - id: TASK-51-BUG-11
+    severity: high
+    finding: >-
+      `one_line` escapes the trailing newline every YAML block scalar carries, which `$( )` used to
+      strip. `access:\n  tracker: |\n    manual` resolved to `manual` at 050f9fb and now halts with
+      `access.tracker: "manual\n" is not a recognised value`. The individual reader and the bulk path
+      now disagree on the same file and the same tier. Confirmed regression.
+    suggested_action: 'Strip trailing newlines before encoding; make the two paths agree by construction, not by coincidence.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-7
+    severity: medium
+    finding: >-
+      An encoder was added with no decoder. `config_bulk` doubles backslashes on the wire while
+      `read_config_key` does not, and `_rp_line` only strips the index. The docstring still promises
+      "the same sentinels as the individual readers", and platform-detection.md shows the call with
+      no mention of framing — two copies of one contract, drifted, which is the shape the extraction
+      existed to end.
+    suggested_action: 'Remove the need for escaping entirely, and document the wire format where the function is defined.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-8
+    severity: medium
+    finding: >-
+      The hygiene fix clears `_RP_*` but not the four exported OUTPUT variables, and every early
+      `return 1` precedes their assignment. After a failed source, `ACCESS_TRACKER=full` from the
+      previous repo is still exported and inherited by every child process — the same leak MED-5 was
+      filed for, one layer up. A caller honouring `|| exit 1` is safe; one that does not is not.
+    suggested_action: 'unset TRACKER VCS ACCESS_TRACKER ACCESS_VCS alongside the _RP_* clearing.'
+    suggested_owner: dev
+
+  - id: TASK-51-LOW-9
+    severity: low
+    finding: >-
+      `_config_denull` uses `echo`, whose bash builtin swallows `-n`/`-e`. `tracker: -n` now resolves
+      silently to detection where it previously produced a loud rejection — contradicting the task's
+      own headline. Under zsh the doubled `echo` also interprets escapes, so `a\nb` comes back as a
+      real newline.
+    suggested_action: "printf '%s\\n' instead of echo, in both places."
+    suggested_owner: dev
+
+  - id: TASK-51-LOW-10
+    severity: low
+    finding: >-
+      Sentinels remain in-band and forgeable in the fail-open direction: `access: {tracker: __NONE__}`,
+      `{__ERR__}` and `{__MAP__}` each give rc=0 ACCESS_TRACKER=full with no validation error, and
+      `{tracker: __UNREADABLE__}` fails closed but with a diagnostic that is untrue and unactionable
+      ("multi-line flow mapping … install pyyaml" on a one-line map with pyyaml present).
+    suggested_action: 'Type the records so a value can never be read as a signal.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 55
+
+evidence:
+  tests_reviewed: 1406   # 1287 node + 119 shell assertions
+  suites: 'tracker-access 119/119 · test:platform 6/6 · retrospective fixture pass · npm test 1287/1287 · validate:all 115/115 · CI green'
+  coverage_gap: 'None of the suites covers HIGH-1, HIGH-2 or HIGH-3.'
+  not_broken: >-
+    13-spec index addressing (including tab-in-value forgery and ≥10 indices); duplicate rejection at
+    every nesting depth; _StrictLoader on non-merge anchors, tags, empty/comment-only docs, explicit
+    markers, quoted and slash keys; the repo's own config on bash and zsh; the _RP_ACC_T
+    unset-vs-empty distinction; the resolve_access whitelist; and every cycle-1/2 fix spot-checked.
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: 'Injection closed. Forged sentinels still fail open (LOW-10), and a stale exported ACCESS_TRACKER survives a refused resolve (MED-8).'
+  performance:
+    status: PASS
+    notes: '2 python spawns, ~209 ms per source.'
+  reliability:
+    status: FAIL
+    notes: 'Three new ways a legal config fails, two of them hard halts and one a junk mkdir in the consumer repo.'
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      Downgraded from PASS. The extraction and the comments are still good, but the file now carries
+      a bespoke wire protocol AND a partial YAML parser, and three cycles running the defects have
+      come from those two mechanisms. The remedy is subtraction, not another layer.
+
+recommendations:
+  immediate:
+    - action: 'flatten_mapping before the duplicate check; restore generator semantics'
+      refs: ['shared/resources/read-config.sh:58-65']
+    - action: 'Confine __UNREADABLE__ to the access path; every other parent maps it to ""'
+      refs: ['shared/resources/read-config.sh:319', 'shared/resources/resolve-paths.sh:55-59']
+    - action: 'Remove the escaping layer — use a framing that cannot collide with data — and strip trailing newlines'
+      refs: ['shared/resources/read-config.sh:114-117']
+    - action: 'unset the four exported outputs alongside the _RP_* clearing'
+      refs: ['shared/resources/resolve-platform.sh:159-160']
+    - action: "Replace echo with printf '%s\\n' in _config_denull and read_config_key"
+      refs: ['shared/resources/read-config.sh:258,291']
+  future:
+    - action: 'Re-bundle skills/qa-task/references/resolve-paths.sh — a stale pre-extraction copy predating this branch (last touched d6a9ff4), the only stale one under skills/'
+      refs: ['skills/qa-task/references/resolve-paths.sh']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'All three HIGH fixed, each with a test that fails without the fix'
+    - 'A legal config that uses merge keys, block scalars, or a flow-form path root resolves identically on both tiers'
+    - 'No sentinel observable outside the reader that produces it'

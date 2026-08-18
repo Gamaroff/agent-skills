@@ -2,7 +2,7 @@
 
 > **Setting up a project? Skip this doc.** Run the [setup wizard](../../docs/concepts/getting-started.md#quick-setup-wizard) — it picks the platform interactively and writes the right `skills-config.yaml` for you. This document is the resolver-internals reference for skill authors and for cases where you need to override auto-detection.
 
-This file is the single source of truth for how skills determine the active tracker and VCS platform. Skills reference this via the explicit path `shared/resources/platform-detection.md`. At package time, `scripts/package_skill.py` bundles this file under `references/` and rewrites the path so installed skills are self-contained.
+This file is the single source of truth for how skills determine the active tracker and VCS platform, and how much access the agent has to each. Skills reference this via the explicit path `shared/resources/platform-detection.md`. At package time, `skills/create-skill/scripts/package_skill.py` (zip) and `bundle_skill.py` (in-tree) bundle this file under `references/` and rewrite the path so installed skills are self-contained.
 
 ## Canonical helper
 
@@ -10,45 +10,191 @@ The resolver is implemented as a sourceable bash helper: `shared/resources/resol
 
 ```bash
 # In any skill — source once before the first platform branch:
-source shared/resources/resolve-platform.sh
-# TRACKER = jira | github
-# VCS     = github | bitbucket
+source shared/resources/resolve-platform.sh || exit 1
+# TRACKER        = jira | github
+# VCS            = github | bitbucket
+# ACCESS_TRACKER = full | read-only | approve | command | manual
+# ACCESS_VCS     = full
 ```
+
+> **Copy the `|| exit 1`.** The resolver rejects an unrecognised value on any of the four keys by
+> writing to stderr and returning non-zero. A caller that sources it bare prints the message and
+> carries straight on with a default — which for an access control is the exact silent-permissive
+> outcome the validation exists to prevent. Every call site in this repository uses the guarded
+> form; a new skill that copies the snippet gets it for free.
 
 `package_skill.py` auto-bundles and rewrites this path into `references/resolve-platform.sh` inside each skill's zip. Installed skills are self-contained.
 
+## Identity vs access
+
+Two independent axes, deliberately not collapsed into one key:
+
+| Axis         | Keys                            | Question it answers                |
+| ------------ | ------------------------------- | ---------------------------------- |
+| **Identity** | `tracker:` / `vcs:`             | *Which* system is this project on? |
+| **Access**   | `access.tracker` / `access.vcs` | *How much* may the agent do to it? |
+
+A restricted run still needs the identity: emitting "move RAPP-605 to In Review" with the right URL
+and field names is only possible if the agent knows the tracker is Jira. So `manual` is a value of
+`access.tracker`, never of `tracker`.
+
+The five access modes, ordered least to most permissive:
+
+| Mode        | Meaning                                                    |
+| ----------- | ---------------------------------------------------------- |
+| `manual`    | Agent emits UI instructions; a human performs them         |
+| `command`   | Agent emits commands; a human runs them                    |
+| `approve`   | Agent holds credentials but must ask before each mutation  |
+| `read-only` | Agent may read the tracker, not write to it                |
+| `full`      | Today's behaviour. The default when the key is absent      |
+
+`access.vcs` is accepted and validated so the schema is stable, but only `full` is supported today —
+VCS write is a hard requirement for the pipelines (`/create-pr` returns a PR URL later steps consume,
+`/develop-next` gates on `gh pr merge`). Any other value is rejected with a message naming the reason
+rather than being silently ignored.
+
+### Precedence — and why access differs from identity
+
+**Identity** resolves config → env → git remote → default. First match wins.
+
+**Access** does not. Config and env (`AGENT_SKILLS_ACCESS_TRACKER`, `AGENT_SKILLS_ACCESS_VCS`) are
+read *independently*, and the **more restrictive** of the two wins, against the permissiveness order
+`manual < command < approve < read-only < full`.
+
+The asymmetry is deliberate: picking the wrong *tracker* is a mistake, whereas picking the wrong
+*access* is an escalation. Most-restrictive-wins lets a single run or a CI environment lock itself
+down without editing committed config, while making it impossible for a stray env var to loosen a
+config that deliberately restricts.
+
+| `access.tracker` | `AGENT_SKILLS_ACCESS_TRACKER` | Resolved   |
+| ---------------- | ----------------------------- | ---------- |
+| absent           | absent                        | `full`     |
+| `full`           | `manual`                      | `manual`   |
+| `manual`         | `full`                        | `manual`   |
+| `read-only`      | `approve`                     | `approve`  |
+| absent           | `command`                     | `command`  |
+
+Both tiers are validated — an env var that bypassed validation would be a hole straight through the
+check, since it is the tier a CI environment can set most easily.
+
+### Unrecognised values are fatal
+
+Legal sets are **per key**, never shared:
+
+| Key              | Legal values                                     |
+| ---------------- | ------------------------------------------------ |
+| `tracker`        | `jira` · `github` · `auto` (or absent)           |
+| `vcs`            | `github` · `bitbucket` · `auto` (or absent)      |
+| `access.tracker` | `manual` · `command` · `approve` · `read-only` · `full` |
+| `access.vcs`     | `full`                                           |
+
+One shared set across `tracker` and `vcs` would accept `tracker: bitbucket` and `vcs: jira` —
+misconfigurations of exactly the class this closes. `tracker: jria` used to resolve silently to
+`github`; it now halts.
+
+A **mapping-valued** `tracker:` is the documented [`tracker.workflowFile`](../../docs/reference/tracker-workflow.md)
+form, not a typo. It resolves to `auto` (i.e. detect) rather than being graded as a scalar override.
+
+### Malformed or unreachable `skills-config.yaml`
+
+| File state                                        | Behaviour                                             |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| Missing                                            | Detect, as always                                     |
+| Unparseable, and `access` provably **not** a key   | Warn, degrade to detection — as always                |
+| Unparseable, and `access` **may** be a key         | **Halt.** "access may be configured, and the file could not be parsed" |
+| Present but **unreadable** (permissions, bad mount) | **Halt.** "exists but cannot be read"                 |
+| `SKILLS_CONFIG_FILE` set to an absent or non-regular file | **Halt.** "does not name a readable config file" |
+
+The blanket degrade rule is right for identity, where the default is *detect*. For access the
+default is `full`, so the same rule would silently re-grant credentials on a truncated file. The
+probe that separates the two cases has to fail **closed**, and that means answering a narrower
+question than "is access configured?" — it answers **"can I prove this file declares no access?"**,
+and answers *no* whenever it cannot read the file at all.
+
+Three things follow from that framing, each of which the earlier `grep -q '^access:'` got wrong:
+
+- **An unreadable file halts.** The old probe grepped the very file the parser had just failed to
+  read, so on a `chmod 000` config the grep failed too and the branch fell through to detection: the
+  canonical documented `access:\n  tracker: manual` resolved to `full` at exit 0. The gate failed
+  open at precisely the moment it existed to fail closed.
+- **The key is matched in any legal spelling**, not just block form at column 0 — a root flow
+  mapping, a quoted `"access":`, a space before the colon, a leading BOM, or a block supplied
+  through a `<<` merge. The over-match is deliberate: `access` mentioned in a *comment* also counts,
+  and the only consequence is that an already-malformed file halts instead of warning.
+- **`SKILLS_CONFIG_FILE` may redirect, but it may not point nowhere.** The path is env-overridable;
+  pointing it at an absent file or at `/dev/null` (not a regular file, so read as "no config at
+  all") used to discard a committed restriction silently, on both tiers — falsifying the guarantee
+  that a stray env var can never loosen a config that deliberately restricts. Redirecting at a
+  *real* config that happens to be permissive is still honoured: that is a deliberate operator act,
+  and it is the form cross-repo callers legitimately use.
+
+### Known limit — the awk tier reads only the canonical spelling of `access:`
+
+Tier 2 anchors on the literal patterns `^access:` and an indented `tracker:`/`vcs:` beneath it. It
+has no grammar, so an access level supplied through a **merge key or anchor**, under a **quoted
+key**, or as a **mapping-valued child** (`access:\n  tracker:\n    mode: manual` — a nesting typo)
+reads as *absent* there and takes the permissive default, while tier 1 reads the declared value.
+The file is well-formed, the exit status is 0, and nothing is printed.
+
+This matters more than a fallback normally would, because **tier 2 is the default tier on a stock
+macOS host**: `/usr/bin/python3` ships without pyyaml, so a machine that has never installed it
+never reaches tier 1.
+
+It is recorded rather than closed because closing it means giving the tier a grammar, not more
+regexes — each cycle that added one spelling left its siblings open. The options are costed in the
+task document (`docs/tasks/task.51.access-mode-config-and-resolver/`) under **Known limits**. Until
+then: **write `access:` in the canonical block form**, and install `python3` + `pyyaml` on any host
+where the setting is load-bearing. `tracker-access.test.sh` §41 pins the divergence so it cannot
+drift unnoticed.
+
 Its companion for the Bitbucket branch is `shared/resources/bitbucket-auth.sh`, which resolves the REST credential and the auth scheme — see [The Bitbucket credential](#the-bitbucket-credential).
 
-## Resolver (reference copy)
+## Resolver (shape, not a copy)
+
+The implementation is [`resolve-platform.sh`](resolve-platform.sh), which reads
+`skills-config.yaml` through the shared two-tier reader in [`read-config.sh`](read-config.sh)
+(python+pyyaml, then awk). **Read those files for the real thing** — what follows is the shape of
+the resolution, kept short precisely so it cannot silently drift out of step with the code the way
+a verbatim duplicate does.
 
 ```bash
-read_config_key() {
-  local key="$1" val=""
-  # Tier 1: python+pyyaml (full YAML)
-  val=$(python -c "
-import yaml
-try:
-    with open('skills-config.yaml') as f:
-        v = yaml.safe_load(f).get('$key', 'auto')
-        print(v if v is not None else 'auto')
-except Exception:
-    print('auto')
-" 2>/dev/null) || val=""
-  # Tier 2: awk fallback when pyyaml unavailable
-  if [ -z "$val" ] || [ "$val" = "auto" ]; then
-    val=$(awk -F': *' "/^${key}:/{gsub(/[[:space:]]+$/, \"\", \$2); print \$2; exit}" \
-      skills-config.yaml 2>/dev/null)
-    [ -z "$val" ] && val="auto"
-  fi
-  echo "$val"
-}
+# One batched read — six questions, one python spawn. Falls back to the individual readers when
+# tier 1 is unavailable.
+config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested:access.vcs
 
-TRACKER=$(read_config_key tracker)
-[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "$JIRA_URL" ] && echo jira || echo github)
+# Identity — first match wins, then validate against a per-key legal set.
+# validate_enum takes the SOURCE first, so an env-var rejection does not misdirect the operator to
+# a config file that does not contain the value.
+[ "$TRACKER" = "__MAP__" ] && TRACKER="auto"   # tracker.workflowFile form ⇒ detect
+validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
+[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "${JIRA_URL:-}" ] && echo jira || echo github)
 
-VCS=$(read_config_key vcs)
-[ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null | grep -qi bitbucket.org && echo bitbucket || echo github)
+validate_enum "$SKILLS_CONFIG_FILE" vcs "$VCS" github bitbucket auto || return 1
+[ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null \
+  | grep -qi bitbucket.org && echo bitbucket || echo github)
+
+# Access — reject a shape the per-system reader cannot honour (a scalar `access: manual` would
+# otherwise read as nothing and resolve to the permissive default), then read both tiers and take
+# the MORE RESTRICTIVE.
+[ "$(config_child_shape access)" = "scalar" ] && return 1
+ACCESS_TRACKER=$(resolve_access tracker) || return 1   # manual<command<approve<read-only<full
+ACCESS_VCS=$(resolve_access vcs) || return 1           # rejected unless `full`
 ```
+
+Two portability rules the resolver learned the hard way, both of which broke every call site on
+macOS before they were fixed:
+
+- **No `${!var}`.** Bash-only indirect expansion; zsh raises `bad substitution`. Use
+  `eval "v=\${$name:-}"`, which works in both.
+- **No unquoted `$LIST` relying on word splitting.** zsh does not split unquoted parameter
+  expansions, so a legal-set string arrives as one candidate and rejects everything. Pass the set
+  as separate literal arguments.
+
+Two tiers, and they are not interchangeable: only python+pyyaml can tell a mapping from a scalar or
+a parse failure from an absent key. The tier-1 probe tries `python3` then `python` — it used to
+invoke a bare `python`, which macOS has not shipped since 12.3, so tier 1 was dead on most machines
+and awk was silently the only tier. Any test covering tier-sensitive behaviour must force each tier
+explicitly (`AGENT_SKILLS_CONFIG_TIER=python|awk`) rather than take whichever the host provides.
 
 ## Env vars
 
@@ -115,10 +261,26 @@ Five things about this credential are easy to get wrong:
 
 ## Skills migrated to the helper
 
-All 8 leaf skills now source `resolve-platform.sh`:
+Sixteen skills source `resolve-platform.sh`, across **eighteen** sourcing forms — `create-epic`,
+`qa-task` and `qa-story` each have two, and three of the eighteen are prose sentences rather than
+fenced snippets. All eighteen use the guarded `|| exit 1` form, and nothing **executes** the
+resolver (`bash …/resolve-platform.sh` never exports to the caller and exits 0 on a rejection).
 
-- `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`
+- `create-epic` (×2), `create-pr`, `create-story`, `create-task`, `develop-next`, `qa-fix`,
+  `qa-story`, `qa-task`, `review-bug`, `review-epic`, `review-story`, `review-task`,
+  `sync-github-epic`, `sync-github-story`, `sync-github-task`
+
+This list is hand-maintained and has drifted before (it read "All 8 leaf skills" long after it was
+15). Re-derive it rather than trusting it:
+
+```bash
+grep -rnoE '(^|[^=[:alnum:]_])source[[:space:]]+[^`]*resolve-platform\.sh' skills/*/SKILL.md
+```
+
+The repo's own `tracker-access.test.sh` (§11) asserts this repo-wide and fails when any site loses
+its guard — including the prose ones, which an anchored pattern silently skips. That assertion is
+the reason the list can be trusted; before it existed, an unguarded site shipped unnoticed.
 
 Skills that are platform-agnostic (no resolver needed):
 
-- `create-branch`, `commit-changes`, `create-story` (docs-only), `qa-review`, `qa-gate`
+- `create-branch`, `commit-changes`, `qa-gate`, and the docs-only authoring skills

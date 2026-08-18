@@ -50,7 +50,7 @@ Execute `references/review-pipeline-step-0a-branch-setup.md` with the **review-b
 
 ## Step 1: Load Context
 
-Read `BUG_FILE` (frontmatter + body). Load the structure oracle `create-bug-report/assets/bug-report-template.md`. Source the platform resolver once: `source references/resolve-platform.sh` (sets `TRACKER`/`VCS`; see [`references/platform-detection.md`](references/platform-detection.md)). Note `github_issue`/`jira_key` if present (usually absent — `TRACKER_ISSUE` empty).
+Read `BUG_FILE` (frontmatter + body). Load the structure oracle `create-bug-report/assets/bug-report-template.md`. Source the platform resolver once, guarded: `source references/resolve-platform.sh || exit 1` (sets `TRACKER`/`VCS`/`ACCESS_TRACKER`/`ACCESS_VCS`; see [`references/platform-detection.md`](references/platform-detection.md)). The `|| exit 1` is required — the resolver rejects an unrecognised `tracker:`, `vcs:` or `access:` value by returning non-zero, and sourcing it bare would print the error and carry on with a default. Note `github_issue`/`jira_key` if present (usually absent — `TRACKER_ISSUE` empty).
 
 ## Phase 1.5: Pre-pass (2 Parallel Explore Subagents)
 

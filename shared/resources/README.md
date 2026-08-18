@@ -12,11 +12,22 @@ Reference files in skill `.md` files using the exact path `shared/resources/<fil
 
 | File | Used by (skill count) | Purpose |
 |------|-----------------------|---------|
-| `platform-detection.md` | 9 skills | Canonical spec for tracker/VCS resolver order (Jira/GitHub, Bitbucket/GitHub) |
-| `resolve-platform.sh` | 10 skills | Shell helper — sources before any tracker/VCS branch; determines `TRACKER` and `VCS` env vars |
-| `resolve-platform.test.sh` | — (test only) | Test suite for the platform resolver; not bundled into skills |
+| `platform-detection.md` | 28 skills | Canonical spec for tracker/VCS identity **and** access resolution, precedence, and the guarded sourcing form |
+| `read-config.sh` | 36 skills | Shared two-tier `skills-config.yaml` readers (`read_config_key`, `read_nested_config_key`, `config_file_status`). Sourced as a sibling by both resolvers below |
+| `resolve-platform.sh` | 28 skills | Shell helper — source before any tracker/VCS branch; sets `TRACKER`, `VCS`, `ACCESS_TRACKER`, `ACCESS_VCS`. **Returns non-zero on an unrecognised value — source it as `… || exit 1`** |
+| `resolve-paths.sh` | 22 skills | Shell helper — sets `PRD_ROOT` and `ARCH_ROOT` |
+| `resolve-platform.test.sh` | — (test only) | Identity-resolution suite; not bundled into skills |
+| `tracker-access.test.sh` | — (test only) | Access resolution, strict enum validation, malformed-YAML fail-closed, guarded call site; not bundled |
 
-Skills that source `resolve-platform.sh`: `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`, `sync-jira-story`, `sync-jira-task`
+Bundled-copy counts above are what `npm run bundle` produces and will change as skills are added —
+re-derive with `ls skills/*/references/<file> | wc -l` rather than trusting them.
+
+Sixteen skills source `resolve-platform.sh` directly (18 sourcing forms; `create-epic`, `qa-task`
+and `qa-story` have two each):
+`create-epic`, `create-pr`, `create-story`, `create-task`, `develop-next`, `jira-sprint-retrospective`,
+`qa-fix`, `qa-story`, `qa-task`, `review-bug`, `review-code`, `review-epic`, `review-story`,
+`review-task`, `sync-github-epic`, `sync-github-story`, `sync-github-task`. The wider bundled-copy count is larger because other
+skills reference `platform-detection.md`, which pulls the script in transitively.
 
 ### GitHub Project Boards
 

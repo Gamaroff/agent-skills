@@ -43,7 +43,13 @@ Skills reference shared files using the explicit path `shared/resources/<filenam
 
 ## Platform branching
 
-Skills that branch on tracker or VCS platform source `shared/resources/resolve-platform.sh` and follow the resolver order: explicit config → env vars → git remote → default GitHub. Canonical spec: [`shared/resources/platform-detection.md`](../../../shared/resources/platform-detection.md). `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
+Skills that branch on tracker or VCS platform source `shared/resources/resolve-platform.sh` **guarded**:
+
+```bash
+source references/resolve-platform.sh || exit 1
+```
+
+Identity follows the resolver order explicit config → env vars → git remote → default GitHub. Access (`ACCESS_TRACKER` / `ACCESS_VCS`) does not: config and env are read independently and the more restrictive wins. The `|| exit 1` is required, not stylistic — the resolver returns non-zero on an unrecognised value, and sourcing it bare continues past the rejection with a default. Canonical spec: [`shared/resources/platform-detection.md`](../../../shared/resources/platform-detection.md). `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
 
 ## Plan files
 

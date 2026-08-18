@@ -638,7 +638,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    Detect tracker platform using the canonical resolver — see `references/platform-detection.md`. Source the helper once per skill invocation:
 
    ```bash
-   source references/resolve-platform.sh
+   source references/resolve-platform.sh || exit 1
    # TRACKER = jira | github
    ```
    - When `TRACKER=jira` → **Jira path** (check for `jira_key:` in frontmatter)

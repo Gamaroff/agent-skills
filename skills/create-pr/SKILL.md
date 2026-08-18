@@ -103,7 +103,7 @@ Before asking the user, check whether parameters were supplied:
 Before interacting with any remote hosting service, detect the platform using the canonical resolver. See `references/platform-detection.md` for the full resolver spec.
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # VCS = github | bitbucket; TRACKER = jira | github
 PLATFORM="$VCS"   # PLATFORM keeps backward compat with downstream branches
 
