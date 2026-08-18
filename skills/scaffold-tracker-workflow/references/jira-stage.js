@@ -445,39 +445,42 @@ async function run({
     const baseUrl = (process.env.JIRA_URL || "").replace(/\/+$/, "");
     const issueUrl = baseUrl ? `${baseUrl}/browse/${args.issue}` : "";
     try {
-      const rec = dm.defer({
-        kind: "jira.transition",
-        system: "jira",
-        access,
-        intent: `Move ${args.issue} to ${target || `the ${args.stage} column`}`,
-        target: { issue: args.issue, url: issueUrl, ui_url: issueUrl },
-        desired: { status: target || null },
-        skill: "jira-stage",
-        step: args.stage,
-        run: process.env.PIPELINE_RUN || "",
-        manual: {
-          deepLink: issueUrl,
-          ui: `Open the issue → Status → ${target || `the ${args.stage} column`}`,
-          fields: [{ name: "Status", value: target || "" }],
+      const rec = dm.defer(
+        {
+          kind: "jira.transition",
+          system: "jira",
+          access,
+          intent: `Move ${args.issue} to ${target || `the ${args.stage} column`}`,
+          target: { issue: args.issue, url: issueUrl, ui_url: issueUrl },
+          desired: { status: target || null },
+          skill: "jira-stage",
+          step: args.stage,
+          run: process.env.PIPELINE_RUN || "",
+          manual: {
+            deepLink: issueUrl,
+            ui: `Open the issue → Status → ${target || `the ${args.stage} column`}`,
+            fields: [{ name: "Status", value: target || "" }],
+          },
+          command: {
+            argv: [
+              "node",
+              "jira-stage.js",
+              "--issue",
+              String(args.issue),
+              "--stage",
+              args.stage,
+              "--json",
+            ],
+            stdin: null,
+          },
+          verify: {
+            cmd: `jira-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
+            expect: `status is "${target || args.stage}"`,
+          },
+          // The repo root, not process.cwd() — see gh-stage.js.
         },
-        command: {
-          argv: [
-            "node",
-            "jira-stage.js",
-            "--issue",
-            String(args.issue),
-            "--stage",
-            args.stage,
-            "--json",
-          ],
-          stdin: null,
-        },
-        verify: {
-          cmd: `jira-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
-          expect: `status is "${target || args.stage}"`,
-        },
-      // The repo root, not process.cwd() — see gh-stage.js.
-      }, { cwd: repoRoot || gitToplevel() });
+        { cwd: repoRoot || gitToplevel() },
+      );
       output.info(
         `⏸️  access.tracker=${access} — not transitioning ${args.issue}; recorded as ${rec.id}.`,
       );

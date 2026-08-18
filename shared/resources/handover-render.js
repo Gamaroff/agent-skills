@@ -62,7 +62,10 @@ const KIND_PRESENTATION = Object.freeze({
   "jira.issue.link": { verb: "Link", noun: "Jira issues" },
   "jira.worklog.add": { verb: "Log work on", noun: "Jira issue" },
   "jira.backlog.add": { verb: "Add to the backlog", noun: "Jira issue" },
-  "jira.sprint.move-issues": { verb: "Move into the sprint", noun: "Jira issues" },
+  "jira.sprint.move-issues": {
+    verb: "Move into the sprint",
+    noun: "Jira issues",
+  },
   "jira.sprint.set-state": { verb: "Change the state of", noun: "sprint" },
   "jira.transition": { verb: "Transition", noun: "Jira issue" },
 
@@ -72,9 +75,15 @@ const KIND_PRESENTATION = Object.freeze({
   "github.issue.close": { verb: "Close", noun: "GitHub issue" },
   "github.issue.reopen": { verb: "Reopen", noun: "GitHub issue" },
   "github.issue.comment": { verb: "Comment on", noun: "GitHub issue" },
-  "github.sub-issue.add": { verb: "Attach as a sub-issue", noun: "GitHub issue" },
+  "github.sub-issue.add": {
+    verb: "Attach as a sub-issue",
+    noun: "GitHub issue",
+  },
   "github.board.item-add": { verb: "Add to the board", noun: "board item" },
-  "github.board.field-set": { verb: "Set the board field on", noun: "board item" },
+  "github.board.field-set": {
+    verb: "Set the board field on",
+    noun: "board item",
+  },
   "github.pr.create": { verb: "Open", noun: "pull request" },
   "github.pr.comment": { verb: "Comment on", noun: "pull request" },
   "github.pr.merge": { verb: "Merge", noun: "pull request" },
@@ -97,8 +106,10 @@ function presentationFor(kind) {
 }
 
 const CONSEQUENCE_LABEL = Object.freeze({
-  "state-drift": "State drift — the board and reality disagree until this is done",
-  communication: "Communication — a record nobody reads is lost; nothing breaks",
+  "state-drift":
+    "State drift — the board and reality disagree until this is done",
+  communication:
+    "Communication — a record nobody reads is lost; nothing breaks",
   irreversible: "Irreversible — cannot be undone, and is not safe to run twice",
 });
 
@@ -387,7 +398,8 @@ function renderMarkdown(model) {
         "something broke, and the same script below will re-run them.",
     );
     L.push("");
-    for (const rec of model.failures) L.push(...markdownItem(rec, model, 0, seen));
+    for (const rec of model.failures)
+      L.push(...markdownItem(rec, model, 0, seen));
   }
 
   if (model.satisfied.length) {
@@ -415,7 +427,8 @@ function renderMarkdown(model) {
         "an action of unknown status — verify it by hand.",
     );
     L.push("");
-    for (const kind of model.unrecorded) L.push(`- ⚠️ UNRECORDED — \`${kind}\``);
+    for (const kind of model.unrecorded)
+      L.push(`- ⚠️ UNRECORDED — \`${kind}\``);
     L.push("");
   }
 
@@ -426,7 +439,9 @@ function renderMarkdown(model) {
     L.push("");
   }
 
-  return `${L.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
+  return `${L.join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd()}\n`;
 }
 
 /**
@@ -456,7 +471,9 @@ function markdownItem(rec, model, depth, seen) {
   const fields = Array.isArray(manual.fields) ? manual.fields : [];
   for (const f of fields) {
     if (!f || !f.name) continue;
-    const value = String(f.value === undefined || f.value === null ? "" : f.value);
+    const value = String(
+      f.value === undefined || f.value === null ? "" : f.value,
+    );
     if (value.includes("\n")) {
       L.push(`${pad}  - **${f.name}**:`);
       L.push("");
@@ -528,13 +545,17 @@ function renderShell(model) {
   L.push("#");
   L.push("# Tracker actions this run could not perform.");
   L.push("#");
-  L.push("# DRY RUN BY DEFAULT. This script prints what it would do and changes");
+  L.push(
+    "# DRY RUN BY DEFAULT. This script prints what it would do and changes",
+  );
   L.push("# nothing. Re-run with --apply to perform the actions.");
   L.push("#");
   L.push("#   bash <this file>            # show the plan");
   L.push("#   bash <this file> --apply    # perform it");
   L.push("#");
-  L.push("# It contains no credential by construction — only environment variable");
+  L.push(
+    "# It contains no credential by construction — only environment variable",
+  );
   L.push("# NAMES. Export those yourself before running with --apply.");
   L.push("#");
   if (ctx.run) L.push(`# Run:         ${shComment(ctx.run)}`);
@@ -551,28 +572,32 @@ function renderShell(model) {
   L.push("  cat <<'HANDOVER_USAGE'");
   L.push("Tracker actions this run could not perform.");
   L.push("");
-  L.push("  bash <this file>            show the plan (default — changes nothing)");
+  L.push(
+    "  bash <this file>            show the plan (default — changes nothing)",
+  );
   L.push("  bash <this file> --apply    perform it");
   L.push("");
-  L.push("Contains no credential — only environment variable NAMES. Export those");
+  L.push(
+    "Contains no credential — only environment variable NAMES. Export those",
+  );
   L.push("yourself before running with --apply.");
   L.push("HANDOVER_USAGE");
   L.push("}");
   L.push("");
-  L.push('APPLY=0');
+  L.push("APPLY=0");
   L.push('for arg in "$@"; do');
   L.push('  case "$arg" in');
-  L.push('    --apply) APPLY=1 ;;');
-  L.push('    -h|--help) usage; exit 0 ;;');
+  L.push("    --apply) APPLY=1 ;;");
+  L.push("    -h|--help) usage; exit 0 ;;");
   L.push('    *) echo "unknown argument: $arg" >&2; exit 2 ;;');
   L.push("  esac");
   L.push("done");
   L.push("");
   L.push('WORKDIR="$(mktemp -d)"');
-  L.push('trap \'rm -rf "$WORKDIR"\' EXIT');
+  L.push("trap 'rm -rf \"$WORKDIR\"' EXIT");
   L.push("");
   L.push("run_step() {");
-  L.push('  # $1 = id, $2 = description; remaining args = the command');
+  L.push("  # $1 = id, $2 = description; remaining args = the command");
   L.push('  local id="$1"; shift');
   L.push('  local desc="$1"; shift');
   L.push('  if [ "$APPLY" -eq 1 ]; then');
@@ -580,7 +605,7 @@ function renderShell(model) {
   L.push('    "$@"');
   L.push("  else");
   L.push('    echo "·  [$id] $desc"');
-  L.push('    printf \'     \'; printf \'%q \' "$@"; printf \'\\n\'');
+  L.push("    printf '     '; printf '%q ' \"$@\"; printf '\\n'");
   L.push("  fi");
   L.push("}");
   L.push("");
@@ -590,20 +615,24 @@ function renderShell(model) {
   L.push('  local desc="$1"; shift');
   L.push('  if [ "$APPLY" -ne 1 ]; then');
   L.push('    echo "·  [$id] IRREVERSIBLE — $desc"');
-  L.push('    printf \'     \'; printf \'%q \' "$@"; printf \'\\n\'');
+  L.push("    printf '     '; printf '%q ' \"$@\"; printf '\\n'");
   L.push("    return 0");
   L.push("  fi");
   L.push('  echo "⚠️  [$id] IRREVERSIBLE — $desc"');
-  L.push('  printf \'    \'; printf \'%q \' "$@"; printf \'\\n\'');
+  L.push("  printf '    '; printf '%q ' \"$@\"; printf '\\n'");
   // No controlling tty (CI, a pipe, nohup) must SKIP this action, not kill the
   // script. Under `set -euo pipefail` a bare `read … < /dev/tty` exits non-zero
   // when /dev/tty cannot be opened, so an --apply run in CI used to stop at the
   // first irreversible action and silently skip everything after it.
-  L.push('  if [ ! -e /dev/tty ]; then');
-  L.push('    echo "    no tty — skipped (re-run interactively to perform this)."');
+  L.push("  if [ ! -e /dev/tty ]; then");
+  L.push(
+    '    echo "    no tty — skipped (re-run interactively to perform this)."',
+  );
   L.push("    return 0");
   L.push("  fi");
-  L.push('  if ! read -r -p "    Perform this? [y/N] " _reply < /dev/tty; then');
+  L.push(
+    '  if ! read -r -p "    Perform this? [y/N] " _reply < /dev/tty; then',
+  );
   L.push('    echo "    could not read a reply — skipped."');
   L.push("    return 0");
   L.push("  fi");
@@ -619,10 +648,18 @@ function renderShell(model) {
   // Body payloads first, so the command lines below read uninterrupted.
   const bodies = runnable.map(bodyFunction).filter(Boolean);
   if (bodies.length) {
-    L.push("# ── Bodies ──────────────────────────────────────────────────────────");
-    L.push("# Base64 so that backticks, $(…), heredoc terminators, CRLF and a missing");
-    L.push("# trailing newline all round-trip byte-exactly. Decoded to a file and");
-    L.push("# passed with --body-file; never interpolated into a command line.");
+    L.push(
+      "# ── Bodies ──────────────────────────────────────────────────────────",
+    );
+    L.push(
+      "# Base64 so that backticks, $(…), heredoc terminators, CRLF and a missing",
+    );
+    L.push(
+      "# trailing newline all round-trip byte-exactly. Decoded to a file and",
+    );
+    L.push(
+      "# passed with --body-file; never interpolated into a command line.",
+    );
     L.push("");
     for (const b of bodies) {
       L.push(`# ${shComment(b.preview)}…`);
@@ -639,13 +676,17 @@ function renderShell(model) {
   }
 
   for (const [system, recs] of groupBySystem(runnable)) {
-    L.push(`# ══ ${SYSTEM_LABEL[system] || system} ${"═".repeat(Math.max(0, 60 - (SYSTEM_LABEL[system] || system).length))}`);
+    L.push(
+      `# ══ ${SYSTEM_LABEL[system] || system} ${"═".repeat(Math.max(0, 60 - (SYSTEM_LABEL[system] || system).length))}`,
+    );
     L.push("");
     for (const rec of recs) L.push(...shellStep(rec));
   }
 
   if (model.unrecorded.length) {
-    L.push("# ── ⚠️ UNRECORDED ───────────────────────────────────────────────────");
+    L.push(
+      "# ── ⚠️ UNRECORDED ───────────────────────────────────────────────────",
+    );
     L.push("# Expected to produce a record and did not. Verify each by hand.");
     for (const kind of model.unrecorded) {
       L.push(`echo ${shQuote(`⚠️  UNRECORDED — ${kind}`)} >&2`);
@@ -655,9 +696,13 @@ function renderShell(model) {
 
   L.push('if [ "$APPLY" -ne 1 ]; then');
   L.push('  echo ""');
-  L.push('  echo "Dry run — nothing was changed. Re-run with --apply to perform these."');
+  L.push(
+    '  echo "Dry run — nothing was changed. Re-run with --apply to perform these."',
+  );
   L.push("fi");
-  return `${L.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
+  return `${L.join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd()}\n`;
 }
 
 function shellStep(rec) {
@@ -674,7 +719,9 @@ function shellStep(rec) {
   L.push(`# [${rec.id}] ${shComment(rec.intent)}`);
   L.push(`#   kind: ${rec.kind}  ·  consequence: ${rec.consequence}`);
   if (rec.retry_of)
-    L.push(`#   retry of: ${shComment(rec.retry_of)} (failed under full access)`);
+    L.push(
+      `#   retry of: ${shComment(rec.retry_of)} (failed under full access)`,
+    );
   if (Array.isArray(rec.dependsOn) && rec.dependsOn.length)
     L.push(`#   after: ${rec.dependsOn.join(", ")}`);
   if (rec.produces) L.push(`#   yields: ${rec.produces}`);
@@ -705,11 +752,14 @@ function shellStep(rec) {
   // exec with no pipeline to misquote.
   const quoted = finalArgv
     .map((a) =>
-      body && a === `$WORKDIR/${body.fn}` ? `"$WORKDIR/${body.fn}"` : shQuote(a),
+      body && a === `$WORKDIR/${body.fn}`
+        ? `"$WORKDIR/${body.fn}"`
+        : shQuote(a),
     )
     .join(" ");
 
-  const helper = rec.consequence === "irreversible" ? "confirm_step" : "run_step";
+  const helper =
+    rec.consequence === "irreversible" ? "confirm_step" : "run_step";
   L.push(`${helper} ${shQuote(rec.id)} ${desc} ${quoted}`);
 
   if (rec.verify && rec.verify.cmd) {
@@ -794,7 +844,9 @@ function renderSummary(model) {
   }
 
   if (model.satisfied.length) {
-    L.push(`_${model.satisfied.length} action(s) already correct — collapsed._`);
+    L.push(
+      `_${model.satisfied.length} action(s) already correct — collapsed._`,
+    );
     L.push("");
   }
 
@@ -805,7 +857,9 @@ function renderSummary(model) {
     L.push("");
   }
 
-  return `${L.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
+  return `${L.join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd()}\n`;
 }
 
 // ---------------------------------------------------------------------------
@@ -923,7 +977,11 @@ function parseArgs(argv) {
   return args;
 }
 
-function run({ argv = process.argv, env = process.env, cwd = process.cwd() } = {}) {
+function run({
+  argv = process.argv,
+  env = process.env,
+  cwd = process.cwd(),
+} = {}) {
   let args;
   try {
     args = parseArgs(argv);
@@ -940,7 +998,9 @@ function run({ argv = process.argv, env = process.env, cwd = process.cwd() } = {
   const formats = args.formats.length ? args.formats : ["summary"];
   for (const f of formats) {
     if (!FORMATS.includes(f)) {
-      console.error(`Error: unknown format "${f}". Known: ${FORMATS.join(", ")}`);
+      console.error(
+        `Error: unknown format "${f}". Known: ${FORMATS.join(", ")}`,
+      );
       return { exitCode: 2 };
     }
   }
@@ -975,7 +1035,8 @@ function run({ argv = process.argv, env = process.env, cwd = process.cwd() } = {
   // work-item directory tells a reviewer "nothing was deferred" in the same
   // shape it would tell them "the renderer broke".
   if (isEmpty(model)) {
-    if (!args.quiet) console.error("ℹ️  Journal is empty — no artifact written.");
+    if (!args.quiet)
+      console.error("ℹ️  Journal is empty — no artifact written.");
     return { exitCode: 0, written: [], empty: true };
   }
 

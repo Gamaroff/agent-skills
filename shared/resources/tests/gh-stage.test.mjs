@@ -1468,10 +1468,13 @@ test("gh-stage.js does not depend on jira-sync.js", () => {
     "./yaml-subset.js",
   ]);
 
-  const deferSrc = readFileSync(join(__dirname, "..", "defer-mutation.js"), "utf-8");
-  const deferRequires = [...deferSrc.matchAll(/require\(["']([^"']+)["']\)/g)].map(
-    (m) => m[1],
+  const deferSrc = readFileSync(
+    join(__dirname, "..", "defer-mutation.js"),
+    "utf-8",
   );
+  const deferRequires = [
+    ...deferSrc.matchAll(/require\(["']([^"']+)["']\)/g),
+  ].map((m) => m[1]);
   assert.deepEqual(
     // A module's own name appears in its usage example; that is a self-reference,
     // not a dependency.

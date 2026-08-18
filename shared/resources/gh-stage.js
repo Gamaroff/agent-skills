@@ -857,48 +857,51 @@ function run({
     }/issues/${args.issue}`;
     const field = args.field || resolveStatusFieldName(root);
     try {
-      const rec = dm.defer({
-        kind: "github.board.field-set",
-        system: "github",
-        access,
-        intent: `Set ${field} to ${target || `the ${args.stage} column`} on issue #${args.issue}`,
-        target: {
-          issue: String(args.issue),
-          url: issueUrl,
-          // The object and the place you perform the action differ for a board
-          // field: the issue lives in the repo, the field lives on the board.
-          ui_url: "the project board → filter to this issue → set the field",
+      const rec = dm.defer(
+        {
+          kind: "github.board.field-set",
+          system: "github",
+          access,
+          intent: `Set ${field} to ${target || `the ${args.stage} column`} on issue #${args.issue}`,
+          target: {
+            issue: String(args.issue),
+            url: issueUrl,
+            // The object and the place you perform the action differ for a board
+            // field: the issue lives in the repo, the field lives on the board.
+            ui_url: "the project board → filter to this issue → set the field",
+          },
+          desired: { [field]: target },
+          skill: "gh-stage",
+          step: args.stage,
+          run: process.env.PIPELINE_RUN || "",
+          manual: {
+            deepLink: issueUrl,
+            ui: `Open the project board → find issue #${args.issue} → set ${field}`,
+            fields: [{ name: field, value: target || "" }],
+          },
+          command: {
+            argv: [
+              "node",
+              "gh-stage.js",
+              "--issue",
+              String(args.issue),
+              "--stage",
+              args.stage,
+              "--json",
+            ],
+            stdin: null,
+          },
+          verify: {
+            cmd: `gh-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
+            expect: `${field} is "${target || args.stage}"`,
+          },
+          // The repo root, not process.cwd(). A step invoked from a subdirectory
+          // would otherwise append to <subdir>/.claude/state/tracker-actions.jsonl
+          // while the renderer reads the repo-root journal and reports it empty,
+          // losing the deferred action with no warning.
         },
-        desired: { [field]: target },
-        skill: "gh-stage",
-        step: args.stage,
-        run: process.env.PIPELINE_RUN || "",
-        manual: {
-          deepLink: issueUrl,
-          ui: `Open the project board → find issue #${args.issue} → set ${field}`,
-          fields: [{ name: field, value: target || "" }],
-        },
-        command: {
-          argv: [
-            "node",
-            "gh-stage.js",
-            "--issue",
-            String(args.issue),
-            "--stage",
-            args.stage,
-            "--json",
-          ],
-          stdin: null,
-        },
-        verify: {
-          cmd: `gh-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
-          expect: `${field} is "${target || args.stage}"`,
-        },
-      // The repo root, not process.cwd(). A step invoked from a subdirectory
-      // would otherwise append to <subdir>/.claude/state/tracker-actions.jsonl
-      // while the renderer reads the repo-root journal and reports it empty,
-      // losing the deferred action with no warning.
-      }, { cwd: root });
+        { cwd: root },
+      );
       output.info(
         `⏸️  access.tracker=${access} — not moving issue #${args.issue}; recorded as ${rec.id}.`,
       );

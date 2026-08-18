@@ -23,7 +23,13 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 
 const require = createRequire(import.meta.url);
@@ -86,7 +92,10 @@ process.on("exit", () => {
  *   is the one who HAS a token and has declared a restricted mode.
  */
 function underAccess(mode, fn, { credentials = false } = {}) {
-  const dir = withRepo({ "tracker-workflow.yaml": LADDER, "project.yml": PROJECT_YML });
+  const dir = withRepo({
+    "tracker-workflow.yaml": LADDER,
+    "project.yml": PROJECT_YML,
+  });
   const journal = join(dir, "journal.jsonl");
   const saved = {};
   const set = (k, v) => {
@@ -153,26 +162,45 @@ for (const mode of RESTRICTED) {
   test(`gh-stage defers under access.tracker=${mode}: exit 0, reason "deferred", one record, no network`, () => {
     underAccess(mode, ({ dir, journal }) => {
       const r = ghCli.run({
-        argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "done", "--json"],
+        argv: [
+          "node",
+          "gh-stage.js",
+          "--issue",
+          "42",
+          "--stage",
+          "done",
+          "--json",
+        ],
         execImpl: explode("gh"),
         repoRoot: dir,
         sleepImpl: () => {},
       });
 
-      assert.equal(r.exitCode, 0, "a gated run must exit 0 — pipeline steps run in shells");
+      assert.equal(
+        r.exitCode,
+        0,
+        "a gated run must exit 0 — pipeline steps run in shells",
+      );
       assert.equal(r.transitioned, false);
       assert.equal(r.reason, "deferred");
       assert.equal(r.access, mode);
 
       const records = readJournal(journal);
-      assert.equal(records.length, 1, `expected exactly one record, got ${records.length}`);
+      assert.equal(
+        records.length,
+        1,
+        `expected exactly one record, got ${records.length}`,
+      );
       const rec = records[0];
       assert.equal(rec.kind, "github.board.field-set");
       assert.equal(rec.system, "github");
       assert.equal(rec.access, mode);
       assert.equal(rec.target.issue, "42");
       assert.deepEqual(rec.desired, { Status: "Done" });
-      assert.ok(rec.intent.includes("Done"), "the record must name the target column");
+      assert.ok(
+        rec.intent.includes("Done"),
+        "the record must name the target column",
+      );
       assert.equal(rec.id, r.record, "the CLI must report the id it wrote");
     });
   });
@@ -182,7 +210,15 @@ test("gh-stage under access.tracker=full is inert: no record, transport is reach
   underAccess("full", ({ dir, journal }) => {
     let reached = false;
     const r = ghCli.run({
-      argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "done", "--json"],
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--json",
+      ],
       execImpl: (argv) => {
         reached = true;
         if (argv[0] === "auth") throw new Error("not authenticated");
@@ -198,14 +234,26 @@ test("gh-stage under access.tracker=full is inert: no record, transport is reach
       "under `full` the CLI must take its normal path, not the gate",
     );
     assert.equal(reached, true, "the gate swallowed a full-access run");
-    assert.deepEqual(readJournal(journal), [], "a full-access run must write no record");
+    assert.deepEqual(
+      readJournal(journal),
+      [],
+      "a full-access run must write no record",
+    );
   });
 });
 
 test("gh-stage with ACCESS_TRACKER unset behaves exactly as `full`", () => {
   const asFull = underAccess("full", ({ dir }) =>
     ghCli.run({
-      argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "done", "--json"],
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--json",
+      ],
       execImpl: () => {
         throw new Error("not authenticated");
       },
@@ -215,21 +263,33 @@ test("gh-stage with ACCESS_TRACKER unset behaves exactly as `full`", () => {
   );
   const asUnset = underAccess(undefined, ({ dir, journal }) => {
     const r = ghCli.run({
-      argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "done", "--json"],
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--json",
+      ],
       execImpl: () => {
         throw new Error("not authenticated");
       },
       repoRoot: dir,
       sleepImpl: () => {},
     });
-    assert.deepEqual(readJournal(journal), [], "an unset variable must not defer");
+    assert.deepEqual(
+      readJournal(journal),
+      [],
+      "an unset variable must not defer",
+    );
     return r;
   });
   assert.deepEqual(
     asUnset,
     asFull,
     "an unset ACCESS_TRACKER must be byte-identical to `full` — gating on " +
-      "truthiness or emptiness instead of `!== \"full\"` breaks every consumer",
+      'truthiness or emptiness instead of `!== "full"` breaks every consumer',
   );
 });
 
@@ -251,7 +311,11 @@ test("gh-stage --probe-board still reads under a restricted mode", () => {
       "--probe-board is a READ; gating it would break scaffold-tracker-workflow " +
         "for exactly the consumers who most need to see their board",
     );
-    assert.deepEqual(readJournal(journal), [], "a read must not write a record");
+    assert.deepEqual(
+      readJournal(journal),
+      [],
+      "a read must not write a record",
+    );
   });
 });
 
@@ -264,7 +328,15 @@ test("gh-stage: a disabled moment under a restricted mode is stage-disabled, not
       "project.yml": PROJECT_YML,
     });
     const r = ghCli.run({
-      argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "in-qa", "--json"],
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "in-qa",
+        "--json",
+      ],
       execImpl: explode("gh"),
       repoRoot: dir,
       sleepImpl: () => {},
@@ -287,7 +359,15 @@ for (const mode of RESTRICTED) {
       async ({ dir, journal }) => {
         let fetches = 0;
         const res = await jiraCli.run({
-          argv: ["node", "jira-stage.js", "--issue", "PROJ-7", "--stage", "done", "--json"],
+          argv: [
+            "node",
+            "jira-stage.js",
+            "--issue",
+            "PROJ-7",
+            "--stage",
+            "done",
+            "--json",
+          ],
           fetchImpl: (...a) => {
             fetches++;
             return explode("fetch")(...a);
@@ -306,7 +386,11 @@ for (const mode of RESTRICTED) {
         assert.equal(res.access, mode);
 
         const records = readJournal(journal);
-        assert.equal(records.length, 1, `expected one record, got ${records.length}`);
+        assert.equal(
+          records.length,
+          1,
+          `expected one record, got ${records.length}`,
+        );
         const rec = records[0];
         assert.equal(rec.kind, "jira.transition");
         assert.equal(rec.system, "jira");
@@ -338,7 +422,15 @@ test("jira-stage under `full` WITH credentials does reach the network", async ()
     async ({ dir, journal }) => {
       let fetches = 0;
       await jiraCli.run({
-        argv: ["node", "jira-stage.js", "--issue", "PROJ-7", "--stage", "done", "--json"],
+        argv: [
+          "node",
+          "jira-stage.js",
+          "--issue",
+          "PROJ-7",
+          "--stage",
+          "done",
+          "--json",
+        ],
         fetchImpl: () => {
           fetches++;
           throw new Error("network unavailable in test");
@@ -346,7 +438,11 @@ test("jira-stage under `full` WITH credentials does reach the network", async ()
         repoRoot: dir,
       });
       assert.ok(fetches > 0, "a full-access run must still talk to Jira");
-      assert.deepEqual(readJournal(journal), [], "a full-access run writes no record");
+      assert.deepEqual(
+        readJournal(journal),
+        [],
+        "a full-access run writes no record",
+      );
     },
     { credentials: true },
   );
@@ -355,7 +451,14 @@ test("jira-stage under `full` WITH credentials does reach the network", async ()
 test("jira-stage --print-plan still works under a restricted mode (credential-free read)", async () => {
   await underAccess("manual", async ({ dir, journal }) => {
     const r = await jiraCli.run({
-      argv: ["node", "jira-stage.js", "--stage", "done", "--print-plan", "--json"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--stage",
+        "done",
+        "--print-plan",
+        "--json",
+      ],
       fetchImpl: explode("fetch"),
       repoRoot: dir,
     });
@@ -373,7 +476,15 @@ test("jira-stage --print-plan still works under a restricted mode (credential-fr
 test("jira-stage under access.tracker=full is inert: no record, normal path taken", async () => {
   await underAccess("full", async ({ dir, journal }) => {
     const r = await jiraCli.run({
-      argv: ["node", "jira-stage.js", "--issue", "PROJ-7", "--stage", "done", "--json"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "PROJ-7",
+        "--stage",
+        "done",
+        "--json",
+      ],
       fetchImpl: explode("fetch"),
       repoRoot: dir,
     });
@@ -392,7 +503,15 @@ test("jira-stage under access.tracker=full is inert: no record, normal path take
 test("an unrecognised ACCESS_TRACKER is refused, never defaulted to full", () => {
   underAccess("manul", ({ dir }) => {
     const r = ghCli.run({
-      argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "done", "--json"],
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--json",
+      ],
       execImpl: explode("gh"),
       repoRoot: dir,
       sleepImpl: () => {},
@@ -426,13 +545,29 @@ test("a gated run produces a journal that renders in all four formats", async ()
   const hr = require(join(SHARED, "handover-render.js"));
   await underAccess("manual", async ({ dir, journal }) => {
     ghCli.run({
-      argv: ["node", "gh-stage.js", "--issue", "42", "--stage", "done", "--json"],
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--json",
+      ],
       execImpl: explode("gh"),
       repoRoot: dir,
       sleepImpl: () => {},
     });
     await jiraCli.run({
-      argv: ["node", "jira-stage.js", "--issue", "PROJ-7", "--stage", "in-review", "--json"],
+      argv: [
+        "node",
+        "jira-stage.js",
+        "--issue",
+        "PROJ-7",
+        "--stage",
+        "in-review",
+        "--json",
+      ],
       fetchImpl: explode("fetch"),
       repoRoot: dir,
     });

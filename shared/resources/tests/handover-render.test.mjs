@@ -51,7 +51,8 @@ function loadFixture(name, { expectWarnings = false } = {}) {
 
 function renderAll(records, ctx = {}) {
   const out = {};
-  for (const f of hr.FORMATS) out[f] = hr.render(records, f, { env: CLEAN_ENV, ...ctx });
+  for (const f of hr.FORMATS)
+    out[f] = hr.render(records, f, { env: CLEAN_ENV, ...ctx });
   return out;
 }
 
@@ -69,7 +70,11 @@ function withTmp(fn) {
 
 test("§1 the roster in the schema doc has exactly 20 kinds, 9 Jira + 11 GitHub", () => {
   const roster = dm.loadRoster();
-  assert.equal(roster.size, 20, "roster size changed — update the schema doc's own count too");
+  assert.equal(
+    roster.size,
+    20,
+    "roster size changed — update the schema doc's own count too",
+  );
   const bySystem = {};
   for (const k of roster.keys()) {
     const s = k.split(".")[0];
@@ -101,9 +106,16 @@ test("§1 every roster kind has a renderer, and every renderer has a roster kind
 
 test("§1 every kind renders non-empty in all four formats, with nothing unsubstituted", () => {
   const { records } = loadFixture("handover-all-kinds.jsonl");
-  assert.equal(records.length, 20, "the all-kinds fixture must carry every kind");
+  assert.equal(
+    records.length,
+    20,
+    "the all-kinds fixture must carry every kind",
+  );
 
-  const outputs = renderAll(records, { run: "feature/task.52.fixture", access: "manual" });
+  const outputs = renderAll(records, {
+    run: "feature/task.52.fixture",
+    access: "manual",
+  });
 
   for (const format of hr.FORMATS) {
     const text = outputs[format];
@@ -111,7 +123,13 @@ test("§1 every kind renders non-empty in all four formats, with nothing unsubst
 
     // A placeholder that survived substitution is the failure mode a
     // "non-empty output" assertion alone would miss.
-    for (const marker of ["{{", "}}", "undefined", "[object Object]", "TODO_"]) {
+    for (const marker of [
+      "{{",
+      "}}",
+      "undefined",
+      "[object Object]",
+      "TODO_",
+    ]) {
       assert.ok(
         !text.includes(marker),
         `${format} contains an unsubstituted placeholder: ${marker}`,
@@ -133,7 +151,11 @@ test("§1 every kind renders non-empty in all four formats, with nothing unsubst
   const summaryBullets = outputs.summary
     .split("\n")
     .filter((l) => l.startsWith("- ")).length;
-  assert.equal(summaryBullets, 20, "summary must list every outstanding record");
+  assert.equal(
+    summaryBullets,
+    20,
+    "summary must list every outstanding record",
+  );
 });
 
 test("§1 render() refuses an unknown format", () => {
@@ -152,10 +174,18 @@ test("§1 a kind with no presentation entry raises rather than rendering generic
 
 test("§2 a duplicated record (resume re-emit) is rendered once", () => {
   const { records } = loadFixture("handover-resume-duplicates.jsonl");
-  assert.equal(records.length, 4, "fixture should carry two records twice over");
+  assert.equal(
+    records.length,
+    4,
+    "fixture should carry two records twice over",
+  );
 
   const ids = records.map((r) => r.id);
-  assert.equal(new Set(ids).size, 2, "fixture must contain exactly two distinct ids");
+  assert.equal(
+    new Set(ids).size,
+    2,
+    "fixture must contain exactly two distinct ids",
+  );
 
   assert.equal(hr.dedupe(records).length, 2);
 
@@ -313,7 +343,9 @@ test("§4 a satisfied record is collapsed into 'already correct'", () => {
 
 test("§5 an expected moment with no record renders as ⚠️ UNRECORDED", () => {
   const { records } = loadFixture("handover-satisfied.jsonl");
-  const ctx = { expected: ["jira.transition", "jira.comment.add", "github.pr.merge"] };
+  const ctx = {
+    expected: ["jira.transition", "jira.comment.add", "github.pr.merge"],
+  };
 
   const model = hr.buildModel(records, ctx);
   assert.deepEqual(
@@ -370,7 +402,10 @@ test("§6 no credential value survives into any of the four outputs", () => {
     {
       kind: "jira.transition",
       intent: "Move PROJ-1 to In Review",
-      target: { issue: "PROJ-1", url: "https://acme.atlassian.net/browse/PROJ-1" },
+      target: {
+        issue: "PROJ-1",
+        url: "https://acme.atlassian.net/browse/PROJ-1",
+      },
       desired: { status: "In Review" },
       command: {
         argv: [
@@ -394,7 +429,10 @@ test("§6 no credential value survives into any of the four outputs", () => {
         ui: "Open the issue → Transition",
         fields: [{ name: "Token", value: env.GITHUB_TOKEN }],
       },
-      verify: { cmd: `curl -H 'Authorization: Bearer ${env.JIRA_API_TOKEN}'`, expect: "200" },
+      verify: {
+        cmd: `curl -H 'Authorization: Bearer ${env.JIRA_API_TOKEN}'`,
+        expect: "200",
+      },
     },
     { env, now: "2026-08-18T00:00:00Z" },
   );
@@ -515,7 +553,10 @@ test("§8 a malformed line is skipped with a warning and the rest still render",
   });
 
   assert.equal(records.length, 2, "the two well-formed records must survive");
-  assert.ok(warnings.length >= 3, `expected several warnings, got ${warnings.length}`);
+  assert.ok(
+    warnings.length >= 3,
+    `expected several warnings, got ${warnings.length}`,
+  );
   assert.match(warnings.join("\n"), /not valid JSON/);
   assert.match(warnings.join("\n"), /newer than this reader/);
   assert.match(warnings.join("\n"), /missing `id` or `kind`/);
@@ -551,17 +592,31 @@ test("§9 a hostile body round-trips byte-exactly and reaches the CLI via --body
   // heredoc terminators, a CRLF, and no trailing newline.
   const body = records[0].command.stdin;
   assert.ok(body.includes("`"), "fixture lost its backticks");
-  assert.ok(body.includes("$(rm -rf /)"), "fixture lost its command substitution");
+  assert.ok(
+    body.includes("$(rm -rf /)"),
+    "fixture lost its command substitution",
+  );
   assert.ok(body.includes("\r\n"), "fixture lost its CRLF");
   assert.ok(!body.endsWith("\n"), "fixture must not end with a newline");
-  assert.equal(body, expected.toString("utf8"), "fixture and expectation drifted");
+  assert.equal(
+    body,
+    expected.toString("utf8"),
+    "fixture and expectation drifted",
+  );
 
   const sh = hr.render(records, "sh", { env: CLEAN_ENV });
 
   // NEVER the interpolating form.
   assert.ok(!/--body\s+"\$\(/.test(sh), 'the script uses --body "$(cat …)"');
-  assert.ok(!/--body\s+'/.test(sh), "the script inlines the body as a --body argument");
-  assert.match(sh, /--body-file/, "the body must reach the CLI via --body-file");
+  assert.ok(
+    !/--body\s+'/.test(sh),
+    "the script inlines the body as a --body argument",
+  );
+  assert.match(
+    sh,
+    /--body-file/,
+    "the body must reach the CLI via --body-file",
+  );
 
   // And the body must not ALSO appear inline anywhere in the script. Asserting
   // only that `--body-file` is present leaves the door open to passing the body
@@ -601,7 +656,11 @@ test("§9 a hostile body round-trips byte-exactly and reaches the CLI via --body
 test("§9 the markdown renders a multi-line body as a fenced block, not an inline span", () => {
   const { records } = loadFixture("handover-hostile-body.jsonl");
   const md = hr.render(records, "md", { env: CLEAN_ENV });
-  assert.match(md, /```text/, "a multi-line field must be fenced for a human to copy");
+  assert.match(
+    md,
+    /```text/,
+    "a multi-line field must be fenced for a human to copy",
+  );
 });
 
 // ── 10. retry_of — a full-access failure is its own section ────────────────
@@ -653,7 +712,10 @@ test("§11 an irreversible action emits a confirm gate, not a bare command", () 
   const md = hr.render(records, "md", { env: CLEAN_ENV });
   const irreversibleHeading = md.indexOf("### Irreversible");
   const driftHeading = md.indexOf("### State drift");
-  assert.ok(irreversibleHeading !== -1, "no irreversible section in the checklist");
+  assert.ok(
+    irreversibleHeading !== -1,
+    "no irreversible section in the checklist",
+  );
   if (driftHeading !== -1) {
     assert.ok(
       irreversibleHeading < driftHeading,
@@ -740,16 +802,29 @@ test("§13 the CLI and the library write byte-identical records for the same inp
     const argv = [
       "node",
       join(SHARED, "defer-mutation.js"),
-      "--kind", "github.issue.comment",
-      "--intent", "Post the Definition of Done summary",
-      "--target", JSON.stringify({ issue: "230", url: "https://github.com/a/b/issues/230" }),
-      "--command-argv", JSON.stringify(["gh", "issue", "comment", "230", "--body-file", "-"]),
-      "--stdin", "the body\n",
-      "--run", "feature/task.52.x",
-      "--step", "7",
-      "--skill", "finalise",
-      "--access", "manual",
-      "--journal", journal,
+      "--kind",
+      "github.issue.comment",
+      "--intent",
+      "Post the Definition of Done summary",
+      "--target",
+      JSON.stringify({
+        issue: "230",
+        url: "https://github.com/a/b/issues/230",
+      }),
+      "--command-argv",
+      JSON.stringify(["gh", "issue", "comment", "230", "--body-file", "-"]),
+      "--stdin",
+      "the body\n",
+      "--run",
+      "feature/task.52.x",
+      "--step",
+      "7",
+      "--skill",
+      "finalise",
+      "--access",
+      "manual",
+      "--journal",
+      journal,
     ];
     const viaCli = dm.run({ argv, env: CLEAN_ENV, cwd: dir });
     assert.equal(viaCli.exitCode, 0);
@@ -759,7 +834,10 @@ test("§13 the CLI and the library write byte-identical records for the same inp
         kind: "github.issue.comment",
         intent: "Post the Definition of Done summary",
         target: { issue: "230", url: "https://github.com/a/b/issues/230" },
-        command: { argv: ["gh", "issue", "comment", "230", "--body-file", "-"], stdin: "the body\n" },
+        command: {
+          argv: ["gh", "issue", "comment", "230", "--body-file", "-"],
+          stdin: "the body\n",
+        },
         run: "feature/task.52.x",
         step: "7",
         skill: "finalise",
@@ -811,10 +889,14 @@ test("§14 the script is written 0644 — reviewable, committable, not runnable 
     const out = join(dir, "task.99.handover.1.x.sh");
     const r = hr.run({
       argv: [
-        "node", "handover-render.js",
-        "--journal", join(FIXTURES, "handover-all-kinds.jsonl"),
-        "--format", "sh",
-        "--out", out,
+        "node",
+        "handover-render.js",
+        "--journal",
+        join(FIXTURES, "handover-all-kinds.jsonl"),
+        "--format",
+        "sh",
+        "--out",
+        out,
         "--quiet",
       ],
       env: CLEAN_ENV,
@@ -822,7 +904,11 @@ test("§14 the script is written 0644 — reviewable, committable, not runnable 
     assert.equal(r.exitCode, 0);
     assert.deepEqual(r.written, [out]);
     const mode = fs.statSync(out).mode & 0o777;
-    assert.equal(mode, 0o644, `script written mode ${mode.toString(8)}, expected 644`);
+    assert.equal(
+      mode,
+      0o644,
+      `script written mode ${mode.toString(8)}, expected 644`,
+    );
   });
 });
 
@@ -848,7 +934,9 @@ test("§14 the generated script runs clean as a dry run and changes nothing", ()
     assert.match(out, /Dry run — nothing was changed/);
     // Every kind is accounted for in the plan: 20 records, each either a step
     // or an explicit "do this by hand" line.
-    const planned = out.split("\n").filter((l) => /^[·✋]/.test(l.trim())).length;
+    const planned = out
+      .split("\n")
+      .filter((l) => /^[·✋]/.test(l.trim())).length;
     assert.equal(planned, 20, `dry run planned ${planned} of 20 actions`);
   });
 });
@@ -858,12 +946,18 @@ test("§14 --format may be given more than once and writes one file per format",
     const out = join(dir, "task.99.handover.1.x.md");
     const r = hr.run({
       argv: [
-        "node", "handover-render.js",
-        "--journal", join(FIXTURES, "handover-satisfied.jsonl"),
-        "--format", "md",
-        "--format", "sh",
-        "--format", "json",
-        "--out", out,
+        "node",
+        "handover-render.js",
+        "--journal",
+        join(FIXTURES, "handover-satisfied.jsonl"),
+        "--format",
+        "md",
+        "--format",
+        "sh",
+        "--format",
+        "json",
+        "--out",
+        out,
         "--quiet",
       ],
       env: CLEAN_ENV,
@@ -913,7 +1007,11 @@ test("§15 the fixture journals exist and are not gitignored", () => {
     } catch {
       ignored = false;
     }
-    assert.equal(ignored, false, `${name} is gitignored and would never be committed`);
+    assert.equal(
+      ignored,
+      false,
+      `${name} is gitignored and would never be committed`,
+    );
   }
 });
 
@@ -960,8 +1058,14 @@ test("§16 BUG-13 renderMarkdown is idempotent on a shared model and does not mu
     "rendering the same model twice must produce the same bytes — writing a " +
       "marker onto the records made the second render drop all nesting",
   );
-  assert.equal(JSON.stringify(records), before, "the caller's records were mutated");
-  assert.ok(!hr.render(records, "json", { env: CLEAN_ENV }).includes("_rendered"));
+  assert.equal(
+    JSON.stringify(records),
+    before,
+    "the caller's records were mutated",
+  );
+  assert.ok(
+    !hr.render(records, "json", { env: CLEAN_ENV }).includes("_rendered"),
+  );
 });
 
 // ── BUG-3: the generated script must never execute record content ──────────
@@ -1074,7 +1178,10 @@ test("§16 BUG-4 two comments to one issue with different bodies are two records
       "then silently discarded one — the invisible drift this sequence removes",
   );
   assert.equal(hr.dedupe([a, b]).length, 2);
-  assert.equal(hr.render([a, b], "md", { env: CLEAN_ENV }).split("- [ ]").length - 1, 2);
+  assert.equal(
+    hr.render([a, b], "md", { env: CLEAN_ENV }).split("- [ ]").length - 1,
+    2,
+  );
 
   // Identity must still be stable for genuinely identical input (resume).
   assert.equal(mk("Post the DoD summary", "DoD body").id, a.id);
@@ -1115,7 +1222,9 @@ test("§16 BUG-5b a variable name nested inside a header value also survives re-
   // nesting level down: `Authorization: Bearer $NAME` is not a bare $IDENT, so
   // the first idempotency guard missed it and the render pass masked a header
   // the write pass had correctly named.
-  const env = { JIRA_API_TOKEN: "ATATT3xFfGF0aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789" };
+  const env = {
+    JIRA_API_TOKEN: "ATATT3xFfGF0aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789",
+  };
   const rec = dm.buildRecord(
     {
       kind: "jira.transition",
@@ -1169,32 +1278,44 @@ test("§16 BUG-2 legitimate content round-trips — SHAs, base64, URLs, branch n
     { env: CLEAN_ENV, now: "2026-08-18T00:00:00Z" },
   );
   assert.equal(rec.command.stdin, body, "the writer corrupted the body");
-  const b64 = /printf %s '([A-Za-z0-9+/=]+)'/.exec(hr.render([rec], "sh", { env: CLEAN_ENV }));
+  const b64 = /printf %s '([A-Za-z0-9+/=]+)'/.exec(
+    hr.render([rec], "sh", { env: CLEAN_ENV }),
+  );
   assert.equal(Buffer.from(b64[1], "base64").toString("utf8"), body);
 });
 
 test("§16 BUG-6 `-u`/`-p` are only secret-bearing for clients that use them that way", () => {
   const t = dm.buildEnvTable({});
   assert.deepEqual(dm.redactArgv(["git", "push", "-u", "origin", "HEAD"], t), [
-    "git", "push", "-u", "origin", "HEAD",
+    "git",
+    "push",
+    "-u",
+    "origin",
+    "HEAD",
   ]);
   assert.deepEqual(dm.redactArgv(["mkdir", "-p", "docs/tasks"], t), [
-    "mkdir", "-p", "docs/tasks",
+    "mkdir",
+    "-p",
+    "docs/tasks",
   ]);
   // curl still masks — that is the case the rule exists for.
   assert.deepEqual(dm.redactArgv(["curl", "-u", "admin:s3cretpass"], t), [
-    "curl", "-u", "«redacted»",
+    "curl",
+    "-u",
+    "«redacted»",
   ]);
   // An explicit secret flag masks for ANY client, however short the value.
   assert.deepEqual(dm.redactArgv(["gh", "--token", "abc"], t), [
-    "gh", "--token", "«redacted»",
+    "gh",
+    "--token",
+    "«redacted»",
   ]);
 });
 
 test("§16 BUG-11 keys, URL userinfo and short secrets are redacted; config words are not", () => {
   const t = dm.buildEnvTable({});
   assert.deepEqual(
-    dm.redactDeep({ "ghp_abcdefghijklmnopqrstuvwxyz0123456789": "v" }, t),
+    dm.redactDeep({ ghp_abcdefghijklmnopqrstuvwxyz0123456789: "v" }, t),
     { "«redacted»": "v" },
     "a credential used as an object KEY survived into md, summary and json",
   );
@@ -1203,12 +1324,18 @@ test("§16 BUG-11 keys, URL userinfo and short secrets are redacted; config word
     "https://user:«redacted»@example.com",
   );
   assert.equal(
-    dm.redactString("pw is hunter2", dm.buildEnvTable({ JIRA_PASSWORD: "hunter2" })),
+    dm.redactString(
+      "pw is hunter2",
+      dm.buildEnvTable({ JIRA_PASSWORD: "hunter2" }),
+    ),
     "pw is $JIRA_PASSWORD",
     "a 7-character secret fell under the old 8-character floor",
   );
   assert.equal(
-    dm.redactString("mode is manual", dm.buildEnvTable({ AUTH_MODE: "manual" })),
+    dm.redactString(
+      "mode is manual",
+      dm.buildEnvTable({ AUTH_MODE: "manual" }),
+    ),
     "mode is manual",
     "a config word must not be swept just because its variable name matches",
   );
@@ -1275,7 +1402,10 @@ test("§16 BUG-8 the confirm gate skips rather than aborting when there is no tt
 test("§16 BUG-9 a reformatted roster row is refused, not silently truncated", () => {
   withTmp((dir) => {
     const doc = join(dir, "tracker-access-record.md");
-    const real = fs.readFileSync(join(SHARED, "tracker-access-record.md"), "utf8");
+    const real = fs.readFileSync(
+      join(SHARED, "tracker-access-record.md"),
+      "utf8",
+    );
     // Bold one kind — the shape a well-meaning edit produces.
     fs.writeFileSync(
       doc,

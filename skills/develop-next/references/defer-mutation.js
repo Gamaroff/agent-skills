@@ -272,7 +272,6 @@ const SECRET_SHAPES = [
 // the user half is usually a username or an email and is worth keeping.
 const URL_USERINFO = /(\/\/[^/\s:@]+):([^/\s@]+)@/g;
 
-
 /**
  * Build the env-sweep replacement table: secret VALUE → `$NAME`.
  *
@@ -422,8 +421,7 @@ function redactArgv(argv, envTable) {
       (cur === "-H" || cur === "--header") &&
       next !== undefined &&
       /^(authorization|proxy-authorization|x-api-key)\s*:/i.test(next);
-    const isShortSecret =
-      shortFlagsAreSecret && SHORT_SECRET_FLAGS.has(cur);
+    const isShortSecret = shortFlagsAreSecret && SHORT_SECRET_FLAGS.has(cur);
 
     if (next === undefined) continue;
     if (!SECRET_FLAGS.has(cur) && !isShortSecret && !isAuthHeader) continue;
@@ -556,7 +554,9 @@ function computeId(rec) {
       ? stableStringify(rec.desired)
       : "",
     rec.manual && Array.isArray(rec.manual.fields)
-      ? stableStringify(rec.manual.fields.map((f) => [f && f.name, f && f.value]))
+      ? stableStringify(
+          rec.manual.fields.map((f) => [f && f.name, f && f.value]),
+        )
       : "",
     rec.command && Array.isArray(rec.command.argv)
       ? rec.command.argv.join(" ")
@@ -627,7 +627,8 @@ function nextOrder(file) {
  */
 function buildRecord(input, opts = {}) {
   const env = opts.env || process.env;
-  const roster = opts.roster || loadRoster(opts.docPath ? { docPath: opts.docPath } : {});
+  const roster =
+    opts.roster || loadRoster(opts.docPath ? { docPath: opts.docPath } : {});
 
   if (!input || typeof input !== "object") {
     throw new Error("defer-mutation: a record object is required");
@@ -688,10 +689,14 @@ function buildRecord(input, opts = {}) {
     id: "",
     order: Number.isFinite(input.order) ? input.order : 0,
     dependsOn: Array.isArray(input.dependsOn) ? input.dependsOn.slice() : [],
-    ts: opts.now || input.ts || new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    ts:
+      opts.now ||
+      input.ts ||
+      new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
 
     run: String(input.run || env.PIPELINE_RUN || env.GIT_BRANCH || ""),
-    step: input.step === undefined || input.step === null ? "" : String(input.step),
+    step:
+      input.step === undefined || input.step === null ? "" : String(input.step),
     skill: String(input.skill || ""),
 
     system,
@@ -914,7 +919,8 @@ function parseArgs(argv) {
       case "--manual-field": {
         const raw = need(i, a);
         const eq = raw.indexOf("=");
-        if (eq < 1) throw new Error(`--manual-field expects name=value, got "${raw}"`);
+        if (eq < 1)
+          throw new Error(`--manual-field expects name=value, got "${raw}"`);
         args.manualFields.push({
           name: raw.slice(0, eq),
           value: raw.slice(eq + 1),
@@ -974,7 +980,11 @@ function parseJsonFlag(raw, flag) {
   }
 }
 
-function run({ argv = process.argv, env = process.env, cwd = process.cwd() } = {}) {
+function run({
+  argv = process.argv,
+  env = process.env,
+  cwd = process.cwd(),
+} = {}) {
   let args;
   try {
     args = parseArgs(argv);
@@ -999,9 +1009,7 @@ function run({ argv = process.argv, env = process.env, cwd = process.cwd() } = {
 
   if (args.listKinds) {
     for (const spec of roster.values()) {
-      console.log(
-        `${spec.kind}\t${spec.consequence}\t${spec.produces || "-"}`,
-      );
+      console.log(`${spec.kind}\t${spec.consequence}\t${spec.produces || "-"}`);
     }
     return { exitCode: 0, kinds: roster.size };
   }

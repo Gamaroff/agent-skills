@@ -5,7 +5,7 @@ type: task
 description: 'Defines the record a skill writes when it cannot perform a tracker mutation, the append-only journal it lands in, and the four renderers that turn a journal into a committed markdown checklist, a runnable shell script, a JSON sidecar and an inline summary. Nothing intercepts anything yet — this task is driven entirely by fixture journals, which is the point: the output contract is fixed and mutation-proven before any call site depends on it. The organising idea for the whole sequence is that manual, command, read-only and approve are four renderings of one record, not four features.'
 tags: [restricted-access, schema, renderers, handover]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-17
@@ -415,21 +415,21 @@ record.
 
 ## QA Testing Results
 
-**QA Status**: FAIL → fixes applied, awaiting re-review
+**QA Status**: PASS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-18
-**Quality Score**: 25/100
-**Gate Decision**: FAIL
+**Quality Score**: 92/100 (cycle 1: 25/100)
+**Gate Decision**: PASS
 
-### QA Report
-- **Full Report**: [task.52.qa.1.deferred-mutation-record-and-renderers.md](./task.52.qa.1.deferred-mutation-record-and-renderers.md)
-- **Gate File**: [task.52.gate.1.deferred-mutation-record-and-renderers.yml](./task.52.gate.1.deferred-mutation-record-and-renderers.yml)
+### QA Reports
+- **Cycle 2 (final)**: [task.52.qa.2.*.md](./task.52.qa.2.deferred-mutation-record-and-renderers.md) · [gate.2 — PASS 92/100](./task.52.gate.2.deferred-mutation-record-and-renderers.yml)
+- **Cycle 1**: [task.52.qa.1.*.md](./task.52.qa.1.deferred-mutation-record-and-renderers.md) · [gate.1 — FAIL 25/100](./task.52.gate.1.deferred-mutation-record-and-renderers.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 1732 (1338 node + 394 shell) — all green
+- **Tests Executed**: 1746 (1352 node + 394 shell) — all green; 14 new regressions, every one mutation-proven
 - **Phases Verified**: 12/12
-- **Critical Issues**: 7 HIGH, 9 MEDIUM, 2 LOW
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Critical Issues**: 0 open (cycle 1 raised 7 HIGH + 9 MEDIUM; all HIGH and 6 MEDIUM fixed, 2 MEDIUM deferred as out-of-scope interception work)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings — all fixed in cycle 1
 
@@ -483,6 +483,7 @@ Scope and the subject of tasks 53–57. Recorded in the gate as future actions.
 | 2026-08-18 |  | Implemented — 24 files (3 new modules, 1 schema doc, 2 test suites, 9 fixtures, 2 gated CLIs, 5 docs), 51 new tests, all 11 invariants mutation-proven | develop |
 | 2026-08-18 |  | QA cycle 1 — gate FAIL (25/100), 7 HIGH + 9 MEDIUM findings | qa-task |
 | 2026-08-18 |  | QA findings fixed — 7 HIGH + 6 MEDIUM, 1 iteration, each regression mutation-proven | qa-fix |
+| 2026-08-18 |  | QA cycle 2 — gate PASS (92/100), all HIGH closed, 2 MEDIUM deferred as out-of-scope | qa-task |
 
 ## References
 
