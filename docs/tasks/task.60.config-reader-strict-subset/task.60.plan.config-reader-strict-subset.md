@@ -15,7 +15,12 @@ Tier 2 of `read-config.sh` currently has two possible answers — *value* and *a
 it cannot parse falls into *absent*, which is the permissive one. This plan gives it a third answer,
 `__UNSUPPORTED__`, and a documented subset that decides which of the three applies. The specification
 is written and validated against real configs **before** any code changes, because the one way this
-task fails is by shipping a subset narrower than what consumers actually write.
+task fails is by shipping a subset narrower than what consumers actually write. The corpus that
+proves that is `docs/reference/configuration.md`'s canonical example config — **not** this repo's
+twelve-line `skills-config.yaml`, which exercises none of the shapes a consumer writes.
+
+It also closes one escalation that is not tier 2's: a mapping-valued `access.tracker` reads as absent
+under `pyyaml` too, so `read_nested_config_key_strict` needs the same distinction on tier 1 (Phase 2).
 
 **Read this first**: [`shared/resources/read-config.sh`](../../../shared/resources/read-config.sh) —
 particularly its header comment, which explains why tier 1 is authoritative when it runs, why the
@@ -52,9 +57,26 @@ Expected today:
 | `read_nested_config_key_strict` | `access.tracker` |
 | `read_nested_config_key_strict` | `access.vcs` |
 
+### The rule the tables encode
+
+Judge every construct by one question: **can this change what one of the six keys resolves to,
+relative to what its own line says?**
+
+- The **aliasing family** can — an anchor, an alias, a merge key, a quoted or explicit key, a flow
+  mapping spanning lines, an explicit tag, a BOM, a document separator. These are **refused**.
+- Everything else cannot. A key three levels down is still read from its own line; a sequence item
+  is not a key at all. These are **accepted or ignorable** — never refused.
+
+Do not define the subset by shape. A shape-based draft of this table refused "nesting deeper than two
+levels", which refuses `docs/reference/configuration.md`'s own canonical example config
+(`jira.statusMap.*`, `sign-off.story.required`, `branching.epicIntegration.*` at three levels,
+`developBatch.resources[].probe.command` at four, `[Waiting for Review, In Review]` as a flow
+sequence, `identities:` → `- jira:` / `  git:` as a sequence of mappings). That is R-1 arriving before
+a line of code — and this repo's twelve-line `skills-config.yaml` would never have revealed it.
+
 ### Proposed subset — starting point, to be validated not assumed
 
-**Accepted:**
+**Accepted (or ignorable):**
 
 | Construct | Example |
 | --- | --- |
@@ -68,6 +90,10 @@ Expected today:
 | Single-line flow mapping value | `tracker: {workflowFile: x.yaml}` |
 | Block sequence item (scalar) | `  - docs/architecture/concepts/tech-stack.md` |
 | Block scalar header + body | `note: \|` then indented free text |
+| Nesting at **any** depth | `jira:` → `statusMap:` → `ready-for-development: …` |
+| Flow sequence value | `ready-for-review: [Waiting for Review, In Review]` |
+| Sequence of mappings | `identities:` → `- jira: …` / `  git: …` |
+| Empty flow sequence | `worktreeSeedPaths: []` |
 
 **Refused** (legal YAML, outside the subset):
 
@@ -80,18 +106,24 @@ Expected today:
 | Space before the colon | `access :` |
 | Explicit key form | `? access` / `: value` |
 | Flow mapping spanning lines | `access: {` … `}` |
-| Nesting deeper than two levels | `access:` → `tracker:` → `mode: manual` |
 | Explicit tag | `access: !!map` |
 | UTF-8 BOM before the first key | |
 | Document separator | `---` / `...` |
 
 ### Validation — do this before writing the doc, not after
 
+Three corpora, **in this order**. Any of these falling OUTSIDE the subset means the SUBSET is wrong.
+
 ```bash
-# Every fixture the existing suite writes, plus the repo's own config.
-# Any of these falling OUTSIDE the subset means the SUBSET is wrong.
-grep -oE "fixture [a-z0-9-]+ '[^']*'" shared/resources/tracker-access.test.sh | head -60
+# 1. THE ONE THAT MATTERS MOST — the config a real consumer writes, per the published schema.
+#    A shape-based subset refuses this outright; that is how R-1 was caught at review time.
+sed -n '40,125p' docs/reference/configuration.md
+
+# 2. This repo's own config. Small — it proves almost nothing on its own.
 cat skills-config.yaml
+
+# 3. Every fixture the existing suite writes.
+grep -oE "fixture [a-z0-9-]+ '[^']*'" shared/resources/tracker-access.test.sh | head -60
 ```
 
 Two constructs need a deliberate call, and both should be written down as decisions rather than
@@ -101,8 +133,16 @@ resolved by accident:
   free-form bodies are not graded as YAML. Keep that; a body line is *ignorable*, never refused.
 - **Sections the reader never consumes** (`jira:`, `github:`, `developNext:`, `sign-off:`). An anchor
   inside `jira:` cannot change what `access.tracker` resolves to — but proving that in a line-oriented
-  scanner is exactly the kind of local reasoning that failed six times in task.51. **Default to
-  refusing file-wide**, and only narrow it if Phase 1's validation shows a real config needs it.
+  scanner is exactly the kind of local reasoning that failed six times in task.51. **Keep refusing
+  file-wide.** The blast radius stays the file; what changed is *which constructs* trigger it, and
+  the aliasing family is narrow enough that a real config rarely contains one.
+- **`config_file_status`'s existing awk lint** (`read-config.sh:348`). It already scans the whole file
+  on tier 2 and returns a third value the resolver never acts on — `unverified`, not `ok`/`malformed`
+  (`resolve-platform.sh:277` branches only on `malformed`). Write down the relationship before adding
+  a second lint over the same file. Recommended: keep them independent — `config_file_status` answers
+  *is this YAML at all*, the subset scan answers *can I read it correctly* — and say so in both
+  header comments. Two overlapping awk lints with an unstated relationship will drift, the way
+  `_config_denull` drifted across two call sites in task.51.
 
 ### Doc changes
 
@@ -118,18 +158,25 @@ resolved by accident:
 
 ### The shape
 
-Add one scanner that classifies the whole file, and have the three tier-2 readers consult it before
-their own extraction:
+Add one scanner that classifies the whole file. **Run it once at source time and have consumers read
+the global** — do not call it lazily, and never through a command substitution:
 
 ```sh
-# _config_subset_scan — echo "" when the file is entirely within the documented subset,
-# or "<line>:<construct>" for the FIRST construct outside it.
+# _config_subset_scan — sets _CONFIG_SUBSET_VERDICT to "-" when the file is entirely within the
+# documented subset, or "<line>:<construct>" for the FIRST construct outside it.
 #
-# One awk pass, memoised per source like _config_probe — the readers run inside command
-# substitutions, so a scan that returned its answer on stdout without caching would re-run
-# on every call. That is the mistake that made one `source` cost ten python spawns.
-_CONFIG_SUBSET_VERDICT=""      # "" = not yet scanned, "-" = clean, else "<line>:<construct>"
+# One awk pass, run ONCE at source time from the bottom of this file — exactly like _config_probe,
+# and for exactly its reason: every reader here runs inside a command substitution, so a scan
+# memoised on first use caches into a subshell that exits immediately. The cache would never reach
+# the parent and the scan would re-run on every call. That is the mistake that made one `source`
+# cost ten python spawns, and §9's performance criterion ("one awk pass per source") forbids it.
+#
+# Sets a global and echoes nothing, for the same reason.
+_CONFIG_SUBSET_VERDICT=""      # "-" = clean, else "<line>:<construct>"; only meaningful on tier 2
 ```
+
+> A `[ -n "$(_config_subset_scan)" ]` call site is self-defeating: the `$( )` is the very subshell
+> the memo cannot escape. If you find yourself writing one, the scan is in the wrong place.
 
 Each refused construct gets one pattern and one name. Keep the names operator-facing — `an anchor
 (&name)` beats `ANCHOR_TOKEN`.
@@ -137,14 +184,18 @@ Each refused construct gets one pattern and one name. Keep the names operator-fa
 ### Wiring into the readers
 
 `read_config_key`, `read_nested_config_key` and `read_nested_config_key_strict` each gain the same
-guard at the top of their **tier-2 branch only** (tier 1 stays authoritative and untouched):
+guard at the top of their **tier-2 branch only** (tier 1's parsing stays authoritative and untouched):
 
 ```sh
-  # Tier 2 only. A construct this tier cannot read may change what a later line means, so the
-  # verdict is file-wide rather than per-key. Returning "absent" here is what silently granted
-  # `full` — the whole defect this task exists to close.
-  [ -n "$(_config_subset_scan)" ] && { echo "__UNSUPPORTED__"; return 0; }
+  # Tier 2 only. An aliasing construct may change what a later line means, so the verdict is
+  # file-wide rather than per-key. Returning "absent" here is what silently granted `full` — the
+  # whole defect this task exists to close. Read the global; do NOT re-scan.
+  [ "$_CONFIG_SUBSET_VERDICT" != "-" ] && { echo "__UNSUPPORTED__"; return 0; }
 ```
+
+These guards are defence in depth. **The refusal an operator actually sees comes from Phase 3's
+hoisted check in `resolve-platform.sh`**, which reads `_CONFIG_SUBSET_VERDICT` directly — see below
+for why routing it through a reader's stdout is both unreachable and forgeable.
 
 `read_nested_config_key` (the non-strict one) must **not** propagate `__UNSUPPORTED__` to its
 callers — `resolve-paths.sh` never fails by contract. It maps the sentinel to `""` exactly as it
@@ -155,6 +206,31 @@ already maps `__UNREADABLE__`, and the caller falls back to its default. Only
 > `__UNREADABLE__` leaked into `resolve-paths.sh` and produced `PRD_ROOT=__UNREADABLE__`, which
 > reached `mkdir -p "__UNREADABLE__"`. Follow that split; do not invent a second mechanism.
 
+### The tier-1 half — a mapping-valued `access.*`
+
+Tier 2 is not the only tier that reads a nesting typo as absent. `_scalar()` returns
+`("s", "__MAP__")` for a dict, and `read_nested_config_key_strict` maps `__MAP__` to `""`:
+
+```sh
+    case "$raw" in
+      __NONE__ | __MAP__) echo ""; return 0 ;;     # <-- __MAP__ is NOT absent
+```
+
+So `access:` → `tracker:` → `mode: manual` resolves to `full` at rc=0 under `pyyaml`. Reproduce it
+before changing anything — `tracker-access.test.sh` §41's `knownlimit-child` fixture already asserts
+it for `for tier in python awk`:
+
+```bash
+printf 'access:\n  tracker:\n    mode: manual\n' > /tmp/t/skills-config.yaml
+(cd /tmp/t && AGENT_SKILLS_CONFIG_TIER=python bash -c 'source .../resolve-platform.sh; echo $ACCESS_TRACKER')
+# today: full     — wanted: a refusal
+```
+
+Split the case in the **strict** reader only: `__NONE__` stays absent, `__MAP__` becomes a distinct
+refusal ("`access.tracker` is a mapping; expected one of the five modes"). `read_nested_config_key`
+keeps collapsing both, so `resolve-paths.sh` is untouched — the same split, for the same reason, as
+`__UNREADABLE__`.
+
 ### Test as you go
 
 ```bash
@@ -163,21 +239,67 @@ printf 'defaults: &d\n  tracker: manual\naccess:\n  <<: *d\n' > /tmp/t/skills-co
 # expect: __UNSUPPORTED__     (today: empty → resolves full)
 ```
 
+And the corpus that matters most — it must stay clean, on both tiers:
+
+```bash
+sed -n '40,125p' docs/reference/configuration.md > /tmp/t/skills-config.yaml   # strip the fence first
+(cd /tmp/t && AGENT_SKILLS_CONFIG_TIER=awk bash -c 'source .../resolve-platform.sh; echo rc=$? AT=$ACCESS_TRACKER')
+# expect: rc=0 AT=full   — a REFUSAL here means the subset is wrong, not the config
+```
+
 ---
 
 ## Phase 3 — Propagate the refusal
 
 **Files:** `shared/resources/resolve-platform.sh`
 
-`resolve_access` already has the exact shape needed — the `__UNREADABLE__` branch added in task.51:
+### Where the refusal fires — read this before touching `resolve_access`
+
+`resolve_access` is the wrong site, even though it is where the `__UNREADABLE__` precedent lives.
+`resolve-platform.sh` runs its blocks in this order:
+
+| Order | Block | Line | Reader |
+| --- | --- | --- | --- |
+| 1 | `config_bulk` | 187 | tier 1 only — skipped entirely on tier 2 |
+| 2 | malformed / fail-closed branch | 277 | `config_file_status` |
+| 3 | **Identity — `TRACKER`, `VCS`** | **305, 318** | **`read_config_key`** |
+| 4 | `access:` shape check | 336 | `config_child_shape` |
+| 5 | `resolve_access tracker` / `vcs` | 342–343 | `read_nested_config_key_strict` |
+
+On tier 2 with an out-of-subset file, step 3 fires first. `read_config_key` returns
+`__UNSUPPORTED__`, `validate_enum` rejects it, and the run halts at line 307 with:
+
+```
+❌ skills-config.yaml: tracker: "__UNSUPPORTED__" is not a recognised value.
+   Legal values for tracker: jira github auto
+```
+
+No line. No construct. Neither migration path. And the message below — which BC-1 designates as *the
+entire migration path* — never prints. A suite asserting `rc=1` would call that a pass.
+
+**Hoist one check above the identity block**, between steps 2 and 3:
+
+```sh
+# One site, one message, all five consumed keys. Reads the scan's verdict global DIRECTLY — never a
+# reader's stdout. Tier 2's plain-stdout channel has no kind byte, so a config value spelling
+# `__UNSUPPORTED__` would be indistinguishable from the signal there; that is the `__MAP__` forgery
+# class task.51 spent three QA cycles closing, and it has no framing to lean on on this tier.
+if [ -n "$_CONFIG_SUBSET_VERDICT" ] && [ "$_CONFIG_SUBSET_VERDICT" != "-" ]; then
+  … the message below …
+  return 1
+fi
+```
+
+`resolve_access` already has the shape of the message needed — the `__UNREADABLE__` branch added in
+task.51. **Move it, do not generalise it in place**, and delete the old branch rather than running
+both:
 
 ```sh
   if [ "$cfg" = "__UNREADABLE__" ]; then
     printf '❌ %s: access is written as a multi-line flow mapping, which this host cannot read.\n' ...
 ```
 
-Generalise it. `__UNREADABLE__` was one construct handled narrowly; `__UNSUPPORTED__` is the class it
-belongs to. Fold the old branch in rather than running both.
+`__UNREADABLE__` was one construct handled narrowly; `__UNSUPPORTED__` is the class it belongs to.
 
 **The message is a deliverable, not a detail.** It is the entire migration path for BC-1, so it must
 name the line, the construct, and both fixes:
@@ -198,10 +320,15 @@ name the line, the construct, and both fixes:
 Also re-check, with a test for each:
 
 - The **fail-closed branch** — with tier 2 refusing outright, its job may shrink. Do not delete it on
-  reasoning alone; task.51 cycle 7 found two defects in exactly this area.
+  reasoning alone; task.51 cycle 7 found two defects in exactly this area. Note it is driven by
+  `config_file_status`, which on tier 2 returns `unverified` rather than `malformed`, so this branch
+  does not currently fire from the awk path at all.
 - The **`access:` opt-in probe** (`_rp_access_may_be_declared`) — same caution.
 - **`config_child_shape`'s awk fallback** — currently grades `access: &acc` as a scalar and halts with
-  the wrong reason. Under the new scan it should refuse with the right one.
+  the wrong reason. It sits at step 4, *below* the hoisted check, so the new refusal pre-empts it;
+  keep it for the tier-1 path and prove that with a test.
+- **`resolve_access` runs twice** (tracker, then vcs). Another reason the check belongs above them
+  both rather than inside: hoisting it also removes a duplicated evaluation.
 
 ---
 
@@ -238,14 +365,46 @@ without it.
 
 **Files:** `shared/resources/tracker-access.test.sh`
 
-### Delete §41
+### First, invert §30 — the one existing assertion that conflicts
+
+```bash
+sed -n '700,703p' shared/resources/tracker-access.test.sh
+```
+
+```sh
+D=$(fixture merge-override 'defaults: &d\n  tracker: read-only\n  vcs: full\naccess:\n  <<: *d\n  tracker: manual\n')
+for tier in python awk; do
+  run_case "$D" "AGENT_SKILLS_CONFIG_TIER=$tier"
+  assert_rc "<<: override [$tier] → status 0"        "$RC" "0"
+done
+```
+
+That fixture carries an anchor **and** a merge key and asserts `rc=0` on the **awk** tier. Under this
+task the awk arm must assert `rc=1` with the refusal on stderr. Split the loop; keep the python arm
+as it is. This is a deliverable, not a regression.
+
+It is the **only** conflict in the suite — verified by cross-scanning every `fixture` line carrying
+`&`, `*`, `<<`, `"access"` or `---` against its tier argument. §25, §31 and §37's merge/anchor
+fixtures are all forced to `AGENT_SKILLS_CONFIG_TIER=python`; §26's multi-line-flow fixture asserts
+only that no sentinel reaches `PRD_ROOT`/`ARCH_ROOT`, which still holds once `read_nested_config_key`
+maps `__UNSUPPORTED__` to `""`.
+
+### Then migrate §41 — do not simply delete it
 
 ```bash
 grep -n "41. KNOWN LIMIT" shared/resources/tracker-access.test.sh   # ~1024
 ```
 
-Remove the whole block (~1024–1055). Its own comment says a failure there means the limit has been
-fixed — **do not repair its assertions back to the escalating values.**
+The block holds four fixtures, and they are not all the same kind:
+
+| Fixture | Today | Becomes |
+| --- | --- | --- |
+| `<<: *d` merge, `<<: {…}` merge, `"access":` quoted key | awk → `full`, python → `manual` | three refusal-matrix cases (awk refuses; python still reads `manual`) |
+| `knownlimit-child` (`access:` → `tracker:` → `mode:`) | `full` on **both** tiers | a refusal on **both** tiers, per the tier-1 fix in Phase 2 |
+
+Carry all four across **first**, then remove the block (~1024–1055). Its own comment says a failure
+there means the limit has been fixed — **do not repair its assertions back to the escalating values**,
+and do not drop the coverage on the way out either.
 
 ### Two new matrices
 
@@ -298,6 +457,10 @@ For each invariant: revert it in isolation, run the full suite, record the failu
 | Widen the subset to accept a refused construct | go red |
 | Remove an `AGENT_SKILLS_CONFIG_TIER` force-guard | go red |
 | Change `read_nested_config_key` to propagate `__UNSUPPORTED__` | go red (`resolve-paths.sh` must never fail) |
+| Move the hoisted refusal back below the identity block | go red (only the stderr assertions catch this; an rc-only suite would not) |
+| Make the subset scan lazy again | go red (source-time spawn count rises) |
+| Collapse tier 1's `__MAP__` for `access.*` back to absent | go red |
+| Have the hoisted check read a reader's stdout instead of the verdict global | go red (the `tracker: __UNSUPPORTED__` forgery fixture) |
 
 **A count is not a result — a witness is.** Gate 6 of task.51 found 11 of 35 mutations surviving
 behind a green 166/166 suite. Record the failure count for each mutation in the QA report.
@@ -326,9 +489,13 @@ npm run bundle && git status --short | wc -l   # then re-run: must be identical 
 
 - **`__UNREADABLE__` / `read_nested_config_key_strict`** — the existing precedent for a sentinel that
   only opt-in callers see. Follow it; do not invent a parallel mechanism.
-- **`_config_probe` memoisation** — the reason it sets a global instead of echoing: readers run inside
-  command substitutions, so a cache written in a subshell never reaches the parent. The subset scan
-  has the same constraint.
+- **`_config_probe` memoisation** — the reason it sets a global instead of echoing, and the reason it
+  runs once at the bottom of the file rather than on first use: readers run inside command
+  substitutions, so a cache written in a subshell never reaches the parent. The subset scan has the
+  same constraint and therefore the same lifecycle. A `$(_config_subset_scan)` call site defeats it.
+- **Execution order in `resolve-platform.sh`** — identity (`read_config_key`, ~line 305) runs *before*
+  access (`resolve_access`, ~line 342). A refusal raised only in the access path is unreachable; it
+  belongs above both. Read the order before deciding where any new halt goes.
 - **Typed US/RS bulk records** — three QA cycles of task.51 went into making this transport
   unforgeable. Extend the payload; do not change the framing.
 - **Tier 1 is authoritative when it runs** — letting an "absent" answer from tier 1 fall through to
@@ -344,6 +511,6 @@ npm run bundle && git status --short | wc -l   # then re-run: must be identical 
 | End-to-end halt | A real guarded caller exits 1 — not just the resolver's return code |
 | Cross-shell | `bash` and `zsh` |
 | Real host | `python3`/`python` shimmed to exit 127 |
-| awk variants | macOS BWK awk, `gawk`, `mawk` |
+| awk variants | macOS BWK awk, `gawk`, `mawk` — installed in `.github/workflows/test.yml`; skip with a printed notice when absent locally. Divergences are in scope |
 | Mutation | Every invariant reverted in isolation, failure count recorded |
 | Regression | `npm test`, `npm run validate:all`, bundle idempotent |

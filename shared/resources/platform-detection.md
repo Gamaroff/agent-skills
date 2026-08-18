@@ -102,6 +102,8 @@ form, not a typo. It resolves to `auto` (i.e. detect) rather than being graded a
 | Missing                                            | Detect, as always                                     |
 | Unparseable, and `access` provably **not** a key   | Warn, degrade to detection — as always                |
 | Unparseable, and `access` **may** be a key         | **Halt.** "access may be configured, and the file could not be parsed" |
+| Outside the tier-2 subset, and `access` provably **not** a key | Warn, degrade to detection — see [Tier 2 — the strict subset](#tier-2--the-strict-subset) |
+| Outside the tier-2 subset, and `access` **may** be a key | **Halt.** "this file uses \<construct\>, which the no-dependency config reader cannot parse" |
 | Present but **unreadable** (permissions, bad mount) | **Halt.** "exists but cannot be read"                 |
 | `SKILLS_CONFIG_FILE` set to an absent or non-regular file | **Halt.** "does not name a readable config file" |
 
@@ -128,24 +130,133 @@ Three things follow from that framing, each of which the earlier `grep -q '^acce
   *real* config that happens to be permissive is still honoured: that is a deliberate operator act,
   and it is the form cross-repo callers legitimately use.
 
-### Known limit — the awk tier reads only the canonical spelling of `access:`
+### Tier 2 — the strict subset
 
-Tier 2 anchors on the literal patterns `^access:` and an indented `tracker:`/`vcs:` beneath it. It
-has no grammar, so an access level supplied through a **merge key or anchor**, under a **quoted
-key**, or as a **mapping-valued child** (`access:\n  tracker:\n    mode: manual` — a nesting typo)
-reads as *absent* there and takes the permissive default, while tier 1 reads the declared value.
-The file is well-formed, the exit status is 0, and nothing is printed.
+Tier 2 is `awk`: a set of anchored line regexes with no grammar. It is not a fallback anyone should
+think of as rare — **it is the default tier on a stock macOS host**, where `/usr/bin/python3` ships
+without `pyyaml`, so a machine that has never installed it never reaches tier 1.
 
-This matters more than a fallback normally would, because **tier 2 is the default tier on a stock
-macOS host**: `/usr/bin/python3` ships without pyyaml, so a machine that has never installed it
-never reaches tier 1.
+Until task.60 that tier had two answers, *a value* and *absent*, and everything it could not read
+fell into the second one. For `access:` absent means `full`, so a restriction written with a merge
+key, an anchor, a quoted key or a space before the colon read as *no restriction at all* — on a
+well-formed file, at exit 0, with nothing printed, while tier 1 read the declared value.
 
-It is recorded rather than closed because closing it means giving the tier a grammar, not more
-regexes — each cycle that added one spelling left its siblings open. The options are costed in the
-task document (`docs/tasks/task.51.access-mode-config-and-resolver/`) under **Known limits**. Until
-then: **write `access:` in the canonical block form**, and install `python3` + `pyyaml` on any host
-where the setting is load-bearing. `tracker-access.test.sh` §41 pins the divergence so it cannot
-drift unnoticed.
+It now has a third answer. **Anything outside the documented subset below is refused, not guessed.**
+
+#### The rule
+
+Every construct is judged by one question: *can this change what one of the keys this reader
+consumes resolves to, relative to what its own line says?* Two answers, with different blast radii:
+
+| | Constructs | Radius |
+| --- | --- | --- |
+| **Non-local** | anchor, alias, merge key, flow mapping spanning lines, explicit tag, BOM, document separator | **the whole file** — each can move or reinterpret content declared elsewhere, and a line scanner cannot bound which key it reaches |
+| **Local** | quoted key, space before the colon, explicit `? key` | **that key only** — refused when it spells a key this reader consumes (`access`, `tracker`, `vcs`, `prd`, `architecture`, `prdShardedLocation`, `architectureShardedLocation`), or when quoting hides an escape a parser would resolve |
+
+Everything else is read from its own line and cannot mislead. That is a closed rule over a closed
+key set — a grammar, rather than one more spelling patched shut each cycle.
+
+#### Accepted (or ignorable)
+
+| Construct | Example |
+| --- | --- |
+| Comment line | `# anything` — including one that mentions `&anchor` or `<<:` |
+| Blank line | |
+| Top-level scalar | `tracker: github` |
+| Top-level block mapping key | `access:` |
+| Indented scalar child | `  tracker: manual` |
+| Quoted scalar value | `tracker: "github"` |
+| Trailing inline comment | `tracker: github  # why` |
+| Single-line flow mapping value | `tracker: {workflowFile: x.yaml}` |
+| Block sequence item | `  - docs/architecture/concepts/tech-stack.md` |
+| Block scalar header and body | `note: \|` then indented free text — the body is never graded as YAML |
+| Nesting at **any** depth | `jira:` → `statusMap:` → `ready-for-development: …` |
+| Flow sequence value | `ready-for-review: [Waiting for Review, In Review]` |
+| Sequence of mappings | `identities:` → `- jira: …` / `  git: …` |
+| Empty flow sequence | `worktreeSeedPaths: []` |
+| Quoted key this reader never reads | `"my key": 1` |
+| Balanced braces inside a quoted value | `branchPattern: "epic/{n}.{slug}"` |
+
+Nesting depth, sequences and flow sequences are **deliberately** on this list. A shape-based subset
+("nothing deeper than two levels") was drafted first and would have refused
+[`docs/reference/configuration.md`](../../docs/reference/configuration.md)'s own canonical example
+config, which carries three- and four-level nesting, a flow sequence and a sequence of mappings.
+An over-narrow subset is not the safer failure — every refusal is loud, so it is a locked door on a
+config that was always legal.
+
+#### Refused
+
+| Construct | Example |
+| --- | --- |
+| Anchor | `defaults: &d` |
+| Alias | `access: *d` |
+| Merge key | `<<: *d` |
+| Quoted key this reader consumes | `"access":` |
+| Space before the colon | `access :` |
+| Explicit key form | `? access` / `: value` |
+| Flow mapping spanning lines | `access: {` … `}` |
+| Explicit tag | `access: !!map` |
+| UTF-8 BOM before the first key | |
+| Document separator | `---` / `...` |
+
+A mapping where a mode belongs — `access:` → `tracker:` → `mode: manual`, a nesting typo — is
+refused on **both** tiers. It was never a tier-2 problem: `pyyaml` parses it correctly and the
+reader then collapsed its "this is a mapping" signal into the same empty string it uses for "not
+configured". A genuine null (`access:` → `tracker:` with nothing after it) still reads as absent,
+because the key really is not configured.
+
+#### What a refusal looks like
+
+```
+❌ skills-config.yaml:4: this file uses a merge key (`<<`), which the no-dependency
+   config reader cannot parse.
+
+   This host has no python3 + pyyaml, so the reader is running in its limited mode.
+   Rather than guess — and risk resolving a declared access restriction to `full` —
+   it is refusing. Two ways forward:
+
+     1. Rewrite the file in the documented subset:
+        shared/resources/platform-detection.md → "Tier 2 — the strict subset"
+     2. Install pyyaml (`pip install pyyaml`); the full-YAML tier accepts this file as written.
+```
+
+**The two migration paths are the whole point of the message**, so it is raised from one site above
+the identity block rather than from the access path. Identity resolves first: a refusal raised only
+inside `resolve_access` would never print, because `read_config_key tracker` returns the refusal
+sentinel and enum validation halts the run first with *"`__UNSUPPORTED__` is not a recognised
+value"* — no line, no construct, neither way out. A suite asserting `rc=1` would call that a pass,
+which is why `tracker-access.test.sh` §42 asserts the stderr text rather than the exit code.
+
+#### When it does *not* halt
+
+The refusal is gated on the same fail-closed probe as the malformed branch, and the asymmetry is
+the same one: the default for **access** is `full`, so a file that may declare a restriction and
+cannot be read correctly must halt — but the default for **identity** is *detection*, which is the
+documented behaviour rather than a guess. A file outside the subset that provably declares no
+`access` therefore warns and degrades, exactly as a malformed file always has.
+
+#### Breaking change
+
+A config using one of the refused constructs, on a host without `pyyaml`, used to resolve to
+defaults at exit 0 and now halts. This is breaking in the correct direction — a silent wrong answer
+becomes a loud refusal with two documented fixes — but it is still breaking: a file that worked
+yesterday can halt a run today. Tier 1 accepts every one of these constructs as written, so
+`pip install pyyaml` is a migration path that needs no edit to the config.
+
+Sections this reader never consumes (`jira:`, `github:`, `developNext:`, `sign-off:`) are **not**
+exempt from the non-local constructs. An anchor inside `jira:` almost certainly cannot change what
+`access.tracker` resolves to — but "almost certainly", argued locally about a line-oriented
+scanner, is exactly the reasoning that left six sibling spellings open across task.51's QA cycles.
+The aliasing family is narrow enough that a real config rarely carries one.
+
+#### Relationship to the tier-2 YAML lint
+
+`config_file_status` also scans the whole file on tier 2, and the two lints are **independent**:
+`config_file_status` answers *is this YAML at all* and rejects only what cannot be valid YAML in
+block context; the subset scan answers *can I read it correctly*. A file can be flawless YAML and
+still sit outside the subset — that is the entire point. The relationship is stated in both header
+comments rather than left to be inferred, because two overlapping awk lints with an unstated
+relationship drift.
 
 Its companion for the Bitbucket branch is `shared/resources/bitbucket-auth.sh`, which resolves the REST credential and the auth scheme — see [The Bitbucket credential](#the-bitbucket-credential).
 

@@ -369,17 +369,20 @@ time in seven cycles that has happened rather than the regression surfacing in t
 
 ### Known limits — deferred by operator decision
 
-See the **Known limits** section above. Two remain open, both documented and pinned by test:
+See the **Known limits** section above. Both were deferred here and **both are now closed** by
+[task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) (2026-08-18):
 
-- **LIMIT-1** (MEDIUM) — the awk tier reads only the canonical spelling of `access:`. On a stock
-  macOS host, where awk is the only tier, a merge key, a quoted key, or a mapping-valued child reads
-  as unset and resolves to `full` at exit 0. Pinned by `tracker-access.test.sh` §41.
-- **LIMIT-2** (LOW) — the parse-failure reason is not surfaced. Mitigated by a halt message that
-  enumerates the shapes this reader rejects.
+- **LIMIT-1** (MEDIUM) — ✅ **CLOSED**. The awk tier read only the canonical spelling of `access:`,
+  so on a stock macOS host a merge key, a quoted key, or a mapping-valued child read as unset and
+  resolved to `full` at exit 0. Tier 2 now refuses anything outside a documented strict subset, and
+  the mapping-valued child is refused on tier 1 too.
+- **LIMIT-2** (LOW) — ✅ **CLOSED**. The parse-failure reason is carried across the record format as
+  `__ERR__:<line>:<reason>`, and the halt names the cause instead of enumerating candidates.
 
-**Condition on acceptance**: LIMIT-1 must be closed before any skill actually gates a mutation on
-`ACCESS_TRACKER` (task.52 onward). While nothing reads the value, a wrong value is a wrong value;
-once a consumer gates on it, the same wrong value is an unintended write.
+**Condition on acceptance** (satisfied): LIMIT-1 had to be closed before any skill gates a mutation
+on `ACCESS_TRACKER` (task.52 onward). While nothing reads the value, a wrong value is a wrong value;
+once a consumer gates on it, the same wrong value is an unintended write. [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) is
+therefore a prerequisite of task.52, and landed first.
 
 ---
 
@@ -401,18 +404,19 @@ once a consumer gates on it, the same wrong value is an unintended write.
 - ✅ **Call sites:** 20 sourcing lines, 0 unguarded, and now all enforced by test
 - ✅ **Documentation:** config schema, canonical spec, setup wizard, Change Log
 - ✅ **Mutation audit:** 9 tried, 9 caught (gate 6 found 11 surviving of 35)
-- ⚠️ **Security:** CONCERNS — five escalation routes closed, LIMIT-1 open on the awk tier
+- ⚠️ **Security:** CONCERNS at the time — five escalation routes closed, LIMIT-1 open on the awk
+  tier. LIMIT-1 was subsequently closed by [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) (2026-08-18).
 - — **Compliance:** not applicable
 
 ### Accepted with three conditions
 
-1. **LIMIT-1 is a known limit, not a closed one.** The awk tier reads only the canonical spelling of
-   `access:`; a merge key, a quoted key, or a mapping-valued child resolves to `full` at exit 0. Tier 2
-   is the *default* tier on a stock macOS host. Consumers without `pyyaml` must use the canonical block
-   form. See **Known limits** above; pinned by `tracker-access.test.sh` §41.
-2. **LIMIT-1 must be closed before any skill gates a mutation on `ACCESS_TRACKER`** (task.52 onward).
-   Nothing reads the value today, which is what makes this accept-eligible; the day something does,
-   the same wrong value stops being cosmetic. A follow-up task is recorded as a prerequisite of task.52.
+1. ~~**LIMIT-1 is a known limit, not a closed one.**~~ ✅ **Discharged 2026-08-18 by [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md).**
+   The awk tier read only the canonical spelling of `access:`; a merge key, a quoted key, or a
+   mapping-valued child resolved to `full` at exit 0, on the *default* tier of a stock macOS host.
+   Tier 2 now refuses everything outside a documented strict subset.
+2. ~~**LIMIT-1 must be closed before any skill gates a mutation on `ACCESS_TRACKER`**~~ ✅
+   **Discharged.** The follow-up recorded here as a prerequisite of task.52 is [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md), and
+   it landed before task.52.
 3. **Human review of PR #246 is outstanding.** No human has read this branch across seven QA cycles.
    Two of the defects closed in cycle 7 were introduced by cycle 7's own fixes.
 
@@ -446,7 +450,15 @@ test so it cannot drift unnoticed, and each is visible to an operator in
 [`platform-detection.md`](../../../shared/resources/platform-detection.md) and
 [`configuration.md`](../../reference/configuration.md).
 
-### The awk tier reads only the canonical spelling of `access:`
+### ~~The awk tier reads only the canonical spelling of `access:`~~ — CLOSED (LIMIT-1)
+
+> **CLOSED by [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) on 2026-08-18.** Option 3 below was taken: tier 2 now has a
+> documented strict subset and a third answer, `__UNSUPPORTED__`, and refuses anything outside it
+> instead of reading it as absent. The mapping-valued child was closed on tier 1 as well, where it
+> was never an awk problem. `tracker-access.test.sh` §41–§42e replace the §41 KNOWN LIMIT block,
+> carrying every one of its fixtures across inverted. Spec:
+> [`platform-detection.md`](../../../shared/resources/platform-detection.md) → *Tier 2 — the strict
+> subset*. The description below is retained as the record of what was wrong.
 
 Tier 2 anchors on the literal patterns `^access:` and an indented child beneath it. It has no
 grammar, so an access level supplied through a **merge key or anchor**, under a **quoted key**, or
@@ -470,10 +482,18 @@ before more patching:
 3. **Restrict tier 2 to a documented strict subset and refuse anything outside it** rather than
    guessing. Converts every silent escalation into a loud, correct refusal.
 
-Pinned by `tracker-access.test.sh` §41, which asserts the divergence in both directions. When one of
-those assertions fails, the limit has been fixed — the block should be deleted, not repaired.
+~~Pinned by `tracker-access.test.sh` §41, which asserts the divergence in both directions. When one of
+those assertions fails, the limit has been fixed — the block should be deleted, not repaired.~~
+That is exactly what happened: [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) deleted the block and migrated its four fixtures
+into the refusal matrix rather than repairing them back to the escalating values.
 
-### The reason a file was rejected is not surfaced
+### ~~The reason a file was rejected is not surfaced~~ — CLOSED (LIMIT-2)
+
+> **CLOSED by [task.60](../task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) on 2026-08-18.** The `__ERR__` signal now carries
+> `<line>:<reason>` — the YAML exception position and message, or the strict loader's own message
+> naming the offending key — sanitised before framing so it travels the same hardened transport as
+> any value. The enumerated-shapes workaround described below is retired; the halt reports the
+> actual cause. The description below is retained as the record of what was wrong.
 
 The reader collapses every parse exception to a single `__ERR__` sentinel, so an operator sees "could
 not be parsed" rather than "duplicate key `tracker` at line 12". The halt message now enumerates the
