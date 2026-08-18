@@ -5,18 +5,20 @@ type: task
 description: 'Closes LIMIT-1 from task.51 — the no-dependency awk tier of read-config.sh approximates YAML with anchored regexes, so an access level written with a merge key, a quoted key, or a mapping-valued child reads as absent and resolves to the permissive default at exit 0. That tier is the DEFAULT on a stock macOS host, where /usr/bin/python3 ships without pyyaml. Rather than close one more spelling — six QA cycles each did that and each left the siblings open — tier 2 is narrowed to a documented strict subset and made to REFUSE anything outside it. Every silent escalation becomes a loud, correct refusal. Prerequisite of task.52, which is the first task to gate a real mutation on ACCESS_TRACKER.'
 tags: [restricted-access, config, parser, fail-closed, security]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-18
 updated: 2026-08-18
+completed_date: 2026-08-18
 estimated_effort_hours: 8
 github_issue: 247
+pr_number: 248
 ---
 
 # [Task 60] Give the config reader's awk tier a grammar, or make it refuse
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All Critical and Important recommendations from `task.60.review.1.config-reader-strict-subset.md` implemented 2026-08-18
 
@@ -664,6 +666,7 @@ demonstrates the gap — not on speculation, which is how the six-cycle patching
 | 2026-08-18 |         | QA gate CONCERNS (80/100) — 2 medium, 2 low; duplicate-key escalation survives on tier 2 | qa-task |
 | 2026-08-18 |         | QA findings fixed — 2 medium + 2 low closed, suite 371 → 378, 1 iteration | qa-fix |
 | 2026-08-18 |         | QA gate PASS (95/100) — all cycle-1 findings verified closed, no new findings | qa-task |
+| 2026-08-18 | 1.2     | DoD verified 23/23, CI green — accepted (PR #248) | finalise |
 
 ---
 
@@ -773,6 +776,37 @@ deviations were reviewed and confirmed correct.
 **Carried forward, non-blocking**: duplicates deeper than the first child level are not refused (not
 an escalation — tier 2 resolves correctly there and tier 1 halts); and `gawk`/`mawk` remain
 unobserved locally, to be confirmed on the first CI run of this branch.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**Detailed Verification Log:** [task.60.dod.1.config-reader-strict-subset.md](./task.60.dod.1.config-reader-strict-subset.md)
+
+### QA Summary
+
+**Final Gate**: [gate 2](./task.60.gate.2.config-reader-strict-subset.yml) — ✅ PASS, 95/100 · **QA Cycles**: 2
+Cycle 1 was CONCERNS 80/100 with 2 MEDIUM + 2 LOW findings; all four closed in qa-fix cycle 1 and re-verified in cycle 2.
+
+### Criteria verified
+
+- ✅ **Success Criteria**: 23/23 — functional 8/8, performance 2/2, code quality 6/6, migration 4/4
+- ✅ **Tests**: 378 local / 375 CI, 0 failing; `npm test` 1287/1287; `validate:all` 115/115
+- ✅ **CI**: rollup **SUCCESS** on `e1f16bc` — the exact commit at HEAD. Read, not assumed
+- ✅ **Cross-implementation**: green under BWK awk (local), `gawk` and `mawk` (CI). Local and CI skip *different* sections, so between them every assertion is exercised and none is skipped in both
+- ✅ **Mutation audit**: 24 mutations, **0 survivors** — including one witnessing the *over-refusal* direction
+- ✅ **Security**: net-negative on escalation routes; fail-closed on unreadable input; the refusal signal is unforgeable from config data
+- ⚠️ **Compliance**: NOT_APPLICABLE — internal config reader in a developer-tooling library
+- ✅ **Documentation**: subset spec published, obsolete warnings retired, task.51 LIMIT-1/2 closed, CHANGELOG updated
+
+### Residual gaps (non-blocking, recorded not glossed)
+
+1. **No human has reviewed PR #248** — both QA cycles and this DoD were performed by the pipeline. The same condition task.51 was accepted under; restated so a green DoD does not imply sign-off it did not have.
+2. **Duplicates deeper than the first child level are not refused** — not an escalation (tier 2 resolves correctly there, tier 1 halts), but worth a spec line if the key surface grows deeper.
+
+**Task marked as ACCEPTED on:** 2026-08-18
 
 ---
 
