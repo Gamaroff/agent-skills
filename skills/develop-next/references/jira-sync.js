@@ -45,12 +45,22 @@ const dm = require("./defer-mutation.js");
 // ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and skills-config.yaml —
 // most-restrictive-wins.
 function mostRestrictiveAccess(env = process.env, opts = {}) {
-  return dm.resolveAccessTracker(env, opts);
+  // The env object carries SKILLS_CONFIG_FILE, so the config tier resolves
+  // against the path captured at require time rather than whatever a dot-env
+  // has since put in process.env.
+  return dm.resolveAccessTracker(env, { env, ...opts });
 }
 
 const ACCESS_ENV_AT_LOAD = Object.freeze({
   ACCESS_TRACKER: process.env.ACCESS_TRACKER,
   AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+  // CYCLE-4 CR-3 — the config PATH is part of the restriction, not incidental
+  // to it. The mode is resolved lazily at the first write, which is after
+  // loadDotEnv() has copied absent keys out of a repo-root .env — so a .env line
+  // redirecting SKILLS_CONFIG_FILE at a file with no `access:` key would have
+  // walked straight around the snapshot whose whole purpose is that a dot-env
+  // cannot escalate a declared restriction.
+  SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
 });
 
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
@@ -1759,11 +1769,14 @@ function summariseFields(fields) {
     // name/value/key/id, so it used to be discarded as "structured". The value
     // is exactly the kind a human could type, so name the shape explicitly.
     if (v.originalEstimate !== undefined || v.remainingEstimate !== undefined) {
-      const est = v.originalEstimate ?? v.remainingEstimate;
-      // CYCLE-2 CR-4 — an empty string is not an estimate a human can act on.
-      return est === null || est === undefined || String(est).trim() === ""
-        ? CLEARED_VALUE
-        : short(est);
+      // CYCLE-4 CR-9 — first NON-EMPTY, not first non-null. `??` skips only
+      // null/undefined, so `{originalEstimate: "", remainingEstimate: "3d"}`
+      // rendered "(cleared)" — an affirmative instruction to clear a field that
+      // carries an estimate.
+      const est = [v.originalEstimate, v.remainingEstimate]
+        .map((x) => (x === null || x === undefined ? "" : String(x).trim()))
+        .find((x) => x !== "");
+      return est === undefined ? CLEARED_VALUE : short(est);
     }
     const named = v.name ?? v.value ?? v.key ?? v.id;
     // CR-8 — `?? ` treats an explicit null as "present", so `{name: null}` used

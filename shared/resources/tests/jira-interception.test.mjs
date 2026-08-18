@@ -1646,64 +1646,93 @@ test("§14 C2-CR4 an empty list renders as a named absence, never the string nul
 
 // ── 15. Cycle-3 findings: the consolidation's own defects ──────────────────
 
-test("§15 C3-CR1 a present-but-unusable restriction refuses; a genuinely absent one does not", async () => {
+test("§15 C3-CR1 a present-but-unusable restriction resolves to the most restrictive mode", async () => {
   await withTmp(async (dir) => {
-    const cfg = path.join(dir, "skills-config.yaml");
-
+    const w = (n, t) => {
+      const f = path.join(dir, n);
+      fs.writeFileSync(f, t);
+      return f;
+    };
     // The case that made this HIGH. `access: {tracker: manual}` is a flow
     // mapping, which the subset parser reads as the STRING "{tracker: manual}"
     // — so `.tracker` was undefined, the tier answered "absent", and a declared
     // restriction resolved to `full`.
-    fs.writeFileSync(cfg, "access: {tracker: manual}\n");
-    assert.throws(
-      () => dm.readConfiguredAccessTracker({ configPath: cfg }),
-      /not a block mapping|Refusing/,
+    //
+    // §16 (C4-CR2) is why the answer is `manual` rather than a throw: throwing
+    // took the read-only CLI modes down with it and destroyed the record too.
+    assert.equal(
+      dm.readConfiguredAccessTracker({
+        configPath: w("a.yaml", "access: {tracker: manual}\n"),
+      }),
+      "manual",
       "reading an unparseable restriction as absent is fail-OPEN",
     );
-
-    // Absent is still absent — the ordinary case must not become an error.
-    const cfg2 = path.join(dir, "b", "skills-config.yaml");
-    fs.mkdirSync(path.dirname(cfg2));
-    fs.writeFileSync(cfg2, "tracker: jira\nvcs: github\n");
-    assert.equal(dm.readConfiguredAccessTracker({ configPath: cfg2 }), "");
-
-    // A non-scalar mode refuses rather than being coerced.
-    const cfg3 = path.join(dir, "c", "skills-config.yaml");
-    fs.mkdirSync(path.dirname(cfg3));
-    fs.writeFileSync(cfg3, "access:\n  tracker:\n    mode: manual\n");
-    assert.throws(
-      () => dm.readConfiguredAccessTracker({ configPath: cfg3 }),
-      /Refusing/,
+    // Absent is still absent — the ordinary case must not become a restriction.
+    assert.equal(
+      dm.readConfiguredAccessTracker({
+        configPath: w("c.yaml", "tracker: jira\nvcs: github\n"),
+      }),
+      "",
+    );
+    // A non-scalar mode is a declaration we cannot read, not an absent one.
+    assert.equal(
+      dm.readConfiguredAccessTracker({
+        configPath: w("e.yaml", "access:\n  tracker:\n    mode: manual\n"),
+      }),
+      "manual",
+    );
+    // And the ordinary block form still reads as itself.
+    assert.equal(
+      dm.readConfiguredAccessTracker({
+        configPath: w("f.yaml", "access:\n  tracker: read-only\n"),
+      }),
+      "read-only",
     );
   });
 });
 
-test("§15 C3-CR3 the config search honours SKILLS_CONFIG_FILE and stops at the repo root", async () => {
+test("§15 C3-CR3 config path resolution matches read-config.sh exactly", async () => {
   await withTmp(async (dir) => {
-    // A parent config must NOT reach into a repo that declared nothing: the
-    // walk stops at the first directory carrying a .git entry.
+    // CYCLE-4 CR-3/CR-5/CR-6 — no upward walk. The canonical resolver looks in
+    // the working directory, so a second search order here is drift by
+    // construction: it made a parent repo's restriction bind an unrelated child,
+    // and a child's restriction invisible from anywhere but its own root.
     fs.writeFileSync(
       path.join(dir, "skills-config.yaml"),
       "access:\n  tracker: manual\n",
     );
-    const repo = path.join(dir, "inner");
-    fs.mkdirSync(repo);
-    fs.writeFileSync(path.join(repo, ".git"), "gitdir: elsewhere");
+    const sub = path.join(dir, "sub");
+    fs.mkdirSync(sub);
     assert.equal(
-      dm.readConfiguredAccessTracker({ cwd: repo }),
+      dm.readConfiguredAccessTracker({ cwd: sub }),
       "",
-      "an unrelated parent's restriction must not bind this repo",
+      "a parent directory's config must not bind a different working directory",
     );
+    assert.equal(dm.readConfiguredAccessTracker({ cwd: dir }), "manual");
 
-    // And an explicit redirect that lands on nothing refuses rather than
-    // silently falling back to detection.
-    assert.throws(
-      () =>
+    // A redirect that cannot be honoured is a declaration we cannot read.
+    for (const [label, value] of [
+      ["missing", path.join(dir, "nope.yaml")],
+      ["not a regular file", "/dev/null"],
+      ["a directory", dir],
+    ]) {
+      assert.equal(
         dm.readConfiguredAccessTracker({
-          cwd: repo,
-          env: { SKILLS_CONFIG_FILE: path.join(dir, "nope.yaml") },
+          cwd: sub,
+          env: { SKILLS_CONFIG_FILE: value },
         }),
-      /does not exist/,
+        "manual",
+        `${label}: changing WHICH file is read must never widen access`,
+      );
+    }
+    // The literal default name is not a redirect — read-config.sh classifies it
+    // as origin=default and never refuses it.
+    assert.equal(
+      dm.readConfiguredAccessTracker({
+        cwd: dir,
+        env: { SKILLS_CONFIG_FILE: "skills-config.yaml" },
+      }),
+      "manual",
     );
   });
 });
@@ -1811,5 +1840,191 @@ test("§15 C3-CR2 a missing writer degrades closed, not open", () => {
     src,
     /ACCESS_RANK_FALLBACK/,
     "it must fall back to the env tier instead",
+  );
+});
+
+// ── 16. Cycle-4 findings: fail closed, but in the right shape ──────────────
+
+test("§16 C4-CR2 an unreadable restriction refuses the write and keeps the reads", async () => {
+  await withTmp(async (dir) => {
+    fs.writeFileSync(
+      path.join(dir, "skills-config.yaml"),
+      "access: {tracker: manual}\n",
+    );
+    // Cycle 3 made this throw. `resolveAccessTracker` is called by both stage
+    // CLIs and by every deferral, so the throw took down the read-only modes
+    // (--check, --print-plan, --probe-board) AND destroyed the record: a
+    // mutation that would have been deferred-and-recorded became a hard failure
+    // with nothing written down.
+    const r = spawnSync(
+      process.execPath,
+      [path.join(SHARED, "defer-mutation.js"), "--resolve-access"],
+      { encoding: "utf8", cwd: dir, timeout: 20000 },
+    );
+    assert.equal(
+      r.status,
+      0,
+      "an unreadable declaration must not be an exit code",
+    );
+    assert.equal(
+      r.stdout.trim(),
+      "manual",
+      "it must be the most restrictive mode",
+    );
+
+    // And the write is genuinely refused, with a record.
+    const calls = [];
+    const http = lib.makeHttp({
+      fetchImpl: throwOnWrite(calls),
+      cwd: dir,
+      access: dm.resolveAccessTracker({}, { cwd: dir }),
+    });
+    const resp = await http(`${BASE}/rest/api/3/issue/PROJ-1`, {
+      method: "PUT",
+    });
+    assert.equal(resp.deferred, true);
+    assert.equal(calls.length, 0);
+    assert.equal(
+      journal(dir).length,
+      1,
+      "the record survives — that was the point",
+    );
+  });
+});
+
+test("§16 C4-CR1 an answer the shell cannot name is a refusal, not a fallback to full", async () => {
+  await withTmp(async (dir) => {
+    // The env-only fallback answers `full` when nothing is set, so falling
+    // through to it on an unreadable resolver answer DISCARDED the config tier
+    // it had just been asked about.
+    const sh = `
+      set -euo pipefail
+      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
+      # A writer that exits 0 and prints something that is not a mode.
+      jsm_resolve_access_probe() { :; }
+      if jsm_resolve_access; then echo "MODE=[$JSM_ACCESS_MODE]"; else echo "REFUSED"; fi
+    `;
+    const r = spawnSync("bash", ["-c", sh], {
+      encoding: "utf8",
+      cwd: dir,
+      env: { ...process.env },
+      timeout: 20000,
+    });
+    // With a healthy writer it resolves normally; the point of the assertion is
+    // that the function reports a MODE or a REFUSAL, never a silent "full".
+    assert.match(
+      r.stdout,
+      /MODE=\[(full|manual|command|approve|read-only)\]|REFUSED/,
+    );
+    const src = fs.readFileSync(
+      path.join(SHARED, "jira-sprint-lib.sh"),
+      "utf8",
+    );
+    assert.match(
+      src,
+      /Could not read the access mode from the resolver[\s\S]{0,400}return 1/,
+      "an unnameable answer must return 1, not fall through to the env tier",
+    );
+  });
+});
+
+test("§16 C4-CR7 a resolver failure does not abort the caller before it can report", async () => {
+  await withTmp(async (dir) => {
+    // `out=$(...)` as a bare assignment aborts under `set -e` BEFORE `rc=$?`,
+    // losing the message and leaking the temp file.
+    const src = fs.readFileSync(
+      path.join(SHARED, "jira-sprint-lib.sh"),
+      "utf8",
+    );
+    assert.match(
+      src,
+      /if out=\$\(node "\$writer" --resolve-access 2>"\$errfile"\); then/,
+      "the non-zero exit must be an inspected condition, not a bare assignment",
+    );
+    // And a refusal always carries a message.
+    assert.match(
+      src,
+      /exited \$rc without a message/,
+      "a node that dies silently must still produce a reason",
+    );
+
+    const sh = `
+      set -euo pipefail
+      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
+      jsm_resolve_access
+      echo "SURVIVED MODE=[$JSM_ACCESS_MODE]"
+    `;
+    const r = spawnSync("bash", ["-c", sh], {
+      encoding: "utf8",
+      cwd: dir,
+      timeout: 20000,
+    });
+    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    assert.match(r.stdout, /SURVIVED/);
+  });
+});
+
+test("§16 C4-CR10 jsm_defer does not shadow the memoised mode", () => {
+  const src = fs.readFileSync(path.join(SHARED, "jira-sprint-lib.sh"), "utf8");
+  assert.doesNotMatch(
+    src,
+    /local method=\$1 url=\$2 JSM_ACCESS_MODE=/,
+    "a local of the same name shadows the global under bash's dynamic scope, " +
+      "so the process-wide memo is never populated",
+  );
+  assert.match(src, /local method=\$1 url=\$2 mode=/);
+});
+
+test("§16 C4-CR3 the config path is captured at require time, not read later", () => {
+  const src = fs.readFileSync(path.join(SHARED, "jira-sync.js"), "utf8");
+  const snapshot =
+    /const ACCESS_ENV_AT_LOAD = Object\.freeze\(\{[\s\S]*?\}\);/.exec(src);
+  assert.ok(snapshot, "no require-time snapshot found");
+  // The KEY, not a mention of it: a comment naming the variable satisfied a
+  // looser match while the field itself had been removed.
+  assert.match(
+    snapshot[0],
+    /SKILLS_CONFIG_FILE:\s*process\.env\.SKILLS_CONFIG_FILE/,
+    "the config PATH is part of the restriction — a .env that redirects it " +
+      "walks around the snapshot whose purpose is that a dot-env cannot escalate",
+  );
+  // And it must actually reach the resolver.
+  assert.match(
+    src,
+    /dm\.resolveAccessTracker\(env, \{ env, \.\.\.opts \}\)/,
+    "the captured env must be handed to the config tier, not just captured",
+  );
+});
+
+test("§16 C4-CR9 an empty original estimate falls through to the remaining one", () => {
+  const out = lib.summariseFields({
+    a: { originalEstimate: "", remainingEstimate: "3d" },
+    b: { originalEstimate: "2d" },
+    c: { originalEstimate: "", remainingEstimate: "" },
+  });
+  assert.equal(
+    out.a,
+    "3d",
+    "`??` skips only null/undefined — an empty string is not absent",
+  );
+  assert.equal(out.b, "2d");
+  assert.equal(out.c, "(cleared)");
+});
+
+test("§16 C4-CR13 mode membership is an own-property test", () => {
+  const src = fs.readFileSync(
+    path.join(
+      REPO,
+      "skills",
+      "jira-epic-creator",
+      "scripts",
+      "jira-create-epic.js",
+    ),
+    "utf8",
+  );
+  assert.match(
+    src,
+    /hasOwnProperty\.call\(ACCESS_RANK_FALLBACK/,
+    '`in` walks the prototype chain, so "constructor" passed validation',
   );
 });

@@ -546,108 +546,93 @@ const ACCESS_RANK = Object.freeze({
   full: 4,
 });
 
-// `access.tracker` from skills-config.yaml. Returns "" ONLY when the key is
-// genuinely absent; anything present-but-unusable THROWS.
+// `access.tracker` from skills-config.yaml. Returns "" when the key is
+// genuinely absent, and the MOST RESTRICTIVE mode when the declaration exists
+// but cannot be read.
 //
-// CYCLE-3 CR-1 — the first version swallowed every failure as "absent", which
-// resolves to `full`. That is fail-OPEN on exactly the input that matters: a
-// flow mapping (`access: {tracker: manual}`) parses to the STRING
-// "{tracker: manual}", so `.tracker` was undefined and a declared restriction
-// silently granted everything it was written to withhold. resolve-platform.sh
-// refuses each of these cases explicitly; so does this now.
+// CYCLE-4 CR-2 — it no longer THROWS. Cycle 3 made the unreadable case throw,
+// which is fail-closed in the wrong shape: `resolveAccessTracker` is called by
+// both stage CLIs and by every deferral, so a config quirk turned every
+// invocation — including the deliberately read-only `--check`, `--print-plan`
+// and `--probe-board` — into exit 2, and turned a mutation that would have been
+// deferred AND RECORDED into a hard failure with no record at all. Answering
+// `manual` refuses the write, keeps the reads working, and still writes the
+// record a human needs.
 //
-// CYCLE-3 CR-3 — path resolution matches read-config.sh rather than inventing
-// its own: SKILLS_CONFIG_FILE wins, otherwise the search stops at the repo root
-// instead of climbing into a parent repo or $HOME.
+// CYCLE-4 CR-3/CR-4/CR-6 — path resolution is read-config.sh's, exactly: an
+// explicit redirect must name a readable REGULAR file (so /dev/null cannot
+// blank a restriction), the literal default name is not a redirect, and there
+// is NO upward walk — the canonical resolver looks in the working directory and
+// so does this. A second, subtly different search order is the drift this whole
+// consolidation exists to remove.
 const _cfgAccessCache = new Map();
+const CONFIG_BASENAME = "skills-config.yaml";
+const MOST_RESTRICTIVE = "manual";
 
 function findConfigFile({ cwd, configPath, env = process.env } = {}) {
-  if (configPath) return configPath;
-  // Honoured, and honoured strictly: read-config.sh refuses to let an explicit
-  // redirect land on nothing, because changing WHICH file is read would
-  // otherwise bypass the most-restrictive-wins guarantee.
-  if (env.SKILLS_CONFIG_FILE) {
-    if (!fs.existsSync(env.SKILLS_CONFIG_FILE)) {
-      throw new Error(
-        `SKILLS_CONFIG_FILE="${env.SKILLS_CONFIG_FILE}" does not exist. ` +
-          `Refusing to fall back to detection: a redirect that lands on nothing ` +
-          `would discard a committed access restriction.`,
-      );
+  if (configPath) return { file: configPath, unusable: null };
+  const redirect = env.SKILLS_CONFIG_FILE;
+  // read-config.sh classifies a value equal to the default basename as
+  // origin=default, not a redirect, and never refuses it.
+  if (redirect && redirect !== CONFIG_BASENAME) {
+    try {
+      const st = fs.statSync(redirect);
+      if (!st.isFile()) {
+        return {
+          file: "",
+          unusable: `SKILLS_CONFIG_FILE="${redirect}" is not a regular file`,
+        };
+      }
+      fs.accessSync(redirect, fs.constants.R_OK);
+    } catch (_) {
+      return {
+        file: "",
+        unusable: `SKILLS_CONFIG_FILE="${redirect}" is not readable`,
+      };
     }
-    return env.SKILLS_CONFIG_FILE;
+    return { file: redirect, unusable: null };
   }
-  let dir = cwd || process.cwd();
-  for (;;) {
-    const candidate = path.join(dir, "skills-config.yaml");
-    if (fs.existsSync(candidate)) return candidate;
-    // Stop at the repo root. Climbing past it finds an unrelated project's
-    // config — which would either block a repo that declared nothing, or read
-    // `full` for one that declared a restriction one directory down.
-    if (fs.existsSync(path.join(dir, ".git"))) return "";
-    const parent = path.dirname(dir);
-    if (parent === dir) return "";
-    dir = parent;
-  }
+  const local = path.join(cwd || process.cwd(), CONFIG_BASENAME);
+  return { file: fs.existsSync(local) ? local : "", unusable: null };
 }
 
 function readConfiguredAccessTracker(opts = {}) {
-  const file = findConfigFile(opts);
+  const { file, unusable } = findConfigFile(opts);
+  // A redirect that cannot be honoured is a declaration we cannot read, not an
+  // absent one. Changing WHICH file is read must never be a way to widen access.
+  if (unusable) return MOST_RESTRICTIVE;
   if (!file) return "";
-  if (_cfgAccessCache.has(file)) {
-    const hit = _cfgAccessCache.get(file);
-    if (hit instanceof Error) throw hit;
-    return hit;
-  }
-  const fail = (why) => {
-    const e = new Error(
-      `${file}: access.tracker ${why}. Refusing rather than defaulting to ` +
-        `"full", because that would silently escalate a declared restriction ` +
-        `into a tracker write.`,
-    );
-    _cfgAccessCache.set(file, e);
-    throw e;
+  if (_cfgAccessCache.has(file)) return _cfgAccessCache.get(file);
+
+  const remember = (v) => {
+    _cfgAccessCache.set(file, v);
+    return v;
   };
 
   let text;
   try {
     text = fs.readFileSync(file, "utf8");
-  } catch (e) {
-    fail(`could not be read (${e.code || e.message})`);
+  } catch (_) {
+    // CYCLE-4 CR-14 — deliberately NOT memoised: a transient EACCES/EMFILE must
+    // not refuse every later resolution in a long-lived process.
+    return MOST_RESTRICTIVE;
   }
 
-  let doc;
-  try {
-    doc = parseYamlSubset(text);
-  } catch (e) {
-    fail(`is in a file that does not parse (${e.message})`);
-  }
-
+  const doc = parseYamlSubset(text);
   const access = doc && doc.access;
   // No `access:` key at all is the ordinary case, and means "unrestricted".
-  if (access === undefined || access === null) {
-    _cfgAccessCache.set(file, "");
-    return "";
-  }
+  if (access === undefined || access === null) return remember("");
   // A STRING here means the subset parser met a flow mapping it does not
-  // support — `access: {tracker: manual}`. Reading that as absent is the
-  // fail-open this guard exists for.
+  // support — `access: {tracker: manual}`. Reading that as absent was the
+  // fail-open this guard exists for; reading it as `manual` is the fail-closed
+  // answer that still lets the run record what it refused.
   if (typeof access !== "object" || Array.isArray(access)) {
-    fail(
-      `could not be read: \`access:\` is not a block mapping. Write it as\n` +
-        `     access:\n       tracker: manual`,
-    );
+    return remember(MOST_RESTRICTIVE);
   }
   const v = access.tracker;
-  if (v === undefined || v === null) {
-    _cfgAccessCache.set(file, "");
-    return "";
-  }
-  if (typeof v !== "string") {
-    fail(`is not one of the five modes (found ${JSON.stringify(v)})`);
-  }
-  const out = v.trim();
-  _cfgAccessCache.set(file, out);
-  return out;
+  if (v === undefined || v === null) return remember("");
+  if (typeof v !== "string") return remember(MOST_RESTRICTIVE);
+  return remember(v.trim());
 }
 
 // ---------------------------------------------------------------------------

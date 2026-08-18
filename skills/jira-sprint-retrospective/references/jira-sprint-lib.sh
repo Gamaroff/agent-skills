@@ -57,9 +57,10 @@ jsm_auth_header() {
 # value that was neither `full` nor the invalid sentinel, so a full-access run
 # quietly diverted every mutation into the defer branch.
 #
-# CYCLE-3 CR-4 — a resolver CRASH is not a refusal. Only a non-zero exit whose
-# message names an access problem refuses; anything else degrades to the env
-# tier with a warning, because a broken writer must not block reads.
+# CYCLE-4 CR-11 — the rule, stated as implemented: ANY non-zero exit from the
+# resolver is a refusal. Fail-closed on a crash is deliberate — a gate that
+# cannot answer must not answer "full" — and reads are protected instead by
+# jsm_curl, which never consults this for a GET.
 jsm_resolve_access() {
   [ -n "${JSM_ACCESS_MODE:-}" ] && return 0
   JSM_ACCESS_ERROR=""
@@ -68,8 +69,14 @@ jsm_resolve_access() {
   writer="$(dirname "${BASH_SOURCE[0]}")/defer-mutation.js"
   if [ -f "$writer" ] && command -v node >/dev/null 2>&1; then
     errfile=$(mktemp)
-    out=$(node "$writer" --resolve-access 2>"$errfile")
-    rc=$?
+    # CYCLE-4 CR-7 — `out=$(...)` as a bare assignment ABORTS the caller under
+    # `set -e` before `rc=$?` runs, losing the refusal message and leaking the
+    # temp file. The `if` makes the non-zero exit an inspected condition.
+    if out=$(node "$writer" --resolve-access 2>"$errfile"); then
+      rc=0
+    else
+      rc=$?
+    fi
     if [ "$rc" -eq 0 ]; then
       case "$out" in
         manual|command|approve|read-only|full)
@@ -78,11 +85,22 @@ jsm_resolve_access() {
           return 0
           ;;
       esac
-      # rc 0 but not a mode: a polluted stdout. Degrade to the env tier rather
-      # than trusting a value we cannot name.
-      echo "⚠️  Could not read the access mode from the resolver — falling back to the environment." >&2
+      # CYCLE-4 CR-1 — rc 0 but not a mode. Falling back to the env tier here
+      # answered "full" whenever no env var was set, DISCARDING a config-declared
+      # restriction the resolver had just been asked about. A value we cannot
+      # name is a refusal.
+      JSM_ACCESS_ERROR="Could not read the access mode from the resolver (got: $(printf '%s' "$out" | head -c 120)). Refusing rather than defaulting to \"full\"."
+      JSM_ACCESS_MODE=""
+      rm -f "$errfile"
+      return 1
     else
       JSM_ACCESS_ERROR=$(cat "$errfile")
+      # CYCLE-4 CR-8 — a node that dies without writing to stderr (a bare
+      # process.exit, a signal) left this empty, so the caller printed a blank
+      # line and exited 1 with no reason given.
+      if [ -z "$JSM_ACCESS_ERROR" ]; then
+        JSM_ACCESS_ERROR="The access resolver ($writer) exited $rc without a message. Refusing rather than defaulting to \"full\"."
+      fi
       rm -f "$errfile"
       JSM_ACCESS_MODE=""
       return 1
@@ -124,7 +142,10 @@ jsm_access_mode() {
 # callers run under `set -euo pipefail` and branch on them, so returning without
 # them converts a deferral into a failed run.
 jsm_defer() {
-  local method=$1 url=$2 JSM_ACCESS_MODE=${3:-}
+  # CYCLE-4 CR-10 — named `mode`, not JSM_ACCESS_MODE: a local of the same name
+  # shadows the global under bash's dynamic scope, so the process-wide memo the
+  # cycle-3 fix exists to create was never populated.
+  local method=$1 url=$2 mode=${3:-}
   local writer kind intent target desired
   writer="$(dirname "${BASH_SOURCE[0]}")/defer-mutation.js"
   kind=${JSM_DEFER_KIND:-jira.unknown-mutation}
@@ -137,7 +158,7 @@ jsm_defer() {
     record_id=$(node "$writer" \
       --kind "$kind" \
       --intent "$intent" \
-      --access "${JSM_ACCESS_MODE:-$(jsm_access_mode)}" \
+      --access "${mode:-${JSM_ACCESS_MODE:-full}}" \
       --target "$target" \
       --desired "$desired" \
       --skill "jira-sprint-manager" --json 2>/dev/null \

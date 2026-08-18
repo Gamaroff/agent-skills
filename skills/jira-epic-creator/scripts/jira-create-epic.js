@@ -56,7 +56,10 @@ function accessTracker() {
       .filter(Boolean);
     if (!seen.length) return "full";
     for (const v of seen) {
-      if (!(v in ACCESS_RANK_FALLBACK)) {
+      // CYCLE-4 CR-13 — own properties only. `in` walks the prototype chain, so
+      // ACCESS_TRACKER="constructor" passed validation and was then compared as
+      // a function against a number.
+      if (!Object.prototype.hasOwnProperty.call(ACCESS_RANK_FALLBACK, v)) {
         console.error(
           `Error: access.tracker="${v}" is not a recognised access mode.`,
         );
