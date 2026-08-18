@@ -661,6 +661,8 @@ demonstrates the gap — not on speculation, which is how the six-cycle patching
 | 2026-08-18 | 1.1     | Review 1 — NEEDS REVISION (6/10), 5 Critical + 5 Important closed: subset redefined by "what can mislead" after the shape-based draft was shown to refuse `configuration.md`'s own example config; tier-1 mapping-valued `access.*` escalation brought in scope; refusal hoisted above the identity block where its message is reachable; `§30`'s awk assertion added to Phase 5 and `§41` migrated rather than deleted; subset scan moved to source time; `config_file_status` reconciled; R-4 widened to the sentinel; gawk/mawk exclusion removed; Files Summary and regression baselines corrected | review-task |
 | 2026-08-18 |         | Status → ready-for-development | review-task |
 | 2026-08-18 |         | Implemented — 8 files (2 resolvers, 1 suite, 1 workflow, 4 docs) + 104 bundled copies, tracker-access.test.sh 285 → 371 assertions, 21 mutations audited with 0 survivors | develop |
+| 2026-08-18 |         | QA gate CONCERNS (80/100) — 2 medium, 2 low; duplicate-key escalation survives on tier 2 | qa-task |
+| 2026-08-18 |         | QA findings fixed — 2 medium + 2 low closed, suite 371 → 378, 1 iteration | qa-fix |
 
 ---
 
@@ -726,6 +728,43 @@ demonstrates the gap — not on speculation, which is how the six-cycle patching
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-18
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.60.qa.1.config-reader-strict-subset.md](./task.60.qa.1.config-reader-strict-subset.md)
+- **Gate File**: [task.60.gate.1.config-reader-strict-subset.yml](./task.60.gate.1.config-reader-strict-subset.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 371 (`tracker-access.test.sh`), 1287 (`npm test`), 115 (`validate:all`)
+- **Phases Verified**: 6/6
+- **Critical Issues**: 0 HIGH, 2 MEDIUM, 2 LOW
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+- **TASK-60-QA1-1 (MEDIUM)** — a duplicated `access:` key is not in the refused set, so the tier-2
+  scan reports the file clean and the first-wins block reader returns the permissive value while
+  tier 1 halts. The same class this task closes, one spelling further along, on the tier a stock
+  macOS host runs. `read-config.sh:81` names this exact shape as why tier 1 rejects duplicates.
+- **TASK-60-QA1-2 (MEDIUM)** — the awk-variant CI install has no `apt-get update`, so a stale index
+  fails the whole Test job before `npm test` runs.
+- Two LOW items: the else-branch indentation in the hoisted refusal, and an undocumented deliberate
+  narrowness in the alias rule.
+
+The subset, the refusal position, the message, the anti-forgery property and the mutation audit all
+verified sound. See the report's *Verification of the dev's two flagged items* — all three plan
+deviations were reviewed and confirmed correct.
+
+---
+
 ## Implementation Record
 
 **Implemented**: 2026-08-18 · **Branch**: `feature/task.60.config-reader-strict-subset`
@@ -778,10 +817,29 @@ as an empty string, indistinguishable from "not configured", and the strict read
 on that path. Both sites are fixed; `§42b` asserts the refusal on both tiers, which is the assertion
 that would have caught the gap.
 
+### QA cycle 1 — findings and fixes
+
+| Finding | Fix |
+| --- | --- |
+| **TASK-60-QA1-1** (medium) — a duplicated `access:` key was not refused, so tier 2's first-wins block matcher returned the permissive value at rc=0 while tier 1 halted. YAML says last-wins. | Duplicate detection added to `_config_subset_scan` for the **consumed** keys — a repeated top-level guarded key, and a repeated first-level child under one. Scoped deliberately: a repeated `jira:` cannot change what any of the six keys resolves to, and refusing it would halt a consumer over a section this reader never reads (§38 depends on that). |
+| **TASK-60-QA1-2** (medium) — the awk-variant CI install had no `apt-get update`, and sits before `npm test`, so a stale runner index reddened the whole job. | `apt-get update` added, with the reason stated in the step. |
+| **LOW-1** — the else-branch of the hoisted refusal was indented at the outer level, reading as unconditional on a skim of a security-relevant branch. | Re-indented. |
+| **LOW-2** — the alias rule's deliberate narrowness was undocumented. | Comment added explaining that it misses an alias whose name starts with a non-alphanumeric, and why that is structural rather than lucky: a legal alias needs its anchor declared earlier, `&[^[:space:]]` catches that, and the scan reports the first construct it meets. |
+
+Found while fixing, and worth recording because it is a live hazard rather than a style point: the
+`OUT_OF_SUBSET` matrix in the test suite is a **double-quoted** shell string, so a backtick in a
+construct label is command substitution — the first version of the duplicate rows silently executed
+the label and left the stderr assertion matching a shorter needle. Backticks escaped and the hazard
+noted in the file.
+
+Three further mutations witness the new rule: deleting the top-level duplicate refusal → 2 failing;
+deleting the child-level one → 2 failing; **widening it to every key rather than the consumed ones →
+1 failing** (the over-refusal direction, which is the one that would lock a consumer out).
+
 ### Verification
 
-- `tracker-access.test.sh`: **371 passed, 0 failed** (baseline 285/0).
-- Mutation audit: **21 mutations reverted in isolation, 0 survivors.** Three survived a first pass
+- `tracker-access.test.sh`: **378 passed, 0 failed** (baseline 285/0; 371 before the QA cycle).
+- Mutation audit: **24 mutations reverted in isolation, 0 survivors** (21 pre-QA + 3 for the duplicate rule). Three survived a first pass
   and each was closed by adding the missing witness rather than by accepting the count:
 
   | Mutation | Failing | Mutation | Failing |

@@ -525,6 +525,15 @@ _config_subset_scan() {
     # both strict and safe. `*` is looser on purpose in the other direction: a leading alphanumeric
     # matches every real alias name and excludes the globs a path value plausibly carries
     # (`*.env`, `**/x`), which would otherwise be refused for looking like one.
+    #
+    # That narrowness means the alias rule alone MISSES an alias whose name starts with a
+    # non-alphanumeric — `*.d` is a legal alias, and this pattern does not match it. It is not a
+    # hole, and the reason is structural rather than lucky: a legal alias requires its anchor to
+    # have been declared EARLIER in the same file, `&[^[:space:]]` matches that anchor whatever its
+    # name, and the scan reports the FIRST construct it meets. The anchor line is always first, so
+    # the file is refused before the alias line is reached. The alias rule is therefore defence in
+    # depth, not the primary catch — do not "tighten" it to `[^[:space:]]` without checking what
+    # that does to a path value containing a glob.
     s ~ /(^|[[:space:]])&[^[:space:]]/            { refuse("an anchor (`&name`)") }
     s ~ /(^|[[:space:]])\*[A-Za-z0-9_]/           { refuse("an alias (`*name`)") }
     s ~ /(^|[[:space:]])![^[:space:]]/            { refuse("an explicit tag (`!tag`)") }
@@ -543,6 +552,43 @@ _config_subset_scan() {
       sub(/^[[:space:]]*(-[[:space:]]+)?/, "", sk)
       sub(/[[:space:]]+:.*$/, "", sk)
       if (consumed(sk)) refuse("a space before the colon (`" sk " :`)")
+    }
+
+    # A DUPLICATED guarded key. YAML resolves a duplicate last-wins; this reader\047s tier-2 block
+    # matcher takes the FIRST match and exits. So `access:` written twice resolves to whichever
+    # value was written first — and when that is the permissive one, a config whose author plainly
+    # meant the second block silently grants more than it declares, at rc=0. Tier 1 refuses the
+    # shape outright (see _no_dupes), so tier 2 was the only tier that both accepted it and picked
+    # the permissive reading. read-config.sh\047s own header names this shape as the reason tier 1
+    # rejects duplicates: "a copy-pasted second `access:` block made the first one vanish, silently
+    # resolving a declared `manual` back to `full`".
+    #
+    # Scoped to the CONSUMED keys, like the other local rules. A duplicated `jira:` cannot change
+    # what any of the six keys resolves to, and refusing it would halt a consumer over a section
+    # this reader never reads — the over-refusal the subset is shaped to avoid.
+    {
+      if (indent == 0) {
+        cur_parent = ""; child_indent = -1
+        if (match(s, /^[A-Za-z0-9_.-]+[[:space:]]*:/)) {
+          k = substr(s, RSTART, RLENGTH); sub(/[[:space:]]*:$/, "", k)
+          if (consumed(k)) {
+            if (k in seen_top) refuse("a duplicate `" k ":` key")
+            seen_top[k] = 1
+            cur_parent = k
+            for (ck in seen_child) delete seen_child[ck]
+          }
+        }
+      } else if (cur_parent != "" && match(s, /^[[:space:]]+[A-Za-z0-9_.-]+[[:space:]]*:/)) {
+        # Only the FIRST child level under a consumed parent — that is the only level the nested
+        # readers look at, so a repeat deeper down cannot change what they return.
+        ck = s; sub(/^[[:space:]]+/, "", ck); sub(/[[:space:]]*:.*$/, "", ck)
+        ci = match(s, /[^ \t]/) - 1
+        if (child_indent < 0) child_indent = ci
+        if (ci == child_indent) {
+          if (ck in seen_child) refuse("a duplicate `" ck ":` key under `" cur_parent ":`")
+          seen_child[ck] = 1
+        }
+      }
     }
 
     # An unbalanced `{` opens a flow mapping the next line continues — the shape that used to read

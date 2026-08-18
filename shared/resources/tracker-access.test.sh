@@ -1094,6 +1094,9 @@ fi
 # that deletion, with the coverage carried across rather than dropped: each fixture is here,
 # inverted, and `knownlimit-child` is now §42b because it was never a tier-2 problem at all.
 echo "  42. Tier 2 refuses everything outside the subset"
+# NOTE: this is a DOUBLE-quoted string, so a backtick in a construct label is command substitution —
+# it would execute the label and substitute the (empty) output, silently weakening the stderr
+# assertion below to a shorter needle. Escape every backtick here as \`.
 OUT_OF_SUBSET="
 defaults: &d\n  tracker: manual\naccess:\n  <<: *d\n|an anchor
 access:\n  <<: {tracker: manual}\n|a merge key
@@ -1103,6 +1106,8 @@ access :\n  tracker: manual\n|a space before the colon
 access: {\n  tracker: manual}\n|a flow mapping spanning lines
 access: !!map\n  tracker: manual\n|an explicit tag
 ---\naccess:\n  tracker: manual\n|a document separator
+access:\n  tracker: full\naccess:\n  tracker: manual\n|a duplicate \`access:\` key
+access:\n  tracker: full\n  tracker: manual\n|a duplicate \`tracker:\` key under \`access:\`
 "
 OUT_N=0
 echo "$OUT_OF_SUBSET" | while IFS='|' read -r shape construct; do
@@ -1125,11 +1130,21 @@ echo "$OUT_OF_SUBSET" | while IFS='|' read -r shape construct; do
   grep -qF -- "pip install pyyaml" "$STDERR_FILE"  || { echo "  FAIL  out-of-subset ($construct) [awk] did not offer pyyaml"; FAILED=1; }
   grep -qF -- "platform-detection.md" "$STDERR_FILE" || { echo "  FAIL  out-of-subset ($construct) [awk] did not point at the subset spec"; FAILED=1; }
 
-  # Tier 1 is a real parser and still accepts every one of these. The refusal is a property of the
-  # no-dependency tier, not a new restriction on the config format.
+  # Tier 1 is a real parser and still accepts every one of these — with ONE exception. A duplicate
+  # key is refused by tier 1 as well (the strict loader rejects it outright, because YAML last-wins
+  # would hide the first spelling), so for those two rows the expectation is a halt on BOTH tiers
+  # rather than "awk refuses, python reads it". Same verdict, different mechanism.
   run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
-  [ "$RC" = "0" ]      || { echo "  FAIL  out-of-subset ($construct) [python] → expected rc=0, got $RC"; FAILED=1; }
-  [ "$AT" = "manual" ] || { echo "  FAIL  out-of-subset ($construct) [python] → expected manual, got $AT"; FAILED=1; }
+  case "$construct" in
+    *duplicate*)
+      [ "$RC" = "1" ] || { echo "  FAIL  out-of-subset ($construct) [python] → expected rc=1 (strict loader), got $RC"; FAILED=1; }
+      [ "$AT" = "full" ] && { echo "  FAIL  out-of-subset ($construct) [python] granted full"; FAILED=1; }
+      ;;
+    *)
+      [ "$RC" = "0" ]      || { echo "  FAIL  out-of-subset ($construct) [python] → expected rc=0, got $RC"; FAILED=1; }
+      [ "$AT" = "manual" ] || { echo "  FAIL  out-of-subset ($construct) [python] → expected manual, got $AT"; FAILED=1; }
+      ;;
+  esac
 
   if [ "$FAILED" = "0" ]; then
     echo "  PASS  out-of-subset ($construct): awk refuses with the migration path, python still reads it"
@@ -1140,7 +1155,7 @@ done
 if [ -f "$TMPDIR_TEST/subset-out-failures" ]; then
   FAIL=$((FAIL + $(wc -l < "$TMPDIR_TEST/subset-out-failures")))
 else
-  PASS=$((PASS + 8))
+  PASS=$((PASS + 10))
 fi
 
 # --- 42b. A mapping-valued access.tracker is refused on BOTH tiers -------------------------------
@@ -1269,6 +1284,10 @@ assert_eq "classifier: explicit key" "$(scan_verdict qmark  '? access\n')"      
 assert_eq "classifier: flow map"    "$(scan_verdict flowml  'access: {\n')"             '1:a flow mapping spanning lines'
 assert_eq "classifier: tag"         "$(scan_verdict tag     'access: !!map\n')"         '1:an explicit tag (`!tag`)'
 assert_eq "classifier: doc sep"     "$(scan_verdict docsep  '---\naccess:\n')"          '1:a document separator (`---`)'
+assert_eq "classifier: duplicate top-level guarded key" \
+  "$(scan_verdict duptop  'access:\n  tracker: full\naccess:\n  tracker: manual\n')" '3:a duplicate `access:` key'
+assert_eq "classifier: duplicate child under a guarded key" \
+  "$(scan_verdict dupchild 'access:\n  tracker: full\n  tracker: manual\n')" '3:a duplicate `tracker:` key under `access:`'
 assert_eq "classifier: BOM"         "$(scan_verdict bom     '\xef\xbb\xbfaccess:\n')"   '1:a UTF-8 byte-order mark'
 assert_eq "classifier: escaped quoted key" "$(scan_verdict qesc '"acc\\x65ss":\n')"    '1:a quoted key containing an escape'
 
@@ -1306,6 +1325,15 @@ assert_eq "classifier: a glob value is not an alias"       "$(scan_verdict glob 
 assert_eq "classifier: an ampersand in a URL is not an anchor" "$(scan_verdict amp 'jira:\n  docBranch: https://x/y?a=1&b=2\n')" "-"
 assert_eq "classifier: a quoted key we never read is fine" "$(scan_verdict okey  '"my key": 1\n')" "-"
 assert_eq "classifier: a bare - sequence item is fine"     "$(scan_verdict seq   'devLoadAlwaysFiles:\n  - docs/a.md\n')" "-"
+# The duplicate rule is scoped to the CONSUMED keys, and that scoping is the difference between
+# closing an escalation and locking a consumer out of their own config. A repeated key this reader
+# never looks at cannot change what any of the six resolve to; §38 depends on it degrading.
+assert_eq "classifier: a duplicated key we never read is fine" \
+  "$(scan_verdict dupother 'x: 1\nx: 2\naccess:\n  tracker: manual\n')" "-"
+assert_eq "classifier: two different children are not a duplicate" \
+  "$(scan_verdict twochild 'access:\n  tracker: manual\n  vcs: full\n')" "-"
+assert_eq "classifier: the same child name under DIFFERENT parents is fine" \
+  "$(scan_verdict twoparent 'prd:\n  x: 1\narchitecture:\n  x: 2\n')" "-"
 
 # The scan runs ONCE, at source time. Memoised on first use it would cache into the command
 # substitution each reader runs inside, never reach the parent, and re-run on every call — the

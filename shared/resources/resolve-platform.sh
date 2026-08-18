@@ -390,20 +390,20 @@ if _config_subset_refuses; then
     unset -f _rp_access_may_be_declared 2>/dev/null || true
     _CONFIG_SUBSET_VERDICT="-"
   else
-  printf '❌ %s:%s: this file uses %s, which the no-dependency config reader cannot parse.\n' \
-    "$SKILLS_CONFIG_FILE" "$_rp_line" "$_rp_what" >&2
-  printf '\n' >&2
-  printf '   This host has no python3 + pyyaml, so the reader is running in its limited mode.\n' >&2
-  printf '   Rather than guess — and risk resolving a declared access restriction to `full` —\n' >&2
-  printf '   it is refusing. Two ways forward:\n' >&2
-  printf '\n' >&2
-  printf '     1. Rewrite the file in the documented subset:\n' >&2
-  printf '        shared/resources/platform-detection.md → "Tier 2 — the strict subset"\n' >&2
-  printf '     2. Install pyyaml (`pip install pyyaml`); the full-YAML tier accepts this file\n' >&2
-  printf '        as written.\n' >&2
-  unset _rp_line _rp_what
-  unset -f _rp_access_may_be_declared 2>/dev/null || true
-  return 1
+    printf '❌ %s:%s: this file uses %s, which the no-dependency config reader cannot parse.\n' \
+      "$SKILLS_CONFIG_FILE" "$_rp_line" "$_rp_what" >&2
+    printf '\n' >&2
+    printf '   This host has no python3 + pyyaml, so the reader is running in its limited mode.\n' >&2
+    printf '   Rather than guess — and risk resolving a declared access restriction to `full` —\n' >&2
+    printf '   it is refusing. Two ways forward:\n' >&2
+    printf '\n' >&2
+    printf '     1. Rewrite the file in the documented subset:\n' >&2
+    printf '        shared/resources/platform-detection.md → "Tier 2 — the strict subset"\n' >&2
+    printf '     2. Install pyyaml (`pip install pyyaml`); the full-YAML tier accepts this file\n' >&2
+    printf '        as written.\n' >&2
+    unset _rp_line _rp_what
+    unset -f _rp_access_may_be_declared 2>/dev/null || true
+    return 1
   fi
 fi
 unset -f _rp_access_may_be_declared 2>/dev/null || true

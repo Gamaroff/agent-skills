@@ -151,7 +151,7 @@ consumes resolves to, relative to what its own line says?* Two answers, with dif
 | | Constructs | Radius |
 | --- | --- | --- |
 | **Non-local** | anchor, alias, merge key, flow mapping spanning lines, explicit tag, BOM, document separator | **the whole file** — each can move or reinterpret content declared elsewhere, and a line scanner cannot bound which key it reaches |
-| **Local** | quoted key, space before the colon, explicit `? key` | **that key only** — refused when it spells a key this reader consumes (`access`, `tracker`, `vcs`, `prd`, `architecture`, `prdShardedLocation`, `architectureShardedLocation`), or when quoting hides an escape a parser would resolve |
+| **Local** | quoted key, space before the colon, explicit `? key`, **duplicate key** | **that key only** — refused when it spells a key this reader consumes (`access`, `tracker`, `vcs`, `prd`, `architecture`, `prdShardedLocation`, `architectureShardedLocation`), or when quoting hides an escape a parser would resolve |
 
 Everything else is read from its own line and cannot mislead. That is a closed rule over a closed
 key set — a grammar, rather than one more spelling patched shut each cycle.
@@ -175,6 +175,7 @@ key set — a grammar, rather than one more spelling patched shut each cycle.
 | Sequence of mappings | `identities:` → `- jira: …` / `  git: …` |
 | Empty flow sequence | `worktreeSeedPaths: []` |
 | Quoted key this reader never reads | `"my key": 1` |
+| Duplicate of a key this reader never reads | `x: 1` … `x: 2` |
 | Balanced braces inside a quoted value | `branchPattern: "epic/{n}.{slug}"` |
 
 Nesting depth, sequences and flow sequences are **deliberately** on this list. A shape-based subset
@@ -198,6 +199,16 @@ config that was always legal.
 | Explicit tag | `access: !!map` |
 | UTF-8 BOM before the first key | |
 | Document separator | `---` / `...` |
+| Duplicate of a key this reader consumes | `access:` … `access:` |
+
+The duplicate rule closes the one route that survived the first cut of this subset. YAML resolves a
+duplicate **last-wins**; tier 2's block matcher takes the **first** match and stops. So a
+copy-pasted second `access:` block resolved to whichever value came first, and when that was the
+permissive one, a config whose author plainly meant the second block granted more than it declared,
+at exit 0. Tier 1 rejects the shape outright — it is the same defect its duplicate-key guard was
+added for. Like the other local rules it is **scoped to the consumed keys**: a repeated `jira:`
+cannot change what any of the six resolve to, and refusing it would halt a consumer over a section
+this reader never reads.
 
 A mapping where a mode belongs — `access:` → `tracker:` → `mode: manual`, a nesting typo — is
 refused on **both** tiers. It was never a tier-2 problem: `pyyaml` parses it correctly and the

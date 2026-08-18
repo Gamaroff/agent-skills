@@ -28,7 +28,12 @@ jobs:
       # permissive direction, on the tier a stock consumer host actually runs. The section skips
       # with a printed notice when a variant is missing, so without this step it silently covers one.
       - name: Install awk variants
-        run: sudo apt-get install -y --no-install-recommends gawk mawk
+        # `apt-get update` first, and deliberately: this step runs BEFORE the suite, so a stale
+        # package index on the runner would fail the whole job for a reason unrelated to the change
+        # under test. The install is a prerequisite for §45, not the thing being verified.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gawk mawk
 
       - name: Install dependencies
         run: npm ci
