@@ -47,6 +47,7 @@ const { execFileSync, execSync } = require("child_process");
 
 const tw = require("./tracker-workflow.js");
 const { parseYamlSubset } = require("./yaml-subset.js");
+const dm = require("./defer-mutation.js");
 
 const GIT_EXEC_OPTS = {
   encoding: "utf-8",
@@ -795,6 +796,112 @@ function run({
     const off = checkWorkflowOffline({ workflow, args, output });
     if (off.done) return off.result;
     checkWarnings = off.warnings;
+  }
+
+  // ── ACCESS GATE ───────────────────────────────────────────────────────────
+  //
+  // Under any non-`full` tracker access mode this CLI must not touch the board.
+  // It records the field-set it wanted, exits 0 with `reason: "deferred"`, and
+  // the run-end handover names the card and its target column.
+  //
+  // PLACEMENT IS THE WHOLE POINT. Everything above this line is local: arg
+  // parsing, the workflow YAML, and the offline half of --check. Everything
+  // below reaches out — `ghAvailable` shells `gh auth status`, which is both the
+  // first credential read and the first out-of-process call. The gate sits
+  // exactly between them, so a gated run demonstrably attempts no network call.
+  //
+  // `--probe-board` (and therefore `--check` and `--init-workflow`, which set
+  // it) are NOT gated: they read a board, they do not mutate one, and every
+  // non-`full` mode still permits reads. `--dry-run` is exempt for the same
+  // reason. Gating them would break `scaffold-tracker-workflow` for exactly the
+  // consumers who most need to see their board's real columns.
+  //
+  // The comparison is `!== "full"`, never truthiness or emptiness: an UNSET
+  // variable must read as `full`, because this CLI is invoked from seven skills
+  // and six pipeline steps and a gate that misfires stops every one of them
+  // moving cards.
+  let access;
+  try {
+    access = dm.resolveAccessTracker(process.env);
+  } catch (e) {
+    output.err(`Error: ${e.message}`);
+    return { exitCode: 2 };
+  }
+  if (access !== "full" && !args.probeBoard && !args.dryRun) {
+    const moment = tw.resolveMoment(args.stage, workflow, {
+      issueType: args.issueType,
+    });
+    if (!moment) {
+      // A moment omitted from `pipeline:` is deliberate disablement — there was
+      // never a mutation to defer. Report it as an unrestricted run would.
+      output.info(
+        `⏭️  Moment ${args.stage} is not declared in the workflow — nothing to do.`,
+      );
+      return emit({ transitioned: false, reason: "stage-disabled" }, 0);
+    }
+    const target = (moment.targets && moment.targets[0]) || null;
+    const issueUrl = `https://github.com/${
+      readProjectYml(root).owner || "OWNER"
+    }/${readProjectYml(root).repo || "REPO"}/issues/${args.issue}`;
+    const field = args.field || resolveStatusFieldName(root);
+    try {
+      const rec = dm.defer({
+        kind: "github.board.field-set",
+        system: "github",
+        access,
+        intent: `Set ${field} to ${target || `the ${args.stage} column`} on issue #${args.issue}`,
+        target: {
+          issue: String(args.issue),
+          url: issueUrl,
+          // The object and the place you perform the action differ for a board
+          // field: the issue lives in the repo, the field lives on the board.
+          ui_url: "the project board → filter to this issue → set the field",
+        },
+        desired: { [field]: target },
+        skill: "gh-stage",
+        step: args.stage,
+        run: process.env.PIPELINE_RUN || "",
+        manual: {
+          deepLink: issueUrl,
+          ui: `Open the project board → find issue #${args.issue} → set ${field}`,
+          fields: [{ name: field, value: target || "" }],
+        },
+        command: {
+          argv: [
+            "node",
+            "gh-stage.js",
+            "--issue",
+            String(args.issue),
+            "--stage",
+            args.stage,
+            "--json",
+          ],
+          stdin: null,
+        },
+        verify: {
+          cmd: `gh-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
+          expect: `${field} is "${target || args.stage}"`,
+        },
+      });
+      output.info(
+        `⏸️  access.tracker=${access} — not moving issue #${args.issue}; recorded as ${rec.id}.`,
+      );
+      return emit(
+        {
+          transitioned: false,
+          reason: "deferred",
+          access,
+          target,
+          record: rec.id,
+        },
+        0,
+      );
+    } catch (e) {
+      // A journal we cannot write is a real problem, but it is not a reason to
+      // fall through and perform the very mutation the mode forbids.
+      output.warn(`⚠️  Could not record the deferred board move: ${e.message}`);
+      return emit({ transitioned: false, reason: "deferred", access }, 0);
+    }
   }
 
   const statusField = args.field || resolveStatusFieldName(root);
