@@ -37,30 +37,17 @@ const dm = require("./defer-mutation.js");
 // loadDotEnv(). A dot-env file must not be able to escalate a restriction the
 // operator declared into a tracker write.
 //
-// CYCLE-2 CR-5 — ONE resolver, in defer-mutation.js. This file used to carry
-// its own copy of the mode table, jira-create-epic.js a third and
-// jira-sprint-lib.sh a fourth, and the cost showed up immediately: each read a
-// different subset of the tiers, and none read the `access.tracker` key an
-// operator actually edits. `dm.resolveAccessTracker` reads all three tiers —
-// ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and skills-config.yaml —
-// most-restrictive-wins.
-function mostRestrictiveAccess(env = process.env, opts = {}) {
-  // The env object carries SKILLS_CONFIG_FILE, so the config tier resolves
-  // against the path captured at require time rather than whatever a dot-env
-  // has since put in process.env.
-  return dm.resolveAccessTracker(env, { env, ...opts });
+// ONE resolver, in defer-mutation.js. This file used to carry its own copy of
+// the mode table, jira-create-epic.js a third and jira-sprint-lib.sh a fourth,
+// and each read a different subset of the tiers. `dm.resolveAccessTracker`
+// reads ACCESS_TRACKER and AGENT_SKILLS_ACCESS_TRACKER, most-restrictive-wins.
+function mostRestrictiveAccess(env = process.env) {
+  return dm.resolveAccessTracker(env);
 }
 
 const ACCESS_ENV_AT_LOAD = Object.freeze({
   ACCESS_TRACKER: process.env.ACCESS_TRACKER,
   AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
-  // CYCLE-4 CR-3 — the config PATH is part of the restriction, not incidental
-  // to it. The mode is resolved lazily at the first write, which is after
-  // loadDotEnv() has copied absent keys out of a repo-root .env — so a .env line
-  // redirecting SKILLS_CONFIG_FILE at a file with no `access:` key would have
-  // walked straight around the snapshot whose whole purpose is that a dot-env
-  // cannot escalate a declared restriction.
-  SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
 });
 
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as

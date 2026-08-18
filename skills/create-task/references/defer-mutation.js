@@ -54,7 +54,6 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { parseYamlSubset } = require("./yaml-subset.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_JOURNAL = ".claude/state/tracker-actions.jsonl";
@@ -497,28 +496,29 @@ function redactDeep(value, envTable, keyPath = "") {
  * @param {Record<string,string>} [env]
  * @returns {"full"|"read-only"|"approve"|"command"|"manual"}
  */
-function resolveAccessTracker(env = process.env, opts = {}) {
-  // THREE tiers, most-restrictive-wins — the same contract resolve-platform.sh
-  // documents, and the reason this function now lives in one place instead of
-  // four. Cycle 2 found what four copies cost: jira-sync.js read one env var,
-  // the stage CLIs read a different one, and NONE of them read the config key an
-  // operator actually edits, so `access: {tracker: manual}` in skills-config.yaml
-  // was ignored by every bare `node …` invocation the skills document.
+function resolveAccessTracker(env = process.env) {
+  // TWO env tiers, most-restrictive-wins:
   //
-  //   1. ACCESS_TRACKER                — the resolver's own output
-  //   2. AGENT_SKILLS_ACCESS_TRACKER   — the knob an operator sets
-  //   3. access.tracker in skills-config.yaml — the committed declaration
+  //   1. ACCESS_TRACKER              — resolve-platform.sh's own output
+  //   2. AGENT_SKILLS_ACCESS_TRACKER — the knob an operator sets
   //
   // Most-restrictive-wins rather than first-wins: picking the wrong tracker is a
   // mistake, picking the wrong access is an escalation. A run may lock itself
-  // down; nothing may loosen a config that deliberately restricts.
-  const candidates = [
+  // down; nothing may loosen a restriction that is already declared.
+  //
+  // `access.tracker` in skills-config.yaml is NOT read here. A config tier needs
+  // read-config.sh's discovery, subset and refusal semantics, and a second
+  // implementation of those in JavaScript produced a high-severity divergence in
+  // every review round it survived. It is [task.61](../../docs/tasks/task.61.access-mode-config-tier/task.61.access-mode-config-tier.md),
+  // with parity as its explicit subject. Until it lands, a config-declared
+  // restriction reaches these gates only via a shell that sourced the resolver —
+  // which is what task.52 shipped and what every pipeline path already does.
+  const seen = [
     env && env.ACCESS_TRACKER,
     env && env.AGENT_SKILLS_ACCESS_TRACKER,
-  ];
-  if (opts.config !== false) candidates.push(readConfiguredAccessTracker(opts));
-
-  const seen = candidates.map((v) => String(v || "").trim()).filter(Boolean);
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
   if (!seen.length) return "full";
 
   // An UNRECOGNISED value is refused rather than defaulted. Defaulting a typo to
@@ -545,95 +545,6 @@ const ACCESS_RANK = Object.freeze({
   "read-only": 3,
   full: 4,
 });
-
-// `access.tracker` from skills-config.yaml. Returns "" when the key is
-// genuinely absent, and the MOST RESTRICTIVE mode when the declaration exists
-// but cannot be read.
-//
-// CYCLE-4 CR-2 — it no longer THROWS. Cycle 3 made the unreadable case throw,
-// which is fail-closed in the wrong shape: `resolveAccessTracker` is called by
-// both stage CLIs and by every deferral, so a config quirk turned every
-// invocation — including the deliberately read-only `--check`, `--print-plan`
-// and `--probe-board` — into exit 2, and turned a mutation that would have been
-// deferred AND RECORDED into a hard failure with no record at all. Answering
-// `manual` refuses the write, keeps the reads working, and still writes the
-// record a human needs.
-//
-// CYCLE-4 CR-3/CR-4/CR-6 — path resolution is read-config.sh's, exactly: an
-// explicit redirect must name a readable REGULAR file (so /dev/null cannot
-// blank a restriction), the literal default name is not a redirect, and there
-// is NO upward walk — the canonical resolver looks in the working directory and
-// so does this. A second, subtly different search order is the drift this whole
-// consolidation exists to remove.
-const _cfgAccessCache = new Map();
-const CONFIG_BASENAME = "skills-config.yaml";
-const MOST_RESTRICTIVE = "manual";
-
-function findConfigFile({ cwd, configPath, env = process.env } = {}) {
-  if (configPath) return { file: configPath, unusable: null };
-  const redirect = env.SKILLS_CONFIG_FILE;
-  // read-config.sh classifies a value equal to the default basename as
-  // origin=default, not a redirect, and never refuses it.
-  if (redirect && redirect !== CONFIG_BASENAME) {
-    try {
-      const st = fs.statSync(redirect);
-      if (!st.isFile()) {
-        return {
-          file: "",
-          unusable: `SKILLS_CONFIG_FILE="${redirect}" is not a regular file`,
-        };
-      }
-      fs.accessSync(redirect, fs.constants.R_OK);
-    } catch (_) {
-      return {
-        file: "",
-        unusable: `SKILLS_CONFIG_FILE="${redirect}" is not readable`,
-      };
-    }
-    return { file: redirect, unusable: null };
-  }
-  const local = path.join(cwd || process.cwd(), CONFIG_BASENAME);
-  return { file: fs.existsSync(local) ? local : "", unusable: null };
-}
-
-function readConfiguredAccessTracker(opts = {}) {
-  const { file, unusable } = findConfigFile(opts);
-  // A redirect that cannot be honoured is a declaration we cannot read, not an
-  // absent one. Changing WHICH file is read must never be a way to widen access.
-  if (unusable) return MOST_RESTRICTIVE;
-  if (!file) return "";
-  if (_cfgAccessCache.has(file)) return _cfgAccessCache.get(file);
-
-  const remember = (v) => {
-    _cfgAccessCache.set(file, v);
-    return v;
-  };
-
-  let text;
-  try {
-    text = fs.readFileSync(file, "utf8");
-  } catch (_) {
-    // CYCLE-4 CR-14 — deliberately NOT memoised: a transient EACCES/EMFILE must
-    // not refuse every later resolution in a long-lived process.
-    return MOST_RESTRICTIVE;
-  }
-
-  const doc = parseYamlSubset(text);
-  const access = doc && doc.access;
-  // No `access:` key at all is the ordinary case, and means "unrestricted".
-  if (access === undefined || access === null) return remember("");
-  // A STRING here means the subset parser met a flow mapping it does not
-  // support — `access: {tracker: manual}`. Reading that as absent was the
-  // fail-open this guard exists for; reading it as `manual` is the fail-closed
-  // answer that still lets the run record what it refused.
-  if (typeof access !== "object" || Array.isArray(access)) {
-    return remember(MOST_RESTRICTIVE);
-  }
-  const v = access.tracker;
-  if (v === undefined || v === null) return remember("");
-  if (typeof v !== "string") return remember(MOST_RESTRICTIVE);
-  return remember(v.trim());
-}
 
 // ---------------------------------------------------------------------------
 // Identity
@@ -961,7 +872,6 @@ Provenance:
 Other:
   --journal <path>      override the journal path
   --list-kinds          print the roster and exit
-  --resolve-access      print the resolved access mode and exit (for shell gates)
   --json                print the written record as JSON
   -h, --help`;
 
@@ -984,9 +894,6 @@ function parseArgs(argv) {
         break;
       case "--json":
         args.json = true;
-        break;
-      case "--resolve-access":
-        args.resolveAccess = true;
         break;
       case "--list-kinds":
         args.listKinds = true;
@@ -1123,23 +1030,6 @@ function run({
     return { exitCode: 2 };
   }
 
-  // The one resolver, reachable from a shell. jira-sprint-lib.sh calls this
-  // rather than carrying a fourth copy of the mode table — and a copy is exactly
-  // what a shell gate cannot keep in step, since the config tier needs a YAML
-  // read that bash has no business doing.
-  // CYCLE-3 CR-4 — answered BEFORE loadRoster. A roster read error used to
-  // exit 2 here, which the shell gate could not tell from a refused mode, so it
-  // aborted every call including GETs.
-  if (args.resolveAccess) {
-    try {
-      console.log(resolveAccessTracker());
-      return { exitCode: 0 };
-    } catch (e) {
-      console.error(e.message);
-      return { exitCode: 2 };
-    }
-  }
-
   if (args.help) {
     console.log(USAGE);
     return { exitCode: 0 };
@@ -1238,7 +1128,6 @@ module.exports = {
   CONSEQUENCES,
   CONSEQUENCE_RANK,
   resolveAccessTracker,
-  readConfiguredAccessTracker,
   ACCESS_RANK,
   parseRoster,
   loadRoster,

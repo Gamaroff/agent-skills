@@ -28,10 +28,10 @@ try {
   dm = null;
 }
 
-// CYCLE-2 CR-5 — delegate to the one resolver rather than keeping a third copy
-// of the mode table. It reads ACCESS_TRACKER, AGENT_SKILLS_ACCESS_TRACKER and
-// `access.tracker` in skills-config.yaml, most-restrictive-wins, and refuses an
-// unrecognised value rather than defaulting to "full".
+// Delegate to the one resolver rather than keeping a third copy of the mode
+// table. It reads ACCESS_TRACKER and AGENT_SKILLS_ACCESS_TRACKER,
+// most-restrictive-wins, and refuses an unrecognised value rather than
+// defaulting to "full".
 const ACCESS_RANK_FALLBACK = {
   manual: 0,
   command: 1,
@@ -54,21 +54,7 @@ function accessTracker() {
     ]
       .map((v) => String(v || "").trim())
       .filter(Boolean);
-    // A config file we cannot read is not an absent restriction. With no writer
-    // bundled there is no way to consult `access.tracker` — and no way to record
-    // a deferral either — so answering "full" over a file that may restrict is
-    // the one outcome this gate exists to prevent.
-    if (!seen.length) {
-      const cfg = process.env.SKILLS_CONFIG_FILE || "skills-config.yaml";
-      if (fs.existsSync(cfg)) {
-        console.error(
-          `Error: cannot read access.tracker from ${cfg} — the deferred-mutation ` +
-            `writer is unavailable. Refusing rather than defaulting to "full".`,
-        );
-        process.exit(1);
-      }
-      return "full";
-    }
+    if (!seen.length) return "full";
     for (const v of seen) {
       // CYCLE-4 CR-13 — own properties only. `in` walks the prototype chain, so
       // ACCESS_TRACKER="constructor" passed validation and was then compared as

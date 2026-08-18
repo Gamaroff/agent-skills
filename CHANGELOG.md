@@ -53,6 +53,18 @@ All notable changes to this project will be documented in this file. Format foll
 - **The resolver's `PARTIALLY ENFORCED` notice names Jira as covered and GitHub as the remaining
   gap.** A warning that overstates coverage is worse than none.
 
+- **The access gates resolve the mode from both environment names**, `ACCESS_TRACKER` (the resolver's
+  output) and `AGENT_SKILLS_ACCESS_TRACKER` (the knob an operator sets), most-restrictive-wins, in one
+  place rather than four hand-rolled copies. Reading only the first left the sprint and epic-creator
+  gates inert under exactly the bare invocations their own SKILL.md documents.
+
+  **`access.tracker` in `skills-config.yaml` is not read by the JavaScript gates yet.** A config tier
+  has to agree with `read-config.sh` on every input — its discovery rules, its strict subset, its
+  refusals — and a second implementation of those in JavaScript diverged high-severity in every review
+  round it survived. It is task.61, with parity as its explicit subject. Until then a config-declared
+  restriction reaches these gates through a shell that sourced the resolver, which is what every
+  pipeline path already does.
+
 - **`access:` in `skills-config.yaml` declares how much access the agent has to each system**, resolved into `ACCESS_TRACKER` / `ACCESS_VCS` by `resolve-platform.sh` alongside the existing `TRACKER` / `VCS`. Five values per system — `full` (default) · `read-only` · `approve` · `command` · `manual`. This is the vocabulary for the restricted-tracker-access sequence, for consumers whose security team will not issue a tracker write token to a locally running agent.
 
   **It ships no behaviour change on its own.** Nothing intercepts a mutation yet; setting `access: {tracker: manual}` resolves the variable and changes nothing else. It lands first, and separately, to fix the output contract before any caller depends on it — and because it closes a live bug on the way.

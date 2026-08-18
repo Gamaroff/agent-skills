@@ -45,82 +45,22 @@ jsm_auth_header() {
 # Sets: JSM_ACCESS_MODE (one of the five modes) and, on a refusal,
 # JSM_ACCESS_ERROR. Returns 0 when a mode was resolved, 1 on a refusal.
 #
-# CYCLE-3 CR-6 — this SETS a global rather than printing, and is called as a
-# plain command rather than `$(...)`. The previous version memoised into a
-# variable inside a command substitution, so the cache died with the subshell
-# and every jsm_curl — including the paginated GET loops — spawned node and
-# re-parsed the roster.
+# Two env tiers, most-restrictive-wins: ACCESS_TRACKER is resolve-platform.sh's
+# output, AGENT_SKILLS_ACCESS_TRACKER is the knob an operator sets. Reading only
+# the first left this gate inert for exactly the person who had declared a
+# restriction, because this skill's own SKILL.md documents bare
+# `manage-sprint-state.sh <id> closed` invocations that never source the resolver.
 #
-# CYCLE-3 CR-5 — stdout only. Folding stderr in meant any node-level warning
-# (a TLS notice, an NODE_OPTIONS loader line) produced rc 0 with a multi-line
-# value that was neither `full` nor the invalid sentinel, so a full-access run
-# quietly diverted every mutation into the defer branch.
+# `access.tracker` in skills-config.yaml is NOT read here — see the matching note
+# in defer-mutation.js. A config tier needs read-config.sh's discovery and subset
+# semantics; a shell reimplementation of those is task.61, not this file.
 #
-# CYCLE-4 CR-11 — the rule, stated as implemented: ANY non-zero exit from the
-# resolver is a refusal. Fail-closed on a crash is deliberate — a gate that
-# cannot answer must not answer "full" — and reads are protected instead by
-# jsm_curl, which never consults this for a GET.
+# It SETS a global rather than printing, and is called as a plain command: a
+# value assigned inside `$(...)` dies with the subshell, so a memo there never
+# survives and an `exit` there kills only the subshell.
 jsm_resolve_access() {
   [ -n "${JSM_ACCESS_MODE:-}" ] && return 0
   JSM_ACCESS_ERROR=""
-
-  local writer out rc errfile
-  writer="$(dirname "${BASH_SOURCE[0]}")/defer-mutation.js"
-  if [ -f "$writer" ] && command -v node >/dev/null 2>&1; then
-    errfile=$(mktemp)
-    # CYCLE-4 CR-7 — `out=$(...)` as a bare assignment ABORTS the caller under
-    # `set -e` before `rc=$?` runs, losing the refusal message and leaking the
-    # temp file. The `if` makes the non-zero exit an inspected condition.
-    if out=$(node "$writer" --resolve-access 2>"$errfile"); then
-      rc=0
-    else
-      rc=$?
-    fi
-    if [ "$rc" -eq 0 ]; then
-      case "$out" in
-        manual|command|approve|read-only|full)
-          JSM_ACCESS_MODE="$out"
-          rm -f "$errfile"
-          return 0
-          ;;
-      esac
-      # CYCLE-4 CR-1 — rc 0 but not a mode. Falling back to the env tier here
-      # answered "full" whenever no env var was set, DISCARDING a config-declared
-      # restriction the resolver had just been asked about. A value we cannot
-      # name is a refusal.
-      JSM_ACCESS_ERROR="Could not read the access mode from the resolver (got: $(printf '%s' "$out" | head -c 120)). Refusing rather than defaulting to \"full\"."
-      JSM_ACCESS_MODE=""
-      rm -f "$errfile"
-      return 1
-    else
-      JSM_ACCESS_ERROR=$(cat "$errfile")
-      # CYCLE-4 CR-8 — a node that dies without writing to stderr (a bare
-      # process.exit, a signal) left this empty, so the caller printed a blank
-      # line and exited 1 with no reason given.
-      if [ -z "$JSM_ACCESS_ERROR" ]; then
-        JSM_ACCESS_ERROR="The access resolver ($writer) exited $rc without a message. Refusing rather than defaulting to \"full\"."
-      fi
-      rm -f "$errfile"
-      JSM_ACCESS_MODE=""
-      return 1
-    fi
-    rm -f "$errfile"
-  fi
-
-  # Env tier only. Degraded — it cannot see `access.tracker` in
-  # skills-config.yaml — so it is a fallback, never the normal path.
-  #
-  # And that is exactly why a config file being PRESENT is a refusal here: with
-  # no writer we cannot read the declaration, and answering "full" over a file
-  # that may restrict is the one outcome this gate exists to prevent. (It is
-  # also moot for the mutation itself — with no writer there is nothing to
-  # record the deferral with either.)
-  if [ -f "${SKILLS_CONFIG_FILE:-skills-config.yaml}" ] \
-     && [ -z "${ACCESS_TRACKER:-}" ] && [ -z "${AGENT_SKILLS_ACCESS_TRACKER:-}" ]; then
-    JSM_ACCESS_ERROR="Cannot read access.tracker from ${SKILLS_CONFIG_FILE:-skills-config.yaml}: the deferred-mutation writer is unavailable (node missing, or $writer not bundled). Refusing rather than defaulting to \"full\"."
-    JSM_ACCESS_MODE=""
-    return 1
-  fi
 
   local best="full" v rank_v rank_best
   for v in "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
@@ -129,6 +69,8 @@ jsm_resolve_access() {
       manual) rank_v=0 ;; command) rank_v=1 ;; approve) rank_v=2 ;;
       read-only) rank_v=3 ;; full) rank_v=4 ;;
       *)
+        # Refused, never defaulted: a typo resolving to "full" would turn a
+        # declared restriction into an unintended tracker write.
         JSM_ACCESS_ERROR="access.tracker=\"$v\" is not a recognised access mode (manual, command, approve, read-only, full). Refusing rather than defaulting to \"full\"."
         JSM_ACCESS_MODE=""
         return 1
@@ -142,12 +84,6 @@ jsm_resolve_access() {
   done
   JSM_ACCESS_MODE="$best"
   return 0
-}
-
-# Back-compat shim for anything that reads the mode as a value.
-jsm_access_mode() {
-  jsm_resolve_access || { printf '%s' "__INVALID__"; return 0; }
-  printf '%s' "$JSM_ACCESS_MODE"
 }
 
 # Record one refused call. MUST leave JSM_HTTP_STATUS and JSM_BODY set: both
@@ -170,7 +106,7 @@ jsm_defer() {
     record_id=$(node "$writer" \
       --kind "$kind" \
       --intent "$intent" \
-      --access "${mode:-${JSM_ACCESS_MODE:-full}}" \
+      --access "${mode:-${JSM_ACCESS_MODE:?jsm_defer: no access mode resolved}}" \
       --target "$target" \
       --desired "$desired" \
       --skill "jira-sprint-manager" --json 2>/dev/null \

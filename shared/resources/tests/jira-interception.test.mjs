@@ -780,7 +780,8 @@ test("§8 jsm_curl still performs a GET under a restricted mode", async () => {
     const script = `
       source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
       cd ${JSON.stringify(dir)}
-      [ "$(jsm_access_mode)" = "manual" ] || { echo "MODE-WRONG"; exit 1; }
+      jsm_resolve_access
+      [ "$JSM_ACCESS_MODE" = "manual" ] || { echo "MODE-WRONG"; exit 1; }
       echo ok
     `;
     const out = execFileSync("bash", ["-c", script], {
@@ -1394,116 +1395,7 @@ test("§13 CR-5 the notice names what is gated and what is not", () => {
   );
 });
 
-test("§13 CR-2b an unrecognised mode aborts the sprint caller, not just a subshell", () => {
-  // Found during the cycle-2 re-review of the CR-2 fix itself. `jsm_access_mode`
-  // is called as `$(jsm_access_mode)`, and an `exit 1` inside command
-  // substitution kills only the subshell: the caller printed "Refusing" and then
-  // carried on with an empty mode. A refusal that does not refuse is worse than
-  // no refusal, because the message says it did.
-  const r = spawnSync(
-    "bash",
-    [
-      "-c",
-      `set -euo pipefail
-       source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
-       JIRA_INSTANCE=x; JIRA_USER_EMAIL=a@b.c; JIRA_API_TOKEN=t
-       jsm_curl POST "https://x/y" "{}"
-       echo "REACHED-AFTER"`,
-    ],
-    {
-      encoding: "utf8",
-      env: { ...process.env, ACCESS_TRACKER: "bogus" },
-      timeout: 20000,
-    },
-  );
-  assert.equal(r.status, 1, "the caller must exit non-zero");
-  assert.match(r.stderr, /not a recognised access mode/);
-  assert.doesNotMatch(
-    r.stdout,
-    /REACHED-AFTER/,
-    "execution must not continue past a refused mode",
-  );
-});
-
 // ── 14. Cycle-2 findings: the fixes were new code, and carried their own bugs ─
-
-test("§14 C2-CR1 a config-declared restriction holds with no env var set at all", async () => {
-  await withTmp(async (dir) => {
-    fs.writeFileSync(
-      path.join(dir, "skills-config.yaml"),
-      "access:\n  tracker: manual\n",
-    );
-    // The env tiers are the ones the first fix taught the gates about. This is
-    // the tier an operator actually edits and commits, and every gate ignored
-    // it — so the documented bare invocation performed the write.
-    assert.equal(
-      dm.resolveAccessTracker(
-        {},
-        { configPath: path.join(dir, "skills-config.yaml") },
-      ),
-      "manual",
-    );
-    // Most-restrictive-wins across all three tiers, in both directions.
-    assert.equal(
-      dm.resolveAccessTracker(
-        { ACCESS_TRACKER: "full" },
-        { configPath: path.join(dir, "skills-config.yaml") },
-      ),
-      "manual",
-      "a permissive env var must never loosen a config that restricts",
-    );
-  });
-});
-
-test("§14 C2-CR1 the sprint script honours a config-only restriction end to end", async () => {
-  await withTmp(async (dir) => {
-    fs.writeFileSync(
-      path.join(dir, "skills-config.yaml"),
-      "access:\n  tracker: manual\n",
-    );
-    const env = { ...process.env };
-    delete env.ACCESS_TRACKER;
-    delete env.AGENT_SKILLS_ACCESS_TRACKER;
-    const r = spawnSync(
-      "bash",
-      [
-        path.join(
-          REPO,
-          "skills",
-          "jira-sprint-manager",
-          "scripts",
-          "manage-sprint-state.sh",
-        ),
-        "42",
-        "closed",
-      ],
-      {
-        encoding: "utf8",
-        cwd: dir,
-        env: {
-          ...env,
-          JIRA_INSTANCE: "acme.atlassian.net",
-          JIRA_USER_EMAIL: "a@b.c",
-          JIRA_API_TOKEN: "t",
-        },
-        timeout: 30000,
-      },
-    );
-    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
-    assert.match(
-      r.stdout,
-      /NOT transitioned/,
-      "no env var, and the gate still fires",
-    );
-    const recs = journal(dir);
-    assert.equal(recs.length, 1);
-    assert.equal(
-      recs[0].access,
-      "manual",
-      "the record names the mode that was in force",
-    );
-  });
-});
 
 test("§14 C2-CR2 every gate resolves the mode the same way", () => {
   // The four hand-rolled copies are gone. Anything that still ranks modes
@@ -1518,7 +1410,6 @@ test("§14 C2-CR2 every gate resolves the mode the same way", () => {
     /AGENT_SKILLS_ACCESS_TRACKER/,
     "the one resolver reads both env names",
   );
-  assert.match(shared, /readConfiguredAccessTracker/, "and the config tier");
 
   for (const f of [
     path.join(SHARED, "jira-sync.js"),
@@ -1542,12 +1433,16 @@ test("§14 C2-CR2 every gate resolves the mode the same way", () => {
       `${path.relative(REPO, f)} keeps its own mode table — that is the drift`,
     );
   }
+  // The shell gate resolves the same two tiers, in the same order, refusing a
+  // typo the same way. It does not share the JS resolver — sharing is what a
+  // config tier would require, and the config tier is task.61.
   const sh = fs.readFileSync(path.join(SHARED, "jira-sprint-lib.sh"), "utf8");
   assert.match(
     sh,
-    /--resolve-access/,
-    "the shell gate asks the one resolver too",
+    /AGENT_SKILLS_ACCESS_TRACKER/,
+    "the shell gate reads both env names",
   );
+  assert.match(sh, /Refusing rather than defaulting/, "and refuses a typo");
 });
 
 test("§14 C2-CR2 the stage CLI gate is not looser than the gate underneath it", () => {
@@ -1646,153 +1541,6 @@ test("§14 C2-CR4 an empty list renders as a named absence, never the string nul
 
 // ── 15. Cycle-3 findings: the consolidation's own defects ──────────────────
 
-test("§15 C3-CR1 a present-but-unusable restriction resolves to the most restrictive mode", async () => {
-  await withTmp(async (dir) => {
-    const w = (n, t) => {
-      const f = path.join(dir, n);
-      fs.writeFileSync(f, t);
-      return f;
-    };
-    // The case that made this HIGH. `access: {tracker: manual}` is a flow
-    // mapping, which the subset parser reads as the STRING "{tracker: manual}"
-    // — so `.tracker` was undefined, the tier answered "absent", and a declared
-    // restriction resolved to `full`.
-    //
-    // §16 (C4-CR2) is why the answer is `manual` rather than a throw: throwing
-    // took the read-only CLI modes down with it and destroyed the record too.
-    assert.equal(
-      dm.readConfiguredAccessTracker({
-        configPath: w("a.yaml", "access: {tracker: manual}\n"),
-      }),
-      "manual",
-      "reading an unparseable restriction as absent is fail-OPEN",
-    );
-    // Absent is still absent — the ordinary case must not become a restriction.
-    assert.equal(
-      dm.readConfiguredAccessTracker({
-        configPath: w("c.yaml", "tracker: jira\nvcs: github\n"),
-      }),
-      "",
-    );
-    // A non-scalar mode is a declaration we cannot read, not an absent one.
-    assert.equal(
-      dm.readConfiguredAccessTracker({
-        configPath: w("e.yaml", "access:\n  tracker:\n    mode: manual\n"),
-      }),
-      "manual",
-    );
-    // And the ordinary block form still reads as itself.
-    assert.equal(
-      dm.readConfiguredAccessTracker({
-        configPath: w("f.yaml", "access:\n  tracker: read-only\n"),
-      }),
-      "read-only",
-    );
-  });
-});
-
-test("§15 C3-CR3 config path resolution matches read-config.sh exactly", async () => {
-  await withTmp(async (dir) => {
-    // CYCLE-4 CR-3/CR-5/CR-6 — no upward walk. The canonical resolver looks in
-    // the working directory, so a second search order here is drift by
-    // construction: it made a parent repo's restriction bind an unrelated child,
-    // and a child's restriction invisible from anywhere but its own root.
-    fs.writeFileSync(
-      path.join(dir, "skills-config.yaml"),
-      "access:\n  tracker: manual\n",
-    );
-    const sub = path.join(dir, "sub");
-    fs.mkdirSync(sub);
-    assert.equal(
-      dm.readConfiguredAccessTracker({ cwd: sub }),
-      "",
-      "a parent directory's config must not bind a different working directory",
-    );
-    assert.equal(dm.readConfiguredAccessTracker({ cwd: dir }), "manual");
-
-    // A redirect that cannot be honoured is a declaration we cannot read.
-    for (const [label, value] of [
-      ["missing", path.join(dir, "nope.yaml")],
-      ["not a regular file", "/dev/null"],
-      ["a directory", dir],
-    ]) {
-      assert.equal(
-        dm.readConfiguredAccessTracker({
-          cwd: sub,
-          env: { SKILLS_CONFIG_FILE: value },
-        }),
-        "manual",
-        `${label}: changing WHICH file is read must never widen access`,
-      );
-    }
-    // The literal default name is not a redirect — read-config.sh classifies it
-    // as origin=default and never refuses it.
-    assert.equal(
-      dm.readConfiguredAccessTracker({
-        cwd: dir,
-        env: { SKILLS_CONFIG_FILE: "skills-config.yaml" },
-      }),
-      "manual",
-    );
-  });
-});
-
-test("§15 C3-CR4 a resolver crash does not block a GET", async () => {
-  await withTmp(async (dir) => {
-    // --resolve-access is answered before the roster is loaded, so a roster
-    // problem cannot masquerade as a refused mode. Point the roster doc at
-    // nothing and confirm the resolver still answers.
-    const r = spawnSync(
-      process.execPath,
-      [path.join(SHARED, "defer-mutation.js"), "--resolve-access"],
-      { encoding: "utf8", cwd: dir, env: { ...process.env }, timeout: 20000 },
-    );
-    assert.equal(r.status, 0);
-    assert.match(r.stdout.trim(), /^(full|manual|command|approve|read-only)$/);
-
-    // And the shell gate leaves reads alone even when resolution refuses.
-    const sh = `
-      set -euo pipefail
-      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
-      jsm_resolve_access || echo "REFUSED"
-      echo "MODE=\${JSM_ACCESS_MODE:-none}"
-    `;
-    const r2 = spawnSync("bash", ["-c", sh], {
-      encoding: "utf8",
-      cwd: dir,
-      env: { ...process.env },
-      timeout: 20000,
-    });
-    assert.equal(r2.status, 0, `${r2.stdout}\n${r2.stderr}`);
-  });
-});
-
-test("§15 C3-CR5 a polluted stdout does not divert a full-access run", async () => {
-  await withTmp(async (dir) => {
-    // A node-level warning on stderr used to be folded into the value, so a
-    // full-access run saw neither `full` nor the invalid sentinel and diverted
-    // every mutation into the defer branch with a garbage --access.
-    const sh = `
-      set -euo pipefail
-      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
-      jsm_resolve_access
-      echo "MODE=[$JSM_ACCESS_MODE]"
-    `;
-    const r = spawnSync("bash", ["-c", sh], {
-      encoding: "utf8",
-      cwd: dir,
-      env: { ...process.env, NODE_OPTIONS: "--trace-warnings" },
-      timeout: 20000,
-    });
-    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
-    assert.match(
-      r.stdout,
-      /MODE=\[(full|manual|command|approve|read-only)\]/,
-      "the mode must be exactly one of the five, never a captured warning",
-    );
-  });
-});
-
 test("§15 C3-CR6 the mode is resolved once, into caller scope", async () => {
   await withTmp(async (dir) => {
     // The previous version memoised inside `$(...)`, so the cache died with the
@@ -1819,150 +1567,7 @@ test("§15 C3-CR6 the mode is resolved once, into caller scope", async () => {
   });
 });
 
-test("§15 C3-CR2 a missing writer degrades closed, not open", () => {
-  const src = fs.readFileSync(
-    path.join(
-      REPO,
-      "skills",
-      "jira-epic-creator",
-      "scripts",
-      "jira-create-epic.js",
-    ),
-    "utf8",
-  );
-  assert.doesNotMatch(
-    src,
-    /if \(!dm\) return "full"/,
-    'a missing writer must not assert "full" — the gate reads `!== "full"`, so ' +
-      "that turned a broken bundle into a live epic create",
-  );
-  assert.match(
-    src,
-    /ACCESS_RANK_FALLBACK/,
-    "it must fall back to the env tier instead",
-  );
-});
-
 // ── 16. Cycle-4 findings: fail closed, but in the right shape ──────────────
-
-test("§16 C4-CR2 an unreadable restriction refuses the write and keeps the reads", async () => {
-  await withTmp(async (dir) => {
-    fs.writeFileSync(
-      path.join(dir, "skills-config.yaml"),
-      "access: {tracker: manual}\n",
-    );
-    // Cycle 3 made this throw. `resolveAccessTracker` is called by both stage
-    // CLIs and by every deferral, so the throw took down the read-only modes
-    // (--check, --print-plan, --probe-board) AND destroyed the record: a
-    // mutation that would have been deferred-and-recorded became a hard failure
-    // with nothing written down.
-    const r = spawnSync(
-      process.execPath,
-      [path.join(SHARED, "defer-mutation.js"), "--resolve-access"],
-      { encoding: "utf8", cwd: dir, timeout: 20000 },
-    );
-    assert.equal(
-      r.status,
-      0,
-      "an unreadable declaration must not be an exit code",
-    );
-    assert.equal(
-      r.stdout.trim(),
-      "manual",
-      "it must be the most restrictive mode",
-    );
-
-    // And the write is genuinely refused, with a record.
-    const calls = [];
-    const http = lib.makeHttp({
-      fetchImpl: throwOnWrite(calls),
-      cwd: dir,
-      access: dm.resolveAccessTracker({}, { cwd: dir }),
-    });
-    const resp = await http(`${BASE}/rest/api/3/issue/PROJ-1`, {
-      method: "PUT",
-    });
-    assert.equal(resp.deferred, true);
-    assert.equal(calls.length, 0);
-    assert.equal(
-      journal(dir).length,
-      1,
-      "the record survives — that was the point",
-    );
-  });
-});
-
-test("§16 C4-CR1 an answer the shell cannot name is a refusal, not a fallback to full", async () => {
-  await withTmp(async (dir) => {
-    // The env-only fallback answers `full` when nothing is set, so falling
-    // through to it on an unreadable resolver answer DISCARDED the config tier
-    // it had just been asked about.
-    const sh = `
-      set -euo pipefail
-      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
-      # A writer that exits 0 and prints something that is not a mode.
-      jsm_resolve_access_probe() { :; }
-      if jsm_resolve_access; then echo "MODE=[$JSM_ACCESS_MODE]"; else echo "REFUSED"; fi
-    `;
-    const r = spawnSync("bash", ["-c", sh], {
-      encoding: "utf8",
-      cwd: dir,
-      env: { ...process.env },
-      timeout: 20000,
-    });
-    // With a healthy writer it resolves normally; the point of the assertion is
-    // that the function reports a MODE or a REFUSAL, never a silent "full".
-    assert.match(
-      r.stdout,
-      /MODE=\[(full|manual|command|approve|read-only)\]|REFUSED/,
-    );
-    const src = fs.readFileSync(
-      path.join(SHARED, "jira-sprint-lib.sh"),
-      "utf8",
-    );
-    assert.match(
-      src,
-      /Could not read the access mode from the resolver[\s\S]{0,400}return 1/,
-      "an unnameable answer must return 1, not fall through to the env tier",
-    );
-  });
-});
-
-test("§16 C4-CR7 a resolver failure does not abort the caller before it can report", async () => {
-  await withTmp(async (dir) => {
-    // `out=$(...)` as a bare assignment aborts under `set -e` BEFORE `rc=$?`,
-    // losing the message and leaking the temp file.
-    const src = fs.readFileSync(
-      path.join(SHARED, "jira-sprint-lib.sh"),
-      "utf8",
-    );
-    assert.match(
-      src,
-      /if out=\$\(node "\$writer" --resolve-access 2>"\$errfile"\); then/,
-      "the non-zero exit must be an inspected condition, not a bare assignment",
-    );
-    // And a refusal always carries a message.
-    assert.match(
-      src,
-      /exited \$rc without a message/,
-      "a node that dies silently must still produce a reason",
-    );
-
-    const sh = `
-      set -euo pipefail
-      source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
-      jsm_resolve_access
-      echo "SURVIVED MODE=[$JSM_ACCESS_MODE]"
-    `;
-    const r = spawnSync("bash", ["-c", sh], {
-      encoding: "utf8",
-      cwd: dir,
-      timeout: 20000,
-    });
-    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
-    assert.match(r.stdout, /SURVIVED/);
-  });
-});
 
 test("§16 C4-CR10 jsm_defer does not shadow the memoised mode", () => {
   const src = fs.readFileSync(path.join(SHARED, "jira-sprint-lib.sh"), "utf8");
@@ -1973,27 +1578,6 @@ test("§16 C4-CR10 jsm_defer does not shadow the memoised mode", () => {
       "so the process-wide memo is never populated",
   );
   assert.match(src, /local method=\$1 url=\$2 mode=/);
-});
-
-test("§16 C4-CR3 the config path is captured at require time, not read later", () => {
-  const src = fs.readFileSync(path.join(SHARED, "jira-sync.js"), "utf8");
-  const snapshot =
-    /const ACCESS_ENV_AT_LOAD = Object\.freeze\(\{[\s\S]*?\}\);/.exec(src);
-  assert.ok(snapshot, "no require-time snapshot found");
-  // The KEY, not a mention of it: a comment naming the variable satisfied a
-  // looser match while the field itself had been removed.
-  assert.match(
-    snapshot[0],
-    /SKILLS_CONFIG_FILE:\s*process\.env\.SKILLS_CONFIG_FILE/,
-    "the config PATH is part of the restriction — a .env that redirects it " +
-      "walks around the snapshot whose purpose is that a dot-env cannot escalate",
-  );
-  // And it must actually reach the resolver.
-  assert.match(
-    src,
-    /dm\.resolveAccessTracker\(env, \{ env, \.\.\.opts \}\)/,
-    "the captured env must be handed to the config tier, not just captured",
-  );
 });
 
 test("§16 C4-CR9 an empty original estimate falls through to the remaining one", () => {
@@ -2027,36 +1611,4 @@ test("§16 C4-CR13 mode membership is an own-property test", () => {
     /hasOwnProperty\.call\(ACCESS_RANK_FALLBACK/,
     '`in` walks the prototype chain, so "constructor" passed validation',
   );
-});
-
-test("§16 C5-1 a gate with no writer refuses over a config it cannot read", async () => {
-  await withTmp(async (dir) => {
-    // Found by tracing the property rather than by a review: the no-writer
-    // fallback consults the env tier ONLY, so with no env var set it answered
-    // "full" — over a skills-config.yaml that may well restrict. With no writer
-    // there is also nothing to record a deferral with, so proceeding is the one
-    // outcome that leaves no trace at all.
-    fs.writeFileSync(
-      path.join(dir, "skills-config.yaml"),
-      "access:\n  tracker: manual\n",
-    );
-    const env = { ...process.env, PATH: "/nonexistent" };
-    delete env.ACCESS_TRACKER;
-    delete env.AGENT_SKILLS_ACCESS_TRACKER;
-    const r = spawnSync(
-      "/bin/bash",
-      [
-        "-c",
-        `source ${JSON.stringify(path.join(SHARED, "jira-sprint-lib.sh"))}
-         if jsm_resolve_access; then echo "MODE=[$JSM_ACCESS_MODE]"; else echo "REFUSED"; fi`,
-      ],
-      { encoding: "utf8", cwd: dir, env, timeout: 20000 },
-    );
-    assert.match(
-      r.stdout,
-      /REFUSED/,
-      'with no node and a config present, the gate must refuse — not answer "full"',
-    );
-    assert.doesNotMatch(r.stdout, /MODE=\[full\]/);
-  });
 });
