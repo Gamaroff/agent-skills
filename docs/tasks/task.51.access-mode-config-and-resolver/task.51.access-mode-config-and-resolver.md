@@ -5,11 +5,13 @@ type: task
 description: 'Adds an `access:` block to skills-config.yaml declaring how much access the agent has to each system — full | read-only | approve | command | manual — resolved into ACCESS_TRACKER / ACCESS_VCS by resolve-platform.sh alongside the existing TRACKER / VCS. Identity stays separate from access: the tracker is still Jira, and the instructions emitted later need to know that. Unlike the existing keys, an unrecognised value fails loudly rather than falling through to a default, because the failure mode here is handing credentials to a run the operator meant to lock down. First unit of the restricted-tracker-access sequence (tasks 51-58); useful on its own because it also closes the silent fall-through on the existing tracker/vcs keys, and because making a rejection actually halt a run requires guarding all 16 resolver call sites — today none of them check.'
 tags: [config, platform-detection, access-control, restricted-access]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-08-17
 updated: 2026-08-18
+completed_date: 2026-08-18
+pr_number: 246
 estimated_effort_hours: 8
 github_issue: 225
 ---
@@ -381,6 +383,39 @@ once a consumer gates on it, the same wrong value is an unintended write.
 
 ---
 
+## Definition of Done — PASSED (CONDITIONAL) ✅
+
+**Status:** ACCEPTED
+**Accepted on:** 2026-08-18
+**PR:** [#246](https://github.com/Gamaroff/agent-skills/pull/246)
+**Detailed Verification Log:** [`task.51.dod.1.access-mode-config-and-resolver.md`](./task.51.dod.1.access-mode-config-and-resolver.md)
+
+### QA Summary
+
+**Gate:** [`task.51.gate.7.access-mode-config-and-resolver.yml`](./task.51.gate.7.access-mode-config-and-resolver.yml) — ⚠️ CONCERNS, 80/100, after 7 cycles
+**Report:** [`task.51.qa.7.access-mode-config-and-resolver.md`](./task.51.qa.7.access-mode-config-and-resolver.md)
+
+- ✅ **Success criteria:** 12/12, each executed rather than read off a checkbox
+- ✅ **CI:** green on `7add4ce` — the final head, not an ancestor
+- ✅ **Halt behaviour:** verified end-to-end through a real guarded call site
+- ✅ **Call sites:** 20 sourcing lines, 0 unguarded, and now all enforced by test
+- ✅ **Documentation:** config schema, canonical spec, setup wizard, Change Log
+- ✅ **Mutation audit:** 9 tried, 9 caught (gate 6 found 11 surviving of 35)
+- ⚠️ **Security:** CONCERNS — five escalation routes closed, LIMIT-1 open on the awk tier
+- — **Compliance:** not applicable
+
+### Accepted with three conditions
+
+1. **LIMIT-1 is a known limit, not a closed one.** The awk tier reads only the canonical spelling of
+   `access:`; a merge key, a quoted key, or a mapping-valued child resolves to `full` at exit 0. Tier 2
+   is the *default* tier on a stock macOS host. Consumers without `pyyaml` must use the canonical block
+   form. See **Known limits** above; pinned by `tracker-access.test.sh` §41.
+2. **LIMIT-1 must be closed before any skill gates a mutation on `ACCESS_TRACKER`** (task.52 onward).
+   Nothing reads the value today, which is what makes this accept-eligible; the day something does,
+   the same wrong value stops being cosmetic. A follow-up task is recorded as a prerequisite of task.52.
+3. **Human review of PR #246 is outstanding.** No human has read this branch across seven QA cycles.
+   Two of the defects closed in cycle 7 were introduced by cycle 7's own fixes.
+
 ## Risk Assessment
 
 **Low–medium** — the resolver logic is small and well-tested, but the call-site guards touch 16 skill
@@ -506,6 +541,7 @@ Rollback triggers: any consumer report of a halt on a config that is legal per t
 | 2026-08-17 |  | QA gate FAIL (20/100) cycle 6 — independent adversarial pass: 10 HIGH incl. 4 silent-escalation routes, 1 code-execution vector, 1 cycle-5 regression; 11 surviving mutations | qa-task |
 | 2026-08-18 |  | QA findings fixed cycle 7 (scoped, user-directed) — 6 HIGH closed: python isolated from CWD, unreadable + redirected config fail closed, `access:` opt-in probe broadened, documented `tracker:` mapping form works on the awk tier, over-broad `<<` guard narrowed to overlapping sources, `vcs:` mapping disagreement closed. Suite 166 → 277; call-site scan no longer blind to dot-sources; all five fixes mutation-witnessed. Awk-tier spelling class recorded under Known limits rather than patched | qa-fix |
 | 2026-08-18 |  | QA gate CONCERNS (80/100) cycle 7 — all 6 scoped defects verified closed; 2 regressions caused by the fixes found and closed in-cycle (BUG-29 nested-merge overlap, BUG-30 explicit-key spelling); 9/9 mutations caught; suite 277 → 285. 2 deferred limits documented and pinned | qa-task |
+| 2026-08-18 | 1.2 | DoD verified — accepted with three conditions (PR #246): LIMIT-1 is a known limit, it must be closed before task.52 gates on ACCESS_TRACKER, and human PR review is outstanding | finalise |
 
 ## References
 
