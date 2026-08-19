@@ -51,9 +51,17 @@ jsm_auth_header() {
 # restriction, because this skill's own SKILL.md documents bare
 # `manage-sprint-state.sh <id> closed` invocations that never source the resolver.
 #
-# `access.tracker` in skills-config.yaml is NOT read here — see the matching note
-# in defer-mutation.js. A config tier needs read-config.sh's discovery and subset
-# semantics; a shell reimplementation of those is task.61, not this file.
+# `access.tracker` in skills-config.yaml IS read here, and by the only reader
+# there is: resolve-platform.sh, sourced below in a subshell. This file used to
+# open-code the mode table over the two env names, which made it a FOURTH copy of
+# a contract that already had three — and left it blind to a restriction an
+# operator had committed to the repo, which is precisely the person the gate
+# exists for. Sourcing the resolver is not a fifth copy; it is the original.
+#
+# In a SUBSHELL, and read back through stdout, on purpose. resolve-platform.sh
+# `unset`s and re-exports TRACKER/VCS/ACCESS_* and defines functions; sourcing it
+# into the caller's shell would overwrite platform state the caller may have
+# resolved for itself. A subshell keeps the blast radius to one variable.
 #
 # It SETS a global rather than printing, and is called as a plain command: a
 # value assigned inside `$(...)` dies with the subshell, so a memo there never
@@ -62,8 +70,88 @@ jsm_resolve_access() {
   [ -n "${JSM_ACCESS_MODE:-}" ] && return 0
   JSM_ACCESS_ERROR=""
 
+  # The CONFIG tier, from the one reader. A non-zero exit is a refusal — the file
+  # exists and could not be read correctly — and resolves to the most restrictive
+  # mode rather than to "full", matching what the JS gates do with the same
+  # answer. An absent config answers "full", which is the identity element of the
+  # most-restrictive-wins reduction below and so changes nothing.
+  local cfg_mode="" resolver cfg_err
+  # ABSOLUTE, resolved BEFORE the subshell cd's. `dirname "${BASH_SOURCE[0]}"` is
+  # relative whenever the lib is sourced by a relative path — which is the
+  # documented call shape — so a later `cd` to the repo root left the resolver
+  # path pointing nowhere, `source` failed, and EVERY answer became `manual`.
+  # A repo declaring nothing then deferred every sprint write: a false
+  # restriction, and worse than the anchoring bug it was fixing.
+  #
+  # Three hazards in one line, each of which re-opens that same false-restriction
+  # class through a different door:
+  #
+  #   CDPATH= — `cd` consults CDPATH, and when an entry matches it PRINTS the
+  #     resolved directory on stdout. Inside `$(...)` that lands in the value, so
+  #     an operator with CDPATH exported (common in dotfiles) plus a bare relative
+  #     dirname like `references` got a two-line garbage path, `[ -f ]` false, and
+  #     `manual` on every write — under a message blaming the bundle.
+  #   || true — a bare assignment whose only command is a failing substitution is
+  #     FATAL under `set -euo pipefail`. Harmless today because the sole caller
+  #     tests it in a condition context, but a future plain-command caller would
+  #     get a silent exit 1 instead of the intended fail-closed `manual`.
+  #   :-/nonexistent — an empty BASH_SOURCE[0] (sourced from stdin) makes
+  #     `dirname ""` return `.`, so the resolver would be taken from the CALLER'S
+  #     CWD — anchoring to cwd being the precise thing this line exists to forbid,
+  #     and a cwd-controlled script being a far worse outcome than refusing.
+  _jsm_self=${BASH_SOURCE[0]:-}
+  if [ -z "$_jsm_self" ]; then
+    resolver="/nonexistent/resolve-platform.sh"
+  else
+    resolver="$(CDPATH= cd -P -- "$(dirname "$_jsm_self")" >/dev/null 2>&1 && pwd -P || true)/resolve-platform.sh"
+  fi
+  unset _jsm_self
+  if [ -f "$resolver" ]; then
+    # ANCHORED to the repo root, not the caller's cwd. read-config.sh defaults
+    # SKILLS_CONFIG_FILE to the RELATIVE `skills-config.yaml`, and this skill
+    # documents bare `manage-sprint-state.sh <id> closed` invocations that no
+    # wrapper cd's for. Unanchored, the same repo resolved `manual` from its root
+    # and `full` from `docs/` — the C5-CR6 defect, fixed on the JS side and left
+    # here (T61-H4).
+    #
+    # AGENT_SKILLS_CONFIG_TIER is unset alongside the two access names: forcing a
+    # tier the host cannot honour makes the reader answer nothing and the resolver
+    # exit 0 with `full` over a committed restriction (T61-M4).
+    cfg_err=$(mktemp) || cfg_err=""
+    cfg_mode=$(
+      unset ACCESS_TRACKER AGENT_SKILLS_ACCESS_TRACKER AGENT_SKILLS_CONFIG_TIER
+      cd "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" || exit 1
+      source "$resolver" >/dev/null 2>"${cfg_err:-/dev/null}" && printf '%s' "$ACCESS_TRACKER"
+    ) || cfg_mode="manual"
+    [ -n "$cfg_mode" ] || cfg_mode="manual"
+    # Surface the resolver's own refusal line, the way the JS path does. Without
+    # this the operator gets `manual` and no reason at all.
+    if [ "$cfg_mode" = "manual" ] && [ -n "$cfg_err" ] && [ -s "$cfg_err" ]; then
+      # shellcheck disable=SC2034
+      # $'...' (ANSI-C quoting), NOT "\xe2…": grep does not interpret \xNN, so the
+      # double-quoted form searched for the literal text `xe2x9dx8c` and matched
+      # nothing. The capture was silently inert until a test caught it.
+      JSM_ACCESS_ERROR=$(grep -m1 $'^\xe2\x9d\x8c' "$cfg_err" 2>/dev/null || true)
+    fi
+    # A refusal with no reason is not a legible refusal. mktemp can fail (a
+    # read-only TMPDIR), and the subshell can die before the resolver prints
+    # anything — a failing `cd`, a partially-bundled resolver. Both left `manual`
+    # with an empty JSM_ACCESS_ERROR, which is the exact silence the emit above
+    # was added to end.
+    if [ "$cfg_mode" = "manual" ] && [ -z "${JSM_ACCESS_ERROR:-}" ]; then
+      JSM_ACCESS_ERROR="skills-config.yaml could not be read by resolve-platform.sh (no diagnostic captured) - refusing rather than defaulting to full"
+    fi
+    [ -n "$cfg_err" ] && rm -f "$cfg_err"
+  else
+    # FAIL CLOSED, matching the JS tier for the identical condition. A partial
+    # bundle leaves no way to read the config, and `full` is the wrong guess to
+    # make when nothing can be verified (T61-M1).
+    cfg_mode="manual"
+    JSM_ACCESS_ERROR="resolve-platform.sh not found beside jira-sprint-lib.sh - refusing rather than defaulting to full"
+  fi
+
   local best="full" v rank_v rank_best
-  for v in "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
+  for v in "$cfg_mode" "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
     [ -z "$v" ] && continue
     case "$v" in
       manual) rank_v=0 ;; command) rank_v=1 ;; approve) rank_v=2 ;;
@@ -83,6 +171,14 @@ jsm_resolve_access() {
     [ "$rank_v" -lt "$rank_best" ] && best="$v"
   done
   JSM_ACCESS_MODE="$best"
+  # Say WHY, once, when the config tier refused. Both writers above set
+  # JSM_ACCESS_ERROR and then return 0 with mode=manual, so the only existing
+  # printer — the `return 1` path in the caller — never fired and the operator
+  # still got `manual` with no reason, which is precisely what setting the
+  # variable was meant to fix.
+  if [ -n "${JSM_ACCESS_ERROR:-}" ] && [ "$best" != "full" ]; then
+    printf '%s\n' "$JSM_ACCESS_ERROR" >&2
+  fi
   return 0
 }
 

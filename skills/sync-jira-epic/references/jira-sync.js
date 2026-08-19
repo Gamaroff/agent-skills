@@ -41,13 +41,19 @@ const dm = require("./defer-mutation.js");
 // the mode table, jira-create-epic.js a third and jira-sprint-lib.sh a fourth,
 // and each read a different subset of the tiers. `dm.resolveAccessTracker`
 // reads ACCESS_TRACKER and AGENT_SKILLS_ACCESS_TRACKER, most-restrictive-wins.
-function mostRestrictiveAccess(env = process.env) {
-  return dm.resolveAccessTracker(env);
+// `cwd` reaches the config tier so it anchors to the repo root the caller
+// computed rather than to process.cwd() (C5-CR6).
+function mostRestrictiveAccess(env = process.env, cwd = undefined) {
+  return dm.resolveAccessTracker(env, { cwd });
 }
 
+// SKILLS_CONFIG_FILE is frozen alongside the two mode names: it is how the
+// config tier finds the file, so leaving it out would let a .env redirect the
+// config path after this snapshot (C5-CR1).
 const ACCESS_ENV_AT_LOAD = Object.freeze({
   ACCESS_TRACKER: process.env.ACCESS_TRACKER,
   AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+  SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
 });
 
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
@@ -1814,7 +1820,11 @@ function makeHttp({
   // be the one hole the resolver refuses everywhere else.
   let resolved = null;
   if (access) {
-    const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    // Same anchor as the lazy path below. Without it this clamp resolved against
+    // process.cwd(), so an injected `full` survived a config-declared `manual`
+    // whenever the process stood outside the repo root — falsifying the
+    // may-restrict-never-escalate rule stated directly above (T61-M2).
+    const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD, cwd);
     resolved =
       dm.ACCESS_MODES.indexOf(access) < 0
         ? access // let the shared resolver produce the refusal message
@@ -1824,7 +1834,7 @@ function makeHttp({
   }
   const accessFor = (method) => {
     if (method === "GET") return "full"; // a read is never gated
-    if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD, cwd);
     return resolved;
   };
 

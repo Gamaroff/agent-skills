@@ -958,7 +958,7 @@ async function main(argv) {
         return 3;
       }
       probe = await probeJira({
-        http: lib.makeHttp(),
+        http: lib.makeHttp({ cwd: repoRoot }),
         baseUrl: auth.baseUrl,
         email: auth.email,
         token: auth.token,

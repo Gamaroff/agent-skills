@@ -728,9 +728,16 @@ function run({
   // resolve-platform.sh's output and `AGENT_SKILLS_ACCESS_TRACKER` is the knob
   // an operator sets. Capturing only the first made the shared resolver blind to
   // the operator knob no matter how many tiers it grew.
+  //
+  // SKILLS_CONFIG_FILE is captured here for the same reason and it is the whole
+  // of C5-CR1: the config tier reads that variable to find the file, so a .env
+  // line setting it would redirect the config path AFTER this snapshot and walk
+  // straight around it. Capturing the mode but not the path to the mode leaves
+  // the door the snapshot exists to shut.
   const accessEnv = {
     ACCESS_TRACKER: process.env.ACCESS_TRACKER,
     AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+    SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
   };
 
   loadDotEnv(root);
@@ -842,7 +849,9 @@ function run({
   // moving cards.
   let access;
   try {
-    access = dm.resolveAccessTracker(accessEnv);
+    // `root` is the repo root computed above, before loadDotEnv — the same
+    // anchor read-config.sh uses when a shell sources it from the root (C5-CR6).
+    access = dm.resolveAccessTracker(accessEnv, { cwd: root || process.cwd() });
   } catch (e) {
     output.err(`Error: ${e.message}`);
     return { exitCode: 2 };

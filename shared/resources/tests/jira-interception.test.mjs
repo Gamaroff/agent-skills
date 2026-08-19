@@ -1440,9 +1440,11 @@ test("§14 C2-CR2 every gate resolves the mode the same way", () => {
       );
     }
   }
-  // The shell gate resolves the same two tiers, in the same order, refusing a
-  // typo the same way. It does not share the JS resolver — sharing is what a
-  // config tier would require, and the config tier is task.61.
+  // The shell gate resolves the same tiers, in the same order, refusing a typo
+  // the same way. Since task.61 it also reads the CONFIG tier, and it does so by
+  // sourcing resolve-platform.sh rather than by open-coding a fourth copy of the
+  // mode table. That it delegates is the property worth pinning: an inlined
+  // reimplementation here would be the drift this whole test guards against.
   const sh = fs.readFileSync(path.join(SHARED, "jira-sprint-lib.sh"), "utf8");
   assert.match(
     sh,
@@ -1450,6 +1452,16 @@ test("§14 C2-CR2 every gate resolves the mode the same way", () => {
     "the shell gate reads both env names",
   );
   assert.match(sh, /Refusing rather than defaulting/, "and refuses a typo");
+  assert.match(
+    sh,
+    /source "\$resolver"/,
+    "the shell gate reads the config tier through resolve-platform.sh",
+  );
+  assert.doesNotMatch(
+    sh,
+    /read_nested_config_key|_config_subset_scan|parseYamlSubset/,
+    "and must not reach past the resolver into the reader's internals",
+  );
 });
 
 test("§14 C2-CR2 the stage CLI gate is not looser than the gate underneath it", () => {

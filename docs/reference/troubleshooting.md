@@ -260,6 +260,52 @@ unrestricted run would create a duplicate. `jira_key` stays absent until the iss
 Full schema and the roster of mutation kinds:
 [`tracker-access-record.md`](../../shared/resources/tracker-access-record.md).
 
+## Everything is deferred, and I did not restrict anything
+
+**Symptom:** every tracker write is refused and recorded, but `skills-config.yaml` declares no
+`access.tracker` — or declares `full`. One line names a file and a reason:
+
+```
+⚠️  /path/to/skills-config.yaml was refused — 1: this file uses an anchor (`&name`), which the
+    no-dependency config reader cannot parse. Resolving tracker access to "manual" — refusing
+    rather than defaulting to "full", because that would silently escalate a declared
+    restriction into a tracker write.
+```
+
+> The line deliberately does **not** begin `access.tracker:`. `resolve-platform.sh` also exits
+> non-zero for an invalid `tracker:`/`vcs:` value and for `access.vcs`, so naming `access.tracker`
+> as the cause misattributed those refusals. The resolver's own message, carried verbatim above,
+> says which it was.
+
+**Cause:** the config file exists and mentions `access`, but could not be read *correctly*. That is
+not the same as "declares nothing", and the two must not resolve the same way — reading an
+unreadable file as absent is what silently granted `full` over a committed restriction. The reader
+refuses instead, and the JavaScript gates turn that refusal into the most restrictive mode.
+
+The reason names the construct. On a host without `pyyaml` the no-dependency reader accepts a
+documented subset of YAML; an anchor, an alias, a merge key, a document separator, a BOM, an
+explicit tag or a multi-line flow mapping is outside it, as is a quoted or space-padded spelling of
+a key the reader consumes. See
+[Platform Detection → Tier 2 — the strict subset](../../shared/resources/platform-detection.md#tier-2--the-strict-subset).
+
+**Fix — either rewrite the construct, or install a real parser:**
+
+```bash
+# See exactly what the reader objects to, and on which line:
+SKILLS_CONFIG_FILE=skills-config.yaml bash -c 'source shared/resources/resolve-platform.sh'
+
+python3 -m pip install pyyaml     # or: rewrite the offending line in the subset
+```
+
+A repo whose config declares no access restriction is never affected: it resolves to `full`. Note
+the check is deliberately generous — the word `access` appearing **anywhere**, including inside a
+comment, is enough to make the reader run, because under-matching it would be an escalation and
+over-matching it is only slow. So a config that documents the option in a commented-out block does
+pay one subprocess per process, and still answers `full`.
+
+**Not this:** do not "fix" it by setting `AGENT_SKILLS_ACCESS_TRACKER=full`. Config and env are
+reduced most-restrictively, so that changes nothing — by design. The file has to become readable.
+
 ## See also
 
 - [Story Development Runbook](../runbooks/story-development.md)

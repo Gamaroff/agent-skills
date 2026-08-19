@@ -54,6 +54,17 @@ function accessTracker() {
     ]
       .map((v) => String(v || "").trim())
       .filter(Boolean);
+    // C5-CR4 — the degraded tier must not answer "full" over a config it cannot
+    // read. Without `dm` there is no config tier at all, so a repo that declares
+    // `access.tracker` would get everything the declaration withholds. Detecting
+    // that the declaration EXISTS needs no parser, and is enough to refuse.
+    //
+    // Folded into the reduction UNCONDITIONALLY, not only when `seen` is empty.
+    // Gating it on an empty `seen` closed just half the hole: with
+    // AGENT_SKILLS_ACCESS_TRACKER=read-only set and `access.tracker: manual`
+    // committed, the env value won and the create proceeded at a mode looser than
+    // the repo declares (T61-H3).
+    if (configMayRestrict()) seen.push("manual");
     if (!seen.length) return "full";
     for (const v of seen) {
       // CYCLE-4 CR-13 — own properties only. `in` walks the prototype chain, so
@@ -71,10 +82,79 @@ function accessTracker() {
     );
   }
   try {
-    return dm.resolveAccessTracker();
+    // Anchored to the repo root rather than process.cwd(), so a bare
+    // `node jira-create-epic.js …` from a subdirectory reads the same config the
+    // resolver would (C5-CR6).
+    return dm.resolveAccessTracker(process.env, { cwd: repoRootOrCwd() });
   } catch (e) {
     console.error(`Error: ${e.message}`);
     process.exit(1);
+  }
+}
+
+/**
+ * The git top level, or the working directory when this is not a checkout.
+ * Memoised: this used to shell out to git twice per gated operation.
+ */
+let _repoRoot;
+function repoRootOrCwd() {
+  if (_repoRoot !== undefined) return _repoRoot;
+  try {
+    const out = require("child_process")
+      .execSync("git rev-parse --show-toplevel", {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      .trim();
+    // `out || process.cwd()`: an older git can exit 0 printing nothing, and
+    // memoising "" would hand spawnSync an empty cwd (ENOENT) for the rest of
+    // the process.
+    return (_repoRoot = out || process.cwd());
+  } catch (_) {
+    return (_repoRoot = process.cwd());
+  }
+}
+
+/**
+ * Does a config file exist that mentions `access`? Used ONLY on the degraded
+ * no-writer path, where there is no reader to ask. It deliberately answers a
+ * weaker question than read-config.sh does — "might something be declared here"
+ * rather than "what is declared" — because the only safe action when the answer
+ * is yes and nothing can parse it is to refuse.
+ */
+function configMayRestrict() {
+  const root = repoRootOrCwd();
+  const raw = String(process.env.SKILLS_CONFIG_FILE || "").trim();
+  const file = raw
+    ? path.isAbsolute(raw)
+      ? raw
+      : path.resolve(root, raw)
+    : path.join(root, "skills-config.yaml");
+  // A redirect that lands on nothing is itself a refusal: changing WHICH file is
+  // read must never widen access.
+  try {
+    if (!fs.statSync(file).isFile()) return true;
+  } catch (_) {
+    // A redirect that lands on nothing is a refusal — but the literal default
+    // basename is NOT a redirect, per read-config.sh's own rule. Treating it as
+    // one forced `manual` on a repo that declares nothing (T61-L1).
+    return Boolean(raw) && raw !== "skills-config.yaml";
+  }
+  try {
+    // Key-shaped, not a bare substring. `accessToken:` or a path like
+    // `docs/access-control/` is not a declaration, and forcing `manual` on those
+    // would be a false restriction that stops every epic create.
+    // BOTH spellings the shell greps for. YAML has two ways to write a key, and
+    // dropping the explicit-key form (`? access` / `: {tracker: manual}`) left a
+    // config written that way invisible to the degraded tier — which then
+    // proceeded at `full` over a committed restriction.
+    const text = fs.readFileSync(file, "utf8");
+    return (
+      /(^|[^A-Za-z0-9_-])["']?access["']?[ \t]*:/m.test(text) ||
+      /^[ \t]*\?[ \t]+["']?access["']?[ \t]*$/m.test(text)
+    );
+  } catch (_) {
+    return true;
   }
 }
 

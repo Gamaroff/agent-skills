@@ -295,9 +295,16 @@ async function run({
   // the layer-1 net underneath it — it read "full", skipped the typed deferral
   // it exists to write, and the POST was then refused downstream as an untyped
   // unknown-mutation.
+  //
+  // SKILLS_CONFIG_FILE is captured here for the same reason and it is the whole
+  // of C5-CR1: the config tier reads that variable to find the file, so a .env
+  // line setting it would redirect the config path AFTER this snapshot and walk
+  // straight around it. Capturing the mode but not the path to the mode leaves
+  // the door the snapshot exists to shut.
   const accessEnv = {
     ACCESS_TRACKER: process.env.ACCESS_TRACKER,
     AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+    SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
   };
 
   lib.loadDotEnv();
@@ -429,7 +436,12 @@ async function run({
   // non-`full` mode still permits reads.
   let access;
   try {
-    access = dm.resolveAccessTracker(accessEnv);
+    // `cwd` is the repo root this CLI already computes, not process.cwd(). A
+    // bare `node jira-stage.js …` run from a subdirectory must see the same
+    // declared restriction the resolver sees from the root (C5-CR6).
+    access = dm.resolveAccessTracker(accessEnv, {
+      cwd: repoRoot || gitToplevel() || process.cwd(),
+    });
   } catch (e) {
     output.err(`Error: ${e.message}`);
     return { exitCode: 2 };
@@ -521,7 +533,13 @@ async function run({
     return emit({ transitioned: false, reason: "no-credentials" }, 0);
   }
 
-  const http = lib.makeHttp({ fetchImpl });
+  // The SAME anchor the CLI gate above used. Leaving it out let layer 1 resolve
+  // the config tier against process.cwd() while the gate resolved it against the
+  // repo root, so one run could hold two different answers (T61-M3).
+  const http = lib.makeHttp({
+    fetchImpl,
+    cwd: repoRoot || gitToplevel() || process.cwd(),
+  });
   const record = lib.loadWorkflowRecord(repoRoot);
 
   let issue;
