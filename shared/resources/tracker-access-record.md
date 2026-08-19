@@ -1,6 +1,6 @@
 ---
 name: tracker-access-record
-description: Canonical schema for the deferred-mutation record, the append-only journal it lands in, and the roster of the 21 tracker mutation kinds. Read by defer-mutation.js (which refuses an unknown kind) and by handover-render.js (whose totality test enumerates the roster from this file).
+description: Canonical schema for the deferred-mutation record, the append-only journal it lands in, and the roster of the 23 tracker mutation kinds. Read by defer-mutation.js (which refuses an unknown kind) and by handover-render.js (whose totality test enumerates the roster from this file).
 ---
 
 # The deferred-mutation record
@@ -14,7 +14,7 @@ journal. This file is the canonical definition of both, and of the roster of mut
 may name.
 
 **This file is load-bearing, not descriptive.** `defer-mutation.js` refuses to write a record whose
-`kind` is absent from §"The 22 kinds" below, and `handover-render.js`'s totality test enumerates the
+`kind` is absent from §"The 23 kinds" below, and `handover-render.js`'s totality test enumerates the
 roster *from this file* rather than from a hand-written list in the test. A kind added here without a
 renderer fails the suite; a kind added to a renderer without a row here is never reachable. Any count
 that disagrees with the roster is a bug in one of the two.
@@ -38,7 +38,7 @@ A mode is a **selection over renderers**, never a renderer itself:
 | `command` | `sh` + `summary` | The operator holds the credential and runs the script. |
 | `manual` | `md` + `summary` | The operator clicks through the UI. |
 
-The test matrix is therefore **22 kinds × 4 output formats**, not 22 × 5.
+The test matrix is therefore **23 kinds × 4 output formats**, not 23 × 5.
 
 ---
 
@@ -60,7 +60,7 @@ One JSON object per line of the journal. Field order below is the canonical orde
 
   "system": "jira",              // jira | github
   "access": "manual",            // the mode in force when the record was written
-  "kind": "jira.comment.add",    // one of the 21; see roster
+  "kind": "jira.comment.add",    // one of the 23; see roster
   "consequence": "communication",// state-drift | communication | irreversible
   "produces": null,              // symbol the operator's action yields, or null
 
@@ -88,6 +88,7 @@ One JSON object per line of the journal. Field order below is the canonical orde
     "expect": "contains 'Accepted'"
   },
 
+  "blocking": false,             // true → nothing after this can proceed; see §Blocking
   "retry_of": null               // non-null → this is a FAILED full-access mutation, not a policy deferral
 }
 ```
@@ -115,7 +116,36 @@ One JSON object per line of the journal. Field order below is the canonical orde
 | `manual` | object \| null | yes | `null` only when the kind genuinely has no UI path. |
 | `command` | object \| null | yes | `argv` is an **array** — never a joined string. `stdin` carries bodies. |
 | `verify` | object \| null | no | Omitted when there is no cheap read-back. |
+| `blocking` | boolean | no | Defaults `false`. `true` → the run cannot converge until a human performs this action. See §Blocking. |
 | `retry_of` | string \| null | no | The `id` of the record whose execution failed, or a short failure token. |
+
+### Blocking
+
+A record is **blocking** when the run cannot finish correctly until a human performs it — not merely
+when it is important. The test is mechanical and narrow:
+
+> A record is blocking if some later action in the same run needs the value it `produces`, and no
+> other path can supply that value.
+
+`github.issue.create` under a deferring mode is the case this field exists for. The caller wanted an
+issue number to write into frontmatter; it did not get one, so the document is left unwritten and
+every dependant action is stranded. The operator must create the issue, write the key into the
+document, and re-run — the **two-run convergence**. Until they do, re-running changes nothing, and a
+run that appears to do nothing twice is indistinguishable from a broken one. That is the failure this
+field is here to make loud.
+
+**`blocking` is not a severity.** `consequence: irreversible` says *this cannot be undone*;
+`blocking: true` says *nothing after this can proceed*. They are independent: a `jira.sprint.set-state`
+is irreversible and not blocking; a milestone create is reversible and blocking for the issue that
+needs its number.
+
+**Never fabricate the produced value to clear a block.** Writing `github_issue: 0` or
+`jira_key: <pending>` would defeat the idempotent `synced-from-*` label search that stops the next run
+creating a duplicate. A wrong key is worse than no key, and the empty capture is the honest answer.
+
+Renderers must surface blocking records **at the top**, not in document order — `md` and `summary`
+both open with a banner naming them and the convergence instruction. A blocking record buried at
+position 17 of a checklist is a blocking record nobody acts on first.
 
 ### Identity
 
@@ -224,7 +254,7 @@ mode `0644` and dry-run-by-default so nobody runs it by accident.
 
 ---
 
-## The 22 kinds
+## The 23 kinds
 
 Every row is one mutation kind. `Consequence` is the default a record inherits; a caller may harden
 it (`state-drift` → `irreversible`) but never soften it. `Produces` names the symbol an operator's
@@ -251,7 +281,7 @@ action yields, which dependants consume via `dependsOn`.
 honest default for a mutation the system cannot describe. A record of this kind is also a signal:
 it means a mutation path exists that nobody has annotated yet.
 
-**GitHub — 12** (board, issue, PR and comment kinds)
+**GitHub — 13** (board, issue, milestone, PR and comment kinds)
 
 | `kind` | Consequence | Produces | Underlying call |
 | ------ | ----------- | -------- | --------------- |
@@ -260,6 +290,7 @@ it means a mutation path exists that nobody has annotated yet.
 | `github.issue.close` | state-drift | — | `gh issue close` |
 | `github.issue.reopen` | state-drift | — | `gh issue reopen` |
 | `github.issue.comment` | communication | — | `gh issue comment` |
+| `github.milestone.create` | state-drift | `github.milestoneNumber` | `POST /repos/{o}/{r}/milestones` |
 | `github.sub-issue.add` | state-drift | — | `POST /repos/{o}/{r}/issues/{n}/sub_issues` |
 | `github.board.item-add` | state-drift | `github.projectItemId` | `gh project item-add` |
 | `github.board.field-set` | state-drift | — | `updateProjectV2ItemFieldValue` (Status, Priority, Estimate) |
@@ -277,7 +308,16 @@ knows what the call would have done — a confirm gate is the only honest defaul
 system cannot describe. A record of this kind is also a signal: it means a `gh` mutation path exists
 that nobody has annotated yet.
 
-**Total: 22.**
+**Total: 23.**
+
+`github.milestone.create` is a **create**, not an edit, and that distinction is the reason it is its
+own kind rather than a case of `github.issue.edit`. The four call sites that reach it
+(`ensure-{story,epic,task}-github-issue`, `sync-github-epic`) resolve a milestone by title and create
+it when absent; the number that comes back is then attached to an issue. It therefore `produces` a
+symbol a dependant consumes — the property that defines this class — where `github.issue.edit`
+attaching an *already existing* milestone produces nothing. Reading the parenthetical
+"(title, body, milestone, labels)" on `github.issue.edit` as covering creation is the mistake this
+row exists to prevent.
 
 > The roster is parsed mechanically. A kind row is a table row whose first cell is a single
 > backtick-quoted token containing a `.`, in a table whose header reads `` `kind` `` followed by a
