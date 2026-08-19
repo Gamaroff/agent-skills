@@ -381,3 +381,89 @@ test("frontmatter — an unquoted title keeping a trailing quote is left intact"
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ===========================================================================
+// Replacement-pattern injection ($&, $`, $', $$) in an epic title
+// ===========================================================================
+
+// The regenerate path feeds the freshly built block to `String.replace` as the
+// replacement argument. A STRING replacement is a PATTERN: `$&` expands to the
+// whole match, `` $` `` / `$'` to the text around it, `$$` to a literal `$`. So an
+// epic titled `Tilemap $& Ruleset` did not insert its own title — it spliced the
+// entire previous index block back inside a table cell, corrupting the PRD.
+//
+// It compounds. The regex is lazy (`[\s\S]*?END`), so it matches only up to the
+// FIRST end marker; the next run re-expands around the already-nested block and
+// adds another. Left running, the PRD grows without bound and `--check` reports
+// STALE forever — a permanently red gate with no explanation of what is stale.
+// Passing a FUNCTION suppresses all `$` expansion — see the call site.
+//
+// Found by adversarial review downstream (tinker-city task.83), which had just
+// wired `--check` into `lint:docs` and therefore into a required CI job.
+test("epic title containing $& is inserted literally, not expanded", () => {
+  const root = tmp();
+  try {
+    const prdDir = makePrd(root, "prd.dollar", [
+      {
+        dir: "epic.38.tilemap",
+        title: "[Epic 38] Tilemap $& Ruleset",
+        number: 38,
+        status: "planned",
+      },
+    ]);
+
+    // First run inserts the block; second run takes the regenerate/replace path.
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+
+    const out = readPrd(prdDir, "prd.dollar");
+
+    assert.match(
+      out,
+      /\| 38 \| \[Tilemap \$& Ruleset\]\(epics\/epic\.38\.tilemap\/epic\.38\.tilemap\.md\) \| planned \|/,
+      "the title must appear verbatim in its table cell",
+    );
+    // The block must appear exactly once — `$&` re-inserting the match would
+    // nest a second copy of the markers inside the table cell.
+    assert.equal(
+      out.split("<!-- epics-index-start -->").length - 1,
+      1,
+      "exactly one index block — no recursive re-insertion",
+    );
+    assert.equal(out.split("## Epics").length - 1, 1);
+
+    // Second half: --check must agree the file is up to date. On the unfixed
+    // script it reported STALE indefinitely, because each run nested one more
+    // block and no amount of regenerating ever converged.
+    const check = run(root, ["--prd-root", root, "--check"]);
+    assert.equal(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stdout, /All epics indexes up to date\./);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The remaining three replacement patterns, for completeness: `` $` `` (text
+// before the match), `$'` (text after), and `$$` (a literal dollar). Each one
+// silently rewrites the cell under a string replacement.
+test("epic titles containing $`, $' and $$ survive regeneration", () => {
+  const root = tmp();
+  try {
+    const prdDir = makePrd(root, "prd.dollars", [
+      { dir: "epic.1.before", title: "[Epic 1] Cost $` each", number: 1 },
+      { dir: "epic.2.after", title: "[Epic 2] Cost $' each", number: 2 },
+      { dir: "epic.3.literal", title: "[Epic 3] Cost $$ each", number: 3 },
+    ]);
+
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+
+    const out = readPrd(prdDir, "prd.dollars");
+    assert.match(out, /\| 1 \| \[Cost \$` each\]/);
+    assert.match(out, /\| 2 \| \[Cost \$' each\]/);
+    assert.match(out, /\| 3 \| \[Cost \$\$ each\]/);
+    assert.equal(out.split("<!-- epics-index-start -->").length - 1, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

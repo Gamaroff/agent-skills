@@ -220,8 +220,13 @@ for (const prdDir of listDirs(PRDS_DIR)) {
   const block = buildBlock(epics);
   const src = readFileSync(prdFile, "utf8");
   const has = src.includes(START) && src.includes(END);
+  // The replacement MUST stay a function. A string replacement is a pattern, so an
+  // epic title carrying `$&`, `$\``, `$'` or `$$` would be expanded instead of
+  // inserted — `$&` splices the whole matched index block back inside a table cell,
+  // and because the regex is lazy each rerun nests another copy. A function argument
+  // suppresses all `$` expansion and is otherwise identical. Do not "simplify" it.
   const next = has
-    ? src.replace(new RegExp(`${START}[\\s\\S]*?${END}`), block)
+    ? src.replace(new RegExp(`${START}[\\s\\S]*?${END}`), () => block)
     : insertBlock(src, block);
 
   if (next === src) continue;
