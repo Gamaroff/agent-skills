@@ -246,32 +246,51 @@ test("§2 the ⏸️ notice goes to stderr, where a capture cannot see it", () =
   );
 });
 
-test("§2 a performed create prints the issue NUMBER, not the URL", () => {
+test("§2 a performed create prints the issue NUMBER to STDOUT", () => {
+  // END-TO-END, through a real subprocess and a fake `gh` on PATH.
+  //
+  // The earlier version passed --json and asserted on the returned payload,
+  // which is NOT the contract: callers bind stdout —
+  //   ISSUE_NUM=$(node references/tracker-issue.js --kind create …)
+  // — so deleting `output.value(num)` left that capture empty while the test
+  // stayed green. Demonstrated by reverting the line: the payload assertion
+  // held. This is the single most important behaviour in the file, so it is
+  // now exercised the way a caller exercises it.
   const dir = withRepo();
-  const { execImpl } = stubGh({
-    createUrl: "https://github.com/acme/repo/issues/207",
-  });
-  const r = cli.run({
-    argv: [
-      "node",
-      "tracker-issue.js",
-      "--kind",
-      "create",
-      "--title",
-      "T",
-      "--json",
-    ],
-    repoRoot: dir,
-    env: {},
-    execImpl,
-  });
-  assert.equal(r.reason, "performed");
-  assert.equal(
-    r.issue,
-    "207",
-    "every call site follows the create with grep -oE '[0-9]+$' — doing it " +
-      "here is what removes that step from six prose blocks",
+  const bin = join(dir, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "gh"),
+    [
+      "#!/bin/sh",
+      'case "$1 $2" in',
+      '  "auth status") exit 0 ;;',
+      '  "repo view") echo acme/repo ;;',
+      '  "issue create") echo https://github.com/acme/repo/issues/207 ;;',
+      "  *) exit 1 ;;",
+      "esac",
+    ].join("\n"),
+    { mode: 0o755 },
   );
+
+  const res = spawnSync(
+    process.execPath,
+    [CLI_PATH, "--kind", "create", "--title", "T", "--repo", "acme/repo"],
+    {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    },
+  );
+
+  assert.equal(
+    res.stdout,
+    "207\n",
+    "stdout must carry the NUMBER and nothing else — every call site used to " +
+      "follow the create with grep -oE '[0-9]+$', and doing it here is what " +
+      "removed that step from six prose blocks",
+  );
+  assert.equal(res.status, 0);
 });
 
 // ── §3 No placeholder, ever ─────────────────────────────────────────────────
