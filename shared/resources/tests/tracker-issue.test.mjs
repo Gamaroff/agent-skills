@@ -1108,6 +1108,49 @@ test("§11 EVERY perform-path gh call carries the resolved cwd", () => {
   }
 });
 
+test("§11 the --body-file path carries the cwd too — it is the hot path", () => {
+  // ALL_KINDS never passes --body-file, so the sweep above exercises `plain()`
+  // and never `withStdin()` — yet withStdin is what EVERY real caller hits:
+  // create and edit both write the body to a file. Removing its `cwd` left the
+  // whole suite green, which is the one coverage gap the final review named.
+  const dir = withRepo({ "body.md": "a body\n" });
+  const seen = [];
+  const execImpl = (bin, argv, opts) => {
+    seen.push({ argv: argv.join(" "), cwd: opts && opts.cwd });
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    return "https://github.com/acme/repo/issues/207";
+  };
+  cli.run({
+    argv: [
+      "node",
+      "x",
+      "--kind",
+      "create",
+      "--title",
+      "T",
+      "--body-file",
+      join(dir, "body.md"),
+      "--repo",
+      "acme/repo",
+    ],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  const create = seen.find((c) => c.argv.startsWith("issue create"));
+  assert.ok(create, "the create should have run through the stdin path");
+  assert.ok(
+    create.argv.includes("--body-file -"),
+    "…and it must be the stdin path, not an inline body",
+  );
+  assert.equal(
+    create.cwd,
+    dir,
+    "the body-file path must resolve against the caller's root like every other",
+  );
+});
+
 test("§11 the perform path refuses, not guesses, when the slug is unresolvable", () => {
   // Both `!slug` refusals were untested: disabling either left the whole suite
   // green, so cycle 3's fix for the sub-issue arm was never actually watched.

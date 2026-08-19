@@ -346,6 +346,36 @@ The builder drops empty label values.
 Nothing. Every scope item landed, including the six board sites the review
 brought in.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-20
+**Quality Score**: 94/100
+**Gate Decision**: PASS (gate 1 was FAIL — 5 QA cycles)
+
+### QA Reports
+
+- Cycle 1: [task.56.qa.1.tracker-issue-cli.md](./task.56.qa.1.tracker-issue-cli.md) — FAIL (70/100), [gate 1](./task.56.gate.1.tracker-issue-cli.yml)
+- Cycles 2–5: [task.56.qa.2.tracker-issue-cli.md](./task.56.qa.2.tracker-issue-cli.md) — PASS (94/100), [gate 2](./task.56.gate.2.tracker-issue-cli.yml)
+
+### Test Coverage Summary
+
+- **Tests executed**: 1583 (1544 on `develop` → +39)
+- **Phases verified**: 9/9
+- **Critical issues**: 0 remaining (3 found and fixed)
+- **NFR status**: Security PASS · Performance PASS · Reliability PASS · Maintainability PASS
+
+### Key Findings
+
+25 defects found and fixed across 5 QA cycles. The dominant one was singular rather
+than plural: **the same wrong-repo hazard re-emerged one layer below each fix** — first
+in the deferred record, then in the resolver it was replaced with, then in that
+resolver's working directory, then in every perform-path exec below it. Four tests were
+vacuous and were caught by reverting the behaviour they named rather than by reading
+them. The indented-heredoc defect proved repo-wide: two introduced here, six already on
+`develop`, every one silently swallowing a tracker call.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -353,7 +383,9 @@ brought in.
 | 2026-08-17 | 1.0 | Initial draft | create-task |
 | 2026-08-19 | 1.1 | Review (8.5/10) — 3 critical, 5 important fixed: `blocking` and `github.milestone.create` named as new schema work; the "existing suites green unchanged" criterion corrected against the assertion it contradicts; Files Summary +9 files; count 20 → 28; subcommands → flat `--kind`; board sites brought in scope; guard scoping rule stated | review-task |
 | 2026-08-19 |  | Status → ready-for-development | review-task |
-| 2026-08-20 |  | Implemented — tracker-issue.js + 23rd roster kind + blocking banner; 28 call sites routed; repo-wide guard added; 31 new tests, 1564 passing | develop |
+| 2026-08-20 |  | Implemented — tracker-issue.js + 23rd roster kind + blocking banner; 28 call sites routed; repo-wide guard added | develop |
+| 2026-08-20 |  | QA gate FAIL (70/100) — 3 high, 6 medium, 2 low | qa-task |
+| 2026-08-20 |  | QA cycles 2–5 — 25 defects fixed; gate PASS (94/100), 1583 tests | qa-task |
 
 ## References
 
