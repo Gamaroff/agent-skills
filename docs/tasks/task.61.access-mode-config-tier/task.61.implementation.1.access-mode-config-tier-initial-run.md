@@ -35,7 +35,7 @@ Teach `dm.resolveAccessTracker` a `skills-config.yaml` tier that agrees with `re
 | 2. review-task             | ✅ Done    | `task.61.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT 8/10 — 0 critical, 6 important (applied), 4 optional (3 applied). Report: `task.61.review.1.access-mode-config-tier.md`. Status `planned` → `ready-for-development` | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 6/6 phases, 31/31 checkboxes. 1416 tests green, validate:all 115 green, bundle committed. Commit `f47ad25` | `.summaries/step-3-initial-audit.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #252: https://github.com/Gamaroff/agent-skills/pull/252 (OPEN, MERGEABLE) → `develop`. Issue #251 commented | — |
-| 5–6. qa-task / qa-fix loop | 🔄 In progress | `task.61.qa.{N}.*.md`; `task.61.gate.{N}.*.yml`; PR comment posted | Cycle 1: FAIL 40/100 (4 high). Cycle 2: regression + new high found and fixed. Cycle 3 verification in flight | — |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.61.qa.{N}.*.md`; `task.61.gate.{N}.*.yml`; PR comment posted | **3 cycles**. Gate 1 FAIL 40/100 → gate 2 **PASS 92/100**. 24 findings closed, 11 mutations proven | — |
 | 7. finalise                | ⏳ Pending | `task.61.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -157,7 +157,28 @@ way — I verified the fix on the shape I had in mind (absolute path, one call s
 shape operators actually use. Both are now covered by tests that use the operator's shape, and both
 are mutation-proven.
 
-### Cycle 3 — 2026-08-19 — verification in flight
+### Cycle 3 — 2026-08-19 — verification: **PASS 92/100**
+
+Independent verification confirmed all six fix classes. No escalation path remains. The residuals it
+found were all in the **false-restriction** direction (fail-closed, so safe) and were folded in
+rather than deferred:
+
+- **CDPATH** — `cd` consults CDPATH and prints the directory on a match; inside `$(...)` that lands
+  in the resolver path, so an operator with CDPATH in their dotfiles got `manual` on every sprint
+  write. Same class as the cycle-2 regression, through another door.
+- **Silent `manual`** — reachable when `mktemp` fails or the subshell dies before printing, so the
+  reason-emit added in cycle 2 did not actually deliver its legibility.
+- Plus `set -e` fatality on a failing substitution, empty `BASH_SOURCE` anchoring to cwd, the
+  explicit-key form missing from `configMayRestrict`, and a makeHttp guard that could pass vacuously.
+
+**Two of my own tests were asserting nothing**, and mutation testing is what found them: the CDPATH
+test used `../refs`, and CDPATH is consulted *only* for bare relative names — so it could never
+trigger the hazard it was named for; and the makeHttp regex terminated inside
+`(typeof fetch !== "undefined" ? …)`, so it read no arguments at all and failed against correct code.
+Both fixed and re-proven.
+
+**Final: 1431 tests, 11 mutations each turning the suite red, prettier clean, validate:all 115,
+bundle current, 18/18 skills shipping the fixes.**
 
 ---
 

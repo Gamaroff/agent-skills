@@ -160,8 +160,11 @@ made an unreadable config throw and broke `--check`, `--print-plan` and `--probe
 no stake in whether a write would be permitted. `manual` preserves the shell's *meaning* — nothing is
 sent, every attempted write is deferred and recorded — while leaving read-only paths working.
 
-A repo whose config declares no `access:` key never spawns anything and answers `full`, so the
-common case costs nothing and cannot be falsely restricted.
+A repo whose config declares no access restriction answers `full` and cannot be falsely restricted.
+The JS side skips the subprocess entirely when it can *prove* the file declares nothing — which is a
+narrower condition than "has no `access:` key": the word `access` anywhere, a backslash escape, a
+non-ASCII byte or a YAML aliasing construct all make it run the reader instead. Proving absence is
+the only safe direction to be wrong in, so the common case is usually free and never permissive.
 
 ### Tier 2 — the strict subset
 

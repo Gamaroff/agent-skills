@@ -100,7 +100,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 58 | [Document restricted tracker access for someone who has never heard of it](task.58.restricted-access-documentation/task.58.restricted-access-documentation.md) | planned | documentation | High | 2026-08-17 | — | task.51-57 |
 | 59 | [Finish the Prettier adoption — sweep the 50 stragglers, then guard the boundary](task.59.prettier-sweep-and-format-guard/task.59.prettier-sweep-and-format-guard.md) | accepted | infrastructure | Medium | 2026-08-17 | [#237](https://github.com/Gamaroff/agent-skills/issues/237) | none |
 | 60 | [Give the config reader's awk tier a grammar, or make it refuse](task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) | accepted | infrastructure | High | 2026-08-18 | [#247](https://github.com/Gamaroff/agent-skills/issues/247) | task.51 |
-| 61 | [Let the JavaScript gates read a config-declared access mode, with read-config.sh parity](task.61.access-mode-config-tier/task.61.access-mode-config-tier.md) | ready-for-development | infrastructure | High | 2026-08-19 | [#251](https://github.com/Gamaroff/agent-skills/issues/251) | task.51, task.52, task.53, task.60 |
+| 61 | [Let the JavaScript gates read a config-declared access mode, with read-config.sh parity](task.61.access-mode-config-tier/task.61.access-mode-config-tier.md) | accepted | infrastructure | High | 2026-08-19 | [#251](https://github.com/Gamaroff/agent-skills/issues/251) | task.51, task.52, task.53, task.60 |
 
 ---
 

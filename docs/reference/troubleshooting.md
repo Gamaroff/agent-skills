@@ -266,11 +266,16 @@ Full schema and the roster of mutation kinds:
 `access.tracker` — or declares `full`. One line names a file and a reason:
 
 ```
-⚠️  access.tracker: /path/to/skills-config.yaml was refused — this file uses an anchor
-    (`&name`), which the no-dependency config reader cannot parse. Resolving to "manual" —
-    refusing rather than defaulting to "full", because that would silently escalate a declared
+⚠️  /path/to/skills-config.yaml was refused — 1: this file uses an anchor (`&name`), which the
+    no-dependency config reader cannot parse. Resolving tracker access to "manual" — refusing
+    rather than defaulting to "full", because that would silently escalate a declared
     restriction into a tracker write.
 ```
+
+> The line deliberately does **not** begin `access.tracker:`. `resolve-platform.sh` also exits
+> non-zero for an invalid `tracker:`/`vcs:` value and for `access.vcs`, so naming `access.tracker`
+> as the cause misattributed those refusals. The resolver's own message, carried verbatim above,
+> says which it was.
 
 **Cause:** the config file exists and mentions `access`, but could not be read *correctly*. That is
 not the same as "declares nothing", and the two must not resolve the same way — reading an
@@ -292,8 +297,11 @@ SKILLS_CONFIG_FILE=skills-config.yaml bash -c 'source shared/resources/resolve-p
 python3 -m pip install pyyaml     # or: rewrite the offending line in the subset
 ```
 
-A repo whose config has **no** `access` key anywhere is never affected — it answers `full` without
-reading anything, so this cannot be the cause of a restriction you did not declare.
+A repo whose config declares no access restriction is never affected: it resolves to `full`. Note
+the check is deliberately generous — the word `access` appearing **anywhere**, including inside a
+comment, is enough to make the reader run, because under-matching it would be an escalation and
+over-matching it is only slow. So a config that documents the option in a commented-out block does
+pay one subprocess per process, and still answers `full`.
 
 **Not this:** do not "fix" it by setting `AGENT_SKILLS_ACCESS_TRACKER=full`. Config and env are
 reduced most-restrictively, so that changes nothing — by design. The file has to become readable.

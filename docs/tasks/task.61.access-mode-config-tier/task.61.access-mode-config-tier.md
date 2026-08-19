@@ -5,17 +5,20 @@ type: task
 description: 'The access gates in JavaScript — jira-sync.js, the two stage CLIs, jira-epic-creator.js — resolve `access.tracker` from environment variables only. A restriction an operator commits to skills-config.yaml is therefore invisible to every bare `node …` invocation the sync and sprint skills document, and resolves to `full`. Task 53 attempted this inline and produced a high-severity divergence from read-config.sh in every review round it survived: fail-open on an unparseable file, then a throw that took down the read-only CLI modes, then three YAML shapes the subset parser silently drops. The lesson is that this is a parity problem, not a feature: the config tier must answer exactly what read-config.sh answers, for every input, or it must not exist. That parity is this task''s subject.'
 tags: [restricted-access, config, parser, fail-closed, security, parity]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: high
 created: 2026-08-19
 updated: 2026-08-19
+completed_date: 2026-08-19
+pr_number: 252
 estimated_effort_hours: 12
 github_issue: 251
 ---
 
 # [Task 61] Let the JavaScript gates read a config-declared access mode, with read-config.sh parity
 
+**Status:** Accepted
 **Task File**: [task.61.access-mode-config-tier.md](./task.61.access-mode-config-tier.md)
 **GitHub Issue**: [#251](https://github.com/Gamaroff/agent-skills/issues/251)
 **Review**: ✅ All review recommendations from `task.61.review.1.access-mode-config-tier.md` implemented 2026-08-19
@@ -231,7 +234,11 @@ task is `risk_level: high` despite its size.
 
 - [x] Give the shell gate the same answer without a fourth copy of the mode table — most likely a
       small resolver CLI it calls once per run, resolved into caller scope rather than inside `$(...)`
-- [x] Replace `jsm_resolve_access`'s inline mode table (`jira-sprint-lib.sh:43-88`) with the seam
+- [x] Replace `jsm_resolve_access`'s duplicated **reader** with the seam. Note the scope
+      precisely: what the seam removes is the second *reader* of the config, not the local
+      rank `case` — that still ranks the resolved modes in-file, because reducing three
+      answers needs an ordering wherever it happens. The contract that had four copies was
+      the reader; there is now one
 - [x] Confirm C5-CR7 stays closed: `jsm_defer` (`:109`) must keep failing loudly rather than
       defaulting to `full`
 
@@ -261,9 +268,11 @@ task is `risk_level: high` despite its size.
 | `shared/resources/jira-sync.js` | `mostRestrictiveAccess` takes a cwd; `SKILLS_CONFIG_FILE` frozen into `ACCESS_ENV_AT_LOAD` |
 | `shared/resources/jira-stage.js`, `gh-stage.js` | config path in the pre-`loadDotEnv` snapshot; gate anchored to the computed root |
 | `skills/jira-epic-creator/scripts/jira-create-epic.js` | consumes the tier; the no-bundle fallback stops answering `full` over an unreadable config |
+| `skills/sync-jira-{story,epic,task}/scripts/sync-jira-*.js` | anchor `makeHttp` to the repo root — six call sites, all live write paths |
+| `skills/scaffold-tracker-workflow/scripts/scaffold-tracker-workflow.js` | same anchor, one call site |
 | `shared/resources/jira-sprint-lib.sh` | the shell seam — sources `resolve-platform.sh` in a subshell instead of a fourth mode table |
 | `shared/resources/tests/access-config-parity.test.mjs` | **new** — the corpus, driven through both readers on both tiers |
-| `shared/resources/tests/fixtures/access-config-*.yaml` | **new** — 31 fixture bodies |
+| `shared/resources/tests/fixtures/access-config-*.yaml` | **new** — 34 fixture bodies |
 | `shared/resources/tests/stage-access-gate.test.mjs` | updated — env tier pinned with `config: false`; three new config-tier tests |
 | `shared/resources/tests/jira-interception.test.mjs` | updated — pins that the shell gate *delegates* rather than reimplements |
 | `docs/reference/configuration.md`, `troubleshooting.md` | what a config-declared restriction does; a new entry for an unreadable config |
@@ -304,7 +313,8 @@ test red.
       unreadable config
 - [x] A `.env` cannot redirect the config path around the pre-`loadDotEnv` snapshot
 - [x] A refused write still produces a record, and one stderr line names the file and the reason
-- [x] `jira-sprint-lib.sh` gets the same answer without a fourth copy of the mode table
+- [x] `jira-sprint-lib.sh` gets the same answer without a fourth copy of the **reader** (the
+      local rank `case` remains — see Phase 5)
 - [x] The seven findings carried over from task 53 (below) are each closed or explicitly dismissed
 - [x] `npm test`, `validate:all` green; `npm run bundle` committed
 
@@ -403,6 +413,56 @@ The same pattern then appeared twice in my own *tests*: the CDPATH test used `..
 consulted only for bare relative names, and the makeHttp guard's regex terminated inside
 `(typeof fetch …)`. Mutation testing surfaced all three; a test that cannot fail is worth nothing.
 
+## Definition of Done - PASSED
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: [task.61.gate.2.access-mode-config-tier.yml](./task.61.gate.2.access-mode-config-tier.yml) — **PASS 92/100** (3 cycles, 24 findings closed)
+**Detailed verification log**: [task.61.dod.1.access-mode-config-tier.md](./task.61.dod.1.access-mode-config-tier.md)
+
+### DoD Verification
+
+| Check | Result |
+| ----- | ------ |
+| Success criteria (9/9) | PASS — code and test evidence for each |
+| Implementation phases (22/22) | PASS |
+| Security | PASS — all four escalation paths verified closed *in the tree*, not merely described as closed |
+| Compliance / repo standards | PASS *(after correcting 2 gaps this check found)* |
+| Documentation & changelog | PASS *(after correcting 3 gaps this check found)* |
+| **CI** | **SUCCESS** on `a0850c6` — the current HEAD, not an ancestor |
+| `npm test` | 1431 / 1431 |
+| `validate:all` | 115 skills |
+| Prettier | clean repo-wide |
+| Bundle freshness | no drift |
+
+### Gaps the DoD checks found, and what was done
+
+The DoD verification was not a formality — it returned two FAILs, and both were real:
+
+- **No body `**Status:**` line**, breaking the frontmatter/body sync rule. Added.
+- **Registry row 61 stale** at `ready-for-development`. Moved to `accepted`.
+- **`troubleshooting.md` quoted a warning string the code was deliberately fixed to stop
+  printing** — the `access.tracker:` prefix removed as T61-L3. An operator grepping their logs for
+  the documented string would have found nothing. Corrected to the real output, with a note saying
+  why the prefix is absent.
+- **§7 Files Summary omitted four behaviour-bearing source files** — the three sync scripts and
+  `scaffold-tracker-workflow.js`, all carrying the T61-M3 anchor fix. Added.
+- **"never spawns a subprocess" was false**, in three places. `mayDeclareAccess` also runs the
+  reader on a backslash, a non-ASCII byte, an aliasing construct, or the word `access` in a
+  comment. The *conclusion* (answers `full`, cannot be falsely restricted) held; the mechanism
+  claim did not. Corrected in `platform-detection.md`, `CHANGELOG.md` and `troubleshooting.md`.
+- **"31 fixtures" was stale** — there are 34. Corrected in two places.
+- **A Phase 5 checkbox overstated what landed**: the seam removed the duplicated *reader*, not the
+  local rank `case`, which still ranks modes in-file because reducing three answers needs an
+  ordering wherever it happens. Both the checkbox and success criterion 7 now say so.
+
+For a task whose subject is *parity between two readers*, a doc that misdescribes what the code
+prints is the same class of defect as the code diverging — so these were fixed rather than filed.
+
+**Task marked ACCEPTED on:** 2026-08-19
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -414,6 +474,7 @@ consulted only for bare relative names, and the makeHttp guard's regex terminate
 | 2026-08-19 |  | QA gate FAIL (40/100) — 14 findings: 4 high (2 escalation paths, 1 of them RCE), 5 medium, 5 low | qa-task |
 | 2026-08-19 |  | QA cycle 2 — a cycle-1 fix regressed; 6 unanchored write paths found. Fixed | qa-fix |
 | 2026-08-19 |  | QA gate PASS (92/100) after 3 cycles — 24 findings closed, 11 mutations proven | qa-task |
+| 2026-08-19 | 1.2 | DoD verified — accepted (PR #252). Doc accuracy gaps found by the DoD checks and corrected in the same pass | finalise |
 
 ---
 

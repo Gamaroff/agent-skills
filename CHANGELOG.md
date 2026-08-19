@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file. Format foll
   `resolve-platform.sh` in a subprocess and uses its answer verbatim, which makes agreement with
   `read-config.sh` structural rather than asserted. Task 53 tried the other way — a second reader in
   JavaScript — and found a high-severity divergence in each of three review rounds. A derived parity
-  corpus (`access-config-parity.test.mjs`, 31 fixtures × both reader tiers) pins it anyway.
+  corpus (`access-config-parity.test.mjs`, 34 fixtures × both reader tiers) pins it anyway.
 
   Two deliberate differences from the shell path. A config that cannot be read *correctly* resolves
   to `manual` and prints one line naming the file and the reason, rather than throwing — a throw is
@@ -25,9 +25,9 @@ All notable changes to this project will be documented in this file. Format foll
   tier still throws, unchanged.
 
   **Breaking only for a repo that declares `access:`** — such a repo's bare `node …` invocations
-  begin deferring writes instead of performing them, which is the point. A repo with no `access` key
-  anywhere never spawns a subprocess and answers `full`, so the common path is unchanged and cannot
-  be falsely restricted.
+  begin deferring writes instead of performing them, which is the point. A repo that declares no
+  restriction answers `full` and cannot be falsely restricted; the subprocess is skipped only when
+  absence is *provable* from the bytes, which is deliberately narrower than "no `access:` key".
 
 - **A restricted `access.tracker` now actually stops Jira REST writes**, in two layers inside the
   shared `jira-sync.js`. Layer 1 sits at the top of `http()`, **above** the retry loop: under any
