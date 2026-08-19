@@ -787,16 +787,48 @@ test("§10 the slug resolver handles every remote URL form", () => {
   // GitHub Enterprise host and for a URL with a trailing slash — a degraded
   // record rather than a crash, which is the kind of gap nobody notices.
   const forms = [
-    ["git@github.com:acme/repo.git", "acme/repo"],
-    ["https://github.com/acme/repo.git", "acme/repo"],
-    ["https://github.com/acme/repo", "acme/repo"],
-    ["https://github.com/acme/repo/", "acme/repo"],
-    ["ssh://git@github.com/acme/repo.git", "acme/repo"],
-    ["https://user@github.com/acme/repo.git", "acme/repo"],
-    ["git@ghe.corp.example.com:acme/repo.git", "acme/repo"],
-    ["https://github.com/acme/my.repo.js", "acme/my.repo.js"],
+    ["git@github.com:acme/repo.git", "acme/repo", {}],
+    ["https://github.com/acme/repo.git", "acme/repo", {}],
+    ["https://github.com/acme/repo", "acme/repo", {}],
+    ["https://github.com/acme/repo/", "acme/repo", {}],
+    ["ssh://git@github.com/acme/repo.git", "acme/repo", {}],
+    ["https://user@github.com/acme/repo.git", "acme/repo", {}],
+    ["https://github.com/acme/my.repo.js", "acme/my.repo.js", {}],
+    // A GHE host whose name contains "github." is recognised on its own…
+    ["git@github.mycorp.com:acme/repo.git", "acme/repo", {}],
+    // …and one that does not is recognised only when GH_HOST names it.
+    [
+      "git@ghe.corp.example.com:acme/repo.git",
+      "acme/repo",
+      { GH_HOST: "ghe.corp.example.com" },
+    ],
   ];
-  for (const [url, expected] of forms) {
+  for (const [url, expected, extraEnv] of forms) {
+    const dir = withRepo();
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", url], { cwd: dir });
+    run(dir, ["--kind", "milestone", "--title", "M"], {
+      ACCESS_TRACKER: "manual",
+      ...extraEnv,
+    });
+    const rec = readJournal(dir)[0];
+    assert.ok(
+      rec.command && rec.command.argv.join(" ").includes(`/repos/${expected}/`),
+      `${url} → expected slug ${expected}, got ${JSON.stringify(rec.command)}`,
+    );
+  }
+});
+
+test("§10 a non-GitHub remote yields NO slug and NO command, never a wrong one", () => {
+  // A plausible-but-wrong slug is worse than none: handed to `gh --repo` it
+  // aims at an unrelated github.com repository. Matching any host — the first
+  // attempt at host-agnosticism — turned `git@bitbucket.org:acme/repo.git` and
+  // a bare local path into `acme/repo`.
+  for (const url of [
+    "git@bitbucket.org:acme/repo.git",
+    "https://gitlab.com/acme/repo.git",
+    "/srv/git/acme/repo.git",
+  ]) {
     const dir = withRepo();
     execFileSync("git", ["init", "-q"], { cwd: dir });
     execFileSync("git", ["remote", "add", "origin", url], { cwd: dir });
@@ -804,9 +836,14 @@ test("§10 the slug resolver handles every remote URL form", () => {
       ACCESS_TRACKER: "manual",
     });
     const rec = readJournal(dir)[0];
-    assert.ok(
-      rec.command.argv.join(" ").includes(`/repos/${expected}/`),
-      `${url} → expected slug ${expected}, got argv ${rec.command.argv.join(" ")}`,
+    assert.equal(
+      rec.command,
+      null,
+      `${url}: a record whose command cannot run is worse than one with none — ` +
+        `the sh renderer would emit a script that 404s and an operator seeing ` +
+        `no error would assume the action was performed`,
     );
+    // The manual path still works — the record is degraded, not broken.
+    assert.ok(rec.manual, "the manual path must survive");
   }
 });

@@ -176,6 +176,7 @@ Options:
   --remove-label  Repeatable. Label to remove on edit.
   --milestone     Milestone title to attach (create, edit).
   --reason        Close reason: completed | not planned.
+                  ("duplicate" needs gh's --duplicate-of, which this CLI has no flag for.)
   --state         Milestone state: open | closed. Default open.
   --repo          owner/name. Default: the current repository.
   --json          Emit a JSON result object on stdout.
@@ -312,9 +313,14 @@ function gh(execImpl, argv) {
  *
  * An explicit --repo always wins.
  */
-function repoSlug(execImpl, explicit, env = process.env, cwd = undefined) {
+function repoSlug(explicit, env = process.env, cwd = undefined) {
   if (explicit) return explicit;
-  if (env.GH_REPO) return env.GH_REPO;
+  // gh documents GH_REPO as `[HOST/]OWNER/REPO`; a three-segment value would
+  // break every `/repos/${slug}/…` path built from it, so take the last two.
+  if (env.GH_REPO) {
+    const parts = String(env.GH_REPO).split("/").filter(Boolean);
+    return parts.length >= 2 ? parts.slice(-2).join("/") : "";
+  }
   try {
     // `cwd` matters: without it git runs wherever the PROCESS happens to be,
     // which for an agent invoking this from a parent directory resolves some
@@ -334,8 +340,44 @@ function repoSlug(execImpl, explicit, env = process.env, cwd = undefined) {
     // trailing slash. This CLI is GitHub-only by contract — it rejects a Jira
     // key in --issue — so `origin` is a GitHub remote by assumption, and the
     // host adds nothing to the match.
+    // The HOST must look like GitHub. Matching any host was the previous
+    // attempt and it was wrong in the way this function's own comment warns
+    // about: `git@bitbucket.org:acme/repo.git` and `/srv/git/acme/repo.git`
+    // both yielded `acme/repo`, which would then be handed to `gh --repo` and
+    // aimed at an unrelated github.com repository. A plausible-but-wrong slug
+    // is worse than none, so an unrecognised host returns "".
+    const host = /^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)[:/]/.exec(url);
+    const ghHost = (env.GH_HOST || "").trim();
+    const hostOk =
+      host &&
+      (host[1] === "github.com" ||
+        (ghHost && host[1] === ghHost) ||
+        /(^|\.)github\./i.test(host[1]));
+    if (!hostOk) return "";
+
     const m = /[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url);
     return m ? `${m[1]}/${m[2]}` : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+/**
+ * owner/name as `gh` itself resolves it. NETWORK — perform path only.
+ *
+ * This is what honours `gh repo set-default` and a fork's upstream, which the
+ * git-remote read cannot see.
+ */
+function ghRepoSlug(execImpl) {
+  try {
+    return gh(execImpl, [
+      "repo",
+      "view",
+      "--json",
+      "nameWithOwner",
+      "-q",
+      ".nameWithOwner",
+    ]);
   } catch (_) {
     return "";
   }
@@ -599,9 +641,9 @@ function recordShape({ kind, args, body, slug }) {
           argv: [
             "bash",
             "-c",
-            `SUB_ID=$(gh api /repos/${slug || "$OWNER/$REPO"}/issues/${args.issue} --jq .id) && ` +
+            `SUB_ID=$(gh api /repos/${slug}/issues/${args.issue} --jq .id) && ` +
               `gh api --method POST -H "Accept: application/vnd.github+json" ` +
-              `/repos/${slug || "$OWNER/$REPO"}/issues/${args.parent}/sub_issues ` +
+              `/repos/${slug}/issues/${args.parent}/sub_issues ` +
               `-F sub_issue_id="$SUB_ID"`,
           ],
           stdin: null,
@@ -670,7 +712,7 @@ function ghMilestoneArgv(args, slug) {
     "api",
     "--method",
     "POST",
-    `/repos/${slug || "$OWNER/$REPO"}/milestones`,
+    `/repos/${slug}/milestones`,
     "-f",
     `title=${args.title}`,
     "-f",
@@ -747,6 +789,16 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
       );
 
     case "milestone": {
+      // Without a slug the lookup URL becomes `/repos//milestones`, the catch
+      // swallows the error, and the code proceeds to a blind POST against the
+      // same broken path. Refuse explicitly instead.
+      if (!slug) {
+        output.warn(
+          "⚠️  Could not resolve owner/repo — not creating the milestone. " +
+            "Pass --repo <owner/name>.",
+        );
+        return emit({ performed: false, reason: "unverifiable" }, skipCode);
+      }
       // Idempotent by search-then-create: a milestone title that already exists
       // returns 422 from the API, and four call sites resolve-or-create rather
       // than create blindly. Doing the lookup here means those sites lose their
@@ -942,7 +994,11 @@ function run({
   // Normalise the underscore form rather than making six call sites remember.
   if (args.reason) {
     const normalised = args.reason.replace(/_/g, " ").toLowerCase();
-    const CLOSE_REASONS = ["completed", "not planned", "duplicate"];
+    // `duplicate` is deliberately NOT accepted: `gh issue close --reason
+    // duplicate` additionally requires `--duplicate-of <issue>`, which this CLI
+    // has no flag for, so accepting it would produce a call gh rejects at run
+    // time — a usage error discovered on the network rather than locally.
+    const CLOSE_REASONS = ["completed", "not planned"];
     if (!CLOSE_REASONS.includes(normalised)) {
       output.err(
         `Error: --reason must be one of: ${CLOSE_REASONS.join(", ")} ` +
@@ -996,15 +1052,47 @@ function run({
     return { exitCode: 2 };
   }
 
-  // Resolved the same way on every path, because it is now a LOCAL read. The
-  // earlier version took --repo only under a deferring mode, to avoid a network
-  // call — but that left every deferred record carrying `$OWNER/$REPO` and made
-  // the generated script unrunnable. Reading the git remote costs nothing and
-  // keeps the gate's promise intact, so there is no longer a trade to make.
-  const slug = repoSlug(execImpl, args.repo, env, root || process.cwd());
+  // TWO TIERS, and the split matters.
+  //
+  // On the PERFORM path (`full`), ask `gh` — it honours its own resolution:
+  // `gh repo set-default`, a fork's upstream, GH_HOST. Reading the git remote
+  // alone was a regression: in a fork clone every mutation would be aimed at
+  // the FORK rather than the base repo, silently creating issues in the wrong
+  // repository. A network call is already permitted here, so there is nothing
+  // to save by guessing.
+  //
+  // On the GATED path, use the local git remote only — no network, so the
+  // gate's promise holds — and accept it only when the host looks like GitHub.
+  // When it cannot be resolved the record simply carries no `command` (see
+  // recordShape), rather than a `$OWNER/$REPO` placeholder that renders into a
+  // script which cannot run.
+  const local = () => repoSlug(args.repo, env, root || process.cwd());
+  const slug =
+    access === "full" || args.dryRun
+      ? args.repo || ghRepoSlug(execImpl) || local()
+      : local();
 
   if (access !== "full" && !args.dryRun) {
     const shape = recordShape({ kind: args.kind, args, body, slug });
+
+    // A record whose `command` cannot run is worse than one with none: the `sh`
+    // renderer would emit a script that 404s, and an operator who runs it and
+    // sees no error assumes the action was performed. `manual` always has a
+    // usable path (the GitHub UI takes the visible numbers), so dropping
+    // `command` degrades the record rather than breaking it.
+    //
+    // Only the two kinds whose argv embeds the slug are affected — the issue
+    // verbs take a number and `gh` resolves the repo itself at run time.
+    const needsSlug = ["milestone", "sub-issue-link"].includes(args.kind);
+    if (needsSlug && !slug) {
+      output.warn(
+        `⚠️  Could not resolve owner/repo — recording ${spec.summary} without a ` +
+          `runnable command. Perform it from the checklist's manual path, or ` +
+          `re-run with --repo <owner/name>.`,
+      );
+      shape.command = null;
+    }
+
     try {
       const rec = dm.defer(
         {

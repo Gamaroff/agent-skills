@@ -315,12 +315,25 @@ test("§4 every ensure-*/sync-* skill keeps the key-present short-circuit", () =
       missing.push(`${skill} — SKILL.md not found`);
       continue;
     }
-    const text = fs.readFileSync(p, "utf8");
+    // STRIP THE FRONTMATTER FIRST. Every one of these skills says
+    // "updates it if github_issue is already set" in its `description:` field,
+    // so matching the whole file matched line 3 in all six — the guard passed
+    // on the strength of a sentence that documents the behaviour rather than
+    // implements it, and would have kept passing with the actual step deleted.
+    const raw = fs.readFileSync(p, "utf8");
+    const text = raw.replace(/^---\n[\s\S]*?\n---\n/, "");
 
-    // The short-circuit: "github_issue is already set → do not create".
+    // The short-circuit, in the BODY: a step that checks for an existing issue
+    // and returns without creating one.
+    // Anchored on the STEP, not on a phrase that could appear in any prose.
+    // `\bUpdate Path\b` was the first attempt and matched a sentence in this
+    // task's own explanatory text — a guard that matches commentary about the
+    // behaviour is the same vacuity as one that matches the frontmatter.
     const shortCircuits =
-      /github_issue.*(?:already set|is a positive integer)/is.test(text) ||
-      /Return immediately/i.test(text);
+      // ensure-*: a step that checks for the key and returns without creating
+      /###[^\n]*Already Exists[\s\S]{0,600}?Return immediately/i.test(text) ||
+      // sync-*: an explicit update path selected on the key being present
+      /####[^\n]*Update Path[^\n]*github_issue[^\n]*present/i.test(text);
     if (!shortCircuits) {
       missing.push(
         `${skill} — no "github_issue already present" short-circuit. Without it ` +
@@ -395,13 +408,22 @@ test("§5 no heredoc in canonical prose has an indented terminator", () => {
     const lines = fs.readFileSync(file, "utf8").split("\n");
 
     lines.forEach((line, i) => {
-      // An opener, capturing the delimiter. `<<-` is exempt: it is the form that
-      // legitimately permits a tab-indented terminator.
-      const open = /<<\s*(?!-)'?([A-Za-z_][A-Za-z0-9_]*)'?\s*$/.exec(line);
+      // An opener, capturing the delimiter. Accepts a bare, single- or
+      // double-quoted delimiter, and tolerates trailing text — `cat <<EOF | tee f`
+      // and `<<EOF 2>/dev/null` are openers too, and the first version of this
+      // guard (anchored with `$`) missed both.
+      //
+      // `<<-` is exempt: it is the one form bash lets an indented (tab)
+      // terminator close.
+      const open = /<<\s*(?!-)(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(line);
       if (!open) return;
-      const delim = open[1];
+      const delim = open[2];
 
-      // Find the terminator and check its column.
+      // The FIRST line whose trimmed content equals the delimiter is taken as
+      // the terminator. A body line that is itself exactly `EOF` would be a
+      // false positive — accepted, because the alternative is parsing shell,
+      // and a body line reading only `EOF` is vanishingly rare next to the
+      // defect this catches.
       for (let j = i + 1; j < lines.length; j++) {
         if (lines[j].trim() !== delim) continue;
         if (lines[j] !== delim) {

@@ -282,10 +282,12 @@ issue_number=$(node references/tracker-issue.js \
   --body-file "$body_file" \
   --label "enhancement" \
   --label "story.180")
-# Derive the slug here — OWNER/REPO_NAME are NOT assigned anywhere in this skill,
-# and referencing them produced the dead link https://github.com///issues/N.
-REPO_SLUG=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-issue_url="https://github.com/${REPO_SLUG}/issues/${issue_number}"
+# REPO_SLUG is already derived from $REMOTE_URL during platform detection above
+# — reuse it. The earlier fix here referenced ${OWNER}/${REPO_NAME}, which this
+# skill never assigns (producing https://github.com///issues/N); the fix after
+# that added a `gh repo view` call, which was worse: a network call on a path
+# whose create may have just been DEFERRED, shadowing a value that was already
+# correct and free.
 ```
 
 The CLI prints the issue **number**, so the old `${issue_url##*/}` split is gone.
@@ -299,7 +301,12 @@ by hand. See [`references/tracker-issue-cli.md`](./references/tracker-issue-cli.
 Post-create verification (skip when `issue_number` is empty):
 
 ```bash
+# The guard comes FIRST. Everything below — the URL, the read-back — assumes an
+# issue exists, and under a deferring access mode it does not.
 [ -z "$issue_number" ] && exit 0
+
+issue_url="https://github.com/${REPO_SLUG}/issues/${issue_number}"
+
 created_body=$(gh issue view "$issue_number" --json body --jq '.body')
 if echo "$created_body" | grep -Eq '(_PLACEHOLDER|\{[a-z_]+\})'; then
   echo "ERROR: created issue #$issue_number has unsubstituted tokens:" >&2
