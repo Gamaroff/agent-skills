@@ -397,9 +397,13 @@ Bitbucket Issues are disabled for this project — do NOT use the Bitbucket Issu
 
    ```bash
    mkdir -p .claude/state
+   # Terminator at COLUMN 0 — an indented terminator does not close an
+   # unquoted heredoc; bash swallows everything after it into the body,
+   # so the call below would never run. Body lines are unindented for
+   # the same reason: leading spaces are written verbatim.
    cat > .claude/state/comment-body.md <<EOF
-   PR opened — [PR #{PR_ID}]({PR_URL})
-   EOF
+PR opened — [PR #{PR_ID}]({PR_URL})
+EOF
 
    node .agents/skills/create-pr/references/tracker-comment.js \
      --issue {jira_key} --body-file .claude/state/comment-body.md \

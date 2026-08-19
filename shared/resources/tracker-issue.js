@@ -322,9 +322,19 @@ function repoSlug(execImpl, explicit, env = process.env, cwd = undefined) {
     const url = String(
       execSync("git remote get-url origin", { ...GIT_EXEC_OPTS, cwd }) || "",
     ).trim();
-    // git@github.com:owner/name.git | https://github.com/owner/name(.git)
-    const m = /github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/.exec(url);
-    return m ? m[1] : "";
+    // Take the LAST TWO path segments, host-agnostically:
+    //   git@github.com:owner/name.git
+    //   https://github.com/owner/name(.git)(/)
+    //   ssh://git@github.com/owner/name.git
+    //   git@ghe.corp.example.com:owner/name.git   ← GitHub Enterprise
+    //
+    // Anchoring on the literal `github.com` looked safer and was not: it
+    // silently returned "" for every Enterprise host, and for a URL with a
+    // trailing slash. This CLI is GitHub-only by contract — it rejects a Jira
+    // key in --issue — so `origin` is a GitHub remote by assumption, and the
+    // host adds nothing to the match.
+    const m = /[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url);
+    return m ? `${m[1]}/${m[2]}` : "";
   } catch (_) {
     return "";
   }
@@ -750,22 +760,38 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
       // repo silently missed an existing title and tried to re-create it.
       let existing = "";
       try {
+        // A CONSTANT jq filter — no interpolation, so no title can alter the
+        // program — emitting NDJSON: one compact object per line. That makes
+        // the response parseable line by line, with no need to split a
+        // concatenated stream.
+        //
+        // Splitting `--paginate`'s concatenated arrays on /(?<=\])\s*(?=\[)/
+        // was the first attempt and is WRONG: a milestone titled
+        // `Epic ] [ bracket` splits inside the string, both halves fail to
+        // parse, and the milestone is silently dropped — re-creating the exact
+        // class of defect (a title's own characters breaking the lookup) that
+        // moving off jq-interpolation was meant to remove.
         const raw = gh(execImpl, [
           "api",
           "--paginate",
           `/repos/${slug}/milestones?state=all&per_page=100`,
+          "--jq",
+          ".[] | {number, title}",
         ]);
-        // --paginate concatenates JSON arrays; tolerate both one array and
-        // several by matching every top-level array in the response.
-        const found = [];
-        for (const chunk of String(raw).split(/(?<=\])\s*(?=\[)/)) {
+        let hit = null;
+        for (const line of String(raw).split("\n")) {
+          const t = line.trim();
+          if (!t) continue;
           try {
-            for (const m of JSON.parse(chunk)) found.push(m);
+            const m = JSON.parse(t);
+            if (m && m.title === args.title) {
+              hit = m;
+              break;
+            }
           } catch (_) {
-            /* a partial chunk is skipped, never guessed at */
+            /* a malformed line is skipped, never guessed at */
           }
         }
-        const hit = found.find((m) => m && m.title === args.title);
         existing = hit ? String(hit.number) : "";
       } catch (_) {
         existing = "";

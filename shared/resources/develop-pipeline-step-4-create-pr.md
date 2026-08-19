@@ -198,9 +198,13 @@ After extracting the PR URL from `create-pr`'s output:
 
    ```bash
    mkdir -p .claude/state
+   # Terminator at COLUMN 0 — an indented terminator does not close an
+   # unquoted heredoc; bash swallows everything after it into the body,
+   # so the call below would never run. Body lines are unindented for
+   # the same reason: leading spaces are written verbatim.
    cat > .claude/state/comment-body.md <<EOF
-   PR opened — {PR_URL}
-   EOF
+PR opened — {PR_URL}
+EOF
 
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
      --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \

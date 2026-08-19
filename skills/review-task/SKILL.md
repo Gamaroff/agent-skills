@@ -1646,22 +1646,26 @@ fi
 2. Post the comment through the CLI:
 
    ```bash
+   # Terminator at COLUMN 0 — an indented terminator does not close an unquoted
+   # heredoc, and bash would swallow the invocation below into the comment body.
+   # Body lines are unindented for the same reason: leading spaces would be
+   # written into the comment verbatim.
    mkdir -p .claude/state
    cat > .claude/state/comment-body.md <<EOF
-   ## Task Review Complete
+## Task Review Complete
 
-   **Recommendation**: ${RECOMMENDATION}
-   **Readiness Score**: ${SCORE}/10
+**Recommendation**: ${RECOMMENDATION}
+**Readiness Score**: ${SCORE}/10
 
-   | Severity | Count |
-   |---|---|
-   | Critical 🚨 | ${CRITICAL} |
-   | Important ⚠️ | ${IMPORTANT} |
-   | Optional 💡 | ${OPTIONAL} |
+| Severity | Count |
+|---|---|
+| Critical 🚨 | ${CRITICAL} |
+| Important ⚠️ | ${IMPORTANT} |
+| Optional 💡 | ${OPTIONAL} |
 
-   **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}
-   EOF
+**Review artifact**: \`${REVIEW_FILE}\`
+${CHANGES_SECTION}
+EOF
 
    node .agents/skills/review-task/references/tracker-comment.js \
      --issue "{jira_key from frontmatter}" --body-file .claude/state/comment-body.md \

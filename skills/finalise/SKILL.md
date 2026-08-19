@@ -1090,9 +1090,13 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
         ```bash
         mkdir -p .claude/state
+        # Terminator at COLUMN 0 — an indented terminator does not close an
+        # unquoted heredoc; bash swallows everything after it into the body,
+        # so the call below would never run. Body lines are unindented for
+        # the same reason: leading spaces are written verbatim.
         cat > .claude/state/comment-body.md <<EOF
-        {the body rendered above}
-        EOF
+{the body rendered above}
+EOF
 
         node .agents/skills/finalise/references/tracker-comment.js \
           --issue {jira_key} --body-file .claude/state/comment-body.md \

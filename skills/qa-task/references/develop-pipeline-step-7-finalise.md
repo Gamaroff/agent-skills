@@ -224,16 +224,20 @@ If `TRACKER_ISSUE` is set, post the completion comment and confirm the Done tran
      | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
 
    mkdir -p .claude/state
+   # Terminator at COLUMN 0 — an indented terminator does not close an
+   # unquoted heredoc; bash swallows everything after it into the body,
+   # so the call below would never run. Body lines are unindented for
+   # the same reason: leading spaces are written verbatim.
    cat > .claude/state/comment-body.md <<EOF
-   ## ✅ Story Accepted — Definition of Done Verified
+## ✅ Story Accepted — Definition of Done Verified
 
-   **PR**: {PR_URL}
-   **QA Gate**: ${FINAL_GATE}
-   **Accepted**: {YYYY-MM-DD}
-   **DoD Summary**: \`${DOD_PATH}\`
+**PR**: {PR_URL}
+**QA Gate**: ${FINAL_GATE}
+**Accepted**: {YYYY-MM-DD}
+**DoD Summary**: \`${DOD_PATH}\`
 
-   All Definition of Done criteria verified. Story accepted and transitioning to Done.
-   EOF
+All Definition of Done criteria verified. Story accepted and transitioning to Done.
+EOF
 
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
      --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \

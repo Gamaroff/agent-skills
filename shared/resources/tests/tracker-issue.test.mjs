@@ -110,13 +110,14 @@ function stubGh({
       joined.includes("/milestones") &&
       !joined.includes("POST")
     )
-      // Real API shape — a JSON array of milestone objects. The stub used to
-      // return bare numbers, which matched an implementation that asked jq to
-      // do the filtering; comparing titles in JS needs the real thing, and a
-      // faithful stub is what lets the test catch a parsing regression.
-      return JSON.stringify(
-        milestones.map((n) => ({ number: Number(n), title: milestoneTitle })),
-      );
+      // NDJSON — one compact object per line, which is what the constant
+      // `--jq '.[] | {number, title}'` filter emits. A faithful stub is what
+      // lets these tests catch a parsing regression.
+      return milestones
+        .map((n) =>
+          JSON.stringify({ number: Number(n), title: milestoneTitle }),
+        )
+        .join("\n");
     if (
       argv[0] === "api" &&
       joined.includes("POST") &&
@@ -759,4 +760,53 @@ test("§10 the milestone lookup asks for ALL states, paginated", () => {
   const joined = lookup.argv.join(" ");
   assert.match(joined, /--paginate/, "must paginate");
   assert.match(joined, /state=all/, "must include closed milestones");
+});
+
+test("§10 a milestone title containing ] [ is still matched", () => {
+  // The regression this pins is one the FIX introduced, not the original code.
+  // Moving off jq-interpolation, the first attempt split --paginate's
+  // concatenated arrays on /(?<=\])\s*(?=\[)/ — which cuts inside a title
+  // containing `] [`, so both halves fail to parse and the milestone is
+  // silently dropped. Same failure class as the jq syntax error it replaced:
+  // a title's own characters breaking its own lookup.
+  const dir = withRepo();
+  const nasty = "Epic ] [ bracket";
+  const { execImpl } = stubGh({ milestones: ["11"], milestoneTitle: nasty });
+  const r = cli.run({
+    argv: ["node", "x", "--kind", "milestone", "--title", nasty, "--json"],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  assert.equal(r.reason, "already");
+  assert.equal(r.milestone, "11");
+});
+
+test("§10 the slug resolver handles every remote URL form", () => {
+  // Anchoring on the literal `github.com` silently returned "" for every
+  // GitHub Enterprise host and for a URL with a trailing slash — a degraded
+  // record rather than a crash, which is the kind of gap nobody notices.
+  const forms = [
+    ["git@github.com:acme/repo.git", "acme/repo"],
+    ["https://github.com/acme/repo.git", "acme/repo"],
+    ["https://github.com/acme/repo", "acme/repo"],
+    ["https://github.com/acme/repo/", "acme/repo"],
+    ["ssh://git@github.com/acme/repo.git", "acme/repo"],
+    ["https://user@github.com/acme/repo.git", "acme/repo"],
+    ["git@ghe.corp.example.com:acme/repo.git", "acme/repo"],
+    ["https://github.com/acme/my.repo.js", "acme/my.repo.js"],
+  ];
+  for (const [url, expected] of forms) {
+    const dir = withRepo();
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", url], { cwd: dir });
+    run(dir, ["--kind", "milestone", "--title", "M"], {
+      ACCESS_TRACKER: "manual",
+    });
+    const rec = readJournal(dir)[0];
+    assert.ok(
+      rec.command.argv.join(" ").includes(`/repos/${expected}/`),
+      `${url} → expected slug ${expected}, got argv ${rec.command.argv.join(" ")}`,
+    );
+  }
 });

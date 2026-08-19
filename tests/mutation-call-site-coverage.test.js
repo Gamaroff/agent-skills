@@ -372,3 +372,55 @@ test("§4 no skill writes a placeholder key", () => {
   }
   assert.deepEqual(offenders, [], offenders.join("\n"));
 });
+
+// ── §5 Heredoc terminators ──────────────────────────────────────────────────
+
+test("§5 no heredoc in canonical prose has an indented terminator", () => {
+  // Bash does not accept an indented terminator for a heredoc opened with
+  // `<<EOF` or `<<'EOF'`. It warns "here-document delimited by end-of-file" and
+  // swallows EVERYTHING after it into the body — including, in every instance
+  // this guard was written for, the `tracker-comment.js` or `tracker-issue.js`
+  // call on the next line.
+  //
+  // The failure is silent and total: the comment is never posted, the issue is
+  // never closed, and the run reports success. Eight instances existed across
+  // the repo when this was first checked — two introduced by task.56 and six
+  // pre-existing, every one of them inside a numbered list where the indentation
+  // looked natural. `<<-EOF` (tab-indented terminator) is the only indented form
+  // bash accepts, and nothing here uses it.
+  const offenders = [];
+
+  for (const file of DOCS) {
+    const rel = path.relative(REPO_ROOT, file);
+    const lines = fs.readFileSync(file, "utf8").split("\n");
+
+    lines.forEach((line, i) => {
+      // An opener, capturing the delimiter. `<<-` is exempt: it is the form that
+      // legitimately permits a tab-indented terminator.
+      const open = /<<\s*(?!-)'?([A-Za-z_][A-Za-z0-9_]*)'?\s*$/.exec(line);
+      if (!open) return;
+      const delim = open[1];
+
+      // Find the terminator and check its column.
+      for (let j = i + 1; j < lines.length; j++) {
+        if (lines[j].trim() !== delim) continue;
+        if (lines[j] !== delim) {
+          offenders.push(
+            `${rel}:${j + 1} — heredoc opened at line ${i + 1} with <<${delim} ` +
+              `has an INDENTED terminator ("${lines[j]}"). Bash will not close ` +
+              `the here-document; everything after it is swallowed into the body.`,
+          );
+        }
+        return;
+      }
+    });
+  }
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `Indented heredoc terminators found:\n\n${offenders.join("\n")}\n\n` +
+      `Move the terminator to column 0. Body lines should be unindented too — ` +
+      `leading whitespace is written into the file verbatim.`,
+  );
+});
