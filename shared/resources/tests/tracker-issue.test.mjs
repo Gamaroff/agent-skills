@@ -794,9 +794,13 @@ test("§10 the slug resolver handles every remote URL form", () => {
     ["ssh://git@github.com/acme/repo.git", "acme/repo", {}],
     ["https://user@github.com/acme/repo.git", "acme/repo", {}],
     ["https://github.com/acme/my.repo.js", "acme/my.repo.js", {}],
-    // A GHE host whose name contains "github." is recognised on its own…
-    ["git@github.mycorp.com:acme/repo.git", "acme/repo", {}],
-    // …and one that does not is recognised only when GH_HOST names it.
+    // A GitHub Enterprise host is recognised ONLY when GH_HOST names it —
+    // gh itself already requires that, so it costs a GHE user nothing.
+    [
+      "git@github.mycorp.com:acme/repo.git",
+      "acme/repo",
+      { GH_HOST: "github.mycorp.com" },
+    ],
     [
       "git@ghe.corp.example.com:acme/repo.git",
       "acme/repo",
@@ -828,6 +832,11 @@ test("§10 a non-GitHub remote yields NO slug and NO command, never a wrong one"
     "git@bitbucket.org:acme/repo.git",
     "https://gitlab.com/acme/repo.git",
     "/srv/git/acme/repo.git",
+    // A lookalike host. `github.evil.com` and `github.mycorp.com` are
+    // indistinguishable by shape, so neither is accepted without GH_HOST.
+    "git@github.evil.com:acme/repo.git",
+    // …and an unnamed GHE host is refused for the same reason.
+    "git@github.mycorp.com:acme/repo.git",
   ]) {
     const dir = withRepo();
     execFileSync("git", ["init", "-q"], { cwd: dir });
@@ -845,5 +854,134 @@ test("§10 a non-GitHub remote yields NO slug and NO command, never a wrong one"
     );
     // The manual path still works — the record is degraded, not broken.
     assert.ok(rec.manual, "the manual path must survive");
+  }
+});
+
+test("§10 --dry-run under a restricted mode makes NO network call", () => {
+  // This has regressed twice, from opposite directions: cycle 1 left
+  // `gh repo view` on the dry-run path, cycle 2 fixed it and then reintroduced
+  // it by gating on `access === "full" || args.dryRun`. Pinned directly with a
+  // throwing transport so it cannot come back a third time quietly.
+  for (const mode of RESTRICTED) {
+    const dir = withRepo();
+    // COUNT THE ATTEMPT, do not merely throw. ghRepoSlug catches its own
+    // errors, so a throwing stub proves nothing: the call happens, the throw is
+    // swallowed, and the assertion passes anyway. That is the same swallow that
+    // made the cycle-1 version of this check vacuous.
+    const attempted = [];
+    const execImpl = (bin, argv) => {
+      attempted.push([bin, ...argv].join(" "));
+      throw new Error("no network in a test");
+    };
+    const r = cli.run({
+      argv: ["node", "x", "--kind", "milestone", "--title", "M", "--dry-run"],
+      repoRoot: dir,
+      env: { ACCESS_TRACKER: mode },
+      execImpl,
+    });
+    assert.deepEqual(
+      attempted,
+      [],
+      `${mode}: --dry-run attempted ${attempted.join(", ")} — a gated run must ` +
+        `issue no network call, and an attempt counts even when it fails`,
+    );
+    assert.equal(r.reason, "dry-run", `${mode}: must report dry-run`);
+    assert.equal(r.exitCode, 0);
+    assert.equal(
+      readJournal(dir).length,
+      0,
+      `${mode}: a dry run records nothing either`,
+    );
+  }
+});
+
+test("§10 an explicit --repo short-circuits slug resolution entirely", () => {
+  // No transport call at all when the caller already said which repo.
+  const dir = withRepo();
+  const { execImpl, calls } = stubGh();
+  cli.run({
+    argv: [
+      "node",
+      "x",
+      "--kind",
+      "close",
+      "--issue",
+      "42",
+      "--repo",
+      "acme/repo",
+    ],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  assert.ok(
+    !calls.some((c) => c.argv[0] === "repo"),
+    "gh repo view must not run when --repo was supplied",
+  );
+});
+
+test("§10 both slug tiers resolve against the RESOLVED root, not process.cwd()", () => {
+  // repoSlug passes cwd and says why; ghRepoSlug did not, and it takes
+  // precedence — so the higher-priority tier reintroduced the exact hazard the
+  // lower one documents. An agent invoking this from a parent directory would
+  // have pinned every mutation to whatever repo that directory belongs to.
+  const dir = withRepo();
+  const seen = [];
+  const execImpl = (bin, argv, opts) => {
+    seen.push({ argv: argv.join(" "), cwd: opts && opts.cwd });
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    return "";
+  };
+  cli.run({
+    argv: ["node", "x", "--kind", "close", "--issue", "42"],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  const view = seen.find((c) => c.argv.startsWith("repo view"));
+  assert.ok(view, "gh repo view should run on the perform path");
+  assert.equal(
+    view.cwd,
+    dir,
+    "gh must resolve against the repo root the caller supplied",
+  );
+});
+
+test("§10 GH_REPO with a foreign host is refused, not silently truncated", () => {
+  // gh --repo accepts `[HOST/]OWNER/REPO`, so discarding the host turned
+  // `ghe.corp/acme/repo` into `acme/repo` and aimed it at github.com.
+  const cases = [
+    [{ GH_REPO: "acme/repo" }, true],
+    [{ GH_REPO: "github.com/acme/repo" }, true],
+    [{ GH_REPO: "ghe.corp.example.com/acme/repo" }, false],
+    [
+      {
+        GH_REPO: "ghe.corp.example.com/acme/repo",
+        GH_HOST: "ghe.corp.example.com",
+      },
+      true,
+    ],
+  ];
+  for (const [envExtra, shouldResolve] of cases) {
+    const dir = withRepo();
+    run(dir, ["--kind", "milestone", "--title", "M"], {
+      ACCESS_TRACKER: "manual",
+      ...envExtra,
+    });
+    const rec = readJournal(dir)[0];
+    if (shouldResolve) {
+      assert.ok(
+        rec.command && rec.command.argv.join(" ").includes("/repos/acme/repo/"),
+        `${JSON.stringify(envExtra)} should resolve to acme/repo`,
+      );
+    } else {
+      assert.equal(
+        rec.command,
+        null,
+        `${JSON.stringify(envExtra)} names a host we cannot verify — refuse ` +
+          `rather than aim at github.com`,
+      );
+    }
   }
 });

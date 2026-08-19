@@ -318,7 +318,20 @@ function repoSlug(explicit, env = process.env, cwd = undefined) {
   // break every `/repos/${slug}/…` path built from it, so take the last two.
   if (env.GH_REPO) {
     const parts = String(env.GH_REPO).split("/").filter(Boolean);
-    return parts.length >= 2 ? parts.slice(-2).join("/") : "";
+    if (parts.length === 2) return parts.join("/");
+    if (parts.length === 3) {
+      // `[HOST/]OWNER/REPO`. Discarding the host unconditionally was the
+      // previous behaviour and it let `GH_REPO=ghe.corp/acme/repo` with GH_HOST
+      // unset emit `--repo acme/repo`, which gh then resolves against
+      // github.com — the same wrong-target failure the host allowlist below
+      // exists to stop, entering through a different door.
+      const ghHost = (env.GH_HOST || "").trim();
+      if (parts[0] === "github.com" || (ghHost && parts[0] === ghHost)) {
+        return parts.slice(-2).join("/");
+      }
+      return "";
+    }
+    return "";
   }
   try {
     // `cwd` matters: without it git runs wherever the PROCESS happens to be,
@@ -347,11 +360,16 @@ function repoSlug(explicit, env = process.env, cwd = undefined) {
     // is worse than none, so an unrecognised host returns "".
     const host = /^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)[:/]/.exec(url);
     const ghHost = (env.GH_HOST || "").trim();
+    // EXACT match only — `github.com`, or the host GH_HOST names.
+    //
+    // A `/(^|\.)github\./` heuristic was the previous attempt and it accepted
+    // `github.evil.com` as readily as `github.mycorp.com`: the two are
+    // indistinguishable by shape, and the slug it yields is handed to
+    // `gh --repo` and aimed at github.com. GitHub Enterprise already requires
+    // GH_HOST for `gh` itself to work, so naming it costs a GHE user nothing
+    // and removes the guess entirely.
     const hostOk =
-      host &&
-      (host[1] === "github.com" ||
-        (ghHost && host[1] === ghHost) ||
-        /(^|\.)github\./i.test(host[1]));
+      host && (host[1] === "github.com" || (ghHost && host[1] === ghHost));
     if (!hostOk) return "";
 
     const m = /[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url);
@@ -367,16 +385,20 @@ function repoSlug(explicit, env = process.env, cwd = undefined) {
  * This is what honours `gh repo set-default` and a fork's upstream, which the
  * git-remote read cannot see.
  */
-function ghRepoSlug(execImpl) {
+function ghRepoSlug(execImpl, cwd = undefined) {
   try {
-    return gh(execImpl, [
-      "repo",
-      "view",
-      "--json",
-      "nameWithOwner",
-      "-q",
-      ".nameWithOwner",
-    ]);
+    // `cwd` for the same reason repoSlug passes it: without it gh resolves
+    // wherever the PROCESS happens to be, which for an agent invoking this from
+    // a parent directory is some OTHER repository. This tier takes precedence
+    // over the local read, so leaving it unanchored reintroduced the exact
+    // hazard the local read documents and guards against.
+    return String(
+      execImpl(
+        "gh",
+        ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+        { ...GIT_EXEC_OPTS, cwd },
+      ) || "",
+    ).trim();
   } catch (_) {
     return "";
   }
@@ -871,6 +893,19 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
     }
 
     case "sub-issue-link": {
+      // Same guard as the milestone arm. Without it the fetch becomes
+      // `/repos//issues/N`, the catch swallows it, and the operator is told
+      // "could not resolve the internal id of issue #N" — safe, because it
+      // still refuses, but pointing at the child issue instead of the real
+      // cause. A refusal that names the wrong thing costs more time than one
+      // that names the right thing.
+      if (!slug) {
+        output.warn(
+          "⚠️  Could not resolve owner/repo — not linking the sub-issue. " +
+            "Pass --repo <owner/name>.",
+        );
+        return emit({ performed: false, reason: "unverifiable" }, skipCode);
+      }
       let subId = "";
       try {
         subId = gh(execImpl, [
@@ -1065,10 +1100,19 @@ function run({
   // When it cannot be resolved the record simply carries no `command` (see
   // recordShape), rather than a `$OWNER/$REPO` placeholder that renders into a
   // script which cannot run.
+  // Gate on ACCESS ALONE, never on --dry-run.
+  //
+  // `access === "full" || args.dryRun` was the previous spelling and it put a
+  // `gh repo view` back on the gated path: `--dry-run` under a restricted mode
+  // made a network call, contradicting the header's promise in exactly the way
+  // cycle 1 fixed and cycle 2 reintroduced from the other side. A dry run under
+  // `full` may ask gh; a dry run under a restricted mode may not.
   const local = () => repoSlug(args.repo, env, root || process.cwd());
   const slug =
-    access === "full" || args.dryRun
-      ? args.repo || ghRepoSlug(execImpl) || local()
+    access === "full" && !args.dryRun
+      ? // A dry run reads `slug` nowhere — it returns before recordShape and
+        // before perform — so the network round trip would be pure waste.
+        args.repo || ghRepoSlug(execImpl, root || process.cwd()) || local()
       : local();
 
   if (access !== "full" && !args.dryRun) {
