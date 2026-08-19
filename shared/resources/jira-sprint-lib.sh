@@ -76,7 +76,13 @@ jsm_resolve_access() {
   # answer. An absent config answers "full", which is the identity element of the
   # most-restrictive-wins reduction below and so changes nothing.
   local cfg_mode="" resolver cfg_err
-  resolver="$(dirname "${BASH_SOURCE[0]}")/resolve-platform.sh"
+  # ABSOLUTE, resolved BEFORE the subshell cd's. `dirname "${BASH_SOURCE[0]}"` is
+  # relative whenever the lib is sourced by a relative path — which is the
+  # documented call shape — so a later `cd` to the repo root left the resolver
+  # path pointing nowhere, `source` failed, and EVERY answer became `manual`.
+  # A repo declaring nothing then deferred every sprint write: a false
+  # restriction, and worse than the anchoring bug it was fixing.
+  resolver="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/resolve-platform.sh"
   if [ -f "$resolver" ]; then
     # ANCHORED to the repo root, not the caller's cwd. read-config.sh defaults
     # SKILLS_CONFIG_FILE to the RELATIVE `skills-config.yaml`, and this skill
@@ -98,7 +104,11 @@ jsm_resolve_access() {
     # Surface the resolver's own refusal line, the way the JS path does. Without
     # this the operator gets `manual` and no reason at all.
     if [ "$cfg_mode" = "manual" ] && [ -n "$cfg_err" ] && [ -s "$cfg_err" ]; then
-      JSM_ACCESS_ERROR=$(grep -m1 "^\xe2\x9d\x8c" "$cfg_err" 2>/dev/null || true)
+      # shellcheck disable=SC2034
+      # $'...' (ANSI-C quoting), NOT "\xe2…": grep does not interpret \xNN, so the
+      # double-quoted form searched for the literal text `xe2x9dx8c` and matched
+      # nothing. The capture was silently inert until a test caught it.
+      JSM_ACCESS_ERROR=$(grep -m1 $'^\xe2\x9d\x8c' "$cfg_err" 2>/dev/null || true)
     fi
     [ -n "$cfg_err" ] && rm -f "$cfg_err"
   else
@@ -130,6 +140,14 @@ jsm_resolve_access() {
     [ "$rank_v" -lt "$rank_best" ] && best="$v"
   done
   JSM_ACCESS_MODE="$best"
+  # Say WHY, once, when the config tier refused. Both writers above set
+  # JSM_ACCESS_ERROR and then return 0 with mode=manual, so the only existing
+  # printer — the `return 1` path in the caller — never fired and the operator
+  # still got `manual` with no reason, which is precisely what setting the
+  # variable was meant to fix.
+  if [ -n "${JSM_ACCESS_ERROR:-}" ] && [ "$best" != "full" ]; then
+    printf '%s\n' "$JSM_ACCESS_ERROR" >&2
+  fi
   return 0
 }
 

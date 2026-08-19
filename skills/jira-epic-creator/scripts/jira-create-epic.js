@@ -106,7 +106,10 @@ function repoRootOrCwd() {
         stdio: ["ignore", "pipe", "ignore"],
       })
       .trim();
-    return (_repoRoot = out);
+    // `out || process.cwd()`: an older git can exit 0 printing nothing, and
+    // memoising "" would hand spawnSync an empty cwd (ENOENT) for the rest of
+    // the process.
+    return (_repoRoot = out || process.cwd());
   } catch (_) {
     return (_repoRoot = process.cwd());
   }
@@ -138,7 +141,12 @@ function configMayRestrict() {
     return Boolean(raw) && raw !== "skills-config.yaml";
   }
   try {
-    return /access/i.test(fs.readFileSync(file, "utf8"));
+    // Key-shaped, not a bare substring. `accessToken:` or a path like
+    // `docs/access-control/` is not a declaration, and forcing `manual` on those
+    // would be a false restriction that stops every epic create.
+    return /(^|[^A-Za-z0-9_-])["']?access["']?[ \t]*:/m.test(
+      fs.readFileSync(file, "utf8"),
+    );
   } catch (_) {
     return true;
   }

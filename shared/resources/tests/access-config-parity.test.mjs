@@ -38,6 +38,7 @@ import { createRequire } from "node:module";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SHARED = dirname(HERE);
+const REPO = dirname(dirname(SHARED));
 const RESOLVER = join(SHARED, "resolve-platform.sh");
 const FIXTURES = join(HERE, "fixtures");
 const require = createRequire(import.meta.url);
@@ -80,13 +81,10 @@ function withRepo(body, fn) {
  * two different experiments.
  */
 function childEnvFor(tier) {
-  const env = {
-    PATH: process.env.PATH,
-    HOME: process.env.HOME,
-    LANG: process.env.LANG,
-    LC_ALL: process.env.LC_ALL,
-  };
-  for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
+  // IMPORTED from defer-mutation.js, not re-declared. A hand-copied second copy
+  // is what let the two sides drift in the first place, and copying it again to
+  // fix that would have reinstated the same hazard one layer down.
+  const env = { ...dm.CHILD_ENV_AT_LOAD };
   if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
   return env;
 }
@@ -407,7 +405,12 @@ describe("the environment cannot forge an answer (T61-H1)", () => {
 });
 
 describe("the fast-path is a hint, not an authorisation decision (T61-H2)", () => {
-  test("an escape-spelled access key is not read as absent", () => {
+  test("an escape-spelled access key is not read as absent", (t) => {
+    // Forcing a tier the host cannot honour makes the reader answer nothing and
+    // the resolver exit 0 with `full` — so on a host without pyyaml this would
+    // fail spuriously rather than test anything. SKIP loudly, per read-config.sh's
+    // own instruction to suites that force a tier.
+    if (!TIERS.includes("python")) return t.skip("tier python unavailable");
     // PyYAML resolves "\x61ccess" to the key `access`, so a file with no literal
     // `access` substring can still declare a restriction. The corpus covers this
     // via its escaped-key fixtures; this test names the mechanism.
@@ -467,7 +470,7 @@ describe("the shell seam answers the same as the JS tier", () => {
       ],
       {
         cwd,
-        env: { PATH: process.env.PATH, HOME: process.env.HOME, ...env },
+        env: { ...childEnvFor(), ...env },
         encoding: "utf8",
         timeout: 20000,
       },
@@ -519,6 +522,41 @@ describe("the shell seam answers the same as the JS tier", () => {
     });
   });
 
+  test("a refusal populates JSM_ACCESS_ERROR with the resolver's own line", () => {
+    // The shell path used to hand the operator `manual` and no reason at all.
+    // The first attempt at fixing that grepped for "^\\xe2\\x9d\\x8c" in double
+    // quotes — grep does not interpret \\xNN, so it searched for the literal text
+    // `xe2x9dx8c`, matched nothing, and the capture was silently inert. Asserting
+    // on the CONTENT is what makes that visible; asserting only on the mode would
+    // have passed either way.
+    withRepo("access: manual\n", (dir) => {
+      spawnSync("git", ["init", "-q", "."], { cwd: dir });
+      const r = spawnSync(
+        "bash",
+        [
+          "--noprofile",
+          "--norc",
+          "-c",
+          'source "$1"; jsm_resolve_access; printf "%s" "$JSM_ACCESS_ERROR"',
+          "_",
+          LIB,
+        ],
+        {
+          cwd: dir,
+          env: { PATH: process.env.PATH, HOME: process.env.HOME },
+          encoding: "utf8",
+          timeout: 20000,
+        },
+      );
+      const err = String(r.stdout || "").trim();
+      assert.ok(
+        err.length > 0,
+        "a refusal with no reason is not a legible refusal",
+      );
+      assert.match(err, /access/, "the reason must name what was wrong");
+    });
+  });
+
   test("an unrestricted repo still answers full", () => {
     withRepo("prd:\n  prdShardedLocation: docs/prd\n", (dir) => {
       assert.equal(seamAnswer(dir), "full");
@@ -536,6 +574,124 @@ describe("the shell seam answers the same as the JS tier", () => {
         "approve",
       );
     });
+  });
+});
+
+describe("regressions from the cycle-1 fixes", () => {
+  const LIB2 = join(SHARED, "jira-sprint-lib.sh");
+
+  test("the seam works when the lib is sourced by a RELATIVE path", () => {
+    // The cycle-1 anchor fix computed $resolver from a relative BASH_SOURCE and
+    // then cd'd away from it, so `source` failed and EVERY answer became
+    // `manual`. A repo declaring nothing deferred every sprint write — a false
+    // restriction, and worse than the bug being fixed. The earlier seam tests
+    // could not see it because they passed an absolute path.
+    for (const [body, want] of [
+      ["prd:\n  prdShardedLocation: docs/prd\n", "full"],
+      ["access:\n  tracker: manual\n", "manual"],
+    ]) {
+      withRepo(body, (dir) => {
+        spawnSync("git", ["init", "-q", "."], { cwd: dir });
+        mkdirSync(join(dir, "refs"), { recursive: true });
+        mkdirSync(join(dir, "sub"), { recursive: true });
+        for (const f of [
+          "jira-sprint-lib.sh",
+          "resolve-platform.sh",
+          "read-config.sh",
+        ]) {
+          writeFileSync(
+            join(dir, "refs", f),
+            readFileSync(join(SHARED, f), "utf8"),
+          );
+        }
+        const r = spawnSync(
+          "bash",
+          [
+            "--noprofile",
+            "--norc",
+            "-c",
+            'source "../refs/jira-sprint-lib.sh"; jsm_resolve_access; printf "%s" "$JSM_ACCESS_MODE"',
+          ],
+          {
+            cwd: join(dir, "sub"),
+            env: childEnvFor(),
+            encoding: "utf8",
+            timeout: 20000,
+          },
+        );
+        assert.equal(
+          String(r.stdout || "").trim(),
+          want,
+          `relative source, config ${JSON.stringify(body)}`,
+        );
+      });
+    }
+  });
+
+  test("a config refusal is PRINTED, not just stored in a variable", () => {
+    // Both new writers set JSM_ACCESS_ERROR and returned 0, while the only
+    // existing printer was the return-1 path — so the message was written and
+    // never shown. Asserting on the variable alone would still pass.
+    withRepo("access: manual\n", (dir) => {
+      spawnSync("git", ["init", "-q", "."], { cwd: dir });
+      const r = spawnSync(
+        "bash",
+        [
+          "--noprofile",
+          "--norc",
+          "-c",
+          'source "$1"; jsm_resolve_access >/dev/null',
+          "_",
+          LIB2,
+        ],
+        { cwd: dir, env: childEnvFor(), encoding: "utf8", timeout: 20000 },
+      );
+      assert.match(
+        String(r.stderr || ""),
+        /access/,
+        "the refusal reason must reach stderr, not just a shell variable",
+      );
+    });
+  });
+
+  test("every makeHttp call site is anchored to a repo root", () => {
+    // T61-M3's first sweep fixed jira-stage.js and missed six live write paths in
+    // the three sync scripts plus scaffold-tracker-workflow. Layer 1 there
+    // resolved the config tier against process.cwd(), so a bare `node ...` run
+    // from a subdirectory wrote at `full` over a committed restriction. A grep is
+    // the honest guard: the defect is "somebody added a call site and forgot".
+    const files = [
+      join(SHARED, "jira-stage.js"),
+      join(REPO, "skills/sync-jira-story/scripts/sync-jira-story.js"),
+      join(REPO, "skills/sync-jira-epic/scripts/sync-jira-epic.js"),
+      join(REPO, "skills/sync-jira-task/scripts/sync-jira-task.js"),
+      join(
+        REPO,
+        "skills/scaffold-tracker-workflow/scripts/scaffold-tracker-workflow.js",
+      ),
+    ];
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      // A window after each call, NOT a match to the first `)` — the argument
+      // object contains `(typeof fetch !== "undefined" ? ... )`, so a lazy
+      // `\\)` terminates inside it and the check reads no arguments at all. It
+      // failed on correctly-anchored code the first time for exactly that reason.
+      const calls = [];
+      let at = src.indexOf("makeHttp(");
+      while (at !== -1) {
+        calls.push(src.slice(at, at + 600));
+        at = src.indexOf("makeHttp(", at + 1);
+      }
+      assert.ok(calls.length > 0, `no makeHttp call found in ${f}`);
+      for (const args of calls) {
+        assert.match(
+          args,
+          /cwd:/,
+          `a makeHttp call in ${f} has no cwd — layer 1 would resolve the ` +
+            `config tier against process.cwd()`,
+        );
+      }
+    }
   });
 });
 

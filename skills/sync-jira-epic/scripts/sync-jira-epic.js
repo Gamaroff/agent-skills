@@ -651,6 +651,12 @@ async function run({
     }
     const http = lib.makeHttp({
       fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+      // Anchored to the repo root. Without it layer 1 resolves the config tier
+      // against process.cwd(), so a bare `node .../sync-jira-*.js --file docs/...`
+      // run from a subdirectory reads no config and writes at `full` over a
+      // committed restriction. These are the documented bare invocations the
+      // whole task is about (T61-M3, missed in the first sweep).
+      cwd: lib.getRepoRoot() || process.cwd(),
     });
     await lib.probeWorkflow({
       http,
@@ -808,6 +814,12 @@ async function run({
 
   const http = lib.makeHttp({
     fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+    // Anchored to the repo root. Without it layer 1 resolves the config tier
+    // against process.cwd(), so a bare `node .../sync-jira-*.js --file docs/...`
+    // run from a subdirectory reads no config and writes at `full` over a
+    // committed restriction. These are the documented bare invocations the
+    // whole task is about (T61-M3, missed in the first sweep).
+    cwd: lib.getRepoRoot() || process.cwd(),
   });
   const livePriorities =
     auth.ok && !args.dryRun

@@ -496,6 +496,44 @@ const WARN_MARK = "\u26a0\ufe0f";
 const CONFIG_BASENAME = "skills-config.yaml";
 const RESOLVER_SH = "resolve-platform.sh";
 
+/**
+ * The child shell's environment, SNAPSHOTTED AT REQUIRE TIME.
+ *
+ * Frozen here rather than read at call time because `loadDotEnv()` merges the
+ * repo's `.env` into process.env before the gates resolve, and it fills in any
+ * key that is not already set. LANG, LC_ALL and TMPDIR are routinely unset in CI
+ * and daemon contexts, and HOME occasionally is — so reading them later would let
+ * a repo-local `.env` supply them after all, which is the hole this allowlist
+ * exists to close. defer-mutation.js is required before any loadDotEnv call, so
+ * this snapshot predates the merge. Same trick, and same reason, as
+ * jira-sync.js's ACCESS_ENV_AT_LOAD.
+ *
+ * The names here change how the reader RUNS (which interpreter, which locale,
+ * where temp files go) rather than what bash SOURCES at startup — none of them is
+ * a startup hook like BASH_ENV. Omitting PYTHONPATH/PYENV_VERSION would be its
+ * own parity bug: on a host where pyyaml is reachable only through them, the
+ * child would silently fall back to the awk tier while a normal shell used
+ * PyYAML, and the two readers would then grade the tier-sensitive fixtures
+ * differently.
+ */
+const CHILD_ENV_AT_LOAD = Object.freeze(
+  Object.fromEntries(
+    [
+      "PATH",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "TMPDIR",
+      "PYTHONPATH",
+      "PYTHONHOME",
+      "PYENV_VERSION",
+    ]
+      .map((k) => [k, process.env[k]])
+      .filter(([, v]) => v !== undefined),
+  ),
+);
+
 /** Memo: one bash spawn per (cwd, config path, tier) per process. */
 const _configAccessMemo = new Map();
 
@@ -586,11 +624,7 @@ function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
   // escalation — shell said `manual`, this said `full` — found in QA cycle 1
   // (T61-H2), and it is the reason the checks below are about what could
   // POSSIBLY spell the key rather than about the key itself.
-  if (mayDeclareAccess(text)) {
-    // fall through to the resolver
-  } else {
-    return { mode: null, reason: null };
-  }
+  if (!mayDeclareAccess(text)) return { mode: null, reason: null };
 
   const tier = String((env && env.AGENT_SKILLS_CONFIG_TIER) || "");
   // JSON rather than NUL-joined. The collision reported as T61-L2 was NOT real —
@@ -630,7 +664,17 @@ function mayDeclareAccess(text) {
   // exists to provide was silently gone.
   const body = text.replace(/^[ \t]*#.*$/gm, "");
 
-  if (/access/i.test(body)) return true;
+  // The `access` test runs on the RAW text, comments included. That is a
+  // deliberate over-match, and it is what `_rp_access_may_be_declared` does too:
+  // on a config that does not parse, the shell refuses whenever the word appears
+  // ANYWHERE — comment or not — because it cannot know which. Testing the
+  // stripped body here made the JS answer `full` on a malformed config whose only
+  // mention was commented out, while every shell gate refused it.
+  //
+  // The metacharacter tests below run on the stripped body instead, because those
+  // are about YAML constructs and prose punctuation is not one. That split is the
+  // whole point: over-match the word, under-match the syntax.
+  if (/access/i.test(text)) return true;
   if (body.includes("\\")) return true; // an escape could spell `access`
   if (/[^\x00-\x7F]/.test(body)) return true; // unicode escape, homoglyph
   // Aliasing, in the positions YAML actually gives it meaning: an anchor or alias
@@ -679,16 +723,7 @@ function probeResolver(file, cwd, tier) {
   // same PATH this process was itself resolved on. A caller who can already set
   // this process's PATH can run anything as this process anyway; the property that
   // matters is that a REPO-LOCAL .env cannot.
-  const childEnv = {
-    PATH: process.env.PATH,
-    HOME: process.env.HOME,
-    LANG: process.env.LANG,
-    LC_ALL: process.env.LC_ALL,
-    SKILLS_CONFIG_FILE: file,
-  };
-  for (const k of Object.keys(childEnv)) {
-    if (childEnv[k] === undefined) delete childEnv[k];
-  }
+  const childEnv = { ...CHILD_ENV_AT_LOAD, SKILLS_CONFIG_FILE: file };
   // The tier hook is a documented TESTING knob that materially loosens the answer
   // (forcing `python` on a host without pyyaml makes the reader answer nothing and
   // the resolver exit 0 with `full`). It is honoured only when the CALLER passed it
@@ -759,7 +794,7 @@ function warnOnce(reason) {
   // and left the operator with no way to find the real one (T61-L3). The resolver's
   // own line is carried verbatim and says which it was.
   console.error(
-    `${WARN_MARK}  skills-config.yaml: ${reason}. Resolving tracker access to ` +
+    `${WARN_MARK}  ${reason}. Resolving tracker access to ` +
       `"manual" — refusing rather than defaulting to "full", because that would ` +
       `silently escalate a declared restriction into a tracker write.`,
   );
@@ -1428,6 +1463,7 @@ module.exports = {
   resolveAccessTracker,
   readConfiguredAccessTracker,
   resolveConfigPath,
+  CHILD_ENV_AT_LOAD,
   parseRoster,
   loadRoster,
   buildEnvTable,
