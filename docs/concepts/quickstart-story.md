@@ -90,7 +90,7 @@ docs/prd/footer-link/epics/
     └── epic.{N}.footer-link.md
 ```
 
-When prompted for tracker, choose **Skip — docs only** to avoid creating a practice issue in your tracker.
+When prompted for tracker, choose **Skip — docs only** to avoid creating a practice issue in your tracker. That is *no tracker for this run*. A standing restriction (`access.tracker: manual` / `command`) is a different choice — [Restricted tracker access](./restricted-access.md).
 
 ---
 

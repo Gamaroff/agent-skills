@@ -656,6 +656,46 @@ It stays a separate file on purpose: board identity has a different lifetime fro
 and consolidating the two is not planned. `gh-stage.js` reads it as a fallback exactly as the pipeline
 step files do today. When both are present, `github.projectBoard` in `skills-config.yaml` wins.
 
+## Worked examples — access models
+
+Which of the five to pick: [Which access model?](../concepts/which-access.md). What a run produces: [Restricted tracker access](../concepts/restricted-access.md). The key row above is the contract; these blocks are copy-paste starters. `access.vcs` is omitted on purpose — only `full` is valid, and omitting it is `full`.
+
+<!-- access-model-examples:start -->
+
+```yaml
+# Unattended writes. Equivalent to omitting the access: block.
+access:
+  tracker: full
+```
+
+```yaml
+# Agent may read the board, not write. Writes are deferred.
+access:
+  tracker: read-only
+```
+
+```yaml
+# Credentials present; writes still deferred today (ask prompt is task.57).
+access:
+  tracker: approve
+```
+
+```yaml
+# No write token. After the run, execute the committed .sh (dry-run by default).
+access:
+  tracker: command
+```
+
+```yaml
+# No write token. After the run, tick the committed .md checklist.
+access:
+  tracker: manual
+```
+
+<!-- access-model-examples:end -->
+
+Env `AGENT_SKILLS_ACCESS_TRACKER` is combined most-restrictive-wins with the committed value — it can lock a run down, never escalate it.
+
 ## Worked example — typical project
 
 Complete `skills-config.yaml` for an NX-style monorepo with NestJS + Expo:

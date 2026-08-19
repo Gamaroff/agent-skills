@@ -27,6 +27,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Restricted-access narrative layer** — a concept page, a three-question decision
+  guide, and a runbook walked against this repo's own GitHub board (`Todo` /
+  `In Progress` / `Done`, issue #236). Limits sit next to capabilities: partial
+  enforcement, `approve` does not yet ask, `/develop-next` still needs VCS write,
+  issue create converges over two runs, `/tracker-reconcile` is not shipped
+  (task.57). Vocabulary and the command are registered; a drift guard
+  (`tests/restricted-access-docs.test.js`) asserts modes, examples, indexes, and
+  honest not-shipped labelling.
+
 - **`tracker-comment.js` — a comment endpoint that did not exist, and one call site instead of two
   dozen.** `jira-sync.js` had no comment function at all, so *every* Jira comment in this repository
   was an `addCommentToJiraIssue` MCP call an agent made by following prose, and every GitHub issue

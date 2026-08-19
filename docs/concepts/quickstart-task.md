@@ -36,7 +36,7 @@ Platform-specific — needed because `/develop-task` opens a PR and (optionally)
 | GitHub | Jira | `gh` CLI authenticated; `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 | Bitbucket | Jira | `BITBUCKET_ACCESS_TOKEN` (or `BITBUCKET_USERNAME` + `BITBUCKET_API_TOKEN`), `JIRA_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN` exported |
 
-Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc. To skip tracker integration entirely (PR-only), choose **Skip — docs only** at the tracker prompt.
+Not sure which row to pick? See [How to pick a row](./getting-started.md#how-to-pick-a-row) in the getting-started doc. To skip tracker integration entirely (PR-only), choose **Skip — docs only** at the tracker prompt. To keep a tracker but stop the agent writing to it, set `access.tracker` (see [Restricted tracker access](./restricted-access.md)) — Skip is not that.
 
 ⏱ Set a 10-minute timer. If you blow through it, your walkthrough is your bug report.
 

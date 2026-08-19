@@ -5,11 +5,11 @@ type: task
 description: 'Tasks 51-57 each update the reference page for the thing they ship — the config key, the artifact, the reason code. None of them produces the narrative layer a new developer needs: what restricted access is, which of the five models to pick, what a run looks like under each, and what to do when the board does not move. This task delivers the concept doc, the decision guide, the runbook, the troubleshooting entries, the command and glossary registrations, and the onboarding touchpoints — plus a drift guard, because roughly ten consumer documents restate pipeline behaviour independently and have drifted silently before.'
 tags: [documentation, restricted-access, onboarding]
 category: documentation
-status: planned
+status: in-progress
 priority: High
 risk_level: low
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-19
 estimated_effort_hours: 8
 github_issue: 236
 ---
@@ -145,19 +145,19 @@ shipped reality, not by reading it.
 
 ## Success Criteria
 
-- [ ] A developer who has never heard of restricted access can read one page and know whether it
+- [x] A developer who has never heard of restricted access can read one page and know whether it
       applies to them
-- [ ] The decision guide discriminates between all five models on questions a reader can actually
+- [x] The decision guide discriminates between all five models on questions a reader can actually
       answer about their own situation
-- [ ] The runbook was executed against a real board, and its column names and links came from that
+- [x] The runbook was executed against a real board, and its column names and links came from that
       run rather than from these task documents
-- [ ] The limits are documented as prominently as the capabilities — advisory enforcement, the two
+- [x] The limits are documented as prominently as the capabilities — advisory enforcement, the two
       orchestrators refusing, two-run convergence
-- [ ] `/tracker-reconcile` and the new vocabulary are registered everywhere skills and terms are
+- [x] `/tracker-reconcile` and the new vocabulary are registered everywhere skills and terms are
       registered
-- [ ] Every new page is reachable from `docs/README.md`
-- [ ] The drift guard exists and was watched failing
-- [ ] No reference content is duplicated from tasks 51–57 — linked, not restated
+- [x] Every new page is reachable from `docs/README.md`
+- [x] The drift guard exists and was watched failing
+- [x] No reference content is duplicated from tasks 51–57 — linked, not restated
 - [ ] `npm test`, `npm run validate:all`, `docs-link-check` green; catalog regenerated
 
 ## Risk Assessment
@@ -174,6 +174,15 @@ shipped reality, not by reading it.
 ## Rollback Plan
 
 `git revert <sha>`. Documentation and one test; no consumer behaviour depends on it.
+
+## Change Log
+
+<!-- change-log-start -->
+| Date | Version | Description | Author |
+| --- | --- | --- | --- |
+| 2026-08-17 | 1.0 | Initial draft | create-task |
+| 2026-08-19 |  | Narrative layer: concept doc, which-access, runbook, registrations, wizard copy, drift guard |  |
+<!-- change-log-end -->
 
 ## References
 

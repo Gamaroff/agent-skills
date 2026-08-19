@@ -255,6 +255,11 @@ Then either work the checklist by hand, or re-run with `access.tracker: full` in
 `skills-config.yaml` (config and env are read independently and the **more restrictive** wins,
 so also check `AGENT_SKILLS_ACCESS_TRACKER`).
 
+Narrative, decision guide, and a walkthrough against this repo's board:
+[Restricted tracker access](../concepts/restricted-access.md),
+[Which access model?](../concepts/which-access.md),
+[Restricted access runbook](../runbooks/restricted-access.md).
+
 **Not this:** a deferred create never writes a placeholder key to frontmatter. That is
 deliberate — a placeholder would break the idempotent `synced-from-*` label search and the next
 unrestricted run would create a duplicate. `jira_key` stays absent until the issue really exists.
@@ -346,10 +351,65 @@ pay one subprocess per process, and still answers `full`.
 **Not this:** do not "fix" it by setting `AGENT_SKILLS_ACCESS_TRACKER=full`. Config and env are
 reduced most-restrictively, so that changes nothing — by design. The file has to become readable.
 
+## The handover says UNRECORDED
+
+**Symptom:** `*.handover.*.md` contains `⚠️ UNRECORDED` for a kind (or the `.sh` echoes it).
+
+**Cause:** the pipeline moment that should have written a deferred-mutation record did not. The
+handover renders the gap on purpose so drift is visible — this is not a skip.
+
+**Fix:** treat it as a run defect. Re-run the step that owns that kind, or file a bug against the
+skill that performed the write without going through `defer-mutation` / `tracker_write`. Do not
+delete the UNRECORDED line to make the checklist look clean.
+
+## `/tracker-reconcile` is not a command yet
+
+**Symptom:** the agent cannot find a `tracker-reconcile` skill, or you expected `--apply` to tick
+the committed checklist from the live board.
+
+**Cause:** `/tracker-reconcile` is **not shipped**. Task.57 is still `planned`. `divergent` and
+`unverifiable` are glossary terms for that skill; they are not states the current renderer writes.
+
+**Fix:** work the `.md` checklist (or the `.sh` under `command`) by hand. When task.57 lands,
+reconcile will refuse `--apply` under `manual`, `command`, and `read-only`.
+
+## `/develop-next` ran, and the board still did not move
+
+**Symptom:** you set `access.tracker: manual` expecting `/develop-next` or `/develop-batch` to
+refuse. They ran. The PR merged. The card is still in `Todo`.
+
+**Cause:** those orchestrators refuse restricted **VCS** access (`access.vcs` only accepts `full`).
+They do **not** refuse restricted **tracker** access. Tracker writes are deferred; git push and
+`gh pr merge` still happen.
+
+**Fix:** expected. Work the handover. If you needed the orchestrator not to run at all, that
+behaviour does not exist.
+
+## The GitHub issue appeared on the second run, not the first
+
+**Symptom:** a restricted create left `github_issue` / `jira_key` empty. A later `full` (or
+unrestricted) run created the issue.
+
+**Cause:** two-run convergence. A deferred create never writes a placeholder key — a placeholder
+would duplicate on retry.
+
+**Fix:** expected. Do not invent a key by hand.
+
+## I used Skip — docs only, but I wanted the board updated by a human
+
+**Symptom:** no handover, no issue, local docs only.
+
+**Cause:** **Skip — docs only** means *no tracker for this run*. Restricted access
+(`access.tracker: manual` / `command`) means *there is a tracker, the agent must not write to it*.
+
+**Fix:** do not Skip. Set an access model — [Which access model?](../concepts/which-access.md).
+
 ## See also
 
 - [Story Development Runbook](../runbooks/story-development.md)
 - [Task Development Runbook](../runbooks/task-development.md)
 - [QA Flow Runbook](../runbooks/qa-flow.md)
+- [Restricted Access Runbook](../runbooks/restricted-access.md)
+- [Restricted tracker access](../concepts/restricted-access.md)
 - [Configuration](./configuration.md)
 - [Standards](../standards/README.md)

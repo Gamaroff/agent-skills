@@ -28,6 +28,7 @@ Skills auto-detect your platform via `skills-config.yaml` + env vars + git remot
 - **Your VCS is fixed.** Use GitHub or Bitbucket depending on where your repo lives — there's no flexibility here.
 - **Your tracker is a choice — pick the one your team already uses.** If your team coordinates on Jira (standups, sprint board, backlog), pick Jira. If issues live alongside the code on GitHub, pick GitHub Issues. The skills push the same artifacts either way; the tracker is just where notifications and board states surface.
 - **No tracker at all?** Tracker sync is opt-in — the creation and review skills ask before pushing anything. Choose **Skip — docs only** at the tracker prompt: nothing is sent to a tracker, but your local files and registries are still written. Useful for offline work, dry runs, or solo projects where the tracker would just be noise.
+- **Have a tracker, but the agent must not write to it?** That is **not** Skip. Set `access.tracker` to `manual`, `command`, `read-only`, or `approve` (wizard step 2 asks). The pipeline still runs; tracker writes land in a committed handover instead of on the board. Start at [Restricted tracker access](./restricted-access.md). Silence — leaving the issue key empty so every tracker moment no-ops — is the thing this replaces.
 - **GitHub VCS + Jira tracker is a common combo** in orgs that migrated code to GitHub but kept Jira for product management. It's fully supported.
 
 `project.yml` is GitHub-only — it carries GitHub project-board metadata. Bitbucket/Jira users skip it.
@@ -89,9 +90,11 @@ Set one or the other. `BITBUCKET_ACCESS_TOKEN` wins if both are present.
 > not a 401. It reads as "no pull requests found" rather than "your credential is wrong".
 > Full detail: [Bitbucket credentials](../reference/configuration.md#bitbucket).
 
-**Staying local:**
+**Staying local, or restricting the agent:**
 
 Tracker sync is **opt-in** — the creation and review skills (`create-story`, `create-task`, `create-epic`, `review-story`, `review-task`, `review-epic`) ask before creating any remote issue. Choose **Skip — docs only** at the prompt to keep everything local; your files and registries are still written. There's nothing to configure ahead of time.
+
+Skip is *no tracker*. If you **have** a tracker and the agent must not hold a write token, do not Skip — pick a restricted access model at the wizard's tracker-access prompt (or set `access.tracker` in `skills-config.yaml`). See [Restricted tracker access](./restricted-access.md) and [Which access model?](./which-access.md).
 
 ## Quick setup (wizard)
 
@@ -120,7 +123,7 @@ The full wizard runs all 9 steps. The `--update` flag runs only steps 1 and 8 �
 | Step | Action                                                                                                                             | Skippable?                                           |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | 1    | Checks `node`, `git`, `jq`, `curl` are on PATH — exits if any missing                                                              | No                                                   |
-| 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira                                                                 | No                                                   |
+| 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira, then **tracker access** (`full` / `read-only` / `approve` / `command` / `manual`) | No                                                   |
 | 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
 | 4    | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore`                                                 | Yes                                                  |
 | 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
