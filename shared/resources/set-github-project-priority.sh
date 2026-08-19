@@ -38,6 +38,88 @@ if ! command -v gh >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
+# ── ACCESS GATE (task.54) ────────────────────────────────────────────────────
+#
+# This script writes a board field with `gh api graphql` directly — it does NOT
+# go through gh-stage.js, which deliberately owns the Status field and nothing
+# else. So gh-stage's gate does not cover it, and it needs its own.
+#
+# The mode is resolved by ASKING defer-mutation.js, not by re-implementing the
+# table here. That contract already had four copies in this tree and shell is
+# where they drift: jira-sprint-lib.sh's comments record what open-coding it cost
+# the last time. One flag, one JS implementation, shared with gh-stage.js — the
+# two cannot disagree about whether this repo is restricted.
+#
+# FAIL CLOSED on a non-zero exit (an unrecognised mode, a missing writer, no
+# node): `manual` is the safe answer when nothing can be verified, and defaulting
+# to `full` is exactly how a declared restriction becomes an unintended write.
+#
+# Exit 0 either way — this script's contract is "never fails the caller", and a
+# deferral is a recorded outcome, not an error.
+GATE_DIR=$(CDPATH= cd -P -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd -P)
+DEFER_WRITER="${GATE_DIR}/defer-mutation.js"
+
+if [ -f "$DEFER_WRITER" ] && command -v node >/dev/null 2>&1; then
+  ACCESS_MODE=$(node "$DEFER_WRITER" --resolve-access 2>/dev/null) || ACCESS_MODE="manual"
+  [ -n "$ACCESS_MODE" ] || ACCESS_MODE="manual"
+else
+  # No writer means no way to read the config AND no way to record a deferral.
+  # Proceeding would be an unrecorded write under a possible restriction; the
+  # only honest move is to skip and say so.
+  echo "⚠️  set-github-project-priority: defer-mutation.js not found beside this script — skipping the write rather than performing it unrecorded"
+  exit 0
+fi
+
+if [ "$ACCESS_MODE" != "full" ]; then
+  # Resolve the priority for the record even though we will not write it — a
+  # record naming "P1 – High" is actionable; one naming "some priority" is not.
+  # This duplicates the derivation below rather than restructuring the script,
+  # because the gate must sit ABOVE the first `gh` call and the derivation needs
+  # `gh issue view` when no priority argument was passed. Under a restricted mode
+  # a read is permitted, so calling it here is allowed — but it may legitimately
+  # fail (no auth at all, in `manual`), and an empty answer is still a usable
+  # record: "set Priority to the value of the issue's priority:* label".
+  GATE_PRIORITY="$PRIORITY_IN"
+  if [ -z "$GATE_PRIORITY" ]; then
+    GATE_PRIORITY=$(gh issue view "$ISSUE_NUM" --json labels -q '.labels[].name' 2>/dev/null \
+      | sed -nE 's/^priority:(critical|high|medium|low)$/\1/p' | head -1)
+  fi
+  GATE_LC=$(echo "$GATE_PRIORITY" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+  case "$GATE_LC" in
+    critical) GATE_VALUE="P0" ;; high) GATE_VALUE="P1" ;;
+    medium)   GATE_VALUE="P2" ;; low)  GATE_VALUE="P3" ;;
+    *)        GATE_VALUE="" ;;
+  esac
+
+  GATE_OWNER=$(gh repo view --json owner -q '.owner.login' 2>/dev/null || echo "OWNER")
+  GATE_REPO=$(gh repo view --json name -q '.name' 2>/dev/null || echo "REPO")
+  GATE_URL="https://github.com/${GATE_OWNER}/${GATE_REPO}/issues/${ISSUE_NUM}"
+
+  RECORD_ID=$(node "$DEFER_WRITER" \
+    --kind "github.board.field-set" \
+    --system "github" \
+    --access "$ACCESS_MODE" \
+    --intent "Set Priority to ${GATE_VALUE:-the value of the priority label} on issue #${ISSUE_NUM}" \
+    --target "{\"issue\":\"${ISSUE_NUM}\",\"url\":\"${GATE_URL}\",\"ui_url\":\"the project board → filter to this issue → set the field\"}" \
+    --desired "{\"Priority\":\"${GATE_VALUE}\"}" \
+    --skill "set-github-project-priority" \
+    --manual-ui "Open the project board → find issue #${ISSUE_NUM} → set Priority" \
+    --manual-deep-link "$GATE_URL" \
+    --manual-field "Priority=${GATE_VALUE}" \
+    --command-argv "[\"bash\",\"set-github-project-priority.sh\",\"${ISSUE_NUM}\",\"${GATE_LC}\"]" \
+    --json 2>/dev/null \
+    | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+
+  if [ -n "$RECORD_ID" ]; then
+    echo "⏸️  access.tracker=${ACCESS_MODE} — not setting Priority on issue #${ISSUE_NUM}; recorded as ${RECORD_ID}."
+  else
+    # A journal we cannot write is a real problem, but it is NOT a reason to fall
+    # through and perform the very mutation the mode forbids.
+    echo "⚠️  access.tracker=${ACCESS_MODE} — not setting Priority on issue #${ISSUE_NUM}, and the deferred record could not be written." >&2
+  fi
+  exit 0
+fi
+
 # 1. Resolve priority — argument wins, else read from issue labels.
 if [ -z "$PRIORITY_IN" ]; then
   LABELS=$(gh issue view "$ISSUE_NUM" --json labels -q '.labels[].name' 2>/dev/null || true)

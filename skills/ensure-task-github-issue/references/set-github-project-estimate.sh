@@ -84,6 +84,57 @@ if ! echo "$HOURS_IN" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
   exit 0
 fi
 
+# ── ACCESS GATE (task.54) ────────────────────────────────────────────────────
+#
+# Same shape and same reasoning as set-github-project-priority.sh — see the long
+# comment there. In short: this script writes a board field with `gh api graphql`
+# directly rather than through gh-stage.js, so gh-stage's gate does not cover it;
+# the mode comes from `defer-mutation.js --resolve-access` rather than a fifth
+# shell copy of the mode table; it fails closed to `manual`; and it exits 0
+# either way, because a deferral is a recorded outcome, not an error.
+#
+# Placed AFTER the numeric validation deliberately: a non-numeric estimate is not
+# a mutation anyone wants recorded and replayed, it is a caller bug. The gate
+# defers writes that would otherwise have happened, not ones already rejected.
+GATE_DIR=$(CDPATH= cd -P -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd -P)
+DEFER_WRITER="${GATE_DIR}/defer-mutation.js"
+
+if [ -f "$DEFER_WRITER" ] && command -v node >/dev/null 2>&1; then
+  ACCESS_MODE=$(node "$DEFER_WRITER" --resolve-access 2>/dev/null) || ACCESS_MODE="manual"
+  [ -n "$ACCESS_MODE" ] || ACCESS_MODE="manual"
+else
+  echo "⚠️  set-github-project-estimate: defer-mutation.js not found beside this script — skipping the write rather than performing it unrecorded"
+  exit 0
+fi
+
+if [ "$ACCESS_MODE" != "full" ]; then
+  GATE_OWNER=$(gh repo view --json owner -q '.owner.login' 2>/dev/null || echo "OWNER")
+  GATE_REPO=$(gh repo view --json name -q '.name' 2>/dev/null || echo "REPO")
+  GATE_URL="https://github.com/${GATE_OWNER}/${GATE_REPO}/issues/${ISSUE_NUM}"
+
+  RECORD_ID=$(node "$DEFER_WRITER" \
+    --kind "github.board.field-set" \
+    --system "github" \
+    --access "$ACCESS_MODE" \
+    --intent "Set ${FIELD_NAME} to ${HOURS_IN} on issue #${ISSUE_NUM}" \
+    --target "{\"issue\":\"${ISSUE_NUM}\",\"url\":\"${GATE_URL}\",\"ui_url\":\"the project board → filter to this issue → set the field\"}" \
+    --desired "{\"${FIELD_NAME}\":\"${HOURS_IN}\"}" \
+    --skill "set-github-project-estimate" \
+    --manual-ui "Open the project board → find issue #${ISSUE_NUM} → set ${FIELD_NAME}" \
+    --manual-deep-link "$GATE_URL" \
+    --manual-field "${FIELD_NAME}=${HOURS_IN}" \
+    --command-argv "[\"bash\",\"set-github-project-estimate.sh\",\"${ISSUE_NUM}\",\"${HOURS_IN}\"]" \
+    --json 2>/dev/null \
+    | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+
+  if [ -n "$RECORD_ID" ]; then
+    echo "⏸️  access.tracker=${ACCESS_MODE} — not setting ${FIELD_NAME} on issue #${ISSUE_NUM}; recorded as ${RECORD_ID}."
+  else
+    echo "⚠️  access.tracker=${ACCESS_MODE} — not setting ${FIELD_NAME} on issue #${ISSUE_NUM}, and the deferred record could not be written." >&2
+  fi
+  exit 0
+fi
+
 OWNER=$(gh repo view --json owner -q '.owner.login' 2>/dev/null || true)
 REPO_NAME=$(gh repo view --json name -q '.name' 2>/dev/null || true)
 if [ -z "$OWNER" ] || [ -z "$REPO_NAME" ]; then

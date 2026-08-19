@@ -236,9 +236,11 @@ annotated is still refused; it is recorded generically as `jira.unknown-mutation
 The resolver says so on every restricted run:
 
 ```
-⚠️  access.tracker=manual is PARTIALLY ENFORCED — all Jira writes and board/status moves are
-    deferred and recorded, but GitHub issue and PR writes (comments, issue and PR creation)
-    still proceed normally.
+⚠️  access.tracker=manual is PARTIALLY ENFORCED — Jira REST via jira-sync.js, the sprint scripts,
+    board/status moves, the GitHub board-field helpers and every gh mutation routed through
+    tracker_write are deferred and recorded, but Jira writes made by raw curl or the Atlassian
+    MCP tools, and the GitHub calls whose output the caller captures (gh issue create, sub-issue
+    links), still proceed normally.
 ```
 
 **Fix — read what was deferred, then either perform it or lift the restriction:**
@@ -259,6 +261,44 @@ unrestricted run would create a duplicate. `jira_key` stays absent until the iss
 
 Full schema and the roster of mutation kinds:
 [`tracker-access-record.md`](../../shared/resources/tracker-access-record.md).
+
+## The board column did not change, and nothing failed
+
+**Symptom:** a pipeline step reports success but the card sits where it was. The `--json` payload
+from `gh-stage.js` exits 0 — as it does for every documented outcome — so the exit code tells you
+nothing. **Read `reason`.** Each of these is a *correct* outcome on some board:
+
+| `reason` | What actually happened | What to do |
+| --- | --- | --- |
+| `deferred` | `access.tracker` is not `full`; the move was recorded, not performed | Work the handover checklist — see the section above |
+| `already` | The card was already in the target column | Nothing. This is success |
+| `stage-disabled` | Your `pipeline:` omits this moment | Nothing, if deliberate. Add the moment to `tracker-workflow.yaml` if not |
+| `would-regress` | A human moved the card further along than this moment | Nothing — the board is ahead of the pipeline. `--allow-regress` overrides |
+| `no-option` | The Status field has no column matching this moment | Fix the moment's target in `tracker-workflow.yaml`, or add the column |
+| `not-on-board` | The issue is on no project board at all | Add it, or pass `--add-to-board` on the `work-started` call |
+| `ambiguous-board` | The issue is on several boards and none was chosen | Set `github.projectBoard` in `skills-config.yaml` |
+
+**Find out which column the moment even wanted — no credentials needed:**
+
+```bash
+node .agents/skills/develop-task/references/gh-stage.js --stage done --print-plan
+```
+
+That reads your ladder file alone and prints the target rung. Compare it with what the board really
+has:
+
+```bash
+node .agents/skills/develop-task/references/gh-stage.js --probe-board   # the board's real options
+node .agents/skills/develop-task/references/gh-stage.js --issue 42 --stage done --dry-run --json
+```
+
+If `--print-plan` names a column `--probe-board` does not list, your `tracker-workflow.yaml` is stale
+— the board was renamed under it. `--dry-run` is the authority; the ladder file is a declaration.
+
+**Priority or Estimate, not Status?** Those are different scripts —
+`set-github-project-priority.sh` and `set-github-project-estimate.sh`. `gh-stage.js` owns the Status
+field and nothing else. Both helpers always exit 0 and log their outcome; under a restricted access
+mode both defer and record rather than write, and print `⏸️` with the record id.
 
 ## Everything is deferred, and I did not restrict anything
 

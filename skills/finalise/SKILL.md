@@ -1184,6 +1184,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
      | `board-unreadable` | The board read failed (API/permissions) | Record a warning with the CLI's message |
      | `no-repo-context` | `gh repo view` could not resolve the repository | Record a warning — usually a detached checkout or missing `gh` auth |
      | `no-credentials` | `gh` is not authenticated | Record a warning — the card was not moved |
+     | `deferred` | `access.tracker` is not `full`, so the CLI declined the move and recorded it instead | **Not an error — a recorded outcome.** The run is operating under a declared restriction; the move was never going to happen and the deferral is the system working. Record it in the running summary naming the record id from the JSON's `record` field, then **escalate via the `not-on-board` path below**, pointing at the handover checklist rather than the board |
      | `not-on-board` | Issue is on no project board | **Escalate — see below** |
      | `mutation-failed` | The CLI already retried and still failed | Escalate — see below |
      | _any other value_ | A reason added to the CLI since this table was written | Log it verbatim in the running summary and treat as a non-blocking warning. Never treat an unrecognised reason as success |
@@ -1201,6 +1202,18 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
        ```
      - Record this as a warning (not a blocker) in the running summary.
+
+   - **If `reason` is `deferred`:** reuse the escalation above with the wording below. It is the same shape — the board did not move and a human must move it — but the *cause* is a policy the operator themselves declared, so the message must not read as a malfunction:
+       ```
+       ⏸️ Project Board Move Deferred
+
+       This story/task was accepted. `access.tracker` is set to **<access>**, so the board move to **Done** was recorded rather than performed — recorded as `<record>`.
+
+       **Action required:** run the handover checklist committed beside the implementation report (`*.handover.*.sh` to apply, `*.handover.*.md` to do it by hand). Moving the card to Done on the project board is one of its entries.
+
+       ```
+       Take `<access>` and `<record>` from the CLI's JSON. **Never post this without the record id** — a deferral the operator cannot locate in the journal is indistinguishable from a silent skip, which is the failure the whole deferred-mutation mechanism exists to remove.
+     - Record it in the running summary as a deferral, **not** as a failure. The Definition of Done is unaffected: a card that a declared restriction stopped the pipeline moving is not an incomplete task.
 
    - **If `reason` is `mutation-failed`:** post a PR comment using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
        ```

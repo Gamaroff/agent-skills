@@ -6,6 +6,51 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`gh-stage.js --print-plan`** — the GitHub twin of the Jira flag, and the same contract: it
+  resolves which board column a pipeline moment names by reading `tracker-workflow.yaml` alone,
+  with **no credentials and no network**, and it runs *above* the `gh auth` check. That placement is
+  the whole feature. The consumer who needs it most is the one running `access.tracker: manual`, who
+  has no `gh` auth by definition and whose handover checklist still has to say *"move the card to
+  **Ready for Review**"* using their board's real column name. `--dry-run` was never a substitute —
+  it sits below the auth gate and reads a live board.
+
+  The payload carries the whole target rung, so a caller can prefer whichever name its board has:
+  `{stage, reason:"plan", enabled, targets, offLadder, isLastRung, source, authored}`. There is no
+  `--from` and no `hops`: a Projects v2 Status is a single-select field, so there is nothing between
+  two positions to walk. Where `--print-plan` and `--dry-run` disagree, `--dry-run` is right and your
+  ladder file is stale; a test pins `--dry-run`'s `would` as a member of `--print-plan`'s `targets`.
+
+- **A restricted `access.tracker` now stops GitHub board and issue writes too.** Task 53 gated the
+  Status field and board membership inside `gh-stage.js`; this closes the rest of the GitHub side:
+
+  - `set-github-project-priority.sh` and `set-github-project-estimate.sh` gained their own gates.
+    Neither goes through `gh-stage.js` — that CLI deliberately owns the Status field and nothing
+    else — so each called `gh api graphql` directly and was previously unprotected. Both still
+    always exit 0; under a restricted mode they record and print `⏸️` with the record id.
+  - `tracker_call_with_retry` in `resolve-platform.sh` is now **`tracker_write`**, with a mode check
+    prepended to the retry wrapper. That covers roughly 38 `gh` mutations across 11 skill and
+    pipeline-step files — `gh issue comment`, `gh pr comment`, `gh issue close` and the rest — with
+    **zero call-site edits**. The kind is inferred from argv where the shape is recognised;
+    anything else is recorded as the new `github.unknown-mutation` rather than dropped.
+    **`tracker_call_with_retry` remains as an alias and is not going away** — call sites, including
+    ones in skill prose that people copy by hand, still spell it, and a test pins the alias.
+
+  Neither shell guard re-implements the access-mode table. `defer-mutation.js` gained
+  `--resolve-access`, so both ask the same function `gh-stage.js` asks. There were already four
+  copies of that contract in the tree and a fifth was one file away.
+
+  **Still not gated, and named plainly in the runtime notice:** Jira writes issued as raw `curl`
+  from skill prose or through the Atlassian MCP tools, and the GitHub calls whose stdout a caller
+  captures (`gh issue create`, the sub-issue-link graphql). Wrapping those under a deferring mode
+  would return an empty capture and the caller would proceed with a blank issue number, so they get
+  a purpose-built CLI rather than a wrapper that silently lies.
+
+- **`finalise` understands `deferred`.** The board-move reason table gained the row, and it escalates
+  through the existing `not-on-board` path with wording that reads as a declared policy rather than a
+  malfunction — pointing at the committed handover checklist and always naming the record id. A
+  deferred board move does not affect the Definition of Done: a card a declared restriction stopped
+  the pipeline moving is not an incomplete task.
+
 - **The JavaScript gates now read `access.tracker` from `skills-config.yaml`.** Until now only a
   shell that sourced `resolve-platform.sh` saw that key, so the documented bare invocations —
   `node .agents/skills/sync-jira-*/scripts/…`, `jira-create-epic.js`, the sprint scripts — resolved

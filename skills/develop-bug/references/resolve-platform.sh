@@ -53,6 +53,19 @@ if [ -z "$_rp_self" ] && [ -n "${ZSH_VERSION:-}" ]; then
   eval '_rp_self="${(%):-%x}"'
 fi
 [ -n "$_rp_self" ] || _rp_self="$0"
+
+# Resolved HERE and deliberately kept beyond the `unset _rp_self` below, because
+# tracker_write() needs to find defer-mutation.js beside this file at CALL time —
+# and at call time neither form above still works: BASH_SOURCE inside a function
+# is bash-only, and zsh's %x would expand to the CALLER's file, not this one.
+# Resolve once, at source time, where both forms are still correct.
+#
+# CDPATH= because `cd` prints the resolved directory on stdout when a CDPATH
+# entry matches, which lands straight in the capture; an operator with CDPATH
+# exported (common in dotfiles) would otherwise get a garbage path and a silent
+# "writer not found" on every deferral.
+_RP_SELF_DIR=$(CDPATH= cd -P -- "$(dirname -- "$_rp_self")" >/dev/null 2>&1 && pwd -P)
+
 # shellcheck source=read-config.sh
 source "$(dirname "$_rp_self")/read-config.sh" || {
   printf '❌ read-config.sh not found beside %s — cannot resolve platform.\n' "$_rp_self" >&2
@@ -464,18 +477,22 @@ fi
 
 # Say plainly how far enforcement actually reaches. Without this an operator who sets
 # `access: {tracker: manual}` gets a normal-looking run and reasonably concludes they are fully
-# protected. Coverage as of task.53:
+# protected. Coverage as of task.54:
 #   - the two stage CLIs (jira-stage.js, gh-stage.js) decline the board move and record it (task.52);
 #   - Jira REST through jira-sync.js — every non-GET, annotated or not — plus the sprint scripts
 #     and jira-epic-creator.js, are refused and recorded (task.53);
+#   - the two GitHub board-field helpers (set-github-project-{priority,estimate}.sh) and every `gh`
+#     mutation routed through `tracker_write` below — ~38 call sites, covering `gh issue comment`,
+#     `gh pr comment`, `gh issue close` and the rest — are deferred and recorded (task.54);
 #   - NOT gated: Jira writes issued as raw `curl` from skill prose (create-issue, review-task) or
-#     through the Atlassian MCP tools, and GitHub issue/PR writes — `gh issue comment`,
-#     `gh pr create`, `gh pr comment`, sub-issue links (task.54 onwards).
+#     through the Atlassian MCP tools, and the handful of GitHub calls whose stdout the caller
+#     consumes — `gh issue create` and the sub-issue-link graphql call — which cannot be wrapped
+#     without returning an empty capture to the caller (task.56 gives them a CLI instead).
 # Keep this notice accurate as each one lands; a warning that overstates coverage is worse than none.
 # CR-5: the previous wording claimed every Jira write was covered, which the raw-curl and MCP
 # paths falsify. Name the gated paths instead of generalising over them.
 if [ "$ACCESS_TRACKER" != "full" ]; then
-  printf '⚠️  access.tracker=%s is PARTIALLY ENFORCED — Jira REST via jira-sync.js, the sprint scripts and board/status moves are deferred and recorded, but Jira writes made by raw curl or the Atlassian MCP tools, and all GitHub issue and PR writes, still proceed normally.\n' \
+  printf '⚠️  access.tracker=%s is PARTIALLY ENFORCED — Jira REST via jira-sync.js, the sprint scripts, board/status moves, the GitHub board-field helpers and every gh mutation routed through tracker_write are deferred and recorded, but Jira writes made by raw curl or the Atlassian MCP tools, and the GitHub calls whose output the caller captures (gh issue create, sub-issue links), still proceed normally.\n' \
     "$ACCESS_TRACKER" >&2
 fi
 
@@ -503,7 +520,110 @@ export TRACKER VCS ACCESS_TRACKER ACCESS_VCS
 # Atlassian MCP tool invocations. Skill-level retry is required for MCP calls;
 # orchestrator skills that call MCP should implement equivalent 3× retry
 # inline (see develop-pipeline-step-0-resolve-and-prepare.md "Jira path").
-tracker_call_with_retry() {
+tracker_write() {
+  # ── ACCESS GATE (task.54) ─────────────────────────────────────────────────
+  #
+  # Prepended to the retry wrapper rather than added at each of its ~38 call
+  # sites, which is the whole reason the rename is worth doing: one mode check
+  # covers every `gh issue comment`, `gh pr comment` and `gh api graphql` that
+  # already goes through here, with ZERO call-site edits.
+  #
+  # Mode comes from ACCESS_TRACKER, which this file has already resolved and
+  # exported by the time any caller can reach this function — the config tier,
+  # the env tier and the most-restrictive-wins reduction all happened above.
+  # There is deliberately no second resolution here: unlike the two board-field
+  # `.sh` helpers, a caller of this function has sourced this file by definition.
+  #
+  # `!= "full"` never truthiness: an UNSET ACCESS_TRACKER must read as `full`,
+  # because a gate that misfires silences every tracker comment in the pipeline.
+  if [ "${ACCESS_TRACKER:-full}" != "full" ]; then
+    local _tw_writer _tw_id _tw_kind
+    # _RP_SELF_DIR, not a fresh BASH_SOURCE lookup: see its definition near the
+    # top of this file for why the path cannot be re-derived from inside a
+    # function. A `local` here would shadow it to empty under bash's dynamic
+    # scope, which is why it is not in the `local` list above.
+    _tw_writer="${_RP_SELF_DIR:-/nonexistent}/defer-mutation.js"
+
+    # Infer the kind from argv for the shapes this wrapper actually sees, so the
+    # checklist says "post a comment on issue #232" rather than "run some gh
+    # command". An explicit TRACKER_WRITE_KIND always wins — a caller that knows
+    # what it is doing outranks a pattern match on `$1 $2`.
+    #
+    # Anything unrecognised lands on `github.unknown-mutation`, whose consequence
+    # is `irreversible` on purpose: nothing here knows what the call would have
+    # done, and a confirm gate is the only honest default for that. Such a record
+    # is also a signal that a path exists which nobody has annotated yet.
+    _tw_kind="${TRACKER_WRITE_KIND:-}"
+    if [ -z "$_tw_kind" ]; then
+      case "${1:-} ${2:-}" in
+        "gh issue")
+          case "${3:-}" in
+            comment) _tw_kind="github.issue.comment" ;;
+            close)   _tw_kind="github.issue.close" ;;
+            reopen)  _tw_kind="github.issue.reopen" ;;
+            edit)    _tw_kind="github.issue.edit" ;;
+            create)  _tw_kind="github.issue.create" ;;
+          esac
+          ;;
+        "gh pr")
+          case "${3:-}" in
+            comment) _tw_kind="github.pr.comment" ;;
+            create)  _tw_kind="github.pr.create" ;;
+            merge)   _tw_kind="github.pr.merge" ;;
+          esac
+          ;;
+        "gh project")
+          [ "${3:-}" = "item-add" ] && _tw_kind="github.board.item-add"
+          ;;
+      esac
+    fi
+    [ -n "$_tw_kind" ] || _tw_kind="github.unknown-mutation"
+
+    # The object the action is performed ON. `gh issue comment 42` and
+    # `gh pr comment 42` both put the number in $3, which is the only shape this
+    # needs to handle — every kind inferred above is a `gh <noun> <verb> <N>`.
+    # Without it the checklist says "post a comment" and never says on what,
+    # which is a line no human can action. Left empty for an unrecognised shape
+    # rather than guessed at: the recorded argv is then the only honest answer.
+    # Always passed, defaulting to `{}` — NEVER via `${_tw_target:+--target "$x"}`.
+    # That form relies on the expansion word-splitting into two arguments, which
+    # bash does and **zsh does not**: under zsh the whole thing arrived as one
+    # argument, defer-mutation.js rejected it, and every `tracker_write` deferral
+    # went unrecorded while still (correctly) refusing the write. The refusal is
+    # the safety property, so nothing unsafe happened — but the audit trail was
+    # silently empty, which is the failure this mechanism exists to prevent. This
+    # is the same zsh word-splitting rule already documented at the top of this
+    # file for `validate_enum`; it applies here for the same reason.
+    _tw_target="{}"
+    if [ "$_tw_kind" != "github.unknown-mutation" ] && \
+       printf '%s' "${4:-}" | grep -qE '^[0-9]+$'; then
+      _tw_target="{\"issue\":\"${4}\"}"
+    fi
+
+    if [ -f "$_tw_writer" ] && command -v node >/dev/null 2>&1; then
+      _tw_id=$(node "$_tw_writer" \
+        --kind "$_tw_kind" \
+        --access "$ACCESS_TRACKER" \
+        --intent "${TRACKER_WRITE_INTENT:-Run \`$*\` by hand — no semantic annotation, so what it would have changed is not known here}" \
+        --target "$_tw_target" \
+        --command-argv "$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "$@" 2>/dev/null || echo '[]')" \
+        --skill "${TRACKER_WRITE_SKILL:-resolve-platform}" \
+        --json 2>/dev/null \
+        | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+      if [ -n "$_tw_id" ]; then
+        echo "⏸️  access.tracker=${ACCESS_TRACKER} — not running \`${1:-} ${2:-} ${3:-}\`; recorded as ${_tw_id}." >&2
+      else
+        echo "⚠️  access.tracker=${ACCESS_TRACKER} — not running \`${1:-} ${2:-} ${3:-}\`, and the deferred record could not be written." >&2
+      fi
+    else
+      echo "⚠️  access.tracker=${ACCESS_TRACKER} — not running \`${1:-} ${2:-} ${3:-}\`; defer-mutation.js not found, so it could not be recorded either." >&2
+    fi
+    # 0, deliberately. Callers of this helper are documented as non-blocking:
+    # they log a warning and continue. Returning non-zero would convert a policy
+    # deferral into a pipeline failure at ~38 sites at once.
+    return 0
+  fi
+
   local rc=0
   local delay
   for delay in 1 2 4; do
@@ -514,4 +634,18 @@ tracker_call_with_retry() {
     sleep "$delay"
   done
   return "$rc"
+}
+
+# tracker_call_with_retry — the original name, kept as an alias.
+#
+# NOT redundant, and not safe to delete in a later cleanup. ~38 call sites across
+# 11 skill and pipeline-step files invoke this name, several of them in prose that
+# a reader copies by hand. Renaming the function without keeping this would break
+# every one of them for no gain — the rename exists to make the NAME honest about
+# the mode check now living inside it, not to force a corpus-wide edit.
+#
+# There is a test asserting this alias resolves and behaves identically. If you
+# are here because that test failed after you removed this, the test is right.
+tracker_call_with_retry() {
+  tracker_write "$@"
 }
