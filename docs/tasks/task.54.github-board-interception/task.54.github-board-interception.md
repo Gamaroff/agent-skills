@@ -5,7 +5,7 @@ type: task
 description: 'Makes restricted access real for GitHub Projects v2. Task 53 already gated add-to-board and Status inside gh-stage.js; this task closes two gaps in that gate and guards the two board-field shell helpers, so Priority and Estimate are covered too. Along the way it closes a real asymmetry: jira-stage.js has --print-plan, which runs deliberately before its auth check and needs no credentials, while gh-stage.js has no equivalent and its --dry-run requires gh auth and a live board read. That asymmetry is a prerequisite here, because a manual-mode consumer has no gh auth and still needs to be told which column to move the card to.'
 tags: [restricted-access, github, projects-v2, interception, gh-stage]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-17
@@ -20,7 +20,7 @@ github_issue: 232
 
 **GitHub Issue**: [#232](https://github.com/Gamaroff/agent-skills/issues/232)
 
-**Status**: In Progress
+**Status**: Ready for Review
 
 **Review**: ✅ All review recommendations from `task.54.review.1.github-board-interception.md` implemented 2026-08-19
 
@@ -215,48 +215,52 @@ if only the interception needed reverting.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-19
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was FAIL 70/100)
 
-### QA Report
-- **Full Report**: [task.54.qa.1.github-board-interception.md](./task.54.qa.1.github-board-interception.md)
-- **Gate File**: [task.54.gate.1.github-board-interception.yml](./task.54.gate.1.github-board-interception.yml)
+### QA Reports
+- **Cycle 2 (current)**: [task.54.qa.2.github-board-interception.md](./task.54.qa.2.github-board-interception.md) · [gate.2](./task.54.gate.2.github-board-interception.yml)
+- **Cycle 1**: [task.54.qa.1.github-board-interception.md](./task.54.qa.1.github-board-interception.md) · [gate.1](./task.54.gate.1.github-board-interception.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 1441 JS + 416 shell — all passing
-- **Phases Verified**: 6/6 implemented; 4 pass, 1 concerns, 1 fail (both failures share one root cause)
-- **Critical Issues**: 1 HIGH, 1 MEDIUM
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Tests Executed**: 1448 JS + 416 shell — all passing; `validate:all` 115/0; prettier clean; bundle warning-free
+- **Phases Verified**: 6/6
+- **Open Issues**: 0 (2 found in cycle 1, both fixed and verified)
+- **NFR Status**: Security PASS · Performance PASS · Reliability PASS (was FAIL) · Maintainability PASS
 
 ### Key Findings
 
-- **[HIGH] TASK-54-BUG-1** — `defer-mutation.js` is not bundled beside the three shell files that now
-  need it, so 17 of 35 installed skills lack it. In 11 of those the board helpers exit before their
-  graphql call **under `full` mode**, silently stopping board Priority/Estimate writes — a regression
-  in capability that predates this task. `tracker_write` also cannot record a deferral in any of the
-  17. Root cause: the bundler discovers a sibling `.js` only from a literal `shared/resources/<file>`
-  string; `jira-sprint-lib.sh:32` names it and is bundled correctly, these three do not.
-- **[MEDIUM] TASK-54-BUG-2** — `--print-plan` sits below the `if (!args.probeBoard)` block that
-  validates `--stage`, so `--probe-board`/`--check` bypass it. A typo'd moment returns
-  `enabled: false, targets: null` exit 0 — indistinguishable from a deliberately disabled moment.
+Cycle 1 found two defects the source-level suite was structurally incapable of catching, because
+every test runs against `shared/resources/` while the defect lived only in `skills/*/references/`:
 
-The source-level suite is green throughout (1441/0, 416/0, validate 115/0, prettier clean) and each
-of six invariants was watched failing. BUG-1 lives in a dimension no existing test covers: the state
-of the **bundled** artifact rather than the source.
+- **[HIGH] TASK-54-BUG-1** — `defer-mutation.js` was not bundled beside the three shell files that
+  now invoke it, so 17 of 35 installed skills lacked it. The board helpers then skipped their write
+  **under `full` mode** in 11 skills — a regression in capability predating this task. Fixed with a
+  **comments-only** change (the runtime logic was never wrong, only its dependency declaration) plus
+  two co-location assertions.
+- **[MEDIUM] TASK-54-BUG-2** — `--print-plan` bypassed `--stage` validation under `--probe-board`,
+  `--check` and `--init-workflow`, making a typo indistinguishable from a deliberately disabled
+  moment. Fixed by validating on the `--print-plan` path itself.
+
+Cycle 2 verified both by **re-executing each bug report's own steps**, not by reading the diff, and
+re-ran the full regression because BUG-1 changed the contents of 125 bundled files.
+
+One LOW observation remains, non-blocking: `--probe-board --print-plan` with no `--stage` reports
+`unknown moment ""` rather than `--stage is required`. Both exit 2; only the message differs.
 
 ## Bug Reports
 
 ### In QA Verification
 
-- [TASK-54-BUG-1: `defer-mutation.js` not bundled beside the three shell files that need it](./task.54.bug.1.defer-writer-not-bundled.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-08-19)
-- [TASK-54-BUG-2: `--print-plan` skips moment validation under `--probe-board`/`--check`](./task.54.bug.2.print-plan-skips-moment-validation.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-08-19)
+_None._
 
 ### Closed Bugs
 
-_None yet — awaiting QA verification._
+- [TASK-54-BUG-1: `defer-mutation.js` not bundled beside the three shell files that need it](./task.54.bug.1.defer-writer-not-bundled.md) — ✅ Closed — Severity: HIGH (verified in QA cycle 2)
+- [TASK-54-BUG-2: `--print-plan` skips moment validation under `--probe-board`/`--check`](./task.54.bug.2.print-plan-skips-moment-validation.md) — ✅ Closed — Severity: MEDIUM (verified in QA cycle 2)
 
 ## Progress Tracking
 
@@ -294,3 +298,4 @@ _None yet — awaiting QA verification._
 | 2026-08-19 |  | Implemented — 13 files, 25 new tests (11 JS, 14 shell), 6 invariants mutation-proved | develop |
 | 2026-08-19 |  | QA gate FAIL (70/100) — 2 findings: defer-mutation.js not bundled beside the three shell files that need it (full-mode board writes stop in 11 skills); --print-plan bypasses moment validation under --probe-board | qa-task |
 | 2026-08-19 |  | QA findings fixed — both bugs Ready for QA, 1 iteration; 8 new tests, 3 mutations proved | qa-fix |
+| 2026-08-19 |  | QA gate PASS (95/100) — both cycle-1 findings verified fixed by re-execution; 0 open issues | qa-task |
