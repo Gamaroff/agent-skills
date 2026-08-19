@@ -5,11 +5,13 @@ type: task
 description: 'Makes restricted access real for GitHub Projects v2. Task 53 already gated add-to-board and Status inside gh-stage.js; this task closes two gaps in that gate and guards the two board-field shell helpers, so Priority and Estimate are covered too. Along the way it closes a real asymmetry: jira-stage.js has --print-plan, which runs deliberately before its auth check and needs no credentials, while gh-stage.js has no equivalent and its --dry-run requires gh auth and a live board read. That asymmetry is a prerequisite here, because a manual-mode consumer has no gh auth and still needs to be told which column to move the card to.'
 tags: [restricted-access, github, projects-v2, interception, gh-stage]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-17
 updated: 2026-08-19
+completed_date: 2026-08-19
+pr_number: 255
 estimated_effort_hours: 8
 github_issue: 232
 ---
@@ -20,7 +22,7 @@ github_issue: 232
 
 **GitHub Issue**: [#232](https://github.com/Gamaroff/agent-skills/issues/232)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Review**: ✅ All review recommendations from `task.54.review.1.github-board-interception.md` implemented 2026-08-19
 
@@ -251,6 +253,45 @@ re-ran the full regression because BUG-1 changed the contents of 125 bundled fil
 One LOW observation remains, non-blocking: `--probe-board --print-plan` with no `--stage` reports
 `unknown moment ""` rather than `--stage is required`. Both exit 2; only the message differs.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gate**: [task.54.gate.2.github-board-interception.yml](./task.54.gate.2.github-board-interception.yml) — ✅ **PASS**, 95/100
+**QA cycles**: 2 (cycle 1 FAIL 70/100 → fixes → cycle 2 PASS)
+**Reports**: [qa.1](./task.54.qa.1.github-board-interception.md) · [qa.2](./task.54.qa.2.github-board-interception.md)
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 14/14 — each traced to both code and a test, not to a checkbox
+✅ **CI:** SUCCESS on the final head `16a2234` (`link-check`, `test`, `validate`) — waited for a
+   `PENDING` rollup to finish rather than assuming it
+✅ **Tests:** `npm test` 1448/0 · shell 416/0 · `validate:all` 115/0 · prettier clean · bundle warning-free
+✅ **PR:** [#255](https://github.com/Gamaroff/agent-skills/pull/255) → `develop`, MERGEABLE
+✅ **Documentation:** CHANGELOG + 5 reference docs updated, including two that previously *contradicted* this change
+✅ **Security:** PASS — fail-closed verified in all four degraded paths (bad mode, missing writer,
+   unwritable journal, unreadable config); 0 credentials introduced; 0 new credential surface on `--print-plan`
+⚠️ **Compliance:** NOT_APPLICABLE — no PII, payments, UI or new dependencies
+✅ **Maintainability:** 33 new tests across the run; 9 invariants each watched failing
+
+**Two defects found by QA and fixed**, both in dimensions the source-level suite could not reach:
+
+- **[HIGH]** `defer-mutation.js` was not bundled beside the three shell files that now invoke it —
+  board writes stopped under `full` in 11 installed skills. Fixed with a comments-only change plus
+  two co-location assertions.
+- **[MEDIUM]** `--print-plan` bypassed `--stage` validation under `--probe-board`/`--check`, making a
+  typo indistinguishable from a disabled moment.
+
+**Residual, non-blocking and recorded rather than closed:** a LOW message-quality item, and the
+bundler still having no rule for a shell script invoking a sibling `.js` — that root cause remains
+open by choice, guarded by a test rather than by the tool.
+
+**Detailed Verification Log:** See [task.54.dod.1.github-board-interception.md](./task.54.dod.1.github-board-interception.md).
+
+**Task marked as ACCEPTED on:** 2026-08-19
+
 ## Bug Reports
 
 ### In QA Verification
@@ -299,3 +340,4 @@ _None._
 | 2026-08-19 |  | QA gate FAIL (70/100) — 2 findings: defer-mutation.js not bundled beside the three shell files that need it (full-mode board writes stop in 11 skills); --print-plan bypasses moment validation under --probe-board | qa-task |
 | 2026-08-19 |  | QA findings fixed — both bugs Ready for QA, 1 iteration; 8 new tests, 3 mutations proved | qa-fix |
 | 2026-08-19 |  | QA gate PASS (95/100) — both cycle-1 findings verified fixed by re-execution; 0 open issues | qa-task |
+| 2026-08-19 | 1.2 | DoD verified — accepted (PR #255), CI green on final head | finalise |
