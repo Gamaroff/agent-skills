@@ -534,7 +534,13 @@ async function run({
     return emit({ transitioned: false, reason: "no-credentials" }, 0);
   }
 
-  const http = lib.makeHttp({ fetchImpl });
+  // The SAME anchor the CLI gate above used. Leaving it out let layer 1 resolve
+  // the config tier against process.cwd() while the gate resolved it against the
+  // repo root, so one run could hold two different answers (T61-M3).
+  const http = lib.makeHttp({
+    fetchImpl,
+    cwd: repoRoot || gitToplevel() || process.cwd(),
+  });
   const record = lib.loadWorkflowRecord(repoRoot);
 
   let issue;

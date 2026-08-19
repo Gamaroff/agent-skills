@@ -58,7 +58,14 @@ function accessTracker() {
     // read. Without `dm` there is no config tier at all, so a repo that declares
     // `access.tracker` would get everything the declaration withholds. Detecting
     // that the declaration EXISTS needs no parser, and is enough to refuse.
-    if (!seen.length) return configMayRestrict() ? "manual" : "full";
+    //
+    // Folded into the reduction UNCONDITIONALLY, not only when `seen` is empty.
+    // Gating it on an empty `seen` closed just half the hole: with
+    // AGENT_SKILLS_ACCESS_TRACKER=read-only set and `access.tracker: manual`
+    // committed, the env value won and the create proceeded at a mode looser than
+    // the repo declares (T61-H3).
+    if (configMayRestrict()) seen.push("manual");
+    if (!seen.length) return "full";
     for (const v of seen) {
       // CYCLE-4 CR-13 — own properties only. `in` walks the prototype chain, so
       // ACCESS_TRACKER="constructor" passed validation and was then compared as
@@ -85,17 +92,23 @@ function accessTracker() {
   }
 }
 
-/** The git top level, or the working directory when this is not a checkout. */
+/**
+ * The git top level, or the working directory when this is not a checkout.
+ * Memoised: this used to shell out to git twice per gated operation.
+ */
+let _repoRoot;
 function repoRootOrCwd() {
+  if (_repoRoot !== undefined) return _repoRoot;
   try {
-    return require("child_process")
+    const out = require("child_process")
       .execSync("git rev-parse --show-toplevel", {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
       })
       .trim();
+    return (_repoRoot = out);
   } catch (_) {
-    return process.cwd();
+    return (_repoRoot = process.cwd());
   }
 }
 
@@ -119,7 +132,10 @@ function configMayRestrict() {
   try {
     if (!fs.statSync(file).isFile()) return true;
   } catch (_) {
-    return Boolean(raw);
+    // A redirect that lands on nothing is a refusal — but the literal default
+    // basename is NOT a redirect, per read-config.sh's own rule. Treating it as
+    // one forced `manual` on a repo that declares nothing (T61-L1).
+    return Boolean(raw) && raw !== "skills-config.yaml";
   }
   try {
     return /access/i.test(fs.readFileSync(file, "utf8"));

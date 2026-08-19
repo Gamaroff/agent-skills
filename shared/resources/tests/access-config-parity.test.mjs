@@ -23,7 +23,14 @@
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,6 +67,31 @@ function withRepo(body, fn) {
 }
 
 /**
+ * The environment the child shell is allowed to see — the SAME allowlist
+ * probeResolver builds in defer-mutation.js.
+ *
+ * This is the whole of T61-M5, and it is why two high-severity escalations
+ * survived cycle 1. The suite used to run the shell reader with `{PATH, HOME}`
+ * and the JS reader with the full `process.env`, so the two "readers" were never
+ * compared under the same conditions and the entire class of environment-driven
+ * divergence — BASH_ENV, PATH, the tier hook — was structurally invisible to the
+ * one artifact built to see divergence. A parity suite that varies the
+ * environment between its two sides is not comparing readers; it is comparing
+ * two different experiments.
+ */
+function childEnvFor(tier) {
+  const env = {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+  };
+  for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
+  if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
+  return env;
+}
+
+/**
  * What read-config.sh (via resolve-platform.sh, its only consumer for access)
  * resolves in `dir`. Returns a mode, or REFUSAL_AS when it refused.
  *
@@ -67,8 +99,7 @@ function withRepo(body, fn) {
  * captured stdout nor export an ACCESS_TRACKER that would forge the answer.
  */
 function shellAnswer(dir, tier) {
-  const env = { PATH: process.env.PATH, HOME: process.env.HOME };
-  if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
+  const env = childEnvFor(tier);
   const r = spawnSync(
     "bash",
     [
@@ -133,23 +164,57 @@ before(() => {
     if (tierAvailable(t)) TIERS.push(t);
     else console.error(`# SKIP tier "${t}" unavailable on this host`);
   }
-  assert.ok(TIERS.length > 0, "no config tier is usable \u2014 the corpus cannot run");
+  assert.ok(
+    TIERS.length > 0,
+    "no config tier is usable \u2014 the corpus cannot run",
+  );
 
   for (const tier of TIERS) {
     MATRIX[tier] = {};
     for (const { name, body } of corpus()) {
       withRepo(body, (dir) => {
-        MATRIX[tier][name] = { shell: shellAnswer(dir, tier), js: jsAnswer(dir, tier) };
+        MATRIX[tier][name] = {
+          shell: shellAnswer(dir, tier),
+          js: jsAnswer(dir, tier),
+        };
       });
     }
   }
 });
 
-/** Walk the precomputed matrix. */
+/**
+ * Walk the precomputed matrix, RETURNING the number of cells visited.
+ *
+ * Callers assert on that count. Without it every matrix test is vacuous by
+ * construction: an empty TIERS or MATRIX makes the loop iterate nothing and the
+ * assertions pass green, which looks identical to a real pass (T61-L4). A suite
+ * whose failure mode is "silently checks nothing" is the wrong suite to guard an
+ * access control with.
+ */
 function eachCell(fn) {
+  let cells = 0;
   for (const tier of TIERS) {
-    for (const [name, cell] of Object.entries(MATRIX[tier])) fn(name, tier, cell);
+    for (const [name, cell] of Object.entries(MATRIX[tier])) {
+      fn(name, tier, cell);
+      cells++;
+    }
   }
+  return cells;
+}
+
+/** Every matrix test asserts it actually visited the corpus. */
+function assertNotVacuous(cells) {
+  const expected = TIERS.length * corpus().length;
+  assert.equal(
+    cells,
+    expected,
+    `visited ${cells} cells, expected ${expected} — the matrix is incomplete, ` +
+      `so this assertion proved nothing`,
+  );
+  assert.ok(
+    cells >= 25,
+    `only ${cells} cells visited — corpus too small to trust`,
+  );
 }
 
 describe("access-config parity: read-config.sh vs the JS tier", () => {
@@ -180,9 +245,12 @@ describe("access-config parity: read-config.sh vs the JS tier", () => {
 
   test("every fixture resolves identically through both readers, on every tier", () => {
     const mismatches = [];
-    eachCell((name, tier, { shell, js }) => {
-      if (shell !== js) mismatches.push(`${name} [tier=${tier}]: shell=${shell} js=${js}`);
-    });
+    assertNotVacuous(
+      eachCell((name, tier, { shell, js }) => {
+        if (shell !== js)
+          mismatches.push(`${name} [tier=${tier}]: shell=${shell} js=${js}`);
+      }),
+    );
     assert.deepEqual(
       mismatches,
       [],
@@ -191,13 +259,15 @@ describe("access-config parity: read-config.sh vs the JS tier", () => {
   });
 
   test("no fixture makes the config tier throw", () => {
-    eachCell((name, tier, { js }) => {
-      assert.notEqual(
-        js,
-        "THREW",
-        `${name} [tier=${tier}] threw \u2014 cycle 4's shape has come back`,
-      );
-    });
+    assertNotVacuous(
+      eachCell((name, tier, { js }) => {
+        assert.notEqual(
+          js,
+          "THREW",
+          `${name} [tier=${tier}] threw \u2014 cycle 4's shape has come back`,
+        );
+      }),
+    );
   });
 
   test("a declared restriction is never resolved MORE permissively than the shell", () => {
@@ -205,12 +275,14 @@ describe("access-config parity: read-config.sh vs the JS tier", () => {
     // legitimately disagree with each other, so it is the one that would still
     // catch an escalation if the equality test above were ever relaxed.
     const rank = { manual: 0, command: 1, approve: 2, "read-only": 3, full: 4 };
-    eachCell((name, tier, { shell, js }) => {
-      assert.ok(
-        rank[js] <= rank[shell],
-        `${name} [tier=${tier}]: js=${js} is more permissive than shell=${shell}`,
-      );
-    });
+    assertNotVacuous(
+      eachCell((name, tier, { shell, js }) => {
+        assert.ok(
+          rank[js] <= rank[shell],
+          `${name} [tier=${tier}]: js=${js} is more permissive than shell=${shell}`,
+        );
+      }),
+    );
   });
 });
 
@@ -293,13 +365,191 @@ describe("config path resolution parity", () => {
   });
 });
 
+describe("the environment cannot forge an answer (T61-H1)", () => {
+  test("a .env-supplied BASH_ENV cannot change what the config tier resolves", () => {
+    // The stage CLIs call loadDotEnv() BEFORE resolving, so everything in a repo's
+    // .env is in process.env by the time the tier runs. When probeResolver spread
+    // process.env into the child, `bash --noprofile --norc -c` sourced $BASH_ENV —
+    // arbitrary code execution, and a forged `full` over a committed `manual`.
+    withRepo("access:\n  tracker: manual\n", (dir) => {
+      const pwn = join(dir, "pwn.sh");
+      writeFileSync(pwn, "ACCESS_TRACKER=full\nsource() { :; }\n");
+      const saved = process.env.BASH_ENV;
+      process.env.BASH_ENV = pwn;
+      try {
+        assert.equal(
+          dm.resolveAccessTracker({}, { cwd: dir }),
+          "manual",
+          "a repo-local .env must not be able to forge the access mode",
+        );
+      } finally {
+        if (saved === undefined) delete process.env.BASH_ENV;
+        else process.env.BASH_ENV = saved;
+      }
+    });
+  });
+
+  test("an ambient AGENT_SKILLS_CONFIG_TIER cannot loosen the answer", () => {
+    // Forcing a tier the host cannot honour makes the reader answer nothing and
+    // the resolver exit 0 with `full`. It is a testing hook, so it is honoured
+    // only when a CALLER passes it — never inherited from the environment (T61-M4).
+    withRepo("access:\n  tracker: manual\n", (dir) => {
+      const saved = process.env.AGENT_SKILLS_CONFIG_TIER;
+      process.env.AGENT_SKILLS_CONFIG_TIER = "python";
+      try {
+        assert.equal(dm.resolveAccessTracker({}, { cwd: dir }), "manual");
+      } finally {
+        if (saved === undefined) delete process.env.AGENT_SKILLS_CONFIG_TIER;
+        else process.env.AGENT_SKILLS_CONFIG_TIER = saved;
+      }
+    });
+  });
+});
+
+describe("the fast-path is a hint, not an authorisation decision (T61-H2)", () => {
+  test("an escape-spelled access key is not read as absent", () => {
+    // PyYAML resolves "\x61ccess" to the key `access`, so a file with no literal
+    // `access` substring can still declare a restriction. The corpus covers this
+    // via its escaped-key fixtures; this test names the mechanism.
+    for (const body of [
+      '"\\x61ccess":\n  tracker: manual\n',
+      '"\\u0061ccess":\n  tracker: manual\n',
+    ]) {
+      withRepo(body, (dir) => {
+        assert.notEqual(
+          dm.resolveAccessTracker(
+            { AGENT_SKILLS_CONFIG_TIER: "python" },
+            { cwd: dir },
+          ),
+          "full",
+          `an escape-spelled key must not resolve to full: ${JSON.stringify(body)}`,
+        );
+      });
+    }
+  });
+
+  test("a config with no access key and no metacharacters stays spawn-free", () => {
+    // The other half of the contract: the guard against a FALSE restriction, and
+    // the reason the hint exists at all. A prose `*` in a COMMENT must not count —
+    // this repo's own config carries one, and treating it as an alias made every
+    // ordinary config pay the subprocess.
+    withRepo(
+      "# a comment with *emphasis* and a & ampersand\nprd:\n  prdShardedLocation: docs/prd\n",
+      (dir) => {
+        const t0 = Date.now();
+        assert.equal(dm.resolveAccessTracker({}, { cwd: dir }), "full");
+        assert.ok(
+          Date.now() - t0 < 200,
+          "an unrestricted repo must not pay for a subprocess",
+        );
+      },
+    );
+  });
+});
+
+describe("the shell seam answers the same as the JS tier", () => {
+  // jira-sprint-lib.sh is the fourth gate and had NO automated coverage at all —
+  // T61-H4 and T61-M1 both lived there, and the H4 mutation was caught only by a
+  // hand-run probe. A gate nothing tests is a gate that drifts.
+  const LIB = join(SHARED, "jira-sprint-lib.sh");
+
+  /** Resolve JSM_ACCESS_MODE by sourcing the lib from `cwd`. */
+  function seamAnswer(cwd, lib = LIB, env = {}) {
+    const r = spawnSync(
+      "bash",
+      [
+        "--noprofile",
+        "--norc",
+        "-c",
+        'source "$1"; jsm_resolve_access; printf "%s" "$JSM_ACCESS_MODE"',
+        "_",
+        lib,
+      ],
+      {
+        cwd,
+        env: { PATH: process.env.PATH, HOME: process.env.HOME, ...env },
+        encoding: "utf8",
+        timeout: 20000,
+      },
+    );
+    return String(r.stdout || "").trim();
+  }
+
+  test("it reads a config-declared restriction at all", () => {
+    withRepo("access:\n  tracker: manual\n", (dir) => {
+      assert.equal(seamAnswer(dir), "manual");
+    });
+  });
+
+  test("it is anchored to the repo root, not the caller's cwd", () => {
+    // T61-H4. read-config.sh defaults SKILLS_CONFIG_FILE to the RELATIVE
+    // `skills-config.yaml`, and this skill documents bare invocations that no
+    // wrapper cd's for. Unanchored, the same repo answered `manual` from its root
+    // and `full` from a subdirectory.
+    withRepo("access:\n  tracker: manual\n", (dir) => {
+      mkdirSync(join(dir, "sub"), { recursive: true });
+      spawnSync("git", ["init", "-q", "."], { cwd: dir });
+      assert.equal(seamAnswer(dir), "manual", "from the repo root");
+      assert.equal(
+        seamAnswer(join(dir, "sub")),
+        "manual",
+        "from a subdirectory — a declared restriction must not vanish",
+      );
+    });
+  });
+
+  test("it fails CLOSED when resolve-platform.sh is not beside it", () => {
+    // T61-M1. The JS tier fails closed for the identical condition; a partial
+    // bundle must not be the one situation that grants everything.
+    withRepo("access:\n  tracker: manual\n", (dir) => {
+      const lonely = join(dir, "lonely");
+      mkdirSync(lonely, { recursive: true });
+      const copy = join(lonely, "jira-sprint-lib.sh");
+      writeFileSync(copy, readFileSync(LIB, "utf8"));
+      assert.equal(seamAnswer(dir, copy), "manual");
+    });
+  });
+
+  test("an ambient forced tier cannot loosen it", () => {
+    withRepo("access:\n  tracker: manual\n", (dir) => {
+      assert.equal(
+        seamAnswer(dir, LIB, { AGENT_SKILLS_CONFIG_TIER: "python" }),
+        "manual",
+      );
+    });
+  });
+
+  test("an unrestricted repo still answers full", () => {
+    withRepo("prd:\n  prdShardedLocation: docs/prd\n", (dir) => {
+      assert.equal(seamAnswer(dir), "full");
+    });
+  });
+
+  test("env may tighten the config answer but never loosen it", () => {
+    withRepo("access:\n  tracker: approve\n", (dir) => {
+      assert.equal(
+        seamAnswer(dir, LIB, { AGENT_SKILLS_ACCESS_TRACKER: "manual" }),
+        "manual",
+      );
+      assert.equal(
+        seamAnswer(dir, LIB, { AGENT_SKILLS_ACCESS_TRACKER: "full" }),
+        "approve",
+      );
+    });
+  });
+});
+
 describe("the refusal is legible and safe", () => {
   test("a refused config names the file and the reason", () => {
     withRepo("access: manual\n", (dir) => {
       const { mode, reason } = dm.readConfiguredAccessTracker({}, dir);
       assert.equal(mode, null);
       assert.ok(reason, "a refusal with no reason is not a legible refusal");
-      assert.match(reason, /skills-config\.yaml/, "the reason must name the file");
+      assert.match(
+        reason,
+        /skills-config\.yaml/,
+        "the reason must name the file",
+      );
     });
   });
 
@@ -324,12 +574,18 @@ describe("the refusal is legible and safe", () => {
   test("config and env reduce most-restrictive-wins, in both directions", () => {
     withRepo("access:\n  tracker: approve\n", (dir) => {
       assert.equal(
-        dm.resolveAccessTracker({ AGENT_SKILLS_ACCESS_TRACKER: "manual" }, { cwd: dir }),
+        dm.resolveAccessTracker(
+          { AGENT_SKILLS_ACCESS_TRACKER: "manual" },
+          { cwd: dir },
+        ),
         "manual",
         "env may tighten what config declared",
       );
       assert.equal(
-        dm.resolveAccessTracker({ AGENT_SKILLS_ACCESS_TRACKER: "full" }, { cwd: dir }),
+        dm.resolveAccessTracker(
+          { AGENT_SKILLS_ACCESS_TRACKER: "full" },
+          { cwd: dir },
+        ),
         "approve",
         "env must not loosen what config declared",
       );

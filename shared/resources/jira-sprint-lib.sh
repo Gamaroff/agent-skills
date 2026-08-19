@@ -75,14 +75,38 @@ jsm_resolve_access() {
   # mode rather than to "full", matching what the JS gates do with the same
   # answer. An absent config answers "full", which is the identity element of the
   # most-restrictive-wins reduction below and so changes nothing.
-  local cfg_mode="" resolver
+  local cfg_mode="" resolver cfg_err
   resolver="$(dirname "${BASH_SOURCE[0]}")/resolve-platform.sh"
   if [ -f "$resolver" ]; then
+    # ANCHORED to the repo root, not the caller's cwd. read-config.sh defaults
+    # SKILLS_CONFIG_FILE to the RELATIVE `skills-config.yaml`, and this skill
+    # documents bare `manage-sprint-state.sh <id> closed` invocations that no
+    # wrapper cd's for. Unanchored, the same repo resolved `manual` from its root
+    # and `full` from `docs/` — the C5-CR6 defect, fixed on the JS side and left
+    # here (T61-H4).
+    #
+    # AGENT_SKILLS_CONFIG_TIER is unset alongside the two access names: forcing a
+    # tier the host cannot honour makes the reader answer nothing and the resolver
+    # exit 0 with `full` over a committed restriction (T61-M4).
+    cfg_err=$(mktemp) || cfg_err=""
     cfg_mode=$(
-      unset ACCESS_TRACKER AGENT_SKILLS_ACCESS_TRACKER
-      source "$resolver" >/dev/null 2>&1 && printf '%s' "$ACCESS_TRACKER"
+      unset ACCESS_TRACKER AGENT_SKILLS_ACCESS_TRACKER AGENT_SKILLS_CONFIG_TIER
+      cd "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" || exit 1
+      source "$resolver" >/dev/null 2>"${cfg_err:-/dev/null}" && printf '%s' "$ACCESS_TRACKER"
     ) || cfg_mode="manual"
     [ -n "$cfg_mode" ] || cfg_mode="manual"
+    # Surface the resolver's own refusal line, the way the JS path does. Without
+    # this the operator gets `manual` and no reason at all.
+    if [ "$cfg_mode" = "manual" ] && [ -n "$cfg_err" ] && [ -s "$cfg_err" ]; then
+      JSM_ACCESS_ERROR=$(grep -m1 "^\xe2\x9d\x8c" "$cfg_err" 2>/dev/null || true)
+    fi
+    [ -n "$cfg_err" ] && rm -f "$cfg_err"
+  else
+    # FAIL CLOSED, matching the JS tier for the identical condition. A partial
+    # bundle leaves no way to read the config, and `full` is the wrong guess to
+    # make when nothing can be verified (T61-M1).
+    cfg_mode="manual"
+    JSM_ACCESS_ERROR="resolve-platform.sh not found beside jira-sprint-lib.sh - refusing rather than defaulting to full"
   fi
 
   local best="full" v rank_v rank_best

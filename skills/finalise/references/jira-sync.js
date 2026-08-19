@@ -44,7 +44,7 @@ const dm = require("./defer-mutation.js");
 // `cwd` reaches the config tier so it anchors to the repo root the caller
 // computed rather than to process.cwd() (C5-CR6).
 function mostRestrictiveAccess(env = process.env, cwd = undefined) {
-  return dm.resolveAccessTracker(env, cwd ? { cwd } : {});
+  return dm.resolveAccessTracker(env, { cwd });
 }
 
 // SKILLS_CONFIG_FILE is frozen alongside the two mode names: it is how the
@@ -1820,7 +1820,11 @@ function makeHttp({
   // be the one hole the resolver refuses everywhere else.
   let resolved = null;
   if (access) {
-    const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    // Same anchor as the lazy path below. Without it this clamp resolved against
+    // process.cwd(), so an injected `full` survived a config-declared `manual`
+    // whenever the process stood outside the repo root — falsifying the
+    // may-restrict-never-escalate rule stated directly above (T61-M2).
+    const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD, cwd);
     resolved =
       dm.ACCESS_MODES.indexOf(access) < 0
         ? access // let the shared resolver produce the refusal message

@@ -575,21 +575,72 @@ function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
     };
   }
 
-  // Cheap pre-check, and the guard against a FALSE restriction. If the word
-  // `access` appears nowhere in the file, no tier of any reader can find an
-  // access key in it, so there is nothing to resolve and nothing to fail
-  // closed about. This is what keeps an ordinary repo — no `access:` key, the
-  // case the whole existing suite exercises — spawn-free, and answering `full`
-  // even on a host with no bash.
-  if (!/access/i.test(text)) return { mode: null, reason: null };
+  // Cheap pre-check, and the guard against a FALSE restriction — but ONLY ever a
+  // performance hint, never an authorisation decision.
+  //
+  // It answers the question resolve-platform.sh's `_rp_access_may_be_declared`
+  // asks: "can I PROVE this file declares no access?" — and it fails TOWARD
+  // spawning whenever it cannot. A bare `/access/i` test does not answer that
+  // question: read-config.sh tier 1 is real PyYAML, which resolves the
+  // double-quoted key `"\x61ccess":` to `access`, so a file with no literal
+  // `access` substring can still declare a restriction. That was a live
+  // escalation — shell said `manual`, this said `full` — found in QA cycle 1
+  // (T61-H2), and it is the reason the checks below are about what could
+  // POSSIBLY spell the key rather than about the key itself.
+  if (mayDeclareAccess(text)) {
+    // fall through to the resolver
+  } else {
+    return { mode: null, reason: null };
+  }
 
   const tier = String((env && env.AGENT_SKILLS_CONFIG_TIER) || "");
-  const memoKey = `${cwd} ${file} ${tier}`;
+  // JSON rather than NUL-joined. The collision reported as T61-L2 was NOT real —
+  // the separators were already NUL, which no path or tier value can contain — so
+  // this is a legibility change, not a fix. Recorded that way rather than claimed
+  // as a bug closed.
+  const memoKey = JSON.stringify([cwd, file, tier]);
   if (_configAccessMemo.has(memoKey)) return _configAccessMemo.get(memoKey);
 
   const answer = probeResolver(file, cwd, tier);
   _configAccessMemo.set(memoKey, answer);
   return answer;
+}
+
+/**
+ * Could this text possibly declare `access` as a key? Conservative by design.
+ *
+ * Returns false ONLY when absence is provable from the bytes: no `access`
+ * substring in any case, no backslash (an escape could spell it), no aliasing
+ * construct (an anchor, alias, merge key or tag could import it from elsewhere),
+ * and nothing outside ASCII (a unicode escape or homoglyph could hide it).
+ *
+ * Every one of those is a way a real YAML parser reaches a key the raw text does
+ * not obviously contain. Getting this wrong in the permissive direction resolves
+ * a declared restriction to `full`, so the bar is "prove absence", not "look for
+ * the word".
+ */
+function mayDeclareAccess(text) {
+  // Whole-line comments are dropped FIRST, and only whole-line ones. A line whose
+  // first non-space character is `#` is inert to YAML, so nothing can hide in it —
+  // while a trailing `#` may sit inside a quoted scalar, so those lines stay.
+  //
+  // This is not a nicety. The first version of this function tested the raw text,
+  // and this repo's own config carries the prose comment "*as it dogfoods itself*".
+  // A bare `*` test therefore matched, every ordinary config took the 500 ms
+  // subprocess, and the "an unrestricted repo costs nothing" property this function
+  // exists to provide was silently gone.
+  const body = text.replace(/^[ \t]*#.*$/gm, "");
+
+  if (/access/i.test(body)) return true;
+  if (body.includes("\\")) return true; // an escape could spell `access`
+  if (/[^\x00-\x7F]/.test(body)) return true; // unicode escape, homoglyph
+  // Aliasing, in the positions YAML actually gives it meaning: an anchor or alias
+  // introducing a node (`key: &a` / `key: *a` / `- *a`), a merge key, or a tag.
+  // Matching a bare `&`/`*`/`!` anywhere would match ordinary prose.
+  if (/(^|[:\-]\s*)[&*][A-Za-z0-9_-]/m.test(body)) return true;
+  if (/<<\s*:/.test(body)) return true;
+  if (/(^|\s)!!?[A-Za-z]/m.test(body)) return true;
+  return false;
 }
 
 /**
@@ -610,11 +661,40 @@ function probeResolver(file, cwd, tier) {
     };
   }
 
-  const childEnv = { ...process.env, SKILLS_CONFIG_FILE: file };
-  delete childEnv.ACCESS_TRACKER;
-  delete childEnv.AGENT_SKILLS_ACCESS_TRACKER;
+  // ALLOWLIST, not `{ ...process.env }` minus a couple of keys. This is T61-H1,
+  // and it was a real escalation plus arbitrary code execution:
+  //
+  //   jira-stage.js and gh-stage.js call loadDotEnv() BEFORE resolving, and
+  //   loadDotEnv copies every key of the repo's .env into process.env. Spreading
+  //   process.env here therefore handed the child whatever that file said —
+  //   including BASH_ENV, which `bash --noprofile --norc -c` SOURCES. A .env line
+  //   `BASH_ENV=./x.sh` both ran arbitrary code and printed a forged `full` over a
+  //   committed `manual`.
+  //
+  // Subtracting known-bad names cannot work: the set of environment variables that
+  // change what bash does is open-ended (BASH_ENV, ENV, SHELLOPTS, BASHOPTS,
+  // LD_PRELOAD, DYLD_*, IFS, …) and grows with the shell. Only an allowlist is
+  // closed, so only an allowlist is safe.
+  //
+  // PATH is passed because the resolver needs grep/awk/python3/git, and it is the
+  // same PATH this process was itself resolved on. A caller who can already set
+  // this process's PATH can run anything as this process anyway; the property that
+  // matters is that a REPO-LOCAL .env cannot.
+  const childEnv = {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    SKILLS_CONFIG_FILE: file,
+  };
+  for (const k of Object.keys(childEnv)) {
+    if (childEnv[k] === undefined) delete childEnv[k];
+  }
+  // The tier hook is a documented TESTING knob that materially loosens the answer
+  // (forcing `python` on a host without pyyaml makes the reader answer nothing and
+  // the resolver exit 0 with `full`). It is honoured only when the CALLER passed it
+  // in the env snapshot — never inherited from the ambient environment (T61-M4).
   if (tier) childEnv.AGENT_SKILLS_CONFIG_TIER = tier;
-  else delete childEnv.AGENT_SKILLS_CONFIG_TIER;
 
   // --noprofile --norc: the child must not run the operator's shell profile. A
   // profile that prints (nvm does) would land in the captured stdout, and one
@@ -674,10 +754,15 @@ const _warnedAccessReasons = new Set();
 function warnOnce(reason) {
   if (_warnedAccessReasons.has(reason)) return;
   _warnedAccessReasons.add(reason);
+  // Deliberately NOT prefixed `access.tracker:`. resolve-platform.sh also exits
+  // non-zero for an invalid `tracker:`/`vcs:` enum and for `access.vcs` set to
+  // anything but `full`, so naming access.tracker as the cause misattributed those
+  // and left the operator with no way to find the real one (T61-L3). The resolver's
+  // own line is carried verbatim and says which it was.
   console.error(
-    `${WARN_MARK}  access.tracker: ${reason}. Resolving to "manual" — refusing ` +
-      `rather than defaulting to "full", because that would silently escalate a ` +
-      `declared restriction into a tracker write.`,
+    `${WARN_MARK}  skills-config.yaml: ${reason}. Resolving tracker access to ` +
+      `"manual" — refusing rather than defaulting to "full", because that would ` +
+      `silently escalate a declared restriction into a tracker write.`,
   );
 }
 
