@@ -843,6 +843,34 @@ function run({
   // pair here and no --from flag to feed one. The plan is the target rung, and
   // the rung carries every acceptable name so a caller can prefer its own.
   if (args.printPlan) {
+    // Validated HERE, on this path's own terms — not inherited from the
+    // `if (!args.probeBoard)` block above.
+    //
+    // That block is skipped whenever `probeBoard` is set, and three flags set it:
+    // `--probe-board` directly, plus `--check` and `--init-workflow` which set it
+    // internally. `--check` is the documented CI mode, so
+    // `gh-stage.js --check --stage done --print-plan` is an ordinary script and
+    // used to bypass both the MOMENTS check and the lowercasing.
+    //
+    // The consequence was not cosmetic: an unknown moment resolved to
+    // `enabled: false, targets: null` exit 0 — byte-identical to the payload a
+    // DELIBERATELY DISABLED moment produces. A caller could not tell a typo from
+    // a moment the consumer had switched off, so a typo silently dropped a board
+    // move from a manual checklist. That is the failure this whole mode exists to
+    // prevent, so it is validated even though the shared block usually would.
+    //
+    // Sharing one gate was the mistake: --print-plan and the move path have
+    // genuinely different argument requirements (this one needs no --issue), so
+    // the requirements are stated separately rather than approximated by one
+    // condition that has to be true of both.
+    if (!tw.MOMENTS.includes(String(args.stage).toLowerCase())) {
+      output.err(
+        `Error: unknown moment "${args.stage}". Known: ${tw.MOMENTS.join(", ")}`,
+      );
+      return { exitCode: 2 };
+    }
+    args.stage = String(args.stage).toLowerCase();
+
     const moment = tw.resolveMoment(args.stage, workflow, {
       issueType: args.issueType,
     });

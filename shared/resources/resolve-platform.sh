@@ -537,6 +537,22 @@ tracker_write() {
   # because a gate that misfires silences every tracker comment in the pipeline.
   if [ "${ACCESS_TRACKER:-full}" != "full" ]; then
     local _tw_writer _tw_id _tw_kind
+    # The deferred-mutation writer — shared/resources/defer-mutation.js — which
+    # the bundler ships next to this file, so the sibling lookup below resolves
+    # in-tree and in an installed skill alike.
+    #
+    # THAT PATH IS SPELLED OUT IN FULL DELIBERATELY, and must stay that way. It is
+    # the only thing that tells bundle_skill.py this file has a dependency: the
+    # bundler's shell rule follows `source`/`exec` of a sibling `.sh`, and has no
+    # rule for a shell script that runs a sibling `.js` via `node "$dir/x.js"`.
+    # Discovery falls to the literal string `shared/resources/<file>`, exactly as
+    # jira-sprint-lib.sh:32 and defer-mutation.js's own header both rely on.
+    #
+    # Without it the bundler copied resolve-platform.sh into 17 skills and left
+    # the writer behind, so every deferral in an installed skill went unrecorded
+    # while the whole suite stayed green in-repo (TASK-54-BUG-1). A test now pins
+    # the co-location, because a comment is exactly what a later cleanup deletes.
+    #
     # _RP_SELF_DIR, not a fresh BASH_SOURCE lookup: see its definition near the
     # top of this file for why the path cannot be re-derived from inside a
     # function. A `local` here would shadow it to empty under bash's dynamic

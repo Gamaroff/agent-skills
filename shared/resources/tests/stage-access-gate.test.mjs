@@ -932,3 +932,87 @@ test("defer-mutation --resolve-access reports the resolved mode, and refuses a t
     );
   });
 });
+
+// ── task.54 / TASK-54-BUG-2: --print-plan validates its own arguments ────────
+//
+// The moment check and the lowercasing used to live only inside the
+// `if (!args.probeBoard)` block. Three flags set `probeBoard` — `--probe-board`
+// directly, plus `--check` and `--init-workflow` internally — so all three
+// bypassed both once `--print-plan` was added below that block.
+//
+// The consequence was NOT cosmetic. An unknown moment resolved to
+// `{enabled: false, targets: null}` exit 0, which is byte-identical to the
+// payload a DELIBERATELY DISABLED moment produces. A caller could not tell a
+// typo from a moment the consumer had switched off, so a typo silently dropped a
+// board move from a manual checklist — the exact failure --print-plan exists to
+// prevent. `--check` is the documented CI mode, so the combination is ordinary.
+
+for (const extra of [[], ["--probe-board"], ["--check"]]) {
+  const label = extra.length ? extra[0] : "no extra flag";
+  test(`gh-stage --print-plan rejects an unknown moment (${label})`, () => {
+    underAccess("full", ({ dir }) => {
+      const r = ghCli.run({
+        argv: [
+          "node",
+          "gh-stage.js",
+          ...extra,
+          "--stage",
+          "nonsense",
+          "--print-plan",
+        ],
+        execImpl: explode("gh"),
+        repoRoot: dir,
+        sleepImpl: () => {},
+      });
+      assert.equal(
+        r.exitCode,
+        2,
+        `an unknown moment must exit 2, not resolve to "disabled" — a caller ` +
+          `cannot distinguish {enabled:false} from a moment the board switched off`,
+      );
+    });
+  });
+
+  test(`gh-stage --print-plan canonicalises stage casing (${label})`, () => {
+    underAccess("full", ({ dir }) => {
+      const r = ghCli.run({
+        argv: [
+          "node",
+          "gh-stage.js",
+          ...extra,
+          "--stage",
+          "DONE",
+          "--print-plan",
+        ],
+        execImpl: explode("gh"),
+        repoRoot: dir,
+        sleepImpl: () => {},
+      });
+      assert.equal(r.exitCode, 0);
+      assert.deepEqual(r.targets, ["Done"]);
+    });
+  });
+}
+
+test("gh-stage --probe-board without --print-plan is unaffected by that validation", () => {
+  // The fix must not make the moment mandatory for the probe path, which
+  // legitimately takes no --stage at all.
+  underAccess("full", ({ dir }) => {
+    let reached = false;
+    ghCli.run({
+      argv: ["node", "gh-stage.js", "--probe-board"],
+      execImpl: (argv) => {
+        reached = true;
+        if (argv[0] === "auth") throw new Error("not authenticated");
+        return "";
+      },
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+    assert.equal(
+      reached,
+      true,
+      "--probe-board must still reach the board read",
+    );
+  });
+});

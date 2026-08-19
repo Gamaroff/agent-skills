@@ -1,0 +1,94 @@
+schema: 1
+task: 'task.54.github-board-interception'
+task_title: 'Intercept GitHub board mutations, and give gh-stage.js the credential-free plan its sibling already has'
+gate: FAIL
+status_reason: 'The interception itself is correct and well tested, but the three shell files that
+  now depend on defer-mutation.js do not name it in a form the bundler can follow — so 17 installed
+  skills lack it. In 11 of those the board helpers stop writing under `full` mode, a regression in
+  behaviour that predates this task.'
+reviewer: 'QA Engineer'
+updated: '2026-08-19T11:35:00Z'
+
+top_issues:
+  - id: TASK-54-BUG-1
+    severity: high
+    finding: '`defer-mutation.js` is not bundled beside resolve-platform.sh or the two board helpers.
+      17 of 35 skills lack it. The helpers exit before their graphql call when it is missing, and
+      that branch does not check the access mode — so board Priority/Estimate writes silently stop
+      under `full` in 11 installed skills. Separately, tracker_write cannot record a deferral in any
+      of the 17, leaving the audit gap this sequence exists to close.'
+    suggested_action: 'Name `shared/resources/defer-mutation.js` literally in a comment in each of
+      the three files (the jira-sprint-lib.sh:32 precedent), re-run `npm run bundle`, and add a
+      co-location assertion to jira-interception.test.mjs §12 so a later cleanup cannot silently
+      delete the comment.'
+    suggested_owner: dev
+    bug_ref: 'task.54.bug.1.defer-writer-not-bundled.md'
+  - id: TASK-54-BUG-2
+    severity: medium
+    finding: '`--print-plan` sits below the `if (!args.probeBoard)` block that validates --stage
+      against MOMENTS and lowercases it, so --probe-board/--check/--init-workflow bypass both. A
+      typo''d moment returns `enabled: false, targets: null` exit 0 — indistinguishable from a
+      deliberately disabled moment, so the board move is silently dropped from a checklist.'
+    suggested_action: 'Validate the moment on the --print-plan path itself; assert exit 2 for an
+      unknown moment with --probe-board present, and lowercase canonicalisation on that path.'
+    suggested_owner: dev
+    bug_ref: 'task.54.bug.2.print-plan-skips-moment-validation.md'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 1441
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [1, 6]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'The gate is fail-closed throughout — an unreadable config resolves to `manual`, an
+      unrecognised mode exits 2 rather than defaulting to `full`, and a journal that cannot be
+      written never falls through to performing the mutation. Redaction paths untouched. No new
+      credential handling.'
+  performance:
+    status: PASS
+    notes: '--print-plan is a single config-file read on a path that previously required a network
+      round-trip. tracker_write adds one mode comparison per call on the full-mode path (the
+      resolution already happened at source time) and one node invocation only when deferring.'
+  reliability:
+    status: FAIL
+    notes: 'TASK-54-BUG-1. The bundled board helpers no-op under `full` in 11 skills — an unrelated,
+      pre-existing capability broken by the change. The missing-writer branch is also
+      disproportionate: it refuses the write before establishing that any restriction is in force.'
+  maintainability:
+    status: PASS
+    notes: 'Comments explain the non-obvious constraints (gate placement, zsh word-splitting, why the
+      alias must survive) rather than restating the code. 25 new tests, each of six invariants
+      watched failing. The one deviation from "existing suite green unchanged" — the banner
+      assertion — was a test asserting a fact the task deliberately changed, and was replaced with
+      assertions in both directions plus a stale-claim guard.'
+
+recommendations:
+  immediate:
+    - action: 'Name shared/resources/defer-mutation.js literally in the three shell files, re-bundle,
+        and add the co-location assertion'
+      refs:
+        - 'shared/resources/resolve-platform.sh'
+        - 'shared/resources/set-github-project-priority.sh'
+        - 'shared/resources/set-github-project-estimate.sh'
+        - 'shared/resources/tests/jira-interception.test.mjs'
+    - action: 'Validate the moment on the --print-plan path so --probe-board/--check cannot bypass it'
+      refs: ['shared/resources/gh-stage.js']
+  future:
+    - action: 'Consider a bundler rule for `node "$(dirname …)/x.js"` in shell files, so the next
+        shell→JS runtime dependency does not rely on someone remembering the comment convention'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-54-BUG-1 fixed and re-bundled — board writes must work under `full` in every skill'

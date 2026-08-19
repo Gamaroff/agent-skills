@@ -1051,6 +1051,51 @@ test("§12 every bundled copy of a file this change touches carries the change",
     );
   }
 
+  // task.54 / TASK-54-BUG-1 — CO-LOCATION, not just currency.
+  //
+  // The rows above ask "is the bundled copy up to date?". This asks the prior
+  // question: "is it there at all?". Three shell files now run
+  // `node "$(dirname …)/defer-mutation.js"` at runtime, and the bundler has no
+  // rule for a shell script invoking a sibling `.js` — it follows `source`/`exec`
+  // of a sibling `.sh`, and otherwise only the literal string
+  // `shared/resources/<file>`. So each of the three names that path in a comment,
+  // and this test is what stops a later cleanup deleting the comment.
+  //
+  // The failure it guards is worse than a stale copy, and silent in both
+  // directions: `tracker_write` refused the write but recorded nothing (the audit
+  // gap this sequence exists to close), and the two board helpers skipped their
+  // write entirely — including under `full`, because that branch runs before the
+  // mode is known. Board Priority/Estimate writes stopped in 11 installed skills
+  // while every test in this repo stayed green, because every test runs against
+  // shared/resources/ and the defect existed only in skills/*/references/.
+  for (const name of [
+    "resolve-platform.sh",
+    "set-github-project-priority.sh",
+    "set-github-project-estimate.sh",
+  ]) {
+    const copies = bundled(name);
+    assert.ok(copies.length > 0, `${name} must be bundled somewhere`);
+    for (const f of copies) {
+      const dir = path.dirname(f);
+      assert.ok(
+        fs.existsSync(path.join(dir, "defer-mutation.js")),
+        `${path.relative(REPO, f)} has no defer-mutation.js beside it — it ` +
+          `cannot record a deferral, and the board helpers skip their write ` +
+          `outright. Name shared/resources/defer-mutation.js in a comment in ` +
+          `the source file so the bundler follows it, then re-run npm run bundle.`,
+      );
+      // And the comment that makes the bundler do it must still be in the source.
+      const src = fs.readFileSync(path.join(SHARED, name), "utf8");
+      assert.match(
+        src,
+        /shared\/resources\/defer-mutation\.js/,
+        `shared/resources/${name} no longer names defer-mutation.js literally. ` +
+          `That string is load-bearing, not decorative: it is the only thing ` +
+          `telling bundle_skill.py this file has a dependency.`,
+      );
+    }
+  }
+
   for (const f of bundled("jira-sync.js")) {
     const text = fs.readFileSync(f, "utf8");
     assert.match(

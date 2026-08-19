@@ -57,6 +57,21 @@ fi
 #
 # Exit 0 either way — this script's contract is "never fails the caller", and a
 # deferral is a recorded outcome, not an error.
+#
+# The deferred-mutation writer — shared/resources/defer-mutation.js — which the
+# bundler ships next to this file, so the sibling lookup below resolves in-tree
+# and in an installed skill alike.
+#
+# THAT PATH IS SPELLED OUT IN FULL DELIBERATELY, and must stay that way. It is the
+# only thing that tells bundle_skill.py this file has a dependency: the bundler
+# follows `source`/`exec` of a sibling `.sh`, and has no rule for a shell script
+# that runs a sibling `.js`. Discovery falls to the literal string
+# `shared/resources/<file>`, as jira-sprint-lib.sh:32 relies on.
+#
+# Without it this script was bundled into 11 skills without the writer, and the
+# branch below then skipped the write — under `full` too, since it runs before the
+# mode is known. Board Priority writes silently stopped in every one of them
+# (TASK-54-BUG-1). A test now pins the co-location.
 GATE_DIR=$(CDPATH= cd -P -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd -P)
 DEFER_WRITER="${GATE_DIR}/defer-mutation.js"
 
