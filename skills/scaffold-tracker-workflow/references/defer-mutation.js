@@ -61,7 +61,7 @@ const ROSTER_DOC = "tracker-access-record.md";
 
 // Asserted, not merely non-zero. A reformatted row used to truncate the roster
 // silently; pinning the count turns that into an immediate, explicit failure.
-const EXPECTED_KIND_COUNT = 20;
+const EXPECTED_KIND_COUNT = 21;
 
 const ACCESS_MODES = Object.freeze([
   "full",
@@ -145,7 +145,7 @@ function parseRoster(text) {
       if (cells[0].includes("`")) {
         throw new Error(
           `${ROSTER_DOC}: row "${cells[0]}" sits in a kind table but does not ` +
-            `parse as a kind. Keep the shape documented under "The 20 kinds" — ` +
+            `parse as a kind. Keep the shape documented under "The 21 kinds" — ` +
             `a single backtick-quoted token, no other markup.`,
         );
       }
@@ -172,7 +172,7 @@ function parseRoster(text) {
   if (roster.size !== EXPECTED_KIND_COUNT) {
     throw new Error(
       `${ROSTER_DOC}: parsed ${roster.size} kinds, expected ${EXPECTED_KIND_COUNT}. ` +
-        `Either the roster table shape changed (see the note under "The 20 kinds") ` +
+        `Either the roster table shape changed (see the note under "The 21 kinds") ` +
         `or a kind was added/removed without updating EXPECTED_KIND_COUNT in ` +
         `defer-mutation.js. Both halves must move together — that is what stops a ` +
         `silent truncation from looking like a smaller roster.`,
@@ -194,7 +194,7 @@ function splitRow(line) {
 let _rosterCache = null;
 
 /**
- * The 20 kinds, keyed by kind. Memoised — the doc is read once per process.
+ * The 21 kinds, keyed by kind. Memoised — the doc is read once per process.
  * @param {{docPath?: string, force?: boolean}} [opts]
  */
 function loadRoster(opts = {}) {
@@ -473,42 +473,71 @@ function redactDeep(value, envTable, keyPath = "") {
 // ---------------------------------------------------------------------------
 
 /**
- * The tracker access mode in force, for a node caller.
+ * The access mode in force, from the two environment tiers, most-restrictive-wins.
  *
- * ENVIRONMENT ONLY, and unset reads as `full`. Both halves are deliberate.
+ *   ACCESS_TRACKER              — resolve-platform.sh's own output
+ *   AGENT_SKILLS_ACCESS_TRACKER — the knob an operator sets
  *
- * `resolve-platform.sh` is the single resolver: it reads `access.tracker` from
- * skills-config.yaml, reads the env override, applies most-restrictive-wins,
- * validates the result and EXPORTS `ACCESS_TRACKER`. Re-deriving any of that
- * here would put a second, subtly different resolution path in the tree — which
- * is the exact class of silent escalation task 60 spent a cycle closing. A node
- * script reads the resolver's answer; it does not compute its own.
+ * Ranked `manual < command < approve < read-only < full`, so a run may lock
+ * itself down and nothing may loosen a restriction already declared. An
+ * unrecognised value is REFUSED rather than defaulted, because defaulting a typo
+ * to `full` turns a declared restriction into an unintended tracker write.
  *
- * Unset therefore means "nobody resolved a restriction", which is `full`. That
- * is the safe default for the blast radius that matters: `jira-stage.js` and
- * `gh-stage.js` are called from seven skills and six pipeline steps, and a gate
- * that fires for a full-access consumer stops every one of them moving cards.
- *
- * An UNRECOGNISED value is refused rather than defaulted. Defaulting a typo to
- * `full` would turn a declared restriction into an unintended tracker write —
- * the failure mode this whole sequence exists to remove.
+ * `access.tracker` in skills-config.yaml is deliberately not read here — see the
+ * note in the body.
  *
  * @param {Record<string,string>} [env]
  * @returns {"full"|"read-only"|"approve"|"command"|"manual"}
  */
 function resolveAccessTracker(env = process.env) {
-  const raw = String((env && env.ACCESS_TRACKER) || "").trim();
-  if (!raw) return "full";
-  if (!ACCESS_MODES.includes(raw)) {
-    throw new Error(
-      `ACCESS_TRACKER="${raw}" is not a recognised access mode. ` +
-        `Known: ${ACCESS_MODES.join(", ")}. Refusing rather than defaulting to ` +
-        `"full", because that would silently escalate a declared restriction ` +
-        `into a tracker write.`,
-    );
+  // TWO env tiers, most-restrictive-wins:
+  //
+  //   1. ACCESS_TRACKER              — resolve-platform.sh's own output
+  //   2. AGENT_SKILLS_ACCESS_TRACKER — the knob an operator sets
+  //
+  // Most-restrictive-wins rather than first-wins: picking the wrong tracker is a
+  // mistake, picking the wrong access is an escalation. A run may lock itself
+  // down; nothing may loosen a restriction that is already declared.
+  //
+  // `access.tracker` in skills-config.yaml is NOT read here. A config tier needs
+  // read-config.sh's discovery, subset and refusal semantics, and a second
+  // implementation of those in JavaScript produced a high-severity divergence in
+  // every review round it survived. It is [task.61](../../docs/tasks/task.61.access-mode-config-tier/task.61.access-mode-config-tier.md),
+  // with parity as its explicit subject. Until it lands, a config-declared
+  // restriction reaches these gates only via a shell that sourced the resolver —
+  // which is what task.52 shipped and what every pipeline path already does.
+  const seen = [
+    env && env.ACCESS_TRACKER,
+    env && env.AGENT_SKILLS_ACCESS_TRACKER,
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  if (!seen.length) return "full";
+
+  // An UNRECOGNISED value is refused rather than defaulted. Defaulting a typo to
+  // `full` would turn a declared restriction into an unintended tracker write —
+  // the failure mode this whole sequence exists to remove.
+  for (const raw of seen) {
+    if (!ACCESS_MODES.includes(raw)) {
+      throw new Error(
+        `ACCESS_TRACKER="${raw}" is not a recognised access mode. ` +
+          `Known: ${ACCESS_MODES.join(", ")}. Refusing rather than defaulting to ` +
+          `"full", because that would silently escalate a declared restriction ` +
+          `into a tracker write.`,
+      );
+    }
   }
-  return raw;
+  return seen.reduce((a, b) => (ACCESS_RANK[b] < ACCESS_RANK[a] ? b : a));
 }
+
+// Permissiveness order, least to most. Mirrors resolve-platform.sh's access_rank.
+const ACCESS_RANK = Object.freeze({
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+});
 
 // ---------------------------------------------------------------------------
 // Identity

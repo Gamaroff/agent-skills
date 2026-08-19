@@ -27,6 +27,29 @@ const { execSync } = require("child_process");
 // and a GitHub-only consumer must not pull the Jira client in behind it.
 const tw = require("./tracker-workflow.js");
 
+// The deferred-mutation writer (task.52). Required here so that the access gate
+// below can record what it refuses; the bundler follows this sibling require and
+// ships defer-mutation.js — and, transitively, the roster doc it parses — into
+// every skill that carries this file.
+const dm = require("./defer-mutation.js");
+
+// The access mode captured at require time, BEFORE anything can call
+// loadDotEnv(). A dot-env file must not be able to escalate a restriction the
+// operator declared into a tracker write.
+//
+// ONE resolver, in defer-mutation.js. This file used to carry its own copy of
+// the mode table, jira-create-epic.js a third and jira-sprint-lib.sh a fourth,
+// and each read a different subset of the tiers. `dm.resolveAccessTracker`
+// reads ACCESS_TRACKER and AGENT_SKILLS_ACCESS_TRACKER, most-restrictive-wins.
+function mostRestrictiveAccess(env = process.env) {
+  return dm.resolveAccessTracker(env);
+}
+
+const ACCESS_ENV_AT_LOAD = Object.freeze({
+  ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+  AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+});
+
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
 // "not in a repo, fall back to defaults". Without "ignore" on stderr that
 // silent fallback prints a `fatal: not a git repository` line per call, which
@@ -1584,21 +1607,261 @@ function authHeader(email, token) {
   return `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
 }
 
+// ---------------------------------------------------------------------------
+// The access gate — layer 1 (task.53)
+// ---------------------------------------------------------------------------
+//
+// Under any `access.tracker` mode other than `full`, a non-GET through this
+// module is REFUSED and RECORDED rather than executed. It is a net, not a
+// description: a mutation path nobody has annotated still cannot reach the
+// network, it just renders generically. Layer 2 (the `defer:` annotation the
+// semantic mutators pass) is what turns "PUT /rest/api/3/issue/PROJ-1 {…}" into
+// "set Team to Platform".
+//
+// The one exception is a read wearing a POST — see READ_VIA_POST.
+
+// Jira takes a JQL query in a request body, so `findExistingByLabel` searches
+// with POST. Refusing it would make every sync skill see "no existing issue"
+// and create a duplicate on the next run — the opposite of safe. Matched by
+// URL, never by "it looked like a read".
+const READ_VIA_POST = [/\/rest\/api\/3\/search(\/|\?|$)/];
+
+function isReadViaPost(url) {
+  const u = String(url || "");
+  return READ_VIA_POST.some((re) => re.test(u));
+}
+
+/** The endpoint path, with the origin and any query string dropped. */
+function endpointOf(url) {
+  const u = String(url || "");
+  const m = /^https?:\/\/[^/]+(\/[^?#]*)/.exec(u);
+  return m ? m[1] : u.split("?")[0];
+}
+
+/**
+ * What a refused mutation returns to its caller.
+ *
+ * `ok: true` and a 202 are deliberate. Callers throw on `!resp.ok`, and a
+ * deferral is not a failure — the work was recorded for a human, not lost. The
+ * `deferred` flag is how a caller that must return a different SHAPE (a create
+ * has no issue key to give back) knows to branch; everything else carries on.
+ */
+function deferredResponse(record) {
+  return {
+    ok: true,
+    status: 202,
+    statusText: "Accepted (deferred)",
+    deferred: true,
+    deferredRecord: record ? record.id : null,
+    headers: { get: () => null },
+    async json() {
+      return {};
+    },
+    async text() {
+      return "";
+    },
+  };
+}
+
+/**
+ * Record one refused mutation and hand back the synthetic response.
+ *
+ * `annotation` is layer 2: `{kind, intent, target, desired, …}` supplied by a
+ * semantic mutator. Absent, the record is a `jira.unknown-mutation` — legible
+ * enough to act on, loud enough to notice, and never executed.
+ */
+function recordRefusal({ url, method, access, system, annotation, ctx }) {
+  const a = annotation || {};
+  let rec = null;
+  try {
+    const input = {
+      kind: a.kind || "jira.unknown-mutation",
+      system: a.system || system,
+      access,
+      intent:
+        a.intent ||
+        `Perform ${method} ${endpointOf(url)} by hand — no semantic annotation, ` +
+          `so what it would have changed is not known here`,
+      target: a.target || { url: String(url), name: endpointOf(url) },
+      desired:
+        a.desired === undefined
+          ? { method, endpoint: endpointOf(url) }
+          : a.desired,
+      skill: a.skill || ctx.skill,
+      step: a.step === undefined ? ctx.step : a.step,
+      run: a.run || ctx.run,
+    };
+    for (const k of [
+      "consequence",
+      "produces",
+      "dependsOn",
+      "manual",
+      "command",
+      "verify",
+      "retry_of",
+    ]) {
+      if (a[k] !== undefined) input[k] = a[k];
+    }
+    rec = dm.defer(input, ctx.cwd ? { cwd: ctx.cwd } : {});
+  } catch (e) {
+    // Same contract as jira-stage.js: a journal we could not write is a
+    // warning, never a licence to perform the mutation anyway.
+    const warn =
+      (ctx.output && ctx.output.warn) ||
+      ((m) => process.stderr.write(`${m}\n`));
+    warn(
+      `⚠️  Could not record the deferred ${method} ${endpointOf(url)}: ${e.message}`,
+    );
+  }
+  return deferredResponse(rec);
+}
+
+/**
+ * Turn a Jira `fields` payload into something a human can act on.
+ *
+ * This is the whole reason layer 2 exists. `PUT /rest/api/3/issue/PROJ-1 {…}`
+ * tells an operator nothing; `Team = Platform` tells them exactly what to type.
+ * A value the shape cannot express in one line (an ADF description, say) is
+ * NAMED rather than dumped — a checklist item nobody can read is as useless as
+ * no checklist item, and the document already holds the prose.
+ */
+const EMPTY_VALUE = "(structured value — see the work-item document)";
+// CYCLE-3 CR-7 — an empty collection in a Jira update is not an unrenderable
+// value, it is an INSTRUCTION: clear the field. Pointing the operator at a
+// document that holds nothing to copy describes the wrong thing entirely.
+const CLEARED_VALUE = "(cleared)";
+
+function summariseFields(fields) {
+  const short = (v) => {
+    const t = String(v);
+    return t.length > 120 ? `${t.slice(0, 117)}…` : t;
+  };
+  const oneLine = (v) => {
+    if (v === null || v === undefined) return null;
+    if (typeof v !== "object") return short(v);
+    if (Array.isArray(v)) {
+      // CR-8 — drop empty members rather than stringifying them. A null in a
+      // labels array used to render as a gap (", , x"), which reads as a value
+      // the operator is expected to type.
+      const parts = v
+        .map((x) => oneLine(x))
+        .filter((x) => x !== null && x !== "");
+      // CYCLE-2 CR-4 — NOT null. describeDesired renders a null with
+      // JSON.stringify, so an empty `components: []` printed
+      // "components = null" in the operator's checklist — the same literal-null
+      // rendering this function was just fixed to stop producing.
+      return parts.length ? short(parts.join(", ")) : CLEARED_VALUE;
+    }
+    // CR-8 — `timetracking` is a field THESE scripts send, and it carries no
+    // name/value/key/id, so it used to be discarded as "structured". The value
+    // is exactly the kind a human could type, so name the shape explicitly.
+    if (v.originalEstimate !== undefined || v.remainingEstimate !== undefined) {
+      // CYCLE-4 CR-9 — first NON-EMPTY, not first non-null. `??` skips only
+      // null/undefined, so `{originalEstimate: "", remainingEstimate: "3d"}`
+      // rendered "(cleared)" — an affirmative instruction to clear a field that
+      // carries an estimate.
+      const est = [v.originalEstimate, v.remainingEstimate]
+        .map((x) => (x === null || x === undefined ? "" : String(x).trim()))
+        .find((x) => x !== "");
+      return est === undefined ? CLEARED_VALUE : short(est);
+    }
+    const named = v.name ?? v.value ?? v.key ?? v.id;
+    // CR-8 — `?? ` treats an explicit null as "present", so `{name: null}` used
+    // to render as the literal string "null". An unusable value is not a value.
+    return named === undefined || named === null ? EMPTY_VALUE : short(named);
+  };
+  const out = {};
+  for (const [k, v] of Object.entries(fields || {})) out[k] = oneLine(v);
+  return out;
+}
+
+// Permissiveness order, least to most — mirrors resolve-platform.sh's access_rank.
+const ACCESS_ORDER = Object.freeze({
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+});
+
 function makeHttp({
   fetchImpl = fetch,
   timeoutMs = 30000,
   retries = 2,
   retryDelayMs = 500,
   maxRetryAfterMs = 60000,
+  // Additive, and defaulted so every existing call site is unaffected: with
+  // ACCESS_TRACKER unset the resolver answers "full" and the branch below is
+  // never taken.
+  access = null,
+  system = "jira",
+  run = undefined,
+  step = undefined,
+  skill = "jira-sync",
+  cwd = undefined,
+  output = undefined,
 } = {}) {
+  const ctx = { run, step, skill, cwd, output };
+
+  // Resolved lazily, and only when a write is actually attempted. An
+  // unrecognised mode must refuse, but refusing at FACTORY time also killed
+  // read-only callers that never write (`--probe-workflow`,
+  // scaffold-tracker-workflow), which no requirement asks for.
+  //
+  // An injected `access` may RESTRICT but never escalate: it is reduced against
+  // the environment most-restrictively, the same direction every other tier
+  // moves. A caller passing "full" over `ACCESS_TRACKER=manual` would otherwise
+  // be the one hole the resolver refuses everywhere else.
+  let resolved = null;
+  if (access) {
+    const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    resolved =
+      dm.ACCESS_MODES.indexOf(access) < 0
+        ? access // let the shared resolver produce the refusal message
+        : ACCESS_ORDER[access] <= ACCESS_ORDER[fromEnv]
+          ? access
+          : fromEnv;
+  }
+  const accessFor = (method) => {
+    if (method === "GET") return "full"; // a read is never gated
+    if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    return resolved;
+  };
+
   return async function http(url, opts = {}) {
+    // `defer` is ours, not fetch's. Strip it so the request the transport sees
+    // is byte-identical to the one it saw before this option existed.
+    const { defer: annotation, ...fetchOpts } = opts;
+    const method = String(fetchOpts.method || "GET").toUpperCase();
+
+    // Layer 1 sits ABOVE the retry loop on purpose. Recording inside it would
+    // write one record per attempt for one logical mutation, and a 429 would
+    // then read as three separate things a human must go and do.
+    if (
+      method !== "GET" &&
+      !isReadViaPost(url) &&
+      accessFor(method) !== "full"
+    ) {
+      return recordRefusal({
+        url,
+        method,
+        access: resolved,
+        system,
+        annotation,
+        ctx,
+      });
+    }
+
     let attempt = 0;
     let lastErr;
     while (attempt <= retries) {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
-        const resp = await fetchImpl(url, { ...opts, signal: ctrl.signal });
+        const resp = await fetchImpl(url, {
+          ...fetchOpts,
+          signal: ctrl.signal,
+        });
         clearTimeout(t);
         if (resp.status === 429 && attempt < retries) {
           const ra = parseRetryAfter(
@@ -1870,6 +2133,10 @@ async function moveToBacklog({
   boardId,
   issueKey,
   output,
+  // CR-7 — optional; when absent the record falls back to the makeHttp ctx,
+  // which is the library name. Additive, so every existing call site is
+  // unaffected.
+  skill = undefined,
 }) {
   if (!boardId) {
     if (output)
@@ -1893,7 +2160,31 @@ async function moveToBacklog({
         Accept: "application/json",
       },
       body: JSON.stringify({ issues: [issueKey] }),
+      // Layer 2 — what the gate records if this run may not write.
+      defer: {
+        kind: "jira.backlog.add",
+        intent: `Move ${issueKey} into the backlog of board ${boardId}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: { backlog: `board ${boardId}` },
+        // CR-7 — name the CALLING skill, not the library. The handover renderer
+        // groups by skill, so falling back to "jira-sync" split one logical run
+        // across two attributions.
+        skill,
+      },
     });
+    // A refusal is not a move. Reporting "📋 Moved to backlog" here would be the
+    // exact invisible drift this gate exists to remove.
+    if (resp.deferred) {
+      if (output)
+        output.info(
+          `   ⏸️  Backlog placement deferred (board ${boardId}) — recorded as ${resp.deferredRecord}`,
+        );
+      return { moved: false, reason: "deferred", record: resp.deferredRecord };
+    }
     if (resp.ok || resp.status === 204) {
       if (output) output.info(`   📋 Moved to backlog (board ${boardId})`);
       return { moved: true };
@@ -3097,6 +3388,7 @@ const WORKLOG_VALIDATOR_RE = /time spent|timespent|work ?log|log work/i;
 // record that callers surface in their summary (see the --fail-on-status-skip
 // handling in the sync scripts).
 async function transitionToStatus({
+  skill = undefined, // names the CALLING skill on a deferred transition record
   http,
   baseUrl,
   email,
@@ -3308,10 +3600,56 @@ async function transitionToStatus({
         Accept: "application/json",
       },
       body: JSON.stringify(body),
+      // The `jira.transition` annotation. The task's Decisions table originally
+      // said not to annotate this chain, on the premise that `jira-stage.js`
+      // owns the kind and `walkLadder` is its only caller — QA cycle 1 showed
+      // `syncDocumentStatus` is a SECOND entry point with four call sites, none
+      // of which the stage CLI gates. Unannotated they journalled as
+      // `jira.unknown-mutation`: escalated to `irreversible`, attributed to the
+      // library, and silent about which status to set.
+      //
+      // No double-record risk: the stage CLI's own gate returns before reaching
+      // here, and the deferral short-circuit above this call is the single
+      // record site for one logical hop.
+      defer: {
+        kind: "jira.transition",
+        intent: `Transition ${issueKey} from "${current}" to "${match.name}"`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: { status: match.name },
+        skill,
+      },
     });
   };
 
   let resp = await post(null);
+
+  // CR-1 — the access gate refused this transition. Everything below reads
+  // `resp.ok`, and a deferral IS ok, so without this branch a refused POST
+  // falls into the success path: it logs "🔀 Transitioned" and returns
+  // `transitioned: true`. `syncDocumentStatus` has four call sites outside
+  // jira-stage.js, and its outcome drives a "Status → X" Change Log row that is
+  // written to disk — a document recording a status change Jira never made.
+  if (resp.deferred) {
+    if (output)
+      output.info(
+        `   ⏸️  Transition deferred for ${issueKey}: "${current}" → "${match.name}" — recorded as ${resp.deferredRecord}`,
+      );
+    return {
+      transitioned: false,
+      deferred: true,
+      reason: "deferred",
+      record: resp.deferredRecord,
+      from: current,
+      to: null,
+      via: match.name,
+      rule,
+    };
+  }
+
   let loggedWork = false;
 
   // Retry once, with a worklog, when the workflow turns out to have a
@@ -3715,6 +4053,9 @@ async function syncDocumentStatus({
   docKind,
   repoRoot,
   output,
+  // Named on a deferred transition record, so a refused status move is
+  // attributed to the calling skill rather than to this library.
+  skill = undefined,
 }) {
   const root =
     repoRoot ||
@@ -3732,6 +4073,7 @@ async function syncDocumentStatus({
     return { transitioned: false, reason: "no-target", localStatus };
 
   const res = await transitionToStatus({
+    skill,
     http,
     baseUrl,
     email,
@@ -3761,6 +4103,19 @@ function summariseStatusOutcome(
   if (!outcome) return 0;
   const { transitioned, reason } = outcome;
   if (transitioned || reason === "already" || reason === "no-target") return 0;
+
+  // CR-1 — a deferral is not a skip. The move was refused by policy and WRITTEN
+  // DOWN, so there is a record to act on; treating it as a skip would both
+  // misdescribe it ("move it by hand, or see the guidance above") and, under
+  // --fail-on-status-skip, fail a run that behaved exactly as configured.
+  if (reason === "deferred") {
+    if (output)
+      output.info(
+        `   ⏸️  Status for ${outcome.issueKey || "the issue"} was not moved — access.tracker restricts this run` +
+          (outcome.record ? `. Recorded as ${outcome.record}.` : "."),
+      );
+    return 0;
+  }
 
   if (output) {
     const where = outcome.from ? ` It is still "${outcome.from}".` : "";
@@ -4182,6 +4537,7 @@ async function putIssueAtomic({
   token,
   issueKey,
   fields,
+  skill = undefined, // CR-7 — see moveToBacklog
 }) {
   const resp = await http(
     `${baseUrl}/rest/api/3/issue/${issueKey}?returnIssue=true`,
@@ -4193,8 +4549,26 @@ async function putIssueAtomic({
         Accept: "application/json",
       },
       body: JSON.stringify({ fields }),
+      // Layer 2 — the field names and values, not the request body.
+      defer: {
+        kind: "jira.issue.update",
+        intent: `Set ${Object.keys(fields || {}).join(", ") || "fields"} on ${issueKey}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: summariseFields(fields),
+        skill, // CR-7 — the calling skill, not the library
+      },
     },
   );
+  // The deferred UPDATE shape: the caller already holds a real issue key, so
+  // only `updated` is unknown. Identical to the --dry-run update path, which is
+  // why every caller already copes with it.
+  if (resp.deferred) {
+    return { updated: null, deferred: true, record: resp.deferredRecord };
+  }
   if (!resp.ok)
     throw new Error(`HTTP ${resp.status}: ${await parseJiraError(resp)}`);
   if (resp.status === 204) {
@@ -4366,6 +4740,10 @@ module.exports = {
   getAuth,
   authHeader,
   makeHttp,
+  isReadViaPost,
+  mostRestrictiveAccess,
+  summariseFields,
+  endpointOf,
   parseRetryAfter,
   sleep,
   parseJiraError,

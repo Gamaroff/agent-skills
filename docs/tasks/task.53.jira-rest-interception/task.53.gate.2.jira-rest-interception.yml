@@ -1,0 +1,128 @@
+schema: 1
+task: 'task.53.jira-rest-interception'
+task_title: '[Task 53] Intercept Jira REST mutations in two layers — a fail-closed net and a legible one'
+gate: CONCERNS
+status_reason: 'The task as specified is complete and green: both interception layers, the 21st kind, the sprint and epic-creator gates, and the deferral shapes have been stable since QA cycle 1. The open findings are all in ACCESS-MODE RESOLUTION — work added during QA to close a gap that pre-dates this task and that the task document never scoped.'
+reviewer: 'QA Engineer'
+updated: '2026-08-18T23:25:00Z'
+
+qa_cycles: 5
+loop_limit_reached: true
+
+top_issues:
+  - id: C5-CR1
+    issue: 'The stage CLIs were not threaded with the captured config path'
+    severity: high
+    finding: >-
+      jira-stage.js:432 and gh-stage.js:844 call resolveAccessTracker(accessEnv) with no
+      opts, so the config tier reads process.env AFTER loadDotEnv — a .env line redirecting
+      SKILLS_CONFIG_FILE walks around the pre-dotenv snapshot. gh-stage mutates via
+      execFileSync("gh"), so it has no layer-1 net behind it.
+    suggested_action: 'Pass the snapshot as the config-path source in both CLIs, and add SKILLS_CONFIG_FILE to each accessEnv literal.'
+    suggested_owner: dev
+  - id: C5-CR2
+    issue: 'Three YAML shapes the parser silently drops still resolve to full'
+    severity: high
+    finding: >-
+      The "declaration present but unreadable ⇒ manual" rule covers only shapes parseYamlSubset
+      surfaces as a string/array/non-string. A duplicate access: block (last-wins), an access:
+      preceded by a top-level block scalar, and a merge key under access: all yield undefined
+      and read as absent. read-config.sh refuses all three.
+    suggested_action: 'Probe the raw text for an access key before trusting an "absent" answer, mirroring _rp_access_may_be_declared.'
+    suggested_owner: dev
+  - id: C5-CR3
+    issue: 'The most-restrictive answer is emitted silently'
+    severity: medium
+    finding: >-
+      The `unusable` reasons built in findConfigFile are discarded, so a repo whose config has a
+      quirk defers every write with no line naming the file or the cause. resolve-platform.sh
+      prints an explicit refusal naming both.
+    suggested_action: 'Return the reason and emit a one-line stderr warning, once per process.'
+    suggested_owner: dev
+  - id: C5-CR4
+    issue: 'Both degraded no-writer tiers still answer full on a bad redirect'
+    severity: medium
+    finding: >-
+      They probe ${SKILLS_CONFIG_FILE:-skills-config.yaml}, so a redirect that lands on nothing
+      makes a present, restrictive ./skills-config.yaml invisible and both fall through to the
+      env tier, whose default is full.
+    suggested_action: 'Treat an unusable redirect as a refusal and fall back to probing ./skills-config.yaml.'
+    suggested_owner: dev
+  - id: C5-CR5
+    issue: 'A typo in the CONFIG tier still throws, reproducing the shape cycle 4 removed'
+    severity: medium
+    finding: >-
+      readConfiguredAccessTracker stopped throwing, but resolveAccessTracker still throws on the
+      value it returns — so `access:\n  tracker: Manual` takes down --check/--print-plan/--probe-board
+      and, in jira-sync, rejects the write with no deferral record.
+    suggested_action: 'Apply one rule to the value as well as the shape: map an unrecognised CONFIG-tier value to the most restrictive mode, keeping the throw for env-tier values.'
+    suggested_owner: dev
+  - id: C5-CR6
+    issue: 'The config tier is anchored to process.cwd() only'
+    severity: medium
+    finding: >-
+      With the walk removed (deliberately, for read-config.sh parity) any invocation whose cwd is
+      not the repo root resolves a declared restriction as absent. makeHttp's `cwd` option anchors
+      the journal but not the decision.
+    suggested_action: 'Pass the repo root the callers already compute into the resolver.'
+    suggested_owner: dev
+  - id: C5-CR7
+    issue: 'jsm_defer''s last-resort access value is the literal full'
+    severity: low
+    finding: >-
+      Unreachable today (jsm_curl always passes the mode), but a record stamped access: full
+      without --retry-of misreports a policy deferral as a failed full-access mutation.
+    suggested_action: 'Default to a refusal sentinel rather than full.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 1410
+  phases_verified: '7/7'
+  qa_cycles: 5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      The interception itself is sound and proven: no non-GET reaches the network on any gated path,
+      no credential can reach a record, the mode is captured before loadDotEnv. The residual concern
+      is narrow and named: three YAML shapes (C5-CR2) and one redirect case (C5-CR4) still resolve a
+      declared restriction to `full`, and the stage CLIs are not threaded (C5-CR1). All three are in
+      config-tier resolution, none in the interception.
+  performance:
+    status: PASS
+    notes: 'One resolution per process, memoised. Suite runtime unchanged.'
+  reliability:
+    status: PASS
+    notes: >-
+      Every cycle-1 defect (a refusal reported as success, a false Change Log row, a sprint script
+      claiming a move) is fixed and mutation-proven. full mode is unchanged on every path traced by
+      three independent reviews.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The access resolver is now one function rather than four copies, which is a real improvement.
+      But it re-implements read-config.sh's semantics in a second language, and that duplication is
+      what produced a high-severity finding in every review round from cycle 2 onward.
+
+recommendations:
+  immediate:
+    - action: 'DECIDE THE SCOPE QUESTION — see the escalation entry in the implementation report. Recommended: lift the JS config tier out of this task into its own, restoring task.53 to what its document specifies.'
+      refs: ['shared/resources/defer-mutation.js', 'docs/tasks/task.53.jira-rest-interception/']
+  future:
+    - action: 'C5-CR1..CR7 as listed above, wherever the config tier ends up living'
+      refs: ['shared/resources/defer-mutation.js', 'shared/resources/jira-stage.js', 'shared/resources/gh-stage.js', 'shared/resources/jira-sprint-lib.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'The scope decision is made and, if the config tier stays, C5-CR1 and C5-CR2 are fixed'

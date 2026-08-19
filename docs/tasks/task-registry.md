@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-17
-**Next Available Task Number:** **61**
+**Next Available Task Number:** **62**
 
 ## How to use
 
@@ -92,7 +92,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 50 | [Bitbucket REST auth supports Bearer as well as Basic, chosen by variable name](task.50.bitbucket-bearer-auth/task.50.bitbucket-bearer-auth.md) | accepted | infrastructure | High | 2026-08-16 | — | none |
 | 51 | [Declare tracker access level in config, and reject an unrecognised one loudly](task.51.access-mode-config-and-resolver/task.51.access-mode-config-and-resolver.md) | ready-for-development | infrastructure | High | 2026-08-17 | — | none |
 | 52 | [One deferred-mutation record, four renderings of it](task.52.deferred-mutation-record-and-renderers/task.52.deferred-mutation-record-and-renderers.md) | planned | infrastructure | High | 2026-08-17 | — | task.51 |
-| 53 | [Intercept Jira REST mutations in two layers — a fail-closed net and a legible one](task.53.jira-rest-interception/task.53.jira-rest-interception.md) | planned | refactoring | High | 2026-08-17 | — | task.52 |
+| 53 | [Intercept Jira REST mutations in two layers — a fail-closed net and a legible one](task.53.jira-rest-interception/task.53.jira-rest-interception.md) | ready-for-development | refactoring | High | 2026-08-17 | — | task.52 |
 | 54 | [Intercept GitHub board mutations, and give `gh-stage.js` a credential-free plan](task.54.github-board-interception/task.54.github-board-interception.md) | planned | refactoring | High | 2026-08-17 | — | task.52 |
 | 55 | [Build the Jira comment endpoint that does not exist, and retire ~20 prose comment sites](task.55.tracker-comment-cli/task.55.tracker-comment-cli.md) | planned | refactoring | High | 2026-08-17 | — | task.53 |
 | 56 | [One CLI for the GitHub issue lifecycle, and honest handling of value-returning mutations](task.56.tracker-issue-cli/task.56.tracker-issue-cli.md) | planned | refactoring | Medium | 2026-08-17 | — | task.54, task.55 |
@@ -100,6 +100,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 58 | [Document restricted tracker access for someone who has never heard of it](task.58.restricted-access-documentation/task.58.restricted-access-documentation.md) | planned | documentation | High | 2026-08-17 | — | task.51-57 |
 | 59 | [Finish the Prettier adoption — sweep the 50 stragglers, then guard the boundary](task.59.prettier-sweep-and-format-guard/task.59.prettier-sweep-and-format-guard.md) | accepted | infrastructure | Medium | 2026-08-17 | [#237](https://github.com/Gamaroff/agent-skills/issues/237) | none |
 | 60 | [Give the config reader's awk tier a grammar, or make it refuse](task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) | planned | infrastructure | High | 2026-08-18 | [#247](https://github.com/Gamaroff/agent-skills/issues/247) | task.51 |
+| 61 | [Let the JavaScript gates read a config-declared access mode, with read-config.sh parity](task.61.access-mode-config-tier/task.61.access-mode-config-tier.md) | planned | infrastructure | High | 2026-08-19 | — | task.51, task.52, task.53, task.60 |
 
 ---
 

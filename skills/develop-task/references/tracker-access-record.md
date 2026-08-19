@@ -1,6 +1,6 @@
 ---
 name: tracker-access-record
-description: Canonical schema for the deferred-mutation record, the append-only journal it lands in, and the roster of the 20 tracker mutation kinds. Read by defer-mutation.js (which refuses an unknown kind) and by handover-render.js (whose totality test enumerates the roster from this file).
+description: Canonical schema for the deferred-mutation record, the append-only journal it lands in, and the roster of the 21 tracker mutation kinds. Read by defer-mutation.js (which refuses an unknown kind) and by handover-render.js (whose totality test enumerates the roster from this file).
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/tracker-access-record.md. Regenerate via `npm run bundle`. -->
 
@@ -15,7 +15,7 @@ journal. This file is the canonical definition of both, and of the roster of mut
 may name.
 
 **This file is load-bearing, not descriptive.** `defer-mutation.js` refuses to write a record whose
-`kind` is absent from §"The 20 kinds" below, and `handover-render.js`'s totality test enumerates the
+`kind` is absent from §"The 21 kinds" below, and `handover-render.js`'s totality test enumerates the
 roster *from this file* rather than from a hand-written list in the test. A kind added here without a
 renderer fails the suite; a kind added to a renderer without a row here is never reachable. Any count
 that disagrees with the roster is a bug in one of the two.
@@ -39,7 +39,7 @@ A mode is a **selection over renderers**, never a renderer itself:
 | `command` | `sh` + `summary` | The operator holds the credential and runs the script. |
 | `manual` | `md` + `summary` | The operator clicks through the UI. |
 
-The test matrix is therefore **20 kinds × 4 output formats**, not 20 × 5.
+The test matrix is therefore **21 kinds × 4 output formats**, not 21 × 5.
 
 ---
 
@@ -61,7 +61,7 @@ One JSON object per line of the journal. Field order below is the canonical orde
 
   "system": "jira",              // jira | github
   "access": "manual",            // the mode in force when the record was written
-  "kind": "jira.comment.add",    // one of the 20; see roster
+  "kind": "jira.comment.add",    // one of the 21; see roster
   "consequence": "communication",// state-drift | communication | irreversible
   "produces": null,              // symbol the operator's action yields, or null
 
@@ -225,13 +225,13 @@ mode `0644` and dry-run-by-default so nobody runs it by accident.
 
 ---
 
-## The 20 kinds
+## The 21 kinds
 
 Every row is one mutation kind. `Consequence` is the default a record inherits; a caller may harden
 it (`state-drift` → `irreversible`) but never soften it. `Produces` names the symbol an operator's
 action yields, which dependants consume via `dependsOn`.
 
-**Jira — 9** (6 REST mutators + 2 sprint + 1 transition)
+**Jira — 10** (6 REST mutators + 2 sprint + 1 transition + 1 catch-all)
 
 | `kind` | Consequence | Produces | Underlying call |
 | ------ | ----------- | -------- | --------------- |
@@ -244,6 +244,13 @@ action yields, which dependants consume via `dependsOn`.
 | `jira.sprint.move-issues` | state-drift | — | `POST /rest/agile/1.0/sprint/{id}/issue` |
 | `jira.sprint.set-state` | irreversible | — | `POST\|PUT /rest/agile/1.0/sprint/{id}` |
 | `jira.transition` | state-drift | — | `POST /rest/api/3/issue/{key}/transitions` |
+| `jira.unknown-mutation` | irreversible | — | any non-GET through `makeHttp` that no semantic mutator annotated |
+
+`jira.unknown-mutation` is the catch-all the fail-closed HTTP gate writes: a non-GET that reached
+`makeHttp` under a non-`full` mode and that no semantic mutator annotated. Its consequence is
+`irreversible` because nothing knows what the call would have done — a confirm gate is the only
+honest default for a mutation the system cannot describe. A record of this kind is also a signal:
+it means a mutation path exists that nobody has annotated yet.
 
 **GitHub — 11** (board, issue, PR and comment kinds)
 
@@ -261,7 +268,7 @@ action yields, which dependants consume via `dependsOn`.
 | `github.pr.comment` | communication | — | `gh pr comment` |
 | `github.pr.merge` | irreversible | — | `gh pr merge` |
 
-**Total: 20.**
+**Total: 21.**
 
 > The roster is parsed mechanically. A kind row is a table row whose first cell is a single
 > backtick-quoted token containing a `.`, in a table whose header reads `` `kind` `` followed by a

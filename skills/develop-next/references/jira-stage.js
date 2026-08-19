@@ -287,10 +287,19 @@ async function run({
   // invite editing. Tests pin their own ladder through this.
   repoRoot = undefined,
 } = {}) {
-  // Captured BEFORE loadDotEnv — see the matching note in gh-stage.js. The
-  // resolver owns ACCESS_TRACKER; a dot-env file must not be able to restrict
+  // Captured BEFORE loadDotEnv. A dot-env file must not be able to restrict
   // (or, via a typo, hard-fail) every pipeline step behind the resolver's back.
-  const accessEnv = { ACCESS_TRACKER: process.env.ACCESS_TRACKER };
+  //
+  // BOTH names, because the resolver reads both: `ACCESS_TRACKER` is
+  // resolve-platform.sh's output and `AGENT_SKILLS_ACCESS_TRACKER` is the knob
+  // an operator sets. Capturing only the first left this CLI's gate LOOSER than
+  // the layer-1 net underneath it — it read "full", skipped the typed deferral
+  // it exists to write, and the POST was then refused downstream as an untyped
+  // unknown-mutation.
+  const accessEnv = {
+    ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+    AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+  };
 
   lib.loadDotEnv();
 

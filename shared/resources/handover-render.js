@@ -14,7 +14,7 @@
 // totality test as the other three, because a run-end block that silently omits
 // an action is the same invisible-drift failure as a checklist that does.
 //
-// THE INVARIANT THAT MATTERS MOST IS TOTALITY. Every one of the 20 kinds must
+// THE INVARIANT THAT MATTERS MOST IS TOTALITY. Every one of the 21 kinds must
 // render in all four outputs. There is deliberately NO silent `default:` case
 // anywhere below: an unknown kind raises, and the roster is read from the schema
 // doc rather than a list in this file, so adding a kind without a renderer fails
@@ -68,6 +68,13 @@ const KIND_PRESENTATION = Object.freeze({
   },
   "jira.sprint.set-state": { verb: "Change the state of", noun: "sprint" },
   "jira.transition": { verb: "Transition", noun: "Jira issue" },
+  // The fail-closed catch-all: layer 1 refused a non-GET nobody annotated, so
+  // the wording says only what is known — that a REST call must be replayed by
+  // hand. The record's own `intent` and `desired` carry the method and URL.
+  "jira.unknown-mutation": {
+    verb: "Perform by hand the unrecognised REST call on",
+    noun: "Jira",
+  },
 
   // ── GitHub ──────────────────────────────────────────────────────────────
   "github.issue.create": { verb: "Create", noun: "GitHub issue" },
