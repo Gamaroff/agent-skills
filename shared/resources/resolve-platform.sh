@@ -545,7 +545,8 @@ tracker_write() {
     # the only thing that tells bundle_skill.py this file has a dependency: the
     # bundler's shell rule follows `source`/`exec` of a sibling `.sh`, and has no
     # rule for a shell script that runs a sibling `.js` via `node "$dir/x.js"`.
-    # Discovery falls to the literal string `shared/resources/<file>`, exactly as
+    # Discovery falls to a literal shared-resources path spelled out in the file,
+    # exactly as
     # jira-sprint-lib.sh:32 and defer-mutation.js's own header both rely on.
     #
     # Without it the bundler copied resolve-platform.sh into 17 skills and left

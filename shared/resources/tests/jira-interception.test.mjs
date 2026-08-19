@@ -1058,7 +1058,8 @@ test("§12 every bundled copy of a file this change touches carries the change",
   // `node "$(dirname …)/defer-mutation.js"` at runtime, and the bundler has no
   // rule for a shell script invoking a sibling `.js` — it follows `source`/`exec`
   // of a sibling `.sh`, and otherwise only the literal string
-  // `shared/resources/<file>`. So each of the three names that path in a comment,
+  // a literal shared-resources path spelled out in the file. So each of the three
+  // names that path in a comment,
   // and this test is what stops a later cleanup deleting the comment.
   //
   // The failure it guards is worse than a stale copy, and silent in both

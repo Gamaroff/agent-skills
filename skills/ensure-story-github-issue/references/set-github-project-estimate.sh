@@ -105,7 +105,8 @@ fi
 # only thing that tells bundle_skill.py this file has a dependency: the bundler
 # follows `source`/`exec` of a sibling `.sh`, and has no rule for a shell script
 # that runs a sibling `.js`. Discovery falls to the literal string
-# `shared/resources/<file>`, as jira-sprint-lib.sh:32 relies on.
+# a literal shared-resources path spelled out in the file, as
+# jira-sprint-lib.sh:32 relies on.
 #
 # Without it this script was bundled into 11 skills without the writer, and the
 # branch below then skipped the write — under `full` too, since it runs before the
