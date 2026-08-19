@@ -92,6 +92,13 @@ const COMMENT_MARKER_PREFIX = "agent-skills-comment:";
  * must post its own comment rather than being suppressed by the previous
  * cycle's marker.
  */
+/**
+ * The stages that may carry a numeric suffix (`qa-cycle-2`, `qa-fix-3`),
+ * because each cycle must post its own comment rather than being suppressed by
+ * the previous cycle's marker. Every other stage fires at most once per run.
+ */
+const CYCLE_SCOPED_STAGES = Object.freeze(["qa-cycle", "qa-fix"]);
+
 const COMMENT_STAGES = Object.freeze([
   "work-started",
   "in-review",
@@ -220,10 +227,13 @@ function resolveTracker(explicit, env = process.env) {
  */
 function isKnownStage(stage) {
   if (COMMENT_STAGES.includes(stage)) return true;
-  return COMMENT_STAGES.some((k) => {
-    if (!stage.startsWith(`${k}-`)) return false;
-    return /^\d+$/.test(stage.slice(k.length + 1));
-  });
+  // The numeric suffix is legal ONLY for the cycle-scoped stages, so the
+  // runtime rule matches what the error message promises. Allowing `done-1`
+  // was harmless but meant the two disagreed, and a rule nobody can predict
+  // from its own message is one people route around.
+  return CYCLE_SCOPED_STAGES.some(
+    (k) => stage.startsWith(`${k}-`) && /^\d+$/.test(stage.slice(k.length + 1)),
+  );
 }
 
 /** GitHub/Bitbucket: an HTML comment, invisible when rendered. */
@@ -328,22 +338,56 @@ function ghAvailable(execImpl) {
  * than posting what may be a duplicate.
  */
 function ghFindMarker(execImpl, issue, marker) {
-  let raw;
+  // `gh issue view --json comments` returns a bare array with no total and no
+  // paging, so on a busy issue a marked comment can fall outside the window,
+  // read as absent, and produce the duplicate the cardinality rule exists to
+  // prevent. `gh api --paginate` walks every page, so absence means absence.
+  //
+  // The `issue view` path is kept as a fallback for a `gh` too old for
+  // `--paginate` or a repo it cannot resolve — but a fallback read is a
+  // PARTIAL read, so it reports `unreadable` rather than a count it cannot
+  // stand behind.
+  let repo = "";
   try {
-    raw = execImpl(
-      "gh",
-      ["issue", "view", String(issue), "--json", "comments"],
-      GIT_EXEC_OPTS,
-    );
+    repo = String(
+      execImpl("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], GIT_EXEC_OPTS),
+    ).trim();
   } catch (_) {
-    return { count: null, unreadable: true };
+    /* fall through to the partial read */
   }
+
+  if (repo) {
+    try {
+      const raw = execImpl(
+        "gh",
+        [
+          "api",
+          "--paginate",
+          `repos/${repo}/issues/${String(issue)}/comments`,
+          "--jq",
+          ".[].body",
+        ],
+        GIT_EXEC_OPTS,
+      );
+      const bodies = String(raw).split("\n").filter(Boolean);
+      const hits = bodies.filter((b) => b.includes(marker));
+      return { count: hits.length, unreadable: false };
+    } catch (_) {
+      /* fall through */
+    }
+  }
+
   try {
-    const data = JSON.parse(raw);
+    const data = JSON.parse(
+      execImpl("gh", ["issue", "view", String(issue), "--json", "comments"], GIT_EXEC_OPTS),
+    );
     const hits = (data.comments || []).filter((c) =>
       String(c.body || "").includes(marker),
     );
-    return { count: hits.length, unreadable: false };
+    // A hit found in a partial list is still a hit — `already` is safe. Zero
+    // hits in a partial list is NOT evidence of absence.
+    if (hits.length > 0) return { count: hits.length, unreadable: false };
+    return { count: null, unreadable: true, partial: true };
   } catch (_) {
     return { count: null, unreadable: true };
   }
@@ -743,6 +787,7 @@ module.exports = {
   loadDotEnv,
   COMMENT_MARKER_PREFIX,
   COMMENT_STAGES,
+  CYCLE_SCOPED_STAGES,
   USAGE,
 };
 

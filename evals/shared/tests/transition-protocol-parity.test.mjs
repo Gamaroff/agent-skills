@@ -559,11 +559,36 @@ const MCP_COMMENT_ALLOWLIST = [
   "shared/resources/jira-transition-protocol.md",
 ];
 
+/** Strip the bundler's banner and its path rewrites, so a bundled copy can be
+ *  compared byte-for-byte against the shared source it came from. */
+function normaliseBundled(text) {
+  return text
+    .split("\n")
+    .filter((l) => !l.includes("AUTO-GENERATED — DO NOT EDIT"))
+    .join("\n")
+    .split("references/")
+    .join("shared/resources/");
+}
+
 function isAllowlisted(file) {
   const rel = file.slice(repoRoot.length + 1).split("\\").join("/");
-  return MCP_COMMENT_ALLOWLIST.some(
-    (a) => rel === a || rel.endsWith(`/references/${a.split("/").pop()}`),
-  );
+  if (MCP_COMMENT_ALLOWLIST.includes(rel)) return true;
+  // A bundled COPY of an allowlisted doc is exempt — but by CONTENT, not by
+  // filename. Matching on `endsWith("/references/<basename>")` alone let any
+  // skill mint an exemption just by naming a file `jira-transition-protocol.md`
+  // and putting whatever it liked inside. Nineteen files were exempt on that
+  // basis with nothing tying them to the shared source.
+  const base = rel.split("/").pop();
+  const source = MCP_COMMENT_ALLOWLIST.find((a) => a.endsWith(`/${base}`));
+  if (!source || !rel.includes("/references/")) return false;
+  try {
+    return (
+      normaliseBundled(readFileSync(file, "utf-8")) ===
+      normaliseBundled(readFileSync(join(repoRoot, source), "utf-8"))
+    );
+  } catch {
+    return false;
+  }
 }
 
 test("no shipped markdown calls addCommentToJiraIssue outside the two allowlisted docs", () => {
@@ -692,6 +717,34 @@ test("tracker-comment.js is bundled wherever a skill invokes it", () => {
     [],
     `skill(s) invoke tracker-comment.js without bundling it — run npm run bundle: ${missing.join(", ")}`,
   );
+});
+
+test("the duplicated marker helpers agree across both modules", () => {
+  // tracker-comment.js duplicates three helpers rather than requiring
+  // jira-sync.js, because its GitHub branch must not load 4,800 lines of Jira.
+  // The PREFIX constant was already guarded below; these three were not, and a
+  // duplicated function that drifts makes every marker search silently stop
+  // matching — the same silent-failure class the marker exists to remove.
+  const cli = require(join(sharedDir, "tracker-comment.js"));
+  for (const stage of ["done", "in-review", "qa-cycle-2", "review-story"]) {
+    assert.equal(
+      cli.markerHtml(stage),
+      lib.commentMarkerHtml(stage),
+      `markerHtml drifted for "${stage}"`,
+    );
+    assert.equal(
+      cli.markerText(stage),
+      lib.commentMarkerText(stage),
+      `markerText drifted for "${stage}"`,
+    );
+  }
+  for (const body of ["## Heading\nbody", "**bold** start", "", "x".repeat(300)]) {
+    assert.equal(
+      cli.firstLineOf(body),
+      lib.firstLineOf(body),
+      "firstLineOf drifted",
+    );
+  }
 });
 
 test("the comment marker prefix is identical in both modules that own one", () => {

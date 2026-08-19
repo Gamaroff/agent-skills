@@ -83,6 +83,12 @@ function stubGh({ comments = [], viewFails = false, postFails = false } = {}) {
   const execImpl = (bin, argv, opts) => {
     calls.push({ bin, argv, input: opts && opts.input });
     if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "owner/repo";
+    // The paginated read is the primary path; `issue view` is the fallback.
+    if (argv[0] === "api") {
+      if (viewFails) throw new Error("gh api failed");
+      return comments.map((c) => String(c.body || "").split("\n").join(" ")).join("\n");
+    }
     if (argv[0] === "issue" && argv[1] === "view") {
       if (viewFails) throw new Error("gh view failed");
       return JSON.stringify({ comments });
@@ -828,23 +834,61 @@ test("a closing fence carrying an info string does not close", () => {
   assert.ok(nodes[0].content[0].text.includes("```js"));
 });
 
-test("RE_FENCE and RE_CODE_FENCE agree on what a fence line is", () => {
-  // They disagreed: the extractor matched ```js title="x" while the renderer
-  // did not, so section extraction believed it was inside a fence while the
-  // renderer believed it was prose.
-  const RE_CODE_FENCE = /^\s*(`{3,}|~{3,})[ \t]*([^\s`~]*)[^\n]*$/;
+test("a prose line opening with an inline code span is NOT a fence (NEW-1)", () => {
+  // The first fix for the multi-word info string relaxed the tail to `[^\n]*`,
+  // which let backticks back in — so a prose line merely BEGINNING with an
+  // inline code span of three or more backticks became an opening fence. One
+  // live document hit it: task.42 line 313, where 31,235 characters collapsed
+  // into a single code block. CommonMark's actual rule is that a BACKTICK
+  // fence's info string may not contain a backtick; tilde fences are exempt,
+  // because `~` cannot open a code span.
+  assert.equal(jira.matchCodeFence("```` ``` ```` or `~~~` fenced block."), null);
+  assert.equal(jira.matchCodeFence("``` `x` ```"), null);
+  // ...while the shapes that ARE fences still are.
+  assert.deepEqual(jira.matchCodeFence("```"), { delim: "```", lang: "" });
+  assert.deepEqual(jira.matchCodeFence("```js"), { delim: "```", lang: "js" });
+  assert.deepEqual(jira.matchCodeFence('```js title="x"'), { delim: "```", lang: "js" });
+  assert.deepEqual(jira.matchCodeFence("````"), { delim: "````", lang: "" });
+  // A tilde fence MAY carry a backtick in its info string.
+  assert.deepEqual(jira.matchCodeFence("~~~ `x`"), { delim: "~~~", lang: "`x`" });
+});
+
+test("a real shipped document round-trips without collapsing (NEW-1)", () => {
+  // The regression test with teeth: the actual file that broke. A unit test on
+  // the predicate would not have caught the first fix's failure, because the
+  // shape only appears in prose nobody thought to write down.
+  const md = readFileSync(
+    join(
+      __dirname, "..", "..", "..",
+      "docs/tasks/task.42.change-log-spec-and-engine/task.42.change-log-spec-and-engine.md",
+    ),
+    "utf8",
+  );
+  const nodes = jira.textToAdfNodes(md);
+  const biggest = Math.max(
+    ...nodes
+      .filter((n) => n.type === "codeBlock")
+      .map((n) => (n.content ? n.content[0].text.length : 0)),
+    0,
+  );
+  assert.ok(nodes.length > 100, `document collapsed to ${nodes.length} nodes`);
+  assert.ok(biggest < 5000, `a code block swallowed ${biggest} characters`);
+});
+
+test("the renderer never treats as a fence something the extractor would not", () => {
+  // Direction matters. The extractor being permissive is survivable; the
+  // RENDERER being permissive loses content. So the requirement is
+  // renderer ⊆ extractor, not the reverse — the earlier symmetric assertion is
+  // what pushed the renderer to over-match.
   const RE_FENCE = /^\s*(```|~~~)/;
   for (const line of [
-    "```",
-    "```js",
-    '```js title="x"',
-    "````",
-    "~~~",
-    "~~~python",
-    "   ```bash extra words here",
+    "```", "```js", '```js title="x"', "````", "~~~", "~~~python",
+    "   ```bash extra words here", "```` ``` ```` or `~~~` fenced block.",
+    "not a fence", "`inline`",
   ]) {
-    assert.ok(RE_FENCE.test(line), `RE_FENCE should match ${line}`);
-    assert.ok(RE_CODE_FENCE.test(line), `RE_CODE_FENCE should match ${line}`);
+    if (jira.matchCodeFence(line)) {
+      assert.ok(RE_FENCE.test(line), `renderer matched a non-fence: ${line}`);
+    }
   }
 });
 
@@ -854,4 +898,90 @@ test("a body that renders to nothing produces legal ADF, not an empty text node"
   const doc = jira.buildCommentAdf("---", "");
   const json = JSON.stringify(doc);
   assert.ok(!json.includes('"text":""'), `empty text node in ${json}`);
+});
+
+test("jira: a comment list with no `total` fails CLOSED (NEW-2)", async () => {
+  // Every other unreadable path fails closed; this one read a payload without
+  // `total` as "nothing found" and posted the duplicate.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  // Record the POST rather than throwing on it: a thrown POST is ALSO reported
+  // as `unverifiable` (cause: post-failed), so throwing cannot distinguish
+  // "never posted" from "tried and failed" — and the mutation that reverts this
+  // fix would slip straight through.
+  const posts = [];
+  const fetchImpl = async (url, opts = {}) => {
+    if ((opts.method || "GET") === "GET") {
+      return { ok: true, status: 200, async json() { return { comments: [] }; },
+               async text() { return "{}"; }, headers: { get: () => null } };
+    }
+    posts.push(url);
+    return { ok: true, status: 201, async json() { return { id: "1" }; },
+             async text() { return "{}"; }, headers: { get: () => null } };
+  };
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"), fetchImpl, repoRoot: dir, env: { ...JIRA_ENV },
+  });
+  assert.equal(posts.length, 0, "must not post on a list it could not verify");
+  assert.equal(r.reason, "unverifiable");
+});
+
+test("github: the comment read is paginated, and a partial read is unverifiable (NEW-3)", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const seen = [];
+  // `gh api --paginate` unavailable → falls back to the partial read, which
+  // must NOT report a confident zero.
+  const execImpl = (bin, argv) => {
+    seen.push(argv.join(" "));
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "owner/repo";
+    if (argv[0] === "api") throw new Error("no --paginate on this gh");
+    if (argv[0] === "issue" && argv[1] === "view") return JSON.stringify({ comments: [] });
+    // Recorded, not thrown — a thrown post is also `unverifiable`, so throwing
+    // could not tell "never posted" from "tried and failed".
+    if (argv[0] === "issue" && argv[1] === "comment") return "";
+    throw new Error(`unexpected gh call: ${argv.join(" ")}`);
+  };
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl, repoRoot: dir, env: { ...baseEnv },
+  });
+  assert.ok(seen.some((c) => c.startsWith("api --paginate")), "tried the paginated read first");
+  assert.ok(
+    !seen.some((c) => c.startsWith("issue comment")),
+    "must not post on the strength of a partial list",
+  );
+  assert.equal(r.reason, "unverifiable");
+});
+
+test("github: the paginated read finds a marker across pages (NEW-3)", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const marker = cli.markerHtml("done");
+  const execImpl = (bin, argv) => {
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "owner/repo";
+    if (argv[0] === "api") {
+      // 120 comments, the marked one last — beyond a single unpaginated window.
+      return [...Array(119).fill("chatter"), `${marker}\nposted earlier`].join("\n");
+    }
+    throw new Error("should not post");
+  };
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl, repoRoot: dir, env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "already");
+});
+
+test("the numeric suffix is legal only for cycle-scoped stages (NEW-6)", () => {
+  assert.equal(cli.isKnownStage("qa-cycle-2"), true);
+  assert.equal(cli.isKnownStage("qa-fix-11"), true);
+  // `done-1` used to pass, which made the runtime rule broader than the error
+  // message promised — a rule nobody can predict from its own message.
+  assert.equal(cli.isKnownStage("done-1"), false);
+  assert.equal(cli.isKnownStage("review-3"), false);
+  assert.deepEqual([...cli.CYCLE_SCOPED_STAGES], ["qa-cycle", "qa-fix"]);
 });

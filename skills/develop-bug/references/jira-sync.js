@@ -690,21 +690,33 @@ const adf = {
 
 const RE_BULLET = /^\s*[-*]\s+(.*)$/;
 const RE_ORDERED = /^\s*\d+\.\s+(.*)$/;
-// Opening fence: captures the delimiter run and the info string's FIRST token
-// as the language. Also matches a closing fence, which carries a delimiter and
-// no info string. Both backtick and tilde fences, matching the
-// section-extraction RE_FENCE further down. Named RE_CODE_FENCE to avoid
-// colliding with it — that one answers "are we inside a fence?" for heading
-// extraction; this one renders the fence.
+// A code fence, matched as a PREDICATE rather than one regex, because the rule
+// that matters cannot be expressed cleanly in a single pattern.
 //
-// The trailing `[^\n]*` is load-bearing and was a bug fix. Requiring the whole
-// info string to be a single token meant ```` ```js title="x" ```` did not
-// match at all, so the OPENING line rendered as prose and the CLOSING fence was
-// then read as an opening one — swallowing every subsequent block into a code
-// block and losing it. Worse, it disagreed with RE_FENCE below, which does
-// match that line: the extractor believed it was inside a fence while this
-// renderer believed it was prose. A parity test now pins the two together.
-const RE_CODE_FENCE = /^\s*(`{3,}|~{3,})[ \t]*([^\s`~]*)[^\n]*$/;
+// This has now been wrong in both directions, so both are recorded:
+//
+//   Too STRICT — `(\S*)\s*$` required the whole info string to be one token, so
+//   ```` ```js title="x" ```` did not match at all. The opening line rendered as
+//   prose and the CLOSING fence was then read as an opening one, swallowing
+//   every later block.
+//
+//   Too LOOSE — relaxing the tail to `[^\n]*` let backticks back in, so a prose
+//   line that merely BEGINS with an inline code span of three or more backticks
+//   became an opening fence. One live document hit it: task.42 line 313 reads
+//   "```` ``` ```` or `~~~` fenced block." and 31,235 characters of that file
+//   collapsed into a single code block.
+//
+// CommonMark states the rule directly: a backtick fence's info string may not
+// contain a backtick. Tilde fences have no such restriction, because `~` cannot
+// open an inline code span. That asymmetry is the whole fix.
+function matchCodeFence(line) {
+  const m = /^\s*(`{3,}|~{3,})[ \t]*(.*)$/.exec(line);
+  if (!m) return null;
+  const delim = m[1];
+  const rest = m[2];
+  if (delim[0] === "`" && rest.includes("`")) return null;
+  return { delim, lang: rest.trim().split(/\s+/)[0] || "" };
+}
 
 // ---------------------------------------------------------------------------
 // Inline markdown parser — **bold**, `code`, [link](url)
@@ -818,7 +830,7 @@ function textToAdfNodes(text, linkResolver) {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    const fm = line.match(RE_CODE_FENCE);
+    const fm = matchCodeFence(line);
     if (fenceBuf !== null) {
       // Inside a fence: only a closing fence of the SAME delimiter type is
       // interpreted, so a ``` line inside a ~~~ block stays content. Everything
@@ -831,9 +843,9 @@ function textToAdfNodes(text, linkResolver) {
       // (three shipped documents use ```` to wrap ``` blocks).
       if (
         fm &&
-        fm[1][0] === fenceDelim[0] &&
-        fm[1].length >= fenceDelim.length &&
-        !fm[2]
+        fm.delim[0] === fenceDelim[0] &&
+        fm.delim.length >= fenceDelim.length &&
+        !fm.lang
       ) {
         nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
         fenceBuf = null;
@@ -850,8 +862,8 @@ function textToAdfNodes(text, linkResolver) {
       flushBuf();
       flushTable();
       fenceBuf = [];
-      fenceDelim = fm[1];
-      fenceLang = fm[2] || "";
+      fenceDelim = fm.delim;
+      fenceLang = fm.lang;
       continue;
     }
 
@@ -4782,12 +4794,18 @@ async function findCommentsByMarker({
   const hits = (data.comments || []).filter((c) =>
     adfContainsExactText(c.body, marker),
   );
-  // QA-7: an unpaginated read is not evidence of absence. When Jira reports
-  // more comments than we asked for, the marker may be outside the window, so
-  // report unreadable and let the caller degrade to `unverifiable` rather than
-  // posting a duplicate on the strength of a partial list.
+  // An unpaginated read is not evidence of absence. When Jira reports more
+  // comments than we asked for — OR does not say how many there are — the
+  // marker may be outside the window, so report unreadable and let the caller
+  // degrade to `unverifiable` rather than posting a duplicate on the strength
+  // of a partial list.
+  //
+  // Note the `!Number.isFinite` half: an absent or null `total` must fail
+  // CLOSED. Every other unreadable path in this module does, and this one was
+  // the odd one out — a payload without `total` read as "nothing found" and
+  // posted the duplicate.
   const total = Number(data.total);
-  if (Number.isFinite(total) && total > (data.comments || []).length) {
+  if (!Number.isFinite(total) || total > (data.comments || []).length) {
     return { count: null, ids: [], unreadable: true, truncated: true };
   }
   return { count: hits.length, ids: hits.map((c) => c.id), unreadable: false };
@@ -5069,6 +5087,7 @@ module.exports = {
   commentMarkerText,
   adfContainsText,
   adfContainsExactText,
+  matchCodeFence,
   firstLineOf,
   COMMENT_MARKER_PREFIX,
   // jira api
