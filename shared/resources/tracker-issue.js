@@ -286,17 +286,23 @@ function repoRootOf(repoRoot) {
 // gh helpers
 // ---------------------------------------------------------------------------
 
-function ghAvailable(execImpl) {
+function ghAvailable(execImpl, cwd = undefined) {
   try {
-    execImpl("gh", ["auth", "status"], GIT_EXEC_OPTS);
+    execImpl("gh", ["auth", "status"], { ...GIT_EXEC_OPTS, cwd });
     return true;
   } catch (_) {
     return false;
   }
 }
 
-function gh(execImpl, argv) {
-  return String(execImpl("gh", argv, GIT_EXEC_OPTS) || "").trim();
+function gh(execImpl, argv, cwd = undefined) {
+  // `cwd` on EVERY call, not just the resolver. Fixing ghRepoSlug alone left
+  // the hazard one step down: `gh issue close 42` with no --repo and no cwd
+  // resolves from wherever the PROCESS is, so with an unresolvable slug the
+  // issue was closed in an unrelated repository — silently, and reported as
+  // `performed`. That is precisely the failure the two-tier slug design exists
+  // to prevent, arriving after the slug logic had already run.
+  return String(execImpl("gh", argv, { ...GIT_EXEC_OPTS, cwd }) || "").trim();
 }
 
 /**
@@ -774,8 +780,18 @@ function ghMilestoneArgv(args, slug) {
 // The perform path — only reached under `full`
 // ---------------------------------------------------------------------------
 
-function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
-  if (!ghAvailable(execImpl)) {
+function perform({
+  kind,
+  args,
+  body,
+  slug,
+  execImpl,
+  output,
+  emit,
+  skipCode,
+  cwd,
+}) {
+  if (!ghAvailable(execImpl, cwd)) {
     output.warn("⚠️  gh is not authenticated — not performing the mutation.");
     return emit({ performed: false, reason: "no-credentials" }, 0);
   }
@@ -786,10 +802,11 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "ignore"],
         input: body || "",
+        cwd,
       }) || "",
     ).trim();
 
-  const plain = (argv) => gh(execImpl, argv.slice(1));
+  const plain = (argv) => gh(execImpl, argv.slice(1), cwd);
 
   switch (kind) {
     case "create": {
@@ -874,13 +891,17 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
         // parse, and the milestone is silently dropped — re-creating the exact
         // class of defect (a title's own characters breaking the lookup) that
         // moving off jq-interpolation was meant to remove.
-        const raw = gh(execImpl, [
-          "api",
-          "--paginate",
-          `/repos/${slug}/milestones?state=all&per_page=100`,
-          "--jq",
-          ".[] | {number, title}",
-        ]);
+        const raw = gh(
+          execImpl,
+          [
+            "api",
+            "--paginate",
+            `/repos/${slug}/milestones?state=all&per_page=100`,
+            "--jq",
+            ".[] | {number, title}",
+          ],
+          cwd,
+        );
         let hit = null;
         for (const line of String(raw).split("\n")) {
           const t = line.trim();
@@ -937,12 +958,11 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
       }
       let subId = "";
       try {
-        subId = gh(execImpl, [
-          "api",
-          `/repos/${slug}/issues/${args.issue}`,
-          "--jq",
-          ".id",
-        ]);
+        subId = gh(
+          execImpl,
+          ["api", `/repos/${slug}/issues/${args.issue}`, "--jq", ".id"],
+          cwd,
+        );
       } catch (_) {
         subId = "";
       }
@@ -952,16 +972,20 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
         );
         return emit({ performed: false, reason: "unverifiable" }, skipCode);
       }
-      gh(execImpl, [
-        "api",
-        "--method",
-        "POST",
-        "-H",
-        "Accept: application/vnd.github+json",
-        `/repos/${slug}/issues/${args.parent}/sub_issues`,
-        "-F",
-        `sub_issue_id=${subId}`,
-      ]);
+      gh(
+        execImpl,
+        [
+          "api",
+          "--method",
+          "POST",
+          "-H",
+          "Accept: application/vnd.github+json",
+          `/repos/${slug}/issues/${args.parent}/sub_issues`,
+          "-F",
+          `sub_issue_id=${subId}`,
+        ],
+        cwd,
+      );
       return emit(
         {
           performed: true,
@@ -1051,6 +1075,37 @@ function run({
   // Numeric flags are validated as numbers. `gh issue close PROJ-1` would
   // otherwise reach the network and fail there with a worse message, and a
   // Jira key arriving here at all means a caller branched on the wrong tracker.
+  // `--repo` is the ONLY slug source with no shape check, and it outranks every
+  // validated one — so `--repo ghe.corp/acme/repo` (a form gh's own --repo
+  // accepts, and one the GH_REPO branch explicitly recognises) produced
+  // `/repos/ghe.corp/acme/repo/milestones`, and `--repo acme` produced
+  // `/repos/acme/milestones`. Under a deferring mode the same malformed value
+  // went into the record's command.argv — the unrunnable handover script the
+  // slug-emptiness check exists to prevent, arriving through a value that is
+  // non-empty but wrong.
+  if (args.repo) {
+    const parts = args.repo.split("/").filter(Boolean);
+    if (parts.length === 3) {
+      // `HOST/OWNER/REPO` — accept only a host we can vouch for, then strip it,
+      // exactly as the GH_REPO branch does.
+      const ghHost = (env.GH_HOST || "").trim();
+      if (parts[0] === "github.com" || (ghHost && parts[0] === ghHost)) {
+        args.repo = parts.slice(-2).join("/");
+      } else {
+        output.err(
+          `Error: --repo "${args.repo}" names host "${parts[0]}", which is ` +
+            `neither github.com nor $GH_HOST. Use OWNER/REPO, or set GH_HOST.`,
+        );
+        return { exitCode: 2 };
+      }
+    } else if (parts.length !== 2) {
+      output.err(
+        `Error: --repo must be OWNER/REPO (or HOST/OWNER/REPO) — got "${args.repo}"`,
+      );
+      return { exitCode: 2 };
+    }
+  }
+
   // `gh issue close --reason` accepts only these three spellings. The sync
   // skills pass `not_planned` (the REST API's spelling), which gh rejects — so
   // a cancelled work item never closed and the run reported a warning only.
@@ -1134,13 +1189,13 @@ function run({
   // `access === "full" || args.dryRun` was the previous spelling and it put a
   // `gh repo view` back on the gated path: `--dry-run` under a restricted mode
   // made a network call, contradicting the header's promise in exactly the way
-  // cycle 1 fixed and cycle 2 reintroduced from the other side. A dry run under
-  // `full` may ask gh; a dry run under a restricted mode may not.
+  // cycle 1 fixed and cycle 2 reintroduced from the other side.
   const local = () => repoSlug(args.repo, env, root || process.cwd());
   const slug =
     access === "full" && !args.dryRun
-      ? // A dry run reads `slug` nowhere — it returns before recordShape and
-        // before perform — so the network round trip would be pure waste.
+      ? // NO dry run asks gh, in any mode. A dry run reads `slug` nowhere — it
+        // returns before recordShape and before perform — so the round trip
+        // would be pure waste even under `full`.
         args.repo || ghRepoSlug(execImpl, root || process.cwd()) || local()
       : local();
 
@@ -1221,6 +1276,7 @@ function run({
       output,
       emit,
       skipCode,
+      cwd: root || process.cwd(),
     });
   } catch (e) {
     output.warn(`⚠️  ${spec.summary} failed: ${e.message}`);

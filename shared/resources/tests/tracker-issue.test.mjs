@@ -751,7 +751,10 @@ test("§10 a milestone title containing a quote does not break the lookup", () =
   // a jq syntax error — which surfaced as "no match" and led to a blind POST
   // and a 422. Titles are compared in JavaScript now.
   const nasty = 'Epic 3 — the "new" flow';
-  const { execImpl } = stubGh({ milestones: ["9"], milestoneTitle: nasty });
+  const { execImpl, calls } = stubGh({
+    milestones: ["9"],
+    milestoneTitle: nasty,
+  });
   const r = cli.run({
     argv: ["node", "x", "--kind", "milestone", "--title", nasty, "--json"],
     repoRoot: dir,
@@ -760,6 +763,25 @@ test("§10 a milestone title containing a quote does not break the lookup", () =
   });
   assert.equal(r.reason, "already");
   assert.equal(r.milestone, "9");
+
+  // AND the filter is a constant. Asserting only the outcome was vacuous: the
+  // stub returns its NDJSON whatever --jq is passed, so reverting to the
+  // interpolated `select(.title == "${args.title}")` left this green while a
+  // quote in the title would have been a jq syntax error in production.
+  const lookup = calls.find(
+    (c) => c.argv[0] === "api" && c.argv.join(" ").includes("/milestones"),
+  );
+  const jqArg = lookup.argv[lookup.argv.indexOf("--jq") + 1];
+  assert.equal(
+    jqArg,
+    ".[] | {number, title}",
+    "the jq program must be CONSTANT — no title may reach it, or the title's " +
+      "own characters can break its own lookup",
+  );
+  assert.ok(
+    !jqArg.includes(nasty),
+    "the title must never be interpolated into the filter",
+  );
 });
 
 test("§10 the milestone lookup asks for ALL states, paginated", () => {
@@ -1044,6 +1066,141 @@ test("§10 no shape EVER carries a command with an empty slug in its path", () =
         argv.startsWith("gh issue "),
         `${kind} should be a gh issue verb`,
       );
+    }
+  }
+});
+
+// ── §11 QA cycle 4 — the perform path ───────────────────────────────────────
+
+test("§11 EVERY perform-path gh call carries the resolved cwd", () => {
+  // Fixing ghRepoSlug's cwd left the hazard one step down: `gh issue close 42`
+  // with no --repo and no cwd resolves from wherever the PROCESS is, so an
+  // unresolvable slug closed the issue in an unrelated repository — reported
+  // as `performed`. Demonstrated in review before it was fixed.
+  const dir = withRepo();
+  const seen = [];
+  const execImpl = (bin, argv, opts) => {
+    seen.push({ argv: argv.join(" "), cwd: opts && opts.cwd });
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    if (argv[0] === "issue" && argv[1] === "create")
+      return "https://github.com/acme/repo/issues/207";
+    if (argv[0] === "api") return JSON.stringify({ number: 9 });
+    return "";
+  };
+  for (const { kind, argv } of ALL_KINDS) {
+    seen.length = 0;
+    cli.run({
+      argv: ["node", "x", "--kind", kind, ...argv, "--repo", "acme/repo"],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+    const unanchored = seen.filter((c) => c.cwd !== dir);
+    assert.deepEqual(
+      unanchored.map((c) => c.argv),
+      [],
+      `${kind}: these calls ran with cwd=${JSON.stringify(
+        unanchored[0] && unanchored[0].cwd,
+      )} instead of the resolved root — gh would resolve the repository from ` +
+        `wherever the process happens to be`,
+    );
+  }
+});
+
+test("§11 the perform path refuses, not guesses, when the slug is unresolvable", () => {
+  // Both `!slug` refusals were untested: disabling either left the whole suite
+  // green, so cycle 3's fix for the sub-issue arm was never actually watched.
+  for (const [kind, argv] of [
+    ["milestone", ["--title", "M"]],
+    ["sub-issue-link", ["--issue", "42", "--parent", "7"]],
+  ]) {
+    const dir = withRepo();
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    // A non-GitHub remote: the resolver refuses it, so slug is "".
+    execFileSync(
+      "git",
+      ["remote", "add", "origin", "git@bitbucket.org:a/b.git"],
+      {
+        cwd: dir,
+      },
+    );
+    const calls = [];
+    const execImpl = (bin, av) => {
+      calls.push(av.join(" "));
+      if (av[0] === "auth") return "";
+      if (av[0] === "repo") throw new Error("gh cannot resolve it either");
+      return "";
+    };
+    const r = cli.run({
+      argv: ["node", "x", "--kind", kind, ...argv, "--json"],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+    assert.equal(
+      r.reason,
+      "unverifiable",
+      `${kind} must refuse rather than build a /repos// path`,
+    );
+    assert.ok(
+      !calls.some((c) => c.includes("/repos//")),
+      `${kind} must not put a malformed path on the wire: ${calls.join(" | ")}`,
+    );
+  }
+});
+
+test("§11 --repo is validated — it outranks every checked source", () => {
+  const dir = withRepo();
+  const bad = [
+    ["acme", "one segment"],
+    ["a/b/c/d", "four segments"],
+    ["ghe.corp.example.com/acme/repo", "a host we cannot vouch for"],
+  ];
+  for (const [value, why] of bad) {
+    assert.equal(
+      run(dir, ["--kind", "milestone", "--title", "M", "--repo", value])
+        .exitCode,
+      2,
+      `--repo ${value} (${why}) must be a usage error, caught locally`,
+    );
+  }
+  // HOST/OWNER/REPO with a host we CAN vouch for is accepted and stripped.
+  run(
+    dir,
+    ["--kind", "milestone", "--title", "M", "--repo", "github.com/acme/repo"],
+    {
+      ACCESS_TRACKER: "manual",
+    },
+  );
+  const rec = readJournal(dir)[0];
+  assert.ok(
+    rec.command.argv.join(" ").includes("/repos/acme/repo/milestones"),
+    `the host must be stripped for the API path, got ${rec.command.argv.join(" ")}`,
+  );
+});
+
+test("§11 no kind emits a placeholder slug via repoFlag", () => {
+  // The $OWNER/$REPO invariant was enforced for 2 of 6 kinds only; restoring
+  // the placeholder in repoFlag kept the suite green.
+  for (const kind of cli.KIND_NAMES) {
+    const args = {
+      issue: "42",
+      parent: "7",
+      title: "T",
+      bodyFile: "",
+      labels: [],
+      addLabels: [],
+      removeLabels: [],
+      milestone: "",
+      reason: "",
+      state: "",
+    };
+    const shape = cli.shapeFor({ kind, args, body: "", slug: "" });
+    if (!shape.command) continue;
+    const argv = shape.command.argv.join(" ");
+    for (const bad of ["$OWNER", "$REPO", "/repos//"]) {
+      assert.ok(!argv.includes(bad), `${kind} emitted ${bad}: ${argv}`);
     }
   }
 });
