@@ -1,0 +1,105 @@
+schema: 1
+task: 'task.55.tracker-comment-cli'
+task_title: '[Task 55] Build the Jira comment endpoint that does not exist, and stop routing ~20 comments through prose'
+gate: FAIL
+status_reason: 'Two verified HIGH correctness bugs cause silent content loss: a marker prefix collision suppresses whole comments, and a multi-word code-fence info string swallows the rest of a rendered document. Both are invisible to the 1483 passing tests.'
+reviewer: 'QA Engineer'
+updated: '2026-08-19T14:05:00Z'
+
+top_issues:
+  - id: QA-1
+    severity: high
+    finding: 'Marker search matches the bare prefix as a substring, so --stage review prefix-matches an existing review-story / review-task / review-bug marker (and qa-cycle matches qa-cycle-2). Step 2 posts --stage review on the same issue review-story already marked, so the CLI reports `already` and the review comment is silently never posted.'
+    suggested_action: 'Search the full delimited marker: markerHtml(stage) on GitHub (its trailing " -->" makes it unambiguous), and an exact text-node match on the Jira side rather than a substring.'
+    suggested_owner: dev
+    refs: ['shared/resources/tracker-comment.js:518', 'shared/resources/jira-sync.js:4728']
+  - id: QA-2
+    severity: high
+    finding: 'RE_CODE_FENCE requires a single-token info string, so ```js title="x" is not recognised as a fence. The opening line renders as prose and the CLOSING fence is then treated as an opening one, swallowing every subsequent block into a code block. Verified: "intro / fence / code / fence / tail prose" renders as [paragraph, paragraph, codeBlock("\ntail prose")] — the tail is lost. Also puts RE_CODE_FENCE in direct disagreement with the extractor RE_FENCE, which does match that line.'
+    suggested_action: 'Capture only the first token as the language and tolerate the rest of the info string; add an assertion that any line matching RE_FENCE also matches RE_CODE_FENCE.'
+    suggested_owner: dev
+    refs: ['shared/resources/jira-sync.js:697']
+  - id: QA-3
+    severity: medium
+    finding: 'A 4-backtick fence is closed by a 3-backtick line — only the delimiter character is compared, never the run length. This repo uses 4-backtick fences in at least three shipped documents.'
+    suggested_action: 'Require fm[1].length >= fenceDelim.length and an empty info string on the closing line.'
+    suggested_owner: dev
+    refs: ['shared/resources/jira-sync.js:817']
+  - id: QA-4
+    severity: medium
+    finding: '--stage with a missing or flag-shaped value fails OPEN: opts.stage becomes undefined, the marker is dropped, and the comment posts unmarked on every resume. --issue and --body-file fail closed in the same situation.'
+    suggested_action: 'Reject a missing value or one starting with "-" for every value-taking flag, as exit 2.'
+    suggested_owner: dev
+    refs: ['shared/resources/tracker-comment.js:252-255']
+  - id: QA-5
+    severity: medium
+    finding: 'COMMENT_STAGES is never consulted at runtime — markerText("totally-made-up") is accepted silently. It is enforced only by a prose-scanning guard that cannot see placeholders, shell variables, or downstream consumers.'
+    suggested_action: 'Validate the stage in run(), allowing the documented numeric-suffix form (qa-cycle-2), and exit 2 otherwise.'
+    suggested_owner: dev
+    refs: ['shared/resources/tracker-comment.js:94-106']
+  - id: QA-6
+    severity: medium
+    finding: 'The Jira branch of the CLI (runJira, ~110 lines) and the gh post-failure path have zero tests. The stub even defines a postFails knob no test passes, so runGithub catch is dead code as far as CI is concerned. findCommentsByMarker and addComment have no test referencing them.'
+    suggested_action: 'Add a fetchImpl-driven Jira test covering 0/1/2 marker matches, unreadable GET, addComment throw, and the deferred re-report; pass postFails:true in one GitHub test.'
+    suggested_owner: dev
+    refs: ['shared/resources/tests/tracker-comment.test.mjs']
+  - id: QA-7
+    severity: medium
+    finding: 'Marker search is unpaginated at 100 comments on both trackers, and truncation is not detected — a marker beyond the window reads as count 0 and the CLI posts a duplicate, the exact outcome the cardinality rule exists to prevent.'
+    suggested_action: 'Paginate, or treat total > maxResults as unreadable so it degrades to unverifiable rather than to a blind post.'
+    suggested_owner: dev
+    refs: ['shared/resources/jira-sync.js:4730', 'shared/resources/tracker-comment.js:307']
+
+waiver:
+  active: false
+
+quality_score: 55  # 100 − (20 × 2 HIGH) − (1 × 5 MEDIUM)
+
+evidence:
+  tests_reviewed: 1483
+  phases_verified: '8/8'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [0, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No shell string carries body content — every subprocess is execFileSync with an argv array and no shell:true; the body reaches gh via stdin and Jira via JSON.stringify. Redaction confirmed to run before hashing, covering command.stdin and manual.fields. One unvalidated interpolation: a Jira issue key goes into the REST path unencoded (LOW — the key comes from local frontmatter, so self-harm rather than escalation).'
+  performance:
+    status: PASS
+    notes: 'Additive cost is +18 GitHub / +9 Jira API calls on a 2-cycle run (3 round-trips per marked site vs 1 before). Bounded and trivial against a pipeline that already makes dozens.'
+  reliability:
+    status: CONCERNS
+    notes: 'Every anticipated failure path returns a reason and nothing throws uncaught. But --stage fails open (QA-4), the marker search is unpaginated (QA-7), and the whole Jira branch is untested (QA-6).'
+  maintainability:
+    status: CONCERNS
+    notes: 'The duplicated marker PREFIX is genuinely guarded by a parity assertion, but the three duplicated helper FUNCTIONS (firstLineOf, markerHtml/commentMarkerHtml, markerText/commentMarkerText) are not, so they can drift and silently stop matching. COMMENT_STAGES is documentation, not a runtime constraint (QA-5).'
+
+recommendations:
+  immediate:
+    - action: 'Fix the marker prefix collision — search the full delimited marker'
+      refs: ['shared/resources/tracker-comment.js', 'shared/resources/jira-sync.js']
+    - action: 'Fix RE_CODE_FENCE to tolerate a multi-word info string'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'Compare fence delimiter length, not just the character'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'Make every value-taking flag fail closed; validate the stage at runtime'
+      refs: ['shared/resources/tracker-comment.js']
+    - action: 'Detect marker-list truncation and degrade to unverifiable'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tracker-comment.js']
+    - action: 'Add Jira-branch and post-failure test coverage'
+      refs: ['shared/resources/tests/tracker-comment.test.mjs']
+  future:
+    - action: 'capDescriptionAdf drops an oversized block from the MIDDLE while claiming trailing omission — pre-existing, but the fence branch makes one indivisible block far likelier. Change continue to break, or reword the notice.'
+      refs: ['shared/resources/jira-sync.js:1047-1050']
+    - action: 'Guard the three duplicated helper functions the way the prefix constant is guarded'
+      refs: ['evals/shared/tests/transition-protocol-parity.test.mjs']
+    - action: 'Surface gh stderr on a post failure — it is the operator''s only signal'
+      refs: ['shared/resources/tracker-comment.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'QA-1 and QA-2 fixed and covered by tests that fail without the fix'

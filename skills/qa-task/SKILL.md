@@ -842,7 +842,7 @@ fi
 
 If `github_issue` is absent from the frontmatter, skip silently. Failure does NOT halt the skill.
 
-**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue via the Atlassian MCP tool (mirrors the pattern in `qa-fix` Step "Jira tracker comment"):
+**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue:
 
 ```bash
 JIRA_KEY=$(grep -E '^jira_key:' "$TASK_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
@@ -850,16 +850,24 @@ JIRA_KEY=$(grep -E '^jira_key:' "$TASK_FILE" | head -1 | sed -E 's/jira_key:[[:s
 
 If `TRACKER=jira` and `JIRA_KEY` is non-empty and not `null`:
 
-1. Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
-2. Call `addCommentToJiraIssue` MCP tool:
-   - `cloudId`: {derived hostname}
-   - `issueIdOrKey`: `{JIRA_KEY}`
-   - `commentBody`: `"QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}"`
-   - `contentFormat`: `"markdown"`
+```bash
+mkdir -p .claude/state
+printf 'QA %s (%s/100) — PR #%s: %s\n' \
+  "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
+
+node .agents/skills/qa-task/references/tracker-comment.js \
+  --issue "$JIRA_KEY" --body-file .claude/state/comment-body.md \
+  --stage qa-gate --json
+```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
 3. On success: log `📨 QA summary posted to Jira issue ${JIRA_KEY}`.
 4. On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-task).
 
-If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` uses the same MCP call shape and `finalise` uses `contentFormat: "markdown"`.
+If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` and `finalise` post through the same `tracker-comment.js` call.
 
 ### Step 14: Communicate to User — CRITICAL / BLOCKING
 
@@ -890,7 +898,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] Task file `## QA Testing Results` section updated with gate status and artifact links
 - [ ] Task status updated per gate decision
 - [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (Step 13 — BLOCKING): confirm exit code 0 after up to 3 attempts
-- [ ] Tracker Issue comment posted (Step 13b — graceful): GitHub via `tracker_call_with_retry gh issue comment` when `TRACKER=github` (skipped if `github_issue` absent) **OR** Jira via `addCommentToJiraIssue` MCP when `TRACKER=jira` (skipped if `jira_key` absent or null); non-blocking on persistent failure
+- [ ] Tracker Issue comment posted (Step 13b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] User notified with gate decision, issues summary, and next steps (Step 14 — BLOCKING)
 
 ---

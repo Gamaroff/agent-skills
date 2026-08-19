@@ -1,0 +1,114 @@
+schema: 1
+task: 'task.55.tracker-comment-cli'
+task_title: '[Task 55] Build the Jira comment endpoint that does not exist, and stop routing ~20 comments through prose'
+gate: PASS
+status_reason: 'All 7 cycle-1 findings and all 5 cycle-2 defects are fixed and mutation-proved. The cycle-1 fence fix had reintroduced the same content-loss class it fixed; that is now closed by a CommonMark-correct predicate whose regression test renders the real document that broke.'
+reviewer: 'QA Engineer'
+updated: '2026-08-19T16:20:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92  # 100 − (2 NFR CONCERNS × 0) − 8 for the residual future items below
+
+evidence:
+  tests_reviewed: 1512
+  phases_verified: '8/8'
+  cycles: 2
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: []
+
+cycle_1_resolution:
+  - id: QA-1
+    finding: 'Marker prefix collision silently suppressed whole comments'
+    status: closed
+    fixed_date: '2026-08-19'
+    verification: 'Full self-terminating marker on GitHub; exact text-node equality on Jira. Mutation red on both sides — the Jira half needed a test through the real search path, because a helper-only assertion kept passing while the live search regressed.'
+  - id: QA-2
+    finding: 'A multi-word fence info string swallowed the rest of a document'
+    status: closed
+    fixed_date: '2026-08-19'
+    verification: 'Closed twice. The first fix over-corrected and reintroduced the same class (see NEW-1); now a CommonMark predicate, regression-tested against the real 31KB document that broke.'
+  - id: QA-3
+    finding: 'A 4-backtick fence was closed by a 3-backtick line'
+    status: closed
+    fixed_date: '2026-08-19'
+    verification: 'Same char, run length >= opening, no info string. Mutation red.'
+  - id: QA-4
+    finding: '--stage failed open on a missing value'
+    status: closed
+    fixed_date: '2026-08-19'
+    verification: 'Every value-taking flag rejects a missing or flag-shaped value. Six argv shapes exit 2; no shipped call site is affected.'
+  - id: QA-5
+    finding: 'COMMENT_STAGES never consulted at runtime'
+    status: closed
+    fixed_date: '2026-08-19'
+    verification: 'Enforced in run(). All 60 shipped --stage literals pass; none would exit 2.'
+  - id: QA-6
+    finding: 'The Jira branch and the post-failure path had zero tests'
+    status: closed
+    fixed_date: '2026-08-19'
+    verification: 'getAuth accepts an injected source, which is what made the branch reachable at all. 13 Jira tests + the previously-dead postFails path.'
+  - id: QA-7
+    finding: 'Unpaginated marker search posted duplicates'
+    status: closed
+    fixed_date: '2026-08-19'
+    verification: 'Jira fails closed on absent/short total; GitHub reads via gh api --paginate with a fallback that reports unverifiable rather than a zero it cannot stand behind. Both mutation red.'
+
+cycle_2_resolution:
+  - id: NEW-1
+    severity: high
+    finding: 'The cycle-1 fence fix let backticks into a backtick info string, so a prose line opening with an inline code span became a fence — 31,235 characters of a live task document collapsed into one code block'
+    status: closed
+    verification: 'RE_CODE_FENCE replaced by matchCodeFence(); the regression test renders the actual offending file, because the shape only occurs in prose nobody thought to write down. The renderer-vs-extractor parity assertion was also inverted to renderer ⊆ extractor — requiring equivalence is what pushed the renderer to over-match.'
+  - id: NEW-2
+    severity: medium
+    finding: 'Truncation guard failed open on an absent or null total'
+    status: closed
+  - id: NEW-3
+    severity: medium
+    finding: 'Truncation detection was Jira-only; GitHub had none'
+    status: closed
+  - id: NEW-5
+    severity: low
+    finding: 'The parity allowlist exempted files by basename, so any skill could mint an exemption by filename alone (19 files were exempt on that basis)'
+    status: closed
+    verification: 'Exemption is now by content equality against the shared source. Exploit test: a planted file in an unrelated skill is caught.'
+  - id: NEW-6
+    severity: low
+    finding: 'The numeric suffix was accepted on any stage while the error message promised cycle-scoped only'
+    status: closed
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1 and re-verified: no shell string carries body content, redaction runs before hashing, the visible Jira footer leaks nothing.'
+  performance:
+    status: PASS
+    notes: 'The GitHub read is now a paginated gh api call rather than a single issue view — one extra round-trip per marked site at worst, still bounded and trivial.'
+  reliability:
+    status: PASS
+    notes: 'Was CONCERNS. All three causes closed: --stage fails closed, both trackers detect an unverifiable read, and the Jira branch has 13 tests through a real DI seam.'
+  maintainability:
+    status: PASS
+    notes: 'Was CONCERNS. Stage validation is enforced at runtime, and the three duplicated helper functions are now guarded by a parity test that fails on drift — previously only the prefix constant was.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'capDescriptionAdf drops an oversized block from the MIDDLE while its notice claims trailing omission. Pre-existing; the fence branch makes one indivisible block likelier. Change continue to break, or reword.'
+      refs: ['shared/resources/jira-sync.js:1047-1050']
+    - action: 'The GitHub branch of 7 skill sites still comments via unmarked gh issue comment, so those comments are not idempotent on GitHub. Pre-existing and out of this task scope (which was the MCP sites), but it is the remaining half of the idempotency story.'
+      refs: ['shared/resources/develop-pipeline-step-7-finalise.md', 'skills/*/SKILL.md']
+    - action: 'adfContainsText is now unused in production but still exported.'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'bundle_skill.py does not follow links inside already-bundled docs, so a transitively-referenced file can stay stale forever while the bundler reports "in sync". Worked around by hand here.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

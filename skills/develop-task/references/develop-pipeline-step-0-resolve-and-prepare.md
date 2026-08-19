@@ -322,18 +322,48 @@ fi
 
 If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started on the linked tracker issue. Branch on `TRACKER`. **This section is identical for develop-story and develop-task.**
 
-### Jira path (when `TRACKER=jira`):
+### Post the pipeline-start comment (both trackers)
 
-Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net` from `https://yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` field from the matching entry.
+The comment is the same on either tracker, so it is **one** call — `tracker-comment.js` branches on `TRACKER` internally:
 
-1. **Post pipeline-start comment** — call `addCommentToJiraIssue`:
-   - `cloudId`: {derived hostname}
-   - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`: `"Pipeline started — branch: \`{branch-name}\`"`
-   - `contentFormat`: `"markdown"`
-   - On failure: log warning and continue (non-blocking)
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
-2. **Signal the `work-started` stage** — run the deterministic CLI:
+
+```bash
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+Pipeline started — branch: \`{branch-name}\`
+EOF
+
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage work-started --json
+```
+
+Read `reason` from the JSON:
+
+| `reason` | What it means | What to do |
+|---|---|---|
+| `posted` | The comment was created | Nothing |
+| `already` | The marker says this exact moment was already commented | Nothing — this is a resume, not a failure |
+| `deferred` | `access.tracker` is not `full`; recorded for the handover | Nothing — the record is the deliverable |
+| `unverifiable` | 2+ marker matches, or the comment list was unreadable | Log in Issues Log and continue. **Do not post anyway** |
+| `no-credentials` | No usable auth | **Only here** may the Jira path fall back to MCP — see below |
+
+**The MCP fallback, and only on `no-credentials`.** The procedure lives in one
+place — [`references/tracker-comment-contract.md`](tracker-comment-contract.md)
+§"The MCP fallback" — and is not restated here. Restating it is what made the
+parity guard vacuous: with the fallback spelled out at every site, the guard's
+"is this mention near the word `no-credentials`?" window was satisfied
+everywhere, and a genuinely bare MCP call re-inserted next to a reason table
+passed. One canonical location means the guard can simply forbid the literal
+outside the allowlist, which is a rule that cannot be satisfied by accident.
+
+Do **not** run both paths. The CLI is authoritative whenever credentials exist.
+
+### Jira path — status transition (when `TRACKER=jira`):
+
+1. **Signal the `work-started` stage** — run the deterministic CLI:
 
    ```bash
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
@@ -362,12 +392,13 @@ Add to the implementation report Pipeline Configuration table:
 
 ### GitHub path (when `TRACKER=github`):
 
-```bash
-# 1. Post pipeline-start comment (wrapped in tracker_call_with_retry — 3× backoff)
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
-```
+> The pipeline-start **comment** is already posted by the one `tracker-comment.js`
+> call above, which covers both trackers. This section covers only the board
+> move, which is GitHub-specific. Do not add a second `gh issue comment` here —
+> it posts an unmarked duplicate the CLI's marker cannot see, so it recurs on
+> every resume.
 
-**2. Signal the `work-started` stage** — run the deterministic CLI:
+**1. Signal the `work-started` stage** — run the deterministic CLI:
 
 ```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \

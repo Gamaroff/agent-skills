@@ -176,36 +176,45 @@ for one event. Canonical format: [document-change-log.md](document-change-log.md
 #### develop-story
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🛠️ Development Complete — Step 3/8
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 🛠️ Development Complete — Step 3/8
 
 **Status**: Ready for Review
 **Tasks completed**: {audit.completed}/{audit.total}
 **Tests**: {all passing / {N} failures — see implementation report}
-**Branch**: {branch}"
+**Branch**: {branch}
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage develop-complete --json
 ```
+
+> Engine source: `shared/resources/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
+
+
+Read `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 #### develop-task
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🛠️ Development Complete — Step 3/8
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 🛠️ Development Complete — Step 3/8
 
 **Status**: Ready for Review
 **Phases completed**: {audit.completed}/{audit.total}
 **Tests**: {all passing / {N} failures — see implementation report}
-**Branch**: {branch}"
+**Branch**: {branch}
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage develop-complete --json
 ```
+
+Read `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 Use `audit.completed` / `audit.total` from the final loop-audit result. Use the last `TEST_EXIT` value: `0` → "all passing"; non-zero → "{N} failures — see implementation report". On failure: log warning in Issues Log and continue.
 

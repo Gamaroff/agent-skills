@@ -141,7 +141,10 @@ EOF
 )"
 ```
 
-For Jira/Bitbucket, attach the DoD body to the PR via the equivalent Bitbucket PR-comment API or `addCommentToJiraIssue` (whichever the project uses for PR-level visibility).
+For Bitbucket, attach the DoD body to the PR via the equivalent Bitbucket PR-comment API. This is a **PR** comment, which is a VCS concern — `tracker-comment.js` covers issue comments only, and the DoD also reaches the Jira issue through the tracker comment below.
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
 
 Log in Decisions Log: "DoD body posted to PR — comment URL: {url}."
 
@@ -211,35 +214,35 @@ Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — board: done → {landed
 
 > **MUST execute — pipeline action, not optional sync.** Do not skip on the basis of any user memory that says "Jira sync is manual" (e.g. `feedback_jira_sync_manual_only.md`). That rule applies only to `/create-epic`, `/create-story`, `/create-task` — never to develop-pipeline steps. This is the symmetric Jira counterpart to the GitHub close + board-move block above.
 
-If `TRACKER_ISSUE` is set, use the Atlassian MCP tools to post a completion comment and transition to Done (`cloudId` derived from `JIRA_URL` hostname):
+If `TRACKER_ISSUE` is set, post the completion comment and confirm the Done transition.
 
-1. **Post completion comment** — call `addCommentToJiraIssue`:
-   - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`: Build a structured summary. Locate the DoD summary file and gate file:
+1. **Post completion comment.** Locate the DoD summary and gate files, then make the one call:
 
-     ```bash
-     DOD_PATH=$(ls {story-or-task-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
-     FINAL_GATE=$(ls {story-or-task-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
-       | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
-     ```
+   ```bash
+   DOD_PATH=$(ls {story-or-task-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
+   FINAL_GATE=$(ls {story-or-task-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
+     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
 
-     Format (story variant shown; substitute "Task" for develop-task):
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+   ## ✅ Story Accepted — Definition of Done Verified
 
-     ```
-     ## ✅ Story Accepted — Definition of Done Verified
+   **PR**: {PR_URL}
+   **QA Gate**: ${FINAL_GATE}
+   **Accepted**: {YYYY-MM-DD}
+   **DoD Summary**: \`${DOD_PATH}\`
 
-     **PR**: {PR_URL}
-     **QA Gate**: {FINAL_GATE}
-     **Accepted**: {YYYY-MM-DD}
-     **DoD Summary**: `{DOD_PATH}`
+   All Definition of Done criteria verified. Story accepted and transitioning to Done.
+   EOF
 
-     All Definition of Done criteria verified. Story accepted and transitioning to Done.
-     ```
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+     --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+     --stage done --json
+   ```
 
-     If `DOD_PATH` is empty (finalise was not run via develop-story — rare), omit the DoD Summary line.
+   Story variant shown; substitute "Task" for develop-task. If `DOD_PATH` is empty (finalise was not run via develop-story — rare), omit the DoD Summary line.
 
-   - `contentFormat`: `"markdown"`
-   - On failure: log warning and continue (non-blocking)
+   Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 2. **Confirm the `done` stage** — `/finalise` (invoked at the top of this step) already drives the Done transition, via `sync-jira-{story,task}.js` when credentials exist and the MCP protocol otherwise. Do **not** transition again here as a matter of course: a second call is redundant, and re-deriving the candidates in a second place is how the two paths drift apart.
 
@@ -273,7 +276,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] Change Log carries the acceptance row with a bumped minor `Version`, written in the same edit as the frontmatter change
 - [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
 - [ ] Tracker issue `## Document` link re-pointed to the durable branch by `/finalise` (before close/transition)
-- [ ] Tracker issue commented (GitHub `gh issue comment` or Jira `addCommentToJiraIssue`)
+- [ ] Tracker issue commented via `tracker-comment.js` (`reason` was `posted`, `already` or `deferred`)
 - [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
 - [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `references/tracker-state-poller-subagent.md`)
 - [ ] All five Decisions Log lines written: "DoD summary", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")

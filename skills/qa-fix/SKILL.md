@@ -767,13 +767,21 @@ JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:
 
 If `TRACKER=jira` and `JIRA_KEY` is non-empty (and not `null`):
 
-1. Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
+Post it through the CLI — the same `$COMMENT_BODY` used for the PR comment:
 
-2. Call `addCommentToJiraIssue` MCP tool:
-   - `cloudId`: {derived hostname}
-   - `issueIdOrKey`: `{JIRA_KEY}`
-   - `commentBody`: the same `$COMMENT_BODY` string used for the PR comment
-   - `contentFormat`: `"markdown"`
+```bash
+mkdir -p .claude/state
+printf '%s' "$COMMENT_BODY" > .claude/state/comment-body.md
+
+node .agents/skills/qa-fix/references/tracker-comment.js \
+  --issue "$JIRA_KEY" --body-file .claude/state/comment-body.md \
+  --stage qa-fix --json
+```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
 
 3. On success: log `📨 Fix summary posted to Jira issue ${JIRA_KEY}`.
 4. On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-fix).
@@ -816,7 +824,7 @@ Before marking complete:
 - ✅ Change Log: exactly ONE row added for this fix loop, with the iteration count in the Description
 - ✅ Status set correctly per Status Rule
 - ✅ **Post Fix Summary to PR** (Step 7 — BLOCKING): Confirm platform-appropriate comment call (`gh pr comment` on GitHub / Bitbucket REST on Bitbucket) exited with code 0. Workflow is not done until this is verified.
-- ✅ **Jira comment** (non-blocking): If `TRACKER=jira` and `jira_key` present in story/task frontmatter, `addCommentToJiraIssue` MCP was attempted; failure is logged but does not block completion.
+- ✅ **Tracker comment** (non-blocking): If `jira_key` / `github_issue` is present in story/task frontmatter, `tracker-comment.js` was invoked and its `reason` read; failure is logged but does not block completion.
 
 ---
 

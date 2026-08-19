@@ -1643,18 +1643,12 @@ fi
 
 1. Read `jira_key` from task frontmatter (already loaded in Step 1). If absent or `null`, skip this step silently.
 
-2. Post comment via Jira REST API:
+2. Post the comment through the CLI:
 
    ```bash
-   JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
-   TASK_KEY="{jira_key from frontmatter}"
-
-   curl -s -X POST \
-     "${JIRA_URL}/rest/api/2/issue/${TASK_KEY}/comment" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Basic ${JIRA_AUTH}" \
-     -d "$(jq -n \
-       --arg body "## Task Review Complete
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+   ## Task Review Complete
 
    **Recommendation**: ${RECOMMENDATION}
    **Readiness Score**: ${SCORE}/10
@@ -1666,10 +1660,26 @@ fi
    | Optional 💡 | ${OPTIONAL} |
 
    **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}" \
-       '{"body": $body}'
-     )" || echo "⚠️ Jira comment failed — continuing"
+   ${CHANGES_SECTION}
+   EOF
+
+   node .agents/skills/review-task/references/tracker-comment.js \
+     --issue "{jira_key from frontmatter}" --body-file .claude/state/comment-body.md \
+     --stage review-task --json
    ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
+
+   > **This site used to be a raw `curl` against REST v2** with a plain-string
+   > body — the only comment site in the repository that did, and invisible to
+   > both interception layers because it went through neither `http()` nor `gh`.
+   > It now renders as **v3 ADF** like every other comment, so the rendered
+   > result differs: headings and tables become real ADF nodes instead of raw
+   > markdown characters. That is the improvement, and it is why this was a
+   > behaviour change rather than a mechanical swap.
 
 3. On success → confirm: "✅ Review summary posted to Jira issue ${TASK_KEY}."
 4. On failure → report error but do NOT halt.
