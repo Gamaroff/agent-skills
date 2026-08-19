@@ -46,6 +46,22 @@ const dm = require(join(SHARED, "defer-mutation.js"));
 
 const REFUSAL_AS = "manual";
 
+/**
+ * The access modes, ordered least to most permissive.
+ *
+ * One definition, because two of its readers now depend on it meaning the same
+ * thing: the escalation invariant compares ranks, and the tier accounting uses
+ * membership to tell a mode a reader actually produced from a value that only
+ * looks like one.
+ */
+const MODE_RANK = {
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+};
+
 /** Every access-config-*.yaml body, as { name, body }. */
 function corpus() {
   return readdirSync(FIXTURES)
@@ -90,29 +106,77 @@ function childEnvFor(tier) {
 }
 
 /**
+ * How long a single probe may take, and how many times a probe that never ran is
+ * retried. Both are overridable so a slow CI box can be tuned without editing
+ * the assertion logic.
+ *
+ * The old value was a bare `timeout: 20000`, which sounds enormous and is not.
+ * One probe sources the resolver and costs ~550ms on an idle machine; at only
+ * 12-way concurrency that inflates to ~4.6s median and ~6.7s worst case, and
+ * `npm test` runs the suite alongside far more than 12 children. 20s sat about
+ * three times the loaded median — close enough to be hit, rare enough to look
+ * like a mystery when it was.
+ */
+const SPAWN_TIMEOUT_MS = Number(process.env.PARITY_SPAWN_TIMEOUT_MS || 60000);
+const SPAWN_RETRIES = Number(process.env.PARITY_SPAWN_RETRIES || 2);
+
+/**
  * What read-config.sh (via resolve-platform.sh, its only consumer for access)
  * resolves in `dir`. Returns a mode, or REFUSAL_AS when it refused.
  *
  * --noprofile --norc so an operator's shell profile can neither print into the
  * captured stdout nor export an ACCESS_TRACKER that would forge the answer.
+ *
+ * A CHILD THAT NEVER RAN IS NOT AN ANSWER. This used to be `if (r.status !== 0)
+ * return REFUSAL_AS`, which is true of a resolver that deliberately exited
+ * non-zero AND of one that was killed on timeout (`status: null, signal:
+ * SIGTERM, error: ETIMEDOUT`) or never spawned at all (fork pressure, EAGAIN).
+ * Neither of the latter two is a reading of the config, but both were recorded
+ * as the refusal value and compared against the JS answer as though they were.
+ * That is the whole of the intermittent failure this replaced: under parallel
+ * load a probe timed out, `absent-key` — a fixture with no `access:` key, which
+ * cannot legitimately refuse — was recorded as `manual`, and the suite reported
+ * a reader divergence that had not happened.
+ *
+ * So the two cases are now separated at the source. A refusal is data. A probe
+ * that did not run is an infrastructure failure, and it throws: retried first,
+ * because the cause is transient contention, then surfaced as itself.
  */
-function shellAnswer(dir, tier) {
+function shellAnswer(dir, tier, opts = {}) {
+  const timeout = opts.timeoutMs ?? SPAWN_TIMEOUT_MS;
+  const retries = opts.retries ?? SPAWN_RETRIES;
   const env = childEnvFor(tier);
-  const r = spawnSync(
-    "bash",
-    [
-      "--noprofile",
-      "--norc",
-      "-c",
-      'source "$1" >/dev/null 2>&1 && printf %s "$ACCESS_TRACKER"',
-      "_",
-      RESOLVER,
-    ],
-    { cwd: dir, env, encoding: "utf8", timeout: 20000 },
+  let last;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const r = spawnSync(
+      "bash",
+      [
+        "--noprofile",
+        "--norc",
+        "-c",
+        'source "$1" >/dev/null 2>&1 && printf %s "$ACCESS_TRACKER"',
+        "_",
+        RESOLVER,
+      ],
+      { cwd: dir, env, encoding: "utf8", timeout },
+    );
+    // Ran to completion — non-zero is then a genuine refusal, and empty stdout
+    // means the resolver exported nothing, which is also a refusal.
+    if (!r.error && !r.signal && r.status !== null) {
+      if (r.status !== 0) return REFUSAL_AS;
+      return String(r.stdout || "").trim() || REFUSAL_AS;
+    }
+    last = r;
+  }
+  const why = last.error
+    ? `${last.error.code || last.error.message}`
+    : `killed by ${last.signal}`;
+  throw new Error(
+    `the shell reader never ran (${why}) after ${retries + 1} attempt(s) at ` +
+      `tier "${tier}" — this is an infrastructure failure, NOT a refusal. ` +
+      `Raise PARITY_SPAWN_TIMEOUT_MS (currently ${timeout}ms) if this box is ` +
+      `slower than the probe budget.`,
   );
-  if (r.status !== 0) return REFUSAL_AS;
-  const out = String(r.stdout || "").trim();
-  return out || REFUSAL_AS;
 }
 
 /** What the JS gates resolve in `dir`, with no env tier in play. */
@@ -133,17 +197,38 @@ function jsAnswer(dir, tier) {
  * explicit that a suite covering both tiers must SKIP loudly rather than
  * silently pass when the forced tier is unavailable — a tier-1 assertion that
  * quietly ran on tier 2 would assert nothing.
+ *
+ * Returns the ANSWER the probe gave, not a boolean, so the caller can record
+ * WHY a tier was dropped. A tier the host cannot honour makes the reader answer
+ * nothing and the resolver exit 0 with `full`; that is an observation. A probe
+ * that never ran is not, and shellAnswer now throws rather than returning a
+ * value this function would read as "unavailable".
  */
-function tierAvailable(tier) {
+function tierProbe(tier) {
   return withRepo("access:\n  tracker: read-only\n", (dir) => {
     // `read-only` is chosen because it is neither the absent default (`full`)
     // nor the refusal value (`manual`), so only a tier that genuinely parsed the
     // file can produce it.
-    return shellAnswer(dir, tier) === "read-only";
+    return shellAnswer(dir, tier);
   });
 }
 
+/**
+ * The tiers this suite is supposed to cover, and the ones it actually did.
+ *
+ * ALL_TIERS is a CONSTANT on purpose. The vacuity guard below used to size its
+ * expectation as `TIERS.length * corpus().length` — derived from the same list
+ * the probe had just truncated, so a dropped tier shrank the expectation to fit
+ * and the guard could not see it. Dropping `python` left the suite reporting 28
+ * passed / 0 failed with half the matrix unchecked, which is exactly the
+ * "silently checks nothing" failure this file's own header says is the wrong
+ * shape for an access-control guard (T61-L4). It re-entered through the tier
+ * probe. Sizing against the constant, and requiring every exclusion to carry the
+ * answer that justified it, is what closes that door.
+ */
+const ALL_TIERS = ["awk", "python"];
 const TIERS = [];
+const EXCLUDED = new Map(); // tier -> the observed answer that ruled it out
 
 /**
  * The matrix, computed ONCE: { [tier]: { [fixture]: {shell, js} } }.
@@ -158,9 +243,16 @@ const TIERS = [];
 const MATRIX = {};
 
 before(() => {
-  for (const t of ["awk", "python"]) {
-    if (tierAvailable(t)) TIERS.push(t);
-    else console.error(`# SKIP tier "${t}" unavailable on this host`);
+  for (const t of ALL_TIERS) {
+    // Throws if the probe never ran — a tier is dropped only on evidence.
+    const answer = tierProbe(t);
+    if (answer === "read-only") TIERS.push(t);
+    else {
+      EXCLUDED.set(t, answer);
+      console.error(
+        `# SKIP tier "${t}" unavailable on this host (probe answered ${answer})`,
+      );
+    }
   }
   assert.ok(
     TIERS.length > 0,
@@ -202,7 +294,16 @@ function eachCell(fn) {
 
 /** Every matrix test asserts it actually visited the corpus. */
 function assertNotVacuous(cells) {
-  const expected = TIERS.length * corpus().length;
+  // Sized against ALL_TIERS, less only those a SUCCESSFUL probe ruled out. A
+  // tier that vanished for any other reason leaves expected > cells and fails.
+  const covered = ALL_TIERS.length - EXCLUDED.size;
+  assert.equal(
+    TIERS.length,
+    covered,
+    `${ALL_TIERS.length} tiers, ${TIERS.length} covered, ${EXCLUDED.size} ` +
+      `explained — a tier went missing without an observed reason`,
+  );
+  const expected = covered * corpus().length;
   assert.equal(
     cells,
     expected,
@@ -272,11 +373,10 @@ describe("access-config parity: read-config.sh vs the JS tier", () => {
     // The weaker, direction-only invariant. It holds even where the two tiers
     // legitimately disagree with each other, so it is the one that would still
     // catch an escalation if the equality test above were ever relaxed.
-    const rank = { manual: 0, command: 1, approve: 2, "read-only": 3, full: 4 };
     assertNotVacuous(
       eachCell((name, tier, { shell, js }) => {
         assert.ok(
-          rank[js] <= rank[shell],
+          MODE_RANK[js] <= MODE_RANK[shell],
           `${name} [tier=${tier}]: js=${js} is more permissive than shell=${shell}`,
         );
       }),
@@ -843,5 +943,66 @@ describe("the refusal is legible and safe", () => {
       assert.equal(reason, null);
       assert.equal(dm.resolveAccessTracker({}, { cwd: dir }), "full");
     });
+  });
+});
+
+// ===========================================================================
+// The probe itself — a failed measurement must not read as a measurement
+// ===========================================================================
+
+// This suite's answers are DERIVED at run time from a spawned bash. That makes
+// the spawn part of the instrument, and an instrument that reports a plausible
+// value when it fails is worse than one that reports nothing: every assertion
+// downstream inherits the lie. The tests below guard the instrument rather than
+// the resolver.
+describe("the probe cannot fabricate an answer", () => {
+  test("a probe that never completes throws instead of reading as a refusal", () => {
+    // A 1ms budget guarantees the child is killed rather than finishing — the
+    // same shape as the real failure, which was a 20s budget losing to ~5s
+    // probes under parallel load. Before the fix this returned REFUSAL_AS and
+    // the caller compared it to the JS answer as though bash had spoken.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      assert.throws(
+        () => shellAnswer(dir, "awk", { timeoutMs: 1, retries: 0 }),
+        (err) => {
+          assert.match(err.message, /never ran/);
+          assert.match(err.message, /NOT a refusal/);
+          return true;
+        },
+        "a killed probe must not be reported as a mode",
+      );
+    });
+  });
+
+  test("the same probe, given time, does answer — so the guard is not vacuous", () => {
+    // Without this the test above passes on a box where bash is missing entirely,
+    // proving only that something went wrong rather than that the timeout is what
+    // went wrong.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      assert.equal(shellAnswer(dir, "awk"), "read-only");
+    });
+  });
+
+  test("every excluded tier carries the answer that excluded it", () => {
+    // The accounting assertNotVacuous relies on. A tier may be dropped only
+    // because a probe RAN and said something other than `read-only` — on a host
+    // that cannot honour the tier, the resolver exits 0 with `full`.
+    assert.equal(
+      TIERS.length + EXCLUDED.size,
+      ALL_TIERS.length,
+      "every tier is either covered or explained",
+    );
+    for (const [tier, answer] of EXCLUDED) {
+      assert.notEqual(
+        answer,
+        "read-only",
+        `${tier} was excluded despite answering read-only`,
+      );
+      assert.ok(
+        MODE_RANK[answer] !== undefined,
+        `${tier} was excluded on "${answer}", which is not a mode any reader ` +
+          `produces — the probe did not run`,
+      );
+    }
   });
 });
