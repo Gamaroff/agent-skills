@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The scaffolded Stakeholder Sign-off section no longer claims development is blocked when it is
+  not.** Every story and task scaffolded since the gate shipped opened with *"Development must not
+  begin until every required role below has signed"* — a description of **blocking** enforcement,
+  while `sign-off.enforcement` defaults to **`advisory`**, whose effect this same feature documents
+  as *"None — verdict may still be GO, `develop-*` proceeds"*. The sentence and the table shipped
+  together and contradicted each other.
+
+  This is not cosmetic, and it was rediscovered independently twice by consumers. It cost a review
+  finding on one card, and on another it **halted a `/develop-story` run mid-pipeline** to ask a
+  human whether a gate reading *must not begin* could be passed at 0 of 3 signatures. That was the
+  correct call by the agent — an explicit gate should not be quietly waived — so the document was
+  wrong, not the run. Unattended orchestrators (`/develop-next`, `/develop-batch`) are what this
+  hurts most, and `advisory` exists precisely so they do not stall.
+
+  The replacement names `sign-off.enforcement` as the authority and describes **both** values, so a
+  project that chooses `blocking` is not handed the mirror-image defect. Corrected in the shared
+  source, both story templates, both task templates, the two `SKILL.md` copies, the task
+  sections-guide, and the two sign-off eval fixtures whose replay output asserts the emitted text.
+
 ### Added
 
 - **The JavaScript gates now read `access.tracker` from `skills-config.yaml`.** Until now only a

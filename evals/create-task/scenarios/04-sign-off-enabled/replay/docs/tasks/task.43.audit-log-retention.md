@@ -65,7 +65,9 @@ Revert the commit. Adapter chain has no persistent state.
 
 ## Stakeholder Sign-off
 
-Development must not begin until every required role below has signed. To sign, replace your **Signature** cell with your name and today's date, then commit the change yourself — your commit authorship is the audit trail.
+Sign when you have reviewed this document: replace your **Signature** cell with your name and today's date, then commit the change yourself — your commit authorship is the audit trail, which is why an agent scaffolds these rows and never fills them.
+
+**This gate is `advisory` by default, and does not block development.** The authority is `sign-off.enforcement` in `skills-config.yaml`. Under `advisory` an unsigned required row is raised as an **Important** review finding and docks the readiness score, but the verdict may still be GO and `/develop-*` proceeds. Only if that key is set to `blocking` does an unsigned row become a **Critical** finding that withholds the status promotion and halts the pipeline at Step 2.
 
 | Role              | Signature | Date |
 | ----------------- | --------- | ---- |
