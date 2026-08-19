@@ -58,6 +58,14 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Progressive disclosure** | Three-tier loading: metadata always in context → SKILL.md body on trigger → bundled resources on demand.                                                                                      |
 | **Shared resources**       | Cross-skill docs under `shared/resources/` in this repo. Auto-bundled into each skill's zip by the packager.                                                                                  |
 | **Platform resolver**      | Logic that picks GitHub/Bitbucket/Jira based on `skills-config.yaml`, env vars, and git remote. See [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md). |
+| **Access model**           | How much the agent may do to the tracker: `full` · `read-only` · `approve` · `command` · `manual`. Separate from *which* tracker. See [Restricted tracker access](../concepts/restricted-access.md). |
+| **Handover**               | The three committed renderings of deferred tracker writes: `*.handover.{n}.{name}.{md,sh,json}`. Checklist, script, JSON sidecar. See [Pipeline artifacts](./pipeline-artifacts.md). |
+| **Deferred**               | A tracker write refused by `access.tracker` and recorded rather than sent. Stage CLIs exit 0 with `reason: "deferred"`. |
+| **retry_of**               | On a deferred-mutation record: this is a *failed* full-access write, not a policy deferral. Rendered in its own handover section. |
+| **UNRECORDED**             | A pipeline moment that should have produced a deferred record and did not. Rendered `⚠️ UNRECORDED` in the handover. |
+| **divergent**              | Planned `/tracker-reconcile` state (task.57, **not shipped**): the live board value is neither the desired value nor the pre-action value. |
+| **unverifiable**           | Planned `/tracker-reconcile` state (task.57, **not shipped**): the read failed, was ambiguous, or the kind has no reliable read. Never coerced to satisfied. |
+| **tracker-reconcile**      | Planned skill `/tracker-reconcile` (task.57, **not shipped**). Re-reads a committed handover against the live board. Until it lands, work the checklist by hand. |
 | **Packaged skill**         | `.zip` distributable produced by `package_skill.py`. Self-contained: shared resources bundled in.                                                                                             |
 | **Skill catalog**          | Auto-generated index of all skills at [`docs/reference/skill-catalog.md`](./skill-catalog.md). Regenerate with `npm run generate-catalog`.                                                    |
 

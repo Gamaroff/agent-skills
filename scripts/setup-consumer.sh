@@ -200,9 +200,13 @@ select_access() {
   echo ""
   echo "  1) Full — the agent has write credentials and updates the tracker itself (default)"
   echo "  2) Read-only — the agent may read the tracker but not write to it"
-  echo "  3) Approve — the agent holds credentials but asks before each change"
+  echo "  3) Approve — credentials present; writes are still handed over today (ask prompt is not shipped)"
   echo "  4) Command — the agent prints the commands; you run them"
   echo "  5) Manual — the agent prints instructions; you click through them"
+  echo ""
+  echo "  This is not Skip — docs only (a later per-run prompt on /create-*). Skip means no tracker."
+  echo "  If you have a board but the agent must not hold a write token, pick 4 or 5."
+  echo "  See docs/concepts/restricted-access.md and docs/concepts/which-access.md."
   echo ""
   ask "Choice [1-5] (default: 1):"
   read -r _achoice
@@ -1061,6 +1065,15 @@ print_summary() {
     echo "  2. Restart Claude Code in this project directory"
     echo "  3. Run /create-task to verify skill loading"
     echo "  4. See docs/concepts/quickstart-task.md for a 10-minute walkthrough"
+    if [[ "${ACCESS_TRACKER:-full}" != "full" ]]; then
+      echo ""
+      echo -e "${BOLD}Tracker access is ${ACCESS_TRACKER}:${NC}"
+      echo "  Pipeline runs still complete. Tracker writes are recorded, not performed."
+      echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
+      echo "  /tracker-reconcile is not shipped yet (task.57) — re-check the board by hand."
+      echo "  Limits: enforcement is partial; /develop-next still needs VCS write."
+      echo "  Guide: docs/concepts/restricted-access.md"
+    fi
   fi
   echo ""
   echo -e "${BOLD}Something not working?${NC}  See docs/reference/troubleshooting.md"

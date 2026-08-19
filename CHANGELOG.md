@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Restricted-access narrative layer** — a concept page, a three-question decision
+  guide, and a runbook walked against this repo's own GitHub board (`Todo` /
+  `In Progress` / `Done`, issue #236). Limits sit next to capabilities: partial
+  enforcement, `approve` does not yet ask, `/develop-next` still needs VCS write,
+  issue create converges over two runs, `/tracker-reconcile` is not shipped
+  (task.57). Vocabulary and the command are registered; a drift guard
+  (`tests/restricted-access-docs.test.js`) asserts modes, examples, indexes, and
+  honest not-shipped labelling.
+
+
 - **`gh-stage.js --print-plan`** — the GitHub twin of the Jira flag, and the same contract: it
   resolves which board column a pipeline moment names by reading `tracker-workflow.yaml` alone,
   with **no credentials and no network**, and it runs *above* the `gh auth` check. That placement is

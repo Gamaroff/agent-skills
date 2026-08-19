@@ -93,6 +93,13 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 
 Which family fires is resolved per-run, not chosen by hand — see [platform detection](../../shared/resources/platform-detection.md) and [tracker workflow](./tracker-workflow.md).
 
+### Restricted access — not shipped
+
+| Command | What it does | Reference |
+|---|---|---|
+| `/tracker-reconcile` | **Not shipped** ([task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md)). Re-read a committed handover and report (or, when allowed, apply) what is still outstanding. Until it lands, work the `.md` checklist or the `.sh` by hand. | [Restricted access](../concepts/restricted-access.md), [runbook](../runbooks/restricted-access.md) |
+
+
 ## Sprint & ceremony
 
 | Command | What it does | Reference |
