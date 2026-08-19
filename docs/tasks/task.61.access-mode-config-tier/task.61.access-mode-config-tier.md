@@ -5,7 +5,7 @@ type: task
 description: 'The access gates in JavaScript — jira-sync.js, the two stage CLIs, jira-epic-creator.js — resolve `access.tracker` from environment variables only. A restriction an operator commits to skills-config.yaml is therefore invisible to every bare `node …` invocation the sync and sprint skills document, and resolves to `full`. Task 53 attempted this inline and produced a high-severity divergence from read-config.sh in every review round it survived: fail-open on an unparseable file, then a throw that took down the read-only CLI modes, then three YAML shapes the subset parser silently drops. The lesson is that this is a parity problem, not a feature: the config tier must answer exactly what read-config.sh answers, for every input, or it must not exist. That parity is this task''s subject.'
 tags: [restricted-access, config, parser, fail-closed, security, parity]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: high
 created: 2026-08-19
@@ -352,28 +352,37 @@ declares no `access:` key is affected either way.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-19
-**Quality Score**: 40/100
-**Gate Decision**: FAIL
+**Quality Score**: 92/100
+**Gate Decision**: PASS (after 3 cycles)
 
 ### QA Report
 
-- **Full Report**: [task.61.qa.1.access-mode-config-tier.md](./task.61.qa.1.access-mode-config-tier.md)
-- **Gate File**: [task.61.gate.1.access-mode-config-tier.yml](./task.61.gate.1.access-mode-config-tier.yml)
+- **Final report**: [task.61.qa.2.access-mode-config-tier.md](./task.61.qa.2.access-mode-config-tier.md)
+- **Final gate**: [task.61.gate.2.access-mode-config-tier.yml](./task.61.gate.2.access-mode-config-tier.yml) — **PASS 92/100**
+- Cycle 1 (FAIL 40/100): [qa.1](./task.61.qa.1.access-mode-config-tier.md) · [gate.1](./task.61.gate.1.access-mode-config-tier.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 1416 (all passing)
-- **Phases Verified**: 6/6 (3 with issues)
-- **Critical Issues**: 4 high, 5 medium, 5 low
-- **NFR Status**: Security: **FAIL**, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 1431 (all passing); 11 mutations, each turning the suite red
+- **Phases Verified**: 6/6
+- **Issues**: 24 found across 3 cycles — all closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS (one accepted duplicate predicate on the degraded path)
 
 ### Key Findings
 
-Four high-severity paths resolve a declared restriction to a mode **more permissive** than the
-config says — the exact failure this task exists to remove:
+Three QA cycles. Cycle 1 found four high-severity escalation paths; cycle 2 found that one of my
+cycle-1 fixes had **regressed** the thing it fixed, plus six live write paths the first sweep missed;
+cycle 3 verified every fix class and found only false-restriction residuals, now closed.
+
+The number worth recording is not the score but this: **the parity corpus — the artifact this task
+exists to build — was green through all four cycle-1 escalations.** It compared the shell reader
+under `{PATH, HOME}` against the JS reader under the full `process.env`, so no environment-driven
+divergence could ever appear. Fixing that first is what turned the rest into red tests.
+
+The four escalations, all closed and mutation-proven:
 
 - **T61-H1** — `probeResolver` spreads the live `process.env` into the child shell *after*
   `loadDotEnv()` ran, so a `.env`-supplied `BASH_ENV` is sourced by the subshell: a forged `full`
@@ -385,9 +394,14 @@ config says — the exact failure this task exists to remove:
 - **T61-H4** — the shell seam inherits the caller's cwd; from a subdirectory a committed `manual`
   reads as `full`. C5-CR6, fixed in JS and left in shell.
 
-**T61-M5 is the finding behind the findings**: the parity corpus runs the shell reader with
-`{PATH, HOME}` and the JS reader with the full `process.env`, so it never compares them under one
-environment — which is why H1 and H2 both passed a suite built to catch exactly this.
+**T61-M5 is the finding behind the findings**, and is why H1 and H2 both passed a suite built to
+catch exactly this.
+
+**Carried forward:** two of my three cycle-1 fixes were incomplete in the same way — I verified the
+shape I had in mind (an absolute path, one call site) rather than the shape operators actually use.
+The same pattern then appeared twice in my own *tests*: the CDPATH test used `../refs` when CDPATH is
+consulted only for bare relative names, and the makeHttp guard's regex terminated inside
+`(typeof fetch …)`. Mutation testing surfaced all three; a test that cannot fail is worth nothing.
 
 ## Change Log
 
@@ -398,6 +412,8 @@ environment — which is why H1 and H2 both passed a suite built to catch exactl
 | 2026-08-19 |  | Status → ready-for-development | review-task |
 | 2026-08-19 |  | Implemented — 6 phases, 13 source/doc files + 32 new test files, 1416 tests green | develop |
 | 2026-08-19 |  | QA gate FAIL (40/100) — 14 findings: 4 high (2 escalation paths, 1 of them RCE), 5 medium, 5 low | qa-task |
+| 2026-08-19 |  | QA cycle 2 — a cycle-1 fix regressed; 6 unanchored write paths found. Fixed | qa-fix |
+| 2026-08-19 |  | QA gate PASS (92/100) after 3 cycles — 24 findings closed, 11 mutations proven | qa-task |
 
 ---
 
