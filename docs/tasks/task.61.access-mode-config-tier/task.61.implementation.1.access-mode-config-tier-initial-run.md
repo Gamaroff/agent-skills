@@ -3,7 +3,7 @@
 **Task**: `task.61.access-mode-config-tier.md`
 **Run Number**: 1
 **Started**: 2026-08-19 05:40
-**Status**: In Progress
+**Status**: Complete
 
 ---
 
@@ -36,8 +36,8 @@ Teach `dm.resolveAccessTracker` a `skills-config.yaml` tier that agrees with `re
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 6/6 phases, 31/31 checkboxes. 1416 tests green, validate:all 115 green, bundle committed. Commit `f47ad25` | `.summaries/step-3-initial-audit.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #252: https://github.com/Gamaroff/agent-skills/pull/252 (OPEN, MERGEABLE) → `develop`. Issue #251 commented | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.61.qa.{N}.*.md`; `task.61.gate.{N}.*.yml`; PR comment posted | **3 cycles**. Gate 1 FAIL 40/100 → gate 2 **PASS 92/100**. 24 findings closed, 11 mutations proven | — |
-| 7. finalise                | ⏳ Pending | `task.61.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.61.dod.{N}.*.md`; task `status: accepted`                        | DoD PASSED. CI SUCCESS on current head. 2 of 4 checks returned FAIL — 5 doc-accuracy gaps found and **fixed** in the acceptance commit, not accepted over. Issue #251 closed, board → Done | — |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report committed and pushed | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -98,6 +98,19 @@ Teach `dm.resolveAccessTracker` a `skills-config.yaml` tier that agrees with `re
 - Issue #251 commented with the PR link.
 - Post-PR state check: PR #252 state = OPEN, mergeable = MERGEABLE. errors = 0.
 - GitHub board: in-review → `stage-disabled` (this project has not opted the moment into `tracker-workflow.yaml`; CLI exits 0, a correct outcome).
+
+### Step 7 — finalise — 2026-08-19
+
+- **CI is a hard gate, and it was pending.** First sample read `PENDING` (`test` IN_PROGRESS). Waited rather than rounding up; re-sampled **SUCCESS** on `a0850c6` — verified to be the *current* HEAD, not an ancestor.
+- Four DoD checks dispatched in parallel. Success-criteria: **PASS** (9/9 with code+test evidence). Security: **PASS** — all four escalation paths verified closed *in the tree*, by reading the code rather than the comments, including the require-order check in every consumer that makes the `CHILD_ENV_AT_LOAD` freeze actually predate `loadDotEnv`.
+- **Two checks returned FAIL, and both were right.** Five documentation-accuracy defects, all fixed in the acceptance commit rather than deferred:
+  - `troubleshooting.md` quoted a warning line beginning `access.tracker:` — a prefix the code was **deliberately fixed to stop printing** (T61-L3). An operator grepping their logs for the documented string would have found nothing.
+  - §7 Files Summary omitted four behaviour-bearing source files (the three sync scripts + `scaffold-tracker-workflow.js`, all carrying the T61-M3 anchor fix).
+  - "never spawns a subprocess" was false in three places — `mayDeclareAccess` also runs the reader on a backslash, a non-ASCII byte, an aliasing construct, or the word `access` in a comment. The *conclusion* held; the mechanism claim did not.
+  - A Phase 5 checkbox overstated its scope: the seam removed the duplicated **reader**, not the local rank `case`.
+  - Missing body `**Status:**` line; stale `task-registry.md` row.
+- Rationale for fixing rather than filing: for a task whose subject is *parity between two readers*, a doc that misdescribes what the code prints is the same class of defect as the code diverging.
+- Artifacts: `task.61.dod.1.*.md`, `sprint-review-summary.md`, canonical PR comment on #252, issue #251 **CLOSED**, board `done` → already Done, Document link re-pointed to `develop` (the feature branch is deleted after merge).
 
 - **TRACKER_ISSUE is now 251** — Phase 0's "no issue linked" determination is superseded from Step 3 onward; Steps 4/5/7 post tracker updates normally.
 - Implementation report stashed before branch creation, restored after (clean `git stash pop`).
@@ -184,9 +197,60 @@ bundle current, 18/18 skills shipping the fixes.**
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {populated at end}
+**Finished**: 2026-08-19 10:50
+**Final Status**: Completed
 **Branch**: `feature/task.61.access-mode-config-tier`
 **PR**: [#252](https://github.com/Gamaroff/agent-skills/pull/252)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 3 (gate 1 FAIL 40/100 → gate 2 PASS 92/100)
+**DoD Summary**: `task.61.dod.1.access-mode-config-tier.md`
+
+---
+
+## Completion Summary
+
+Task 61 delivered a `skills-config.yaml` access tier for the JavaScript tracker gates, closing a gap
+where a restriction an operator had committed to the repo was **inert** for every documented bare
+`node …` invocation — resolving to `full` for exactly the person who had declared it.
+
+**The design decision that shaped everything else:** the tier does not parse YAML. It sources
+`resolve-platform.sh` in a subprocess and uses the answer verbatim, so agreement with
+`read-config.sh` is *structural* rather than asserted. Task 53 had tried the other way — a second
+reader in JavaScript — and found a high-severity divergence in each of three review rounds. Three of
+the seven findings this task carried dissolved as a consequence of deleting the duplicate rather
+than needing individual fixes.
+
+**What QA actually caught,** across three cycles and 24 findings:
+
+1. **Arbitrary code execution plus a forged `full`** — `probeResolver` spread the live `process.env`
+   into the child shell, and the stage CLIs call `loadDotEnv()` *before* resolving, so a repo-local
+   `.env` could set `BASH_ENV`, which `bash -c` sources. I had checked that the snapshot carried the
+   config path and stopped there.
+2. **A fix of mine that regressed** — the shell seam's repo-root anchor computed a *relative*
+   resolver path and then `cd`'d away from it, so every answer became `manual` and a repo declaring
+   nothing would have deferred every sprint write.
+3. **The corpus was green through all four cycle-1 escalations** — it ran the two readers under
+   different environments, so no environment-driven divergence could appear in the one artifact
+   built to see divergence.
+4. **Five documentation defects at DoD time**, including a warning string the code had been
+   deliberately fixed to stop printing.
+
+**The pattern in my own mistakes, recorded because it recurred:** I twice verified the shape I had
+in mind (an absolute path, one call site) rather than the shape operators actually use — and twice
+more wrote *tests* that asserted nothing (a CDPATH test that could never trigger CDPATH; a regex
+terminating inside `(typeof fetch …)`). Mutation testing found all four. A test that cannot fail is
+worth nothing, and only mutation testing tells you which ones those are.
+
+**Also recorded:** one reported finding (T61-L2, a memo-key collision) was a **false positive** — the
+separators were already NUL and the reviewer had read a NUL as a space in the diff. It is logged as
+not-a-bug rather than counted among the fixes.
+
+**Final state:** 1431 tests, 11 mutations each turning the suite red, a 34-fixture corpus × 2 reader
+tiers with expectations derived from `read-config.sh` at run time, `validate:all` 115 skills,
+prettier clean repo-wide, bundle current across 18 skills, CI green on the final head.
+
+**Follow-ups left open** (all non-blocking, recorded in gate 2):
+
+- One exported access-may-be-declared predicate — the degraded no-bundle path needs an inlineable copy.
+- Anchor the sync scripts to the repo of `--file` rather than of `process.cwd()`.
+- An end-to-end committed test driving a config-declared restriction through a sync script to a record;
+  today that step rests on structural assertions plus a manual QA act.
