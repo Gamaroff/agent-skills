@@ -195,10 +195,20 @@ failure at ~38 sites at once.
 > copies by hand. The rename exists to make the *name* honest about the mode check now inside it —
 > not to force a corpus-wide edit. A test asserts the alias resolves and behaves identically.
 
-**What this does not cover.** Calls whose stdout the caller captures — `gh issue create`, the
-sub-issue-link graphql — are deliberately *not* wrapped. Under a deferring mode the wrapper returns
-nothing, so `$( )` would capture an empty string and the caller would proceed with a blank issue
-number. Those get a purpose-built CLI instead rather than a wrapper that silently lies.
+**What this does not cover, and what does.** Calls whose stdout the caller captures — `gh issue
+create`, the milestone create, the sub-issue link — are deliberately *not* wrapped. Under a deferring
+mode the wrapper returns nothing, so `$( )` would capture an empty string and the caller would
+proceed with a blank issue number.
+
+Those go through **`tracker-issue.js`** instead — a purpose-built CLI rather than a wrapper that
+silently lies. It can be honest about not having a value: under a deferring mode it prints nothing to
+stdout (every notice goes to stderr, so a capture cannot see it), records the mutation with `produces`
+set, and marks a value-producing kind `blocking: true`. The checklist then opens with a banner naming
+the **two-run convergence**: perform the action, write the value into the document, re-run. Contract:
+[`tracker-issue-cli.md`](tracker-issue-cli.md).
+
+No placeholder is ever written. `github_issue: 0` would defeat the idempotent search that stops the
+next run creating a duplicate, so a wrong key is worse than no key.
 
 The two GitHub board-field helpers (`set-github-project-priority.sh`,
 `set-github-project-estimate.sh`) do not go through this wrapper — they call `gh api graphql`

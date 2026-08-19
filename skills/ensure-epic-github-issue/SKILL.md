@@ -71,10 +71,13 @@ fi
 Auto-create the milestone if it doesn't exist yet:
 
 ```bash
-gh api repos/${OWNER}/$(gh repo view --json name -q '.name')/milestones \
-  -f title="${MILESTONE_TITLE}" \
-  -f state="open" 2>/dev/null || true
+node references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
+
+The CLI is resolve-or-create: an existing title is reused and reported as
+`already`, so this is safe to run on every pass. Under a deferring access mode it
+records the create and prints nothing — see [`references/tracker-issue-cli.md`](./references/tracker-issue-cli.md).
 
 Create the epic issue.
 
@@ -83,12 +86,15 @@ The body is a **summary**, not a copy of the epic file — the contract is
 which is also what the Jira path enforces in code. Read it before changing this
 template.
 
+Write the body to a file first. **Always `--body-file`, never an inline `--body`**:
+the body carries backticks, `$(…)` and newlines, and an interpolated body is a
+shell injection waiting for the first epic whose description contains one. The
+file is also what carries the body into the deferred record's `command.stdin`.
+
 ```bash
-EPIC_ISSUE_URL=$(gh issue create \
-  --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
-  --label "epic" \
-  --milestone "${MILESTONE_TITLE}" \
-  --body "## Summary
+mkdir -p .claude/state
+cat > .claude/state/issue-body.md <<EOF
+## Summary
 
 {First paragraph of the epic's Epic Goal — or its Epic Description if it has no goal — capped at 4 sentences}
 
@@ -102,25 +108,54 @@ EPIC_ISSUE_URL=$(gh issue create \
 ## Document
 
 📄 [Epic Document](${DOC_URL})
-📁 \`${EPIC_RELATIVE_PATH}\`${PRD_LINE}")
+📁 \`${EPIC_RELATIVE_PATH}\`${PRD_LINE}
+EOF
 
-EPIC_ISSUE_NUM=$(echo "$EPIC_ISSUE_URL" | grep -oE '[0-9]+$')
+EPIC_ISSUE_NUM=$(node references/tracker-issue.js \
+  --kind create \
+  --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
+  --body-file .claude/state/issue-body.md \
+  --label "epic" \
+  --milestone "${MILESTONE_TITLE}")
 ```
 
-**On failure** (`gh` exits non-zero or `EPIC_ISSUE_NUM` is empty):
-- Log: `⚠️ Failed to create GitHub issue for epic — proceeding without epic issue linkage`
-- Set `EPIC_ISSUE_NUM=""`
+The CLI prints the issue **number** — the old `grep -oE '[0-9]+$'` on the URL is
+gone, because the CLI does it once for every call site.
+
+**On an empty `EPIC_ISSUE_NUM`** — whether the create failed or was **deferred**:
+- Log: `⚠️ No GitHub issue number for epic — proceeding without epic issue linkage`
+- Leave `EPIC_ISSUE_NUM=""`
+- **Do not write a placeholder into frontmatter.** Not `0`, not `<pending>`. The
+  frontmatter write in Step E4 simply does not run. A wrong key is worse than no
+  key: it defeats the idempotent lookup that stops the *next* run creating a
+  duplicate issue, so a placeholder converts a recoverable state into a permanent
+  one — and because stories link to their epic by this number, a wrong one
+  mis-parents every story in the epic.
 - **Return to the calling skill** — do NOT halt the calling skill.
+
+Under a deferring access mode this is the **two-run convergence**: the run records
+the create as `blocking`, the checklist opens with a banner saying so, and the
+operator creates the issue, writes the number into the epic's frontmatter, and
+re-runs. The second run finds `github_issue` present and takes the update path.
 
 ### Step E4: Add to Project Board and Update Epic Frontmatter
 
 Add the epic issue to the GitHub Project board:
 
 ```bash
-gh project item-add ${PROJECT_NUM} --owner ${OWNER} --url "${EPIC_ISSUE_URL}" 2>/dev/null || true
+source references/resolve-platform.sh || exit 1
+tracker_write gh project item-add ${PROJECT_NUM} --owner ${OWNER} \
+  --url "https://github.com/${OWNER}/$(gh repo view --json name -q '.name')/issues/${EPIC_ISSUE_NUM}" 2>/dev/null || true
 ```
 
+`tracker_write` infers `github.board.item-add` from the argv, so a restricted run
+records the board add rather than performing it.
+
 Failure here is non-blocking — log a warning and continue.
+
+> **Skip the frontmatter write below when `EPIC_ISSUE_NUM` is empty**, and skip
+> the board add above too — there is no issue to add or to record. Writing a
+> placeholder is specifically forbidden; see the create step.
 
 Write `github_issue: {EPIC_ISSUE_NUM}` to the epic file's YAML frontmatter:
 - Locate the closing `---` of the frontmatter block.

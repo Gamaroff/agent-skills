@@ -1137,7 +1137,10 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    DOC_REL_RE=$(printf '%s' "$DOC_REL" | sed 's/[.[\*^$/]/\\&/g')
    NEW_BODY=$(printf '%s' "$CUR_BODY" | sed -E "s#blob/[^) ]+/(${DOC_REL_RE})#blob/${DURABLE_BRANCH}/\1#g")
    if [ "$NEW_BODY" != "$CUR_BODY" ]; then
-     gh issue edit {github_issue} --body-file <(printf '%s' "$NEW_BODY") \
+     mkdir -p .claude/state
+     printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+     node references/tracker-issue.js --kind edit --issue {github_issue} \
+       --body-file .claude/state/issue-body.md \
        && echo "✅ Document link re-pointed to ${DURABLE_BRANCH}" \
        || echo "⚠️ Document-link re-point failed — non-blocking; re-sync from develop after merge"
    fi
@@ -1146,12 +1149,22 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Close the issue and verify closure:
 
    ```bash
-   # Post completion comment
-   gh issue comment {github_issue} --body "Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified."
+   # Post completion comment — always --body-file, never an inline --body
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+   Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
+   EOF
+   node references/tracker-comment.js --issue {github_issue} \
+     --body-file .claude/state/comment-body.md --stage done --json
 
    # Close the issue
-   gh issue close {github_issue} --comment "Closing — accepted. PR: {PR_URL} (pending merge)."
+   node references/tracker-issue.js --kind close --issue {github_issue} --reason completed
    ```
+
+   > The close no longer carries `--comment`. The completion comment is posted by
+   > `tracker-comment.js` immediately above, which is the marked, idempotent path —
+   > a `--comment` on the close is an *unmarked* second comment that the marker
+   > cannot see, so it recurs on every resume.
 
    After closing, verify the issue is actually closed:
 

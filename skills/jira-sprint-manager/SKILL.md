@@ -29,6 +29,38 @@ Safely drive Jira sprint state via the encapsulated bash scripts in `scripts/`. 
 
 See [`references/jira-agile-api.md`](references/jira-agile-api.md) for API quirks (pagination, 50-key bulk limit, POST/PUT fallback, rate limits).
 
+## Restricted access — read the `⏸️` outcome, never assume success
+
+Every sprint **mutation** goes through `jsm_curl`, which refuses and records it
+when `access.tracker` is not `full`. Reads are never gated — they are how this
+skill discovers what it would have changed.
+
+A refused mutation **still exits 0**, and that is deliberate: these scripts run
+under `set -euo pipefail`, and a non-zero exit would turn a policy deferral into a
+crash. So the exit code is not the signal. **The output line is:**
+
+| Script prints | Meaning | What to report |
+| ------------- | ------- | -------------- |
+| `Sprint 42 transitioned to: closed.` | Performed | The sprint moved |
+| `Moved 17 issue(s) to: 42.` | Performed | The issues moved |
+| `⏸️  Sprint 42 NOT transitioned to: closed — access.tracker restricts this run.` | **Deferred** | The sprint did **not** move; a record was written |
+| `⏸️  17 issue(s) NOT moved to: 42 — …` | **Deferred** | The issues did **not** move |
+
+**Never report a sprint as started, closed, or re-scoped on a `⏸️` line.** That is
+the whole failure this mechanism exists to prevent: a sprint the board still shows
+as open, reported to a team as closed, is worse than an error — the team plans the
+next sprint against a state that never happened.
+
+When any step prints `⏸️`:
+
+1. Say plainly which operation did not happen, and that `access.tracker` is why.
+2. Quote the record id from the line (`Recorded as <id>` / `Last record: <id>`).
+3. Point the user at the handover checklist — it carries the deep link and the
+   exact fields for performing the operation in the Jira UI. Render it with
+   `handover-render.js`; the records are already in the journal.
+4. Continue with the remaining read-only steps. A deferred mutation does not stop
+   the workflow — a sprint report is still worth producing.
+
 ## Workflow 1: Starting a Sprint
 
 1. **Find the sprint.** If user only gave board ID, run `bash references/jira-list-sprints.sh <board_id> future` and ask which to start.

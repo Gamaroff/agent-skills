@@ -2285,7 +2285,8 @@ User Can Now: Run `/develop` to begin implementation
    BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
    OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
    REPO=$(gh repo view --json name -q '.name')
-   gh project item-add "$BOARD_NUM" --owner "$OWNER" \
+   source references/resolve-platform.sh || exit 1
+   tracker_write gh project item-add "$BOARD_NUM" --owner "$OWNER" \
      --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
    ```
 

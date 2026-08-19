@@ -366,10 +366,20 @@ If `GITHUB_ISSUE` is set (from Step 0), post a comment linking the PR:
 
 ```bash
 if [ -n "$GITHUB_ISSUE" ]; then
-  gh issue comment "$GITHUB_ISSUE" --body "PR opened — #${PR_NUMBER}: ${PR_URL}" \
+  mkdir -p .claude/state
+  cat > .claude/state/comment-body.md <<EOF
+PR opened — #${PR_NUMBER}: ${PR_URL}
+EOF
+  node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
+    --body-file .claude/state/comment-body.md --stage in-review --json \
     || echo "⚠️  Issue comment failed — continuing"
 fi
 ```
+
+Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md).
+The `--stage` marker is what makes this idempotent across a resume — a bare
+`gh issue comment` posts an unmarked duplicate every time the pipeline re-enters
+Step 4.
 
 If `GITHUB_ISSUE` is not set, skip silently.
 

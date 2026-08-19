@@ -148,9 +148,11 @@ Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The bo
 If anything changed, run:
 
 ```bash
-gh issue edit ${ISSUE_NUM} \
+printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+
+node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
-  --body-file <(printf '%s' "$NEW_BODY") \
+  --body-file .claude/state/issue-body.md \
   --milestone "${MILESTONE_TITLE}" \
   --add-label "priority:${priority}" \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
@@ -159,8 +161,8 @@ gh issue edit ${ISSUE_NUM} \
 The milestone is auto-created first if it does not yet exist (e.g. the epic title changed):
 
 ```bash
-gh api repos/${OWNER}/$(gh repo view --json name -q '.name')/milestones \
-  -f title="${MILESTONE_TITLE}" -f state="open" 2>/dev/null || true
+node references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
 
 If the priority label changed, also re-mirror the board's Priority field:
@@ -194,9 +196,9 @@ if [ "$CURRENT" != "$DESIRED" ]; then
   if [ "$DESIRED" = "closed" ]; then
     REASON=completed
     [ "$STATUS" = "cancelled" ] && REASON=not_planned
-    gh issue close ${EPIC_ISSUE_NUM} --reason ${REASON}
+    node references/tracker-issue.js --kind close --issue ${EPIC_ISSUE_NUM} --reason ${REASON}
   else
-    gh issue reopen ${EPIC_ISSUE_NUM}
+    node references/tracker-issue.js --kind reopen --issue ${EPIC_ISSUE_NUM}
   fi
 fi
 ```

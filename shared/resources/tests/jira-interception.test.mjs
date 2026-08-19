@@ -931,26 +931,44 @@ test("§10 the PARTIALLY ENFORCED notice exists and is qualified", () => {
   // The exact wording — what IS gated and what is not — is pinned in §13 (CR-5).
   const src = fs.readFileSync(path.join(SHARED, "resolve-platform.sh"), "utf8");
   assert.match(src, /PARTIALLY ENFORCED/);
-  // The GitHub side must be named on BOTH sides of the line. Until task.54 it
-  // appeared only as a gap ("all GitHub issue and PR writes"); now the board
-  // helpers and tracker_write are gated and the remaining gap is the narrow set
-  // of calls whose stdout a caller captures. Asserting only one direction lets
-  // the notice drift into overstating or understating coverage, and this file's
-  // §13 CR-5 note is explicit that overstating is worse than saying nothing.
+
+  // BOTH directions, still. Asserting only one lets the notice drift into
+  // overstating or understating coverage, and this file's §13 CR-5 note is
+  // explicit that overstating is worse than saying nothing.
+  //
+  // The gap this test pinned MOVED in task.56, which is why the assertion
+  // changed rather than the notice being made to satisfy it. Until then the
+  // notice named `gh issue create` and the sub-issue link as paths that "still
+  // proceed normally", because a wrapper cannot return the value those calls
+  // produce. tracker-issue.js can — it is a CLI, not a wrapper — so those paths
+  // are now gated and the honest remaining gap is Jira's raw-curl and MCP
+  // writes alone.
   assert.match(
     src,
     /GitHub board-field helpers/,
-    "name the GitHub paths that ARE gated as of task.54",
+    "name the GitHub paths gated as of task.54",
   );
   assert.match(
     src,
-    /gh issue create/,
-    "and the GitHub calls that are still NOT gated — their stdout is captured by the caller",
+    /tracker-issue\.js/,
+    "and the GitHub issue lifecycle, gated as of task.56",
   );
+  assert.match(
+    src,
+    /Atlassian MCP tools still proceed normally/,
+    "and the gap that genuinely remains — Jira raw curl and MCP",
+  );
+
   assert.doesNotMatch(
     src,
     /all GitHub issue and PR writes/,
-    "task.54 gated `gh issue comment` and friends; the old blanket claim is now stale",
+    "task.54 gated `gh issue comment` and friends; that blanket claim is stale",
+  );
+  assert.doesNotMatch(
+    src,
+    /GitHub calls whose output the caller captures[^.]*still proceed normally/,
+    "task.56 gated those too — claiming they are ungated now UNDERSTATES coverage, " +
+      "which sends an operator hunting for a mutation the run already recorded",
   );
 });
 
@@ -1008,6 +1026,19 @@ test("§12 every bundled copy of a file this change touches carries the change",
       .map((s) => path.join(REPO, "skills", s, "references", name))
       .filter((f) => fs.existsSync(f));
 
+  // The expected count is READ FROM THE SOURCE rather than written here as a
+  // literal. The check is "does the bundled copy match what shipped?", and a
+  // hard-coded number answers a different question — "does it match what
+  // somebody typed into this test?" — which goes stale on its own schedule. It
+  // did: task.56 took the roster to 23 and this line still said 22, so the
+  // suite failed on a bundle that was in fact correct.
+  const sourceDefer = fs.readFileSync(
+    path.join(SHARED, "defer-mutation.js"),
+    "utf8",
+  );
+  const expectedCount = /EXPECTED_KIND_COUNT = (\d+)/.exec(sourceDefer);
+  assert.ok(expectedCount, "the source must declare EXPECTED_KIND_COUNT");
+
   const deferCopies = bundled("defer-mutation.js");
   assert.ok(
     deferCopies.length > 0,
@@ -1016,7 +1047,7 @@ test("§12 every bundled copy of a file this change touches carries the change",
   for (const f of deferCopies) {
     assert.match(
       fs.readFileSync(f, "utf8"),
-      /EXPECTED_KIND_COUNT = 22/,
+      new RegExp(`EXPECTED_KIND_COUNT = ${expectedCount[1]}`),
       `${path.relative(REPO, f)} is stale — run \`npm run bundle\``,
     );
   }
@@ -1028,11 +1059,26 @@ test("§12 every bundled copy of a file this change touches carries the change",
     "the roster doc and its parser must be bundled together — defer-mutation.js " +
       "reads the doc from its own directory at run time",
   );
+  // Same rule as above: the total comes from the source doc, not from a literal.
+  const sourceRoster = fs.readFileSync(
+    path.join(SHARED, "tracker-access-record.md"),
+    "utf8",
+  );
+  const expectedTotal = /\*\*Total: (\d+)\.\*\*/.exec(sourceRoster);
+  assert.ok(expectedTotal, "the source roster must declare a total");
+  assert.equal(
+    expectedTotal[1],
+    expectedCount[1],
+    "the roster doc's total and defer-mutation.js's EXPECTED_KIND_COUNT must " +
+      "agree in the SOURCE — they are one fact stored twice, and the writer " +
+      "throws at run time when they disagree",
+  );
+
   for (const f of rosterCopies) {
     const text = fs.readFileSync(f, "utf8");
     assert.match(
       text,
-      /\*\*Total: 22\.\*\*/,
+      new RegExp(`\\*\\*Total: ${expectedTotal[1]}\\.\\*\\*`),
       `${path.relative(REPO, f)} is stale`,
     );
     assert.match(

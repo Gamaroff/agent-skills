@@ -147,9 +147,11 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body > /tmp/issue-${ISSUE_N
 Diff `title`, `body`, `labels` against current GitHub state. The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create, including the `## Document` link block (using `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch. If anything changed, run:
 
 ```bash
-gh issue edit ${ISSUE_NUM} \
+printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+
+node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
-  --body-file <(printf '%s' "$NEW_BODY") \
+  --body-file .claude/state/issue-body.md \
   --add-label "priority:${priority}" \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
 ```
@@ -193,9 +195,9 @@ if [ "$CURRENT" != "$DESIRED" ]; then
   if [ "$DESIRED" = "closed" ]; then
     REASON=completed
     [ "$STATUS" = "cancelled" ] && REASON=not_planned
-    gh issue close ${STORY_ISSUE_NUM} --reason ${REASON}
+    node references/tracker-issue.js --kind close --issue ${STORY_ISSUE_NUM} --reason ${REASON}
   else
-    gh issue reopen ${STORY_ISSUE_NUM}
+    node references/tracker-issue.js --kind reopen --issue ${STORY_ISSUE_NUM}
   fi
 fi
 ```

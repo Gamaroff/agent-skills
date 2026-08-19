@@ -114,9 +114,11 @@ Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The bo
 If anything changed, run:
 
 ```bash
-gh issue edit ${ISSUE_NUM} \
+printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+
+node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Task ${TASK_N}] ${TASK_TITLE}" \
-  --body-file <(printf '%s' "$NEW_BODY") \
+  --body-file .claude/state/issue-body.md \
   --milestone "${MILESTONE_TITLE}" \
   --add-label "priority:${priority}" \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
@@ -159,9 +161,9 @@ if [ "$CURRENT" != "$DESIRED" ]; then
   if [ "$DESIRED" = "closed" ]; then
     REASON=completed
     [ "$STATUS" = "cancelled" ] && REASON=not_planned
-    gh issue close ${TASK_ISSUE_NUM} --reason ${REASON}
+    node references/tracker-issue.js --kind close --issue ${TASK_ISSUE_NUM} --reason ${REASON}
   else
-    gh issue reopen ${TASK_ISSUE_NUM}
+    node references/tracker-issue.js --kind reopen --issue ${TASK_ISSUE_NUM}
   fi
 fi
 ```
