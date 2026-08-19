@@ -5,7 +5,7 @@ type: task
 description: 'jira-sync.js has no comment function at all — there is a deliberate refusal in the source. Every Jira comment in this repository is an Atlassian MCP call made by an agent following prose, because there is no code path to intercept. This adds addComment() and a tracker-comment.js CLI covering both trackers, then replaces the ~20 inline prose comment blocks with one CLI call each. The MCP path survives as the documented no-credentials fallback, exactly as jira-stage.js already established. Load-bearing for restricted access, and independently valuable: it lets comments be retried by code rather than by the model.'
 tags: [restricted-access, jira, github, comments, cli, mcp]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: high
 created: 2026-08-17
@@ -20,7 +20,7 @@ github_issue: 233
 
 **GitHub Issue**: [#233](https://github.com/Gamaroff/agent-skills/issues/233)
 
-**Status**: In Progress
+**Status**: Ready for Review
 
 **Review**: ✅ All critical + important recommendations from `task.55.review.1.tracker-comment-cli.md` implemented 2026-08-19
 
@@ -306,28 +306,32 @@ the exact property `tracker-access-record.md` documents as a past bug.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-19
-**Quality Score**: 55/100
-**Gate Decision**: FAIL
+**Quality Score**: 92/100
+**Gate Decision**: PASS (cycle 2)
+**QA Cycles**: 2
 
-### QA Report
-- **Full Report**: [task.55.qa.1.tracker-comment-cli.md](./task.55.qa.1.tracker-comment-cli.md)
-- **Gate File**: [task.55.gate.1.tracker-comment-cli.yml](./task.55.gate.1.tracker-comment-cli.yml)
+### QA Reports
+- **Cycle 2 (final)**: [task.55.qa.2.tracker-comment-cli.md](./task.55.qa.2.tracker-comment-cli.md) · [gate](./task.55.gate.2.tracker-comment-cli.yml) — **PASS 92/100**
+- **Cycle 1**: [task.55.qa.1.tracker-comment-cli.md](./task.55.qa.1.tracker-comment-cli.md) · [gate](./task.55.gate.1.tracker-comment-cli.yml) — FAIL 55/100
 
 ### Test Coverage Summary
-- **Tests Executed**: 1483 node + 9 shell suites + validate:all (115) — all green
-- **Phases Verified**: 8/8 (4 PASS, 3 CONCERNS, 1 FAIL)
-- **Critical Issues**: 2 HIGH, 5 MEDIUM, 5 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 1512 node + 9 shell suites + validate:all (115) — all green
+- **Phases Verified**: 8/8
+- **Issues**: 12 found across two cycles, 12 closed — 3 HIGH, 7 MEDIUM, 7 LOW
+- **NFR Status**: Security PASS, Performance PASS, Reliability PASS, Maintainability PASS
 
 ### Key Findings
 
-Two HIGH bugs, both causing **silent content loss**, both invisible to a fully green suite — each found by executing the shipped code rather than by reading it:
+Twelve defects across two cycles, **every one mutation-proved** (reverting the fix turns a test red). Three were HIGH, and all three were the same failure mode — a silent loss that looks exactly like success, which is the harm this task exists to remove:
 
-1. **Marker prefix collision** — `--stage review` prefix-matches an existing `review-story` marker, so the Step 2 review comment reports `already` and is never posted. The exact "silent failure looks like success" harm this task exists to remove.
-2. **Multi-word fence info string** — ` ```js title="x" ` is not recognised as a fence, so the closing fence is read as an opening one and everything after it is swallowed.
+1. **Marker prefix collision** — `--stage review` prefix-matched an existing `review-story` marker, so the Step 2 review comment reported `already` and was never posted.
+2. **Multi-word fence info string** — ` ```js title="x" ` was not recognised as a fence, so the closing fence was read as an opening one and everything after it was swallowed.
+3. **The fix for (2) reintroduced (2)** — relaxing the pattern let backticks back in, so a prose line merely *beginning* with an inline code span became a fence. A real shipped document collapsed 31,235 characters into one code block. Closed by stating CommonMark's actual rule, with a regression test that renders the real file.
+
+Two further defects were found in the QA work itself: the parity guard initially **passed on the exact regression it names** (its `no-credentials` proximity window was pre-satisfied at every site), and two cycle-2 tests could not distinguish "never posted" from "post failed" because they threw on POST.
 
 ## Risk Assessment
 
@@ -407,6 +411,9 @@ Two adjacent defects surfaced, one of them pre-existing and worth its own follow
 | 2026-08-19 |  | Status → ready-for-development | review-task |
 | 2026-08-19 |  | Implemented — 45 files, 30 new tests (25 parity assertions), full suite green | develop |
 | 2026-08-19 |  | QA gate FAIL (55/100) — 2 HIGH, 5 MEDIUM, 5 LOW findings | qa-task |
+| 2026-08-19 |  | QA findings fixed — 7 of 7 cycle-1 issues, all mutation-proved | qa-fix |
+| 2026-08-19 |  | QA cycle 2 FAIL — the fence fix had reintroduced its own bug class; 5 new defects | qa-task |
+| 2026-08-19 |  | QA findings fixed — 5 of 5 cycle-2 defects; gate PASS (92/100), 2 cycles | qa-fix |
 
 ## References
 

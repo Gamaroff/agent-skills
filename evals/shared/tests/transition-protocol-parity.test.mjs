@@ -571,7 +571,10 @@ function normaliseBundled(text) {
 }
 
 function isAllowlisted(file) {
-  const rel = file.slice(repoRoot.length + 1).split("\\").join("/");
+  const rel = file
+    .slice(repoRoot.length + 1)
+    .split("\\")
+    .join("/");
   if (MCP_COMMENT_ALLOWLIST.includes(rel)) return true;
   // A bundled COPY of an allowlisted doc is exempt — but by CONTENT, not by
   // filename. Matching on `endsWith("/references/<basename>")` alone let any
@@ -673,9 +676,16 @@ test("each pipeline comment site positively invokes tracker-comment.js", () => {
     "shared/resources/develop-pipeline-step-7-finalise.md",
   ];
   const missing = REQUIRED.filter(
-    (rel) => !readFileSync(join(repoRoot, rel), "utf-8").includes("tracker-comment.js"),
+    (rel) =>
+      !readFileSync(join(repoRoot, rel), "utf-8").includes(
+        "tracker-comment.js",
+      ),
   );
-  assert.deepEqual(missing, [], `step doc(s) no longer comment at all: ${missing.join(", ")}`);
+  assert.deepEqual(
+    missing,
+    [],
+    `step doc(s) no longer comment at all: ${missing.join(", ")}`,
+  );
 });
 
 test("tracker-comment.js is bundled wherever a skill invokes it", () => {
@@ -698,7 +708,10 @@ test("tracker-comment.js is bundled wherever a skill invokes it", () => {
       // passes missed precisely because they excluded this directory. The
       // bundler's own AUTO-GENERATED banner is the discriminator: no banner
       // means the file is source.
-      if (rel.split(/[\\/]/).includes("references") && body.includes("AUTO-GENERATED")) {
+      if (
+        rel.split(/[\\/]/).includes("references") &&
+        body.includes("AUTO-GENERATED")
+      ) {
         return false;
       }
       return body.includes("tracker-comment.js");
@@ -738,7 +751,12 @@ test("the duplicated marker helpers agree across both modules", () => {
       `markerText drifted for "${stage}"`,
     );
   }
-  for (const body of ["## Heading\nbody", "**bold** start", "", "x".repeat(300)]) {
+  for (const body of [
+    "## Heading\nbody",
+    "**bold** start",
+    "",
+    "x".repeat(300),
+  ]) {
     assert.equal(
       cli.firstLineOf(body),
       lib.firstLineOf(body),

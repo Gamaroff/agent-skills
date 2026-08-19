@@ -897,7 +897,8 @@ function textToAdfNodes(text, linkResolver) {
   // An unterminated fence still yields a code block rather than being dropped:
   // truncated input is common (the description cap cuts mid-document), and a
   // silently vanished listing is worse than an unclosed one.
-  if (fenceBuf !== null) nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
+  if (fenceBuf !== null)
+    nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
   flushBuf();
   flushTable();
   return nodes.filter(Boolean);

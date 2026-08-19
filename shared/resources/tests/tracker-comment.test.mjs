@@ -87,7 +87,13 @@ function stubGh({ comments = [], viewFails = false, postFails = false } = {}) {
     // The paginated read is the primary path; `issue view` is the fallback.
     if (argv[0] === "api") {
       if (viewFails) throw new Error("gh api failed");
-      return comments.map((c) => String(c.body || "").split("\n").join(" ")).join("\n");
+      return comments
+        .map((c) =>
+          String(c.body || "")
+            .split("\n")
+            .join(" "),
+        )
+        .join("\n");
     }
     if (argv[0] === "issue" && argv[1] === "view") {
       if (viewFails) throw new Error("gh view failed");
@@ -117,7 +123,17 @@ for (const mode of RESTRICTED) {
     const dir = withRepo();
     const f = bodyFile(dir, "## Done\n\nAll good.");
     const r = await cli.run({
-      argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--stage",
+        "done",
+        "--quiet",
+      ],
       execImpl: explode("gh"),
       fetchImpl: explode("fetch"),
       repoRoot: dir,
@@ -136,7 +152,8 @@ for (const mode of RESTRICTED) {
 test("deferred record carries the body in command.stdin, never interpolated into argv", async () => {
   const dir = withRepo();
   // Every shell metacharacter that has ever mattered, in one body.
-  const nasty = "Backticks `x`, subshell $(rm -rf /), quote ' and \" and \\ and\nnewline";
+  const nasty =
+    "Backticks `x`, subshell $(rm -rf /), quote ' and \" and \\ and\nnewline";
   const f = bodyFile(dir, nasty);
   await cli.run({
     argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet"],
@@ -164,7 +181,17 @@ test("two different bodies on the same issue produce two records; the same body 
   const ids = [];
   for (const f of [a, b, a]) {
     const r = await cli.run({
-      argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--stage",
+        "done",
+        "--quiet",
+      ],
       execImpl: explode("gh"),
       repoRoot: dir,
       env: { ...baseEnv, ACCESS_TRACKER: "manual" },
@@ -174,7 +201,11 @@ test("two different bodies on the same issue produce two records; the same body 
   // The bug this guards: `fingerprint` once used argv alone, so two comments to
   // the same issue with identical argv collapsed to one id and a renderer
   // silently dropped one.
-  assert.notEqual(ids[0], ids[1], "different bodies must not collapse to one id");
+  assert.notEqual(
+    ids[0],
+    ids[1],
+    "different bodies must not collapse to one id",
+  );
   assert.equal(ids[0], ids[2], "an identical re-run must dedup, for resume");
 });
 
@@ -189,7 +220,11 @@ test("access.tracker unset reads as full — the gate is inert for ordinary cons
     env: { ...baseEnv },
   });
   assert.equal(r.reason, "posted");
-  assert.equal(readJournal(dir).length, 0, "nothing deferred under full access");
+  assert.equal(
+    readJournal(dir).length,
+    0,
+    "nothing deferred under full access",
+  );
 });
 
 // ── Marker cardinality ──────────────────────────────────────────────────────
@@ -199,7 +234,17 @@ test("no marker match → posts, with the marker prepended as the first line", a
   const f = bodyFile(dir, "## PR opened\n\nSee #42.");
   const gh = stubGh({ comments: [{ body: "unrelated chatter" }] });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "in-review", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "in-review",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -226,7 +271,17 @@ test("exactly one marker match → reason 'already', nothing posted twice", asyn
     comments: [{ body: `${cli.markerHtml("done")}\nearlier run` }],
   });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -249,7 +304,17 @@ test("two marker matches → 'unverifiable', never 'already', and nothing posted
     ],
   });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -267,7 +332,17 @@ test("an unreadable comment list → 'unverifiable', not a blind post", async ()
   const f = bodyFile(dir, "body");
   const gh = stubGh({ viewFails: true });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -323,7 +398,16 @@ test("--strict turns a skip into exit 1, but never turns 'already' into one", as
     throw new Error("no write");
   };
   const strict = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet", "--strict"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--quiet",
+      "--strict",
+    ],
     execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -332,7 +416,18 @@ test("--strict turns a skip into exit 1, but never turns 'already' into one", as
 
   const gh = stubGh({ comments: [{ body: `${cli.markerHtml("done")}\nx` }] });
   const already = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet", "--strict"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+      "--strict",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -344,7 +439,18 @@ test("--dry-run reads nothing and writes nothing", async () => {
   const dir = withRepo();
   const f = bodyFile(dir, "body");
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--dry-run", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--dry-run",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: explode("fetch"),
     repoRoot: dir,
@@ -359,7 +465,16 @@ test("--dry-run is exempt from the access gate (it mutates nothing)", async () =
   const dir = withRepo();
   const f = bodyFile(dir, "body");
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--dry-run", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--dry-run",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     repoRoot: dir,
     env: { ...baseEnv, ACCESS_TRACKER: "manual" },
@@ -401,7 +516,15 @@ test("a non-numeric issue on GitHub is a usage error", () => {
   const dir = withRepo({ "b.md": "hi" });
   const r = spawnSync(
     process.execPath,
-    [CLI_PATH, "--issue", "PROJ-1", "--body-file", join(dir, "b.md"), "--tracker", "github"],
+    [
+      CLI_PATH,
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      join(dir, "b.md"),
+      "--tracker",
+      "github",
+    ],
     { cwd: dir, encoding: "utf8" },
   );
   assert.equal(r.status, 2);
@@ -532,12 +655,26 @@ test("a stage that PREFIXES another stage does not match its marker", async () =
     comments: [{ body: `${cli.markerHtml("review-story")}\nearlier` }],
   });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "review", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "review",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
   });
-  assert.equal(r.reason, "posted", "`review` must not be suppressed by `review-story`");
+  assert.equal(
+    r.reason,
+    "posted",
+    "`review` must not be suppressed by `review-story`",
+  );
   assert.ok(gh.calls.some((c) => c.argv[1] === "comment"));
 });
 
@@ -548,7 +685,17 @@ test("qa-cycle does not match qa-cycle-2", async () => {
     comments: [{ body: `${cli.markerHtml("qa-cycle-2")}\ncycle two` }],
   });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "qa-cycle", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "qa-cycle",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -561,8 +708,14 @@ test("the Jira footer marker matches exactly, not by prefix", () => {
   // cannot be an HTML comment), so substring matching cannot separate
   // `…:review` from `…:review-story`. Exact text-node equality can.
   const doc = jira.buildCommentAdf("body", "review-story");
-  assert.equal(jira.adfContainsExactText(doc, jira.commentMarkerText("review")), false);
-  assert.equal(jira.adfContainsExactText(doc, jira.commentMarkerText("review-story")), true);
+  assert.equal(
+    jira.adfContainsExactText(doc, jira.commentMarkerText("review")),
+    false,
+  );
+  assert.equal(
+    jira.adfContainsExactText(doc, jira.commentMarkerText("review-story")),
+    true,
+  );
 });
 
 test("jira: a prefixing stage does not match through the real search path", async () => {
@@ -575,13 +728,27 @@ test("jira: a prefixing stage does not match through the real search path", asyn
   const f = bodyFile(dir, "Step 2 review body");
   const j = stubJira({ comments: [jiraComment("review-story")] });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "review", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "review",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
     env: { ...JIRA_ENV },
   });
-  assert.equal(r.reason, "posted", "`review` must not be suppressed by `review-story`");
+  assert.equal(
+    r.reason,
+    "posted",
+    "`review` must not be suppressed by `review-story`",
+  );
   assert.ok(j.calls.some((c) => c.method === "POST"));
 });
 
@@ -604,10 +771,22 @@ test("--stage does not swallow the following flag", () => {
   const dir = withRepo({ "b.md": "hi" });
   const r = spawnSync(
     process.execPath,
-    [CLI_PATH, "--issue", "42", "--body-file", join(dir, "b.md"), "--stage", "--json"],
+    [
+      CLI_PATH,
+      "--issue",
+      "42",
+      "--body-file",
+      join(dir, "b.md"),
+      "--stage",
+      "--json",
+    ],
     { cwd: dir, encoding: "utf8", env: { ...process.env, TRACKER: "github" } },
   );
-  assert.equal(r.status, 2, "swallowing --json would also suppress the JSON the caller parses");
+  assert.equal(
+    r.status,
+    2,
+    "swallowing --json would also suppress the JSON the caller parses",
+  );
 });
 
 // ── Stage validation (QA-5) ─────────────────────────────────────────────────
@@ -616,12 +795,26 @@ test("an unknown --stage is a usage error", async () => {
   const dir = withRepo();
   const f = bodyFile(dir, "body");
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "totally-made-up", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "totally-made-up",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     repoRoot: dir,
     env: { ...baseEnv },
   });
-  assert.equal(r.exitCode, 2, "an unlisted stage produces a permanently un-deduplicable marker");
+  assert.equal(
+    r.exitCode,
+    2,
+    "an unlisted stage produces a permanently un-deduplicable marker",
+  );
 });
 
 test("a cycle-scoped stage may take a numeric suffix", () => {
@@ -658,30 +851,92 @@ const JIRA_ENV = {
 };
 
 /** A fetch stub answering the comment GET and POST. */
-function stubJira({ comments = [], total = null, getOk = true, postOk = true } = {}) {
+function stubJira({
+  comments = [],
+  total = null,
+  getOk = true,
+  postOk = true,
+} = {}) {
   const calls = [];
   const fetchImpl = async (url, opts = {}) => {
     calls.push({ url, method: opts.method || "GET", body: opts.body });
     if ((opts.method || "GET") === "GET") {
-      if (!getOk) return { ok: false, status: 500, async json() { return {}; }, async text() { return ""; }, headers: { get: () => null } };
-      const payload = { comments, total: total === null ? comments.length : total };
-      return { ok: true, status: 200, async json() { return payload; }, async text() { return JSON.stringify(payload); }, headers: { get: () => null } };
+      if (!getOk)
+        return {
+          ok: false,
+          status: 500,
+          async json() {
+            return {};
+          },
+          async text() {
+            return "";
+          },
+          headers: { get: () => null },
+        };
+      const payload = {
+        comments,
+        total: total === null ? comments.length : total,
+      };
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return payload;
+        },
+        async text() {
+          return JSON.stringify(payload);
+        },
+        headers: { get: () => null },
+      };
     }
-    if (!postOk) return { ok: false, status: 400, async json() { return { errorMessages: ["nope"] }; }, async text() { return "nope"; }, headers: { get: () => null } };
-    return { ok: true, status: 201, async json() { return { id: "10001" }; }, async text() { return "{}"; }, headers: { get: () => null } };
+    if (!postOk)
+      return {
+        ok: false,
+        status: 400,
+        async json() {
+          return { errorMessages: ["nope"] };
+        },
+        async text() {
+          return "nope";
+        },
+        headers: { get: () => null },
+      };
+    return {
+      ok: true,
+      status: 201,
+      async json() {
+        return { id: "10001" };
+      },
+      async text() {
+        return "{}";
+      },
+      headers: { get: () => null },
+    };
   };
   return { fetchImpl, calls };
 }
 
-const jiraComment = (stage) =>
-  ({ id: "1", body: jira.buildCommentAdf("prior", stage) });
+const jiraComment = (stage) => ({
+  id: "1",
+  body: jira.buildCommentAdf("prior", stage),
+});
 
 test("jira: no marker match → posts via REST, and the body is ADF", async () => {
   const dir = withRepo();
   const f = bodyFile(dir, "## Done\n\nAccepted.");
   const j = stubJira({ comments: [] });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
@@ -692,7 +947,9 @@ test("jira: no marker match → posts via REST, and the body is ADF", async () =
   assert.ok(post, "a POST was made");
   const sent = JSON.parse(post.body);
   assert.equal(sent.body.type, "doc", "ADF document, not a plain string");
-  assert.ok(jira.adfContainsExactText(sent.body, jira.commentMarkerText("done")));
+  assert.ok(
+    jira.adfContainsExactText(sent.body, jira.commentMarkerText("done")),
+  );
 });
 
 test("jira: exactly one marker match → already, nothing posted", async () => {
@@ -700,7 +957,17 @@ test("jira: exactly one marker match → already, nothing posted", async () => {
   const f = bodyFile(dir, "body");
   const j = stubJira({ comments: [jiraComment("done")] });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
@@ -715,7 +982,17 @@ test("jira: two marker matches → unverifiable, nothing posted", async () => {
   const f = bodyFile(dir, "body");
   const j = stubJira({ comments: [jiraComment("done"), jiraComment("done")] });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
@@ -731,7 +1008,17 @@ test("jira: an unreadable comment list → unverifiable, not a blind post", asyn
   const f = bodyFile(dir, "body");
   const j = stubJira({ getOk: false });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
@@ -749,7 +1036,17 @@ test("jira: a TRUNCATED comment list is unverifiable, never a blind post (QA-7)"
   const f = bodyFile(dir, "body");
   const j = stubJira({ comments: [], total: 250 });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
@@ -764,7 +1061,17 @@ test("jira: a failed POST reports unverifiable", async () => {
   const f = bodyFile(dir, "body");
   const j = stubJira({ comments: [], postOk: false });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
@@ -792,7 +1099,17 @@ test("jira: a restricted mode defers with the jira.comment.add kind", async () =
   const dir = withRepo();
   const f = bodyFile(dir, "body");
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: explode("fetch"),
     repoRoot: dir,
@@ -815,8 +1132,15 @@ test("a multi-word info string is a fence, and the tail is not swallowed", () =>
   const nodes = jira.textToAdfNodes(
     'intro\n\n```js title="x"\nconst a = 1;\n```\n\ntail prose',
   );
-  assert.deepEqual(nodes.map((n) => n.type), ["paragraph", "codeBlock", "paragraph"]);
-  assert.equal(nodes[1].attrs.language, "js", "only the first token is the language");
+  assert.deepEqual(
+    nodes.map((n) => n.type),
+    ["paragraph", "codeBlock", "paragraph"],
+  );
+  assert.equal(
+    nodes[1].attrs.language,
+    "js",
+    "only the first token is the language",
+  );
   assert.equal(nodes[1].content[0].text, "const a = 1;");
   assert.equal(nodes[2].content[0].text, "tail prose", "the tail survives");
 });
@@ -824,13 +1148,19 @@ test("a multi-word info string is a fence, and the tail is not swallowed", () =>
 test("a 4-backtick fence is not closed by a 3-backtick line", () => {
   // Three shipped documents in this repo nest ``` inside ````.
   const nodes = jira.textToAdfNodes("````\na\n```\nb\n````");
-  assert.deepEqual(nodes.map((n) => n.type), ["codeBlock"]);
+  assert.deepEqual(
+    nodes.map((n) => n.type),
+    ["codeBlock"],
+  );
   assert.equal(nodes[0].content[0].text, "a\n```\nb");
 });
 
 test("a closing fence carrying an info string does not close", () => {
   const nodes = jira.textToAdfNodes("```\na\n```js\nb\n```");
-  assert.deepEqual(nodes.map((n) => n.type), ["codeBlock"]);
+  assert.deepEqual(
+    nodes.map((n) => n.type),
+    ["codeBlock"],
+  );
   assert.ok(nodes[0].content[0].text.includes("```js"));
 });
 
@@ -842,15 +1172,24 @@ test("a prose line opening with an inline code span is NOT a fence (NEW-1)", () 
   // into a single code block. CommonMark's actual rule is that a BACKTICK
   // fence's info string may not contain a backtick; tilde fences are exempt,
   // because `~` cannot open a code span.
-  assert.equal(jira.matchCodeFence("```` ``` ```` or `~~~` fenced block."), null);
+  assert.equal(
+    jira.matchCodeFence("```` ``` ```` or `~~~` fenced block."),
+    null,
+  );
   assert.equal(jira.matchCodeFence("``` `x` ```"), null);
   // ...while the shapes that ARE fences still are.
   assert.deepEqual(jira.matchCodeFence("```"), { delim: "```", lang: "" });
   assert.deepEqual(jira.matchCodeFence("```js"), { delim: "```", lang: "js" });
-  assert.deepEqual(jira.matchCodeFence('```js title="x"'), { delim: "```", lang: "js" });
+  assert.deepEqual(jira.matchCodeFence('```js title="x"'), {
+    delim: "```",
+    lang: "js",
+  });
   assert.deepEqual(jira.matchCodeFence("````"), { delim: "````", lang: "" });
   // A tilde fence MAY carry a backtick in its info string.
-  assert.deepEqual(jira.matchCodeFence("~~~ `x`"), { delim: "~~~", lang: "`x`" });
+  assert.deepEqual(jira.matchCodeFence("~~~ `x`"), {
+    delim: "~~~",
+    lang: "`x`",
+  });
 });
 
 test("a real shipped document round-trips without collapsing (NEW-1)", () => {
@@ -859,7 +1198,10 @@ test("a real shipped document round-trips without collapsing (NEW-1)", () => {
   // shape only appears in prose nobody thought to write down.
   const md = readFileSync(
     join(
-      __dirname, "..", "..", "..",
+      __dirname,
+      "..",
+      "..",
+      "..",
       "docs/tasks/task.42.change-log-spec-and-engine/task.42.change-log-spec-and-engine.md",
     ),
     "utf8",
@@ -882,9 +1224,16 @@ test("the renderer never treats as a fence something the extractor would not", (
   // what pushed the renderer to over-match.
   const RE_FENCE = /^\s*(```|~~~)/;
   for (const line of [
-    "```", "```js", '```js title="x"', "````", "~~~", "~~~python",
-    "   ```bash extra words here", "```` ``` ```` or `~~~` fenced block.",
-    "not a fence", "`inline`",
+    "```",
+    "```js",
+    '```js title="x"',
+    "````",
+    "~~~",
+    "~~~python",
+    "   ```bash extra words here",
+    "```` ``` ```` or `~~~` fenced block.",
+    "not a fence",
+    "`inline`",
   ]) {
     if (jira.matchCodeFence(line)) {
       assert.ok(RE_FENCE.test(line), `renderer matched a non-fence: ${line}`);
@@ -912,16 +1261,47 @@ test("jira: a comment list with no `total` fails CLOSED (NEW-2)", async () => {
   const posts = [];
   const fetchImpl = async (url, opts = {}) => {
     if ((opts.method || "GET") === "GET") {
-      return { ok: true, status: 200, async json() { return { comments: [] }; },
-               async text() { return "{}"; }, headers: { get: () => null } };
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { comments: [] };
+        },
+        async text() {
+          return "{}";
+        },
+        headers: { get: () => null },
+      };
     }
     posts.push(url);
-    return { ok: true, status: 201, async json() { return { id: "1" }; },
-             async text() { return "{}"; }, headers: { get: () => null } };
+    return {
+      ok: true,
+      status: 201,
+      async json() {
+        return { id: "1" };
+      },
+      async text() {
+        return "{}";
+      },
+      headers: { get: () => null },
+    };
   };
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
-    execImpl: explode("gh"), fetchImpl, repoRoot: dir, env: { ...JIRA_ENV },
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
   });
   assert.equal(posts.length, 0, "must not post on a list it could not verify");
   assert.equal(r.reason, "unverifiable");
@@ -938,17 +1318,33 @@ test("github: the comment read is paginated, and a partial read is unverifiable 
     if (argv[0] === "auth") return "";
     if (argv[0] === "repo") return "owner/repo";
     if (argv[0] === "api") throw new Error("no --paginate on this gh");
-    if (argv[0] === "issue" && argv[1] === "view") return JSON.stringify({ comments: [] });
+    if (argv[0] === "issue" && argv[1] === "view")
+      return JSON.stringify({ comments: [] });
     // Recorded, not thrown — a thrown post is also `unverifiable`, so throwing
     // could not tell "never posted" from "tried and failed".
     if (argv[0] === "issue" && argv[1] === "comment") return "";
     throw new Error(`unexpected gh call: ${argv.join(" ")}`);
   };
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
-    execImpl, repoRoot: dir, env: { ...baseEnv },
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
   });
-  assert.ok(seen.some((c) => c.startsWith("api --paginate")), "tried the paginated read first");
+  assert.ok(
+    seen.some((c) => c.startsWith("api --paginate")),
+    "tried the paginated read first",
+  );
   assert.ok(
     !seen.some((c) => c.startsWith("issue comment")),
     "must not post on the strength of a partial list",
@@ -965,13 +1361,27 @@ test("github: the paginated read finds a marker across pages (NEW-3)", async () 
     if (argv[0] === "repo") return "owner/repo";
     if (argv[0] === "api") {
       // 120 comments, the marked one last — beyond a single unpaginated window.
-      return [...Array(119).fill("chatter"), `${marker}\nposted earlier`].join("\n");
+      return [...Array(119).fill("chatter"), `${marker}\nposted earlier`].join(
+        "\n",
+      );
     }
     throw new Error("should not post");
   };
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "done", "--quiet"],
-    execImpl, repoRoot: dir, env: { ...baseEnv },
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
   });
   assert.equal(r.reason, "already");
 });

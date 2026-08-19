@@ -212,7 +212,8 @@ function repoRootOf(repoRoot) {
 function resolveTracker(explicit, env = process.env) {
   const want = (explicit || env.TRACKER || "").trim().toLowerCase();
   if (want === "jira" || want === "github") return want;
-  if (want) throw new Error(`Unknown tracker: "${want}" (expected jira|github)`);
+  if (want)
+    throw new Error(`Unknown tracker: "${want}" (expected jira|github)`);
   return env.JIRA_URL ? "jira" : "github";
 }
 
@@ -349,7 +350,11 @@ function ghFindMarker(execImpl, issue, marker) {
   let repo = "";
   try {
     repo = String(
-      execImpl("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], GIT_EXEC_OPTS),
+      execImpl(
+        "gh",
+        ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+        GIT_EXEC_OPTS,
+      ),
     ).trim();
   } catch (_) {
     /* fall through to the partial read */
@@ -378,7 +383,11 @@ function ghFindMarker(execImpl, issue, marker) {
 
   try {
     const data = JSON.parse(
-      execImpl("gh", ["issue", "view", String(issue), "--json", "comments"], GIT_EXEC_OPTS),
+      execImpl(
+        "gh",
+        ["issue", "view", String(issue), "--json", "comments"],
+        GIT_EXEC_OPTS,
+      ),
     );
     const hits = (data.comments || []).filter((c) =>
       String(c.body || "").includes(marker),
@@ -457,7 +466,9 @@ async function run({
   try {
     body = fs.readFileSync(args.bodyFile, "utf-8");
   } catch (e) {
-    output.err(`Error: cannot read --body-file "${args.bodyFile}": ${e.message}`);
+    output.err(
+      `Error: cannot read --body-file "${args.bodyFile}": ${e.message}`,
+    );
     return { exitCode: 2 };
   }
   // CRLF is normalised once, here, so neither branch has to think about it and
@@ -581,7 +592,17 @@ async function run({
   }
 
   return tracker === "jira"
-    ? runJira({ args, issue, body, output, emit, env, root, fetchImpl, skipCode })
+    ? runJira({
+        args,
+        issue,
+        body,
+        output,
+        emit,
+        env,
+        root,
+        fetchImpl,
+        skipCode,
+      })
     : runGithub({ args, issue, body, output, emit, execImpl, skipCode });
 }
 
@@ -590,7 +611,9 @@ async function run({
 // ---------------------------------------------------------------------------
 function runGithub({ args, issue, body, output, emit, execImpl, skipCode }) {
   if (!ghAvailable(execImpl)) {
-    output.info("ℹ️  gh is unavailable or unauthenticated — no comment posted.");
+    output.info(
+      "ℹ️  gh is unavailable or unauthenticated — no comment posted.",
+    );
     return emit({ posted: false, reason: "no-credentials" }, skipCode);
   }
 
@@ -641,9 +664,14 @@ function runGithub({ args, issue, body, output, emit, execImpl, skipCode }) {
     });
   } catch (e) {
     output.warn(`⚠️  gh issue comment failed: ${e.message}`);
-    return emit({ posted: false, reason: "unverifiable", cause: "post-failed" }, skipCode);
+    return emit(
+      { posted: false, reason: "unverifiable", cause: "post-failed" },
+      skipCode,
+    );
   }
-  output.info(`💬 Commented on #${issue}${args.stage ? ` (${args.stage})` : ""}.`);
+  output.info(
+    `💬 Commented on #${issue}${args.stage ? ` (${args.stage})` : ""}.`,
+  );
   return emit({ posted: true, reason: "posted" }, 0);
 }
 
@@ -701,7 +729,10 @@ async function runJira({
   if (args.stage) {
     let found;
     try {
-      found = await jira.findCommentsByMarker({ ...common, momentId: args.stage });
+      found = await jira.findCommentsByMarker({
+        ...common,
+        momentId: args.stage,
+      });
     } catch (e) {
       output.warn(`⚠️  Could not read comments on ${issue}: ${e.message}`);
       return emit(
@@ -758,7 +789,9 @@ async function runJira({
       0,
     );
   }
-  output.info(`💬 Commented on ${issue}${args.stage ? ` (${args.stage})` : ""}.`);
+  output.info(
+    `💬 Commented on ${issue}${args.stage ? ` (${args.stage})` : ""}.`,
+  );
   return emit({ posted: true, reason: "posted", id: result.id || null }, 0);
 }
 
