@@ -49,32 +49,63 @@ test("a feature branch targeting main is REFUSED — the rule this guard exists 
   const r = decide("main", "feature/task.99");
   assert.notEqual(r.status, 0);
   assert.match(r.stdout + r.stderr, /not an allowed source branch/);
-  assert.match(r.stdout + r.stderr, /gh pr edit/, "the refusal must name the fix");
+  assert.match(
+    r.stdout + r.stderr,
+    /gh pr edit/,
+    "the refusal must name the fix",
+  );
 });
 
 test("THE REGRESSION: a non-main base PASSES, so a retarget clears the earlier failure", () => {
   // With `branches: [main]` in the trigger this case never ran at all, so a failure
   // recorded while the PR pointed at `main` could never be superseded.
-  for (const head of ["fix/whatever", "feature/task.99", "chore/x", "develop"]) {
+  for (const head of [
+    "fix/whatever",
+    "feature/task.99",
+    "chore/x",
+    "develop",
+  ]) {
     const r = decide("develop", head);
-    assert.equal(r.status, 0, `base=develop head=${head} must pass — it is not this policy's business`);
+    assert.equal(
+      r.status,
+      0,
+      `base=develop head=${head} must pass — it is not this policy's business`,
+    );
     assert.match(r.stdout, /does not apply/);
   }
 });
 
 test("the base check is LOAD-BEARING — without it a develop-targeted PR is condemned", () => {
   // Mutation: drop the base guard and confirm the same input flips to a failure.
-  const mutated = policyBody().replace(/if \[ "\$BASE_REF" != "main" \][\s\S]*?fi\n/, "");
-  assert.notEqual(mutated, policyBody(), "mutation did not apply — the base guard moved?");
+  const mutated = policyBody().replace(
+    /if \[ "\$BASE_REF" != "main" \][\s\S]*?fi\n/,
+    "",
+  );
+  assert.notEqual(
+    mutated,
+    policyBody(),
+    "mutation did not apply — the base guard moved?",
+  );
   const r = spawnSync("bash", ["-c", mutated], {
     encoding: "utf8",
-    env: { PATH: "/usr/bin:/bin", BASE_REF: "develop", HEAD_REF: "fix/whatever" },
+    env: {
+      PATH: "/usr/bin:/bin",
+      BASE_REF: "develop",
+      HEAD_REF: "fix/whatever",
+    },
   });
-  assert.notEqual(r.status, 0, "without the base guard this input must fail — proving the guard does the work");
+  assert.notEqual(
+    r.status,
+    0,
+    "without the base guard this input must fail — proving the guard does the work",
+  );
 });
 
 test("the trigger carries NO `branches:` filter — reinstating it reinstates the bug", () => {
-  const onBlock = SRC.slice(SRC.indexOf("\non:"), SRC.indexOf("\npermissions:"));
+  const onBlock = SRC.slice(
+    SRC.indexOf("\non:"),
+    SRC.indexOf("\npermissions:"),
+  );
   assert.ok(
     !/^\s{4}branches(-ignore)?:/m.test(onBlock),
     "a `branches:` filter on the trigger makes this guard unclearable after a retarget — see the header comment",
@@ -87,7 +118,10 @@ test("`edited` is still a trigger type — a develop→main retarget must be cau
 
 test("not-applicable is an explicit pass, never a job-level skip", () => {
   // A skipped job reports `skipped`; as a REQUIRED check that can hang a PR forever.
-  assert.ok(!/^\s{4}if:/m.test(SRC.slice(SRC.indexOf("jobs:"))), "the job must not be conditionally skipped");
+  assert.ok(
+    !/^\s{4}if:/m.test(SRC.slice(SRC.indexOf("jobs:"))),
+    "the job must not be conditionally skipped",
+  );
   assert.match(policyBody(), /exit 0/);
 });
 
@@ -95,5 +129,8 @@ test("branch names reach the shell via env, never `${{ }}` interpolation", () =>
   // A branch name is attacker-controlled on a fork PR.
   assert.match(SRC, /BASE_REF: \$\{\{ github\.base_ref \}\}/);
   assert.match(SRC, /HEAD_REF: \$\{\{ github\.head_ref \}\}/);
-  assert.ok(!/run:[\s\S]*\$\{\{ github\.(head|base)_ref \}\}/.test(SRC), "no ref interpolated into the run block");
+  assert.ok(
+    !/run:[\s\S]*\$\{\{ github\.(head|base)_ref \}\}/.test(SRC),
+    "no ref interpolated into the run block",
+  );
 });
