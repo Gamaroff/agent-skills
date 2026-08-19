@@ -237,10 +237,10 @@ The resolver says so on every restricted run:
 
 ```
 ⚠️  access.tracker=manual is PARTIALLY ENFORCED — Jira REST via jira-sync.js, the sprint scripts,
-    board/status moves, the GitHub board-field helpers and every gh mutation routed through
-    tracker_write are deferred and recorded, but Jira writes made by raw curl or the Atlassian
-    MCP tools, and the GitHub calls whose output the caller captures (gh issue create, sub-issue
-    links), still proceed normally.
+    board/status moves, the GitHub board-field helpers, every gh mutation routed through
+    tracker_write, and the GitHub issue lifecycle via tracker-issue.js (create, edit, close,
+    reopen, milestone, sub-issue link) are deferred and recorded, but Jira writes made by raw
+    curl or the Atlassian MCP tools still proceed normally.
 ```
 
 **Fix — read what was deferred, then either perform it or lift the restriction:**
@@ -259,6 +259,43 @@ Narrative, decision guide, and a walkthrough against this repo's board:
 [Restricted tracker access](../concepts/restricted-access.md),
 [Which access model?](../concepts/which-access.md),
 [Restricted access runbook](../runbooks/restricted-access.md).
+
+## I re-ran it and it did nothing again
+
+**Symptom:** a restricted run reported a `BLOCKING` action. You re-ran the same command and it
+reported exactly the same thing. Nothing changed either time, and nothing failed.
+
+**This is the expected behaviour, and it is the one place it looks most like a bug.**
+
+**Cause:** the blocked action produces a value the run cannot obtain for itself — an issue number
+from `gh issue create`, a milestone number. The run recorded the action and left the document's
+frontmatter **unwritten**, because it has nothing true to write there.
+
+Re-running cannot help on its own. The run has no way to learn the value except from the document,
+so a second run makes the same discovery and records the same action. That is the **two-run
+convergence**, and the middle step is the one that is easy to miss:
+
+1. Perform the action. The checklist gives the deep link and the exact fields:
+
+   ```bash
+   node .agents/skills/develop-task/references/handover-render.js --format md
+   ```
+
+   Blocking actions are at the **top**, under a `🚫 BLOCKING — do these first` banner.
+
+2. **Write the value it produced into the document's frontmatter** — `github_issue: 207`,
+   `jira_key: PROJ-42`. This is the step that makes the next run different.
+
+3. Re-run. The skill finds the field present and takes its ordinary update path.
+
+**Why no placeholder was written for you.** Writing `github_issue: 0` or `jira_key: <pending>`
+would let the run "continue", but the next run's idempotent lookup keys off that field: a wrong
+value makes it create a **second** issue rather than finding the first. A duplicate somebody has
+to notice and clean up is worse than a field left empty — so the run leaves it empty, says so,
+and tells you what to put there.
+
+Contract: [`tracker-issue-cli.md`](../../shared/resources/tracker-issue-cli.md) →
+*The two-run convergence*.
 
 **Not this:** a deferred create never writes a placeholder key to frontmatter. That is
 deliberate — a placeholder would break the idempotent `synced-from-*` label search and the next
