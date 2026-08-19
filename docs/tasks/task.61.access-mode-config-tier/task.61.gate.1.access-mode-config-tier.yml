@@ -1,0 +1,245 @@
+schema: 1
+task: "task.61.access-mode-config-tier"
+task_title: "[Task 61] Let the JavaScript gates read a config-declared access mode, with read-config.sh parity"
+gate: FAIL
+status_reason: >-
+  The feature works on the happy path and the parity corpus is genuinely green, but four
+  high-severity escalation paths survive it — each one resolving a declared restriction to a mode
+  MORE permissive than the config says, which is the exact failure this task exists to remove. One
+  (a `.env`-supplied BASH_ENV reaching the probe subshell) is additionally arbitrary code
+  execution. The corpus did not catch any of them because it compares the two readers under
+  different environments and has no fixture for an escape-spelled key.
+reviewer: "QA Engineer"
+updated: "2026-08-19T08:15:00Z"
+
+top_issues:
+  - id: T61-H1
+    issue: "probeResolver spreads the LIVE process.env into the child shell, after loadDotEnv() ran"
+    severity: high
+    finding: >-
+      jira-stage.js and gh-stage.js call loadDotEnv() BEFORE resolveAccessTracker, and loadDotEnv
+      copies every key from .env / .secrets/tooling.env into process.env. probeResolver builds the
+      child env as `{ ...process.env }` and deletes only the two ACCESS names, so BASH_ENV survives
+      — and `bash --noprofile --norc -c` sources $BASH_ENV. VERIFIED: with BASH_ENV pointing at a
+      file containing `ACCESS_TRACKER=full; source() { :; }`, a repo declaring `access.tracker:
+      manual` resolves to `full`. PATH is inheritable the same way, so a .env can substitute bash
+      outright. This defeats the pre-loadDotEnv snapshot that C5-CR1 exists to create, in the same
+      diff that claims to close C5-CR1.
+    suggested_action: >-
+      Build the child env from a strict allowlist (PATH, HOME, LANG, SKILLS_CONFIG_FILE) rather
+      than spreading process.env, and explicitly drop BASH_ENV, ENV, SHELLOPTS, BASHOPTS,
+      LD_PRELOAD and DYLD_*.
+    suggested_owner: dev
+
+  - id: T61-H2
+    issue: "The /access/i fast-path is not sound — an escape-spelled key escalates to full"
+    severity: high
+    finding: >-
+      readConfiguredAccessTracker skips the spawn when the file text has no `access` substring.
+      read-config.sh tier 1 is real PyYAML, which resolves `"\x61ccess":` (and `"access":`)
+      to the key `access`. VERIFIED on a tier-1 host: the shell resolves `manual`, the JS tier
+      resolves `full`, with no warning. The optimisation was making an authorisation decision.
+      Scoped: tier-2 hosts agree (both answer full), so this is tier-1-only — but tier 1 is
+      authoritative wherever it is available.
+    suggested_action: >-
+      Demote the text check to a performance hint that fails TOWARD spawning: skip only when the
+      file provably cannot declare access (no `access` substring AND no backslash escape AND no
+      quoted key AND no aliasing metacharacter AND pure ASCII). Mirror _rp_access_may_be_declared
+      rather than inventing a third grammar.
+    suggested_owner: dev
+
+  - id: T61-H3
+    issue: "jira-create-epic.js consults the config only when BOTH env names are empty"
+    severity: high
+    finding: >-
+      `if (!seen.length) return configMayRestrict() ? "manual" : "full";` — on the degraded (no
+      dm) path, AGENT_SKILLS_ACCESS_TRACKER=read-only plus a committed `access.tracker: manual`
+      resolves to `read-only`, strictly more permissive than the repo declares, and the epic
+      create proceeds. C5-CR4 was only half closed.
+    suggested_action: >-
+      Fold the config signal into the reduction unconditionally — `if (configMayRestrict())
+      seen.push("manual");` before the reduce — keeping `if (!seen.length) return "full";` after.
+    suggested_owner: dev
+
+  - id: T61-H4
+    issue: "The jira-sprint-lib.sh seam inherits the caller's cwd — the C5-CR6 bug, unfixed in shell"
+    severity: high
+    finding: >-
+      read-config.sh defaults SKILLS_CONFIG_FILE to the RELATIVE `skills-config.yaml`, and the
+      subshell inherits the caller's working directory. None of the jira-sprint-manager scripts cd
+      to the repo root, and the skill documents bare `manage-sprint-state.sh <id> closed`
+      invocations. VERIFIED: from the repo root the seam resolves `manual`; from `docs/` in the
+      same repo it resolves `full`. This is exactly the anchoring defect the JS side fixed in this
+      diff, left in place on the shell side.
+    suggested_action: >-
+      Anchor the subshell to the git top level before sourcing the resolver, falling back to the
+      current directory outside a checkout.
+    suggested_owner: dev
+
+  - id: T61-M1
+    issue: "jira-sprint-lib.sh fails OPEN when resolve-platform.sh is absent"
+    severity: medium
+    finding: >-
+      `if [ -f "$resolver" ]; then … fi` has no else branch, so on a partial bundle cfg_mode stays
+      empty, the loop skips it, and the gate resolves to `full`. The JS analogue fails CLOSED for
+      the identical condition. A fail-open divergence in an access control, in the one situation
+      where nothing can be verified.
+    suggested_action: 'Add an else branch setting cfg_mode="manual" and populating JSM_ACCESS_ERROR.'
+    suggested_owner: dev
+
+  - id: T61-M2
+    issue: "jira-sync.js injected-access clamp resolves against process.cwd()"
+    severity: medium
+    finding: >-
+      `const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);` was not given `cwd` while the
+      lazy `accessFor` path was. A caller passing `access: "full"` with a correct `cwd` while
+      standing in a subdirectory computes fromEnv === "full", so the injected "full" survives a
+      clamp whose comment promises it "may RESTRICT but never escalate".
+    suggested_action: "Pass the same anchor: mostRestrictiveAccess(ACCESS_ENV_AT_LOAD, cwd)."
+    suggested_owner: dev
+
+  - id: T61-M3
+    issue: "jira-stage.js constructs makeHttp without cwd, so its two gates can disagree"
+    severity: medium
+    finding: >-
+      `lib.makeHttp({ fetchImpl })` leaves layer 1 resolving against process.cwd() while the CLI
+      gate forty lines earlier uses `repoRoot || gitToplevel()`. Two gates in one run, two
+      answers.
+    suggested_action: "Hoist the anchor into a local and pass it to makeHttp as well."
+    suggested_owner: dev
+
+  - id: T61-M4
+    issue: "AGENT_SKILLS_CONFIG_TIER is forwarded as an unscrubbed loosening knob"
+    severity: medium
+    finding: >-
+      Forcing tier `python` on a host without pyyaml makes read-config.sh short-circuit to an
+      empty answer and grade the file `unverified`, so the resolver exits 0 with full over a
+      committed restriction. jira-create-epic.js forwards process.env wholesale and
+      jira-sprint-lib.sh unsets only the two ACCESS names, so both pass it through.
+    suggested_action: >-
+      Treat the tier hook as untrusted on the access path — scrub it unless an explicit test-only
+      opt-in is passed, and add it to the shell seam's unset list.
+    suggested_owner: dev
+
+  - id: T61-M5
+    issue: "The parity suite compares the two readers under DIFFERENT environments"
+    severity: medium
+    finding: >-
+      shellAnswer runs the resolver with `{ PATH, HOME }`; jsAnswer runs it with the full
+      process.env. The whole class of env-driven divergence — BASH_ENV, PATH, the tier hook — is
+      therefore structurally invisible to a suite whose stated purpose is parity. It is why H1 and
+      H2 both passed. The corpus also has no escape-spelled-key fixture and no unreadable-file
+      fixture, though chmodSync is imported for one.
+    suggested_action: >-
+      Give both sides the same explicit env, and add escaped-key, unicode-escaped-key,
+      unreadable-file and BASH_ENV fixtures.
+    suggested_owner: dev
+
+  - id: T61-L1
+    issue: "configMayRestrict diverges from the default-basename rule"
+    severity: low
+    finding: >-
+      `catch (_) { return Boolean(raw); }` treats SKILLS_CONFIG_FILE=skills-config.yaml as a
+      redirect, so with that value set and no file present the degraded path forces manual on a
+      repo that declares nothing. Fails safe, but diverges from the rule the rest of the diff
+      mirrors carefully.
+    suggested_action: 'return Boolean(raw) && raw !== "skills-config.yaml";'
+    suggested_owner: dev
+
+  - id: T61-L2
+    issue: "Memo key joins three unescaped strings with a space"
+    severity: low
+    finding: >-
+      `${cwd} ${file} ${tier}` can collide across distinct states when a path contains a space, and
+      a collision returns another state's cached answer.
+    suggested_action: "Key on JSON.stringify([cwd, file, tier])."
+    suggested_owner: dev
+
+  - id: T61-L3
+    issue: "The refusal warning misattributes non-access refusals to access.tracker"
+    severity: low
+    finding: >-
+      resolve-platform.sh also exits non-zero for an invalid tracker/vcs enum and for access.vcs
+      != full. A repo committing `access:\n  vcs: read-only` degrades every JS gate to manual
+      under a warning naming access.tracker.
+    suggested_action: "Neutralise the prefix; the verbatim resolver line already carries the cause."
+    suggested_owner: dev
+
+  - id: T61-L4
+    issue: "Matrix tests are vacuous by construction if TIERS or MATRIX is empty"
+    severity: low
+    finding: >-
+      eachCell iterates nothing and three tests pass green. The only guard is an assert inside the
+      root before() hook, one refactor away from disappearing. The SKIP line is console.error, not
+      a real runner skip.
+    suggested_action: "Count visited cells and assert a floor inside the tests themselves."
+    suggested_owner: dev
+
+  - id: T61-L5
+    issue: "access-config-parity.test.mjs fails prettier --check"
+    severity: low
+    finding: "The repo adopted Prettier in task 59 and ships `npm run format:check`."
+    suggested_action: "npm run format"
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 1416
+  phases_verified: "6/6"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3, 4, 5]
+
+nfr_validation:
+  security:
+    status: FAIL
+    notes: >-
+      Two verified escalation paths (T61-H1, T61-H2) and one partial (T61-H3, T61-H4) resolve a
+      declared restriction to a more permissive mode. T61-H1 is additionally arbitrary code
+      execution via a .env-supplied BASH_ENV reaching a subshell the change introduced.
+  performance:
+    status: PASS
+    notes: >-
+      Measured: a repo with no access key spawns nothing (0 ms); a restricted repo pays one 527 ms
+      subprocess per process, memoised thereafter. The common path is unaffected.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      The shell seam fails OPEN where the JS tier fails CLOSED (T61-M1), and the two gates inside
+      one jira-stage run can resolve different answers (T61-M3).
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The "does this file mention access" heuristic now exists in three places with three
+      different grammars. The shell's _rp_access_may_be_declared is the reviewed one and should be
+      the only one.
+
+recommendations:
+  immediate:
+    - action: "Allowlist the child env in probeResolver; drop BASH_ENV/ENV/SHELLOPTS/LD_PRELOAD"
+      refs: ["shared/resources/defer-mutation.js"]
+    - action: "Make the fast-path fail toward spawning; it must not be an authorisation decision"
+      refs: ["shared/resources/defer-mutation.js"]
+    - action: "Fold the config signal into the reduction unconditionally in the degraded path"
+      refs: ["skills/jira-epic-creator/scripts/jira-create-epic.js"]
+    - action: "Anchor the shell seam's subshell to the git top level"
+      refs: ["shared/resources/jira-sprint-lib.sh"]
+    - action: "Give both readers the same environment in the parity suite, and add the missing fixtures"
+      refs: ["shared/resources/tests/access-config-parity.test.mjs"]
+  future:
+    - action: "Export one access-may-be-declared predicate rather than three grammars"
+      refs: ["shared/resources/defer-mutation.js", "skills/jira-epic-creator/scripts/jira-create-epic.js"]
+    - action: "Memoise repoRootOrCwd; it shells out to git twice per gated operation"
+      refs: ["skills/jira-epic-creator/scripts/jira-create-epic.js"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "T61-H1..H4 fixed and mutation-proven"
+    - "Parity suite compares both readers under one environment"
+    - "Escaped-key and BASH_ENV fixtures added to the corpus and green"

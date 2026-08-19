@@ -5,7 +5,7 @@ type: task
 description: 'The access gates in JavaScript — jira-sync.js, the two stage CLIs, jira-epic-creator.js — resolve `access.tracker` from environment variables only. A restriction an operator commits to skills-config.yaml is therefore invisible to every bare `node …` invocation the sync and sprint skills document, and resolves to `full`. Task 53 attempted this inline and produced a high-severity divergence from read-config.sh in every review round it survived: fail-open on an unparseable file, then a throw that took down the read-only CLI modes, then three YAML shapes the subset parser silently drops. The lesson is that this is a parity problem, not a feature: the config tier must answer exactly what read-config.sh answers, for every input, or it must not exist. That parity is this task''s subject.'
 tags: [restricted-access, config, parser, fail-closed, security, parity]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: high
 created: 2026-08-19
@@ -350,6 +350,45 @@ already found five ways to get wrong.
 the environment exactly as they do today, which is the state task 53 landed in. No consumer that
 declares no `access:` key is affected either way.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-19
+**Quality Score**: 40/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.61.qa.1.access-mode-config-tier.md](./task.61.qa.1.access-mode-config-tier.md)
+- **Gate File**: [task.61.gate.1.access-mode-config-tier.yml](./task.61.gate.1.access-mode-config-tier.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1416 (all passing)
+- **Phases Verified**: 6/6 (3 with issues)
+- **Critical Issues**: 4 high, 5 medium, 5 low
+- **NFR Status**: Security: **FAIL**, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+Four high-severity paths resolve a declared restriction to a mode **more permissive** than the
+config says — the exact failure this task exists to remove:
+
+- **T61-H1** — `probeResolver` spreads the live `process.env` into the child shell *after*
+  `loadDotEnv()` ran, so a `.env`-supplied `BASH_ENV` is sourced by the subshell: a forged `full`
+  **and** arbitrary code execution. Defeats the very snapshot this change widened.
+- **T61-H2** — the `/access/i` fast-path is unsound: `"\x61ccess":` resolves to the key `access`
+  under PyYAML, so a tier-1 host reads `manual` in shell and `full` in JS.
+- **T61-H3** — `jira-create-epic.js` consults the config only when both env names are empty, so an
+  env value looser than the config wins. C5-CR4 only half closed.
+- **T61-H4** — the shell seam inherits the caller's cwd; from a subdirectory a committed `manual`
+  reads as `full`. C5-CR6, fixed in JS and left in shell.
+
+**T61-M5 is the finding behind the findings**: the parity corpus runs the shell reader with
+`{PATH, HOME}` and the JS reader with the full `process.env`, so it never compares them under one
+environment — which is why H1 and H2 both passed a suite built to catch exactly this.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -358,6 +397,7 @@ declares no `access:` key is affected either way.
 | 2026-08-19 | 1.1 | Review passed (8/10) — §6 restructured into six dependency-ordered phases with risk levels and checkboxes; §7 gained the fixture dir, the two sibling suites that pin env-only resolution, platform-detection.md and the bundle fan-out; C5-CR7 marked already-closed; GitHub issue #251 created and linked; Progress Tracking and References sections added | review-task |
 | 2026-08-19 |  | Status → ready-for-development | review-task |
 | 2026-08-19 |  | Implemented — 6 phases, 13 source/doc files + 32 new test files, 1416 tests green | develop |
+| 2026-08-19 |  | QA gate FAIL (40/100) — 14 findings: 4 high (2 escalation paths, 1 of them RCE), 5 medium, 5 low | qa-task |
 
 ---
 
