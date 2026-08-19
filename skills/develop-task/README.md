@@ -20,7 +20,7 @@ This document is structured for two audiences:
 | **Filesystem**           | task file (read/append `[x]`), implementation report (`task.{id}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<task-dir>/.summaries/step-*.json`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
 | **Git**                  | branch create, stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits                                                                                                                                                                                       |
 | **GitHub**               | `gh issue comment/close/view`, `gh pr view/comment`, board moves via `gh-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`; Priority auto-set inline), PR creation via `/create-pr`                                                                                                                                                                       |
-| **Jira**                 | `addCommentToJiraIssue`, status moves via `jira-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`). Atlassian MCP (`getTransitionsForJiraIssue`, `transitionJiraIssue`, `getJiraIssue`) is the **fallback only**, used when the CLI reports `no-credentials`                                                                                                                                                                                                        |
+| **Jira**                 | `tracker-comment.js`, status moves via `jira-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`). Atlassian MCP (`getTransitionsForJiraIssue`, `transitionJiraIssue`, `getJiraIssue`) is the **fallback only**, used when the CLI reports `no-credentials`                                                                                                                                                                                                        |
 | **Subagents (Explore)**  | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, post-fix tracker state poller                                                                                                  |
 | **Hooks**                | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission)                                                                                                                                                                         |
 
@@ -465,13 +465,13 @@ Same moments, same call sites, same off-by-default set — only the CLI differs.
 
 | Pipeline event | Moment              | Operation                                                                                          |
 | -------------- | ------------------- | ---------------------------------------------------------------------------------------------------- |
-| Step 1         | `work-started`      | `addCommentToJiraIssue` ("Pipeline started — branch:") + `jira-stage.js --stage work-started`       |
-| Step 4         | `in-review`         | `addCommentToJiraIssue` ("PR opened: …") + `jira-stage.js --stage in-review`                        |
+| Step 1         | `work-started`      | `tracker-comment.js --stage work-started` + `jira-stage.js --stage work-started`       |
+| Step 4         | `in-review`         | `tracker-comment.js --stage in-review` + `jira-stage.js --stage in-review`                        |
 | Step 5         | `in-qa`             | `jira-stage.js --stage in-qa` — once. *Off by default.*                                             |
 | Step 5b        | `changes-requested` | `jira-stage.js --stage changes-requested` — per cycle. *Off by default.*                            |
 | Step 6         | `ready-for-merge`   | `jira-stage.js --stage ready-for-merge`. *Off by default.*                                          |
 | Step 5b        | —                   | tracker state poller (Jira branch — board status read)                                              |
-| Step 7         | `done`              | `addCommentToJiraIssue` (DoD body) + `jira-stage.js --stage done`                                   |
+| Step 7         | `done`              | `tracker-comment.js --stage done` + `jira-stage.js --stage done`                                   |
 | Terminal HALT  | `blocked`           | `jira-stage.js --stage blocked` — real blockage only. *Off by default.*                             |
 | Pause hook     | —                   | **silent** — Jira posting requires authenticated MCP, unavailable from shell context                |
 

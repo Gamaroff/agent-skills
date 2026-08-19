@@ -192,14 +192,25 @@ Log in Decisions Log: "GitHub board: in-review → {landed / already / no-option
 
 > **MUST execute — pipeline action, not optional sync.** Do not skip on the basis of any user memory that says "Jira sync is manual" (e.g. `feedback_jira_sync_manual_only.md`). That rule applies only to `/create-epic`, `/create-story`, `/create-task` — never to develop-pipeline steps. This is the symmetric Jira counterpart to the GitHub `gh issue comment` posted by `create-pr` in the `TRACKER=github` path.
 
-After extracting the PR URL from `create-pr`'s output, use the Atlassian MCP tools:
+After extracting the PR URL from `create-pr`'s output:
 
-1. **Post PR-opened comment** — call `addCommentToJiraIssue`:
-   - `cloudId`: {hostname from `JIRA_URL`}
-   - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`: `"PR opened — {PR_URL}"`
-   - `contentFormat`: `"markdown"`
-   - On failure: log warning and continue (non-blocking)
+1. **Post PR-opened comment** — one call, both trackers:
+
+   ```bash
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+   PR opened — {PR_URL}
+   EOF
+
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+     --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+     --stage in-review --json
+   ```
+
+> Engine source: `shared/resources/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 2. **Signal the `in-review` stage** — run the deterministic CLI:
 

@@ -242,18 +242,24 @@ Log the result in the QA Iteration History section:
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
 
 **Issues found**: {count, or 'none'}
 {top 3 issues from gate file top_issues list, or 'No issues — proceeding to finalise'}
-**Action**: {Proceeding to finalise / Running qa-fix (cycle {N} of 5)}"
+**Action**: {Proceeding to finalise / Running qa-fix (cycle {N} of 5)}
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage qa-cycle-{N} --json
 ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
@@ -331,17 +337,20 @@ After fixes are applied:
 4a. **Post QA fix summary to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔧 QA Fix Cycle {N} Applied — Step 6/8
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 🔧 QA Fix Cycle {N} Applied — Step 6/8
 
 **Fixes applied**: {brief summary from qa-fix output}
-**Commit**: \`{hash}\`"
+**Commit**: `{hash}`
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage qa-fix-{N} --json
 ```
+
+Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fix cycle {N} comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 

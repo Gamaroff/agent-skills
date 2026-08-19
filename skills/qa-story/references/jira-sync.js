@@ -673,13 +673,59 @@ const adf = {
   tableHeader: (...content) => ({ type: "tableHeader", attrs: {}, content }),
   tableCell: (...content) => ({ type: "tableCell", attrs: {}, content }),
   hardBreak: () => ({ type: "hardBreak" }),
+  // A fenced code block. `language` is optional: Jira renders an unlabelled
+  // block fine, but omitting the attr entirely is not the same as an empty
+  // string to every ADF consumer, so only set it when we actually have one.
+  codeBlock: (text, language) => ({
+    type: "codeBlock",
+    ...(language ? { attrs: { language } } : { attrs: {} }),
+    // An empty fence is legal markdown but an empty `content` array is not
+    // legal ADF, so an empty block carries no content key at all.
+    ...(text ? { content: [{ type: "text", text }] } : {}),
+  }),
+  // Italic text. Deliberately a builder rather than an inline-markdown rule:
+  // see the note on inlineMarkdownToAdf below.
+  em: (t) => ({ type: "text", text: t, marks: [{ type: "em" }] }),
 };
 
 const RE_BULLET = /^\s*[-*]\s+(.*)$/;
 const RE_ORDERED = /^\s*\d+\.\s+(.*)$/;
+// A code fence, matched as a PREDICATE rather than one regex, because the rule
+// that matters cannot be expressed cleanly in a single pattern.
+//
+// This has now been wrong in both directions, so both are recorded:
+//
+//   Too STRICT — `(\S*)\s*$` required the whole info string to be one token, so
+//   ```` ```js title="x" ```` did not match at all. The opening line rendered as
+//   prose and the CLOSING fence was then read as an opening one, swallowing
+//   every later block.
+//
+//   Too LOOSE — relaxing the tail to `[^\n]*` let backticks back in, so a prose
+//   line that merely BEGINS with an inline code span of three or more backticks
+//   became an opening fence. One live document hit it: task.42 line 313 reads
+//   "```` ``` ```` or `~~~` fenced block." and 31,235 characters of that file
+//   collapsed into a single code block.
+//
+// CommonMark states the rule directly: a backtick fence's info string may not
+// contain a backtick. Tilde fences have no such restriction, because `~` cannot
+// open an inline code span. That asymmetry is the whole fix.
+function matchCodeFence(line) {
+  const m = /^\s*(`{3,}|~{3,})[ \t]*(.*)$/.exec(line);
+  if (!m) return null;
+  const delim = m[1];
+  const rest = m[2];
+  if (delim[0] === "`" && rest.includes("`")) return null;
+  return { delim, lang: rest.trim().split(/\s+/)[0] || "" };
+}
 
 // ---------------------------------------------------------------------------
 // Inline markdown parser — **bold**, `code`, [link](url)
+//
+// Deliberately NOT handling *italic* / _italic_. The bold rule already owns
+// `*`, so a single-asterisk alternative would have to be ordered against it and
+// would change how every existing document renders — a wide blast radius for a
+// syntax none of them use. Callers that need italics (the tracker-comment
+// identity footer) build the node directly with `adf.em()`.
 // ---------------------------------------------------------------------------
 function inlineMarkdownToAdf(text, linkResolver) {
   if (text == null || text === "") return [adf.text("")];
@@ -746,10 +792,17 @@ function tableLinesToAdf(lines, linkResolver) {
 /**
  * Convert markdown text to ADF nodes. Handles:
  * - ##–###### headings → ADF heading nodes
+ * - ``` fenced blocks → ADF codeBlock nodes (language tag preserved)
  * - pipe tables (|...|) → ADF table nodes with inline markdown in cells
  * - horizontal rules (---) → skipped
  * - bullet/ordered lists → proper ADF list nodes
  * - **bold**, `code`, [link](url) → inline marks
+ *
+ * Fences are tracked HERE rather than in blockToAdf, and that placement is
+ * load-bearing: this loop splits on blank lines before blockToAdf ever sees a
+ * block, so a fenced listing containing a blank line — or a `#` comment, or a
+ * row of `|` — would be torn into pieces and each piece parsed as prose. Inside
+ * a fence every other rule is suspended and lines are taken verbatim.
  */
 function textToAdfNodes(text, linkResolver) {
   if (!text) return [];
@@ -757,6 +810,9 @@ function textToAdfNodes(text, linkResolver) {
   const lines = text.split("\n");
   let buf = [];
   let tableBuf = [];
+  let fenceBuf = null; // non-null ⇒ inside a fence
+  let fenceLang = "";
+  let fenceDelim = "";
 
   const flushBuf = () => {
     if (!buf.length) return;
@@ -773,6 +829,43 @@ function textToAdfNodes(text, linkResolver) {
 
   for (const line of lines) {
     const trimmed = line.trim();
+
+    const fm = matchCodeFence(line);
+    if (fenceBuf !== null) {
+      // Inside a fence: only a closing fence of the SAME delimiter type is
+      // interpreted, so a ``` line inside a ~~~ block stays content. Everything
+      // else is kept verbatim — no trim, because indentation is significant in
+      // code and a re-indented listing is a corrupted one.
+      // A closing fence must use the SAME delimiter character, be AT LEAST as
+      // long as the opening run, and carry no info string — CommonMark's rule.
+      // Comparing only the character let a 3-backtick line close a 4-backtick
+      // fence, tearing apart every nested example in this repo's own docs
+      // (three shipped documents use ```` to wrap ``` blocks).
+      if (
+        fm &&
+        fm.delim[0] === fenceDelim[0] &&
+        fm.delim.length >= fenceDelim.length &&
+        !fm.lang
+      ) {
+        nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
+        fenceBuf = null;
+        fenceLang = "";
+        fenceDelim = "";
+      } else {
+        fenceBuf.push(line);
+      }
+      continue;
+    }
+    if (fm) {
+      // Opening fence. Flush whatever precedes it first, exactly as a heading
+      // or table boundary would.
+      flushBuf();
+      flushTable();
+      fenceBuf = [];
+      fenceDelim = fm.delim;
+      fenceLang = fm.lang;
+      continue;
+    }
 
     if (RE_HR_LINE.test(trimmed)) {
       // horizontal rule — skip
@@ -802,6 +895,11 @@ function textToAdfNodes(text, linkResolver) {
     buf.push(line);
   }
 
+  // An unterminated fence still yields a code block rather than being dropped:
+  // truncated input is common (the description cap cuts mid-document), and a
+  // silently vanished listing is worse than an unclosed one.
+  if (fenceBuf !== null)
+    nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
   flushBuf();
   flushTable();
   return nodes.filter(Boolean);
@@ -1593,10 +1691,17 @@ function getAuth({
     "JIRA_PROJECT_KEY",
   ],
   optional = ["JIRA_BOARD_ID"],
+  // Defaults to process.env, but accepts an injected source so a caller that
+  // already resolved its environment can pass the same one through. Without
+  // this, a CLI reading an injected `env` and then calling getAuth() gets two
+  // different environments — which is exactly why tracker-comment.js's Jira
+  // branch could not be driven through its own DI seam, and therefore had no
+  // test coverage at all.
+  source = process.env,
 } = {}) {
   const env = {};
-  for (const k of required) env[k] = process.env[k];
-  for (const k of optional) env[k] = process.env[k];
+  for (const k of required) env[k] = source[k];
+  for (const k of optional) env[k] = source[k];
   const missing = required.filter((k) => !env[k]);
   return {
     ok: missing.length === 0,
@@ -4592,6 +4697,223 @@ async function putIssueAtomic({
   }
 }
 
+// ---------------------------------------------------------------------------
+// Comments
+//
+// The endpoint this file spent a long time not having. Everything here is a
+// transcription of putIssueAtomic above — same http() factory, so task 53's
+// access gate (makeHttp, "layer 1") covers it without a line of its own, and
+// same deferred-return shape, so callers that already cope with a deferred
+// update cope with a deferred comment.
+//
+// The identity footer is the Jira half of the comment marker. GitHub gets an
+// invisible HTML comment; Jira cannot, because ADF drops nodes it does not
+// recognise and an HTML comment is not an ADF node — it would be silently
+// stripped and the marker would vanish, taking idempotency with it. So Jira
+// gets a small italic line instead: visible, but unobtrusive, and it survives a
+// human copying the body by hand.
+// ---------------------------------------------------------------------------
+
+const COMMENT_MARKER_PREFIX = "agent-skills-comment:";
+
+/** The GitHub/Bitbucket marker — an HTML comment, invisible when rendered. */
+function commentMarkerHtml(momentId) {
+  return `<!-- ${COMMENT_MARKER_PREFIX}${momentId} -->`;
+}
+
+/** The Jira marker — visible italic text, because ADF has nowhere to hide it. */
+function commentMarkerText(momentId) {
+  return `↳ ${COMMENT_MARKER_PREFIX}${momentId}`;
+}
+
+/**
+ * Build the ADF document for a comment: the rendered body, then the identity
+ * footer as its own italic paragraph.
+ */
+function buildCommentAdf(body, momentId, linkResolver) {
+  const nodes = textToAdfNodes(body, linkResolver);
+  if (momentId) {
+    nodes.push(adf.paragraph(adf.em(commentMarkerText(momentId))));
+  }
+  // An entirely empty comment is not a legal ADF doc; a bare paragraph is.
+  // NOT `paragraph(text(""))` — ADF rejects a text node with an empty string,
+  // so Jira 400s and the run reports `unverifiable` instead of posting. A body
+  // that renders to nothing is reachable (a body of only `---`), so this is a
+  // real path, not a defensive one.
+  return adf.doc(...(nodes.length ? nodes : [{ type: "paragraph" }]));
+}
+
+/**
+ * Search an issue's existing comments for the identity marker.
+ *
+ * Returns `{ count, ids }`. The CARDINALITY is the whole point and the caller
+ * must branch on it rather than taking the first hit:
+ *
+ *   0  → nothing posted yet, post it
+ *   1  → already posted, do not post again
+ *   2+ → ambiguous: DO NOT GUESS
+ *
+ * The existing PR-comment convention (skills/finalise/SKILL.md) resolves the
+ * many-match case with `| head -1`, which is how a duplicate comment becomes
+ * invisible: two matches, first one adopted, second one never reconciled. This
+ * function reports the count and refuses to choose.
+ */
+async function findCommentsByMarker({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  momentId,
+  maxResults = 100,
+}) {
+  // The FULL marker line, matched EXACTLY — never the bare prefix as a
+  // substring. `agent-skills-comment:review` is a prefix of
+  // `agent-skills-comment:review-story`, so a substring search made a Step 2
+  // `review` comment report `already` against an existing `review-story`
+  // marker and never post. Silent comment loss, which is the failure this
+  // module exists to prevent.
+  const marker = commentMarkerText(momentId);
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment` +
+      `?maxResults=${maxResults}&orderBy=-created`,
+    {
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
+    },
+  );
+  // A read that fails is not evidence of absence. Signalling "unreadable" lets
+  // the caller report `unverifiable` rather than posting a possible duplicate.
+  if (!resp.ok) return { count: null, ids: [], unreadable: true };
+  let data;
+  try {
+    data = await resp.json();
+  } catch (_) {
+    return { count: null, ids: [], unreadable: true };
+  }
+  const hits = (data.comments || []).filter((c) =>
+    adfContainsExactText(c.body, marker),
+  );
+  // An unpaginated read is not evidence of absence. When Jira reports more
+  // comments than we asked for — OR does not say how many there are — the
+  // marker may be outside the window, so report unreadable and let the caller
+  // degrade to `unverifiable` rather than posting a duplicate on the strength
+  // of a partial list.
+  //
+  // Note the `!Number.isFinite` half: an absent or null `total` must fail
+  // CLOSED. Every other unreadable path in this module does, and this one was
+  // the odd one out — a payload without `total` read as "nothing found" and
+  // posted the duplicate.
+  const total = Number(data.total);
+  if (!Number.isFinite(total) || total > (data.comments || []).length) {
+    return { count: null, ids: [], unreadable: true, truncated: true };
+  }
+  return { count: hits.length, ids: hits.map((c) => c.id), unreadable: false };
+}
+
+/** Depth-first scan of an ADF document for a literal substring. */
+function adfContainsText(node, needle) {
+  if (!node || typeof node !== "object") return false;
+  if (typeof node.text === "string" && node.text.includes(needle)) return true;
+  const kids = Array.isArray(node.content) ? node.content : [];
+  return kids.some((k) => adfContainsText(k, needle));
+}
+
+/**
+ * Depth-first scan for a text node whose trimmed content EQUALS `needle`.
+ *
+ * The identity footer has no closing delimiter — unlike the GitHub HTML
+ * marker, which terminates itself with ` -->` — so a substring match cannot
+ * tell `…:review` from `…:review-story`. Exact equality can, and needs no
+ * change to the marker's shape.
+ */
+function adfContainsExactText(node, needle) {
+  if (!node || typeof node !== "object") return false;
+  if (typeof node.text === "string" && node.text.trim() === needle) return true;
+  const kids = Array.isArray(node.content) ? node.content : [];
+  return kids.some((k) => adfContainsExactText(k, needle));
+}
+
+/**
+ * Post a comment to a Jira issue.
+ *
+ * `skill` is first by the convention transitionToStatus sets — it names the
+ * CALLING skill on the deferred record, not this library.
+ */
+async function addComment({
+  skill = undefined,
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  body,
+  momentId = "",
+  linkResolver = undefined,
+}) {
+  const doc = buildCommentAdf(body, momentId, linkResolver);
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ body: doc }),
+      // Layer 2 — what the mutation MEANS. The rendered ADF is not useful to a
+      // human performing this by hand, so `manual.fields` carries the markdown
+      // they would paste, and `command.stdin` carries it too so the record's
+      // fingerprint distinguishes two different comments on the same issue.
+      defer: {
+        kind: "jira.comment.add",
+        intent: `Comment on ${issueKey}${momentId ? ` (${momentId})` : ""}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}/comment`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: firstLineOf(body),
+        manual: {
+          deepLink: `${baseUrl}/browse/${issueKey}`,
+          ui: "Open the issue → Comment → Paste → Save",
+          fields: [{ name: "Comment", value: body }],
+        },
+        command: { argv: ["jira", "comment", issueKey], stdin: body },
+        skill,
+      },
+    },
+  );
+  if (resp.deferred) {
+    return { posted: false, deferred: true, record: resp.deferredRecord };
+  }
+  if (!resp.ok)
+    throw new Error(`HTTP ${resp.status}: ${await parseJiraError(resp)}`);
+  let id = null;
+  try {
+    const data = await resp.json();
+    id = data.id || null;
+  } catch (_) {
+    /* 204 or unparseable — the post still succeeded */
+  }
+  return { posted: true, id };
+}
+
+/** First non-empty line, trimmed of markdown heading marks, for `desired`. */
+function firstLineOf(text) {
+  if (!text) return "(empty comment)";
+  const line = String(text)
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length);
+  if (!line) return "(empty comment)";
+  const stripped = line.replace(/^#+\s*/, "").replace(/\*\*/g, "");
+  return stripped.length > 120 ? `${stripped.slice(0, 117)}...` : stripped;
+}
+
 async function fetchIssue({
   http,
   baseUrl,
@@ -4762,6 +5084,17 @@ module.exports = {
   diffFields,
   guardConcurrentEdit,
   hashStable,
+  // comments
+  addComment,
+  findCommentsByMarker,
+  buildCommentAdf,
+  commentMarkerHtml,
+  commentMarkerText,
+  adfContainsText,
+  adfContainsExactText,
+  matchCodeFence,
+  firstLineOf,
+  COMMENT_MARKER_PREFIX,
   // jira api
   fetchIssue,
   fetchUpdatedTimestampStrict,

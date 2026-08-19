@@ -95,4 +95,11 @@ A required **field** shows up in `matched.fields`. A workflow **validator** (e.g
 
 ## Workflow without a review state
 
-If the Jira workflow legitimately lacks a review-phase transition (small projects often do), the PR-opened step SHOULD be a no-op for the transition portion — the `addCommentToJiraIssue` portion still runs. The issue remains `In Progress` through QA and is moved to `Done` at Finalise. This is the intended fallback.
+If the Jira workflow legitimately lacks a review-phase transition (small projects often do), the PR-opened step SHOULD be a no-op for the transition portion — the **comment** portion still runs, via `tracker-comment.js` (see [`tracker-comment-contract.md`](tracker-comment-contract.md)). The issue remains `In Progress` through QA and is moved to `Done` at Finalise. This is the intended fallback.
+
+> **This protocol governs transitions only.** Comments are not its business. A
+> comment has no workflow, no candidate list and nothing to match, so none of
+> the guard rails below apply to one. Every comment goes through
+> `tracker-comment.js`, and `addCommentToJiraIssue` is reachable only through
+> that CLI's `no-credentials` branch — the same demotion this document already
+> describes for transitions, for the same reason.

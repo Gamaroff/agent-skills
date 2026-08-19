@@ -62,18 +62,24 @@ ls {task-directory}/task.{id}.review.*.md 2>/dev/null | sort | tail -1
 **Post skip notice to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 📋 Review — Step 2/8
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 📋 Review — Step 2/8
 
 **Outcome**: Skipped — already reviewed
 **Status**: {status}
-**Review report**: {path}"
+**Review report**: {path}
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage review --json
 ```
+
+> Engine source: `shared/resources/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
+
+
+Read `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 On failure: log warning in Issues Log and continue.
 
@@ -154,34 +160,40 @@ After detecting outcomes and handling findings (non-blocking — skip if `TRACKE
 #### develop-story
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 📋 Story Review Complete — Step 2/8
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 📋 Story Review Complete — Step 2/8
 
 **Outcome**: {Ready for Development / Needs Revision}
 **Review report**: {path, or 'not produced — see Issues Log'}
-**Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}"
+**Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage review --json
 ```
+
+Read `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 #### develop-task
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 📋 Task Review Complete — Step 2/8
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 📋 Task Review Complete — Step 2/8
 
 **Outcome**: {Ready for Development / Needs Revision}
 **Review report**: {path, or 'not produced — see Issues Log'}
-**Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}"
+**Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage review --json
 ```
+
+Read `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 On failure: log warning in Issues Log and continue.
 

@@ -65,7 +65,25 @@ Log the cycle in the implementation report's QA Iteration History:
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
 ```
 
-If the bug has a linked tracker issue (`TRACKER_ISSUE` non-empty), post the cycle result as a non-blocking `gh issue comment` / `addCommentToJiraIssue` (skip silently when empty — most bugs have no issue).
+If the bug has a linked tracker issue (`TRACKER_ISSUE` non-empty), post the cycle result — one call, both trackers. Skip silently when empty (most bugs have no issue):
+
+```bash
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+## 🔁 Verify Cycle {N} — {PASS / FAIL}
+
+**Regression test**: {pass/fail}
+**Suite + lint**: {pass/fail}
+**Code review**: {clean / N blocking findings}
+**Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
+EOF
+
+node .agents/skills/develop-bug/references/tracker-comment.js \
+  --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
+  --stage qa-cycle-{N} --json
+```
+
+Non-blocking. Read `reason` per [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md).
 
 ---
 

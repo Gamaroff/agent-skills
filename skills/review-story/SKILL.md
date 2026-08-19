@@ -2240,12 +2240,12 @@ User Can Now: Run `/develop` to begin implementation
 
    Read `jira_key` from story frontmatter. If absent, skip this step silently.
 
-   Use the `addCommentToJiraIssue` Atlassian MCP tool with:
-   - `issueIdOrKey`: `{jira_key from frontmatter}`
-   - `contentFormat`: `"markdown"`
-   - `comment`:
-     ```
-     ## Story Review Complete
+   Post the comment through the CLI:
+
+   ```bash
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<'EOF'
+   ## Story Review Complete
 
      **Recommendation**: {RECOMMENDATION}
      **Readiness Score**: {SCORE}/10
@@ -2256,11 +2256,21 @@ User Can Now: Run `/develop` to begin implementation
      | Important ⚠️ | {IMPORTANT} |
      | Optional 💡 | {OPTIONAL} |
 
-     **Review artifact**: `{REVIEW_FILE}`
-     {CHANGES_SECTION}
-     ```
+   **Review artifact**: `{REVIEW_FILE}`
+   {CHANGES_SECTION}
+   EOF
 
-   On success → confirm: "✅ Review summary posted to Jira issue {jira_key}."
+   node .agents/skills/review-story/references/tracker-comment.js \
+     --issue {jira_key from frontmatter} --body-file .claude/state/comment-body.md \
+     --stage review-story --json
+   ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
+
+   On `posted` → confirm: "✅ Review summary posted to Jira issue {jira_key}."
    On failure → log warning "⚠️ Jira comment failed — continuing", do NOT halt.
 
    ***

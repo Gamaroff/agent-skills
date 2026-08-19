@@ -1063,10 +1063,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
       - If the protocol reports a skip (no matching transition, or a required field it cannot
         fill): log that reason in the running summary (non-blocking).
 
-   2. **Post completion comment** — call `addCommentToJiraIssue`:
-      - `cloudId`: {derived hostname}
-      - `issueIdOrKey`: `{jira_key}`
-      - `commentBody`: Build from the variables already computed for the PR comment (`FINAL_GATE`, `DOD_PATH`, `CYCLES`) and the per-category `overall_status` values from each DoD agent YAML result. Format:
+   2. **Post completion comment** — build the body from the variables already computed for the PR comment (`FINAL_GATE`, `DOD_PATH`, `CYCLES`) and the per-category `overall_status` values from each DoD agent YAML result, then post it through the CLI. Format:
 
         ```
         ## ✅ Story/Task Accepted — Definition of Done Verified
@@ -1091,8 +1088,21 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
         Use ✅ PASS, ❌ FAIL, ⚠️ CONCERNS, or — N/A for each status cell. `{pr_status}` is APPROVED or NOT_APPROVED from the AC agent result.
 
-      - `contentFormat`: `"markdown"`
-      - On failure: log warning and continue (non-blocking)
+        ```bash
+        mkdir -p .claude/state
+        cat > .claude/state/comment-body.md <<EOF
+        {the body rendered above}
+        EOF
+
+        node .agents/skills/finalise/references/tracker-comment.js \
+          --issue {jira_key} --body-file .claude/state/comment-body.md \
+          --stage done --json
+        ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+        Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool. On failure: log warning and continue (non-blocking).
 
    Log outcome in running summary: "Jira issue {jira_key} transitioned to Done ✅" or the warning detail.
 
