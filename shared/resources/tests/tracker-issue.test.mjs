@@ -39,7 +39,7 @@ import {
   mkdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -89,6 +89,7 @@ function readJournal(dir) {
 function stubGh({
   createUrl = "https://github.com/acme/repo/issues/207",
   milestones = [],
+  milestoneTitle = "Epic 7",
   createdMilestone = { number: 9 },
   subId = 1234567,
   failOn = null,
@@ -109,7 +110,13 @@ function stubGh({
       joined.includes("/milestones") &&
       !joined.includes("POST")
     )
-      return milestones.join("\n");
+      // Real API shape — a JSON array of milestone objects. The stub used to
+      // return bare numbers, which matched an implementation that asked jq to
+      // do the filtering; comparing titles in JS needs the real thing, and a
+      // faithful stub is what lets the test catch a parsing regression.
+      return JSON.stringify(
+        milestones.map((n) => ({ number: Number(n), title: milestoneTitle })),
+      );
     if (
       argv[0] === "api" &&
       joined.includes("POST") &&
@@ -216,17 +223,26 @@ test("§2 a deferred run writes NOTHING to stdout (the capture must be empty)", 
 
 test("§2 the ⏸️ notice goes to stderr, where a capture cannot see it", () => {
   const dir = withRepo();
-  const res = execFileSync(
+  // Assert BOTH halves. The earlier version checked only that stdout was empty,
+  // which the preceding test already covers — so it would have passed with
+  // info() deleted entirely and the operator told nothing at all. An empty
+  // stdout is only half the contract; the other half is that the notice still
+  // reaches a human.
+  const res = spawnSync(
     process.execPath,
     [CLI_PATH, "--kind", "create", "--title", "T", "--repo", "acme/repo"],
     {
       cwd: dir,
       encoding: "utf8",
       env: { ...process.env, ACCESS_TRACKER: "manual", PATH: "/nonexistent" },
-      stdio: ["ignore", "pipe", "pipe"],
     },
   );
-  assert.equal(res, "", "stdout stays clean");
+  assert.equal(res.stdout, "", "stdout stays clean — it is the value channel");
+  assert.match(
+    res.stderr,
+    /⏸️.*recorded as/,
+    "and the deferral notice still reaches the operator, on stderr",
+  );
 });
 
 test("§2 a performed create prints the issue NUMBER, not the URL", () => {
@@ -374,7 +390,6 @@ test("§5 the recorded argv is built by the same builder the perform path uses",
   // result from the pipeline. Sharing the builder makes that impossible.
   const shape = cli.recordShape({
     kind: "create",
-    spec: cli.KINDS.create,
     args,
     body: "",
     slug: "acme/repo",
@@ -636,4 +651,112 @@ test('§5 an empty --remove-label is dropped, not passed through as ""', () => {
     cli.ghEditArgv(args, "acme/repo").includes("priority:low"),
     "a real label still passes through",
   );
+});
+
+// ── §10 QA cycle 1 fixes ────────────────────────────────────────────────────
+
+test("§10 a deferred record never carries an unexpanded $OWNER/$REPO", () => {
+  // handover-render.js POSIX-single-quotes every argv element, so a literal
+  // `$OWNER/$REPO` reaches `gh api` verbatim and 404s. The `sh` renderer exists
+  // to be RUNNABLE; an unexpanded variable in it is the one thing that makes it
+  // not. The slug is now read from the git remote — a LOCAL read, so the gate's
+  // no-network promise is untouched.
+  // NOTE: --repo is deliberately NOT passed. An explicit --repo wins on every
+  // path, so a test that supplies it proves nothing about the resolution this
+  // guards — it passed against the old --repo-only code too. The repo fixture
+  // carries a real `origin` remote instead, which is what the fixed code reads.
+  for (const [kind, argv] of [
+    ["milestone", ["--title", "Epic 7"]],
+    ["sub-issue-link", ["--issue", "42", "--parent", "7"]],
+  ]) {
+    const dir = withRepo();
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync(
+      "git",
+      ["remote", "add", "origin", "git@github.com:acme/repo.git"],
+      { cwd: dir },
+    );
+    run(dir, ["--kind", kind, ...argv], { ACCESS_TRACKER: "manual" });
+    const rec = readJournal(dir)[0];
+    const serialised = JSON.stringify(rec.command.argv);
+    assert.ok(
+      !serialised.includes("$OWNER") && !serialised.includes("$REPO"),
+      `${kind}: recorded argv still carries an unexpanded shell variable: ${serialised}`,
+    );
+    assert.ok(
+      serialised.includes("acme/repo"),
+      `${kind}: the resolved slug must appear in the recorded command`,
+    );
+  }
+});
+
+test("§10 --reason is validated and the underscore form normalised", () => {
+  const dir = withRepo();
+  // The sync skills pass `not_planned` (the REST spelling). `gh` accepts only
+  // `completed | not planned | duplicate`, so the underscore form silently
+  // failed every cancelled close.
+  const { execImpl, calls } = stubGh();
+  cli.run({
+    argv: [
+      "node",
+      "x",
+      "--kind",
+      "close",
+      "--issue",
+      "42",
+      "--reason",
+      "not_planned",
+    ],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  const closeCall = calls.find((c) => c.argv[1] === "close");
+  assert.ok(
+    closeCall.argv.includes("not planned"),
+    "not_planned must be normalised to the spelling gh accepts",
+  );
+
+  // And an unknown reason is a usage error, not something gh discovers later.
+  assert.equal(
+    run(dir, ["--kind", "close", "--issue", "42", "--reason", "nonsense"])
+      .exitCode,
+    2,
+  );
+});
+
+test("§10 a milestone title containing a quote does not break the lookup", () => {
+  const dir = withRepo();
+  // The title used to be interpolated into a jq program, so a double quote was
+  // a jq syntax error — which surfaced as "no match" and led to a blind POST
+  // and a 422. Titles are compared in JavaScript now.
+  const nasty = 'Epic 3 — the "new" flow';
+  const { execImpl } = stubGh({ milestones: ["9"], milestoneTitle: nasty });
+  const r = cli.run({
+    argv: ["node", "x", "--kind", "milestone", "--title", nasty, "--json"],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  assert.equal(r.reason, "already");
+  assert.equal(r.milestone, "9");
+});
+
+test("§10 the milestone lookup asks for ALL states, paginated", () => {
+  const dir = withRepo();
+  // The endpoint defaults to open-only, 30 per page: a closed milestone or a
+  // busy repo silently missed an existing title and tried to re-create it.
+  const { execImpl, calls } = stubGh({ milestones: [] });
+  cli.run({
+    argv: ["node", "x", "--kind", "milestone", "--title", "Epic 7"],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  const lookup = calls.find(
+    (c) => c.argv[0] === "api" && c.argv.join(" ").includes("/milestones"),
+  );
+  const joined = lookup.argv.join(" ");
+  assert.match(joined, /--paginate/, "must paginate");
+  assert.match(joined, /state=all/, "must include closed milestones");
 });

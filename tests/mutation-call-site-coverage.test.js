@@ -287,3 +287,88 @@ test("§3 the watched shapes cover every GitHub kind the roster names as a mutat
       `Add a shape, or add the kind to OUT_OF_SCOPE with the reason.`,
   );
 });
+
+// ── §4 The two-run convergence rests on prose that nothing else guards ───────
+
+test("§4 every ensure-*/sync-* skill keeps the key-present short-circuit", () => {
+  // The convergence story is: a deferred create writes no key, the operator
+  // writes it by hand, and the SECOND run finds it present and takes the update
+  // path instead of creating a duplicate.
+  //
+  // That second half lives entirely in prose. Nothing else in the suite asserts
+  // it, so a refactor that drops one skill's early-exit turns the convergence
+  // into "creates a duplicate on every run" — silently, and only in the
+  // restricted mode nobody runs in CI. This is the guard for it.
+  const SKILLS = [
+    "ensure-story-github-issue",
+    "ensure-task-github-issue",
+    "ensure-epic-github-issue",
+    "sync-github-story",
+    "sync-github-task",
+    "sync-github-epic",
+  ];
+
+  const missing = [];
+  for (const skill of SKILLS) {
+    const p = path.join(REPO_ROOT, "skills", skill, "SKILL.md");
+    if (!fs.existsSync(p)) {
+      missing.push(`${skill} — SKILL.md not found`);
+      continue;
+    }
+    const text = fs.readFileSync(p, "utf8");
+
+    // The short-circuit: "github_issue is already set → do not create".
+    const shortCircuits =
+      /github_issue.*(?:already set|is a positive integer)/is.test(text) ||
+      /Return immediately/i.test(text);
+    if (!shortCircuits) {
+      missing.push(
+        `${skill} — no "github_issue already present" short-circuit. Without it ` +
+          `the second run of the two-run convergence creates a DUPLICATE issue.`,
+      );
+    }
+
+    // The write must be guarded on a non-empty issue number — EITHER here, or
+    // in the ensure-* sub-routine this skill delegates the create to. The
+    // sync-github-* skills do the latter, so demanding a local guard from them
+    // is a false positive: they never write the key themselves.
+    const guardsTheWrite =
+      /Skip this entire step when .*ISSUE_NUM.* is empty/i.test(text) ||
+      /is a positive integer/i.test(text);
+    const delegatesTheWrite =
+      /Invoke the `ensure-\w+-github-issue` sub-routine/i.test(text);
+    // Whichever route, an empty id must stop the run claiming success.
+    const guardsTheClaim = /When .*ISSUE_NUM.* is empty, stop here/i.test(text);
+
+    if (!guardsTheWrite && !(delegatesTheWrite && guardsTheClaim)) {
+      missing.push(
+        `${skill} — nothing stops a deferred create from writing an empty key ` +
+          `or claiming a create that did not happen. Guard the write locally, or ` +
+          `delegate it to an ensure-* sub-routine AND stop on an empty id.`,
+      );
+    }
+  }
+
+  assert.deepEqual(missing, [], missing.join("\n"));
+});
+
+test("§4 no skill writes a placeholder key", () => {
+  // Belt to §4's braces. A placeholder defeats the idempotent lookup that stops
+  // the next run creating a duplicate, so it is worse than writing nothing.
+  const offenders = [];
+  for (const file of DOCS) {
+    const rel = path.relative(REPO_ROOT, file);
+    const lines = fs.readFileSync(file, "utf8").split("\n");
+    lines.forEach((line, i) => {
+      // An ASSIGNMENT of a placeholder, not prose forbidding one.
+      if (
+        /^\s*(?:-\s*)?(?:github_issue|jira_key):\s*(?:0|["']?<?pending>?["']?|null\s*#)/.test(
+          line,
+        )
+      ) {
+        offenders.push(`${rel}:${i + 1} — ${line.trim()}`);
+      }
+    });
+  }
+  assert.deepEqual(offenders, [], offenders.join("\n"));
+});

@@ -1149,11 +1149,17 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Close the issue and verify closure:
 
    ```bash
-   # Post completion comment — always --body-file, never an inline --body
+   # Post completion comment — always --body-file, never an inline --body.
+   #
+   # The heredoc terminator sits at COLUMN 0 even though this block is indented
+   # inside a numbered list. Bash does not accept an indented terminator for an
+   # unquoted heredoc: it warns "here-document delimited by end-of-file" and
+   # swallows everything after it INTO THE BODY, so the close below would never
+   # run and the issue would be neither commented nor closed — silently.
    mkdir -p .claude/state
    cat > .claude/state/comment-body.md <<EOF
-   Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
-   EOF
+Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
+EOF
    node references/tracker-comment.js --issue {github_issue} \
      --body-file .claude/state/comment-body.md --stage done --json
 

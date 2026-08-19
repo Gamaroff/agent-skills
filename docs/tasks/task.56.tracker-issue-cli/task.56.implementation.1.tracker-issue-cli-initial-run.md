@@ -34,7 +34,7 @@ First automated pipeline run for task 56 — build `shared/resources/tracker-iss
 | 1. create-branch           | ✅ Done    | Branch `feature/task.56.*` exists in git                               | `feature/task.56.tracker-issue-cli` created at `59e5ec9`, pushed to origin | —                    |
 | 2. review-task             | ✅ Done    | `task.56.review.{N}.{name}.md` exists (or skip logged)                 | `task.56.review.1.tracker-issue-cli.md` — 8.5/10 READY TO IMPLEMENT; 3 critical + 5 important fixed in place; status promoted | 2 Explore pre-pass agents (arch alignment: drift; codebase scan: not-started) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 9 phases; 1564 tests pass, validate:all 115/115, prettier clean, bundle committed | Explore pre-develop surface map |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #265 → develop; 4 commits; issue commented; board in-review `stage-disabled` (correct) | PR body summariser (inline) |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.56.qa.{N}.*.md`; `task.56.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.56.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -87,6 +87,13 @@ First automated pipeline run for task 56 — build `shared/resources/tracker-iss
 
 ---
 
+### Step 4 — create-pr — 2026-08-20
+
+- Base `develop`, issue 234 — both pre-supplied by the orchestrator, no prompt.
+- 4 logical commits: `feat` (engine), `refactor` (call sites + guard), `docs`, `chore` (bundle).
+- PR #265 opened. Issue commented (`reason: posted`).
+- 191 files, +19190/-832 (160 of them generated bundle output).
+
 ### Step 3 — develop — 2026-08-19/20
 
 - Pre-develop surface map: 1 Explore subagent, 8 areas, exact line numbers. No plan file (none exists) — proceeded without.
@@ -107,7 +114,8 @@ First automated pipeline run for task 56 — build `shared/resources/tracker-iss
 
 ## Issues Log
 
-_Problems encountered and how they were resolved or escalated._
+- **Step 4 — implementation report committed early.** `/create-pr` was invoked with `--exclude` for the implementation report, but the final `git add -A` in the bundle commit swept it in anyway, so it landed at Step 4 instead of Step 8. Benign — the file belongs on the branch either way and Step 8 commits its final state on top — but the exclusion did not hold, and it is recorded here rather than passed over. History was not rewritten for it.
+- **Step 4 — board `in-review` is `stage-disabled`** on this project's ladder. Exit 0, correct outcome per the gh-stage contract; no action needed.
 
 ---
 
@@ -122,6 +130,6 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.56.tracker-issue-cli`
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/265
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}

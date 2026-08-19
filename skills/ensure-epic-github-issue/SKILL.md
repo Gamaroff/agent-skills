@@ -87,9 +87,18 @@ which is also what the Jira path enforces in code. Read it before changing this
 template.
 
 Write the body to a file first. **Always `--body-file`, never an inline `--body`**:
-the body carries backticks, `$(…)` and newlines, and an interpolated body is a
+the body carries backticks, `$(…)` and newlines, and an inline `--body` is a
 shell injection waiting for the first epic whose description contains one. The
 file is also what carries the body into the deferred record's `command.stdin`.
+
+> **The heredoc below is unquoted, and that is a real residual risk — not a
+> solved problem.** `<<EOF` still performs command substitution, so a `$(…)` or a
+> backticked span in the document's own text is executed while the body is being
+> written. `--body-file` removes the *argv* injection surface, which is the larger
+> one; it does not remove this. Where the source text is untrusted, write the file
+> with the editor tool instead of a heredoc. `<<'EOF'` is not the fix here — it
+> would also stop the `${…}` values below from being substituted, which the body
+> needs.
 
 ```bash
 mkdir -p .claude/state

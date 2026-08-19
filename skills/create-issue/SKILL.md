@@ -282,7 +282,10 @@ issue_number=$(node references/tracker-issue.js \
   --body-file "$body_file" \
   --label "enhancement" \
   --label "story.180")
-issue_url="https://github.com/${OWNER}/${REPO_NAME}/issues/${issue_number}"
+# Derive the slug here — OWNER/REPO_NAME are NOT assigned anywhere in this skill,
+# and referencing them produced the dead link https://github.com///issues/N.
+REPO_SLUG=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+issue_url="https://github.com/${REPO_SLUG}/issues/${issue_number}"
 ```
 
 The CLI prints the issue **number**, so the old `${issue_url##*/}` split is gone.

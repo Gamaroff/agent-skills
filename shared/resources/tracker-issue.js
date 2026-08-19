@@ -299,22 +299,32 @@ function gh(execImpl, argv) {
 }
 
 /**
- * owner/name for the current repository, or "" when it cannot be determined.
- * An explicit --repo always wins; nothing is guessed from a git remote here,
- * for the reason tracker-comment.js gives about TRACKER — by the time this runs
- * a skill has already resolved context, and re-deriving invites disagreement.
+ * owner/name for the current repository, from a purely LOCAL source.
+ *
+ * Reads `git remote get-url origin` (and GH_REPO, which `gh` itself honours).
+ * No network, so this is safe to call on the gated path — which it must be:
+ * without a slug the deferred record's `command.argv` used to carry the literal
+ * string `/repos/$OWNER/$REPO/milestones`, and handover-render.js POSIX-quotes
+ * every argv element, so the generated handover script sent `$OWNER/$REPO`
+ * verbatim to `gh api` and 404'd. The `sh` renderer exists to be RUNNABLE; an
+ * unexpanded variable in it is the one thing that makes it not.
+ *
+ * An explicit --repo always wins.
  */
-function repoSlug(execImpl, explicit) {
+function repoSlug(execImpl, explicit, env = process.env, cwd = undefined) {
   if (explicit) return explicit;
+  if (env.GH_REPO) return env.GH_REPO;
   try {
-    return gh(execImpl, [
-      "repo",
-      "view",
-      "--json",
-      "nameWithOwner",
-      "-q",
-      ".nameWithOwner",
-    ]);
+    // `cwd` matters: without it git runs wherever the PROCESS happens to be,
+    // which for an agent invoking this from a parent directory resolves some
+    // OTHER repository's remote — a wrong slug is worse than no slug, because
+    // it records a mutation against a repo nobody meant to touch.
+    const url = String(
+      execSync("git remote get-url origin", { ...GIT_EXEC_OPTS, cwd }) || "",
+    ).trim();
+    // git@github.com:owner/name.git | https://github.com/owner/name(.git)
+    const m = /github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/.exec(url);
+    return m ? m[1] : "";
   } catch (_) {
     return "";
   }
@@ -438,7 +448,7 @@ function parseArgs(argv) {
 // ONE record covering a fetch-then-mutate PAIR.
 // ---------------------------------------------------------------------------
 
-function recordShape({ kind, spec, args, body, slug }) {
+function recordShape({ kind, args, body, slug }) {
   const repoUi = slug || "the repository";
   const issueUrl = slug
     ? `https://github.com/${slug}/issues/${args.issue}`
@@ -602,12 +612,12 @@ function recordShape({ kind, spec, args, body, slug }) {
 // spellings drift, and the drift is invisible until an operator runs the script
 // and gets a different result from the pipeline.
 
-function repoFlag(args, slug) {
+function repoFlag(slug) {
   return slug ? ["--repo", slug] : [];
 }
 
 function ghCreateArgv(args, slug) {
-  const a = ["issue", "create", ...repoFlag(args, slug), "--title", args.title];
+  const a = ["issue", "create", ...repoFlag(slug), "--title", args.title];
   // `--body-file -` reads stdin. The body NEVER becomes an argv element: it
   // carries backticks and newlines, and the record's fingerprint hashes
   // command.stdin, so two different bodies stay two records.
@@ -618,7 +628,7 @@ function ghCreateArgv(args, slug) {
 }
 
 function ghEditArgv(args, slug) {
-  const a = ["issue", "edit", args.issue, ...repoFlag(args, slug)];
+  const a = ["issue", "edit", args.issue, ...repoFlag(slug)];
   if (args.title) a.push("--title", args.title);
   if (args.bodyFile) a.push("--body-file", "-");
   if (args.milestone) a.push("--milestone", args.milestone);
@@ -634,13 +644,13 @@ function ghEditArgv(args, slug) {
 }
 
 function ghCloseArgv(args, slug) {
-  const a = ["issue", "close", args.issue, ...repoFlag(args, slug)];
+  const a = ["issue", "close", args.issue, ...repoFlag(slug)];
   if (args.reason) a.push("--reason", args.reason);
   return ["gh", ...a];
 }
 
 function ghReopenArgv(args, slug) {
-  return ["gh", "issue", "reopen", args.issue, ...repoFlag(args, slug)];
+  return ["gh", "issue", "reopen", args.issue, ...repoFlag(slug)];
 }
 
 function ghMilestoneArgv(args, slug) {
@@ -730,25 +740,40 @@ function perform({ kind, args, body, slug, execImpl, output, emit, skipCode }) {
       // returns 422 from the API, and four call sites resolve-or-create rather
       // than create blindly. Doing the lookup here means those sites lose their
       // own copy of it.
+      // Fetch and compare IN JAVASCRIPT. Interpolating the title into a jq
+      // program made a title containing a double quote — `Epic 3 — the "new"
+      // flow` — a jq syntax error, which surfaced as "no match" and led
+      // straight to a blind POST and a 422.
+      //
+      // `--paginate` and `state=all` matter for the same reason: the endpoint
+      // defaults to open-only, 30 per page, so a closed milestone or a busy
+      // repo silently missed an existing title and tried to re-create it.
       let existing = "";
       try {
-        existing = gh(execImpl, [
+        const raw = gh(execImpl, [
           "api",
-          `/repos/${slug}/milestones`,
-          "--jq",
-          `.[] | select(.title == "${args.title}") | .number`,
+          "--paginate",
+          `/repos/${slug}/milestones?state=all&per_page=100`,
         ]);
+        // --paginate concatenates JSON arrays; tolerate both one array and
+        // several by matching every top-level array in the response.
+        const found = [];
+        for (const chunk of String(raw).split(/(?<=\])\s*(?=\[)/)) {
+          try {
+            for (const m of JSON.parse(chunk)) found.push(m);
+          } catch (_) {
+            /* a partial chunk is skipped, never guessed at */
+          }
+        }
+        const hit = found.find((m) => m && m.title === args.title);
+        existing = hit ? String(hit.number) : "";
       } catch (_) {
         existing = "";
       }
       if (existing) {
-        output.value(existing.split("\n")[0].trim());
+        output.value(existing);
         return emit(
-          {
-            performed: false,
-            reason: "already",
-            milestone: existing.split("\n")[0].trim(),
-          },
+          { performed: false, reason: "already", milestone: existing },
           0,
         );
       }
@@ -884,6 +909,23 @@ function run({
   // Numeric flags are validated as numbers. `gh issue close PROJ-1` would
   // otherwise reach the network and fail there with a worse message, and a
   // Jira key arriving here at all means a caller branched on the wrong tracker.
+  // `gh issue close --reason` accepts only these three spellings. The sync
+  // skills pass `not_planned` (the REST API's spelling), which gh rejects — so
+  // a cancelled work item never closed and the run reported a warning only.
+  // Normalise the underscore form rather than making six call sites remember.
+  if (args.reason) {
+    const normalised = args.reason.replace(/_/g, " ").toLowerCase();
+    const CLOSE_REASONS = ["completed", "not planned", "duplicate"];
+    if (!CLOSE_REASONS.includes(normalised)) {
+      output.err(
+        `Error: --reason must be one of: ${CLOSE_REASONS.join(", ")} ` +
+          `(got "${args.reason}")`,
+      );
+      return { exitCode: 2 };
+    }
+    args.reason = normalised;
+  }
+
   for (const numeric of ["issue", "parent"]) {
     if (args[numeric] && !/^\d+$/.test(args[numeric])) {
       output.err(
@@ -927,18 +969,15 @@ function run({
     return { exitCode: 2 };
   }
 
-  // The repo slug is resolved AFTER the gate for the perform path, but a record
-  // needs it too — so under a deferring mode it is read from --repo only, and
-  // left empty when absent. `gh repo view` is a network call, and a gated run
-  // making one to write a nicer checklist entry would break the gate's promise
-  // for cosmetics.
-  const slug =
-    access !== "full" && !args.dryRun
-      ? args.repo
-      : repoSlug(execImpl, args.repo);
+  // Resolved the same way on every path, because it is now a LOCAL read. The
+  // earlier version took --repo only under a deferring mode, to avoid a network
+  // call — but that left every deferred record carrying `$OWNER/$REPO` and made
+  // the generated script unrunnable. Reading the git remote costs nothing and
+  // keeps the gate's promise intact, so there is no longer a trade to make.
+  const slug = repoSlug(execImpl, args.repo, env, root || process.cwd());
 
   if (access !== "full" && !args.dryRun) {
-    const shape = recordShape({ kind: args.kind, spec, args, body, slug });
+    const shape = recordShape({ kind: args.kind, args, body, slug });
     try {
       const rec = dm.defer(
         {

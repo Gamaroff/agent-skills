@@ -1710,22 +1710,27 @@ fi
    ```bash
    GITHUB_ISSUE={github_issue from frontmatter}
 
+   # The heredoc terminator sits at COLUMN 0 even though this block is indented
+   # inside a numbered list — an indented terminator does not close an unquoted
+   # heredoc, and bash would swallow the invocation below into the body.
+   # The body lines are unindented for the same reason: leading spaces would be
+   # written into the comment verbatim.
    mkdir -p .claude/state
    cat > .claude/state/comment-body.md <<EOF
-   ## Task Review Complete
+## Task Review Complete
 
-   **Recommendation**: ${RECOMMENDATION}
-   **Readiness Score**: ${SCORE}/10
+**Recommendation**: ${RECOMMENDATION}
+**Readiness Score**: ${SCORE}/10
 
-   | Severity | Count |
-   |----------|-------|
-   | Critical 🚨 | ${CRITICAL} |
-   | Important ⚠️ | ${IMPORTANT} |
-   | Optional 💡 | ${OPTIONAL} |
+| Severity | Count |
+|----------|-------|
+| Critical 🚨 | ${CRITICAL} |
+| Important ⚠️ | ${IMPORTANT} |
+| Optional 💡 | ${OPTIONAL} |
 
-   **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}
-   EOF
+**Review artifact**: \`${REVIEW_FILE}\`
+${CHANGES_SECTION}
+EOF
 
    node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
      --body-file .claude/state/comment-body.md --stage review-task --json \
