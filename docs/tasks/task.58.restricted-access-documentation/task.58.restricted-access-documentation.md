@@ -5,7 +5,7 @@ type: task
 description: 'Tasks 51-57 each update the reference page for the thing they ship — the config key, the artifact, the reason code. None of them produces the narrative layer a new developer needs: what restricted access is, which of the five models to pick, what a run looks like under each, and what to do when the board does not move. This task delivers the concept doc, the decision guide, the runbook, the troubleshooting entries, the command and glossary registrations, and the onboarding touchpoints — plus a drift guard, because roughly ten consumer documents restate pipeline behaviour independently and have drifted silently before.'
 tags: [documentation, restricted-access, onboarding]
 category: documentation
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-08-17
@@ -158,7 +158,7 @@ shipped reality, not by reading it.
 - [x] Every new page is reachable from `docs/README.md`
 - [x] The drift guard exists and was watched failing
 - [x] No reference content is duplicated from tasks 51–57 — linked, not restated
-- [ ] `npm test`, `npm run validate:all`, `docs-link-check` green; catalog regenerated
+- [x] `npm test`, `npm run validate:all`, `docs-link-check` green; catalog regenerated
 
 ## Risk Assessment
 
@@ -182,6 +182,7 @@ shipped reality, not by reading it.
 | --- | --- | --- | --- |
 | 2026-08-17 | 1.0 | Initial draft | create-task |
 | 2026-08-19 |  | Narrative layer: concept doc, which-access, runbook, registrations, wizard copy, drift guard |  |
+| 2026-08-19 |  | Merged to develop via PR #263 (superseding #258); verification criterion confirmed green; status to ready-for-review |  |
 <!-- change-log-end -->
 
 ## References
