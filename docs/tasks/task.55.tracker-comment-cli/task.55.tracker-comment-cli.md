@@ -5,11 +5,13 @@ type: task
 description: 'jira-sync.js has no comment function at all — there is a deliberate refusal in the source. Every Jira comment in this repository is an Atlassian MCP call made by an agent following prose, because there is no code path to intercept. This adds addComment() and a tracker-comment.js CLI covering both trackers, then replaces the ~20 inline prose comment blocks with one CLI call each. The MCP path survives as the documented no-credentials fallback, exactly as jira-stage.js already established. Load-bearing for restricted access, and independently valuable: it lets comments be retried by code rather than by the model.'
 tags: [restricted-access, jira, github, comments, cli, mcp]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: high
 created: 2026-08-17
 updated: 2026-08-19
+completed_date: 2026-08-19
+pr_number: 257
 estimated_effort_hours: 12
 github_issue: 233
 ---
@@ -20,7 +22,7 @@ github_issue: 233
 
 **GitHub Issue**: [#233](https://github.com/Gamaroff/agent-skills/issues/233)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Review**: ✅ All critical + important recommendations from `task.55.review.1.tracker-comment-cli.md` implemented 2026-08-19
 
@@ -160,21 +162,26 @@ No API, schema or config breaks. The MCP fallback path is preserved verbatim for
 2. **`shared/resources/tracker-comment.js`** — the peer CLI. Contract pinned below, because 23
    mechanical rewrites consume it, and getting it wrong means redoing all of them.
 
-   **Flags** — `--issue <key|#N>` `--body-file <path>` `--stage <name>` `[--json] [--quiet]`
-   `[--dry-run] [--strict]`. Note `--stage`, matching `jira-stage.js:78-82` and `gh-stage.js:634`;
-   there is no `--moment` flag anywhere in `shared/resources/*.js`.
+   **Flags** — `--issue <key|#N>` `--body-file <path>` `--stage <name>` `[--tracker jira|github]`
+   `[--json] [--quiet] [--dry-run] [--strict]`. Note `--stage`, matching `jira-stage.js:78-82` and
+   `gh-stage.js:634`; there is no `--moment` flag anywhere in `shared/resources/*.js`.
 
    **Exit codes** — transcribed from the peers (`jira-stage.js:20-27`, `gh-stage.js:25-30`):
 
    | Code | When |
    | ---- | ---- |
-   | `0` | Every outcome the pipeline should shrug at — posted, already, deferred, no-credentials, dry-run, stage-disabled, unverifiable |
+   | `0` | Every outcome the pipeline should shrug at — posted, already, deferred, no-credentials, dry-run, unverifiable |
    | `1` | A skip, **only** under `--strict` |
-   | `2` | Usage error — unknown flag, unknown stage, **missing `--issue`**, missing `--body-file` |
+   | `2` | Usage error — unknown flag, unknown stage, a flag with a missing or flag-shaped value, **missing `--issue`**, missing/empty `--body-file`, a non-numeric `--issue` on GitHub |
 
    **Reason vocabulary** — `posted` | `already` | `unverifiable` | `deferred` | `no-credentials` |
-   `stage-disabled` | `dry-run`. Emitted via the peers' `emit(payload, exitCode)` shape
-   (`gh-stage.js:766-769`), so `--json` yields `{ posted, reason, stage, exitCode, ... }`.
+   `dry-run`. Emitted via the peers' `emit(payload, exitCode)` shape (`gh-stage.js:766-769`), so
+   `--json` yields `{ posted, reason, stage, exitCode, ... }`.
+
+   > **`stage-disabled` was in this pinned table and was retracted during implementation** — see
+   > Implementation notes below. It is removed here rather than only narrated there, because this
+   > table is pinned precisely so downstream work can copy it, and task 57 builds on this contract.
+   > A retracted reason left in a pinned table is the drift most likely to be copied forward.
 
    `no-issue` is **not** a reason: a missing `--issue` is a usage error and exits `2`, as it does in
    both peers. An issue that is merely unlinked is the *caller's* branch — the step doc skips the call
@@ -199,7 +206,14 @@ No API, schema or config breaks. The MCP fallback path is preserved verbatim for
    already includes `command.stdin` (`:126-135`), precisely because two comments to the same issue with
    identical argv once collapsed to one record id and a wanted action vanished silently.
 4. **Rewrite the sites.** Verified inventory — 24 `addCommentToJiraIssue` occurrences across 15 files
-   outside bundled `references/` (23 rewritten, 1 allowlisted), plus 8 README mentions:
+   outside bundled `references/` (23 rewritten, 1 allowlisted), plus 8 README mentions, plus one
+   authored file inside a `references/` directory that no inventory pass saw (below).
+
+   > **On the "25" in this document's title and prose.** It is not reproducible from the tree by any
+   > single counting rule, and should be read as "every site", not as an assertion you can grep for.
+   > The countable figures are: 24 MCP occurrences across 15 files, 8 README doc-table mentions, 1
+   > stray `curl`, and 1 authored file in a `references/` dir. What is verifiable — and what the
+   > parity guard enforces — is that no MCP or `curl` comment residue remains outside the allowlist.
 
    | File | Sites | Action |
    | ---- | ----- | ------ |
@@ -243,7 +257,11 @@ No API, schema or config breaks. The MCP fallback path is preserved verbatim for
 | `skills/develop-task/README.md` | 4 doc-table mentions |
 | `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` | 1 site — **an authored file inside a `references/` dir**, missed by every inventory pass |
 | `shared/resources/tracker-comment-contract.md` | **new** — the reason table and MCP-fallback rule, referenced by every site instead of repeated at each |
-| `skills/{qa-story,qa-task}/references/develop-pipeline-step-0-*.md` | **deleted** — orphaned stale bundles |
+| `skills/{qa-story,qa-task}/references/develop-pipeline-step-0-*.md` | **refreshed by hand** — a bundler gap leaves them permanently stale (they were briefly deleted in error, then restored; the PR deletes nothing) |
+| `CHANGELOG.md` | Added + Changed entries |
+| `AGENTS.md` | new "Tracker Comments" section |
+| `docs/tasks/task-registry.md` | row 55 → accepted (and row 54's stale `planned` corrected) |
+| `skills/{create-pr,review-story,review-task,review-bug,qa-fix}/references/*.js` | **new bundled engines** — referencing `tracker-comment.js` transitively pulls `jira-sync.js`, `change-log.js`, `tracker-workflow.js` and `yaml-subset.js` into five skills that previously carried none (~1,800 lines). Bundler output, but it is the largest single contributor to this PR's file count |
 | `shared/resources/jira-transition-protocol.md` | narrow the fallback's remit; document the comment fallback; **allowlisted** in the guard |
 | `evals/shared/tests/transition-protocol-parity.test.mjs` | extend with the bare-MCP guard |
 | `shared/resources/tests/tracker-comment.test.mjs` | **new** — already covered by the `shared/resources/tests/*.test.mjs` glob at `package.json:24`, no `package.json` edit needed |
@@ -303,6 +321,41 @@ Each was applied, observed red, and reverted; the suite returns to 30/30 after e
 exit 0 and a throwing transport injected, so "no network" is proven rather than counted; and two
 different bodies on the same issue produce two distinct record ids while an identical re-run dedups —
 the exact property `tracker-access-record.md` documents as a past bug.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: [`task.55.gate.2.tracker-comment-cli.yml`](./task.55.gate.2.tracker-comment-cli.yml) — ✅ **PASS, 92/100**
+**QA Cycles**: 2 · **Defects**: 12 found, 12 closed (3 HIGH, 7 MEDIUM, 7 LOW)
+
+### Verified
+
+✅ **Success Criteria** — all 8 verified with both a code and a test citation, every cited test in the per-PR `npm test` lane
+✅ **CI** — `test`, `validate` and `link-check` all SUCCESS on head `5a9fd72`, which equals the PR head. First sample was **red**: CI runs `format:check`, which `npm test` does not, so a green local run said nothing about formatting. Fixed and re-verified on the new head.
+✅ **Tests** — 1513 passing across every suite; `validate:all` 115/0; `prettier --check` clean
+✅ **Security** — no shell string carries body content (argv arrays, body on stdin); redaction runs before hashing and covers `command.stdin` and `manual.fields`; no credential can reach the journal; the access gate proven ahead of every network call with throwing transports. `encodeURIComponent` added on the two Jira REST paths as hardening.
+✅ **Compliance** — GDPR/PCI/WCAG/HIPAA all N/A (internal tooling). All 22 applicable repo-standard checks pass: kebab-case naming, bundled copies byte-identical to source, no symlinks, shared doc correctly placed and bundled, four-column Change Log with machine writers leaving `Version` blank, status lifecycle, OKF frontmatter, all 11 required sections.
+✅ **Documentation** — CHANGELOG accurate after both fence rewrites; the contract doc's reason table and exit codes now match the CLI exactly (verified by grep against the source); `AGENTS.md` gained a Tracker Comments section; the task's pinned contract corrected in place.
+
+### Corrected during finalise
+
+The DoD pass returned **FAIL** on documentation and found real defects, all fixed before acceptance:
+
+- The contract doc — the file every one of the ~25 rewritten sites now points at — **described the rejected proximity version of its own parity guard**, omitted the `dry-run` reason, and listed only three of the six exit-2 conditions.
+- The task's pinned CLI contract still carried the retracted `stage-disabled` reason and omitted `--tracker`. Narrated in the implementation notes but never corrected in place — the drift most likely to be copied forward, since task 57 builds on this contract.
+- `AGENTS.md` had no home for the MCP prohibition, the one rule an agent authoring new skill prose must know *before* writing a comment block.
+- The Files Summary claimed two files were deleted (they were restored) and omitted ~1,800 lines of newly bundled engines across five skills.
+- The registry row still read `planned`; task 54's row was also stale from its own merge.
+- A **meta-test** was added proving the MCP guard can actually reject — it is otherwise its own only test, and this guard has already passed silently on the exact regression it names.
+
+**Detailed Verification Log:** [`task.55.dod.1.tracker-comment-cli.md`](./task.55.dod.1.tracker-comment-cli.md)
+
+**Task marked as ACCEPTED on:** 2026-08-19
+
+---
 
 ## QA Testing Results
 
@@ -414,6 +467,7 @@ Two adjacent defects surfaced, one of them pre-existing and worth its own follow
 | 2026-08-19 |  | QA findings fixed — 7 of 7 cycle-1 issues, all mutation-proved | qa-fix |
 | 2026-08-19 |  | QA cycle 2 FAIL — the fence fix had reintroduced its own bug class; 5 new defects | qa-task |
 | 2026-08-19 |  | QA findings fixed — 5 of 5 cycle-2 defects; gate PASS (92/100), 2 cycles | qa-fix |
+| 2026-08-19 | 1.2 | DoD verified — accepted (PR #257); corrected the contract doc, the pinned contract, AGENTS.md and the registry | finalise |
 
 ## References
 

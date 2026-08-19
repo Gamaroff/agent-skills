@@ -773,3 +773,60 @@ test("the comment marker prefix is identical in both modules that own one", () =
   const cli = require(join(sharedDir, "tracker-comment.js"));
   assert.equal(cli.COMMENT_MARKER_PREFIX, lib.COMMENT_MARKER_PREFIX);
 });
+
+test("the MCP prohibition guard can actually fail (meta-test)", () => {
+  // A guard that is its own test proves nothing about its ability to REJECT.
+  // That is not a theoretical worry here: the first version of this guard passed
+  // on the exact regression it names, because its `no-credentials` proximity
+  // window was pre-satisfied by every site's own reason table. It looked green
+  // and enforced nothing.
+  //
+  // So this synthesises the offending content and asserts the predicate rejects
+  // it — the negative case, which the guard above can never exercise on a clean
+  // tree.
+  const predicate = (rel, line) => {
+    const allowlisted = MCP_COMMENT_ALLOWLIST.includes(rel);
+    return !allowlisted && line.includes("addCommentToJiraIssue");
+  };
+
+  // A bare call in a non-allowlisted shipped doc is an offence...
+  assert.equal(
+    predicate(
+      "shared/resources/develop-pipeline-step-7-finalise.md",
+      "Call `addCommentToJiraIssue` with issueIdOrKey and commentBody.",
+    ),
+    true,
+    "the guard must reject a bare MCP call",
+  );
+
+  // ...and remains one when the word `no-credentials` is nearby, which is
+  // precisely what the abandoned proximity rule let through.
+  assert.equal(
+    predicate(
+      "shared/resources/develop-pipeline-step-2-review.md",
+      "| `no-credentials` | ... | Call `addCommentToJiraIssue` here |",
+    ),
+    true,
+    "proximity to `no-credentials` must NOT create an exemption",
+  );
+
+  // The two canonical docs are the only exemption.
+  assert.equal(
+    predicate(
+      "shared/resources/tracker-comment-contract.md",
+      "- `addCommentToJiraIssue` with `cloudId` ...",
+    ),
+    false,
+  );
+
+  // And a file merely NAMED like an allowlisted one is not exempt — the
+  // filename-based rule this replaced let any skill mint an exemption.
+  assert.equal(
+    predicate(
+      "skills/unrelated/references/tracker-comment-contract.md",
+      "Call `addCommentToJiraIssue` directly.",
+    ),
+    true,
+    "an allowlist entry is a path, not a basename",
+  );
+});

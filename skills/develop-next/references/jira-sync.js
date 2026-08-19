@@ -4775,7 +4775,8 @@ async function findCommentsByMarker({
   // module exists to prevent.
   const marker = commentMarkerText(momentId);
   const resp = await http(
-    `${baseUrl}/rest/api/3/issue/${issueKey}/comment?maxResults=${maxResults}&orderBy=-created`,
+    `${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment` +
+      `?maxResults=${maxResults}&orderBy=-created`,
     {
       headers: {
         Authorization: authHeader(email, token),
@@ -4853,36 +4854,39 @@ async function addComment({
   linkResolver = undefined,
 }) {
   const doc = buildCommentAdf(body, momentId, linkResolver);
-  const resp = await http(`${baseUrl}/rest/api/3/issue/${issueKey}/comment`, {
-    method: "POST",
-    headers: {
-      Authorization: authHeader(email, token),
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ body: doc }),
-    // Layer 2 — what the mutation MEANS. The rendered ADF is not useful to a
-    // human performing this by hand, so `manual.fields` carries the markdown
-    // they would paste, and `command.stdin` carries it too so the record's
-    // fingerprint distinguishes two different comments on the same issue.
-    defer: {
-      kind: "jira.comment.add",
-      intent: `Comment on ${issueKey}${momentId ? ` (${momentId})` : ""}`,
-      target: {
-        issue: issueKey,
-        url: `${baseUrl}/rest/api/3/issue/${issueKey}/comment`,
-        ui_url: `${baseUrl}/browse/${issueKey}`,
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
-      desired: firstLineOf(body),
-      manual: {
-        deepLink: `${baseUrl}/browse/${issueKey}`,
-        ui: "Open the issue → Comment → Paste → Save",
-        fields: [{ name: "Comment", value: body }],
+      body: JSON.stringify({ body: doc }),
+      // Layer 2 — what the mutation MEANS. The rendered ADF is not useful to a
+      // human performing this by hand, so `manual.fields` carries the markdown
+      // they would paste, and `command.stdin` carries it too so the record's
+      // fingerprint distinguishes two different comments on the same issue.
+      defer: {
+        kind: "jira.comment.add",
+        intent: `Comment on ${issueKey}${momentId ? ` (${momentId})` : ""}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}/comment`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: firstLineOf(body),
+        manual: {
+          deepLink: `${baseUrl}/browse/${issueKey}`,
+          ui: "Open the issue → Comment → Paste → Save",
+          fields: [{ name: "Comment", value: body }],
+        },
+        command: { argv: ["jira", "comment", issueKey], stdin: body },
+        skill,
       },
-      command: { argv: ["jira", "comment", issueKey], stdin: body },
-      skill,
     },
-  });
+  );
   if (resp.deferred) {
     return { posted: false, deferred: true, record: resp.deferredRecord };
   }

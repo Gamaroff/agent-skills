@@ -6,11 +6,22 @@ description: How every pipeline step and skill posts a comment to a tracker issu
 
 # Posting a comment to a tracker issue
 
-> **This is the primary path. There is no other one.** Before task 55, every Jira
-> comment in this repository was an `addCommentToJiraIssue` MCP call an agent
-> made by following prose, and every GitHub issue comment was a bare
-> `gh issue comment`. Neither could be intercepted, retried by code, or made
-> idempotent, because interception needs a chokepoint and prose has none.
+> **This is the primary path for a tracker-issue comment, and the only one on
+> Jira.** Before task 55, every Jira comment in this repository was an
+> `addCommentToJiraIssue` MCP call an agent made by following prose, and every
+> GitHub issue comment was a bare `gh issue comment`. Neither could be
+> intercepted, retried by code, or made idempotent, because interception needs a
+> chokepoint and prose has none.
+>
+> **On GitHub the picture is not yet complete.** A number of authored prose sites
+> still post with a bare `gh issue comment` — they are covered by
+> `tracker_write()` for interception, but they carry no marker, so they are not
+> idempotent and a resumed run comments again. Those sites were out of this
+> task's scope, which targeted the MCP sites and the one stray `curl`. Do not
+> read the paragraph above as "nothing else posts a comment"; read it as "nothing
+> else *should*, and on Jira nothing else does."
+>
+> PR comments are a different concern entirely and are not covered here.
 
 ## The call
 
@@ -54,11 +65,24 @@ only for a comment that genuinely should be posted every time.
 | `deferred` | `access.tracker` is not `full`; recorded for the handover | Nothing — the record **is** the deliverable |
 | `unverifiable` | 2+ marker matches, or the comment list could not be read | Log in the Issues Log and continue. **Never post anyway** |
 | `no-credentials` | No usable auth | The one case where the MCP fallback applies — below |
+| `dry-run` | `--dry-run` was passed; nothing read, nothing written | Nothing |
 
-Exit codes match `jira-stage.js` and `gh-stage.js` exactly: `0` for every
-outcome above, `1` for a skip but only under `--strict`, `2` for a usage error
-(missing `--issue`, missing or empty `--body-file`, unknown flag). A comment
-failure must never kill a pipeline run, which is why almost everything exits 0.
+Exit codes match `jira-stage.js` and `gh-stage.js` exactly:
+
+| Code | When |
+|---|---|
+| `0` | Every reason above |
+| `1` | A skip, but **only** under `--strict` — never for `already`, which is success |
+| `2` | A usage error: missing `--issue`; missing, unreadable or empty `--body-file`; an unknown flag; a value-taking flag with a missing or flag-shaped value; an unknown `--stage`; a non-numeric `--issue` on GitHub; an unresolvable access mode |
+
+A comment failure must never kill a pipeline run, which is why almost everything
+exits 0. Exit 2 is reserved for the caller getting the invocation wrong — a class
+the pipeline should never reach at runtime, and wants to hear about loudly if it
+does.
+
+**`--stage` is validated against a known list** (`COMMENT_STAGES`, plus a numeric
+suffix for the cycle-scoped `qa-cycle` / `qa-fix`). An unlisted stage is exit 2
+rather than a silently unique marker that nothing could ever deduplicate against.
 
 ### Why `unverifiable` is not `already`
 
@@ -91,7 +115,19 @@ and it exists for the same reason: a rule enforced only by prose fails silently,
 and this repository has written down twice why that is the failure mode to
 design out rather than to police.
 
-Any other MCP comment call — one not reached through a `no-credentials` branch —
-is a regression. `evals/shared/tests/transition-protocol-parity.test.mjs`
-enforces this: an `addCommentToJiraIssue` mention in shipped prose is only legal
-when the literal `no-credentials` appears in the lines just above it.
+Any other MCP comment call is a regression, and
+`evals/shared/tests/transition-protocol-parity.test.mjs` enforces it as an
+**absolute prohibition**: the literal `addCommentToJiraIssue` may not appear in
+shipped prose at all, outside this file and `jira-transition-protocol.md`. A
+bundled copy of either is exempt only when its content matches the shared source
+— by content, never by filename.
+
+That is why the fallback procedure above lives *here* and is referenced rather
+than restated at each call site. The guard's first version tried to be cleverer
+— it allowed a mention when the literal `no-credentials` appeared within twelve
+lines above it — and that rule was **vacuous**: every rewritten site ends with a
+reason table containing that literal, so the window was pre-satisfied
+everywhere, and a verbatim bare MCP block re-inserted next to a reason table
+produced zero offenders. A guard satisfied by the sentence documenting the
+correct behaviour is worse than no guard, because it reports success. Keeping
+the procedure in one place is what makes the rule enforceable.
