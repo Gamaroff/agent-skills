@@ -321,18 +321,41 @@ fi
 
 If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started on the linked tracker issue. Branch on `TRACKER`. **This section is identical for develop-story and develop-task.**
 
-### Jira path (when `TRACKER=jira`):
+### Post the pipeline-start comment (both trackers)
 
-Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net` from `https://yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` field from the matching entry.
+The comment is the same on either tracker, so it is **one** call — `tracker-comment.js` branches on `TRACKER` internally:
 
-1. **Post pipeline-start comment** — call `addCommentToJiraIssue`:
-   - `cloudId`: {derived hostname}
-   - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`: `"Pipeline started — branch: \`{branch-name}\`"`
-   - `contentFormat`: `"markdown"`
-   - On failure: log warning and continue (non-blocking)
+> Engine source: `shared/resources/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
 
-2. **Signal the `work-started` stage** — run the deterministic CLI:
+
+```bash
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+Pipeline started — branch: \`{branch-name}\`
+EOF
+
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage work-started --json
+```
+
+Read `reason` from the JSON:
+
+| `reason` | What it means | What to do |
+|---|---|---|
+| `posted` | The comment was created | Nothing |
+| `already` | The marker says this exact moment was already commented | Nothing — this is a resume, not a failure |
+| `deferred` | `access.tracker` is not `full`; recorded for the handover | Nothing — the record is the deliverable |
+| `unverifiable` | 2+ marker matches, or the comment list was unreadable | Log in Issues Log and continue. **Do not post anyway** |
+| `no-credentials` | No usable auth | **Only here** may the Jira path fall back to MCP — see below |
+
+**The MCP fallback, and only on `no-credentials`.** When `TRACKER=jira` and the CLI reports `no-credentials`, call `addCommentToJiraIssue` with `cloudId` (the hostname from `JIRA_URL`), `issueIdOrKey: {TRACKER_ISSUE}`, the same `commentBody`, and `contentFormat: "markdown"`. If a call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry. On failure: log a warning and continue (non-blocking).
+
+Do **not** run both paths. The CLI is authoritative whenever credentials exist.
+
+### Jira path — status transition (when `TRACKER=jira`):
+
+1. **Signal the `work-started` stage** — run the deterministic CLI:
 
    ```bash
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \

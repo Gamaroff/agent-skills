@@ -65,7 +65,7 @@ Log the cycle in the implementation report's QA Iteration History:
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
 ```
 
-If the bug has a linked tracker issue (`TRACKER_ISSUE` non-empty), post the cycle result as a non-blocking `gh issue comment` / `addCommentToJiraIssue` (skip silently when empty — most bugs have no issue).
+If the bug has a linked tracker issue (`TRACKER_ISSUE` non-empty), post the cycle result through `shared/resources/tracker-comment.js` with `--stage qa-cycle-{N}` — it branches on `TRACKER` internally and is non-blocking. Skip silently when empty (most bugs have no issue). Read `reason` per [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md).
 
 ---
 

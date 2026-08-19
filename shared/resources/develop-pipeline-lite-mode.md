@@ -28,8 +28,11 @@ Lite mode trades **QA depth** for speed on low-risk work. It does NOT trade away
 1. Write the `*.dod.{N}.*.md` file (full DoD audit, not a one-line acceptance note)
 2. Set the story/task `status: accepted` in both frontmatter and body
 3. **Post the full DoD body as a PR comment** (the entire DoD file content, not just a "task accepted" line)
-4. **Comment on the linked tracker issue** (GitHub `gh issue comment` + `gh issue close`, or Jira `addCommentToJiraIssue`) with PR URL and DoD verdict
+4. **Comment on the linked tracker issue** via `tracker-comment.js` (and, on GitHub, `gh issue close`) with the PR URL and DoD verdict
 5. **Update the project board / Jira board** status to Done — `gh-stage.js --stage done` on GitHub, `jira-stage.js --stage done` on Jira. Both resolve the target column from the consumer's `tracker-workflow.yaml`; neither is skipped in lite mode.
+
+> Engine source: `shared/resources/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
+
 
 Skipping any of these in lite mode leaves the issue stuck "In Progress" forever and hides acceptance evidence from reviewers. The full Step 7 protocol in `shared/resources/develop-pipeline-step-7-finalise.md` applies in lite mode without exception.
 

@@ -383,10 +383,23 @@ Bitbucket Issues are disabled for this project — do NOT use the Bitbucket Issu
    - Parse the current branch name for a story/task identifier (e.g. `feature/story.37.1.*` or `feature/task.40.*`)
    - Find the corresponding story/task document in the working directory
    - Read `jira_key` from its YAML frontmatter (e.g. `PROJ-12`)
-2. If `jira_key` is found, use the `addCommentToJiraIssue` Atlassian MCP tool with:
-   - `issueIdOrKey`: `{jira_key}`
-   - `contentFormat`: `"markdown"`
-   - `comment`: `"PR opened — [PR #{PR_ID}]({PR_URL})"`
+2. If `jira_key` is found, post the comment through the CLI:
+
+   ```bash
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+   PR opened — [PR #{PR_ID}]({PR_URL})
+   EOF
+
+   node .agents/skills/create-pr/references/tracker-comment.js \
+     --issue {jira_key} --body-file .claude/state/comment-body.md \
+     --stage in-review --json
+   ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
 3. If `jira_key` is not found or the comment fails, log warning and continue — do NOT halt.
 
 ---

@@ -6,6 +6,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`tracker-comment.js` — a comment endpoint that did not exist, and one call site instead of two
+  dozen.** `jira-sync.js` had no comment function at all, so *every* Jira comment in this repository
+  was an `addCommentToJiraIssue` MCP call an agent made by following prose, and every GitHub issue
+  comment was a bare `gh issue comment`. Neither could be intercepted, retried by code, or made
+  idempotent — interception needs a chokepoint and prose has none.
+
+  New `addComment()` in `jira-sync.js` goes through the same `http()` factory as every other write,
+  so the access gate covers it for free. New `shared/resources/tracker-comment.js` is the third peer
+  of `jira-stage.js` / `gh-stage.js`: same `--issue` / `--stage` / `--json` shape, same exit codes
+  (0 for every normal outcome, 1 for a skip under `--strict`, 2 for a usage error), and the same
+  access gate placed above the first credential read, so a restricted run demonstrably makes no
+  network call. The 25 prose sites — including one that had drifted to raw `curl` against REST **v2**
+  and was invisible to both interception layers — now make one CLI call each. The Atlassian MCP tool
+  survives **only** as the documented `no-credentials` fallback.
+
+  Comments are idempotent via an identity marker: an invisible HTML comment on GitHub, and a small
+  italic footer on Jira, because ADF drops unknown nodes and an HTML comment would be stripped
+  silently, taking idempotency with it. The cardinality rule is the point — 0 matches posts, 1 match
+  reports `already`, and **2+ reports `unverifiable` and posts nothing**. The older PR-comment
+  convention resolves that case with `| head -1`, which is how a duplicate comment becomes invisible
+  and stays that way.
+
+- **ADF renderer: fenced code blocks and italics.** `adf` gained a `codeBlock` builder and an `em`
+  mark, and `textToAdfNodes` now tracks fences. The fence is tracked in that line loop rather than in
+  `blockToAdf` because the loop splits on blank lines first — a listing containing a blank line was
+  being torn apart and its pieces re-parsed as prose, so a `|` row became a table and a `#` comment
+  became a heading. Every existing caller benefits: `sync-jira-{task,story,epic}` previously
+  flattened fenced blocks.
+
 - **`gh-stage.js --print-plan`** — the GitHub twin of the Jira flag, and the same contract: it
   resolves which board column a pipeline moment names by reading `tracker-workflow.yaml` alone,
   with **no credentials and no network**, and it runs *above* the `gh auth` check. That placement is
@@ -109,6 +138,12 @@ All notable changes to this project will be documented in this file. Format foll
   has annotated yet.
 
 ### Changed
+
+- **`review-task`'s Jira review comment renders as ADF v3 instead of REST v2 plain text.** That site
+  was the only comment in the repository posted with a raw `curl`; folding it into `addComment()`
+  means its headings and tables now render as real ADF nodes rather than raw markdown characters.
+  Visible change to anyone reading those comments, and the reason this was a behaviour change rather
+  than a mechanical swap.
 
 - **The three `sync-jira-*` skills report `reason: "deferred"`** with the journal `record` id in
   their `--json` payload. A deferred **create** returns the same null shape as `--dry-run`

@@ -322,18 +322,41 @@ fi
 
 If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started on the linked tracker issue. Branch on `TRACKER`. **This section is identical for develop-story and develop-task.**
 
-### Jira path (when `TRACKER=jira`):
+### Post the pipeline-start comment (both trackers)
 
-Use the Atlassian MCP tools — no auth management needed. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net` from `https://yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` field from the matching entry.
+The comment is the same on either tracker, so it is **one** call — `tracker-comment.js` branches on `TRACKER` internally:
 
-1. **Post pipeline-start comment** — call `addCommentToJiraIssue`:
-   - `cloudId`: {derived hostname}
-   - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`: `"Pipeline started — branch: \`{branch-name}\`"`
-   - `contentFormat`: `"markdown"`
-   - On failure: log warning and continue (non-blocking)
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
-2. **Signal the `work-started` stage** — run the deterministic CLI:
+
+```bash
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+Pipeline started — branch: \`{branch-name}\`
+EOF
+
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage work-started --json
+```
+
+Read `reason` from the JSON:
+
+| `reason` | What it means | What to do |
+|---|---|---|
+| `posted` | The comment was created | Nothing |
+| `already` | The marker says this exact moment was already commented | Nothing — this is a resume, not a failure |
+| `deferred` | `access.tracker` is not `full`; recorded for the handover | Nothing — the record is the deliverable |
+| `unverifiable` | 2+ marker matches, or the comment list was unreadable | Log in Issues Log and continue. **Do not post anyway** |
+| `no-credentials` | No usable auth | **Only here** may the Jira path fall back to MCP — see below |
+
+**The MCP fallback, and only on `no-credentials`.** When `TRACKER=jira` and the CLI reports `no-credentials`, call `addCommentToJiraIssue` with `cloudId` (the hostname from `JIRA_URL`), `issueIdOrKey: {TRACKER_ISSUE}`, the same `commentBody`, and `contentFormat: "markdown"`. If a call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry. On failure: log a warning and continue (non-blocking).
+
+Do **not** run both paths. The CLI is authoritative whenever credentials exist.
+
+### Jira path — status transition (when `TRACKER=jira`):
+
+1. **Signal the `work-started` stage** — run the deterministic CLI:
 
    ```bash
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
@@ -385,6 +408,8 @@ The CLI re-reads the item after mutating and reports the option it actually land
 **3. Set Priority to P2 – Medium when unset** (graceful — warn and continue on any failure).
 
 This is a **separate concern** that merely used to share a GraphQL response with the status move. `gh-stage.js` deliberately does not touch Priority — it owns the Status field and nothing else — so this block keeps its own query:
+
+> **Ordering matters: this block must run *after* the `work-started` call above.** It carries no `item-add` and no propagation retry, because it does not need them — `ensureOnBoard` has already added the item, slept for Projects API propagation, and successfully read the item back (it could not have set the status otherwise). Running this block first, or on its own, against an issue not yet on a board would read an empty `projectItems` and silently skip the Priority default. That is graceful rather than harmful, but it is a silent no-op, so keep the order.
 
 ```bash
 (
@@ -655,6 +680,17 @@ _Problems encountered and how they were resolved or escalated._
 
 ---
 
+## Tracker Actions Required
+
+_Tracker mutations this run wanted but did not perform — because `access.tracker` restricts this
+run, or because the call failed. Rendered from `.claude/state/tracker-actions.jsonl` by
+`handover-render.js --format summary`; the committed checklist, script and JSON sidecar are the
+`*.handover.{n}.{name}.{md,sh,json}` artifacts beside this report. **Omit this section entirely when
+the journal is empty** — an empty heading reads as "nothing was deferred" in the same shape it would
+read as "the renderer broke"._
+
+---
+
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
@@ -734,6 +770,17 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+---
+
+## Tracker Actions Required
+
+_Tracker mutations this run wanted but did not perform — because `access.tracker` restricts this
+run, or because the call failed. Rendered from `.claude/state/tracker-actions.jsonl` by
+`handover-render.js --format summary`; the committed checklist, script and JSON sidecar are the
+`*.handover.{n}.{name}.{md,sh,json}` artifacts beside this report. **Omit this section entirely when
+the journal is empty** — an empty heading reads as "nothing was deferred" in the same shape it would
+read as "the renderer broke"._
 
 ---
 

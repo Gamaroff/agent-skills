@@ -70,7 +70,15 @@ for (const [label, stage] of PAIRS) {
 }
 
 test("every --stage literal in shipped markdown names a real stage", () => {
-  const known = new Set(lib.STAGE_NAMES);
+  // Two CLIs take `--stage`, and their value domains differ on purpose.
+  // gh-stage/jira-stage take a BOARD MOMENT; tracker-comment takes a COMMENT
+  // IDENTITY, whose namespace is a superset — a QA cycle is worth commenting on
+  // without being worth a column. Validating every literal against the board
+  // set would force comment-only moments to invent columns nobody wants, so the
+  // check resolves which CLI each literal belongs to first.
+  const boardStages = new Set(lib.STAGE_NAMES);
+  const commentCli = require(join(sharedDir, "tracker-comment.js"));
+  const commentStages = new Set(commentCli.COMMENT_STAGES);
   const offenders = [];
   const scan = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -83,7 +91,27 @@ test("every --stage literal in shipped markdown names a real stage", () => {
       if (!entry.name.endsWith(".md")) continue;
       const text = readFileSync(p, "utf-8");
       for (const m of text.matchAll(/--stage\s+([a-z][a-z-]*)/g)) {
-        if (!known.has(m[1])) offenders.push(`${p}: --stage ${m[1]}`);
+        // Which CLI is this literal an argument to? The nearest CLI filename in
+        // the preceding window wins; absent one, assume a board stage, which
+        // keeps the original strictness as the default rather than the
+        // exception.
+        const before = text.slice(Math.max(0, m.index - 240), m.index);
+        const lastComment = before.lastIndexOf("tracker-comment.js");
+        const lastBoard = Math.max(
+          before.lastIndexOf("gh-stage.js"),
+          before.lastIndexOf("jira-stage.js"),
+        );
+        const isComment = lastComment > lastBoard;
+        // `--stage qa-cycle-{N}` captures a trailing hyphen before the
+        // placeholder; cycle-scoped stages are legitimately dynamic, because
+        // cycle 2 must not be suppressed by cycle 1's marker.
+        const name = m[1].replace(/-$/, "");
+        const known = isComment ? commentStages : boardStages;
+        if (!known.has(name)) {
+          offenders.push(
+            `${p}: --stage ${m[1]} (${isComment ? "comment" : "board"} stage)`,
+          );
+        }
       }
     }
   };
@@ -92,7 +120,7 @@ test("every --stage literal in shipped markdown names a real stage", () => {
   assert.deepEqual(
     offenders,
     [],
-    `Unknown stage name(s). Known: ${[...known].join(", ")}`,
+    `Unknown stage name(s).\n  board: ${[...boardStages].join(", ")}\n  comment: ${[...commentStages].join(", ")}`,
   );
 });
 
@@ -495,4 +523,151 @@ test("the prose tells the fallback to pass --issue-type, and to honour enabled:f
   assert.match(block, /--print-plan/);
   assert.match(block, /--from/);
   assert.match(block, /--issue-type/);
+});
+
+// ---------------------------------------------------------------------------
+// Comment parity (task 55)
+//
+// The same guard shape as the board-mutation one above, for the same reason.
+// Before task 55 every Jira comment was an `addCommentToJiraIssue` MCP call an
+// agent made by following prose — roughly two dozen of them, hand-written and
+// already drifted (one site used raw `curl` against REST v2 while the rest used
+// MCP). Rewriting them once fixes nothing on its own: without a guard the next
+// feature adds a comment the old way and the count climbs back one PR at a time.
+//
+// PAIRED, deliberately: absence alone is a vacuous guard, so this asserts both
+// that no bare MCP comment call survives AND that the sites positively invoke
+// the CLI.
+// ---------------------------------------------------------------------------
+
+// Prose files where naming the MCP tool is the POINT, not a regression.
+const MCP_COMMENT_ALLOWLIST = [
+  // Documents the fallback contract itself.
+  "shared/resources/tracker-comment-contract.md",
+  // Its own examples — the transition protocol references the comment path to
+  // say the transition may be skipped while the comment still runs.
+  "shared/resources/jira-transition-protocol.md",
+];
+
+/** How many lines above a mention we accept a `no-credentials` guard in. */
+const GUARD_WINDOW = 12;
+
+function isAllowlisted(file) {
+  const rel = file.slice(repoRoot.length + 1).split("\\").join("/");
+  return MCP_COMMENT_ALLOWLIST.some(
+    (a) => rel === a || rel.endsWith(`/references/${a.split("/").pop()}`),
+  );
+}
+
+test("no shipped markdown calls addCommentToJiraIssue outside a no-credentials fallback", () => {
+  const offenders = [];
+  for (const f of shippedMarkdown()) {
+    if (isAllowlisted(f)) continue;
+    const lines = readFileSync(f, "utf-8").split("\n");
+    lines.forEach((line, i) => {
+      if (!line.includes("addCommentToJiraIssue")) return;
+      // The mention is legal only when it is reachable ONLY through the CLI's
+      // no-credentials branch. Requiring the literal within a short window
+      // above is a structural check, not a stylistic one: it is what makes the
+      // MCP call unreachable on a credentialed run.
+      const window = lines.slice(Math.max(0, i - GUARD_WINDOW), i + 1).join("\n");
+      if (!window.includes("no-credentials")) {
+        offenders.push(`${f.slice(repoRoot.length + 1)}:${i + 1}`);
+      }
+    });
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `Bare addCommentToJiraIssue call(s) — route through tracker-comment.js and ` +
+      `keep MCP behind a "no-credentials" branch:\n  ${offenders.join("\n  ")}`,
+  );
+});
+
+test("no shipped markdown posts a Jira comment with a raw curl", () => {
+  // The site this replaces (skills/review-task/SKILL.md) used REST v2 with a
+  // plain-string body, so it was invisible to BOTH interception layers — it
+  // went through neither jira-sync.js's http() nor a `gh` call that
+  // resolve-platform.sh's tracker_write could wrap.
+  const offenders = [];
+  for (const f of shippedMarkdown()) {
+    if (isAllowlisted(f)) continue;
+    const lines = readFileSync(f, "utf-8").split("\n");
+    lines.forEach((line, i) => {
+      if (!/rest\/api\/\d\/issue\/[^\s"']*\/comment/.test(line)) return;
+      // A markdown TABLE ROW naming the endpoint is documentation, not a call —
+      // tracker-access-record.md's roster has an "endpoint" column, and the
+      // `jira.comment.add` row legitimately names this URL. An invocation is
+      // never a pipe-delimited row, so that is the discriminator rather than a
+      // file allowlist, which would have blinded the guard to a real call
+      // appearing in the same file later.
+      if (line.trim().startsWith("|")) return;
+      offenders.push(`${f.slice(repoRoot.length + 1)}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `Raw Jira comment REST call(s) — route through tracker-comment.js:\n  ${offenders.join("\n  ")}`,
+  );
+});
+
+test("each pipeline comment site positively invokes tracker-comment.js", () => {
+  // The positive half. Every step doc that had a comment site must still have
+  // one — a rewrite that deleted the comment instead of routing it would pass
+  // the two negative guards above and silently stop commenting.
+  const REQUIRED = [
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+    "shared/resources/develop-pipeline-step-2-review.md",
+    "shared/resources/develop-pipeline-step-3-develop-loop.md",
+    "shared/resources/develop-pipeline-step-4-create-pr.md",
+    "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+    "shared/resources/develop-pipeline-step-7-finalise.md",
+  ];
+  const missing = REQUIRED.filter(
+    (rel) => !readFileSync(join(repoRoot, rel), "utf-8").includes("tracker-comment.js"),
+  );
+  assert.deepEqual(missing, [], `step doc(s) no longer comment at all: ${missing.join(", ")}`);
+});
+
+test("tracker-comment.js is bundled wherever a skill invokes it", () => {
+  const missing = [];
+  for (const skill of readdirSync(join(repoRoot, "skills"))) {
+    const skillDir = join(repoRoot, "skills", skill);
+    let files;
+    try {
+      files = readdirSync(skillDir, { recursive: true });
+    } catch {
+      continue;
+    }
+    const invokes = files.some((rel) => {
+      if (typeof rel !== "string" || !rel.endsWith(".md")) return false;
+      if (rel.split(/[\\/]/).includes("references")) return false;
+      return readFileSync(join(skillDir, rel), "utf-8").includes(
+        "tracker-comment.js",
+      );
+    });
+    if (!invokes) continue;
+    const bundled = files.some(
+      (rel) =>
+        typeof rel === "string" &&
+        rel.split(/[\\/]/).includes("references") &&
+        rel.endsWith("tracker-comment.js"),
+    );
+    if (!bundled) missing.push(skill);
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    `skill(s) invoke tracker-comment.js without bundling it — run npm run bundle: ${missing.join(", ")}`,
+  );
+});
+
+test("the comment marker prefix is identical in both modules that own one", () => {
+  // tracker-comment.js duplicates the literal rather than requiring
+  // jira-sync.js, because its GitHub branch must not load 4,800 lines of Jira.
+  // A duplicated constant needs a check, or the two drift and every marker
+  // search silently stops matching.
+  const cli = require(join(sharedDir, "tracker-comment.js"));
+  assert.equal(cli.COMMENT_MARKER_PREFIX, lib.COMMENT_MARKER_PREFIX);
 });
