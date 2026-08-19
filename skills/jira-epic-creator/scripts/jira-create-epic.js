@@ -54,7 +54,11 @@ function accessTracker() {
     ]
       .map((v) => String(v || "").trim())
       .filter(Boolean);
-    if (!seen.length) return "full";
+    // C5-CR4 — the degraded tier must not answer "full" over a config it cannot
+    // read. Without `dm` there is no config tier at all, so a repo that declares
+    // `access.tracker` would get everything the declaration withholds. Detecting
+    // that the declaration EXISTS needs no parser, and is enough to refuse.
+    if (!seen.length) return configMayRestrict() ? "manual" : "full";
     for (const v of seen) {
       // CYCLE-4 CR-13 — own properties only. `in` walks the prototype chain, so
       // ACCESS_TRACKER="constructor" passed validation and was then compared as
@@ -71,10 +75,56 @@ function accessTracker() {
     );
   }
   try {
-    return dm.resolveAccessTracker();
+    // Anchored to the repo root rather than process.cwd(), so a bare
+    // `node jira-create-epic.js …` from a subdirectory reads the same config the
+    // resolver would (C5-CR6).
+    return dm.resolveAccessTracker(process.env, { cwd: repoRootOrCwd() });
   } catch (e) {
     console.error(`Error: ${e.message}`);
     process.exit(1);
+  }
+}
+
+/** The git top level, or the working directory when this is not a checkout. */
+function repoRootOrCwd() {
+  try {
+    return require("child_process")
+      .execSync("git rev-parse --show-toplevel", {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      .trim();
+  } catch (_) {
+    return process.cwd();
+  }
+}
+
+/**
+ * Does a config file exist that mentions `access`? Used ONLY on the degraded
+ * no-writer path, where there is no reader to ask. It deliberately answers a
+ * weaker question than read-config.sh does — "might something be declared here"
+ * rather than "what is declared" — because the only safe action when the answer
+ * is yes and nothing can parse it is to refuse.
+ */
+function configMayRestrict() {
+  const root = repoRootOrCwd();
+  const raw = String(process.env.SKILLS_CONFIG_FILE || "").trim();
+  const file = raw
+    ? path.isAbsolute(raw)
+      ? raw
+      : path.resolve(root, raw)
+    : path.join(root, "skills-config.yaml");
+  // A redirect that lands on nothing is itself a refusal: changing WHICH file is
+  // read must never widen access.
+  try {
+    if (!fs.statSync(file).isFile()) return true;
+  } catch (_) {
+    return Boolean(raw);
+  }
+  try {
+    return /access/i.test(fs.readFileSync(file, "utf8"));
+  } catch (_) {
+    return true;
   }
 }
 

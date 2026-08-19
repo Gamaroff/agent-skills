@@ -51,9 +51,17 @@ jsm_auth_header() {
 # restriction, because this skill's own SKILL.md documents bare
 # `manage-sprint-state.sh <id> closed` invocations that never source the resolver.
 #
-# `access.tracker` in skills-config.yaml is NOT read here — see the matching note
-# in defer-mutation.js. A config tier needs read-config.sh's discovery and subset
-# semantics; a shell reimplementation of those is task.61, not this file.
+# `access.tracker` in skills-config.yaml IS read here, and by the only reader
+# there is: resolve-platform.sh, sourced below in a subshell. This file used to
+# open-code the mode table over the two env names, which made it a FOURTH copy of
+# a contract that already had three — and left it blind to a restriction an
+# operator had committed to the repo, which is precisely the person the gate
+# exists for. Sourcing the resolver is not a fifth copy; it is the original.
+#
+# In a SUBSHELL, and read back through stdout, on purpose. resolve-platform.sh
+# `unset`s and re-exports TRACKER/VCS/ACCESS_* and defines functions; sourcing it
+# into the caller's shell would overwrite platform state the caller may have
+# resolved for itself. A subshell keeps the blast radius to one variable.
 #
 # It SETS a global rather than printing, and is called as a plain command: a
 # value assigned inside `$(...)` dies with the subshell, so a memo there never
@@ -62,8 +70,23 @@ jsm_resolve_access() {
   [ -n "${JSM_ACCESS_MODE:-}" ] && return 0
   JSM_ACCESS_ERROR=""
 
+  # The CONFIG tier, from the one reader. A non-zero exit is a refusal — the file
+  # exists and could not be read correctly — and resolves to the most restrictive
+  # mode rather than to "full", matching what the JS gates do with the same
+  # answer. An absent config answers "full", which is the identity element of the
+  # most-restrictive-wins reduction below and so changes nothing.
+  local cfg_mode="" resolver
+  resolver="$(dirname "${BASH_SOURCE[0]}")/resolve-platform.sh"
+  if [ -f "$resolver" ]; then
+    cfg_mode=$(
+      unset ACCESS_TRACKER AGENT_SKILLS_ACCESS_TRACKER
+      source "$resolver" >/dev/null 2>&1 && printf '%s' "$ACCESS_TRACKER"
+    ) || cfg_mode="manual"
+    [ -n "$cfg_mode" ] || cfg_mode="manual"
+  fi
+
   local best="full" v rank_v rank_best
-  for v in "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
+  for v in "$cfg_mode" "${ACCESS_TRACKER:-}" "${AGENT_SKILLS_ACCESS_TRACKER:-}"; do
     [ -z "$v" ] && continue
     case "$v" in
       manual) rank_v=0 ;; command) rank_v=1 ;; approve) rank_v=2 ;;

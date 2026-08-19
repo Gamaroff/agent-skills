@@ -130,6 +130,39 @@ Three things follow from that framing, each of which the earlier `grep -q '^acce
   *real* config that happens to be permissive is still honoured: that is a deliberate operator act,
   and it is the form cross-repo callers legitimately use.
 
+### Who reads `access.tracker`
+
+Two families of entry point, **one reader**.
+
+- **Shell** entry points source `resolve-platform.sh`, which reads the config tier through
+  `read-config.sh` and reduces it against the environment, most-restrictive-wins.
+- **JavaScript** gates — `jira-sync.js`'s `makeHttp`, `jira-stage.js`, `gh-stage.js` and
+  `jira-create-epic.js` — go through `dm.resolveAccessTracker` in `defer-mutation.js`, which
+  resolves the same config tier by **sourcing `resolve-platform.sh` in a subprocess** and using its
+  answer verbatim. `jira-sprint-lib.sh` does the same from bash.
+
+That indirection is deliberate. A second YAML reader written in JavaScript would be a duplicated
+contract, and task 53 demonstrated what that costs: three review rounds, three correct fixes, three
+new divergences from `read-config.sh`. Delegating makes parity **structural** rather than asserted.
+The parity corpus (`access-config-parity.test.mjs`, under this directory's `tests/`) still asserts it
+over a derived corpus, on
+both tiers, so a regression is a red test rather than a review finding.
+
+Two differences from the shell path, both intentional:
+
+| | Shell | JavaScript |
+| --- | --- | --- |
+| A config that cannot be read correctly | refuses — non-zero exit halts the skill | resolves to `manual` and prints one line naming the file and the reason |
+| A typo in the **env** tier | refuses | throws |
+
+JavaScript cannot halt the process without taking down callers that never write: cycle 4 of task 53
+made an unreadable config throw and broke `--check`, `--print-plan` and `--probe-board`, which have
+no stake in whether a write would be permitted. `manual` preserves the shell's *meaning* — nothing is
+sent, every attempted write is deferred and recorded — while leaving read-only paths working.
+
+A repo whose config declares no `access:` key never spawns anything and answers `full`, so the
+common case costs nothing and cannot be falsely restricted.
+
 ### Tier 2 — the strict subset
 
 Tier 2 is `awk`: a set of anchored line regexes with no grammar. It is not a fallback anyone should

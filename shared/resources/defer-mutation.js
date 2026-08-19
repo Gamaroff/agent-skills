@@ -53,6 +53,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { spawnSync } = require("child_process");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_JOURNAL = ".claude/state/tracker-actions.jsonl";
@@ -471,47 +472,248 @@ function redactDeep(value, envTable, keyPath = "") {
 // Access mode
 // ---------------------------------------------------------------------------
 
+// The config tier does not re-implement read-config.sh; it ASKS it. The gap this
+// closes is that `access.tracker` in skills-config.yaml was invisible to every
+// bare `node …` invocation, so a committed restriction resolved to `full`.
+//
+// Task 53 tried to answer the same question with a second YAML reader in
+// JavaScript and produced a high-severity divergence from read-config.sh in
+// every review round it survived — fail-open on an unparseable file, then a
+// throw that took down the read-only CLI modes, then three shapes the subset
+// parser silently dropped. Three correct fixes, three new divergences: the
+// signature of a duplicated contract, not of a bug.
+//
+// So there is only ONE reader. resolve-platform.sh is sourced in a subprocess
+// and its answer is used verbatim, which makes parity structural rather than
+// asserted. shared/resources/resolve-platform.sh is named here so bundle_skill.py
+// copies it — and, following its sibling `source`, read-config.sh — into every
+// skill that bundles this file. At runtime both sit beside this file in either
+// layout, so __dirname finds them without knowing which layout it is in.
+// The markers resolve-platform.sh prints. Kept as escapes so this file stays
+// ASCII-clean for the shell chokepoints that grep it.
+const REFUSAL_MARK = "\u274c";
+const WARN_MARK = "\u26a0\ufe0f";
+const CONFIG_BASENAME = "skills-config.yaml";
+const RESOLVER_SH = "resolve-platform.sh";
+
+/** Memo: one bash spawn per (cwd, config path, tier) per process. */
+const _configAccessMemo = new Map();
+
 /**
- * The access mode in force, from the two environment tiers, most-restrictive-wins.
+ * Where the config file is, and whether naming it was a redirect.
  *
- *   ACCESS_TRACKER              — resolve-platform.sh's own output
- *   AGENT_SKILLS_ACCESS_TRACKER — the knob an operator sets
+ * Mirrors read-config.sh's own rule exactly: the origin is `env` only when
+ * SKILLS_CONFIG_FILE is non-empty AND is not the literal default basename. That
+ * comparison is against the literal rather than "was the variable set?", because
+ * an explicit `SKILLS_CONFIG_FILE=skills-config.yaml` names the default and must
+ * behave identically to leaving it unset.
+ *
+ * Relative paths resolve against `cwd` — the repo root the CALLER computed, not
+ * process.cwd(). read-config.sh anchors to the shell's working directory, and
+ * the shell entry points run from the repo root; passing the caller's root is
+ * how a `node …` invocation from a subdirectory gets the same answer.
+ */
+function resolveConfigPath(env = process.env, cwd = process.cwd()) {
+  const raw = String((env && env.SKILLS_CONFIG_FILE) || "").trim();
+  const origin = raw && raw !== CONFIG_BASENAME ? "env" : "default";
+  const rel = raw || CONFIG_BASENAME;
+  return {
+    origin,
+    file: path.isAbsolute(rel) ? rel : path.resolve(cwd, rel),
+    raw,
+  };
+}
+
+/**
+ * The access mode declared in skills-config.yaml, or null when none is.
+ *
+ * Returns `{ mode, reason }`. `mode` is null when nothing is declared — the
+ * overwhelmingly common case, which must stay free of false restriction. A
+ * `reason` is non-null only when the file could not be read correctly; the
+ * caller emits it once and resolves to the most restrictive mode.
+ *
+ * NEVER THROWS. Cycle 4 of task 53 made an unreadable config throw, which took
+ * down the deliberately read-only CLI modes (`--check`, `--print-plan`,
+ * `--probe-board`) and destroyed the deferral record along with the write. The
+ * refusal has to arrive as a VALUE so those paths keep working.
+ *
+ * @returns {{mode: string|null, reason: string|null}}
+ */
+function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
+  const { origin, file, raw } = resolveConfigPath(env, cwd);
+
+  let st = null;
+  try {
+    st = fs.statSync(file);
+  } catch {
+    st = null;
+  }
+  const usable = st && st.isFile();
+
+  // A redirect may point somewhere else; it may not point nowhere. Changing
+  // WHICH file is read must never be a way to widen access, so an unusable
+  // redirect is refused rather than degraded to the env tier's `full` default.
+  // `/dev/null` is not a regular file and is refused here too.
+  if (origin === "env" && !usable) {
+    return {
+      mode: null,
+      reason: `SKILLS_CONFIG_FILE=${raw} does not name a readable config file`,
+    };
+  }
+
+  // No config file at all is not a failure — it is a repo that declares nothing.
+  if (!usable) return { mode: null, reason: null };
+
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch (e) {
+    return {
+      mode: null,
+      reason: `${file} could not be read (${e.code || e.message})`,
+    };
+  }
+
+  // Cheap pre-check, and the guard against a FALSE restriction. If the word
+  // `access` appears nowhere in the file, no tier of any reader can find an
+  // access key in it, so there is nothing to resolve and nothing to fail
+  // closed about. This is what keeps an ordinary repo — no `access:` key, the
+  // case the whole existing suite exercises — spawn-free, and answering `full`
+  // even on a host with no bash.
+  if (!/access/i.test(text)) return { mode: null, reason: null };
+
+  const tier = String((env && env.AGENT_SKILLS_CONFIG_TIER) || "");
+  const memoKey = `${cwd} ${file} ${tier}`;
+  if (_configAccessMemo.has(memoKey)) return _configAccessMemo.get(memoKey);
+
+  const answer = probeResolver(file, cwd, tier);
+  _configAccessMemo.set(memoKey, answer);
+  return answer;
+}
+
+/**
+ * Source resolve-platform.sh in a subprocess and read back what it resolved.
+ *
+ * The two access ENV names are scrubbed from the child's environment so what
+ * comes back is the CONFIG tier alone; this function's caller owns the env tier
+ * and the most-restrictive-wins reduction. `full` and "absent" are the same
+ * answer here, and conflating them is safe precisely because `full` is the
+ * identity element of that reduction.
+ */
+function probeResolver(file, cwd, tier) {
+  const script = path.join(__dirname, RESOLVER_SH);
+  if (!fs.existsSync(script)) {
+    return {
+      mode: null,
+      reason: `${RESOLVER_SH} not found beside defer-mutation.js — cannot read ${file}`,
+    };
+  }
+
+  const childEnv = { ...process.env, SKILLS_CONFIG_FILE: file };
+  delete childEnv.ACCESS_TRACKER;
+  delete childEnv.AGENT_SKILLS_ACCESS_TRACKER;
+  if (tier) childEnv.AGENT_SKILLS_CONFIG_TIER = tier;
+  else delete childEnv.AGENT_SKILLS_CONFIG_TIER;
+
+  // --noprofile --norc: the child must not run the operator's shell profile. A
+  // profile that prints (nvm does) would land in the captured stdout, and one
+  // that exports ACCESS_TRACKER would re-introduce the env tier we just scrubbed.
+  const r = spawnSync(
+    "bash",
+    [
+      "--noprofile",
+      "--norc",
+      "-c",
+      'source "$1" >/dev/null && printf %s "$ACCESS_TRACKER"',
+      "_",
+      script,
+    ],
+    { cwd, env: childEnv, encoding: "utf8", timeout: 10000 },
+  );
+
+  // No bash, a timeout, or a resolver that could not run at all. Reachable only
+  // when the file mentions `access`, so this fails CLOSED without imposing a
+  // restriction on any repo that declares none.
+  if (r.error || r.status === null) {
+    return {
+      mode: null,
+      reason: `could not run ${RESOLVER_SH} to read ${file} (${(r.error && r.error.message) || "no exit status"})`,
+    };
+  }
+
+  if (r.status !== 0) {
+    // The resolver prefixes its own message with the file path. We name the file
+    // too, so strip the duplicate rather than printing it twice in one line.
+    let why = firstRefusalLine(r.stderr) || "it could not be read correctly";
+    if (why.startsWith(`${file}:`)) why = why.slice(file.length + 1).trim();
+    return { mode: null, reason: `${file} was refused \u2014 ${why}` };
+  }
+
+  const out = String(r.stdout || "").trim();
+  // An empty or unrecognised answer on a clean exit is not something to guess at.
+  if (!out || !ACCESS_MODES.includes(out)) {
+    return { mode: null, reason: `${file} produced no usable access mode` };
+  }
+  return { mode: out, reason: null };
+}
+
+/** The first refusal line the resolver printed, trimmed for a one-line warning. */
+function firstRefusalLine(stderr) {
+  for (const line of String(stderr || "").split("\n")) {
+    const t = line.trim();
+    if (t.startsWith(REFUSAL_MARK)) {
+      return t.slice(REFUSAL_MARK.length).trim();
+    }
+  }
+  return "";
+}
+
+/** Emitted at most once per process per reason, so a loop cannot spam stderr. */
+const _warnedAccessReasons = new Set();
+function warnOnce(reason) {
+  if (_warnedAccessReasons.has(reason)) return;
+  _warnedAccessReasons.add(reason);
+  console.error(
+    `${WARN_MARK}  access.tracker: ${reason}. Resolving to "manual" — refusing ` +
+      `rather than defaulting to "full", because that would silently escalate a ` +
+      `declared restriction into a tracker write.`,
+  );
+}
+
+/**
+ * The access mode in force, from the config tier and the two environment tiers,
+ * most-restrictive-wins.
+ *
+ *   skills-config.yaml access.tracker — what an operator commits to the repo
+ *   ACCESS_TRACKER                    — resolve-platform.sh's own output
+ *   AGENT_SKILLS_ACCESS_TRACKER       — the knob an operator sets
  *
  * Ranked `manual < command < approve < read-only < full`, so a run may lock
  * itself down and nothing may loosen a restriction already declared. An
  * unrecognised value is REFUSED rather than defaulted, because defaulting a typo
  * to `full` turns a declared restriction into an unintended tracker write.
  *
- * `access.tracker` in skills-config.yaml is deliberately not read here — see the
- * note in the body.
+ * The two tiers refuse DIFFERENTLY, and deliberately so:
+ *
+ *   env    — throws. It is a value this process was handed directly; a typo in
+ *            it is a caller bug, and the existing suites pin the throw.
+ *   config — resolves to `manual` and emits one stderr line. It is a file that
+ *            may be unreadable for reasons a read-only CLI mode has no stake in,
+ *            and a throw there is what cycle 4 got wrong.
+ *
+ * Both are fail-closed. Only the shape of the refusal differs.
  *
  * @param {Record<string,string>} [env]
+ * @param {{cwd?: string, config?: boolean}} [opts]
  * @returns {"full"|"read-only"|"approve"|"command"|"manual"}
  */
-function resolveAccessTracker(env = process.env) {
-  // TWO env tiers, most-restrictive-wins:
-  //
-  //   1. ACCESS_TRACKER              — resolve-platform.sh's own output
-  //   2. AGENT_SKILLS_ACCESS_TRACKER — the knob an operator sets
-  //
-  // Most-restrictive-wins rather than first-wins: picking the wrong tracker is a
-  // mistake, picking the wrong access is an escalation. A run may lock itself
-  // down; nothing may loosen a restriction that is already declared.
-  //
-  // `access.tracker` in skills-config.yaml is NOT read here. A config tier needs
-  // read-config.sh's discovery, subset and refusal semantics, and a second
-  // implementation of those in JavaScript produced a high-severity divergence in
-  // every review round it survived. It is [task.61](../../docs/tasks/task.61.access-mode-config-tier/task.61.access-mode-config-tier.md),
-  // with parity as its explicit subject. Until it lands, a config-declared
-  // restriction reaches these gates only via a shell that sourced the resolver —
-  // which is what task.52 shipped and what every pipeline path already does.
+function resolveAccessTracker(env = process.env, opts = {}) {
   const seen = [
     env && env.ACCESS_TRACKER,
     env && env.AGENT_SKILLS_ACCESS_TRACKER,
   ]
     .map((v) => String(v || "").trim())
     .filter(Boolean);
-  if (!seen.length) return "full";
 
   // An UNRECOGNISED value is refused rather than defaulted. Defaulting a typo to
   // `full` would turn a declared restriction into an unintended tracker write —
@@ -526,6 +728,25 @@ function resolveAccessTracker(env = process.env) {
       );
     }
   }
+
+  // The config tier is opt-OUT rather than opt-in: a caller that passes nothing
+  // still gets it, which is the entire point of the task. `config: false` exists
+  // for the suites that pin the env tier in isolation, not as a way for a call
+  // site to skip the file.
+  if (opts.config !== false) {
+    const { mode, reason } = readConfiguredAccessTracker(
+      env,
+      opts.cwd || process.cwd(),
+    );
+    if (reason) {
+      warnOnce(reason);
+      seen.push("manual");
+    } else if (mode) {
+      seen.push(mode);
+    }
+  }
+
+  if (!seen.length) return "full";
   return seen.reduce((a, b) => (ACCESS_RANK[b] < ACCESS_RANK[a] ? b : a));
 }
 
@@ -1120,6 +1341,8 @@ module.exports = {
   CONSEQUENCES,
   CONSEQUENCE_RANK,
   resolveAccessTracker,
+  readConfiguredAccessTracker,
+  resolveConfigPath,
   parseRoster,
   loadRoster,
   buildEnvTable,

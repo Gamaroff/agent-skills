@@ -1,0 +1,4 @@
+base: &base
+  tracker: full
+access:
+  <<: *base

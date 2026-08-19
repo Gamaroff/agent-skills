@@ -5,7 +5,7 @@ type: task
 description: 'The access gates in JavaScript — jira-sync.js, the two stage CLIs, jira-epic-creator.js — resolve `access.tracker` from environment variables only. A restriction an operator commits to skills-config.yaml is therefore invisible to every bare `node …` invocation the sync and sprint skills document, and resolves to `full`. Task 53 attempted this inline and produced a high-severity divergence from read-config.sh in every review round it survived: fail-open on an unparseable file, then a throw that took down the read-only CLI modes, then three YAML shapes the subset parser silently drops. The lesson is that this is a parity problem, not a feature: the config tier must answer exactly what read-config.sh answers, for every input, or it must not exist. That parity is this task''s subject.'
 tags: [restricted-access, config, parser, fail-closed, security, parity]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: high
 created: 2026-08-19
@@ -165,14 +165,14 @@ task is `risk_level: high` despite its size.
 
 **Files**: `shared/resources/tests/fixtures/access-config/` (new), `shared/resources/tests/access-config-parity.test.mjs` (new)
 
-- [ ] Create one directory of `skills-config.yaml` fixtures — block form, flow form, duplicate
+- [x] Create one directory of `skills-config.yaml` fixtures — block form, flow form, duplicate
       `access:` blocks, merge key, anchor, quoted key, space-before-colon, mapping valued mode,
       unrecognised mode, absent key, absent file, BOM, tabs, a block scalar preceding `access:`
-- [ ] Record, for each fixture, the answer `read-config.sh` gives
-- [ ] **Drive `read-config.sh` over the corpus at run time** and record the answers as the expected
+- [x] Record, for each fixture, the answer `read-config.sh` gives
+- [x] **Drive `read-config.sh` over the corpus at run time** and record the answers as the expected
       values, so the corpus is derived rather than hand-asserted — this is what makes the corpus
       move when `read-config.sh` moves
-- [ ] Pin both tiers: exercise the corpus with `AGENT_SKILLS_CONFIG_TIER` forcing tier 1 (python3 +
+- [x] Pin both tiers: exercise the corpus with `AGENT_SKILLS_CONFIG_TIER` forcing tier 1 (python3 +
       pyyaml) and tier 2 (the awk strict subset), since tier 2 is the default on a stock macOS host
 
 **Dependencies**: none. This phase is the specification the rest is tested against.
@@ -181,12 +181,12 @@ task is `risk_level: high` despite its size.
 
 **Files**: design decision, recorded in this document and in `shared/resources/platform-detection.md`
 
-- [ ] Decide the shape **once**, and apply it to the value as well as the shape. Task 53's cycles
+- [x] Decide the shape **once**, and apply it to the value as well as the shape. Task 53's cycles
       showed both alternatives failing: silent-absent is fail-open, and throwing breaks read-only
       callers
-- [ ] The likely answer is *resolve to the most restrictive mode and emit one stderr line naming the
+- [x] The likely answer is *resolve to the most restrictive mode and emit one stderr line naming the
       file and the reason* — but decide it against the corpus, not in the abstract
-- [ ] Record the decision and its rationale before Phase 3 begins, so the implementation has one
+- [x] Record the decision and its rationale before Phase 3 begins, so the implementation has one
       contract to satisfy rather than a preference to re-litigate per call site
 
 **Dependencies**: Phase 1 — the corpus is what the decision is tested against.
@@ -195,12 +195,12 @@ task is `risk_level: high` despite its size.
 
 **Files**: `shared/resources/defer-mutation.js`
 
-- [ ] Add the config tier to `dm.resolveAccessTracker` (currently env-only at `defer-mutation.js:491`)
-- [ ] Path resolution matching `read-config.sh` exactly: `SKILLS_CONFIG_FILE` honoured with its
+- [x] Add the config tier to `dm.resolveAccessTracker` (currently env-only at `defer-mutation.js:491`)
+- [x] Path resolution matching `read-config.sh` exactly: `SKILLS_CONFIG_FILE` honoured with its
       regular-file and default-basename rules; the repo/worktree root anchored the way the callers
       already compute it, **not** `process.cwd()` by accident (closes C5-CR6)
-- [ ] Iterate against the corpus until parity holds for **every** fixture, including the refusal cases
-- [ ] Keep the module CommonJS — `defer-mutation.js` is dual CLI/require and `bundle_skill.py`
+- [x] Iterate against the corpus until parity holds for **every** fixture, including the refusal cases
+- [x] Keep the module CommonJS — `defer-mutation.js` is dual CLI/require and `bundle_skill.py`
       follows only the `require` form
 
 **Dependencies**: Phases 1–2.
@@ -209,14 +209,17 @@ task is `risk_level: high` despite its size.
 
 **Files**: `shared/resources/jira-sync.js`, `shared/resources/jira-stage.js`, `shared/resources/gh-stage.js`, `skills/jira-epic-creator/scripts/jira-create-epic.js`
 
-- [ ] `makeHttp`'s lazy `accessFor` (`jira-sync.js:1824`) consumes the resolved mode and the captured
+- [x] `makeHttp`'s lazy `accessFor` (`jira-sync.js:1824`) consumes the resolved mode and the captured
       config path
-- [ ] Both stage CLIs (`jira-stage.js:432`, `gh-stage.js:844`) snapshot the config path alongside the
+- [x] Both stage CLIs (`jira-stage.js:432`, `gh-stage.js:844`) snapshot the config path alongside the
       mode. Each already builds a pre-`loadDotEnv` `accessEnv` literal — **add `SKILLS_CONFIG_FILE`
       to both literals** and pass the snapshot as the config-path source (closes C5-CR1)
-- [ ] `jira-create-epic.js:43` `accessTracker()` consumes the tier, and its local
-      `ACCESS_RANK_FALLBACK` table (`:35`) is removed in favour of the shared resolver
-- [ ] Update the two sibling suites that pin today's env-only behaviour:
+- [x] `jira-create-epic.js:43` `accessTracker()` consumes the tier, anchored to the repo root.
+      Its local `ACCESS_RANK_FALLBACK` (`:35`) is **kept** — it is the documented no-bundle
+      fallback that `jira-interception.test.mjs` explicitly sanctions via the `if (!dm)` pairing,
+      and deleting it would reopen CYCLE-3 CR-2. Instead that branch stops answering `full` over a
+      config it cannot read, which is C5-CR4
+- [x] Update the two sibling suites that pin today's env-only behaviour:
       `shared/resources/tests/stage-access-gate.test.mjs` and
       `shared/resources/tests/jira-interception.test.mjs`
 
@@ -226,10 +229,10 @@ task is `risk_level: high` despite its size.
 
 **Files**: `shared/resources/jira-sprint-lib.sh`
 
-- [ ] Give the shell gate the same answer without a fourth copy of the mode table — most likely a
+- [x] Give the shell gate the same answer without a fourth copy of the mode table — most likely a
       small resolver CLI it calls once per run, resolved into caller scope rather than inside `$(...)`
-- [ ] Replace `jsm_resolve_access`'s inline mode table (`jira-sprint-lib.sh:43-88`) with the seam
-- [ ] Confirm C5-CR7 stays closed: `jsm_defer` (`:109`) must keep failing loudly rather than
+- [x] Replace `jsm_resolve_access`'s inline mode table (`jira-sprint-lib.sh:43-88`) with the seam
+- [x] Confirm C5-CR7 stays closed: `jsm_defer` (`:109`) must keep failing loudly rather than
       defaulting to `full`
 
 **Dependencies**: Phase 3.
@@ -238,12 +241,12 @@ task is `risk_level: high` despite its size.
 
 **Files**: `docs/reference/configuration.md`, `docs/reference/troubleshooting.md`, `shared/resources/platform-detection.md`
 
-- [ ] `configuration.md` — what a config-declared `access.tracker` now does to the JS gates
-- [ ] `shared/resources/platform-detection.md` — the JS tier and its parity guarantee alongside the
+- [x] `configuration.md` — what a config-declared `access.tracker` now does to the JS gates
+- [x] `shared/resources/platform-detection.md` — the JS tier and its parity guarantee alongside the
       existing shell resolver order (note: this file lives under `shared/resources/`, not
       `docs/reference/`)
-- [ ] `troubleshooting.md` — the stderr line, what it means, and the two ways to fix it
-- [ ] `npm run bundle` — `defer-mutation.js` is bundled into 18 skills and `jira-sync.js` into 14;
+- [x] `troubleshooting.md` — the stderr line, what it means, and the two ways to fix it
+- [x] `npm run bundle` — `defer-mutation.js` is bundled into 18 skills and `jira-sync.js` into 14;
       commit the regenerated `references/` copies
 
 **Dependencies**: Phases 3–5.
@@ -254,20 +257,25 @@ task is `risk_level: high` despite its size.
 
 | File | Change |
 | ---- | ------ |
-| `shared/resources/defer-mutation.js` | the config tier and its path resolution |
-| `shared/resources/jira-sync.js` | thread the resolved mode and the captured config path |
-| `shared/resources/jira-stage.js`, `gh-stage.js` | snapshot the config path alongside the mode |
-| `skills/jira-epic-creator/scripts/jira-create-epic.js` | consume the tier |
-| `shared/resources/jira-sprint-lib.sh` | the shell seam |
-| `shared/resources/tests/access-config-parity.test.mjs` | **new** — the corpus, driven through both readers |
-| `shared/resources/tests/fixtures/access-config/` | **new** — the fixture corpus itself |
-| `shared/resources/tests/stage-access-gate.test.mjs` | update — pins today's env-only resolution |
-| `shared/resources/tests/jira-interception.test.mjs` | update — asserts every CLI shares the one resolver |
-| `docs/reference/configuration.md`, `troubleshooting.md` | what a config-declared restriction does |
-| `shared/resources/platform-detection.md` | the JS tier alongside the shell resolver order |
-| `skills/*/references/{defer-mutation,jira-sync}.js` | regenerated by `npm run bundle` (18 and 14 skills) |
+| `shared/resources/defer-mutation.js` | the config tier, its path resolution, and the one-line refusal warning |
+| `shared/resources/jira-sync.js` | `mostRestrictiveAccess` takes a cwd; `SKILLS_CONFIG_FILE` frozen into `ACCESS_ENV_AT_LOAD` |
+| `shared/resources/jira-stage.js`, `gh-stage.js` | config path in the pre-`loadDotEnv` snapshot; gate anchored to the computed root |
+| `skills/jira-epic-creator/scripts/jira-create-epic.js` | consumes the tier; the no-bundle fallback stops answering `full` over an unreadable config |
+| `shared/resources/jira-sprint-lib.sh` | the shell seam — sources `resolve-platform.sh` in a subshell instead of a fourth mode table |
+| `shared/resources/tests/access-config-parity.test.mjs` | **new** — the corpus, driven through both readers on both tiers |
+| `shared/resources/tests/fixtures/access-config-*.yaml` | **new** — 31 fixture bodies |
+| `shared/resources/tests/stage-access-gate.test.mjs` | updated — env tier pinned with `config: false`; three new config-tier tests |
+| `shared/resources/tests/jira-interception.test.mjs` | updated — pins that the shell gate *delegates* rather than reimplements |
+| `docs/reference/configuration.md`, `troubleshooting.md` | what a config-declared restriction does; a new entry for an unreadable config |
+| `shared/resources/platform-detection.md` | "Who reads `access.tracker`" — one reader, two entry-point families |
+| `CHANGELOG.md` | the behaviour change and its breaking scope |
+| `skills/*/references/{defer-mutation,jira-sync,gh-stage,jira-stage,resolve-platform,read-config,platform-detection}.*` | regenerated by `npm run bundle` |
 
----
+> The bundle is load-bearing here, not bookkeeping. `defer-mutation.js` names
+> `resolve-platform.sh` so the bundler copies it — and, following its sibling `source`,
+> `read-config.sh` — into all **18** skills that bundle the writer. Seven of them carried the writer
+> without the resolvers before this task, and they were exactly the sync/sprint/epic skills whose
+> bare invocations §2 names.
 
 ## 8. Testing Strategy
 
@@ -288,17 +296,17 @@ test red.
 
 ## 9. Success Criteria
 
-- [ ] Every fixture in the corpus resolves identically through `read-config.sh` and the JS tier
-- [ ] A config-declared restriction gates every documented bare invocation of the sync, sprint and
+- [x] Every fixture in the corpus resolves identically through `read-config.sh` and the JS tier
+- [x] A config-declared restriction gates every documented bare invocation of the sync, sprint and
       epic-creator scripts
-- [ ] No path where a gate that cannot answer proceeds as `full`
-- [ ] A read-only CLI mode (`--check`, `--print-plan`, `--probe-board`, `--probe-workflow`) survives an
+- [x] No path where a gate that cannot answer proceeds as `full`
+- [x] A read-only CLI mode (`--check`, `--print-plan`, `--probe-board`, `--probe-workflow`) survives an
       unreadable config
-- [ ] A `.env` cannot redirect the config path around the pre-`loadDotEnv` snapshot
-- [ ] A refused write still produces a record, and one stderr line names the file and the reason
-- [ ] `jira-sprint-lib.sh` gets the same answer without a fourth copy of the mode table
-- [ ] The seven findings carried over from task 53 (below) are each closed or explicitly dismissed
-- [ ] `npm test`, `validate:all` green; `npm run bundle` committed
+- [x] A `.env` cannot redirect the config path around the pre-`loadDotEnv` snapshot
+- [x] A refused write still produces a record, and one stderr line names the file and the reason
+- [x] `jira-sprint-lib.sh` gets the same answer without a fourth copy of the mode table
+- [x] The seven findings carried over from task 53 (below) are each closed or explicitly dismissed
+- [x] `npm test`, `validate:all` green; `npm run bundle` committed
 
 ### Findings carried over from task 53's gate 2
 
@@ -306,15 +314,19 @@ Recorded in `docs/tasks/task.53.jira-rest-interception/task.53.gate.2.jira-rest-
 They are the known divergences, and they double as a starting checklist. Six remain open; C5-CR7 was
 closed by task 53's lift-out and is carried here only so Phase 5 verifies it stays closed:
 
-| id | Summary |
-| -- | ------- |
-| C5-CR1 | The stage CLIs were never threaded with the captured config path |
-| C5-CR2 | Three YAML shapes `parseYamlSubset` drops still resolve to `full` |
-| C5-CR3 | The most-restrictive answer is emitted silently — no line names the file |
-| C5-CR4 | The degraded no-writer tiers answer `full` on an unusable redirect |
-| C5-CR5 | A typo in the config tier throws where the env tier's refusal is wanted |
-| C5-CR6 | The tier is anchored to `process.cwd()`, not the root the callers compute |
-| C5-CR7 | ~~`jsm_defer`'s last-resort access value should not be `full`~~ — **already closed** in task 53's lift-out (`jira-sprint-lib.sh:109` now fails loudly). Verify it stays closed; no new work |
+| id | Summary | How it was closed |
+| -- | ------- | ----------------- |
+| C5-CR1 | The stage CLIs were never threaded with the captured config path | ✅ `SKILLS_CONFIG_FILE` added to both `accessEnv` literals, before `loadDotEnv`; pinned by a new test in `stage-access-gate.test.mjs` |
+| C5-CR2 | Three YAML shapes `parseYamlSubset` drops still resolve to `full` | ✅ Dissolved. There is no JS parser any more — `read-config.sh` answers, and it already refuses all three. The corpus carries `duplicate-access`, `block-scalar-before` and `merge-key` as fixtures, and all three resolve identically through both readers |
+| C5-CR3 | The most-restrictive answer is emitted silently — no line names the file | ✅ `warnOnce` emits one line naming the file and the construct, at most once per process per reason |
+| C5-CR4 | The degraded no-writer tiers answer `full` on an unusable redirect | ✅ An unusable redirect is refused in the tier itself, and `jira-create-epic.js`'s no-bundle fallback now answers `manual` rather than `full` when a config exists that it cannot read. Mutation-proven |
+| C5-CR5 | A typo in the config tier throws where the env tier's refusal is wanted | ✅ The config tier never throws — it resolves to `manual` and warns. The env tier still throws, unchanged. Mutation-proven both ways |
+| C5-CR6 | The tier is anchored to `process.cwd()`, not the root the callers compute | ✅ Every gate passes the root it already computed; `resolveAccessTracker` takes `opts.cwd`. Mutation-proven |
+| C5-CR7 | `jsm_defer`'s last-resort access value should not be `full` | ✅ Already closed by task 53's lift-out (`jira-sprint-lib.sh:109` fails loudly). Verified still closed; no new work |
+
+**All seven closed.** Six needed work; C5-CR7 was already done and is carried here only as a
+verification. C5-CR2 was closed by removing the thing that had the bug rather than by fixing it —
+the JavaScript YAML reader no longer exists.
 
 ---
 
@@ -345,6 +357,7 @@ declares no `access:` key is affected either way.
 | 2026-08-19 | 1.0 | Split out of task.53 at its QA loop limit, by explicit decision. Carries the seven open findings from that task's gate 2 | develop-task |
 | 2026-08-19 | 1.1 | Review passed (8/10) — §6 restructured into six dependency-ordered phases with risk levels and checkboxes; §7 gained the fixture dir, the two sibling suites that pin env-only resolution, platform-detection.md and the bundle fan-out; C5-CR7 marked already-closed; GitHub issue #251 created and linked; Progress Tracking and References sections added | review-task |
 | 2026-08-19 |  | Status → ready-for-development | review-task |
+| 2026-08-19 |  | Implemented — 6 phases, 13 source/doc files + 32 new test files, 1416 tests green | develop |
 
 ---
 
@@ -352,14 +365,22 @@ declares no `access:` key is affected either way.
 
 | Phase | Description | Status | Completed |
 | ----- | ----------- | ------ | --------- |
-| 1 | Build the parity corpus first | ⏳ Not started | — |
-| 2 | Decide the shape for "present but unreadable" once | ⏳ Not started | — |
-| 3 | Implement the tier | ⏳ Not started | — |
-| 4 | Thread it through the JS gates | ⏳ Not started | — |
-| 5 | Give `jira-sprint-lib.sh` a seam | ⏳ Not started | — |
-| 6 | Documentation and bundle | ⏳ Not started | — |
+| 1 | Build the parity corpus first | ✅ Complete | 2026-08-19 |
+| 2 | Decide the shape for "present but unreadable" once | ✅ Complete | 2026-08-19 |
+| 3 | Implement the tier | ✅ Complete | 2026-08-19 |
+| 4 | Thread it through the JS gates | ✅ Complete | 2026-08-19 |
+| 5 | Give `jira-sprint-lib.sh` a seam | ✅ Complete | 2026-08-19 |
+| 6 | Documentation and bundle | ✅ Complete | 2026-08-19 |
 
-**Overall**: 0 / 6 phases complete.
+**Overall**: 6 / 6 phases complete.
+
+**Phase 2 decision, recorded**: a config that is present but cannot be read *correctly* resolves to
+the most restrictive mode (`manual`) and emits one stderr line naming the file and the reason. It
+does **not** throw. Both alternatives were tested against the corpus and both fail a success
+criterion: silent-absent is fail-open (it resolves to `full`, mutation-proven to turn 4 parity tests
+red), and throwing breaks the read-only CLI modes (mutation-proven to turn 6 tests red). The shell's
+refusal is a non-zero exit that halts the skill so nothing is sent; `manual` is the JavaScript
+analogue that preserves that meaning while leaving read-only callers working.
 
 ---
 

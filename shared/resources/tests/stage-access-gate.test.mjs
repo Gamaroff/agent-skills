@@ -525,18 +525,70 @@ test("an unrecognised ACCESS_TRACKER is refused, never defaulted to full", () =>
 });
 
 test("resolveAccessTracker: unset and empty both read as full; every legal mode round-trips", () => {
-  assert.equal(dm.resolveAccessTracker({}), "full");
-  assert.equal(dm.resolveAccessTracker({ ACCESS_TRACKER: "" }), "full");
-  assert.equal(dm.resolveAccessTracker({ ACCESS_TRACKER: "  " }), "full");
+  // `config: false` pins the ENV tier in isolation. Without it these assertions
+  // would quietly depend on the config of whatever repo the suite happens to run
+  // in — they pass today only because this one declares no `access:` key, which
+  // is a property of the checkout, not of the resolver. The config tier has its
+  // own corpus in access-config-parity.test.mjs.
+  const env = { config: false };
+  assert.equal(dm.resolveAccessTracker({}, env), "full");
+  assert.equal(dm.resolveAccessTracker({ ACCESS_TRACKER: "" }, env), "full");
+  assert.equal(dm.resolveAccessTracker({ ACCESS_TRACKER: "  " }, env), "full");
   for (const mode of dm.ACCESS_MODES) {
-    assert.equal(dm.resolveAccessTracker({ ACCESS_TRACKER: mode }), mode);
+    assert.equal(dm.resolveAccessTracker({ ACCESS_TRACKER: mode }, env), mode);
   }
   assert.throws(
-    () => dm.resolveAccessTracker({ ACCESS_TRACKER: "FULL" }),
+    () => dm.resolveAccessTracker({ ACCESS_TRACKER: "FULL" }, env),
     /not a recognised access mode/,
     "mode values are lowercase; accepting a variant here would fork the grammar " +
       "from resolve-platform.sh",
   );
+});
+
+test("resolveAccessTracker: the config tier is on by default, and only opt-OUT", () => {
+  // The entire point of task.61: a caller that passes nothing still reads the
+  // file. If this ever inverts, a committed restriction goes back to being
+  // invisible to every bare `node …` invocation and nothing else fails.
+  const src = readFileSync(join(SHARED, "defer-mutation.js"), "utf8");
+  assert.match(
+    src,
+    /opts\.config !== false/,
+    "the config tier must be opt-out, never opt-in",
+  );
+  // And it must not be reachable only through a flag no call site passes.
+  for (const f of ["jira-stage.js", "gh-stage.js", "jira-sync.js"]) {
+    assert.doesNotMatch(
+      readFileSync(join(SHARED, f), "utf8"),
+      /config:\s*false/,
+      `${f} must not opt out of the config tier`,
+    );
+  }
+});
+
+test("resolveAccessTracker: every gate passes a repo root, not process.cwd()", () => {
+  // C5-CR6. A gate that resolves against process.cwd() reads a declared
+  // restriction as absent from any subdirectory — which is where a bare
+  // `node …` invocation is most likely to be run from.
+  for (const f of ["jira-stage.js", "gh-stage.js"]) {
+    const src = readFileSync(join(SHARED, f), "utf8");
+    assert.match(
+      src,
+      /resolveAccessTracker\(accessEnv,\s*\{[\s\S]{0,120}?cwd:/,
+      `${f} must anchor the config tier to the root it already computed`,
+    );
+  }
+  // And the snapshot has to carry the config PATH, or a .env redirects around it.
+  for (const f of ["jira-stage.js", "gh-stage.js"]) {
+    const literal = /const accessEnv = \{[^}]*\}/s.exec(
+      readFileSync(join(SHARED, f), "utf8"),
+    );
+    assert.ok(literal, `${f} must keep a flat accessEnv literal`);
+    assert.match(
+      literal[0],
+      /SKILLS_CONFIG_FILE/,
+      `${f} must snapshot the config path alongside the mode (C5-CR1)`,
+    );
+  }
 });
 
 // ── The deferred record renders ─────────────────────────────────────────────

@@ -40,13 +40,19 @@ const dm = require("./defer-mutation.js");
 // the mode table, jira-create-epic.js a third and jira-sprint-lib.sh a fourth,
 // and each read a different subset of the tiers. `dm.resolveAccessTracker`
 // reads ACCESS_TRACKER and AGENT_SKILLS_ACCESS_TRACKER, most-restrictive-wins.
-function mostRestrictiveAccess(env = process.env) {
-  return dm.resolveAccessTracker(env);
+// `cwd` reaches the config tier so it anchors to the repo root the caller
+// computed rather than to process.cwd() (C5-CR6).
+function mostRestrictiveAccess(env = process.env, cwd = undefined) {
+  return dm.resolveAccessTracker(env, cwd ? { cwd } : {});
 }
 
+// SKILLS_CONFIG_FILE is frozen alongside the two mode names: it is how the
+// config tier finds the file, so leaving it out would let a .env redirect the
+// config path after this snapshot (C5-CR1).
 const ACCESS_ENV_AT_LOAD = Object.freeze({
   ACCESS_TRACKER: process.env.ACCESS_TRACKER,
   AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+  SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
 });
 
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
@@ -1823,7 +1829,7 @@ function makeHttp({
   }
   const accessFor = (method) => {
     if (method === "GET") return "full"; // a read is never gated
-    if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD);
+    if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD, cwd);
     return resolved;
   };
 
