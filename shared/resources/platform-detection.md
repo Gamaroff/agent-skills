@@ -166,6 +166,45 @@ narrower condition than "has no `access:` key": the word `access` anywhere, a ba
 non-ASCII byte or a YAML aliasing construct all make it run the reader instead. Proving absence is
 the only safe direction to be wrong in, so the common case is usually free and never permissive.
 
+### `tracker_write` — the shell chokepoint for `gh` mutations
+
+`resolve-platform.sh` defines the wrapper that non-blocking tracker mutations go through:
+
+```bash
+tracker_write gh issue comment 42 --body "…"
+tracker_write gh api graphql -f query='…'
+```
+
+It does two things, in this order:
+
+1. **Gates.** Under any `ACCESS_TRACKER` other than `full` the command is not run. It is recorded as
+   a deferred mutation and the wrapper returns **0**. The kind is inferred from argv for the shapes
+   this wrapper actually sees (`gh issue comment` → `github.issue.comment`, `gh pr comment` →
+   `github.pr.comment`, and so on); anything unrecognised is recorded as `github.unknown-mutation`,
+   never dropped. Set `TRACKER_WRITE_KIND`, `TRACKER_WRITE_INTENT` and `TRACKER_WRITE_SKILL` before
+   the call to name it explicitly — an explicit kind always outranks the inference.
+2. **Retries.** Under `full`, 3× with exponential backoff (1s, 2s, 4s), passing stdout/stderr
+   through and returning the wrapped command's exit code.
+
+Returning 0 on a deferral is deliberate: every caller of this helper is documented as non-blocking —
+log a warning and continue — so a non-zero return would convert a policy deferral into a pipeline
+failure at ~38 sites at once.
+
+> **`tracker_call_with_retry` is the original name, kept as an alias, and is not safe to delete.**
+> ~38 call sites across 11 skill and pipeline-step files still spell it, several in prose a reader
+> copies by hand. The rename exists to make the *name* honest about the mode check now inside it —
+> not to force a corpus-wide edit. A test asserts the alias resolves and behaves identically.
+
+**What this does not cover.** Calls whose stdout the caller captures — `gh issue create`, the
+sub-issue-link graphql — are deliberately *not* wrapped. Under a deferring mode the wrapper returns
+nothing, so `$( )` would capture an empty string and the caller would proceed with a blank issue
+number. Those get a purpose-built CLI instead rather than a wrapper that silently lies.
+
+The two GitHub board-field helpers (`set-github-project-priority.sh`,
+`set-github-project-estimate.sh`) do not go through this wrapper — they call `gh api graphql`
+directly — so each carries its own gate, resolving the mode via `defer-mutation.js --resolve-access`
+rather than a second copy of the mode table.
+
 ### Tier 2 — the strict subset
 
 Tier 2 is `awk`: a set of anchored line regexes with no grammar. It is not a fallback anyone should

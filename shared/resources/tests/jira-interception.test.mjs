@@ -931,7 +931,27 @@ test("§10 the PARTIALLY ENFORCED notice exists and is qualified", () => {
   // The exact wording — what IS gated and what is not — is pinned in §13 (CR-5).
   const src = fs.readFileSync(path.join(SHARED, "resolve-platform.sh"), "utf8");
   assert.match(src, /PARTIALLY ENFORCED/);
-  assert.match(src, /GitHub issue and PR writes/);
+  // The GitHub side must be named on BOTH sides of the line. Until task.54 it
+  // appeared only as a gap ("all GitHub issue and PR writes"); now the board
+  // helpers and tracker_write are gated and the remaining gap is the narrow set
+  // of calls whose stdout a caller captures. Asserting only one direction lets
+  // the notice drift into overstating or understating coverage, and this file's
+  // §13 CR-5 note is explicit that overstating is worse than saying nothing.
+  assert.match(
+    src,
+    /GitHub board-field helpers/,
+    "name the GitHub paths that ARE gated as of task.54",
+  );
+  assert.match(
+    src,
+    /gh issue create/,
+    "and the GitHub calls that are still NOT gated — their stdout is captured by the caller",
+  );
+  assert.doesNotMatch(
+    src,
+    /all GitHub issue and PR writes/,
+    "task.54 gated `gh issue comment` and friends; the old blanket claim is now stale",
+  );
 });
 
 // ── 11. A capability that refuses without a documented reason reads as a bug ─
@@ -979,8 +999,9 @@ test("§12 every bundled copy of a file this change touches carries the change",
   // A targeted parity check, and stated as one — it does not re-implement the
   // bundler, it pins the load-bearing facts. The failure it exists for is
   // specific: `defer-mutation.js` refuses to write a record when its roster
-  // count disagrees with the doc, so a bundled pair left at 20 would refuse
-  // every deferral IN AN INSTALLED SKILL while the whole suite passed in-repo.
+  // count disagrees with the doc, so a bundled pair left at an older count would
+  // refuse every deferral IN AN INSTALLED SKILL while the whole suite passed
+  // in-repo. Bump these numbers in the same commit as the roster, never after.
   const bundled = (name) =>
     fs
       .readdirSync(path.join(REPO, "skills"))
@@ -995,7 +1016,7 @@ test("§12 every bundled copy of a file this change touches carries the change",
   for (const f of deferCopies) {
     assert.match(
       fs.readFileSync(f, "utf8"),
-      /EXPECTED_KIND_COUNT = 21/,
+      /EXPECTED_KIND_COUNT = 22/,
       `${path.relative(REPO, f)} is stale — run \`npm run bundle\``,
     );
   }
@@ -1011,7 +1032,7 @@ test("§12 every bundled copy of a file this change touches carries the change",
     const text = fs.readFileSync(f, "utf8");
     assert.match(
       text,
-      /\*\*Total: 21\.\*\*/,
+      /\*\*Total: 22\.\*\*/,
       `${path.relative(REPO, f)} is stale`,
     );
     assert.match(
@@ -1019,6 +1040,61 @@ test("§12 every bundled copy of a file this change touches carries the change",
       /`jira\.unknown-mutation`/,
       `${path.relative(REPO, f)} is stale`,
     );
+    // task.54's addition. Named explicitly rather than left to the total,
+    // because the count and the row can go stale independently — a bundled doc
+    // whose total says 22 but whose GitHub table stops at pr.merge parses to 21
+    // and makes defer-mutation.js refuse every deferral in that installed skill.
+    assert.match(
+      text,
+      /`github\.unknown-mutation`/,
+      `${path.relative(REPO, f)} is stale`,
+    );
+  }
+
+  // task.54 / TASK-54-BUG-1 — CO-LOCATION, not just currency.
+  //
+  // The rows above ask "is the bundled copy up to date?". This asks the prior
+  // question: "is it there at all?". Three shell files now run
+  // `node "$(dirname …)/defer-mutation.js"` at runtime, and the bundler has no
+  // rule for a shell script invoking a sibling `.js` — it follows `source`/`exec`
+  // of a sibling `.sh`, and otherwise only the literal string
+  // a literal shared-resources path spelled out in the file. So each of the three
+  // names that path in a comment,
+  // and this test is what stops a later cleanup deleting the comment.
+  //
+  // The failure it guards is worse than a stale copy, and silent in both
+  // directions: `tracker_write` refused the write but recorded nothing (the audit
+  // gap this sequence exists to close), and the two board helpers skipped their
+  // write entirely — including under `full`, because that branch runs before the
+  // mode is known. Board Priority/Estimate writes stopped in 11 installed skills
+  // while every test in this repo stayed green, because every test runs against
+  // shared/resources/ and the defect existed only in skills/*/references/.
+  for (const name of [
+    "resolve-platform.sh",
+    "set-github-project-priority.sh",
+    "set-github-project-estimate.sh",
+  ]) {
+    const copies = bundled(name);
+    assert.ok(copies.length > 0, `${name} must be bundled somewhere`);
+    for (const f of copies) {
+      const dir = path.dirname(f);
+      assert.ok(
+        fs.existsSync(path.join(dir, "defer-mutation.js")),
+        `${path.relative(REPO, f)} has no defer-mutation.js beside it — it ` +
+          `cannot record a deferral, and the board helpers skip their write ` +
+          `outright. Name shared/resources/defer-mutation.js in a comment in ` +
+          `the source file so the bundler follows it, then re-run npm run bundle.`,
+      );
+      // And the comment that makes the bundler do it must still be in the source.
+      const src = fs.readFileSync(path.join(SHARED, name), "utf8");
+      assert.match(
+        src,
+        /shared\/resources\/defer-mutation\.js/,
+        `shared/resources/${name} no longer names defer-mutation.js literally. ` +
+          `That string is load-bearing, not decorative: it is the only thing ` +
+          `telling bundle_skill.py this file has a dependency.`,
+      );
+    }
   }
 
   for (const f of bundled("jira-sync.js")) {

@@ -455,11 +455,17 @@ else
 fi
 
 # --- 17. A partially-enforced mode says exactly how far it reaches -------------------------------
-# As of task.53 every Jira REST mutation is intercepted, along with the two stage CLIs; the GitHub
-# issue/PR call sites are not (task.54 onwards). An operator who sets `manual` and sees a normal run
-# would otherwise reasonably conclude they were fully protected. A notice that OVERSTATES coverage
-# is worse than no notice at all, so this asserts the qualified wording — including that Jira is now
-# named as covered — rather than merely that something was printed.
+# As of task.54 the GitHub board-field helpers and every `gh` mutation routed through tracker_write
+# are intercepted too, on top of task.53's Jira REST coverage and task.52's two stage CLIs. What
+# remains a gap on the GitHub side is narrower and specific: the calls whose stdout the caller
+# captures (`gh issue create`, the sub-issue-link graphql), which cannot be wrapped without handing
+# the caller an empty capture — task.56 gives those a CLI instead.
+#
+# An operator who sets `manual` and sees a normal run would otherwise reasonably conclude they were
+# fully protected. A notice that OVERSTATES coverage is worse than no notice at all — and one that
+# UNDERSTATES it sends people chasing a gap that has closed. So this asserts the qualified wording in
+# both directions rather than merely that something was printed. **When a later task closes one of
+# these gaps, this block must change in the same commit as the banner.**
 echo "  17. Partial-enforcement notice"
 D=$(fixture notice 'access:\n  tracker: manual\n')
 run_case "$D"
@@ -467,8 +473,19 @@ assert_rc         "non-full mode → still status 0"        "$RC" "0"
 assert_stderr_has "non-full mode → warns enforcement is partial" "PARTIALLY ENFORCED"
 assert_stderr_has "non-full mode → names what is still written"  "still proceed normally"
 assert_stderr_has "non-full mode → names the gated Jira paths"   "Jira REST via jira-sync.js"
-assert_stderr_has "non-full mode → names GitHub as a gap"        "GitHub issue and PR writes"
+assert_stderr_has "non-full mode → names the gated GitHub board helpers" "GitHub board-field helpers"
+assert_stderr_has "non-full mode → names tracker_write as gated" "tracker_write"
+assert_stderr_has "non-full mode → names the remaining GitHub gap" "gh issue create"
 assert_stderr_has "non-full mode → names raw curl / MCP as a gap"  "raw curl or the Atlassian MCP tools"
+
+# The gap wording must not survive its own closure. `gh issue comment` IS gated as of task.54, so a
+# banner still describing "all GitHub issue and PR writes" as unprotected is stale — the exact
+# failure mode the notice exists to prevent, pointed the other way.
+if grep -q "all GitHub issue and PR writes" "$STDERR_FILE"; then
+  bad "non-full mode → no stale GitHub claim" "banner still calls all GitHub issue/PR writes ungated, which task.54 falsified"
+else
+  ok "non-full mode → no stale GitHub claim"
+fi
 
 D=$(fixture notice-full "")
 run_case "$D"
@@ -1530,6 +1547,142 @@ for sh in bash zsh; do
   RC_GUARDED=$(env -i PATH="$PYSHIM:/usr/bin:/bin" HOME="$HOME" "$sh" -c "
     $SHIMPATH cd '$D'; ( source '$RESOLVER' || exit 1; echo unreachable ) >/dev/null 2>&1; echo \$?")
   assert_eq "[$sh, no python] a guarded call site exits 1" "$RC_GUARDED" "1"
+done
+
+# --- 47. tracker_write, its alias, and the two board-field .sh guards (task.54) -------------------
+#
+# The wrapper and the two helpers are the GitHub half of the interception. Each is asserted on the
+# only property that actually matters: under a restricted mode NO `gh` write verb is issued. That is
+# proven with a `gh` stub that EXITS NON-ZERO on any write-capable verb, not by reading the source —
+# a comment cannot enforce it and a source scan misses the path that skips the guard.
+echo "  47. tracker_write and the board-field guards"
+
+GH_STUB_DIR="$TMPDIR_TEST/ghstub"
+mkdir -p "$GH_STUB_DIR"
+cat > "$GH_STUB_DIR/gh" <<'STUB'
+#!/usr/bin/env bash
+# Reads are allowed under every mode; writes are the thing being forbidden.
+case "${1:-} ${2:-}" in
+  "issue view") echo "priority:high"; exit 0 ;;
+  "repo view")  echo "acme"; exit 0 ;;
+esac
+for a in "$@"; do
+  case "$a" in
+    api|project) echo "WRITE VERB ISSUED: gh $*" >&2; exit 99 ;;
+  esac
+done
+echo "WRITE VERB ISSUED: gh $*" >&2; exit 99
+STUB
+chmod +x "$GH_STUB_DIR/gh"
+
+D=$(fixture trackerwrite 'access:\n  tracker: manual\n')
+TW_JOURNAL="$D/journal.jsonl"
+# A SECOND fixture with no config, for the unrestricted cases. Reusing the `manual` one above made
+# every `full` assertion resolve to `manual` and fail for a reason unrelated to what it tests.
+DFULL=$(fixture trackerwrite-full "")
+
+# tracker_write under `full` must run the command verbatim — the gate must not swallow an
+# unrestricted run, which would silence every tracker comment in the pipeline at once.
+OUT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$DFULL'; source '$RESOLVER' >/dev/null 2>&1; tracker_write echo RAN" 2>/dev/null)
+assert_eq "tracker_write under full → runs the command" "$OUT" "RAN"
+
+# The alias is not decoration: ~38 call sites across 11 files still spell the old name, several in
+# prose a reader copies by hand. If this fails because the alias was removed in a cleanup, the
+# cleanup is wrong.
+OUT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$DFULL'; source '$RESOLVER' >/dev/null 2>&1; tracker_call_with_retry echo RAN" 2>/dev/null)
+assert_eq "tracker_call_with_retry alias → still resolves and behaves identically" "$OUT" "RAN"
+
+# Retry behaviour must survive the rename: 3 attempts, then the wrapped command's exit code.
+OUT=$(env -i PATH="$PATH" HOME="$HOME" bash -c "
+  cd '$DFULL'; source '$RESOLVER' >/dev/null 2>&1
+  n=0; try() { n=\$((n+1)); echo \$n >> '$DFULL/tries'; return 7; }
+  tracker_write try; echo \"rc=\$?\"" 2>/dev/null)
+assert_eq "tracker_write under full → returns the wrapped exit code" "$OUT" "rc=7"
+assert_eq "tracker_write under full → retried 3 times" "$(wc -l < "$DFULL/tries" | tr -d ' ')" "3"
+
+# The load-bearing one. A restricted mode must defer, record, and exit 0 — and issue no write.
+rm -f "$TW_JOURNAL"
+RC_TW=$(env -i PATH="$GH_STUB_DIR:$PATH" HOME="$HOME" \
+  AGENT_SKILLS_ACCESS_TRACKER=manual TRACKER_ACTIONS_JOURNAL="$TW_JOURNAL" bash -c "
+  cd '$D'; source '$RESOLVER' >/dev/null 2>&1
+  tracker_write gh issue comment 42 --body 'MUST NOT BE POSTED'; echo \$?" 2>/dev/null)
+assert_eq "tracker_write under manual → exits 0 (callers are non-blocking)" "$RC_TW" "0"
+if [ -s "$TW_JOURNAL" ] && grep -q '"github.issue.comment"' "$TW_JOURNAL"; then
+  ok "tracker_write under manual → records, and infers the kind from argv"
+else
+  bad "tracker_write under manual → records, and infers the kind from argv" \
+      "no github.issue.comment record in $TW_JOURNAL"
+fi
+if grep -q "MUST NOT BE POSTED" "$TW_JOURNAL" && ! grep -q "WRITE VERB ISSUED" "$TW_JOURNAL"; then
+  ok "tracker_write under manual → the command is recorded, not run"
+else
+  bad "tracker_write under manual → the command is recorded, not run" "record did not capture argv"
+fi
+
+# The record must NAME the object, and must do so under BOTH shells. This is the zsh
+# word-splitting rule this file already enforces for validate_enum, hit again: passing the target as
+# `${x:+--target "$x"}` word-splits in bash and does NOT in zsh, so zsh handed defer-mutation.js one
+# malformed argument, it rejected the record, and every deferral went unrecorded — while still
+# correctly refusing the write. The refusal is the safety property, so nothing unsafe happened; the
+# AUDIT TRAIL was silently empty, which is the failure the mechanism exists to prevent. Both shells,
+# always, for anything that reaches an argv.
+for _sh in bash zsh; do
+  command -v "$_sh" >/dev/null 2>&1 || { echo "  SKIP  $_sh not on this host"; continue; }
+  rm -f "$TW_JOURNAL"
+  env -i PATH="$GH_STUB_DIR:$PATH" HOME="$HOME" \
+    AGENT_SKILLS_ACCESS_TRACKER=manual TRACKER_ACTIONS_JOURNAL="$TW_JOURNAL" "$_sh" -c "
+    cd '$D'; source '$RESOLVER' >/dev/null 2>&1
+    tracker_write gh issue comment 42 --body 'x'" >/dev/null 2>&1
+  if grep -q '"issue":"42"' "$TW_JOURNAL" 2>/dev/null; then
+    ok "[$_sh] tracker_write records WHICH issue, not just that something was deferred"
+  else
+    bad "[$_sh] tracker_write records WHICH issue, not just that something was deferred" \
+        "no target.issue=42 in the journal (contents: $(cat "$TW_JOURNAL" 2>/dev/null | head -c 200))"
+  fi
+done
+
+# An unrecognised shape must still be recorded — as the catch-all, never dropped. A mutation nobody
+# annotated is exactly the one a human most needs told about.
+rm -f "$TW_JOURNAL"
+env -i PATH="$GH_STUB_DIR:$PATH" HOME="$HOME" \
+  AGENT_SKILLS_ACCESS_TRACKER=manual TRACKER_ACTIONS_JOURNAL="$TW_JOURNAL" bash -c "
+  cd '$D'; source '$RESOLVER' >/dev/null 2>&1
+  tracker_write gh api graphql -f query=mutation" >/dev/null 2>&1
+if grep -q '"github.unknown-mutation"' "$TW_JOURNAL" 2>/dev/null; then
+  ok "tracker_write under manual → an unrecognised gh shape falls back to the catch-all kind"
+else
+  bad "tracker_write under manual → an unrecognised gh shape falls back to the catch-all kind" \
+      "expected github.unknown-mutation in the journal"
+fi
+
+# The two board-field helpers. They do NOT go through gh-stage.js — they call `gh api graphql`
+# directly — so gh-stage's gate does not cover them and each needs its own.
+for helper in priority estimate; do
+  SCRIPT="$HERE/set-github-project-$helper.sh"
+  [ "$helper" = "priority" ] && ARGS="42 high" || ARGS="42 8"
+  rm -f "$TW_JOURNAL"
+  RC_H=$(env -i PATH="$GH_STUB_DIR:$PATH" HOME="$HOME" \
+    AGENT_SKILLS_ACCESS_TRACKER=manual TRACKER_ACTIONS_JOURNAL="$TW_JOURNAL" bash -c "
+    cd '$D'; bash '$SCRIPT' $ARGS >/dev/null 2>&1; echo \$?")
+  assert_eq "set-github-project-$helper under manual → still exits 0" "$RC_H" "0"
+  if [ -s "$TW_JOURNAL" ] && grep -q '"github.board.field-set"' "$TW_JOURNAL"; then
+    ok "set-github-project-$helper under manual → records the field-set"
+  else
+    bad "set-github-project-$helper under manual → records the field-set" \
+        "no record written to $TW_JOURNAL"
+  fi
+  # The stub exits 99 and prints on any write verb. A clean run under manual proves the gate sits
+  # ABOVE the graphql mutation rather than merely wrapping its result.
+  ERRTXT=$(env -i PATH="$GH_STUB_DIR:$PATH" HOME="$HOME" \
+    AGENT_SKILLS_ACCESS_TRACKER=manual TRACKER_ACTIONS_JOURNAL="$TW_JOURNAL" bash -c "
+    cd '$D'; bash '$SCRIPT' $ARGS" 2>&1 >/dev/null)
+  case "$ERRTXT" in
+    *"WRITE VERB ISSUED"*)
+      bad "set-github-project-$helper under manual → issues no gh write verb" "$ERRTXT" ;;
+    *) ok "set-github-project-$helper under manual → issues no gh write verb" ;;
+  esac
 done
 
 # --- Summary -----------------------------------------------------------------

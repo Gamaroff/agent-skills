@@ -14,7 +14,7 @@ journal. This file is the canonical definition of both, and of the roster of mut
 may name.
 
 **This file is load-bearing, not descriptive.** `defer-mutation.js` refuses to write a record whose
-`kind` is absent from §"The 21 kinds" below, and `handover-render.js`'s totality test enumerates the
+`kind` is absent from §"The 22 kinds" below, and `handover-render.js`'s totality test enumerates the
 roster *from this file* rather than from a hand-written list in the test. A kind added here without a
 renderer fails the suite; a kind added to a renderer without a row here is never reachable. Any count
 that disagrees with the roster is a bug in one of the two.
@@ -38,7 +38,7 @@ A mode is a **selection over renderers**, never a renderer itself:
 | `command` | `sh` + `summary` | The operator holds the credential and runs the script. |
 | `manual` | `md` + `summary` | The operator clicks through the UI. |
 
-The test matrix is therefore **21 kinds × 4 output formats**, not 21 × 5.
+The test matrix is therefore **22 kinds × 4 output formats**, not 22 × 5.
 
 ---
 
@@ -224,7 +224,7 @@ mode `0644` and dry-run-by-default so nobody runs it by accident.
 
 ---
 
-## The 21 kinds
+## The 22 kinds
 
 Every row is one mutation kind. `Consequence` is the default a record inherits; a caller may harden
 it (`state-drift` → `irreversible`) but never soften it. `Produces` names the symbol an operator's
@@ -251,7 +251,7 @@ action yields, which dependants consume via `dependsOn`.
 honest default for a mutation the system cannot describe. A record of this kind is also a signal:
 it means a mutation path exists that nobody has annotated yet.
 
-**GitHub — 11** (board, issue, PR and comment kinds)
+**GitHub — 12** (board, issue, PR and comment kinds)
 
 | `kind` | Consequence | Produces | Underlying call |
 | ------ | ----------- | -------- | --------------- |
@@ -262,12 +262,22 @@ it means a mutation path exists that nobody has annotated yet.
 | `github.issue.comment` | communication | — | `gh issue comment` |
 | `github.sub-issue.add` | state-drift | — | `POST /repos/{o}/{r}/issues/{n}/sub_issues` |
 | `github.board.item-add` | state-drift | `github.projectItemId` | `gh project item-add` |
-| `github.board.field-set` | state-drift | — | `updateProjectV2ItemFieldValue` (Status, Priority) |
+| `github.board.field-set` | state-drift | — | `updateProjectV2ItemFieldValue` (Status, Priority, Estimate) |
 | `github.pr.create` | irreversible | `github.prNumber` | `gh pr create` |
 | `github.pr.comment` | communication | — | `gh pr comment` |
 | `github.pr.merge` | irreversible | — | `gh pr merge` |
+| `github.unknown-mutation` | irreversible | — | any `gh` mutation through `tracker_write` that named no kind |
 
-**Total: 21.**
+`github.unknown-mutation` is the GitHub twin of `jira.unknown-mutation`, and exists for the same
+reason: `tracker_write` in `resolve-platform.sh` wraps ~38 `gh` mutations generically, and a caller
+that sets no `TRACKER_WRITE_KIND` gives the gate no way to say what the call would have done. The
+wrapper infers the kind from argv for the shapes it recognises (`gh issue comment`, `gh pr comment`,
+`gh issue close`, …); anything else lands here. Its consequence is `irreversible` because nothing
+knows what the call would have done — a confirm gate is the only honest default for a mutation the
+system cannot describe. A record of this kind is also a signal: it means a `gh` mutation path exists
+that nobody has annotated yet.
+
+**Total: 22.**
 
 > The roster is parsed mechanically. A kind row is a table row whose first cell is a single
 > backtick-quoted token containing a `.`, in a table whose header reads `` `kind` `` followed by a

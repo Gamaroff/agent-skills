@@ -614,6 +614,7 @@ function parseArgs(argv) {
     allowRegress: false,
     addToBoard: false,
     probeBoard: false,
+    printPlan: false,
     writeLadder: false,
     initWorkflow: false,
     force: false,
@@ -645,6 +646,9 @@ function parseArgs(argv) {
         break;
       case "--probe-board":
         opts.probeBoard = true;
+        break;
+      case "--print-plan":
+        opts.printPlan = true;
         break;
       case "--write-ladder":
         opts.writeLadder = true;
@@ -694,6 +698,8 @@ function parseArgs(argv) {
 const USAGE = `Usage: gh-stage --issue <N> --stage <${tw.MOMENTS.join("|")}>
               [--json] [--quiet] [--dry-run] [--strict] [--allow-regress]
               [--add-to-board] [--board <number|name>] [--field <name>]
+       gh-stage --stage <${tw.MOMENTS.join("|")}> --print-plan
+              [--issue-type <type>]   (no credentials, no network)
        gh-stage --probe-board [--write-ladder] [--board <number|name>]
               (read-only; --write-ladder writes tracker-workflow.yaml only when absent)
        gh-stage --init-workflow [--force] [--board <number|name>]
@@ -789,8 +795,14 @@ function run({
   if (args.check) args.probeBoard = true;
 
   if (!args.probeBoard) {
-    if (!args.issue || !args.stage) {
-      output.err("Error: --issue and --stage are both required");
+    // --print-plan needs no issue: it reads a config file, not a board. It still
+    // needs --stage, because the stage IS the question it answers.
+    if ((!args.issue && !args.printPlan) || !args.stage) {
+      output.err(
+        args.printPlan
+          ? "Error: --stage is required"
+          : "Error: --issue and --stage are both required",
+      );
       output.err(USAGE);
       return { exitCode: 2 };
     }
@@ -803,7 +815,92 @@ function run({
     args.stage = String(args.stage).toLowerCase();
   }
 
+  // The ladder is read before credentials are even looked at, because
+  // --print-plan must work without them — that is the entire point of it. Never
+  // throws: a missing or malformed file resolves to the built-in default ladder.
   const workflow = tw.loadWorkflow(repoRoot ? { repoRoot } : {});
+
+  // --print-plan: resolve and print, no credentials, no network, exit 0.
+  //
+  // This is the GitHub half of the pair jira-stage.js has had since task.38, and
+  // it must run BEFORE `ghAvailable` (the first credential read and the first
+  // out-of-process call) for the same reason its sibling runs before `getAuth`:
+  // the consumer who needs it MOST is the one with no credentials at all. A
+  // `manual`-mode run has no `gh` auth by definition, and its handover checklist
+  // still has to name the board's real column — "move the card somewhere" is not
+  // an instruction anyone can follow.
+  //
+  // --dry-run is NOT a substitute and never was: it sits below `ghAvailable` and
+  // reads a live board. That is also why every deferred record this CLI writes
+  // now carries a --print-plan `verify.cmd` rather than a --dry-run one.
+  //
+  // `output.emit` writes unconditionally rather than only under --json, which is
+  // what makes the flag machine-readable on its own — same contract as Jira's.
+  //
+  // GitHub has NO transition graph. A Projects v2 Status is a single-select
+  // field: you set it, you do not walk to it. So there is no `hops`/`spansFrom`
+  // pair here and no --from flag to feed one. The plan is the target rung, and
+  // the rung carries every acceptable name so a caller can prefer its own.
+  if (args.printPlan) {
+    // Validated HERE, on this path's own terms — not inherited from the
+    // `if (!args.probeBoard)` block above.
+    //
+    // That block is skipped whenever `probeBoard` is set, and three flags set it:
+    // `--probe-board` directly, plus `--check` and `--init-workflow` which set it
+    // internally. `--check` is the documented CI mode, so
+    // `gh-stage.js --check --stage done --print-plan` is an ordinary script and
+    // used to bypass both the MOMENTS check and the lowercasing.
+    //
+    // The consequence was not cosmetic: an unknown moment resolved to
+    // `enabled: false, targets: null` exit 0 — byte-identical to the payload a
+    // DELIBERATELY DISABLED moment produces. A caller could not tell a typo from
+    // a moment the consumer had switched off, so a typo silently dropped a board
+    // move from a manual checklist. That is the failure this whole mode exists to
+    // prevent, so it is validated even though the shared block usually would.
+    //
+    // Sharing one gate was the mistake: --print-plan and the move path have
+    // genuinely different argument requirements (this one needs no --issue), so
+    // the requirements are stated separately rather than approximated by one
+    // condition that has to be true of both.
+    if (!tw.MOMENTS.includes(String(args.stage).toLowerCase())) {
+      output.err(
+        `Error: unknown moment "${args.stage}". Known: ${tw.MOMENTS.join(", ")}`,
+      );
+      return { exitCode: 2 };
+    }
+    args.stage = String(args.stage).toLowerCase();
+
+    const moment = tw.resolveMoment(args.stage, workflow, {
+      issueType: args.issueType,
+    });
+    const authored = tw.pipelineAuthoredFor(
+      workflow,
+      args.issueType,
+      args.stage,
+    );
+    output.emit({
+      stage: args.stage,
+      reason: "plan",
+      // A moment absent from `pipeline:` is deliberate disablement, not an
+      // error — the same outcome `stage-disabled` reports on the move path.
+      enabled: !!moment,
+      targets: moment ? moment.targets : null,
+      offLadder: moment ? moment.offLadder : null,
+      isLastRung: moment ? moment.isLastRung : null,
+      // Where this plan actually came from — which is not the same question as
+      // "does a file exist". A statuses-only or malformed file is `source:
+      // "file"` while contributing nothing to the plan, and this is the one
+      // field a reader consults to answer "did my ladder do this?".
+      source: authored ? workflow.source : "record",
+      authored,
+      exitCode: 0,
+    });
+    return {
+      exitCode: 0,
+      reason: "plan",
+      targets: moment ? moment.targets : null,
+    };
+  }
 
   // --check is the ONE mode in this family that exits non-zero on failure.
   //
@@ -879,7 +976,17 @@ function run({
           kind: "github.board.field-set",
           system: "github",
           access,
-          intent: `Set ${field} to ${target || `the ${args.stage} column`} on issue #${args.issue}`,
+          // Name the board ADD as well as the field-set when --add-to-board was
+          // passed. Without this the checklist tells a human to set a field on
+          // an item that may not be on the board at all — `ensureOnBoard` is
+          // what would have put it there, and this gate returns before it runs.
+          // The gate is upstream of the board read, so we cannot know whether
+          // the item is already there; say "add if absent" rather than assert
+          // either way.
+          intent: args.addToBoard
+            ? `Add issue #${args.issue} to the project board if absent, then set ` +
+              `${field} to ${target || `the ${args.stage} column`}`
+            : `Set ${field} to ${target || `the ${args.stage} column`} on issue #${args.issue}`,
           target: {
             issue: String(args.issue),
             url: issueUrl,
@@ -887,13 +994,18 @@ function run({
             // field: the issue lives in the repo, the field lives on the board.
             ui_url: "the project board → filter to this issue → set the field",
           },
-          desired: { [field]: target },
+          desired: args.addToBoard
+            ? { onBoard: true, [field]: target }
+            : { [field]: target },
           skill: "gh-stage",
           step: args.stage,
           run: process.env.PIPELINE_RUN || "",
           manual: {
             deepLink: issueUrl,
-            ui: `Open the project board → find issue #${args.issue} → set ${field}`,
+            ui: args.addToBoard
+              ? `Open the project board → add issue #${args.issue} if it is not ` +
+                `already there → set ${field}`
+              : `Open the project board → find issue #${args.issue} → set ${field}`,
             fields: [{ name: field, value: target || "" }],
           },
           command: {
@@ -904,13 +1016,28 @@ function run({
               String(args.issue),
               "--stage",
               args.stage,
+              // Preserve --add-to-board on the replay command. Dropping it made
+              // the recorded command a DIFFERENT operation from the deferred
+              // one: it would set the field and never add the item, so replaying
+              // a manual run's journal left the card off the board.
+              ...(args.addToBoard ? ["--add-to-board"] : []),
               "--json",
             ],
             stdin: null,
           },
           verify: {
-            cmd: `gh-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
-            expect: `${field} is "${target || args.stage}"`,
+            // --print-plan, NOT --dry-run. This record is written on a machine
+            // running a non-`full` access mode, which in the `manual` case has
+            // no `gh` auth at all — and --dry-run sits below `ghAvailable`, so
+            // it cannot run there. Handing the operator a verification step that
+            // fails on their own machine is worse than handing them none: it
+            // reads as "the deferral is broken" rather than "here is the column".
+            //
+            // The two do not answer quite the same question — --print-plan reads
+            // the ladder, --dry-run reads the board — so `expect` names the whole
+            // rung, which is what --print-plan returns.
+            cmd: `gh-stage.js --stage ${args.stage} --print-plan`,
+            expect: `targets includes "${target || args.stage}" (set ${field} to it)`,
           },
           // The repo root, not process.cwd(). A step invoked from a subdirectory
           // would otherwise append to <subdir>/.claude/state/tracker-actions.jsonl

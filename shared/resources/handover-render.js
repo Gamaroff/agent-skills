@@ -94,6 +94,15 @@ const KIND_PRESENTATION = Object.freeze({
   "github.pr.create": { verb: "Open", noun: "pull request" },
   "github.pr.comment": { verb: "Comment on", noun: "pull request" },
   "github.pr.merge": { verb: "Merge", noun: "pull request" },
+  // The GitHub twin of jira.unknown-mutation. `tracker_write` wraps ~38 `gh`
+  // mutations generically and infers a kind from argv where it can; a shape it
+  // does not recognise lands here rather than being dropped. The wording says
+  // "unrecognised" out loud on purpose — a reader needs to know the checklist
+  // cannot describe this one, and must fall back to the recorded argv.
+  "github.unknown-mutation": {
+    verb: "Run by hand the unrecognised gh command against",
+    noun: "GitHub",
+  },
 });
 
 /**

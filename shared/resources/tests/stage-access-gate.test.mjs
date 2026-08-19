@@ -639,3 +639,380 @@ test("a gated run produces a journal that renders in all four formats", async ()
     assert.match(md, /Done/);
   });
 });
+
+// ── task.54: gh-stage --print-plan, and the two gaps it closed in the gate ───
+//
+// `--print-plan` is the GitHub half of the credential-free pair jira-stage.js has
+// had since task.38. Its whole value is to the consumer with NO credentials, so
+// every test here runs with `explode("gh")` as the transport: any reach for the
+// network fails the test rather than merely being slow.
+
+test("gh-stage --print-plan resolves with no credentials and no network", () => {
+  underAccess("manual", ({ dir, journal }) => {
+    const r = ghCli.run({
+      argv: ["node", "gh-stage.js", "--stage", "done", "--print-plan"],
+      execImpl: explode("gh"),
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.reason, "plan");
+    assert.deepEqual(r.targets, ["Done"]);
+    // A plan is a READ. It must never append to the journal — a deferral record
+    // for a mutation that was never attempted is noise in the handover.
+    assert.deepEqual(readJournal(journal), []);
+  });
+});
+
+test("gh-stage --print-plan needs no --issue, but still needs --stage", () => {
+  underAccess("full", ({ dir }) => {
+    // No --issue: fine. This is the case that matters — a `manual` consumer
+    // building a checklist knows the stage, and asking them for an issue number
+    // to resolve a COLUMN NAME would be nonsense.
+    assert.equal(
+      ghCli.run({
+        argv: ["node", "gh-stage.js", "--stage", "done", "--print-plan"],
+        execImpl: explode("gh"),
+        repoRoot: dir,
+        sleepImpl: () => {},
+      }).exitCode,
+      0,
+    );
+    // No --stage: the stage IS the question, so this is a usage error.
+    assert.equal(
+      ghCli.run({
+        argv: ["node", "gh-stage.js", "--print-plan"],
+        execImpl: explode("gh"),
+        repoRoot: dir,
+        sleepImpl: () => {},
+      }).exitCode,
+      2,
+    );
+  });
+});
+
+test("gh-stage --print-plan reports a ladder-disabled moment as disabled, not missing", () => {
+  underAccess("manual", ({ dir }) => {
+    // LADDER declares no `blocked:`, so the moment is deliberately off. That is
+    // the same answer the move path gives as `stage-disabled` — the two must not
+    // disagree, or a checklist would list an action the board never wanted.
+    const r = ghCli.run({
+      argv: ["node", "gh-stage.js", "--stage", "blocked", "--print-plan"],
+      execImpl: explode("gh"),
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.targets, null);
+  });
+});
+
+test("gh-stage --print-plan agrees with --dry-run on the same board", () => {
+  // The risk this task named: --print-plan reads the ladder file, --dry-run reads
+  // the live board, and a checklist that names a column the board does not have
+  // is worse than one that names none. They are allowed to differ in SHAPE —
+  // --print-plan returns the whole rung, --dry-run the one name the board has —
+  // so the contract is CONTAINMENT, not equality.
+  underAccess("full", ({ dir }) => {
+    const plan = ghCli.run({
+      argv: ["node", "gh-stage.js", "--stage", "done", "--print-plan"],
+      execImpl: explode("gh"),
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+
+    const board = {
+      data: {
+        repository: {
+          issue: {
+            projectItems: {
+              nodes: [
+                {
+                  id: "IT_1",
+                  fieldValueByName: { name: "In Progress" },
+                  project: {
+                    id: "PVT_1",
+                    title: "Agent Skills",
+                    number: 1,
+                    fields: {
+                      nodes: [
+                        {
+                          id: "F_1",
+                          name: "Status",
+                          options: [
+                            { id: "o1", name: "Todo" },
+                            { id: "o2", name: "In Progress" },
+                            { id: "o3", name: "In Review" },
+                            { id: "o4", name: "Done" },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+    const dry = ghCli.run({
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--dry-run",
+        "--json",
+      ],
+      execImpl: (argv) => {
+        if (argv[0] === "auth") return "";
+        return JSON.stringify(board);
+      },
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+
+    assert.equal(dry.reason, "dry-run");
+    assert.ok(
+      plan.targets.includes(dry.would),
+      `--dry-run would set "${dry.would}", which --print-plan does not list in ` +
+        `${JSON.stringify(plan.targets)} — the credential-free path disagrees ` +
+        `with the credentialed one`,
+    );
+  });
+});
+
+test("gh-stage --print-plan is placed ABOVE the auth gate in source order", () => {
+  // A behavioural test cannot catch this on its own: move the block below
+  // `ghAvailable` and the credential-free tests above still pass on any host
+  // where `gh auth status` happens to succeed — i.e. on every developer machine
+  // and never in the one deployment that matters. Assert the ORDER directly.
+  const src = readFileSync(join(SHARED, "gh-stage.js"), "utf-8");
+  const planAt = src.indexOf("if (args.printPlan)");
+  const authAt = src.indexOf("if (!ghAvailable(exec))");
+  assert.ok(planAt > 0, "--print-plan block not found");
+  assert.ok(authAt > 0, "ghAvailable gate not found");
+  assert.ok(
+    planAt < authAt,
+    "--print-plan must resolve BEFORE the first credential read; it is the one " +
+      "mode whose entire purpose is to work without credentials",
+  );
+});
+
+test("a deferred record names the board ADD when --add-to-board was passed", () => {
+  underAccess("manual", ({ dir, journal }) => {
+    const r = ghCli.run({
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--add-to-board",
+        "--json",
+      ],
+      execImpl: explode("gh"),
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+    assert.equal(r.reason, "deferred");
+
+    const rec = readJournal(journal)[0];
+    // Without this, the checklist told a human to set a field on an item that
+    // `ensureOnBoard` had not yet put on the board — an instruction that cannot
+    // be followed, on the one path where a human is the only actor.
+    assert.equal(rec.desired.onBoard, true);
+    assert.match(rec.intent, /board/i);
+    assert.match(rec.manual.ui, /add issue #42/i);
+    assert.ok(
+      rec.command.argv.includes("--add-to-board"),
+      "the replay command must preserve --add-to-board, or replaying the " +
+        "journal sets the field and leaves the card off the board",
+    );
+  });
+});
+
+test("a deferred record WITHOUT --add-to-board claims no board membership", () => {
+  underAccess("manual", ({ dir, journal }) => {
+    ghCli.run({
+      argv: [
+        "node",
+        "gh-stage.js",
+        "--issue",
+        "42",
+        "--stage",
+        "done",
+        "--json",
+      ],
+      execImpl: explode("gh"),
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+    const rec = readJournal(journal)[0];
+    assert.equal(rec.desired.onBoard, undefined);
+    assert.ok(!rec.command.argv.includes("--add-to-board"));
+  });
+});
+
+for (const extra of [[], ["--add-to-board"]]) {
+  test(`a deferred record's verify.cmd is credential-free${
+    extra.length ? " (with --add-to-board)" : ""
+  }`, () => {
+    underAccess("manual", ({ dir, journal }) => {
+      ghCli.run({
+        argv: [
+          "node",
+          "gh-stage.js",
+          "--issue",
+          "42",
+          "--stage",
+          "done",
+          ...extra,
+          "--json",
+        ],
+        execImpl: explode("gh"),
+        repoRoot: dir,
+        sleepImpl: () => {},
+      });
+      const rec = readJournal(journal)[0];
+      // This record is written on a machine under a restricted mode — in
+      // `manual`, one with no `gh` auth at all. --dry-run sits below
+      // `ghAvailable` and reads a live board, so it cannot run there. Handing
+      // the operator a verification step that fails on their own machine reads
+      // as "the deferral is broken" rather than "here is the column".
+      assert.match(rec.verify.cmd, /--print-plan/);
+      assert.doesNotMatch(
+        rec.verify.cmd,
+        /--dry-run/,
+        "verify.cmd must not require credentials the deferring host lacks",
+      );
+    });
+  });
+}
+
+test("defer-mutation --resolve-access reports the resolved mode, and refuses a typo", () => {
+  underAccess("command", ({ dir }) => {
+    // The one mode table. The two `.sh` board helpers call this rather than
+    // open-coding a fifth copy of the contract, so this is the assertion that
+    // keeps shell and JS from drifting.
+    assert.equal(
+      dm.run({
+        argv: ["node", "defer-mutation.js", "--resolve-access"],
+        env: { ACCESS_TRACKER: "command" },
+        cwd: dir,
+      }).access,
+      "command",
+    );
+    // Most-restrictive-wins across the two env tiers.
+    assert.equal(
+      dm.run({
+        argv: ["node", "defer-mutation.js", "--resolve-access"],
+        env: {
+          ACCESS_TRACKER: "read-only",
+          AGENT_SKILLS_ACCESS_TRACKER: "manual",
+        },
+        cwd: dir,
+      }).access,
+      "manual",
+    );
+    // A typo EXITS 2 rather than printing a mode. A refusal is not a
+    // resolution, and answering "manual" here would make the caller unable to
+    // tell a declared restriction from a mistake.
+    assert.equal(
+      dm.run({
+        argv: ["node", "defer-mutation.js", "--resolve-access"],
+        env: { ACCESS_TRACKER: "manul" },
+        cwd: dir,
+      }).exitCode,
+      2,
+    );
+  });
+});
+
+// ── task.54 / TASK-54-BUG-2: --print-plan validates its own arguments ────────
+//
+// The moment check and the lowercasing used to live only inside the
+// `if (!args.probeBoard)` block. Three flags set `probeBoard` — `--probe-board`
+// directly, plus `--check` and `--init-workflow` internally — so all three
+// bypassed both once `--print-plan` was added below that block.
+//
+// The consequence was NOT cosmetic. An unknown moment resolved to
+// `{enabled: false, targets: null}` exit 0, which is byte-identical to the
+// payload a DELIBERATELY DISABLED moment produces. A caller could not tell a
+// typo from a moment the consumer had switched off, so a typo silently dropped a
+// board move from a manual checklist — the exact failure --print-plan exists to
+// prevent. `--check` is the documented CI mode, so the combination is ordinary.
+
+for (const extra of [[], ["--probe-board"], ["--check"]]) {
+  const label = extra.length ? extra[0] : "no extra flag";
+  test(`gh-stage --print-plan rejects an unknown moment (${label})`, () => {
+    underAccess("full", ({ dir }) => {
+      const r = ghCli.run({
+        argv: [
+          "node",
+          "gh-stage.js",
+          ...extra,
+          "--stage",
+          "nonsense",
+          "--print-plan",
+        ],
+        execImpl: explode("gh"),
+        repoRoot: dir,
+        sleepImpl: () => {},
+      });
+      assert.equal(
+        r.exitCode,
+        2,
+        `an unknown moment must exit 2, not resolve to "disabled" — a caller ` +
+          `cannot distinguish {enabled:false} from a moment the board switched off`,
+      );
+    });
+  });
+
+  test(`gh-stage --print-plan canonicalises stage casing (${label})`, () => {
+    underAccess("full", ({ dir }) => {
+      const r = ghCli.run({
+        argv: [
+          "node",
+          "gh-stage.js",
+          ...extra,
+          "--stage",
+          "DONE",
+          "--print-plan",
+        ],
+        execImpl: explode("gh"),
+        repoRoot: dir,
+        sleepImpl: () => {},
+      });
+      assert.equal(r.exitCode, 0);
+      assert.deepEqual(r.targets, ["Done"]);
+    });
+  });
+}
+
+test("gh-stage --probe-board without --print-plan is unaffected by that validation", () => {
+  // The fix must not make the moment mandatory for the probe path, which
+  // legitimately takes no --stage at all.
+  underAccess("full", ({ dir }) => {
+    let reached = false;
+    ghCli.run({
+      argv: ["node", "gh-stage.js", "--probe-board"],
+      execImpl: (argv) => {
+        reached = true;
+        if (argv[0] === "auth") throw new Error("not authenticated");
+        return "";
+      },
+      repoRoot: dir,
+      sleepImpl: () => {},
+    });
+    assert.equal(
+      reached,
+      true,
+      "--probe-board must still reach the board read",
+    );
+  });
+});

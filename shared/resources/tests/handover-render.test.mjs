@@ -7,7 +7,7 @@
  *
  * The two invariants that matter most, and why:
  *
- *   TOTALITY  — every one of the 21 kinds must render in all four output
+ *   TOTALITY  — every one of the 22 kinds must render in all four output
  *               formats. A renderer with a silent `default:` case would emit a
  *               checklist that quietly omits an action a human must perform,
  *               which is precisely the invisible-drift failure this sequence
@@ -68,11 +68,11 @@ function withTmp(fn) {
 
 // ── 1. Totality — every kind × every renderer ──────────────────────────────
 
-test("§1 the roster in the schema doc has exactly 21 kinds, 10 Jira + 11 GitHub", () => {
+test("§1 the roster in the schema doc has exactly 22 kinds, 10 Jira + 12 GitHub", () => {
   const roster = dm.loadRoster();
   assert.equal(
     roster.size,
-    21,
+    22,
     "roster size changed — update the schema doc's own count too",
   );
   const bySystem = {};
@@ -80,7 +80,7 @@ test("§1 the roster in the schema doc has exactly 21 kinds, 10 Jira + 11 GitHub
     const s = k.split(".")[0];
     bySystem[s] = (bySystem[s] || 0) + 1;
   }
-  assert.deepEqual(bySystem, { jira: 10, github: 11 });
+  assert.deepEqual(bySystem, { jira: 10, github: 12 });
 });
 
 test("§1 every roster kind has a renderer, and every renderer has a roster kind", () => {
@@ -108,7 +108,7 @@ test("§1 every kind renders non-empty in all four formats, with nothing unsubst
   const { records } = loadFixture("handover-all-kinds.jsonl");
   assert.equal(
     records.length,
-    21,
+    22,
     "the all-kinds fixture must carry every kind",
   );
 
@@ -153,7 +153,7 @@ test("§1 every kind renders non-empty in all four formats, with nothing unsubst
     .filter((l) => l.startsWith("- ")).length;
   assert.equal(
     summaryBullets,
-    21,
+    22,
     "summary must list every outstanding record",
   );
 });
@@ -932,12 +932,12 @@ test("§14 the generated script runs clean as a dry run and changes nothing", ()
     fs.writeFileSync(f, sh);
     const out = execFileSync("bash", [f], { encoding: "utf8" });
     assert.match(out, /Dry run — nothing was changed/);
-    // Every kind is accounted for in the plan: 21 records, each either a step
+    // Every kind is accounted for in the plan: 22 records, each either a step
     // or an explicit "do this by hand" line.
     const planned = out
       .split("\n")
       .filter((l) => /^[·✋]/.test(l.trim())).length;
-    assert.equal(planned, 21, `dry run planned ${planned} of 21 actions`);
+    assert.equal(planned, 22, `dry run planned ${planned} of 22 actions`);
   });
 });
 
@@ -1416,7 +1416,7 @@ test("§16 BUG-9 a reformatted roster row is refused, not silently truncated", (
     );
     assert.throws(
       () => dm.loadRoster({ docPath: doc }),
-      /does not parse as a kind|expected 21/,
+      /does not parse as a kind|expected 22/,
       "a truncated roster used to pass parsing and then fail at defer() time, " +
         "inside a gate that swallows the throw and records nothing",
     );

@@ -1,0 +1,73 @@
+schema: 1
+task: 'task.54.github-board-interception'
+task_title: 'Intercept GitHub board mutations, and give gh-stage.js the credential-free plan its sibling already has'
+gate: PASS
+status_reason: 'Both gate-1 findings verified fixed by independent re-execution, not by reading the
+  diff. The full-mode regression is gone across three separate bundled skills, the writer is now
+  co-located in 35/35, and both fixes carry tests that were each watched failing.'
+reviewer: 'QA Engineer'
+updated: '2026-08-19T12:20:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 1448
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-08-19'
+  total_iterations: 1
+  verification_method: 'Independent re-execution of each bug report''s own verification steps, plus
+    full regression suite. Not verified by reading the diff.'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged and re-confirmed. The missing-writer branch was deliberately left fail-closed —
+      the cycle-1 fix rejected making it fail open under `full`, on the grounds that weakening a
+      fail-closed access gate to compensate for a packaging bug is the wrong trade. Correct call, and
+      the co-location test now makes the packaging bug unreachable anyway.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. The fix adds one array membership test on a path that already reads a config
+      file.'
+  reliability:
+    status: PASS
+    notes: 'Was FAIL in gate 1. All three causes independently re-verified: writer co-located in
+      35/35 bundled resolve-platform.sh and 11/11 board helpers (was 18/35 and 0/11); board helpers
+      reach their graphql call under `full` in sync-github-task, review-task and
+      ensure-story-github-issue; tracker_write and the helpers both record under `manual` from a
+      bundled skill, with a stub proving no write verb is issued.'
+  maintainability:
+    status: PASS
+    notes: 'Improved by the cycle. The BUG-1 fix is comments only — 30 insertions, zero executable
+      lines, verified by diffing the fix commit — which is the correct shape for a packaging defect.
+      Two co-location assertions rather than one, each covering the other blind spot. The follow-up
+      commit shows the same discipline applied to a warning the fix itself introduced.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Message quality: `--probe-board --print-plan` with no `--stage` reports
+        `unknown moment ""` where the non-probe path reports `--stage is required`. Both exit 2, so
+        behaviour is correct; only the message is less helpful.'
+      refs: ['shared/resources/gh-stage.js']
+    - action: 'Consider a bundler rule for `node "$(dirname …)/x.js"` in shell files, so the next
+        shell-to-JS runtime dependency does not depend on someone remembering the comment convention.
+        Carried forward from gate 1 — still the durable fix; the co-location test is the guard.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

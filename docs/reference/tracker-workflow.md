@@ -531,9 +531,39 @@ This is the asymmetry to internalise before reading anything else here. A Jira w
 it can refuse a transition, which is why the Jira path walks the rungs between two positions and
 re-reads the available transitions after every hop. **A Projects v2 Status field is a single-select
 list.** Every option is settable from every other one. There is no transition graph, no "not reachable
-from here", and therefore no walking and no `--print-plan`.
+from here", and therefore **no walking** — no hop route to plan, and no `--from` to measure one out.
 
 The ladder still matters, for two things: **rank**, and **which option each moment names**.
+
+### `--print-plan` — which column, without credentials
+
+```bash
+gh-stage.js --stage done --print-plan        # no gh auth, no network, exit 0
+```
+
+Answers "which column does this moment name?" by reading `tracker-workflow.yaml` alone, and — like
+its Jira twin — runs **above the auth gate**, so it works on a machine with no `gh` credentials at
+all. That is not an edge case: it is the whole point. A consumer running under
+`access.tracker: manual` has no `gh` auth by definition, and their handover checklist still has to
+say *"move the card to **Ready for Review**"* using their board's real column name.
+
+```json
+{ "stage": "done", "reason": "plan", "enabled": true, "targets": ["Done"],
+  "offLadder": false, "isLastRung": true, "source": "file", "authored": true, "exitCode": 0 }
+```
+
+`targets` is the whole rung, so a caller can prefer whichever name its board actually has. A moment
+absent from `pipeline:` reports `enabled: false, targets: null` — the same answer the move path gives
+as `stage-disabled`.
+
+**`--dry-run` is not a substitute**, which is why both exist. `--dry-run` sits *below* the auth gate
+and reads the live board, so it needs credentials; in exchange it reports what the board really has
+(`would`), not what the file claims. Where the two disagree, `--dry-run` is right and the ladder file
+is stale. The contract between them is containment, not equality — `--dry-run`'s `would` must be one
+of `--print-plan`'s `targets`, and a test asserts it.
+
+The GitHub `--print-plan` takes no `--from` and emits no `hops`/`spansFrom`: with no transition graph
+there is nothing between two positions to walk. Do not port those fields over from the Jira payload.
 
 ### The guard is the only brake
 

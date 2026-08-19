@@ -61,7 +61,7 @@ const ROSTER_DOC = "tracker-access-record.md";
 
 // Asserted, not merely non-zero. A reformatted row used to truncate the roster
 // silently; pinning the count turns that into an immediate, explicit failure.
-const EXPECTED_KIND_COUNT = 21;
+const EXPECTED_KIND_COUNT = 22;
 
 const ACCESS_MODES = Object.freeze([
   "full",
@@ -145,7 +145,7 @@ function parseRoster(text) {
       if (cells[0].includes("`")) {
         throw new Error(
           `${ROSTER_DOC}: row "${cells[0]}" sits in a kind table but does not ` +
-            `parse as a kind. Keep the shape documented under "The 21 kinds" — ` +
+            `parse as a kind. Keep the shape documented under "The 22 kinds" — ` +
             `a single backtick-quoted token, no other markup.`,
         );
       }
@@ -1210,6 +1210,8 @@ Provenance:
 Other:
   --journal <path>      override the journal path
   --list-kinds          print the roster and exit
+  --resolve-access      print the resolved access mode and exit (no roster, no
+                        write); exits 2 on an unrecognised value
   --json                print the written record as JSON
   -h, --help`;
 
@@ -1235,6 +1237,9 @@ function parseArgs(argv) {
         break;
       case "--list-kinds":
         args.listKinds = true;
+        break;
+      case "--resolve-access":
+        args.resolveAccess = true;
         break;
       case "--satisfied":
         args.satisfied = true;
@@ -1371,6 +1376,32 @@ function run({
   if (args.help) {
     console.log(USAGE);
     return { exitCode: 0 };
+  }
+
+  // --resolve-access: print the fully-resolved tracker access mode and exit.
+  //
+  // This exists so a SHELL guard does not have to re-implement the mode table.
+  // There were already four copies of that contract in the tree and a fifth was
+  // one `.sh` file away; `set-github-project-{priority,estimate}.sh` now ask this
+  // CLI the same question `gh-stage.js` asks the same function, so the two can
+  // never drift. It runs BEFORE `loadRoster` because it needs no roster — a
+  // partially-bundled install should still be able to answer "am I restricted?".
+  //
+  // An unrecognised value EXITS 2 with the reason on stderr rather than printing
+  // a mode: a refusal is not a resolution, and printing "manual" here would make
+  // the caller unable to tell a declared restriction from a typo. The shell side
+  // fails closed to `manual` on the non-zero exit, which is the same answer, but
+  // arrived at by the caller's own policy rather than by this CLI guessing.
+  if (args.resolveAccess) {
+    let mode;
+    try {
+      mode = resolveAccessTracker(env, { cwd });
+    } catch (e) {
+      console.error(`Error: ${e.message}`);
+      return { exitCode: 2 };
+    }
+    console.log(mode);
+    return { exitCode: 0, access: mode };
   }
 
   let roster;
