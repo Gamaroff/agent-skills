@@ -689,12 +689,21 @@ const adf = {
 
 const RE_BULLET = /^\s*[-*]\s+(.*)$/;
 const RE_ORDERED = /^\s*\d+\.\s+(.*)$/;
-// Opening fence: captures the delimiter run and an optional language tag. Also
-// matches a closing fence, which carries a delimiter but no tag. Both backtick
-// and tilde fences, matching the section-extraction RE_FENCE further down.
-// Named RE_CODE_FENCE to avoid colliding with it — that one answers "are we
-// inside a fence?" for heading extraction; this one renders the fence.
-const RE_CODE_FENCE = /^\s*(`{3,}|~{3,})(\S*)\s*$/;
+// Opening fence: captures the delimiter run and the info string's FIRST token
+// as the language. Also matches a closing fence, which carries a delimiter and
+// no info string. Both backtick and tilde fences, matching the
+// section-extraction RE_FENCE further down. Named RE_CODE_FENCE to avoid
+// colliding with it — that one answers "are we inside a fence?" for heading
+// extraction; this one renders the fence.
+//
+// The trailing `[^\n]*` is load-bearing and was a bug fix. Requiring the whole
+// info string to be a single token meant ```` ```js title="x" ```` did not
+// match at all, so the OPENING line rendered as prose and the CLOSING fence was
+// then read as an opening one — swallowing every subsequent block into a code
+// block and losing it. Worse, it disagreed with RE_FENCE below, which does
+// match that line: the extractor believed it was inside a fence while this
+// renderer believed it was prose. A parity test now pins the two together.
+const RE_CODE_FENCE = /^\s*(`{3,}|~{3,})[ \t]*([^\s`~]*)[^\n]*$/;
 
 // ---------------------------------------------------------------------------
 // Inline markdown parser — **bold**, `code`, [link](url)
@@ -814,7 +823,17 @@ function textToAdfNodes(text, linkResolver) {
       // interpreted, so a ``` line inside a ~~~ block stays content. Everything
       // else is kept verbatim — no trim, because indentation is significant in
       // code and a re-indented listing is a corrupted one.
-      if (fm && fm[1][0] === fenceDelim[0]) {
+      // A closing fence must use the SAME delimiter character, be AT LEAST as
+      // long as the opening run, and carry no info string — CommonMark's rule.
+      // Comparing only the character let a 3-backtick line close a 4-backtick
+      // fence, tearing apart every nested example in this repo's own docs
+      // (three shipped documents use ```` to wrap ``` blocks).
+      if (
+        fm &&
+        fm[1][0] === fenceDelim[0] &&
+        fm[1].length >= fenceDelim.length &&
+        !fm[2]
+      ) {
         nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
         fenceBuf = null;
         fenceLang = "";
@@ -1658,10 +1677,17 @@ function getAuth({
     "JIRA_PROJECT_KEY",
   ],
   optional = ["JIRA_BOARD_ID"],
+  // Defaults to process.env, but accepts an injected source so a caller that
+  // already resolved its environment can pass the same one through. Without
+  // this, a CLI reading an injected `env` and then calling getAuth() gets two
+  // different environments — which is exactly why tracker-comment.js's Jira
+  // branch could not be driven through its own DI seam, and therefore had no
+  // test coverage at all.
+  source = process.env,
 } = {}) {
   const env = {};
-  for (const k of required) env[k] = process.env[k];
-  for (const k of optional) env[k] = process.env[k];
+  for (const k of required) env[k] = source[k];
+  for (const k of optional) env[k] = source[k];
   const missing = required.filter((k) => !env[k]);
   return {
     ok: missing.length === 0,
@@ -4695,10 +4721,12 @@ function buildCommentAdf(body, momentId, linkResolver) {
   if (momentId) {
     nodes.push(adf.paragraph(adf.em(commentMarkerText(momentId))));
   }
-  // An entirely empty comment is not a legal ADF doc; a single empty paragraph
-  // is. Callers should not post empty comments, but a deferred/dry-run caller
-  // may build one to inspect it.
-  return adf.doc(...(nodes.length ? nodes : [adf.paragraph(adf.text(""))]));
+  // An entirely empty comment is not a legal ADF doc; a bare paragraph is.
+  // NOT `paragraph(text(""))` — ADF rejects a text node with an empty string,
+  // so Jira 400s and the run reports `unverifiable` instead of posting. A body
+  // that renders to nothing is reachable (a body of only `---`), so this is a
+  // real path, not a defensive one.
+  return adf.doc(...(nodes.length ? nodes : [{ type: "paragraph" }]));
 }
 
 /**
@@ -4725,7 +4753,13 @@ async function findCommentsByMarker({
   momentId,
   maxResults = 100,
 }) {
-  const marker = COMMENT_MARKER_PREFIX + momentId;
+  // The FULL marker line, matched EXACTLY — never the bare prefix as a
+  // substring. `agent-skills-comment:review` is a prefix of
+  // `agent-skills-comment:review-story`, so a substring search made a Step 2
+  // `review` comment report `already` against an existing `review-story`
+  // marker and never post. Silent comment loss, which is the failure this
+  // module exists to prevent.
+  const marker = commentMarkerText(momentId);
   const resp = await http(
     `${baseUrl}/rest/api/3/issue/${issueKey}/comment?maxResults=${maxResults}&orderBy=-created`,
     {
@@ -4745,8 +4779,16 @@ async function findCommentsByMarker({
     return { count: null, ids: [], unreadable: true };
   }
   const hits = (data.comments || []).filter((c) =>
-    adfContainsText(c.body, marker),
+    adfContainsExactText(c.body, marker),
   );
+  // QA-7: an unpaginated read is not evidence of absence. When Jira reports
+  // more comments than we asked for, the marker may be outside the window, so
+  // report unreadable and let the caller degrade to `unverifiable` rather than
+  // posting a duplicate on the strength of a partial list.
+  const total = Number(data.total);
+  if (Number.isFinite(total) && total > (data.comments || []).length) {
+    return { count: null, ids: [], unreadable: true, truncated: true };
+  }
   return { count: hits.length, ids: hits.map((c) => c.id), unreadable: false };
 }
 
@@ -4756,6 +4798,21 @@ function adfContainsText(node, needle) {
   if (typeof node.text === "string" && node.text.includes(needle)) return true;
   const kids = Array.isArray(node.content) ? node.content : [];
   return kids.some((k) => adfContainsText(k, needle));
+}
+
+/**
+ * Depth-first scan for a text node whose trimmed content EQUALS `needle`.
+ *
+ * The identity footer has no closing delimiter — unlike the GitHub HTML
+ * marker, which terminates itself with ` -->` — so a substring match cannot
+ * tell `…:review` from `…:review-story`. Exact equality can, and needs no
+ * change to the marker's shape.
+ */
+function adfContainsExactText(node, needle) {
+  if (!node || typeof node !== "object") return false;
+  if (typeof node.text === "string" && node.text.trim() === needle) return true;
+  const kids = Array.isArray(node.content) ? node.content : [];
+  return kids.some((k) => adfContainsExactText(k, needle));
 }
 
 /**
@@ -5010,6 +5067,7 @@ module.exports = {
   commentMarkerHtml,
   commentMarkerText,
   adfContainsText,
+  adfContainsExactText,
   firstLineOf,
   COMMENT_MARKER_PREFIX,
   // jira api

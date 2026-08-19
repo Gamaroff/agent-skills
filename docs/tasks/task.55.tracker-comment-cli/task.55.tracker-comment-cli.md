@@ -5,7 +5,7 @@ type: task
 description: 'jira-sync.js has no comment function at all — there is a deliberate refusal in the source. Every Jira comment in this repository is an Atlassian MCP call made by an agent following prose, because there is no code path to intercept. This adds addComment() and a tracker-comment.js CLI covering both trackers, then replaces the ~20 inline prose comment blocks with one CLI call each. The MCP path survives as the documented no-credentials fallback, exactly as jira-stage.js already established. Load-bearing for restricted access, and independently valuable: it lets comments be retried by code rather than by the model.'
 tags: [restricted-access, jira, github, comments, cli, mcp]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: high
 created: 2026-08-17
@@ -20,7 +20,7 @@ github_issue: 233
 
 **GitHub Issue**: [#233](https://github.com/Gamaroff/agent-skills/issues/233)
 
-**Status**: Ready for Review
+**Status**: In Progress
 
 **Review**: ✅ All critical + important recommendations from `task.55.review.1.tracker-comment-cli.md` implemented 2026-08-19
 
@@ -304,6 +304,31 @@ exit 0 and a throwing transport injected, so "no network" is proven rather than 
 different bodies on the same issue produce two distinct record ids while an identical re-run dedups —
 the exact property `tracker-access-record.md` documents as a past bug.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-19
+**Quality Score**: 55/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.55.qa.1.tracker-comment-cli.md](./task.55.qa.1.tracker-comment-cli.md)
+- **Gate File**: [task.55.gate.1.tracker-comment-cli.yml](./task.55.gate.1.tracker-comment-cli.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1483 node + 9 shell suites + validate:all (115) — all green
+- **Phases Verified**: 8/8 (4 PASS, 3 CONCERNS, 1 FAIL)
+- **Critical Issues**: 2 HIGH, 5 MEDIUM, 5 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+Two HIGH bugs, both causing **silent content loss**, both invisible to a fully green suite — each found by executing the shipped code rather than by reading it:
+
+1. **Marker prefix collision** — `--stage review` prefix-matches an existing `review-story` marker, so the Step 2 review comment reports `already` and is never posted. The exact "silent failure looks like success" harm this task exists to remove.
+2. **Multi-word fence info string** — ` ```js title="x" ` is not recognised as a fence, so the closing fence is read as an opening one and everything after it is swallowed.
+
 ## Risk Assessment
 
 **High** — 24 `addCommentToJiraIssue` occurrences across 15 files (23 to rewrite, 1 allowlisted), plus
@@ -381,6 +406,7 @@ Two adjacent defects surfaced, one of them pre-existing and worth its own follow
 | 2026-08-19 | 1.1 | Review found 3 critical, 7 important issues (6/10) — pinned the CLI contract to `--stage` + peer exit codes, corrected the false ADF-reuse claim into two renderer extensions, decided the `jira-sync.js` module-boundary question, fixed two misdirected citations, completed the call-site inventory, and added Technical Background, Breaking Changes, Progress Tracking and this log | review-task |
 | 2026-08-19 |  | Status → ready-for-development | review-task |
 | 2026-08-19 |  | Implemented — 45 files, 30 new tests (25 parity assertions), full suite green | develop |
+| 2026-08-19 |  | QA gate FAIL (55/100) — 2 HIGH, 5 MEDIUM, 5 LOW findings | qa-task |
 
 ## References
 

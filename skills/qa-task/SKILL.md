@@ -867,7 +867,7 @@ Read `reason` and act per [`references/tracker-comment-contract.md`](references/
 3. On success: log `📨 QA summary posted to Jira issue ${JIRA_KEY}`.
 4. On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-task).
 
-If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` uses the same MCP call shape and `finalise` uses `contentFormat: "markdown"`.
+If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` and `finalise` post through the same `tracker-comment.js` call.
 
 ### Step 14: Communicate to User — CRITICAL / BLOCKING
 

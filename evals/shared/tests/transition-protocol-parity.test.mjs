@@ -95,7 +95,17 @@ test("every --stage literal in shipped markdown names a real stage", () => {
         // the preceding window wins; absent one, assume a board stage, which
         // keeps the original strictness as the default rather than the
         // exception.
-        const before = text.slice(Math.max(0, m.index - 240), m.index);
+        // Attribution ignores blockquote lines. The boilerplate
+        // "> Engine source: `…/tracker-comment.js` …" note sits immediately
+        // above or below most stage invocations, so counting it would
+        // misattribute a genuine BOARD call to the comment namespace whenever
+        // the stage name happens to exist in both — a false pass on a call that
+        // would exit 2 at runtime.
+        const before = text
+          .slice(Math.max(0, m.index - 240), m.index)
+          .split("\n")
+          .filter((l) => !l.trim().startsWith(">"))
+          .join("\n");
         const lastComment = before.lastIndexOf("tracker-comment.js");
         const lastBoard = Math.max(
           before.lastIndexOf("gh-stage.js"),
@@ -549,9 +559,6 @@ const MCP_COMMENT_ALLOWLIST = [
   "shared/resources/jira-transition-protocol.md",
 ];
 
-/** How many lines above a mention we accept a `no-credentials` guard in. */
-const GUARD_WINDOW = 12;
-
 function isAllowlisted(file) {
   const rel = file.slice(repoRoot.length + 1).split("\\").join("/");
   return MCP_COMMENT_ALLOWLIST.some(
@@ -559,19 +566,30 @@ function isAllowlisted(file) {
   );
 }
 
-test("no shipped markdown calls addCommentToJiraIssue outside a no-credentials fallback", () => {
+test("no shipped markdown calls addCommentToJiraIssue outside the two allowlisted docs", () => {
+  // An ABSOLUTE prohibition, not a proximity heuristic — and that is the whole
+  // point of this version.
+  //
+  // The first cut of this guard accepted a mention when the literal
+  // `no-credentials` appeared within 12 lines above it. That read as a
+  // structural check ("the MCP call is only reachable through the fallback
+  // branch") but was not one: every rewritten site ends with a reason table
+  // containing a `no-credentials` row, so the window was pre-satisfied at
+  // roughly sixteen sites by construction. Re-inserting the verbatim pre-task
+  // bare MCP block immediately after step-0's reason table produced ZERO
+  // offenders — the guard passed on the exact regression it names.
+  //
+  // That is this repository's documented failure mode in its passive form: a
+  // check satisfied by the very sentence that documents the correct behaviour.
+  // The fix is not a cleverer window. It is to keep the fallback procedure in
+  // ONE canonical file, so the rule becomes "the literal must not appear
+  // anywhere else" — which nothing can satisfy by accident.
   const offenders = [];
   for (const f of shippedMarkdown()) {
     if (isAllowlisted(f)) continue;
     const lines = readFileSync(f, "utf-8").split("\n");
     lines.forEach((line, i) => {
-      if (!line.includes("addCommentToJiraIssue")) return;
-      // The mention is legal only when it is reachable ONLY through the CLI's
-      // no-credentials branch. Requiring the literal within a short window
-      // above is a structural check, not a stylistic one: it is what makes the
-      // MCP call unreachable on a credentialed run.
-      const window = lines.slice(Math.max(0, i - GUARD_WINDOW), i + 1).join("\n");
-      if (!window.includes("no-credentials")) {
+      if (line.includes("addCommentToJiraIssue")) {
         offenders.push(`${f.slice(repoRoot.length + 1)}:${i + 1}`);
       }
     });
@@ -579,8 +597,9 @@ test("no shipped markdown calls addCommentToJiraIssue outside a no-credentials f
   assert.deepEqual(
     offenders,
     [],
-    `Bare addCommentToJiraIssue call(s) — route through tracker-comment.js and ` +
-      `keep MCP behind a "no-credentials" branch:\n  ${offenders.join("\n  ")}`,
+    `addCommentToJiraIssue outside the allowlist. Route the comment through ` +
+      `tracker-comment.js; the MCP fallback is documented once, in ` +
+      `tracker-comment-contract.md — do not restate it at the call site:\n  ${offenders.join("\n  ")}`,
   );
 });
 
@@ -597,11 +616,15 @@ test("no shipped markdown posts a Jira comment with a raw curl", () => {
       if (!/rest\/api\/\d\/issue\/[^\s"']*\/comment/.test(line)) return;
       // A markdown TABLE ROW naming the endpoint is documentation, not a call —
       // tracker-access-record.md's roster has an "endpoint" column, and the
-      // `jira.comment.add` row legitimately names this URL. An invocation is
-      // never a pipe-delimited row, so that is the discriminator rather than a
-      // file allowlist, which would have blinded the guard to a real call
-      // appearing in the same file later.
-      if (line.trim().startsWith("|")) return;
+      // `jira.comment.add` row legitimately names this URL.
+      //
+      // But "starts with a pipe" alone was too broad: a table CELL is a
+      // perfectly followable instruction for an agent, and this repo's step
+      // docs routinely put commands in cells, so a real curl hidden in a row
+      // slipped straight through. Skip a row only when it carries no invocation
+      // verb — the roster row it protects contains none of these.
+      const INVOCATION = /\bcurl\b|-X\s*POST|--data|-d\s/;
+      if (line.trim().startsWith("|") && !INVOCATION.test(line)) return;
       offenders.push(`${f.slice(repoRoot.length + 1)}:${i + 1}`);
     });
   }
@@ -642,10 +665,18 @@ test("tracker-comment.js is bundled wherever a skill invokes it", () => {
     }
     const invokes = files.some((rel) => {
       if (typeof rel !== "string" || !rel.endsWith(".md")) return false;
-      if (rel.split(/[\\/]/).includes("references")) return false;
-      return readFileSync(join(skillDir, rel), "utf-8").includes(
-        "tracker-comment.js",
-      );
+      const body = readFileSync(join(skillDir, rel), "utf-8");
+      // A file under references/ is normally a BUNDLED copy and must not count
+      // as an invocation. But some are authored there and have no
+      // shared/resources/ twin — develop-bug's step docs are the live example,
+      // and one of them was the 25th call site that three separate inventory
+      // passes missed precisely because they excluded this directory. The
+      // bundler's own AUTO-GENERATED banner is the discriminator: no banner
+      // means the file is source.
+      if (rel.split(/[\\/]/).includes("references") && body.includes("AUTO-GENERATED")) {
+        return false;
+      }
+      return body.includes("tracker-comment.js");
     });
     if (!invokes) continue;
     const bundled = files.some(

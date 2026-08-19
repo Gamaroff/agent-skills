@@ -349,7 +349,14 @@ Read `reason` from the JSON:
 | `unverifiable` | 2+ marker matches, or the comment list was unreadable | Log in Issues Log and continue. **Do not post anyway** |
 | `no-credentials` | No usable auth | **Only here** may the Jira path fall back to MCP — see below |
 
-**The MCP fallback, and only on `no-credentials`.** When `TRACKER=jira` and the CLI reports `no-credentials`, call `addCommentToJiraIssue` with `cloudId` (the hostname from `JIRA_URL`), `issueIdOrKey: {TRACKER_ISSUE}`, the same `commentBody`, and `contentFormat: "markdown"`. If a call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry. On failure: log a warning and continue (non-blocking).
+**The MCP fallback, and only on `no-credentials`.** The procedure lives in one
+place — [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md)
+§"The MCP fallback" — and is not restated here. Restating it is what made the
+parity guard vacuous: with the fallback spelled out at every site, the guard's
+"is this mention near the word `no-credentials`?" window was satisfied
+everywhere, and a genuinely bare MCP call re-inserted next to a reason table
+passed. One canonical location means the guard can simply forbid the literal
+outside the allowlist, which is a rule that cannot be satisfied by accident.
 
 Do **not** run both paths. The CLI is authoritative whenever credentials exist.
 
@@ -384,12 +391,13 @@ Add to the implementation report Pipeline Configuration table:
 
 ### GitHub path (when `TRACKER=github`):
 
-```bash
-# 1. Post pipeline-start comment (wrapped in tracker_call_with_retry — 3× backoff)
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Pipeline started — branch: \`{branch-name}\`"
-```
+> The pipeline-start **comment** is already posted by the one `tracker-comment.js`
+> call above, which covers both trackers. This section covers only the board
+> move, which is GitHub-specific. Do not add a second `gh issue comment` here —
+> it posts an unmarked duplicate the CLI's marker cannot see, so it recurs on
+> every resume.
 
-**2. Signal the `work-started` stage** — run the deterministic CLI:
+**1. Signal the `work-started` stage** — run the deterministic CLI:
 
 ```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \

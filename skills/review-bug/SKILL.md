@@ -146,7 +146,25 @@ Leave the `Status` cell at the bug's **current** lifecycle status — this step 
 
 ## Step 7: Tracker Comment (graceful — non-blocking)
 
-Only if the bug has `github_issue`/`jira_key` in frontmatter (skip silently otherwise — most bugs have none). Post a short review-outcome comment (recommendation, score, issue counts, review-file path) via `tracker-comment.js` with `--stage review-bug` — it branches on `TRACKER` internally. Read `reason` per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). Failure logs a warning and does not halt.
+Only if the bug has `github_issue`/`jira_key` in frontmatter (skip silently otherwise — most bugs have none). Post a short review-outcome comment (recommendation, score, issue counts, review-file path) — one call, both trackers:
+
+```bash
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+## Bug Review Complete
+
+**Recommendation**: ${RECOMMENDATION}
+**Fix-readiness**: ${SCORE}/10
+**Issues**: Critical ${CRITICAL} · Important ${IMPORTANT} · Optional ${OPTIONAL}
+**Review artifact**: \`${REVIEW_FILE}\`
+EOF
+
+node .agents/skills/review-bug/references/tracker-comment.js \
+  --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
+  --stage review-bug --json
+```
+
+Read `reason` per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). Failure logs a warning and does not halt.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 

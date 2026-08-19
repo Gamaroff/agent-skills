@@ -214,6 +214,18 @@ function resolveTracker(explicit, env = process.env) {
 // Markers
 // ---------------------------------------------------------------------------
 
+/**
+ * Is this a stage this CLI knows? Exact member, or a cycle-scoped member with a
+ * numeric suffix (`qa-cycle-2`, `qa-fix-3`).
+ */
+function isKnownStage(stage) {
+  if (COMMENT_STAGES.includes(stage)) return true;
+  return COMMENT_STAGES.some((k) => {
+    if (!stage.startsWith(`${k}-`)) return false;
+    return /^\d+$/.test(stage.slice(k.length + 1));
+  });
+}
+
 /** GitHub/Bitbucket: an HTML comment, invisible when rendered. */
 function markerHtml(stage) {
   return `<!-- ${COMMENT_MARKER_PREFIX}${stage} -->`;
@@ -229,6 +241,19 @@ function markerText(stage) {
 // ---------------------------------------------------------------------------
 function parseArgs(argv) {
   const args = argv.slice(2);
+  // Every value-taking flag fails CLOSED. `--stage` used to fail open: a
+  // missing value left `stage` undefined, `if (args.stage)` went false, and the
+  // comment posted UNMARKED and unconditionally on every resume — while
+  // `--issue` and `--body-file` correctly exited 2 in the same situation. A
+  // flag-shaped value is rejected too, since `--stage --json` would otherwise
+  // swallow the flag the caller parses `reason` from.
+  const value = (i, name) => {
+    const v = args[i];
+    if (v === undefined || v.startsWith("-")) {
+      throw new Error(`${name} requires a value`);
+    }
+    return v;
+  };
   const opts = {
     issue: "",
     bodyFile: "",
@@ -244,18 +269,18 @@ function parseArgs(argv) {
     switch (args[i]) {
       case "--issue":
       case "-i":
-        opts.issue = args[++i];
+        opts.issue = value(++i, "--issue");
         break;
       case "--body-file":
       case "-f":
-        opts.bodyFile = args[++i];
+        opts.bodyFile = value(++i, "--body-file");
         break;
       case "--stage":
       case "-s":
-        opts.stage = args[++i];
+        opts.stage = value(++i, "--stage");
         break;
       case "--tracker":
-        opts.tracker = args[++i];
+        opts.tracker = value(++i, "--tracker");
         break;
       case "--json":
         opts.json = true;
@@ -414,6 +439,19 @@ async function run({
     return { exitCode: 2 };
   }
 
+  // QA-5: COMMENT_STAGES was documentation, never a constraint — any string
+  // was accepted and produced a silently unique marker, so two step docs
+  // spelling one moment differently could never reconcile. Validate it here.
+  // The numeric-suffix form is legal for cycle-scoped stages (`qa-cycle-2`),
+  // because each cycle must post its own comment.
+  if (args.stage && !isKnownStage(args.stage)) {
+    output.err(
+      `Error: unknown --stage "${args.stage}". Known: ${COMMENT_STAGES.join(", ")} ` +
+        `(cycle-scoped stages may take a numeric suffix, e.g. qa-cycle-2)`,
+    );
+    return { exitCode: 2 };
+  }
+
   const skipCode = args.strict ? 1 : 0;
 
   // ── ACCESS GATE ───────────────────────────────────────────────────────────
@@ -516,7 +554,12 @@ function runGithub({ args, issue, body, output, emit, execImpl, skipCode }) {
   let finalBody = body;
   if (args.stage) {
     const marker = markerHtml(args.stage);
-    const found = ghFindMarker(execImpl, issue, COMMENT_MARKER_PREFIX + args.stage);
+    // Search the FULL marker, never the bare prefix. `<!-- …:review -->` is not
+    // a substring of `<!-- …:review-story -->` because the marker terminates
+    // itself; searching `…:review` alone matched both, so a Step 2 `review`
+    // comment reported `already` against a `review-story` marker and was never
+    // posted. Silent comment loss — the failure this module exists to prevent.
+    const found = ghFindMarker(execImpl, issue, marker);
     if (found.unreadable) {
       output.warn(
         `⚠️  Could not read comments on #${issue} — not posting, to avoid a duplicate.`,
@@ -578,9 +621,13 @@ async function runJira({
   // eslint-disable-next-line global-require
   const jira = require("./jira-sync.js");
 
+  // Pass the SAME env `run()` resolved the tracker from. Reading process.env
+  // here instead let the two disagree and made this whole branch unreachable
+  // from a test.
   const auth = jira.getAuth({
     required: ["JIRA_URL", "JIRA_API_TOKEN", "JIRA_USER_EMAIL"],
     optional: [],
+    source: env,
   });
   if (!auth.ok) {
     output.info(
@@ -691,6 +738,7 @@ module.exports = {
   resolveTracker,
   markerHtml,
   markerText,
+  isKnownStage,
   firstLineOf,
   loadDotEnv,
   COMMENT_MARKER_PREFIX,

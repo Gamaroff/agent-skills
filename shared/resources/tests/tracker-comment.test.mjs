@@ -510,3 +510,348 @@ test("firstLineOf strips markdown for the record's `desired`", () => {
   assert.equal(jira.firstLineOf(""), "(empty comment)");
   assert.ok(jira.firstLineOf("x".repeat(300)).length <= 120);
 });
+
+// ── Marker prefix collision (QA-1) ──────────────────────────────────────────
+
+test("a stage that PREFIXES another stage does not match its marker", async () => {
+  // The regression: the search used the bare prefix as a substring, so
+  // `agent-skills-comment:review` matched an existing `review-story` marker.
+  // Live consequence — /review-story comments first with --stage review-story,
+  // then step 2 posts --stage review on the same issue, sees "1 match", reports
+  // `already`, exits 0, and the review comment is never posted. Silent comment
+  // loss, which is the failure this whole module exists to prevent.
+  const dir = withRepo();
+  const f = bodyFile(dir, "Step 2 review body");
+  const gh = stubGh({
+    comments: [{ body: `${cli.markerHtml("review-story")}\nearlier` }],
+  });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "review", "--quiet"],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "posted", "`review` must not be suppressed by `review-story`");
+  assert.ok(gh.calls.some((c) => c.argv[1] === "comment"));
+});
+
+test("qa-cycle does not match qa-cycle-2", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const gh = stubGh({
+    comments: [{ body: `${cli.markerHtml("qa-cycle-2")}\ncycle two` }],
+  });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "qa-cycle", "--quiet"],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "posted");
+});
+
+test("the Jira footer marker matches exactly, not by prefix", () => {
+  // The Jira marker has no closing delimiter (ADF drops unknown nodes, so it
+  // cannot be an HTML comment), so substring matching cannot separate
+  // `…:review` from `…:review-story`. Exact text-node equality can.
+  const doc = jira.buildCommentAdf("body", "review-story");
+  assert.equal(jira.adfContainsExactText(doc, jira.commentMarkerText("review")), false);
+  assert.equal(jira.adfContainsExactText(doc, jira.commentMarkerText("review-story")), true);
+});
+
+test("jira: a prefixing stage does not match through the real search path", async () => {
+  // The assertion above exercises the HELPER. This one exercises the CODE PATH:
+  // reverting findCommentsByMarker to a substring test must fail something, and
+  // a helper-only assertion does not — it kept passing while the live search
+  // regressed. Same collision as the GitHub case: /review-story comments first,
+  // then step 2 posts --stage review on the same issue.
+  const dir = withRepo();
+  const f = bodyFile(dir, "Step 2 review body");
+  const j = stubJira({ comments: [jiraComment("review-story")] });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "review", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "posted", "`review` must not be suppressed by `review-story`");
+  assert.ok(j.calls.some((c) => c.method === "POST"));
+});
+
+// ── Flags fail closed (QA-4) ────────────────────────────────────────────────
+
+test("--stage without a value is a usage error, not a silently unmarked comment", () => {
+  // It used to fail OPEN: stage became undefined, the marker was dropped, and
+  // the comment re-posted on every resume — while --issue and --body-file
+  // correctly exited 2 in the same situation.
+  const dir = withRepo({ "b.md": "hi" });
+  const r = spawnSync(
+    process.execPath,
+    [CLI_PATH, "--issue", "42", "--body-file", join(dir, "b.md"), "--stage"],
+    { cwd: dir, encoding: "utf8", env: { ...process.env, TRACKER: "github" } },
+  );
+  assert.equal(r.status, 2);
+});
+
+test("--stage does not swallow the following flag", () => {
+  const dir = withRepo({ "b.md": "hi" });
+  const r = spawnSync(
+    process.execPath,
+    [CLI_PATH, "--issue", "42", "--body-file", join(dir, "b.md"), "--stage", "--json"],
+    { cwd: dir, encoding: "utf8", env: { ...process.env, TRACKER: "github" } },
+  );
+  assert.equal(r.status, 2, "swallowing --json would also suppress the JSON the caller parses");
+});
+
+// ── Stage validation (QA-5) ─────────────────────────────────────────────────
+
+test("an unknown --stage is a usage error", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", "totally-made-up", "--quiet"],
+    execImpl: explode("gh"),
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.exitCode, 2, "an unlisted stage produces a permanently un-deduplicable marker");
+});
+
+test("a cycle-scoped stage may take a numeric suffix", () => {
+  assert.equal(cli.isKnownStage("qa-cycle-2"), true);
+  assert.equal(cli.isKnownStage("qa-fix-11"), true);
+  assert.equal(cli.isKnownStage("qa-cycle-x"), false, "only a numeric suffix");
+  assert.equal(cli.isKnownStage("done"), true);
+});
+
+// ── Post failure (QA-6) ─────────────────────────────────────────────────────
+
+test("a failed gh post reports unverifiable, never a silent success", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const gh = stubGh({ postFails: true });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet"],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "unverifiable");
+  assert.equal(r.cause, "post-failed");
+  assert.equal(r.posted, false);
+});
+
+// ── Jira branch (QA-6) ──────────────────────────────────────────────────────
+
+const JIRA_ENV = {
+  TRACKER: "jira",
+  JIRA_URL: "https://example.atlassian.net",
+  JIRA_API_TOKEN: "t",
+  JIRA_USER_EMAIL: "e@example.com",
+};
+
+/** A fetch stub answering the comment GET and POST. */
+function stubJira({ comments = [], total = null, getOk = true, postOk = true } = {}) {
+  const calls = [];
+  const fetchImpl = async (url, opts = {}) => {
+    calls.push({ url, method: opts.method || "GET", body: opts.body });
+    if ((opts.method || "GET") === "GET") {
+      if (!getOk) return { ok: false, status: 500, async json() { return {}; }, async text() { return ""; }, headers: { get: () => null } };
+      const payload = { comments, total: total === null ? comments.length : total };
+      return { ok: true, status: 200, async json() { return payload; }, async text() { return JSON.stringify(payload); }, headers: { get: () => null } };
+    }
+    if (!postOk) return { ok: false, status: 400, async json() { return { errorMessages: ["nope"] }; }, async text() { return "nope"; }, headers: { get: () => null } };
+    return { ok: true, status: 201, async json() { return { id: "10001" }; }, async text() { return "{}"; }, headers: { get: () => null } };
+  };
+  return { fetchImpl, calls };
+}
+
+const jiraComment = (stage) =>
+  ({ id: "1", body: jira.buildCommentAdf("prior", stage) });
+
+test("jira: no marker match → posts via REST, and the body is ADF", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "## Done\n\nAccepted.");
+  const j = stubJira({ comments: [] });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "posted");
+  const post = j.calls.find((c) => c.method === "POST");
+  assert.ok(post, "a POST was made");
+  const sent = JSON.parse(post.body);
+  assert.equal(sent.body.type, "doc", "ADF document, not a plain string");
+  assert.ok(jira.adfContainsExactText(sent.body, jira.commentMarkerText("done")));
+});
+
+test("jira: exactly one marker match → already, nothing posted", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const j = stubJira({ comments: [jiraComment("done")] });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "already");
+  assert.ok(!j.calls.some((c) => c.method === "POST"));
+});
+
+test("jira: two marker matches → unverifiable, nothing posted", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const j = stubJira({ comments: [jiraComment("done"), jiraComment("done")] });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "unverifiable");
+  assert.equal(r.matches, 2);
+  assert.ok(!j.calls.some((c) => c.method === "POST"));
+});
+
+test("jira: an unreadable comment list → unverifiable, not a blind post", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const j = stubJira({ getOk: false });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "unverifiable");
+  assert.ok(!j.calls.some((c) => c.method === "POST"));
+});
+
+test("jira: a TRUNCATED comment list is unverifiable, never a blind post (QA-7)", async () => {
+  // total > returned means the marker may be outside the window. Reading a
+  // partial list as "absent" is how the CLI would post the duplicate the
+  // cardinality rule exists to prevent.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const j = stubJira({ comments: [], total: 250 });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "unverifiable");
+  assert.ok(!j.calls.some((c) => c.method === "POST"));
+});
+
+test("jira: a failed POST reports unverifiable", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const j = stubJira({ comments: [], postOk: false });
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "unverifiable");
+  assert.equal(r.cause, "post-failed");
+});
+
+test("jira: no credentials → no-credentials, the MCP fallback's only cue", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: explode("fetch"),
+    repoRoot: dir,
+    env: { TRACKER: "jira", JIRA_URL: "https://example.atlassian.net" },
+  });
+  assert.equal(r.reason, "no-credentials");
+  assert.equal(r.exitCode, 0);
+});
+
+test("jira: a restricted mode defers with the jira.comment.add kind", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const r = await cli.run({
+    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--stage", "done", "--quiet"],
+    execImpl: explode("gh"),
+    fetchImpl: explode("fetch"),
+    repoRoot: dir,
+    env: { ...JIRA_ENV, ACCESS_TRACKER: "manual" },
+  });
+  assert.equal(r.reason, "deferred");
+  const recs = readJournal(dir);
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].kind, "jira.comment.add");
+  assert.equal(recs[0].system, "jira");
+});
+
+// ── Fence rendering regressions (QA-2, QA-3) ────────────────────────────────
+
+test("a multi-word info string is a fence, and the tail is not swallowed", () => {
+  // The regression: RE_CODE_FENCE required a single-token info string, so
+  // ```js title="x" did not match. The opening line rendered as prose and the
+  // CLOSING fence was then read as an opening one, absorbing every subsequent
+  // block. Silent content loss in the published description.
+  const nodes = jira.textToAdfNodes(
+    'intro\n\n```js title="x"\nconst a = 1;\n```\n\ntail prose',
+  );
+  assert.deepEqual(nodes.map((n) => n.type), ["paragraph", "codeBlock", "paragraph"]);
+  assert.equal(nodes[1].attrs.language, "js", "only the first token is the language");
+  assert.equal(nodes[1].content[0].text, "const a = 1;");
+  assert.equal(nodes[2].content[0].text, "tail prose", "the tail survives");
+});
+
+test("a 4-backtick fence is not closed by a 3-backtick line", () => {
+  // Three shipped documents in this repo nest ``` inside ````.
+  const nodes = jira.textToAdfNodes("````\na\n```\nb\n````");
+  assert.deepEqual(nodes.map((n) => n.type), ["codeBlock"]);
+  assert.equal(nodes[0].content[0].text, "a\n```\nb");
+});
+
+test("a closing fence carrying an info string does not close", () => {
+  const nodes = jira.textToAdfNodes("```\na\n```js\nb\n```");
+  assert.deepEqual(nodes.map((n) => n.type), ["codeBlock"]);
+  assert.ok(nodes[0].content[0].text.includes("```js"));
+});
+
+test("RE_FENCE and RE_CODE_FENCE agree on what a fence line is", () => {
+  // They disagreed: the extractor matched ```js title="x" while the renderer
+  // did not, so section extraction believed it was inside a fence while the
+  // renderer believed it was prose.
+  const RE_CODE_FENCE = /^\s*(`{3,}|~{3,})[ \t]*([^\s`~]*)[^\n]*$/;
+  const RE_FENCE = /^\s*(```|~~~)/;
+  for (const line of [
+    "```",
+    "```js",
+    '```js title="x"',
+    "````",
+    "~~~",
+    "~~~python",
+    "   ```bash extra words here",
+  ]) {
+    assert.ok(RE_FENCE.test(line), `RE_FENCE should match ${line}`);
+    assert.ok(RE_CODE_FENCE.test(line), `RE_CODE_FENCE should match ${line}`);
+  }
+});
+
+test("a body that renders to nothing produces legal ADF, not an empty text node", () => {
+  // ADF rejects a text node with an empty string; Jira 400s and the run reports
+  // unverifiable instead of posting. Reachable with a body of only `---`.
+  const doc = jira.buildCommentAdf("---", "");
+  const json = JSON.stringify(doc);
+  assert.ok(!json.includes('"text":""'), `empty text node in ${json}`);
+});
