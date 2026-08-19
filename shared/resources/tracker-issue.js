@@ -522,6 +522,17 @@ function parseArgs(argv) {
 // ONE record covering a fetch-then-mutate PAIR.
 // ---------------------------------------------------------------------------
 
+/**
+ * The kinds whose recorded `command` embeds the repo slug in a REST path, and
+ * which therefore cannot produce a runnable command without one.
+ *
+ * The issue verbs are absent deliberately: `gh issue create|edit|close|reopen`
+ * with no `--repo` resolves the repository from the working directory, and the
+ * handover script is generated into that directory — so their recorded commands
+ * run correctly with no slug at all.
+ */
+const SLUG_EMBEDDING_KINDS = Object.freeze(["milestone", "sub-issue-link"]);
+
 function recordShape({ kind, args, body, slug }) {
   const repoUi = slug || "the repository";
   const issueUrl = slug
@@ -676,6 +687,24 @@ function recordShape({ kind, args, body, slug }) {
       // Unreachable: run() validates --kind against KINDS before reaching here.
       throw new Error(`tracker-issue: no record shape for kind "${kind}"`);
   }
+}
+
+/**
+ * recordShape, with the no-runnable-command rule applied AT CONSTRUCTION.
+ *
+ * The rule used to live in run(), one level above where the broken value was
+ * built — so `recordShape` itself still returned `/repos//milestones` for a
+ * slugless milestone, and the invariant "no record carries a command that
+ * cannot run" held only because a caller remembered to null it afterwards.
+ * Enforcing it here means the shape is never constructed wrong in the first
+ * place, and a future caller cannot forget.
+ */
+function shapeFor({ kind, args, body, slug }) {
+  const shape = recordShape({ kind, args, body, slug });
+  if (!slug && SLUG_EMBEDDING_KINDS.includes(kind)) {
+    shape.command = null;
+  }
+  return shape;
 }
 
 // ── argv builders, shared by the perform path and the recorded command ───────
@@ -1116,24 +1145,19 @@ function run({
       : local();
 
   if (access !== "full" && !args.dryRun) {
-    const shape = recordShape({ kind: args.kind, args, body, slug });
+    // shapeFor applies the rule: a record whose `command` cannot run carries no
+    // command at all. The `sh` renderer would otherwise emit a script that
+    // 404s, and an operator who runs it and sees no error assumes the action
+    // was performed. `manual` always has a usable path (the GitHub UI takes the
+    // visible numbers), so the record degrades rather than breaks.
+    const shape = shapeFor({ kind: args.kind, args, body, slug });
 
-    // A record whose `command` cannot run is worse than one with none: the `sh`
-    // renderer would emit a script that 404s, and an operator who runs it and
-    // sees no error assumes the action was performed. `manual` always has a
-    // usable path (the GitHub UI takes the visible numbers), so dropping
-    // `command` degrades the record rather than breaking it.
-    //
-    // Only the two kinds whose argv embeds the slug are affected — the issue
-    // verbs take a number and `gh` resolves the repo itself at run time.
-    const needsSlug = ["milestone", "sub-issue-link"].includes(args.kind);
-    if (needsSlug && !slug) {
+    if (!shape.command && SLUG_EMBEDDING_KINDS.includes(args.kind)) {
       output.warn(
         `⚠️  Could not resolve owner/repo — recording ${spec.summary} without a ` +
           `runnable command. Perform it from the checklist's manual path, or ` +
           `re-run with --repo <owner/name>.`,
       );
-      shape.command = null;
     }
 
     try {
@@ -1209,6 +1233,8 @@ module.exports = {
   parseArgs,
   makeOutput,
   recordShape,
+  shapeFor,
+  SLUG_EMBEDDING_KINDS,
   numberFromUrl,
   ghCreateArgv,
   ghEditArgv,

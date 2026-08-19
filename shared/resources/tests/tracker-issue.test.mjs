@@ -1004,3 +1004,46 @@ test("§10 GH_REPO with a foreign host is refused, not silently truncated", () =
     }
   }
 });
+
+test("§10 no shape EVER carries a command with an empty slug in its path", () => {
+  // The rule is enforced at CONSTRUCTION, not by a caller remembering to null
+  // the command afterwards. recordShape used to return `/repos//milestones`
+  // for a slugless milestone and rely on run() to clear it — correct, but
+  // enforced one level from where the broken value was built, so a second
+  // caller could reintroduce it. shapeFor holds the invariant at the source.
+  for (const kind of cli.KIND_NAMES) {
+    const args = {
+      issue: "42",
+      parent: "7",
+      title: "T",
+      bodyFile: "",
+      labels: [],
+      addLabels: [],
+      removeLabels: [],
+      milestone: "",
+      reason: "",
+      state: "",
+    };
+    const shape = cli.shapeFor({ kind, args, body: "", slug: "" });
+    if (cli.SLUG_EMBEDDING_KINDS.includes(kind)) {
+      assert.equal(
+        shape.command,
+        null,
+        `${kind} embeds the slug in a REST path — with no slug there is no ` +
+          `runnable command, and a broken one is worse than none`,
+      );
+    } else {
+      const argv = shape.command.argv.join(" ");
+      assert.ok(
+        !argv.includes("/repos//") && !argv.includes("$OWNER"),
+        `${kind}: ${argv}`,
+      );
+      // …and it is genuinely runnable: gh resolves the repo from the cwd the
+      // handover script is generated into.
+      assert.ok(
+        argv.startsWith("gh issue "),
+        `${kind} should be a gh issue verb`,
+      );
+    }
+  }
+});
