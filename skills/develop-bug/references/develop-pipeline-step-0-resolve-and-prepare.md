@@ -301,12 +301,17 @@ fi
 
 | Status                          | Action                                                                                                                                      |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Draft`                         | Note in the implementation report. Proceed — Step 2 (`/review-task`) will validate and update the status autonomously. Do NOT ask the user. |
 | `Planned`                       | Note in the implementation report. Proceed — Step 2 (`/review-task`) will validate and update the status autonomously. Do NOT ask the user. |
 | `Ready for Development`         | Proceed normally                                                                                                                            |
 | `In Progress`                   | Proceed normally                                                                                                                            |
 | `Ready for Review` / `accepted` | HALT — task is already past development. Ask the user if they want to re-run or check the wrong task path.                                  |
 | `Cancelled`                     | HALT — task is cancelled. Report to user before proceeding.                                                                                 |
 | Any other status                | HALT — status is unexpected. Report to user before proceeding.                                                                              |
+
+> ⚠️ **`Draft` added 2026-08-19, closing a three-way disagreement that made a legitimately-authored task undeliverable.** This table previously omitted `draft`, so it fell through to *"Any other status → HALT"* — while the docs linter validated task files against the **story** status set, which includes `draft`, and the corpus used it. A task could therefore be authored, pass every check, and then be impossible to develop.
+>
+> The pipeline was the wrong one of the three. **`develop-story` already proceeds on `Draft`** for exactly this reason (Step 2 promotes it), and **`review-task` Step 9 handles `Draft → Ready for Development` identically** — so `develop-task` was refusing to reach the step designed to fix the thing it was refusing over. Found when a `draft` task (`task.73`) reached the front of a consumer repo's roadmap queue and the pipeline halted at Phase 0c.
 
 **Note (tasks only)**: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations.
 
