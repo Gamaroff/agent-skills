@@ -35,7 +35,7 @@ Teach `dm.resolveAccessTracker` a `skills-config.yaml` tier that agrees with `re
 | 2. review-task             | ✅ Done    | `task.61.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT 8/10 — 0 critical, 6 important (applied), 4 optional (3 applied). Report: `task.61.review.1.access-mode-config-tier.md`. Status `planned` → `ready-for-development` | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 6/6 phases, 31/31 checkboxes. 1416 tests green, validate:all 115 green, bundle committed. Commit `f47ad25` | `.summaries/step-3-initial-audit.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #252: https://github.com/Gamaroff/agent-skills/pull/252 (OPEN, MERGEABLE) → `develop`. Issue #251 commented | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.61.qa.{N}.*.md`; `task.61.gate.{N}.*.yml`; PR comment posted     |       | —                    |
+| 5–6. qa-task / qa-fix loop | 🔄 In progress | `task.61.qa.{N}.*.md`; `task.61.gate.{N}.*.yml`; PR comment posted | Cycle 1: FAIL 40/100 (4 high). Cycle 2: regression + new high found and fixed. Cycle 3 verification in flight | — |
 | 7. finalise                | ⏳ Pending | `task.61.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -113,7 +113,51 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — 2026-08-19 — gate **FAIL** (40/100)
+
+Strategy: parallel agents (high risk, 6 phases, multi-module). One adversarial diff review over a
+scoped 1022-line diff; the 141 bundle copies excluded as generated.
+
+**4 HIGH, 5 MEDIUM, 5 LOW.** Every high-severity finding resolved a declared restriction to
+something *more permissive* than the config says.
+
+- **T61-H1** — `probeResolver` spread the live `process.env` into the child, and the stage CLIs call
+  `loadDotEnv()` **before** resolving. A repo-local `.env` could therefore set `BASH_ENV`, which
+  `bash --noprofile --norc -c` sources: arbitrary code execution *and* a forged `full`. Found by the
+  review agent, not by me — I had checked the snapshot carried the config path and stopped there.
+- **T61-H2** — the `/access/i` fast-path I added to avoid a 500 ms spawn had quietly become an
+  authorisation decision, and was unsound (PyYAML resolves `"\x61ccess"` to `access`). Found
+  independently by me and by the agent.
+- **T61-H3** — the epic-creator consulted the config only when both env names were empty.
+- **T61-H4** — the shell seam inherited the caller's cwd; C5-CR6, fixed on the JS side in the same
+  diff and left in the shell.
+- **T61-M5, the finding behind the findings** — the corpus ran the shell reader with `{PATH,HOME}`
+  and the JS reader with the full `process.env`, so it never compared them under one environment.
+  That is why H1 and H2 both passed a suite built to catch exactly this.
+
+**T61-L2 was a false positive** and is recorded as such: the memo separators were already NUL, so the
+reported collision was not real — the reviewer read a NUL as a space in the diff rendering. Changed to
+`JSON.stringify` for legibility, labelled a readability change rather than claimed as a fix.
+
+### Cycle 2 — 2026-08-19 — a regression **I caused**, and a HIGH I missed
+
+- **H4 REGRESSED.** My cycle-1 anchor computed `$resolver` from a *relative* `BASH_SOURCE` and then
+  `cd`'d away from it, so `source` failed and the `|| cfg_mode="manual"` fired on every call — a repo
+  declaring **nothing** deferred every sprint write. A false restriction, and worse than the bug it
+  replaced. The seam tests could not see it because they passed an absolute path.
+- **New HIGH** — the M3 sweep fixed `jira-stage.js` and missed **six** `makeHttp` call sites across
+  the three sync scripts plus `scaffold-tracker-workflow.js`, every one holding a repo root in scope
+  and none passing it. Those are precisely the bare invocations §2 names as the gap.
+- Plus: the refusal reason was written to `JSM_ACCESS_ERROR` and never printed; the
+  `mayDeclareAccess` comment strip made the JS answer `full` on a malformed config whose only
+  `access` mention was commented out; the allowlist was read after `loadDotEnv` rather than snapshotted.
+
+**Lesson recorded rather than glossed:** two of my three cycle-1 fixes were incomplete in the same
+way — I verified the fix on the shape I had in mind (absolute path, one call site) instead of the
+shape operators actually use. Both are now covered by tests that use the operator's shape, and both
+are mutation-proven.
+
+### Cycle 3 — 2026-08-19 — verification in flight
 
 ---
 

@@ -83,7 +83,30 @@ jsm_resolve_access() {
   # path pointing nowhere, `source` failed, and EVERY answer became `manual`.
   # A repo declaring nothing then deferred every sprint write: a false
   # restriction, and worse than the anchoring bug it was fixing.
-  resolver="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/resolve-platform.sh"
+  #
+  # Three hazards in one line, each of which re-opens that same false-restriction
+  # class through a different door:
+  #
+  #   CDPATH= — `cd` consults CDPATH, and when an entry matches it PRINTS the
+  #     resolved directory on stdout. Inside `$(...)` that lands in the value, so
+  #     an operator with CDPATH exported (common in dotfiles) plus a bare relative
+  #     dirname like `references` got a two-line garbage path, `[ -f ]` false, and
+  #     `manual` on every write — under a message blaming the bundle.
+  #   || true — a bare assignment whose only command is a failing substitution is
+  #     FATAL under `set -euo pipefail`. Harmless today because the sole caller
+  #     tests it in a condition context, but a future plain-command caller would
+  #     get a silent exit 1 instead of the intended fail-closed `manual`.
+  #   :-/nonexistent — an empty BASH_SOURCE[0] (sourced from stdin) makes
+  #     `dirname ""` return `.`, so the resolver would be taken from the CALLER'S
+  #     CWD — anchoring to cwd being the precise thing this line exists to forbid,
+  #     and a cwd-controlled script being a far worse outcome than refusing.
+  _jsm_self=${BASH_SOURCE[0]:-}
+  if [ -z "$_jsm_self" ]; then
+    resolver="/nonexistent/resolve-platform.sh"
+  else
+    resolver="$(CDPATH= cd -P -- "$(dirname "$_jsm_self")" >/dev/null 2>&1 && pwd -P || true)/resolve-platform.sh"
+  fi
+  unset _jsm_self
   if [ -f "$resolver" ]; then
     # ANCHORED to the repo root, not the caller's cwd. read-config.sh defaults
     # SKILLS_CONFIG_FILE to the RELATIVE `skills-config.yaml`, and this skill
@@ -110,6 +133,14 @@ jsm_resolve_access() {
       # double-quoted form searched for the literal text `xe2x9dx8c` and matched
       # nothing. The capture was silently inert until a test caught it.
       JSM_ACCESS_ERROR=$(grep -m1 $'^\xe2\x9d\x8c' "$cfg_err" 2>/dev/null || true)
+    fi
+    # A refusal with no reason is not a legible refusal. mktemp can fail (a
+    # read-only TMPDIR), and the subshell can die before the resolver prints
+    # anything — a failing `cd`, a partially-bundled resolver. Both left `manual`
+    # with an empty JSM_ACCESS_ERROR, which is the exact silence the emit above
+    # was added to end.
+    if [ "$cfg_mode" = "manual" ] && [ -z "${JSM_ACCESS_ERROR:-}" ]; then
+      JSM_ACCESS_ERROR="skills-config.yaml could not be read by resolve-platform.sh (no diagnostic captured) - refusing rather than defaulting to full"
     fi
     [ -n "$cfg_err" ] && rm -f "$cfg_err"
   else

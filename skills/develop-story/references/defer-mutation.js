@@ -658,11 +658,16 @@ function mayDeclareAccess(text) {
   // first non-space character is `#` is inert to YAML, so nothing can hide in it —
   // while a trailing `#` may sit inside a quoted scalar, so those lines stay.
   //
-  // This is not a nicety. The first version of this function tested the raw text,
-  // and this repo's own config carries the prose comment "*as it dogfoods itself*".
-  // A bare `*` test therefore matched, every ordinary config took the 500 ms
-  // subprocess, and the "an unrestricted repo costs nothing" property this function
-  // exists to provide was silently gone.
+  // This is not a nicety, and it protects ONLY the metacharacter tests below.
+  // The first version tested the raw text for those too, and this repo's own
+  // config carries the prose comment "*as it dogfoods itself*" — so a bare `*`
+  // matched, every ordinary config took the 500 ms subprocess, and the
+  // "an unrestricted repo costs nothing" property was silently gone.
+  //
+  // The `access` WORD is deliberately still paid for even inside a comment (see
+  // below), so a config that documents the option in a commented-out block does
+  // spawn once per process. That cost is accepted: under-matching the word is an
+  // escalation, and over-matching it is only slow.
   const body = text.replace(/^[ \t]*#.*$/gm, "");
 
   // The `access` test runs on the RAW text, comments included. That is a

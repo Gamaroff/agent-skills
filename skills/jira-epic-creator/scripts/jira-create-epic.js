@@ -144,8 +144,14 @@ function configMayRestrict() {
     // Key-shaped, not a bare substring. `accessToken:` or a path like
     // `docs/access-control/` is not a declaration, and forcing `manual` on those
     // would be a false restriction that stops every epic create.
-    return /(^|[^A-Za-z0-9_-])["']?access["']?[ \t]*:/m.test(
-      fs.readFileSync(file, "utf8"),
+    // BOTH spellings the shell greps for. YAML has two ways to write a key, and
+    // dropping the explicit-key form (`? access` / `: {tracker: manual}`) left a
+    // config written that way invisible to the degraded tier — which then
+    // proceeded at `full` over a committed restriction.
+    const text = fs.readFileSync(file, "utf8");
+    return (
+      /(^|[^A-Za-z0-9_-])["']?access["']?[ \t]*:/m.test(text) ||
+      /^[ \t]*\?[ \t]+["']?access["']?[ \t]*$/m.test(text)
     );
   } catch (_) {
     return true;

@@ -628,6 +628,60 @@ describe("regressions from the cycle-1 fixes", () => {
     }
   });
 
+  test("an exported CDPATH cannot turn every answer into `manual`", () => {
+    // `cd` consults CDPATH, and on a match it PRINTS the directory to stdout —
+    // which, inside `$(...)`, lands in the resolver path. An operator with CDPATH
+    // in their dotfiles plus a bare-relative source path got a garbage path,
+    // `[ -f ]` false, and `manual` on every write, blamed on the bundle. Same
+    // false-restriction class as the cycle-2 regression, through another door.
+    for (const [body, want] of [
+      ["prd:\n  prdShardedLocation: docs/prd\n", "full"],
+      ["access:\n  tracker: manual\n", "manual"],
+    ]) {
+      withRepo(body, (dir) => {
+        spawnSync("git", ["init", "-q", "."], { cwd: dir });
+        mkdirSync(join(dir, "refs"), { recursive: true });
+        mkdirSync(join(dir, "sub"), { recursive: true });
+        mkdirSync(join(dir, "decoy", "refs"), { recursive: true });
+        for (const f of [
+          "jira-sprint-lib.sh",
+          "resolve-platform.sh",
+          "read-config.sh",
+        ]) {
+          writeFileSync(
+            join(dir, "refs", f),
+            readFileSync(join(SHARED, f), "utf8"),
+          );
+        }
+        const r = spawnSync(
+          "bash",
+          [
+            "--noprofile",
+            "--norc",
+            "-c",
+            // A BARE relative dirname (`refs/...`, not `../refs/...`). CDPATH is
+            // consulted only for paths that do not begin with `/`, `./` or
+            // `../`, so the `../` form used by the sibling test cannot trigger
+            // this hazard at all — the first version of this test asserted
+            // nothing for exactly that reason.
+            'source "refs/jira-sprint-lib.sh"; jsm_resolve_access; printf "%s" "$JSM_ACCESS_MODE"',
+          ],
+          {
+            cwd: dir,
+            env: { ...childEnvFor(), CDPATH: join(dir, "decoy") },
+            encoding: "utf8",
+            timeout: 20000,
+          },
+        );
+        assert.equal(
+          String(r.stdout || "").trim(),
+          want,
+          `CDPATH exported, config ${JSON.stringify(body)}`,
+        );
+      });
+    }
+  });
+
   test("a config refusal is PRINTED, not just stored in a variable", () => {
     // Both new writers set JSM_ACCESS_ERROR and returned 0, while the only
     // existing printer was the return-1 path — so the message was written and
@@ -660,17 +714,33 @@ describe("regressions from the cycle-1 fixes", () => {
     // resolved the config tier against process.cwd(), so a bare `node ...` run
     // from a subdirectory wrote at `full` over a committed restriction. A grep is
     // the honest guard: the defect is "somebody added a call site and forgot".
-    const files = [
-      join(SHARED, "jira-stage.js"),
-      join(REPO, "skills/sync-jira-story/scripts/sync-jira-story.js"),
-      join(REPO, "skills/sync-jira-epic/scripts/sync-jira-epic.js"),
-      join(REPO, "skills/sync-jira-task/scripts/sync-jira-task.js"),
-      join(
-        REPO,
-        "skills/scaffold-tracker-workflow/scripts/scaffold-tracker-workflow.js",
-      ),
-    ];
-    for (const f of files) {
+    // DISCOVERED, not listed. The defect this guards against is "somebody added a
+    // call site and forgot the anchor" — a hard-coded list cannot see a call site
+    // in a file nobody remembered to add to the list.
+    const files = [];
+    for (const f of readdirSync(SHARED)) {
+      if (f.endsWith(".js")) files.push(join(SHARED, f));
+    }
+    const skillsDir = join(REPO, "skills");
+    for (const skill of readdirSync(skillsDir)) {
+      let entries = [];
+      try {
+        entries = readdirSync(join(skillsDir, skill, "scripts"));
+      } catch {
+        continue; // no scripts/ dir
+      }
+      for (const f of entries) {
+        if (f.endsWith(".js")) files.push(join(skillsDir, skill, "scripts", f));
+      }
+    }
+    const withCalls = files.filter((f) =>
+      readFileSync(f, "utf8").includes("makeHttp("),
+    );
+    assert.ok(
+      withCalls.length >= 5,
+      `expected >=5 files with makeHttp calls, found ${withCalls.length}`,
+    );
+    for (const f of withCalls) {
       const src = readFileSync(f, "utf8");
       // A window after each call, NOT a match to the first `)` — the argument
       // object contains `(typeof fetch !== "undefined" ? ... )`, so a lazy
@@ -679,11 +749,27 @@ describe("regressions from the cycle-1 fixes", () => {
       const calls = [];
       let at = src.indexOf("makeHttp(");
       while (at !== -1) {
-        calls.push(src.slice(at, at + 600));
-        at = src.indexOf("makeHttp(", at + 1);
+        const next = src.indexOf("makeHttp(", at + 1);
+        // Bounded at the NEXT call, not a fixed window: otherwise a new
+        // unanchored call added just before an anchored one borrows its
+        // neighbour's `cwd:` and the guard passes on broken code.
+        calls.push(
+          src.slice(
+            Math.max(0, at - 12),
+            next === -1 ? at + 600 : Math.min(next, at + 600),
+          ),
+        );
+        at = next;
       }
       assert.ok(calls.length > 0, `no makeHttp call found in ${f}`);
       for (const args of calls) {
+        // Not every `makeHttp(` is a call. The DEFINITION in jira-sync.js
+        // (`function makeHttp({ … })`) and a no-argument invocation are both
+        // exempt — only an argument object on a real call needs the anchor.
+        // The widened discovery above surfaced the definition immediately, which
+        // is the guard working, not a defect in the source.
+        if (/^makeHttp\(\s*\)/.test(args)) continue;
+        if (/function\s+makeHttp\(/.test(args)) continue;
         assert.match(
           args,
           /cwd:/,
