@@ -126,7 +126,29 @@ done | grep -q 'LEAK' && echo "LEAK DETECTED" || echo "OK"
 
 If the verification prints any LEAK lines, note them in the Issues Log (does not warrant a halt — investigate before the next pipeline run).
 
-The implementation report will continue to be updated through Steps 5–8; its final state is captured in the dedicated Step 8 commit.
+### The implementation report IS committed here — and only here does its first commit belong
+
+Stage the report in this commit. Steps 5–6 then exclude its **updates** from each `fix(...)` commit,
+and Step 8 commits its final state. That ordering is deliberate, and the two halves are different
+things: this step commits **the file**, Steps 5–6 defer **changes to a file that already exists**.
+
+Withholding the file itself until Step 8 was the previous behaviour and it had two costs, one of
+which is close to invisible:
+
+- **A reviewer cannot read the audit trail while the PR is under review.** The report is the record
+  of what the pipeline decided and why. Between Step 4 and Step 8 — which spans the entire QA loop,
+  the part of the run most worth reviewing — it did not exist in the branch at all.
+- **Any document that links to the report acquires a dangling relative link, and it fails only in
+  CI.** Consumers reasonably cross-reference the report from the work item; the file is present in
+  the working tree (untracked), so a link checker run locally resolves it, while CI checks out only
+  tracked files and does not. The result is a red build that cannot be reproduced by running the same
+  command in the same directory, which is the most expensive shape a defect can take.
+
+> **If you are diagnosing a link failure that reproduces in CI and not locally, check the tracked
+> tree, not the working tree:** `git worktree add --detach /tmp/probe HEAD` and run the gate there.
+> A dirty working tree hides exactly this class of failure.
+
+Its final state is captured in the dedicated Step 8 commit.
 
 ---
 

@@ -90,7 +90,22 @@ git diff --cached --name-only | grep -q 'task.Y' && echo "LEAK" || echo "OK"
 3a. **Check for files that must NOT be committed yet**
 
 Before finalising staging, check for any files that should be excluded from this commit:
-- **Implementation reports** (`*.implementation.*.md`) — if the pipeline has not reached its final Step 8 commit, unstage these: `git restore --staged path/to/story.*.implementation.*.md`. When called by the pipeline orchestrator with `--exclude <path>`, the flag enforces this exclusion automatically via pathspec magic (see Flags section above) — no manual unstage needed.
+- **Implementation report *updates*** (`*.implementation.*.md`) — once the report is tracked, keep its
+  churn out of unrelated commits: `git restore --staged path/to/story.*.implementation.*.md`. When
+  called by the pipeline orchestrator with `--exclude <path>`, the flag enforces this automatically
+  via pathspec magic (see Flags section above) — no manual unstage needed.
+
+  **This defers updates to a file that already exists. It is not a licence to withhold the file's
+  first commit.** An untracked file that a *tracked* document links to is a dangling relative link,
+  and it fails asymmetrically: the file is present in the working tree, so a link checker run locally
+  resolves it and passes, while CI checks out only tracked files and goes red. That produces a red
+  build which cannot be reproduced by running the same command in the same directory — the most
+  expensive shape a defect can take, and one that survives every local gate. If a document you are
+  committing links to a file, commit the file with it.
+
+  > Diagnosing a link failure that reproduces in CI and not locally: check the **tracked** tree.
+  > `git worktree add --detach /tmp/probe HEAD` and run the gate there. A dirty working tree hides
+  > exactly this class of failure.
 - **DoD running summaries** (`*.dod.*.md`) — only commit these when finalise has completed
 - **Partial QA artifacts** — gate files and QA reports are owned by QA; dev should not commit them unless explicitly part of the current work
 

@@ -6,6 +6,30 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The implementation report is now committed at pipeline Step 4 instead of being withheld until
+  Step 8**, and only its *updates* are deferred thereafter. Holding the file itself out of every
+  commit had two costs, one of them close to invisible. The audit trail was absent from the branch
+  for the whole QA loop — the stretch of a run a reviewer most wants to read. And any document that
+  linked to the report acquired a **dangling relative link that fails only in CI**: the file is
+  present in the working tree but untracked, so a link checker run locally resolves it and passes,
+  while CI checks out only tracked files and goes red. A red build that cannot be reproduced by
+  running the same command in the same directory is the most expensive shape a defect can take, and
+  this one survived every local gate.
+
+  The original rationale — that a report still being written should not land in a `fix(...)` commit —
+  is sound and is kept: Steps 5–6 still exclude the report, but now they defer *changes to a file
+  that already exists*, which cannot dangle. Step 8 still owns its final state. `commit-changes`
+  step 3a is rescoped to updates and now carries the general rule the specific case is an instance of
+  — *if a document you are committing links to a file, commit the file with it* — plus the diagnosis
+  for the CI-only failure mode (`git worktree add --detach` and run the gate against the tracked
+  tree). `create-pr`'s `--exclude` documentation no longer claims the orchestrators pass the report
+  path, which had become untrue and contradicted Step 4.
+
+  Pinned by `evals/develop-story/protocol/implementation-report-first-commit.test.mjs`, which asserts
+  the *distinction* rather than the wording — an editor who collapses "defer the updates" back into
+  "withhold the file" reintroduces the bug, so the guard rails against doing so are asserted
+  explicitly.
+
 - **The scaffolded Stakeholder Sign-off section no longer claims development is blocked when it is
   not.** Every story and task scaffolded since the gate shipped opened with *"Development must not
   begin until every required role below has signed"* — a description of **blocking** enforcement,

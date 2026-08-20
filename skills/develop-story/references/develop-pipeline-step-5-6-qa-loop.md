@@ -297,7 +297,7 @@ After fixes are applied:
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
-1. **Exclude the implementation report from this commit** — Step 8 owns the sole report commit, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. Before invoking `/commit-changes`, unstage the report explicitly:
+1. **Exclude the implementation report's *updates* from this commit** — Step 8 owns the report's final state, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. The file itself is already tracked (Step 4 committed it), so this defers changes rather than withholding the file: no link to the report can dangle. Before invoking `/commit-changes`, unstage the report explicitly:
 
    ```bash
    # develop-story
@@ -318,7 +318,9 @@ After fixes are applied:
 
    `fix(task.{id}): qa-fix cycle {N} — {brief summary of fixes}`
 
-   Rationale: previously the report was simply "not needed" in qa-fix commits but nothing prevented inclusion. Decisions Log / QA Iteration History entries written during the cycle would silently land in `fix(...)` commits, splitting report history across the branch. Step 8 is the single owner of the report commit (`docs(...)`).
+   Rationale: previously the report was simply "not needed" in qa-fix commits but nothing prevented inclusion. Decisions Log / QA Iteration History entries written during the cycle would silently land in `fix(...)` commits, splitting report history across the branch. Step 8 is the single owner of the report's **final** commit (`docs(...)`).
+
+   > **Do not extend this to the report's first commit.** An earlier revision of this pipeline held the file out of *every* commit until Step 8, which left the audit trail absent from the branch throughout the QA loop and turned any document linking to the report into a dangling relative link — one that resolves locally, because the file is present but untracked, and fails only in CI. Step 4 commits the file for that reason; this step defers only its churn.
 
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
