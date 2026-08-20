@@ -710,10 +710,14 @@ const RECIPES = {
  * @returns {{state: string, observed: any, detail: string}}
  */
 function deriveState(rec, reading) {
+  // `evidence` records whether a REAL read produced this state. States without
+  // evidence (no recipe, unreliable kind, failed or ambiguous read) may not
+  // revoke an existing tick — only positive evidence of regression may.
   if (reading === null || reading === undefined) {
     return {
       state: "pending",
       observed: null,
+      evidence: false,
       detail: "no read defined for this kind",
     };
   }
@@ -721,6 +725,7 @@ function deriveState(rec, reading) {
     return {
       state: "unverifiable",
       observed: null,
+      evidence: false,
       detail: "this kind has no reliable read — check by hand",
     };
   }
@@ -728,6 +733,7 @@ function deriveState(rec, reading) {
     return {
       state: "unverifiable",
       observed: null,
+      evidence: false,
       detail: `read failed: ${reading.error}`,
     };
   }
@@ -736,6 +742,7 @@ function deriveState(rec, reading) {
     return {
       state: "unverifiable",
       observed: null,
+      evidence: false,
       detail: reading.detail || `${reading.count} candidate matches`,
     };
   }
@@ -745,12 +752,14 @@ function deriveState(rec, reading) {
       return {
         state: "satisfied",
         observed: reading.current || "present",
+        evidence: true,
         detail: reading.detail || "verified present",
       };
     }
     return {
       state: "pending",
       observed: null,
+      evidence: true,
       detail: "not found — still to do",
     };
   }
@@ -764,6 +773,7 @@ function deriveState(rec, reading) {
     return {
       state: "satisfied",
       observed: current,
+      evidence: true,
       detail: "verified in the desired state",
     };
   }
@@ -776,12 +786,14 @@ function deriveState(rec, reading) {
     return {
       state: "divergent",
       observed: current,
+      evidence: true,
       detail: `observed ${current}, wanted ${want}`,
     };
   }
   return {
     state: "pending",
     observed: current,
+    evidence: true,
     detail: `still ${current}; wanted ${want}`,
   };
 }
@@ -842,6 +854,7 @@ async function verifyRecord(rec, opts = {}) {
     state: derived.state,
     at: io.now(),
     observed: derived.observed,
+    evidence: derived.evidence === true,
     detail: derived.detail,
   };
   // Preserve the earliest baseline across passes: the first non-satisfied
@@ -880,12 +893,15 @@ async function verifyRecords(records, opts = {}) {
     const verification = await verifyRecord(rec, { io });
     counts[verification.state]++;
     const annotated = { ...rec, verification };
-    // `satisfied` follows the FRESH verification state in both directions. A
-    // record ticked by an earlier pass whose later read finds pending or
-    // divergent must lose its tick — partition() tests `satisfied` first, so a
-    // stale `true` here would render the regression as ticked and silently
-    // swallow the divergence. A revoked tick must be visible.
-    annotated.satisfied = verification.state === "satisfied";
+    // `satisfied` follows the FRESH verification state — but a tick is revoked
+    // only on POSITIVE EVIDENCE of regression (a real read that came back
+    // pending or divergent). A read that produced no evidence — unverifiable,
+    // failed, or a kind with no recipe — keeps an existing tick: revoking on
+    // silence would return an already-executed action to `outstanding`, and
+    // --apply / the rendered script would then run the mutation a second time.
+    annotated.satisfied =
+      verification.state === "satisfied" ||
+      (rec.satisfied === true && verification.evidence !== true);
     if (verification.state === "satisfied") {
       annotated.observed =
         verification.observed !== null &&

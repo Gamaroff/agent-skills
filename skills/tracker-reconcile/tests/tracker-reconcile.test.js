@@ -478,3 +478,19 @@ test("§7 CR-3: run() threads an injected confirm through to the apply pass", as
   assert.equal(asked.length, 1, "the injected confirm must be consulted");
   assert.equal(apply.calls.length, 1);
 });
+
+// ── §8 Regressions from QA cycle 2 (CR2-3) ──────────────────────────────────
+
+test("§8 CR2-3: the confirmation prompt travels as DATA — never interpolated into bash -c", () => {
+  const hostile = record({
+    id: "beefbeef",
+    consequence: "irreversible",
+    intent: "Merge `touch /tmp/pwned` and $(rm -rf /) now",
+  });
+  const cmd = tr.ttyConfirmCommand(hostile);
+  const script = cmd.argv.join(" ");
+  assert.ok(!script.includes("pwned"), "record text must not appear in the script argv");
+  assert.ok(!script.includes("rm -rf"), "record text must not appear in the script argv");
+  assert.match(script, /\$RECONCILE_PROMPT/, "the script must reference the prompt as an env variable");
+  assert.match(cmd.env.RECONCILE_PROMPT, /pwned/, "the prompt content travels in env, as data");
+});

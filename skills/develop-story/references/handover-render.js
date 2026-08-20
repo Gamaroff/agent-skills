@@ -1321,25 +1321,26 @@ function run(opts = {}) {
   if (args.verify) {
     const hv = require("./handover-verify.js");
     const io = opts.verifyIo || hv.makeIo({ env });
-    return hv
-      .verifyRecords(records, { io })
-      .then(({ records: annotated }) =>
-        renderFromRecords(annotated, { args, env, warnings }),
-      )
-      .catch((e) => {
+    // The catch is attached to the VERIFY promise only: a render failure must
+    // propagate as a render failure, not be misreported as a verification
+    // failure and trigger a second, unannotated render over files the first
+    // attempt already wrote.
+    return hv.verifyRecords(records, { io }).then(
+      ({ records: annotated }) => annotated,
+      (e) => {
         console.error(
           `⚠️  verification pass failed (${e.message}) — rendering unannotated`,
         );
-        return renderFromRecords(records, { args, env, warnings });
-      });
+        return records;
+      },
+    ).then((recs) => renderFromRecords(recs, { args, formats, env, warnings }));
   }
 
-  return renderFromRecords(records, { args, env, warnings });
+  return renderFromRecords(records, { args, formats, env, warnings });
 }
 
 /** The synchronous core shared by the plain and --verify paths. */
-function renderFromRecords(records, { args, env, warnings }) {
-  const formats = args.formats.length ? args.formats : ["summary"];
+function renderFromRecords(records, { args, formats, env, warnings }) {
   const ctx = {
     expected: args.expected,
     run: args.run,
@@ -1386,8 +1387,14 @@ function renderFromRecords(records, { args, env, warnings }) {
     // Strip only a KNOWN extension. A blanket /\.[^./]+$/ ate the `{name}`
     // component of `task.52.handover.1.deferred-mutation`, which file-naming.md
     // requires, turning it into `task.52.handover.1.md`.
+    //
+    // The extension is substituted for EVERY file format, single-format renders
+    // included: a lone `--format sh` with `--out …md` used to write the shell
+    // script into a .md filename, and a lone `--format json` buried the sidecar
+    // where tracker-reconcile\'s *.handover.*.json discovery never finds it.
+    // `summary` keeps the caller\'s path verbatim when it is the only format.
     const outPath =
-      formats.length === 1
+      format === "summary" && formats.length === 1
         ? args.out
         : `${args.out.replace(/\.(md|sh|json)$/, "")}.${format}`;
     fs.mkdirSync(path.dirname(outPath), { recursive: true });

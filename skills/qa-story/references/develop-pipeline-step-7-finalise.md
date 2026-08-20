@@ -304,7 +304,10 @@ debt line, no comment. When it is non-empty:
      command)   FORMAT_FLAGS="--format sh" ;;
      read-only) FORMAT_FLAGS="--format json" ;;
      approve)   if [ -t 1 ]; then FORMAT_FLAGS="--format md --format sh"; else FORMAT_FLAGS="--format sh"; fi ;;
-     *)         FORMAT_FLAGS="--format md" ;;   # full reaches here only via retry_of failures
+     full|"")   FORMAT_FLAGS="" ;;              # full selects no FILE format — its journal
+                                                # entries are retry_of failures, reported by
+                                                # the inline summary (step 2 below) only
+     *)         FORMAT_FLAGS="--format md" ;;   # unknown mode — fail safe to a checklist
    esac
 
    # --verify runs the read-only verification pass IN-PROCESS so its
@@ -314,10 +317,17 @@ debt line, no comment. When it is non-empty:
    VERIFY_FLAG=""
    case "$ACCESS_TRACKER" in read-only|approve) VERIFY_FLAG="--verify" ;; esac
 
-   node .agents/skills/{develop-story|develop-task|develop-bug}/references/handover-render.js \
-     $VERIFY_FLAG $FORMAT_FLAGS \
-     --out {work-item-dir}/{prefix}.handover.{n}.{name}.md \
-     --run "{branch}" --access "$ACCESS_TRACKER" --work-item {work-item-dir}
+   # `full` (and an unset mode) commits no artifact — skip the render call
+   # entirely rather than widening the mode's renderer selection. The renderer
+   # substitutes the .md extension per selected format, so a single-format
+   # `command` render lands on .sh and `read-only` on .json — never sh/json
+   # content inside a .md filename.
+   if [ -n "$FORMAT_FLAGS" ]; then
+     node .agents/skills/{develop-story|develop-task|develop-bug}/references/handover-render.js \
+       $VERIFY_FLAG $FORMAT_FLAGS \
+       --out {work-item-dir}/{prefix}.handover.{n}.{name}.md \
+       --run "{branch}" --access "$ACCESS_TRACKER" --work-item {work-item-dir}
+   fi
    ```
 
 2. **Populate the implementation report's `## Tracker Actions Required` section** with the

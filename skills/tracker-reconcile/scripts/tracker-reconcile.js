@@ -313,18 +313,35 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
  * read from /dev/tty. Built only when a tty exists; where /dev/tty cannot be
  * read the answer is "no" — consent is never assumed.
  */
+/**
+ * The bash invocation for one confirmation prompt. The script text is a FIXED
+ * string — the prompt travels as data in an environment variable, never
+ * interpolated into `bash -c`. A committed record's `intent` can contain
+ * `$(…)` or backticks, and interpolating it into script text would execute
+ * them in the operator's shell the moment the prompt rendered.
+ */
+function ttyConfirmCommand(rec) {
+  return {
+    argv: [
+      "bash",
+      "-c",
+      'read -r -p "$RECONCILE_PROMPT" _reply < /dev/tty && printf %s "$_reply"',
+    ],
+    env: {
+      ...process.env,
+      RECONCILE_PROMPT: `⚠️  [${rec.id}] IRREVERSIBLE — ${rec.intent}. Perform this? [y/N] `,
+    },
+  };
+}
+
 function ttyConfirm(rec) {
   try {
-    const reply = execFileSync(
-      "bash",
-      [
-        "-c",
-        `read -r -p ${JSON.stringify(
-          `⚠️  [${rec.id}] IRREVERSIBLE — ${rec.intent}. Perform this? [y/N] `,
-        )} _reply < /dev/tty && printf %s "$_reply"`,
-      ],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
-    ).trim();
+    const cmd = ttyConfirmCommand(rec);
+    const reply = execFileSync(cmd.argv[0], cmd.argv.slice(1), {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "inherit"],
+      env: cmd.env,
+    }).trim();
     return /^y(es)?$/i.test(reply);
   } catch {
     return false;
@@ -554,6 +571,7 @@ module.exports = {
   writeArtifacts,
   applyRecords,
   ttyConfirm,
+  ttyConfirmCommand,
   markExecuted,
   writeChangeLogRow,
   run,

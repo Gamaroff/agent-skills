@@ -563,3 +563,97 @@ test("§10 CR-5: render --verify annotates in-process and the annotations reach 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── §11 Regressions from QA cycle 2 (CR2-1, CR2-2, CR2-4) ──────────────────
+
+test("§11 CR2-1: a single-format render lands on the format's own extension", async () => {
+  const { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(join(tmpdir(), "render-ext-"));
+  try {
+    const journal = join(dir, "journal.jsonl");
+    writeFileSync(journal, `${JSON.stringify(rec())}\n`);
+    // --out names the .md base, per the pipeline docs — a lone sh/json format
+    // must land on .sh/.json, or reconcile's *.handover.*.json glob finds nothing.
+    for (const [format, ext, marker] of [
+      ["sh", "sh", "#!/usr/bin/env bash"],
+      ["json", "json", '"generator": "handover-render.js"'],
+      ["md", "md", "# Tracker actions required"],
+    ]) {
+      const out = join(dir, `task.9.handover.1.smoke.md`);
+      const r = hr.run({
+        argv: ["node", "handover-render.js", "--journal", journal, "--format", format, "--out", out, "--quiet"],
+        env: {},
+        cwd: dir,
+      });
+      assert.equal(r.exitCode, 0);
+      const expected = join(dir, `task.9.handover.1.smoke.${ext}`);
+      assert.ok(existsSync(expected), `${format} must write ${expected}`);
+      assert.match(readFileSync(expected, "utf8"), new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      rmSync(expected, { force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("§11 CR2-2: a tick is NOT revoked without evidence — unverifiable and no-recipe reads keep it", async () => {
+  // An executed/verified action whose kind has no reliable read: the fresh
+  // pass returns unverifiable, which is silence, not evidence of regression.
+  const ticked = rec({
+    kind: "jira.worklog.add",
+    system: "jira",
+    consequence: "communication",
+    satisfied: true,
+    verification: {
+      state: "satisfied",
+      at: "2026-08-19T10:00:00Z",
+      observed: "executed",
+      evidence: true,
+      detail: "executed by tracker-reconcile --apply",
+    },
+  });
+  const { records: out, counts } = await verify([ticked], readStub([]));
+  assert.equal(out[0].satisfied, true, "silence must not revoke a tick");
+  assert.equal(counts.satisfied + counts.unverifiable, 1);
+  const model = hr.buildModel(out, {});
+  assert.equal(model.counts.satisfied, 1, "the ticked action must not return to outstanding");
+  assert.equal(model.counts.outstanding, 0, "no re-run risk: not outstanding");
+
+  // But POSITIVE evidence still revokes: a real board read showing a
+  // non-desired value.
+  const regressed = rec({
+    satisfied: true,
+    verification: {
+      state: "satisfied",
+      at: "2026-08-19T10:00:00Z",
+      observed: "Done",
+      evidence: true,
+      detail: "verified in the desired state",
+    },
+  });
+  const { records: out2 } = await verify([regressed], readStub([["graphql", boardRead("To Do")]]));
+  assert.equal(out2[0].satisfied, false, "a real read showing regression must revoke");
+});
+
+test("§11 CR2-4: a render failure under --verify propagates — it is not swallowed as a verify failure", async () => {
+  const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(join(tmpdir(), "render-fail-"));
+  try {
+    const journal = join(dir, "journal.jsonl");
+    writeFileSync(journal, `${JSON.stringify(rec())}\n`);
+    const io = hv.makeIo({ env: {}, execImpl: readStub([["graphql", boardRead("Done")]]).execImpl, now: FIXED_NOW });
+    // An unwritable --out path: the render fails; with the old catch placement
+    // this resolved exitCode 0 after a second unannotated render attempt.
+    const r = await hr.run({
+      argv: ["node", "handover-render.js", "--journal", journal, "--format", "md", "--out", join(dir, "no-such-dir-file\u0000bad", "x.md"), "--verify", "--quiet"],
+      env: {},
+      cwd: dir,
+      verifyIo: io,
+    }).catch((e) => ({ threw: true, message: e.message }));
+    assert.ok(r.threw || r.exitCode !== 0, "a render failure must surface as a failure");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
