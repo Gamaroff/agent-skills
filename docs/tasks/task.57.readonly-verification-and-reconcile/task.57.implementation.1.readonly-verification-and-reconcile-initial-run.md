@@ -37,7 +37,7 @@ Initial run: build the read-only verification pass (`handover-verify.js`), the f
 | 4. create-pr               | ✅ Done | PR #269: https://github.com/Gamaroff/agent-skills/pull/269 | Commit `803a989` (83 files, scope-staged, no leaks); issue comment posted; board in-review: stage-disabled (no such column — correct) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done | qa.1/2/3 + gate.1/2/3 (final: PASS 92/100); PR comments per cycle | 3 cycles; 19 findings closed incl. 3 HIGH introduced-by-fixes caught by adversarial pass; commits `6eb5708`, `3c6a81f`, `cd0aada` | `.summaries/step-5-post-fix-tracker-2.json` |
 | 7. finalise                | ✅ Done | `task.57.dod.1.readonly-verification-and-reconcile.md`; task `status: accepted` | ACCEPTED: 10/10 ACs cited+tested; CI SUCCESS on `e193e27` (after prettier fix); canonical PR comment posted; issue #235 CLOSED; board Done (already); Tracker debt: none; sprint-review-summary.md written | 4 parallel DoD agents (AC/security/compliance/docs) |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed | Acceptance artifacts committed in `241a17a` and pushed; PR #269 current; lock removed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
