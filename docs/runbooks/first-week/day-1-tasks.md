@@ -46,7 +46,11 @@ Follow the quickstart end-to-end. It walks you through `/create-task` → `/deve
 
 **What you're building:** Add a one-sentence summary to `CONTRIBUTING.md` introducing `docs/concepts/quickstart-task.md`. Something like:
 
-> New contributors: see [Quickstart: your first task](docs/concepts/quickstart-task.md) for a 10-minute end-to-end walkthrough before diving into the pipeline details below.
+```markdown
+New contributors: see [Quickstart: your first task](docs/concepts/quickstart-task.md) for a 10-minute end-to-end walkthrough before diving into the pipeline details below.
+```
+
+(The link is root-relative because it will live in `CONTRIBUTING.md` at the repo root.)
 
 This task is simple and will fly through QA with zero findings. The goal is to run the pipeline a second time with full autonomy.
 
