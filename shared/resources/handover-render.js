@@ -811,11 +811,15 @@ function renderShell(model) {
   L.push("divergent_step() {");
   L.push("  # The verification pass saw a value that is neither the desired");
   L.push("  # state nor where the card started. Applying the recorded command");
-  L.push("  # anyway could drag it BACKWARDS off a state a human chose. Skipped");
+  L.push(
+    "  # anyway could drag it BACKWARDS off a state a human chose. Skipped",
+  );
   L.push("  # with a warning unless --all is given.");
   L.push("  #");
   L.push("  # The guards COMPOSE: --all lifts only the divergence skip. An");
-  L.push('  # irreversible action still goes through confirm_step — "$3" names');
+  L.push(
+    '  # irreversible action still goes through confirm_step — "$3" names',
+  );
   L.push("  # the inner helper — so --all never becomes a consent bypass.");
   L.push('  local id="$1"; shift');
   L.push('  local desc="$1"; shift');
@@ -1156,7 +1160,9 @@ const RENDERERS = Object.freeze({
  */
 function renderersForMode(mode, opts = {}) {
   const tty =
-    opts.tty !== undefined ? !!opts.tty : !!(process.stdout && process.stdout.isTTY);
+    opts.tty !== undefined
+      ? !!opts.tty
+      : !!(process.stdout && process.stdout.isTTY);
   switch (mode) {
     case "full":
       // Nothing is deferred by policy; a record here means something FAILED.
@@ -1292,11 +1298,7 @@ function parseArgs(argv) {
 }
 
 function run(opts = {}) {
-  const {
-    argv = process.argv,
-    env = process.env,
-    cwd = process.cwd(),
-  } = opts;
+  const { argv = process.argv, env = process.env, cwd = process.cwd() } = opts;
   let args;
   try {
     args = parseArgs(argv);
@@ -1338,15 +1340,20 @@ function run(opts = {}) {
     // propagate as a render failure, not be misreported as a verification
     // failure and trigger a second, unannotated render over files the first
     // attempt already wrote.
-    return hv.verifyRecords(records, { io }).then(
-      ({ records: annotated }) => annotated,
-      (e) => {
-        console.error(
-          `⚠️  verification pass failed (${e.message}) — rendering unannotated`,
-        );
-        return records;
-      },
-    ).then((recs) => renderFromRecords(recs, { args, formats, env, warnings }));
+    return hv
+      .verifyRecords(records, { io })
+      .then(
+        ({ records: annotated }) => annotated,
+        (e) => {
+          console.error(
+            `⚠️  verification pass failed (${e.message}) — rendering unannotated`,
+          );
+          return records;
+        },
+      )
+      .then((recs) =>
+        renderFromRecords(recs, { args, formats, env, warnings }),
+      );
   }
 
   return renderFromRecords(records, { args, formats, env, warnings });

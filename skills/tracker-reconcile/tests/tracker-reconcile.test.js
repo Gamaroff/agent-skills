@@ -95,7 +95,11 @@ function makeRepo(records) {
       {
         v: 1,
         generator: "handover-render.js",
-        context: { run: "feature/task.99.fixture", access: "manual", workItem: "task.99" },
+        context: {
+          run: "feature/task.99.fixture",
+          access: "manual",
+          workItem: "task.99",
+        },
         records,
       },
       null,
@@ -147,7 +151,17 @@ function applyStub({ throwing = false } = {}) {
   };
 }
 
-function runReconcile(repo, { flags = [], env = {}, boardValue = "To Do", apply = null, isTTY = false, now = FIXED_NOW } = {}) {
+function runReconcile(
+  repo,
+  {
+    flags = [],
+    env = {},
+    boardValue = "To Do",
+    apply = null,
+    isTTY = false,
+    now = FIXED_NOW,
+  } = {},
+) {
   return tr.run({
     argv: ["node", "tracker-reconcile.js", repo.dir, ...flags],
     env,
@@ -201,7 +215,10 @@ test("§1 the refused run still performs the check pass (ticks satisfied items)"
 // ── §2 Check-only: tick, never delete; status frontmatter ───────────────────
 
 test("§2 an already-done action is ticked, not deleted — item count equals record count", async () => {
-  const repo = makeRepo([record({ id: "aaaa0001" }), record({ id: "aaaa0002", order: 2, intent: "Move the other card" })]);
+  const repo = makeRepo([
+    record({ id: "aaaa0001" }),
+    record({ id: "aaaa0002", order: 2, intent: "Move the other card" }),
+  ]);
   const result = await runReconcile(repo, { boardValue: "Done" });
   assert.equal(result.reason, "checked");
   const sidecar = JSON.parse(fs.readFileSync(repo.sidecar, "utf8"));
@@ -209,7 +226,11 @@ test("§2 an already-done action is ticked, not deleted — item count equals re
   assert.equal(sidecar.counts.satisfied, 2);
   assert.equal(sidecar.status, "complete");
   const md = fs.readFileSync(repo.sidecar.replace(/\.json$/, ".md"), "utf8");
-  assert.match(md, /^status: complete$/m, "checklist frontmatter carries status:");
+  assert.match(
+    md,
+    /^status: complete$/m,
+    "checklist frontmatter carries status:",
+  );
   const ticks = md.match(/- \[x\]/g) || [];
   assert.equal(ticks.length, 2, "both boxes ticked in place");
 });
@@ -311,7 +332,11 @@ test("§4 a check-only run writes NO Change Log row — observation is a non-eve
   const repo = makeRepo([record()]);
   await runReconcile(repo, { boardValue: "Done" }); // observes satisfied
   const doc = fs.readFileSync(repo.doc, "utf8");
-  assert.doesNotMatch(doc, /tracker-reconcile/, "observation must not write history");
+  assert.doesNotMatch(
+    doc,
+    /tracker-reconcile/,
+    "observation must not write history",
+  );
 });
 
 test("§4 a refused --apply writes NO Change Log row — deferral is a non-event", async () => {
@@ -328,11 +353,23 @@ test("§4 a refused --apply writes NO Change Log row — deferral is a non-event
 test("§4 an executed action earns exactly one row, naming what ran", async () => {
   const repo = makeRepo([record()]);
   const apply = applyStub();
-  await runReconcile(repo, { flags: ["--apply"], env: {}, boardValue: "To Do", apply });
+  await runReconcile(repo, {
+    flags: ["--apply"],
+    env: {},
+    boardValue: "To Do",
+    apply,
+  });
   const doc = fs.readFileSync(repo.doc, "utf8");
-  assert.match(doc, /Reconcile executed 1 tracker action\(s\): github\.board\.field-set/);
+  assert.match(
+    doc,
+    /Reconcile executed 1 tracker action\(s\): github\.board\.field-set/,
+  );
   assert.match(doc, /\| tracker-reconcile \|/);
-  assert.match(doc, /^updated: 2026-08-20$/m, "frontmatter updated bumps with the row");
+  assert.match(
+    doc,
+    /^updated: 2026-08-20$/m,
+    "frontmatter updated bumps with the row",
+  );
   const rows = doc.match(/tracker-reconcile/g) || [];
   assert.equal(rows.length, 1, "one run, one row");
 });
@@ -351,17 +388,31 @@ test("§5 reconciling twice with an unchanged board is byte-identical", async ()
       intent: "Log work",
     }),
   ]);
-  await runReconcile(repo, { boardValue: "Done", now: () => "2026-08-20T09:00:00Z" });
+  await runReconcile(repo, {
+    boardValue: "Done",
+    now: () => "2026-08-20T09:00:00Z",
+  });
   const md1 = fs.readFileSync(repo.sidecar.replace(/\.json$/, ".md"), "utf8");
   const json1 = fs.readFileSync(repo.sidecar, "utf8");
 
   // A later clock — nothing on the board changed.
-  await runReconcile(repo, { boardValue: "Done", now: () => "2026-08-27T15:45:00Z" });
+  await runReconcile(repo, {
+    boardValue: "Done",
+    now: () => "2026-08-27T15:45:00Z",
+  });
   const md2 = fs.readFileSync(repo.sidecar.replace(/\.json$/, ".md"), "utf8");
   const json2 = fs.readFileSync(repo.sidecar, "utf8");
 
-  assert.equal(md2, md1, "checklist must be byte-identical on a no-change reconcile");
-  assert.equal(json2, json1, "sidecar must be byte-identical on a no-change reconcile");
+  assert.equal(
+    md2,
+    md1,
+    "checklist must be byte-identical on a no-change reconcile",
+  );
+  assert.equal(
+    json2,
+    json1,
+    "sidecar must be byte-identical on a no-change reconcile",
+  );
 });
 
 // ── §6 Targets ───────────────────────────────────────────────────────────────
@@ -414,7 +465,11 @@ test("§7 CR-3: irreversible on a tty with NO confirm mechanism is skipped — n
     isTTY: true,
     confirm: null,
   });
-  assert.equal(executed.length, 0, "tty without a confirm mechanism must not execute");
+  assert.equal(
+    executed.length,
+    0,
+    "tty without a confirm mechanism must not execute",
+  );
   assert.equal(apply.calls.length, 0);
   assert.match(skipped[0].why, /no confirmation mechanism|never assumed/);
 });
@@ -467,12 +522,16 @@ test("§7 CR-3: run() threads an injected confirm through to the apply pass", as
     cwd: repo.root,
     verifyExecImpl: (argv) => {
       if (!hv.isReadOnlyArgv(argv)) throw new Error("MUTATION during verify");
-      if (argv.join(" ").includes("pr view")) return { status: 0, stdout: JSON.stringify({ state: "OPEN" }) };
+      if (argv.join(" ").includes("pr view"))
+        return { status: 0, stdout: JSON.stringify({ state: "OPEN" }) };
       return { status: 1, error: "no canned response" };
     },
     execImpl: apply.execImpl,
     isTTY: true,
-    confirm: (rec) => { asked.push(rec.id); return true; },
+    confirm: (rec) => {
+      asked.push(rec.id);
+      return true;
+    },
   });
   assert.equal(result.reason, "applied");
   assert.equal(asked.length, 1, "the injected confirm must be consulted");
@@ -489,8 +548,22 @@ test("§8 CR2-3: the confirmation prompt travels as DATA — never interpolated 
   });
   const cmd = tr.ttyConfirmCommand(hostile);
   const script = cmd.argv.join(" ");
-  assert.ok(!script.includes("pwned"), "record text must not appear in the script argv");
-  assert.ok(!script.includes("rm -rf"), "record text must not appear in the script argv");
-  assert.match(script, /\$RECONCILE_PROMPT/, "the script must reference the prompt as an env variable");
-  assert.match(cmd.env.RECONCILE_PROMPT, /pwned/, "the prompt content travels in env, as data");
+  assert.ok(
+    !script.includes("pwned"),
+    "record text must not appear in the script argv",
+  );
+  assert.ok(
+    !script.includes("rm -rf"),
+    "record text must not appear in the script argv",
+  );
+  assert.match(
+    script,
+    /\$RECONCILE_PROMPT/,
+    "the script must reference the prompt as an env variable",
+  );
+  assert.match(
+    cmd.env.RECONCILE_PROMPT,
+    /pwned/,
+    "the prompt content travels in env, as data",
+  );
 });

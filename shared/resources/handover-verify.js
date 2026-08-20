@@ -370,7 +370,8 @@ const RECIPES = {
         count: 1,
         current: `#${hits[0].number}`,
       };
-    if (hits.length === 0) return { read: "existence", exists: false, count: 0 };
+    if (hits.length === 0)
+      return { read: "existence", exists: false, count: 0 };
     return {
       ambiguous: true,
       count: hits.length,
@@ -429,7 +430,9 @@ const RECIPES = {
 
   async "github.milestone.create"(io, rec) {
     const title =
-      (rec.desired && rec.desired.title) || rec.target.name || rec.target.milestone;
+      (rec.desired && rec.desired.title) ||
+      rec.target.name ||
+      rec.target.milestone;
     if (!title) return { error: "no milestone title recorded" };
     const r = io.exec([
       "gh",
@@ -447,7 +450,8 @@ const RECIPES = {
         count: 1,
         current: `#${hits[0].number}`,
       };
-    if (hits.length === 0) return { read: "existence", exists: false, count: 0 };
+    if (hits.length === 0)
+      return { read: "existence", exists: false, count: 0 };
     return {
       ambiguous: true,
       count: hits.length,
@@ -521,8 +525,7 @@ const RECIPES = {
         count: nodes.length,
         detail: `issue sits on ${nodes.length} boards`,
       };
-    const current =
-      nodes[0].fieldValueByName && nodes[0].fieldValueByName.name;
+    const current = nodes[0].fieldValueByName && nodes[0].fieldValueByName.name;
     return {
       read: "value",
       current: current || "",
@@ -582,7 +585,10 @@ const RECIPES = {
     );
     if (g.error) return { error: g.error };
     const current =
-      g.json && g.json.fields && g.json.fields.status && g.json.fields.status.name;
+      g.json &&
+      g.json.fields &&
+      g.json.fields.status &&
+      g.json.fields.status.name;
     if (current === undefined) return { error: "status field unreadable" };
     return { read: "value", current, desired: desiredStatus(rec) };
   },
@@ -599,7 +605,10 @@ const RECIPES = {
     );
     if (g.error) return { error: g.error };
     const current =
-      g.json && g.json.fields && g.json.fields.status && g.json.fields.status.name;
+      g.json &&
+      g.json.fields &&
+      g.json.fields.status &&
+      g.json.fields.status.name;
     if (current === undefined) return { error: "status field unreadable" };
     return { read: "value", current, desired: want };
   },
@@ -644,7 +653,12 @@ const RECIPES = {
       (i) => i.fields && eq(i.fields.summary, summary),
     );
     if (hits.length === 1)
-      return { read: "existence", exists: true, count: 1, current: hits[0].key };
+      return {
+        read: "existence",
+        exists: true,
+        count: 1,
+        current: hits[0].key,
+      };
     if (hits.length === 0)
       return { read: "existence", exists: false, count: 0 };
     return {
@@ -656,7 +670,8 @@ const RECIPES = {
 
   async "jira.issue.link"(io, rec) {
     const other =
-      rec.desired && (rec.desired.outward || rec.desired.inward || rec.desired.issue);
+      rec.desired &&
+      (rec.desired.outward || rec.desired.inward || rec.desired.issue);
     if (!other) return { error: "no linked issue recorded" };
     const g = await jiraGet(
       io,
@@ -946,7 +961,10 @@ function verifyGitPush(branch, opts = {}) {
   const localSha = String(local.stdout || "").trim();
   if (!remoteSha) return { state: "pending", detail: "branch not on origin" };
   if (remoteSha === localSha)
-    return { state: "satisfied", detail: `origin/${branch} at ${remoteSha.slice(0, 8)}` };
+    return {
+      state: "satisfied",
+      detail: `origin/${branch} at ${remoteSha.slice(0, 8)}`,
+    };
   return {
     state: "divergent",
     detail: `origin/${branch} at ${remoteSha.slice(0, 8)}, local at ${localSha.slice(0, 8)}`,
@@ -995,7 +1013,11 @@ function parseArgs(argv) {
   return args;
 }
 
-async function run({ argv = process.argv, env = process.env, cwd = process.cwd() } = {}) {
+async function run({
+  argv = process.argv,
+  env = process.env,
+  cwd = process.cwd(),
+} = {}) {
   let args;
   try {
     args = parseArgs(argv);
@@ -1034,7 +1056,9 @@ async function run({ argv = process.argv, env = process.env, cwd = process.cwd()
         state: r.satisfied ? "satisfied" : "pending",
         detail: "",
       };
-      console.log(`${v.state.padEnd(12)} ${r.kind.padEnd(26)} ${r.id}  ${v.detail || ""}`);
+      console.log(
+        `${v.state.padEnd(12)} ${r.kind.padEnd(26)} ${r.id}  ${v.detail || ""}`,
+      );
     }
     console.log(
       `\n${counts.satisfied} satisfied · ${counts.pending} pending · ` +

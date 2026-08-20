@@ -282,7 +282,11 @@ test("the accept gap is a DECISION: finalise accepts locally AND records the deb
     "step-7 must state that finalise accepts locally under restricted modes — " +
       "the accept gap is a decision, not a bug to halt on",
   );
-  assert.match(step7, /\*\*Tracker debt:?\*\*/, "the debt line must be specified");
+  assert.match(
+    step7,
+    /\*\*Tracker debt:?\*\*/,
+    "the debt line must be specified",
+  );
   assert.match(step7, /## Tracker Actions Required/);
   assert.match(
     step7,

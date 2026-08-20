@@ -155,7 +155,10 @@ test("§1 the allowlist admits reads and refuses every mutating shape", () => {
 test("§1 a full verification run performs no mutation — throwing stub stays silent", async () => {
   const stub = readStub([
     ["graphql", boardRead("Done")],
-    ["issue view 235 --json state", { status: 0, stdout: '{"state":"CLOSED"}' }],
+    [
+      "issue view 235 --json state",
+      { status: 0, stdout: '{"state":"CLOSED"}' },
+    ],
   ]);
   const records = [
     rec({ id: "aaaa0001" }),
@@ -163,16 +166,26 @@ test("§1 a full verification run performs no mutation — throwing stub stays s
     rec({ id: "aaaa0003", kind: "jira.worklog.add", system: "jira" }),
   ];
   const { counts } = await verify(records, stub);
-  assert.equal(counts.satisfied + counts.pending + counts.divergent + counts.unverifiable, 3);
+  assert.equal(
+    counts.satisfied + counts.pending + counts.divergent + counts.unverifiable,
+    3,
+  );
   for (const argv of stub.calls)
-    assert.ok(hv.isReadOnlyArgv(argv), `non-read argv executed: ${argv.join(" ")}`);
+    assert.ok(
+      hv.isReadOnlyArgv(argv),
+      `non-read argv executed: ${argv.join(" ")}`,
+    );
 });
 
 test("§1 a recipe that tried to mutate is refused in-process and resolves unverifiable", async () => {
   // Simulate a future recipe bug by injecting a record whose read path would
   // exec a mutation: makeIo's assertReadOnlyArgv throws, verifyRecord catches,
   // and the state is unverifiable — never a silent success.
-  const io = hv.makeIo({ env: {}, execImpl: () => ({ status: 0, stdout: "{}" }), now: FIXED_NOW });
+  const io = hv.makeIo({
+    env: {},
+    execImpl: () => ({ status: 0, stdout: "{}" }),
+    now: FIXED_NOW,
+  });
   assert.throws(
     () => io.exec(["gh", "issue", "close", "235"]),
     /refusing to execute non-read-only argv/,
@@ -186,7 +199,11 @@ test("§2 a read matching the desired value derives satisfied and keeps the reco
   const records = [rec()];
   const { records: out, counts } = await verify(records, stub);
   assert.equal(counts.satisfied, 1);
-  assert.equal(out.length, records.length, "item count must equal record count");
+  assert.equal(
+    out.length,
+    records.length,
+    "item count must equal record count",
+  );
   assert.equal(out[0].satisfied, true);
   assert.equal(out[0].verification.state, "satisfied");
   assert.match(String(out[0].verification.observed), /Done/);
@@ -196,12 +213,24 @@ test("§2 the markdown checklist ticks and strikes a satisfied action with value
   const stub = readStub([["graphql", boardRead("Done")]]);
   const { records: out } = await verify([rec()], stub);
   const md = hr.render(out, "md", { env: {} });
-  assert.match(md, /- \[x\] ~~.*~~/, "satisfied item must be ticked and struck through");
+  assert.match(
+    md,
+    /- \[x\] ~~.*~~/,
+    "satisfied item must be ticked and struck through",
+  );
   assert.match(md, /observed `Done`/);
   assert.match(md, /2026-08-20T09:00:00Z/, "observed time must be shown");
   const sh = hr.render(out, "sh", { env: {} });
-  assert.match(sh, /already satisfied — short-circuited|already satisfied/, "script must show the short-circuit");
-  assert.doesNotMatch(sh, /run_step 'aaaa0001'/, "a satisfied action must not run");
+  assert.match(
+    sh,
+    /already satisfied — short-circuited|already satisfied/,
+    "script must show the short-circuit",
+  );
+  assert.doesNotMatch(
+    sh,
+    /run_step 'aaaa0001'/,
+    "a satisfied action must not run",
+  );
 });
 
 // ── §3 Ambiguity never coerces to satisfied ─────────────────────────────────
@@ -209,13 +238,21 @@ test("§2 the markdown checklist ticks and strikes a satisfied action with value
 test("§3 two marker matches resolve to unverifiable — never satisfied", async () => {
   const marker = "<!-- agent-skills-comment:review -->";
   const comments = JSON.stringify({
-    comments: [{ body: `${marker}\nhello` }, { body: `${marker}\nhello again` }],
+    comments: [
+      { body: `${marker}\nhello` },
+      { body: `${marker}\nhello again` },
+    ],
   });
-  const stub = readStub([["issue view 235 --json comments", { status: 0, stdout: comments }]]);
+  const stub = readStub([
+    ["issue view 235 --json comments", { status: 0, stdout: comments }],
+  ]);
   const r = rec({
     kind: "github.issue.comment",
     consequence: "communication",
-    command: { argv: ["gh", "issue", "comment", "235", "--body-file", "-"], stdin: `${marker}\nhello` },
+    command: {
+      argv: ["gh", "issue", "comment", "235", "--body-file", "-"],
+      stdin: `${marker}\nhello`,
+    },
   });
   const { records: out, counts } = await verify([r], stub);
   assert.equal(counts.unverifiable, 1);
@@ -233,7 +270,10 @@ test("§3 exactly one marker match is satisfied; zero is pending", async () => {
     readStub([["issue view 235 --json comments", { status: 0, stdout }]]);
   const r = rec({
     kind: "github.issue.comment",
-    command: { argv: ["gh", "issue", "comment", "235", "--body-file", "-"], stdin: `${marker}\nhello` },
+    command: {
+      argv: ["gh", "issue", "comment", "235", "--body-file", "-"],
+      stdin: `${marker}\nhello`,
+    },
   });
   const a = await verify([r], mk(one));
   assert.equal(a.counts.satisfied, 1);
@@ -243,9 +283,14 @@ test("§3 exactly one marker match is satisfied; zero is pending", async () => {
 
 test("§3 the no-marker heuristic: one match satisfied, two matches unverifiable", async () => {
   const two = JSON.stringify({
-    comments: [{ body: "Pipeline started — branch: x" }, { body: "Pipeline started — branch: x (retyped)" }],
+    comments: [
+      { body: "Pipeline started — branch: x" },
+      { body: "Pipeline started — branch: x (retyped)" },
+    ],
   });
-  const stub = readStub([["issue view 235 --json comments", { status: 0, stdout: two }]]);
+  const stub = readStub([
+    ["issue view 235 --json comments", { status: 0, stdout: two }],
+  ]);
   const r = rec({
     kind: "github.issue.comment",
     command: {
@@ -254,7 +299,11 @@ test("§3 the no-marker heuristic: one match satisfied, two matches unverifiable
     },
   });
   const { counts } = await verify([r], stub);
-  assert.equal(counts.unverifiable, 1, "heuristic multi-match must be unverifiable");
+  assert.equal(
+    counts.unverifiable,
+    1,
+    "heuristic multi-match must be unverifiable",
+  );
 });
 
 // ── §4 Divergence — the card moved somewhere else ───────────────────────────
@@ -313,11 +362,19 @@ test("§4 a divergent step is guarded behind --all in the rendered script", asyn
   });
   const { records: out } = await verify([r], stub);
   const sh = hr.render(out, "sh", { env: {} });
-  assert.match(sh, /divergent_step 'aaaa0001'/, "divergent action must use the guard");
+  assert.match(
+    sh,
+    /divergent_step 'aaaa0001'/,
+    "divergent action must use the guard",
+  );
   assert.match(sh, /--all\) ALL=1/, "the script must parse --all");
   assert.match(sh, /DIVERGENT — skipped \(re-run with --all to force\)/);
   const md = hr.render(out, "md", { env: {} });
-  assert.match(md, /observed `Blocked`, wanted/, "checklist must show observed vs wanted");
+  assert.match(
+    md,
+    /observed `Blocked`, wanted/,
+    "checklist must show observed vs wanted",
+  );
 });
 
 // ── §5 A failed read never aborts the pass ──────────────────────────────────
@@ -340,8 +397,18 @@ test("§5 a failed read derives unverifiable and the run continues", async () =>
 test("§5 a kind with no reliable read is unverifiable; a kind with no recipe is pending", async () => {
   const stub = readStub([]);
   const records = [
-    rec({ id: "aaaa0001", kind: "jira.worklog.add", system: "jira", consequence: "communication" }),
-    rec({ id: "aaaa0002", kind: "jira.unknown-mutation", system: "jira", consequence: "irreversible" }),
+    rec({
+      id: "aaaa0001",
+      kind: "jira.worklog.add",
+      system: "jira",
+      consequence: "communication",
+    }),
+    rec({
+      id: "aaaa0002",
+      kind: "jira.unknown-mutation",
+      system: "jira",
+      consequence: "irreversible",
+    }),
   ];
   const { records: out, counts } = await verify(records, stub);
   assert.equal(counts.unverifiable, 2);
@@ -352,10 +419,16 @@ test("§5 a kind with no reliable read is unverifiable; a kind with no recipe is
 
 test("§6 re-verifying an unchanged state keeps the annotation verbatim, timestamp included", async () => {
   const stub = readStub([["graphql", boardRead("Done")]]);
-  const first = await verify([rec()], stub, { now: () => "2026-08-20T09:00:00Z" });
-  const second = await verify(first.records, readStub([["graphql", boardRead("Done")]]), {
-    now: () => "2026-08-21T17:30:00Z", // a later clock must NOT leak in
+  const first = await verify([rec()], stub, {
+    now: () => "2026-08-20T09:00:00Z",
   });
+  const second = await verify(
+    first.records,
+    readStub([["graphql", boardRead("Done")]]),
+    {
+      now: () => "2026-08-21T17:30:00Z", // a later clock must NOT leak in
+    },
+  );
   assert.deepEqual(
     second.records[0].verification,
     first.records[0].verification,
@@ -386,7 +459,10 @@ test("§7 counts: pending + divergent + unverifiable === outstanding; all four i
       kind: "github.issue.comment",
       consequence: "communication",
       target: { issue: "111", url: "" },
-      command: { argv: ["gh", "issue", "comment", "111", "--body-file", "-"], stdin: `${marker}x` },
+      command: {
+        argv: ["gh", "issue", "comment", "111", "--body-file", "-"],
+        stdin: `${marker}x`,
+      },
     }),
     rec({
       id: "aaaa0003",
@@ -445,7 +521,11 @@ test("§7 counts: pending + divergent + unverifiable === outstanding; all four i
 // ── §8 renderersForMode — the approve model's selection ─────────────────────
 
 test("§8 approve WITH a tty selects md+sh+summary; WITHOUT one it degrades to command", () => {
-  assert.deepEqual(hr.renderersForMode("approve", { tty: true }), ["md", "sh", "summary"]);
+  assert.deepEqual(hr.renderersForMode("approve", { tty: true }), [
+    "md",
+    "sh",
+    "summary",
+  ]);
   assert.deepEqual(
     hr.renderersForMode("approve", { tty: false }),
     hr.renderersForMode("command", { tty: false }),
@@ -455,10 +535,22 @@ test("§8 approve WITH a tty selects md+sh+summary; WITHOUT one it degrades to c
 
 test("§8 the other modes select per the schema doc's table", () => {
   assert.deepEqual(hr.renderersForMode("full", { tty: true }), ["summary"]);
-  assert.deepEqual(hr.renderersForMode("read-only", { tty: true }), ["json", "summary"]);
-  assert.deepEqual(hr.renderersForMode("command", { tty: true }), ["sh", "summary"]);
-  assert.deepEqual(hr.renderersForMode("manual", { tty: true }), ["md", "summary"]);
-  assert.throws(() => hr.renderersForMode("write-everything"), /unknown access mode/);
+  assert.deepEqual(hr.renderersForMode("read-only", { tty: true }), [
+    "json",
+    "summary",
+  ]);
+  assert.deepEqual(hr.renderersForMode("command", { tty: true }), [
+    "sh",
+    "summary",
+  ]);
+  assert.deepEqual(hr.renderersForMode("manual", { tty: true }), [
+    "md",
+    "summary",
+  ]);
+  assert.throws(
+    () => hr.renderersForMode("write-everything"),
+    /unknown access mode/,
+  );
 });
 
 // ── §9 git push verification — credential-free ──────────────────────────────
@@ -469,7 +561,8 @@ test("§9 verifyGitPush compares ls-remote to the local sha with no API call", (
     env: {},
     execImpl: (argv) => {
       if (argv[1] === "rev-parse") return { status: 0, stdout: `${sha}\n` };
-      if (argv[1] === "ls-remote") return { status: 0, stdout: `${sha}\trefs/heads/main\n` };
+      if (argv[1] === "ls-remote")
+        return { status: 0, stdout: `${sha}\trefs/heads/main\n` };
       throw new Error(`unexpected argv ${argv.join(" ")}`);
     },
   });
@@ -505,7 +598,11 @@ test("§10 CR-2: a revoked tick is cleared — satisfied follows the fresh read"
   assert.notEqual(out[0].verification.state, "satisfied");
   assert.equal(counts.satisfied, 0);
   const model = hr.buildModel(out, {});
-  assert.equal(model.counts.satisfied, 0, "partition must not render the regression as ticked");
+  assert.equal(
+    model.counts.satisfied,
+    0,
+    "partition must not render the regression as ticked",
+  );
   assert.equal(model.counts.outstanding, 1);
 });
 
@@ -531,13 +628,17 @@ test("§10 CR-4: a divergent AND irreversible step keeps its confirm gate under 
   );
   // And a reversible divergent step dispatches to run_step.
   const r2 = { ...r, consequence: "state-drift" };
-  const { records: out2 } = await verify([r2], readStub([["graphql", boardRead("Blocked")]]));
+  const { records: out2 } = await verify(
+    [r2],
+    readStub([["graphql", boardRead("Blocked")]]),
+  );
   const sh2 = hr.render(out2, "sh", { env: {} });
   assert.match(sh2, /divergent_step 'aaaa0001' .* run_step /);
 });
 
 test("§10 CR-5: render --verify annotates in-process and the annotations reach the artifact", async () => {
-  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = await import("node:fs");
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } =
+    await import("node:fs");
   const { tmpdir } = await import("node:os");
   const dir = mkdtempSync(join(tmpdir(), "render-verify-"));
   try {
@@ -550,14 +651,29 @@ test("§10 CR-5: render --verify annotates in-process and the annotations reach 
       now: FIXED_NOW,
     });
     const result = await hr.run({
-      argv: ["node", "handover-render.js", "--journal", journal, "--format", "md", "--out", out, "--verify", "--quiet"],
+      argv: [
+        "node",
+        "handover-render.js",
+        "--journal",
+        journal,
+        "--format",
+        "md",
+        "--out",
+        out,
+        "--verify",
+        "--quiet",
+      ],
       env: {},
       cwd: dir,
       verifyIo: io,
     });
     assert.equal(result.exitCode, 0);
     const md = readFileSync(out, "utf8");
-    assert.match(md, /- \[x\] ~~/, "the verified tick must reach the rendered artifact");
+    assert.match(
+      md,
+      /- \[x\] ~~/,
+      "the verified tick must reach the rendered artifact",
+    );
     assert.match(md, /observed `Done`/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -567,7 +683,8 @@ test("§10 CR-5: render --verify annotates in-process and the annotations reach 
 // ── §11 Regressions from QA cycle 2 (CR2-1, CR2-2, CR2-4) ──────────────────
 
 test("§11 CR2-1: a single-format render lands on the format's own extension", async () => {
-  const { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } = await import("node:fs");
+  const { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } =
+    await import("node:fs");
   const { tmpdir } = await import("node:os");
   const dir = mkdtempSync(join(tmpdir(), "render-ext-"));
   try {
@@ -582,14 +699,27 @@ test("§11 CR2-1: a single-format render lands on the format's own extension", a
     ]) {
       const out = join(dir, `task.9.handover.1.smoke.md`);
       const r = hr.run({
-        argv: ["node", "handover-render.js", "--journal", journal, "--format", format, "--out", out, "--quiet"],
+        argv: [
+          "node",
+          "handover-render.js",
+          "--journal",
+          journal,
+          "--format",
+          format,
+          "--out",
+          out,
+          "--quiet",
+        ],
         env: {},
         cwd: dir,
       });
       assert.equal(r.exitCode, 0);
       const expected = join(dir, `task.9.handover.1.smoke.${ext}`);
       assert.ok(existsSync(expected), `${format} must write ${expected}`);
-      assert.match(readFileSync(expected, "utf8"), new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      assert.match(
+        readFileSync(expected, "utf8"),
+        new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      );
       rmSync(expected, { force: true });
     }
   } finally {
@@ -617,7 +747,11 @@ test("§11 CR2-2: a tick is NOT revoked without evidence — unverifiable and no
   assert.equal(out[0].satisfied, true, "silence must not revoke a tick");
   assert.equal(counts.satisfied + counts.unverifiable, 1);
   const model = hr.buildModel(out, {});
-  assert.equal(model.counts.satisfied, 1, "the ticked action must not return to outstanding");
+  assert.equal(
+    model.counts.satisfied,
+    1,
+    "the ticked action must not return to outstanding",
+  );
   assert.equal(model.counts.outstanding, 0, "no re-run risk: not outstanding");
 
   // But POSITIVE evidence still revokes: a real board read showing a
@@ -632,8 +766,15 @@ test("§11 CR2-2: a tick is NOT revoked without evidence — unverifiable and no
       detail: "verified in the desired state",
     },
   });
-  const { records: out2 } = await verify([regressed], readStub([["graphql", boardRead("To Do")]]));
-  assert.equal(out2[0].satisfied, false, "a real read showing regression must revoke");
+  const { records: out2 } = await verify(
+    [regressed],
+    readStub([["graphql", boardRead("To Do")]]),
+  );
+  assert.equal(
+    out2[0].satisfied,
+    false,
+    "a real read showing regression must revoke",
+  );
 });
 
 test("§11 CR2-4: a render failure under --verify propagates — it is not swallowed as a verify failure", async () => {
@@ -643,16 +784,36 @@ test("§11 CR2-4: a render failure under --verify propagates — it is not swall
   try {
     const journal = join(dir, "journal.jsonl");
     writeFileSync(journal, `${JSON.stringify(rec())}\n`);
-    const io = hv.makeIo({ env: {}, execImpl: readStub([["graphql", boardRead("Done")]]).execImpl, now: FIXED_NOW });
+    const io = hv.makeIo({
+      env: {},
+      execImpl: readStub([["graphql", boardRead("Done")]]).execImpl,
+      now: FIXED_NOW,
+    });
     // An unwritable --out path: the render fails; with the old catch placement
     // this resolved exitCode 0 after a second unannotated render attempt.
-    const r = await hr.run({
-      argv: ["node", "handover-render.js", "--journal", journal, "--format", "md", "--out", join(dir, "no-such-dir-file\u0000bad", "x.md"), "--verify", "--quiet"],
-      env: {},
-      cwd: dir,
-      verifyIo: io,
-    }).catch((e) => ({ threw: true, message: e.message }));
-    assert.ok(r.threw || r.exitCode !== 0, "a render failure must surface as a failure");
+    const r = await hr
+      .run({
+        argv: [
+          "node",
+          "handover-render.js",
+          "--journal",
+          journal,
+          "--format",
+          "md",
+          "--out",
+          join(dir, "no-such-dir-file\u0000bad", "x.md"),
+          "--verify",
+          "--quiet",
+        ],
+        env: {},
+        cwd: dir,
+        verifyIo: io,
+      })
+      .catch((e) => ({ threw: true, message: e.message }));
+    assert.ok(
+      r.threw || r.exitCode !== 0,
+      "a render failure must surface as a failure",
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

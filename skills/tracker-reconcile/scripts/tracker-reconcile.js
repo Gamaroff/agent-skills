@@ -83,7 +83,9 @@ function parseArgs(argv) {
   if (args.targets.length > 1)
     throw new Error("at most one target (a directory or a sidecar path)");
   if (!args.all && args.targets.length === 0)
-    throw new Error("a target is required: <work-item-dir>, <handover.json>, or --all");
+    throw new Error(
+      "a target is required: <work-item-dir>, <handover.json>, or --all",
+    );
   return args;
 }
 
@@ -141,7 +143,9 @@ function resolveTargets(args, cwd) {
     return [sidecar];
   }
   if (!isSidecar(t))
-    throw new Error(`${args.targets[0]} is not a handover sidecar (*.handover.{n}.{name}.json)`);
+    throw new Error(
+      `${args.targets[0]} is not a handover sidecar (*.handover.{n}.{name}.json)`,
+    );
   return [t];
 }
 
@@ -206,7 +210,11 @@ function writeArtifacts(sidecarPath, records, ctx, status) {
   // The sidecar carries the render payload plus the reconcile status.
   const payload = JSON.parse(hr.render(records, "json", ctx));
   payload.status = status;
-  fs.writeFileSync(sidecarPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    sidecarPath,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf8",
+  );
   fs.chmodSync(sidecarPath, hr.SCRIPT_MODE);
 
   const written = { md: mdPath, json: sidecarPath };
@@ -253,7 +261,15 @@ function defaultExec(argv, stdin) {
  *
  * Returns { executed: [records], skipped: [{id, why}] } — mutates nothing else.
  */
-function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = () => {}, confirm = null } = {}) {
+function applyRecords(
+  records,
+  {
+    execImpl = defaultExec,
+    isTTY = false,
+    log = () => {},
+    confirm = null,
+  } = {},
+) {
   const executed = [];
   const skipped = [];
 
@@ -263,12 +279,18 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
     if (rec.satisfied === true) continue;
 
     if (state === "divergent") {
-      skipped.push({ id: rec.id, why: "divergent — not applied; resolve by hand" });
-      log(`⚠️  [${rec.id}] DIVERGENT — skipped: observed ${(rec.verification || {}).observed}`);
+      skipped.push({
+        id: rec.id,
+        why: "divergent — not applied; resolve by hand",
+      });
+      log(
+        `⚠️  [${rec.id}] DIVERGENT — skipped: observed ${(rec.verification || {}).observed}`,
+      );
       continue;
     }
 
-    const argv = rec.command && Array.isArray(rec.command.argv) ? rec.command.argv : [];
+    const argv =
+      rec.command && Array.isArray(rec.command.argv) ? rec.command.argv : [];
     if (!argv.length) {
       skipped.push({ id: rec.id, why: "no command form — do by hand" });
       continue;
@@ -284,7 +306,9 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
           id: rec.id,
           why: "irreversible — no confirmation mechanism; never assumed",
         });
-        log(`⚠️  [${rec.id}] irreversible — no way to confirm, skipped (re-run interactively)`);
+        log(
+          `⚠️  [${rec.id}] irreversible — no way to confirm, skipped (re-run interactively)`,
+        );
         continue;
       }
       if (!confirm(rec)) {
@@ -300,7 +324,10 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
       executed.push(rec);
       log(`▶  [${rec.id}] executed: ${hr.headline(rec)}`);
     } else {
-      skipped.push({ id: rec.id, why: `failed: ${r.error || `exit ${r.status}`}` });
+      skipped.push({
+        id: rec.id,
+        why: `failed: ${r.error || `exit ${r.status}`}`,
+      });
       log(`❌ [${rec.id}] failed (exit ${r.status})`);
     }
   }
@@ -451,7 +478,11 @@ async function run({
     try {
       payload = JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
     } catch (e) {
-      items.push({ sidecar: sidecarPath, reason: "unreadable", error: e.message });
+      items.push({
+        sidecar: sidecarPath,
+        reason: "unreadable",
+        error: e.message,
+      });
       console.error(`⚠️  ${sidecarPath}: unreadable (${e.message}) — skipped`);
       continue;
     }
@@ -470,8 +501,7 @@ async function run({
       // caller supplied none. applyRecords still skips irreversible records
       // whenever no callback reaches it — the default here is what makes a
       // plain `--apply` on a tty ask instead of silently executing.
-      const effectiveConfirm =
-        confirm || (isTTY ? ttyConfirm : null);
+      const effectiveConfirm = confirm || (isTTY ? ttyConfirm : null);
       const { executed, skipped } = applyRecords(records, {
         execImpl,
         isTTY,
@@ -480,7 +510,9 @@ async function run({
       });
       const at = io.now();
       const executedSet = new Set(executed.map((r) => r.id));
-      records = records.map((r) => (executedSet.has(r.id) ? markExecuted(r, at) : r));
+      records = records.map((r) =>
+        executedSet.has(r.id) ? markExecuted(r, at) : r,
+      );
       executedIds = executed.map((r) => r.id);
       skippedApply = skipped;
 
