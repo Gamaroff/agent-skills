@@ -5,13 +5,15 @@ type: task
 description: 'Turns a one-shot handover into a loop that converges. Adds the read-only verification pass — read current state, tick what is already satisfied, flag what someone moved somewhere else — and /tracker-reconcile, which re-reads a committed handover days later and reports or applies what is outstanding. Reconcile refuses --apply under read-only, command and manual, because a reconcile that quietly applies under manual makes manual meaningless. Also lands the approve model and makes the accept gap loud in the implementation report and on the PR.'
 tags: [restricted-access, verification, reconcile, skill]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-08-17
 updated: 2026-08-20
+completed_date: 2026-08-20
 estimated_effort_hours: 12
 github_issue: 235
+pr_number: 269
 ---
 
 # [Task 57] Read-only verification, and `/tracker-reconcile` so the checklist is a ledger rather than a receipt
@@ -20,7 +22,7 @@ github_issue: 235
 
 **GitHub Issue**: [#235](https://github.com/Gamaroff/agent-skills/issues/235)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Review**: ✅ All review recommendations from `task.57.review.1.readonly-verification-and-reconcile.md` implemented 2026-08-20
 
@@ -274,6 +276,32 @@ ambiguous→satisfied coercion (7 red) · refusal dropped under `manual` (13 red
 | 2026-08-20 |  | QA cycle 2 gate FAIL (40/100) — cycle-1 fixes verified; 3 high defects introduced by the fixes (wrong-extension artifacts, tick revoked on unverifiable read, ttyConfirm injection) | qa-task |
 | 2026-08-20 |  | QA cycle 3 gate PASS (92/100) — cycle-2 fixes verified; 4 coherence findings fixed in-cycle | qa-task |
 | 2026-08-20 |  | QA findings fixed — gate PASS (92/100), 3 iterations, 19 defects closed | qa-fix |
+| 2026-08-20 | 1.2 | DoD passed — accepted (PR #269) | finalise |
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.57.qa.1/2/3.readonly-verification-and-reconcile.md`
+**Gate Files**: `task.57.gate.1/2/3.readonly-verification-and-reconcile.yml`
+**Final Gate Status**: ✅ PASS · **Quality Score**: 92/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 — every criterion traced to implementation AND a test running in the npm-test lane
+✅ **Tests:** 46 new tests across the task; full suite 1653 pass / 0 fail; 10 named mutations proven red
+✅ **CI:** SUCCESS on final head `e193e27` (Test, Validate Skills, Docs link check, Branch Policy)
+✅ **PR:** #269 (open, pending merge — no human review decision; autonomous pipeline)
+✅ **Documentation:** CHANGELOG, SKILL.md, catalog, six reference/concept docs flipped live, schema doc, both standing-rule amendments — all pinned or cited
+✅ **Security Review:** PASS — read-only gate proven by throwing stub; injection closed with hostile-intent regression test; redaction intact on all render paths
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal developer tooling; credential-hygiene checks all PASS
+✅ **Tracker debt:** none — journal empty; no deferred actions this run
+
+**Task marked as ACCEPTED on:** 2026-08-20
+
+**Detailed Verification Log:** See `task.57.dod.1.readonly-verification-and-reconcile.md` for complete verification evidence.
 
 ## References
 
