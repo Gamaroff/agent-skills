@@ -1256,8 +1256,18 @@ test("§11 a slug with shell metacharacters is refused, from every source", () =
   // ran the generated handover script. GitHub owner/repo names are
   // [A-Za-z0-9._-], so this rejects nothing real.
   assert.ok(cli.isSlugShaped("acme/repo"));
-  assert.ok(cli.isSlugShaped("acme/my.repo.js"), "dots are legal in repo names");
-  for (const bad of ["o/n$(cmd)", "o/`id`", "a b/c", "x/y;z", "o/n|w", "o/n&w"]) {
+  assert.ok(
+    cli.isSlugShaped("acme/my.repo.js"),
+    "dots are legal in repo names",
+  );
+  for (const bad of [
+    "o/n$(cmd)",
+    "o/`id`",
+    "a b/c",
+    "x/y;z",
+    "o/n|w",
+    "o/n&w",
+  ]) {
     assert.ok(!cli.isSlugShaped(bad), `${bad} must be refused`);
   }
 
@@ -1266,7 +1276,12 @@ test("§11 a slug with shell metacharacters is refused, from every source", () =
   execFileSync("git", ["init", "-q"], { cwd: dir });
   execFileSync(
     "git",
-    ["remote", "add", "origin", "https://github.com/o/n$(touch /tmp/pwned).git"],
+    [
+      "remote",
+      "add",
+      "origin",
+      "https://github.com/o/n$(touch /tmp/pwned).git",
+    ],
     { cwd: dir },
   );
   run(dir, ["--kind", "sub-issue-link", "--issue", "42", "--parent", "7"], {
