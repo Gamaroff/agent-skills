@@ -5,13 +5,15 @@ type: task
 description: 'Tasks 51-57 each update the reference page for the thing they ship — the config key, the artifact, the reason code. None of them produces the narrative layer a new developer needs: what restricted access is, which of the five models to pick, what a run looks like under each, and what to do when the board does not move. This task delivers the concept doc, the decision guide, the runbook, the troubleshooting entries, the command and glossary registrations, and the onboarding touchpoints — plus a drift guard, because roughly ten consumer documents restate pipeline behaviour independently and have drifted silently before.'
 tags: [documentation, restricted-access, onboarding]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-08-17
-updated: 2026-08-19
+updated: 2026-08-20
+completed_date: 2026-08-20
 estimated_effort_hours: 8
 github_issue: 236
+pr_number: 263
 ---
 
 # [Task 58] Document restricted tracker access for someone who has never heard of it
@@ -208,6 +210,24 @@ them once:
 
 `git revert <sha>`. Documentation and one test; no consumer behaviour depends on it.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 9 criteria verified with file:line evidence against the merged files (PR #263)
+✅ **Drift Guard:** `tests/restricted-access-docs.test.js` — 10/10 pass at develop tip; mutation exercise re-proven 2026-08-20 (sixth mode added → 2 tests red → reverted → green)
+✅ **PR Review:** PR #263 merged 2026-08-19 with CI green (test, link-check, branch-policy); merged by repo owner
+✅ **Validation:** `npm run validate:all` — 116 passed, 0 failed (re-run at develop tip 2026-08-20)
+✅ **Documentation:** All 11 promised deliverables present and indexed from `docs/README.md`; CHANGELOG entry at `CHANGELOG.md:125`
+✅ **Security Review:** PASS — no secrets, no unsafe patterns, no new dependencies
+✅ **Compliance Review:** NOT_APPLICABLE — no data, payment, health, or UI surface
+
+**Detailed Verification Log:** See `task.58.dod.1.restricted-access-documentation.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-08-20
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -216,6 +236,7 @@ them once:
 | 2026-08-17 | 1.0 | Initial draft | create-task |
 | 2026-08-19 |  | Narrative layer: concept doc, which-access, runbook, registrations, wizard copy, drift guard |  |
 | 2026-08-19 |  | Merged to develop via PR #263 (superseding #258); verification criterion confirmed green; status to ready-for-review |  |
+| 2026-08-20 | 1.1 | DoD passed — accepted (PR #263) | finalise |
 <!-- change-log-end -->
 
 ## References
