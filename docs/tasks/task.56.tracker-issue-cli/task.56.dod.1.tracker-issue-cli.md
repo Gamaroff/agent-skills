@@ -241,7 +241,14 @@ failed, so no section fell back to manual review.
 - ✅ Task document updated — `status: accepted`, `completed_date`, `pr_number`, DoD PASSED section
 - ✅ Sprint Review summary — `sprint-review-summary.md`
 - ✅ Change Log row (v1.2) written in the same edit as the status change
-- ⏳ PR canonical comment, tracker issue close, board move — recorded below as they complete
+- ✅ PR canonical comment posted (idempotent, marker-keyed)
+- ✅ Tracker issue #234 **closed** and verified (`gh issue view --json state` → `CLOSED`)
+- ✅ GitHub project board — `reason: already` (Done; the close moved it)
+- ℹ️ Document link already pointed at a durable branch — no re-point needed
+
+**Worth noting:** the issue was closed by `tracker-issue.js --kind close` — the CLI this task adds —
+and the completion comment by `tracker-comment.js`. Finalise exercised the thing it was verifying,
+end to end, against a real issue.
 
 **Next steps:** none for this task. `task.57` (read-only verification and reconcile) closes the
 sequence.

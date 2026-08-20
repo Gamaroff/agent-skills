@@ -3,7 +3,7 @@
 **Task**: `task.56.tracker-issue-cli.md`
 **Run Number**: 1
 **Started**: 2026-08-19 22:50
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ First automated pipeline run for task 56 — build `shared/resources/tracker-iss
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 9 phases; 1564 tests pass, validate:all 115/115, prettier clean, bundle committed | Explore pre-develop surface map |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #265 → develop; 4 commits; issue commented; board in-review `stage-disabled` (correct) | PR body summariser (inline) |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.56.qa.{N}.*.md`; `task.56.gate.{N}.*.yml`; PR comment posted     | 5 cycles: gate 1 FAIL (70) → gate 2 PASS (94); 25 defects fixed | 5 Explore code-review agents |
-| 7. finalise                | ⏳ Pending | `task.56.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.56.dod.{N}.*.md`; task `status: accepted`                        | DoD PASSED; 2 gaps found and closed (CHANGELOG, slug shape check); issue #234 closed, board Done | 4 parallel DoD Explore agents |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 15 commits, all pushed; working tree clean | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -119,6 +119,17 @@ First automated pipeline run for task 56 — build `shared/resources/tracker-iss
 
 ---
 
+### Step 7 — finalise — 2026-08-20
+
+- 4 DoD Explore agents dispatched in parallel (AC traceability, security, compliance, docs); all 4 returned, none failed.
+- QA gate PASS (94/100) · CI SUCCESS 4/4 on `52299a7` = HEAD (waited for a `PENDING` rollup to settle rather than concluding from the first sample) · 10/10 success criteria with code **and** test citations.
+- **Two gaps found and closed rather than waived:**
+  1. No CHANGELOG entry — the sibling task.55 (`tracker-comment.js`) set the precedent.
+  2. The repo slug reached a recorded `bash -c` string unchecked. Advisory per the reviewer; fixed because a generated script an operator runs is itself a mutation path.
+- Task accepted: `status: accepted`, `completed_date`, `pr_number`, DoD PASSED section, Change Log v1.2 — all in one edit.
+- Issue #234 closed and verified; board `already` Done; canonical PR comment posted.
+- The close ran through `tracker-issue.js --kind close` and the comment through `tracker-comment.js` — finalise exercised this task's own CLI end to end against a real issue.
+
 ## QA Iteration History
 
 | Cycle | Outcome | Found |
@@ -142,11 +153,45 @@ does not tell you whether it would fail.
 
 ---
 
+## Completion Summary
+
+**What shipped.** `shared/resources/tracker-issue.js` — a CLI for the six GitHub issue-lifecycle
+mutations whose stdout a caller binds, on the same contract as its three siblings. Plus the 23rd
+roster kind (`github.milestone.create`), the `blocking` record field and its banner, 28 routed call
+sites, and `tests/mutation-call-site-coverage.test.js` — five guards that keep the call-site count a
+maintained number rather than a one-off audit.
+
+**The design decision at the centre of it.** A wrapper cannot both refuse a call and return the
+value the call would have produced. So under a deferring mode the CLI prints *nothing* to stdout,
+records the mutation with `produces` and `blocking: true`, and the checklist tells the operator to
+perform it, write the value into the document, and re-run. **No placeholder is ever written** — a
+wrong key defeats the duplicate guard and converts a recoverable state into a permanent one.
+
+**Three things worth carrying forward:**
+
+1. **The QA loop found one hazard, not twenty-five.** The wrong-repo failure re-emerged one layer
+   below each fix: deferred record → the resolver that replaced it → that resolver's working
+   directory → every exec beneath it. Cycle 2 caught that the cycle-1 fix was itself a *regression*
+   that would have created issues in a fork rather than the base repo. Closing a symptom at the
+   layer it surfaced is not evidence the class is closed.
+
+2. **Five tests were vacuous** — four found in QA, one more in finalise — and every one was caught
+   by reverting the behaviour it named and re-running, never by reading it. One guarded this CLI's
+   entire contract (that stdout carries the issue number) by asserting the JSON payload instead.
+
+3. **The indented-heredoc defect was repo-wide.** Two introduced here; six already on `develop`,
+   each silently swallowing a `tracker-comment.js` call — the comment never posted, the run
+   reporting success. Fixing all eight and guarding the class went beyond this task's stated scope,
+   and is flagged rather than folded in.
+
+**Scope note.** Everything in the task's Files Summary landed. Two additions beyond it: the six
+pre-existing heredocs, and the CHANGELOG entry plus slug shape check that DoD verification surfaced.
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-08-20 02:45
+**Final Status**: Completed
 **Branch**: `feature/task.56.tracker-issue-cli`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/265
 **QA Iterations**: 5 (gate 1 FAIL 70/100 → gate 2 PASS 94/100)
-**DoD Summary**: {populated after Step 7}
+**DoD Summary**: `docs/tasks/task.56.tracker-issue-cli/task.56.dod.1.tracker-issue-cli.md`
