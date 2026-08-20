@@ -1,0 +1,104 @@
+schema: 1
+task: 'task.60.config-reader-strict-subset'
+task_title: "Give the config reader's awk tier a grammar, or make it refuse"
+gate: CONCERNS
+status_reason: 'The subset, the refusal and its message are correct and well-witnessed, but one escalation of the same class the task exists to close survives on tier 2 — a duplicated `access:` key resolves first-wins to the permissive value while tier 1 halts. One CI robustness issue alongside it.'
+reviewer: 'QA Engineer'
+updated: '2026-08-18T12:35:00Z'
+
+top_issues:
+  - id: TASK-60-QA1-1
+    severity: medium
+    finding: >-
+      A duplicate `access:` key (or a duplicated child beneath it) is not in the refused set, so the
+      tier-2 scan reports the file clean and the block reader takes the FIRST match. With the
+      permissive value written first, `access:\n  tracker: full\naccess:\n  tracker: manual`
+      resolves to `full` at exit 0 on tier 2, while tier 1 halts on the duplicate. YAML itself says
+      last-wins (`manual`), so tier 2 is the only tier that both accepts the shape and picks the
+      permissive reading. read-config.sh:81 describes this exact shape ("a copy-pasted second
+      `access:` block made the first one vanish, silently resolving a declared `manual` back to
+      `full`") as the reason tier 1 rejects duplicates — the same hole remains open on the tier a
+      stock macOS host actually runs.
+    suggested_action: >-
+      Add duplicate detection to _config_subset_scan for the guarded keys — a repeated top-level
+      guarded key, and a repeated child under a guarded parent — and refuse. Add refusal-matrix
+      fixtures for both shapes plus a mutation witness.
+    suggested_owner: dev
+  - id: TASK-60-QA1-2
+    severity: medium
+    finding: >-
+      .github/workflows/test.yml runs `sudo apt-get install -y --no-install-recommends gawk mawk`
+      with no preceding `apt-get update`. A stale package index on the runner fails the step, which
+      fails the whole Test job before `npm test` runs — turning an unrelated infrastructure flake
+      into a red build on every PR. This is also the step that makes §45 meaningful, so its
+      reliability matters more than a convenience install.
+    suggested_action: >-
+      Add `sudo apt-get update` before the install, or make the step non-fatal so §45 degrades to
+      its printed SKIP rather than failing the job.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 371
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 5]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      The change closes a real and well-evidenced escalation class, and closes it in the fail-closed
+      direction — including the tier-1 half (`__MAP__` vs `__NONE__`) that was never an awk problem.
+      The refusal is unforgeable: it reads the scan verdict global rather than a reader's stdout, and
+      `tracker: __UNSUPPORTED__` on a clean file is verified to stay DATA and fail enum validation.
+      CONCERNS solely for TASK-60-QA1-1, which leaves one route of the same class open on tier 2.
+  performance:
+    status: PASS
+    notes: >-
+      Measured rather than asserted, and independently reproduced: awk invocations per `source` go
+      8 -> 9 on the awk tier (the single scan pass) and 13 -> 13 on the python tier (the scan skips
+      itself when tier 1 is authoritative). No added python spawns. The scan runs once at source
+      time; §42e pins that it does not become per-read.
+  reliability:
+    status: PASS
+    notes: >-
+      A failed `awk` yields a refusal rather than a clean verdict — the task's own defect one layer
+      down, caught by the mutation audit and witnessed. resolve-paths.sh keeps its never-fail
+      contract (§26 green, `__UNSUPPORTED__` mapped to ""). Rollback plan present and unchanged.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      Comments are unusually good — every non-obvious decision carries its reason, and the
+      local/non-local rule is stated where a future reader will meet it. Two deductions: the CI step
+      in TASK-60-QA1-2, and the else-branch of the hoisted refusal in resolve-platform.sh is
+      indented at the outer level, so the halt message reads as unconditional on a skim. That block
+      is security-relevant; a misread is expensive.
+
+recommendations:
+  immediate:
+    - action: 'Refuse a duplicated guarded key on tier 2 (TASK-60-QA1-1)'
+      refs: ['shared/resources/read-config.sh', 'shared/resources/tracker-access.test.sh']
+    - action: 'Make the awk-variant CI install robust (TASK-60-QA1-2)'
+      refs: ['.github/workflows/test.yml']
+  future:
+    - action: >-
+        Note in the scanner comment that the alias rule (`\*[A-Za-z0-9_]`) does not match an alias
+        whose name starts with a non-alphanumeric (e.g. `*.d`). Not exploitable — a legal alias
+        requires an anchor earlier in the file and `&[^[:space:]]` catches it first — but the
+        narrowness is deliberate and should say so.
+      refs: ['shared/resources/read-config.sh']
+    - action: 'Re-indent the else-branch of the hoisted refusal to match its nesting'
+      refs: ['shared/resources/resolve-platform.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-60-QA1-1 closed, or consciously accepted and recorded as a known limit with a test pinning it'
+    - 'TASK-60-QA1-2 closed so CI reliably exercises gawk/mawk'

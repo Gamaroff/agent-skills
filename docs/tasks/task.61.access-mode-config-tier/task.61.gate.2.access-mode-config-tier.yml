@@ -1,0 +1,87 @@
+schema: 1
+task: "task.61.access-mode-config-tier"
+task_title: "[Task 61] Let the JavaScript gates read a config-declared access mode, with read-config.sh parity"
+gate: PASS
+status_reason: >-
+  Three review cycles found 4 high-severity escalation paths, one regression introduced by the
+  cycle-1 fixes, and a set of false-restriction residuals. All are closed and every fix is
+  mutation-proven. The independent cycle-3 verification confirmed all six fix classes and found no
+  path by which a run can write at `full` over a committed restriction in any documented
+  invocation. What survives is documented, fail-closed, and covered by tests.
+reviewer: "QA Engineer"
+updated: "2026-08-19T09:40:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 1431
+  phases_verified: "6/6"
+  qa_cycles: 3
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      Every escalation direction probed across three cycles is closed and pinned by a
+      mutation-proven test. The child environment is an allowlist snapshotted at require time, so a
+      repo-local `.env` can neither forge the answer nor reach the subshell as a bash startup hook —
+      the freeze is what makes the widened PYTHON*/PYENV entries safe rather than a new hole. The
+      fast-path over-matches the `access` word where the shell over-matches it and under-matches
+      only YAML syntax, so it can no longer decide authorisation. All 7 makeHttp sites and every
+      resolveAccessTracker call site are anchored to a repo root.
+  performance:
+    status: PASS
+    notes: >-
+      A repo with no `access` mention resolves in ~1 ms and spawns nothing. A repo that mentions the
+      word — including in a comment — pays one ~500 ms subprocess per process, memoised. That cost
+      is deliberate and documented: under-matching the word is an escalation, over-matching it is
+      only slow.
+  reliability:
+    status: PASS
+    notes: >-
+      The shell seam and the JS tier now fail closed identically, and every refusal carries a
+      reason — including the two paths (mktemp failure, a subshell that dies before printing) where
+      the mode was refused silently. The seam is anchored against relative sourcing, CDPATH, a
+      failing cd under `set -e`, and an empty BASH_SOURCE.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      One accepted residual. The "may this file declare access" question is still asked in two
+      places — `mayDeclareAccess` in defer-mutation.js and `configMayRestrict` in
+      jira-create-epic.js — because the latter runs on the degraded path where `defer-mutation.js`
+      is unavailable by definition and so cannot import it. Both now mirror the shell's grammar
+      including the explicit-key form, and the divergence is commented at both sites. Folding them
+      into one export is a follow-up, not a defect.
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Export one access-may-be-declared predicate; the degraded path needs an inlineable form"
+      refs: ["shared/resources/defer-mutation.js", "skills/jira-epic-creator/scripts/jira-create-epic.js"]
+    - action: "Anchor the sync scripts to the repo of --file rather than of process.cwd()"
+      refs: ["skills/sync-jira-story/scripts/sync-jira-story.js", "skills/sync-jira-epic/scripts/sync-jira-epic.js", "skills/sync-jira-task/scripts/sync-jira-task.js"]
+    - action: "Have childEnvFor set SKILLS_CONFIG_FILE so both readers match on the origin axis too"
+      refs: ["shared/resources/tests/access-config-parity.test.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 24
+  bugs_remaining: 0
+  fix_date: "2026-08-19"
+  total_iterations: 3
+  verification_method: >-
+    Derived parity corpus (34 fixtures x 2 reader tiers), mutation testing (11 mutations, each
+    turning the suite red), three independent adversarial diff reviews, and end-to-end proof that a
+    config-only restriction defers a real write through the bundled skill copy.

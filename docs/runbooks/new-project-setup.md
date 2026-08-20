@@ -60,6 +60,8 @@ Before step 1:
 
   Auth env vars per combo: `gh auth login` (GitHub VCS); `BITBUCKET_ACCESS_TOKEN` **or** `BITBUCKET_USERNAME` + `BITBUCKET_API_TOKEN` (Bitbucket VCS — an access token sent as Bearer, or an Atlassian API token with the **Bitbucket scopes ticked** sent as Basic; `BITBUCKET_APP_PASSWORD` is still read as a fallback); `JIRA_URL` + `JIRA_USER_EMAIL` + `JIRA_API_TOKEN` (Jira tracker). Full spec: [platform detection](../../shared/resources/platform-detection.md).
 
+- Decide **how much** tracker access the agent has **at setup**, not after the first surprising run. The wizard asks. `full` is the default. If the agent must not hold a write token, set `access.tracker` to `manual`, `command`, `read-only`, or `approve` — see [Which access model?](../concepts/which-access.md). **Skip — docs only** is a later per-run prompt on `/create-*`; it is not an access model and it is not the only alternative to `full`.
+
 ## See also
 
 - [`architect` SKILL.md](../../skills/architect/SKILL.md)

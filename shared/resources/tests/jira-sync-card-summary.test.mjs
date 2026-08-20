@@ -65,7 +65,10 @@ test("A: a criteria list is capped and the dropped count is exact", () => {
 });
 
 test("A: a list at or under the cap is passed through whole, with nothing omitted", () => {
-  const items = Array.from({ length: CARD_MAX_LIST_ITEMS }, (_, i) => `- AC${i + 1}`).join("\n");
+  const items = Array.from(
+    { length: CARD_MAX_LIST_ITEMS },
+    (_, i) => `- AC${i + 1}`,
+  ).join("\n");
   const { text, omitted } = summariseSection(items);
   assert.equal(text, items);
   assert.equal(omitted, 0);
@@ -130,7 +133,9 @@ test("B: short prose is passed through untouched with nothing omitted", () => {
 });
 
 test("B: only the first paragraph is kept, and later paragraphs count as omitted", () => {
-  const { text, omitted } = summariseSection("Lead para.\n\nSecond para.\n\nThird para.");
+  const { text, omitted } = summariseSection(
+    "Lead para.\n\nSecond para.\n\nThird para.",
+  );
   assert.equal(text, "Lead para.");
   assert.equal(omitted, 2);
 });
@@ -138,7 +143,10 @@ test("B: only the first paragraph is kept, and later paragraphs count as omitted
 // A missed split yields a slightly longer summary; a wrong one cuts a sentence
 // in half. Abbreviations and decimals must not terminate a sentence.
 test("B: abbreviations and decimals do not split a sentence", () => {
-  assert.equal(splitSentences("Use the cache, e.g. Redis, for reads.").length, 1);
+  assert.equal(
+    splitSentences("Use the cache, e.g. Redis, for reads.").length,
+    1,
+  );
   assert.equal(splitSentences("It takes 2.5 hours to run.").length, 1);
   assert.equal(splitSentences("First. Second.").length, 2);
 });
@@ -149,9 +157,16 @@ test("B: abbreviations and decimals do not split a sentence", () => {
 // silently summary-less card, which is the failure this change exists to
 // prevent, reached from the other direction.
 test("B: a leading table or fence is skipped, not treated as the summary", () => {
-  for (const lead of ["| a | b |\n|---|---|\n| 1 | 2 |", "```js\ncode()\n```"]) {
+  for (const lead of [
+    "| a | b |\n|---|---|\n| 1 | 2 |",
+    "```js\ncode()\n```",
+  ]) {
     const { text, omitted } = summariseSection(`${lead}\n\nReal prose here.`);
-    assert.equal(text, "Real prose here.", `failed for lead: ${lead.slice(0, 12)}`);
+    assert.equal(
+      text,
+      "Real prose here.",
+      `failed for lead: ${lead.slice(0, 12)}`,
+    );
     assert.equal(omitted, 1, "the skipped block still counts as omitted");
   }
 });
@@ -184,13 +199,25 @@ test("B: prose with no sentence terminators is still capped", () => {
 
 test("C: criteria grouped under sub-headings still reach the card", () => {
   const src = [
-    "### Functional", "",
-    "- [x] one", "- [x] two", "- [x] three", "- [x] four", "- [x] five", "- [x] six", "",
-    "### Non-Functional", "",
+    "### Functional",
+    "",
+    "- [x] one",
+    "- [x] two",
+    "- [x] three",
+    "- [x] four",
+    "- [x] five",
+    "- [x] six",
+    "",
+    "### Non-Functional",
+    "",
     "- [ ] seven",
   ].join("\n");
   const { kind, text, omitted } = summariseSection(src);
-  assert.equal(kind, "list", "a section opening with a grouping heading is still a list");
+  assert.equal(
+    kind,
+    "list",
+    "a section opening with a grouping heading is still a list",
+  );
   assert.equal(text.split("\n").length, CARD_MAX_LIST_ITEMS);
   assert.equal(omitted, 2, "7 criteria across both groups, 5 kept");
   assert.match(text, /one/);
@@ -209,11 +236,18 @@ test("C: a `###` inside a fenced block is code, not a heading", () => {
 
 test("C: firstTableIn finds a table nested under a sub-heading", () => {
   const src = [
-    "**Guidelines:**", "",
-    "- authoring note that is not card content", "",
-    "### Stories Overview", "",
-    "| Story | Status |", "| ----- | ------ |", "| 1.1 | Not Started |", "",
-    "### [Story 1.1] Detail", "",
+    "**Guidelines:**",
+    "",
+    "- authoring note that is not card content",
+    "",
+    "### Stories Overview",
+    "",
+    "| Story | Status |",
+    "| ----- | ------ |",
+    "| 1.1 | Not Started |",
+    "",
+    "### [Story 1.1] Detail",
+    "",
     "| a | b |",
   ].join("\n");
   const table = firstTableIn(src);
@@ -241,7 +275,10 @@ test("D: trimming emits a pointer naming the count and linking the document", ()
   const json = textOf(nodes);
   assert.match(json, /\+4 more in /);
   assert.match(json, /the story document/);
-  assert.match(json, new RegExp(DOC_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(
+    json,
+    new RegExp(DOC_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+  );
 });
 
 test("D: nothing trimmed means no pointer at all", () => {
@@ -300,7 +337,11 @@ test("E: an optional section neither renders nor warns when absent", () => {
   const warnings = [];
   const specs = [
     { heading: "Summary", names: ["Overview"] },
-    { heading: "Breaking Changes", names: ["Breaking Changes"], optional: true },
+    {
+      heading: "Breaking Changes",
+      names: ["Breaking Changes"],
+      optional: true,
+    },
   ];
   const nodes = buildCardSections("## Overview\n\nbody.\n", specs, {
     output: { warn: (m) => warnings.push(String(m)) },
@@ -311,17 +352,25 @@ test("E: an optional section neither renders nor warns when absent", () => {
 
 test("E: a missing REQUIRED section still warns", () => {
   const warnings = [];
-  buildCardSections("## Overview\n\nbody.\n", [
-    { heading: "Summary", names: ["Overview"] },
-    { heading: "Success Criteria", names: ["Success Criteria"] },
-  ], { output: { warn: (m) => warnings.push(String(m)) } });
+  buildCardSections(
+    "## Overview\n\nbody.\n",
+    [
+      { heading: "Summary", names: ["Overview"] },
+      { heading: "Success Criteria", names: ["Success Criteria"] },
+    ],
+    { output: { warn: (m) => warnings.push(String(m)) } },
+  );
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /Success Criteria/);
 });
 
 test("E: transform runs before summarisation", () => {
   const nodes = buildCardSections("## Overview\n\n**Label:** text.\n", [
-    { heading: "Summary", names: ["Overview"], transform: (t) => t.replace(/\*\*([^*\n]+):\*\*/g, "$1:") },
+    {
+      heading: "Summary",
+      names: ["Overview"],
+      transform: (t) => t.replace(/\*\*([^*\n]+):\*\*/g, "$1:"),
+    },
   ]);
   const json = textOf(nodes);
   assert.doesNotMatch(json, /\*\*Label:\*\*/);
@@ -339,13 +388,25 @@ test("F: a body hash tracks the card, not the document", () => {
   const { hashBody } = require(
     join(repoRoot, "skills/sync-jira-task/scripts/sync-jira-task.js"),
   );
-  const base = "## Overview\n\nSummary text.\n\n## Success Criteria\n\n- one\n\n## Rollback Plan\n\nRevert.\n";
-  const h = (body) => hashBody({ body, taskBbUrl: DOC_URL, relatedDocLinks: [], linkResolver: null });
+  const base =
+    "## Overview\n\nSummary text.\n\n## Success Criteria\n\n- one\n\n## Rollback Plan\n\nRevert.\n";
+  const h = (body) =>
+    hashBody({
+      body,
+      taskBbUrl: DOC_URL,
+      relatedDocLinks: [],
+      linkResolver: null,
+    });
 
   assert.equal(h(base), h(base), "identical input must hash identically");
   assert.equal(
     h(base),
-    h(base.replace("Revert.", "Revert the commit, then redeploy and notify the team.")),
+    h(
+      base.replace(
+        "Revert.",
+        "Revert the commit, then redeploy and notify the team.",
+      ),
+    ),
     "editing a section the card does not publish must not churn the hash",
   );
   assert.notEqual(
@@ -386,10 +447,24 @@ test("G: the real create-task template produces a card an order of magnitude und
   // The eleven-section mirror is gone: at most Summary, Success Criteria,
   // Breaking Changes, Metadata, Source Documents.
   const headings = headingsOf(doc.content);
-  assert.ok(headings.length <= 5, `too many blocks on the card: ${headings.join(", ")}`);
-  assert.ok(!headings.includes("Change Log"), "the card must never carry a Change Log");
-  for (const dropped of ["Motivation", "Implementation Plan", "Rollback Plan", "Risk Assessment"]) {
-    assert.ok(!headings.includes(dropped), `${dropped} belongs in the document, not the card`);
+  assert.ok(
+    headings.length <= 5,
+    `too many blocks on the card: ${headings.join(", ")}`,
+  );
+  assert.ok(
+    !headings.includes("Change Log"),
+    "the card must never carry a Change Log",
+  );
+  for (const dropped of [
+    "Motivation",
+    "Implementation Plan",
+    "Rollback Plan",
+    "Risk Assessment",
+  ]) {
+    assert.ok(
+      !headings.includes(dropped),
+      `${dropped} belongs in the document, not the card`,
+    );
   }
   assert.equal(TASK_CARD_SECTIONS.length, 3);
 });
@@ -425,7 +500,11 @@ test("H: a missing required section is Critical and names the accepted headings"
   const f = r.findings.find((x) => x.section === "Success Criteria");
   assert.equal(f.severity, "critical");
   assert.equal(f.code, "missing");
-  assert.match(f.fix, /## Success Criteria/, "the fix must name the heading to add");
+  assert.match(
+    f.fix,
+    /## Success Criteria/,
+    "the fix must name the heading to add",
+  );
   assert.match(f.fix, /Numbering/, "and say numbering is accepted");
 });
 
@@ -454,7 +533,10 @@ test("H: a section present but unsummarisable is reported as empty", () => {
 });
 
 test("H: a document sharing no headings reports no-body, not just per-section misses", () => {
-  const r = lib.checkCardSections("## Goal\n\ntext\n\n## Steps\n\n- a\n", TASK_SPECS);
+  const r = lib.checkCardSections(
+    "## Goal\n\ntext\n\n## Steps\n\n- a\n",
+    TASK_SPECS,
+  );
   assert.ok(r.findings.some((f) => f.code === "no-body"));
   assert.ok(r.findings.every((f) => f.severity === "critical"));
 });
@@ -513,10 +595,9 @@ test("H: every real task card passes preflight", () => {
 // below asserts a non-zero corpus so it can never do that again.
 const cardDocsNamed = (prefix) => {
   const { execSync } = require("node:child_process");
-  const out = execSync(
-    `find ${repoRoot}/docs -type f -name '${prefix}.*.md'`,
-    { encoding: "utf8" },
-  );
+  const out = execSync(`find ${repoRoot}/docs -type f -name '${prefix}.*.md'`, {
+    encoding: "utf8",
+  });
   return out
     .trim()
     .split("\n")
@@ -532,9 +613,14 @@ for (const [kind, prefix, skill, specKey] of [
   ["epic", "epic", "sync-jira-epic", "EPIC_CARD_SECTIONS"],
 ]) {
   test(`H: every real ${kind} card passes preflight`, () => {
-    const specs = require(join(repoRoot, `skills/${skill}/scripts/${skill}.js`))[specKey];
+    const specs = require(
+      join(repoRoot, `skills/${skill}/scripts/${skill}.js`),
+    )[specKey];
     const files = cardDocsNamed(prefix);
-    assert.ok(files.length > 0, `found no ${kind} card documents — the corpus glob is broken`);
+    assert.ok(
+      files.length > 0,
+      `found no ${kind} card documents — the corpus glob is broken`,
+    );
 
     const failing = [];
     for (const f of files) {
@@ -545,7 +631,8 @@ for (const [kind, prefix, skill, specKey] of [
       const tableMissing =
         kind === "epic" &&
         !lib.firstTableIn(
-          (lib.extractBodySections(body, ["Stories Breakdown"])[0] || {}).content || "",
+          (lib.extractBodySections(body, ["Stories Breakdown"])[0] || {})
+            .content || "",
         );
       if (!r.ok || tableMissing) failing.push(f.split("/").pop());
     }

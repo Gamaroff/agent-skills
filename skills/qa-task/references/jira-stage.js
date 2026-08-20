@@ -48,6 +48,7 @@ const fs = require("fs");
 const path = require("path");
 const lib = require("./jira-sync.js");
 const tw = require("./tracker-workflow.js");
+const dm = require("./defer-mutation.js");
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -247,7 +248,8 @@ function resolveMomentSpec({ stage, issueType, record, workflow }) {
         enabled: false,
         candidates: [],
         rank: null,
-        reason: "not declared in tracker-workflow.yaml — omission is disablement",
+        reason:
+          "not declared in tracker-workflow.yaml — omission is disablement",
         terminal: false,
       },
       moment: null,
@@ -285,6 +287,27 @@ async function run({
   // invite editing. Tests pin their own ladder through this.
   repoRoot = undefined,
 } = {}) {
+  // Captured BEFORE loadDotEnv. A dot-env file must not be able to restrict
+  // (or, via a typo, hard-fail) every pipeline step behind the resolver's back.
+  //
+  // BOTH names, because the resolver reads both: `ACCESS_TRACKER` is
+  // resolve-platform.sh's output and `AGENT_SKILLS_ACCESS_TRACKER` is the knob
+  // an operator sets. Capturing only the first left this CLI's gate LOOSER than
+  // the layer-1 net underneath it — it read "full", skipped the typed deferral
+  // it exists to write, and the POST was then refused downstream as an untyped
+  // unknown-mutation.
+  //
+  // SKILLS_CONFIG_FILE is captured here for the same reason and it is the whole
+  // of C5-CR1: the config tier reads that variable to find the file, so a .env
+  // line setting it would redirect the config path AFTER this snapshot and walk
+  // straight around it. Capturing the mode but not the path to the mode leaves
+  // the door the snapshot exists to shut.
+  const accessEnv = {
+    ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+    AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+    SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
+  };
+
   lib.loadDotEnv();
 
   let args;
@@ -392,6 +415,114 @@ async function run({
     return { exitCode: 0, reason: "plan", hops, spansFrom: !!args.from };
   }
 
+  // ── ACCESS GATE ───────────────────────────────────────────────────────────
+  //
+  // Under any non-`full` tracker access mode this CLI must not touch Jira. It
+  // records what it wanted, exits 0 with `reason: "deferred"`, and the run-end
+  // handover names the card and its target column.
+  //
+  // PLACEMENT IS THE WHOLE POINT. This sits after arg parsing and after the
+  // credential-free modes (--print-plan, --init-workflow, --check) have already
+  // returned, and immediately BEFORE `lib.getAuth()` on the next line — the
+  // first credential read, itself ahead of the first network call. A gate placed
+  // after the issue fetch would have already told the tracker who is asking.
+  //
+  // The comparison is `!== "full"`, never truthiness or emptiness: an UNSET
+  // variable must read as `full`, because this CLI is invoked from seven skills
+  // and six pipeline steps and a gate that misfires stops every one of them
+  // moving cards. `resolveAccessTracker` holds that contract and refuses an
+  // unrecognised value rather than defaulting either way.
+  //
+  // `--dry-run` is exempt: it is a preview that mutates nothing, and every
+  // non-`full` mode still permits reads.
+  let access;
+  try {
+    // `cwd` is the repo root this CLI already computes, not process.cwd(). A
+    // bare `node jira-stage.js …` run from a subdirectory must see the same
+    // declared restriction the resolver sees from the root (C5-CR6).
+    access = dm.resolveAccessTracker(accessEnv, {
+      cwd: repoRoot || gitToplevel() || process.cwd(),
+    });
+  } catch (e) {
+    output.err(`Error: ${e.message}`);
+    return { exitCode: 2 };
+  }
+  if (access !== "full" && !args.dryRun) {
+    const { spec } = resolveMomentSpec({
+      stage: args.stage,
+      issueType: args.issueType,
+      record: lib.loadWorkflowRecord(repoRoot),
+      workflow,
+    });
+    if (!spec.enabled) {
+      // A disabled moment is not a deferral — there was never a mutation to
+      // defer. Report it exactly as an unrestricted run would.
+      output.info(
+        `⏭️  Stage ${args.stage} is not enabled${spec.reason ? ` (${spec.reason})` : ""} — nothing to do.`,
+      );
+      return emit({ transitioned: false, reason: "stage-disabled" }, 0);
+    }
+    const target = spec.candidates && spec.candidates[0];
+    const baseUrl = (process.env.JIRA_URL || "").replace(/\/+$/, "");
+    const issueUrl = baseUrl ? `${baseUrl}/browse/${args.issue}` : "";
+    try {
+      const rec = dm.defer(
+        {
+          kind: "jira.transition",
+          system: "jira",
+          access,
+          intent: `Move ${args.issue} to ${target || `the ${args.stage} column`}`,
+          target: { issue: args.issue, url: issueUrl, ui_url: issueUrl },
+          desired: { status: target || null },
+          skill: "jira-stage",
+          step: args.stage,
+          run: process.env.PIPELINE_RUN || "",
+          manual: {
+            deepLink: issueUrl,
+            ui: `Open the issue → Status → ${target || `the ${args.stage} column`}`,
+            fields: [{ name: "Status", value: target || "" }],
+          },
+          command: {
+            argv: [
+              "node",
+              "jira-stage.js",
+              "--issue",
+              String(args.issue),
+              "--stage",
+              args.stage,
+              "--json",
+            ],
+            stdin: null,
+          },
+          verify: {
+            cmd: `jira-stage.js --issue ${args.issue} --stage ${args.stage} --dry-run --json`,
+            expect: `status is "${target || args.stage}"`,
+          },
+          // The repo root, not process.cwd() — see gh-stage.js.
+        },
+        { cwd: repoRoot || gitToplevel() },
+      );
+      output.info(
+        `⏸️  access.tracker=${access} — not transitioning ${args.issue}; recorded as ${rec.id}.`,
+      );
+      return emit(
+        {
+          transitioned: false,
+          reason: "deferred",
+          access,
+          target: target || null,
+          record: rec.id,
+        },
+        0,
+      );
+    } catch (e) {
+      // A journal we cannot write is a real problem, but it is not a reason to
+      // fall through and perform the very mutation the mode forbids.
+      output.warn(`⚠️  Could not record the deferred transition: ${e.message}`);
+      return emit({ transitioned: false, reason: "deferred", access }, 0);
+    }
+  }
+
   // Absent credentials is a documented, non-failing outcome: the caller falls
   // back to the MCP protocol. Anything else here would make the CLI a
   // regression for every consumer using the Atlassian connector.
@@ -403,7 +534,13 @@ async function run({
     return emit({ transitioned: false, reason: "no-credentials" }, 0);
   }
 
-  const http = lib.makeHttp({ fetchImpl });
+  // The SAME anchor the CLI gate above used. Leaving it out let layer 1 resolve
+  // the config tier against process.cwd() while the gate resolved it against the
+  // repo root, so one run could hold two different answers (T61-M3).
+  const http = lib.makeHttp({
+    fetchImpl,
+    cwd: repoRoot || gitToplevel() || process.cwd(),
+  });
   const record = lib.loadWorkflowRecord(repoRoot);
 
   let issue;
@@ -592,7 +729,9 @@ async function run({
     // The hop's own failure, which `incomplete()` carries up as `cause`. Without
     // this an HTTP error or a required-field refusal reads as a gate.
     if (res.cause && res.cause !== "no-transition")
-      output.warn(`    Hop failed with: ${res.cause}${res.detail ? ` — ${res.detail}` : ""}.`);
+      output.warn(
+        `    Hop failed with: ${res.cause}${res.detail ? ` — ${res.detail}` : ""}.`,
+      );
     if (res.cause === "no-transition") await explainNoTransition();
     return emit({ ...res, issueType }, args.strict ? 1 : 0);
   }
@@ -677,8 +816,12 @@ function recordToLadder(record) {
     if (!s) continue;
     const first = (s.candidates || [])[0];
     const reason = s.reason ? `   # ${s.reason}` : "";
-    if (s.enabled && first) pipeline.push(`  ${stage}: ${JSON.stringify(first)}${reason}`);
-    else pipeline.push(`  # ${stage}: ${first ? JSON.stringify(first) : "..."}${reason || "   # disabled in the JSON record"}`);
+    if (s.enabled && first)
+      pipeline.push(`  ${stage}: ${JSON.stringify(first)}${reason}`);
+    else
+      pipeline.push(
+        `  # ${stage}: ${first ? JSON.stringify(first) : "..."}${reason || "   # disabled in the JSON record"}`,
+      );
   }
   return { statuses, pipeline };
 }
@@ -689,7 +832,8 @@ function renderJiraWorkflowFile({ record, statusesByType }) {
   const converted = record ? recordToLadder(record) : null;
 
   // Prefer the record's own ranked ladder; fall back to a live status list.
-  let statuses = converted && converted.statuses.length ? converted.statuses : null;
+  let statuses =
+    converted && converted.statuses.length ? converted.statuses : null;
   if (!statuses && statusesByType) {
     const first = Object.values(statusesByType)[0];
     if (first && first.length) statuses = first.slice();
@@ -702,16 +846,25 @@ function renderJiraWorkflowFile({ record, statusesByType }) {
       : "# Generated by `jira-stage --init-workflow`.",
   );
   lines.push("#");
-  lines.push("# Schema and worked examples: docs/reference/tracker-workflow.md");
+  lines.push(
+    "# Schema and worked examples: docs/reference/tracker-workflow.md",
+  );
   lines.push("# Check in CI:  jira-stage --check --offline");
-  if (record && record.project) lines.push(`# Source record project: ${record.project}`);
+  if (record && record.project)
+    lines.push(`# Source record project: ${record.project}`);
   lines.push("");
-  lines.push("# The ladder, in board order. Order IS the workflow: a rung's index is its");
-  lines.push("# rank, and the rungs between two positions are the path between them.");
+  lines.push(
+    "# The ladder, in board order. Order IS the workflow: a rung's index is its",
+  );
+  lines.push(
+    "# rank, and the rungs between two positions are the path between them.",
+  );
   lines.push("statuses:");
   for (const s of statuses) lines.push(`  - ${q(s)}`);
   lines.push("");
-  lines.push("# Which status each pipeline moment targets. Omission is disablement.");
+  lines.push(
+    "# Which status each pipeline moment targets. Omission is disablement.",
+  );
   lines.push("pipeline:");
   if (converted) {
     lines.push(...converted.pipeline);
@@ -747,7 +900,9 @@ function initWorkflow({ root, args, output, repoRoot }) {
   });
 
   if (args.dryRun) {
-    output.info(`🔎 would write ${tw.DEFAULT_WORKFLOW_PATH} (skipped: --dry-run):`);
+    output.info(
+      `🔎 would write ${tw.DEFAULT_WORKFLOW_PATH} (skipped: --dry-run):`,
+    );
     output.info(body.replace(/^/gm, "   "));
     const payload = { reason: "dry-run", written: false, path: target };
     if (args.json) output.emit({ ...payload, exitCode: 0 });
@@ -781,7 +936,12 @@ function initWorkflow({ root, args, output, repoRoot }) {
         "`jira-sync --probe-workflow --write-record` first and re-run with --force.",
     );
   }
-  const payload = { reason: "written", written: true, path: target, fromRecord: !!(record && record.stages) };
+  const payload = {
+    reason: "written",
+    written: true,
+    path: target,
+    fromRecord: !!(record && record.stages),
+  };
   if (args.json) output.emit({ ...payload, exitCode: 0 });
   return { exitCode: 0, ...payload };
 }
@@ -818,7 +978,12 @@ function checkWorkflow({ args, output, workflow, repoRoot }) {
       `ℹ️  No ${tw.DEFAULT_WORKFLOW_PATH} — using the built-in default ladder. ` +
         "Nothing to check. Generate one with `jira-stage --init-workflow`.",
     );
-    const payload = { reason: "no-file", checked: false, errors: 0, warnings: 0 };
+    const payload = {
+      reason: "no-file",
+      checked: false,
+      errors: 0,
+      warnings: 0,
+    };
     if (args.json) output.emit({ ...payload, exitCode: 0 });
     return { exitCode: 0, ...payload };
   }
@@ -837,7 +1002,13 @@ function checkWorkflow({ args, output, workflow, repoRoot }) {
 
   if (args.offline) {
     output.info("✅ tracker-workflow.yaml is self-consistent.");
-    const payload = { reason: "ok-offline", checked: true, offline: true, errors: 0, warnings: warns.length };
+    const payload = {
+      reason: "ok-offline",
+      checked: true,
+      offline: true,
+      errors: 0,
+      warnings: warns.length,
+    };
     if (args.json) output.emit({ ...payload, exitCode: 0 });
     return { exitCode: 0, ...payload };
   }
@@ -853,7 +1024,12 @@ function checkWorkflow({ args, output, workflow, repoRoot }) {
         "`jira-sync --probe-workflow --write-record` to enable the board half, " +
         "or use `--check --offline` to assert only the schema half deliberately.",
     );
-    const payload = { reason: "no-record", checked: true, errors: 0, warnings: warns.length };
+    const payload = {
+      reason: "no-record",
+      checked: true,
+      errors: 0,
+      warnings: warns.length,
+    };
     if (args.json) output.emit({ ...payload, exitCode: 0 });
     return { exitCode: 0, ...payload };
   }
@@ -866,7 +1042,9 @@ function checkWorkflow({ args, output, workflow, repoRoot }) {
   for (const m of tw.MOMENTS) {
     const spec = tw.resolveMoment(m, workflow, { issueType: args.issueType });
     if (!spec) continue;
-    const hit = spec.targets.some((t) => known.has(String(t).trim().toLowerCase()));
+    const hit = spec.targets.some((t) =>
+      known.has(String(t).trim().toLowerCase()),
+    );
     if (!hit)
       drift.push({
         moment: m,

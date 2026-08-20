@@ -71,7 +71,7 @@ grep -L 'github_issue:' $(find "$PRD_ROOT" -path '*/epics/*/epic.*.md' -not -pat
 ### 2. Source the Platform Resolver and Confirm GitHub
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # Expect TRACKER=github. If TRACKER=jira, abort and tell the user to run /sync-jira-epic.
 ```
 
@@ -100,9 +100,19 @@ Invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH={resolved
 - adds it to the Project board,
 - writes `github_issue: {N}` into the epic frontmatter.
 
-On return, `EPIC_ISSUE_NUM` is set (integer) or empty (on failure — non-blocking).
+On return, `EPIC_ISSUE_NUM` is set (integer) or empty — on failure **or when the
+create was deferred** by a restricted `access.tracker`.
 
-After the sub-routine returns, mirror the board's Priority field from frontmatter:
+> **When `EPIC_ISSUE_NUM` is empty, stop here.** Skip the Priority mirror, the
+> Change Log row and Step 5: each would assert a create that did not happen, and
+> the board helper would be handed an empty issue number. Report the deferral
+> instead; the handover checklist carries the action, and the second run converges
+> once the key is in the frontmatter. This matters more for an epic than for a
+> story or task — stories link to their epic by this number, so a false claim here
+> mis-parents everything beneath it.
+
+After the sub-routine returns (and only with a non-empty `EPIC_ISSUE_NUM`), mirror
+the board's Priority field from frontmatter:
 
 ```bash
 bash references/set-github-project-priority.sh "${EPIC_ISSUE_NUM}" "${priority}" || true
@@ -148,9 +158,12 @@ Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The bo
 If anything changed, run:
 
 ```bash
-gh issue edit ${ISSUE_NUM} \
+mkdir -p .claude/state
+printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+
+node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
-  --body-file <(printf '%s' "$NEW_BODY") \
+  --body-file .claude/state/issue-body.md \
   --milestone "${MILESTONE_TITLE}" \
   --add-label "priority:${priority}" \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
@@ -159,8 +172,8 @@ gh issue edit ${ISSUE_NUM} \
 The milestone is auto-created first if it does not yet exist (e.g. the epic title changed):
 
 ```bash
-gh api repos/${OWNER}/$(gh repo view --json name -q '.name')/milestones \
-  -f title="${MILESTONE_TITLE}" -f state="open" 2>/dev/null || true
+node references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
 
 If the priority label changed, also re-mirror the board's Priority field:
@@ -194,9 +207,9 @@ if [ "$CURRENT" != "$DESIRED" ]; then
   if [ "$DESIRED" = "closed" ]; then
     REASON=completed
     [ "$STATUS" = "cancelled" ] && REASON=not_planned
-    gh issue close ${EPIC_ISSUE_NUM} --reason ${REASON}
+    node references/tracker-issue.js --kind close --issue ${EPIC_ISSUE_NUM} --reason ${REASON}
   else
-    gh issue reopen ${EPIC_ISSUE_NUM}
+    node references/tracker-issue.js --kind reopen --issue ${EPIC_ISSUE_NUM}
   fi
 fi
 ```

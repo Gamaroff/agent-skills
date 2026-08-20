@@ -1063,10 +1063,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
       - If the protocol reports a skip (no matching transition, or a required field it cannot
         fill): log that reason in the running summary (non-blocking).
 
-   2. **Post completion comment** — call `addCommentToJiraIssue`:
-      - `cloudId`: {derived hostname}
-      - `issueIdOrKey`: `{jira_key}`
-      - `commentBody`: Build from the variables already computed for the PR comment (`FINAL_GATE`, `DOD_PATH`, `CYCLES`) and the per-category `overall_status` values from each DoD agent YAML result. Format:
+   2. **Post completion comment** — build the body from the variables already computed for the PR comment (`FINAL_GATE`, `DOD_PATH`, `CYCLES`) and the per-category `overall_status` values from each DoD agent YAML result, then post it through the CLI. Format:
 
         ```
         ## ✅ Story/Task Accepted — Definition of Done Verified
@@ -1091,8 +1088,25 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
         Use ✅ PASS, ❌ FAIL, ⚠️ CONCERNS, or — N/A for each status cell. `{pr_status}` is APPROVED or NOT_APPROVED from the AC agent result.
 
-      - `contentFormat`: `"markdown"`
-      - On failure: log warning and continue (non-blocking)
+        ```bash
+        mkdir -p .claude/state
+        # Terminator at COLUMN 0 — an indented terminator does not close an
+        # unquoted heredoc; bash swallows everything after it into the body,
+        # so the call below would never run. Body lines are unindented for
+        # the same reason: leading spaces are written verbatim.
+        cat > .claude/state/comment-body.md <<EOF
+{the body rendered above}
+EOF
+
+        node .agents/skills/finalise/references/tracker-comment.js \
+          --issue {jira_key} --body-file .claude/state/comment-body.md \
+          --stage done --json
+        ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+        Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool. On failure: log warning and continue (non-blocking).
 
    Log outcome in running summary: "Jira issue {jira_key} transitioned to Done ✅" or the warning detail.
 
@@ -1127,7 +1141,10 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    DOC_REL_RE=$(printf '%s' "$DOC_REL" | sed 's/[.[\*^$/]/\\&/g')
    NEW_BODY=$(printf '%s' "$CUR_BODY" | sed -E "s#blob/[^) ]+/(${DOC_REL_RE})#blob/${DURABLE_BRANCH}/\1#g")
    if [ "$NEW_BODY" != "$CUR_BODY" ]; then
-     gh issue edit {github_issue} --body-file <(printf '%s' "$NEW_BODY") \
+     mkdir -p .claude/state
+     printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+     node references/tracker-issue.js --kind edit --issue {github_issue} \
+       --body-file .claude/state/issue-body.md \
        && echo "✅ Document link re-pointed to ${DURABLE_BRANCH}" \
        || echo "⚠️ Document-link re-point failed — non-blocking; re-sync from develop after merge"
    fi
@@ -1136,12 +1153,28 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Close the issue and verify closure:
 
    ```bash
-   # Post completion comment
-   gh issue comment {github_issue} --body "Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified."
+   # Post completion comment — always --body-file, never an inline --body.
+   #
+   # The heredoc terminator sits at COLUMN 0 even though this block is indented
+   # inside a numbered list. Bash does not accept an indented terminator for an
+   # unquoted heredoc: it warns "here-document delimited by end-of-file" and
+   # swallows everything after it INTO THE BODY, so the close below would never
+   # run and the issue would be neither commented nor closed — silently.
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
+EOF
+   node references/tracker-comment.js --issue {github_issue} \
+     --body-file .claude/state/comment-body.md --stage done --json
 
    # Close the issue
-   gh issue close {github_issue} --comment "Closing — accepted. PR: {PR_URL} (pending merge)."
+   node references/tracker-issue.js --kind close --issue {github_issue} --reason completed
    ```
+
+   > The close no longer carries `--comment`. The completion comment is posted by
+   > `tracker-comment.js` immediately above, which is the marked, idempotent path —
+   > a `--comment` on the close is an *unmarked* second comment that the marker
+   > cannot see, so it recurs on every resume.
 
    After closing, verify the issue is actually closed:
 
@@ -1184,6 +1217,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
      | `board-unreadable` | The board read failed (API/permissions) | Record a warning with the CLI's message |
      | `no-repo-context` | `gh repo view` could not resolve the repository | Record a warning — usually a detached checkout or missing `gh` auth |
      | `no-credentials` | `gh` is not authenticated | Record a warning — the card was not moved |
+     | `deferred` | `access.tracker` is not `full`, so the CLI declined the move and recorded it instead | **Not an error — a recorded outcome.** The run is operating under a declared restriction; the move was never going to happen and the deferral is the system working. Record it in the running summary naming the record id from the JSON's `record` field, then **escalate via the `not-on-board` path below**, pointing at the handover checklist rather than the board |
      | `not-on-board` | Issue is on no project board | **Escalate — see below** |
      | `mutation-failed` | The CLI already retried and still failed | Escalate — see below |
      | _any other value_ | A reason added to the CLI since this table was written | Log it verbatim in the running summary and treat as a non-blocking warning. Never treat an unrecognised reason as success |
@@ -1201,6 +1235,18 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
        ```
      - Record this as a warning (not a blocker) in the running summary.
+
+   - **If `reason` is `deferred`:** reuse the escalation above with the wording below. It is the same shape — the board did not move and a human must move it — but the *cause* is a policy the operator themselves declared, so the message must not read as a malfunction:
+       ```
+       ⏸️ Project Board Move Deferred
+
+       This story/task was accepted. `access.tracker` is set to **<access>**, so the board move to **Done** was recorded rather than performed — recorded as `<record>`.
+
+       **Action required:** run the handover checklist committed beside the implementation report (`*.handover.*.sh` to apply, `*.handover.*.md` to do it by hand). Moving the card to Done on the project board is one of its entries.
+
+       ```
+       Take `<access>` and `<record>` from the CLI's JSON. **Never post this without the record id** — a deferral the operator cannot locate in the journal is indistinguishable from a silent skip, which is the failure the whole deferred-mutation mechanism exists to remove.
+     - Record it in the running summary as a deferral, **not** as a failure. The Definition of Done is unaffected: a card that a declared restriction stopped the pipeline moving is not an incomplete task.
 
    - **If `reason` is `mutation-failed`:** post a PR comment using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
        ```

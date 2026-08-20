@@ -1,0 +1,87 @@
+schema: 1
+task: 'task.60.config-reader-strict-subset'
+task_title: "Give the config reader's awk tier a grammar, or make it refuse"
+gate: PASS
+status_reason: 'Both MEDIUM findings and both LOW recommendations from gate 1 are closed and verified. The duplicate-key route — the last way tier 2 could resolve more permissively than declared — is refused, scoped to the consumed keys so the degrade path for a config declaring no access is preserved. No new findings.'
+reviewer: 'QA Engineer'
+updated: '2026-08-18T13:05:00Z'
+
+top_issues: []
+
+previous_issues:
+  - id: TASK-60-QA1-1
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-18'
+    verification: >-
+      Reproduced the original shape against the fixed branch: `access:\n  tracker: full\naccess:\n
+      tracker: manual` now returns rc=1 on the awk tier (was rc=0 / `full`), matching tier 1's halt.
+      Same for the duplicated child. Verified the rule did NOT over-refuse: a duplicated key this
+      reader never consumes still degrades (§38 preserved), this repo's own config still resolves on
+      both tiers, and two different children under one parent stay clean. Nine transition probes
+      against the new scanner state (block-scalar bodies, comments, blank lines, sequence items,
+      parent reset, flow form, childless parent, deeper nesting, anchor-before-duplicate) all
+      behave correctly.
+  - id: TASK-60-QA1-2
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-18'
+    verification: '`sudo apt-get update` added before the install, with the reason stated in the step.'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 378
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      Every escalation route identified across task.51 and this review is now closed on both tiers:
+      the aliasing family, the mapping-valued child, and — as of this cycle — the duplicate key. The
+      refusal remains unforgeable (reads the scan verdict global, not a reader's stdout; §42c pins
+      that a config value spelling the sentinel stays DATA). Upgraded from CONCERNS.
+  performance:
+    status: PASS
+    notes: >-
+      The duplicate rule lives inside the existing single awk pass and adds no process spawn.
+      Measured counts unchanged: awk tier 9, python tier 13.
+  reliability:
+    status: PASS
+    notes: >-
+      Unchanged and still good — a failed awk yields a refusal rather than a clean verdict, and
+      resolve-paths.sh keeps its never-fail contract.
+  maintainability:
+    status: PASS
+    notes: >-
+      Both deductions closed. The CI step now explains why `apt-get update` precedes the install;
+      the hoisted refusal's else-branch is correctly indented; the alias rule documents its
+      deliberate narrowness and why the anchor rule covers what it misses. Upgraded from CONCERNS.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        The duplicate rule tracks only the FIRST child level under a consumed parent, which is the
+        only level the nested readers read. A repeat deeper down (`prd:` -> `a:` -> `k:` twice) is
+        not refused on tier 2 while tier 1 halts. Not an escalation — tier 2 resolves the correct
+        value and tier 1 refuses the file — but worth a line in the spec if the key surface ever
+        grows deeper.
+      refs: ['shared/resources/read-config.sh']
+    - action: >-
+        `gawk`/`mawk` remain unobserved locally (not installed). The CI step now installs them
+        reliably; confirm §45 actually runs green on the first CI execution of this branch rather
+        than assuming it.
+      refs: ['.github/workflows/test.yml', 'shared/resources/tracker-access.test.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

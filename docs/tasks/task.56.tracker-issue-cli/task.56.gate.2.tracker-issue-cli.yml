@@ -1,0 +1,73 @@
+schema: 1
+task: "task.56.tracker-issue-cli"
+task_title: "One CLI for the GitHub issue lifecycle, and honest handling of the mutations that return a value"
+gate: PASS
+status_reason: "Four fix cycles closed 11 findings from gate 1 plus 14 raised during re-review. The final round found no production defect with both a named triggering input and an observable wrong outcome, and swept 192 runs across every restricted mode, kind and flag combination: zero network calls, zero stdout bytes, zero malformed records."
+reviewer: "QA Engineer"
+updated: "2026-08-20T02:10:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 94
+
+evidence:
+  tests_reviewed: 1583
+  phases_verified: "9/9"
+  qa_cycles: 5
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No path reaches the network under any restricted mode — proven across 192
+      runs with both throwing and counting transports, and mutation-proven
+      (disabling the gate yields 48 violations). Credential redaction unchanged
+      and still covered. The prose that once claimed --body-file removed the
+      command-substitution surface now states the residual risk accurately
+      instead of overclaiming.
+  performance:
+    status: PASS
+    notes: >-
+      No hot path. The dry-run branch no longer makes a network round trip it
+      never reads.
+  reliability:
+    status: PASS
+    notes: >-
+      The failure class that dominated this task — a mutation landing somewhere
+      nobody meant — is closed at every layer it appeared: slug resolution, the
+      resolver's cwd, every perform-path exec's cwd, --repo validation, and the
+      construction-time refusal to build an unrunnable command. Eight indented
+      heredocs that silently swallowed tracker calls are fixed and guarded.
+  maintainability:
+    status: PASS
+    notes: >-
+      Every non-obvious choice carries the reason it was made, including the
+      three rejected alternatives. Roster counts derive from source rather than
+      being restated in five literals. Five guards (§1–§5) turn invariants that
+      were previously audited once into invariants that are maintained.
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Extract the credential/repo-root block now copied verbatim by four CLIs"
+      refs: ["shared/resources/tracker-issue.js"]
+    - action: "Consider routing git through an injectable exec so the URL-form table can be a pure unit test rather than creating repositories on disk"
+      refs: ["shared/resources/tracker-issue.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 25
+  bugs_remaining: 0
+  fix_date: "2026-08-20"
+  total_iterations: 4
+  verification_method: "Per-fix mutation testing — each invariant reverted individually and the suite re-run to confirm it goes red"

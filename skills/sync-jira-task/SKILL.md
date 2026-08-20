@@ -367,9 +367,18 @@ the authoritative log.
   "change_summary": "Updated: summary, description, metadata",
   "jira_last_synced_at": "2026-04-28T11:05:33.123+0000",
   "jira_last_body_hash": "f4b2c1d9a0e72b58",
-  "jira_last_meta_hash": "a91c0aef33eb1d04"
+  "jira_last_meta_hash": "a91c0aef33eb1d04",
+  "reason": null,
+  "record": null
 }
 ```
+
+`reason` is `"deferred"` and `record` carries the journal record id when
+`access.tracker` is not `full`: the Jira write was **refused and recorded**, not
+performed. A deferred *create* also returns `jira_key: null` — never a
+placeholder — so the next unrestricted run creates the issue exactly once. See
+[`references/tracker-access-record.md`](references/tracker-access-record.md)
+for the record and the roster of kinds.
 
 The `*_bitbucket_url` keys report the absolute Bitbucket URL used for the **Jira** link,
 built at render time. They are **not** written to the document — the file gets a relative

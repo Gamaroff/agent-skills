@@ -67,7 +67,8 @@ function makePrd(root, prd, epics) {
   return prdDir;
 }
 
-const readPrd = (prdDir, prd) => readFileSync(join(prdDir, `${prd}.md`), "utf8");
+const readPrd = (prdDir, prd) =>
+  readFileSync(join(prdDir, `${prd}.md`), "utf8");
 
 // ===========================================================================
 // Idempotency
@@ -76,8 +77,18 @@ test("idempotency — second run makes no change", () => {
   const root = tmp();
   try {
     makePrd(root, "prd.alpha", [
-      { dir: "epic.1.foo", title: "[Epic 1] Foo", number: 1, status: "planned" },
-      { dir: "epic.2.bar", title: "[Epic 2] Bar", number: 2, status: "in-progress" },
+      {
+        dir: "epic.1.foo",
+        title: "[Epic 1] Foo",
+        number: 1,
+        status: "planned",
+      },
+      {
+        dir: "epic.2.bar",
+        title: "[Epic 2] Bar",
+        number: 2,
+        status: "in-progress",
+      },
     ]);
     const first = run(root, ["--prd-root", root]);
     assert.equal(first.status, 0, first.stderr);
@@ -101,8 +112,18 @@ test("output shape — markers, table header, sort, relative links", () => {
   const root = tmp();
   try {
     makePrd(root, "prd.alpha", [
-      { dir: "epic.10.ten", title: "[Epic 10] Ten", number: 10, status: "planned" },
-      { dir: "epic.2.two", title: "[Epic 2] Two", number: 2, status: "accepted" },
+      {
+        dir: "epic.10.ten",
+        title: "[Epic 10] Ten",
+        number: 10,
+        status: "planned",
+      },
+      {
+        dir: "epic.2.two",
+        title: "[Epic 2] Two",
+        number: 2,
+        status: "accepted",
+      },
       { dir: "epic.1.one", title: "[Epic 1] One", number: 1 },
     ]);
     assert.equal(run(root, ["--prd-root", root]).status, 0);
@@ -119,7 +140,10 @@ test("output shape — markers, table header, sort, relative links", () => {
     assert.match(out, /\| --- \| ---- \| ------ \|/);
 
     // Relative link shape: [Title](epics/<dir>/<dir>.md)
-    assert.match(out, /\| 1 \| \[One\]\(epics\/epic\.1\.one\/epic\.1\.one\.md\) \| — \|/);
+    assert.match(
+      out,
+      /\| 1 \| \[One\]\(epics\/epic\.1\.one\/epic\.1\.one\.md\) \| — \|/,
+    );
     assert.match(
       out,
       /\| 2 \| \[Two\]\(epics\/epic\.2\.two\/epic\.2\.two\.md\) \| accepted \|/,
@@ -127,11 +151,15 @@ test("output shape — markers, table header, sort, relative links", () => {
 
     // Numeric (not lexical) sort: 1 then 2 then 10.
     const order = ["One", "Two", "Ten"].map((t) => out.indexOf(`[${t}]`));
-    assert.ok(order[0] < order[1] && order[1] < order[2], "epics must sort numerically");
+    assert.ok(
+      order[0] < order[1] && order[1] < order[2],
+      "epics must sort numerically",
+    );
 
     // Block sits after the H1.
     assert.ok(
-      out.indexOf("# prd.alpha PRD") < out.indexOf("<!-- epics-index-start -->"),
+      out.indexOf("# prd.alpha PRD") <
+        out.indexOf("<!-- epics-index-start -->"),
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -169,7 +197,12 @@ test("--check exits 0 when up to date, non-zero on drift", () => {
   const root = tmp();
   try {
     const prdDir = makePrd(root, "prd.alpha", [
-      { dir: "epic.1.foo", title: "[Epic 1] Foo", number: 1, status: "planned" },
+      {
+        dir: "epic.1.foo",
+        title: "[Epic 1] Foo",
+        number: 1,
+        status: "planned",
+      },
     ]);
     // Generate once so the index is current.
     assert.equal(run(root, ["--prd-root", root]).status, 0);
@@ -182,7 +215,10 @@ test("--check exits 0 when up to date, non-zero on drift", () => {
     const epicFile = join(prdDir, "epics", "epic.1.foo", "epic.1.foo.md");
     writeFileSync(
       epicFile,
-      readFileSync(epicFile, "utf8").replace("status: planned", "status: accepted"),
+      readFileSync(epicFile, "utf8").replace(
+        "status: planned",
+        "status: accepted",
+      ),
     );
     const drift = run(root, ["--prd-root", root, "--check"]);
     assert.equal(drift.status, 1, "stale tree → exit 1");
@@ -257,7 +293,10 @@ test("--prd-root overrides config", () => {
     );
     const res = run(root, ["--prd-root", join(root, "custom")]);
     assert.equal(res.status, 0, res.stderr);
-    assert.match(readPrd(join(root, "custom", "prd.beta"), "prd.beta"), /\[Foo\]/);
+    assert.match(
+      readPrd(join(root, "custom", "prd.beta"), "prd.beta"),
+      /\[Foo\]/,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -308,7 +347,11 @@ test("frontmatter — a single-quoted title undoubles YAML's escaped apostrophe"
     const out = readPrd(prdDir, "prd.quoted");
     assert.match(out, /Anna's wallet/, "renders one apostrophe");
     assert.doesNotMatch(out, /Anna''s wallet/, "never leaks YAML's doubling");
-    assert.doesNotMatch(out, /'\[Epic 1\]/, "the wrapping quote is still stripped");
+    assert.doesNotMatch(
+      out,
+      /'\[Epic 1\]/,
+      "the wrapping quote is still stripped",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -334,6 +377,92 @@ test("frontmatter — an unquoted title keeping a trailing quote is left intact"
     const res = run(root, ["--prd-root", root]);
     assert.equal(res.status, 0, res.stderr);
     assert.match(readPrd(prdDir, "prd.trailing"), /Say it "loud"/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
+// Replacement-pattern injection ($&, $`, $', $$) in an epic title
+// ===========================================================================
+
+// The regenerate path feeds the freshly built block to `String.replace` as the
+// replacement argument. A STRING replacement is a PATTERN: `$&` expands to the
+// whole match, `` $` `` / `$'` to the text around it, `$$` to a literal `$`. So an
+// epic titled `Tilemap $& Ruleset` did not insert its own title — it spliced the
+// entire previous index block back inside a table cell, corrupting the PRD.
+//
+// It compounds. The regex is lazy (`[\s\S]*?END`), so it matches only up to the
+// FIRST end marker; the next run re-expands around the already-nested block and
+// adds another. Left running, the PRD grows without bound and `--check` reports
+// STALE forever — a permanently red gate with no explanation of what is stale.
+// Passing a FUNCTION suppresses all `$` expansion — see the call site.
+//
+// Found by adversarial review downstream (tinker-city task.83), which had just
+// wired `--check` into `lint:docs` and therefore into a required CI job.
+test("epic title containing $& is inserted literally, not expanded", () => {
+  const root = tmp();
+  try {
+    const prdDir = makePrd(root, "prd.dollar", [
+      {
+        dir: "epic.38.tilemap",
+        title: "[Epic 38] Tilemap $& Ruleset",
+        number: 38,
+        status: "planned",
+      },
+    ]);
+
+    // First run inserts the block; second run takes the regenerate/replace path.
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+
+    const out = readPrd(prdDir, "prd.dollar");
+
+    assert.match(
+      out,
+      /\| 38 \| \[Tilemap \$& Ruleset\]\(epics\/epic\.38\.tilemap\/epic\.38\.tilemap\.md\) \| planned \|/,
+      "the title must appear verbatim in its table cell",
+    );
+    // The block must appear exactly once — `$&` re-inserting the match would
+    // nest a second copy of the markers inside the table cell.
+    assert.equal(
+      out.split("<!-- epics-index-start -->").length - 1,
+      1,
+      "exactly one index block — no recursive re-insertion",
+    );
+    assert.equal(out.split("## Epics").length - 1, 1);
+
+    // Second half: --check must agree the file is up to date. On the unfixed
+    // script it reported STALE indefinitely, because each run nested one more
+    // block and no amount of regenerating ever converged.
+    const check = run(root, ["--prd-root", root, "--check"]);
+    assert.equal(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stdout, /All epics indexes up to date\./);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The remaining three replacement patterns, for completeness: `` $` `` (text
+// before the match), `$'` (text after), and `$$` (a literal dollar). Each one
+// silently rewrites the cell under a string replacement.
+test("epic titles containing $`, $' and $$ survive regeneration", () => {
+  const root = tmp();
+  try {
+    const prdDir = makePrd(root, "prd.dollars", [
+      { dir: "epic.1.before", title: "[Epic 1] Cost $` each", number: 1 },
+      { dir: "epic.2.after", title: "[Epic 2] Cost $' each", number: 2 },
+      { dir: "epic.3.literal", title: "[Epic 3] Cost $$ each", number: 3 },
+    ]);
+
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+
+    const out = readPrd(prdDir, "prd.dollars");
+    assert.match(out, /\| 1 \| \[Cost \$` each\]/);
+    assert.match(out, /\| 2 \| \[Cost \$' each\]/);
+    assert.match(out, /\| 3 \| \[Cost \$\$ each\]/);
+    assert.equal(out.split("<!-- epics-index-start -->").length - 1, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

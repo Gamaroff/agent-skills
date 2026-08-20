@@ -350,6 +350,23 @@ Action: Perform re-review to verify if issues were addressed.
 
 ---
 
+## Mutation-Proof Spot Check
+
+A green suite says the tests ran, not that they can fail. Before crediting a test
+as coverage for a defect this cycle fixed, **revert the behaviour it names and
+confirm that test goes red** — full procedure and the four shapes vacuity takes:
+[`references/mutation-proving.md`](references/mutation-proving.md).
+
+Scope it: not every assertion, but **every test guarding a fix made this cycle**,
+plus any guard whose failure mode is silence. If the suite stays green with the
+behaviour reverted, record the test as **not** covering that criterion — a
+vacuous test is worse than a missing one, because it reports coverage that is not
+there.
+
+Record `mutation-proven: yes/no` per fixed defect in the QA report's Code Review
+section. Do **not** write "every invariant mutation-proven" unless every one was
+actually reverted; if you proved four of five, say four of five.
+
 ## Story Review Process
 
 Perform a comprehensive test architecture review with quality assessment. This adaptive, risk-aware review creates both a QA report and a detailed gate file.
@@ -1368,7 +1385,7 @@ After review:
 
    ```bash
    # shellcheck source=references/resolve-platform.sh
-   . "$(dirname "$0")/references/resolve-platform.sh"  # adjust path to wherever the bundled helper lives in this skill install
+   . "$(dirname "$0")/references/resolve-platform.sh" || exit 1  # adjust path to wherever the bundled helper lives in this skill install
 
    tracker_call_with_retry gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
 
@@ -1422,7 +1439,7 @@ After review:
 
 6b. **Comment on Tracker Issue (graceful — non-blocking)**
 
-Branch on the tracker resolved by `source references/resolve-platform.sh` (which sets `TRACKER=github|jira`).
+Branch on the tracker resolved by `source references/resolve-platform.sh || exit 1` (which sets `TRACKER=github|jira`). Keep the `|| exit 1` — the resolver returns non-zero on an unrecognised `tracker:`, `vcs:` or `access:` value, and sourcing it bare would continue past the rejection with a default.
 
 **GitHub path** (when `TRACKER=github`) — extract `github_issue` from the story/task document YAML frontmatter (read in Prerequisites). If present, post a summary comment to the linked Issue (also wrapped in `tracker_call_with_retry`):
 
@@ -1436,7 +1453,7 @@ fi
 
 If `github_issue` is absent from the frontmatter, skip silently. Failure does NOT halt the skill.
 
-**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the story/task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue via the Atlassian MCP tool (mirrors the pattern in `qa-fix` Step "Jira tracker comment"):
+**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the story/task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue:
 
 ```bash
 JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
@@ -1444,16 +1461,24 @@ JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:
 
 If `TRACKER=jira` and `JIRA_KEY` is non-empty and not `null`:
 
-1.  Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
-2.  Call `addCommentToJiraIssue` MCP tool:
-    - `cloudId`: {derived hostname}
-    - `issueIdOrKey`: `{JIRA_KEY}`
-    - `commentBody`: `"QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}"`
-    - `contentFormat`: `"markdown"`
+```bash
+mkdir -p .claude/state
+printf 'QA %s (%s/100) — PR #%s: %s\n' \
+  "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
+
+node .agents/skills/qa-story/references/tracker-comment.js \
+  --issue "$JIRA_KEY" --body-file .claude/state/comment-body.md \
+  --stage qa-gate --json
+```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
 3.  On success: log `📨 QA summary posted to Jira issue ${JIRA_KEY}`.
 4.  On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-story).
 
-If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` uses the same MCP call shape and `finalise` uses `contentFormat: "markdown"`.
+If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` and `finalise` post through the same `tracker-comment.js` call.
 
 7. **Communicate to user** — **CRITICAL / BLOCKING**: Provide constructive feedback and actionable recommendations. This step is required — do not end the skill silently. Always output:
    - Gate decision and quality score
@@ -1470,7 +1495,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] Bug report files created for all HIGH and MEDIUM severity issues (if any)
 - [ ] Story Bug Reports section updated with current bug statuses (if any)
 - [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (step 6 — BLOCKING): confirm exit code 0 after up to 3 attempts
-- [ ] Tracker Issue comment posted (step 6b — graceful): GitHub via `tracker_call_with_retry gh issue comment` when `TRACKER=github` (skipped if `github_issue` absent) **OR** Jira via `addCommentToJiraIssue` MCP when `TRACKER=jira` (skipped if `jira_key` absent or null); non-blocking on persistent failure
+- [ ] Tracker Issue comment posted (step 6b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] Next steps communicated to user (step 7 — BLOCKING): gate decision + issues + next steps output
 
 **File Creation Locations (Updated 2025-12-09):**

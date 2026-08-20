@@ -1,0 +1,112 @@
+schema: 1
+task: "task.56.tracker-issue-cli"
+task_title: "One CLI for the GitHub issue lifecycle, and honest handling of the mutations that return a value"
+gate: FAIL
+status_reason: "The CLI itself is sound — gate placement, stdout discipline and the no-placeholder rule all hold under test. Three high-severity defects sit in the rewritten skill prose: two unterminated heredocs that swallow the calls following them, and an issue URL built from two variables that are never assigned."
+reviewer: "QA Engineer"
+updated: "2026-08-20T00:20:00Z"
+
+top_issues:
+  - id: TASK-56-BUG-1
+    severity: high
+    finding: "skills/finalise/SKILL.md:1156 — heredoc terminator is indented (`   EOF`) after a plain `<<EOF`, so bash never closes the here-document. The tracker-comment.js and tracker-issue.js --kind close calls that follow are swallowed into the comment body: the issue is neither commented nor closed."
+    suggested_action: "Un-indent EOF to column 0, or use <<-EOF with a tab-indented terminator."
+    suggested_owner: dev
+  - id: TASK-56-BUG-2
+    severity: high
+    finding: "skills/review-task/SKILL.md:1728 — same indented-terminator defect; the tracker-comment.js invocation becomes part of the body and the GitHub review comment is silently dropped."
+    suggested_action: "Move the EOF terminator to column 0."
+    suggested_owner: dev
+  - id: TASK-56-BUG-3
+    severity: high
+    finding: "skills/create-issue/SKILL.md:285 — `issue_url` is built from ${OWNER}/${REPO_NAME}, neither of which is ever assigned in this skill. The value written into the local issue document becomes https://github.com///issues/207."
+    suggested_action: "Derive the slug in the block via `gh repo view --json nameWithOwner`, or have the CLI emit the URL under --json."
+    suggested_owner: dev
+  - id: TASK-56-BUG-4
+    severity: medium
+    finding: "shared/resources/tracker-issue.js:936 — under a deferring mode `slug` comes from --repo only, and no call site passes it, so recorded commands carry the literal `/repos/$OWNER/$REPO/...`. handover-render.js single-quotes every argv element, so the generated handover script sends `$OWNER/$REPO` verbatim to gh api. The sh renderer exists to be runnable; this makes every deferred milestone and sub-issue record unrunnable."
+    suggested_action: "Resolve the slug from a purely LOCAL source (git remote get-url origin / GH_REPO) when --repo is absent — a local read keeps the gate's no-network promise."
+    suggested_owner: dev
+  - id: TASK-56-BUG-5
+    severity: medium
+    finding: "shared/resources/tracker-issue.js:739 — the milestone resolve interpolates the raw title into a jq program and queries /milestones unpaginated (defaults state=open, 30/page). A title containing a double quote is a jq syntax error; >30 open milestones or a closed milestone silently misses, then the blind POST 422s."
+    suggested_action: "Fetch with --paginate and state=all, parse JSON in JS, compare titles in JavaScript rather than inside jq."
+    suggested_owner: dev
+  - id: TASK-56-BUG-6
+    severity: medium
+    finding: "sync-github-{epic,story,task}/SKILL.md — `printf ... > .claude/state/issue-body.md` with no preceding `mkdir -p .claude/state`, unlike all five other new call sites. On a repo that has never written that directory the redirect fails, tracker-issue.js exits 2 on an unreadable --body-file, and the whole title/body/milestone/label edit is lost."
+    suggested_action: "Add `mkdir -p .claude/state` before the redirect in all three blocks."
+    suggested_owner: dev
+  - id: TASK-56-BUG-7
+    severity: medium
+    finding: "sync-github-*/SKILL.md — `--reason ${REASON}` passes `not_planned`, but gh accepts only `completed|not planned|duplicate`, and tracker-issue.js copies --reason straight into argv without validating it. Cancelled work items never close; the run reports a warning only. (Pre-existing, but now on the CLI's path.)"
+    suggested_action: "Normalise and validate --reason inside tracker-issue.js (map not_planned → 'not planned', exit 2 otherwise) and quote it at the call sites."
+    suggested_owner: dev
+  - id: TASK-56-BUG-8
+    severity: medium
+    finding: "ensure-{story,task,epic}-github-issue/SKILL.md — body files are written with an UNQUOTED `<<EOF` heredoc while the adjacent prose claims the file form removes the injection surface. An unquoted heredoc still performs command substitution, so a `$(…)` in an acceptance criterion is executed and its output substituted into the issue body."
+    suggested_action: "State the residual risk honestly and prefer writing the body file directly rather than through an unquoted heredoc; the prose must not overclaim."
+    suggested_owner: dev
+  - id: TASK-56-BUG-9
+    severity: medium
+    finding: "No test covers the two-run convergence, which the task's own Testing Strategy lists as a case. The behaviour rests on six skills each retaining an early-exit/dedup branch; all six are currently intact but nothing guards them, so a refactor that drops one turns the convergence into 'creates a duplicate every run', silently."
+    suggested_action: "Add a docs-level guard asserting each ensure-*/sync-* skill keeps its key-present short-circuit and dedup search."
+    suggested_owner: dev
+  - id: TASK-56-BUG-10
+    severity: low
+    finding: "shared/resources/tests/tracker-issue.test.mjs:229 — the test named 'the ⏸️ notice goes to stderr' asserts only that stdout is empty, duplicating the previous test. It would pass if info() were deleted entirely and the operator got no deferral notice at all."
+    suggested_action: "Capture stderr and assert it matches /⏸️.*recorded as/ as well."
+    suggested_owner: dev
+  - id: TASK-56-BUG-11
+    severity: low
+    finding: "shared/resources/tracker-issue.js:937 — --dry-run bypasses the deferral branch, so under a restricted mode the slug is still resolved via `gh repo view`, an actual network call. This contradicts the file header's 'a gated run demonstrably makes no network call'."
+    suggested_action: "Skip repoSlug() whenever access !== 'full', regardless of --dry-run, and assert no execImpl call in the §8 test."
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 1564
+  phases_verified: "9/9"
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: "Credential redaction and the access gate hold (no network call reachable under a restricted mode on the non-dry-run path). But the ensure-* body heredocs are unquoted, so document text containing $(…) is executed at body-authoring time — while the adjacent prose claims the --body-file form removes exactly that surface. Overclaiming is the concern, more than the residual risk."
+  performance:
+    status: PASS
+    notes: "No hot path. One extra `gh repo view` per invocation under full; negligible against the mutation it precedes."
+  reliability:
+    status: FAIL
+    notes: "Two unterminated heredocs silently disable an issue close, an issue comment and a review comment. A missing mkdir loses an entire sync edit on a fresh clone. A deferred milestone/sub-issue record is unrunnable from the generated script. Each fails silently — the run reports success."
+  maintainability:
+    status: PASS
+    notes: "The CLI is well-reasoned and heavily commented with the rationale for each non-obvious choice. Five hard-coded roster counts were replaced by derivations, reducing the cost of the next kind addition. Four minor cleanups noted (unused params, duplicated block)."
+
+recommendations:
+  immediate:
+    - action: "Fix both indented heredoc terminators — these silently disable tracker calls"
+      refs: ["skills/finalise/SKILL.md", "skills/review-task/SKILL.md"]
+    - action: "Assign the repo slug in create-issue, or emit the URL from the CLI"
+      refs: ["skills/create-issue/SKILL.md"]
+    - action: "Resolve the slug locally under defer so recorded commands are runnable"
+      refs: ["shared/resources/tracker-issue.js"]
+    - action: "Add mkdir -p .claude/state to the three sync-github-* blocks"
+      refs: ["skills/sync-github-epic/SKILL.md", "skills/sync-github-story/SKILL.md", "skills/sync-github-task/SKILL.md"]
+  future:
+    - action: "Extract the credential/repo-root block shared verbatim by four CLIs"
+      refs: ["shared/resources/tracker-issue.js"]
+    - action: "Drop the unused `spec` and `args` parameters"
+      refs: ["shared/resources/tracker-issue.js"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "All three high-severity defects fixed and re-reviewed"

@@ -638,7 +638,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    Detect tracker platform using the canonical resolver — see `references/platform-detection.md`. Source the helper once per skill invocation:
 
    ```bash
-   source references/resolve-platform.sh
+   source references/resolve-platform.sh || exit 1
    # TRACKER = jira | github
    ```
    - When `TRACKER=jira` → **Jira path** (check for `jira_key:` in frontmatter)
@@ -2240,27 +2240,42 @@ User Can Now: Run `/develop` to begin implementation
 
    Read `jira_key` from story frontmatter. If absent, skip this step silently.
 
-   Use the `addCommentToJiraIssue` Atlassian MCP tool with:
-   - `issueIdOrKey`: `{jira_key from frontmatter}`
-   - `contentFormat`: `"markdown"`
-   - `comment`:
-     ```
-     ## Story Review Complete
+   Post the comment through the CLI:
 
-     **Recommendation**: {RECOMMENDATION}
-     **Readiness Score**: {SCORE}/10
+   ```bash
+   # Terminator at COLUMN 0 — a QUOTED heredoc needs an unindented terminator
+   # just as an unquoted one does; bash otherwise swallows the call below into
+   # the body. Body lines are unindented too: leading spaces are written
+   # verbatim, and the inconsistent 3/5-space mix here would have shown up as
+   # a stray indented block inside the posted comment.
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<'EOF'
+## Story Review Complete
 
-     | Severity | Count |
-     |---|---|
-     | Critical 🚨 | {CRITICAL} |
-     | Important ⚠️ | {IMPORTANT} |
-     | Optional 💡 | {OPTIONAL} |
+**Recommendation**: {RECOMMENDATION}
+**Readiness Score**: {SCORE}/10
 
-     **Review artifact**: `{REVIEW_FILE}`
-     {CHANGES_SECTION}
-     ```
+| Severity | Count |
+|---|---|
+| Critical 🚨 | {CRITICAL} |
+| Important ⚠️ | {IMPORTANT} |
+| Optional 💡 | {OPTIONAL} |
 
-   On success → confirm: "✅ Review summary posted to Jira issue {jira_key}."
+**Review artifact**: `{REVIEW_FILE}`
+{CHANGES_SECTION}
+EOF
+
+   node .agents/skills/review-story/references/tracker-comment.js \
+     --issue {jira_key from frontmatter} --body-file .claude/state/comment-body.md \
+     --stage review-story --json
+   ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
+
+   On `posted` → confirm: "✅ Review summary posted to Jira issue {jira_key}."
    On failure → log warning "⚠️ Jira comment failed — continuing", do NOT halt.
 
    ***
@@ -2275,7 +2290,8 @@ User Can Now: Run `/develop` to begin implementation
    BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
    OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
    REPO=$(gh repo view --json name -q '.name')
-   gh project item-add "$BOARD_NUM" --owner "$OWNER" \
+   source references/resolve-platform.sh || exit 1
+   tracker_write gh project item-add "$BOARD_NUM" --owner "$OWNER" \
      --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
    ```
 

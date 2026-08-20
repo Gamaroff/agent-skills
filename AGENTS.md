@@ -87,7 +87,7 @@ Canonical spec: [`docs/reference/tracker-workflow.md`](./docs/reference/tracker-
 
 Skills that interact with remote trackers or PRs use a resolver order to pick the platform — explicit config → env vars → git remote → default GitHub. Canonical spec: [`shared/resources/platform-detection.md`](./shared/resources/platform-detection.md).
 
-All leaf skills that branch on platform source `shared/resources/resolve-platform.sh` before the branch. `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
+All leaf skills that branch on platform source `shared/resources/resolve-platform.sh` before the branch, **guarded as `source … || exit 1`** — it validates the `tracker:`/`vcs:`/`access:` keys and returns non-zero on an unrecognised value, which a bare `source` would print and then ignore. It also sets `ACCESS_TRACKER`/`ACCESS_VCS` (how much access the agent has, resolved most-restrictive-wins across config and env — a separate axis from which platform). `package_skill.py` auto-bundles and rewrites this path into each skill's zip.
 
 ## File Naming
 
@@ -96,6 +96,12 @@ Canonical patterns: [`docs/standards/file-naming.md`](./docs/standards/file-nami
 ## Status Lifecycle
 
 Canonical spec: [`shared/resources/document-status-lifecycle.md`](./shared/resources/document-status-lifecycle.md). TL;DR: `draft → planned → ready-for-development → in-progress → ready-for-review → accepted`, with `cancelled` reachable from any non-terminal state. Frontmatter `status:` uses `lowercase-kebab-case`; body `**Status:**` uses `Title Case`. Update both in the same edit.
+
+## Tracker Comments
+
+Canonical spec: [`shared/resources/tracker-comment-contract.md`](./shared/resources/tracker-comment-contract.md). Engine: [`shared/resources/tracker-comment.js`](./shared/resources/tracker-comment.js) (peer of `jira-stage.js` / `gh-stage.js`, same exit codes and `--json` `reason` contract). TL;DR: a comment on a tracker **issue** is one CLI call — the engine resolves `TRACKER` itself, so a step doc never branches for a comment. Always `--body-file`, never an inline `--body`: bodies carry backticks, `$(…)` and newlines, and the file is also what carries the body into the deferred-mutation record's `command.stdin`. `--stage` is the comment's **identity**, not a board column — it builds the idempotency marker, and it is validated against a known list. Read `reason` and act on it; **never post over `unverifiable`**.
+
+**`addCommentToJiraIssue` is prohibited in shipped prose.** It is legal in exactly one place — the `no-credentials` fallback documented in the contract file — and `evals/shared/tests/transition-protocol-parity.test.mjs` enforces that as an absolute rule with a two-file allowlist, so do not restate the fallback at a call site. An earlier version of that guard allowed the call near the literal `no-credentials`, which every site's own reason table pre-satisfied; it passed on the exact regression it named. Keeping the procedure in one file is what makes the rule enforceable.
 
 ## Document Change Log
 

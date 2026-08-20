@@ -85,7 +85,11 @@ Before asking the user, check whether parameters were supplied:
 **`--exclude <path>`** (repeatable):
 
 - The caller may pass one or more `--exclude <path>` flags (e.g., `/create-pr --exclude path/to/report.md`)
-- When invoked by the `develop-story` or `develop-task` orchestrator, the implementation report path is passed so it is never staged in the auto-commit
+- Orchestrators use it for files that must stay out of *this* commit. Note that the develop pipelines
+  do **not** pass the implementation report here — Step 4 is where the report's first commit belongs,
+  so that reviewers can read the audit trail during QA and so that any document linking to it does not
+  acquire a dangling relative link. Steps 5–6 exclude the report's *updates* from each `fix(...)`
+  commit, which is a different thing: by then the file is tracked
 - Collect all values into an `EXCLUDE_PATHS` array
 - When invoking `/commit-changes` in Step 2 (uncommitted changes present): forward all values as repeated flags — `/commit-changes --exclude path1 --exclude path2 ...`
 - When there are NO uncommitted changes (commit-changes is not invoked): silently ignore all `--exclude` values and log `"--exclude received but no commit needed — ignored"`
@@ -103,7 +107,7 @@ Before asking the user, check whether parameters were supplied:
 Before interacting with any remote hosting service, detect the platform using the canonical resolver. See `references/platform-detection.md` for the full resolver spec.
 
 ```bash
-source references/resolve-platform.sh
+source references/resolve-platform.sh || exit 1
 # VCS = github | bitbucket; TRACKER = jira | github
 PLATFORM="$VCS"   # PLATFORM keeps backward compat with downstream branches
 
@@ -366,10 +370,20 @@ If `GITHUB_ISSUE` is set (from Step 0), post a comment linking the PR:
 
 ```bash
 if [ -n "$GITHUB_ISSUE" ]; then
-  gh issue comment "$GITHUB_ISSUE" --body "PR opened — #${PR_NUMBER}: ${PR_URL}" \
+  mkdir -p .claude/state
+  cat > .claude/state/comment-body.md <<EOF
+PR opened — #${PR_NUMBER}: ${PR_URL}
+EOF
+  node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
+    --body-file .claude/state/comment-body.md --stage in-review --json \
     || echo "⚠️  Issue comment failed — continuing"
 fi
 ```
+
+Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md).
+The `--stage` marker is what makes this idempotent across a resume — a bare
+`gh issue comment` posts an unmarked duplicate every time the pipeline re-enters
+Step 4.
 
 If `GITHUB_ISSUE` is not set, skip silently.
 
@@ -383,10 +397,27 @@ Bitbucket Issues are disabled for this project — do NOT use the Bitbucket Issu
    - Parse the current branch name for a story/task identifier (e.g. `feature/story.37.1.*` or `feature/task.40.*`)
    - Find the corresponding story/task document in the working directory
    - Read `jira_key` from its YAML frontmatter (e.g. `PROJ-12`)
-2. If `jira_key` is found, use the `addCommentToJiraIssue` Atlassian MCP tool with:
-   - `issueIdOrKey`: `{jira_key}`
-   - `contentFormat`: `"markdown"`
-   - `comment`: `"PR opened — [PR #{PR_ID}]({PR_URL})"`
+2. If `jira_key` is found, post the comment through the CLI:
+
+   ```bash
+   mkdir -p .claude/state
+   # Terminator at COLUMN 0 — an indented terminator does not close an
+   # unquoted heredoc; bash swallows everything after it into the body,
+   # so the call below would never run. Body lines are unindented for
+   # the same reason: leading spaces are written verbatim.
+   cat > .claude/state/comment-body.md <<EOF
+PR opened — [PR #{PR_ID}]({PR_URL})
+EOF
+
+   node .agents/skills/create-pr/references/tracker-comment.js \
+     --issue {jira_key} --body-file .claude/state/comment-body.md \
+     --stage in-review --json
+   ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
 3. If `jira_key` is not found or the comment fails, log warning and continue — do NOT halt.
 
 ---

@@ -242,18 +242,24 @@ Log the result in the QA Iteration History section:
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
 
 **Issues found**: {count, or 'none'}
 {top 3 issues from gate file top_issues list, or 'No issues — proceeding to finalise'}
-**Action**: {Proceeding to finalise / Running qa-fix (cycle {N} of 5)}"
+**Action**: {Proceeding to finalise / Running qa-fix (cycle {N} of 5)}
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage qa-cycle-{N} --json
 ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
@@ -291,7 +297,7 @@ After fixes are applied:
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
-1. **Exclude the implementation report from this commit** — Step 8 owns the sole report commit, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. Before invoking `/commit-changes`, unstage the report explicitly:
+1. **Exclude the implementation report's *updates* from this commit** — Step 8 owns the report's final state, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. The file itself is already tracked (Step 4 committed it), so this defers changes rather than withholding the file: no link to the report can dangle. Before invoking `/commit-changes`, unstage the report explicitly:
 
    ```bash
    # develop-story
@@ -312,7 +318,9 @@ After fixes are applied:
 
    `fix(task.{id}): qa-fix cycle {N} — {brief summary of fixes}`
 
-   Rationale: previously the report was simply "not needed" in qa-fix commits but nothing prevented inclusion. Decisions Log / QA Iteration History entries written during the cycle would silently land in `fix(...)` commits, splitting report history across the branch. Step 8 is the single owner of the report commit (`docs(...)`).
+   Rationale: previously the report was simply "not needed" in qa-fix commits but nothing prevented inclusion. Decisions Log / QA Iteration History entries written during the cycle would silently land in `fix(...)` commits, splitting report history across the branch. Step 8 is the single owner of the report's **final** commit (`docs(...)`).
+
+   > **Do not extend this to the report's first commit.** An earlier revision of this pipeline held the file out of *every* commit until Step 8, which left the audit trail absent from the branch throughout the QA loop and turned any document linking to the report into a dangling relative link — one that resolves locally, because the file is present but untracked, and fails only in CI. Step 4 commits the file for that reason; this step defers only its churn.
 
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
@@ -331,17 +339,20 @@ After fixes are applied:
 4a. **Post QA fix summary to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
 ```bash
-# GitHub
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "## 🔧 QA Fix Cycle {N} Applied — Step 6/8
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<'EOF'
+## 🔧 QA Fix Cycle {N} Applied — Step 6/8
 
 **Fixes applied**: {brief summary from qa-fix output}
-**Commit**: \`{hash}\`"
+**Commit**: `{hash}`
+EOF
 
-# Jira — call addCommentToJiraIssue:
-#   issueIdOrKey: {TRACKER_ISSUE}
-#   commentBody: same markdown body above
-#   contentFormat: "markdown"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage qa-fix-{N} --json
 ```
+
+Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fix cycle {N} comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 

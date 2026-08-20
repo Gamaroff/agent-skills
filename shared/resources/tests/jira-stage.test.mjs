@@ -103,7 +103,11 @@ test("every stage is unranked or ranked, and only the ladder positions are ranke
   // one cycle. `pr-merged` must stay in it because "after done" is not a rung the
   // built-in six-rung ladder has.
   const unranked = STAGE_NAMES.filter((s) => DEFAULT_STAGE_MAP[s].rank == null);
-  assert.deepEqual(unranked.sort(), ["blocked", "changes-requested", "pr-merged"]);
+  assert.deepEqual(unranked.sort(), [
+    "blocked",
+    "changes-requested",
+    "pr-merged",
+  ]);
 });
 
 test("STAGE_NAMES runs in pipeline order, which describeAlternatives depends on", () => {
@@ -1717,7 +1721,11 @@ test("parseArgs accepts the new flags and defaults them off", () => {
 // ── task.41: --init-workflow (incl. JSON-record conversion) and --check ──────
 
 const jcli = require(join(__dirname, "..", "jira-stage.js"));
-const { mkdirSync, readFileSync: readF, existsSync: existsF } = require("node:fs");
+const {
+  mkdirSync,
+  readFileSync: readF,
+  existsSync: existsF,
+} = require("node:fs");
 
 /** A repo with an existing jira.workflowRecord at its default path. */
 function withRecord(record, extra = {}) {
@@ -1727,7 +1735,8 @@ function withRecord(record, extra = {}) {
     join(dir, "docs", "development", "jira-workflow.json"),
     JSON.stringify(record, null, 2),
   );
-  for (const [name, body] of Object.entries(extra)) writeFileSync(join(dir, name), body);
+  for (const [name, body] of Object.entries(extra))
+    writeFileSync(join(dir, name), body);
   _tmpDirs.push(dir);
   return dir;
 }
@@ -1736,7 +1745,9 @@ const SAMPLE_RECORD = {
   version: 1,
   project: "PROJ",
   site: "example.atlassian.net",
-  statusesByIssueType: { Task: ["Backlog", "In Progress", "Code Review", "Done"] },
+  statusesByIssueType: {
+    Task: ["Backlog", "In Progress", "Code Review", "Done"],
+  },
   stages: {
     "work-started": { enabled: true, rank: 20, candidates: ["In Progress"] },
     "in-review": {
@@ -1756,8 +1767,15 @@ test("recordToLadder orders rungs by rank and preserves hand-authored reasons", 
 
   const line = (m) => pipeline.find((l) => l.includes(`${m}:`));
   // `enabled: false` becomes OMISSION — the YAML format's only way to say off.
-  assert.match(line("in-qa"), /^ {2}# in-qa:/, "a disabled stage must be commented out");
-  assert.ok(!/^ {2}# /.test(line("work-started")), "an enabled stage must be live");
+  assert.match(
+    line("in-qa"),
+    /^ {2}# in-qa:/,
+    "a disabled stage must be commented out",
+  );
+  assert.ok(
+    !/^ {2}# /.test(line("work-started")),
+    "an enabled stage must be live",
+  );
   // The reason is intent a board read cannot recover. buildWorkflowRecord treats
   // these as sacred across regenerations; dropping them here would undo that.
   assert.match(line("in-review"), /# we call it Code Review, not In Review/);
@@ -1782,7 +1800,11 @@ test("--init-workflow converts an existing JSON record, and the result round-tri
     argv: ["node", "jira-stage", "--check", "--offline"],
     repoRoot: root,
   });
-  assert.equal(check.exitCode, 0, "a file this CLI generated must pass its own --check");
+  assert.equal(
+    check.exitCode,
+    0,
+    "a file this CLI generated must pass its own --check",
+  );
 });
 
 test("--init-workflow refuses to overwrite; --force overwrites", async () => {
@@ -1806,7 +1828,10 @@ test("--init-workflow refuses to overwrite; --force overwrites", async () => {
     repoRoot: root,
   });
   assert.equal(forced.written, true);
-  assert.match(readF(join(root, "tracker-workflow.yaml"), "utf-8"), /work-started/);
+  assert.match(
+    readF(join(root, "tracker-workflow.yaml"), "utf-8"),
+    /work-started/,
+  );
 });
 
 test("--init-workflow --dry-run writes nothing", async () => {
@@ -1823,17 +1848,34 @@ test("--check exits NON-ZERO on a broken file, 0 on a clean one", async () => {
   const bad = withLadder(
     "statuses:\n  - Todo\n  - In Progress\n  - Todo\npipeline:\n  nope: Todo\n",
   );
-  const rBad = await jcli.run({ argv: ["node", "jira-stage", "--check", "--offline"], repoRoot: bad });
-  assert.equal(rBad.exitCode, 1, "the inverted contract — a broken file MUST fail");
+  const rBad = await jcli.run({
+    argv: ["node", "jira-stage", "--check", "--offline"],
+    repoRoot: bad,
+  });
+  assert.equal(
+    rBad.exitCode,
+    1,
+    "the inverted contract — a broken file MUST fail",
+  );
 
-  const good = withLadder("statuses:\n  - Todo\n  - Done\npipeline:\n  done: Done\n");
-  const rGood = await jcli.run({ argv: ["node", "jira-stage", "--check", "--offline"], repoRoot: good });
+  const good = withLadder(
+    "statuses:\n  - Todo\n  - Done\npipeline:\n  done: Done\n",
+  );
+  const rGood = await jcli.run({
+    argv: ["node", "jira-stage", "--check", "--offline"],
+    repoRoot: good,
+  });
   assert.equal(rGood.exitCode, 0);
 });
 
 test("--check exits 0 when there is no record to compare against", async () => {
-  const root = withLadder("statuses:\n  - Todo\n  - Done\npipeline:\n  done: Done\n");
-  const r = await jcli.run({ argv: ["node", "jira-stage", "--check"], repoRoot: root });
+  const root = withLadder(
+    "statuses:\n  - Todo\n  - Done\npipeline:\n  done: Done\n",
+  );
+  const r = await jcli.run({
+    argv: ["node", "jira-stage", "--check"],
+    repoRoot: root,
+  });
   assert.equal(r.exitCode, 0, "no record is a skip, not a failure");
   assert.equal(r.reason, "no-record");
 });
@@ -1843,7 +1885,10 @@ test("--check catches a status no issue type on the project has", async () => {
     "tracker-workflow.yaml":
       "statuses:\n  - Backlog\n  - Nonexistent Column\n  - Done\npipeline:\n  work-started: Nonexistent Column\n  done: Done\n",
   });
-  const r = await jcli.run({ argv: ["node", "jira-stage", "--check"], repoRoot: root });
+  const r = await jcli.run({
+    argv: ["node", "jira-stage", "--check"],
+    repoRoot: root,
+  });
   assert.equal(r.exitCode, 1);
   assert.equal(r.reason, "drift");
   assert.ok(r.drift.some((d) => d.moment === "work-started"));
@@ -1884,8 +1929,16 @@ test("a landed status is reported as the status, never as the transition name", 
   });
   assert.equal(res.transitioned, true);
   assert.equal(res.to, "In Progress", "must report the destination STATUS");
-  assert.equal(res.via, "Start Progress", "must also report the transition fired");
-  assert.notEqual(res.to, "Start Progress", "the verb must never be the status");
+  assert.equal(
+    res.via,
+    "Start Progress",
+    "must also report the transition fired",
+  );
+  assert.notEqual(
+    res.to,
+    "Start Progress",
+    "the verb must never be the status",
+  );
 });
 
 test("a transition payload with no `to` reports the status as unknown, not as the verb", async () => {
@@ -1907,7 +1960,11 @@ test("a transition payload with no `to` reports the status as unknown, not as th
   });
   assert.equal(res.transitioned, true, "the card did move");
   assert.equal(res.to, null, "an unknown destination is null, not a guess");
-  assert.equal(res.via, "Start Progress", "the transition fired is still known");
+  assert.equal(
+    res.via,
+    "Start Progress",
+    "the transition fired is still known",
+  );
 });
 
 test("matching on the transition name still reports the real destination when Jira gives one", async () => {

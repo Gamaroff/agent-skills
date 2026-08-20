@@ -31,6 +31,9 @@ docs/tasks/task.{N}.{name}/
 ├── task.{N}.qa.{n}.{name}.md                   # ← Step 5, one per QA cycle
 ├── task.{N}.gate.{n}.{name}.yml                # ← Step 5, one per QA cycle
 ├── task.{N}.dod.{n}.{name}.md                  # ← Step 7
+├── task.{N}.handover.{n}.{name}.md             # ← run end, only when a mutation was deferred
+├── task.{N}.handover.{n}.{name}.sh             # ← the same records, as a runnable script
+├── task.{N}.handover.{n}.{name}.json           # ← the same records, for task.57's reconcile
 └── .summaries/                                 # ← runtime only, gitignored
 ```
 
@@ -49,11 +52,12 @@ The two pipelines are the same shape. Read `story.{E}.{S}` and `task.{N}` as int
 | 5 | `qa-story` / `qa-task` | **QA report** `*.qa.{n}.{name}.md` **and gate file** `*.gate.{n}.{name}.yml` — one pair per cycle | Yes — Step 8 |
 | 6 | `qa-fix` | Fix commits pushed to the branch (no new document) | Yes — immediately |
 | 7 | `finalise` | **DoD summary** `*.dod.{n}.{name}.md`, a PR comment, a tracker-issue comment, a board move, and `status: accepted` on the work item | Yes — Step 8 |
+| Run end | `handover-render` | **Tracker handover** `*.handover.{n}.{name}.{md,sh,json}` — written only when the run deferred (or failed) a tracker mutation; an empty journal writes nothing | Yes — Step 8 |
 | 8 | `commit-changes` | The commit containing everything above marked "Yes" | — |
 
 Steps 5–6 loop up to 5 cycles. Cycle *n* produces `qa.{n}` **and** `gate.{n}` as a pair — a gate file without its report (or vice versa) means the cycle did not finish, and resume will redo it.
 
-## The seven documents, in plain terms
+## The eight documents, in plain terms
 
 | Document | What it is | Who may edit it |
 | --- | --- | --- |
@@ -64,6 +68,7 @@ Steps 5–6 loop up to 5 cycles. Cycle *n* produces `qa.{n}` **and** `gate.{n}` 
 | **QA report** | The full quality review for one cycle: NFR assessment, requirements traceability, findings. | `qa-*` skills |
 | **Gate file** (`.yml`) | The machine-readable verdict for that cycle — `PASS` / `CONCERNS` / `FAIL` / `WAIVED`. Small on purpose: it is what tooling greps. | **`qa-*` skills only.** Dev skills must never write a gate file — see [Anti-patterns](./anti-patterns.md) |
 | **DoD summary** | The Definition of Done checklist as evaluated at the end, and the thing posted to the PR. Its existence is what lets `status:` advance to `accepted`. | `finalise` |
+| **Tracker handover** (`.md` / `.sh` / `.json`) | What the run wanted to change on the tracker but could not — because `access.tracker` restricts it, or because the call failed. Three renderings of one journal: a checklist to click through, a dry-run-by-default script to run, and a JSON sidecar for reconcile. Contains no credential by construction. Absent when nothing was deferred. | `handover-render`, from records written by `defer-mutation` |
 
 Numbering (`{n}`) restarts per work item and increments per run or per cycle: a second pipeline run on the same story writes `implementation.2.…`, a second QA cycle writes `qa.2.…` + `gate.2.…`.
 

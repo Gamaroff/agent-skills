@@ -538,7 +538,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
    **Detection**: source the canonical resolver once per skill invocation, then branch on `TRACKER` — see `references/platform-detection.md`:
    ```bash
-   source references/resolve-platform.sh
+   source references/resolve-platform.sh || exit 1
    # TRACKER = jira | github
    ```
    When `TRACKER=jira` → Jira path; when `TRACKER=github` → GitHub path.
@@ -1643,33 +1643,47 @@ fi
 
 1. Read `jira_key` from task frontmatter (already loaded in Step 1). If absent or `null`, skip this step silently.
 
-2. Post comment via Jira REST API:
+2. Post the comment through the CLI:
 
    ```bash
-   JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
-   TASK_KEY="{jira_key from frontmatter}"
+   # Terminator at COLUMN 0 — an indented terminator does not close an unquoted
+   # heredoc, and bash would swallow the invocation below into the comment body.
+   # Body lines are unindented for the same reason: leading spaces would be
+   # written into the comment verbatim.
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+## Task Review Complete
 
-   curl -s -X POST \
-     "${JIRA_URL}/rest/api/2/issue/${TASK_KEY}/comment" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Basic ${JIRA_AUTH}" \
-     -d "$(jq -n \
-       --arg body "## Task Review Complete
+**Recommendation**: ${RECOMMENDATION}
+**Readiness Score**: ${SCORE}/10
 
-   **Recommendation**: ${RECOMMENDATION}
-   **Readiness Score**: ${SCORE}/10
+| Severity | Count |
+|---|---|
+| Critical 🚨 | ${CRITICAL} |
+| Important ⚠️ | ${IMPORTANT} |
+| Optional 💡 | ${OPTIONAL} |
 
-   | Severity | Count |
-   |---|---|
-   | Critical 🚨 | ${CRITICAL} |
-   | Important ⚠️ | ${IMPORTANT} |
-   | Optional 💡 | ${OPTIONAL} |
+**Review artifact**: \`${REVIEW_FILE}\`
+${CHANGES_SECTION}
+EOF
 
-   **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}" \
-       '{"body": $body}'
-     )" || echo "⚠️ Jira comment failed — continuing"
+   node .agents/skills/review-task/references/tracker-comment.js \
+     --issue "{jira_key from frontmatter}" --body-file .claude/state/comment-body.md \
+     --stage review-task --json
    ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
+
+   > **This site used to be a raw `curl` against REST v2** with a plain-string
+   > body — the only comment site in the repository that did, and invisible to
+   > both interception layers because it went through neither `http()` nor `gh`.
+   > It now renders as **v3 ADF** like every other comment, so the rendered
+   > result differs: headings and tables become real ADF nodes instead of raw
+   > markdown characters. That is the improvement, and it is why this was a
+   > behaviour change rather than a mechanical swap.
 
 3. On success → confirm: "✅ Review summary posted to Jira issue ${TASK_KEY}."
 4. On failure → report error but do NOT halt.
@@ -1688,7 +1702,8 @@ fi
    BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
    OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
    REPO=$(gh repo view --json name -q '.name')
-   gh project item-add "$BOARD_NUM" --owner "$OWNER" \
+   source references/resolve-platform.sh || exit 1
+   tracker_write gh project item-add "$BOARD_NUM" --owner "$OWNER" \
      --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
    ```
 
@@ -1699,23 +1714,38 @@ fi
    ```bash
    GITHUB_ISSUE={github_issue from frontmatter}
 
-   gh issue comment "$GITHUB_ISSUE" --body "## Task Review Complete
+   # The heredoc terminator sits at COLUMN 0 even though this block is indented
+   # inside a numbered list — an indented terminator does not close an unquoted
+   # heredoc, and bash would swallow the invocation below into the body.
+   # The body lines are unindented for the same reason: leading spaces would be
+   # written into the comment verbatim.
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+## Task Review Complete
 
-   **Recommendation**: ${RECOMMENDATION}
-   **Readiness Score**: ${SCORE}/10
+**Recommendation**: ${RECOMMENDATION}
+**Readiness Score**: ${SCORE}/10
 
-   | Severity | Count |
-   |----------|-------|
-   | Critical 🚨 | ${CRITICAL} |
-   | Important ⚠️ | ${IMPORTANT} |
-   | Optional 💡 | ${OPTIONAL} |
+| Severity | Count |
+|----------|-------|
+| Critical 🚨 | ${CRITICAL} |
+| Important ⚠️ | ${IMPORTANT} |
+| Optional 💡 | ${OPTIONAL} |
 
-   **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}" \
+**Review artifact**: \`${REVIEW_FILE}\`
+${CHANGES_SECTION}
+EOF
+
+   node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
+     --body-file .claude/state/comment-body.md --stage review-task --json \
      || echo "⚠️  GitHub issue comment failed — continuing"
    ```
 
-4. **Verify**: If `gh issue comment` exits 0, confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}." If it fails, report the error but do NOT halt the skill.
+   This is the same call the Jira path above makes — `tracker-comment.js` resolves
+   `TRACKER` itself, so the two branches differ only in the issue identifier.
+   Always `--body-file`: the body carries backticks and newlines.
+
+4. **Verify**: read `reason` from the JSON and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). On `posted`, confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}." If it fails, report the error but do NOT halt the skill.
 
 **Output** (GitHub path): GitHub issue updated with review outcome comment and added to the project board (if `github_issue` present in frontmatter).
 

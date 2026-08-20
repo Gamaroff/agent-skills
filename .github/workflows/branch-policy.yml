@@ -1,0 +1,85 @@
+name: Branch Policy
+
+# `main` only receives release-ready code (docs/contributing/releases.md).
+# scripts/release.sh enforces that at the release end — it refuses to run
+# anywhere but `main` — but nothing stopped a feature PR from targeting `main`
+# in the first place. Six did on 2026-08-14..17, which is what put `main` ahead
+# of `develop` and broke the promotion direction the release script assumes.
+#
+# This is the missing half: reject a PR into `main` from anything other than a
+# branch that is allowed to land there.
+#
+# Metadata only — no checkout, no dependencies, runs in seconds.
+
+on:
+  pull_request:
+    # ⚠️ NO `branches:` FILTER — deliberately, and this is the whole point.
+    #
+    # `branches: [main]` was here, and it made this guard UNCLEARABLE. The filter is
+    # evaluated against the PR's CURRENT base, so:
+    #
+    #   1. PR opened against `main` from a feature branch  -> filter matches -> job runs -> FAILS.
+    #   2. Author does the right thing: `gh pr edit --base develop`.
+    #   3. `edited` fires, but the filter now sees base=`develop` -> NO MATCH -> nothing runs.
+    #   4. The failure from step 1 is never superseded. It sits on the PR forever.
+    #
+    # The `edited` type was added to catch a `develop -> main` retarget, and it does. But the
+    # filter defeats it in the REVERSE direction — the one that has to clear a red check. The
+    # result is a correctly-routed PR wearing a permanent ✗: `gh pr merge` prompts on UNSTABLE,
+    # automation stalls, and merging needs `--admin`. Hit live on PR #256 (2026-08-19).
+    #
+    # So the base-branch decision moved OUT of the trigger and INTO the job, where a
+    # non-`main` base reports an explicit PASS that supersedes the earlier failure.
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  base-branch:
+    name: PR into main comes from an allowed branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check head branch
+        env:
+          # Via env rather than inline `${{ }}` interpolation — a branch name is
+          # attacker-controlled on a fork PR, and interpolating it directly into
+          # the shell would be a script-injection hole. Same reasoning for BASE_REF.
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          # Not-applicable is an explicit PASS, never a skip. A skipped job reports
+          # `skipped`, and if this guard is ever made a REQUIRED check, a skip is a
+          # status that may never report — the "Expected — waiting for status" trap that
+          # makes a PR permanently unmergeable. An always-reporting green costs seconds
+          # (metadata only, no checkout) and cannot hang.
+          if [ "$BASE_REF" != "main" ]; then
+            echo "✓ base is '$BASE_REF', not 'main' — this policy does not apply."
+            exit 0
+          fi
+
+          case "$HEAD_REF" in
+            # The release promotion path (docs/contributing/releases.md).
+            develop) ;;
+            # Cut from `main`, lands on `main` — see the create-branch skill's
+            # branch-type table, and releases.md on reconciling one afterwards.
+            hotfix/*) ;;
+            # Standard Gitflow: a release branch closes into `main`.
+            release/*) ;;
+            *)
+              echo "::error::PR into 'main' from '$HEAD_REF' — not an allowed source branch."
+              echo ""
+              echo "This repo uses 'develop' as the integration branch. 'main' only receives"
+              echo "release-ready code, and scripts/release.sh depends on that direction:"
+              echo "it promotes develop -> main, never the reverse."
+              echo ""
+              echo "Allowed into 'main': develop, hotfix/*, release/*"
+              echo ""
+              echo "Feature and task work belongs on 'develop'. Retarget this PR:"
+              echo "  gh pr edit <number> --base develop"
+              echo ""
+              echo "See docs/contributing/releases.md ('Branch flow')."
+              exit 1
+              ;;
+          esac
+          echo "✓ '$HEAD_REF' may target 'main'."

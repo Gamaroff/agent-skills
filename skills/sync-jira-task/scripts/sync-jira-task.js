@@ -466,6 +466,12 @@ async function run({
     }
     const http = lib.makeHttp({
       fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+      // Anchored to the repo root. Without it layer 1 resolves the config tier
+      // against process.cwd(), so a bare `node .../sync-jira-*.js --file docs/...`
+      // run from a subdirectory reads no config and writes at `full` over a
+      // committed restriction. These are the documented bare invocations the
+      // whole task is about (T61-M3, missed in the first sweep).
+      cwd: lib.getRepoRoot() || process.cwd(),
     });
     await lib.probeWorkflow({
       http,
@@ -579,6 +585,12 @@ async function run({
 
   const http = lib.makeHttp({
     fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
+    // Anchored to the repo root. Without it layer 1 resolves the config tier
+    // against process.cwd(), so a bare `node .../sync-jira-*.js --file docs/...`
+    // run from a subdirectory reads no config and writes at `full` over a
+    // committed restriction. These are the documented bare invocations the
+    // whole task is about (T61-M3, missed in the first sweep).
+    cwd: lib.getRepoRoot() || process.cwd(),
   });
   const livePriorities =
     auth.ok && !args.dryRun
@@ -633,6 +645,13 @@ async function run({
   let result,
     changeSummary,
     current = null;
+  // CR-3 — TWO variables, deliberately. `deferred` is the fact ("we were not
+  // allowed to write"); `deferredRecord` is only how to find the record. A
+  // journal write can fail — recordRefusal warns and returns a null id — and
+  // gating on the id meant the one path that recorded NOTHING was also the one
+  // that wrote the Change Log row and reported success.
+  let deferred = false;
+  let deferredRecord = null;
 
   if (isUpdate) {
     if (!args.dryRun) {
@@ -704,6 +723,7 @@ async function run({
       let putResp;
       try {
         putResp = await lib.putIssueAtomic({
+          skill: "sync-jira-task",
           http,
           baseUrl: auth.baseUrl,
           email: auth.email,
@@ -737,6 +757,7 @@ async function run({
         }
         if (!retry) throw e;
         putResp = await lib.putIssueAtomic({
+          skill: "sync-jira-task",
           http,
           baseUrl: auth.baseUrl,
           email: auth.email,
@@ -745,24 +766,40 @@ async function run({
           fields: stripped,
         });
       }
-      const { updated } = putResp;
-      const finalUpdated =
-        updated ||
-        (await lib.fetchUpdatedTimestampStrict({
-          http,
-          baseUrl: auth.baseUrl,
-          email: auth.email,
-          token: auth.token,
+      // The deferred UPDATE shape — real key, null timestamp. Reaching for the
+      // real `updated` here would tell the next run the issue was touched.
+      if (putResp.deferred) {
+        deferred = true;
+        deferredRecord = putResp.record;
+        result = {
           issueKey: existingJiraKey,
-        }));
-      result = {
-        issueKey: existingJiraKey,
-        issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
-        updated: finalUpdated,
-      };
-      output.info(`\n✅ Task updated: ${existingJiraKey}`);
-      output.info(`   URL: ${result.issueUrl}`);
-      output.info(`   Changes: ${changeSummary}`);
+          issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+          updated: null,
+        };
+        output.info(
+          `\n⏸️  Task update deferred — access.tracker restricts this run. Recorded as ${deferredRecord}.`,
+        );
+        output.info(`   Changes: ${changeSummary}`);
+      } else {
+        const { updated } = putResp;
+        const finalUpdated =
+          updated ||
+          (await lib.fetchUpdatedTimestampStrict({
+            http,
+            baseUrl: auth.baseUrl,
+            email: auth.email,
+            token: auth.token,
+            issueKey: existingJiraKey,
+          }));
+        result = {
+          issueKey: existingJiraKey,
+          issueUrl: `${auth.baseUrl}/browse/${existingJiraKey}`,
+          updated: finalUpdated,
+        };
+        output.info(`\n✅ Task updated: ${existingJiraKey}`);
+        output.info(`   URL: ${result.issueUrl}`);
+        output.info(`   Changes: ${changeSummary}`);
+      }
     }
   } else {
     changeSummary = "Initial Jira task created";
@@ -813,66 +850,94 @@ async function run({
           method: "POST",
           headers: postHeaders,
           body: JSON.stringify({ fields: f }),
+          // Layer 2 — the create screen a human would fill in, not the body.
+          // The 400-retries below are unreachable on a deferral (the gate
+          // answers `ok`), so one logical create writes one record.
+          defer: {
+            kind: "jira.issue.create",
+            intent: `Create the Jira task "${f.summary || "(no summary)"}" in ${auth.project || "the project"}`,
+            target: {
+              name: f.summary || "(no summary)",
+              url: `${auth.baseUrl}/rest/api/3/issue`,
+              ui_url: `${auth.baseUrl}/secure/CreateIssue!default.jspa`,
+            },
+            desired: lib.summariseFields(f),
+            skill: "sync-jira-task",
+          },
         });
       let resp = await postCreate(fields);
-      if (!resp.ok && resp.status === 400) {
-        // Strip whichever optional field Jira rejected and retry. `current`
-        // carries forward so both strips can compound on the same payload.
-        let current = fields;
-        let errText = await lib.parseJiraError(resp);
-        if (current.timetracking && TIMETRACKING_ERROR_RE.test(errText)) {
-          output.warn(
-            `⚠️  Jira rejected timetracking field — retrying create without estimate.`,
-          );
-          current = { ...current };
-          delete current.timetracking;
-          resp = await postCreate(current);
-          if (!resp.ok) errText = await lib.parseJiraError(resp);
-        }
-        if (
-          !resp.ok &&
-          DEV_ESTIMATE_FIELD &&
-          current[DEV_ESTIMATE_FIELD] !== undefined &&
-          errText.includes(DEV_ESTIMATE_FIELD)
-        ) {
-          output.warn(
-            `⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} — retrying create without the dev-estimate field.`,
-          );
-          current = { ...current };
-          delete current[DEV_ESTIMATE_FIELD];
-          resp = await postCreate(current);
-          if (!resp.ok) errText = await lib.parseJiraError(resp);
-        }
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${errText}`);
-      }
-      if (!resp.ok)
-        throw new Error(
-          `HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`,
+      if (resp.deferred) {
+        // The create null shape — identical to --dry-run. NEVER a placeholder
+        // key: one would break the idempotent synced-from-* label search and
+        // the next run would create a duplicate.
+        deferred = true;
+        deferredRecord = resp.deferredRecord;
+        result = { issueKey: null, issueUrl: null, updated: null };
+        output.info(
+          `\n⏸️  Task create deferred — access.tracker restricts this run. Recorded as ${deferredRecord}.`,
         );
-      const created = await resp.json();
-      const issueKey = created.key;
-      const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
-      const updated = await lib.fetchUpdatedTimestampStrict({
-        http,
-        baseUrl: auth.baseUrl,
-        email: auth.email,
-        token: auth.token,
-        issueKey,
-      });
-      result = { issueKey, issueUrl, updated };
-      output.info(`\n✅ Task created: ${issueKey}`);
-      output.info(`   URL: ${issueUrl}`);
-      output.info(`   Standalone (no parent epic)`);
+        output.info(`   Summary: ${summary}`);
+      } else {
+        if (!resp.ok && resp.status === 400) {
+          // Strip whichever optional field Jira rejected and retry. `current`
+          // carries forward so both strips can compound on the same payload.
+          let current = fields;
+          let errText = await lib.parseJiraError(resp);
+          if (current.timetracking && TIMETRACKING_ERROR_RE.test(errText)) {
+            output.warn(
+              `⚠️  Jira rejected timetracking field — retrying create without estimate.`,
+            );
+            current = { ...current };
+            delete current.timetracking;
+            resp = await postCreate(current);
+            if (!resp.ok) errText = await lib.parseJiraError(resp);
+          }
+          if (
+            !resp.ok &&
+            DEV_ESTIMATE_FIELD &&
+            current[DEV_ESTIMATE_FIELD] !== undefined &&
+            errText.includes(DEV_ESTIMATE_FIELD)
+          ) {
+            output.warn(
+              `⚠️  Jira rejected ${DEV_ESTIMATE_FIELD} — retrying create without the dev-estimate field.`,
+            );
+            current = { ...current };
+            delete current[DEV_ESTIMATE_FIELD];
+            resp = await postCreate(current);
+            if (!resp.ok) errText = await lib.parseJiraError(resp);
+          }
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${errText}`);
+        }
+        if (!resp.ok)
+          throw new Error(
+            `HTTP ${resp.status}: ${await lib.parseJiraError(resp)}`,
+          );
+        const created = await resp.json();
+        const issueKey = created.key;
+        const issueUrl = `${auth.baseUrl}/browse/${issueKey}`;
+        const updated = await lib.fetchUpdatedTimestampStrict({
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          issueKey,
+        });
+        result = { issueKey, issueUrl, updated };
+        output.info(`\n✅ Task created: ${issueKey}`);
+        output.info(`   URL: ${issueUrl}`);
+        output.info(`   Standalone (no parent epic)`);
 
-      await lib.moveToBacklog({
-        http,
-        baseUrl: auth.baseUrl,
-        email: auth.email,
-        token: auth.token,
-        boardId: auth.boardId,
-        issueKey,
-        output,
-      });
+        await lib.moveToBacklog({
+          skill: "sync-jira-task",
+          http,
+          baseUrl: auth.baseUrl,
+          email: auth.email,
+          token: auth.token,
+          boardId: auth.boardId,
+          issueKey,
+          output,
+        });
+      }
     }
   }
 
@@ -880,6 +945,7 @@ async function run({
   let statusOutcome = null;
   if (result?.issueKey && !args.dryRun && frontmatter.status) {
     statusOutcome = await lib.syncDocumentStatus({
+      skill: "sync-jira-task",
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,
@@ -892,8 +958,9 @@ async function run({
     });
   }
 
-  // Write-back
-  if (result?.issueKey && !args.dryRun) {
+  // Write-back. A deferred update changed nothing in Jira, so recording a
+  // Change Log row saying it did is the drift this gate exists to prevent.
+  if (result?.issueKey && !args.dryRun && !deferred) {
     updateTaskFile({
       filePath,
       issueKey: result.issueKey,
@@ -925,6 +992,13 @@ async function run({
       jira_last_synced_at: result?.updated || null,
       jira_last_body_hash: newBodyHash,
       jira_last_meta_hash: newMetaHash,
+      // CYCLE-2 CR-3 — THREE deferral sources, not two. The create and the PUT
+      // set the flag directly; a refused status transition is the third, and on
+      // the no-field-changes path it is the ONLY one, so keying `reason` off the
+      // flag alone reported `null` for a run that refused and recorded a write.
+      reason:
+        deferred || statusOutcome?.reason === "deferred" ? "deferred" : null,
+      record: deferredRecord || statusOutcome?.record || null,
     });
   }
 

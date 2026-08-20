@@ -185,6 +185,44 @@ select_platform() {
 
   ok "Selected: $VCS + $TRACKER"
   record_step "Platform" "ok" "$VCS + $TRACKER"
+
+  select_access
+}
+
+# ── 2b. tracker access level ─────────────────────────────────────────────────
+# How much the locally running agent may do to the tracker. Separate from which
+# tracker it is: a restricted run still needs the identity to emit the right
+# URLs and field names. Defaults to `full`, and the block is written only when
+# the answer is something else, so an existing generated config is unchanged.
+select_access() {
+  heading "Tracker access"
+  echo "  How much access does the agent have to $TRACKER?"
+  echo ""
+  echo "  1) Full — the agent has write credentials and updates the tracker itself (default)"
+  echo "  2) Read-only — the agent may read the tracker but not write to it"
+  echo "  3) Approve — credentials present; writes are still handed over today (ask prompt is not shipped)"
+  echo "  4) Command — the agent prints the commands; you run them"
+  echo "  5) Manual — the agent prints instructions; you click through them"
+  echo ""
+  echo "  This is not Skip — docs only (a later per-run prompt on /create-*). Skip means no tracker."
+  echo "  If you have a board but the agent must not hold a write token, pick 4 or 5."
+  echo "  See docs/concepts/restricted-access.md and docs/concepts/which-access.md."
+  echo ""
+  ask "Choice [1-5] (default: 1):"
+  read -r _achoice
+  _achoice=${_achoice:-1}
+
+  case "$_achoice" in
+    1) ACCESS_TRACKER=full ;;
+    2) ACCESS_TRACKER=read-only ;;
+    3) ACCESS_TRACKER=approve ;;
+    4) ACCESS_TRACKER=command ;;
+    5) ACCESS_TRACKER=manual ;;
+    *) err "Invalid choice: $_achoice"; exit 1 ;;
+  esac
+
+  ok "Tracker access: $ACCESS_TRACKER"
+  record_step "Tracker access" "ok" "$ACCESS_TRACKER"
 }
 
 # ── 3. credentials ───────────────────────────────────────────────────────────
@@ -421,6 +459,13 @@ write_skills_config() {
   PRD_DIR="$_prd_loc"
   ARCH_DIR="$_arch_loc"
 
+  # Written only when the answer is not `full`, so a config generated before this
+  # prompt existed stays byte-identical. Absent means `full`.
+  local access_block=""
+  if [[ -n "${ACCESS_TRACKER:-}" && "${ACCESS_TRACKER}" != "full" ]]; then
+    access_block=$'\n# How much access the agent has to each system. Absent means `full`.\n# Values: full | read-only | approve | command | manual. An unrecognised value\n# halts the run rather than falling through to a default.\n# Env override AGENT_SKILLS_ACCESS_TRACKER is combined most-restrictive-wins,\n# so it can lock a run down further but never loosen this setting.\naccess:\n  tracker: '"${ACCESS_TRACKER}"$'\n'
+  fi
+
   local tracker_block=""
   if [[ "$TRACKER" == "jira" ]]; then
     tracker_block=$'\ntracker: jira\n\njira:\n  # devEstimateField: customfield_10594  # optional — Jira numeric custom field id for estimated dev hours\n  # defaultAssignee: 712020:00000000-0000-0000-0000-000000000000  # optional — Jira accountId every card is assigned to. Frontmatter assignee overrides. Unset = leave Jira alone.\n  #\n  # statusMap — local document status -> your Jira workflow status name(s).\n  # MOST PROJECTS NEED NONE. The built-in candidate lists already cover the\n  # common vocabularies (In Review / Code Review / Waiting for Review / ...).\n  # An override REPLACES the candidate list for that status, so adding one\n  # NARROWS matching. Run --probe-workflow first and add only the statuses it\n  # shows being skipped — as ordered lists, not single names:\n  #\n  # statusMap:\n  #   ready-for-review: [Waiting for Review, In Review]'
@@ -445,7 +490,7 @@ devLoadAlwaysFiles:
   - ${_cs_path}
   - ${_arch_loc}/concepts/tech-stack.md
   - ${_arch_loc}/concepts/source-tree.md
-${tracker_block}"
+${access_block}${tracker_block}"
 
   write_file "skills-config.yaml" "$config"
   ok "skills-config.yaml"
@@ -1020,6 +1065,15 @@ print_summary() {
     echo "  2. Restart Claude Code in this project directory"
     echo "  3. Run /create-task to verify skill loading"
     echo "  4. See docs/concepts/quickstart-task.md for a 10-minute walkthrough"
+    if [[ "${ACCESS_TRACKER:-full}" != "full" ]]; then
+      echo ""
+      echo -e "${BOLD}Tracker access is ${ACCESS_TRACKER}:${NC}"
+      echo "  Pipeline runs still complete. Tracker writes are recorded, not performed."
+      echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
+      echo "  /tracker-reconcile is not shipped yet (task.57) — re-check the board by hand."
+      echo "  Limits: enforcement is partial; /develop-next still needs VCS write."
+      echo "  Guide: docs/concepts/restricted-access.md"
+    fi
   fi
   echo ""
   echo -e "${BOLD}Something not working?${NC}  See docs/reference/troubleshooting.md"

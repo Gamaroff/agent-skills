@@ -31,6 +31,7 @@ Each area of the docs has its own index page with full contents and intro:
   - [Parallel Stories](./runbooks/create-parallel-stories.md)
   - [Change Management](./runbooks/change-management.md)
   - [Document Existing Project](./runbooks/document-existing-project.md)
+  - [Restricted Access](./runbooks/restricted-access.md)
 - **Reference** — look up specific behaviour
   - [Invocation](./reference/invocation.md) — natural language, explicit, slash commands
   - [Activation phrases](./reference/activation-phrases.md) — natural-language phrases that trigger each skill
@@ -58,6 +59,8 @@ Each area of the docs has its own index page with full contents and intro:
 - [Getting started](./concepts/getting-started.md) — install → first command
 - [Overview](./concepts/overview.md) — what skills are, progressive disclosure, key principles
 - [Architecture](./concepts/architecture.md) — system view, dependency map, design principles
+- [Restricted tracker access](./concepts/restricted-access.md) — when the agent must not write to the tracker
+- [Which access model?](./concepts/which-access.md) — full / read-only / approve / command / manual
 
 ## I'm authoring a skill in this repo
 

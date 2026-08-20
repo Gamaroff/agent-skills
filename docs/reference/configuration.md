@@ -36,6 +36,21 @@ vcs: bitbucket # optional override — see Platform Detection
 tracker:
   workflowFile: tracker-workflow.yaml # optional — path to the status ladder
 
+# How much access the agent has to each system. Optional; omit it entirely and
+# everything behaves exactly as before. Identity (which tracker) and access (how
+# much it may do) are separate axes — a restricted run still needs to know it is
+# Jira to emit the right URLs and field names.
+#   full      — today's behaviour (default when the key or block is absent)
+#   read-only — agent may read the tracker, not write to it
+#   approve   — agent holds credentials but must ask before each mutation
+#   command   — agent emits commands; a human runs them
+#   manual    — agent emits UI instructions; a human performs them
+# Unlike every other key here, an unrecognised value HALTS the run rather than
+# falling through to a default. Only `full` is supported for `vcs` today.
+access:
+  tracker: full
+  vcs: full
+
 prd:
   prdShardedLocation: docs/prd # root for PRD shard tree
 
@@ -118,8 +133,10 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 
 | Key                                              | Type                            | Default                                          | What it controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------------------------------------ | ------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tracker`                                        | `jira` \| `github`              | (auto-detected)                                  | Issue tracker override. See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                                                                                                                                            |
-| `vcs`                                            | `github` \| `bitbucket`         | (auto-detected from git remote)                  | VCS override. See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `tracker`                                        | `jira` \| `github` \| `auto`, **or** a map | (auto-detected)                       | Issue tracker override. Two forms, graded differently. As a **scalar** it is a platform override, validated against `jira` / `github` / `auto` — anything else halts the run (`tracker: bitbucket` is rejected; it is legal for `vcs`, not here). As a **map** it is the `tracker.workflowFile` form below, which is not a platform override and resolves as if `auto`. See [Platform Detection](../../shared/resources/platform-detection.md)                                              |
+| `vcs`                                            | `github` \| `bitbucket` \| `auto` | (auto-detected from git remote)                | VCS override. Validated against `github` / `bitbucket` / `auto` — anything else halts the run (`vcs: jira` is rejected; legal sets are per key). See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                    |
+| `access.tracker`                                 | `full` \| `read-only` \| `approve` \| `command` \| `manual` | `full`                | How much access the agent has to the tracker — a separate axis from `tracker`, which says only *which* tracker. Also settable via `AGENT_SKILLS_ACCESS_TRACKER`; config and env are read independently and the **more restrictive** wins, so an env var can lock a run down but never escalate it. An unrecognised value halts. On a host without `pyyaml` the no-dependency reader accepts a documented subset of YAML and **refuses** anything outside it rather than reading it as unset — so a merge key, an anchor or a quoted key now halts with the line, the construct and two ways forward, where it used to resolve silently to `full`. See [Platform Detection](../../shared/resources/platform-detection.md) → *Tier 2 — the strict subset*. **Since task.61 the JavaScript gates read this key too.** Previously only a shell that sourced `resolve-platform.sh` saw it, so the documented bare `node …` invocations of the sync, sprint and epic-creator scripts resolved to `full` and a committed restriction was inert. They now resolve the same three tiers by asking the same reader, so there is one answer rather than two implementations of one. A config that cannot be read correctly resolves to `manual` and prints one line naming the file and the reason — it never throws, so the read-only CLI modes (`--check`, `--print-plan`, `--probe-board`, `--probe-workflow`) keep working. Under any value but `full`, every Jira REST mutation is refused and appended to `.claude/state/tracker-actions.jsonl` instead of being sent; the affected CLIs report `reason: "deferred"` with the record id in their `--json` payload, and a deferred create returns `jira_key: null` rather than a placeholder. **Since task.54 the GitHub side is covered too** — board Status and membership (`gh-stage.js`), the Priority and Estimate board fields (`set-github-project-{priority,estimate}.sh`), and every `gh` mutation routed through `tracker_write` in `resolve-platform.sh` (`gh issue comment`, `gh pr comment`, `gh issue close`, …). **Since task.56 the GitHub issue lifecycle is covered as well** — `create`, `edit`, `close`, `reopen`, milestone create and the sub-issue link, through `tracker-issue.js`. Those are the calls whose stdout a caller *captures*, so they needed a CLI rather than a wrapper: a wrapper that refuses returns nothing, and `$( )` binds the empty string. The CLI prints nothing to stdout under a deferring mode (every notice goes to stderr) and records the mutation with `produces` set. A `create` or `milestone` additionally records `blocking: true`, and the checklist opens with a banner naming the **two-run convergence** — perform the action, write the value it produced into the document's frontmatter, re-run. **No placeholder is ever written**: `github_issue: 0` would defeat the idempotent search that stops the next run creating a duplicate, so a wrong key is worse than no key. Contract: [`tracker-issue-cli.md`](../../shared/resources/tracker-issue-cli.md). Still **not** covered, by design: Jira writes issued as raw `curl` from skill prose or through the Atlassian MCP tools. The runtime notice on every restricted run names both sides. See [`tracker-access-record.md`](../../shared/resources/tracker-access-record.md) and [Troubleshooting → My Jira card did not move](./troubleshooting.md#my-jira-card-did-not-move-and-nothing-failed)                                                                                      |
+| `access.vcs`                                     | `full`                          | `full`                                           | Accepted and validated so the schema is stable, but **only `full` works today** — VCS write is a hard requirement for the pipelines (`/create-pr` returns a PR URL later steps consume, `/develop-next` gates on `gh pr merge`). Any other value is rejected with a message naming the reason rather than silently ignored                                                                                                                                                                  |
 | `tracker.workflowFile`                           | path                            | `tracker-workflow.yaml`                          | Path to the consumer-owned status ladder. Env override `TRACKER_WORKFLOW_FILE` wins. Mutually exclusive with the scalar `tracker:` form above — see [Tracker workflow](#tracker-workflow). Full spec: [`tracker-workflow.md`](./tracker-workflow.md)                                                                                                                                                                                                                                       |
 | `prd.prdShardedLocation`                         | path                            | `docs/prd`                                       | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `architecture.architectureShardedLocation`       | path                            | `docs/architecture`                              | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md)                                                                                                                                                                                                                                                                                                                                        |
@@ -638,6 +655,46 @@ github:
 It stays a separate file on purpose: board identity has a different lifetime from skill configuration,
 and consolidating the two is not planned. `gh-stage.js` reads it as a fallback exactly as the pipeline
 step files do today. When both are present, `github.projectBoard` in `skills-config.yaml` wins.
+
+## Worked examples — access models
+
+Which of the five to pick: [Which access model?](../concepts/which-access.md). What a run produces: [Restricted tracker access](../concepts/restricted-access.md). The key row above is the contract; these blocks are copy-paste starters. `access.vcs` is omitted on purpose — only `full` is valid, and omitting it is `full`.
+
+<!-- access-model-examples:start -->
+
+```yaml
+# Unattended writes. Equivalent to omitting the access: block.
+access:
+  tracker: full
+```
+
+```yaml
+# Agent may read the board, not write. Writes are deferred.
+access:
+  tracker: read-only
+```
+
+```yaml
+# Credentials present; writes still deferred today (ask prompt is task.57).
+access:
+  tracker: approve
+```
+
+```yaml
+# No write token. After the run, execute the committed .sh (dry-run by default).
+access:
+  tracker: command
+```
+
+```yaml
+# No write token. After the run, tick the committed .md checklist.
+access:
+  tracker: manual
+```
+
+<!-- access-model-examples:end -->
+
+Env `AGENT_SKILLS_ACCESS_TRACKER` is combined most-restrictive-wins with the committed value — it can lock a run down, never escalate it.
 
 ## Worked example — typical project
 

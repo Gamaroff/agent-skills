@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.52.deferred-mutation-record-and-renderers'
+task_title: '[Task 52] One deferred-mutation record, four renderings of it'
+gate: PASS
+status_reason: 'All 7 HIGH and 6 of 9 MEDIUM from gate 1 are fixed and verified by re-running each original reproduction. The two remaining MEDIUMs are interception work, explicitly out of this task scope and deferred with rationale to tasks 53–57. The re-review found one further defect — in the cycle-1 fix itself — which was fixed and mutation-proven within the cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-08-18T17:30:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 1746
+  phases_verified: '12/12'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-08-18'
+  total_iterations: 2
+  verification_method: 'Each original reproduction command re-run against the fixed code, plus an execution test for both command-injection paths, plus the full suite'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Both command-execution paths are closed and PROVEN closed by execution tests that run the generated script against hostile record content and assert no side-effect file appears — including during the dry run, where the original defect fired. Redaction holes closed: object keys, URL userinfo, sub-8-char env values. Re-verified end to end that no credential value reaches any of the four formats while the variable NAMES survive — the property that makes the committed script both safe and usable. The gates still attempt no network call under any restricted mode.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. The fixes add a Set lookup per rendered record and a regex test per redacted value; both are negligible against a run-scoped journal. topoSort recursion remains unbounded (LOW, unreachable at run scale).'
+  reliability:
+    status: PASS
+    notes: 'The record-identity defect is fixed at the root: intent and stdin are now part of the fingerprint, so two payloads to one object are two records. Rendering is idempotent and no longer mutates the caller. The confirm gate skips rather than aborting without a tty. The roster refuses a malformed row instead of truncating. A resume still dedupes correctly — verified through the real CLI path.'
+  maintainability:
+    status: PASS
+    notes: 'Three dead artifacts removed (unused stack parameter, unused argvLine export, unreachable guard). The schema doc now records the three contracts the fixes created rather than leaving them implicit: intent must be deterministic because it is part of identity; EXPECTED_KIND_COUNT moves with the roster; the high-entropy heuristic is scoped to credential-bearing positions. 14 new regression tests, every one mutation-proven.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'BUG-7 — invoke handover-render at run end and make the bundler ship it (interception work, tasks 53–57)'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'BUG-15 — read the board before deferring so satisfied/would-regress are honoured (interception work, task 57)'
+      refs: ['shared/resources/gh-stage.js']
+    - action: 'topoSort: convert the recursion to an explicit stack if journals ever grow past a few thousand records'
+      refs: ['shared/resources/handover-render.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

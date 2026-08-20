@@ -10,6 +10,8 @@ Foundational explanations of what skills are, how they work, and how to get star
 - [Overview](./overview.md) — what skills are, progressive disclosure, key principles
 - [Architecture](./architecture.md) — system view, dependency map, design principles
 - [Which path?](./which-path.md) — decision tree: task vs story vs hotfix vs parallel
+- [Restricted tracker access](./restricted-access.md) — what restricted access is, limits, what a run produces
+- [Which access model?](./which-access.md) — three questions that pick full / read-only / approve / command / manual
 
 ## See also
 

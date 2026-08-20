@@ -18,7 +18,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-const SCRIPT = path.join(REPO_ROOT, "skills", "develop-batch", "scripts", "schedule.mjs");
+const SCRIPT = path.join(
+  REPO_ROOT,
+  "skills",
+  "develop-batch",
+  "scripts",
+  "schedule.mjs",
+);
 
 const {
   parseYamlSubset,
@@ -126,14 +132,18 @@ test("normalizeResources: maxParallel below the sum binds, and says so", () => {
 });
 
 test("normalizeResources: empty resources list falls back rather than yielding zero capacity", () => {
-  const t = normalizeResources({ developBatch: { resources: [], maxParallel: 2 } });
+  const t = normalizeResources({
+    developBatch: { resources: [], maxParallel: 2 },
+  });
   assert.equal(t.resources.length, 1);
   assert.equal(t.globalCap, 2);
 });
 
 test("normalizeResources: a resource with no name is skipped, not fatal", () => {
   const t = normalizeResources({
-    developBatch: { resources: [{ capacity: 2 }, { name: "box", capacity: 3 }] },
+    developBatch: {
+      resources: [{ capacity: 2 }, { name: "box", capacity: 3 }],
+    },
   });
   assert.equal(t.resources.length, 1);
   assert.equal(t.resources[0].name, "box");
@@ -142,7 +152,9 @@ test("normalizeResources: a resource with no name is skipped, not fatal", () => 
 
 test("normalizeResources: a probe without a command is ignored", () => {
   const t = normalizeResources({
-    developBatch: { resources: [{ name: "box", capacity: 1, probe: { intervalSec: 5 } }] },
+    developBatch: {
+      resources: [{ name: "box", capacity: 1, probe: { intervalSec: 5 } }],
+    },
   });
   assert.equal(t.resources[0].probe, null);
   assert.match(t.notes.join(" "), /probe with no command/);
@@ -154,11 +166,11 @@ test("computeInflight: only dispatched-and-still-running items hold a slot", () 
   const { resources } = normalizeResources(TWO_RESOURCES);
   const state = {
     items: [
-      item("a", { dispatched: true, resource: "box" }),                    // holds
+      item("a", { dispatched: true, resource: "box" }), // holds
       item("b", { dispatched: true, resource: "box", pipelineDone: true }), // frees
-      item("c", { dispatched: true, resource: "box", halted: true }),       // frees
-      item("d", { dispatched: true, resource: "local", interrupted: true }),// frees
-      item("e"),                                                            // never dispatched
+      item("c", { dispatched: true, resource: "box", halted: true }), // frees
+      item("d", { dispatched: true, resource: "local", interrupted: true }), // frees
+      item("e"), // never dispatched
     ],
   };
   assert.deepEqual(computeInflight(state, resources), { local: 0, box: 1 });
@@ -166,7 +178,9 @@ test("computeInflight: only dispatched-and-still-running items hold a slot", () 
 
 test("computeInflight: a v1 state file with no `resource` attributes to the first resource", () => {
   const { resources } = normalizeResources(TWO_RESOURCES);
-  const state = { items: [item("a", { dispatched: true }), item("b", { dispatched: true })] };
+  const state = {
+    items: [item("a", { dispatched: true }), item("b", { dispatched: true })],
+  };
   assert.deepEqual(computeInflight(state, resources), { local: 2, box: 0 });
 });
 
@@ -282,7 +296,12 @@ test("planAdmissions: an interrupted item is re-admitted and RE-PLACED, not pinn
   // It was on `box`; box is now full, local is free → it must move.
   const state = {
     items: [
-      item("a", { dispatched: true, resource: "box", interrupted: true, attempts: 1 }),
+      item("a", {
+        dispatched: true,
+        resource: "box",
+        interrupted: true,
+        attempts: 1,
+      }),
       item("b", { dispatched: true, resource: "box" }),
       item("c", { dispatched: true, resource: "box" }),
       item("d", { dispatched: true, resource: "box" }),
@@ -301,7 +320,12 @@ test("planAdmissions: an item past the resume budget is held, not re-dispatched 
   const state = {
     items: [item("a", { dispatched: true, interrupted: true, attempts: 3 })],
   };
-  const { admit, hold } = planAdmissions(state, table, {}, { maxResumeAttempts: 2 });
+  const { admit, hold } = planAdmissions(
+    state,
+    table,
+    {},
+    { maxResumeAttempts: 2 },
+  );
   assert.equal(admit.length, 0);
   assert.match(hold[0].reason, /resume budget exhausted/);
 });
@@ -323,12 +347,18 @@ test("planAdmissions: terminal items are never re-admitted", () => {
 // ── classifyStop ─────────────────────────────────────────────────────────────
 
 test("classifyStop: plan mode is an interruption, not a HALT", () => {
-  const r = classifyStop("Plan mode is active. You MUST NOT make any edits.", null);
+  const r = classifyStop(
+    "Plan mode is active. You MUST NOT make any edits.",
+    null,
+  );
   assert.equal(r.kind, "interrupted");
 });
 
 test("classifyStop: pipeline-gate failures are HALTs", () => {
-  assert.equal(classifyStop("review NO-GO — rework required", null).kind, "halt");
+  assert.equal(
+    classifyStop("review NO-GO — rework required", null).kind,
+    "halt",
+  );
   assert.equal(classifyStop("5 QA cycles without PASS", null).kind, "halt");
   assert.equal(classifyStop("DoD gaps remain", null).kind, "halt");
   assert.equal(classifyStop("non-trivial rebase conflict", null).kind, "halt");
@@ -355,30 +385,56 @@ test("classifyStop: ambiguous text + NO lock fails safe to halt", () => {
 // ── shouldRebatch ────────────────────────────────────────────────────────────
 
 test("shouldRebatch: no ticks → stop (the real anti-spin guard)", () => {
-  const r = shouldRebatch({ prevSignature: "a", newIds: ["b"], tickedCount: 0, rebatchCount: 0 });
+  const r = shouldRebatch({
+    prevSignature: "a",
+    newIds: ["b"],
+    tickedCount: 0,
+    rebatchCount: 0,
+  });
   assert.equal(r.go, false);
   assert.match(r.reason, /no progress/);
 });
 
 test("shouldRebatch: identical signature → stop", () => {
-  const r = shouldRebatch({ prevSignature: "a,b", newIds: ["b", "a"], tickedCount: 2, rebatchCount: 0 });
+  const r = shouldRebatch({
+    prevSignature: "a,b",
+    newIds: ["b", "a"],
+    tickedCount: 2,
+    rebatchCount: 0,
+  });
   assert.equal(r.go, false);
   assert.match(r.reason, /same batch/);
 });
 
 test("shouldRebatch: cap reached → stop", () => {
-  const r = shouldRebatch({ prevSignature: "a", newIds: ["b"], tickedCount: 1, rebatchCount: 3, maxRebatches: 3 });
+  const r = shouldRebatch({
+    prevSignature: "a",
+    newIds: ["b"],
+    tickedCount: 1,
+    rebatchCount: 3,
+    maxRebatches: 3,
+  });
   assert.equal(r.go, false);
   assert.match(r.reason, /cap reached/);
 });
 
 test("shouldRebatch: empty frontier → stop", () => {
-  const r = shouldRebatch({ prevSignature: "a", newIds: [], tickedCount: 1, rebatchCount: 0 });
+  const r = shouldRebatch({
+    prevSignature: "a",
+    newIds: [],
+    tickedCount: 1,
+    rebatchCount: 0,
+  });
   assert.equal(r.go, false);
 });
 
 test("shouldRebatch: progress + new frontier + under cap → go", () => {
-  const r = shouldRebatch({ prevSignature: "a", newIds: ["b", "c"], tickedCount: 1, rebatchCount: 0 });
+  const r = shouldRebatch({
+    prevSignature: "a",
+    newIds: ["b", "c"],
+    tickedCount: 1,
+    rebatchCount: 0,
+  });
   assert.equal(r.go, true);
   assert.equal(r.signature, "b,c");
 });
@@ -403,10 +459,17 @@ test("CLI: `plan` emits well-formed JSON with placement", () => {
       "",
     ].join("\n"),
   );
-  writeFileSync(st, JSON.stringify({ items: [item("a"), item("b"), item("c"), item("d")] }));
-  const out = execFileSync(process.execPath, [SCRIPT, "plan", "--state", st, "--config", cfg], {
-    encoding: "utf-8",
-  });
+  writeFileSync(
+    st,
+    JSON.stringify({ items: [item("a"), item("b"), item("c"), item("d")] }),
+  );
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "plan", "--state", st, "--config", cfg],
+    {
+      encoding: "utf-8",
+    },
+  );
   const plan = JSON.parse(out);
   assert.equal(plan.globalCap, 3);
   assert.equal(plan.admit.length, 3);
@@ -447,9 +510,13 @@ test("CLI: a saturated probe withholds its resource end to end", () => {
     ].join("\n"),
   );
   writeFileSync(st, JSON.stringify({ items: [item("a")] }));
-  const out = execFileSync(process.execPath, [SCRIPT, "plan", "--state", st, "--config", cfg], {
-    encoding: "utf-8",
-  });
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "plan", "--state", st, "--config", cfg],
+    {
+      encoding: "utf-8",
+    },
+  );
   const plan = JSON.parse(out);
   assert.equal(plan.admit.length, 0);
   assert.match(plan.hold[0].reason, /capacity or saturated/);

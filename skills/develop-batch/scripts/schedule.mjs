@@ -97,10 +97,20 @@ export function normalizeResources(config) {
         ? db.maxParallel
         : DEFAULT_CAPACITY;
     if (declared && declared.length === 0) {
-      notes.push("developBatch.resources is empty — falling back to a single implicit resource");
+      notes.push(
+        "developBatch.resources is empty — falling back to a single implicit resource",
+      );
     }
     return {
-      resources: [{ name: "local", capacity: cap, testCommand: null, env: null, probe: null }],
+      resources: [
+        {
+          name: "local",
+          capacity: cap,
+          testCommand: null,
+          env: null,
+          probe: null,
+        },
+      ],
       globalCap: cap,
       notes,
       implicit: true,
@@ -116,10 +126,16 @@ export function normalizeResources(config) {
     const capacity =
       Number.isInteger(r.capacity) && r.capacity > 0 ? r.capacity : 1;
     if (!(Number.isInteger(r.capacity) && r.capacity > 0)) {
-      notes.push(`resource "${r.name}" has no valid capacity — defaulting to 1`);
+      notes.push(
+        `resource "${r.name}" has no valid capacity — defaulting to 1`,
+      );
     }
     let probe = null;
-    if (r.probe && typeof r.probe.command === "string" && r.probe.command.trim()) {
+    if (
+      r.probe &&
+      typeof r.probe.command === "string" &&
+      r.probe.command.trim()
+    ) {
       probe = {
         command: r.probe.command,
         intervalSec: Number.isFinite(r.probe.intervalSec)
@@ -136,7 +152,9 @@ export function normalizeResources(config) {
         ? r.probe.settleSec
         : probe.intervalSec;
     } else if (r.probe) {
-      notes.push(`resource "${r.name}" has a probe with no command — ignoring it`);
+      notes.push(
+        `resource "${r.name}" has a probe with no command — ignoring it`,
+      );
     }
     resources.push({
       name: r.name.trim(),
@@ -155,9 +173,19 @@ export function normalizeResources(config) {
       Number.isInteger(db.maxParallel) && db.maxParallel > 0
         ? db.maxParallel
         : DEFAULT_CAPACITY;
-    notes.push("no usable resources declared — falling back to a single implicit resource");
+    notes.push(
+      "no usable resources declared — falling back to a single implicit resource",
+    );
     return {
-      resources: [{ name: "local", capacity: cap, testCommand: null, env: null, probe: null }],
+      resources: [
+        {
+          name: "local",
+          capacity: cap,
+          testCommand: null,
+          env: null,
+          probe: null,
+        },
+      ],
       globalCap: cap,
       notes,
       implicit: true,
@@ -193,7 +221,8 @@ export function computeInflight(state, resources) {
     if (it.pipelineDone || it.halted || it.interrupted) continue;
     // A v1 state file has no `resource` — attribute it to the first resource
     // rather than halting. Migration must never cost a run.
-    const name = it.resource && counts[it.resource] !== undefined ? it.resource : fallback;
+    const name =
+      it.resource && counts[it.resource] !== undefined ? it.resource : fallback;
     if (counts[name] === undefined) counts[name] = 0;
     counts[name]++;
   }
@@ -213,16 +242,22 @@ export function interpretProbe({ code, stdout, timedOut, spawnError }) {
     return {
       saturated: false,
       freeSlots: null,
-      reason: timedOut ? "probe timed out — treating as available" : "probe failed to spawn — treating as available",
+      reason: timedOut
+        ? "probe timed out — treating as available"
+        : "probe failed to spawn — treating as available",
       degraded: true,
     };
   }
   if (code !== 0) {
-    const reason = String(stdout || "").trim().split(/\r?\n/)[0] || `probe exited ${code}`;
+    const reason =
+      String(stdout || "")
+        .trim()
+        .split(/\r?\n/)[0] || `probe exited ${code}`;
     return { saturated: true, freeSlots: null, reason, degraded: false };
   }
   const text = String(stdout || "").trim();
-  if (!text) return { saturated: false, freeSlots: null, reason: "", degraded: false };
+  if (!text)
+    return { saturated: false, freeSlots: null, reason: "", degraded: false };
   try {
     const parsed = JSON.parse(text);
     if (parsed && Number.isFinite(parsed.freeSlots)) {
@@ -247,7 +282,11 @@ export function interpretProbe({ code, stdout, timedOut, spawnError }) {
  */
 export function effectiveCapacity(resource, inflight, probeResult) {
   const base = resource.capacity;
-  if (!probeResult || probeResult.freeSlots === null || probeResult.freeSlots === undefined) {
+  if (
+    !probeResult ||
+    probeResult.freeSlots === null ||
+    probeResult.freeSlots === undefined
+  ) {
     return base;
   }
   return Math.min(base, inflight + probeResult.freeSlots);
@@ -285,7 +324,12 @@ export function placeItem(resources, inflight, probes = {}) {
  * budget. An interrupted item is re-PLACED, not pinned to its old resource —
  * the whole point is that a different resource may now be idle.
  */
-export function planAdmissions(state, { resources, globalCap }, probes = {}, opts = {}) {
+export function planAdmissions(
+  state,
+  { resources, globalCap },
+  probes = {},
+  opts = {},
+) {
   const maxResumeAttempts = Number.isInteger(opts.maxResumeAttempts)
     ? opts.maxResumeAttempts
     : DEFAULT_MAX_RESUME_ATTEMPTS;
@@ -301,7 +345,10 @@ export function planAdmissions(state, { resources, globalCap }, probes = {}, opt
     if (!isPending) continue;
 
     if (it.interrupted && (it.attempts || 0) > maxResumeAttempts) {
-      hold.push({ id: it.id, reason: `resume budget exhausted (${it.attempts} > ${maxResumeAttempts})` });
+      hold.push({
+        id: it.id,
+        reason: `resume budget exhausted (${it.attempts} > ${maxResumeAttempts})`,
+      });
       continue;
     }
     if (total >= globalCap) {
@@ -310,7 +357,10 @@ export function planAdmissions(state, { resources, globalCap }, probes = {}, opt
     }
     const target = placeItem(resources, working, probes);
     if (!target) {
-      hold.push({ id: it.id, reason: "all resources at capacity or saturated" });
+      hold.push({
+        id: it.id,
+        reason: "all resources at capacity or saturated",
+      });
       continue;
     }
     const res = resources.find((r) => r.name === target);
@@ -347,15 +397,27 @@ export function planAdmissions(state, { resources, globalCap }, probes = {}, opt
 export function classifyStop(reportText, lock) {
   const text = String(reportText || "");
   for (const re of HALT_SIGNATURES) {
-    if (re.test(text)) return { kind: "halt", reason: `matched pipeline-gate signature ${re}` };
+    if (re.test(text))
+      return { kind: "halt", reason: `matched pipeline-gate signature ${re}` };
   }
   for (const re of INTERRUPT_SIGNATURES) {
-    if (re.test(text)) return { kind: "interrupted", reason: `matched external-stop signature ${re}` };
+    if (re.test(text))
+      return {
+        kind: "interrupted",
+        reason: `matched external-stop signature ${re}`,
+      };
   }
   if (lock && lock.step && !lock.terminal) {
-    return { kind: "interrupted", reason: `pipeline lock is live at step ${lock.step}` };
+    return {
+      kind: "interrupted",
+      reason: `pipeline lock is live at step ${lock.step}`,
+    };
   }
-  return { kind: "halt", reason: "no external-stop signal and no live pipeline lock — failing safe to halt" };
+  return {
+    kind: "halt",
+    reason:
+      "no external-stop signal and no live pipeline lock — failing safe to halt",
+  };
 }
 
 /**
@@ -365,22 +427,40 @@ export function classifyStop(reportText, lock) {
  * only if the previous batch actually ticked a roadmap row, which makes
  * progress monotonic against the roadmap and cannot loop forever.
  */
-export function shouldRebatch({ prevSignature, newIds, tickedCount, rebatchCount, maxRebatches }) {
-  const max = Number.isInteger(maxRebatches) ? maxRebatches : DEFAULT_MAX_REBATCHES;
+export function shouldRebatch({
+  prevSignature,
+  newIds,
+  tickedCount,
+  rebatchCount,
+  maxRebatches,
+}) {
+  const max = Number.isInteger(maxRebatches)
+    ? maxRebatches
+    : DEFAULT_MAX_REBATCHES;
   if (!Array.isArray(newIds) || newIds.length === 0) {
     return { go: false, reason: "selector returned an empty batch" };
   }
   if (!tickedCount) {
-    return { go: false, reason: "previous batch ticked no roadmap rows — no progress" };
+    return {
+      go: false,
+      reason: "previous batch ticked no roadmap rows — no progress",
+    };
   }
   if ((rebatchCount || 0) >= max) {
     return { go: false, reason: `re-batch cap reached (${max})` };
   }
   const sig = [...newIds].sort().join(",");
   if (prevSignature && sig === prevSignature) {
-    return { go: false, reason: "selector returned the same batch — roadmap did not move" };
+    return {
+      go: false,
+      reason: "selector returned the same batch — roadmap did not move",
+    };
   }
-  return { go: true, reason: "progress made and a new frontier is available", signature: sig };
+  return {
+    go: true,
+    reason: "progress made and a new frontier is available",
+    signature: sig,
+  };
 }
 
 // ── impure edges (CLI only) ──────────────────────────────────────────────────
@@ -423,7 +503,11 @@ function runProbe(resource, cacheEntry, nowMs) {
       stdout = String(e.stdout || "") + String(e.stderr || "");
     } else spawnError = true;
   }
-  return { ...interpretProbe({ code, stdout, timedOut, spawnError }), cached: false, ageSec: 0 };
+  return {
+    ...interpretProbe({ code, stdout, timedOut, spawnError }),
+    cached: false,
+    ageSec: 0,
+  };
 }
 
 function gatherProbes(resources, state, nowMs) {
@@ -463,7 +547,8 @@ function parseArgs(argv) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const usage = "usage: schedule.mjs <plan|resources|probe> [--state <path>] [--config <path>]";
+  const usage =
+    "usage: schedule.mjs <plan|resources|probe> [--state <path>] [--config <path>]";
   if (!args.cmd || !["plan", "resources", "probe"].includes(args.cmd)) {
     process.stderr.write(usage + "\n");
     process.exit(1);
@@ -472,7 +557,9 @@ function main() {
   try {
     config = readConfig(args.config);
   } catch (e) {
-    process.stderr.write(`schedule: cannot read config ${args.config}: ${e.message}\n`);
+    process.stderr.write(
+      `schedule: cannot read config ${args.config}: ${e.message}\n`,
+    );
     process.exit(1);
   }
   const table = normalizeResources(config);
@@ -498,7 +585,9 @@ function main() {
   try {
     state = readJson(args.state);
   } catch (e) {
-    process.stderr.write(`schedule: cannot read state ${args.state}: ${e.message}\n`);
+    process.stderr.write(
+      `schedule: cannot read state ${args.state}: ${e.message}\n`,
+    );
     process.exit(1);
   }
   const now = Date.now();
@@ -508,14 +597,19 @@ function main() {
   });
   const notes = [...table.notes];
   for (const [name, p] of Object.entries(probes)) {
-    if (p.saturated) notes.push(`resource "${name}" reported saturated: ${p.reason}`);
-    if (p.degraded) notes.push(`resource "${name}" probe degraded: ${p.reason}`);
+    if (p.saturated)
+      notes.push(`resource "${name}" reported saturated: ${p.reason}`);
+    if (p.degraded)
+      notes.push(`resource "${name}" probe degraded: ${p.reason}`);
   }
   process.stdout.write(
     JSON.stringify(
       {
         ...plan,
-        resources: table.resources.map((r) => ({ name: r.name, capacity: r.capacity })),
+        resources: table.resources.map((r) => ({
+          name: r.name,
+          capacity: r.capacity,
+        })),
         probeCache: cache,
         notes,
       },
@@ -533,7 +627,10 @@ function main() {
 function isInvokedDirectly() {
   if (!process.argv[1]) return false;
   try {
-    return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url));
+    return (
+      fs.realpathSync(process.argv[1]) ===
+      fs.realpathSync(fileURLToPath(import.meta.url))
+    );
   } catch {
     return path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
   }

@@ -1,0 +1,67 @@
+schema: 1
+task: 'task.53.jira-rest-interception'
+task_title: '[Task 53] Intercept Jira REST mutations in two layers — a fail-closed net and a legible one'
+gate: PASS
+status_reason: 'The final review of the net change returned no high-severity findings. Its two mediums and eight cleanups are all fixed and, where behavioural, mutation-proven. With the access-mode config tier lifted into task.61 by explicit decision, the change is exactly what the task document specifies, and green.'
+reviewer: 'QA Engineer'
+updated: '2026-08-19T01:00:00Z'
+
+qa_cycles: 6
+scope_decision: 'The JS config tier was split into task.61 after cycle 5. Gate 2''s seven findings moved with it and are listed in that task.'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 1400
+  phases_verified: '7/7'
+  qa_cycles: 6
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No non-GET reaches the network under a non-full mode on any gated path, proven against a stub
+      that throws on any write. No credential can reach a record — buildRecord redacts before hashing
+      and endpointOf drops the query string. The mode is captured before loadDotEnv, and an injected
+      access may now restrict but never escalate past the environment. The POST-as-search allowlist is
+      by URL, not by heuristic. The stated boundary — config-declared restrictions need a shell that
+      sourced the resolver — is documented in code, in the task, and in the CHANGELOG.
+  performance:
+    status: PASS
+    notes: 'One string compare and at most one regex per request; one mode resolution per process. Suite runtime unchanged.'
+  reliability:
+    status: PASS
+    notes: >-
+      Every path that could report a refusal as a success is closed and watched failing: the
+      transition chain, the write-back gate, the --json reason on all three scripts including the
+      epic skip path, and both sprint scripts' success lines. A refused transition now records
+      jira.transition with the target status rather than an escalated catch-all. full mode is
+      unchanged on every path three independent reviews traced.
+  maintainability:
+    status: PASS
+    notes: >-
+      One access resolver rather than four copies. The 21st kind is pinned at six counting sites
+      including the bundled copies. Every comment that described behaviour the code no longer had has
+      been corrected, and two tests that passed vacuously — one matching a comment, one pinning an
+      exact identifier a rename walked past — were tightened.
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'task.61 — the config tier, with read-config.sh parity as its subject'
+      refs: ['docs/tasks/task.61.access-mode-config-tier/task.61.access-mode-config-tier.md']
+    - action: 'task.54 — GitHub board interception, the next in the sequence'
+      refs: ['docs/tasks/task.54.github-board-interception/task.54.github-board-interception.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

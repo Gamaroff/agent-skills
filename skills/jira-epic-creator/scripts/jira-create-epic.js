@@ -7,6 +7,157 @@
 const fs = require("fs");
 const path = require("path");
 
+// The deferred-mutation writer — shared/resources/defer-mutation.js, bundled
+// into this skill's references/ by `npm run bundle`.
+//
+// This file calls global `fetch` directly and does NOT go through
+// jira-sync.js's makeHttp, so LAYER 1'S FAIL-CLOSED GUARANTEE DOES NOT REACH
+// IT. The gate below is a hand-rolled local copy, and that exception is stated
+// in the task document rather than left implicit — this script has drifted from
+// the shared library before. Routing it through jira-sync.js is worth doing and
+// is not this change.
+// CR-6 — ONE require, not a try/catch pair. The bundler rewrites
+// a shared-resources path to a references/ one inside skill scripts too, so the
+// "in-tree fallback" this used to carry was rewritten into a byte-identical
+// copy of its own try branch: a catch that could never succeed where the try
+// had already failed.
+let dm = null;
+try {
+  dm = require("../references/defer-mutation.js");
+} catch (_) {
+  dm = null;
+}
+
+// Delegate to the one resolver rather than keeping a third copy of the mode
+// table. It reads ACCESS_TRACKER and AGENT_SKILLS_ACCESS_TRACKER,
+// most-restrictive-wins, and refuses an unrecognised value rather than
+// defaulting to "full".
+const ACCESS_RANK_FALLBACK = {
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+};
+
+function accessTracker() {
+  // CYCLE-3 CR-2 — a missing writer used to return "full", and the gate below
+  // reads `accessTracker() !== "full"`, so a broken bundle turned a declared
+  // restriction into a live epic create. The comment claiming "the gate below
+  // still refuses" was simply wrong. Degrade to the env tier instead: it cannot
+  // see the config tier, but it can never answer "full" over a restriction the
+  // environment declares.
+  if (!dm) {
+    const seen = [
+      process.env.ACCESS_TRACKER,
+      process.env.AGENT_SKILLS_ACCESS_TRACKER,
+    ]
+      .map((v) => String(v || "").trim())
+      .filter(Boolean);
+    // C5-CR4 — the degraded tier must not answer "full" over a config it cannot
+    // read. Without `dm` there is no config tier at all, so a repo that declares
+    // `access.tracker` would get everything the declaration withholds. Detecting
+    // that the declaration EXISTS needs no parser, and is enough to refuse.
+    //
+    // Folded into the reduction UNCONDITIONALLY, not only when `seen` is empty.
+    // Gating it on an empty `seen` closed just half the hole: with
+    // AGENT_SKILLS_ACCESS_TRACKER=read-only set and `access.tracker: manual`
+    // committed, the env value won and the create proceeded at a mode looser than
+    // the repo declares (T61-H3).
+    if (configMayRestrict()) seen.push("manual");
+    if (!seen.length) return "full";
+    for (const v of seen) {
+      // CYCLE-4 CR-13 — own properties only. `in` walks the prototype chain, so
+      // ACCESS_TRACKER="constructor" passed validation and was then compared as
+      // a function against a number.
+      if (!Object.prototype.hasOwnProperty.call(ACCESS_RANK_FALLBACK, v)) {
+        console.error(
+          `Error: access.tracker="${v}" is not a recognised access mode.`,
+        );
+        process.exit(1);
+      }
+    }
+    return seen.reduce((x, y) =>
+      ACCESS_RANK_FALLBACK[y] < ACCESS_RANK_FALLBACK[x] ? y : x,
+    );
+  }
+  try {
+    // Anchored to the repo root rather than process.cwd(), so a bare
+    // `node jira-create-epic.js …` from a subdirectory reads the same config the
+    // resolver would (C5-CR6).
+    return dm.resolveAccessTracker(process.env, { cwd: repoRootOrCwd() });
+  } catch (e) {
+    console.error(`Error: ${e.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * The git top level, or the working directory when this is not a checkout.
+ * Memoised: this used to shell out to git twice per gated operation.
+ */
+let _repoRoot;
+function repoRootOrCwd() {
+  if (_repoRoot !== undefined) return _repoRoot;
+  try {
+    const out = require("child_process")
+      .execSync("git rev-parse --show-toplevel", {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      .trim();
+    // `out || process.cwd()`: an older git can exit 0 printing nothing, and
+    // memoising "" would hand spawnSync an empty cwd (ENOENT) for the rest of
+    // the process.
+    return (_repoRoot = out || process.cwd());
+  } catch (_) {
+    return (_repoRoot = process.cwd());
+  }
+}
+
+/**
+ * Does a config file exist that mentions `access`? Used ONLY on the degraded
+ * no-writer path, where there is no reader to ask. It deliberately answers a
+ * weaker question than read-config.sh does — "might something be declared here"
+ * rather than "what is declared" — because the only safe action when the answer
+ * is yes and nothing can parse it is to refuse.
+ */
+function configMayRestrict() {
+  const root = repoRootOrCwd();
+  const raw = String(process.env.SKILLS_CONFIG_FILE || "").trim();
+  const file = raw
+    ? path.isAbsolute(raw)
+      ? raw
+      : path.resolve(root, raw)
+    : path.join(root, "skills-config.yaml");
+  // A redirect that lands on nothing is itself a refusal: changing WHICH file is
+  // read must never widen access.
+  try {
+    if (!fs.statSync(file).isFile()) return true;
+  } catch (_) {
+    // A redirect that lands on nothing is a refusal — but the literal default
+    // basename is NOT a redirect, per read-config.sh's own rule. Treating it as
+    // one forced `manual` on a repo that declares nothing (T61-L1).
+    return Boolean(raw) && raw !== "skills-config.yaml";
+  }
+  try {
+    // Key-shaped, not a bare substring. `accessToken:` or a path like
+    // `docs/access-control/` is not a declaration, and forcing `manual` on those
+    // would be a false restriction that stops every epic create.
+    // BOTH spellings the shell greps for. YAML has two ways to write a key, and
+    // dropping the explicit-key form (`? access` / `: {tracker: manual}`) left a
+    // config written that way invisible to the degraded tier — which then
+    // proceeded at `full` over a committed restriction.
+    const text = fs.readFileSync(file, "utf8");
+    return (
+      /(^|[^A-Za-z0-9_-])["']?access["']?[ \t]*:/m.test(text) ||
+      /^[ \t]*\?[ \t]+["']?access["']?[ \t]*$/m.test(text)
+    );
+  } catch (_) {
+    return true;
+  }
+}
+
 async function parseFrontmatter(content) {
   if (content.startsWith("---")) {
     const parts = content.split("---");
@@ -332,6 +483,46 @@ async function createEpic({
     issueData.fields.labels = Array.isArray(labels)
       ? labels
       : labels.split(",");
+  }
+
+  // The gate. A refused create returns null — the same shape the catch below
+  // already returns, so every caller copes with it today.
+  if (accessTracker() !== "full") {
+    let recordId = null;
+    try {
+      if (!dm)
+        throw new Error("defer-mutation.js not found next to this script");
+      const rec = dm.defer({
+        kind: "jira.issue.create",
+        system: "jira",
+        access: accessTracker(),
+        intent: `Create the Jira epic "${issueData.fields.summary || "(no summary)"}" in ${issueData.fields.project?.key || "the project"}`,
+        target: {
+          name: issueData.fields.summary || "(no summary)",
+          url: `${baseUrl}/rest/api/2/issue`,
+          ui_url: `${baseUrl}/secure/CreateIssue!default.jspa`,
+        },
+        desired: {
+          project: issueData.fields.project?.key || null,
+          issuetype: issueData.fields.issuetype?.name || null,
+          summary: issueData.fields.summary || null,
+          priority: issueData.fields.priority?.name || null,
+          labels: (issueData.fields.labels || []).join(", ") || null,
+        },
+        skill: "jira-epic-creator",
+      });
+      recordId = rec.id;
+    } catch (e) {
+      console.error(
+        `⚠️  Could not record the deferred epic create: ${e.message}`,
+      );
+    }
+    console.log(
+      `\n⏸️  Epic create deferred — access.tracker=${accessTracker()} restricts this run.` +
+        (recordId ? ` Recorded as ${recordId}.` : ""),
+    );
+    console.log(`   Summary: ${issueData.fields.summary || "(no summary)"}`);
+    return null;
   }
 
   // Create the issue

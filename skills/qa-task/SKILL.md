@@ -334,6 +334,23 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
 
 This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle; cleanups and uncertain findings stay advisory. Under the develop-task pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the task opts in via frontmatter.
 
+### Step 3c: Mutation-Proof Spot Check
+
+A green suite says the tests ran, not that they can fail. Before crediting a test
+as coverage for a defect this cycle fixed, **revert the behaviour it names and
+confirm that test goes red** — full procedure and the four shapes vacuity takes:
+[`references/mutation-proving.md`](references/mutation-proving.md).
+
+Scope it: not every assertion, but **every test guarding a fix made this cycle**,
+plus any guard whose failure mode is silence. If the suite stays green with the
+behaviour reverted, record the test as **not** covering that criterion — a
+vacuous test is worse than a missing one, because it reports coverage that is
+not there.
+
+Record the result in the QA report's Code Review section as `mutation-proven:
+yes/no` per fixed defect. Do **not** write "every invariant mutation-proven"
+unless every one was actually reverted; if you proved four of five, say so.
+
 ### Step 4: Run Tests
 
 Execute all tests mentioned in the testing strategy:
@@ -778,7 +795,7 @@ touches the document. See [`docs/reference/anti-patterns.md`](../../docs/referen
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
 
-Use the PR metadata stored in the Prerequisites step. Source the retry helper from `references/resolve-platform.sh` and wrap the comment in `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). Run:
+Use the PR metadata stored in the Prerequisites step. Source the retry helper with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value — and wrap the comment in `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). Run:
 
 ```bash
 tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
@@ -828,7 +845,7 @@ tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECI
 
 ### Step 13b: Comment on Tracker Issue (graceful — non-blocking)
 
-Branch on the tracker resolved by `source references/resolve-platform.sh` (which sets `TRACKER=github|jira`).
+Branch on the tracker resolved by `source references/resolve-platform.sh || exit 1` (which sets `TRACKER=github|jira`). Keep the `|| exit 1` — the resolver returns non-zero on an unrecognised `tracker:`, `vcs:` or `access:` value, and sourcing it bare would continue past the rejection with a default.
 
 **GitHub path** (when `TRACKER=github`) — extract `github_issue` from the task document YAML frontmatter (read in Step 2). If present, post a summary comment to the linked Issue:
 
@@ -842,7 +859,7 @@ fi
 
 If `github_issue` is absent from the frontmatter, skip silently. Failure does NOT halt the skill.
 
-**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue via the Atlassian MCP tool (mirrors the pattern in `qa-fix` Step "Jira tracker comment"):
+**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue:
 
 ```bash
 JIRA_KEY=$(grep -E '^jira_key:' "$TASK_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
@@ -850,16 +867,24 @@ JIRA_KEY=$(grep -E '^jira_key:' "$TASK_FILE" | head -1 | sed -E 's/jira_key:[[:s
 
 If `TRACKER=jira` and `JIRA_KEY` is non-empty and not `null`:
 
-1. Derive `cloudId` from the `JIRA_URL` hostname (e.g. `myorg.atlassian.net` from `https://myorg.atlassian.net`). If any MCP tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
-2. Call `addCommentToJiraIssue` MCP tool:
-   - `cloudId`: {derived hostname}
-   - `issueIdOrKey`: `{JIRA_KEY}`
-   - `commentBody`: `"QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}"`
-   - `contentFormat`: `"markdown"`
+```bash
+mkdir -p .claude/state
+printf 'QA %s (%s/100) — PR #%s: %s\n' \
+  "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
+
+node .agents/skills/qa-task/references/tracker-comment.js \
+  --issue "$JIRA_KEY" --body-file .claude/state/comment-body.md \
+  --stage qa-gate --json
+```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+Read `reason` and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md) — only `no-credentials` may fall back to the Atlassian MCP tool.
 3. On success: log `📨 QA summary posted to Jira issue ${JIRA_KEY}`.
 4. On failure: log `⚠️ Jira comment failed for ${JIRA_KEY} — PR comment was posted successfully. Continuing.` (non-blocking — do not halt qa-task).
 
-If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` uses the same MCP call shape and `finalise` uses `contentFormat: "markdown"`.
+If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill. Cross-reference: `qa-fix` and `finalise` post through the same `tracker-comment.js` call.
 
 ### Step 14: Communicate to User — CRITICAL / BLOCKING
 
@@ -890,7 +915,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] Task file `## QA Testing Results` section updated with gate status and artifact links
 - [ ] Task status updated per gate decision
 - [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (Step 13 — BLOCKING): confirm exit code 0 after up to 3 attempts
-- [ ] Tracker Issue comment posted (Step 13b — graceful): GitHub via `tracker_call_with_retry gh issue comment` when `TRACKER=github` (skipped if `github_issue` absent) **OR** Jira via `addCommentToJiraIssue` MCP when `TRACKER=jira` (skipped if `jira_key` absent or null); non-blocking on persistent failure
+- [ ] Tracker Issue comment posted (Step 13b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] User notified with gate decision, issues summary, and next steps (Step 14 — BLOCKING)
 
 ---

@@ -55,7 +55,9 @@ test("driver claude-cli — availability tracks whether `claude` is on PATH", as
 });
 
 test("drivers/ has no rogue files outside the contract", () => {
-  const files = fs.readdirSync(DRIVERS_DIR).filter(f => f.endsWith(".mjs") && f !== "types.mjs");
+  const files = fs
+    .readdirSync(DRIVERS_DIR)
+    .filter((f) => f.endsWith(".mjs") && f !== "types.mjs");
   for (const f of files) {
     const name = f.replace(/\.mjs$/, "");
     assert.ok(EXPECTED.includes(name), `unexpected driver file: ${f}`);

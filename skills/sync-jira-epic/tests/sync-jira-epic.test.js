@@ -33,7 +33,11 @@ test("parseFrontmatter — preserves body containing horizontal rule", () => {
 // ---------------------------------------------------------------------------
 test("upsertChangeLog — wraps existing hand-written ## Change Log", () => {
   const src = `# Title\n\n## Change Log\n\n| Date (UTC) | Change |\n|------------|--------|\n| 2026-01-01 09:00 | Manual entry |\n\n## Other\n\nstuff\n`;
-  const out = lib.upsertChangeLog(src, { date: "2026-07-31", description: "Auto entry", author: "sync-jira" });
+  const out = lib.upsertChangeLog(src, {
+    date: "2026-07-31",
+    description: "Auto entry",
+    author: "sync-jira",
+  });
   assert.equal(out.match(/## Change Log/g).length, 1);
   assert.match(out, /Manual entry/);
   assert.match(out, /Auto entry/);
@@ -49,17 +53,23 @@ test("diffFields — separate body/meta hashes detect description vs metadata ch
 
   // Only meta changed
   let changed = lib.diffFields({
-    prev, next,
-    prevBodyHash: "B1", newBodyHash: "B1",
-    prevMetaHash: "M1", newMetaHash: "M2",
+    prev,
+    next,
+    prevBodyHash: "B1",
+    newBodyHash: "B1",
+    prevMetaHash: "M1",
+    newMetaHash: "M2",
   });
   assert.deepEqual(changed, ["metadata"]);
 
   // Body changed
   changed = lib.diffFields({
-    prev, next,
-    prevBodyHash: "B1", newBodyHash: "B2",
-    prevMetaHash: "M1", newMetaHash: "M1",
+    prev,
+    next,
+    prevBodyHash: "B1",
+    newBodyHash: "B2",
+    prevMetaHash: "M1",
+    newMetaHash: "M1",
   });
   assert.deepEqual(changed, ["description"]);
 });
@@ -68,7 +78,11 @@ test("diffFields — separate body/meta hashes detect description vs metadata ch
 // hashBody / hashMeta
 // ---------------------------------------------------------------------------
 test("hashBody — stable across runs, differs on body change", () => {
-  const args = { body: "## Epic Goal\n\nFoo.\n", prdBbUrl: null, epicBbUrl: null };
+  const args = {
+    body: "## Epic Goal\n\nFoo.\n",
+    prdBbUrl: null,
+    epicBbUrl: null,
+  };
   const h1 = lib.hashBody(args);
   const h2 = lib.hashBody(args);
   assert.equal(h1, h2);
@@ -77,10 +91,27 @@ test("hashBody — stable across runs, differs on body change", () => {
 });
 
 test("hashMeta — depends only on epic_type/prd_source/sprints/status", () => {
-  const h1 = lib.hashMeta({ epic_type: "X", prd_source: "p.md", estimated_sprints: 3, status: "todo", labels: ["a"] });
-  const h2 = lib.hashMeta({ epic_type: "X", prd_source: "p.md", estimated_sprints: 3, status: "todo", labels: ["b"] });
+  const h1 = lib.hashMeta({
+    epic_type: "X",
+    prd_source: "p.md",
+    estimated_sprints: 3,
+    status: "todo",
+    labels: ["a"],
+  });
+  const h2 = lib.hashMeta({
+    epic_type: "X",
+    prd_source: "p.md",
+    estimated_sprints: 3,
+    status: "todo",
+    labels: ["b"],
+  });
   assert.equal(h1, h2, "labels must not affect meta hash");
-  const h3 = lib.hashMeta({ epic_type: "Y", prd_source: "p.md", estimated_sprints: 3, status: "todo" });
+  const h3 = lib.hashMeta({
+    epic_type: "Y",
+    prd_source: "p.md",
+    estimated_sprints: 3,
+    status: "todo",
+  });
   assert.notEqual(h1, h3);
 });
 
@@ -114,12 +145,16 @@ test("storiesTableToAdf — emits ADF table with header + body", () => {
 // buildDescriptionAdf
 // ---------------------------------------------------------------------------
 const headingsOf = (doc) =>
-  doc.content.filter(n => n.type === "heading").map(h => h.content[0].text);
+  doc.content.filter((n) => n.type === "heading").map((h) => h.content[0].text);
 
 test("buildDescriptionAdf — produces ADF doc with summary, stories table and links", () => {
   const doc = lib.buildDescriptionAdf({
     body: "## Epic Goal\n\nGoal text.\n\n## Epic Description\n\nDesc.\n\n## Stories Breakdown\n\n| ID | Title |\n|----|-------|\n| 1 | A |\n",
-    frontmatter: { epic_type: "foundation", prd_source: "p.md", estimated_sprints: 2 },
+    frontmatter: {
+      epic_type: "foundation",
+      prd_source: "p.md",
+      estimated_sprints: 2,
+    },
     prdBbUrl: "https://bitbucket.org/o/r/src/main/p.md",
     epicBbUrl: "https://bitbucket.org/o/r/src/main/e.md",
   });
@@ -127,7 +162,12 @@ test("buildDescriptionAdf — produces ADF doc with summary, stories table and l
   // `Epic Description` is a FALLBACK alias of Summary, never its own block, and
   // the old fixed "Story Requirements" boilerplate is authoring guidance, not
   // card content.
-  assert.deepEqual(headingsOf(doc), ["Summary", "Metadata", "Stories Breakdown", "Source Documents"]);
+  assert.deepEqual(headingsOf(doc), [
+    "Summary",
+    "Metadata",
+    "Stories Breakdown",
+    "Source Documents",
+  ]);
   assert.equal(doc.content[1].content[0].text, "Goal text.");
 });
 
@@ -136,10 +176,15 @@ test("buildDescriptionAdf — produces ADF doc with summary, stories table and l
 test("buildDescriptionAdf — never publishes the document's Change Log", () => {
   const doc = lib.buildDescriptionAdf({
     body: "## Epic Goal\n\nGoal text.\n\n## Change Log\n\n| 2026-04-28 | created |\n",
-    frontmatter: {}, prdBbUrl: null, epicBbUrl: null,
+    frontmatter: {},
+    prdBbUrl: null,
+    epicBbUrl: null,
   });
   assert.ok(!headingsOf(doc).includes("Change Log"));
-  assert.ok(!doc.content.some(n => n.type === "table"), "no changelog table on the card");
+  assert.ok(
+    !doc.content.some((n) => n.type === "table"),
+    "no changelog table on the card",
+  );
 });
 
 // The per-story `###` blocks are what made epic descriptions the longest of the
@@ -147,16 +192,34 @@ test("buildDescriptionAdf — never publishes the document's Change Log", () => 
 test("buildDescriptionAdf — Stories Breakdown keeps the overview table, cuts the story subsections", () => {
   const doc = lib.buildDescriptionAdf({
     body: [
-      "## Epic Goal", "", "Goal text.", "",
-      "## Stories Breakdown", "",
-      "| ID | Title |", "|----|-------|", "| 1 | A |", "",
-      "### Story 1.1: A", "", "Lots of detail that belongs in the file.", "",
-      "### Story 1.2: B", "", "More detail.", "",
+      "## Epic Goal",
+      "",
+      "Goal text.",
+      "",
+      "## Stories Breakdown",
+      "",
+      "| ID | Title |",
+      "|----|-------|",
+      "| 1 | A |",
+      "",
+      "### Story 1.1: A",
+      "",
+      "Lots of detail that belongs in the file.",
+      "",
+      "### Story 1.2: B",
+      "",
+      "More detail.",
+      "",
     ].join("\n"),
-    frontmatter: {}, prdBbUrl: null, epicBbUrl: null,
+    frontmatter: {},
+    prdBbUrl: null,
+    epicBbUrl: null,
   });
   const json = JSON.stringify(doc);
-  assert.ok(doc.content.some(n => n.type === "table"), "overview table survives");
+  assert.ok(
+    doc.content.some((n) => n.type === "table"),
+    "overview table survives",
+  );
   assert.doesNotMatch(json, /Lots of detail/);
   assert.doesNotMatch(json, /Story 1\.2: B/);
 });
@@ -165,7 +228,8 @@ test("buildDescriptionAdf — strips ** ** markers from Epic Description", () =>
   const doc = lib.buildDescriptionAdf({
     body: "## Epic Description\n\n**Existing System Context:** baseline.\n",
     frontmatter: {},
-    prdBbUrl: null, epicBbUrl: null,
+    prdBbUrl: null,
+    epicBbUrl: null,
   });
   const text = JSON.stringify(doc);
   assert.doesNotMatch(text, /\*\*Existing System Context:\*\*/);
@@ -181,7 +245,10 @@ test("resolvePrdPath — null on empty input", () => {
 });
 
 test("resolvePrdPath — non-existent path returns null without throwing", () => {
-  assert.equal(lib.resolvePrdPath("docs/prd/no.md", "/nonexistent-root-xyz"), null);
+  assert.equal(
+    lib.resolvePrdPath("docs/prd/no.md", "/nonexistent-root-xyz"),
+    null,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -199,7 +266,9 @@ test("mapStatus — strips emoji and maps to Jira canonical status", () => {
 // syncLabelFor
 // ---------------------------------------------------------------------------
 test("syncLabelFor — derives label from epic dir name", () => {
-  const fp = path.resolve("/x/docs/prd/foo/epics/epic.1.foundation/epic.1.foundation.md");
+  const fp = path.resolve(
+    "/x/docs/prd/foo/epics/epic.1.foundation/epic.1.foundation.md",
+  );
   assert.equal(lib.syncLabelFor(fp), "synced-from-epic.1.foundation");
 });
 
@@ -218,10 +287,11 @@ test("upsertFrontmatterKeys — updates jira_key in place", () => {
 // ---------------------------------------------------------------------------
 test("parseJiraError — extracts errorMessages and field errors", async () => {
   const fake = {
-    text: async () => JSON.stringify({
-      errorMessages: ["Project not found"],
-      errors: { customfield_10011: "Field required for create" },
-    }),
+    text: async () =>
+      JSON.stringify({
+        errorMessages: ["Project not found"],
+        errors: { customfield_10011: "Field required for create" },
+      }),
   };
   const msg = await lib.parseJiraError(fake);
   assert.match(msg, /Project not found/);
@@ -232,8 +302,14 @@ test("parseJiraError — extracts errorMessages and field errors", async () => {
 // EPIC_SECTIONS
 // ---------------------------------------------------------------------------
 test("EPIC_CARD_SECTIONS — one Summary block, with Epic Description as its fallback alias", () => {
-  assert.deepEqual(lib.EPIC_CARD_SECTIONS.map(s => s.heading), ["Summary"]);
-  assert.deepEqual(lib.EPIC_CARD_SECTIONS[0].names, ["Epic Goal", "Epic Description"]);
+  assert.deepEqual(
+    lib.EPIC_CARD_SECTIONS.map((s) => s.heading),
+    ["Summary"],
+  );
+  assert.deepEqual(lib.EPIC_CARD_SECTIONS[0].names, [
+    "Epic Goal",
+    "Epic Description",
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -263,7 +339,9 @@ test("inlineToAdfNodes — plain text → single text node", () => {
 });
 
 test("inlineToAdfNodes — markdown link → text + link node", () => {
-  const nodes = lib.inlineToAdfNodes("See [Story 1.1](https://example.com/x) here");
+  const nodes = lib.inlineToAdfNodes(
+    "See [Story 1.1](https://example.com/x) here",
+  );
   assert.equal(nodes.length, 3);
   assert.equal(nodes[0].text, "See ");
   assert.equal(nodes[1].text, "Story 1.1");
@@ -274,7 +352,7 @@ test("inlineToAdfNodes — markdown link → text + link node", () => {
 
 test("inlineToAdfNodes — multiple links in one string", () => {
   const nodes = lib.inlineToAdfNodes("[a](u1) and [b](u2)");
-  const linked = nodes.filter(n => n.marks?.[0]?.type === "link");
+  const linked = nodes.filter((n) => n.marks?.[0]?.type === "link");
   assert.equal(linked.length, 2);
   assert.equal(linked[0].marks[0].attrs.href, "u1");
   assert.equal(linked[1].marks[0].attrs.href, "u2");
@@ -298,29 +376,37 @@ test("splitTableRow — bare-pipe row (no surround pipes)", () => {
 });
 
 test("splitTableRow — escaped \\| preserved as literal pipe inside cell", () => {
-  assert.deepEqual(lib.splitTableRow("| left \\| right | next |"), ["left | right", "next"]);
+  assert.deepEqual(lib.splitTableRow("| left \\| right | next |"), [
+    "left | right",
+    "next",
+  ]);
 });
 
 // ---------------------------------------------------------------------------
 // extractStoriesTable — separator edge cases
 // ---------------------------------------------------------------------------
 test("extractStoriesTable — separator with colons (alignment markers)", () => {
-  const body = "## Stories Breakdown\n\n| ID | Title |\n|:---|:------:|\n| 1.1 | A |\n";
+  const body =
+    "## Stories Breakdown\n\n| ID | Title |\n|:---|:------:|\n| 1.1 | A |\n";
   const rows = lib.extractStoriesTable(body);
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[1], ["1.1", "A"]);
 });
 
 test("extractStoriesTable — table with inline link in cell", () => {
-  const body = "## Stories Breakdown\n\n| ID | Story |\n|----|-------|\n| 1.1 | [link](https://x) |\n";
+  const body =
+    "## Stories Breakdown\n\n| ID | Story |\n|----|-------|\n| 1.1 | [link](https://x) |\n";
   const rows = lib.extractStoriesTable(body);
   assert.equal(rows[1][1], "[link](https://x)");
 });
 
 test("storiesTableToAdf — link in cell renders as ADF link mark", () => {
-  const adf = lib.storiesTableToAdf([["ID", "Story"], ["1.1", "[Story 1.1](https://example.com)"]]);
+  const adf = lib.storiesTableToAdf([
+    ["ID", "Story"],
+    ["1.1", "[Story 1.1](https://example.com)"],
+  ]);
   const cellPara = adf.content[1].content[1].content[0];
-  const linkNode = cellPara.content.find(n => n.marks?.[0]?.type === "link");
+  const linkNode = cellPara.content.find((n) => n.marks?.[0]?.type === "link");
   assert.ok(linkNode, "expected link node in cell paragraph");
   assert.equal(linkNode.marks[0].attrs.href, "https://example.com");
 });
@@ -350,14 +436,21 @@ test("mapStatus — covers the full canonical lifecycle (no passthrough)", () =>
 
 test("mapStatus — honours a project-supplied status map", () => {
   const custom = { "ready-for-development": "Selected for Development" };
-  assert.equal(lib.mapStatus("ready-for-development", custom), "Selected for Development");
+  assert.equal(
+    lib.mapStatus("ready-for-development", custom),
+    "Selected for Development",
+  );
 });
 
 test("loadStatusMap — merges jira.statusMap over defaults", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-epic-"));
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
-    "jira:\n  statusMap:\n    accepted: Shipped\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:\n    accepted: Shipped\n",
+  );
   const map = lib.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
   assert.equal(map["in-progress"][0], "In Progress");
@@ -365,10 +458,14 @@ test("loadStatusMap — merges jira.statusMap over defaults", () => {
 });
 
 test("loadStatusMap — tolerates inline comments on the statusMap opener and value lines", () => {
-  const fs = require("fs"), os = require("os"), path = require("path");
+  const fs = require("fs"),
+    os = require("os"),
+    path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "statusmap-epic-comment-"));
-  fs.writeFileSync(path.join(dir, "skills-config.yaml"),
-    "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n");
+  fs.writeFileSync(
+    path.join(dir, "skills-config.yaml"),
+    "jira:\n  statusMap:                          # local document status -> Jira status\n    accepted: Shipped  # done column\n",
+  );
   const map = lib.loadStatusMap(dir);
   assert.equal(map["accepted"], "Shipped");
   assert.equal(map["in-progress"][0], "In Progress");
@@ -385,12 +482,23 @@ test("findExistingByLabel — POSTs to /rest/api/3/search/jql with JSON body", a
     return {
       ok: true,
       status: 200,
-      json: async () => ({ issues: [{ key: "PROJ-42", fields: { updated: "2026-04-28T09:00:00.000+0000" } }] }),
+      json: async () => ({
+        issues: [
+          {
+            key: "PROJ-42",
+            fields: { updated: "2026-04-28T09:00:00.000+0000" },
+          },
+        ],
+      }),
     };
   };
   const result = await lib.findExistingByLabel({
-    http: fakeHttp, baseUrl: "https://x.atlassian.net",
-    email: "a@b", token: "t", projectKey: "RB", label: "synced-from-epic.1.foo",
+    http: fakeHttp,
+    baseUrl: "https://x.atlassian.net",
+    email: "a@b",
+    token: "t",
+    projectKey: "RB",
+    label: "synced-from-epic.1.foo",
   });
   assert.equal(calls.length, 1);
   assert.match(calls[0].url, /\/rest\/api\/3\/search\/jql$/);
@@ -404,17 +512,34 @@ test("findExistingByLabel — POSTs to /rest/api/3/search/jql with JSON body", a
 });
 
 test("findExistingByLabel — empty issues array returns null", async () => {
-  const fakeHttp = async () => ({ ok: true, json: async () => ({ issues: [] }) });
+  const fakeHttp = async () => ({
+    ok: true,
+    json: async () => ({ issues: [] }),
+  });
   const result = await lib.findExistingByLabel({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", projectKey: "RB", label: "L",
+    http: fakeHttp,
+    baseUrl: "x",
+    email: "a",
+    token: "t",
+    projectKey: "RB",
+    label: "L",
   });
   assert.equal(result, null);
 });
 
 test("findExistingByLabel — non-OK response returns null", async () => {
-  const fakeHttp = async () => ({ ok: false, status: 410, text: async () => "Gone" });
+  const fakeHttp = async () => ({
+    ok: false,
+    status: 410,
+    text: async () => "Gone",
+  });
   const result = await lib.findExistingByLabel({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", projectKey: "RB", label: "L",
+    http: fakeHttp,
+    baseUrl: "x",
+    email: "a",
+    token: "t",
+    projectKey: "RB",
+    label: "L",
   });
   assert.equal(result, null);
 });
@@ -425,7 +550,11 @@ test("findExistingByLabel — non-OK response returns null", async () => {
 test("fetchUpdatedTimestamp — returns null on non-OK without throwing", async () => {
   const fakeHttp = async () => ({ ok: false, status: 500 });
   const ts = await lib.fetchUpdatedTimestamp({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "PROJ-1",
+    http: fakeHttp,
+    baseUrl: "x",
+    email: "a",
+    token: "t",
+    issueKey: "PROJ-1",
   });
   assert.equal(ts, null);
 });
@@ -436,15 +565,25 @@ test("fetchUpdatedTimestamp — returns timestamp on success", async () => {
     json: async () => ({ fields: { updated: "2026-04-28T10:00:00.000+0000" } }),
   });
   const ts = await lib.fetchUpdatedTimestamp({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "PROJ-1",
+    http: fakeHttp,
+    baseUrl: "x",
+    email: "a",
+    token: "t",
+    issueKey: "PROJ-1",
   });
   assert.equal(ts, "2026-04-28T10:00:00.000+0000");
 });
 
 test("fetchUpdatedTimestamp — swallows http throws and returns null", async () => {
-  const fakeHttp = async () => { throw new Error("network blew up"); };
+  const fakeHttp = async () => {
+    throw new Error("network blew up");
+  };
   const ts = await lib.fetchUpdatedTimestamp({
-    http: fakeHttp, baseUrl: "x", email: "a", token: "t", issueKey: "PROJ-1",
+    http: fakeHttp,
+    baseUrl: "x",
+    email: "a",
+    token: "t",
+    issueKey: "PROJ-1",
   });
   assert.equal(ts, null);
 });
@@ -453,34 +592,44 @@ test("fetchUpdatedTimestamp — swallows http throws and returns null", async ()
 // guardConcurrentEdit
 // ---------------------------------------------------------------------------
 test("guardConcurrentEdit — no-op when no lastSyncedAt", () => {
-  assert.doesNotThrow(() => lib.guardConcurrentEdit({
-    jiraUpdated: "2026-04-28T10:00:00.000+0000",
-    lastSyncedAt: null,
-  }));
+  assert.doesNotThrow(() =>
+    lib.guardConcurrentEdit({
+      jiraUpdated: "2026-04-28T10:00:00.000+0000",
+      lastSyncedAt: null,
+    }),
+  );
 });
 
 test("guardConcurrentEdit — throws when Jira newer than local", () => {
-  assert.throws(() => lib.guardConcurrentEdit({
-    jiraUpdated: "2026-04-28T11:00:00.000+0000",
-    lastSyncedAt: "2026-04-28T10:00:00.000+0000",
-  }), /updated since last local sync/);
+  assert.throws(
+    () =>
+      lib.guardConcurrentEdit({
+        jiraUpdated: "2026-04-28T11:00:00.000+0000",
+        lastSyncedAt: "2026-04-28T10:00:00.000+0000",
+      }),
+    /updated since last local sync/,
+  );
 });
 
 test("guardConcurrentEdit — passes when Jira older or equal", () => {
-  assert.doesNotThrow(() => lib.guardConcurrentEdit({
-    jiraUpdated: "2026-04-28T09:00:00.000+0000",
-    lastSyncedAt: "2026-04-28T10:00:00.000+0000",
-  }));
+  assert.doesNotThrow(() =>
+    lib.guardConcurrentEdit({
+      jiraUpdated: "2026-04-28T09:00:00.000+0000",
+      lastSyncedAt: "2026-04-28T10:00:00.000+0000",
+    }),
+  );
 });
 
 test("guardConcurrentEdit — --force overrides and warns", () => {
   const warns = [];
-  assert.doesNotThrow(() => lib.guardConcurrentEdit({
-    jiraUpdated: "2026-04-28T11:00:00.000+0000",
-    lastSyncedAt: "2026-04-28T10:00:00.000+0000",
-    force: true,
-    output: { warn: m => warns.push(m) },
-  }));
+  assert.doesNotThrow(() =>
+    lib.guardConcurrentEdit({
+      jiraUpdated: "2026-04-28T11:00:00.000+0000",
+      lastSyncedAt: "2026-04-28T10:00:00.000+0000",
+      force: true,
+      output: { warn: (m) => warns.push(m) },
+    }),
+  );
   assert.equal(warns.length, 1);
   assert.match(warns[0], /--force in effect/);
 });
@@ -490,10 +639,15 @@ test("guardConcurrentEdit — --force overrides and warns", () => {
 // ---------------------------------------------------------------------------
 test("collectCreateFields — includes project + issuetype on create", () => {
   const fields = lib.collectCreateFields({
-    args: {}, frontmatter: {}, descAdf: { type: "doc", content: [] },
-    livePriorities: null, output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x", summary: "S",
-    epicTypeId: "10001", projectKey: "RB",
+    args: {},
+    frontmatter: {},
+    descAdf: { type: "doc", content: [] },
+    livePriorities: null,
+    output: { warn: () => {} },
+    syncLabel: "synced-from-epic.1.x",
+    summary: "S",
+    epicTypeId: "10001",
+    projectKey: "RB",
   });
   assert.equal(fields.project.key, "RB");
   assert.equal(fields.issuetype.id, "10001");
@@ -503,9 +657,13 @@ test("collectCreateFields — includes project + issuetype on create", () => {
 
 test("collectUpdateFields — omits project + issuetype (Jira refuses on PUT)", () => {
   const fields = lib.collectUpdateFields({
-    args: {}, frontmatter: {}, descAdf: { type: "doc", content: [] },
-    livePriorities: null, output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x", summary: "S",
+    args: {},
+    frontmatter: {},
+    descAdf: { type: "doc", content: [] },
+    livePriorities: null,
+    output: { warn: () => {} },
+    syncLabel: "synced-from-epic.1.x",
+    summary: "S",
   });
   assert.equal(fields.project, undefined);
   assert.equal(fields.issuetype, undefined);
@@ -514,10 +672,13 @@ test("collectUpdateFields — omits project + issuetype (Jira refuses on PUT)", 
 
 test("collectCommonFields — preserves user-supplied labels and adds sync label", () => {
   const fields = lib.collectCommonFields({
-    args: { labels: "alpha,beta" }, frontmatter: {},
+    args: { labels: "alpha,beta" },
+    frontmatter: {},
     descAdf: { type: "doc", content: [] },
-    livePriorities: null, output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x", summary: "S",
+    livePriorities: null,
+    output: { warn: () => {} },
+    syncLabel: "synced-from-epic.1.x",
+    summary: "S",
   });
   assert.ok(fields.labels.includes("alpha"));
   assert.ok(fields.labels.includes("beta"));
@@ -526,15 +687,19 @@ test("collectCommonFields — preserves user-supplied labels and adds sync label
 
 test("collectCommonFields — does not duplicate sync label if already present", () => {
   const fields = lib.collectCommonFields({
-    args: { labels: "synced-from-epic.1.x,other" }, frontmatter: {},
+    args: { labels: "synced-from-epic.1.x,other" },
+    frontmatter: {},
     descAdf: { type: "doc", content: [] },
-    livePriorities: null, output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x", summary: "S",
+    livePriorities: null,
+    output: { warn: () => {} },
+    syncLabel: "synced-from-epic.1.x",
+    summary: "S",
   });
-  const count = fields.labels.filter(l => l === "synced-from-epic.1.x").length;
+  const count = fields.labels.filter(
+    (l) => l === "synced-from-epic.1.x",
+  ).length;
   assert.equal(count, 1);
 });
-
 
 // ---------------------------------------------------------------------------
 // parseArgs — --version / --verbose
@@ -565,7 +730,10 @@ test("parseArgs — -v short form sets verbose", () => {
 // ---------------------------------------------------------------------------
 test("stripRemotePrefix — strips remote name, preserves slashes in branch", () => {
   assert.equal(lib.stripRemotePrefix("origin/main"), "main");
-  assert.equal(lib.stripRemotePrefix("origin/feature/story.5.1.foo"), "feature/story.5.1.foo");
+  assert.equal(
+    lib.stripRemotePrefix("origin/feature/story.5.1.foo"),
+    "feature/story.5.1.foo",
+  );
   assert.equal(lib.stripRemotePrefix("upstream/release/1.2"), "release/1.2");
 });
 
@@ -575,7 +743,14 @@ test("stripRemotePrefix — empty or shape-less ref returns null", () => {
 });
 
 test("parseArgs — --doc-branch overrides the resolved branch", () => {
-  const opts = lib.parseArgs(["node", "script", "--file", "x.md", "--doc-branch", "develop"]);
+  const opts = lib.parseArgs([
+    "node",
+    "script",
+    "--file",
+    "x.md",
+    "--doc-branch",
+    "develop",
+  ]);
   assert.equal(opts.docBranch, "develop");
 });
 
@@ -617,7 +792,8 @@ test("normaliseEpicSummary — falls back to the title's prefix id when epic_num
 // findChildStories — an epic's related docs are its child story cards
 // ---------------------------------------------------------------------------
 function makeEpicDir(stories, { withStoriesDir = true } = {}) {
-  const fs = require("fs"), os = require("os");
+  const fs = require("fs"),
+    os = require("os");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "child-stories-"));
   const epicDir = path.join(dir, "epic.2.demo");
   fs.mkdirSync(epicDir);
@@ -628,7 +804,8 @@ function makeEpicDir(stories, { withStoriesDir = true } = {}) {
     for (const [name, files] of Object.entries(stories)) {
       const sd = path.join(storiesDir, name);
       fs.mkdirSync(sd);
-      for (const [f, content] of Object.entries(files)) fs.writeFileSync(path.join(sd, f), content);
+      for (const [f, content] of Object.entries(files))
+        fs.writeFileSync(path.join(sd, f), content);
     }
   }
   return path.join(epicDir, "epic.2.demo.md");
@@ -638,8 +815,8 @@ test("findChildStories — links each story card and ignores its sibling artifac
   const epicFile = makeEpicDir({
     "story.2.1.alpha": {
       "story.2.1.alpha.md": "# Alpha story",
-      "story.2.1.plan.alpha.md": "# plan",   // artifact — must not be linked
-      "story.2.1.qa.1.alpha.md": "# qa",     // artifact — must not be linked
+      "story.2.1.plan.alpha.md": "# plan", // artifact — must not be linked
+      "story.2.1.qa.1.alpha.md": "# qa", // artifact — must not be linked
     },
   });
   const found = lib.findChildStories(epicFile);
@@ -650,21 +827,26 @@ test("findChildStories — links each story card and ignores its sibling artifac
 test("findChildStories — orders numerically, not lexicographically", () => {
   const epicFile = makeEpicDir({
     "story.2.10.j": { "story.2.10.j.md": "# J" },
-    "story.2.2.b":  { "story.2.2.b.md": "# B" },
-    "story.2.1.a":  { "story.2.1.a.md": "# A" },
+    "story.2.2.b": { "story.2.2.b.md": "# B" },
+    "story.2.1.a": { "story.2.1.a.md": "# A" },
   });
   assert.deepEqual(
-    lib.findChildStories(epicFile).map(s => s.label),
+    lib.findChildStories(epicFile).map((s) => s.label),
     ["Story 2.1 — A", "Story 2.2 — B", "Story 2.10 — J"],
   );
 });
 
 test("findChildStories — an epic with no stories/ directory yields no links", () => {
-  assert.deepEqual(lib.findChildStories(makeEpicDir({}, { withStoriesDir: false })), []);
+  assert.deepEqual(
+    lib.findChildStories(makeEpicDir({}, { withStoriesDir: false })),
+    [],
+  );
 });
 
 test("findChildStories — a story dir without its matching card is skipped", () => {
-  const epicFile = makeEpicDir({ "story.2.1.alpha": { "story.2.1.plan.alpha.md": "# orphan plan" } });
+  const epicFile = makeEpicDir({
+    "story.2.1.alpha": { "story.2.1.plan.alpha.md": "# orphan plan" },
+  });
   assert.deepEqual(lib.findChildStories(epicFile), []);
 });
 
@@ -672,10 +854,15 @@ test("labelForChildStory — an already-prefixed title is not repeated", () => {
   const epicFile = makeEpicDir({
     "story.2.1.alpha": { "story.2.1.alpha.md": "# [Story 2.1] Alpha thing" },
   });
-  assert.equal(lib.findChildStories(epicFile)[0].label, "Story 2.1 — Alpha thing");
+  assert.equal(
+    lib.findChildStories(epicFile)[0].label,
+    "Story 2.1 — Alpha thing",
+  );
 });
 
 test("labelForChildStory — an untitled card still gets a numbered label", () => {
-  const epicFile = makeEpicDir({ "story.2.1.alpha": { "story.2.1.alpha.md": "no heading here" } });
+  const epicFile = makeEpicDir({
+    "story.2.1.alpha": { "story.2.1.alpha.md": "no heading here" },
+  });
   assert.equal(lib.findChildStories(epicFile)[0].label, "Story 2.1");
 });

@@ -127,7 +127,29 @@ done | grep -q 'LEAK' && echo "LEAK DETECTED" || echo "OK"
 
 If the verification prints any LEAK lines, note them in the Issues Log (does not warrant a halt — investigate before the next pipeline run).
 
-The implementation report will continue to be updated through Steps 5–8; its final state is captured in the dedicated Step 8 commit.
+### The implementation report IS committed here — and only here does its first commit belong
+
+Stage the report in this commit. Steps 5–6 then exclude its **updates** from each `fix(...)` commit,
+and Step 8 commits its final state. That ordering is deliberate, and the two halves are different
+things: this step commits **the file**, Steps 5–6 defer **changes to a file that already exists**.
+
+Withholding the file itself until Step 8 was the previous behaviour and it had two costs, one of
+which is close to invisible:
+
+- **A reviewer cannot read the audit trail while the PR is under review.** The report is the record
+  of what the pipeline decided and why. Between Step 4 and Step 8 — which spans the entire QA loop,
+  the part of the run most worth reviewing — it did not exist in the branch at all.
+- **Any document that links to the report acquires a dangling relative link, and it fails only in
+  CI.** Consumers reasonably cross-reference the report from the work item; the file is present in
+  the working tree (untracked), so a link checker run locally resolves it, while CI checks out only
+  tracked files and does not. The result is a red build that cannot be reproduced by running the same
+  command in the same directory, which is the most expensive shape a defect can take.
+
+> **If you are diagnosing a link failure that reproduces in CI and not locally, check the tracked
+> tree, not the working tree:** `git worktree add --detach /tmp/probe HEAD` and run the gate there.
+> A dirty working tree hides exactly this class of failure.
+
+Its final state is captured in the dedicated Step 8 commit.
 
 ---
 
@@ -193,14 +215,29 @@ Log in Decisions Log: "GitHub board: in-review → {landed / already / no-option
 
 > **MUST execute — pipeline action, not optional sync.** Do not skip on the basis of any user memory that says "Jira sync is manual" (e.g. `feedback_jira_sync_manual_only.md`). That rule applies only to `/create-epic`, `/create-story`, `/create-task` — never to develop-pipeline steps. This is the symmetric Jira counterpart to the GitHub `gh issue comment` posted by `create-pr` in the `TRACKER=github` path.
 
-After extracting the PR URL from `create-pr`'s output, use the Atlassian MCP tools:
+After extracting the PR URL from `create-pr`'s output:
 
-1. **Post PR-opened comment** — call `addCommentToJiraIssue`:
-   - `cloudId`: {hostname from `JIRA_URL`}
-   - `issueIdOrKey`: `{TRACKER_ISSUE}`
-   - `commentBody`: `"PR opened — {PR_URL}"`
-   - `contentFormat`: `"markdown"`
-   - On failure: log warning and continue (non-blocking)
+1. **Post PR-opened comment** — one call, both trackers:
+
+   ```bash
+   mkdir -p .claude/state
+   # Terminator at COLUMN 0 — an indented terminator does not close an
+   # unquoted heredoc; bash swallows everything after it into the body,
+   # so the call below would never run. Body lines are unindented for
+   # the same reason: leading spaces are written verbatim.
+   cat > .claude/state/comment-body.md <<EOF
+PR opened — {PR_URL}
+EOF
+
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
+     --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+     --stage in-review --json
+   ```
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
+
+   Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 2. **Signal the `in-review` stage** — run the deterministic CLI:
 

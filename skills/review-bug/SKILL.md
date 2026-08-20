@@ -50,7 +50,7 @@ Execute `references/review-pipeline-step-0a-branch-setup.md` with the **review-b
 
 ## Step 1: Load Context
 
-Read `BUG_FILE` (frontmatter + body). Load the structure oracle `create-bug-report/assets/bug-report-template.md`. Source the platform resolver once: `source references/resolve-platform.sh` (sets `TRACKER`/`VCS`; see [`references/platform-detection.md`](references/platform-detection.md)). Note `github_issue`/`jira_key` if present (usually absent — `TRACKER_ISSUE` empty).
+Read `BUG_FILE` (frontmatter + body). Load the structure oracle `create-bug-report/assets/bug-report-template.md`. Source the platform resolver once, guarded: `source references/resolve-platform.sh || exit 1` (sets `TRACKER`/`VCS`/`ACCESS_TRACKER`/`ACCESS_VCS`; see [`references/platform-detection.md`](references/platform-detection.md)). The `|| exit 1` is required — the resolver rejects an unrecognised `tracker:`, `vcs:` or `access:` value by returning non-zero, and sourcing it bare would print the error and carry on with a default. Note `github_issue`/`jira_key` if present (usually absent — `TRACKER_ISSUE` empty).
 
 ## Phase 1.5: Pre-pass (2 Parallel Explore Subagents)
 
@@ -146,7 +146,28 @@ Leave the `Status` cell at the bug's **current** lifecycle status — this step 
 
 ## Step 7: Tracker Comment (graceful — non-blocking)
 
-Only if the bug has `github_issue`/`jira_key` in frontmatter (skip silently otherwise — most bugs have none). Post a short review-outcome comment (recommendation, score, issue counts, review-file path) via the `TRACKER` path (`gh issue comment` / `addCommentToJiraIssue`). Failure logs a warning and does not halt.
+Only if the bug has `github_issue`/`jira_key` in frontmatter (skip silently otherwise — most bugs have none). Post a short review-outcome comment (recommendation, score, issue counts, review-file path) — one call, both trackers:
+
+```bash
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+## Bug Review Complete
+
+**Recommendation**: ${RECOMMENDATION}
+**Fix-readiness**: ${SCORE}/10
+**Issues**: Critical ${CRITICAL} · Important ${IMPORTANT} · Optional ${OPTIONAL}
+**Review artifact**: \`${REVIEW_FILE}\`
+EOF
+
+node .agents/skills/review-bug/references/tracker-comment.js \
+  --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
+  --stage review-bug --json
+```
+
+Read `reason` per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). Failure logs a warning and does not halt.
+
+> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+
 
 ## Pipeline Integration (develop-bug Step 2)
 

@@ -27,6 +27,35 @@ const { execSync } = require("child_process");
 // and a GitHub-only consumer must not pull the Jira client in behind it.
 const tw = require("./tracker-workflow.js");
 
+// The deferred-mutation writer (task.52). Required here so that the access gate
+// below can record what it refuses; the bundler follows this sibling require and
+// ships defer-mutation.js — and, transitively, the roster doc it parses — into
+// every skill that carries this file.
+const dm = require("./defer-mutation.js");
+
+// The access mode captured at require time, BEFORE anything can call
+// loadDotEnv(). A dot-env file must not be able to escalate a restriction the
+// operator declared into a tracker write.
+//
+// ONE resolver, in defer-mutation.js. This file used to carry its own copy of
+// the mode table, jira-create-epic.js a third and jira-sprint-lib.sh a fourth,
+// and each read a different subset of the tiers. `dm.resolveAccessTracker`
+// reads ACCESS_TRACKER and AGENT_SKILLS_ACCESS_TRACKER, most-restrictive-wins.
+// `cwd` reaches the config tier so it anchors to the repo root the caller
+// computed rather than to process.cwd() (C5-CR6).
+function mostRestrictiveAccess(env = process.env, cwd = undefined) {
+  return dm.resolveAccessTracker(env, { cwd });
+}
+
+// SKILLS_CONFIG_FILE is frozen alongside the two mode names: it is how the
+// config tier finds the file, so leaving it out would let a .env redirect the
+// config path after this snapshot (C5-CR1).
+const ACCESS_ENV_AT_LOAD = Object.freeze({
+  ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+  AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+  SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
+});
+
 // Every `git rev-parse` below sits inside a try/catch that reads a failure as
 // "not in a repo, fall back to defaults". Without "ignore" on stderr that
 // silent fallback prints a `fatal: not a git repository` line per call, which
@@ -644,13 +673,59 @@ const adf = {
   tableHeader: (...content) => ({ type: "tableHeader", attrs: {}, content }),
   tableCell: (...content) => ({ type: "tableCell", attrs: {}, content }),
   hardBreak: () => ({ type: "hardBreak" }),
+  // A fenced code block. `language` is optional: Jira renders an unlabelled
+  // block fine, but omitting the attr entirely is not the same as an empty
+  // string to every ADF consumer, so only set it when we actually have one.
+  codeBlock: (text, language) => ({
+    type: "codeBlock",
+    ...(language ? { attrs: { language } } : { attrs: {} }),
+    // An empty fence is legal markdown but an empty `content` array is not
+    // legal ADF, so an empty block carries no content key at all.
+    ...(text ? { content: [{ type: "text", text }] } : {}),
+  }),
+  // Italic text. Deliberately a builder rather than an inline-markdown rule:
+  // see the note on inlineMarkdownToAdf below.
+  em: (t) => ({ type: "text", text: t, marks: [{ type: "em" }] }),
 };
 
 const RE_BULLET = /^\s*[-*]\s+(.*)$/;
 const RE_ORDERED = /^\s*\d+\.\s+(.*)$/;
+// A code fence, matched as a PREDICATE rather than one regex, because the rule
+// that matters cannot be expressed cleanly in a single pattern.
+//
+// This has now been wrong in both directions, so both are recorded:
+//
+//   Too STRICT — `(\S*)\s*$` required the whole info string to be one token, so
+//   ```` ```js title="x" ```` did not match at all. The opening line rendered as
+//   prose and the CLOSING fence was then read as an opening one, swallowing
+//   every later block.
+//
+//   Too LOOSE — relaxing the tail to `[^\n]*` let backticks back in, so a prose
+//   line that merely BEGINS with an inline code span of three or more backticks
+//   became an opening fence. One live document hit it: task.42 line 313 reads
+//   "```` ``` ```` or `~~~` fenced block." and 31,235 characters of that file
+//   collapsed into a single code block.
+//
+// CommonMark states the rule directly: a backtick fence's info string may not
+// contain a backtick. Tilde fences have no such restriction, because `~` cannot
+// open an inline code span. That asymmetry is the whole fix.
+function matchCodeFence(line) {
+  const m = /^\s*(`{3,}|~{3,})[ \t]*(.*)$/.exec(line);
+  if (!m) return null;
+  const delim = m[1];
+  const rest = m[2];
+  if (delim[0] === "`" && rest.includes("`")) return null;
+  return { delim, lang: rest.trim().split(/\s+/)[0] || "" };
+}
 
 // ---------------------------------------------------------------------------
 // Inline markdown parser — **bold**, `code`, [link](url)
+//
+// Deliberately NOT handling *italic* / _italic_. The bold rule already owns
+// `*`, so a single-asterisk alternative would have to be ordered against it and
+// would change how every existing document renders — a wide blast radius for a
+// syntax none of them use. Callers that need italics (the tracker-comment
+// identity footer) build the node directly with `adf.em()`.
 // ---------------------------------------------------------------------------
 function inlineMarkdownToAdf(text, linkResolver) {
   if (text == null || text === "") return [adf.text("")];
@@ -717,10 +792,17 @@ function tableLinesToAdf(lines, linkResolver) {
 /**
  * Convert markdown text to ADF nodes. Handles:
  * - ##–###### headings → ADF heading nodes
+ * - ``` fenced blocks → ADF codeBlock nodes (language tag preserved)
  * - pipe tables (|...|) → ADF table nodes with inline markdown in cells
  * - horizontal rules (---) → skipped
  * - bullet/ordered lists → proper ADF list nodes
  * - **bold**, `code`, [link](url) → inline marks
+ *
+ * Fences are tracked HERE rather than in blockToAdf, and that placement is
+ * load-bearing: this loop splits on blank lines before blockToAdf ever sees a
+ * block, so a fenced listing containing a blank line — or a `#` comment, or a
+ * row of `|` — would be torn into pieces and each piece parsed as prose. Inside
+ * a fence every other rule is suspended and lines are taken verbatim.
  */
 function textToAdfNodes(text, linkResolver) {
   if (!text) return [];
@@ -728,6 +810,9 @@ function textToAdfNodes(text, linkResolver) {
   const lines = text.split("\n");
   let buf = [];
   let tableBuf = [];
+  let fenceBuf = null; // non-null ⇒ inside a fence
+  let fenceLang = "";
+  let fenceDelim = "";
 
   const flushBuf = () => {
     if (!buf.length) return;
@@ -744,6 +829,43 @@ function textToAdfNodes(text, linkResolver) {
 
   for (const line of lines) {
     const trimmed = line.trim();
+
+    const fm = matchCodeFence(line);
+    if (fenceBuf !== null) {
+      // Inside a fence: only a closing fence of the SAME delimiter type is
+      // interpreted, so a ``` line inside a ~~~ block stays content. Everything
+      // else is kept verbatim — no trim, because indentation is significant in
+      // code and a re-indented listing is a corrupted one.
+      // A closing fence must use the SAME delimiter character, be AT LEAST as
+      // long as the opening run, and carry no info string — CommonMark's rule.
+      // Comparing only the character let a 3-backtick line close a 4-backtick
+      // fence, tearing apart every nested example in this repo's own docs
+      // (three shipped documents use ```` to wrap ``` blocks).
+      if (
+        fm &&
+        fm.delim[0] === fenceDelim[0] &&
+        fm.delim.length >= fenceDelim.length &&
+        !fm.lang
+      ) {
+        nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
+        fenceBuf = null;
+        fenceLang = "";
+        fenceDelim = "";
+      } else {
+        fenceBuf.push(line);
+      }
+      continue;
+    }
+    if (fm) {
+      // Opening fence. Flush whatever precedes it first, exactly as a heading
+      // or table boundary would.
+      flushBuf();
+      flushTable();
+      fenceBuf = [];
+      fenceDelim = fm.delim;
+      fenceLang = fm.lang;
+      continue;
+    }
 
     if (RE_HR_LINE.test(trimmed)) {
       // horizontal rule — skip
@@ -773,6 +895,11 @@ function textToAdfNodes(text, linkResolver) {
     buf.push(line);
   }
 
+  // An unterminated fence still yields a code block rather than being dropped:
+  // truncated input is common (the description cap cuts mid-document), and a
+  // silently vanished listing is worse than an unclosed one.
+  if (fenceBuf !== null)
+    nodes.push(adf.codeBlock(fenceBuf.join("\n"), fenceLang));
   flushBuf();
   flushTable();
   return nodes.filter(Boolean);
@@ -1564,10 +1691,17 @@ function getAuth({
     "JIRA_PROJECT_KEY",
   ],
   optional = ["JIRA_BOARD_ID"],
+  // Defaults to process.env, but accepts an injected source so a caller that
+  // already resolved its environment can pass the same one through. Without
+  // this, a CLI reading an injected `env` and then calling getAuth() gets two
+  // different environments — which is exactly why tracker-comment.js's Jira
+  // branch could not be driven through its own DI seam, and therefore had no
+  // test coverage at all.
+  source = process.env,
 } = {}) {
   const env = {};
-  for (const k of required) env[k] = process.env[k];
-  for (const k of optional) env[k] = process.env[k];
+  for (const k of required) env[k] = source[k];
+  for (const k of optional) env[k] = source[k];
   const missing = required.filter((k) => !env[k]);
   return {
     ok: missing.length === 0,
@@ -1584,21 +1718,265 @@ function authHeader(email, token) {
   return `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
 }
 
+// ---------------------------------------------------------------------------
+// The access gate — layer 1 (task.53)
+// ---------------------------------------------------------------------------
+//
+// Under any `access.tracker` mode other than `full`, a non-GET through this
+// module is REFUSED and RECORDED rather than executed. It is a net, not a
+// description: a mutation path nobody has annotated still cannot reach the
+// network, it just renders generically. Layer 2 (the `defer:` annotation the
+// semantic mutators pass) is what turns "PUT /rest/api/3/issue/PROJ-1 {…}" into
+// "set Team to Platform".
+//
+// The one exception is a read wearing a POST — see READ_VIA_POST.
+
+// Jira takes a JQL query in a request body, so `findExistingByLabel` searches
+// with POST. Refusing it would make every sync skill see "no existing issue"
+// and create a duplicate on the next run — the opposite of safe. Matched by
+// URL, never by "it looked like a read".
+const READ_VIA_POST = [/\/rest\/api\/3\/search(\/|\?|$)/];
+
+function isReadViaPost(url) {
+  const u = String(url || "");
+  return READ_VIA_POST.some((re) => re.test(u));
+}
+
+/** The endpoint path, with the origin and any query string dropped. */
+function endpointOf(url) {
+  const u = String(url || "");
+  const m = /^https?:\/\/[^/]+(\/[^?#]*)/.exec(u);
+  return m ? m[1] : u.split("?")[0];
+}
+
+/**
+ * What a refused mutation returns to its caller.
+ *
+ * `ok: true` and a 202 are deliberate. Callers throw on `!resp.ok`, and a
+ * deferral is not a failure — the work was recorded for a human, not lost. The
+ * `deferred` flag is how a caller that must return a different SHAPE (a create
+ * has no issue key to give back) knows to branch; everything else carries on.
+ */
+function deferredResponse(record) {
+  return {
+    ok: true,
+    status: 202,
+    statusText: "Accepted (deferred)",
+    deferred: true,
+    deferredRecord: record ? record.id : null,
+    headers: { get: () => null },
+    async json() {
+      return {};
+    },
+    async text() {
+      return "";
+    },
+  };
+}
+
+/**
+ * Record one refused mutation and hand back the synthetic response.
+ *
+ * `annotation` is layer 2: `{kind, intent, target, desired, …}` supplied by a
+ * semantic mutator. Absent, the record is a `jira.unknown-mutation` — legible
+ * enough to act on, loud enough to notice, and never executed.
+ */
+function recordRefusal({ url, method, access, system, annotation, ctx }) {
+  const a = annotation || {};
+  let rec = null;
+  try {
+    const input = {
+      kind: a.kind || "jira.unknown-mutation",
+      system: a.system || system,
+      access,
+      intent:
+        a.intent ||
+        `Perform ${method} ${endpointOf(url)} by hand — no semantic annotation, ` +
+          `so what it would have changed is not known here`,
+      target: a.target || { url: String(url), name: endpointOf(url) },
+      desired:
+        a.desired === undefined
+          ? { method, endpoint: endpointOf(url) }
+          : a.desired,
+      skill: a.skill || ctx.skill,
+      step: a.step === undefined ? ctx.step : a.step,
+      run: a.run || ctx.run,
+    };
+    for (const k of [
+      "consequence",
+      "produces",
+      "dependsOn",
+      "manual",
+      "command",
+      "verify",
+      "retry_of",
+    ]) {
+      if (a[k] !== undefined) input[k] = a[k];
+    }
+    rec = dm.defer(input, ctx.cwd ? { cwd: ctx.cwd } : {});
+  } catch (e) {
+    // Same contract as jira-stage.js: a journal we could not write is a
+    // warning, never a licence to perform the mutation anyway.
+    const warn =
+      (ctx.output && ctx.output.warn) ||
+      ((m) => process.stderr.write(`${m}\n`));
+    warn(
+      `⚠️  Could not record the deferred ${method} ${endpointOf(url)}: ${e.message}`,
+    );
+  }
+  return deferredResponse(rec);
+}
+
+/**
+ * Turn a Jira `fields` payload into something a human can act on.
+ *
+ * This is the whole reason layer 2 exists. `PUT /rest/api/3/issue/PROJ-1 {…}`
+ * tells an operator nothing; `Team = Platform` tells them exactly what to type.
+ * A value the shape cannot express in one line (an ADF description, say) is
+ * NAMED rather than dumped — a checklist item nobody can read is as useless as
+ * no checklist item, and the document already holds the prose.
+ */
+const EMPTY_VALUE = "(structured value — see the work-item document)";
+// CYCLE-3 CR-7 — an empty collection in a Jira update is not an unrenderable
+// value, it is an INSTRUCTION: clear the field. Pointing the operator at a
+// document that holds nothing to copy describes the wrong thing entirely.
+const CLEARED_VALUE = "(cleared)";
+
+function summariseFields(fields) {
+  const short = (v) => {
+    const t = String(v);
+    return t.length > 120 ? `${t.slice(0, 117)}…` : t;
+  };
+  const oneLine = (v) => {
+    if (v === null || v === undefined) return null;
+    if (typeof v !== "object") return short(v);
+    if (Array.isArray(v)) {
+      // CR-8 — drop empty members rather than stringifying them. A null in a
+      // labels array used to render as a gap (", , x"), which reads as a value
+      // the operator is expected to type.
+      const parts = v
+        .map((x) => oneLine(x))
+        .filter((x) => x !== null && x !== "");
+      // CYCLE-2 CR-4 — NOT null. describeDesired renders a null with
+      // JSON.stringify, so an empty `components: []` printed
+      // "components = null" in the operator's checklist — the same literal-null
+      // rendering this function was just fixed to stop producing.
+      return parts.length ? short(parts.join(", ")) : CLEARED_VALUE;
+    }
+    // CR-8 — `timetracking` is a field THESE scripts send, and it carries no
+    // name/value/key/id, so it used to be discarded as "structured". The value
+    // is exactly the kind a human could type, so name the shape explicitly.
+    if (v.originalEstimate !== undefined || v.remainingEstimate !== undefined) {
+      // CYCLE-4 CR-9 — first NON-EMPTY, not first non-null. `??` skips only
+      // null/undefined, so `{originalEstimate: "", remainingEstimate: "3d"}`
+      // rendered "(cleared)" — an affirmative instruction to clear a field that
+      // carries an estimate.
+      const est = [v.originalEstimate, v.remainingEstimate]
+        .map((x) => (x === null || x === undefined ? "" : String(x).trim()))
+        .find((x) => x !== "");
+      return est === undefined ? CLEARED_VALUE : short(est);
+    }
+    const named = v.name ?? v.value ?? v.key ?? v.id;
+    // CR-8 — `?? ` treats an explicit null as "present", so `{name: null}` used
+    // to render as the literal string "null". An unusable value is not a value.
+    return named === undefined || named === null ? EMPTY_VALUE : short(named);
+  };
+  const out = {};
+  for (const [k, v] of Object.entries(fields || {})) out[k] = oneLine(v);
+  return out;
+}
+
+// Permissiveness order, least to most — mirrors resolve-platform.sh's access_rank.
+const ACCESS_ORDER = Object.freeze({
+  manual: 0,
+  command: 1,
+  approve: 2,
+  "read-only": 3,
+  full: 4,
+});
+
 function makeHttp({
   fetchImpl = fetch,
   timeoutMs = 30000,
   retries = 2,
   retryDelayMs = 500,
   maxRetryAfterMs = 60000,
+  // Additive, and defaulted so every existing call site is unaffected: with
+  // ACCESS_TRACKER unset the resolver answers "full" and the branch below is
+  // never taken.
+  access = null,
+  system = "jira",
+  run = undefined,
+  step = undefined,
+  skill = "jira-sync",
+  cwd = undefined,
+  output = undefined,
 } = {}) {
+  const ctx = { run, step, skill, cwd, output };
+
+  // Resolved lazily, and only when a write is actually attempted. An
+  // unrecognised mode must refuse, but refusing at FACTORY time also killed
+  // read-only callers that never write (`--probe-workflow`,
+  // scaffold-tracker-workflow), which no requirement asks for.
+  //
+  // An injected `access` may RESTRICT but never escalate: it is reduced against
+  // the environment most-restrictively, the same direction every other tier
+  // moves. A caller passing "full" over `ACCESS_TRACKER=manual` would otherwise
+  // be the one hole the resolver refuses everywhere else.
+  let resolved = null;
+  if (access) {
+    // Same anchor as the lazy path below. Without it this clamp resolved against
+    // process.cwd(), so an injected `full` survived a config-declared `manual`
+    // whenever the process stood outside the repo root — falsifying the
+    // may-restrict-never-escalate rule stated directly above (T61-M2).
+    const fromEnv = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD, cwd);
+    resolved =
+      dm.ACCESS_MODES.indexOf(access) < 0
+        ? access // let the shared resolver produce the refusal message
+        : ACCESS_ORDER[access] <= ACCESS_ORDER[fromEnv]
+          ? access
+          : fromEnv;
+  }
+  const accessFor = (method) => {
+    if (method === "GET") return "full"; // a read is never gated
+    if (!resolved) resolved = mostRestrictiveAccess(ACCESS_ENV_AT_LOAD, cwd);
+    return resolved;
+  };
+
   return async function http(url, opts = {}) {
+    // `defer` is ours, not fetch's. Strip it so the request the transport sees
+    // is byte-identical to the one it saw before this option existed.
+    const { defer: annotation, ...fetchOpts } = opts;
+    const method = String(fetchOpts.method || "GET").toUpperCase();
+
+    // Layer 1 sits ABOVE the retry loop on purpose. Recording inside it would
+    // write one record per attempt for one logical mutation, and a 429 would
+    // then read as three separate things a human must go and do.
+    if (
+      method !== "GET" &&
+      !isReadViaPost(url) &&
+      accessFor(method) !== "full"
+    ) {
+      return recordRefusal({
+        url,
+        method,
+        access: resolved,
+        system,
+        annotation,
+        ctx,
+      });
+    }
+
     let attempt = 0;
     let lastErr;
     while (attempt <= retries) {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
-        const resp = await fetchImpl(url, { ...opts, signal: ctrl.signal });
+        const resp = await fetchImpl(url, {
+          ...fetchOpts,
+          signal: ctrl.signal,
+        });
         clearTimeout(t);
         if (resp.status === 429 && attempt < retries) {
           const ra = parseRetryAfter(
@@ -1870,6 +2248,10 @@ async function moveToBacklog({
   boardId,
   issueKey,
   output,
+  // CR-7 — optional; when absent the record falls back to the makeHttp ctx,
+  // which is the library name. Additive, so every existing call site is
+  // unaffected.
+  skill = undefined,
 }) {
   if (!boardId) {
     if (output)
@@ -1893,7 +2275,31 @@ async function moveToBacklog({
         Accept: "application/json",
       },
       body: JSON.stringify({ issues: [issueKey] }),
+      // Layer 2 — what the gate records if this run may not write.
+      defer: {
+        kind: "jira.backlog.add",
+        intent: `Move ${issueKey} into the backlog of board ${boardId}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: { backlog: `board ${boardId}` },
+        // CR-7 — name the CALLING skill, not the library. The handover renderer
+        // groups by skill, so falling back to "jira-sync" split one logical run
+        // across two attributions.
+        skill,
+      },
     });
+    // A refusal is not a move. Reporting "📋 Moved to backlog" here would be the
+    // exact invisible drift this gate exists to remove.
+    if (resp.deferred) {
+      if (output)
+        output.info(
+          `   ⏸️  Backlog placement deferred (board ${boardId}) — recorded as ${resp.deferredRecord}`,
+        );
+      return { moved: false, reason: "deferred", record: resp.deferredRecord };
+    }
     if (resp.ok || resp.status === 204) {
       if (output) output.info(`   📋 Moved to backlog (board ${boardId})`);
       return { moved: true };
@@ -3097,6 +3503,7 @@ const WORKLOG_VALIDATOR_RE = /time spent|timespent|work ?log|log work/i;
 // record that callers surface in their summary (see the --fail-on-status-skip
 // handling in the sync scripts).
 async function transitionToStatus({
+  skill = undefined, // names the CALLING skill on a deferred transition record
   http,
   baseUrl,
   email,
@@ -3308,10 +3715,56 @@ async function transitionToStatus({
         Accept: "application/json",
       },
       body: JSON.stringify(body),
+      // The `jira.transition` annotation. The task's Decisions table originally
+      // said not to annotate this chain, on the premise that `jira-stage.js`
+      // owns the kind and `walkLadder` is its only caller — QA cycle 1 showed
+      // `syncDocumentStatus` is a SECOND entry point with four call sites, none
+      // of which the stage CLI gates. Unannotated they journalled as
+      // `jira.unknown-mutation`: escalated to `irreversible`, attributed to the
+      // library, and silent about which status to set.
+      //
+      // No double-record risk: the stage CLI's own gate returns before reaching
+      // here, and the deferral short-circuit above this call is the single
+      // record site for one logical hop.
+      defer: {
+        kind: "jira.transition",
+        intent: `Transition ${issueKey} from "${current}" to "${match.name}"`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: { status: match.name },
+        skill,
+      },
     });
   };
 
   let resp = await post(null);
+
+  // CR-1 — the access gate refused this transition. Everything below reads
+  // `resp.ok`, and a deferral IS ok, so without this branch a refused POST
+  // falls into the success path: it logs "🔀 Transitioned" and returns
+  // `transitioned: true`. `syncDocumentStatus` has four call sites outside
+  // jira-stage.js, and its outcome drives a "Status → X" Change Log row that is
+  // written to disk — a document recording a status change Jira never made.
+  if (resp.deferred) {
+    if (output)
+      output.info(
+        `   ⏸️  Transition deferred for ${issueKey}: "${current}" → "${match.name}" — recorded as ${resp.deferredRecord}`,
+      );
+    return {
+      transitioned: false,
+      deferred: true,
+      reason: "deferred",
+      record: resp.deferredRecord,
+      from: current,
+      to: null,
+      via: match.name,
+      rule,
+    };
+  }
+
   let loggedWork = false;
 
   // Retry once, with a worklog, when the workflow turns out to have a
@@ -3715,6 +4168,9 @@ async function syncDocumentStatus({
   docKind,
   repoRoot,
   output,
+  // Named on a deferred transition record, so a refused status move is
+  // attributed to the calling skill rather than to this library.
+  skill = undefined,
 }) {
   const root =
     repoRoot ||
@@ -3732,6 +4188,7 @@ async function syncDocumentStatus({
     return { transitioned: false, reason: "no-target", localStatus };
 
   const res = await transitionToStatus({
+    skill,
     http,
     baseUrl,
     email,
@@ -3761,6 +4218,19 @@ function summariseStatusOutcome(
   if (!outcome) return 0;
   const { transitioned, reason } = outcome;
   if (transitioned || reason === "already" || reason === "no-target") return 0;
+
+  // CR-1 — a deferral is not a skip. The move was refused by policy and WRITTEN
+  // DOWN, so there is a record to act on; treating it as a skip would both
+  // misdescribe it ("move it by hand, or see the guidance above") and, under
+  // --fail-on-status-skip, fail a run that behaved exactly as configured.
+  if (reason === "deferred") {
+    if (output)
+      output.info(
+        `   ⏸️  Status for ${outcome.issueKey || "the issue"} was not moved — access.tracker restricts this run` +
+          (outcome.record ? `. Recorded as ${outcome.record}.` : "."),
+      );
+    return 0;
+  }
 
   if (output) {
     const where = outcome.from ? ` It is still "${outcome.from}".` : "";
@@ -4182,6 +4652,7 @@ async function putIssueAtomic({
   token,
   issueKey,
   fields,
+  skill = undefined, // CR-7 — see moveToBacklog
 }) {
   const resp = await http(
     `${baseUrl}/rest/api/3/issue/${issueKey}?returnIssue=true`,
@@ -4193,8 +4664,26 @@ async function putIssueAtomic({
         Accept: "application/json",
       },
       body: JSON.stringify({ fields }),
+      // Layer 2 — the field names and values, not the request body.
+      defer: {
+        kind: "jira.issue.update",
+        intent: `Set ${Object.keys(fields || {}).join(", ") || "fields"} on ${issueKey}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: summariseFields(fields),
+        skill, // CR-7 — the calling skill, not the library
+      },
     },
   );
+  // The deferred UPDATE shape: the caller already holds a real issue key, so
+  // only `updated` is unknown. Identical to the --dry-run update path, which is
+  // why every caller already copes with it.
+  if (resp.deferred) {
+    return { updated: null, deferred: true, record: resp.deferredRecord };
+  }
   if (!resp.ok)
     throw new Error(`HTTP ${resp.status}: ${await parseJiraError(resp)}`);
   if (resp.status === 204) {
@@ -4206,6 +4695,223 @@ async function putIssueAtomic({
   } catch (_) {
     return { updated: null };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Comments
+//
+// The endpoint this file spent a long time not having. Everything here is a
+// transcription of putIssueAtomic above — same http() factory, so task 53's
+// access gate (makeHttp, "layer 1") covers it without a line of its own, and
+// same deferred-return shape, so callers that already cope with a deferred
+// update cope with a deferred comment.
+//
+// The identity footer is the Jira half of the comment marker. GitHub gets an
+// invisible HTML comment; Jira cannot, because ADF drops nodes it does not
+// recognise and an HTML comment is not an ADF node — it would be silently
+// stripped and the marker would vanish, taking idempotency with it. So Jira
+// gets a small italic line instead: visible, but unobtrusive, and it survives a
+// human copying the body by hand.
+// ---------------------------------------------------------------------------
+
+const COMMENT_MARKER_PREFIX = "agent-skills-comment:";
+
+/** The GitHub/Bitbucket marker — an HTML comment, invisible when rendered. */
+function commentMarkerHtml(momentId) {
+  return `<!-- ${COMMENT_MARKER_PREFIX}${momentId} -->`;
+}
+
+/** The Jira marker — visible italic text, because ADF has nowhere to hide it. */
+function commentMarkerText(momentId) {
+  return `↳ ${COMMENT_MARKER_PREFIX}${momentId}`;
+}
+
+/**
+ * Build the ADF document for a comment: the rendered body, then the identity
+ * footer as its own italic paragraph.
+ */
+function buildCommentAdf(body, momentId, linkResolver) {
+  const nodes = textToAdfNodes(body, linkResolver);
+  if (momentId) {
+    nodes.push(adf.paragraph(adf.em(commentMarkerText(momentId))));
+  }
+  // An entirely empty comment is not a legal ADF doc; a bare paragraph is.
+  // NOT `paragraph(text(""))` — ADF rejects a text node with an empty string,
+  // so Jira 400s and the run reports `unverifiable` instead of posting. A body
+  // that renders to nothing is reachable (a body of only `---`), so this is a
+  // real path, not a defensive one.
+  return adf.doc(...(nodes.length ? nodes : [{ type: "paragraph" }]));
+}
+
+/**
+ * Search an issue's existing comments for the identity marker.
+ *
+ * Returns `{ count, ids }`. The CARDINALITY is the whole point and the caller
+ * must branch on it rather than taking the first hit:
+ *
+ *   0  → nothing posted yet, post it
+ *   1  → already posted, do not post again
+ *   2+ → ambiguous: DO NOT GUESS
+ *
+ * The existing PR-comment convention (skills/finalise/SKILL.md) resolves the
+ * many-match case with `| head -1`, which is how a duplicate comment becomes
+ * invisible: two matches, first one adopted, second one never reconciled. This
+ * function reports the count and refuses to choose.
+ */
+async function findCommentsByMarker({
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  momentId,
+  maxResults = 100,
+}) {
+  // The FULL marker line, matched EXACTLY — never the bare prefix as a
+  // substring. `agent-skills-comment:review` is a prefix of
+  // `agent-skills-comment:review-story`, so a substring search made a Step 2
+  // `review` comment report `already` against an existing `review-story`
+  // marker and never post. Silent comment loss, which is the failure this
+  // module exists to prevent.
+  const marker = commentMarkerText(momentId);
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment` +
+      `?maxResults=${maxResults}&orderBy=-created`,
+    {
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
+    },
+  );
+  // A read that fails is not evidence of absence. Signalling "unreadable" lets
+  // the caller report `unverifiable` rather than posting a possible duplicate.
+  if (!resp.ok) return { count: null, ids: [], unreadable: true };
+  let data;
+  try {
+    data = await resp.json();
+  } catch (_) {
+    return { count: null, ids: [], unreadable: true };
+  }
+  const hits = (data.comments || []).filter((c) =>
+    adfContainsExactText(c.body, marker),
+  );
+  // An unpaginated read is not evidence of absence. When Jira reports more
+  // comments than we asked for — OR does not say how many there are — the
+  // marker may be outside the window, so report unreadable and let the caller
+  // degrade to `unverifiable` rather than posting a duplicate on the strength
+  // of a partial list.
+  //
+  // Note the `!Number.isFinite` half: an absent or null `total` must fail
+  // CLOSED. Every other unreadable path in this module does, and this one was
+  // the odd one out — a payload without `total` read as "nothing found" and
+  // posted the duplicate.
+  const total = Number(data.total);
+  if (!Number.isFinite(total) || total > (data.comments || []).length) {
+    return { count: null, ids: [], unreadable: true, truncated: true };
+  }
+  return { count: hits.length, ids: hits.map((c) => c.id), unreadable: false };
+}
+
+/** Depth-first scan of an ADF document for a literal substring. */
+function adfContainsText(node, needle) {
+  if (!node || typeof node !== "object") return false;
+  if (typeof node.text === "string" && node.text.includes(needle)) return true;
+  const kids = Array.isArray(node.content) ? node.content : [];
+  return kids.some((k) => adfContainsText(k, needle));
+}
+
+/**
+ * Depth-first scan for a text node whose trimmed content EQUALS `needle`.
+ *
+ * The identity footer has no closing delimiter — unlike the GitHub HTML
+ * marker, which terminates itself with ` -->` — so a substring match cannot
+ * tell `…:review` from `…:review-story`. Exact equality can, and needs no
+ * change to the marker's shape.
+ */
+function adfContainsExactText(node, needle) {
+  if (!node || typeof node !== "object") return false;
+  if (typeof node.text === "string" && node.text.trim() === needle) return true;
+  const kids = Array.isArray(node.content) ? node.content : [];
+  return kids.some((k) => adfContainsExactText(k, needle));
+}
+
+/**
+ * Post a comment to a Jira issue.
+ *
+ * `skill` is first by the convention transitionToStatus sets — it names the
+ * CALLING skill on the deferred record, not this library.
+ */
+async function addComment({
+  skill = undefined,
+  http,
+  baseUrl,
+  email,
+  token,
+  issueKey,
+  body,
+  momentId = "",
+  linkResolver = undefined,
+}) {
+  const doc = buildCommentAdf(body, momentId, linkResolver);
+  const resp = await http(
+    `${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ body: doc }),
+      // Layer 2 — what the mutation MEANS. The rendered ADF is not useful to a
+      // human performing this by hand, so `manual.fields` carries the markdown
+      // they would paste, and `command.stdin` carries it too so the record's
+      // fingerprint distinguishes two different comments on the same issue.
+      defer: {
+        kind: "jira.comment.add",
+        intent: `Comment on ${issueKey}${momentId ? ` (${momentId})` : ""}`,
+        target: {
+          issue: issueKey,
+          url: `${baseUrl}/rest/api/3/issue/${issueKey}/comment`,
+          ui_url: `${baseUrl}/browse/${issueKey}`,
+        },
+        desired: firstLineOf(body),
+        manual: {
+          deepLink: `${baseUrl}/browse/${issueKey}`,
+          ui: "Open the issue → Comment → Paste → Save",
+          fields: [{ name: "Comment", value: body }],
+        },
+        command: { argv: ["jira", "comment", issueKey], stdin: body },
+        skill,
+      },
+    },
+  );
+  if (resp.deferred) {
+    return { posted: false, deferred: true, record: resp.deferredRecord };
+  }
+  if (!resp.ok)
+    throw new Error(`HTTP ${resp.status}: ${await parseJiraError(resp)}`);
+  let id = null;
+  try {
+    const data = await resp.json();
+    id = data.id || null;
+  } catch (_) {
+    /* 204 or unparseable — the post still succeeded */
+  }
+  return { posted: true, id };
+}
+
+/** First non-empty line, trimmed of markdown heading marks, for `desired`. */
+function firstLineOf(text) {
+  if (!text) return "(empty comment)";
+  const line = String(text)
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length);
+  if (!line) return "(empty comment)";
+  const stripped = line.replace(/^#+\s*/, "").replace(/\*\*/g, "");
+  return stripped.length > 120 ? `${stripped.slice(0, 117)}...` : stripped;
 }
 
 async function fetchIssue({
@@ -4366,6 +5072,10 @@ module.exports = {
   getAuth,
   authHeader,
   makeHttp,
+  isReadViaPost,
+  mostRestrictiveAccess,
+  summariseFields,
+  endpointOf,
   parseRetryAfter,
   sleep,
   parseJiraError,
@@ -4374,6 +5084,17 @@ module.exports = {
   diffFields,
   guardConcurrentEdit,
   hashStable,
+  // comments
+  addComment,
+  findCommentsByMarker,
+  buildCommentAdf,
+  commentMarkerHtml,
+  commentMarkerText,
+  adfContainsText,
+  adfContainsExactText,
+  matchCodeFence,
+  firstLineOf,
+  COMMENT_MARKER_PREFIX,
   // jira api
   fetchIssue,
   fetchUpdatedTimestampStrict,

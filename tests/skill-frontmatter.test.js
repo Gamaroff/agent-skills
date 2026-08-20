@@ -59,7 +59,7 @@ test("PyYAML is available, so frontmatter is strictly validated", () => {
   assert.ok(
     hasPyYAML(),
     "PyYAML is not importable — install it (pip install pyyaml). Without it " +
-      "quick_validate.py cannot detect malformed frontmatter."
+      "quick_validate.py cannot detect malformed frontmatter.",
   );
 });
 
@@ -112,7 +112,7 @@ test("validator rejects an unescaped apostrophe in a quoted description", () => 
       "",
       "# Bad",
       "",
-    ].join("\n")
+    ].join("\n"),
   );
 
   const res = python([VALIDATOR, dir]);
@@ -135,11 +135,15 @@ test("validator accepts the same description once the apostrophe is escaped", ()
       "",
       "# Good",
       "",
-    ].join("\n")
+    ].join("\n"),
   );
 
   const res = python([VALIDATOR, dir]);
-  assert.equal(res.status, 0, `validator rejected valid frontmatter: ${res.stdout}${res.stderr}`);
+  assert.equal(
+    res.status,
+    0,
+    `validator rejected valid frontmatter: ${res.stdout}${res.stderr}`,
+  );
 });
 
 test("parsed descriptions carry no leftover opening quote", () => {
@@ -167,7 +171,11 @@ test("parsed descriptions carry no leftover opening quote", () => {
   const res = python(["-c", script, ...files]);
   assert.equal(res.status, 0, `parser crashed: ${res.stderr}`);
   const bad = JSON.parse(res.stdout).map((f) => path.relative(REPO_ROOT, f));
-  assert.deepEqual(bad, [], `descriptions retain an opening quote:\n${bad.join("\n")}`);
+  assert.deepEqual(
+    bad,
+    [],
+    `descriptions retain an opening quote:\n${bad.join("\n")}`,
+  );
 });
 
 test("generated catalog is in sync with SKILL.md frontmatter", () => {
@@ -182,7 +190,7 @@ test("generated catalog is in sync with SKILL.md frontmatter", () => {
     assert.equal(
       after,
       before,
-      "skill-catalog.md is stale — run 'npm run generate-catalog' and commit the diff."
+      "skill-catalog.md is stale — run 'npm run generate-catalog' and commit the diff.",
     );
   } finally {
     fs.writeFileSync(catalog, before);

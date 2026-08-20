@@ -1,0 +1,149 @@
+schema: 1
+task: 'task.51.access-mode-config-and-resolver'
+task_title: '[Task 51] Declare tracker access level in config, and reject an unrecognised one loudly'
+gate: FAIL
+status_reason: >-
+  Cycle 3 traded an encoder/decoder drift bug for an unescaped in-band framing bug. The wire format
+  has no escaping AND no validation that a payload is separator-free, so `access.tracker` is
+  forgeable from `tracker:` with a two-byte YAML escape — silently, exit 0, on both shells and
+  through the bundled copies. That is a clean regression against 7e0d2dd, which caught the same file
+  loudly. Separately the merge-key fix is half-landed: the `<<` OVERRIDE form, which is the common
+  idiom, is still rejected, and the new test passes only because it exercises the other form.
+reviewer: 'QA Engineer'
+updated: '2026-08-17T19:10:00Z'
+
+re_review_of: 'task.51.gate.3.access-mode-config-and-resolver.yml'
+
+previous_issues:
+  - id: 'BUG-9 merge keys'
+    status: partial
+    verified: 'Plain merge, multi-merge, nested merge and recursive anchors all work. The OVERRIDE form does not — see MED-11.'
+  - id: 'BUG-10 sentinel containment'
+    status: closed
+    verified: 'resolve-paths.sh produces no sentinel on either tier for any fixture, including open flow maps and nulls.'
+  - id: 'BUG-11 block scalars'
+    status: closed
+    verified: '`tracker: |`, `>-`, embedded-newline values and multi-line access.tracker all behave; bulk and single readers agree on every one.'
+  - id: 'MED-8 exported outputs'
+    status: closed
+  - id: 'LOW-9 printf'
+    status: closed
+    verified: '%, -n, -e, -E all safe; no consumer depended on the trailing newline.'
+  - id: 'kind-from-provenance'
+    status: closed
+    verified: >-
+      All six specs checked. No path found where a config value arrives as a signal or vice versa.
+      `tracker: "__MAP__"` and `access: {tracker: "__MAP__"}` are now rejected where the baseline
+      accepted them. This part genuinely works — it is the payload-spelling forgery that is closed,
+      not the separator-injection one.
+
+top_issues:
+  - id: TASK-51-BUG-12
+    severity: high
+    finding: >-
+      The encoder emits `<i> US <kind> US <payload> RS` with NO sanitisation of the payload, and
+      `config_bulk_get` returns the FIRST record matching an index. Records are emitted in order, so
+      a payload in record N is injected ahead of every real record N+1..6 and the forgery wins.
+      `tracker: "jira\x1e5\x1fv\x1ffull"` with `access.tracker: manual` yields ACCESS_TRACKER=full,
+      exit 0, no diagnostic. Also demonstrated: downgrade full→manual; forging record 4 to bypass the
+      scalar-`access:` halt from cycle 1; injection from `vcs:`; under zsh; through a bundled copy.
+      Regression against 7e0d2dd, which rejected the same file loudly. The code comment claiming a
+      separator "could at worst truncate its own record" is the load-bearing false claim.
+    suggested_action: 'Refuse any payload containing US/RS at the encoder and emit __ERR__ — YAML forbids the raw bytes and no legal value contains them, so refusing costs nothing.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-9
+    severity: medium
+    finding: >-
+      A value containing a lone US is silently truncated into a different legal value rather than
+      rejected: `tracker: "jira\x1fgithub"` → TRACKER=jira, exit 0. Baseline preserved the byte and
+      validation caught it. No record injected — distinct from BUG-12, same root cause.
+    suggested_action: 'Covered by the same encoder-side refusal.'
+    suggested_owner: dev
+
+  - id: TASK-51-MED-10
+    severity: medium
+    finding: >-
+      `_no_dupes` scans node.value AFTER flatten_mapping, which prepends the merged pairs, so an
+      inherited key plus a local key that overrides it reads as a duplicate — and overriding is the
+      entire purpose of `<<`. `access:\n  <<: *d\n  tracker: github` is graded malformed and
+      hard-halts. NOT a regression (7e0d2dd identical), but cycle 3's stated goal was merge-key
+      support and it is half-delivered. The new test at tracker-access.test.sh:560-562 only exercises
+      a merge that ADDS a key never present locally, so it passes while the common idiom stays broken.
+    suggested_action: 'Scan the pre-flatten node for duplicates, then flatten and construct.'
+    suggested_owner: dev
+
+  - id: TASK-51-LOW-11
+    severity: low
+    finding: >-
+      `config_bulk_get` compares the index numerically (both sides are awk strnums), so `01`, `1.0`,
+      ` 1`, `+1` and `1e0` all match index 1 — confirmed end to end as an alternative spelling of the
+      BUG-12 attack. Matters mainly because any index hardening that assumes a string compare will
+      miss those. Also, a truncated stream yields kind `v` with an empty payload rather than nothing,
+      so the caller degrades to `auto` instead of noticing.
+    suggested_action: 'Force a string comparison on the index.'
+    suggested_owner: dev
+
+  - id: TASK-51-LOW-12
+    severity: low
+    finding: >-
+      A new test label contains backticks — `assert_rc "merge key `<<:` → status 0"` — which bash
+      parses as command substitution and then as a heredoc, so every suite run emits
+      "warning: here-document at line 561 delimited by end-of-file". The assertion still runs, but
+      the warning reads like a real failure. Introduced in this diff.
+    suggested_action: 'Quote the label without backticks.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 1425
+  suites: 'tracker-access 138/138 · test:platform 6/6 · retrospective fixture pass · npm test 1287/1287 · validate:all 115/115'
+  coverage_gap: 'No suite covers BUG-12, MED-9 or MED-10. The merge-key test passes on the form that works.'
+  bundle: 'All 36 read-config.sh and 28 resolve-platform.sh copies byte-identical to source modulo the generated header.'
+  portability_note: 'The awk decoder was verified only on BSD awk 20200816; gawk/mawk/nawk/busybox absent on this host. Single-character RS is POSIX, so no reason to suspect it, but it is untested elsewhere.'
+
+nfr_validation:
+  security:
+    status: FAIL
+    notes: >-
+      Downgraded from CONCERNS. A config value can forge a control record and silently grant a more
+      permissive access mode than the operator declared. The threat model is narrow — whoever writes
+      skills-config.yaml is the operator and could simply write `full` — so this is robustness rather
+      than a crossed trust boundary. It is still the exact outcome the task names as the one it must
+      never produce, and it regressed from a state that caught it.
+  performance:
+    status: PASS
+  reliability:
+    status: FAIL
+    notes: 'Two silent value corruptions and one hard halt on a legal merge-key override.'
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The wire format is now simpler than the escaping it replaced, which was the right direction —
+      it just shipped without the one validation that makes an unescaped framing safe.
+
+recommendations:
+  immediate:
+    - action: 'Refuse payloads containing US/RS at the encoder; emit __ERR__ so it fails closed'
+      refs: ['shared/resources/read-config.sh:158']
+    - action: 'Duplicate-scan the pre-flatten node so `<<` override works'
+      refs: ['shared/resources/read-config.sh:62-67']
+    - action: 'String-compare the index in config_bulk_get'
+      refs: ['shared/resources/read-config.sh:419']
+    - action: 'Fix the backticked test label'
+      refs: ['shared/resources/tracker-access.test.sh:561']
+  future:
+    - action: 'Re-bundle skills/qa-task/references/resolve-paths.sh — stale pre-extraction copy, predates this branch'
+      refs: ['skills/qa-task/references/resolve-paths.sh']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'No config value can influence which record the resolver reads'
+    - 'A legal `<<` override resolves rather than halting'
+    - 'The suite runs without shell warnings'

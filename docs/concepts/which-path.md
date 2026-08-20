@@ -76,3 +76,4 @@ For example: several developers are each shipping separate pieces of a larger fe
 
 - [docs/runbooks/README.md](../runbooks/README.md) — full runbook index
 - [docs/reference/invocation.md](../reference/invocation.md) — complete skill invocation reference
+- [Which access model?](./which-access.md) — how much tracker access to grant the agent

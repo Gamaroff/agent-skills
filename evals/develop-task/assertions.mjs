@@ -29,12 +29,15 @@ export {
  * @param {string|RegExp} namePattern
  */
 export async function branchExistsInRepo(sandbox, namePattern) {
-  const re = namePattern instanceof RegExp ? namePattern : new RegExp(namePattern);
+  const re =
+    namePattern instanceof RegExp ? namePattern : new RegExp(namePattern);
   const branches = await sandbox.branchList();
-  const matched = branches.some(b => re.test(b));
+  const matched = branches.some((b) => re.test(b));
   return {
     ok: matched,
-    reason: matched ? "" : `no branch matching ${namePattern} (branches: ${branches.join(", ") || "(none)"})`,
+    reason: matched
+      ? ""
+      : `no branch matching ${namePattern} (branches: ${branches.join(", ") || "(none)"})`,
   };
 }
 
@@ -45,12 +48,17 @@ export async function branchExistsInRepo(sandbox, namePattern) {
  * @param {string[]} expectedSteps
  */
 export function pipelineStepsRanFromEvents(events, expectedSteps) {
-  const actual = events.filter(e => e.status === "started").map(e => e.skill);
+  const actual = events
+    .filter((e) => e.status === "started")
+    .map((e) => e.skill);
   let i = 0;
   for (const expected of expectedSteps) {
     const found = actual.indexOf(expected, i);
     if (found === -1) {
-      return { ok: false, reason: `step "${expected}" missing or out of order (actual: ${actual.join(", ")})` };
+      return {
+        ok: false,
+        reason: `step "${expected}" missing or out of order (actual: ${actual.join(", ")})`,
+      };
     }
     i = found + 1;
   }
@@ -65,9 +73,14 @@ export function pipelineStepsRanFromEvents(events, expectedSteps) {
  * @param {number} maxIter
  */
 export function loopBoundedAtFromEvents(events, skill, maxIter) {
-  const count = events.filter(e => e.skill === skill && e.status === "started").length;
+  const count = events.filter(
+    (e) => e.skill === skill && e.status === "started",
+  ).length;
   return {
     ok: count <= maxIter,
-    reason: count <= maxIter ? "" : `skill "${skill}" ran ${count} times (max ${maxIter})`,
+    reason:
+      count <= maxIter
+        ? ""
+        : `skill "${skill}" ran ${count} times (max ${maxIter})`,
   };
 }

@@ -55,14 +55,18 @@ function isKebab(s) {
 // ---------------------------------------------------------------------------
 function mergeSprintStatus(yaml, entry, { listKey = "tasks" } = {}) {
   if (typeof yaml !== "string") throw new TypeError("yaml must be string");
-  if (!entry || typeof entry !== "object") throw new TypeError("entry must be object");
+  if (!entry || typeof entry !== "object")
+    throw new TypeError("entry must be object");
   if (!entry.id || !entry.status) throw new Error("entry requires id + status");
-  if (typeof listKey !== "string" || !listKey) throw new TypeError("listKey must be non-empty string");
+  if (typeof listKey !== "string" || !listKey)
+    throw new TypeError("listKey must be non-empty string");
 
   const lines = yaml.split("\n");
-  const headerRe = new RegExp("^" + listKey.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + ":\\s*$");
+  const headerRe = new RegExp(
+    "^" + listKey.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + ":\\s*$",
+  );
 
-  let headerIdx = lines.findIndex(l => headerRe.test(l));
+  let headerIdx = lines.findIndex((l) => headerRe.test(l));
   if (headerIdx === -1) {
     const sep = yaml.endsWith("\n") || yaml.length === 0 ? "" : "\n";
     return `${yaml}${sep}${listKey}:\n  - id: ${entry.id}\n    status: ${entry.status}\n`;

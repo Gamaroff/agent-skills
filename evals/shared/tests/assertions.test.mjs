@@ -55,8 +55,14 @@ test("hasAtLeastNSourceCitations", () => {
 });
 
 test("trackerPayloadMatches — literal + regex", () => {
-  const p = tmpFile(JSON.stringify({ dryRun: true, summary: "Cache lib stuff" }), "p.json");
-  assert.equal(A.trackerPayloadMatches(p, { dryRun: true, summary: "/cache lib/i" }).ok, true);
+  const p = tmpFile(
+    JSON.stringify({ dryRun: true, summary: "Cache lib stuff" }),
+    "p.json",
+  );
+  assert.equal(
+    A.trackerPayloadMatches(p, { dryRun: true, summary: "/cache lib/i" }).ok,
+    true,
+  );
   assert.equal(A.trackerPayloadMatches(p, { dryRun: false }).ok, false);
   assert.equal(A.trackerPayloadMatches(p, { summary: "/nope/" }).ok, false);
 });
@@ -67,7 +73,10 @@ test("answerQueueDrained", () => {
 });
 
 test("aggregate — counts failures", () => {
-  const r = A.aggregate([{ ok: true, reason: "" }, { ok: false, reason: "x" }]);
+  const r = A.aggregate([
+    { ok: true, reason: "" },
+    { ok: false, reason: "x" },
+  ]);
   assert.equal(r.total, 2);
   assert.equal(r.passed, 1);
   assert.equal(r.failed, 1);

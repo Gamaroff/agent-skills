@@ -47,6 +47,7 @@ const { execFileSync, execSync } = require("child_process");
 
 const tw = require("./tracker-workflow.js");
 const { parseYamlSubset } = require("./yaml-subset.js");
+const dm = require("./defer-mutation.js");
 
 const GIT_EXEC_OPTS = {
   encoding: "utf-8",
@@ -614,6 +615,7 @@ function parseArgs(argv) {
     allowRegress: false,
     addToBoard: false,
     probeBoard: false,
+    printPlan: false,
     writeLadder: false,
     initWorkflow: false,
     force: false,
@@ -645,6 +647,9 @@ function parseArgs(argv) {
         break;
       case "--probe-board":
         opts.probeBoard = true;
+        break;
+      case "--print-plan":
+        opts.printPlan = true;
         break;
       case "--write-ladder":
         opts.writeLadder = true;
@@ -694,6 +699,8 @@ function parseArgs(argv) {
 const USAGE = `Usage: gh-stage --issue <N> --stage <${tw.MOMENTS.join("|")}>
               [--json] [--quiet] [--dry-run] [--strict] [--allow-regress]
               [--add-to-board] [--board <number|name>] [--field <name>]
+       gh-stage --stage <${tw.MOMENTS.join("|")}> --print-plan
+              [--issue-type <type>]   (no credentials, no network)
        gh-stage --probe-board [--write-ladder] [--board <number|name>]
               (read-only; --write-ladder writes tracker-workflow.yaml only when absent)
        gh-stage --init-workflow [--force] [--board <number|name>]
@@ -712,6 +719,33 @@ function run({
   sleepImpl = sleepSync,
 } = {}) {
   const root = repoRootOf(repoRoot);
+
+  // ACCESS_TRACKER is captured from the REAL environment BEFORE loadDotEnv runs.
+  //
+  // loadDotEnv copies .secrets/tooling.env and .env into process.env. Reading the
+  // access mode after it would create a second resolution path that
+  // resolve-platform.sh never sees: a repo whose .env said ACCESS_TRACKER=manual
+  // would make this CLI defer while the resolver reported `full` and printed no
+  // restriction notice, and a typo in that file would make every one of the six
+  // pipeline steps that call this CLI exit 2 with no indication of where the
+  // value came from. The resolver owns this key; the dot-env file does not.
+  //
+  // BOTH names, because the resolver reads both: `ACCESS_TRACKER` is
+  // resolve-platform.sh's output and `AGENT_SKILLS_ACCESS_TRACKER` is the knob
+  // an operator sets. Capturing only the first made the shared resolver blind to
+  // the operator knob no matter how many tiers it grew.
+  //
+  // SKILLS_CONFIG_FILE is captured here for the same reason and it is the whole
+  // of C5-CR1: the config tier reads that variable to find the file, so a .env
+  // line setting it would redirect the config path AFTER this snapshot and walk
+  // straight around it. Capturing the mode but not the path to the mode leaves
+  // the door the snapshot exists to shut.
+  const accessEnv = {
+    ACCESS_TRACKER: process.env.ACCESS_TRACKER,
+    AGENT_SKILLS_ACCESS_TRACKER: process.env.AGENT_SKILLS_ACCESS_TRACKER,
+    SKILLS_CONFIG_FILE: process.env.SKILLS_CONFIG_FILE,
+  };
+
   loadDotEnv(root);
 
   let args;
@@ -762,8 +796,14 @@ function run({
   if (args.check) args.probeBoard = true;
 
   if (!args.probeBoard) {
-    if (!args.issue || !args.stage) {
-      output.err("Error: --issue and --stage are both required");
+    // --print-plan needs no issue: it reads a config file, not a board. It still
+    // needs --stage, because the stage IS the question it answers.
+    if ((!args.issue && !args.printPlan) || !args.stage) {
+      output.err(
+        args.printPlan
+          ? "Error: --stage is required"
+          : "Error: --issue and --stage are both required",
+      );
       output.err(USAGE);
       return { exitCode: 2 };
     }
@@ -776,7 +816,92 @@ function run({
     args.stage = String(args.stage).toLowerCase();
   }
 
+  // The ladder is read before credentials are even looked at, because
+  // --print-plan must work without them — that is the entire point of it. Never
+  // throws: a missing or malformed file resolves to the built-in default ladder.
   const workflow = tw.loadWorkflow(repoRoot ? { repoRoot } : {});
+
+  // --print-plan: resolve and print, no credentials, no network, exit 0.
+  //
+  // This is the GitHub half of the pair jira-stage.js has had since task.38, and
+  // it must run BEFORE `ghAvailable` (the first credential read and the first
+  // out-of-process call) for the same reason its sibling runs before `getAuth`:
+  // the consumer who needs it MOST is the one with no credentials at all. A
+  // `manual`-mode run has no `gh` auth by definition, and its handover checklist
+  // still has to name the board's real column — "move the card somewhere" is not
+  // an instruction anyone can follow.
+  //
+  // --dry-run is NOT a substitute and never was: it sits below `ghAvailable` and
+  // reads a live board. That is also why every deferred record this CLI writes
+  // now carries a --print-plan `verify.cmd` rather than a --dry-run one.
+  //
+  // `output.emit` writes unconditionally rather than only under --json, which is
+  // what makes the flag machine-readable on its own — same contract as Jira's.
+  //
+  // GitHub has NO transition graph. A Projects v2 Status is a single-select
+  // field: you set it, you do not walk to it. So there is no `hops`/`spansFrom`
+  // pair here and no --from flag to feed one. The plan is the target rung, and
+  // the rung carries every acceptable name so a caller can prefer its own.
+  if (args.printPlan) {
+    // Validated HERE, on this path's own terms — not inherited from the
+    // `if (!args.probeBoard)` block above.
+    //
+    // That block is skipped whenever `probeBoard` is set, and three flags set it:
+    // `--probe-board` directly, plus `--check` and `--init-workflow` which set it
+    // internally. `--check` is the documented CI mode, so
+    // `gh-stage.js --check --stage done --print-plan` is an ordinary script and
+    // used to bypass both the MOMENTS check and the lowercasing.
+    //
+    // The consequence was not cosmetic: an unknown moment resolved to
+    // `enabled: false, targets: null` exit 0 — byte-identical to the payload a
+    // DELIBERATELY DISABLED moment produces. A caller could not tell a typo from
+    // a moment the consumer had switched off, so a typo silently dropped a board
+    // move from a manual checklist. That is the failure this whole mode exists to
+    // prevent, so it is validated even though the shared block usually would.
+    //
+    // Sharing one gate was the mistake: --print-plan and the move path have
+    // genuinely different argument requirements (this one needs no --issue), so
+    // the requirements are stated separately rather than approximated by one
+    // condition that has to be true of both.
+    if (!tw.MOMENTS.includes(String(args.stage).toLowerCase())) {
+      output.err(
+        `Error: unknown moment "${args.stage}". Known: ${tw.MOMENTS.join(", ")}`,
+      );
+      return { exitCode: 2 };
+    }
+    args.stage = String(args.stage).toLowerCase();
+
+    const moment = tw.resolveMoment(args.stage, workflow, {
+      issueType: args.issueType,
+    });
+    const authored = tw.pipelineAuthoredFor(
+      workflow,
+      args.issueType,
+      args.stage,
+    );
+    output.emit({
+      stage: args.stage,
+      reason: "plan",
+      // A moment absent from `pipeline:` is deliberate disablement, not an
+      // error — the same outcome `stage-disabled` reports on the move path.
+      enabled: !!moment,
+      targets: moment ? moment.targets : null,
+      offLadder: moment ? moment.offLadder : null,
+      isLastRung: moment ? moment.isLastRung : null,
+      // Where this plan actually came from — which is not the same question as
+      // "does a file exist". A statuses-only or malformed file is `source:
+      // "file"` while contributing nothing to the plan, and this is the one
+      // field a reader consults to answer "did my ladder do this?".
+      source: authored ? workflow.source : "record",
+      authored,
+      exitCode: 0,
+    });
+    return {
+      exitCode: 0,
+      reason: "plan",
+      targets: moment ? moment.targets : null,
+    };
+  }
 
   // --check is the ONE mode in this family that exits non-zero on failure.
   //
@@ -795,6 +920,152 @@ function run({
     const off = checkWorkflowOffline({ workflow, args, output });
     if (off.done) return off.result;
     checkWarnings = off.warnings;
+  }
+
+  // ── ACCESS GATE ───────────────────────────────────────────────────────────
+  //
+  // Under any non-`full` tracker access mode this CLI must not touch the board.
+  // It records the field-set it wanted, exits 0 with `reason: "deferred"`, and
+  // the run-end handover names the card and its target column.
+  //
+  // PLACEMENT IS THE WHOLE POINT. Everything above this line is local: arg
+  // parsing, the workflow YAML, and the offline half of --check. Everything
+  // below reaches out — `ghAvailable` shells `gh auth status`, which is both the
+  // first credential read and the first out-of-process call. The gate sits
+  // exactly between them, so a gated run demonstrably attempts no network call.
+  //
+  // `--probe-board` (and therefore `--check` and `--init-workflow`, which set
+  // it) are NOT gated: they read a board, they do not mutate one, and every
+  // non-`full` mode still permits reads. `--dry-run` is exempt for the same
+  // reason. Gating them would break `scaffold-tracker-workflow` for exactly the
+  // consumers who most need to see their board's real columns.
+  //
+  // The comparison is `!== "full"`, never truthiness or emptiness: an UNSET
+  // variable must read as `full`, because this CLI is invoked from seven skills
+  // and six pipeline steps and a gate that misfires stops every one of them
+  // moving cards.
+  let access;
+  try {
+    // `root` is the repo root computed above, before loadDotEnv — the same
+    // anchor read-config.sh uses when a shell sources it from the root (C5-CR6).
+    access = dm.resolveAccessTracker(accessEnv, { cwd: root || process.cwd() });
+  } catch (e) {
+    output.err(`Error: ${e.message}`);
+    return { exitCode: 2 };
+  }
+  if (access !== "full" && !args.probeBoard && !args.dryRun) {
+    const moment = tw.resolveMoment(args.stage, workflow, {
+      issueType: args.issueType,
+    });
+    if (!moment) {
+      // A moment omitted from `pipeline:` is deliberate disablement — there was
+      // never a mutation to defer. Report it as an unrestricted run would.
+      output.info(
+        `⏭️  Moment ${args.stage} is not declared in the workflow — nothing to do.`,
+      );
+      return emit({ transitioned: false, reason: "stage-disabled" }, 0);
+    }
+    const target = (moment.targets && moment.targets[0]) || null;
+    const gateProjectYml = readProjectYml(root);
+    const issueUrl = `https://github.com/${gateProjectYml.owner || "OWNER"}/${
+      gateProjectYml.repo || "REPO"
+    }/issues/${args.issue}`;
+    const field = args.field || resolveStatusFieldName(root);
+    try {
+      const rec = dm.defer(
+        {
+          kind: "github.board.field-set",
+          system: "github",
+          access,
+          // Name the board ADD as well as the field-set when --add-to-board was
+          // passed. Without this the checklist tells a human to set a field on
+          // an item that may not be on the board at all — `ensureOnBoard` is
+          // what would have put it there, and this gate returns before it runs.
+          // The gate is upstream of the board read, so we cannot know whether
+          // the item is already there; say "add if absent" rather than assert
+          // either way.
+          intent: args.addToBoard
+            ? `Add issue #${args.issue} to the project board if absent, then set ` +
+              `${field} to ${target || `the ${args.stage} column`}`
+            : `Set ${field} to ${target || `the ${args.stage} column`} on issue #${args.issue}`,
+          target: {
+            issue: String(args.issue),
+            url: issueUrl,
+            // The object and the place you perform the action differ for a board
+            // field: the issue lives in the repo, the field lives on the board.
+            ui_url: "the project board → filter to this issue → set the field",
+          },
+          desired: args.addToBoard
+            ? { onBoard: true, [field]: target }
+            : { [field]: target },
+          skill: "gh-stage",
+          step: args.stage,
+          run: process.env.PIPELINE_RUN || "",
+          manual: {
+            deepLink: issueUrl,
+            ui: args.addToBoard
+              ? `Open the project board → add issue #${args.issue} if it is not ` +
+                `already there → set ${field}`
+              : `Open the project board → find issue #${args.issue} → set ${field}`,
+            fields: [{ name: field, value: target || "" }],
+          },
+          command: {
+            argv: [
+              "node",
+              "gh-stage.js",
+              "--issue",
+              String(args.issue),
+              "--stage",
+              args.stage,
+              // Preserve --add-to-board on the replay command. Dropping it made
+              // the recorded command a DIFFERENT operation from the deferred
+              // one: it would set the field and never add the item, so replaying
+              // a manual run's journal left the card off the board.
+              ...(args.addToBoard ? ["--add-to-board"] : []),
+              "--json",
+            ],
+            stdin: null,
+          },
+          verify: {
+            // --print-plan, NOT --dry-run. This record is written on a machine
+            // running a non-`full` access mode, which in the `manual` case has
+            // no `gh` auth at all — and --dry-run sits below `ghAvailable`, so
+            // it cannot run there. Handing the operator a verification step that
+            // fails on their own machine is worse than handing them none: it
+            // reads as "the deferral is broken" rather than "here is the column".
+            //
+            // The two do not answer quite the same question — --print-plan reads
+            // the ladder, --dry-run reads the board — so `expect` names the whole
+            // rung, which is what --print-plan returns.
+            cmd: `gh-stage.js --stage ${args.stage} --print-plan`,
+            expect: `targets includes "${target || args.stage}" (set ${field} to it)`,
+          },
+          // The repo root, not process.cwd(). A step invoked from a subdirectory
+          // would otherwise append to <subdir>/.claude/state/tracker-actions.jsonl
+          // while the renderer reads the repo-root journal and reports it empty,
+          // losing the deferred action with no warning.
+        },
+        { cwd: root },
+      );
+      output.info(
+        `⏸️  access.tracker=${access} — not moving issue #${args.issue}; recorded as ${rec.id}.`,
+      );
+      return emit(
+        {
+          transitioned: false,
+          reason: "deferred",
+          access,
+          target,
+          record: rec.id,
+        },
+        0,
+      );
+    } catch (e) {
+      // A journal we cannot write is a real problem, but it is not a reason to
+      // fall through and perform the very mutation the mode forbids.
+      output.warn(`⚠️  Could not record the deferred board move: ${e.message}`);
+      return emit({ transitioned: false, reason: "deferred", access }, 0);
+    }
   }
 
   const statusField = args.field || resolveStatusFieldName(root);

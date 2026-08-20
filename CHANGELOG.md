@@ -4,6 +4,362 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`/develop-next` and `/develop-batch` can reach bug work — the selector now dispatches
+  `/develop-bug`.** The roadmap selector recognised `/develop-story` and `/develop-task` only, so
+  bugs were unreachable by the autonomous loop no matter how they were annotated. The failure was
+  worse than a gap: a roadmap row that correctly named `/develop-bug` fell through to the
+  *manual-checkpoint* stop and hard-stopped the loop with "names no /develop-story or /develop-task
+  command", so filing rows for bugs made every subsequent `/develop-next` run halt where doing
+  nothing would at least have reported a clean empty frontier. Observed in a consumer whose only
+  unparked work was four open bugs. The `develop-bug` skill already existed, so this is wiring, not
+  new capability.
+
+  Five sites in `select-next.mjs` were involved, and the two easy to miss are the ones that fail
+  quietly. The batch planner derived a row's worktree kind with a **two-way ternary**
+  (`command === "/develop-task" ? "task" : "story"`), so a bug row would have been silently branched
+  as `story/<slug>` — a wrong label on a real branch, with nothing to notice it. And `workItemPath`,
+  the `[story](…)`/`[task](…)` link fallback, matched only filename stems beginning `story.` or
+  `task.`: story bugs (`story.2.3.bug.1.x.md`) and task bugs (`task.44.bug.1.x.md`) happened to pass
+  on their prefix, but a **general bug** is `bug.{N}.{name}.md` and resolved to null, so a correctly
+  authored row stopped with "no resolvable path" — precisely the form the consumer's bugs took. Both
+  are fixed alongside the command regex, the selection gate, and the batch readiness predicate.
+
+  Widening the alternation deliberately did *not* become "accept anything": an unrecognised command
+  such as `/develop-epic` still returns the manual-checkpoint stop, and the stop's `detail` string
+  was corrected so it stays truthful now that three commands are legal. The dispatch directive in
+  `develop-next` was generalised too — it previously hard-coded the story/task Phase 0d question
+  numbering, which does not map onto `develop-bug`'s three-question set (Q1 branch model, with base
+  and PR target derived from it), so it now says *take the recommended option for every question* and
+  names each pipeline's set rather than assuming one shape. Batch worktrees are always based off
+  `develop`, so a batched bug row is a bugfix; a production hotfix is not expressible in a batch and
+  must be run through `/develop-bug` directly. Documented in `roadmap-selection.md`, the roadmap
+  template, and both orchestrator SKILL.md files.
+
+  Nine unit tests cover it, and each of the five sites was mutation-checked to confirm the test that
+  names it actually fails when that site is reverted — including the two silent ones.
+
+  **Consumer note:** land this before filing `/develop-bug` roadmap rows. Rows first means every
+  `/develop-next` run hard-stops until the selector is re-vendored.
+
+### Fixed
+
+- **The implementation report is now committed at pipeline Step 4 instead of being withheld until
+  Step 8**, and only its *updates* are deferred thereafter. Holding the file itself out of every
+  commit had two costs, one of them close to invisible. The audit trail was absent from the branch
+  for the whole QA loop — the stretch of a run a reviewer most wants to read. And any document that
+  linked to the report acquired a **dangling relative link that fails only in CI**: the file is
+  present in the working tree but untracked, so a link checker run locally resolves it and passes,
+  while CI checks out only tracked files and goes red. A red build that cannot be reproduced by
+  running the same command in the same directory is the most expensive shape a defect can take, and
+  this one survived every local gate.
+
+  The original rationale — that a report still being written should not land in a `fix(...)` commit —
+  is sound and is kept: Steps 5–6 still exclude the report, but now they defer *changes to a file
+  that already exists*, which cannot dangle. Step 8 still owns its final state. `commit-changes`
+  step 3a is rescoped to updates and now carries the general rule the specific case is an instance of
+  — *if a document you are committing links to a file, commit the file with it* — plus the diagnosis
+  for the CI-only failure mode (`git worktree add --detach` and run the gate against the tracked
+  tree). `create-pr`'s `--exclude` documentation no longer claims the orchestrators pass the report
+  path, which had become untrue and contradicted Step 4.
+
+  Pinned by `evals/develop-story/protocol/implementation-report-first-commit.test.mjs`, which asserts
+  the *distinction* rather than the wording — an editor who collapses "defer the updates" back into
+  "withhold the file" reintroduces the bug, so the guard rails against doing so are asserted
+  explicitly.
+
+- **The scaffolded Stakeholder Sign-off section no longer claims development is blocked when it is
+  not.** Every story and task scaffolded since the gate shipped opened with *"Development must not
+  begin until every required role below has signed"* — a description of **blocking** enforcement,
+  while `sign-off.enforcement` defaults to **`advisory`**, whose effect this same feature documents
+  as *"None — verdict may still be GO, `develop-*` proceeds"*. The sentence and the table shipped
+  together and contradicted each other.
+
+  This is not cosmetic, and it was rediscovered independently twice by consumers. It cost a review
+  finding on one card, and on another it **halted a `/develop-story` run mid-pipeline** to ask a
+  human whether a gate reading *must not begin* could be passed at 0 of 3 signatures. That was the
+  correct call by the agent — an explicit gate should not be quietly waived — so the document was
+  wrong, not the run. Unattended orchestrators (`/develop-next`, `/develop-batch`) are what this
+  hurts most, and `advisory` exists precisely so they do not stall.
+
+  The replacement names `sign-off.enforcement` as the authority and describes **both** values, so a
+  project that chooses `blocking` is not handed the mirror-image defect. Corrected in the shared
+  source, both story templates, both task templates, the two `SKILL.md` copies, the task
+  sections-guide, and the two sign-off eval fixtures whose replay output asserts the emitted text.
+
+### Added
+
+- **Restricted-access narrative layer** — a concept page, a three-question decision
+  guide, and a runbook walked against this repo's own GitHub board (`Todo` /
+  `In Progress` / `Done`, issue #236). Limits sit next to capabilities: partial
+  enforcement, `approve` does not yet ask, `/develop-next` still needs VCS write,
+  issue create converges over two runs, `/tracker-reconcile` is not shipped
+  (task.57). Vocabulary and the command are registered; a drift guard
+  (`tests/restricted-access-docs.test.js`) asserts modes, examples, indexes, and
+  honest not-shipped labelling.
+
+- **`tracker-issue.js` — a CLI for the mutations that return a value, and an honest answer to the
+  empty capture.** `tracker_write` is the right chokepoint for the ~38 `gh` mutations nobody
+  captures: it refuses the call, records it, warns on stderr, and returns 0. For a call whose value
+  the caller binds — `ISSUE=$(gh issue create …)` — that is exactly wrong. The capture comes back
+  empty and the caller writes nothing, or garbage, into a document's frontmatter. A shell function
+  cannot both refuse a call and return the value the call would have produced, so these six calls
+  get a CLI rather than another wrapper arm.
+
+  New `shared/resources/tracker-issue.js` is the fourth peer of `jira-stage.js` / `gh-stage.js` /
+  `tracker-comment.js` — same `--json` `{reason}` contract, same exit codes, same access gate above
+  the first network call. Its one deliberate divergence is that **stdout is the value channel**: the
+  produced number goes there and every notice goes to stderr, so a caller's `$( )` captures the
+  value or nothing, never a sentence. `--kind` covers create / edit / close / reopen / milestone /
+  sub-issue-link; the sub-issue link records as **one** composite record because its fetch-then-mutate
+  pair yields two checklist items neither of which a human can perform alone.
+
+  **No placeholder is ever written.** Not `github_issue: 0`, not `<pending>`. A wrong key defeats the
+  idempotent `synced-from-*` search that stops the *next* run creating a duplicate, so it converts a
+  recoverable state into a permanent one. Instead a value-producing kind records `blocking: true` —
+  a **new record field** — and the checklist opens with a banner naming the **two-run convergence**:
+  perform the action, write the value into the document, re-run. The middle step is the one that is
+  easy to skip and skipping it is silent, so `docs/reference/troubleshooting.md` carries it under the
+  symptom a consumer would actually search for: *"I re-ran it and it did nothing again."*
+
+  The roster gains a 23rd kind, `github.milestone.create` — milestone creation is a *create*, not a
+  case of `github.issue.edit`, because it yields a number a dependant consumes. 28 bare call sites
+  are routed, and `tests/mutation-call-site-coverage.test.js` keeps the count a maintained number
+  rather than a one-off audit: it found two bare `gh issue comment` sites on its first run that the
+  manual audit had miscounted as covered.
+
+- **A repo-wide heredoc defect, found while fixing two of its instances.** Eight bash blocks in
+  canonical prose closed a heredoc with an *indented* terminator (`   EOF`), which bash does not
+  accept: it warns "delimited by end-of-file" and swallows everything after it into the body. In
+  every case what it swallowed was the `tracker-comment.js` call on the next line — so the comment
+  was never posted, the issue was never closed, and the run reported success. Two were introduced by
+  the task above; six were already present, in the Jira-path blocks of `create-pr`, `finalise`,
+  `review-story`, `review-task` and two pipeline step docs. All eight are fixed, and §5 of the new
+  guard blocks the class.
+
+- **`tracker-comment.js` — a comment endpoint that did not exist, and one call site instead of two
+  dozen.** `jira-sync.js` had no comment function at all, so *every* Jira comment in this repository
+  was an `addCommentToJiraIssue` MCP call an agent made by following prose, and every GitHub issue
+  comment was a bare `gh issue comment`. Neither could be intercepted, retried by code, or made
+  idempotent — interception needs a chokepoint and prose has none.
+
+  New `addComment()` in `jira-sync.js` goes through the same `http()` factory as every other write,
+  so the access gate covers it for free. New `shared/resources/tracker-comment.js` is the third peer
+  of `jira-stage.js` / `gh-stage.js`: same `--issue` / `--stage` / `--json` shape, same exit codes
+  (0 for every normal outcome, 1 for a skip under `--strict`, 2 for a usage error), and the same
+  access gate placed above the first credential read, so a restricted run demonstrably makes no
+  network call. The 25 prose sites — including one that had drifted to raw `curl` against REST **v2**
+  and was invisible to both interception layers — now make one CLI call each. The Atlassian MCP tool
+  survives **only** as the documented `no-credentials` fallback.
+
+  Comments are idempotent via an identity marker: an invisible HTML comment on GitHub, and a small
+  italic footer on Jira, because ADF drops unknown nodes and an HTML comment would be stripped
+  silently, taking idempotency with it. The cardinality rule is the point — 0 matches posts, 1 match
+  reports `already`, and **2+ reports `unverifiable` and posts nothing**. The older PR-comment
+  convention resolves that case with `| head -1`, which is how a duplicate comment becomes invisible
+  and stays that way.
+
+- **ADF renderer: fenced code blocks and italics.** `adf` gained a `codeBlock` builder and an `em`
+  mark, and `textToAdfNodes` now tracks fences. The fence is tracked in that line loop rather than in
+  `blockToAdf` because the loop splits on blank lines first — a listing containing a blank line was
+  being torn apart and its pieces re-parsed as prose, so a `|` row became a table and a `#` comment
+  became a heading. Every existing caller benefits: `sync-jira-{task,story,epic}` previously
+  flattened fenced blocks.
+
+- **`gh-stage.js --print-plan`** — the GitHub twin of the Jira flag, and the same contract: it
+  resolves which board column a pipeline moment names by reading `tracker-workflow.yaml` alone,
+  with **no credentials and no network**, and it runs *above* the `gh auth` check. That placement is
+  the whole feature. The consumer who needs it most is the one running `access.tracker: manual`, who
+  has no `gh` auth by definition and whose handover checklist still has to say *"move the card to
+  **Ready for Review**"* using their board's real column name. `--dry-run` was never a substitute —
+  it sits below the auth gate and reads a live board.
+
+  The payload carries the whole target rung, so a caller can prefer whichever name its board has:
+  `{stage, reason:"plan", enabled, targets, offLadder, isLastRung, source, authored}`. There is no
+  `--from` and no `hops`: a Projects v2 Status is a single-select field, so there is nothing between
+  two positions to walk. Where `--print-plan` and `--dry-run` disagree, `--dry-run` is right and your
+  ladder file is stale; a test pins `--dry-run`'s `would` as a member of `--print-plan`'s `targets`.
+
+- **A restricted `access.tracker` now stops GitHub board and issue writes too.** Task 53 gated the
+  Status field and board membership inside `gh-stage.js`; this closes the rest of the GitHub side:
+
+  - `set-github-project-priority.sh` and `set-github-project-estimate.sh` gained their own gates.
+    Neither goes through `gh-stage.js` — that CLI deliberately owns the Status field and nothing
+    else — so each called `gh api graphql` directly and was previously unprotected. Both still
+    always exit 0; under a restricted mode they record and print `⏸️` with the record id.
+  - `tracker_call_with_retry` in `resolve-platform.sh` is now **`tracker_write`**, with a mode check
+    prepended to the retry wrapper. That covers roughly 38 `gh` mutations across 11 skill and
+    pipeline-step files — `gh issue comment`, `gh pr comment`, `gh issue close` and the rest — with
+    **zero call-site edits**. The kind is inferred from argv where the shape is recognised;
+    anything else is recorded as the new `github.unknown-mutation` rather than dropped.
+    **`tracker_call_with_retry` remains as an alias and is not going away** — call sites, including
+    ones in skill prose that people copy by hand, still spell it, and a test pins the alias.
+
+  Neither shell guard re-implements the access-mode table. `defer-mutation.js` gained
+  `--resolve-access`, so both ask the same function `gh-stage.js` asks. There were already four
+  copies of that contract in the tree and a fifth was one file away.
+
+  **Still not gated, and named plainly in the runtime notice:** Jira writes issued as raw `curl`
+  from skill prose or through the Atlassian MCP tools, and the GitHub calls whose stdout a caller
+  captures (`gh issue create`, the sub-issue-link graphql). Wrapping those under a deferring mode
+  would return an empty capture and the caller would proceed with a blank issue number, so they get
+  a purpose-built CLI rather than a wrapper that silently lies.
+
+- **`finalise` understands `deferred`.** The board-move reason table gained the row, and it escalates
+  through the existing `not-on-board` path with wording that reads as a declared policy rather than a
+  malfunction — pointing at the committed handover checklist and always naming the record id. A
+  deferred board move does not affect the Definition of Done: a card a declared restriction stopped
+  the pipeline moving is not an incomplete task.
+
+- **The JavaScript gates now read `access.tracker` from `skills-config.yaml`.** Until now only a
+  shell that sourced `resolve-platform.sh` saw that key, so the documented bare invocations —
+  `node .agents/skills/sync-jira-*/scripts/…`, `jira-create-epic.js`, the sprint scripts — resolved
+  to `full` and a restriction an operator had committed to the repo was inert. All four JS gates
+  (`jira-sync.js`'s `makeHttp`, `jira-stage.js`, `gh-stage.js`, `jira-create-epic.js`) and
+  `jira-sprint-lib.sh` now resolve the same three tiers, most-restrictive-wins.
+
+  There is still exactly **one reader**. `dm.resolveAccessTracker` does not parse YAML: it sources
+  `resolve-platform.sh` in a subprocess and uses its answer verbatim, which makes agreement with
+  `read-config.sh` structural rather than asserted. Task 53 tried the other way — a second reader in
+  JavaScript — and found a high-severity divergence in each of three review rounds. A derived parity
+  corpus (`access-config-parity.test.mjs`, 34 fixtures × both reader tiers) pins it anyway.
+
+  Two deliberate differences from the shell path. A config that cannot be read *correctly* resolves
+  to `manual` and prints one line naming the file and the reason, rather than throwing — a throw is
+  what took down `--check`, `--print-plan` and `--probe-board` during task 53. A typo in the **env**
+  tier still throws, unchanged.
+
+  **Breaking only for a repo that declares `access:`** — such a repo's bare `node …` invocations
+  begin deferring writes instead of performing them, which is the point. A repo that declares no
+  restriction answers `full` and cannot be falsely restricted; the subprocess is skipped only when
+  absence is *provable* from the bytes, which is deliberately narrower than "no `access:` key".
+
+- **A restricted `access.tracker` now actually stops Jira REST writes**, in two layers inside the
+  shared `jira-sync.js`. Layer 1 sits at the top of `http()`, **above** the retry loop: under any
+  mode but `full`, a non-GET is refused, recorded, and answered with a synthetic `202` marked
+  `deferred` — so a mutation nobody thought about is loud rather than silently executed, and a
+  429 cannot turn one logical mutation into three records. Layer 2 is an additive `defer:`
+  annotation on the semantic mutators (`putIssueAtomic`, `moveToBacklog`, the four create-POSTs and
+  the epic Team-field PUT), which is what makes `manual` mode say *"Set Team to Platform"* instead
+  of printing a URL and a JSON blob. An ADF description is **named**, never dumped: a checklist
+  item nobody can read is as useless as none.
+
+  `full` is unchanged and remains the default — the gate is a single early branch on a variable
+  that resolves to `full` when `ACCESS_TRACKER` is unset, and the mode is captured at require time,
+  before `loadDotEnv()`, so a dot-env file cannot escalate a declared restriction.
+
+  Five kinds newly covered — `jira.issue.create`, `jira.issue.update`, `jira.backlog.add`,
+  `jira.sprint.move-issues`, `jira.sprint.set-state` — joining `jira.transition`, which the stage
+  CLI already owned, for **6 of the 9** Jira kinds. The three uncovered ones have no call site to
+  intercept.
+
+  Two paths outside the shared library carry their own gate, and the exception is stated rather
+  than implied: `jsm_curl` in `jira-sprint-lib.sh` (whose defer branch **must** set
+  `JSM_HTTP_STATUS=200` and a jq-safe `JSM_BODY`, or a deferral becomes a failed run under
+  `set -euo pipefail`), and `jira-epic-creator.js`, which calls global `fetch` directly and so
+  layer 1 cannot reach.
+
+  The one read wearing a POST — Jira's JQL search — is allowlisted **by URL**. Refusing it would
+  make every sync skill see "no existing issue" and create a duplicate on the next run.
+
+- **`jira.unknown-mutation` is the 21st mutation-record kind**, the catch-all layer 1 writes when
+  no semantic mutator annotated the call. Its consequence is `irreversible`, so it renders as a
+  confirm gate rather than a bare command: nothing knows what the call would have done, and that is
+  the honest default. A record of this kind is also a signal — a mutation path exists that nobody
+  has annotated yet.
+
+### Changed
+
+- **`review-task`'s Jira review comment renders as ADF v3 instead of REST v2 plain text.** That site
+  was the only comment in the repository posted with a raw `curl`; folding it into `addComment()`
+  means its headings and tables now render as real ADF nodes rather than raw markdown characters.
+  Visible change to anyone reading those comments, and the reason this was a behaviour change rather
+  than a mechanical swap.
+
+- **The three `sync-jira-*` skills report `reason: "deferred"`** with the journal `record` id in
+  their `--json` payload. A deferred **create** returns the same null shape as `--dry-run`
+  (`jira_key: null`) and **never** a placeholder key — a placeholder would break the idempotent
+  `synced-from-*` label search and make the next unrestricted run create a duplicate. A deferred
+  **update** returns the real key with `jira_last_synced_at: null`, and the local file is left
+  untouched, because a Change Log row saying the issue was updated when it was not is precisely the
+  drift this sequence exists to remove.
+
+- **The resolver's `PARTIALLY ENFORCED` notice names Jira as covered and GitHub as the remaining
+  gap.** A warning that overstates coverage is worse than none.
+
+- **The access gates resolve the mode from both environment names**, `ACCESS_TRACKER` (the resolver's
+  output) and `AGENT_SKILLS_ACCESS_TRACKER` (the knob an operator sets), most-restrictive-wins, in one
+  place rather than four hand-rolled copies. Reading only the first left the sprint and epic-creator
+  gates inert under exactly the bare invocations their own SKILL.md documents.
+
+  **`access.tracker` in `skills-config.yaml` is not read by the JavaScript gates yet.** A config tier
+  has to agree with `read-config.sh` on every input — its discovery rules, its strict subset, its
+  refusals — and a second implementation of those in JavaScript diverged high-severity in every review
+  round it survived. It is task.61, with parity as its explicit subject. Until then a config-declared
+  restriction reaches these gates through a shell that sourced the resolver, which is what every
+  pipeline path already does.
+
+- **`access:` in `skills-config.yaml` declares how much access the agent has to each system**, resolved into `ACCESS_TRACKER` / `ACCESS_VCS` by `resolve-platform.sh` alongside the existing `TRACKER` / `VCS`. Five values per system — `full` (default) · `read-only` · `approve` · `command` · `manual`. This is the vocabulary for the restricted-tracker-access sequence, for consumers whose security team will not issue a tracker write token to a locally running agent.
+
+  **It ships no behaviour change on its own.** Nothing intercepts a mutation yet; setting `access: {tracker: manual}` resolves the variable and changes nothing else. It lands first, and separately, to fix the output contract before any caller depends on it — and because it closes a live bug on the way.
+
+  Identity stays a separate axis from access. `tracker:` answers *which* system, `access.tracker` answers *how much the agent may do to it*. Collapsing them into `tracker: manual` would discard exactly the information the feature depends on: emitting "move RAPP-605 to In Review" needs to know it is Jira.
+
+  Access resolves **most-restrictive-wins** across config and `AGENT_SKILLS_ACCESS_TRACKER`, against the order `manual < command < approve < read-only < full` — a deliberate departure from the config → env → detect order used for identity. Picking the wrong tracker is a mistake; picking the wrong access is an escalation. A run or a CI environment can lock itself down without editing committed config, and a stray env var can never loosen a config that deliberately restricts.
+
+### Fixed
+
+- **The no-dependency config reader now refuses YAML it cannot parse, instead of reading it as absent.** `read-config.sh` reads `skills-config.yaml` through two tiers: `python3` + `pyyaml`, a real parser, and `awk`, a set of anchored line regexes. The awk tier had exactly two answers — *a value* and *absent* — so everything it could not read fell into the second one. For `access:` absent means `full`, which made a restriction written with a merge key, an anchor, a quoted key, a space before the colon or a multi-line flow mapping resolve to **no restriction at all**: on a well-formed file, at exit 0, with nothing printed, while the pyyaml tier read the declared value.
+
+  That tier is not a rare fallback. **It is the default tier on a stock macOS host**, where `/usr/bin/python3` ships without `pyyaml`, so the tier consumers run is the one that was wrong.
+
+  Tier 2 now has a documented strict subset and a third answer. Constructs are judged by one question — *can this change what one of the keys the reader consumes resolves to, relative to what its own line says?* The **aliasing family** (anchor, alias, merge key, multi-line flow mapping, explicit tag, BOM, document separator) can, and is refused **file-wide**, because a line-oriented scanner cannot bound which key an alias reaches. **Key-spelling constructs** (a quoted key, a space before the colon, an explicit `? key`) change only the key they spell, and are refused only when that key is one the reader consumes. Everything else — nesting at **any** depth, block sequences, flow sequences, sequences of mappings, block scalars — is read from its own line, cannot mislead, and is never refused. Full tables with examples: [`platform-detection.md`](shared/resources/platform-detection.md) → *Tier 2 — the strict subset*.
+
+  **A duplicated key is refused too, for the consumed keys.** YAML resolves a duplicate last-wins; tier 2's block matcher takes the *first* match and stops. A copy-pasted second `access:` block therefore resolved to whichever value came first — and when that was the permissive one, a config whose author plainly meant the second block granted more than it declared, at exit 0, while tier 1 rejected the shape outright. It is the same defect tier 1's duplicate-key guard was added for.
+
+  A shape-based subset was drafted first and rejected at review: "nothing deeper than two levels" would have refused this project's own documented example config. That config is now a test fixture, derived from the doc at run time so it cannot drift.
+
+  **The refusal fires from one site above the identity block**, and the position is the point rather than a detail. Identity resolves first, so a refusal raised in the access path would never print — `read_config_key tracker` would return the sentinel and enum validation would halt first with *"`__UNSUPPORTED__` is not a recognised value"*: no line, no construct, neither way out. The message an operator actually sees is the entire migration path for the breaking change, so the suite asserts its stderr text rather than the exit code. It reads the scan's verdict directly and never a reader's stdout, so a config whose value *spells* the sentinel stays data and is rejected by validation like any other bad value.
+
+  **Breaking on a host without `pyyaml`:** a config using one of the refused constructs used to resolve to defaults at exit 0 and now halts, naming the line, the construct, and two ways forward — rewrite in the subset, or `pip install pyyaml`, which accepts the file as written. Breaking in the correct direction, but breaking. A file that provably declares no `access` still warns and degrades, exactly as a malformed file always has: the default for access is `full` and must fail closed, while the default for identity is *detection*, which is the documented behaviour rather than a guess.
+
+- **A mapping-valued `access.tracker` is refused on both tiers.** `access:` → `tracker:` → `mode: manual` — an ordinary nesting typo — resolved to `full` at exit 0 under `pyyaml` too, so this was never an awk problem: the parser read it correctly and the strict reader then collapsed its "this is a mapping" signal into the same empty string it uses for "not configured". `__NONE__` and `__MAP__` are now different answers. A genuine null still reads as absent, because the key really is not configured.
+
+- **A parse failure now names its cause.** The reader collapsed every exception to a bare `__ERR__`, so the halt had to enumerate the three parser-legal-but-silent shapes it rejects and leave the operator to work out which was theirs. The signal carries `<line>:<reason>` — the YAML exception's position and message, or the strict loader's own message naming the offending key — sanitised to one line of printable ASCII **before** framing, so it travels the same hardened transport as any value and a reason that cannot be framed is dropped rather than injected. The enumerated list is retired.
+
+  Together these close LIMIT-1 and LIMIT-2, recorded as deferred in task.51 with the condition that LIMIT-1 be closed before any skill gates a mutation on `ACCESS_TRACKER`. `tracker-access.test.sh` grew from 285 to 348 assertions: the `§41 KNOWN LIMIT` block is deleted with all four of its fixtures migrated into a refusal matrix rather than repaired back to the escalating values, `§30`'s awk arm is inverted deliberately, and the subset scan is exercised under `gawk` and `mawk` (both now installed in CI) as well as macOS BWK awk, under `bash` and `zsh`, and on a host with the Python interpreters shimmed away entirely.
+
+- **An unrecognised `tracker:` or `vcs:` value now halts instead of silently meaning `github`.** `read_config_key` returned any value verbatim and every downstream branch was `if TRACKER = jira … else … github`, so `tracker: jria` resolved to **github** and the run pushed to the wrong system without a word. Legal sets are validated **per key** — `tracker` is `{jira, github, auto}`, `vcs` is `{github, bitbucket, auto}` — because one shared set would accept `tracker: bitbucket` and `vcs: jira`, misconfigurations of exactly the class being closed.
+
+  A **mapping**-valued `tracker:` is the documented `tracker.workflowFile` form, not a typo, and resolves as `auto`. The two parser tiers disagreed on it natively (pyyaml returned the dict, awk returned empty); strict validation would have made that disagreement fatal on precisely the machines where tier 1 runs, so it is now asserted under both tiers.
+
+- **All 16 resolver call sites are guarded with `|| exit 1`.** A validator that writes to stderr and returns non-zero halts nothing unless a caller checks, and none of them did — so shipping validation alone would have reproduced the silent-permissive failure it exists to prevent, by a different route. The canonical snippet in `platform-detection.md` now shows the guarded form so new skills inherit it.
+
+- **The nested-config reader's tier-1 probe now finds `python3`.** `read_nested_config_key` invoked a bare `python`, which macOS has not shipped since 12.3, so tier 1 was dead on most machines and awk was silently the only tier. The reader is extracted to `shared/resources/read-config.sh` and shared by both resolvers rather than duplicated — one copy, one place to fix.
+
+- **A malformed `skills-config.yaml` containing an `access:` line now halts** rather than degrading to defaults. The blanket degrade rule is right for identity, where the default is *detect*; for access the default is `full`, so the same rule would silently re-grant credentials on a truncated file. Consumers with no `access:` block are unaffected and still degrade exactly as before.
+
+  **Breaking, deliberately, in three places:** an out-of-domain `tracker:`/`vcs:` value halts; the resolver can now exit non-zero and 16 call sites propagate it; a malformed config with an `access:` line halts. A consumer with no `access:` block and a legal `tracker:`/`vcs:` is byte-identical to today.
+
+### Changed
+
+- **The repo is now Prettier-clean, and CI keeps it that way.** Adopting Prettier as policy in v0.39.0 deliberately stopped short of the repo-wide sweep — running it inside the very PR that documented why not to bury a functional change would have been self-refuting. The consequence was that `npm run format:check` failed on **50 files** from the day it was added and nothing enforced the policy it described. A check that has never once passed is not a check.
+
+  This sweeps them, plus the **56** `skills/*/references/` copies that `npm run bundle` regenerates from the now-formatted shared sources — 106 files, as an isolated `style:` commit that a reviewer can skip in one keystroke. Order is load-bearing: `format` then `bundle`. The bundled copies are `.prettierignore`d so the formatter skips them; they must be reached by regenerating from their formatted sources, never by formatting the copy, because formatting a copy independently of its source is how the two drift.
+
+  **No behaviour changes, proven rather than asserted.** Both the pre- and post-sweep version of all 106 files were normalised through Prettier in-process and compared: zero functional deltas. `npm test` is 1287/1287 either side, `validate:all` 115/115, and a second `npm run bundle` is a no-op.
+
+  `npm run format:check` is now a step in the Test workflow, placed after `npm ci` and before the suite so a formatting failure costs seconds rather than a full run plus the replay evals. The gate was verified to bite before being trusted: a deliberate violation exits 1 and names the file.
+
+- **`.git-blame-ignore-revs` added**, so reformatting churn drops out of `git blame` — verified, not assumed: `gh-stage.js` goes from 113 lines attributed to the earlier `style(gh-stage)` reformat to 0, and `change-log.js` from 25 attributed to this sweep to 0.
+
+  It also lists the **two mixed commits**, `ee12ab7` (v0.29.5) and `08c917b` (task.46), each of which interleaves a whole-file reformat with real functional work. That is a deliberate exception to the file's own rule, taken on measured grounds: across the four affected Jira files those commits held **2,376 lines** of blame attribution, of which roughly **296** are functional. Excluding them left blame technically accurate and practically useless on exactly the files [#179](https://github.com/Gamaroff/agent-skills/issues/179) complained about. Including them drops the attribution to **77 lines** — a 97% reduction, with the residue being additions git cannot re-attribute, which are close to the functional core.
+
+  **The cost is real and bounded**, and the file says so: those ~296 functional lines now attribute to whichever commit last touched the surrounding region, which is wrong. The header carries the `git show` commands that recover the true provenance. The general rule is unchanged — a reformat belongs in its own commit — and nothing further should be added there without measuring the same ratio.
+
+- **`CONTRIBUTING.md` now states the rule the tooling cannot enforce.** A formatter config settles *which* style wins; it does nothing about a reformat being bundled into a functional commit, which is what actually made two diffs unreviewable — the second landing while the issue describing the first was still open. Run `npm run format` as its own `style:` commit.
+
 ## [v0.42.0] - 2026-08-17
 
 ### Changed
@@ -670,6 +1026,8 @@ Four defects in Jira sync, every one of which **reported success while publishin
 - **`assignee: TBD` shipped in the task template, and the sync passed it to Jira verbatim as an accountId.** Every task card created the intended way and then synced came back `HTTP 400` with nothing in the message naming the cause — the template and the tool disagreed, again, and the failure pointed nowhere. `create-task/scripts/lib.js` made it worse by listing `assignee` as a **required** answer and substituting it unvalidated; its own test asserted `assignee: platform-team`, a team name, which would have failed identically. Now: the template ships the key with a **blank** value and a comment stating it must be an accountId; `populateTaskTemplate` no longer requires it and only substitutes when one is supplied; and `resolveAssignee` refuses a placebo list (`TBD`, `TBA`, `none`, `unassigned`, `unset`, `todo`, `n/a`, `na`, `-`, `?`, case- and whitespace-insensitive) in **either** frontmatter or config, warning with the reason and the three ways to fix it instead of letting Jira reject it. A frontmatter placeholder falls through to the configured default rather than aborting. Two guard tests added: one asserts the shipped template value is blank, one asserts omitting the answer leaves the key present and empty.
 
 ## [v0.29.5] - 2026-07-29
+
+> **Note added 2026-08-17.** This release also contains a whole-file Prettier reformat of `shared/resources/jira-sync.js` and `skills/sync-jira-epic/scripts/*.js` that is unrelated to the fixes below and was not declared at the time. The release commit (`ee12ab7`) carries **5,669 insertions**; roughly **40** of them are the functional change described here. The reformat came from a contributor's editor hook at a point when this repo had no formatter config of its own, so the style applied was not the project's. Nothing is broken by it — Prettier is deterministic and the suite was green — but the diff cannot be reviewed at a glance, and `git bisect` / `git log -L` over `jira-sync.js` hit a wall at this commit. Prettier was subsequently adopted as repo policy in v0.39.0, and the repo swept to match under task.59 — see the `Unreleased` entry at the top of this file. Issue: [#179](https://github.com/Gamaroff/agent-skills/issues/179).
 
 ### Fixed
 

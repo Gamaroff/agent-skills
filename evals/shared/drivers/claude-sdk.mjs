@@ -57,7 +57,8 @@ const driver = {
     } catch {
       return {
         ok: false,
-        reason: "@anthropic-ai/claude-agent-sdk not installed (npm i -D @anthropic-ai/claude-agent-sdk)",
+        reason:
+          "@anthropic-ai/claude-agent-sdk not installed (npm i -D @anthropic-ai/claude-agent-sdk)",
       };
     }
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -74,7 +75,9 @@ const driver = {
     const remaining = ctx.answers.slice();
 
     function findAnswerFor(questionText) {
-      const idx = remaining.findIndex(a => new RegExp(a.matches, "i").test(questionText));
+      const idx = remaining.findIndex((a) =>
+        new RegExp(a.matches, "i").test(questionText),
+      );
       if (idx < 0) return null;
       const [hit] = remaining.splice(idx, 1);
       return hit.answer;
@@ -104,7 +107,8 @@ const driver = {
           for (const qn of questions) {
             const a = findAnswerFor(qn.question);
             // If no scripted match, pick the first option (recommended).
-            answers[qn.question] = a || (qn.options[0] && qn.options[0].label) || "";
+            answers[qn.question] =
+              a || (qn.options[0] && qn.options[0].label) || "";
           }
           return { behavior: "allow", updatedInput: { questions, answers } };
         },
@@ -115,7 +119,9 @@ const driver = {
     // run against the artefacts the agent wrote to ctx.sandbox.
     for await (const msg of q) {
       if (msg.type === "result" && msg.subtype !== "success") {
-        throw new Error(`claude-sdk query failed: ${msg.subtype} — ${msg.error || "unknown"}`);
+        throw new Error(
+          `claude-sdk query failed: ${msg.subtype} — ${msg.error || "unknown"}`,
+        );
       }
     }
 
