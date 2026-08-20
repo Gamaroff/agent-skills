@@ -36,6 +36,45 @@ All notable changes to this project will be documented in this file. Format foll
   (`tests/restricted-access-docs.test.js`) asserts modes, examples, indexes, and
   honest not-shipped labelling.
 
+- **`tracker-issue.js` — a CLI for the mutations that return a value, and an honest answer to the
+  empty capture.** `tracker_write` is the right chokepoint for the ~38 `gh` mutations nobody
+  captures: it refuses the call, records it, warns on stderr, and returns 0. For a call whose value
+  the caller binds — `ISSUE=$(gh issue create …)` — that is exactly wrong. The capture comes back
+  empty and the caller writes nothing, or garbage, into a document's frontmatter. A shell function
+  cannot both refuse a call and return the value the call would have produced, so these six calls
+  get a CLI rather than another wrapper arm.
+
+  New `shared/resources/tracker-issue.js` is the fourth peer of `jira-stage.js` / `gh-stage.js` /
+  `tracker-comment.js` — same `--json` `{reason}` contract, same exit codes, same access gate above
+  the first network call. Its one deliberate divergence is that **stdout is the value channel**: the
+  produced number goes there and every notice goes to stderr, so a caller's `$( )` captures the
+  value or nothing, never a sentence. `--kind` covers create / edit / close / reopen / milestone /
+  sub-issue-link; the sub-issue link records as **one** composite record because its fetch-then-mutate
+  pair yields two checklist items neither of which a human can perform alone.
+
+  **No placeholder is ever written.** Not `github_issue: 0`, not `<pending>`. A wrong key defeats the
+  idempotent `synced-from-*` search that stops the *next* run creating a duplicate, so it converts a
+  recoverable state into a permanent one. Instead a value-producing kind records `blocking: true` —
+  a **new record field** — and the checklist opens with a banner naming the **two-run convergence**:
+  perform the action, write the value into the document, re-run. The middle step is the one that is
+  easy to skip and skipping it is silent, so `docs/reference/troubleshooting.md` carries it under the
+  symptom a consumer would actually search for: *"I re-ran it and it did nothing again."*
+
+  The roster gains a 23rd kind, `github.milestone.create` — milestone creation is a *create*, not a
+  case of `github.issue.edit`, because it yields a number a dependant consumes. 28 bare call sites
+  are routed, and `tests/mutation-call-site-coverage.test.js` keeps the count a maintained number
+  rather than a one-off audit: it found two bare `gh issue comment` sites on its first run that the
+  manual audit had miscounted as covered.
+
+- **A repo-wide heredoc defect, found while fixing two of its instances.** Eight bash blocks in
+  canonical prose closed a heredoc with an *indented* terminator (`   EOF`), which bash does not
+  accept: it warns "delimited by end-of-file" and swallows everything after it into the body. In
+  every case what it swallowed was the `tracker-comment.js` call on the next line — so the comment
+  was never posted, the issue was never closed, and the run reported success. Two were introduced by
+  the task above; six were already present, in the Jira-path blocks of `create-pr`, `finalise`,
+  `review-story`, `review-task` and two pipeline step docs. All eight are fixed, and §5 of the new
+  guard blocks the class.
+
 - **`tracker-comment.js` — a comment endpoint that did not exist, and one call site instead of two
   dozen.** `jira-sync.js` had no comment function at all, so *every* Jira comment in this repository
   was an `addCommentToJiraIssue` MCP call an agent made by following prose, and every GitHub issue

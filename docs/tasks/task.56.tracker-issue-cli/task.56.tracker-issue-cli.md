@@ -5,11 +5,13 @@ type: task
 description: 'Consolidates the last prose-driven tracker mutations — GitHub issue create, edit, close, reopen, milestone and sub-issue link — behind a tracker-issue.js CLI on the same reason contract as its siblings. Also confronts the class this sequence has deferred: mutations whose stdout the caller consumes. Wrapping gh issue create under a deferring mode returns nothing and the caller captures empty. The resolution is a dependency edge and an honest two-run convergence, not a fabricated placeholder key, because a placeholder written to frontmatter would defeat the idempotent create guard on the next run.'
 tags: [restricted-access, github, issues, cli]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: high
 created: 2026-08-17
 updated: 2026-08-20
+completed_date: 2026-08-20
+pr_number: 265
 estimated_effort_hours: 12
 github_issue: 234
 ---
@@ -24,7 +26,7 @@ github_issue: 234
 
 **GitHub Issue**: [#234](https://github.com/Gamaroff/agent-skills/issues/234)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Review**: ✅ All review recommendations from `task.56.review.1.tracker-issue-cli.md` implemented 2026-08-19
 
@@ -346,6 +348,32 @@ The builder drops empty label values.
 Nothing. Every scope item landed, including the six board sites the review
 brought in.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**PR**: [#265](https://github.com/Gamaroff/agent-skills/pull/265) · **CI**: SUCCESS (4/4 on `52299a7` = HEAD)
+**Final QA Gate**: PASS (94/100) · **QA Cycles**: 5
+
+All Definition of Done criteria verified:
+
+- ✅ **Success Criteria** — 10/10, each with code **and** test citations; every cited test runs in the per-PR lane
+- ✅ **Tests** — 1584 passing (1544 on `develop` → +40); `validate:all` 115/115; prettier clean
+- ✅ **CI** — 4/4 jobs green on the branch HEAD, not an ancestor commit
+- ✅ **Security** — argv arrays with no shell, bodies on stdin (regression-tested with a `$(…)` payload), gate provably makes no network call under any restricted mode, records redacted on write and on render
+- ✅ **Compliance** — 8 repo conventions verified; 156 bundled copies byte-in-sync; 4 statutory areas N/A with reasoning
+- ✅ **Documentation** — CLI contract verified *against the implementation*, not merely present; the three coverage notices agree with each other and with reality
+
+**Two gaps were found by this verification and closed rather than waived:** a missing CHANGELOG
+entry (the sibling task.55 set the precedent), and an unchecked slug reaching a recorded `bash -c`
+string — advisory per the reviewer, fixed because a generated script an operator runs is a mutation
+path.
+
+**Detailed Verification Log:** see [`task.56.dod.1.tracker-issue-cli.md`](./task.56.dod.1.tracker-issue-cli.md)
+for full evidence, citations and the two caveats recorded rather than smoothed over.
+
+**Task marked as ACCEPTED on:** 2026-08-20
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -386,6 +414,7 @@ them. The indented-heredoc defect proved repo-wide: two introduced here, six alr
 | 2026-08-20 |  | Implemented — tracker-issue.js + 23rd roster kind + blocking banner; 28 call sites routed; repo-wide guard added | develop |
 | 2026-08-20 |  | QA gate FAIL (70/100) — 3 high, 6 medium, 2 low | qa-task |
 | 2026-08-20 |  | QA cycles 2–5 — 25 defects fixed; gate PASS (94/100), 1583 tests | qa-task |
+| 2026-08-20 | 1.2 | DoD verified — accepted (PR #265). CHANGELOG entry and slug shape check added during verification | finalise |
 
 ## References
 

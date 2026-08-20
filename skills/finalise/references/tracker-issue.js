@@ -319,13 +319,26 @@ function gh(execImpl, argv, cwd = undefined) {
  *
  * An explicit --repo always wins.
  */
+/**
+ * Is this a slug we are willing to interpolate into a command?
+ *
+ * GitHub owner and repository names are drawn from [A-Za-z0-9._-]; anything else
+ * did not come from GitHub, and the one place a slug reaches a shell STRING (the
+ * recorded sub-issue-link `bash -c`) is exactly where a metacharacter would
+ * matter.
+ */
+function isSlugShaped(slug) {
+  return /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(String(slug || ""));
+}
+
 function repoSlug(explicit, env = process.env, cwd = undefined) {
   if (explicit) return explicit;
   // gh documents GH_REPO as `[HOST/]OWNER/REPO`; a three-segment value would
   // break every `/repos/${slug}/…` path built from it, so take the last two.
   if (env.GH_REPO) {
     const parts = String(env.GH_REPO).split("/").filter(Boolean);
-    if (parts.length === 2) return parts.join("/");
+    if (parts.length === 2)
+      return isSlugShaped(parts.join("/")) ? parts.join("/") : "";
     if (parts.length === 3) {
       // `[HOST/]OWNER/REPO`. Discarding the host unconditionally was the
       // previous behaviour and it let `GH_REPO=ghe.corp/acme/repo` with GH_HOST
@@ -334,7 +347,8 @@ function repoSlug(explicit, env = process.env, cwd = undefined) {
       // exists to stop, entering through a different door.
       const ghHost = (env.GH_HOST || "").trim();
       if (parts[0] === "github.com" || (ghHost && parts[0] === ghHost)) {
-        return parts.slice(-2).join("/");
+        const tail = parts.slice(-2).join("/");
+        return isSlugShaped(tail) ? tail : "";
       }
       return "";
     }
@@ -380,7 +394,15 @@ function repoSlug(explicit, env = process.env, cwd = undefined) {
     if (!hostOk) return "";
 
     const m = /[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url);
-    return m ? `${m[1]}/${m[2]}` : "";
+    if (!m) return "";
+    // Constrain the SHAPE, not just the host. The slug is interpolated into the
+    // recorded sub-issue-link `bash -c` string, and handover-render.js quotes
+    // that string as ONE argv element — quoting protects the rendering, not the
+    // script inside it. So a hostile `origin` such as
+    // `https://github.com/o/n$(cmd)` would execute if an operator ran the
+    // generated handover script. GitHub owner and repo names are
+    // [A-Za-z0-9._-] anyway, so this rejects nothing real.
+    return isSlugShaped(`${m[1]}/${m[2]}`) ? `${m[1]}/${m[2]}` : "";
   } catch (_) {
     return "";
   }
@@ -1105,6 +1127,13 @@ function run({
       );
       return { exitCode: 2 };
     }
+    if (!isSlugShaped(args.repo)) {
+      output.err(
+        `Error: --repo "${args.repo}" contains characters GitHub owner/repo names ` +
+          `do not use. Allowed: letters, digits, dot, underscore, hyphen.`,
+      );
+      return { exitCode: 2 };
+    }
   }
 
   // `gh issue close --reason` accepts only these three spellings. The sync
@@ -1300,6 +1329,7 @@ module.exports = {
   ghMilestoneArgv,
   KINDS,
   KIND_NAMES,
+  isSlugShaped,
   USAGE,
 };
 

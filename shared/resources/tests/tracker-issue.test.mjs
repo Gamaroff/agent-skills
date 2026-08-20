@@ -1247,3 +1247,43 @@ test("§11 no kind emits a placeholder slug via repoFlag", () => {
     }
   }
 });
+
+test("§11 a slug with shell metacharacters is refused, from every source", () => {
+  // The slug is interpolated into the RECORDED sub-issue-link `bash -c` string,
+  // and handover-render.js quotes that whole string as ONE argv element —
+  // quoting protects the rendering, not the script inside it. So a hostile
+  // `origin` like https://github.com/o/n$(cmd) would execute when an operator
+  // ran the generated handover script. GitHub owner/repo names are
+  // [A-Za-z0-9._-], so this rejects nothing real.
+  assert.ok(cli.isSlugShaped("acme/repo"));
+  assert.ok(cli.isSlugShaped("acme/my.repo.js"), "dots are legal in repo names");
+  for (const bad of ["o/n$(cmd)", "o/`id`", "a b/c", "x/y;z", "o/n|w", "o/n&w"]) {
+    assert.ok(!cli.isSlugShaped(bad), `${bad} must be refused`);
+  }
+
+  // From the git remote: refused, so the record carries no command at all.
+  const dir = withRepo();
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  execFileSync(
+    "git",
+    ["remote", "add", "origin", "https://github.com/o/n$(touch /tmp/pwned).git"],
+    { cwd: dir },
+  );
+  run(dir, ["--kind", "sub-issue-link", "--issue", "42", "--parent", "7"], {
+    ACCESS_TRACKER: "manual",
+  });
+  const rec = readJournal(dir)[0];
+  assert.equal(
+    rec.command,
+    null,
+    "a slug we will not vouch for yields no command, rather than one that " +
+      "executes something when the operator runs the handover script",
+  );
+
+  // And from --repo: a usage error, caught locally.
+  assert.equal(
+    run(dir, ["--kind", "milestone", "--title", "M", "--repo", "o/n$(cmd)"])
+      .exitCode,
+    2,
+  );
+});

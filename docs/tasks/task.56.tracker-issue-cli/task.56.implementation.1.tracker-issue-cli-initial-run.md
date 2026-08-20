@@ -35,7 +35,7 @@ First automated pipeline run for task 56 — build `shared/resources/tracker-iss
 | 2. review-task             | ✅ Done    | `task.56.review.{N}.{name}.md` exists (or skip logged)                 | `task.56.review.1.tracker-issue-cli.md` — 8.5/10 READY TO IMPLEMENT; 3 critical + 5 important fixed in place; status promoted | 2 Explore pre-pass agents (arch alignment: drift; codebase scan: not-started) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 9 phases; 1564 tests pass, validate:all 115/115, prettier clean, bundle committed | Explore pre-develop surface map |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #265 → develop; 4 commits; issue commented; board in-review `stage-disabled` (correct) | PR body summariser (inline) |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.56.qa.{N}.*.md`; `task.56.gate.{N}.*.yml`; PR comment posted     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.56.qa.{N}.*.md`; `task.56.gate.{N}.*.yml`; PR comment posted     | 5 cycles: gate 1 FAIL (70) → gate 2 PASS (94); 25 defects fixed | 5 Explore code-review agents |
 | 7. finalise                | ⏳ Pending | `task.56.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -121,7 +121,24 @@ First automated pipeline run for task 56 — build `shared/resources/tracker-iss
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+| Cycle | Outcome | Found |
+| ----- | ------- | ----- |
+| 1 | **FAIL** (70/100) | 3 high, 6 medium, 2 low. Two indented heredocs silently swallowing tracker calls; an issue URL built from two never-assigned variables |
+| 2 | fixes | The cycle-1 slug fix was a **regression**: dropping `gh repo view` lost fork / `set-default` resolution, so a fork clone would create issues in the wrong repo. Two guards found vacuous |
+| 3 | fixes | The replacement resolver ran `gh` against `process.cwd()` — the exact hazard the local reader documents and guards against |
+| 4 | fixes | Anchoring the resolvers was not enough: every perform-path exec ran with no `cwd`, so a slugless `close` mutated whatever repo the process was in and reported success. `--repo` had no validation but outranked every validated source |
+| 5 | **PASS** (94/100) | No production defect with a named trigger and an observable wrong outcome. 192-run sweep: 0 network calls, 0 stdout bytes, 0 malformed records |
+
+**The finding worth carrying forward:** this was *one* hazard, not four. The wrong-repo
+failure re-emerged one layer below each fix — record → resolver → resolver's cwd → every
+exec below it. Each cycle fixed where it had been seen and the next found where it had
+moved. A fix that closes a symptom at the layer it surfaced is not evidence the class is
+closed.
+
+**Second:** four tests were vacuous, each caught by reverting the behaviour they named
+rather than by reading them. One guarded this CLI's entire contract — that stdout carries
+the issue number a caller binds — by asserting the JSON payload instead. Reading a test
+does not tell you whether it would fail.
 
 ---
 
@@ -131,5 +148,5 @@ _Track each QA review/fix cycle._
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.56.tracker-issue-cli`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/265
-**QA Iterations**: {populated at end}
+**QA Iterations**: 5 (gate 1 FAIL 70/100 → gate 2 PASS 94/100)
 **DoD Summary**: {populated after Step 7}
